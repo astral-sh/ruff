@@ -1,23 +1,16 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 ---
-D214_module.py:1:1: D214 [*] Section is over-indented ("Returns")
-   |
- 1 | / """A module docstring with D214 violations
- 2 | | 
- 3 | |     Returns
- 4 | | -----
- 5 | |     valid returns
- 6 | | 
- 7 | |     Args
- 8 | | -----
- 9 | |     valid args
-10 | | """
-   | |___^ D214
-11 |   
-12 |   import os
-   |
-   = help: Remove over-indentation from "Returns"
+D214_module.py:3:5: D214 [*] Section is over-indented ("Returns")
+  |
+1 | """A module docstring with D214 violations
+2 | 
+3 |     Returns
+  |     ^^^^^^^ D214
+4 | -----
+5 |     valid returns
+  |
+  = help: Remove over-indentation from "Returns"
 
 ℹ Safe fix
 1 1 | """A module docstring with D214 violations
@@ -28,23 +21,16 @@ D214_module.py:1:1: D214 [*] Section is over-indented ("Returns")
 5 5 |     valid returns
 6 6 | 
 
-D214_module.py:1:1: D214 [*] Section is over-indented ("Args")
-   |
- 1 | / """A module docstring with D214 violations
- 2 | | 
- 3 | |     Returns
- 4 | | -----
- 5 | |     valid returns
- 6 | | 
- 7 | |     Args
- 8 | | -----
- 9 | |     valid args
-10 | | """
-   | |___^ D214
-11 |   
-12 |   import os
-   |
-   = help: Remove over-indentation from "Args"
+D214_module.py:7:5: D214 [*] Section is over-indented ("Args")
+  |
+5 |     valid returns
+6 | 
+7 |     Args
+  |     ^^^^ D214
+8 | -----
+9 |     valid args
+  |
+  = help: Remove over-indentation from "Args"
 
 ℹ Safe fix
 4 4 | -----
@@ -55,5 +41,3 @@ D214_module.py:1:1: D214 [*] Section is over-indented ("Args")
 8 8 | -----
 9 9 |     valid args
 10 10 | """
-
-

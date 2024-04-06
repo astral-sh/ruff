@@ -7,34 +7,41 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for union annotations that contain redundant numeric types (e.g.,
-/// `int | float`).
+/// Checks for parameter annotations that contain redundant unions between
+/// builtin numeric types (e.g., `int | float`).
 ///
 /// ## Why is this bad?
-/// In Python, `int` is a subtype of `float`, and `float` is a subtype of
-/// `complex`. As such, a union that includes both `int` and `float` is
-/// redundant, as it is equivalent to a union that only includes `float`.
+/// The [typing specification] states:
 ///
-/// For more, see [PEP 3141], which defines Python's "numeric tower".
+/// > Python’s numeric types `complex`, `float` and `int` are not subtypes of
+/// > each other, but to support common use cases, the type system contains a
+/// > straightforward shortcut: when an argument is annotated as having type
+/// > `float`, an argument of type `int` is acceptable; similar, for an
+/// > argument annotated as having type `complex`, arguments of type `float` or
+/// > `int` are acceptable.
 ///
-/// Unions with redundant elements are less readable than unions without them.
+/// As such, a union that includes both `int` and `float` is redundant in the
+/// specific context of a parameter annotation, as it is equivalent to a union
+/// that only includes `float`. For readability and clarity, unions should omit
+/// redundant elements.
 ///
 /// ## Example
 /// ```python
-/// def foo(x: float | int) -> None:
+/// def foo(x: float | int | str) -> None:
 ///     ...
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// def foo(x: float) -> None:
+/// def foo(x: float | str) -> None:
 ///     ...
 /// ```
 ///
 /// ## References
-/// - [Python documentation: The numeric tower](https://docs.python.org/3/library/numbers.html#the-numeric-tower)
+/// - [The typing specification](https://docs.python.org/3/library/numbers.html#the-numeric-tower)
+/// - [PEP 484: The numeric tower](https://peps.python.org/pep-0484/#the-numeric-tower)
 ///
-/// [PEP 3141]: https://peps.python.org/pep-3141/
+/// [typing specification]: https://typing.readthedocs.io/en/latest/spec/special-types.html#special-cases-for-float-and-complex
 #[violation]
 pub struct RedundantNumericUnion {
     redundancy: Redundancy,
@@ -90,11 +97,11 @@ fn check_annotation(checker: &mut Checker, annotation: &Expr) {
     let mut has_int = false;
 
     let mut func = |expr: &Expr, _parent: &Expr| {
-        let Some(call_path) = checker.semantic().resolve_call_path(expr) else {
+        let Some(qualified_name) = checker.semantic().resolve_qualified_name(expr) else {
             return;
         };
 
-        match call_path.as_slice() {
+        match qualified_name.segments() {
             ["" | "builtins", "int"] => has_int = true,
             ["" | "builtins", "float"] => has_float = true,
             ["" | "builtins", "complex"] => has_complex = true,

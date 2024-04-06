@@ -29,7 +29,7 @@ use crate::checkers::ast::Checker;
 /// into the remainder of the enclosing loop.
 ///
 /// While this mistake is easy to spot in small examples, it can be hidden
-/// in larger blocks of code where the definition and redefinition of the
+/// in larger blocks of code, where the definition and redefinition of the
 /// variable may not be visible at the same time.
 ///
 /// ## Example
@@ -305,6 +305,7 @@ fn assignment_targets_from_expr<'a>(
             ctx: ExprContext::Store,
             elts,
             range: _,
+            parenthesized: _,
         }) => Box::new(
             elts.iter()
                 .flat_map(|elt| assignment_targets_from_expr(elt, dummy_variable_rgx)),

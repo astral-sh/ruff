@@ -7,3 +7,9 @@
 
 # Jupyter
 /crates/ruff_linter/src/jupyter/ @dhruvmanila
+/crates/ruff_formatter/ @MichaReiser
+/crates/ruff_python_formatter/ @MichaReiser
+/crates/ruff_python_parser/ @MichaReiser
+
+# flake8-pyi
+/crates/ruff_linter/src/rules/flake8_pyi/ @AlexWaygood

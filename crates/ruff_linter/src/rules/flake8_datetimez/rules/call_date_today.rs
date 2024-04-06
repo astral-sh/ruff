@@ -18,7 +18,7 @@ use crate::checkers::ast::Checker;
 /// always use timezone-aware objects.
 ///
 /// `datetime.date.today` returns a naive datetime object. Instead, use
-/// `datetime.datetime.now(tz=).date()` to return a timezone-aware object.
+/// `datetime.datetime.now(tz=...).date()` to create a timezone-aware object.
 ///
 /// ## Example
 /// ```python
@@ -49,10 +49,11 @@ pub struct CallDateToday;
 impl Violation for CallDateToday {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!(
-            "The use of `datetime.date.today()` is not allowed, use \
-             `datetime.datetime.now(tz=).date()` instead"
-        )
+        format!("`datetime.date.today()` used")
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        Some("Use `datetime.datetime.now(tz=...).date()` instead".to_string())
     }
 }
 
@@ -63,8 +64,10 @@ pub(crate) fn call_date_today(checker: &mut Checker, func: &Expr, location: Text
 
     if checker
         .semantic()
-        .resolve_call_path(func)
-        .is_some_and(|call_path| matches!(call_path.as_slice(), ["datetime", "date", "today"]))
+        .resolve_qualified_name(func)
+        .is_some_and(|qualified_name| {
+            matches!(qualified_name.segments(), ["datetime", "date", "today"])
+        })
     {
         checker
             .diagnostics

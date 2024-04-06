@@ -288,13 +288,13 @@ ____aaa = 1111111111111111111111111111111111111111111111111111111111111111111111
 ## Breaking left
 
 # Should break `[a]` first
-____[
-    a
-] = aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbbbbbbbbvvvvvvvvvvv  # c
+____[a] = (
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbbbbbbbbvvvvvvvvvvv  # c
+)
 
-____[
-    a
-] = aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbbbbbbbbvvvvvvvvvvv  # cc
+____[a] = (
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbbbbbbbbvvvvvvvvvvv  # cc
+)
 
 (
     # some weird comments
@@ -352,9 +352,9 @@ ____a: a = (
 # 89 characters parenthesized (collapse)
 ____a: a = aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbbbbbbbbvvvvvvvvvvvv  # c
 
-_a: a[
-    b
-] = aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbbbbbbbbvvvvvvvvvvvv  # c
+_a: a[b] = (
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbbbbbbbbvvvvvvvvvvvv  # c
+)
 
 ## Augmented Assign
 
@@ -418,46 +418,6 @@ def test5():
 def test6():
     # 89 characters parenthesized (collapse)
     return aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbbbbbbbbvvvvvvvv  # c
-```
-
-
-## Preview changes
-```diff
---- Stable
-+++ Preview
-@@ -72,13 +72,13 @@
- ## Breaking left
- 
- # Should break `[a]` first
--____[
--    a
--] = aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbbbbbbbbvvvvvvvvvvv  # c
-+____[a] = (
-+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbbbbbbbbvvvvvvvvvvv  # c
-+)
- 
--____[
--    a
--] = aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbbbbbbbbvvvvvvvvvvv  # cc
-+____[a] = (
-+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbbbbbbbbvvvvvvvvvvv  # cc
-+)
- 
- (
-     # some weird comments
-@@ -136,9 +136,9 @@
- # 89 characters parenthesized (collapse)
- ____a: a = aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbbbbbbbbvvvvvvvvvvvv  # c
- 
--_a: a[
--    b
--] = aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbbbbbbbbvvvvvvvvvvvv  # c
-+_a: a[b] = (
-+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbbbbbbbbvvvvvvvvvvvv  # c
-+)
- 
- ## Augmented Assign
- 
 ```
 
 

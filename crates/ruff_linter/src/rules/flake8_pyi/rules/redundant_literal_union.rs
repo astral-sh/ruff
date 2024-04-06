@@ -13,30 +13,28 @@ use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
 
 /// ## What it does
-/// Checks for the presence of redundant `Literal` types and builtin super
-/// types in an union.
+/// Checks for redundant unions between a `Literal` and a builtin supertype of
+/// that `Literal`.
 ///
 /// ## Why is this bad?
-/// The use of `Literal` types in a union with the builtin super type of one of
-/// its literal members is redundant, as the super type is strictly more
-/// general than the `Literal` type.
-///
+/// Using a `Literal` type in a union with its builtin supertype is redundant,
+/// as the supertype will be strictly more general than the `Literal` type.
 /// For example, `Literal["A"] | str` is equivalent to `str`, and
-/// `Literal[1] | int` is equivalent to `int`, as `str` and `int` are the super
-/// types of `"A"` and `1` respectively.
+/// `Literal[1] | int` is equivalent to `int`, as `str` and `int` are the
+/// supertypes of `"A"` and `1` respectively.
 ///
 /// ## Example
 /// ```python
 /// from typing import Literal
 ///
-/// A: Literal["A"] | str
+/// x: Literal["A", b"B"] | str
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// from typing import Literal
 ///
-/// A: Literal["A"]
+/// x: Literal[b"B"] | str
 /// ```
 #[violation]
 pub struct RedundantLiteralUnion {
@@ -150,10 +148,7 @@ fn match_builtin_type(expr: &Expr, semantic: &SemanticModel) -> Option<ExprType>
 /// Return the [`ExprType`] of an [`Expr`] if it is a literal (e.g., an `int`, like `1`, or a
 /// `bool`, like `True`).
 fn match_literal_type(expr: &Expr) -> Option<ExprType> {
-    let Some(literal_expr) = expr.as_literal_expr() else {
-        return None;
-    };
-    let result = match literal_expr {
+    Some(match expr.as_literal_expr()? {
         LiteralExpressionRef::BooleanLiteral(_) => ExprType::Bool,
         LiteralExpressionRef::StringLiteral(_) => ExprType::Str,
         LiteralExpressionRef::BytesLiteral(_) => ExprType::Bytes,
@@ -165,6 +160,5 @@ fn match_literal_type(expr: &Expr) -> Option<ExprType> {
         LiteralExpressionRef::NoneLiteral(_) | LiteralExpressionRef::EllipsisLiteral(_) => {
             return None;
         }
-    };
-    Some(result)
+    })
 }

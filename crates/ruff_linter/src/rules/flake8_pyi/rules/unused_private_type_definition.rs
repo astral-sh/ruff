@@ -45,7 +45,7 @@ impl Violation for UnusedPrivateTypeVar {
 ///
 /// ## Why is this bad?
 /// A private `typing.Protocol` that is defined but not used is likely a
-/// mistake, and should either be used, made public, or removed to avoid
+/// mistake. It should either be used, made public, or removed to avoid
 /// confusion.
 ///
 /// ## Example
@@ -83,11 +83,11 @@ impl Violation for UnusedPrivateProtocol {
 }
 
 /// ## What it does
-/// Checks for the presence of unused private `typing.TypeAlias` definitions.
+/// Checks for the presence of unused private type aliases.
 ///
 /// ## Why is this bad?
-/// A private `typing.TypeAlias` that is defined but not used is likely a
-/// mistake, and should either be used, made public, or removed to avoid
+/// A private type alias that is defined but not used is likely a
+/// mistake. It should either be used, made public, or removed to avoid
 /// confusion.
 ///
 /// ## Example
@@ -125,7 +125,7 @@ impl Violation for UnusedPrivateTypeAlias {
 ///
 /// ## Why is this bad?
 /// A private `typing.TypedDict` that is defined but not used is likely a
-/// mistake, and should either be used, made public, or removed to avoid
+/// mistake. It should either be used, made public, or removed to avoid
 /// confusion.
 ///
 /// ## Example
@@ -195,17 +195,22 @@ pub(crate) fn unused_private_type_var(
         };
 
         let semantic = checker.semantic();
-        let Some(type_var_like_kind) = semantic.resolve_call_path(func).and_then(|call_path| {
-            if semantic.match_typing_call_path(&call_path, "TypeVar") {
-                Some("TypeVar")
-            } else if semantic.match_typing_call_path(&call_path, "ParamSpec") {
-                Some("ParamSpec")
-            } else if semantic.match_typing_call_path(&call_path, "TypeVarTuple") {
-                Some("TypeVarTuple")
-            } else {
-                None
-            }
-        }) else {
+        let Some(type_var_like_kind) =
+            semantic
+                .resolve_qualified_name(func)
+                .and_then(|qualified_name| {
+                    if semantic.match_typing_qualified_name(&qualified_name, "TypeVar") {
+                        Some("TypeVar")
+                    } else if semantic.match_typing_qualified_name(&qualified_name, "ParamSpec") {
+                        Some("ParamSpec")
+                    } else if semantic.match_typing_qualified_name(&qualified_name, "TypeVarTuple")
+                    {
+                        Some("TypeVarTuple")
+                    } else {
+                        None
+                    }
+                })
+        else {
             continue;
         };
 

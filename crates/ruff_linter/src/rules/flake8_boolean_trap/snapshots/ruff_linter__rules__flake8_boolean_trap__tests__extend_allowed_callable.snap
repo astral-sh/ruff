@@ -1,0 +1,35 @@
+---
+source: crates/ruff_linter/src/rules/flake8_boolean_trap/mod.rs
+---
+FBT.py:41:11: FBT003 Boolean positional value in function call
+   |
+41 | used("a", True)
+   |           ^^^^ FBT003
+42 | used(do=True)
+   |
+
+FBT.py:56:11: FBT003 Boolean positional value in function call
+   |
+54 | {}.pop(True, False)
+55 | dict.fromkeys(("world",), True)
+56 | {}.deploy(True, False)
+   |           ^^^^ FBT003
+57 | getattr(someobj, attrname, False)
+58 | mylist.index(True)
+   |
+
+FBT.py:56:17: FBT003 Boolean positional value in function call
+   |
+54 | {}.pop(True, False)
+55 | dict.fromkeys(("world",), True)
+56 | {}.deploy(True, False)
+   |                 ^^^^^ FBT003
+57 | getattr(someobj, attrname, False)
+58 | mylist.index(True)
+   |
+
+FBT.py:120:10: FBT003 Boolean positional value in function call
+    |
+120 | settings(True)
+    |          ^^^^ FBT003
+    |

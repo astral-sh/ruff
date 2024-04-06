@@ -6,8 +6,13 @@ expression: triple_quoted_eol(UNIX_EOL)
     (
         String {
             value: "\n test string\n ",
-            kind: String,
-            triple_quoted: true,
+            kind: StringKind {
+                prefix: Regular(
+                    Empty,
+                ),
+                triple_quoted: true,
+                quote_style: Double,
+            },
         },
         0..21,
     ),

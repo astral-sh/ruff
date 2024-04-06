@@ -271,6 +271,11 @@ expression: parse_ast
                                     254,
                                     255,
                                 ],
+                                flags: BytesLiteralFlags {
+                                    quote_style: Double,
+                                    prefix: Regular,
+                                    triple_quoted: false,
+                                },
                             },
                         ),
                     },

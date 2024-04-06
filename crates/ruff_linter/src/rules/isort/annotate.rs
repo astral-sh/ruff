@@ -11,7 +11,7 @@ use super::{AnnotatedAliasData, AnnotatedImport};
 pub(crate) fn annotate_imports<'a>(
     imports: &'a [&'a Stmt],
     comments: Vec<Comment<'a>>,
-    locator: &Locator,
+    locator: &Locator<'a>,
     split_on_trailing_comma: bool,
     source_type: PySourceType,
 ) -> Vec<AnnotatedImport<'a>> {
@@ -44,8 +44,8 @@ pub(crate) fn annotate_imports<'a>(
                         names: names
                             .iter()
                             .map(|alias| AliasData {
-                                name: &alias.name,
-                                asname: alias.asname.as_deref(),
+                                name: locator.slice(&alias.name),
+                                asname: alias.asname.as_ref().map(|asname| locator.slice(asname)),
                             })
                             .collect(),
                         atop,
@@ -107,8 +107,8 @@ pub(crate) fn annotate_imports<'a>(
                             }
 
                             AnnotatedAliasData {
-                                name: &alias.name,
-                                asname: alias.asname.as_deref(),
+                                name: locator.slice(&alias.name),
+                                asname: alias.asname.as_ref().map(|asname| locator.slice(asname)),
                                 atop: alias_atop,
                                 inline: alias_inline,
                             }
@@ -116,7 +116,7 @@ pub(crate) fn annotate_imports<'a>(
                         .collect();
 
                     AnnotatedImport::ImportFrom {
-                        module: module.as_deref(),
+                        module: module.as_ref().map(|module| locator.slice(module)),
                         names: aliases,
                         level: *level,
                         trailing_comma: if split_on_trailing_comma {

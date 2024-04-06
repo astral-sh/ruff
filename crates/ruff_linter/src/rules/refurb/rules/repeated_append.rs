@@ -347,6 +347,7 @@ fn make_suggestion(group: &AppendGroup, generator: Generator) -> String {
         elts,
         ctx: ast::ExprContext::Load,
         range: TextRange::default(),
+        parenthesized: true,
     };
     // Make `var.extend`.
     // NOTE: receiver is the same for all appends and that's why we can take the first.

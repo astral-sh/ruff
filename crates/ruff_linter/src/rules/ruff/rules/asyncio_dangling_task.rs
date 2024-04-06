@@ -3,7 +3,6 @@ use std::fmt;
 use ast::Stmt;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::call_path::compose_call_path;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::{analyze::typing, Scope, SemanticModel};
 use ruff_text_size::Ranged;
@@ -72,14 +71,13 @@ pub(crate) fn asyncio_dangling_task(expr: &Expr, semantic: &SemanticModel) -> Op
     };
 
     // Ex) `asyncio.create_task(...)`
-    if let Some(method) =
-        semantic
-            .resolve_call_path(func)
-            .and_then(|call_path| match call_path.as_slice() {
-                ["asyncio", "create_task"] => Some(Method::CreateTask),
-                ["asyncio", "ensure_future"] => Some(Method::EnsureFuture),
-                _ => None,
-            })
+    if let Some(method) = semantic
+        .resolve_qualified_name(func)
+        .and_then(|qualified_name| match qualified_name.segments() {
+            ["asyncio", "create_task"] => Some(Method::CreateTask),
+            ["asyncio", "ensure_future"] => Some(Method::EnsureFuture),
+            _ => None,
+        })
     {
         return Some(Diagnostic::new(
             AsyncioDanglingTask {
@@ -93,22 +91,24 @@ pub(crate) fn asyncio_dangling_task(expr: &Expr, semantic: &SemanticModel) -> Op
     // Ex) `loop = ...; loop.create_task(...)`
     if let Expr::Attribute(ast::ExprAttribute { attr, value, .. }) = func.as_ref() {
         if attr == "create_task" {
-            if typing::resolve_assignment(value, semantic).is_some_and(|call_path| {
-                matches!(
-                    call_path.as_slice(),
-                    [
-                        "asyncio",
-                        "get_event_loop" | "get_running_loop" | "new_event_loop"
-                    ]
-                )
-            }) {
-                return Some(Diagnostic::new(
-                    AsyncioDanglingTask {
-                        expr: compose_call_path(value).unwrap_or_else(|| "asyncio".to_string()),
-                        method: Method::CreateTask,
-                    },
-                    expr.range(),
-                ));
+            if let Expr::Name(name) = value.as_ref() {
+                if typing::resolve_assignment(value, semantic).is_some_and(|qualified_name| {
+                    matches!(
+                        qualified_name.segments(),
+                        [
+                            "asyncio",
+                            "get_event_loop" | "get_running_loop" | "new_event_loop"
+                        ]
+                    )
+                }) {
+                    return Some(Diagnostic::new(
+                        AsyncioDanglingTask {
+                            expr: name.id.to_string(),
+                            method: Method::CreateTask,
+                        },
+                        expr.range(),
+                    ));
+                }
             }
         }
     }
@@ -139,8 +139,7 @@ pub(crate) fn asyncio_dangling_binding(
         // else:
         //     task = asyncio.create_task(make_request())
         // ```
-        for binding_id in
-            std::iter::successors(Some(binding_id), |id| semantic.shadowed_binding(*id))
+        for binding_id in std::iter::successors(Some(binding_id), |id| scope.shadowed_binding(*id))
         {
             let binding = semantic.binding(binding_id);
             if binding.is_used()

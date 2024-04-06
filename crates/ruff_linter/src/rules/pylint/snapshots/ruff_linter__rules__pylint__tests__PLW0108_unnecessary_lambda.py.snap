@@ -9,7 +9,7 @@ unnecessary_lambda.py:1:5: PLW0108 [*] Lambda may be unnecessary; consider inlin
   |
   = help: Inline function call
 
-ℹ Safe fix
+ℹ Unsafe fix
 1   |-_ = lambda: print()  # [unnecessary-lambda]
   1 |+_ = print  # [unnecessary-lambda]
 2 2 | _ = lambda x, y: min(x, y) # [unnecessary-lambda]
@@ -26,7 +26,7 @@ unnecessary_lambda.py:2:5: PLW0108 [*] Lambda may be unnecessary; consider inlin
   |
   = help: Inline function call
 
-ℹ Safe fix
+ℹ Unsafe fix
 1 1 | _ = lambda: print()  # [unnecessary-lambda]
 2   |-_ = lambda x, y: min(x, y) # [unnecessary-lambda]
   2 |+_ = min # [unnecessary-lambda]
@@ -45,7 +45,7 @@ unnecessary_lambda.py:4:5: PLW0108 [*] Lambda may be unnecessary; consider inlin
   |
   = help: Inline function call
 
-ℹ Safe fix
+ℹ Unsafe fix
 1 1 | _ = lambda: print()  # [unnecessary-lambda]
 2 2 | _ = lambda x, y: min(x, y) # [unnecessary-lambda]
 3 3 | 
@@ -65,7 +65,7 @@ unnecessary_lambda.py:5:5: PLW0108 [*] Lambda may be unnecessary; consider inlin
   |
   = help: Inline function call
 
-ℹ Safe fix
+ℹ Unsafe fix
 2 2 | _ = lambda x, y: min(x, y) # [unnecessary-lambda]
 3 3 | 
 4 4 | _ = lambda *args: f(*args) # [unnecessary-lambda]
@@ -85,7 +85,7 @@ unnecessary_lambda.py:6:5: PLW0108 [*] Lambda may be unnecessary; consider inlin
   |
   = help: Inline function call
 
-ℹ Safe fix
+ℹ Unsafe fix
 3 3 | 
 4 4 | _ = lambda *args: f(*args) # [unnecessary-lambda]
 5 5 | _ = lambda **kwargs: f(**kwargs) # [unnecessary-lambda]
@@ -106,7 +106,7 @@ unnecessary_lambda.py:7:5: PLW0108 [*] Lambda may be unnecessary; consider inlin
   |
   = help: Inline function call
 
-ℹ Safe fix
+ℹ Unsafe fix
 4 4 | _ = lambda *args: f(*args) # [unnecessary-lambda]
 5 5 | _ = lambda **kwargs: f(**kwargs) # [unnecessary-lambda]
 6 6 | _ = lambda *args, **kwargs: f(*args, **kwargs) # [unnecessary-lambda]
@@ -155,5 +155,3 @@ unnecessary_lambda.py:10:5: PLW0108 [*] Lambda may be unnecessary; consider inli
 11 11 | 
 12 12 | # default value in lambda parameters
 13 13 | _ = lambda x=42: print(x)
-
-

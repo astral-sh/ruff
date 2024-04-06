@@ -157,7 +157,9 @@ impl<'a> StringLiteralDisplay<'a> {
                 }
             }
             ast::Expr::Tuple(tuple_node @ ast::ExprTuple { elts, range, .. }) => {
-                let display_kind = DisplayKind::Sequence(SequenceKind::Tuple(tuple_node));
+                let display_kind = DisplayKind::Sequence(SequenceKind::Tuple {
+                    parenthesized: tuple_node.parenthesized,
+                });
                 Self {
                     elts: Cow::Borrowed(elts),
                     range: *range,
@@ -211,7 +213,7 @@ impl<'a> StringLiteralDisplay<'a> {
             (DisplayKind::Sequence(sequence_kind), true) => {
                 let analyzed_sequence = MultilineStringSequenceValue::from_source_range(
                     self.range(),
-                    sequence_kind,
+                    *sequence_kind,
                     locator,
                 )?;
                 assert_eq!(analyzed_sequence.len(), self.elts.len());
@@ -220,7 +222,7 @@ impl<'a> StringLiteralDisplay<'a> {
             // Sorting multiline dicts is unsupported
             (DisplayKind::Dict { .. }, true) => return None,
             (DisplayKind::Sequence(sequence_kind), false) => sort_single_line_elements_sequence(
-                sequence_kind,
+                *sequence_kind,
                 &self.elts,
                 items,
                 locator,
@@ -242,7 +244,7 @@ impl<'a> StringLiteralDisplay<'a> {
 /// Python provides for builtin containers.
 #[derive(Debug)]
 enum DisplayKind<'a> {
-    Sequence(SequenceKind<'a>),
+    Sequence(SequenceKind),
     Dict { values: &'a [ast::Expr] },
 }
 

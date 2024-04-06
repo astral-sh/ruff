@@ -1,65 +1,65 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-E30.py:686:1: E304 [*] Blank lines found after function decorator (1)
+E30.py:709:1: E304 [*] Blank lines found after function decorator (1)
     |
-684 | @decorator
-685 | 
-686 | def function():
+707 | @decorator
+708 | 
+709 | def function():
     | ^^^ E304
-687 |     pass
-688 | # end
+710 |     pass
+711 | # end
     |
     = help: Remove extraneous blank line(s)
 
 ℹ Safe fix
-682 682 | 
-683 683 | # E304
-684 684 | @decorator
-685     |-
-686 685 | def function():
-687 686 |     pass
-688 687 | # end
+705 705 | 
+706 706 | # E304
+707 707 | @decorator
+708     |-
+709 708 | def function():
+710 709 |     pass
+711 710 | # end
 
-E30.py:695:1: E304 [*] Blank lines found after function decorator (1)
+E30.py:718:1: E304 [*] Blank lines found after function decorator (1)
     |
-694 | # comment    E304 not expected
-695 | def function():
+717 | # comment    E304 not expected
+718 | def function():
     | ^^^ E304
-696 |     pass
-697 | # end
+719 |     pass
+720 | # end
     |
     = help: Remove extraneous blank line(s)
 
 ℹ Safe fix
-690 690 | 
-691 691 | # E304
-692 692 | @decorator
-693     |-
-694 693 | # comment    E304 not expected
-695 694 | def function():
-696 695 |     pass
+713 713 | 
+714 714 | # E304
+715 715 | @decorator
+716     |-
+717 716 | # comment    E304 not expected
+718 717 | def function():
+719 718 |     pass
 
-E30.py:707:1: E304 [*] Blank lines found after function decorator (2)
+E30.py:730:1: E304 [*] Blank lines found after function decorator (2)
     |
-706 | # second comment  E304 not expected
-707 | def function():
+729 | # second comment  E304 not expected
+730 | def function():
     | ^^^ E304
-708 |     pass
-709 | # end
+731 |     pass
+732 | # end
     |
     = help: Remove extraneous blank line(s)
 
 ℹ Safe fix
-699 699 | 
-700 700 | # E304
-701 701 | @decorator
-702     |-
-703 702 | # comment  E304 not expected
-704     |-
-705     |-
-706 703 | # second comment  E304 not expected
-707 704 | def function():
-708 705 |     pass
+722 722 | 
+723 723 | # E304
+724 724 | @decorator
+725     |-
+726 725 | # comment  E304 not expected
+727     |-
+728     |-
+729 726 | # second comment  E304 not expected
+730 727 | def function():
+731 728 |     pass
 
 
