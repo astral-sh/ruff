@@ -456,7 +456,7 @@ impl<'src> Parser<'src> {
             None
         };
 
-        // test from_import_no_space
+        // test_ok from_import_no_space
         // from.import x
         // from...import x
         self.expect(TokenKind::Import);
@@ -580,7 +580,7 @@ impl<'src> Parser<'src> {
             dotted_name.push_str(&self.parse_identifier());
         }
 
-        // test dotted_name_normalized_spaces
+        // test_ok dotted_name_normalized_spaces
         // import a.b.c
         // import a .  b  . c
         ast::Identifier {
@@ -714,7 +714,7 @@ impl<'src> Parser<'src> {
             self.add_error(ParseErrorType::EmptyGlobalNames, self.current_token_range());
         }
 
-        // test global_stmt
+        // test_ok global_stmt
         // global x
         // global x, y, z
         ast::StmtGlobal {
@@ -755,7 +755,7 @@ impl<'src> Parser<'src> {
             );
         }
 
-        // test nonlocal_stmt
+        // test_ok nonlocal_stmt
         // nonlocal x
         // nonlocal x, y, z
         ast::StmtNonlocal {

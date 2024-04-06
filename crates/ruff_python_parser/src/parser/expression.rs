@@ -2294,7 +2294,7 @@ impl<'src> Parser<'src> {
         self.bump(TokenKind::Lambda);
 
         let parameters = if self.at(TokenKind::Colon) {
-            // test lambda_with_no_parameters
+            // test_ok lambda_with_no_parameters
             // lambda: 1
             None
         } else {
@@ -2303,7 +2303,7 @@ impl<'src> Parser<'src> {
 
         self.expect(TokenKind::Colon);
 
-        // test lambda_with_valid_body
+        // test_ok lambda_with_valid_body
         // lambda x: x
         // lambda x: x if True else y
         // lambda x: await x
