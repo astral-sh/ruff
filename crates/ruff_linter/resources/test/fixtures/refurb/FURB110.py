@@ -28,3 +28,13 @@ z = (
         y
     )
 )
+
+# FURB110
+z = (
+    x if
+    # If true, use x.
+    x
+    # Otherwise, use y.
+    else
+    y
+)
