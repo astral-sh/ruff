@@ -16,7 +16,7 @@ use crate::parser::{
 use crate::token_set::TokenSet;
 use crate::{Mode, ParseErrorType, Tok, TokenKind};
 
-use super::expression::{ExpressionContext, Precedence};
+use super::expression::{ExpressionContext, OperatorPrecedence};
 use super::Parenthesized;
 
 /// Tokens that represent compound statements.
@@ -2173,9 +2173,9 @@ impl<'src> Parser<'src> {
                 // with (a | b) << c | d: ...
                 // # Postfix should still be parsed first
                 // with (a)[0] + b * c: ...
-                self.parse_expression_with_precedence_recursive(
+                self.parse_binary_expression_or_higher_recursive(
                     lhs.into(),
-                    Precedence::Initial,
+                    OperatorPrecedence::Initial,
                     ExpressionContext::default(),
                     start,
                 )

@@ -210,80 +210,26 @@ impl<'src> Parser<'src> {
     ///
     /// [Python grammar]: https://docs.python.org/3/reference/grammar.html
     fn parse_simple_expression(&mut self, context: ExpressionContext) -> ParsedExpr {
-        self.parse_expression_with_precedence(Precedence::Initial, context)
+        self.parse_binary_expression_or_higher(OperatorPrecedence::Initial, context)
     }
 
-    /// Returns the binding power of the current token for a Pratt parser.
-    ///
-    /// This includes the precedence and associativity of the current token.
-    /// If the current token is not an operator, it returns [`Precedence::Unknown`],
-    /// [`TokenKind::Unknown`], and [`Associativity::Left`] respectively.
-    ///
-    /// See: <https://matklad.github.io/2020/04/13/simple-but-powerful-pratt-parsing.html>
-    fn current_binding_power(&mut self) -> (Precedence, TokenKind, Associativity) {
-        const NOT_AN_OPERATOR: (Precedence, TokenKind, Associativity) =
-            (Precedence::Unknown, TokenKind::Unknown, Associativity::Left);
-
-        let kind = self.current_token_kind();
-
-        match kind {
-            TokenKind::Or => (Precedence::Or, kind, Associativity::Left),
-            TokenKind::And => (Precedence::And, kind, Associativity::Left),
-            TokenKind::Not if self.peek() == TokenKind::In => (
-                Precedence::ComparisonsMembershipIdentity,
-                kind,
-                Associativity::Left,
-            ),
-            TokenKind::Is
-            | TokenKind::In
-            | TokenKind::EqEqual
-            | TokenKind::NotEqual
-            | TokenKind::Less
-            | TokenKind::LessEqual
-            | TokenKind::Greater
-            | TokenKind::GreaterEqual => (
-                Precedence::ComparisonsMembershipIdentity,
-                kind,
-                Associativity::Left,
-            ),
-            TokenKind::Vbar => (Precedence::BitOr, kind, Associativity::Left),
-            TokenKind::CircumFlex => (Precedence::BitXor, kind, Associativity::Left),
-            TokenKind::Amper => (Precedence::BitAnd, kind, Associativity::Left),
-            TokenKind::LeftShift | TokenKind::RightShift => {
-                (Precedence::LeftRightShift, kind, Associativity::Left)
-            }
-            TokenKind::Plus | TokenKind::Minus => (Precedence::AddSub, kind, Associativity::Left),
-            TokenKind::Star
-            | TokenKind::Slash
-            | TokenKind::DoubleSlash
-            | TokenKind::Percent
-            | TokenKind::At => (Precedence::MulDivRemain, kind, Associativity::Left),
-            TokenKind::DoubleStar => (Precedence::Exponent, kind, Associativity::Right),
-            _ => NOT_AN_OPERATOR,
-        }
-    }
-
-    /// Parses an expression with binding power of at least `previous_precedence`.
-    ///
-    /// This method uses the [Pratt parsing algorithm].
+    /// Parses a binary expression using the [Pratt parsing algorithm].
     ///
     /// [Pratt parsing algorithm]: https://matklad.github.io/2020/04/13/simple-but-powerful-pratt-parsing.html
-    fn parse_expression_with_precedence(
+    fn parse_binary_expression_or_higher(
         &mut self,
-        previous_precedence: Precedence,
+        left_precedence: OperatorPrecedence,
         context: ExpressionContext,
     ) -> ParsedExpr {
         let start = self.node_start();
-        let lhs = self.parse_lhs_expression(previous_precedence, context);
-        self.parse_expression_with_precedence_recursive(lhs, previous_precedence, context, start)
+        let lhs = self.parse_lhs_expression(left_precedence, context);
+        self.parse_binary_expression_or_higher_recursive(lhs, left_precedence, context, start)
     }
 
-    /// Parses an expression with binding power of at least `previous_precedence` given the
-    /// left-hand side expression.
-    pub(super) fn parse_expression_with_precedence_recursive(
+    pub(super) fn parse_binary_expression_or_higher_recursive(
         &mut self,
-        mut lhs: ParsedExpr,
-        previous_precedence: Precedence,
+        mut left: ParsedExpr,
+        left_precedence: OperatorPrecedence,
         context: ExpressionContext,
         start: TextSize,
     ) -> ParsedExpr {
@@ -292,30 +238,42 @@ impl<'src> Parser<'src> {
         loop {
             progress.assert_progressing(self);
 
-            let (current_precedence, token, associativity) = self.current_binding_power();
-            if current_precedence < previous_precedence {
-                break;
-            }
+            let token = self.current_token_kind();
 
             if matches!(token, TokenKind::In) && context.is_in_excluded() {
+                // Omit the `in` keyword when parsing the target expression in a comprehension or
+                // a `for` statement.
                 break;
             }
 
-            let operator_binding_power = match associativity {
-                Associativity::Left => current_precedence.increment_precedence(),
-                Associativity::Right => current_precedence,
+            // We need to peek the next token because of `not in` operator.
+            let Some(new_precedence) = OperatorPrecedence::try_from_tokens(token, self.peek())
+            else {
+                // Not an operator token.
+                break;
             };
 
+            let stop_at_current_operator = if new_precedence.is_right_associative() {
+                new_precedence < left_precedence
+            } else {
+                new_precedence <= left_precedence
+            };
+
+            if stop_at_current_operator {
+                break;
+            }
+
+            // Operator token.
             self.bump(token);
 
             // We need to create a dedicated node for boolean operations and comparison operations
             // even though they are infix operators.
             if token.is_bool_operator() {
-                lhs = Expr::BoolOp(self.parse_bool_operation_expression(
-                    lhs.expr,
+                left = Expr::BoolOp(self.parse_bool_operation_expression(
+                    left.expr,
                     start,
                     token,
-                    operator_binding_power,
+                    new_precedence,
                     context,
                 ))
                 .into();
@@ -323,28 +281,28 @@ impl<'src> Parser<'src> {
             }
 
             if token.is_compare_operator() {
-                lhs = Expr::Compare(self.parse_compare_expression(
-                    lhs.expr,
+                left = Expr::Compare(self.parse_compare_expression(
+                    left.expr,
                     start,
                     token,
-                    operator_binding_power,
+                    new_precedence,
                     context,
                 ))
                 .into();
                 continue;
             }
 
-            let rhs = self.parse_expression_with_precedence(operator_binding_power, context);
+            let right = self.parse_binary_expression_or_higher(new_precedence, context);
 
-            lhs.expr = Expr::BinOp(ast::ExprBinOp {
-                left: Box::new(lhs.expr),
+            left.expr = Expr::BinOp(ast::ExprBinOp {
+                left: Box::new(left.expr),
                 op: Operator::try_from(token).unwrap(),
-                right: Box::new(rhs.expr),
+                right: Box::new(right.expr),
                 range: self.node_range(start),
             });
         }
 
-        lhs
+        left
     }
 
     /// Parses the left-hand side of an expression.
@@ -352,13 +310,13 @@ impl<'src> Parser<'src> {
     /// This includes prefix expressions such as unary operators, boolean `not`,
     /// `await`, `lambda`. It also parses atoms and postfix expressions.
     ///
-    /// The given [`Precedence`] is used to determine if the parsed expression
+    /// The given [`OperatorPrecedence`] is used to determine if the parsed expression
     /// is valid in that context. For example, a unary operator is not valid
-    /// in an `await` expression in which case the `previous_precedence` would
-    /// be [`Precedence::Await`].
+    /// in an `await` expression in which case the `left_precedence` would
+    /// be [`OperatorPrecedence::Await`].
     fn parse_lhs_expression(
         &mut self,
-        previous_precedence: Precedence,
+        left_precedence: OperatorPrecedence,
         context: ExpressionContext,
     ) -> ParsedExpr {
         let start = self.node_start();
@@ -366,12 +324,12 @@ impl<'src> Parser<'src> {
         let lhs = match self.current_token_kind() {
             unary_tok @ (TokenKind::Plus | TokenKind::Minus | TokenKind::Tilde) => {
                 let unary_expr = self.parse_unary_expression(context);
-                if previous_precedence > Precedence::PosNegBitNot
+                if left_precedence > OperatorPrecedence::PosNegBitNot
                     // > The power operator `**` binds less tightly than an arithmetic
                     // > or bitwise unary operator on its right, that is, 2**-1 is 0.5.
                     //
                     // Reference: https://docs.python.org/3/reference/expressions.html#id21
-                    && previous_precedence != Precedence::Exponent
+                    && left_precedence != OperatorPrecedence::Exponent
                 {
                     self.add_error(
                         ParseErrorType::OtherError(format!(
@@ -384,7 +342,7 @@ impl<'src> Parser<'src> {
             }
             TokenKind::Not => {
                 let unary_expr = self.parse_unary_expression(context);
-                if previous_precedence > Precedence::Not {
+                if left_precedence > OperatorPrecedence::Not {
                     self.add_error(
                         ParseErrorType::OtherError(
                             "Boolean 'not' expression cannot be used here".to_string(),
@@ -396,7 +354,7 @@ impl<'src> Parser<'src> {
             }
             TokenKind::Star => {
                 let starred_expr = self.parse_starred_expression(context);
-                if previous_precedence > Precedence::Initial
+                if left_precedence > OperatorPrecedence::Initial
                     || !context.is_starred_expression_allowed()
                 {
                     self.add_error(ParseErrorType::InvalidStarredExpressionUsage, &starred_expr);
@@ -406,7 +364,7 @@ impl<'src> Parser<'src> {
             TokenKind::Await => {
                 let await_expr = self.parse_await_expression();
                 // `await` expressions cannot be nested
-                if previous_precedence >= Precedence::Await {
+                if left_precedence >= OperatorPrecedence::Await {
                     self.add_error(
                         ParseErrorType::OtherError(
                             "Await expression cannot be used here".to_string(),
@@ -425,7 +383,7 @@ impl<'src> Parser<'src> {
             }
             TokenKind::Yield => {
                 let expr = self.parse_yield_expression();
-                if previous_precedence > Precedence::Initial
+                if left_precedence > OperatorPrecedence::Initial
                     || !context.is_yield_expression_allowed()
                 {
                     self.add_error(ParseErrorType::InvalidYieldExpressionUsage, &expr);
@@ -949,10 +907,10 @@ impl<'src> Parser<'src> {
         self.bump(self.current_token_kind());
 
         let operand = if op.is_not() {
-            self.parse_expression_with_precedence(Precedence::Not, context)
+            self.parse_binary_expression_or_higher(OperatorPrecedence::Not, context)
         } else {
             // plus, minus and tilde
-            self.parse_expression_with_precedence(Precedence::PosNegBitNot, context)
+            self.parse_binary_expression_or_higher(OperatorPrecedence::PosNegBitNot, context)
         };
 
         ast::ExprUnaryOp {
@@ -1001,7 +959,7 @@ impl<'src> Parser<'src> {
         lhs: Expr,
         start: TextSize,
         operator_token: TokenKind,
-        operator_binding_power: Precedence,
+        operator_binding_power: OperatorPrecedence,
         context: ExpressionContext,
     ) -> ast::ExprBoolOp {
         let mut values = vec![lhs];
@@ -1013,7 +971,7 @@ impl<'src> Parser<'src> {
             progress.assert_progressing(self);
 
             let parsed_expr =
-                self.parse_expression_with_precedence(operator_binding_power, context);
+                self.parse_binary_expression_or_higher(operator_binding_power, context);
             values.push(parsed_expr.expr);
 
             if !self.eat(operator_token) {
@@ -1045,7 +1003,7 @@ impl<'src> Parser<'src> {
         lhs: Expr,
         start: TextSize,
         operator: TokenKind,
-        operator_binding_power: Precedence,
+        operator_binding_power: OperatorPrecedence,
         context: ExpressionContext,
     ) -> ast::ExprCompare {
         let compare_operator = token_kind_to_cmp_op([operator, self.current_token_kind()]).unwrap();
@@ -1071,7 +1029,7 @@ impl<'src> Parser<'src> {
             progress.assert_progressing(self);
 
             let parsed_expr =
-                self.parse_expression_with_precedence(operator_binding_power, context);
+                self.parse_binary_expression_or_higher(operator_binding_power, context);
             comparators.push(parsed_expr.expr);
 
             let next_operator = self.current_token_kind();
@@ -2100,8 +2058,10 @@ impl<'src> Parser<'src> {
         let start = self.node_start();
         self.bump(TokenKind::Await);
 
-        let parsed_expr =
-            self.parse_expression_with_precedence(Precedence::Await, ExpressionContext::default());
+        let parsed_expr = self.parse_binary_expression_or_higher(
+            OperatorPrecedence::Await,
+            ExpressionContext::default(),
+        );
 
         ast::ExprAwait {
             value: Box::new(parsed_expr.expr),
@@ -2370,12 +2330,6 @@ impl Ranged for ParsedExpr {
     }
 }
 
-/// Binding power associativity
-enum Associativity {
-    Left,
-    Right,
-}
-
 /// Represents the precedence levels for various operators and expressions of Python.
 /// Variants at the top have lower precedence and variants at the bottom have
 /// higher precedence.
@@ -2386,9 +2340,7 @@ enum Associativity {
 ///
 /// See: <https://docs.python.org/3/reference/expressions.html#operator-precedence>
 #[derive(Debug, Ord, Eq, PartialEq, PartialOrd, Copy, Clone)]
-pub(super) enum Precedence {
-    /// Precedence for an unknown operator.
-    Unknown,
+pub(super) enum OperatorPrecedence {
     /// The initital precedence when parsing an expression.
     Initial,
     /// Precedence of boolean `or` operator.
@@ -2421,29 +2373,43 @@ pub(super) enum Precedence {
     Await,
 }
 
-impl Precedence {
-    fn increment_precedence(self) -> Precedence {
-        match self {
-            Precedence::Or => Precedence::And,
-            Precedence::And => Precedence::Not,
-            Precedence::Not => Precedence::ComparisonsMembershipIdentity,
-            Precedence::ComparisonsMembershipIdentity => Precedence::BitOr,
-            Precedence::BitOr => Precedence::BitXor,
-            Precedence::BitXor => Precedence::BitAnd,
-            Precedence::BitAnd => Precedence::LeftRightShift,
-            Precedence::LeftRightShift => Precedence::AddSub,
-            Precedence::AddSub => Precedence::MulDivRemain,
-            Precedence::MulDivRemain => Precedence::PosNegBitNot,
-            Precedence::PosNegBitNot => Precedence::Exponent,
-            Precedence::Exponent => Precedence::Await,
-            // We've reached the highest precedence, we can't increment anymore,
-            // so return the same precedence.
-            Precedence::Await => Precedence::Await,
-            // When this function is invoked, the precedence will never be 'Unknown' or 'Initial'.
-            // This is due to their lower precedence values, causing them to exit the loop in the
-            // `parse_expression_with_precedence` function before the execution of this function.
-            Precedence::Unknown | Precedence::Initial => unreachable!(),
-        }
+impl OperatorPrecedence {
+    /// Returns the precedence for the given operator token or [None] if the token isn't an
+    /// operator token.
+    fn try_from_tokens(token: TokenKind, next: TokenKind) -> Option<OperatorPrecedence> {
+        Some(match token {
+            TokenKind::Or => OperatorPrecedence::Or,
+            TokenKind::And => OperatorPrecedence::And,
+            TokenKind::Not if next == TokenKind::In => {
+                OperatorPrecedence::ComparisonsMembershipIdentity
+            }
+            TokenKind::Is
+            | TokenKind::In
+            | TokenKind::EqEqual
+            | TokenKind::NotEqual
+            | TokenKind::Less
+            | TokenKind::LessEqual
+            | TokenKind::Greater
+            | TokenKind::GreaterEqual => OperatorPrecedence::ComparisonsMembershipIdentity,
+            TokenKind::Vbar => OperatorPrecedence::BitOr,
+            TokenKind::CircumFlex => OperatorPrecedence::BitXor,
+            TokenKind::Amper => OperatorPrecedence::BitAnd,
+            TokenKind::LeftShift | TokenKind::RightShift => OperatorPrecedence::LeftRightShift,
+            TokenKind::Plus | TokenKind::Minus => OperatorPrecedence::AddSub,
+            TokenKind::Star
+            | TokenKind::Slash
+            | TokenKind::DoubleSlash
+            | TokenKind::Percent
+            | TokenKind::At => OperatorPrecedence::MulDivRemain,
+            TokenKind::DoubleStar => OperatorPrecedence::Exponent,
+            _ => return None,
+        })
+    }
+
+    /// Returns `true` if the precedence is right-associative i.e., the operations are evaluated
+    /// from right to left.
+    fn is_right_associative(self) -> bool {
+        matches!(self, OperatorPrecedence::Exponent)
     }
 }
 
