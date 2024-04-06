@@ -12,7 +12,7 @@ directories, and formats all discovered Python files:
 
 ```shell
 ruff format                   # Format all files in the current directory.
-ruff format path/to/code/     # Lint all files in `path/to/code` (and any subdirectories).
+ruff format path/to/code/     # Format all files in `path/to/code` (and any subdirectories).
 ruff format path/to/file.py   # Format a single file.
 ```
 

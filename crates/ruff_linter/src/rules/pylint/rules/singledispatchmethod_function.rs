@@ -9,12 +9,11 @@ use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
 
 /// ## What it does
-/// Checks for `@singledispatchmethod` decorators on functions or static
-/// methods.
+/// Checks for non-method functions decorated with `@singledispatchmethod`.
 ///
 /// ## Why is this bad?
-/// The `@singledispatchmethod` decorator is intended for use with class and
-/// instance methods, not functions.
+/// The `@singledispatchmethod` decorator is intended for use with methods, not
+/// functions.
 ///
 /// Instead, use the `@singledispatch` decorator.
 ///
@@ -85,10 +84,7 @@ pub(crate) fn singledispatchmethod_function(
         &checker.settings.pep8_naming.classmethod_decorators,
         &checker.settings.pep8_naming.staticmethod_decorators,
     );
-    if !matches!(
-        type_,
-        function_type::FunctionType::Function | function_type::FunctionType::StaticMethod
-    ) {
+    if !matches!(type_, function_type::FunctionType::Function) {
         return;
     }
 

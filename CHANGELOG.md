@@ -1,5 +1,54 @@
 # Changelog
 
+## 0.3.5
+
+### Preview features
+
+- \[`pylint`\] Implement `modified-iterating-set` (`E4703`) ([#10473](https://github.com/astral-sh/ruff/pull/10473))
+- \[`refurb`\] Implement `for-loop-set-mutations` (`FURB142`) ([#10583](https://github.com/astral-sh/ruff/pull/10583))
+- \[`refurb`\] Implement `unnecessary-from-float` (`FURB164`) ([#10647](https://github.com/astral-sh/ruff/pull/10647))
+- \[`refurb`\] Implement `verbose-decimal-constructor` (`FURB157`) ([#10533](https://github.com/astral-sh/ruff/pull/10533))
+
+### Rule changes
+
+- \[`flake8-comprehensions`\] Handled special case for `C401` which also matches `C416` ([#10596](https://github.com/astral-sh/ruff/pull/10596))
+- \[`flake8-pyi`\] Mark `unaliased-collections-abc-set-import` fix as "safe" for more cases in stub files (`PYI025`) ([#10547](https://github.com/astral-sh/ruff/pull/10547))
+- \[`numpy`\] Add `row_stack` to NumPy 2.0 migration rule ([#10646](https://github.com/astral-sh/ruff/pull/10646))
+- \[`pycodestyle`\] Allow cell magics before an import (`E402`) ([#10545](https://github.com/astral-sh/ruff/pull/10545))
+- \[`pycodestyle`\] Avoid blank line rules for the first logical line in cell ([#10291](https://github.com/astral-sh/ruff/pull/10291))
+
+### Configuration
+
+- Respected nested namespace packages ([#10541](https://github.com/astral-sh/ruff/pull/10541))
+- \[`flake8-boolean-trap`\] Add setting for user defined allowed boolean trap ([#10531](https://github.com/astral-sh/ruff/pull/10531))
+
+### Bug fixes
+
+- Correctly handle references in `__all__` definitions when renaming symbols in autofixes ([#10527](https://github.com/astral-sh/ruff/pull/10527))
+- Track ranges of names inside `__all__` definitions ([#10525](https://github.com/astral-sh/ruff/pull/10525))
+- \[`flake8-bugbear`\] Avoid false positive for usage after `continue` (`B031`) ([#10539](https://github.com/astral-sh/ruff/pull/10539))
+- \[`flake8-copyright`\] Accept commas in default copyright pattern ([#9498](https://github.com/astral-sh/ruff/pull/9498))
+- \[`flake8-datetimez`\] Allow f-strings with `%z` for `DTZ007` ([#10651](https://github.com/astral-sh/ruff/pull/10651))
+- \[`flake8-pytest-style`\] Fix `PT014` autofix for last item in list ([#10532](https://github.com/astral-sh/ruff/pull/10532))
+- \[`flake8-quotes`\] Ignore `Q000`, `Q001` when string is inside forward ref ([#10585](https://github.com/astral-sh/ruff/pull/10585))
+- \[`isort`\] Always place non-relative imports after relative imports ([#10669](https://github.com/astral-sh/ruff/pull/10669))
+- \[`isort`\] Respect Unicode characters in import sorting ([#10529](https://github.com/astral-sh/ruff/pull/10529))
+- \[`pyflakes`\] Fix F821 false negatives when `from __future__ import annotations` is active (attempt 2) ([#10524](https://github.com/astral-sh/ruff/pull/10524))
+- \[`pyflakes`\] Make `unnecessary-lambda` an always-unsafe fix ([#10668](https://github.com/astral-sh/ruff/pull/10668))
+- \[`pylint`\] Fixed false-positive on the rule `PLW1641` (`eq-without-hash`) ([#10566](https://github.com/astral-sh/ruff/pull/10566))
+- \[`ruff`\] Fix panic in unused `# noqa` removal with multi-byte space (`RUF100`) ([#10682](https://github.com/astral-sh/ruff/pull/10682))
+
+### Documentation
+
+- Add PR title format to `CONTRIBUTING.md` ([#10665](https://github.com/astral-sh/ruff/pull/10665))
+- Fix list markup to include blank lines required ([#10591](https://github.com/astral-sh/ruff/pull/10591))
+- Put `flake8-logging` next to the other flake8 plugins in registry ([#10587](https://github.com/astral-sh/ruff/pull/10587))
+- \[`flake8-bandit`\] Update warning message for rule `S305` to address insecure block cipher mode use ([#10602](https://github.com/astral-sh/ruff/pull/10602))
+- \[`flake8-bugbear`\] Document use of anonymous assignment in `useless-expression` ([#10551](https://github.com/astral-sh/ruff/pull/10551))
+- \[`flake8-datetimez`\] Clarify error messages and docs for `DTZ` rules ([#10621](https://github.com/astral-sh/ruff/pull/10621))
+- \[`pycodestyle`\] Use same before vs. after numbers for `space-around-operator` ([#10640](https://github.com/astral-sh/ruff/pull/10640))
+- \[`ruff`\] Change `quadratic-list-summation` docs to use `iadd` consistently ([#10666](https://github.com/astral-sh/ruff/pull/10666))
+
 ## 0.3.4
 
 ### Preview features
@@ -97,7 +146,7 @@
 - Fix unstable `with` items formatting ([#10274](https://github.com/astral-sh/ruff/pull/10274))
 - Avoid repeating function calls in f-string conversions ([#10265](https://github.com/astral-sh/ruff/pull/10265))
 - Fix E203 false positive for slices in format strings ([#10280](https://github.com/astral-sh/ruff/pull/10280))
-- Fix incorrect `Parameter` range  for `*args` and `**kwargs`  ([#10283](https://github.com/astral-sh/ruff/pull/10283))
+- Fix incorrect `Parameter` range for `*args` and `**kwargs` ([#10283](https://github.com/astral-sh/ruff/pull/10283))
 - Treat `typing.Annotated` subscripts as type definitions ([#10285](https://github.com/astral-sh/ruff/pull/10285))
 
 ## 0.3.1
@@ -205,8 +254,7 @@ This release introduces the Ruff 2024.2 style, stabilizing the following changes
 Highlights include:
 
 - Initial support formatting f-strings (in `--preview`).
-- Support for overriding arbitrary configuration options via the CLI through an expanded `--config`
-    argument (e.g., `--config "lint.isort.combine-as-imports=false"`).
+- Support for overriding arbitrary configuration options via the CLI through an expanded `--config` argument (e.g., `--config "lint.isort.combine-as-imports=false"`).
 - Significant performance improvements in Ruff's lexer, parser, and lint rules.
 
 ### Preview features
@@ -854,7 +902,7 @@ docstrings via the `docstring-code-format` setting.
 - \[`pylint`\] Default `max-positional-args` to `max-args` ([#8998](https://github.com/astral-sh/ruff/pull/8998))
 - \[`pylint`\] Add `allow-dunder-method-names` setting for `bad-dunder-method-name` (`PLW3201`) ([#8812](https://github.com/astral-sh/ruff/pull/8812))
 - \[`isort`\] Add support for `from-first` setting ([#8663](https://github.com/astral-sh/ruff/pull/8663))
-- \[`isort`\]  Add support for `length-sort` settings ([#8841](https://github.com/astral-sh/ruff/pull/8841))
+- \[`isort`\] Add support for `length-sort` settings ([#8841](https://github.com/astral-sh/ruff/pull/8841))
 
 ### Bug fixes
 
@@ -983,7 +1031,7 @@ docstrings via the `docstring-code-format` setting.
 - \[`flake8-trio`\] Implement `TRIO115` ([#8486](https://github.com/astral-sh/ruff/pull/8486))
 - \[`refurb`\] Implement `type-none-comparison` (`FURB169`) ([#8487](https://github.com/astral-sh/ruff/pull/8487))
 - Flag all comparisons against builtin types in `E721` ([#8491](https://github.com/astral-sh/ruff/pull/8491))
-- Make `SIM118` fix as safe when the expression is a known dictionary  ([#8525](https://github.com/astral-sh/ruff/pull/8525))
+- Make `SIM118` fix as safe when the expression is a known dictionary ([#8525](https://github.com/astral-sh/ruff/pull/8525))
 
 ### Formatter
 
@@ -1151,7 +1199,7 @@ Try it today with `ruff format`! [Check out the blog post](https://astral.sh/blo
 - Add `backports.strenum` to `deprecated-imports` ([#8113](https://github.com/astral-sh/ruff/pull/8113))
 - Update `SIM112` to ignore `https_proxy`, `http_proxy`, and `no_proxy` ([#8140](https://github.com/astral-sh/ruff/pull/8140))
 - Update fix for `literal-membership` (`PLR6201`) to be unsafe ([#8097](https://github.com/astral-sh/ruff/pull/8097))
-- Update fix for  `mutable-argument-defaults` (`B006`) to be unsafe ([#8108](https://github.com/astral-sh/ruff/pull/8108))
+- Update fix for `mutable-argument-defaults` (`B006`) to be unsafe ([#8108](https://github.com/astral-sh/ruff/pull/8108))
 
 ### Formatter
 
@@ -1279,7 +1327,7 @@ Read Ruff's new [versioning policy](https://docs.astral.sh/ruff/versioning/).
 - \[`refurb`\] Add `single-item-membership-test` (`FURB171`) ([#7815](https://github.com/astral-sh/ruff/pull/7815))
 - \[`pylint`\] Add `and-or-ternary` (`R1706`) ([#7811](https://github.com/astral-sh/ruff/pull/7811))
 
-*New rules are added in [preview](https://docs.astral.sh/ruff/preview/).*
+_New rules are added in [preview](https://docs.astral.sh/ruff/preview/)._
 
 ### Configuration
 
