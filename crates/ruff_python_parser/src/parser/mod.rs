@@ -958,7 +958,7 @@ impl RecoveryContextKind {
                     // When the parser is parsing f-string elements inside format spec,
                     // the terminator would be `}`.
 
-                    // test fstring_format_spec_terminator
+                    // test_ok fstring_format_spec_terminator
                     // f"hello {x:} world"
                     // f"hello {x:.3f} world"
                     TokenKind::Rbrace,
