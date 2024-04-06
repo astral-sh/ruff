@@ -785,7 +785,7 @@ Module(
  9 | {x: y for x in yield y}
 10 | {x: y for x in yield from y}
 11 | {x: y for x in lambda y: y}
-   |                ^^^^^^^^^^^ Syntax Error: unparenthesized lambda expression cannot be used here
+   |                ^^^^^^^^^^^ Syntax Error: `lambda` expression cannot be used here
 12 | 
 13 | # Invalid if
    |
@@ -823,5 +823,5 @@ Module(
 15 | {x: y for x in data if yield y}
 16 | {x: y for x in data if yield from y}
 17 | {x: y for x in data if lambda y: y}
-   |                        ^^^^^^^^^^^ Syntax Error: unparenthesized lambda expression cannot be used here
+   |                        ^^^^^^^^^^^ Syntax Error: `lambda` expression cannot be used here
    |

@@ -309,7 +309,7 @@ Module(
 1 | # Invalid test expression
 2 | x if *expr else y
 3 | x if lambda x: x else y
-  |      ^^^^^^^^^^^ Syntax Error: unparenthesized lambda expression cannot be used here
+  |      ^^^^^^^^^^^ Syntax Error: `lambda` expression cannot be used here
 4 | x if yield x else y
 5 | x if yield from x else y
   |

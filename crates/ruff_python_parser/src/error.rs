@@ -107,6 +107,8 @@ pub enum ParseErrorType {
     UnparenthesizedNamedExpression,
     /// An unparenthesized tuple expression was found where it is not allowed.
     UnparenthesizedTupleExpression,
+    /// An unparenthesized lambda expression was found where it is not allowed.
+    InvalidLambdaExpressionUsage,
 
     /// An invalid expression was found in the assignment `target`.
     InvalidAssignmentTarget,
@@ -207,6 +209,9 @@ impl std::fmt::Display for ParseErrorType {
             }
             ParseErrorType::UnparenthesizedTupleExpression => {
                 write!(f, "unparenthesized tuple expression cannot be used here")
+            }
+            ParseErrorType::InvalidLambdaExpressionUsage => {
+                write!(f, "`lambda` expression cannot be used here")
             }
             ParseErrorType::StarredExpressionUsage => {
                 write!(f, "starred expression cannot be used here")

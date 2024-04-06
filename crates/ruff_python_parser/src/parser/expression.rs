@@ -170,7 +170,7 @@ impl<'src> Parser<'src> {
     /// [Python grammar]: https://docs.python.org/3/reference/grammar.html
     pub(super) fn parse_conditional_expression_or_higher(&mut self) -> ParsedExpr {
         let start = self.node_start();
-        let parsed_expr = self.parse_simple_expression();
+        let parsed_expr = self.parse_simple_expression(AllowLambdaExpression::Yes);
 
         if self.at(TokenKind::If) {
             Expr::If(self.parse_if_expression(parsed_expr.expr, start)).into()
@@ -185,12 +185,31 @@ impl<'src> Parser<'src> {
     /// This is a combination of the `disjunction`, `starred_expression`, `yield_expr`
     /// and `lambdef` rules of the [Python grammar].
     ///
+    /// The caller can specify whether lambda expressions are allowed or not. This
+    /// doesn't affect the parsing of `lambdef` expressions as it is parsed nevertheless.
+    /// But, if it is not allowed, an error is reported.
+    ///
     /// When parsing an AST node that only uses some of the above mentioned rules,
     /// you need to **explicitly** check if an invalid node for that AST node was parsed.
+    /// These nodes would be [`Expr::Starred`], [`Expr::Yield`], and [`Expr::YieldFrom`].
     ///
     /// [Python grammar]: https://docs.python.org/3/reference/grammar.html
-    fn parse_simple_expression(&mut self) -> ParsedExpr {
-        self.parse_expression_with_precedence(Precedence::Initial)
+    fn parse_simple_expression(
+        &mut self,
+        allow_lambda_expression: AllowLambdaExpression,
+    ) -> ParsedExpr {
+        let parsed_expr = self.parse_expression_with_precedence(Precedence::Initial);
+
+        if parsed_expr.is_parenthesized {
+            // Parentheses resets the precedence, so we don't need to validate it.
+            return parsed_expr;
+        }
+
+        if allow_lambda_expression.is_no() && parsed_expr.is_lambda_expr() {
+            self.add_error(ParseErrorType::InvalidLambdaExpressionUsage, &parsed_expr);
+        }
+
+        parsed_expr
     }
 
     /// Returns the binding power of the current token for a Pratt parser.
@@ -375,12 +394,7 @@ impl<'src> Parser<'src> {
             TokenKind::Lambda => {
                 let lambda_expr = self.parse_lambda_expr();
                 if previous_precedence > Precedence::Initial {
-                    self.add_error(
-                        ParseErrorType::OtherError(
-                            "`lambda` expression cannot be used here".to_string(),
-                        ),
-                        &lambda_expr,
-                    );
+                    self.add_error(ParseErrorType::InvalidLambdaExpressionUsage, &lambda_expr);
                 }
                 Expr::Lambda(lambda_expr).into()
             }
@@ -1951,7 +1965,7 @@ impl<'src> Parser<'src> {
         }
 
         self.expect(TokenKind::In);
-        let iter = self.parse_simple_expression();
+        let iter = self.parse_simple_expression(AllowLambdaExpression::No);
         self.validate_comprehension_iter_and_if_expr(&iter);
 
         let mut ifs = vec![];
@@ -1960,7 +1974,7 @@ impl<'src> Parser<'src> {
         while self.eat(TokenKind::If) {
             progress.assert_progressing(self);
 
-            let parsed_expr = self.parse_simple_expression();
+            let parsed_expr = self.parse_simple_expression(AllowLambdaExpression::No);
             self.validate_comprehension_iter_and_if_expr(&parsed_expr);
 
             ifs.push(parsed_expr.expr);
@@ -1990,14 +2004,6 @@ impl<'src> Parser<'src> {
                 self.add_error(
                     ParseErrorType::OtherError(
                         "unparenthesized yield expression cannot be used here".to_string(),
-                    ),
-                    parsed_expr,
-                );
-            }
-            Expr::Lambda(_) => {
-                self.add_error(
-                    ParseErrorType::OtherError(
-                        "unparenthesized lambda expression cannot be used here".to_string(),
                     ),
                     parsed_expr,
                 );
@@ -2355,17 +2361,9 @@ impl<'src> Parser<'src> {
     fn parse_if_expression(&mut self, body: Expr, start: TextSize) -> ast::ExprIf {
         self.bump(TokenKind::If);
 
-        let test = self.parse_simple_expression();
+        let test = self.parse_simple_expression(AllowLambdaExpression::No);
         if !test.is_parenthesized {
             match test.expr {
-                Expr::Lambda(_) => {
-                    self.add_error(
-                        ParseErrorType::OtherError(
-                            "unparenthesized lambda expression cannot be used here".to_string(),
-                        ),
-                        &test,
-                    );
-                }
                 Expr::Yield(_) | Expr::YieldFrom(_) => {
                     self.add_error(
                         ParseErrorType::OtherError(
@@ -2565,5 +2563,17 @@ pub(super) enum AllowNamedExpression {
 impl AllowNamedExpression {
     const fn is_yes(self) -> bool {
         matches!(self, AllowNamedExpression::Yes)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum AllowLambdaExpression {
+    Yes,
+    No,
+}
+
+impl AllowLambdaExpression {
+    const fn is_no(self) -> bool {
+        matches!(self, AllowLambdaExpression::No)
     }
 }
