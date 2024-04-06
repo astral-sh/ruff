@@ -56,9 +56,10 @@ impl AnnotationContext {
             _ => {}
         }
 
-        // If `__future__` annotations are enabled, then annotations are never evaluated
-        // at runtime, so we can treat them as typing-only.
-        if semantic.future_annotations() {
+        // If `__future__` annotations are enabled or it's a stub file,
+        // then annotations are never evaluated at runtime,
+        // so we can treat them as typing-only.
+        if semantic.future_annotations_or_stub() {
             return Self::TypingOnly;
         }
 
@@ -87,7 +88,7 @@ impl AnnotationContext {
             semantic,
         ) {
             Self::RuntimeRequired
-        } else if semantic.future_annotations() {
+        } else if semantic.future_annotations_or_stub() {
             Self::TypingOnly
         } else {
             Self::RuntimeEvaluated

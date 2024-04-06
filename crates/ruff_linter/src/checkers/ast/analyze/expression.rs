@@ -32,10 +32,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 if let Some(operator) = typing::to_pep604_operator(value, slice, &checker.semantic)
                 {
                     if checker.enabled(Rule::FutureRewritableTypeAnnotation) {
-                        if !checker.source_type.is_stub()
+                        if !checker.semantic.future_annotations_or_stub()
                             && checker.settings.target_version < PythonVersion::Py310
                             && checker.settings.target_version >= PythonVersion::Py37
-                            && !checker.semantic.future_annotations()
                             && checker.semantic.in_annotation()
                             && !checker.settings.pyupgrade.keep_runtime_typing
                         {
@@ -48,7 +47,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                         if checker.source_type.is_stub()
                             || checker.settings.target_version >= PythonVersion::Py310
                             || (checker.settings.target_version >= PythonVersion::Py37
-                                && checker.semantic.future_annotations()
+                                && checker.semantic.future_annotations_or_stub()
                                 && checker.semantic.in_annotation()
                                 && !checker.settings.pyupgrade.keep_runtime_typing)
                         {
@@ -60,9 +59,8 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
 
             // Ex) list[...]
             if checker.enabled(Rule::FutureRequiredTypeAnnotation) {
-                if !checker.source_type.is_stub()
+                if !checker.semantic.future_annotations_or_stub()
                     && checker.settings.target_version < PythonVersion::Py39
-                    && !checker.semantic.future_annotations()
                     && checker.semantic.in_annotation()
                     && typing::is_pep585_generic(value, &checker.semantic)
                 {
@@ -186,10 +184,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                             typing::to_pep585_generic(expr, &checker.semantic)
                         {
                             if checker.enabled(Rule::FutureRewritableTypeAnnotation) {
-                                if !checker.source_type.is_stub()
+                                if !checker.semantic.future_annotations_or_stub()
                                     && checker.settings.target_version < PythonVersion::Py39
                                     && checker.settings.target_version >= PythonVersion::Py37
-                                    && !checker.semantic.future_annotations()
                                     && checker.semantic.in_annotation()
                                     && !checker.settings.pyupgrade.keep_runtime_typing
                                 {
@@ -200,7 +197,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                                 if checker.source_type.is_stub()
                                     || checker.settings.target_version >= PythonVersion::Py39
                                     || (checker.settings.target_version >= PythonVersion::Py37
-                                        && checker.semantic.future_annotations()
+                                        && checker.semantic.future_annotations_or_stub()
                                         && checker.semantic.in_annotation()
                                         && !checker.settings.pyupgrade.keep_runtime_typing)
                                 {
@@ -270,10 +267,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             ]) {
                 if let Some(replacement) = typing::to_pep585_generic(expr, &checker.semantic) {
                     if checker.enabled(Rule::FutureRewritableTypeAnnotation) {
-                        if !checker.source_type.is_stub()
+                        if !checker.semantic.future_annotations_or_stub()
                             && checker.settings.target_version < PythonVersion::Py39
                             && checker.settings.target_version >= PythonVersion::Py37
-                            && !checker.semantic.future_annotations()
                             && checker.semantic.in_annotation()
                             && !checker.settings.pyupgrade.keep_runtime_typing
                         {
@@ -286,7 +282,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                         if checker.source_type.is_stub()
                             || checker.settings.target_version >= PythonVersion::Py39
                             || (checker.settings.target_version >= PythonVersion::Py37
-                                && checker.semantic.future_annotations()
+                                && checker.semantic.future_annotations_or_stub()
                                 && checker.semantic.in_annotation()
                                 && !checker.settings.pyupgrade.keep_runtime_typing)
                         {
@@ -1176,9 +1172,8 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
         }) => {
             // Ex) `str | None`
             if checker.enabled(Rule::FutureRequiredTypeAnnotation) {
-                if !checker.source_type.is_stub()
+                if !checker.semantic.future_annotations_or_stub()
                     && checker.settings.target_version < PythonVersion::Py310
-                    && !checker.semantic.future_annotations()
                     && checker.semantic.in_annotation()
                 {
                     flake8_future_annotations::rules::future_required_type_annotation(
