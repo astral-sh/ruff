@@ -12,12 +12,13 @@ pub(crate) type WorkspaceSettingsMap = FxHashMap<Url, ClientSettings>;
 /// sends them.
 #[derive(Debug)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
-// TODO(jane): Remove dead code warning
-#[allow(dead_code, clippy::struct_excessive_bools)]
+#[allow(clippy::struct_excessive_bools)]
 pub(crate) struct ResolvedClientSettings {
     fix_all: bool,
     organize_imports: bool,
     lint_enable: bool,
+    // TODO(jane): Remove once noqa auto-fix is implemented
+    #[allow(dead_code)]
     disable_rule_comment_enable: bool,
     fix_violation_enable: bool,
 }
@@ -193,6 +194,24 @@ impl ResolvedClientSettings {
             .map(Deref::deref)
             .find_map(get)
             .unwrap_or(default)
+    }
+}
+
+impl ResolvedClientSettings {
+    pub(crate) fn fix_all(&self) -> bool {
+        self.fix_all
+    }
+
+    pub(crate) fn organize_imports(&self) -> bool {
+        self.organize_imports
+    }
+
+    pub(crate) fn lint(&self) -> bool {
+        self.lint_enable
+    }
+
+    pub(crate) fn fix_violation(&self) -> bool {
+        self.fix_violation_enable
     }
 }
 
