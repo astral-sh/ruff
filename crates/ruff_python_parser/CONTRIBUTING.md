@@ -13,7 +13,7 @@ Test that the parser successfully parses the input with no syntax errors. They'r
 written in the following format:
 
 ```rs
-// test this_is_the_test_name
+// test_ok this_is_the_test_name
 // def foo():
 //     pass
 println!("some rust code");
@@ -28,14 +28,14 @@ in the following format:
 println!("some rust code");
 ```
 
-Note that the difference between the two is the `test` and `test_err` keywords.
+Note that the difference between the two is the `test_ok` and `test_err` keywords.
 The comment block must be independent of any other comment blocks. For example, the
 following is not extracted:
 
 ```rs
 // Some random comment
 //
-// test this_is_the_test_name
+// test_ok this_is_the_test_name
 // def foo():
 //     pass
 println!("some rust code");

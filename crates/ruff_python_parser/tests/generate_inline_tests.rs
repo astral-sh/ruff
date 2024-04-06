@@ -6,12 +6,12 @@
 //! - <https://github.com/rust-lang/rust-analyzer/blob/e4a405f877efd820bef9c0e77a02494e47c17512/crates/parser/src/tests/sourcegen_inline_tests.rs>
 //! - <https://github.com/biomejs/biome/blob/b9f8ffea9967b098ec4c8bf74fa96826a879f043/xtask/codegen/src/parser_tests.rs>
 use std::collections::HashMap;
+use std::fmt;
 use std::fs;
-use std::ops::{Deref, DerefMut};
+use std::ops::{AddAssign, Deref, DerefMut};
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
-use itertools::Itertools;
 
 fn project_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -25,13 +25,80 @@ fn generate_inline_tests() -> Result<()> {
     let parser_dir = project_root().join("crates/ruff_python_parser/src/parser");
     let tests = TestCollection::try_from(parser_dir.as_path())?;
 
-    install_tests(&tests.ok, "crates/ruff_python_parser/resources/inline/ok")?;
-    install_tests(&tests.err, "crates/ruff_python_parser/resources/inline/err")?;
+    let mut test_files = TestFiles::default();
+    test_files += install_tests(&tests.ok, "crates/ruff_python_parser/resources/inline/ok")?;
+    test_files += install_tests(&tests.err, "crates/ruff_python_parser/resources/inline/err")?;
+
+    if !test_files.is_empty() {
+        anyhow::bail!("{}", test_files);
+    }
 
     Ok(())
 }
 
-fn install_tests(tests: &HashMap<String, Test>, target_dir: &str) -> Result<()> {
+#[derive(Debug, Default)]
+struct TestFiles {
+    unreferenced: Vec<PathBuf>,
+    updated: Vec<PathBuf>,
+}
+
+impl TestFiles {
+    fn is_empty(&self) -> bool {
+        self.unreferenced.is_empty() && self.updated.is_empty()
+    }
+}
+
+impl AddAssign<TestFiles> for TestFiles {
+    fn add_assign(&mut self, other: TestFiles) {
+        self.unreferenced.extend(other.unreferenced);
+        self.updated.extend(other.updated);
+    }
+}
+
+impl fmt::Display for TestFiles {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.is_empty() {
+            writeln!(f, "No unreferenced or updated test files found")
+        } else {
+            let root_dir = project_root();
+            if !self.unreferenced.is_empty() {
+                writeln!(
+                    f,
+                    "Unreferenced test files found for which no comment exists:",
+                )?;
+                for path in &self.unreferenced {
+                    writeln!(f, "  {}", path.strip_prefix(&root_dir).unwrap().display())?;
+                }
+                writeln!(f, "Please delete these files manually")?;
+            }
+            if !self.updated.is_empty() {
+                if !self.unreferenced.is_empty() {
+                    writeln!(f)?;
+                }
+                writeln!(
+                    f,
+                    "Following files were not up-to date and has been updated:",
+                )?;
+                for path in &self.updated {
+                    writeln!(f, "  {}", path.strip_prefix(&root_dir).unwrap().display())?;
+                }
+                writeln!(
+                    f,
+                    "Re-run the tests with `cargo test` to update the test snapshots"
+                )?;
+                if std::env::var("CI").is_ok() {
+                    writeln!(
+                        f,
+                        "NOTE: Run the tests locally and commit the updated files"
+                    )?;
+                }
+            }
+            Ok(())
+        }
+    }
+}
+
+fn install_tests(tests: &HashMap<String, Test>, target_dir: &str) -> Result<TestFiles> {
     let root_dir = project_root();
     let tests_dir = root_dir.join(target_dir);
     if !tests_dir.is_dir() {
@@ -40,22 +107,6 @@ fn install_tests(tests: &HashMap<String, Test>, target_dir: &str) -> Result<()> 
 
     // Test kind is irrelevant for existing test cases.
     let existing = existing_tests(&tests_dir)?;
-
-    let unreferenced = existing
-        .iter()
-        .filter(|&(name, _)| !tests.contains_key(name))
-        .map(|(_, path)| path)
-        .collect::<Vec<_>>();
-
-    if !unreferenced.is_empty() {
-        anyhow::bail!(
-            "Unreferenced test files found for which no comment exists:\n  {}\nPlease delete these files manually\n",
-            unreferenced
-                .iter()
-                .map(|path| path.strip_prefix(&root_dir).unwrap().display())
-                .join("\n  ")
-        );
-    }
 
     let mut updated_files = vec![];
 
@@ -73,21 +124,14 @@ fn install_tests(tests: &HashMap<String, Test>, target_dir: &str) -> Result<()> 
         updated_files.push(path);
     }
 
-    if !updated_files.is_empty() {
-        let mut message = format!(
-            "Following files were not up-to date and has been updated:\n  {}\nRe-run the tests with `cargo test` to update the test snapshots\n",
-            updated_files
-                .iter()
-                .map(|path| path.strip_prefix(&root_dir).unwrap().display())
-                .join("\n  ")
-        );
-        if std::env::var("CI").is_ok() {
-            message.push_str("NOTE: Run the tests locally and commit the updated files\n");
-        }
-        anyhow::bail!(message);
-    }
-
-    Ok(())
+    Ok(TestFiles {
+        unreferenced: existing
+            .into_iter()
+            .filter(|(name, _)| !tests.contains_key(name))
+            .map(|(_, path)| path)
+            .collect::<Vec<_>>(),
+        updated: updated_files,
+    })
 }
 
 #[derive(Default, Debug)]
@@ -115,7 +159,7 @@ impl TryFrom<&Path> for TestCollection {
                 if test.is_ok() {
                     if let Some(old_test) = tests.ok.insert(test.name.clone(), test) {
                         anyhow::bail!(
-                            "Duplicate test found: {name:?} (search '// test {name}' for the location)\n",
+                            "Duplicate test found: {name:?} (search '// test_ok {name}' for the location)\n",
                             name = old_test.name
                         );
                     }
@@ -141,7 +185,7 @@ enum TestKind {
 /// A test of the following form:
 ///
 /// ```text
-/// // (test|test_err) name
+/// // (test_ok|test_err) name
 /// // <code>
 /// ```
 #[derive(Debug)]
@@ -165,7 +209,7 @@ fn collect_tests(text: &str) -> Vec<Test> {
         let first_line = &comment_block[0];
 
         let (kind, name) = match first_line.split_once(' ') {
-            Some(("test", suffix)) => (TestKind::Ok, suffix),
+            Some(("test_ok", suffix)) => (TestKind::Ok, suffix),
             Some(("test_err", suffix)) => (TestKind::Err, suffix),
             _ => continue,
         };
