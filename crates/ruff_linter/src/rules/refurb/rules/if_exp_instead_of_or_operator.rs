@@ -31,7 +31,8 @@ use crate::checkers::ast::Checker;
 /// `if` expression contains side effects.
 ///
 /// For example, `foo` will be called twice in `foo() if foo() else bar()`
-/// (assuming it returns a truthy value), but only once in `foo() or bar()`.
+/// (assuming `foo()` returns a truthy value), but only once in
+/// `foo() or bar()`.
 #[violation]
 pub struct IfExpInsteadOfOrOperator;
 
@@ -89,7 +90,7 @@ pub(crate) fn if_exp_instead_of_or_operator(checker: &mut Checker, if_expr: &ast
             ),
             if_expr.range(),
         ),
-        if contains_effect(&body, |id| checker.semantic().is_builtin(id)) {
+        if contains_effect(body, |id| checker.semantic().is_builtin(id)) {
             Applicability::Unsafe
         } else {
             Applicability::Safe
