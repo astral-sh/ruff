@@ -1,29 +1,31 @@
-use std::ops::Deref;
-
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
-use ruff_python_ast::{self as ast, Arguments, CmpOp, ExprContext, Stmt};
-use ruff_text_size::{Ranged, TextRange};
+use ruff_python_ast::{self as ast, CmpOp, Stmt};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::fix::snippet::SourceCodeSnippet;
 
 /// ## What it does
-/// Check for an if node that can be refactored as a min/max python builtin.
+/// Checks for `if` statements that can be replaced with `min()` or `max()`
+/// calls.
 ///
 /// ## Why is this bad?
-/// An if block where the test and assignment have the same structure can
-/// be expressed more concisely by using the python builtin min/max function.
+/// An `if` statement that selects the lesser or greater of two sub-expressions
+/// can be replaced with a `min()` or `max()` call respectively. When possible,
+/// prefer `min()` and `max()`, as they're more concise and readable than the
+/// equivalent `if` statements.
 ///
 /// ## Example
 /// ```python
-/// if value < 10:
-///     value = 10
+/// if score > highest_score:
+///     highest_score = score
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// value = max(value, 10)
+/// highest_score = max(highest_score, score)
 /// ```
 ///
 /// ## References
@@ -31,14 +33,36 @@ use crate::checkers::ast::Checker;
 /// - [Python documentation: min function](https://docs.python.org/3/library/functions.html#min)
 #[violation]
 pub struct IfStmtMinMax {
-    contents: String,
+    min_max: MinMax,
+    replacement: SourceCodeSnippet,
 }
 
 impl Violation for IfStmtMinMax {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
-        let IfStmtMinMax { contents } = self;
-        format!("Consider using `{contents}` instead of unnecessary if block")
+        let Self {
+            min_max,
+            replacement,
+        } = self;
+        if let Some(replacement) = replacement.full_display() {
+            format!("Replace `if` statement with `{replacement}`")
+        } else {
+            format!("Replace `if` statement with `{min_max}` call")
+        }
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        let Self {
+            min_max,
+            replacement,
+        } = self;
+        if let Some(replacement) = replacement.full_display() {
+            Some(format!("Replace with `{replacement}`"))
+        } else {
+            Some(format!("Replace with `{min_max}` call"))
+        }
     }
 }
 
@@ -77,11 +101,22 @@ pub(crate) fn if_stmt_min_max(checker: &mut Checker, stmt_if: &ast::StmtIf) {
         return;
     };
 
-    if !(!body_target.is_subscript_expr() && !left.is_subscript_expr()) {
+    // Ignore, e.g., `foo < bar < baz`.
+    let [op] = &**ops else {
         return;
-    }
+    };
 
-    let ([op], [right_statement]) = (&**ops, &**comparators) else {
+    // Determine whether to use `min()` or `max()`, and whether to flip the
+    // order of the arguments, which is relevant for breaking ties.
+    let (min_max, flip_args) = match op {
+        CmpOp::Gt => (MinMax::Max, true),
+        CmpOp::GtE => (MinMax::Max, false),
+        CmpOp::Lt => (MinMax::Min, true),
+        CmpOp::LtE => (MinMax::Min, false),
+        _ => return,
+    };
+
+    let [right] = &**comparators else {
         return;
     };
 
@@ -93,50 +128,60 @@ pub(crate) fn if_stmt_min_max(checker: &mut Checker, stmt_if: &ast::StmtIf) {
 
     let left_cmp = ComparableExpr::from(left);
     let body_target_cmp = ComparableExpr::from(body_target);
-    let right_statement_cmp = ComparableExpr::from(right_statement);
+    let right_statement_cmp = ComparableExpr::from(right);
     let body_value_cmp = ComparableExpr::from(body_value);
     if left_cmp != body_target_cmp || right_statement_cmp != body_value_cmp {
         return;
     }
 
-    let func_node = ast::ExprName {
-        id: min_or_max.as_str().into(),
-        ctx: ExprContext::Load,
-        range: TextRange::default(),
+    let (arg1, arg2) = if flip_args {
+        (left.as_ref(), right)
+    } else {
+        (right, left.as_ref())
     };
-    let value_node = ast::ExprCall {
-        func: Box::new(func_node.into()),
-        arguments: Arguments {
-            args: Box::from([body_target.clone(), body_value.deref().clone()]),
-            keywords: Box::from([]),
-            range: TextRange::default(),
-        },
-        range: TextRange::default(),
-    };
-    let assign_node = ast::StmtAssign {
-        targets: vec![body_target.clone()],
-        value: Box::new(value_node.into()),
-        range: TextRange::default(),
-    };
-    let diagnostic = Diagnostic::new(
+
+    let replacement = format!(
+        "{} = {min_max}({}, {})",
+        checker.locator().slice(body_target),
+        checker.locator().slice(arg1),
+        checker.locator().slice(arg2),
+    );
+
+    let mut diagnostic = Diagnostic::new(
         IfStmtMinMax {
-            contents: checker.generator().stmt(&assign_node.into()),
+            min_max,
+            replacement: SourceCodeSnippet::from_str(replacement.as_str()),
         },
         stmt_if.range(),
     );
+
+    if checker.semantic().is_builtin(min_max.as_str()) {
+        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+            replacement,
+            stmt_if.range(),
+        )));
+    }
+
     checker.diagnostics.push(diagnostic);
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 enum MinMax {
     Min,
     Max,
 }
 
 impl MinMax {
-    fn as_str(&self) -> &'static str {
+    fn as_str(self) -> &'static str {
         match self {
             Self::Min => "min",
             Self::Max => "max",
         }
+    }
+}
+
+impl std::fmt::Display for MinMax {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(fmt, "{}", self.as_str())
     }
 }
