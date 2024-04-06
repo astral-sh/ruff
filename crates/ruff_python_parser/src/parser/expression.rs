@@ -83,16 +83,19 @@ impl<'src> Parser<'src> {
     /// Matches the `expressions` rule in the [Python grammar].
     ///
     /// [Python grammar]: https://docs.python.org/3/reference/grammar.html
-    pub(super) fn parse_expression_list(&mut self) -> ParsedExpr {
+    pub(super) fn parse_expression_list(
+        &mut self,
+        allow_starred_expression: AllowStarredExpression,
+    ) -> ParsedExpr {
         let start = self.node_start();
-        let parsed_expr = self.parse_conditional_expression_or_higher();
+        let parsed_expr = self.parse_conditional_expression_or_higher(allow_starred_expression);
 
         if self.at(TokenKind::Comma) {
             Expr::Tuple(self.parse_tuple_expression(
                 parsed_expr.expr,
                 start,
                 Parenthesized::No,
-                Parser::parse_conditional_expression_or_higher,
+                |p| p.parse_conditional_expression_or_higher(allow_starred_expression),
             ))
             .into()
         } else {
@@ -132,12 +135,14 @@ impl<'src> Parser<'src> {
         &mut self,
         allow_named_expression: AllowNamedExpression,
     ) -> ParsedExpr {
+        // This method parses starred expression with a different precedence,
+        // so don't allow it in other branches.
         if self.at(TokenKind::Star) {
             Expr::Starred(self.parse_starred_expression(StarredExpressionPrecedence::BitOr)).into()
         } else if allow_named_expression.is_yes() {
-            self.parse_named_expression_or_higher()
+            self.parse_named_expression_or_higher(AllowStarredExpression::No)
         } else {
-            self.parse_conditional_expression_or_higher()
+            self.parse_conditional_expression_or_higher(AllowStarredExpression::No)
         }
     }
 
@@ -149,9 +154,12 @@ impl<'src> Parser<'src> {
     /// instead of a tuple, use this function!
     ///
     /// [Python grammar]: https://docs.python.org/3/reference/grammar.html
-    pub(super) fn parse_named_expression_or_higher(&mut self) -> ParsedExpr {
+    pub(super) fn parse_named_expression_or_higher(
+        &mut self,
+        allow_starred_expression: AllowStarredExpression,
+    ) -> ParsedExpr {
         let start = self.node_start();
-        let parsed_expr = self.parse_conditional_expression_or_higher();
+        let parsed_expr = self.parse_conditional_expression_or_higher(allow_starred_expression);
 
         if self.at(TokenKind::ColonEqual) {
             Expr::Named(self.parse_named_expression(parsed_expr.expr, start)).into()
@@ -168,9 +176,13 @@ impl<'src> Parser<'src> {
     /// instead of a tuple, use this function!
     ///
     /// [Python grammar]: https://docs.python.org/3/reference/grammar.html
-    pub(super) fn parse_conditional_expression_or_higher(&mut self) -> ParsedExpr {
+    pub(super) fn parse_conditional_expression_or_higher(
+        &mut self,
+        allow_starred_expression: AllowStarredExpression,
+    ) -> ParsedExpr {
         let start = self.node_start();
-        let parsed_expr = self.parse_simple_expression(AllowLambdaExpression::Yes);
+        let parsed_expr =
+            self.parse_simple_expression(AllowLambdaExpression::Yes, allow_starred_expression);
 
         if self.at(TokenKind::If) {
             Expr::If(self.parse_if_expression(parsed_expr.expr, start)).into()
@@ -197,6 +209,7 @@ impl<'src> Parser<'src> {
     fn parse_simple_expression(
         &mut self,
         allow_lambda_expression: AllowLambdaExpression,
+        allow_starred_expression: AllowStarredExpression,
     ) -> ParsedExpr {
         let parsed_expr = self.parse_expression_with_precedence(Precedence::Initial);
 
@@ -205,8 +218,14 @@ impl<'src> Parser<'src> {
             return parsed_expr;
         }
 
-        if allow_lambda_expression.is_no() && parsed_expr.is_lambda_expr() {
-            self.add_error(ParseErrorType::InvalidLambdaExpressionUsage, &parsed_expr);
+        match parsed_expr.expr {
+            Expr::Lambda(_) if allow_lambda_expression.is_no() => {
+                self.add_error(ParseErrorType::InvalidLambdaExpressionUsage, &parsed_expr);
+            }
+            Expr::Starred(_) if allow_starred_expression.is_no() => {
+                self.add_error(ParseErrorType::StarredExpressionUsage, &parsed_expr);
+            }
+            _ => {}
         }
 
         parsed_expr
@@ -428,7 +447,7 @@ impl<'src> Parser<'src> {
     ///
     /// [Python grammar]: https://docs.python.org/3/reference/grammar.html
     fn parse_expression_with_bitwise_or_precedence(&mut self) -> ParsedExpr {
-        let parsed_expr = self.parse_conditional_expression_or_higher();
+        let parsed_expr = self.parse_conditional_expression_or_higher(AllowStarredExpression::No);
 
         if parsed_expr.is_parenthesized {
             // Parentheses resets the precedence, so we don't need to validate it.
@@ -445,7 +464,6 @@ impl<'src> Parser<'src> {
             Expr::If(_) => "conditional",
             Expr::Lambda(_) => "lambda",
             Expr::Yield(_) | Expr::YieldFrom(_) => "yield",
-            Expr::Starred(_) => "starred",
             _ => return parsed_expr,
         };
 
@@ -686,7 +704,8 @@ impl<'src> Parser<'src> {
         self.parse_comma_separated_list(RecoveryContextKind::Arguments, |parser| {
             let argument_start = parser.node_start();
             if parser.eat(TokenKind::DoubleStar) {
-                let value = parser.parse_conditional_expression_or_higher();
+                let value =
+                    parser.parse_conditional_expression_or_higher(AllowStarredExpression::No);
 
                 if !value.is_parenthesized {
                     match value.expr {
@@ -696,9 +715,6 @@ impl<'src> Parser<'src> {
                             ),
                             &value,
                         ),
-                        Expr::Starred(_) => {
-                            parser.add_error(ParseErrorType::StarredExpressionUsage, &value);
-                        }
                         _ => {}
                     }
                 }
@@ -712,7 +728,8 @@ impl<'src> Parser<'src> {
                 seen_keyword_unpacking = true;
             } else {
                 let start = parser.node_start();
-                let mut parsed_expr = parser.parse_named_expression_or_higher();
+                let mut parsed_expr =
+                    parser.parse_named_expression_or_higher(AllowStarredExpression::Yes);
 
                 if parsed_expr.is_unparenthesized_yield_expr() {
                     parser.add_error(
@@ -766,7 +783,8 @@ impl<'src> Parser<'src> {
                         }
                     };
 
-                    let value = parser.parse_conditional_expression_or_higher();
+                    let value =
+                        parser.parse_conditional_expression_or_higher(AllowStarredExpression::No);
                     if !value.is_parenthesized {
                         match value.expr {
                             Expr::Yield(_) | Expr::YieldFrom(_) => parser.add_error(
@@ -776,9 +794,6 @@ impl<'src> Parser<'src> {
                                 ),
                                 &value,
                             ),
-                            Expr::Starred(_) => {
-                                parser.add_error(ParseErrorType::StarredExpressionUsage, &value);
-                            }
                             _ => {}
                         }
                     }
@@ -914,7 +929,7 @@ impl<'src> Parser<'src> {
         let start = self.node_start();
 
         let lower = if self.at_expr() {
-            let lower = self.parse_named_expression_or_higher();
+            let lower = self.parse_named_expression_or_higher(AllowStarredExpression::Yes);
             if self.at_ts(NEWLINE_EOF_SET.union([TokenKind::Rsqb, TokenKind::Comma].into())) {
                 return lower.expr;
             }
@@ -942,22 +957,20 @@ impl<'src> Parser<'src> {
         let upper = if self.at_ts(UPPER_END_SET) {
             None
         } else {
-            let upper = self.parse_conditional_expression_or_higher();
-            if upper.is_unparenthesized_starred_expr() {
-                self.add_error(ParseErrorType::StarredExpressionUsage, &upper);
-            }
-            Some(Box::new(upper.expr))
+            Some(Box::new(
+                self.parse_conditional_expression_or_higher(AllowStarredExpression::No)
+                    .expr,
+            ))
         };
 
         let step = if self.eat(TokenKind::Colon) {
             if self.at_ts(STEP_END_SET) {
                 None
             } else {
-                let step = self.parse_conditional_expression_or_higher();
-                if step.is_unparenthesized_starred_expr() {
-                    self.add_error(ParseErrorType::StarredExpressionUsage, &step);
-                }
-                Some(Box::new(step.expr))
+                Some(Box::new(
+                    self.parse_conditional_expression_or_higher(AllowStarredExpression::No)
+                        .expr,
+                ))
             }
         } else {
             None
@@ -1683,7 +1696,7 @@ impl<'src> Parser<'src> {
                 }
 
                 self.bump(TokenKind::Colon);
-                let value = self.parse_conditional_expression_or_higher();
+                let value = self.parse_conditional_expression_or_higher(AllowStarredExpression::No);
 
                 if matches!(self.current_token_kind(), TokenKind::Async | TokenKind::For) {
                     Expr::DictComp(self.parse_dictionary_comprehension_expression(
@@ -1896,20 +1909,18 @@ impl<'src> Parser<'src> {
                 // which requires limiting the expression.
                 values.push(parser.parse_expression_with_bitwise_or_precedence().expr);
             } else {
-                let key = parser.parse_conditional_expression_or_higher();
-                if !key.is_parenthesized && key.expr.is_starred_expr() {
-                    parser.add_error(ParseErrorType::StarredExpressionUsage, &key);
-                }
-
-                keys.push(Some(key.expr));
+                keys.push(Some(
+                    parser
+                        .parse_conditional_expression_or_higher(AllowStarredExpression::No)
+                        .expr,
+                ));
                 parser.expect(TokenKind::Colon);
 
-                let value = parser.parse_conditional_expression_or_higher();
-                if !value.is_parenthesized && value.expr.is_starred_expr() {
-                    parser.add_error(ParseErrorType::StarredExpressionUsage, &value);
-                }
-
-                values.push(value.expr);
+                values.push(
+                    parser
+                        .parse_conditional_expression_or_higher(AllowStarredExpression::No)
+                        .expr,
+                );
             }
         });
 
@@ -1956,7 +1967,7 @@ impl<'src> Parser<'src> {
         self.bump(TokenKind::For);
 
         let saved_context = self.set_ctx(ParserCtxFlags::FOR_TARGET);
-        let mut target = self.parse_expression_list();
+        let mut target = self.parse_expression_list(AllowStarredExpression::Yes);
         self.restore_ctx(ParserCtxFlags::FOR_TARGET, saved_context);
 
         helpers::set_expr_ctx(&mut target.expr, ExprContext::Store);
@@ -1965,7 +1976,8 @@ impl<'src> Parser<'src> {
         }
 
         self.expect(TokenKind::In);
-        let iter = self.parse_simple_expression(AllowLambdaExpression::No);
+        let iter =
+            self.parse_simple_expression(AllowLambdaExpression::No, AllowStarredExpression::No);
         self.validate_comprehension_iter_and_if_expr(&iter);
 
         let mut ifs = vec![];
@@ -1974,7 +1986,8 @@ impl<'src> Parser<'src> {
         while self.eat(TokenKind::If) {
             progress.assert_progressing(self);
 
-            let parsed_expr = self.parse_simple_expression(AllowLambdaExpression::No);
+            let parsed_expr =
+                self.parse_simple_expression(AllowLambdaExpression::No, AllowStarredExpression::No);
             self.validate_comprehension_iter_and_if_expr(&parsed_expr);
 
             ifs.push(parsed_expr.expr);
@@ -1997,9 +2010,6 @@ impl<'src> Parser<'src> {
         }
 
         match parsed_expr.expr {
-            Expr::Starred(_) => {
-                self.add_error(ParseErrorType::StarredExpressionUsage, parsed_expr);
-            }
             Expr::Yield(_) | Expr::YieldFrom(_) => {
                 self.add_error(
                     ParseErrorType::OtherError(
@@ -2141,7 +2151,7 @@ impl<'src> Parser<'src> {
 
         let parsed_expr = match precedence {
             StarredExpressionPrecedence::Conditional => {
-                self.parse_conditional_expression_or_higher()
+                self.parse_conditional_expression_or_higher(AllowStarredExpression::No)
             }
             StarredExpressionPrecedence::BitOr => {
                 self.parse_expression_with_bitwise_or_precedence()
@@ -2221,12 +2231,9 @@ impl<'src> Parser<'src> {
         // If we didn't use the `parse_expression_list` method here, the parser
         // would have stopped at the comma. Then, the outer expression would
         // have been a tuple expression with two elements: `yield from x` and `y`.
-        let expr = self.parse_expression_list().expr;
+        let expr = self.parse_expression_list(AllowStarredExpression::No).expr;
 
         match &expr {
-            Expr::Starred(_) => {
-                self.add_error(ParseErrorType::StarredExpressionUsage, &expr);
-            }
             Expr::Tuple(tuple) if !tuple.parenthesized => {
                 self.add_error(
                     ParseErrorType::OtherError(
@@ -2263,7 +2270,7 @@ impl<'src> Parser<'src> {
         }
         helpers::set_expr_ctx(&mut target, ExprContext::Store);
 
-        let value = self.parse_conditional_expression_or_higher();
+        let value = self.parse_conditional_expression_or_higher(AllowStarredExpression::No);
         if !value.is_parenthesized {
             match value.expr {
                 Expr::Yield(_) | Expr::YieldFrom(_) => {
@@ -2273,9 +2280,6 @@ impl<'src> Parser<'src> {
                         ),
                         &value,
                     );
-                }
-                Expr::Starred(_) => {
-                    self.add_error(ParseErrorType::StarredExpressionUsage, &value);
                 }
                 _ => {}
             }
@@ -2316,7 +2320,13 @@ impl<'src> Parser<'src> {
         // lambda x: lambda y: x + y
         // lambda x: (yield x)  # Parenthesized `yield` is fine
         // lambda x: x, *y
-        let body = self.parse_conditional_expression_or_higher();
+
+        // test_err lambda_body_with_starred_expr
+        // lambda x: *y
+        // lambda x: *y,
+        // lambda x: *y, z
+        // lambda x: *y and z
+        let body = self.parse_conditional_expression_or_higher(AllowStarredExpression::No);
 
         if !body.is_parenthesized {
             match body.expr {
@@ -2330,15 +2340,6 @@ impl<'src> Parser<'src> {
                         ),
                         &body,
                     );
-                }
-
-                // test_err lambda_body_with_starred_expr
-                // lambda x: *y
-                // lambda x: *y,
-                // lambda x: *y, z
-                // lambda x: *y and z
-                Expr::Starred(_) => {
-                    self.add_error(ParseErrorType::StarredExpressionUsage, &body);
                 }
                 _ => {}
             }
@@ -2361,7 +2362,8 @@ impl<'src> Parser<'src> {
     fn parse_if_expression(&mut self, body: Expr, start: TextSize) -> ast::ExprIf {
         self.bump(TokenKind::If);
 
-        let test = self.parse_simple_expression(AllowLambdaExpression::No);
+        let test =
+            self.parse_simple_expression(AllowLambdaExpression::No, AllowStarredExpression::No);
         if !test.is_parenthesized {
             match test.expr {
                 Expr::Yield(_) | Expr::YieldFrom(_) => {
@@ -2372,16 +2374,13 @@ impl<'src> Parser<'src> {
                         &test,
                     );
                 }
-                Expr::Starred(_) => {
-                    self.add_error(ParseErrorType::StarredExpressionUsage, &test);
-                }
                 _ => {}
             }
         }
 
         self.expect(TokenKind::Else);
 
-        let orelse = self.parse_conditional_expression_or_higher();
+        let orelse = self.parse_conditional_expression_or_higher(AllowStarredExpression::No);
         if !orelse.is_parenthesized {
             match orelse.expr {
                 Expr::Yield(_) | Expr::YieldFrom(_) => {
@@ -2391,9 +2390,6 @@ impl<'src> Parser<'src> {
                         ),
                         &orelse,
                     );
-                }
-                Expr::Starred(_) => {
-                    self.add_error(ParseErrorType::StarredExpressionUsage, &orelse);
                 }
                 _ => {}
             }
@@ -2575,5 +2571,17 @@ enum AllowLambdaExpression {
 impl AllowLambdaExpression {
     const fn is_no(self) -> bool {
         matches!(self, AllowLambdaExpression::No)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum AllowStarredExpression {
+    Yes,
+    No,
+}
+
+impl AllowStarredExpression {
+    const fn is_no(self) -> bool {
+        matches!(self, AllowStarredExpression::No)
     }
 }
