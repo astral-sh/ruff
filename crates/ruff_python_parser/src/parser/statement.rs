@@ -831,6 +831,11 @@ impl<'src> Parser<'src> {
     ///
     /// See: <https://docs.python.org/3/reference/simple_stmts.html#assignment-statements>
     fn parse_assign_statement(&mut self, target: ParsedExpr, start: TextSize) -> ast::StmtAssign {
+        // The `parse_list` function could exit without parsing any target if it
+        // doesn't encounter a `=` token at the start, so make sure that isn't the
+        // case. This also ensures the function contract about the panic condition.
+        assert_eq!(self.current_token_kind(), TokenKind::Equal);
+
         let mut targets = vec![target.expr];
 
         // test_err assign_stmt_missing_rhs
