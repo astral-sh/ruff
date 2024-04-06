@@ -936,7 +936,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
     fn visit_expr(&mut self, expr: &'a Expr) {
         // Step 0: Pre-processing
         if !self.semantic.in_typing_literal()
-            // `in_deferred_type_definition()` will only be `true` if we've are now visiting the deferred nodes
+            // `in_deferred_type_definition()` will only be `true` if we're now visiting the deferred nodes
             // after having already traversed the source tree once. If we're now visiting the deferred nodes,
             // we can't defer again, or we'll infinitely recurse!
             && !self.semantic.in_deferred_type_definition()
