@@ -15,6 +15,7 @@ use crate::importer::ImportRequest;
 /// from both `str` and `enum.Enum`.
 ///
 /// ## Example
+///
 /// ```python
 /// import enum
 ///
@@ -24,6 +25,7 @@ use crate::importer::ImportRequest;
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// import enum
 ///
@@ -33,6 +35,7 @@ use crate::importer::ImportRequest;
 /// ```
 ///
 /// ## Fix safety
+///
 /// Python 3.11 introduced a [breaking change] for enums that inherit from both
 /// `str` and `enum.Enum`. Consider the following enum:
 ///
@@ -60,8 +63,10 @@ use crate::importer::ImportRequest;
 /// ```python
 /// from enum import StrEnum
 ///
+///
 /// class Foo(StrEnum):
 ///     BAR = "bar"
+///
 ///
 /// f"{Foo.BAR}"  # > bar
 /// ```
