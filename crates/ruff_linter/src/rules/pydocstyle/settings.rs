@@ -83,7 +83,7 @@ impl fmt::Display for Convention {
     }
 }
 
-#[derive(Debug, Default, CacheKey)]
+#[derive(Debug, Clone, Default, CacheKey)]
 pub struct Settings {
     pub convention: Option<Convention>,
     pub ignore_decorators: BTreeSet<String>,

@@ -15,15 +15,19 @@ use crate::rules::{
 pub(crate) fn deferred_scopes(checker: &mut Checker) {
     if !checker.any_enabled(&[
         Rule::AsyncioDanglingTask,
+        Rule::BadStaticmethodArgument,
+        Rule::BuiltinAttributeShadowing,
         Rule::GlobalVariableNotAssigned,
         Rule::ImportPrivateName,
         Rule::ImportShadowedByLoopVar,
-        Rule::InvalidFirstArgumentNameForMethod,
         Rule::InvalidFirstArgumentNameForClassMethod,
+        Rule::InvalidFirstArgumentNameForMethod,
         Rule::NoSelfUse,
         Rule::RedefinedArgumentFromLocal,
         Rule::RedefinedWhileUnused,
         Rule::RuntimeImportInTypeCheckingBlock,
+        Rule::SingledispatchMethod,
+        Rule::SingledispatchmethodFunction,
         Rule::TooManyLocals,
         Rule::TypingOnlyFirstPartyImport,
         Rule::TypingOnlyStandardLibraryImport,
@@ -31,19 +35,16 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
         Rule::UndefinedLocal,
         Rule::UnusedAnnotation,
         Rule::UnusedClassMethodArgument,
-        Rule::BuiltinAttributeShadowing,
         Rule::UnusedFunctionArgument,
         Rule::UnusedImport,
         Rule::UnusedLambdaArgument,
         Rule::UnusedMethodArgument,
         Rule::UnusedPrivateProtocol,
         Rule::UnusedPrivateTypeAlias,
-        Rule::UnusedPrivateTypeVar,
         Rule::UnusedPrivateTypedDict,
+        Rule::UnusedPrivateTypeVar,
         Rule::UnusedStaticMethodArgument,
         Rule::UnusedVariable,
-        Rule::SingledispatchMethod,
-        Rule::SingledispatchmethodFunction,
     ]) {
         return;
     }
@@ -422,6 +423,10 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
 
             if checker.enabled(Rule::SingledispatchmethodFunction) {
                 pylint::rules::singledispatchmethod_function(checker, scope, &mut diagnostics);
+            }
+
+            if checker.enabled(Rule::BadStaticmethodArgument) {
+                pylint::rules::bad_staticmethod_argument(checker, scope, &mut diagnostics);
             }
 
             if checker.any_enabled(&[

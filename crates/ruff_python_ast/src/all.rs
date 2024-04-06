@@ -39,6 +39,34 @@ impl Ranged for DunderAllName<'_> {
     }
 }
 
+/// Abstraction for a collection of names inside an `__all__` definition,
+/// e.g. `["foo", "bar"]` in `__all__ = ["foo", "bar"]`
+#[derive(Debug, Clone)]
+pub struct DunderAllDefinition<'a> {
+    /// The range of the `__all__` identifier.
+    range: TextRange,
+    /// The names inside the `__all__` definition.
+    names: Vec<DunderAllName<'a>>,
+}
+
+impl<'a> DunderAllDefinition<'a> {
+    /// Initialize a new [`DunderAllDefinition`] instance.
+    pub fn new(range: TextRange, names: Vec<DunderAllName<'a>>) -> Self {
+        Self { range, names }
+    }
+
+    /// The names inside the `__all__` definition.
+    pub fn names(&self) -> &[DunderAllName<'a>] {
+        &self.names
+    }
+}
+
+impl Ranged for DunderAllDefinition<'_> {
+    fn range(&self) -> TextRange {
+        self.range
+    }
+}
+
 /// Extract the names bound to a given __all__ assignment.
 ///
 /// Accepts a closure that determines whether a given name (e.g., `"list"`) is a Python builtin.

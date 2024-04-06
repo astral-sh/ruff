@@ -31,7 +31,7 @@ impl From<ruff_python_ast::str::Quote> for Quote {
     }
 }
 
-#[derive(Debug, CacheKey)]
+#[derive(Debug, Clone, CacheKey)]
 pub struct Settings {
     pub inline_quotes: Quote,
     pub multiline_quotes: Quote,

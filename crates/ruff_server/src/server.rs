@@ -21,6 +21,8 @@ use types::WorkspaceFoldersServerCapabilities;
 use self::schedule::event_loop_thread;
 use self::schedule::Scheduler;
 use self::schedule::Task;
+use crate::session::AllSettings;
+use crate::session::ClientSettings;
 use crate::session::Session;
 use crate::PositionEncoding;
 
@@ -47,14 +49,34 @@ impl Server {
         let init_params: types::InitializeParams = serde_json::from_value(params)?;
 
         let client_capabilities = init_params.capabilities;
-        let server_capabilities = Self::server_capabilities(&client_capabilities);
+        let position_encoding = Self::find_best_position_encoding(&client_capabilities);
+        let server_capabilities = Self::server_capabilities(position_encoding);
+
+        let AllSettings {
+            global_settings,
+            mut workspace_settings,
+        } = AllSettings::from_value(init_params.initialization_options.unwrap_or_default());
+
+        let mut workspace_for_uri = |uri| {
+            let Some(workspace_settings) = workspace_settings.as_mut() else {
+                return (uri, ClientSettings::default());
+            };
+            let settings = workspace_settings.remove(&uri).unwrap_or_else(|| {
+                tracing::warn!("No workspace settings found for {uri}");
+                ClientSettings::default()
+            });
+            (uri, settings)
+        };
 
         let workspaces = init_params
             .workspace_folders
-            .map(|folders| folders.into_iter().map(|folder| folder.uri).collect())
+            .map(|folders| folders.into_iter().map(|folder| {
+                workspace_for_uri(folder.uri)
+            }).collect())
             .or_else(|| {
                 tracing::debug!("No workspace(s) were provided during initialization. Using the current working directory as a default workspace...");
-                Some(vec![types::Url::from_file_path(std::env::current_dir().ok()?).ok()?])
+                let uri = types::Url::from_file_path(std::env::current_dir().ok()?).ok()?;
+                Some(vec![workspace_for_uri(uri)])
             })
             .ok_or_else(|| {
                 anyhow::anyhow!("Failed to get the current working directory while creating a default workspace.")
@@ -74,7 +96,12 @@ impl Server {
             conn,
             threads,
             worker_threads,
-            session: Session::new(&client_capabilities, &server_capabilities, &workspaces)?,
+            session: Session::new(
+                &client_capabilities,
+                position_encoding,
+                global_settings,
+                workspaces,
+            )?,
             client_capabilities,
         })
     }
@@ -176,8 +203,8 @@ impl Server {
         }
     }
 
-    fn server_capabilities(client_capabilities: &ClientCapabilities) -> types::ServerCapabilities {
-        let position_encoding = client_capabilities
+    fn find_best_position_encoding(client_capabilities: &ClientCapabilities) -> PositionEncoding {
+        client_capabilities
             .general
             .as_ref()
             .and_then(|general_capabilities| general_capabilities.position_encodings.as_ref())
@@ -187,7 +214,10 @@ impl Server {
                     .filter_map(|encoding| PositionEncoding::try_from(encoding).ok())
                     .max() // this selects the highest priority position encoding
             })
-            .unwrap_or_default();
+            .unwrap_or_default()
+    }
+
+    fn server_capabilities(position_encoding: PositionEncoding) -> types::ServerCapabilities {
         types::ServerCapabilities {
             position_encoding: Some(position_encoding.into()),
             code_action_provider: Some(types::CodeActionProviderCapability::Options(
@@ -271,7 +301,7 @@ impl SupportedCodeAction {
         [
             Self::QuickFix,
             Self::SourceFixAll,
-            // Self::SourceOrganizeImports,
+            Self::SourceOrganizeImports,
         ]
         .into_iter()
     }

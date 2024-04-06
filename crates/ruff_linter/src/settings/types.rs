@@ -590,7 +590,7 @@ impl Display for RequiredVersion {
 /// pattern matching.
 pub type IdentifierPattern = glob::Pattern;
 
-#[derive(Debug, CacheKey, Default)]
+#[derive(Debug, Clone, CacheKey, Default)]
 pub struct PerFileIgnores {
     // Ordered as (absolute path matcher, basename matcher, rules)
     ignores: Vec<(GlobMatcher, GlobMatcher, RuleSet)>,

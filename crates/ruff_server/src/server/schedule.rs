@@ -80,10 +80,13 @@ impl<'s> Scheduler<'s> {
     pub(super) fn dispatch(&mut self, task: task::Task<'s>) {
         match task {
             Task::Sync(SyncTask { func }) => {
+                let notifier = self.client.notifier();
+                let responder = self.client.responder();
                 func(
                     self.session,
-                    self.client.notifier(),
-                    self.client.responder(),
+                    notifier,
+                    &mut self.client.requester,
+                    responder,
                 );
             }
             Task::Background(BackgroundTaskBuilder {
