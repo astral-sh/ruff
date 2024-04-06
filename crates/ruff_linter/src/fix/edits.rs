@@ -136,12 +136,6 @@ pub(crate) enum Parentheses {
 ///
 /// Supports the removal of parentheses when this is the only (kw)arg left.
 /// For this behavior, set `remove_parentheses` to `true`.
-///
-/// NOTE: does not support multiple consecutive calls within a single [`Fix`].
-/// Because the first call deletes one arg, one arg remains (as expected),
-/// the second call will return an [`Edit`] with positions on a locator which
-/// has 2 args, so the second call will corrupt the source (likely, comma
-/// and a space will remain).
 pub(crate) fn remove_argument<T: Ranged>(
     argument: &T,
     arguments: &Arguments,
