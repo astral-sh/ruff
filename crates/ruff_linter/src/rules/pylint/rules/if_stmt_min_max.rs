@@ -30,20 +30,20 @@ use crate::checkers::ast::Checker;
 /// - [Python documentation: max function](https://docs.python.org/3/library/functions.html#max)
 /// - [Python documentation: min function](https://docs.python.org/3/library/functions.html#min)
 #[violation]
-pub struct MinMaxInsteadOfIf {
+pub struct IfStmtMinMax {
     contents: String,
 }
 
-impl Violation for MinMaxInsteadOfIf {
+impl Violation for IfStmtMinMax {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let MinMaxInsteadOfIf { contents } = self;
+        let IfStmtMinMax { contents } = self;
         format!("Consider using `{contents}` instead of unnecessary if block")
     }
 }
 
-/// R1730 (and also R1731)
-pub(crate) fn min_max_instead_of_if(checker: &mut Checker, stmt_if: &ast::StmtIf) {
+/// R1730, R1731
+pub(crate) fn if_stmt_min_max(checker: &mut Checker, stmt_if: &ast::StmtIf) {
     let ast::StmtIf {
         test,
         body,
@@ -119,7 +119,7 @@ pub(crate) fn min_max_instead_of_if(checker: &mut Checker, stmt_if: &ast::StmtIf
         range: TextRange::default(),
     };
     let diagnostic = Diagnostic::new(
-        MinMaxInsteadOfIf {
+        IfStmtMinMax {
             contents: checker.generator().stmt(&assign_node.into()),
         },
         stmt_if.range(),
