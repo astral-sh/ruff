@@ -1,0 +1,272 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/try_stmt_misspelled_except.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..107,
+        body: [
+            Try(
+                StmtTry {
+                    range: 0..13,
+                    body: [
+                        Pass(
+                            StmtPass {
+                                range: 9..13,
+                            },
+                        ),
+                    ],
+                    handlers: [],
+                    orelse: [],
+                    finalbody: [],
+                    is_star: false,
+                },
+            ),
+            AnnAssign(
+                StmtAnnAssign {
+                    range: 14..20,
+                    target: Name(
+                        ExprName {
+                            range: 14..19,
+                            id: "exept",
+                            ctx: Store,
+                        },
+                    ),
+                    annotation: Name(
+                        ExprName {
+                            range: 20..20,
+                            id: "",
+                            ctx: Invalid,
+                        },
+                    ),
+                    value: None,
+                    simple: true,
+                },
+            ),
+            Pass(
+                StmtPass {
+                    range: 25..29,
+                },
+            ),
+            Pass(
+                StmtPass {
+                    range: 43..47,
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    range: 48..53,
+                    targets: [
+                        Name(
+                            ExprName {
+                                range: 48..49,
+                                id: "a",
+                                ctx: Store,
+                            },
+                        ),
+                    ],
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 52..53,
+                            value: Int(
+                                1,
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Try(
+                StmtTry {
+                    range: 54..84,
+                    body: [
+                        Pass(
+                            StmtPass {
+                                range: 63..67,
+                            },
+                        ),
+                    ],
+                    handlers: [
+                        ExceptHandler(
+                            ExceptHandlerExceptHandler {
+                                range: 68..84,
+                                type_: None,
+                                name: None,
+                                body: [
+                                    Pass(
+                                        StmtPass {
+                                            range: 80..84,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    ],
+                    orelse: [],
+                    finalbody: [],
+                    is_star: false,
+                },
+            ),
+            AnnAssign(
+                StmtAnnAssign {
+                    range: 85..91,
+                    target: Name(
+                        ExprName {
+                            range: 85..90,
+                            id: "exept",
+                            ctx: Store,
+                        },
+                    ),
+                    annotation: Name(
+                        ExprName {
+                            range: 91..91,
+                            id: "",
+                            ctx: Invalid,
+                        },
+                    ),
+                    value: None,
+                    simple: true,
+                },
+            ),
+            Pass(
+                StmtPass {
+                    range: 96..100,
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    range: 101..106,
+                    targets: [
+                        Name(
+                            ExprName {
+                                range: 101..102,
+                                id: "b",
+                                ctx: Store,
+                            },
+                        ),
+                    ],
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 105..106,
+                            value: Int(
+                                1,
+                            ),
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | try:
+2 |     pass
+3 | exept:
+  | ^^^^^ Syntax Error: Expected `except` or `finally` after `try` block
+4 |     pass
+5 | finally:
+  |
+
+
+  |
+1 | try:
+2 |     pass
+3 | exept:
+  |       ^ Syntax Error: Expected an expression
+4 |     pass
+5 | finally:
+6 |     pass
+  |
+
+
+  |
+2 |     pass
+3 | exept:
+4 |     pass
+  | ^^^^ Syntax Error: unexpected indentation
+5 | finally:
+6 |     pass
+  |
+
+
+  |
+3 | exept:
+4 |     pass
+5 | finally:
+  |  Syntax Error: Expected a statement
+6 |     pass
+7 | a = 1
+  |
+
+
+  |
+3 | exept:
+4 |     pass
+5 | finally:
+  |        ^ Syntax Error: Expected a statement
+6 |     pass
+7 | a = 1
+  |
+
+
+  |
+3 | exept:
+4 |     pass
+5 | finally:
+  |         ^ Syntax Error: Expected a statement
+6 |     pass
+7 | a = 1
+8 | try:
+  |
+
+
+  |
+4 |     pass
+5 | finally:
+6 |     pass
+  | ^^^^ Syntax Error: unexpected indentation
+7 | a = 1
+8 | try:
+  |
+
+
+  |
+5 | finally:
+6 |     pass
+7 | a = 1
+  |  Syntax Error: Expected a statement
+8 | try:
+9 |     pass
+  |
+
+
+   |
+10 | except:
+11 |     pass
+12 | exept:
+   |       ^ Syntax Error: Expected an expression
+13 |     pass
+14 | b = 1
+   |
+
+
+   |
+11 |     pass
+12 | exept:
+13 |     pass
+   | ^^^^ Syntax Error: unexpected indentation
+14 | b = 1
+   |
+
+
+   |
+12 | exept:
+13 |     pass
+14 | b = 1
+   |  Syntax Error: Expected a statement
+   |

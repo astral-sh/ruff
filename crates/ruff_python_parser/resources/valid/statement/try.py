@@ -49,9 +49,9 @@ finally:
 
 try:
     ...
-except* a as A:
+except* GroupA as eg:
     ...
-except* b:
+except* ExceptionGroup:
     ...
 
 try:
@@ -67,3 +67,33 @@ except* TypeError as e:
     print(f"caught {type(e)} with nested {e.exceptions}")
 except* OSError as e:
     print(f"caught {type(e)} with nested {e.exceptions}")
+
+try:
+    pass
+except "exception":
+    pass
+except 1:
+    pass
+except True:
+    pass
+except 1 + 1:
+    pass
+except a | b:
+    pass
+except x and y:
+    pass
+except await x:
+    pass
+except lambda x: x:
+    pass
+except x if True else y:
+    pass
+
+if True:
+    try:
+        pass
+    finally:
+        pass
+# This `else` is not part of the `try` statement, so don't raise an error
+else:
+    pass
