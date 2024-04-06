@@ -1363,8 +1363,8 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::IfExprMinMax) {
                 refurb::rules::if_expr_min_max(checker, if_exp);
             }
-            if checker.enabled(Rule::OrOper) {
-                refurb::rules::or_oper(checker, if_exp);
+            if checker.enabled(Rule::IfExpInsteadOfOrOperator) {
+                refurb::rules::if_exp_instead_of_or_operator(checker, if_exp);
             }
         }
         Expr::ListComp(
