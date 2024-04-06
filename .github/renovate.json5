@@ -4,8 +4,9 @@
   suppressNotifications: ["prEditedNotification"],
   extends: ["config:recommended"],
   labels: ["internal"],
-  schedule: ["before 4am on Monday"],
+  schedule: ["on Monday"],
   separateMajorMinor: false,
+  prHourlyLimit: 10,
   enabledManagers: ["github-actions", "pre-commit", "cargo", "pep621", "npm"],
   cargo: {
     // See https://docs.renovatebot.com/configuration-options/#rangestrategy
@@ -44,6 +45,12 @@
       matchManagers: ["npm"],
       matchPackagePatterns: ["monaco"],
       description: "Weekly update of the Monaco editor",
+    },
+    {
+      groupName: "strum",
+      matchManagers: ["cargo"],
+      matchPackagePatterns: ["strum"],
+      description: "Weekly update of strum dependencies",
     },
   ],
   vulnerabilityAlerts: {

@@ -21,3 +21,10 @@ class D(TypedDict):
     mixedCase: bool
     _mixedCase: list
     mixed_Case: set
+
+class E(D):
+    lower: int
+    CONSTANT: str
+    mixedCase: bool
+    _mixedCase: list
+    mixed_Case: set

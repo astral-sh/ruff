@@ -6,7 +6,7 @@ use ruff_macros::CacheKey;
 use crate::registry::{Rule, RuleSet, RuleSetIterator};
 
 /// A table to keep track of which rules are enabled and whether they should be fixed.
-#[derive(Debug, CacheKey, Default)]
+#[derive(Debug, Clone, CacheKey, Default)]
 pub struct RuleTable {
     /// Maps rule codes to a boolean indicating if the rule should be fixed.
     enabled: RuleSet,

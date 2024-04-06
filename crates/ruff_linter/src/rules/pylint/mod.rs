@@ -190,6 +190,10 @@ mod tests {
         Path::new("useless_exception_statement.py")
     )]
     #[test_case(Rule::NanComparison, Path::new("nan_comparison.py"))]
+    #[test_case(
+        Rule::BadStaticmethodArgument,
+        Path::new("bad_staticmethod_argument.py")
+    )]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(

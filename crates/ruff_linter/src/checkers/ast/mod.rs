@@ -31,15 +31,14 @@ use std::path::Path;
 use itertools::Itertools;
 use log::debug;
 use ruff_python_ast::{
-    self as ast, all::DunderAllName, Comprehension, ElifElseClause, ExceptHandler, Expr,
-    ExprContext, Keyword, MatchCase, Parameter, ParameterWithDefault, Parameters, Pattern, Stmt,
-    Suite, UnaryOp,
+    self as ast, Comprehension, ElifElseClause, ExceptHandler, Expr, ExprContext, FStringElement,
+    Keyword, MatchCase, Parameter, ParameterWithDefault, Parameters, Pattern, Stmt, Suite, UnaryOp,
 };
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use ruff_diagnostics::{Diagnostic, IsolationLevel};
 use ruff_notebook::{CellOffsets, NotebookIndex};
-use ruff_python_ast::all::{extract_all_names, DunderAllFlags};
+use ruff_python_ast::all::{extract_all_names, DunderAllDefinition, DunderAllFlags};
 use ruff_python_ast::helpers::{
     collect_import_from_member, extract_handled_exceptions, is_docstring_stmt, to_module_path,
 };
@@ -1580,6 +1579,15 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 .push((bound, self.semantic.snapshot()));
         }
     }
+
+    fn visit_f_string_element(&mut self, f_string_element: &'a FStringElement) {
+        let snapshot = self.semantic.flags;
+        if f_string_element.is_expression() {
+            self.semantic.flags |= SemanticModelFlags::F_STRING_REPLACEMENT_FIELD;
+        }
+        visitor::walk_f_string_element(self, f_string_element);
+        self.semantic.flags = snapshot;
+    }
 }
 
 impl<'a> Checker<'a> {
@@ -2100,45 +2108,54 @@ impl<'a> Checker<'a> {
     fn visit_exports(&mut self) {
         let snapshot = self.semantic.snapshot();
 
-        let exports: Vec<DunderAllName> = self
+        let definitions: Vec<DunderAllDefinition> = self
             .semantic
             .global_scope()
             .get_all("__all__")
             .map(|binding_id| &self.semantic.bindings[binding_id])
             .filter_map(|binding| match &binding.kind {
-                BindingKind::Export(Export { names }) => Some(names.iter().copied()),
+                BindingKind::Export(Export { names }) => {
+                    Some(DunderAllDefinition::new(binding.range(), names.to_vec()))
+                }
                 _ => None,
             })
-            .flatten()
             .collect();
 
-        for export in exports {
-            let (name, range) = (export.name(), export.range());
-            if let Some(binding_id) = self.semantic.global_scope().get(name) {
-                self.semantic.flags |= SemanticModelFlags::DUNDER_ALL_DEFINITION;
-                // Mark anything referenced in `__all__` as used.
-                self.semantic
-                    .add_global_reference(binding_id, ExprContext::Load, range);
-                self.semantic.flags -= SemanticModelFlags::DUNDER_ALL_DEFINITION;
-            } else {
-                if self.semantic.global_scope().uses_star_imports() {
-                    if self.enabled(Rule::UndefinedLocalWithImportStarUsage) {
-                        self.diagnostics.push(Diagnostic::new(
-                            pyflakes::rules::UndefinedLocalWithImportStarUsage {
-                                name: name.to_string(),
-                            },
-                            range,
-                        ));
-                    }
+        for definition in definitions {
+            for export in definition.names() {
+                let (name, range) = (export.name(), export.range());
+                if let Some(binding_id) = self.semantic.global_scope().get(name) {
+                    self.semantic.flags |= SemanticModelFlags::DUNDER_ALL_DEFINITION;
+                    // Mark anything referenced in `__all__` as used.
+                    self.semantic
+                        .add_global_reference(binding_id, ExprContext::Load, range);
+                    self.semantic.flags -= SemanticModelFlags::DUNDER_ALL_DEFINITION;
                 } else {
-                    if self.enabled(Rule::UndefinedExport) {
-                        if !self.path.ends_with("__init__.py") {
-                            self.diagnostics.push(Diagnostic::new(
-                                pyflakes::rules::UndefinedExport {
-                                    name: name.to_string(),
-                                },
-                                range,
-                            ));
+                    if self.semantic.global_scope().uses_star_imports() {
+                        if self.enabled(Rule::UndefinedLocalWithImportStarUsage) {
+                            self.diagnostics.push(
+                                Diagnostic::new(
+                                    pyflakes::rules::UndefinedLocalWithImportStarUsage {
+                                        name: name.to_string(),
+                                    },
+                                    range,
+                                )
+                                .with_parent(definition.start()),
+                            );
+                        }
+                    } else {
+                        if self.enabled(Rule::UndefinedExport) {
+                            if !self.path.ends_with("__init__.py") {
+                                self.diagnostics.push(
+                                    Diagnostic::new(
+                                        pyflakes::rules::UndefinedExport {
+                                            name: name.to_string(),
+                                        },
+                                        range,
+                                    )
+                                    .with_parent(definition.start()),
+                                );
+                            }
                         }
                     }
                 }

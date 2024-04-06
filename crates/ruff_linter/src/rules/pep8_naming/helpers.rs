@@ -1,8 +1,8 @@
 use itertools::Itertools;
 
 use ruff_python_ast::name::UnqualifiedName;
-use ruff_python_ast::{self as ast, Arguments, Expr, Stmt};
-use ruff_python_semantic::SemanticModel;
+use ruff_python_ast::{self as ast, Expr, Stmt};
+use ruff_python_semantic::{analyze, SemanticModel};
 use ruff_python_stdlib::str::{is_cased_lowercase, is_cased_uppercase};
 
 pub(super) fn is_camelcase(name: &str) -> bool {
@@ -86,16 +86,13 @@ pub(super) fn is_type_alias_assignment(stmt: &Stmt, semantic: &SemanticModel) ->
 }
 
 /// Returns `true` if the statement is an assignment to a `TypedDict`.
-pub(super) fn is_typed_dict_class(arguments: Option<&Arguments>, semantic: &SemanticModel) -> bool {
+pub(super) fn is_typed_dict_class(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> bool {
     if !semantic.seen_typing() {
         return false;
     }
 
-    arguments.is_some_and(|arguments| {
-        arguments
-            .args
-            .iter()
-            .any(|base| semantic.match_typing_expr(base, "TypedDict"))
+    analyze::class::any_qualified_name(class_def, semantic, &|qualified_name| {
+        semantic.match_typing_qualified_name(&qualified_name, "TypedDict")
     })
 }
 

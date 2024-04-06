@@ -539,7 +539,7 @@ impl SerializationFormat {
 pub struct RequiredVersion(VersionSpecifiers);
 
 impl TryFrom<String> for RequiredVersion {
-    type Error = pep440_rs::Pep440Error;
+    type Error = pep440_rs::VersionSpecifiersParseError;
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
         // Treat `0.3.1` as `==0.3.1`, for backwards compatibility.
@@ -590,7 +590,7 @@ impl Display for RequiredVersion {
 /// pattern matching.
 pub type IdentifierPattern = glob::Pattern;
 
-#[derive(Debug, CacheKey, Default)]
+#[derive(Debug, Clone, CacheKey, Default)]
 pub struct PerFileIgnores {
     // Ordered as (absolute path matcher, basename matcher, rules)
     ignores: Vec<(GlobMatcher, GlobMatcher, RuleSet)>,

@@ -1,7 +1,7 @@
 pub(crate) use unnecessary_call_around_sorted::*;
 pub(crate) use unnecessary_collection_call::*;
 pub(crate) use unnecessary_comprehension::*;
-pub(crate) use unnecessary_comprehension_any_all::*;
+pub(crate) use unnecessary_comprehension_in_call::*;
 pub(crate) use unnecessary_double_cast_or_process::*;
 pub(crate) use unnecessary_generator_dict::*;
 pub(crate) use unnecessary_generator_list::*;
@@ -21,7 +21,7 @@ mod helpers;
 mod unnecessary_call_around_sorted;
 mod unnecessary_collection_call;
 mod unnecessary_comprehension;
-mod unnecessary_comprehension_any_all;
+mod unnecessary_comprehension_in_call;
 mod unnecessary_double_cast_or_process;
 mod unnecessary_generator_dict;
 mod unnecessary_generator_list;

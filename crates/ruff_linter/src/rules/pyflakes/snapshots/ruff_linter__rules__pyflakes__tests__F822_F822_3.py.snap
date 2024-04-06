@@ -1,0 +1,11 @@
+---
+source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+---
+F822_3.py:12:5: F822 Undefined name `ExponentialFamily` in `__all__`
+   |
+10 | __all__ += [
+11 |     "ContinuousBernoulli",  # noqa: F822
+12 |     "ExponentialFamily",
+   |     ^^^^^^^^^^^^^^^^^^^ F822
+13 | ]
+   |

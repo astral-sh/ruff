@@ -680,7 +680,7 @@ impl<'a> SemanticModel<'a> {
     /// print(python_version)
     /// ```
     ///
-    /// ...then `resolve_call_path(${python_version})` will resolve to `sys.version_info`.
+    /// ...then `resolve_qualified_name(${python_version})` will resolve to `sys.version_info`.
     pub fn resolve_qualified_name<'name, 'expr: 'name>(
         &self,
         value: &'expr Expr,
@@ -1525,6 +1525,12 @@ impl<'a> SemanticModel<'a> {
         self.flags.intersects(SemanticModelFlags::F_STRING)
     }
 
+    /// Return `true` if the model is in an f-string replacement field.
+    pub const fn in_f_string_replacement_field(&self) -> bool {
+        self.flags
+            .intersects(SemanticModelFlags::F_STRING_REPLACEMENT_FIELD)
+    }
+
     /// Return `true` if the model is in boolean test.
     pub const fn in_boolean_test(&self) -> bool {
         self.flags.intersects(SemanticModelFlags::BOOLEAN_TEST)
@@ -1959,6 +1965,15 @@ bitflags! {
         /// __all__ += ("baz,")
         /// ```
         const DUNDER_ALL_DEFINITION = 1 << 22;
+
+        /// The model is in an f-string replacement field.
+        ///
+        /// For example, the model could be visiting `x` or `y` in:
+        ///
+        /// ```python
+        /// f"first {x} second {y}"
+        /// ```
+        const F_STRING_REPLACEMENT_FIELD = 1 << 23;
 
         /// The context is in any type annotation.
         const ANNOTATION = Self::TYPING_ONLY_ANNOTATION.bits() | Self::RUNTIME_EVALUATED_ANNOTATION.bits() | Self::RUNTIME_REQUIRED_ANNOTATION.bits();
