@@ -1,6 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
+use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{self as ast, CmpOp, Stmt};
 use ruff_text_size::Ranged;
 
@@ -79,7 +80,7 @@ pub(crate) fn if_stmt_min_max(checker: &mut Checker, stmt_if: &ast::StmtIf) {
         return;
     }
 
-    let [Stmt::Assign(ast::StmtAssign {
+    let [body @ Stmt::Assign(ast::StmtAssign {
         targets: body_targets,
         value: body_value,
         ..
@@ -120,7 +121,7 @@ pub(crate) fn if_stmt_min_max(checker: &mut Checker, stmt_if: &ast::StmtIf) {
         return;
     };
 
-    let min_or_max = match op {
+    let _min_or_max = match op {
         CmpOp::Gt | CmpOp::GtE => MinMax::Min,
         CmpOp::Lt | CmpOp::LtE => MinMax::Max,
         _ => return,
@@ -142,7 +143,15 @@ pub(crate) fn if_stmt_min_max(checker: &mut Checker, stmt_if: &ast::StmtIf) {
 
     let replacement = format!(
         "{} = {min_max}({}, {})",
-        checker.locator().slice(body_target),
+        checker.locator().slice(
+            parenthesized_range(
+                body_target.into(),
+                body.into(),
+                checker.indexer().comment_ranges(),
+                checker.locator().contents()
+            )
+            .unwrap_or(body_target.range())
+        ),
         checker.locator().slice(arg1),
         checker.locator().slice(arg2),
     );

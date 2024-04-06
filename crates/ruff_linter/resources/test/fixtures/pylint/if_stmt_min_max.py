@@ -127,3 +127,10 @@ if value >= 3:
     value = 5
 elif value == 3:
     value = 2
+
+# Parenthesized expressions
+if value.attr > 3:
+    (
+        value.
+        attr
+    ) = 3

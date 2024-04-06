@@ -270,3 +270,27 @@ if_stmt_min_max.py:69:1: PLR1730 [*] Replace `if` statement with `A2 = max(A1, A
 71 70 | 
 72 71 | # Negative
 73 72 | if value < 10:
+
+if_stmt_min_max.py:132:1: PLR1730 [*] Replace `if` statement with `max` call
+    |
+131 |   # Parenthesized expressions
+132 | / if value.attr > 3:
+133 | |     (
+134 | |         value.
+135 | |         attr
+136 | |     ) = 3
+    | |_________^ PLR1730
+    |
+    = help: Replace with `max` call
+
+ℹ Safe fix
+129 129 |     value = 2
+130 130 | 
+131 131 | # Parenthesized expressions
+132     |-if value.attr > 3:
+133     |-    (
+    132 |+(
+134 133 |         value.
+135 134 |         attr
+136     |-    ) = 3
+    135 |+    ) = max(value.attr, 3)
