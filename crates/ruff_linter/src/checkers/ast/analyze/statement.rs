@@ -406,6 +406,11 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::UselessObjectInheritance) {
                 pyupgrade::rules::useless_object_inheritance(checker, class_def);
             }
+            if checker.enabled(Rule::ReplaceStrEnum) {
+                if checker.settings.target_version >= PythonVersion::Py311 {
+                    pyupgrade::rules::replace_str_enum(checker, class_def);
+                }
+            }
             if checker.enabled(Rule::UnnecessaryClassParentheses) {
                 pyupgrade::rules::unnecessary_class_parentheses(checker, class_def);
             }
