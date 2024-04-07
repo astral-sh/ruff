@@ -1027,10 +1027,10 @@ impl<'src> Parser<'src> {
         let start = self.node_start();
         self.bump(TokenKind::If);
 
-        // TODO(dhruvmanila): Disallow star and yield expression
         // test_err if_stmt_invalid_test_expr
         // if *x: ...
         // if yield x: ...
+        // if yield from x: ...
 
         // test_err if_stmt_missing_test
         // if : ...
@@ -1081,7 +1081,6 @@ impl<'src> Parser<'src> {
         self.bump(kind.as_token_kind());
 
         let test = if kind.is_elif() {
-            // TODO(dhruvmanila): Disallow star and yield expression
             // test_err if_stmt_invalid_elif_test_expr
             // if x:
             //     pass
