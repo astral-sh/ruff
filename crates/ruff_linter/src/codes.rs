@@ -310,6 +310,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "W0211") => (RuleGroup::Preview, rules::pylint::rules::BadStaticmethodArgument),
         (Pylint, "W0245") => (RuleGroup::Preview, rules::pylint::rules::SuperWithoutBrackets),
         (Pylint, "W0406") => (RuleGroup::Stable, rules::pylint::rules::ImportSelf),
+        (Pylint, "W0601") => (RuleGroup::Stable, rules::pylint::rules::GlobalVariableUndefined),
         (Pylint, "W0602") => (RuleGroup::Stable, rules::pylint::rules::GlobalVariableNotAssigned),
         (Pylint, "W0603") => (RuleGroup::Stable, rules::pylint::rules::GlobalStatement),
         (Pylint, "W0604") => (RuleGroup::Preview, rules::pylint::rules::GlobalAtModuleLevel),
