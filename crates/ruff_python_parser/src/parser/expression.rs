@@ -82,6 +82,13 @@ impl<'src> Parser<'src> {
     ///
     /// Matches the `expressions` rule in the [Python grammar].
     ///
+    /// The caller can specify whether starred expression is allowed or not. This
+    /// doesn't affect the parsing of a starred expression as it will be parsed
+    /// nevertheless. But, if it is not allowed, an error is reported.
+    ///
+    /// Use [`Parser::parse_star_expression_list`] if the starred expression is
+    /// required with a bitwise OR precedence.
+    ///
     /// [Python grammar]: https://docs.python.org/3/reference/grammar.html
     pub(super) fn parse_expression_list(
         &mut self,
@@ -127,8 +134,13 @@ impl<'src> Parser<'src> {
 
     /// Parses a star expression or any other expression.
     ///
-    /// Matches either the `star_expression` or `star_named_expression` rule in
-    /// the [Python grammar] depending on whether named expressions are allowed.
+    /// Matches either the `star_named_expression` or `star_expression` rule in
+    /// the [Python grammar] depending on whether named expressions are allowed
+    /// or not respectively.
+    ///
+    /// NOTE: If you have expressions separated by commas and want to parse them
+    /// individually instead of as a tuple, as done by [`Parser::parse_star_expression_list`],
+    /// use this function.
     ///
     /// [Python grammar]: https://docs.python.org/3/reference/grammar.html
     pub(super) fn parse_star_expression_or_higher(
@@ -136,7 +148,7 @@ impl<'src> Parser<'src> {
         allow_named_expression: AllowNamedExpression,
     ) -> ParsedExpr {
         // This method parses starred expression with a different precedence,
-        // so don't allow it in other branches.
+        // so don't allow starred expression in other branches.
         if self.at(TokenKind::Star) {
             Expr::Starred(self.parse_starred_expression(StarredExpressionPrecedence::BitOr)).into()
         } else if allow_named_expression.is_yes() {
@@ -150,8 +162,16 @@ impl<'src> Parser<'src> {
     ///
     /// Matches the `named_expression` rule in the [Python grammar].
     ///
-    /// NOTE: If you have expressions separated by commas and want to parse them individually,
-    /// instead of a tuple, use this function!
+    /// The caller can specify whether starred expression is allowed or not. This
+    /// doesn't affect the parsing of a starred expression as it will be parsed
+    /// nevertheless. But, if it is not allowed, an error is reported.
+    ///
+    /// Use [`Parser::parse_star_expression_or_higher`] with [`AllowNamedExpression::Yes`]
+    /// if the starred expression is required with a bitwise OR precedence.
+    ///
+    /// NOTE: If you have expressions separated by commas and want to parse them
+    /// individually instead of as a tuple, as done by [`Parser::parse_expression_list`]
+    /// use this function!
     ///
     /// [Python grammar]: https://docs.python.org/3/reference/grammar.html
     pub(super) fn parse_named_expression_or_higher(
@@ -172,8 +192,16 @@ impl<'src> Parser<'src> {
     ///
     /// Matches the `expression` rule in the [Python grammar].
     ///
-    /// NOTE: If you have expressions separated by commas and want to parse them individually,
-    /// instead of a tuple, use this function!
+    /// The caller can specify whether starred expression is allowed or not. This
+    /// doesn't affect the parsing of a starred expression as it will be parsed
+    /// nevertheless. But, if it is not allowed, an error is reported.
+    ///
+    /// Use [`Parser::parse_star_expression_or_higher`] with [`AllowNamedExpression::No`]
+    /// if the starred expression is required with a bitwise OR precedence.
+    ///
+    /// NOTE: If you have expressions separated by commas and want to parse them
+    /// individually instead of as a tuple, as done by [`Parser::parse_expression_list`]
+    /// use this function!
     ///
     /// [Python grammar]: https://docs.python.org/3/reference/grammar.html
     pub(super) fn parse_conditional_expression_or_higher(
@@ -197,13 +225,13 @@ impl<'src> Parser<'src> {
     /// This is a combination of the `disjunction`, `starred_expression`, `yield_expr`
     /// and `lambdef` rules of the [Python grammar].
     ///
-    /// The caller can specify whether lambda expressions are allowed or not. This
-    /// doesn't affect the parsing of `lambdef` expressions as it is parsed nevertheless.
-    /// But, if it is not allowed, an error is reported.
+    /// Note that this function parses yield expression but reports an error as they're
+    /// not allowed in this context.This is done for better error recovery.
+    /// Use [`Parser::parse_yield_expression_or_else`] to allow parsing yield expressions.
     ///
-    /// When parsing an AST node that only uses some of the above mentioned rules,
-    /// you need to **explicitly** check if an invalid node for that AST node was parsed.
-    /// These nodes would be [`Expr::Starred`], [`Expr::Yield`], and [`Expr::YieldFrom`].
+    /// The caller can specify whether lambda and starred expressions are allowed or not.
+    /// This doesn't affect the parsing of the said expressions as it is parsed nevertheless.
+    /// But, if it is not allowed, an error is reported.
     ///
     /// [Python grammar]: https://docs.python.org/3/reference/grammar.html
     fn parse_simple_expression(
@@ -418,6 +446,8 @@ impl<'src> Parser<'src> {
                 Expr::Lambda(lambda_expr).into()
             }
             TokenKind::Yield => {
+                // Yield expressions aren't allowed in this context but we'll still
+                // parse it and report an error for better recovery.
                 let expr = self.parse_yield_expression();
                 self.add_error(ParseErrorType::InvalidYieldExpressionUsage, &expr);
                 expr.into()

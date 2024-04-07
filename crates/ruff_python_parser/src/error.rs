@@ -107,7 +107,7 @@ pub enum ParseErrorType {
     UnparenthesizedNamedExpression,
     /// An unparenthesized tuple expression was found where it is not allowed.
     UnparenthesizedTupleExpression,
-    /// An unparenthesized lambda expression was found where it is not allowed.
+    /// An invalid usage of a lambda expression was found.
     InvalidLambdaExpressionUsage,
     /// An invalid usage of a yield expression was found.
     InvalidYieldExpressionUsage,
