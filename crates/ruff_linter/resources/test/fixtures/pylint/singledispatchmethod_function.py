@@ -17,7 +17,7 @@ class Board:
     def move(self, position):
         pass
 
-    @singledispatchmethod  # [singledispatchmethod-function]
+    @singledispatchmethod  # Ok
     @staticmethod
     def do(position):
         pass

@@ -4,7 +4,7 @@ use crate::display_settings;
 use ruff_macros::CacheKey;
 use std::fmt;
 
-#[derive(Debug, Default, CacheKey)]
+#[derive(Debug, Clone, Default, CacheKey)]
 pub struct Settings {
     pub keep_runtime_typing: bool,
 }

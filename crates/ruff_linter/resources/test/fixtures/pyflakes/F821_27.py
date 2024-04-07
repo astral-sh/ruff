@@ -33,3 +33,16 @@ class MyClass:
 baz: MyClass
 eggs = baz  # Still invalid even when `__future__.annotations` are enabled
 eggs = "baz"  # always okay
+
+# Forward references:
+MaybeDStr: TypeAlias = Optional[DStr]  # Still invalid even when `__future__.annotations` are enabled
+MaybeDStr2: TypeAlias = Optional["DStr"]  # always okay
+DStr: TypeAlias = Union[D, str]  # Still invalid even when `__future__.annotations` are enabled
+DStr2: TypeAlias = Union["D", str]  # always okay
+
+class D: ...
+
+# More circular references
+class Leaf: ...
+class Tree(list[Tree | Leaf]): ...  # Still invalid even when `__future__.annotations` are enabled
+class Tree2(list["Tree | Leaf"]): ...  # always okay

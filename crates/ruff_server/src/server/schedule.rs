@@ -34,16 +34,16 @@ pub(crate) fn event_loop_thread(
     )
 }
 
-pub(crate) struct Scheduler {
-    session: Session,
-    client: Client,
+pub(crate) struct Scheduler<'s> {
+    session: &'s mut Session,
+    client: Client<'s>,
     fmt_pool: thread::Pool,
     background_pool: thread::Pool,
 }
 
-impl Scheduler {
+impl<'s> Scheduler<'s> {
     pub(super) fn new(
-        session: Session,
+        session: &'s mut Session,
         worker_threads: NonZeroUsize,
         sender: &Sender<lsp_server::Message>,
     ) -> Self {
@@ -56,22 +56,44 @@ impl Scheduler {
         }
     }
 
+    /// Immediately sends a request of kind `R` to the client, with associated parameters.
+    /// The task provided by `response_handler` will be dispatched as soon as the response
+    /// comes back from the client.
+    pub(super) fn request<R>(
+        &mut self,
+        params: R::Params,
+        response_handler: impl Fn(R::Result) -> Task<'s> + 'static,
+    ) -> crate::Result<()>
+    where
+        R: lsp_types::request::Request,
+    {
+        self.client.requester.request::<R>(params, response_handler)
+    }
+
+    /// Creates a task to handle a response from the client.
+    pub(super) fn response(&mut self, response: lsp_server::Response) -> Task<'s> {
+        self.client.requester.pop_response_task(response)
+    }
+
     /// Dispatches a `task` by either running it as a blocking function or
     /// executing it on a background thread pool.
-    pub(super) fn dispatch<'s>(&'s mut self, task: task::Task<'s>) {
+    pub(super) fn dispatch(&mut self, task: task::Task<'s>) {
         match task {
             Task::Sync(SyncTask { func }) => {
+                let notifier = self.client.notifier();
+                let responder = self.client.responder();
                 func(
-                    &mut self.session,
-                    self.client.notifier(),
-                    self.client.responder(),
+                    self.session,
+                    notifier,
+                    &mut self.client.requester,
+                    responder,
                 );
             }
             Task::Background(BackgroundTaskBuilder {
                 schedule,
                 builder: func,
             }) => {
-                let static_func = func(&self.session);
+                let static_func = func(self.session);
                 let notifier = self.client.notifier();
                 let responder = self.client.responder();
                 let task = move || static_func(notifier, responder);

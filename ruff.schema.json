@@ -226,6 +226,18 @@
         }
       ]
     },
+    "flake8-boolean-trap": {
+      "description": "Options for the `flake8-boolean-trap` plugin.",
+      "deprecated": true,
+      "anyOf": [
+        {
+          "$ref": "#/definitions/Flake8BooleanTrapOptions"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "flake8-bugbear": {
       "description": "Options for the `flake8-bugbear` plugin.",
       "deprecated": true,
@@ -509,7 +521,7 @@
       ]
     },
     "namespace-packages": {
-      "description": "Mark the specified directories as namespace packages. For the purpose of module resolution, Ruff will treat those directories as if they contained an `__init__.py` file.",
+      "description": "Mark the specified directories as namespace packages. For the purpose of module resolution, Ruff will treat those directories and all their subdirectories as if they contained an `__init__.py` file.",
       "type": [
         "array",
         "null"
@@ -894,6 +906,22 @@
       },
       "additionalProperties": false
     },
+    "Flake8BooleanTrapOptions": {
+      "type": "object",
+      "properties": {
+        "extend-allowed-calls": {
+          "description": "Additional callable functions with which to allow boolean traps.\n\nExpects to receive a list of fully-qualified names (e.g., `pydantic.Field`, rather than `Field`).",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
     "Flake8BugbearOptions": {
       "type": "object",
       "properties": {
@@ -959,7 +987,7 @@
           "minimum": 0.0
         },
         "notice-rgx": {
-          "description": "The regular expression used to match the copyright notice, compiled with the [`regex`](https://docs.rs/regex/latest/regex/) crate.\n\nDefaults to `(?i)Copyright\\s+((?:\\(C\\)|©)\\s+)?\\d{4}(-\\d{4})*`, which matches the following: - `Copyright 2023` - `Copyright (C) 2023` - `Copyright 2021-2023` - `Copyright (C) 2021-2023`",
+          "description": "The regular expression used to match the copyright notice, compiled with the [`regex`](https://docs.rs/regex/latest/regex/) crate. Defaults to `(?i)Copyright\\s+((?:\\(C\\)|©)\\s+)?\\d{4}((-|,\\s)\\d{4})*`, which matches the following:\n\n- `Copyright 2023` - `Copyright (C) 2023` - `Copyright 2021-2023` - `Copyright (C) 2021-2023` - `Copyright (C) 2021, 2023`",
           "type": [
             "string",
             "null"
@@ -1376,7 +1404,7 @@
           ]
         },
         "quote-style": {
-          "description": "Configures the preferred quote character for strings. The recommended options are * `double` (default): Use double quotes `\"` * `single`: Use single quotes `'`\n\nIn compliance with [PEP 8](https://peps.python.org/pep-0008/) and [PEP 257](https://peps.python.org/pep-0257/), Ruff prefers double quotes for triple quoted strings and docstrings even when using `quote-style = \"single\"`.\n\nRuff deviates from using the configured quotes if doing so prevents the need for escaping quote characters inside the string:\n\n```python a = \"a string without any quotes\" b = \"It's monday morning\" ```\n\nRuff will change the quotes of the string assigned to `a` to single quotes when using `quote-style = \"single\"`. However, ruff uses double quotes for he string assigned to `b` because using single quotes would require escaping the `'`, which leads to the less readable code: `'It\\'s monday morning'`.\n\nIn addition, Ruff supports the quote style `preserve` for projects that already use a mixture of single and double quotes and can't migrate to the `double` or `single` style. The quote style `preserve` leaves the quotes of all strings unchanged.",
+          "description": "Configures the preferred quote character for strings. The recommended options are\n\n* `double` (default): Use double quotes `\"` * `single`: Use single quotes `'`\n\nIn compliance with [PEP 8](https://peps.python.org/pep-0008/) and [PEP 257](https://peps.python.org/pep-0257/), Ruff prefers double quotes for triple quoted strings and docstrings even when using `quote-style = \"single\"`.\n\nRuff deviates from using the configured quotes if doing so prevents the need for escaping quote characters inside the string:\n\n```python a = \"a string without any quotes\" b = \"It's monday morning\" ```\n\nRuff will change the quotes of the string assigned to `a` to single quotes when using `quote-style = \"single\"`. However, ruff uses double quotes for he string assigned to `b` because using single quotes would require escaping the `'`, which leads to the less readable code: `'It\\'s monday morning'`.\n\nIn addition, Ruff supports the quote style `preserve` for projects that already use a mixture of single and double quotes and can't migrate to the `double` or `single` style. The quote style `preserve` leaves the quotes of all strings unchanged.",
           "anyOf": [
             {
               "$ref": "#/definitions/QuoteStyle"
@@ -1908,6 +1936,17 @@
           "anyOf": [
             {
               "$ref": "#/definitions/Flake8BanditOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "flake8-boolean-trap": {
+          "description": "Options for the `flake8-boolean-trap` plugin.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Flake8BooleanTrapOptions"
             },
             {
               "type": "null"
@@ -3004,6 +3043,7 @@
         "FURB101",
         "FURB105",
         "FURB11",
+        "FURB110",
         "FURB113",
         "FURB118",
         "FURB12",
@@ -3014,13 +3054,17 @@
         "FURB136",
         "FURB14",
         "FURB140",
+        "FURB142",
         "FURB145",
         "FURB148",
         "FURB15",
         "FURB152",
+        "FURB157",
         "FURB16",
         "FURB161",
         "FURB163",
+        "FURB164",
+        "FURB166",
         "FURB167",
         "FURB168",
         "FURB169",
@@ -3269,6 +3313,10 @@
         "PLE2513",
         "PLE2514",
         "PLE2515",
+        "PLE4",
+        "PLE47",
+        "PLE470",
+        "PLE4703",
         "PLR",
         "PLR0",
         "PLR01",
@@ -3307,6 +3355,7 @@
         "PLR172",
         "PLR1722",
         "PLR173",
+        "PLR1730",
         "PLR1733",
         "PLR1736",
         "PLR2",
@@ -3342,6 +3391,8 @@
         "PLW0131",
         "PLW0133",
         "PLW02",
+        "PLW021",
+        "PLW0211",
         "PLW024",
         "PLW0245",
         "PLW04",
@@ -3818,6 +3869,7 @@
         "UP04",
         "UP040",
         "UP041",
+        "UP042",
         "W",
         "W1",
         "W19",

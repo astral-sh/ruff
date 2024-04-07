@@ -47,6 +47,7 @@ mod tests {
     #[test_case(Rule::EqWithoutHash, Path::new("eq_without_hash.py"))]
     #[test_case(Rule::EmptyComment, Path::new("empty_comment.py"))]
     #[test_case(Rule::ManualFromImport, Path::new("import_aliasing.py"))]
+    #[test_case(Rule::IfStmtMinMax, Path::new("if_stmt_min_max.py"))]
     #[test_case(Rule::SingleStringSlots, Path::new("single_string_slots.py"))]
     #[test_case(Rule::SysExitAlias, Path::new("sys_exit_alias_0.py"))]
     #[test_case(Rule::SysExitAlias, Path::new("sys_exit_alias_1.py"))]
@@ -92,6 +93,7 @@ mod tests {
     #[test_case(Rule::LoggingTooFewArgs, Path::new("logging_too_few_args.py"))]
     #[test_case(Rule::LoggingTooManyArgs, Path::new("logging_too_many_args.py"))]
     #[test_case(Rule::MagicValueComparison, Path::new("magic_value_comparison.py"))]
+    #[test_case(Rule::ModifiedIteratingSet, Path::new("modified_iterating_set.py"))]
     #[test_case(
         Rule::NamedExprWithoutContext,
         Path::new("named_expr_without_context.py")
@@ -189,6 +191,10 @@ mod tests {
         Path::new("useless_exception_statement.py")
     )]
     #[test_case(Rule::NanComparison, Path::new("nan_comparison.py"))]
+    #[test_case(
+        Rule::BadStaticmethodArgument,
+        Path::new("bad_staticmethod_argument.py")
+    )]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(

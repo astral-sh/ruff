@@ -32,10 +32,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 if let Some(operator) = typing::to_pep604_operator(value, slice, &checker.semantic)
                 {
                     if checker.enabled(Rule::FutureRewritableTypeAnnotation) {
-                        if !checker.source_type.is_stub()
+                        if !checker.semantic.future_annotations_or_stub()
                             && checker.settings.target_version < PythonVersion::Py310
                             && checker.settings.target_version >= PythonVersion::Py37
-                            && !checker.semantic.future_annotations()
                             && checker.semantic.in_annotation()
                             && !checker.settings.pyupgrade.keep_runtime_typing
                         {
@@ -48,7 +47,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                         if checker.source_type.is_stub()
                             || checker.settings.target_version >= PythonVersion::Py310
                             || (checker.settings.target_version >= PythonVersion::Py37
-                                && checker.semantic.future_annotations()
+                                && checker.semantic.future_annotations_or_stub()
                                 && checker.semantic.in_annotation()
                                 && !checker.settings.pyupgrade.keep_runtime_typing)
                         {
@@ -60,9 +59,8 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
 
             // Ex) list[...]
             if checker.enabled(Rule::FutureRequiredTypeAnnotation) {
-                if !checker.source_type.is_stub()
+                if !checker.semantic.future_annotations_or_stub()
                     && checker.settings.target_version < PythonVersion::Py39
-                    && !checker.semantic.future_annotations()
                     && checker.semantic.in_annotation()
                     && typing::is_pep585_generic(value, &checker.semantic)
                 {
@@ -186,10 +184,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                             typing::to_pep585_generic(expr, &checker.semantic)
                         {
                             if checker.enabled(Rule::FutureRewritableTypeAnnotation) {
-                                if !checker.source_type.is_stub()
+                                if !checker.semantic.future_annotations_or_stub()
                                     && checker.settings.target_version < PythonVersion::Py39
                                     && checker.settings.target_version >= PythonVersion::Py37
-                                    && !checker.semantic.future_annotations()
                                     && checker.semantic.in_annotation()
                                     && !checker.settings.pyupgrade.keep_runtime_typing
                                 {
@@ -200,7 +197,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                                 if checker.source_type.is_stub()
                                     || checker.settings.target_version >= PythonVersion::Py39
                                     || (checker.settings.target_version >= PythonVersion::Py37
-                                        && checker.semantic.future_annotations()
+                                        && checker.semantic.future_annotations_or_stub()
                                         && checker.semantic.in_annotation()
                                         && !checker.settings.pyupgrade.keep_runtime_typing)
                                 {
@@ -223,14 +220,10 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                         }
                     }
                     if checker.enabled(Rule::MixedCaseVariableInClassScope) {
-                        if let ScopeKind::Class(ast::StmtClassDef { arguments, .. }) =
-                            &checker.semantic.current_scope().kind
+                        if let ScopeKind::Class(class_def) = &checker.semantic.current_scope().kind
                         {
                             pep8_naming::rules::mixed_case_variable_in_class_scope(
-                                checker,
-                                expr,
-                                id,
-                                arguments.as_deref(),
+                                checker, expr, id, class_def,
                             );
                         }
                     }
@@ -274,10 +267,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             ]) {
                 if let Some(replacement) = typing::to_pep585_generic(expr, &checker.semantic) {
                     if checker.enabled(Rule::FutureRewritableTypeAnnotation) {
-                        if !checker.source_type.is_stub()
+                        if !checker.semantic.future_annotations_or_stub()
                             && checker.settings.target_version < PythonVersion::Py39
                             && checker.settings.target_version >= PythonVersion::Py37
-                            && !checker.semantic.future_annotations()
                             && checker.semantic.in_annotation()
                             && !checker.settings.pyupgrade.keep_runtime_typing
                         {
@@ -290,7 +282,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                         if checker.source_type.is_stub()
                             || checker.settings.target_version >= PythonVersion::Py39
                             || (checker.settings.target_version >= PythonVersion::Py37
-                                && checker.semantic.future_annotations()
+                                && checker.semantic.future_annotations_or_stub()
                                 && checker.semantic.in_annotation()
                                 && !checker.settings.pyupgrade.keep_runtime_typing)
                         {
@@ -709,8 +701,8 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                     args,
                 );
             }
-            if checker.enabled(Rule::UnnecessaryComprehensionAnyAll) {
-                flake8_comprehensions::rules::unnecessary_comprehension_any_all(
+            if checker.enabled(Rule::UnnecessaryComprehensionInCall) {
+                flake8_comprehensions::rules::unnecessary_comprehension_in_call(
                     checker, expr, func, args, keywords,
                 );
             }
@@ -926,6 +918,12 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::RedundantLogBase) {
                 refurb::rules::redundant_log_base(checker, call);
             }
+            if checker.enabled(Rule::VerboseDecimalConstructor) {
+                refurb::rules::verbose_decimal_constructor(checker, call);
+            }
+            if checker.enabled(Rule::UnnecessaryFromFloat) {
+                refurb::rules::unnecessary_from_float(checker, call);
+            }
             if checker.enabled(Rule::QuadraticListSummation) {
                 ruff::rules::quadratic_list_summation(checker, call);
             }
@@ -970,6 +968,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             }
             if checker.enabled(Rule::UnnecessaryIterableAllocationForFirstElement) {
                 ruff::rules::unnecessary_iterable_allocation_for_first_element(checker, expr);
+            }
+            if checker.enabled(Rule::IntOnSlicedStr) {
+                refurb::rules::int_on_sliced_str(checker, call);
             }
         }
         Expr::Dict(dict) => {
@@ -1171,9 +1172,8 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
         }) => {
             // Ex) `str | None`
             if checker.enabled(Rule::FutureRequiredTypeAnnotation) {
-                if !checker.source_type.is_stub()
+                if !checker.semantic.future_annotations_or_stub()
                     && checker.settings.target_version < PythonVersion::Py310
-                    && !checker.semantic.future_annotations()
                     && checker.semantic.in_annotation()
                 {
                     flake8_future_annotations::rules::future_required_type_annotation(
@@ -1357,6 +1357,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             }
             if checker.enabled(Rule::IfExprMinMax) {
                 refurb::rules::if_expr_min_max(checker, if_exp);
+            }
+            if checker.enabled(Rule::IfExpInsteadOfOrOperator) {
+                refurb::rules::if_exp_instead_of_or_operator(checker, if_exp);
             }
         }
         Expr::ListComp(

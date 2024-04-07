@@ -104,3 +104,5 @@ def func():
     np.unicode_("asf")
 
     np.who()
+
+    np.row_stack(([1,2], [3,4]))

@@ -406,6 +406,11 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::UselessObjectInheritance) {
                 pyupgrade::rules::useless_object_inheritance(checker, class_def);
             }
+            if checker.enabled(Rule::ReplaceStrEnum) {
+                if checker.settings.target_version >= PythonVersion::Py311 {
+                    pyupgrade::rules::replace_str_enum(checker, class_def);
+                }
+            }
             if checker.enabled(Rule::UnnecessaryClassParentheses) {
                 pyupgrade::rules::unnecessary_class_parentheses(checker, class_def);
             }
@@ -1112,6 +1117,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::TooManyBooleanExpressions) {
                 pylint::rules::too_many_boolean_expressions(checker, if_);
             }
+            if checker.enabled(Rule::IfStmtMinMax) {
+                pylint::rules::if_stmt_min_max(checker, if_);
+            }
             if checker.source_type.is_stub() {
                 if checker.any_enabled(&[
                     Rule::UnrecognizedVersionInfoCheck,
@@ -1293,6 +1301,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::ManualDictComprehension) {
                 perflint::rules::manual_dict_comprehension(checker, target, body);
             }
+            if checker.enabled(Rule::ModifiedIteratingSet) {
+                pylint::rules::modified_iterating_set(checker, for_stmt);
+            }
             if checker.enabled(Rule::UnnecessaryListCast) {
                 perflint::rules::unnecessary_list_cast(checker, iter, body);
             }
@@ -1314,6 +1325,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 }
                 if checker.enabled(Rule::TryExceptInLoop) {
                     perflint::rules::try_except_in_loop(checker, body);
+                }
+                if checker.enabled(Rule::ForLoopSetMutations) {
+                    refurb::rules::for_loop_set_mutations(checker, for_stmt);
                 }
             }
         }

@@ -1,0 +1,101 @@
+{
+    "settings": [
+        {
+            "experimentalServer": true,
+            "cwd": "/Users/test/projects/pandas",
+            "workspace": "file:///Users/test/projects/pandas",
+            "path": [],
+            "ignoreStandardLibrary": true,
+            "interpreter": [
+                "/Users/test/projects/pandas/.venv/bin/python"
+            ],
+            "importStrategy": "fromEnvironment",
+            "codeAction": {
+                "fixViolation": {
+                    "enable": false
+                },
+                "disableRuleComment": {
+                    "enable": false
+                }
+            },
+            "lint": {
+                "enable": true,
+                "run": "onType",
+                "args": [
+                    "--preview"
+                ]
+            },
+            "format": {
+                "args": []
+            },
+            "enable": true,
+            "organizeImports": true,
+            "fixAll": true,
+            "showNotifications": "off"
+        },
+        {
+            "experimentalServer": true,
+            "cwd": "/Users/test/projects/scipy",
+            "workspace": "file:///Users/test/projects/scipy",
+            "path": [],
+            "ignoreStandardLibrary": true,
+            "interpreter": [
+                "/Users/test/projects/scipy/.venv/bin/python"
+            ],
+            "importStrategy": "fromEnvironment",
+            "codeAction": {
+                "fixViolation": {
+                    "enable": false
+                },
+                "disableRuleComment": {
+                    "enable": true
+                }
+            },
+            "lint": {
+                "enable": true,
+                "run": "onType",
+                "args": [
+                    "--preview"
+                ]
+            },
+            "format": {
+                "args": []
+            },
+            "enable": true,
+            "organizeImports": true,
+            "fixAll": true,
+            "showNotifications": "off"
+        }
+    ],
+    "globalSettings": {
+        "experimentalServer": true,
+        "cwd": "/",
+        "workspace": "/",
+        "path": [],
+        "ignoreStandardLibrary": true,
+        "interpreter": [],
+        "importStrategy": "fromEnvironment",
+        "codeAction": {
+            "fixViolation": {
+                "enable": false
+            },
+            "disableRuleComment": {
+                "enable": false
+            }
+        },
+        "lint": {
+            "enable": true,
+            "run": "onType",
+            "args": [
+                "--preview"
+            ]
+        },
+        "format": {
+            "args": []
+        },
+        "enable": true,
+        "organizeImports": true,
+        "fixAll": false,
+        "showNotifications": "off"
+    }
+}

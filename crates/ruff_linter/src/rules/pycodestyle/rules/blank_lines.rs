@@ -1,5 +1,7 @@
 use itertools::Itertools;
+use ruff_notebook::CellOffsets;
 use std::cmp::Ordering;
+use std::iter::Peekable;
 use std::num::NonZeroU32;
 use std::slice::Iter;
 
@@ -359,6 +361,9 @@ struct LogicalLineInfo {
     // `true` if this is not a blank but only consists of a comment.
     is_comment_only: bool,
 
+    /// If running on a notebook, whether the line is the first logical line (or a comment preceding it) of its cell.
+    is_beginning_of_cell: bool,
+
     /// `true` if the line is a string only (including trivia tokens) line, which is a docstring if coming right after a class/function definition.
     is_docstring: bool,
 
@@ -387,6 +392,10 @@ struct LinePreprocessor<'a> {
     /// Maximum number of consecutive blank lines between the current line and the previous non-comment logical line.
     /// One of its main uses is to allow a comment to directly precede a class/function definition.
     max_preceding_blank_lines: BlankLines,
+    /// The cell offsets of the notebook (if running on a notebook).
+    cell_offsets: Option<Peekable<Iter<'a, TextSize>>>,
+    /// If running on a notebook, whether the line is the first logical line (or a comment preceding it) of its cell.
+    is_beginning_of_cell: bool,
 }
 
 impl<'a> LinePreprocessor<'a> {
@@ -394,6 +403,7 @@ impl<'a> LinePreprocessor<'a> {
         tokens: &'a [LexResult],
         locator: &'a Locator,
         indent_width: IndentWidth,
+        cell_offsets: Option<&'a CellOffsets>,
     ) -> LinePreprocessor<'a> {
         LinePreprocessor {
             tokens: tokens.iter(),
@@ -401,6 +411,9 @@ impl<'a> LinePreprocessor<'a> {
             line_start: TextSize::new(0),
             max_preceding_blank_lines: BlankLines::Zero,
             indent_width,
+            is_beginning_of_cell: cell_offsets.is_some(),
+            cell_offsets: cell_offsets
+                .map(|cell_offsets| cell_offsets.get(1..).unwrap_or_default().iter().peekable()),
         }
     }
 }
@@ -435,6 +448,19 @@ impl<'a> Iterator for LinePreprocessor<'a> {
             }
             // At the start of the line...
             else {
+                // Check if we are at the beginning of a cell in a notebook.
+                if let Some(ref mut cell_offsets) = self.cell_offsets {
+                    if cell_offsets
+                        .peek()
+                        .is_some_and(|offset| offset == &&self.line_start)
+                    {
+                        self.is_beginning_of_cell = true;
+                        cell_offsets.next();
+                        blank_lines = BlankLines::Zero;
+                        self.max_preceding_blank_lines = BlankLines::Zero;
+                    }
+                }
+
                 // An empty line
                 if token_kind == TokenKind::NonLogicalNewline {
                     blank_lines.add(*range);
@@ -499,6 +525,7 @@ impl<'a> Iterator for LinePreprocessor<'a> {
                         last_token,
                         logical_line_end: range.end(),
                         is_comment_only: line_is_comment_only,
+                        is_beginning_of_cell: self.is_beginning_of_cell,
                         is_docstring,
                         indent_length,
                         blank_lines,
@@ -512,6 +539,10 @@ impl<'a> Iterator for LinePreprocessor<'a> {
 
                     // Set the start for the next logical line.
                     self.line_start = range.end();
+
+                    if self.cell_offsets.is_some() && !line_is_comment_only {
+                        self.is_beginning_of_cell = false;
+                    }
 
                     return Some(logical_line);
                 }
@@ -662,6 +693,7 @@ pub(crate) struct BlankLinesChecker<'a> {
     lines_after_imports: isize,
     lines_between_types: usize,
     source_type: PySourceType,
+    cell_offsets: Option<&'a CellOffsets>,
 }
 
 impl<'a> BlankLinesChecker<'a> {
@@ -670,6 +702,7 @@ impl<'a> BlankLinesChecker<'a> {
         stylist: &'a Stylist<'a>,
         settings: &crate::settings::LinterSettings,
         source_type: PySourceType,
+        cell_offsets: Option<&'a CellOffsets>,
     ) -> BlankLinesChecker<'a> {
         BlankLinesChecker {
             stylist,
@@ -678,6 +711,7 @@ impl<'a> BlankLinesChecker<'a> {
             lines_after_imports: settings.isort.lines_after_imports,
             lines_between_types: settings.isort.lines_between_types,
             source_type,
+            cell_offsets,
         }
     }
 
@@ -685,7 +719,8 @@ impl<'a> BlankLinesChecker<'a> {
     pub(crate) fn check_lines(&self, tokens: &[LexResult], diagnostics: &mut Vec<Diagnostic>) {
         let mut prev_indent_length: Option<usize> = None;
         let mut state = BlankLinesState::default();
-        let line_preprocessor = LinePreprocessor::new(tokens, self.locator, self.indent_width);
+        let line_preprocessor =
+            LinePreprocessor::new(tokens, self.locator, self.indent_width, self.cell_offsets);
 
         for logical_line in line_preprocessor {
             // Reset `follows` after a dedent:
@@ -826,6 +861,8 @@ impl<'a> BlankLinesChecker<'a> {
             && !self.source_type.is_stub()
             // Do not expect blank lines before the first logical line.
             && state.is_not_first_logical_line
+            // Ignore the first logical line (and any comment preceding it) of each cell in notebooks.
+            && !line.is_beginning_of_cell
         {
             // E302
             let mut diagnostic = Diagnostic::new(
@@ -940,6 +977,8 @@ impl<'a> BlankLinesChecker<'a> {
             && !line.kind.is_class_function_or_decorator()
             // Blank lines in stub files are used for grouping, don't enforce blank lines.
             && !self.source_type.is_stub()
+            // Ignore the first logical line (and any comment preceding it) of each cell in notebooks.
+            && !line.is_beginning_of_cell
         {
             // E305
             let mut diagnostic = Diagnostic::new(
