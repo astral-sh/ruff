@@ -711,7 +711,9 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 }
 
                 if let Some(arguments) = arguments {
+                    self.semantic.flags |= SemanticModelFlags::CLASS_BASE;
                     self.visit_arguments(arguments);
+                    self.semantic.flags -= SemanticModelFlags::CLASS_BASE;
                 }
 
                 let definition = docstrings::extraction::extract_definition(
@@ -934,6 +936,16 @@ impl<'a> Visitor<'a> for Checker<'a> {
 
     fn visit_expr(&mut self, expr: &'a Expr) {
         // Step 0: Pre-processing
+        if self.source_type.is_stub()
+            && self.semantic.in_class_base()
+            && !self.semantic.in_deferred_class_base()
+        {
+            self.visit
+                .class_bases
+                .push((expr, self.semantic.snapshot()));
+            return;
+        }
+
         if !self.semantic.in_typing_literal()
             // `in_deferred_type_definition()` will only be `true` if we're now visiting the deferred nodes
             // after having already traversed the source tree once. If we're now visiting the deferred nodes,
@@ -1967,6 +1979,33 @@ impl<'a> Checker<'a> {
         scope.add(id, binding_id);
     }
 
+    /// After initial traversal of the AST, visit all class bases that were deferred.
+    ///
+    /// This method should only be relevant in stub files, where forward references are
+    /// legal in class bases. For other kinds of Python files, using a forward reference
+    /// in a class base is never legal, so `self.visit.class_bases` should always be empty.
+    ///
+    /// For example, in a stub file:
+    /// ```python
+    /// class Foo(list[Bar]): ...  # <-- `Bar` is a forward reference in a class base
+    /// class Bar: ...
+    /// ```
+    fn visit_deferred_class_bases(&mut self) {
+        let snapshot = self.semantic.snapshot();
+        let deferred_bases = std::mem::take(&mut self.visit.class_bases);
+        debug_assert!(
+            self.source_type.is_stub() || deferred_bases.is_empty(),
+            "Class bases should never be deferred outside of stub files"
+        );
+        for (expr, snapshot) in deferred_bases {
+            self.semantic.restore(snapshot);
+            // Set this flag to avoid infinite recursion, or we'll just defer it again:
+            self.semantic.flags |= SemanticModelFlags::DEFERRED_CLASS_BASE;
+            self.visit_expr(expr);
+        }
+        self.semantic.restore(snapshot);
+    }
+
     /// After initial traversal of the AST, visit all "future type definitions".
     ///
     /// A "future type definition" is a type definition where [PEP 563] semantics
@@ -2157,6 +2196,7 @@ impl<'a> Checker<'a> {
     /// This includes lambdas, functions, type parameters, and type annotations.
     fn visit_deferred(&mut self, allocator: &'a typed_arena::Arena<Expr>) {
         while !self.visit.is_empty() {
+            self.visit_deferred_class_bases();
             self.visit_deferred_functions();
             self.visit_deferred_type_param_definitions();
             self.visit_deferred_lambdas();
