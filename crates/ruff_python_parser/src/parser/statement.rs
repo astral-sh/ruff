@@ -196,7 +196,8 @@ impl<'src> Parser<'src> {
             }
             _ => {
                 let start = self.node_start();
-                let parsed_expr = self.parse_star_expression_list();
+                let parsed_expr =
+                    self.parse_yield_expression_or_else(Parser::parse_star_expression_list);
 
                 if self.eat(TokenKind::Equal) {
                     Stmt::Assign(self.parse_assign_statement(parsed_expr, start))
@@ -833,13 +834,17 @@ impl<'src> Parser<'src> {
     /// See: <https://docs.python.org/3/reference/simple_stmts.html#grammar-token-python-grammar-assignment_stmt>
     fn parse_assign_statement(&mut self, target: ParsedExpr, start: TextSize) -> ast::StmtAssign {
         let mut targets = vec![target.expr];
-        let mut value = self.parse_expression_list(AllowStarredExpression::Yes);
+        let mut value = self.parse_yield_expression_or_else(|p| {
+            p.parse_expression_list(AllowStarredExpression::Yes)
+        });
 
         if self.at(TokenKind::Equal) {
             self.parse_list(RecoveryContextKind::AssignmentTargets, |parser| {
                 parser.bump(TokenKind::Equal);
 
-                let mut parsed_expr = parser.parse_expression_list(AllowStarredExpression::Yes);
+                let mut parsed_expr = parser.parse_yield_expression_or_else(|p| {
+                    p.parse_expression_list(AllowStarredExpression::Yes)
+                });
 
                 std::mem::swap(&mut value, &mut parsed_expr);
 
@@ -907,9 +912,14 @@ impl<'src> Parser<'src> {
             );
         }
 
-        let value = self
-            .eat(TokenKind::Equal)
-            .then(|| Box::new(self.parse_expression_list(AllowStarredExpression::Yes).expr));
+        let value = self.eat(TokenKind::Equal).then(|| {
+            Box::new(
+                self.parse_yield_expression_or_else(|p| {
+                    p.parse_expression_list(AllowStarredExpression::Yes)
+                })
+                .expr,
+            )
+        });
 
         ast::StmtAnnAssign {
             target: Box::new(target.expr),
@@ -945,7 +955,9 @@ impl<'src> Parser<'src> {
 
         helpers::set_expr_ctx(&mut target.expr, ExprContext::Store);
 
-        let value = self.parse_expression_list(AllowStarredExpression::Yes);
+        let value = self.parse_yield_expression_or_else(|p| {
+            p.parse_expression_list(AllowStarredExpression::Yes)
+        });
 
         ast::StmtAugAssign {
             target: Box::new(target.expr),
@@ -1552,7 +1564,9 @@ impl<'src> Parser<'src> {
     fn parse_with_item(&mut self, state: WithItemParsingState) -> ParsedWithItem {
         let start = self.node_start();
 
-        let parsed_expr = self.parse_conditional_expression_or_higher(AllowStarredExpression::Yes);
+        let parsed_expr = self.parse_yield_expression_or_else(|p| {
+            p.parse_conditional_expression_or_higher(AllowStarredExpression::Yes)
+        });
         let mut used_ambiguous_lpar = false;
 
         // While parsing a with item after an ambiguous `(` token, we need to check

@@ -419,14 +419,7 @@ impl<'src> Parser<'src> {
             }
             TokenKind::Yield => {
                 let expr = self.parse_yield_expression();
-                if previous_precedence > Precedence::Initial {
-                    self.add_error(
-                        ParseErrorType::OtherError(
-                            "`yield` expression cannot be used here".to_string(),
-                        ),
-                        &expr,
-                    );
-                }
+                self.add_error(ParseErrorType::InvalidYieldExpressionUsage, &expr);
                 expr.into()
             }
             _ => self.parse_atom(),
@@ -463,7 +456,6 @@ impl<'src> Parser<'src> {
             }) => "boolean",
             Expr::If(_) => "conditional",
             Expr::Lambda(_) => "lambda",
-            Expr::Yield(_) | Expr::YieldFrom(_) => "yield",
             _ => return parsed_expr,
         };
 
@@ -707,18 +699,6 @@ impl<'src> Parser<'src> {
                 let value =
                     parser.parse_conditional_expression_or_higher(AllowStarredExpression::No);
 
-                if !value.is_parenthesized {
-                    match value.expr {
-                        Expr::Yield(_) | Expr::YieldFrom(_) => parser.add_error(
-                            ParseErrorType::OtherError(
-                                "Unparenthesized yield expression cannot be used here".to_string(),
-                            ),
-                            &value,
-                        ),
-                        _ => {}
-                    }
-                }
-
                 keywords.push(ast::Keyword {
                     arg: None,
                     value: value.expr,
@@ -730,15 +710,6 @@ impl<'src> Parser<'src> {
                 let start = parser.node_start();
                 let mut parsed_expr =
                     parser.parse_named_expression_or_higher(AllowStarredExpression::Yes);
-
-                if parsed_expr.is_unparenthesized_yield_expr() {
-                    parser.add_error(
-                        ParseErrorType::OtherError(
-                            "unparenthesized yield expression cannot be used here".to_string(),
-                        ),
-                        &parsed_expr,
-                    );
-                }
 
                 match parser.current_token_kind() {
                     TokenKind::Async | TokenKind::For => {
@@ -785,18 +756,6 @@ impl<'src> Parser<'src> {
 
                     let value =
                         parser.parse_conditional_expression_or_higher(AllowStarredExpression::No);
-                    if !value.is_parenthesized {
-                        match value.expr {
-                            Expr::Yield(_) | Expr::YieldFrom(_) => parser.add_error(
-                                ParseErrorType::OtherError(
-                                    "Unparenthesized yield expression cannot be used here"
-                                        .to_string(),
-                                ),
-                                &value,
-                            ),
-                            _ => {}
-                        }
-                    }
 
                     keywords.push(ast::Keyword {
                         arg: Some(arg),
@@ -1474,7 +1433,7 @@ impl<'src> Parser<'src> {
         // f"{*}"
         // f"{*x and y}"
         // f"{*yield x}"
-        let value = self.parse_star_expression_list();
+        let value = self.parse_yield_expression_or_else(Parser::parse_star_expression_list);
 
         if !value.is_parenthesized && value.expr.is_lambda_expr() {
             // TODO(dhruvmanila): This requires making some changes in lambda expression
@@ -1747,7 +1706,9 @@ impl<'src> Parser<'src> {
 
         // Use the more general rule of the three to parse the first element
         // and limit it later.
-        let mut parsed_expr = self.parse_star_expression_or_higher(AllowNamedExpression::Yes);
+        let mut parsed_expr = self.parse_yield_expression_or_else(|p| {
+            p.parse_star_expression_or_higher(AllowNamedExpression::Yes)
+        });
 
         match self.current_token_kind() {
             TokenKind::Comma => {
@@ -1978,7 +1939,6 @@ impl<'src> Parser<'src> {
         self.expect(TokenKind::In);
         let iter =
             self.parse_simple_expression(AllowLambdaExpression::No, AllowStarredExpression::No);
-        self.validate_comprehension_iter_and_if_expr(&iter);
 
         let mut ifs = vec![];
         let mut progress = ParserProgress::default();
@@ -1988,7 +1948,6 @@ impl<'src> Parser<'src> {
 
             let parsed_expr =
                 self.parse_simple_expression(AllowLambdaExpression::No, AllowStarredExpression::No);
-            self.validate_comprehension_iter_and_if_expr(&parsed_expr);
 
             ifs.push(parsed_expr.expr);
         }
@@ -1999,26 +1958,6 @@ impl<'src> Parser<'src> {
             iter: iter.expr,
             ifs,
             is_async,
-        }
-    }
-
-    /// Helper function to validate the comprehension iter and `if` expressions.
-    fn validate_comprehension_iter_and_if_expr(&mut self, parsed_expr: &ParsedExpr) {
-        if parsed_expr.is_parenthesized {
-            // Parentheses resets the precedence, so we don't need to validate it.
-            return;
-        }
-
-        match parsed_expr.expr {
-            Expr::Yield(_) | Expr::YieldFrom(_) => {
-                self.add_error(
-                    ParseErrorType::OtherError(
-                        "unparenthesized yield expression cannot be used here".to_string(),
-                    ),
-                    parsed_expr,
-                );
-            }
-            _ => {}
         }
     }
 
@@ -2184,6 +2123,23 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// Parses a yield expression if the parser is positioned at a `yield` token
+    /// or calls the given closure to parse an expression.
+    ///
+    /// This method is used where the grammar allows a `yield` expression or an
+    /// alternative expression. For example, the grammar for a parenthesized
+    /// expression is `(yield_expr | named_expression)`.
+    pub(super) fn parse_yield_expression_or_else<F>(&mut self, f: F) -> ParsedExpr
+    where
+        F: Fn(&mut Parser<'src>) -> ParsedExpr,
+    {
+        if self.at(TokenKind::Yield) {
+            self.parse_yield_expression().into()
+        } else {
+            f(self)
+        }
+    }
+
     /// Parses a `yield` expression.
     ///
     /// # Panics
@@ -2271,19 +2227,6 @@ impl<'src> Parser<'src> {
         helpers::set_expr_ctx(&mut target, ExprContext::Store);
 
         let value = self.parse_conditional_expression_or_higher(AllowStarredExpression::No);
-        if !value.is_parenthesized {
-            match value.expr {
-                Expr::Yield(_) | Expr::YieldFrom(_) => {
-                    self.add_error(
-                        ParseErrorType::OtherError(
-                            "unparenthesized yield expression cannot be used here".to_string(),
-                        ),
-                        &value,
-                    );
-                }
-                _ => {}
-            }
-        }
 
         ast::ExprNamed {
             target: Box::new(target),
@@ -2326,24 +2269,11 @@ impl<'src> Parser<'src> {
         // lambda x: *y,
         // lambda x: *y, z
         // lambda x: *y and z
-        let body = self.parse_conditional_expression_or_higher(AllowStarredExpression::No);
 
-        if !body.is_parenthesized {
-            match body.expr {
-                // test_err lambda_body_with_yield_expr
-                // lambda x: yield y
-                // lambda x: yield from y
-                Expr::Yield(_) | Expr::YieldFrom(_) => {
-                    self.add_error(
-                        ParseErrorType::OtherError(
-                            "unparenthesized yield expression cannot be used here".to_string(),
-                        ),
-                        &body,
-                    );
-                }
-                _ => {}
-            }
-        }
+        // test_err lambda_body_with_yield_expr
+        // lambda x: yield y
+        // lambda x: yield from y
+        let body = self.parse_conditional_expression_or_higher(AllowStarredExpression::No);
 
         ast::ExprLambda {
             body: Box::new(body.expr),
@@ -2364,36 +2294,10 @@ impl<'src> Parser<'src> {
 
         let test =
             self.parse_simple_expression(AllowLambdaExpression::No, AllowStarredExpression::No);
-        if !test.is_parenthesized {
-            match test.expr {
-                Expr::Yield(_) | Expr::YieldFrom(_) => {
-                    self.add_error(
-                        ParseErrorType::OtherError(
-                            "unparenthesized yield expression cannot be used here".to_string(),
-                        ),
-                        &test,
-                    );
-                }
-                _ => {}
-            }
-        }
 
         self.expect(TokenKind::Else);
 
         let orelse = self.parse_conditional_expression_or_higher(AllowStarredExpression::No);
-        if !orelse.is_parenthesized {
-            match orelse.expr {
-                Expr::Yield(_) | Expr::YieldFrom(_) => {
-                    self.add_error(
-                        ParseErrorType::OtherError(
-                            "unparenthesized yield expression cannot be used here".to_string(),
-                        ),
-                        &orelse,
-                    );
-                }
-                _ => {}
-            }
-        }
 
         ast::ExprIf {
             body: Box::new(body),
@@ -2414,11 +2318,6 @@ impl ParsedExpr {
     #[inline]
     const fn is_unparenthesized_starred_expr(&self) -> bool {
         !self.is_parenthesized && self.expr.is_starred_expr()
-    }
-
-    #[inline]
-    const fn is_unparenthesized_yield_expr(&self) -> bool {
-        !self.is_parenthesized && matches!(self.expr, Expr::Yield(_) | Expr::YieldFrom(_))
     }
 }
 

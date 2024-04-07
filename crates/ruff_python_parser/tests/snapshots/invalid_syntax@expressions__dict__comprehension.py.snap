@@ -766,7 +766,7 @@ Module(
  7 | # Invalid iter
  8 | {x: y for x in *y}
  9 | {x: y for x in yield y}
-   |                ^^^^^^^ Syntax Error: unparenthesized yield expression cannot be used here
+   |                ^^^^^^^ Syntax Error: yield expression cannot be used here
 10 | {x: y for x in yield from y}
 11 | {x: y for x in lambda y: y}
    |
@@ -776,7 +776,7 @@ Module(
  8 | {x: y for x in *y}
  9 | {x: y for x in yield y}
 10 | {x: y for x in yield from y}
-   |                ^^^^^^^^^^^^ Syntax Error: unparenthesized yield expression cannot be used here
+   |                ^^^^^^^^^^^^ Syntax Error: yield expression cannot be used here
 11 | {x: y for x in lambda y: y}
    |
 
@@ -804,7 +804,7 @@ Module(
 13 | # Invalid if
 14 | {x: y for x in data if *y}
 15 | {x: y for x in data if yield y}
-   |                        ^^^^^^^ Syntax Error: unparenthesized yield expression cannot be used here
+   |                        ^^^^^^^ Syntax Error: yield expression cannot be used here
 16 | {x: y for x in data if yield from y}
 17 | {x: y for x in data if lambda y: y}
    |
@@ -814,7 +814,7 @@ Module(
 14 | {x: y for x in data if *y}
 15 | {x: y for x in data if yield y}
 16 | {x: y for x in data if yield from y}
-   |                        ^^^^^^^^^^^^ Syntax Error: unparenthesized yield expression cannot be used here
+   |                        ^^^^^^^^^^^^ Syntax Error: yield expression cannot be used here
 17 | {x: y for x in data if lambda y: y}
    |
 
