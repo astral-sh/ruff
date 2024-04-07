@@ -28,6 +28,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     pycodestyle::rules::ambiguous_variable_name(checker, name, name.range());
                 }
             }
+            if checker.enabled(Rule::GlobalVariableUndefined) {
+                pylint::rules::global_variable_undefined(checker, stmt);
+            }
         }
         Stmt::Nonlocal(nonlocal @ ast::StmtNonlocal { names, range: _ }) => {
             if checker.enabled(Rule::AmbiguousVariableName) {

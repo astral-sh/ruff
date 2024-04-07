@@ -1,0 +1,11 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+global_variable_undefined.py:17:5: PLW0601 Global variable `SOMEVAR` is undefined at the module
+   |
+15 | # BAD
+16 | def global_variable_undefined():
+17 |     global SOMEVAR  # [global-variable-undefined]
+   |     ^^^^^^^^^^^^^^ PLW0601
+18 |     SOMEVAR = 2
+   |
