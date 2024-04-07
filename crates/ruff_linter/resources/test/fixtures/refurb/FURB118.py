@@ -10,7 +10,7 @@ op_mult = lambda x, y: x * y
 op_matmutl = lambda x, y: x @ y
 op_truediv = lambda x, y: x / y
 op_mod = lambda x, y: x % y
-op_pow = lambda x, y: x ** y
+op_pow = lambda x, y: x**y
 op_lshift = lambda x, y: x << y
 op_rshift = lambda x, y: x >> y
 op_bitor = lambda x, y: x | y
@@ -45,8 +45,9 @@ class Adder:
     def add(x, y):
         return x + y
 
+
 # OK.
-op_add3 = lambda x, y = 1: x + y
+op_add3 = lambda x, y=1: x + y
 op_neg2 = lambda x, y: y - x
 op_notin = lambda x, y: y not in x
 op_and = lambda x, y: y and x
@@ -63,8 +64,10 @@ op_itemgetter = lambda x: (*x[0], x[1])
 def op_neg3(x, y):
     return y - x
 
-def op_add4(x, y = 1):
+
+def op_add4(x, y=1):
     return x + y
+
 
 def op_add5(x, y):
     print("op_add5")

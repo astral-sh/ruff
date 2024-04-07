@@ -1,12 +1,13 @@
+use std::borrow::Cow;
 use std::fmt::{Debug, Display, Formatter};
 
 use anyhow::Result;
-use itertools::Itertools;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Expr, ExprSlice, ExprSubscript, ExprTuple, Parameters, Stmt};
 use ruff_python_semantic::SemanticModel;
+use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -74,7 +75,7 @@ pub(crate) fn reimplemented_operator(checker: &mut Checker, target: &FunctionLik
         return;
     };
     let Some(body) = target.body() else { return };
-    let Some(operator) = get_operator(checker, body, params) else {
+    let Some(operator) = get_operator(body, params, checker.locator()) else {
         return;
     };
     let fix = target.try_fix(&operator, checker.importer(), checker.semantic());
@@ -118,8 +119,8 @@ impl Ranged for FunctionLike<'_> {
 }
 
 impl FunctionLike<'_> {
-    /// Return the [`ast::Parameters`] of the function-like node.
-    fn parameters(&self) -> Option<&ast::Parameters> {
+    /// Return the [`Parameters`] of the function-like node.
+    fn parameters(&self) -> Option<&Parameters> {
         match self {
             Self::Lambda(expr) => expr.parameters.as_deref(),
             Self::Function(stmt) => Some(&stmt.parameters),
@@ -163,10 +164,10 @@ impl FunctionLike<'_> {
                     self.start(),
                     semantic,
                 )?;
-                let content = if let Some(args) = operator.args.as_ref() {
-                    format!("{binding}({args})")
-                } else {
+                let content = if operator.args.is_empty() {
                     binding
+                } else {
+                    format!("{binding}({})", operator.args.join(", "))
                 };
                 Ok(Some(Fix::safe_edits(
                     Edit::range_replacement(content, self.range()),
@@ -180,40 +181,37 @@ impl FunctionLike<'_> {
 
 /// Convert the slice expression to the string representation of `slice` call.
 /// For example, expression `1:2` will be `slice(1, 2)`, and `:` will be `slice(None)`.
-fn slice_expr_to_slice_call(checker: &mut Checker, expr_slice: &ExprSlice) -> String {
-    let stringify =
-        |x: Option<&Box<Expr>>| x.map_or("None".into(), |x| checker.generator().expr(x));
+fn slice_expr_to_slice_call(slice: &ExprSlice, locator: &Locator) -> String {
+    let stringify = |expr: Option<&Expr>| expr.map_or("None", |expr| locator.slice(expr));
     match (
-        expr_slice.lower.as_ref(),
-        expr_slice.upper.as_ref(),
-        expr_slice.step.as_ref(),
+        slice.lower.as_deref(),
+        slice.upper.as_deref(),
+        slice.step.as_deref(),
     ) {
-        (l, u, s @ Some(_)) => format!(
+        (lower, upper, step @ Some(_)) => format!(
             "slice({}, {}, {})",
-            stringify(l),
-            stringify(u),
-            stringify(s)
+            stringify(lower),
+            stringify(upper),
+            stringify(step)
         ),
-        (None, u, None) => format!("slice({})", stringify(u)),
-        (l @ Some(_), u, None) => format!("slice({}, {})", stringify(l), stringify(u)),
+        (None, upper, None) => format!("slice({})", stringify(upper)),
+        (lower @ Some(_), upper, None) => {
+            format!("slice({}, {})", stringify(lower), stringify(upper))
+        }
     }
 }
 
 /// Convert the given expression to a string representation, suitable to be a function argument.
-fn subscript_slice_to_string(checker: &mut Checker, expr: &Expr) -> String {
+fn subscript_slice_to_string<'a>(expr: &Expr, locator: &Locator<'a>) -> Cow<'a, str> {
     if let Expr::Slice(expr_slice) = expr {
-        slice_expr_to_slice_call(checker, expr_slice)
+        Cow::Owned(slice_expr_to_slice_call(expr_slice, locator))
     } else {
-        checker.generator().expr(expr)
+        Cow::Borrowed(locator.slice(expr))
     }
 }
 
 /// Return the `operator` implemented by given subscript expression.
-fn itemgetter_op(
-    checker: &mut Checker,
-    expr: &ExprSubscript,
-    params: &Parameters,
-) -> Option<Operator> {
+fn itemgetter_op(expr: &ExprSubscript, params: &Parameters, locator: &Locator) -> Option<Operator> {
     let [arg] = params.args.as_slice() else {
         return None;
     };
@@ -222,15 +220,15 @@ fn itemgetter_op(
     };
     Some(Operator {
         name: "itemgetter",
-        args: Some(subscript_slice_to_string(checker, expr.slice.as_ref())),
+        args: vec![subscript_slice_to_string(expr.slice.as_ref(), locator).to_string()],
     })
 }
 
 /// Return the `operator` implemented by given tuple expression.
 fn itemgetter_op_tuple(
-    checker: &mut Checker,
     expr: &ExprTuple,
     params: &Parameters,
+    locator: &Locator,
 ) -> Option<Operator> {
     let [arg] = params.args.as_slice() else {
         return None;
@@ -238,40 +236,32 @@ fn itemgetter_op_tuple(
     if expr.elts.is_empty() {
         return None;
     }
-    if !expr.elts.iter().all(|expr| {
-        expr.as_subscript_expr()
-            .is_some_and(|expr| is_same_expression(arg, &expr.value))
-    }) {
-        return None;
-    }
     Some(Operator {
         name: "itemgetter",
-        args: Some(
-            expr.elts
-                .iter()
-                .map(|expr| {
-                    subscript_slice_to_string(
-                        checker,
-                        // unwrap is safe, because we check that all elts are subscripts
-                        expr.as_subscript_expr().unwrap().slice.as_ref(),
-                    )
-                })
-                .join(", "),
-        ),
+        args: expr
+            .elts
+            .iter()
+            .map(|expr| {
+                expr.as_subscript_expr()
+                    .filter(|expr| is_same_expression(arg, &expr.value))
+                    .map(|expr| expr.slice.as_ref())
+                    .map(|slice| subscript_slice_to_string(slice, locator).to_string())
+            })
+            .collect::<Option<Vec<_>>>()?,
     })
 }
 
 #[derive(Eq, PartialEq, Debug)]
 struct Operator {
     name: &'static str,
-    args: Option<String>,
+    args: Vec<String>,
 }
 
 impl From<&'static str> for Operator {
     fn from(value: &'static str) -> Self {
         Self {
             name: value,
-            args: None,
+            args: vec![],
         }
     }
 }
@@ -279,20 +269,22 @@ impl From<&'static str> for Operator {
 impl Display for Operator {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.name)?;
-        self.args
-            .as_ref()
-            .map_or(Ok(()), |args| write!(f, "({args})"))
+        if self.args.is_empty() {
+            Ok(())
+        } else {
+            write!(f, "({})", self.args.join(", "))
+        }
     }
 }
 
 /// Return the `operator` implemented by the given expression.
-fn get_operator(checker: &mut Checker, expr: &Expr, params: &ast::Parameters) -> Option<Operator> {
+fn get_operator(expr: &Expr, params: &Parameters, locator: &Locator) -> Option<Operator> {
     match expr {
-        Expr::UnaryOp(expr) => unary_op(expr, params).map(Into::into),
-        Expr::BinOp(expr) => bin_op(expr, params).map(Into::into),
-        Expr::Compare(expr) => cmp_op(expr, params).map(Into::into),
-        Expr::Subscript(expr) => itemgetter_op(checker, expr, params),
-        Expr::Tuple(expr) => itemgetter_op_tuple(checker, expr, params),
+        Expr::UnaryOp(expr) => unary_op(expr, params).map(Operator::from),
+        Expr::BinOp(expr) => bin_op(expr, params).map(Operator::from),
+        Expr::Compare(expr) => cmp_op(expr, params).map(Operator::from),
+        Expr::Subscript(expr) => itemgetter_op(expr, params, locator),
+        Expr::Tuple(expr) => itemgetter_op_tuple(expr, params, locator),
         _ => None,
     }
 }
@@ -304,7 +296,7 @@ enum FunctionLikeKind {
 }
 
 /// Return the name of the `operator` implemented by the given unary expression.
-fn unary_op(expr: &ast::ExprUnaryOp, params: &ast::Parameters) -> Option<&'static str> {
+fn unary_op(expr: &ast::ExprUnaryOp, params: &Parameters) -> Option<&'static str> {
     let [arg] = params.args.as_slice() else {
         return None;
     };
@@ -320,7 +312,7 @@ fn unary_op(expr: &ast::ExprUnaryOp, params: &ast::Parameters) -> Option<&'stati
 }
 
 /// Return the name of the `operator` implemented by the given binary expression.
-fn bin_op(expr: &ast::ExprBinOp, params: &ast::Parameters) -> Option<&'static str> {
+fn bin_op(expr: &ast::ExprBinOp, params: &Parameters) -> Option<&'static str> {
     let [arg1, arg2] = params.args.as_slice() else {
         return None;
     };
@@ -345,7 +337,7 @@ fn bin_op(expr: &ast::ExprBinOp, params: &ast::Parameters) -> Option<&'static st
 }
 
 /// Return the name of the `operator` implemented by the given comparison expression.
-fn cmp_op(expr: &ast::ExprCompare, params: &ast::Parameters) -> Option<&'static str> {
+fn cmp_op(expr: &ast::ExprCompare, params: &Parameters) -> Option<&'static str> {
     let [arg1, arg2] = params.args.as_slice() else {
         return None;
     };
