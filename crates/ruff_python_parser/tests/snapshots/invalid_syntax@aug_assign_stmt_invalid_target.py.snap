@@ -7,7 +7,7 @@ input_file: crates/ruff_python_parser/resources/inline/err/aug_assign_stmt_inval
 ```
 Module(
     ModModule {
-        range: 0..46,
+        range: 0..59,
         body: [
             AugAssign(
                 StmtAugAssign {
@@ -138,6 +138,40 @@ Module(
                     ),
                 },
             ),
+            AugAssign(
+                StmtAugAssign {
+                    range: 46..58,
+                    target: BinOp(
+                        ExprBinOp {
+                            range: 47..52,
+                            left: Name(
+                                ExprName {
+                                    range: 47..48,
+                                    id: "x",
+                                    ctx: Load,
+                                },
+                            ),
+                            op: Add,
+                            right: Name(
+                                ExprName {
+                                    range: 51..52,
+                                    id: "y",
+                                    ctx: Load,
+                                },
+                            ),
+                        },
+                    ),
+                    op: Add,
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 57..58,
+                            value: Int(
+                                1,
+                            ),
+                        },
+                    ),
+                },
+            ),
         ],
     },
 )
@@ -177,6 +211,7 @@ Module(
 4 | pass += 1
   |      ^^ Syntax Error: Expected a statement
 5 | x += pass
+6 | (x + y) += 1
   |
 
 
@@ -185,4 +220,13 @@ Module(
 4 | pass += 1
 5 | x += pass
   |      ^^^^ Syntax Error: Expected an identifier, but found a keyword 'pass' that cannot be used here
+6 | (x + y) += 1
+  |
+
+
+  |
+4 | pass += 1
+5 | x += pass
+6 | (x + y) += 1
+  |  ^^^^^ Syntax Error: invalid augmented assignment target
   |

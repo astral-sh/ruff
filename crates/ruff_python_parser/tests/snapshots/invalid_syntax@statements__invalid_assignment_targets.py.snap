@@ -1404,7 +1404,7 @@ Module(
  7 | 5 += 3
  8 | 
  9 | (5): int = 3
-   |  ^ Syntax Error: invalid assignment target
+   |  ^ Syntax Error: invalid annotated assignment target
 10 | 
 11 | # Now we exhaustively test all possible cases where assignment can fail.
    |

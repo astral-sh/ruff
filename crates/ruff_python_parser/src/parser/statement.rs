@@ -848,7 +848,7 @@ impl<'src> Parser<'src> {
         self.parse_list(RecoveryContextKind::AssignmentTargets, |parser| {
             parser.bump(TokenKind::Equal);
 
-            // test_err_assign_stmt_keyword_target
+            // test_err assign_stmt_keyword_target
             // a = pass = c
             // a + b
             // a = b = pass = c
@@ -860,10 +860,12 @@ impl<'src> Parser<'src> {
             );
         });
 
-        // test_err assign_stmt_invalid_starred_expr
+        // test_err assign_stmt_invalid_value_expr
         // x = *a and b
         // x = *yield x
+        // x = *yield from x
         // x = *lambda x: x
+        // x = x := 1
 
         // The last target is the value of the assignment statement.
         // SAFETY: There is at least one element in the vector which is the parameter `target`.
@@ -902,30 +904,34 @@ impl<'src> Parser<'src> {
 
         // test_err ann_assign_stmt_invalid_target
         // "abc": str = "def"
-        // [123, 456]: (int, int) = (1, 2)
-        self.validate_assignment_target(&target.expr);
-
-        if target.is_tuple_expr() {
-            // test_err ann_assign_stmt_tuple_target
-            // x,: int = 1
-            // x, y: int = 1, 2
-            // (x, y): int = 1, 2
-            self.add_error(
-                ParseErrorType::OtherError(
-                    "only single target (not tuple) can be annotated".into(),
-                ),
-                target.range(),
-            );
-        }
+        // call(): str = "no"
+        // *x: int = 1, 2
+        // # Tuple assignment
+        // x,: int = 1
+        // x, y: int = 1, 2
+        // (x, y): int = 1, 2
+        // # List assignment
+        // [x]: int = 1
+        // [x, y]: int = 1, 2
+        self.validate_annotated_assignment_target(&target.expr);
 
         helpers::set_expr_ctx(&mut target.expr, ExprContext::Store);
 
         let simple = target.is_name_expr() && !target.is_parenthesized;
 
+        // test_err ann_assign_stmt_invalid_annotation
+        // x: *int = 1
+        // x: yield a = 1
+        // x: yield from b = 1
+        // x: y := int = 1
         let annotation = self.parse_conditional_expression_or_higher(AllowStarredExpression::No);
 
         let value = if self.eat(TokenKind::Equal) {
             if self.at_expr() {
+                // test_err ann_assign_stmt_invalid_value
+                // x: Any = *a and b
+                // x: Any = x := 1
+                // x: list = [x, *a | b, *a or b]
                 Some(Box::new(
                     self.parse_yield_expression_or_else(Parser::parse_star_expression_list)
                         .expr,
@@ -978,6 +984,7 @@ impl<'src> Parser<'src> {
             // *x += 1
             // pass += 1
             // x += pass
+            // (x + y) += 1
             self.add_error(ParseErrorType::InvalidAugmentedAssignmentTarget, &target);
         }
 
@@ -989,6 +996,12 @@ impl<'src> Parser<'src> {
         // x += y +=
         // 2 + 2
 
+        // test_err aug_assign_stmt_invalid_value
+        // x += *a and b
+        // x += *yield x
+        // x += *yield from x
+        // x += *lambda x: x
+        // x += y := 1
         let value = self.parse_yield_expression_or_else(Parser::parse_star_expression_list);
 
         ast::StmtAugAssign {
@@ -2202,6 +2215,29 @@ impl<'src> Parser<'src> {
             }
             Expr::Name(_) | Expr::Attribute(_) | Expr::Subscript(_) => {}
             _ => self.add_error(ParseErrorType::InvalidAssignmentTarget, expr.range()),
+        }
+    }
+
+    /// Validate that the given expression is a valid annotated assignment target.
+    ///
+    /// Unlike [`Parser::validate_assignment_target`], starred, list and tuple
+    /// expressions aren't allowed here.
+    fn validate_annotated_assignment_target(&mut self, expr: &Expr) {
+        match expr {
+            Expr::List(_) => self.add_error(
+                ParseErrorType::OtherError(
+                    "only single target (not list) can be annotated".to_string(),
+                ),
+                expr,
+            ),
+            Expr::Tuple(_) => self.add_error(
+                ParseErrorType::OtherError(
+                    "only single target (not tuple) can be annotated".to_string(),
+                ),
+                expr,
+            ),
+            Expr::Name(_) | Expr::Attribute(_) | Expr::Subscript(_) => {}
+            _ => self.add_error(ParseErrorType::InvalidAnnotatedAssignmentTarget, expr),
         }
     }
 

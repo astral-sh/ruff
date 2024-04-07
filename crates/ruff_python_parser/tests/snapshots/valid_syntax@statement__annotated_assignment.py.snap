@@ -7,7 +7,7 @@ input_file: crates/ruff_python_parser/resources/valid/statement/annotated_assign
 ```
 Module(
     ModModule {
-        range: 0..84,
+        range: 0..103,
         body: [
             AnnAssign(
                 StmtAnnAssign {
@@ -200,6 +200,64 @@ Module(
                         NumberLiteral(
                             ExprNumberLiteral {
                                 range: 82..83,
+                                value: Int(
+                                    1,
+                                ),
+                            },
+                        ),
+                    ),
+                    simple: true,
+                },
+            ),
+            AnnAssign(
+                StmtAnnAssign {
+                    range: 84..102,
+                    target: Name(
+                        ExprName {
+                            range: 84..85,
+                            id: "x",
+                            ctx: Store,
+                        },
+                    ),
+                    annotation: Lambda(
+                        ExprLambda {
+                            range: 87..98,
+                            parameters: Some(
+                                Parameters {
+                                    range: 94..95,
+                                    posonlyargs: [],
+                                    args: [
+                                        ParameterWithDefault {
+                                            range: 94..95,
+                                            parameter: Parameter {
+                                                range: 94..95,
+                                                name: Identifier {
+                                                    id: "x",
+                                                    range: 94..95,
+                                                },
+                                                annotation: None,
+                                            },
+                                            default: None,
+                                        },
+                                    ],
+                                    vararg: None,
+                                    kwonlyargs: [],
+                                    kwarg: None,
+                                },
+                            ),
+                            body: Name(
+                                ExprName {
+                                    range: 97..98,
+                                    id: "y",
+                                    ctx: Load,
+                                },
+                            ),
+                        },
+                    ),
+                    value: Some(
+                        NumberLiteral(
+                            ExprNumberLiteral {
+                                range: 101..102,
                                 value: Int(
                                     1,
                                 ),
