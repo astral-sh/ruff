@@ -42,11 +42,7 @@ use ruff_text_size::Ranged;
 /// - [Python documentation: `max`](https://docs.python.org/3/library/functions.html#max)
 
 #[violation]
-pub struct SortedMinMax {
-    min_max: MinMax,
-    expression: SourceCodeSnippet,
-    replacement: SourceCodeSnippet,
-}
+pub struct SortedMinMax;
 
 impl Violation for SortedMinMax {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Always;
@@ -74,7 +70,12 @@ pub(crate) fn sorted_min_max(checker: &mut Checker, subscript: &ExprSubscript) {
         return;
     }
 
-    let Expr::Call(ExprCall { func, .. }) = value.as_ref() else {
+    let Expr::Call(ExprCall {
+        func,
+        arguments,
+        range,
+    }) = value.as_ref()
+    else {
         return;
     };
     // Check if the value is a call to `sorted()`
@@ -83,12 +84,12 @@ pub(crate) fn sorted_min_max(checker: &mut Checker, subscript: &ExprSubscript) {
         return;
     };
 
-    let Some(index) = (match slice.as_ref() {
+    let index = match slice.as_ref() {
         // [0]
         Expr::NumberLiteral(ExprNumberLiteral {
             value: Number::Int(index),
             ..
-        }) if *index == 0 => index.as_i64(),
+        }) if *index == 0 => Index::First,
 
         // [-1]
         Expr::UnaryOp(ExprUnaryOp {
@@ -96,53 +97,49 @@ pub(crate) fn sorted_min_max(checker: &mut Checker, subscript: &ExprSubscript) {
             operand,
             ..
         }) => {
-            if let Expr::NumberLiteral(ExprNumberLiteral {
-                value: Number::Int(index),
-                ..
-            }) = operand.as_ref()
-            {
-                if *index == 1 {
-                    index.as_i64().map(|i| -i)
-                } else {
-                    None
-                }
-            } else {
-                return;
+            match operand.as_ref() {
+                // [-1]
+                Expr::NumberLiteral(ExprNumberLiteral {
+                    value: Number::Int(index),
+                    ..
+                }) if *index == 1 => Index::Last,
+                _ => return,
             }
         }
         _ => return,
-    }) else {
-        return;
     };
 
-    let reversed = if let Expr::Call(ExprCall { arguments, .. }) = value.as_ref() {
-        arguments.keywords.iter().any(|keyword| {
-            // Is the keyword "reverse" and is the value `true`?
-            keyword
-                .arg
-                .as_ref()
-                .map_or(false, |arg| arg.as_str() == "reverse")
-                && keyword
-                    .value
-                    .as_boolean_literal_expr()
-                    .map_or(false, |b| b.value)
-        })
-    } else {
-        false
+    let reversed = arguments.keywords.iter().any(|keyword| {
+        // Is the keyword "reverse" and is the value `true`?
+        keyword
+            .arg
+            .as_ref()
+            .map_or(false, |arg| arg.as_str() == "reverse")
+            && keyword
+                .value
+                .as_boolean_literal_expr()
+                .map_or(false, |b| b.value)
+    });
+
+    let keys = arguments.keywords.iter().find(|keyword| {
+        keyword
+            .arg
+            .as_ref()
+            .map_or(false, |arg| arg.as_str() == "keys")
+    });
+
+    let min_max = match (index, reversed) {
+        (Index::First, false) => MinMax::Min,
+        (Index::First, true) => MinMax::Max,
+        (Index::Last, false) => MinMax::Max,
+        (Index::Last, true) => MinMax::Min,
     };
 
-    let replacement = format!("{}(sorted())", if index == 0 { "min" } else { "max" });
+    let replacement = format!("{}({})", min_max.as_str(), keys);
 
-    let mut diagnostic = Diagnostic::new(
-        SortedMinMax {
-            min_max: if index == 0 { MinMax::Min } else { MinMax::Max },
-            expression: SourceCodeSnippet::from_str(checker.locator().slice(subscript)),
-            replacement: SourceCodeSnippet::new(replacement),
-        },
-        subscript.range(),
-    );
+    let mut diagnostic = Diagnostic::new(SortedMinMax, subscript.range());
     diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
-        index.to_string(),
+        replacement,
         subscript.start(),
         subscript.end(),
     )));
@@ -154,5 +151,23 @@ enum MinMax {
     Min,
     Max,
 }
+
+impl MinMax {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Min => "min",
+            Self::Max => "max",
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+enum Index {
+    // 0
+    First,
+    // -1
+    Last,
+}
+
 // TODO:
 // - Caveat reverse=True with -1 as unsafe
