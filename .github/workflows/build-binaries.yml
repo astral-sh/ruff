@@ -78,7 +78,7 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: x86_64
-          args: --release --locked --out dist --features self-update
+          args: --release --locked --out dist
       - name: "Upload wheels"
         uses: actions/upload-artifact@v4
         with:
@@ -119,7 +119,7 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: aarch64
-          args: --release --locked --out dist --features self-update
+          args: --release --locked --out dist
       - name: "Test wheel - aarch64"
         run: |
           pip install dist/${{ env.PACKAGE_NAME }}-*.whl --force-reinstall
@@ -158,6 +158,8 @@ jobs:
             arch: x64
           - target: i686-pc-windows-msvc
             arch: x86
+          - target: aarch64-pc-windows-msvc
+            arch: x64
     steps:
       - uses: actions/checkout@v4
         with:
@@ -172,7 +174,7 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
-          args: --release --locked --out dist --features self-update
+          args: --release --locked --out dist
         env:
           # aarch64 build fails, see https://github.com/PyO3/maturin/issues/2110
           XWIN_VERSION: 16
@@ -225,22 +227,7 @@ jobs:
         with:
           target: ${{ matrix.target }}
           manylinux: auto
-          args: --release --locked --out dist --features self-update
-          # See: https://github.com/sfackler/rust-openssl/issues/2036#issuecomment-1724324145
-          before-script-linux: |
-            # If we're running on rhel centos, install needed packages.
-            if command -v yum &> /dev/null; then
-                yum update -y && yum install -y perl-core openssl openssl-devel pkgconfig libatomic
-
-                # If we're running on i686 we need to symlink libatomic
-                # in order to build openssl with -latomic flag.
-                if [[ ! -d "/usr/lib64" ]]; then
-                    ln -s /usr/lib/libatomic.so.1 /usr/lib/libatomic.so
-                fi
-            else
-                # If we're running on debian-based system.
-                apt update -y && apt-get install -y libssl-dev openssl pkg-config
-            fi
+          args: --release --locked --out dist
       - name: "Test wheel"
         if: ${{ startsWith(matrix.target, 'x86_64') }}
         run: |
@@ -273,7 +260,7 @@ jobs:
             *.tar.gz
             *.sha256
 
-  linux-arm:
+  linux-cross:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-build') }}
     runs-on: ubuntu-latest
     strategy:
@@ -286,6 +273,16 @@ jobs:
             maturin_docker_options: -e JEMALLOC_SYS_WITH_LG_PAGE=16
           - target: armv7-unknown-linux-gnueabihf
             arch: armv7
+          - target: s390x-unknown-linux-gnu
+            arch: s390x
+          - target: powerpc64le-unknown-linux-gnu
+            arch: ppc64le
+            # see https://github.com/astral-sh/ruff/issues/10073
+            maturin_docker_options: -e JEMALLOC_SYS_WITH_LG_PAGE=16
+          - target: powerpc64-unknown-linux-gnu
+            arch: ppc64
+            # see https://github.com/astral-sh/ruff/issues/10073
+            maturin_docker_options: -e JEMALLOC_SYS_WITH_LG_PAGE=16
           - target: arm-unknown-linux-musleabihf
             arch: arm
 
@@ -302,11 +299,11 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
-          # On `aarch64`, use `manylinux: 2_28`; otherwise, use `manylinux: auto`.
-          manylinux: ${{ matrix.platform.arch == 'aarch64' && '2_28' || 'auto' }}
+          manylinux: auto
           docker-options: ${{ matrix.platform.maturin_docker_options }}
-          args: --release --locked --out dist --features self-update
+          args: --release --locked --out dist
       - uses: uraimo/run-on-arch-action@v2
+        if: matrix.platform.arch != 'ppc64'
         name: Test wheel
         with:
           arch: ${{ matrix.platform.arch == 'arm' && 'armv6' || matrix.platform.arch }}
@@ -318,150 +315,7 @@ jobs:
             pip3 install -U pip
           run: |
             pip3 install ${{ env.PACKAGE_NAME }} --no-index --find-links dist/ --force-reinstall
-            ${{ env.MODULE_NAME }} --help
-      - name: "Upload wheels"
-        uses: actions/upload-artifact@v4
-        with:
-          name: wheels-${{ matrix.platform.target }}
-          path: dist
-      - name: "Archive binary"
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          TARGET=${{ matrix.platform.target }}
-          ARCHIVE_NAME=ruff-$TARGET
-          ARCHIVE_FILE=$ARCHIVE_NAME.tar.gz
-
-          mkdir -p $ARCHIVE_NAME
-          cp target/$TARGET/release/ruff $ARCHIVE_NAME/ruff
-          tar czvf $ARCHIVE_FILE $ARCHIVE_NAME
-          shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
-      - name: "Upload binary"
-        uses: actions/upload-artifact@v4
-        with:
-          name: artifacts-${{ matrix.platform.target }}
-          path: |
-            *.tar.gz
-            *.sha256
-
-  # Like `linux-arm`, but use `--no-default-features --features flate2/rust_backend` when
-  # building ruff.
-  linux-s390x:
-    if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-build') }}
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        platform:
-          - target: s390x-unknown-linux-gnu
-            arch: s390x
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      - name: "Prep README.md"
-        run: python scripts/transform_readme.py --target pypi
-      - name: "Build wheels"
-        uses: PyO3/maturin-action@v1
-        with:
-          target: ${{ matrix.platform.target }}
-          manylinux: auto
-          docker-options: ${{ matrix.platform.maturin_docker_options }}
-          args: --release --locked --out dist --no-default-features --features flate2/rust_backend --features self-update
-      - uses: uraimo/run-on-arch-action@v2
-        if: matrix.platform.arch != 'ppc64'
-        name: Test wheel
-        with:
-          arch: ${{ matrix.platform.arch }}
-          distro: ubuntu20.04
-          githubToken: ${{ github.token }}
-          install: |
-            apt-get update
-            apt-get install -y --no-install-recommends python3 python3-pip
-            pip3 install -U pip
-          run: |
-            pip3 install ${{ env.PACKAGE_NAME }} --no-index --find-links dist/ --force-reinstall
-            ${{ env.MODULE_NAME }} --help
-      - name: "Upload wheels"
-        uses: actions/upload-artifact@v4
-        with:
-          name: wheels-${{ matrix.platform.target }}
-          path: dist
-      - name: "Archive binary"
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          TARGET=${{ matrix.platform.target }}
-          ARCHIVE_NAME=ruff-$TARGET
-          ARCHIVE_FILE=$ARCHIVE_NAME.tar.gz
-
-          mkdir -p $ARCHIVE_NAME
-          cp target/$TARGET/release/ruff $ARCHIVE_NAME/ruff
-          tar czvf $ARCHIVE_FILE $ARCHIVE_NAME
-          shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
-      - name: "Upload binary"
-        uses: actions/upload-artifact@v4
-        with:
-          name: artifacts-${{ matrix.platform.target }}
-          path: |
-            *.tar.gz
-            *.sha256
-
-  # Like `linux-arm`, but use `--no-default-features --features flate2/rust_backend` when
-  # building ruff, and install the `gcc-powerpc64-linux-gnu` package.
-  linux-powerpc:
-    if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-build') }}
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        platform:
-          - target: powerpc64le-unknown-linux-gnu
-            arch: ppc64le
-          - target: powerpc64-unknown-linux-gnu
-            arch: ppc64
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      - name: "Prep README.md"
-        run: python scripts/transform_readme.py --target pypi
-      - name: "Build wheels"
-        uses: PyO3/maturin-action@v1
-        with:
-          target: ${{ matrix.platform.target }}
-          manylinux: auto
-          docker-options: ${{ matrix.platform.maturin_docker_options }}
-          args: --release --locked --out dist --no-default-features --features flate2/rust_backend --features self-update
-          before-script-linux: |
-            if command -v yum &> /dev/null; then
-                yum update -y
-                yum -y install epel-release
-                yum repolist
-                yum install -y gcc-powerpc64-linux-gnu
-            fi
-      - uses: uraimo/run-on-arch-action@v2
-        if: matrix.platform.arch != 'ppc64'
-        name: Test wheel
-        with:
-          arch: ${{ matrix.platform.arch }}
-          distro: ubuntu20.04
-          githubToken: ${{ github.token }}
-          install: |
-            apt-get update
-            apt-get install -y --no-install-recommends python3 python3-pip
-            pip3 install -U pip
-          run: |
-            pip3 install ${{ env.PACKAGE_NAME }} --no-index --find-links dist/ --force-reinstall
-            ${{ env.MODULE_NAME }} --help
+            ruff --help
       - name: "Upload wheels"
         uses: actions/upload-artifact@v4
         with:
@@ -511,7 +365,7 @@ jobs:
         with:
           target: ${{ matrix.target }}
           manylinux: musllinux_1_2
-          args: --release --locked --out dist --features self-update
+          args: --release --locked --out dist
       - name: "Test wheel"
         if: matrix.target == 'x86_64-unknown-linux-musl'
         uses: addnab/docker-run-action@v3
@@ -575,7 +429,7 @@ jobs:
         with:
           target: ${{ matrix.platform.target }}
           manylinux: musllinux_1_2
-          args: --release --locked --out dist --features self-update
+          args: --release --locked --out dist
           docker-options: ${{ matrix.platform.maturin_docker_options }}
       - uses: uraimo/run-on-arch-action@v2
         name: Test wheel

@@ -227,7 +227,7 @@ inherits = "release"
 # Config for 'cargo dist'
 [workspace.metadata.dist]
 # The preferred cargo-dist version to use in CI (Cargo.toml SemVer syntax)
-cargo-dist-version = "0.7.3-prerelease.3"
+cargo-dist-version = "0.14.0"
 # CI backends to support
 ci = ["github"]
 # The installers to generate for each app
@@ -238,23 +238,25 @@ windows-archive = ".zip"
 unix-archive = ".tar.gz"
 # Target platforms to build apps for (Rust target-triple syntax)
 targets = [
-  "aarch64-unknown-linux-gnu",
-  "x86_64-unknown-linux-gnu",
-  "i686-unknown-linux-gnu",
   "aarch64-apple-darwin",
-  "x86_64-apple-darwin",
-  "aarch64-unknown-linux-musl",
-  "x86_64-unknown-linux-musl",
-  "i686-unknown-linux-musl",
   "aarch64-pc-windows-msvc",
-  "x86_64-pc-windows-msvc",
-  "i686-pc-windows-msvc",
+  "aarch64-unknown-linux-gnu",
+  "aarch64-unknown-linux-musl",
+  "arm-unknown-linux-musleabihf",
   "armv7-unknown-linux-gnueabihf",
+  "armv7-unknown-linux-musleabihf",
+  "i686-pc-windows-msvc",
+  "i686-unknown-linux-gnu",
+  "i686-unknown-linux-musl",
   "powerpc64-unknown-linux-gnu",
   "powerpc64le-unknown-linux-gnu",
-  "s390x-unknown-linux-gnu"
+  "s390x-unknown-linux-gnu",
+  "x86_64-apple-darwin",
+  "x86_64-pc-windows-msvc",
+  "x86_64-unknown-linux-gnu",
+  "x86_64-unknown-linux-musl",
 ]
-# Whether to auto-include files like READMEs and CHANGELOGs (default true)
+# Whether to auto-include files like READMEs, LICENSEs, and CHANGELOGs (default true)
 auto-includes = false
 # Whether cargo-dist should create a Github Release or use an existing draft
 create-release = true
@@ -270,3 +272,7 @@ local-artifacts-jobs = ["./build-binaries", "./build-docker"]
 publish-jobs = ["./publish-pypi"]
 # Announcement jobs to run in CI
 post-announce-jobs = ["./notify-dependents"]
+# Skip checking whether the specified configuration files are up to date
+#allow-dirty = ["ci"]
+# Whether to install an updater program
+install-updater = false
