@@ -11,10 +11,11 @@ use crate::checkers::ast::Checker;
 use rustc_hash::FxHashMap;
 
 /// ### What it does
-///
+/// It checks that there are no data members defined that have the same name as items within `__slots__`.
 ///
 /// ### Why is this bad?
-///
+/// Since the idea behind `__slots__` is to disallow the creation of the `__dict__` and `__weakref__` attributes,
+/// defining data members contradicts this, and a `ValueError` will be raised at run-time.   
 ///
 /// ## Problematic code
 /// ```python
