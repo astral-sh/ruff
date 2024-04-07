@@ -15,7 +15,11 @@ Dict(
                                 StringLiteral {
                                     range: 1..4,
                                     value: "a",
-                                    unicode: false,
+                                    flags: StringLiteralFlags {
+                                        quote_style: Double,
+                                        prefix: Empty,
+                                        triple_quoted: false,
+                                    },
                                 },
                             ),
                         },
@@ -32,7 +36,11 @@ Dict(
                                 StringLiteral {
                                     range: 16..19,
                                     value: "d",
-                                    unicode: false,
+                                    flags: StringLiteralFlags {
+                                        quote_style: Double,
+                                        prefix: Empty,
+                                        triple_quoted: false,
+                                    },
                                 },
                             ),
                         },
@@ -49,7 +57,11 @@ Dict(
                             StringLiteral {
                                 range: 6..9,
                                 value: "b",
-                                unicode: false,
+                                flags: StringLiteralFlags {
+                                    quote_style: Double,
+                                    prefix: Empty,
+                                    triple_quoted: false,
+                                },
                             },
                         ),
                     },
@@ -70,7 +82,11 @@ Dict(
                             StringLiteral {
                                 range: 21..24,
                                 value: "e",
-                                unicode: false,
+                                flags: StringLiteralFlags {
+                                    quote_style: Double,
+                                    prefix: Empty,
+                                    triple_quoted: false,
+                                },
                             },
                         ),
                     },

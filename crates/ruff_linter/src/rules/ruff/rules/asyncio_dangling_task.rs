@@ -139,8 +139,7 @@ pub(crate) fn asyncio_dangling_binding(
         // else:
         //     task = asyncio.create_task(make_request())
         // ```
-        for binding_id in
-            std::iter::successors(Some(binding_id), |id| semantic.shadowed_binding(*id))
+        for binding_id in std::iter::successors(Some(binding_id), |id| scope.shadowed_binding(*id))
         {
             let binding = semantic.binding(binding_id);
             if binding.is_used()

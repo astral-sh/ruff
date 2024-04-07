@@ -71,6 +71,14 @@ impl Diagnostic {
         }
     }
 
+    /// Consumes `self` and returns a new `Diagnostic` with the given parent node.
+    #[inline]
+    #[must_use]
+    pub fn with_parent(mut self, parent: TextSize) -> Self {
+        self.set_parent(parent);
+        self
+    }
+
     /// Set the location of the diagnostic's parent node.
     #[inline]
     pub fn set_parent(&mut self, parent: TextSize) {

@@ -9,6 +9,7 @@ Example usage:
 
     scripts/check_ecosystem.py <path/to/ruff1> <path/to/ruff2>
 """
+
 from __future__ import annotations
 
 import argparse

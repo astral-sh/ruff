@@ -406,3 +406,18 @@ def foo():
         with contextlib.suppress(Exception):
             y = 2
         return y
+
+
+# See: https://github.com/astral-sh/ruff/issues/10732
+def func(a: dict[str, int]) -> list[dict[str, int]]:
+    services: list[dict[str, int]]
+    if "services" in a:
+        services = a["services"]
+        return services
+
+
+# See: https://github.com/astral-sh/ruff/issues/10732
+def func(a: dict[str, int]) -> list[dict[str, int]]:
+    if "services" in a:
+        services = a["services"]
+        return services

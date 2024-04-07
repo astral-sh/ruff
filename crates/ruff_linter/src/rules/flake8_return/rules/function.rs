@@ -151,7 +151,7 @@ impl AlwaysFixableViolation for ImplicitReturn {
 /// assigned variable.
 ///
 /// ## Why is this bad?
-/// The variable assignment is not necessary as the value can be returned
+/// The variable assignment is not necessary, as the value can be returned
 /// directly.
 ///
 /// ## Example
@@ -567,6 +567,12 @@ fn unnecessary_assign(checker: &mut Checker, stack: &Stack) {
             continue;
         }
 
+        // Ignore variables that have an annotation defined elsewhere.
+        if stack.annotations.contains(assigned_id.as_str()) {
+            continue;
+        }
+
+        // Ignore `nonlocal` and `global` variables.
         if stack.non_locals.contains(assigned_id.as_str()) {
             continue;
         }

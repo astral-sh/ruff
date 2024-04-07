@@ -175,9 +175,7 @@ fn find_double_star(pattern: &PatternMatchMapping, source: &str) -> Option<(Text
     } = pattern;
 
     // If there's no `rest` element, there's no `**`.
-    let Some(rest) = rest else {
-        return None;
-    };
+    let rest = rest.as_ref()?;
 
     let mut tokenizer =
         SimpleTokenizer::starts_at(patterns.last().map_or(pattern.start(), Ranged::end), source);

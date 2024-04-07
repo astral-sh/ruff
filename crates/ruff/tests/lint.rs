@@ -496,6 +496,7 @@ ignore = ["D203", "D212"]
     success: true
     exit_code: 0
     ----- stdout -----
+    All checks passed!
 
     ----- stderr -----
     warning: No Python files found under the given path(s)
@@ -833,6 +834,7 @@ fn complex_config_setting_overridden_via_cli() -> Result<()> {
     success: true
     exit_code: 0
     ----- stdout -----
+    All checks passed!
 
     ----- stderr -----
     "###);

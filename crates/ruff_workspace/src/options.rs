@@ -8,6 +8,7 @@ use strum::IntoEnumIterator;
 
 use ruff_formatter::IndentStyle;
 use ruff_linter::line_width::{IndentWidth, LineLength};
+use ruff_linter::rules::flake8_import_conventions::settings::BannedAliases;
 use ruff_linter::rules::flake8_pytest_style::settings::SettingsError;
 use ruff_linter::rules::flake8_pytest_style::types;
 use ruff_linter::rules::flake8_quotes::settings::Quote;
@@ -292,8 +293,8 @@ pub struct Options {
     pub builtins: Option<Vec<String>>,
 
     /// Mark the specified directories as namespace packages. For the purpose of
-    /// module resolution, Ruff will treat those directories as if they
-    /// contained an `__init__.py` file.
+    /// module resolution, Ruff will treat those directories and all their subdirectories
+    /// as if they contained an `__init__.py` file.
     #[option(
         default = r#"[]"#,
         value_type = "list[str]",
@@ -595,7 +596,7 @@ pub struct LintCommonOptions {
         default = "[]",
         value_type = "list[RuleSelector]",
         example = r#"
-            # On top of the default `select` (`E`, `F`), enable flake8-bugbear (`B`) and flake8-quotes (`Q`).
+            # On top of the default `select` (`E4`, E7`, `E9`, and `F`), enable flake8-bugbear (`B`) and flake8-quotes (`Q`).
             extend-select = ["B", "Q"]
         "#
     )]
@@ -692,11 +693,14 @@ pub struct LintCommonOptions {
     /// imports will still be flagged, but with a dedicated message suggesting
     /// that the import is either added to the module's `__all__` symbol, or
     /// re-exported with a redundant alias (e.g., `import os as os`).
+    ///
+    /// This option is enabled by default, but you can opt-in to removal of imports
+    /// via an unsafe fix.
     #[option(
-        default = "false",
+        default = "true",
         value_type = "bool",
         example = r#"
-            ignore-init-module-imports = true
+            ignore-init-module-imports = false
         "#
     )]
     pub ignore_init_module_imports: Option<bool>,
@@ -804,6 +808,10 @@ pub struct LintCommonOptions {
     /// Options for the `flake8-bandit` plugin.
     #[option_group]
     pub flake8_bandit: Option<Flake8BanditOptions>,
+
+    /// Options for the `flake8-boolean-trap` plugin.
+    #[option_group]
+    pub flake8_boolean_trap: Option<Flake8BooleanTrapOptions>,
 
     /// Options for the `flake8-bugbear` plugin.
     #[option_group]
@@ -1047,6 +1055,32 @@ impl Flake8BanditOptions {
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub struct Flake8BooleanTrapOptions {
+    /// Additional callable functions with which to allow boolean traps.
+    ///
+    /// Expects to receive a list of fully-qualified names (e.g., `pydantic.Field`, rather than
+    /// `Field`).
+    #[option(
+        default = "[]",
+        value_type = "list[str]",
+        example = "extend-allowed-calls = [\"pydantic.Field\", \"django.db.models.Value\"]"
+    )]
+    pub extend_allowed_calls: Option<Vec<String>>,
+}
+
+impl Flake8BooleanTrapOptions {
+    pub fn into_settings(self) -> ruff_linter::rules::flake8_boolean_trap::settings::Settings {
+        ruff_linter::rules::flake8_boolean_trap::settings::Settings {
+            extend_allowed_calls: self.extend_allowed_calls.unwrap_or_default(),
+        }
+    }
+}
+
+#[derive(
+    Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
+)]
+#[serde(deny_unknown_fields, rename_all = "kebab-case")]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct Flake8BugbearOptions {
     /// Additional callable functions to consider "immutable" when evaluating, e.g., the
     /// `function-call-in-default-argument` rule (`B008`) or `function-call-in-dataclass-defaults`
@@ -1127,15 +1161,16 @@ impl Flake8ComprehensionsOptions {
 pub struct Flake8CopyrightOptions {
     /// The regular expression used to match the copyright notice, compiled
     /// with the [`regex`](https://docs.rs/regex/latest/regex/) crate.
-    ///
-    /// Defaults to `(?i)Copyright\s+((?:\(C\)|©)\s+)?\d{4}(-\d{4})*`, which matches
+    /// Defaults to `(?i)Copyright\s+((?:\(C\)|©)\s+)?\d{4}((-|,\s)\d{4})*`, which matches
     /// the following:
+    ///
     /// - `Copyright 2023`
     /// - `Copyright (C) 2023`
     /// - `Copyright 2021-2023`
     /// - `Copyright (C) 2021-2023`
+    /// - `Copyright (C) 2021, 2023`
     #[option(
-        default = r#"(?i)Copyright\s+((?:\(C\)|©)\s+)?\d{4}([-,]\d{4})*"#,
+        default = r#"(?i)Copyright\s+((?:\(C\)|©)\s+)?\d{4}((-|,\s)\d{4})*"#,
         value_type = "str",
         example = r#"notice-rgx = "(?i)Copyright \\(C\\) \\d{4}""#
     )]
@@ -1309,7 +1344,7 @@ pub struct Flake8ImportConventionsOptions {
             "tensorflow.keras.backend" = ["K"]
     "#
     )]
-    pub banned_aliases: Option<FxHashMap<String, Vec<String>>>,
+    pub banned_aliases: Option<FxHashMap<String, BannedAliases>>,
 
     /// A list of modules that should not be imported from using the
     /// `from ... import ...` syntax.
@@ -2383,7 +2418,7 @@ impl IsortOptions {
             case_sensitive: self.case_sensitive.unwrap_or(false),
             force_wrap_aliases: self.force_wrap_aliases.unwrap_or(false),
             detect_same_package: self.detect_same_package.unwrap_or(true),
-            force_to_top: BTreeSet::from_iter(self.force_to_top.unwrap_or_default()),
+            force_to_top: FxHashSet::from_iter(self.force_to_top.unwrap_or_default()),
             known_modules: isort::categorize::KnownModules::new(
                 known_first_party,
                 known_third_party,
@@ -2393,14 +2428,14 @@ impl IsortOptions {
             ),
             order_by_type: self.order_by_type.unwrap_or(true),
             relative_imports_order: self.relative_imports_order.unwrap_or_default(),
-            single_line_exclusions: BTreeSet::from_iter(
+            single_line_exclusions: FxHashSet::from_iter(
                 self.single_line_exclusions.unwrap_or_default(),
             ),
             split_on_trailing_comma: self.split_on_trailing_comma.unwrap_or(true),
-            classes: BTreeSet::from_iter(self.classes.unwrap_or_default()),
-            constants: BTreeSet::from_iter(self.constants.unwrap_or_default()),
-            variables: BTreeSet::from_iter(self.variables.unwrap_or_default()),
-            no_lines_before: BTreeSet::from_iter(no_lines_before),
+            classes: FxHashSet::from_iter(self.classes.unwrap_or_default()),
+            constants: FxHashSet::from_iter(self.constants.unwrap_or_default()),
+            variables: FxHashSet::from_iter(self.variables.unwrap_or_default()),
+            no_lines_before: FxHashSet::from_iter(no_lines_before),
             lines_after_imports: self.lines_after_imports.unwrap_or(-1),
             lines_between_types,
             forced_separate: Vec::from_iter(self.forced_separate.unwrap_or_default()),
@@ -2958,6 +2993,7 @@ pub struct FormatOptions {
     pub indent_style: Option<IndentStyle>,
 
     /// Configures the preferred quote character for strings. The recommended options are
+    ///
     /// * `double` (default): Use double quotes `"`
     /// * `single`: Use single quotes `'`
     ///
@@ -3097,7 +3133,7 @@ pub struct FormatOptions {
     ///     pass
     /// ```
     ///
-    /// If a code snippt in a docstring contains invalid Python code or if the
+    /// If a code snippet in a docstring contains invalid Python code or if the
     /// formatter would otherwise write invalid Python code, then the code
     /// example is ignored by the formatter and kept as-is.
     ///

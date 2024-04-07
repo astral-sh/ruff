@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "ruff"
-version = "0.3.1"
+version = "0.3.5"
 description = "An extremely fast Python linter and code formatter, written in Rust."
 authors = [{ name = "Astral Software Inc.", email = "hey@astral.sh" }]
 readme = "README.md"
@@ -58,8 +58,15 @@ include = [
 
 [tool.ruff]
 extend-exclude = [
+  "crates/ruff/resources/",
   "crates/ruff_linter/resources/",
   "crates/ruff_python_formatter/resources/"
+]
+
+[tool.ruff.lint]
+ignore = [
+  # Conflicts with the formatter
+  "COM812", "ISC001"
 ]
 
 [tool.black]
@@ -81,6 +88,7 @@ changelog_sections.breaking = "Breaking changes"
 changelog_sections.preview = "Preview features"
 changelog_sections.rule = "Rule changes"
 changelog_sections.formatter = "Formatter"
+changelog_sections.server = "Server"
 changelog_sections.cli = "CLI"
 changelog_sections.configuration = "Configuration"
 changelog_sections.bug = "Bug fixes"

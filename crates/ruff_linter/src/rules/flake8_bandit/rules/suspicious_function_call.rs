@@ -59,7 +59,7 @@ impl Violation for SuspiciousPickleUsage {
 /// Checks for calls to `marshal` functions.
 ///
 /// ## Why is this bad?
-/// Deserializing untrusted data with `marshal` is insecure as it can allow for
+/// Deserializing untrusted data with `marshal` is insecure, as it can allow for
 /// the creation of arbitrary objects, which can then be used to achieve
 /// arbitrary code execution and otherwise unexpected behavior.
 ///
@@ -68,7 +68,7 @@ impl Violation for SuspiciousPickleUsage {
 ///
 /// If you must deserialize untrusted data with `marshal`, consider signing the
 /// data with a secret key and verifying the signature before deserializing the
-/// payload, This will prevent an attacker from injecting arbitrary objects
+/// payload. This will prevent an attacker from injecting arbitrary objects
 /// into the serialized data.
 ///
 /// ## Example
@@ -220,7 +220,7 @@ pub struct SuspiciousInsecureCipherModeUsage;
 impl Violation for SuspiciousInsecureCipherModeUsage {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use of insecure cipher mode, replace with a known secure cipher such as AES")
+        format!("Use of insecure block cipher mode, replace with a known secure mode such as CBC or CTR")
     }
 }
 
@@ -353,7 +353,7 @@ impl Violation for SuspiciousMarkSafeUsage {
 /// behavior.
 ///
 /// To mitigate this risk, audit all uses of URL open functions and ensure that
-/// only permitted schemes are used (e.g., allowing `http:` and `https:` and
+/// only permitted schemes are used (e.g., allowing `http:` and `https:`, and
 /// disallowing `file:` and `ftp:`).
 ///
 /// ## Example
@@ -395,7 +395,7 @@ impl Violation for SuspiciousURLOpenUsage {
 /// Checks for uses of cryptographically weak pseudo-random number generators.
 ///
 /// ## Why is this bad?
-/// Cryptographically weak pseudo-random number generators are insecure as they
+/// Cryptographically weak pseudo-random number generators are insecure, as they
 /// are easily predictable. This can allow an attacker to guess the generated
 /// numbers and compromise the security of the system.
 ///
@@ -867,7 +867,7 @@ pub(crate) fn suspicious_function_call(checker: &mut Checker, call: &ExprCall) {
             ["urllib", "request", "URLopener" | "FancyURLopener"] |
             ["six", "moves", "urllib", "request", "URLopener" | "FancyURLopener"] => Some(SuspiciousURLOpenUsage.into()),
             // NonCryptographicRandom
-            ["random", "random" | "randrange" | "randint" | "choice" | "choices" | "uniform" | "triangular"] => Some(SuspiciousNonCryptographicRandomUsage.into()),
+            ["random", "Random" | "random" | "randrange" | "randint" | "choice" | "choices" | "uniform" | "triangular" | "randbytes"] => Some(SuspiciousNonCryptographicRandomUsage.into()),
             // UnverifiedContext
             ["ssl", "_create_unverified_context"] => Some(SuspiciousUnverifiedContextUsage.into()),
             // XMLCElementTree

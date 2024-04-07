@@ -97,6 +97,7 @@ export default function Editor() {
       });
       setRuffVersion(Workspace.version());
     }
+
     initAsync().catch(console.error);
   }, []);
 
@@ -231,7 +232,7 @@ export default function Editor() {
               onSelectTool={(tool) => setTab(tool)}
               selected={tab}
             />
-            <Panel id="main" order={0} className="my-2">
+            <Panel id="main" order={0} className="my-2" minSize={10}>
               <SourceEditor
                 visible={tab === "Source"}
                 source={source.pythonSource}
@@ -249,7 +250,12 @@ export default function Editor() {
             {secondaryTool != null && (
               <>
                 <HorizontalResizeHandle />
-                <Panel id="secondary-panel" order={1} className={"my-2"}>
+                <Panel
+                  id="secondary-panel"
+                  order={1}
+                  className={"my-2"}
+                  minSize={10}
+                >
                   <SecondaryPanel
                     theme={theme}
                     tool={secondaryTool}

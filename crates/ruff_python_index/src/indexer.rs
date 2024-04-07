@@ -37,7 +37,6 @@ impl Indexer {
         let mut continuation_lines = Vec::new();
         // Token, end
         let mut prev_end = TextSize::default();
-        let mut prev_token: Option<&Tok> = None;
         let mut line_start = TextSize::default();
 
         for (tok, range) in tokens.iter().flatten() {
@@ -51,11 +50,7 @@ impl Indexer {
                 if text == "\r" && trivia.as_bytes().get(index + 1) == Some(&b'\n') {
                     continue;
                 }
-
-                // Newlines after a newline never form a continuation.
-                if !matches!(prev_token, Some(Tok::Newline | Tok::NonLogicalNewline)) {
-                    continuation_lines.push(line_start);
-                }
+                continuation_lines.push(line_start);
 
                 // SAFETY: Safe because of the len assertion at the top of the function.
                 #[allow(clippy::cast_possible_truncation)]
@@ -80,7 +75,6 @@ impl Indexer {
                 _ => {}
             }
 
-            prev_token = Some(tok);
             prev_end = range.end();
         }
 
@@ -359,6 +353,33 @@ f'foo { 'str1' \
                 TextSize::new(17),
                 // row 5
                 TextSize::new(63),
+            ]
+        );
+
+        let contents = r"
+x = (
+    1
+    \
+    \
+    \
+
+    \
+    + 2)
+"
+        .trim();
+        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
+        let indexer = Indexer::from_tokens(lxr.as_slice(), &Locator::new(contents));
+        assert_eq!(
+            indexer.continuation_line_starts(),
+            [
+                // row 3
+                TextSize::new(12),
+                // row 4
+                TextSize::new(18),
+                // row 5
+                TextSize::new(24),
+                // row 7
+                TextSize::new(31),
             ]
         );
     }

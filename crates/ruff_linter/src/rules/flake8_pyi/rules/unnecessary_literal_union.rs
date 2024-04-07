@@ -11,22 +11,25 @@ use crate::checkers::ast::Checker;
 /// Checks for the presence of multiple literal types in a union.
 ///
 /// ## Why is this bad?
-/// Literal types accept multiple arguments and it is clearer to specify them
-/// as a single literal.
+/// `Literal["foo", 42]` has identical semantics to
+/// `Literal["foo"] | Literal[42]`, but is clearer and more concise.
 ///
 /// ## Example
 /// ```python
 /// from typing import Literal
 ///
-/// field: Literal[1] | Literal[2]
+/// field: Literal[1] | Literal[2] | str
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// from typing import Literal
 ///
-/// field: Literal[1, 2]
+/// field: Literal[1, 2] | str
 /// ```
+///
+/// ## References
+/// - [Python documentation: `typing.Literal`](https://docs.python.org/3/library/typing.html#typing.Literal)
 #[violation]
 pub struct UnnecessaryLiteralUnion {
     members: Vec<String>,

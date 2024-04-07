@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Check code snippets in docs are formatted by black."""
+
 from __future__ import annotations
 
 import argparse
@@ -69,6 +70,7 @@ KNOWN_FORMATTING_VIOLATIONS = [
     "over-indented",
     "pass-statement-stub-body",
     "prohibited-trailing-comma",
+    "redundant-backslash",
     "shebang-leading-whitespace",
     "surrounding-whitespace",
     "tab-indentation",
@@ -104,6 +106,7 @@ KNOWN_PARSE_ERRORS = [
     "tab-after-operator",
     "tab-before-keyword",
     "tab-before-operator",
+    "too-many-newlines-at-end-of-file",
     "trailing-whitespace",
     "unexpected-indentation",
 ]

@@ -20,7 +20,7 @@ class Board:
     def place(self, position):
         pass
 
-    @singledispatch
+    @singledispatch  # [singledispatch-method]
     @staticmethod
     def do(position):
         pass

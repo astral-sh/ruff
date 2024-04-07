@@ -25,11 +25,6 @@ pub trait Violation: Debug + PartialEq + Eq {
     /// The message used to describe the violation.
     fn message(&self) -> String;
 
-    /// The explanation used in documentation and elsewhere.
-    fn explanation() -> Option<&'static str> {
-        None
-    }
-
     // TODO(micha): Move `fix_title` to `Fix`, add new `advice` method that is shown as an advice.
     // Change the `Diagnostic` renderer to show the advice, and render the fix message after the `Suggested fix: <here>`
 
@@ -50,11 +45,6 @@ pub trait AlwaysFixableViolation: Debug + PartialEq + Eq {
     /// The message used to describe the violation.
     fn message(&self) -> String;
 
-    /// The explanation used in documentation and elsewhere.
-    fn explanation() -> Option<&'static str> {
-        None
-    }
-
     /// The title displayed for the available fix.
     fn fix_title(&self) -> String;
 
@@ -69,10 +59,6 @@ impl<V: AlwaysFixableViolation> Violation for V {
 
     fn message(&self) -> String {
         <Self as AlwaysFixableViolation>::message(self)
-    }
-
-    fn explanation() -> Option<&'static str> {
-        <Self as AlwaysFixableViolation>::explanation()
     }
 
     fn fix_title(&self) -> Option<String> {

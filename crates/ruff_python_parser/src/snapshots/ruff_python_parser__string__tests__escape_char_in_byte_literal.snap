@@ -25,6 +25,11 @@ expression: parse_ast
                                     97,
                                     97,
                                 ],
+                                flags: BytesLiteralFlags {
+                                    quote_style: Double,
+                                    prefix: Regular,
+                                    triple_quoted: false,
+                                },
                             },
                         ),
                     },

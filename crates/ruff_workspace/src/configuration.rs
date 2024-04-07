@@ -40,10 +40,11 @@ use ruff_python_formatter::{
 };
 
 use crate::options::{
-    Flake8AnnotationsOptions, Flake8BanditOptions, Flake8BugbearOptions, Flake8BuiltinsOptions,
-    Flake8ComprehensionsOptions, Flake8CopyrightOptions, Flake8ErrMsgOptions, Flake8GetTextOptions,
-    Flake8ImplicitStrConcatOptions, Flake8ImportConventionsOptions, Flake8PytestStyleOptions,
-    Flake8QuotesOptions, Flake8SelfOptions, Flake8TidyImportsOptions, Flake8TypeCheckingOptions,
+    Flake8AnnotationsOptions, Flake8BanditOptions, Flake8BooleanTrapOptions, Flake8BugbearOptions,
+    Flake8BuiltinsOptions, Flake8ComprehensionsOptions, Flake8CopyrightOptions,
+    Flake8ErrMsgOptions, Flake8GetTextOptions, Flake8ImplicitStrConcatOptions,
+    Flake8ImportConventionsOptions, Flake8PytestStyleOptions, Flake8QuotesOptions,
+    Flake8SelfOptions, Flake8TidyImportsOptions, Flake8TypeCheckingOptions,
     Flake8UnusedArgumentsOptions, FormatOptions, IsortOptions, LintCommonOptions, LintOptions,
     McCabeOptions, Options, Pep8NamingOptions, PyUpgradeOptions, PycodestyleOptions,
     PydocstyleOptions, PyflakesOptions, PylintOptions,
@@ -237,6 +238,7 @@ impl Configuration {
                 project_root: project_root.to_path_buf(),
             },
 
+            #[allow(deprecated)]
             linter: LinterSettings {
                 rules: lint.as_rule_table(lint_preview)?,
                 exclude: FilePatternSet::try_from_iter(lint.exclude.unwrap_or_default())?,
@@ -253,7 +255,7 @@ impl Configuration {
                     .dummy_variable_rgx
                     .unwrap_or_else(|| DUMMY_VARIABLE_RGX.clone()),
                 external: lint.external.unwrap_or_default(),
-                ignore_init_module_imports: lint.ignore_init_module_imports.unwrap_or_default(),
+                ignore_init_module_imports: lint.ignore_init_module_imports.unwrap_or(true),
                 line_length,
                 tab_size: self.indent_width.unwrap_or_default(),
                 namespace_packages: self.namespace_packages.unwrap_or_default(),
@@ -290,6 +292,10 @@ impl Configuration {
                 flake8_bandit: lint
                     .flake8_bandit
                     .map(Flake8BanditOptions::into_settings)
+                    .unwrap_or_default(),
+                flake8_boolean_trap: lint
+                    .flake8_boolean_trap
+                    .map(Flake8BooleanTrapOptions::into_settings)
                     .unwrap_or_default(),
                 flake8_bugbear: lint
                     .flake8_bugbear
@@ -608,6 +614,7 @@ pub struct LintConfiguration {
     // Plugins
     pub flake8_annotations: Option<Flake8AnnotationsOptions>,
     pub flake8_bandit: Option<Flake8BanditOptions>,
+    pub flake8_boolean_trap: Option<Flake8BooleanTrapOptions>,
     pub flake8_bugbear: Option<Flake8BugbearOptions>,
     pub flake8_builtins: Option<Flake8BuiltinsOptions>,
     pub flake8_comprehensions: Option<Flake8ComprehensionsOptions>,
@@ -650,6 +657,10 @@ impl LintConfiguration {
             .flatten()
             .chain(options.common.extend_unfixable.into_iter().flatten())
             .collect();
+
+        #[allow(deprecated)]
+        let ignore_init_module_imports = options.common.ignore_init_module_imports;
+
         Ok(LintConfiguration {
             exclude: options.exclude.map(|paths| {
                 paths
@@ -692,7 +703,7 @@ impl LintConfiguration {
                 })
                 .unwrap_or_default(),
             external: options.common.external,
-            ignore_init_module_imports: options.common.ignore_init_module_imports,
+            ignore_init_module_imports,
             explicit_preview_rules: options.common.explicit_preview_rules,
             per_file_ignores: options.common.per_file_ignores.map(|per_file_ignores| {
                 per_file_ignores
@@ -708,6 +719,7 @@ impl LintConfiguration {
             // Plugins
             flake8_annotations: options.common.flake8_annotations,
             flake8_bandit: options.common.flake8_bandit,
+            flake8_boolean_trap: options.common.flake8_boolean_trap,
             flake8_bugbear: options.common.flake8_bugbear,
             flake8_builtins: options.common.flake8_builtins,
             flake8_comprehensions: options.common.flake8_comprehensions,
@@ -1122,6 +1134,7 @@ impl LintConfiguration {
             // Plugins
             flake8_annotations: self.flake8_annotations.combine(config.flake8_annotations),
             flake8_bandit: self.flake8_bandit.combine(config.flake8_bandit),
+            flake8_boolean_trap: self.flake8_boolean_trap.combine(config.flake8_boolean_trap),
             flake8_bugbear: self.flake8_bugbear.combine(config.flake8_bugbear),
             flake8_builtins: self.flake8_builtins.combine(config.flake8_builtins),
             flake8_comprehensions: self
@@ -1316,6 +1329,7 @@ fn warn_about_deprecated_top_level_lint_options(
         used_options.push("extend-unsafe-fixes");
     }
 
+    #[allow(deprecated)]
     if top_level_options.ignore_init_module_imports.is_some() {
         used_options.push("ignore-init-module-imports");
     }
@@ -1350,6 +1364,10 @@ fn warn_about_deprecated_top_level_lint_options(
 
     if top_level_options.flake8_bandit.is_some() {
         used_options.push("flake8-bandit");
+    }
+
+    if top_level_options.flake8_boolean_trap.is_some() {
+        used_options.push("flake8-boolean-trap");
     }
 
     if top_level_options.flake8_bugbear.is_some() {

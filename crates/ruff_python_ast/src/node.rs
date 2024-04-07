@@ -4430,7 +4430,11 @@ impl AstNode for ast::FString {
     where
         V: PreorderVisitor<'a> + ?Sized,
     {
-        let ast::FString { elements, range: _ } = self;
+        let ast::FString {
+            elements,
+            range: _,
+            flags: _,
+        } = self;
 
         for fstring_element in elements {
             visitor.visit_f_string_element(fstring_element);

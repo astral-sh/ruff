@@ -71,6 +71,12 @@ mod tests {
     #[test_case(Rule::IsLiteral, Path::new("constant_literals.py"))]
     #[test_case(Rule::TypeComparison, Path::new("E721.py"))]
     #[test_case(Rule::ModuleImportNotAtTopOfFile, Path::new("E402_2.py"))]
+    #[test_case(Rule::RedundantBackslash, Path::new("E502.py"))]
+    #[test_case(Rule::TooManyNewlinesAtEndOfFile, Path::new("W391_0.py"))]
+    #[test_case(Rule::TooManyNewlinesAtEndOfFile, Path::new("W391_1.py"))]
+    #[test_case(Rule::TooManyNewlinesAtEndOfFile, Path::new("W391_2.py"))]
+    #[test_case(Rule::TooManyNewlinesAtEndOfFile, Path::new("W391_3.py"))]
+    #[test_case(Rule::TooManyNewlinesAtEndOfFile, Path::new("W391_4.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",
@@ -139,6 +145,41 @@ mod tests {
     )]
     #[test_case(Rule::MissingWhitespaceAroundParameterEquals, Path::new("E25.py"))]
     fn logical(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("pycodestyle").join(path).as_path(),
+            &settings::LinterSettings::for_rule(rule_code),
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    /// Tests the compatibility of E2 rules (E202, E225 and E275) on syntactically incorrect code.
+    #[test]
+    fn white_space_syntax_error_compatibility() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pycodestyle").join("E2_syntax_error.py"),
+            &settings::LinterSettings {
+                ..settings::LinterSettings::for_rules([
+                    Rule::MissingWhitespaceAroundOperator,
+                    Rule::MissingWhitespaceAfterKeyword,
+                    Rule::WhitespaceBeforeCloseBracket,
+                ])
+            },
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::BlankLinesTopLevel, Path::new("E302_first_line_docstring.py"))]
+    #[test_case(Rule::BlankLinesTopLevel, Path::new("E302_first_line_expression.py"))]
+    #[test_case(Rule::BlankLinesTopLevel, Path::new("E302_first_line_function.py"))]
+    #[test_case(Rule::BlankLinesTopLevel, Path::new("E302_first_line_statement.py"))]
+    #[test_case(Rule::TooManyBlankLines, Path::new("E303_first_line_comment.py"))]
+    #[test_case(Rule::TooManyBlankLines, Path::new("E303_first_line_docstring.py"))]
+    #[test_case(Rule::TooManyBlankLines, Path::new("E303_first_line_expression.py"))]
+    #[test_case(Rule::TooManyBlankLines, Path::new("E303_first_line_statement.py"))]
+    fn blank_lines_first_line(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("pycodestyle").join(path).as_path(),
@@ -232,6 +273,22 @@ mod tests {
         let snapshot = format!("blank_lines_{}_typing_stub", rule_code.noqa_code());
         let diagnostics = test_path(
             Path::new("pycodestyle").join("E30.pyi"),
+            &settings::LinterSettings::for_rule(rule_code),
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::BlankLineBetweenMethods)]
+    #[test_case(Rule::BlankLinesTopLevel)]
+    #[test_case(Rule::TooManyBlankLines)]
+    #[test_case(Rule::BlankLineAfterDecorator)]
+    #[test_case(Rule::BlankLinesAfterFunctionOrClass)]
+    #[test_case(Rule::BlankLinesBeforeNestedDefinition)]
+    fn blank_lines_notebook(rule_code: Rule) -> Result<()> {
+        let snapshot = format!("blank_lines_{}_notebook", rule_code.noqa_code());
+        let diagnostics = test_path(
+            Path::new("pycodestyle").join("E30.ipynb"),
             &settings::LinterSettings::for_rule(rule_code),
         )?;
         assert_messages!(snapshot, diagnostics);
