@@ -149,6 +149,13 @@ pub fn run(
     #[cfg(windows)]
     assert!(colored::control::set_virtual_terminal(true).is_ok());
 
+    // support FORCE_COLOR env var
+    if let Some(force_color) = std::env::var_os("FORCE_COLOR") {
+        if force_color.len() > 0 {
+            colored::control::set_override(true);
+        }
+    }
+
     set_up_logging(global_options.log_level())?;
 
     if let Some(deprecated_alias_warning) = deprecated_alias_warning {
