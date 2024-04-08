@@ -1438,12 +1438,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e4a24736216ec316047a1fc4252e27dabb04218aa4a3f37c6e7ddbf1f9782b54"
 
 [[package]]
-name = "nextest-workspace-hack"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d906846a98739ed9d73d66e62c2641eef8321f1734b7a1156ab045a0248fb2b3"
-
-[[package]]
 name = "nix"
 version = "0.26.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1812,13 +1806,12 @@ dependencies = [
 
 [[package]]
 name = "quick-junit"
-version = "0.3.5"
+version = "0.3.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1b9599bffc2cd7511355996e0cfd979266b2cfa3f3ff5247d07a3a6e1ded6158"
+checksum = "d1a341ae463320e9f8f34adda49c8a85d81d4e8f34cce4397fb0350481552224"
 dependencies = [
  "chrono",
  "indexmap",
- "nextest-workspace-hack",
  "quick-xml",
  "strip-ansi-escapes",
  "thiserror",
