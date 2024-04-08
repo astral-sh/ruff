@@ -1,6 +1,6 @@
 try:
     pass
-exept:
+exept:  # spellchecker:disable-line
     pass
 finally:
     pass
@@ -9,6 +9,6 @@ try:
     pass
 except:
     pass
-exept:
+exept:  # spellchecker:disable-line
     pass
 b = 1

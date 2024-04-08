@@ -1156,7 +1156,7 @@ impl<'src> Parser<'src> {
         // test_err try_stmt_misspelled_except
         // try:
         //     pass
-        // exept:
+        // exept:  # spellchecker:disable-line
         //     pass
         // finally:
         //     pass
@@ -1165,7 +1165,7 @@ impl<'src> Parser<'src> {
         //     pass
         // except:
         //     pass
-        // exept:
+        // exept:  # spellchecker:disable-line
         //     pass
         // b = 1
 

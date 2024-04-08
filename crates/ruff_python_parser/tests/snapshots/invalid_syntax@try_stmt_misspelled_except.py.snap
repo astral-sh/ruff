@@ -7,7 +7,7 @@ input_file: crates/ruff_python_parser/resources/inline/err/try_stmt_misspelled_e
 ```
 Module(
     ModModule {
-        range: 0..107,
+        range: 0..165,
         body: [
             Try(
                 StmtTry {
@@ -48,21 +48,21 @@ Module(
             ),
             Pass(
                 StmtPass {
-                    range: 25..29,
+                    range: 54..58,
                 },
             ),
             Pass(
                 StmtPass {
-                    range: 43..47,
+                    range: 72..76,
                 },
             ),
             Assign(
                 StmtAssign {
-                    range: 48..53,
+                    range: 77..82,
                     targets: [
                         Name(
                             ExprName {
-                                range: 48..49,
+                                range: 77..78,
                                 id: "a",
                                 ctx: Store,
                             },
@@ -70,7 +70,7 @@ Module(
                     ],
                     value: NumberLiteral(
                         ExprNumberLiteral {
-                            range: 52..53,
+                            range: 81..82,
                             value: Int(
                                 1,
                             ),
@@ -80,24 +80,24 @@ Module(
             ),
             Try(
                 StmtTry {
-                    range: 54..84,
+                    range: 83..113,
                     body: [
                         Pass(
                             StmtPass {
-                                range: 63..67,
+                                range: 92..96,
                             },
                         ),
                     ],
                     handlers: [
                         ExceptHandler(
                             ExceptHandlerExceptHandler {
-                                range: 68..84,
+                                range: 97..113,
                                 type_: None,
                                 name: None,
                                 body: [
                                     Pass(
                                         StmtPass {
-                                            range: 80..84,
+                                            range: 109..113,
                                         },
                                     ),
                                 ],
@@ -111,17 +111,17 @@ Module(
             ),
             AnnAssign(
                 StmtAnnAssign {
-                    range: 85..91,
+                    range: 114..120,
                     target: Name(
                         ExprName {
-                            range: 85..90,
+                            range: 114..119,
                             id: "exept",
                             ctx: Store,
                         },
                     ),
                     annotation: Name(
                         ExprName {
-                            range: 91..91,
+                            range: 120..120,
                             id: "",
                             ctx: Invalid,
                         },
@@ -132,16 +132,16 @@ Module(
             ),
             Pass(
                 StmtPass {
-                    range: 96..100,
+                    range: 154..158,
                 },
             ),
             Assign(
                 StmtAssign {
-                    range: 101..106,
+                    range: 159..164,
                     targets: [
                         Name(
                             ExprName {
-                                range: 101..102,
+                                range: 159..160,
                                 id: "b",
                                 ctx: Store,
                             },
@@ -149,7 +149,7 @@ Module(
                     ],
                     value: NumberLiteral(
                         ExprNumberLiteral {
-                            range: 105..106,
+                            range: 163..164,
                             value: Int(
                                 1,
                             ),
@@ -166,7 +166,7 @@ Module(
   |
 1 | try:
 2 |     pass
-3 | exept:
+3 | exept:  # spellchecker:disable-line
   | ^^^^^ Syntax Error: Expected `except` or `finally` after `try` block
 4 |     pass
 5 | finally:
@@ -176,8 +176,8 @@ Module(
   |
 1 | try:
 2 |     pass
-3 | exept:
-  |       ^ Syntax Error: Expected an expression
+3 | exept:  # spellchecker:disable-line
+  |                                    ^ Syntax Error: Expected an expression
 4 |     pass
 5 | finally:
 6 |     pass
@@ -186,7 +186,7 @@ Module(
 
   |
 2 |     pass
-3 | exept:
+3 | exept:  # spellchecker:disable-line
 4 |     pass
   | ^^^^ Syntax Error: unexpected indentation
 5 | finally:
@@ -195,7 +195,7 @@ Module(
 
 
   |
-3 | exept:
+3 | exept:  # spellchecker:disable-line
 4 |     pass
 5 | finally:
   |  Syntax Error: Expected a statement
@@ -205,7 +205,7 @@ Module(
 
 
   |
-3 | exept:
+3 | exept:  # spellchecker:disable-line
 4 |     pass
 5 | finally:
   |        ^ Syntax Error: Expected a statement
@@ -215,7 +215,7 @@ Module(
 
 
   |
-3 | exept:
+3 | exept:  # spellchecker:disable-line
 4 |     pass
 5 | finally:
   |         ^ Syntax Error: Expected a statement
@@ -248,8 +248,8 @@ Module(
    |
 10 | except:
 11 |     pass
-12 | exept:
-   |       ^ Syntax Error: Expected an expression
+12 | exept:  # spellchecker:disable-line
+   |                                    ^ Syntax Error: Expected an expression
 13 |     pass
 14 | b = 1
    |
@@ -257,7 +257,7 @@ Module(
 
    |
 11 |     pass
-12 | exept:
+12 | exept:  # spellchecker:disable-line
 13 |     pass
    | ^^^^ Syntax Error: unexpected indentation
 14 | b = 1
@@ -265,7 +265,7 @@ Module(
 
 
    |
-12 | exept:
+12 | exept:  # spellchecker:disable-line
 13 |     pass
 14 | b = 1
    |  Syntax Error: Expected a statement
