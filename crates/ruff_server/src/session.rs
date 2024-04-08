@@ -36,7 +36,6 @@ pub(crate) struct Session {
 pub(crate) struct DocumentSnapshot {
     configuration: Arc<RuffConfiguration>,
     resolved_client_capabilities: Arc<ResolvedClientCapabilities>,
-    #[allow(dead_code)]
     client_settings: settings::ResolvedClientSettings,
     document_ref: DocumentRef,
     position_encoding: PositionEncoding,
@@ -215,6 +214,10 @@ impl DocumentSnapshot {
 
     pub(crate) fn resolved_client_capabilities(&self) -> &ResolvedClientCapabilities {
         &self.resolved_client_capabilities
+    }
+
+    pub(crate) fn client_settings(&self) -> &ResolvedClientSettings {
+        &self.client_settings
     }
 
     pub(crate) fn document(&self) -> &DocumentRef {

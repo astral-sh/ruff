@@ -29,18 +29,24 @@ impl super::BackgroundDocumentRequestHandler for CodeActions {
 
         let supported_code_actions = supported_code_actions(params.context.only.clone());
 
-        if supported_code_actions.contains(&SupportedCodeAction::QuickFix) {
+        if snapshot.client_settings().fix_violation()
+            && supported_code_actions.contains(&SupportedCodeAction::QuickFix)
+        {
             response.extend(
                 quick_fix(&snapshot, params.context.diagnostics.clone())
                     .with_failure_code(ErrorCode::InternalError)?,
             );
         }
 
-        if supported_code_actions.contains(&SupportedCodeAction::SourceFixAll) {
+        if snapshot.client_settings().fix_all()
+            && supported_code_actions.contains(&SupportedCodeAction::SourceFixAll)
+        {
             response.push(fix_all(&snapshot).with_failure_code(ErrorCode::InternalError)?);
         }
 
-        if supported_code_actions.contains(&SupportedCodeAction::SourceOrganizeImports) {
+        if snapshot.client_settings().organize_imports()
+            && supported_code_actions.contains(&SupportedCodeAction::SourceOrganizeImports)
+        {
             response.push(organize_imports(&snapshot).with_failure_code(ErrorCode::InternalError)?);
         }
 
