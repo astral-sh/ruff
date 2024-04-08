@@ -2129,57 +2129,105 @@ impl<'src> Parser<'src> {
     ///
     /// See: <https://docs.python.org/3/reference/compound_stmts.html#the-match-statement>
     fn parse_match_statement(&mut self) -> ast::StmtMatch {
-        let start_offset = self.node_start();
-
+        let start = self.node_start();
         self.bump(TokenKind::Match);
 
         let subject_start = self.node_start();
-        let subject = self.parse_named_expression_or_higher(AllowStarredExpression::No);
+
+        // Subject expression grammar is:
+        //
+        //     subject_expr:
+        //         | star_named_expression ',' star_named_expressions?
+        //         | named_expression
+        //
+        // First try with `star_named_expression`, then if there's no comma,
+        // we'll restrict it to `named_expression`.
+        let subject = self.parse_star_expression_or_higher(AllowNamedExpression::Yes);
+
+        // test_ok match_stmt_subject_expr
+        // match x := 1:
+        //     case _: ...
+        // match (x := 1):
+        //     case _: ...
+        // # Starred expressions are only allowed in tuple expression
+        // match *x | y, z:
+        //     case _: ...
+        // match await x:
+        //     case _: ...
+
+        // test_err match_stmt_invalid_subject_expr
+        // match (*x):
+        //     case _: ...
+        // # Starred expression precedence test
+        // match *x and y, z:
+        //     case _: ...
+        // match yield x:
+        //     case _: ...
         let subject = if self.at(TokenKind::Comma) {
             let tuple =
                 self.parse_tuple_expression(subject.expr, subject_start, Parenthesized::No, |p| {
-                    p.parse_named_expression_or_higher(AllowStarredExpression::No)
+                    p.parse_star_expression_or_higher(AllowNamedExpression::Yes)
                 });
 
             Expr::Tuple(tuple).into()
         } else {
+            if subject.is_unparenthesized_starred_expr() {
+                // test_err match_stmt_single_starred_subject
+                // match *foo:
+                //     case _: ...
+                self.add_error(ParseErrorType::StarredExpressionUsage, &subject);
+            }
             subject
         };
 
         self.expect(TokenKind::Colon);
 
-        self.eat(TokenKind::Newline);
+        // test_err match_stmt_no_newline_before_case
+        // match foo: case _: ...
+        self.expect(TokenKind::Newline);
+
+        // Use `eat` instead of `expect` for better error message.
         if !self.eat(TokenKind::Indent) {
-            let range = self.current_token_range();
+            // test_err match_stmt_expect_indented_block
+            // match foo:
+            // case _: ...
             self.add_error(
                 ParseErrorType::OtherError(
-                    "expected an indented block after `match` statement".to_string(),
+                    "Expected an indented block after `match` statement".to_string(),
                 ),
-                range,
+                self.current_token_range(),
             );
         }
 
-        let cases = self.parse_match_cases();
+        let cases = self.parse_match_case_blocks();
 
         self.eat(TokenKind::Dedent);
 
         ast::StmtMatch {
             subject: Box::new(subject.expr),
             cases,
-            range: self.node_range(start_offset),
+            range: self.node_range(start),
         }
     }
 
     /// Parses a list of match case blocks.
-    fn parse_match_cases(&mut self) -> Vec<ast::MatchCase> {
+    fn parse_match_case_blocks(&mut self) -> Vec<ast::MatchCase> {
+        let mut cases = vec![];
+
         if !self.at(TokenKind::Case) {
+            // test_err match_stmt_expected_case_block
+            // match x:
+            //     x = 1
+            // match x:
+            //     match y:
+            //         case _: ...
             self.add_error(
-                ParseErrorType::OtherError("expecting `case` block after `match`".to_string()),
+                ParseErrorType::OtherError("Expected `case` block".to_string()),
                 self.current_token_range(),
             );
+            return cases;
         }
 
-        let mut cases = vec![];
         let mut progress = ParserProgress::default();
 
         while self.at(TokenKind::Case) {
@@ -2199,16 +2247,50 @@ impl<'src> Parser<'src> {
     /// See: <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-case_block>
     fn parse_match_case(&mut self) -> ast::MatchCase {
         let start = self.node_start();
-
         self.bump(TokenKind::Case);
+
+        // test_err match_stmt_missing_pattern
+        // # TODO(dhruvmanila): Here, `case` is a name token because of soft keyword transformer
+        // match x:
+        //     case : ...
         let pattern = self.parse_match_patterns();
 
-        let guard = self.eat(TokenKind::If).then(|| {
-            Box::new(
-                self.parse_named_expression_or_higher(AllowStarredExpression::No)
-                    .expr,
-            )
-        });
+        let guard = if self.eat(TokenKind::If) {
+            if self.at_expr() {
+                // test_ok match_stmt_valid_guard_expr
+                // match x:
+                //     case y if a := 1: ...
+                // match x:
+                //     case y if a if True else b: ...
+                // match x:
+                //     case y if lambda a: b: ...
+                // match x:
+                //     case y if (yield x): ...
+
+                // test_err match_stmt_invalid_guard_expr
+                // match x:
+                //     case y if *a: ...
+                // match x:
+                //     case y if (*a): ...
+                // match x:
+                //     case y if yield x: ...
+                Some(Box::new(
+                    self.parse_named_expression_or_higher(AllowStarredExpression::No)
+                        .expr,
+                ))
+            } else {
+                // test_err match_stmt_missing_guard_expr
+                // match x:
+                //     case y if: ...
+                self.add_error(
+                    ParseErrorType::ExpectedExpression,
+                    self.current_token_range(),
+                );
+                None
+            }
+        } else {
+            None
+        };
 
         self.expect(TokenKind::Colon);
         let body = self.parse_body(Clause::Match);

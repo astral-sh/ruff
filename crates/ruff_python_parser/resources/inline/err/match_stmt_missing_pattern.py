@@ -1,0 +1,3 @@
+# TODO(dhruvmanila): Here, `case` is a name token because of soft keyword transformer
+match x:
+    case : ...
