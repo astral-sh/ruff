@@ -62,7 +62,9 @@ pub(super) fn token_kind_to_cmp_op(kind: [TokenKind; 2]) -> Result<CmpOp, ()> {
 }
 
 // Perform validation of function/lambda parameters in a function definition.
-pub(super) fn validate_parameters(parameters: &ast::Parameters) -> Result<(), ParseError> {
+pub(super) fn validate_parameters(parameters: &ast::Parameters) -> Result<(), Vec<ParseError>> {
+    let mut errors = vec![];
+
     let mut all_arg_names = FxHashSet::with_capacity_and_hasher(
         parameters.posonlyargs.len()
             + parameters.args.len()
@@ -86,17 +88,21 @@ pub(super) fn validate_parameters(parameters: &ast::Parameters) -> Result<(), Pa
         .chain(vararg)
         .chain(kwarg)
     {
-        let range = arg.range;
+        let range = arg.name.range;
         let arg_name = arg.name.as_str();
         if !all_arg_names.insert(arg_name) {
-            return Err(ParseError {
-                error: ParseErrorType::DuplicateArgumentError(arg_name.to_string()),
+            errors.push(ParseError {
+                error: ParseErrorType::DuplicateParameter(arg_name.to_string()),
                 location: range,
             });
         }
     }
 
-    Ok(())
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(errors)
+    }
 }
 
 pub(super) fn validate_arguments(arguments: &ast::Arguments) -> Result<(), Vec<ParseError>> {

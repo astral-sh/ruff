@@ -92,5 +92,5 @@ Module(
   |
 1 | # TODO(micha): The offset of the generated error message is off by one.
 2 | lambda a, b=20, c: 1
-  |                  ^ Syntax Error: non-default argument follows default argument
+  |                 ^ Syntax Error: Parameter without a default follows parameter with a default
   |
