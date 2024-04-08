@@ -571,6 +571,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
         match stmt {
             Stmt::FunctionDef(
                 function_def @ ast::StmtFunctionDef {
+                    name,
                     body,
                     parameters,
                     decorator_list,
@@ -690,9 +691,21 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 if let Some(globals) = Globals::from_body(body) {
                     self.semantic.set_globals(globals);
                 }
+                let scope_id = self.semantic.scope_id;
+                self.analyze.scopes.push(scope_id);
+                self.semantic.pop_scope(); // Function scope
+                self.semantic.pop_definition();
+                self.semantic.pop_scope(); // Type parameter scope
+                self.add_binding(
+                    name,
+                    stmt.identifier(),
+                    BindingKind::FunctionDefinition(scope_id),
+                    BindingFlags::empty(),
+                );
             }
             Stmt::ClassDef(
                 class_def @ ast::StmtClassDef {
+                    name,
                     body,
                     arguments,
                     decorator_list,
@@ -733,6 +746,18 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 // Set the docstring state before visiting the class body.
                 self.docstring_state = DocstringState::Expected;
                 self.visit_body(body);
+
+                let scope_id = self.semantic.scope_id;
+                self.analyze.scopes.push(scope_id);
+                self.semantic.pop_scope(); // Class scope
+                self.semantic.pop_definition();
+                self.semantic.pop_scope(); // Type parameter scope
+                self.add_binding(
+                    name,
+                    stmt.identifier(),
+                    BindingKind::ClassDefinition(scope_id),
+                    BindingFlags::empty(),
+                );
             }
             Stmt::TypeAlias(ast::StmtTypeAlias {
                 range: _,
@@ -889,35 +914,6 @@ impl<'a> Visitor<'a> for Checker<'a> {
         };
 
         // Step 3: Clean-up
-        match stmt {
-            Stmt::FunctionDef(ast::StmtFunctionDef { name, .. }) => {
-                let scope_id = self.semantic.scope_id;
-                self.analyze.scopes.push(scope_id);
-                self.semantic.pop_scope(); // Function scope
-                self.semantic.pop_definition();
-                self.semantic.pop_scope(); // Type parameter scope
-                self.add_binding(
-                    name,
-                    stmt.identifier(),
-                    BindingKind::FunctionDefinition(scope_id),
-                    BindingFlags::empty(),
-                );
-            }
-            Stmt::ClassDef(ast::StmtClassDef { name, .. }) => {
-                let scope_id = self.semantic.scope_id;
-                self.analyze.scopes.push(scope_id);
-                self.semantic.pop_scope(); // Class scope
-                self.semantic.pop_definition();
-                self.semantic.pop_scope(); // Type parameter scope
-                self.add_binding(
-                    name,
-                    stmt.identifier(),
-                    BindingKind::ClassDefinition(scope_id),
-                    BindingFlags::empty(),
-                );
-            }
-            _ => {}
-        }
 
         // Step 4: Analysis
         analyze::statement(stmt, self);
