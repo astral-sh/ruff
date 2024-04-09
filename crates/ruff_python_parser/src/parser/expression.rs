@@ -1955,9 +1955,7 @@ impl<'src> Parser<'src> {
         self.restore_ctx(ParserCtxFlags::FOR_TARGET, saved_context);
 
         helpers::set_expr_ctx(&mut target.expr, ExprContext::Store);
-        if !helpers::is_valid_assignment_target(&target.expr) {
-            self.add_error(ParseErrorType::InvalidAssignmentTarget, &target);
-        }
+        self.validate_assignment_target(&target.expr);
 
         self.expect(TokenKind::In);
         let iter = self.parse_simple_expression(AllowStarredExpression::No);

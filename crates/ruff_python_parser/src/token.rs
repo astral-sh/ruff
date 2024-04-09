@@ -720,6 +720,28 @@ impl TokenKind {
         matches!(self, TokenKind::And | TokenKind::Or)
     }
 
+    /// Returns the [`Operator`] that corresponds to this token kind, if it is
+    /// an augmented assignment operator, or [`None`] otherwise.
+    #[inline]
+    pub const fn as_augmented_assign_operator(&self) -> Option<Operator> {
+        match self {
+            TokenKind::PlusEqual => Some(Operator::Add),
+            TokenKind::MinusEqual => Some(Operator::Sub),
+            TokenKind::StarEqual => Some(Operator::Mult),
+            TokenKind::AtEqual => Some(Operator::MatMult),
+            TokenKind::DoubleStarEqual => Some(Operator::Pow),
+            TokenKind::SlashEqual => Some(Operator::Div),
+            TokenKind::DoubleSlashEqual => Some(Operator::FloorDiv),
+            TokenKind::PercentEqual => Some(Operator::Mod),
+            TokenKind::AmperEqual => Some(Operator::BitAnd),
+            TokenKind::VbarEqual => Some(Operator::BitOr),
+            TokenKind::CircumflexEqual => Some(Operator::BitXor),
+            TokenKind::LeftShiftEqual => Some(Operator::LShift),
+            TokenKind::RightShiftEqual => Some(Operator::RShift),
+            _ => None,
+        }
+    }
+
     pub const fn from_token(token: &Tok) -> Self {
         match token {
             Tok::Name { .. } => TokenKind::Name,
