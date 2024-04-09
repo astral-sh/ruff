@@ -274,7 +274,7 @@ Module(
    |
 11 | # Invalid expression as per precedence
 12 | await yield x
-   |       ^^^^^^^ Syntax Error: `yield` expression cannot be used here
+   |       ^^^^^^^ Syntax Error: yield expression cannot be used here
 13 | await lambda x: x
 14 | await +x
    |
