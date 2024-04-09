@@ -7,7 +7,7 @@ for target in (1, 2, 3):
 for target.attr in call():
     pass
 
-for 1 + 2 in x.attr:
+for target[0] in x.attr:
     pass
 
 for target in x <= y:
@@ -25,10 +25,23 @@ for (a, b) in iter:
 for target in *x.attr:
     pass
 
-for -target in [1, 2]:
+for target in [1, 2]:
     pass
 
 for *target in a, b, c,:
     pass
+else:
+    pass
+
+for target in *x | y: ...
+for target in *await x: ...
+for target in await x: ...
+for target in lambda x: x: ...
+for target in x if True else y: ...
+
+if x:
+    for target in iter:
+        pass
+# This `else` is not part of the `try` statement, so don't raise an error
 else:
     pass
