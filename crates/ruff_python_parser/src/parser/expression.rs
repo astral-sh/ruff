@@ -2336,7 +2336,7 @@ pub(super) struct ParsedExpr {
 
 impl ParsedExpr {
     #[inline]
-    const fn is_unparenthesized_starred_expr(&self) -> bool {
+    pub(super) const fn is_unparenthesized_starred_expr(&self) -> bool {
         !self.is_parenthesized && self.expr.is_starred_expr()
     }
 }
