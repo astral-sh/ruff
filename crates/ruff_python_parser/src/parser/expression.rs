@@ -90,6 +90,7 @@ impl<'src> Parser<'src> {
     /// required with a bitwise OR precedence.
     ///
     /// [Python grammar]: https://docs.python.org/3/reference/grammar.html
+    #[inline]
     pub(super) fn parse_expression_list(
         &mut self,
         allow_starred_expression: AllowStarredExpression,
@@ -115,6 +116,7 @@ impl<'src> Parser<'src> {
     /// Matches the `star_expressions` rule in the [Python grammar].
     ///
     /// [Python grammar]: https://docs.python.org/3/reference/grammar.html
+    #[inline]
     pub(super) fn parse_star_expression_list(&mut self) -> ParsedExpr {
         let start = self.node_start();
         let parsed_expr = self.parse_star_expression_or_higher(AllowNamedExpression::No);
