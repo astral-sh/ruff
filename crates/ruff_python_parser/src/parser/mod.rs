@@ -269,7 +269,7 @@ impl<'src> Parser<'src> {
         SavedParserContext {
             flags: std::mem::replace(&mut self.ctx, ctx),
             bomb: DebugDropBomb::new(
-                "You must restore the old parser context explicit by calling `clear_ctx`.",
+                "You must restore the old parser context explicit by calling `restore_ctx`",
             ),
         }
     }
