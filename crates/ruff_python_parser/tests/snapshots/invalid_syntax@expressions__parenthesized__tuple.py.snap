@@ -327,7 +327,7 @@ Module(
    |
 12 | # Dictionary element in a list
 13 | (1: 2)
-   |  ^ Syntax Error: invalid assignment target
+   |  ^ Syntax Error: invalid annotated assignment target
 14 | 
 15 | # Missing expression
    |
