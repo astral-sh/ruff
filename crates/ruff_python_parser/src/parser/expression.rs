@@ -208,14 +208,17 @@ impl<'src> Parser<'src> {
         &mut self,
         allow_starred_expression: AllowStarredExpression,
     ) -> ParsedExpr {
-        let start = self.node_start();
-        let parsed_expr =
-            self.parse_simple_expression(AllowLambdaExpression::Yes, allow_starred_expression);
-
-        if self.at(TokenKind::If) {
-            Expr::If(self.parse_if_expression(parsed_expr.expr, start)).into()
+        if self.at(TokenKind::Lambda) {
+            Expr::Lambda(self.parse_lambda_expr()).into()
         } else {
-            parsed_expr
+            let start = self.node_start();
+            let parsed_expr = self.parse_simple_expression(allow_starred_expression);
+
+            if self.at(TokenKind::If) {
+                Expr::If(self.parse_if_expression(parsed_expr.expr, start)).into()
+            } else {
+                parsed_expr
+            }
         }
     }
 
@@ -225,35 +228,25 @@ impl<'src> Parser<'src> {
     /// This is a combination of the `disjunction`, `starred_expression`, `yield_expr`
     /// and `lambdef` rules of the [Python grammar].
     ///
-    /// Note that this function parses yield expression but reports an error as they're
-    /// not allowed in this context.This is done for better error recovery.
-    /// Use [`Parser::parse_yield_expression_or_else`] to allow parsing yield expressions.
+    /// Note that this function parses yield and lambda expression but reports an error
+    /// as they're not allowed in this context. This is done for better error recovery.
+    /// Use [`Parser::parse_yield_expression_or_else`] to allow parsing yield expression.
+    /// Use [`Parser::parse_conditional_expression_or_higher`] or any methods which calls
+    /// into the specified method to allow parsing lambda expression.
     ///
-    /// The caller can specify whether lambda and starred expressions are allowed or not.
-    /// This doesn't affect the parsing of the said expressions as it is parsed nevertheless.
-    /// But, if it is not allowed, an error is reported.
+    /// The caller can specify whether starred expression is allowed or not. This
+    /// doesn't affect the parsing of a starred expression as it will be parsed
+    /// nevertheless. But, if it is not allowed, an error is reported.
     ///
     /// [Python grammar]: https://docs.python.org/3/reference/grammar.html
     fn parse_simple_expression(
         &mut self,
-        allow_lambda_expression: AllowLambdaExpression,
         allow_starred_expression: AllowStarredExpression,
     ) -> ParsedExpr {
         let parsed_expr = self.parse_expression_with_precedence(Precedence::Initial);
 
-        if parsed_expr.is_parenthesized {
-            // Parentheses resets the precedence, so we don't need to validate it.
-            return parsed_expr;
-        }
-
-        match parsed_expr.expr {
-            Expr::Lambda(_) if allow_lambda_expression.is_no() => {
-                self.add_error(ParseErrorType::InvalidLambdaExpressionUsage, &parsed_expr);
-            }
-            Expr::Starred(_) if allow_starred_expression.is_no() => {
-                self.add_error(ParseErrorType::StarredExpressionUsage, &parsed_expr);
-            }
-            _ => {}
+        if allow_starred_expression.is_no() && parsed_expr.is_unparenthesized_starred_expr() {
+            self.add_error(ParseErrorType::StarredExpressionUsage, &parsed_expr);
         }
 
         parsed_expr
@@ -439,10 +432,10 @@ impl<'src> Parser<'src> {
                 Expr::Await(await_expr).into()
             }
             TokenKind::Lambda => {
+                // Lambda expression isn't allowed in this context but we'll still
+                // parse it and report an error for better recovery.
                 let lambda_expr = self.parse_lambda_expr();
-                if previous_precedence > Precedence::Initial {
-                    self.add_error(ParseErrorType::InvalidLambdaExpressionUsage, &lambda_expr);
-                }
+                self.add_error(ParseErrorType::InvalidLambdaExpressionUsage, &lambda_expr);
                 Expr::Lambda(lambda_expr).into()
             }
             TokenKind::Yield => {
@@ -1967,8 +1960,7 @@ impl<'src> Parser<'src> {
         }
 
         self.expect(TokenKind::In);
-        let iter =
-            self.parse_simple_expression(AllowLambdaExpression::No, AllowStarredExpression::No);
+        let iter = self.parse_simple_expression(AllowStarredExpression::No);
 
         let mut ifs = vec![];
         let mut progress = ParserProgress::default();
@@ -1976,8 +1968,7 @@ impl<'src> Parser<'src> {
         while self.eat(TokenKind::If) {
             progress.assert_progressing(self);
 
-            let parsed_expr =
-                self.parse_simple_expression(AllowLambdaExpression::No, AllowStarredExpression::No);
+            let parsed_expr = self.parse_simple_expression(AllowStarredExpression::No);
 
             ifs.push(parsed_expr.expr);
         }
@@ -2322,8 +2313,7 @@ impl<'src> Parser<'src> {
     fn parse_if_expression(&mut self, body: Expr, start: TextSize) -> ast::ExprIf {
         self.bump(TokenKind::If);
 
-        let test =
-            self.parse_simple_expression(AllowLambdaExpression::No, AllowStarredExpression::No);
+        let test = self.parse_simple_expression(AllowStarredExpression::No);
 
         self.expect(TokenKind::Else);
 
@@ -2488,18 +2478,6 @@ pub(super) enum AllowNamedExpression {
 impl AllowNamedExpression {
     const fn is_yes(self) -> bool {
         matches!(self, AllowNamedExpression::Yes)
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum AllowLambdaExpression {
-    Yes,
-    No,
-}
-
-impl AllowLambdaExpression {
-    const fn is_no(self) -> bool {
-        matches!(self, AllowLambdaExpression::No)
     }
 }
 
