@@ -111,7 +111,7 @@ Module(
 1 | x[::
 2 | 
 3 | def foo():
-  |     ^^^^^ Syntax Error: invalid assignment target
+  |     ^^^^^ Syntax Error: invalid annotated assignment target
 4 |     pass
   |
 
