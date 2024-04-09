@@ -1,7 +1,7 @@
-sorted([4, 1, 3, 2])[0]
-sorted([4, 1, 3, 2])[-1]
-sorted([4, 1, 3, 2], reverse=True)[0]
-sorted([4, 1, 3, 2], reverse=True, key=lambda x: x)[0]
+sorted(l)[0]
+sorted(l)[-1]
+sorted(l)[0]
+sorted(l)[0]
 
 # Edge cases
-sorted([4, 1, 3, 2], reverse=foo())[0]
+sorted(l, reverse=foo())[0]

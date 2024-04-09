@@ -4,15 +4,9 @@ use ruff_diagnostics::Fix;
 use ruff_diagnostics::FixAvailability;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::Expr;
-use ruff_python_ast::ExprCall;
-use ruff_python_ast::ExprNumberLiteral;
-use ruff_python_ast::ExprSubscript;
-use ruff_python_ast::ExprUnaryOp;
-use ruff_python_ast::UnaryOp;
+use ruff_python_ast::{self as ast, Expr};
 
 use crate::checkers::ast::Checker;
-use crate::fix::snippet::SourceCodeSnippet;
 use ruff_python_ast::Number;
 use ruff_text_size::Ranged;
 
@@ -58,19 +52,19 @@ impl Violation for SortedMinMax {
 }
 
 /// FURB192
-pub(crate) fn sorted_min_max(checker: &mut Checker, subscript: &ExprSubscript) {
+pub(crate) fn sorted_min_max(checker: &mut Checker, subscript: &ast::ExprSubscript) {
     if subscript.ctx.is_store() || subscript.ctx.is_del() {
         return;
     }
 
-    let ExprSubscript { slice, value, .. } = &subscript;
+    let ast::ExprSubscript { slice, value, .. } = &subscript;
 
     // Early return if index is not unary or a number literal
     if !(slice.is_number_literal_expr() || slice.is_unary_op_expr()) {
         return;
     }
 
-    let Expr::Call(ExprCall {
+    let Expr::Call(ast::ExprCall {
         func,
         arguments,
         range,
@@ -86,20 +80,20 @@ pub(crate) fn sorted_min_max(checker: &mut Checker, subscript: &ExprSubscript) {
 
     let index = match slice.as_ref() {
         // [0]
-        Expr::NumberLiteral(ExprNumberLiteral {
+        Expr::NumberLiteral(ast::ExprNumberLiteral {
             value: Number::Int(index),
             ..
         }) if *index == 0 => Index::First,
 
         // [-1]
-        Expr::UnaryOp(ExprUnaryOp {
-            op: UnaryOp::USub,
+        Expr::UnaryOp(ast::ExprUnaryOp {
+            op: ast::UnaryOp::USub,
             operand,
             ..
         }) => {
             match operand.as_ref() {
                 // [-1]
-                Expr::NumberLiteral(ExprNumberLiteral {
+                Expr::NumberLiteral(ast::ExprNumberLiteral {
                     value: Number::Int(index),
                     ..
                 }) if *index == 1 => Index::Last,
@@ -135,7 +129,12 @@ pub(crate) fn sorted_min_max(checker: &mut Checker, subscript: &ExprSubscript) {
         (Index::Last, true) => MinMax::Min,
     };
 
-    let replacement = format!("{}({})", min_max.as_str(), keys);
+    let Some(Expr::Name(list_expr)) = arguments.args.get(0) else {
+        return;
+    };
+
+    // let replacement = format!("{}({})", min_max.as_str(), keys);
+    let replacement = format!("{}({})", min_max.as_str(), list_expr.id);
 
     let mut diagnostic = Diagnostic::new(SortedMinMax, subscript.range());
     diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
