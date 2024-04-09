@@ -304,6 +304,16 @@ impl<'src> Parser<'src> {
     }
 
     fn missing_node_range(&self) -> TextRange {
+        // TODO(dhruvmanila): This range depends on whether the missing node is
+        // on the leftmost or the rightmost of the expression. It's incorrect for
+        // the leftmost missing node because the range is outside the expression
+        // range. For example,
+        //
+        // ```python
+        // value = ** y
+        // #       ^^^^ expression range
+        // #      ^ last token end
+        // ```
         TextRange::empty(self.last_token_end)
     }
 
