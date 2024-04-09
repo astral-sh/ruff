@@ -73,7 +73,7 @@ impl<'src> Parser<'src> {
         self.at_ts(EXPR_SET)
     }
 
-    // Returns `true` if the current token ends a sequence.
+    /// Returns `true` if the current token ends a sequence.
     pub(super) fn at_sequence_end(&self) -> bool {
         self.at_ts(END_SEQUENCE_SET)
     }
