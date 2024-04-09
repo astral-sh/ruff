@@ -103,7 +103,7 @@ Module(
 3 | (x :=
 4 | 
 5 | def foo():
-  |     ^^^^^ Syntax Error: invalid assignment target
+  |     ^^^^^ Syntax Error: invalid annotated assignment target
 6 |     pass
   |
 

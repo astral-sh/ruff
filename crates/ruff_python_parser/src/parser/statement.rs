@@ -199,11 +199,11 @@ impl<'src> Parser<'src> {
                 let parsed_expr =
                     self.parse_yield_expression_or_else(Parser::parse_star_expression_list);
 
-                if self.eat(TokenKind::Equal) {
+                if self.at(TokenKind::Equal) {
                     Stmt::Assign(self.parse_assign_statement(parsed_expr, start))
-                } else if self.eat(TokenKind::Colon) {
+                } else if self.at(TokenKind::Colon) {
                     Stmt::AnnAssign(self.parse_annotated_assignment_statement(parsed_expr, start))
-                } else if let Ok(op) = Operator::try_from(self.current_token_kind()) {
+                } else if let Some(op) = self.current_token_kind().as_augmented_assign_operator() {
                     Stmt::AugAssign(self.parse_augmented_assignment_statement(
                         parsed_expr,
                         op,
@@ -823,20 +823,48 @@ impl<'src> Parser<'src> {
         }
     }
 
-    /// See: <https://docs.python.org/3/reference/simple_stmts.html#grammar-token-python-grammar-assignment_stmt>
+    /// Parse an assignment statement.
+    ///
+    /// # Panics
+    ///
+    /// If the parser isn't positioned at an `=` token.
+    ///
+    /// See: <https://docs.python.org/3/reference/simple_stmts.html#assignment-statements>
     fn parse_assign_statement(&mut self, target: ParsedExpr, start: TextSize) -> ast::StmtAssign {
+        self.bump(TokenKind::Equal);
+
         let mut targets = vec![target.expr];
-        let mut value = self.parse_yield_expression_or_else(|p| {
-            p.parse_expression_list(AllowStarredExpression::Yes)
-        });
+
+        // test_err assign_stmt_missing_rhs
+        // x =
+        // 1 + 1
+        // x = y =
+        // 2 + 2
+        // x = = y
+        // 3 + 3
+
+        // test_err assign_stmt_keyword_target
+        // a = pass = c
+        // a + b
+        // a = b = pass = c
+        // a + b
+
+        // test_err assign_stmt_invalid_value_expr
+        // x = *a and b
+        // x = *yield x
+        // x = *yield from x
+        // x = *lambda x: x
+        // x = x := 1
+
+        let mut value = self.parse_yield_expression_or_else(Parser::parse_star_expression_list);
 
         if self.at(TokenKind::Equal) {
+            // This path is only taken when there are more than one assignment targets.
             self.parse_list(RecoveryContextKind::AssignmentTargets, |parser| {
                 parser.bump(TokenKind::Equal);
 
-                let mut parsed_expr = parser.parse_yield_expression_or_else(|p| {
-                    p.parse_expression_list(AllowStarredExpression::Yes)
-                });
+                let mut parsed_expr =
+                    parser.parse_yield_expression_or_else(Parser::parse_star_expression_list);
 
                 std::mem::swap(&mut value, &mut parsed_expr);
 
@@ -844,17 +872,14 @@ impl<'src> Parser<'src> {
             });
         }
 
-        targets
-            .iter_mut()
-            .for_each(|target| helpers::set_expr_ctx(target, ExprContext::Store));
-
-        if !targets.iter().all(helpers::is_valid_assignment_target) {
-            targets
-                .iter()
-                .filter(|target| !helpers::is_valid_assignment_target(target))
-                .for_each(|target| {
-                    self.add_error(ParseErrorType::InvalidAssignmentTarget, target.range());
-                });
+        for target in &mut targets {
+            helpers::set_expr_ctx(target, ExprContext::Store);
+            // test_err assign_stmt_invalid_target
+            // 1 = 1
+            // x = 1 = 2
+            // x = 1 = y = 2 = z
+            // ["a", "b"] = ["a", "b"]
+            self.validate_assignment_target(target);
         }
 
         ast::StmtAssign {
@@ -864,54 +889,66 @@ impl<'src> Parser<'src> {
         }
     }
 
-    /// See: <https://docs.python.org/3/reference/simple_stmts.html#grammar-token-python-grammar-annotated_assignment_stmt>
+    /// Parses an annotated assignment statement.
+    ///
+    /// # Panics
+    ///
+    /// If the parser isn't positioned at a `:` token.
+    ///
+    /// See: <https://docs.python.org/3/reference/simple_stmts.html#annotated-assignment-statements>
     fn parse_annotated_assignment_statement(
         &mut self,
         mut target: ParsedExpr,
         start: TextSize,
     ) -> ast::StmtAnnAssign {
-        if !helpers::is_valid_assignment_target(&target.expr) {
-            self.add_error(ParseErrorType::InvalidAssignmentTarget, target.range());
-        }
+        self.bump(TokenKind::Colon);
 
-        if matches!(target.expr, Expr::Tuple(_)) {
-            self.add_error(
-                ParseErrorType::OtherError(
-                    "only single target (not tuple) can be annotated".into(),
-                ),
-                target.range(),
-            );
-        }
+        // test_err ann_assign_stmt_invalid_target
+        // "abc": str = "def"
+        // call(): str = "no"
+        // *x: int = 1, 2
+        // # Tuple assignment
+        // x,: int = 1
+        // x, y: int = 1, 2
+        // (x, y): int = 1, 2
+        // # List assignment
+        // [x]: int = 1
+        // [x, y]: int = 1, 2
+        self.validate_annotated_assignment_target(&target.expr);
 
         helpers::set_expr_ctx(&mut target.expr, ExprContext::Store);
 
-        let simple = target.expr.is_name_expr() && !target.is_parenthesized;
+        let simple = target.is_name_expr() && !target.is_parenthesized;
 
-        // Annotation is actually just an `expression` but we use `expressions`
-        // for better error recovery in case tuple isn't parenthesized.
-        let annotation = self.parse_expression_list(AllowStarredExpression::No);
+        // test_err ann_assign_stmt_invalid_annotation
+        // x: *int = 1
+        // x: yield a = 1
+        // x: yield from b = 1
+        // x: y := int = 1
+        let annotation = self.parse_conditional_expression_or_higher(AllowStarredExpression::No);
 
-        if matches!(
-            annotation.expr,
-            Expr::Tuple(ast::ExprTuple {
-                parenthesized: false,
-                ..
-            })
-        ) {
-            self.add_error(
-                ParseErrorType::OtherError("annotation cannot be unparenthesized".into()),
-                annotation.range(),
-            );
-        }
-
-        let value = self.eat(TokenKind::Equal).then(|| {
-            Box::new(
-                self.parse_yield_expression_or_else(|p| {
-                    p.parse_expression_list(AllowStarredExpression::Yes)
-                })
-                .expr,
-            )
-        });
+        let value = if self.eat(TokenKind::Equal) {
+            if self.at_expr() {
+                // test_err ann_assign_stmt_invalid_value
+                // x: Any = *a and b
+                // x: Any = x := 1
+                // x: list = [x, *a | b, *a or b]
+                Some(Box::new(
+                    self.parse_yield_expression_or_else(Parser::parse_star_expression_list)
+                        .expr,
+                ))
+            } else {
+                // test_err ann_assign_stmt_missing_rhs
+                // x: int =
+                self.add_error(
+                    ParseErrorType::OtherError("Expected an expression".to_string()),
+                    self.current_token_range(),
+                );
+                None
+            }
+        } else {
+            None
+        };
 
         ast::StmtAnnAssign {
             target: Box::new(target.expr),
@@ -928,7 +965,7 @@ impl<'src> Parser<'src> {
     ///
     /// If the parser isn't positioned at an augmented assignment token.
     ///
-    /// See: <https://docs.python.org/3/reference/simple_stmts.html#grammar-token-python-grammar-augmented_assignment_stmt>
+    /// See: <https://docs.python.org/3/reference/simple_stmts.html#augmented-assignment-statements>
     fn parse_augmented_assignment_statement(
         &mut self,
         mut target: ParsedExpr,
@@ -938,18 +975,35 @@ impl<'src> Parser<'src> {
         // Consume the operator
         self.bump_ts(AUGMENTED_ASSIGN_SET);
 
-        if !helpers::is_valid_aug_assignment_target(&target.expr) {
-            self.add_error(
-                ParseErrorType::InvalidAugmentedAssignmentTarget,
-                target.range(),
-            );
+        if !matches!(
+            &target.expr,
+            Expr::Name(_) | Expr::Attribute(_) | Expr::Subscript(_)
+        ) {
+            // test_err aug_assign_stmt_invalid_target
+            // 1 += 1
+            // "a" += "b"
+            // *x += 1
+            // pass += 1
+            // x += pass
+            // (x + y) += 1
+            self.add_error(ParseErrorType::InvalidAugmentedAssignmentTarget, &target);
         }
 
         helpers::set_expr_ctx(&mut target.expr, ExprContext::Store);
 
-        let value = self.parse_yield_expression_or_else(|p| {
-            p.parse_expression_list(AllowStarredExpression::Yes)
-        });
+        // test_err aug_assign_stmt_missing_rhs
+        // x +=
+        // 1 + 1
+        // x += y +=
+        // 2 + 2
+
+        // test_err aug_assign_stmt_invalid_value
+        // x += *a and b
+        // x += *yield x
+        // x += *yield from x
+        // x += *lambda x: x
+        // x += y := 1
+        let value = self.parse_yield_expression_or_else(Parser::parse_star_expression_list);
 
         ast::StmtAugAssign {
             target: Box::new(target.expr),
@@ -1698,9 +1752,7 @@ impl<'src> Parser<'src> {
         let mut target = self.parse_conditional_expression_or_higher(AllowStarredExpression::Yes);
 
         // This has the same semantics as an assignment target.
-        if !helpers::is_valid_assignment_target(&target.expr) {
-            self.add_error(ParseErrorType::InvalidAssignmentTarget, target.range());
-        }
+        self.validate_assignment_target(&target.expr);
 
         helpers::set_expr_ctx(&mut target.expr, ExprContext::Store);
 
@@ -2145,6 +2197,48 @@ impl<'src> Parser<'src> {
                 name,
                 bound,
             })
+        }
+    }
+
+    /// Validate that the given expression is a valid assignment target.
+    ///
+    /// If the expression is a list or tuple, then validate each element in the list.
+    /// If it's a starred expression, then validate the value of the starred expression.
+    ///
+    /// Report an error for each invalid assignment expression found.
+    pub(super) fn validate_assignment_target(&mut self, expr: &Expr) {
+        match expr {
+            Expr::Starred(ast::ExprStarred { value, .. }) => self.validate_assignment_target(value),
+            Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+                for expr in elts {
+                    self.validate_assignment_target(expr);
+                }
+            }
+            Expr::Name(_) | Expr::Attribute(_) | Expr::Subscript(_) => {}
+            _ => self.add_error(ParseErrorType::InvalidAssignmentTarget, expr.range()),
+        }
+    }
+
+    /// Validate that the given expression is a valid annotated assignment target.
+    ///
+    /// Unlike [`Parser::validate_assignment_target`], starred, list and tuple
+    /// expressions aren't allowed here.
+    fn validate_annotated_assignment_target(&mut self, expr: &Expr) {
+        match expr {
+            Expr::List(_) => self.add_error(
+                ParseErrorType::OtherError(
+                    "only single target (not list) can be annotated".to_string(),
+                ),
+                expr,
+            ),
+            Expr::Tuple(_) => self.add_error(
+                ParseErrorType::OtherError(
+                    "only single target (not tuple) can be annotated".to_string(),
+                ),
+                expr,
+            ),
+            Expr::Name(_) | Expr::Attribute(_) | Expr::Subscript(_) => {}
+            _ => self.add_error(ParseErrorType::InvalidAnnotatedAssignmentTarget, expr),
         }
     }
 
