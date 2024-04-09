@@ -473,7 +473,7 @@ Program {
                         is_async: false,
                         items: [
                             WithItem {
-                                range: 238..245,
+                                range: 237..246,
                                 context_expr: Yield(
                                     ExprYield {
                                         range: 238..245,
@@ -512,7 +512,7 @@ Program {
                         is_async: false,
                         items: [
                             WithItem {
-                                range: 262..274,
+                                range: 261..275,
                                 context_expr: YieldFrom(
                                     ExprYieldFrom {
                                         range: 262..274,
