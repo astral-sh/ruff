@@ -65,9 +65,7 @@ pub(crate) fn sorted_min_max(checker: &mut Checker, subscript: &ast::ExprSubscri
     }
 
     let Expr::Call(ast::ExprCall {
-        func,
-        arguments,
-        range,
+        func, arguments, ..
     }) = value.as_ref()
     else {
         return;
