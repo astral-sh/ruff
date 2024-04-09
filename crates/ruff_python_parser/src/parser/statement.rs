@@ -2118,35 +2118,58 @@ impl<'src> Parser<'src> {
         }
     }
 
-    /// Parses any statement that is valid after an `async` token.
+    /// Parses a statement that is valid after an `async` token.
+    ///
+    /// If the statement is not a valid `async` statement, an error will be reported
+    /// and it will be parsed as a statement.
+    ///
     /// See:
-    ///  - <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-async_with_stmt>
-    ///  - <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-async_for_stmt>
-    ///  - <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-async_funcdef>
+    /// - <https://docs.python.org/3/reference/compound_stmts.html#the-async-with-statement>
+    /// - <https://docs.python.org/3/reference/compound_stmts.html#the-async-for-statement>
+    /// - <https://docs.python.org/3/reference/compound_stmts.html#coroutine-function-definition>
     fn parse_async_statement(&mut self) -> Stmt {
         let async_start = self.node_start();
         self.bump(TokenKind::Async);
 
         match self.current_token_kind() {
+            // test_ok async_function_definition
+            // async def foo(): ...
             TokenKind::Def => Stmt::FunctionDef(ast::StmtFunctionDef {
                 is_async: true,
                 ..self.parse_function_definition(vec![], async_start)
             }),
+
+            // test_ok async_with_statement
+            // async with item: ...
             TokenKind::With => Stmt::With(ast::StmtWith {
                 is_async: true,
                 ..self.parse_with_statement(async_start)
             }),
+
+            // test_ok async_for_statement
+            // async for target in iter: ...
             TokenKind::For => Stmt::For(ast::StmtFor {
                 is_async: true,
                 ..self.parse_for_statement(async_start)
             }),
+
             kind => {
-                // Although this statement is not a valid `async` statement,
-                // we still parse it.
+                // test_err async_unexpected_token
+                // async class Foo: ...
+                // async while test: ...
+                // async x = 1
+                // async async def foo(): ...
+                // # TODO(dhruvmanila): Here, `match` is actually a Name token because
+                // # of the soft keyword # transformer
+                // async match test:
+                //     case _: ...
                 self.add_error(
-                    ParseErrorType::StmtIsNotAsync(kind),
+                    ParseErrorType::UnexpectedAsyncToken(kind),
                     self.current_token_range(),
                 );
+
+                // Although this statement is not a valid `async` statement,
+                // we still parse it.
                 self.parse_statement()
             }
         }
