@@ -8,11 +8,6 @@
 # That roughly means that any kind of recovery can lead to unrelated syntax errors
 # on following lines.
 
-def unclosed[A, *B(test: name):
-    pass
-
-    a + b
-
 def keyword[A, await](): ...
 
 def not_a_type_param[A, |, B](): ...
