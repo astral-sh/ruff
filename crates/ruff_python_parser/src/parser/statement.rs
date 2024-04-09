@@ -2129,57 +2129,105 @@ impl<'src> Parser<'src> {
     ///
     /// See: <https://docs.python.org/3/reference/compound_stmts.html#the-match-statement>
     fn parse_match_statement(&mut self) -> ast::StmtMatch {
-        let start_offset = self.node_start();
-
+        let start = self.node_start();
         self.bump(TokenKind::Match);
 
         let subject_start = self.node_start();
-        let subject = self.parse_named_expression_or_higher(AllowStarredExpression::No);
+
+        // Subject expression grammar is:
+        //
+        //     subject_expr:
+        //         | star_named_expression ',' star_named_expressions?
+        //         | named_expression
+        //
+        // First try with `star_named_expression`, then if there's no comma,
+        // we'll restrict it to `named_expression`.
+        let subject = self.parse_star_expression_or_higher(AllowNamedExpression::Yes);
+
+        // test_ok match_stmt_subject_expr
+        // match x := 1:
+        //     case _: ...
+        // match (x := 1):
+        //     case _: ...
+        // # Starred expressions are only allowed in tuple expression
+        // match *x | y, z:
+        //     case _: ...
+        // match await x:
+        //     case _: ...
+
+        // test_err match_stmt_invalid_subject_expr
+        // match (*x):
+        //     case _: ...
+        // # Starred expression precedence test
+        // match *x and y, z:
+        //     case _: ...
+        // match yield x:
+        //     case _: ...
         let subject = if self.at(TokenKind::Comma) {
             let tuple =
                 self.parse_tuple_expression(subject.expr, subject_start, Parenthesized::No, |p| {
-                    p.parse_named_expression_or_higher(AllowStarredExpression::No)
+                    p.parse_star_expression_or_higher(AllowNamedExpression::Yes)
                 });
 
             Expr::Tuple(tuple).into()
         } else {
+            if subject.is_unparenthesized_starred_expr() {
+                // test_err match_stmt_single_starred_subject
+                // match *foo:
+                //     case _: ...
+                self.add_error(ParseErrorType::StarredExpressionUsage, &subject);
+            }
             subject
         };
 
         self.expect(TokenKind::Colon);
 
-        self.eat(TokenKind::Newline);
+        // test_err match_stmt_no_newline_before_case
+        // match foo: case _: ...
+        self.expect(TokenKind::Newline);
+
+        // Use `eat` instead of `expect` for better error message.
         if !self.eat(TokenKind::Indent) {
-            let range = self.current_token_range();
+            // test_err match_stmt_expect_indented_block
+            // match foo:
+            // case _: ...
             self.add_error(
                 ParseErrorType::OtherError(
-                    "expected an indented block after `match` statement".to_string(),
+                    "Expected an indented block after `match` statement".to_string(),
                 ),
-                range,
-            );
-        }
-
-        let cases = self.parse_match_cases();
-
-        self.eat(TokenKind::Dedent);
-
-        ast::StmtMatch {
-            subject: Box::new(subject.expr),
-            cases,
-            range: self.node_range(start_offset),
-        }
-    }
-
-    /// Parses a list of match case blocks.
-    fn parse_match_cases(&mut self) -> Vec<ast::MatchCase> {
-        if !self.at(TokenKind::Case) {
-            self.add_error(
-                ParseErrorType::OtherError("expecting `case` block after `match`".to_string()),
                 self.current_token_range(),
             );
         }
 
+        let cases = self.parse_match_case_blocks();
+
+        self.expect(TokenKind::Dedent);
+
+        ast::StmtMatch {
+            subject: Box::new(subject.expr),
+            cases,
+            range: self.node_range(start),
+        }
+    }
+
+    /// Parses a list of match case blocks.
+    fn parse_match_case_blocks(&mut self) -> Vec<ast::MatchCase> {
         let mut cases = vec![];
+
+        if !self.at(TokenKind::Case) {
+            // test_err match_stmt_expected_case_block
+            // match x:
+            //     x = 1
+            // match x:
+            //     match y:
+            //         case _: ...
+            self.add_error(
+                ParseErrorType::OtherError("Expected `case` block".to_string()),
+                self.current_token_range(),
+            );
+            return cases;
+        }
+
         let mut progress = ParserProgress::default();
 
         while self.at(TokenKind::Case) {
@@ -2199,16 +2247,50 @@ impl<'src> Parser<'src> {
     /// See: <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-case_block>
     fn parse_match_case(&mut self) -> ast::MatchCase {
         let start = self.node_start();
-
         self.bump(TokenKind::Case);
+
+        // test_err match_stmt_missing_pattern
+        // # TODO(dhruvmanila): Here, `case` is a name token because of soft keyword transformer
+        // match x:
+        //     case : ...
         let pattern = self.parse_match_patterns();
 
-        let guard = self.eat(TokenKind::If).then(|| {
-            Box::new(
-                self.parse_named_expression_or_higher(AllowStarredExpression::No)
-                    .expr,
-            )
-        });
+        let guard = if self.eat(TokenKind::If) {
+            if self.at_expr() {
+                // test_ok match_stmt_valid_guard_expr
+                // match x:
+                //     case y if a := 1: ...
+                // match x:
+                //     case y if a if True else b: ...
+                // match x:
+                //     case y if lambda a: b: ...
+                // match x:
+                //     case y if (yield x): ...
+
+                // test_err match_stmt_invalid_guard_expr
+                // match x:
+                //     case y if *a: ...
+                // match x:
+                //     case y if (*a): ...
+                // match x:
+                //     case y if yield x: ...
+                Some(Box::new(
+                    self.parse_named_expression_or_higher(AllowStarredExpression::No)
+                        .expr,
+                ))
+            } else {
+                // test_err match_stmt_missing_guard_expr
+                // match x:
+                //     case y if: ...
+                self.add_error(
+                    ParseErrorType::ExpectedExpression,
+                    self.current_token_range(),
+                );
+                None
+            }
+        } else {
+            None
+        };
 
         self.expect(TokenKind::Colon);
         let body = self.parse_body(Clause::Match);
@@ -2586,7 +2668,10 @@ impl<'src> Parser<'src> {
                 // of the pre-order visit
                 // test_err params_follows_var_keyword_param
                 // def foo(**kwargs, a, /, b=10, *, *args): ...
-                parser.add_error(ParseErrorType::ParamFollowsVarKeywordParam, parser.current_token_range());
+                parser.add_error(
+                    ParseErrorType::ParamFollowsVarKeywordParam,
+                    parser.current_token_range(),
+                );
             }
 
             match parser.current_token_kind() {
@@ -2601,7 +2686,10 @@ impl<'src> Parser<'src> {
                         if parser.at(TokenKind::Equal) {
                             // test_err params_var_positional_with_default
                             // def foo(a, *args=(1, 2)): ...
-                            parser.add_error(ParseErrorType::VarParameterWithDefault, parser.current_token_range());
+                            parser.add_error(
+                                ParseErrorType::VarParameterWithDefault,
+                                parser.current_token_range(),
+                            );
                         }
 
                         if seen_keyword_only_separator || parameters.vararg.is_some() {
@@ -2611,7 +2699,9 @@ impl<'src> Parser<'src> {
                             // def foo(a, *args1, *args2, b): ...
                             // def foo(a, *args1, b, c, *args2): ...
                             parser.add_error(
-                                ParseErrorType::OtherError("Only one '*' parameter allowed".to_string()),
+                                ParseErrorType::OtherError(
+                                    "Only one '*' parameter allowed".to_string(),
+                                ),
                                 param_star_range,
                             );
                         }
@@ -2629,7 +2719,9 @@ impl<'src> Parser<'src> {
                             // def foo(a, *, *, b): ...
                             // def foo(a, *, b, c, *): ...
                             parser.add_error(
-                                ParseErrorType::OtherError("Only one '*' separator allowed".to_string()),
+                                ParseErrorType::OtherError(
+                                    "Only one '*' separator allowed".to_string(),
+                                ),
                                 star_range,
                             );
                         }
@@ -2662,7 +2754,9 @@ impl<'src> Parser<'src> {
                         // test_err params_multiple_kwargs
                         // def foo(a, **kwargs1, **kwargs2): ...
                         parser.add_error(
-                            ParseErrorType::OtherError("Only one '**' parameter allowed".to_string()),
+                            ParseErrorType::OtherError(
+                                "Only one '**' parameter allowed".to_string(),
+                            ),
                             param_double_star_range,
                         );
                     }
@@ -2670,7 +2764,10 @@ impl<'src> Parser<'src> {
                     if parser.at(TokenKind::Equal) {
                         // test_err params_var_keyword_with_default
                         // def foo(a, **kwargs={'b': 1, 'c': 2}): ...
-                        parser.add_error(ParseErrorType::VarParameterWithDefault, parser.current_token_range());
+                        parser.add_error(
+                            ParseErrorType::VarParameterWithDefault,
+                            parser.current_token_range(),
+                        );
                     }
 
                     if seen_keyword_only_separator && !seen_keyword_only_param_after_separator {
@@ -2680,7 +2777,10 @@ impl<'src> Parser<'src> {
 
                         // test_err params_kwarg_after_star_separator
                         // def foo(*, **kwargs): ...
-                        parser.add_error(ParseErrorType::ExpectedKeywordParam, param_double_star_range);
+                        parser.add_error(
+                            ParseErrorType::ExpectedKeywordParam,
+                            param_double_star_range,
+                        );
                     }
 
                     parameters.kwarg = Some(Box::new(param));
@@ -2980,11 +3080,13 @@ impl<'src> Parser<'src> {
 
     /// Specialized [`Parser::parse_list_into_vec`] for parsing a sequence of clauses.
     ///
-    /// The difference is that the parser only continues parsing for as long as it sees the token indicating the start
-    /// of the specific clause. This is different from [`Parser::parse_list_into_vec`] that performs error recovery when
-    /// the next token is not a list terminator or the start of a list element.
+    /// The difference is that the parser only continues parsing for as long as it sees the token
+    /// indicating the start of the specific clause. This is different from
+    /// [`Parser::parse_list_into_vec`] that performs error recovery when the next token is not a
+    /// list terminator or the start of a list element.
     ///
-    /// The special method is necessary because Python uses indentation over explicit delimiters to indicate the end of a clause.
+    /// The special method is necessary because Python uses indentation over explicit delimiters to
+    /// indicate the end of a clause.
     ///
     /// ```python
     /// if True: ...
@@ -2993,12 +3095,14 @@ impl<'src> Parser<'src> {
     /// else: ...
     /// ```
     ///
-    /// It would be nice if the above example would recover and either skip over the `elf x: ...` or parse it as a nested statement
-    /// so that the parser recognises the `else` clause. But Python makes this hard (without writing custom error recovery logic)
-    /// because `elf x: ` could also be an annotated assignment that went wrong ;)
+    /// It would be nice if the above example would recover and either skip over the `elf x: ...`
+    /// or parse it as a nested statement so that the parser recognises the `else` clause. But
+    /// Python makes this hard (without writing custom error recovery logic) because `elf x: `
+    /// could also be an annotated assignment that went wrong ;)
     ///
-    /// For now, don't recover when parsing clause headers, but add the terminator tokens (e.g. `Else`) to the recovery context
-    /// so that expression recovery stops when it encounters an `else` token.
+    /// For now, don't recover when parsing clause headers, but add the terminator tokens (e.g.
+    /// `Else`) to the recovery context so that expression recovery stops when it encounters an
+    /// `else` token.
     fn parse_clauses<T>(
         &mut self,
         clause: Clause,
