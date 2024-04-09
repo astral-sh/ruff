@@ -7,45 +7,45 @@ input_file: crates/ruff_python_parser/resources/invalid/expressions/lambda_defau
 ```
 Module(
     ModModule {
-        range: 0..93,
+        range: 0..20,
         body: [
             Expr(
                 StmtExpr {
-                    range: 72..92,
+                    range: 0..20,
                     value: Lambda(
                         ExprLambda {
-                            range: 72..92,
+                            range: 0..20,
                             parameters: Some(
                                 Parameters {
-                                    range: 79..89,
+                                    range: 7..17,
                                     posonlyargs: [],
                                     args: [
                                         ParameterWithDefault {
-                                            range: 79..80,
+                                            range: 7..8,
                                             parameter: Parameter {
-                                                range: 79..80,
+                                                range: 7..8,
                                                 name: Identifier {
                                                     id: "a",
-                                                    range: 79..80,
+                                                    range: 7..8,
                                                 },
                                                 annotation: None,
                                             },
                                             default: None,
                                         },
                                         ParameterWithDefault {
-                                            range: 82..86,
+                                            range: 10..14,
                                             parameter: Parameter {
-                                                range: 82..83,
+                                                range: 10..11,
                                                 name: Identifier {
                                                     id: "b",
-                                                    range: 82..83,
+                                                    range: 10..11,
                                                 },
                                                 annotation: None,
                                             },
                                             default: Some(
                                                 NumberLiteral(
                                                     ExprNumberLiteral {
-                                                        range: 84..86,
+                                                        range: 12..14,
                                                         value: Int(
                                                             20,
                                                         ),
@@ -54,12 +54,12 @@ Module(
                                             ),
                                         },
                                         ParameterWithDefault {
-                                            range: 88..89,
+                                            range: 16..17,
                                             parameter: Parameter {
-                                                range: 88..89,
+                                                range: 16..17,
                                                 name: Identifier {
                                                     id: "c",
-                                                    range: 88..89,
+                                                    range: 16..17,
                                                 },
                                                 annotation: None,
                                             },
@@ -73,7 +73,7 @@ Module(
                             ),
                             body: NumberLiteral(
                                 ExprNumberLiteral {
-                                    range: 91..92,
+                                    range: 19..20,
                                     value: Int(
                                         1,
                                     ),
@@ -90,7 +90,6 @@ Module(
 ## Errors
 
   |
-1 | # TODO(micha): The offset of the generated error message is off by one.
-2 | lambda a, b=20, c: 1
-  |                 ^ Syntax Error: Parameter without a default follows parameter with a default
+1 | lambda a, b=20, c: 1
+  |                 ^ Syntax Error: Parameter without a default cannot follow a parameter with a default
   |

@@ -258,7 +258,7 @@ impl std::fmt::Display for ParseErrorType {
             ParseErrorType::NonDefaultParamFollowsDefaultParam => {
                 write!(
                     f,
-                    "Parameter without a default follows parameter with a default"
+                    "Parameter without a default cannot follow a parameter with a default"
                 )
             }
             ParseErrorType::ExpectedKeywordParam => {

@@ -7,7 +7,7 @@ input_file: crates/ruff_python_parser/resources/inline/err/params_multiple_varar
 ```
 Module(
     ModModule {
-        range: 0..138,
+        range: 0..136,
         body: [
             FunctionDef(
                 StmtFunctionDef {
@@ -106,10 +106,10 @@ Module(
                         ],
                         vararg: Some(
                             Parameter {
-                                range: 83..88,
+                                range: 75..80,
                                 name: Identifier {
-                                    id: "args2",
-                                    range: 83..88,
+                                    id: "args1",
+                                    range: 75..80,
                                 },
                                 annotation: None,
                             },
@@ -145,6 +145,86 @@ Module(
                     ],
                 },
             ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 98..135,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: "foo",
+                        range: 102..105,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 105..130,
+                        posonlyargs: [],
+                        args: [
+                            ParameterWithDefault {
+                                range: 106..107,
+                                parameter: Parameter {
+                                    range: 106..107,
+                                    name: Identifier {
+                                        id: "a",
+                                        range: 106..107,
+                                    },
+                                    annotation: None,
+                                },
+                                default: None,
+                            },
+                        ],
+                        vararg: Some(
+                            Parameter {
+                                range: 110..115,
+                                name: Identifier {
+                                    id: "args1",
+                                    range: 110..115,
+                                },
+                                annotation: None,
+                            },
+                        ),
+                        kwonlyargs: [
+                            ParameterWithDefault {
+                                range: 117..118,
+                                parameter: Parameter {
+                                    range: 117..118,
+                                    name: Identifier {
+                                        id: "b",
+                                        range: 117..118,
+                                    },
+                                    annotation: None,
+                                },
+                                default: None,
+                            },
+                            ParameterWithDefault {
+                                range: 120..121,
+                                parameter: Parameter {
+                                    range: 120..121,
+                                    name: Identifier {
+                                        id: "c",
+                                        range: 120..121,
+                                    },
+                                    annotation: None,
+                                },
+                                default: None,
+                            },
+                        ],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 132..135,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 132..135,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
         ],
     },
 )
@@ -164,5 +244,13 @@ Module(
 2 | # def foo(a, *, b, c, *args): ...
 3 | def foo(a, *args1, *args2, b): ...
   |                    ^^^^^^ Syntax Error: Only one '*' parameter allowed
-4 | # def foo(a, *args1, b, c, *args2): ...
+4 | def foo(a, *args1, b, c, *args2): ...
+  |
+
+
+  |
+2 | # def foo(a, *, b, c, *args): ...
+3 | def foo(a, *args1, *args2, b): ...
+4 | def foo(a, *args1, b, c, *args2): ...
+  |                          ^^^^^^ Syntax Error: Only one '*' parameter allowed
   |

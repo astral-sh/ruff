@@ -61,50 +61,6 @@ pub(super) fn token_kind_to_cmp_op(kind: [TokenKind; 2]) -> Result<CmpOp, ()> {
     })
 }
 
-// Perform validation of function/lambda parameters in a function definition.
-pub(super) fn validate_parameters(parameters: &ast::Parameters) -> Result<(), Vec<ParseError>> {
-    let mut errors = vec![];
-
-    let mut all_arg_names = FxHashSet::with_capacity_and_hasher(
-        parameters.posonlyargs.len()
-            + parameters.args.len()
-            + usize::from(parameters.vararg.is_some())
-            + parameters.kwonlyargs.len()
-            + usize::from(parameters.kwarg.is_some()),
-        BuildHasherDefault::default(),
-    );
-
-    let posonlyargs = parameters.posonlyargs.iter();
-    let args = parameters.args.iter();
-    let kwonlyargs = parameters.kwonlyargs.iter();
-
-    let vararg: Option<&ast::Parameter> = parameters.vararg.as_deref();
-    let kwarg: Option<&ast::Parameter> = parameters.kwarg.as_deref();
-
-    for arg in posonlyargs
-        .chain(args)
-        .chain(kwonlyargs)
-        .map(|arg| &arg.parameter)
-        .chain(vararg)
-        .chain(kwarg)
-    {
-        let range = arg.name.range;
-        let arg_name = arg.name.as_str();
-        if !all_arg_names.insert(arg_name) {
-            errors.push(ParseError {
-                error: ParseErrorType::DuplicateParameter(arg_name.to_string()),
-                location: range,
-            });
-        }
-    }
-
-    if errors.is_empty() {
-        Ok(())
-    } else {
-        Err(errors)
-    }
-}
-
 pub(super) fn validate_arguments(arguments: &ast::Arguments) -> Result<(), Vec<ParseError>> {
     let mut errors = vec![];
 

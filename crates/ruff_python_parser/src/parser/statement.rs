@@ -1,4 +1,7 @@
 use std::fmt::Display;
+use std::hash::BuildHasherDefault;
+
+use rustc_hash::FxHashSet;
 
 use ruff_python_ast::{
     self as ast, ExceptHandler, Expr, ExprContext, IpyEscapeKind, Operator, Stmt, WithItem,
@@ -2455,10 +2458,11 @@ impl<'src> Parser<'src> {
     pub(super) fn parse_parameters(&mut self, function_kind: FunctionKind) -> ast::Parameters {
         let start = self.node_start();
 
-        // TODO(dhruvmanila): This has the same problem where if there are multiple
-        // kwarg or vararg, the last one will win and the parser will drop the
-        // previous ones. Another thing is the vararg and kwarg uses `Parameter`
-        // which means that the parser cannot recover well from `*args=(1, 2)`.
+        // TODO(dhruvmanila): This has the same problem as `parse_match_pattern_mapping`
+        // has where if there are multiple kwarg or vararg, the last one will win and
+        // the parser will drop the previous ones. Another thing is the vararg and kwarg
+        // uses `Parameter` (not `ParameterWithDefault`) which means that the parser cannot
+        // recover well from `*args=(1, 2)`.
         let mut parameters = ast::Parameters {
             range: TextRange::default(),
             posonlyargs: vec![],
@@ -2492,7 +2496,7 @@ impl<'src> Parser<'src> {
 
                     if parser.at(TokenKind::Name) {
                         let param = parser.parse_parameter(function_kind, AllowStarAnnotation::Yes);
-                        let param_star_range = param.range().cover(star_range);
+                        let param_star_range = parser.node_range(star_range.start());
 
                         if parser.at(TokenKind::Equal) {
                             // test_err params_var_positional_with_default
@@ -2505,14 +2509,19 @@ impl<'src> Parser<'src> {
                             // def foo(a, *, *args, b): ...
                             // # def foo(a, *, b, c, *args): ...
                             // def foo(a, *args1, *args2, b): ...
-                            // # def foo(a, *args1, b, c, *args2): ...
+                            // def foo(a, *args1, b, c, *args2): ...
                             parser.add_error(
                                 ParseErrorType::OtherError("Only one '*' parameter allowed".to_string()),
                                 param_star_range,
                             );
                         }
 
-                        parameters.vararg = Some(Box::new(param));
+                        // TODO(dhruvmanila): The AST doesn't allow multiple `vararg`, so let's
+                        // choose to keep the first one so that the parameters remain in preorder.
+                        if parameters.vararg.is_none() {
+                            parameters.vararg = Some(Box::new(param));
+                        }
+
                         last_keyword_only_separator_range = None;
                     } else {
                         if seen_keyword_only_separator {
@@ -2547,7 +2556,7 @@ impl<'src> Parser<'src> {
                     parser.bump(TokenKind::DoubleStar);
 
                     let param = parser.parse_parameter(function_kind, AllowStarAnnotation::No);
-                    let param_double_star_range = param.range().cover(double_star_range);
+                    let param_double_star_range = parser.node_range(double_star_range.start());
 
                     if parameters.kwarg.is_some() {
                         // test_err params_multiple_kwargs
@@ -2597,7 +2606,7 @@ impl<'src> Parser<'src> {
                     if seen_positional_only_separator {
                         // test_err params_multiple_slash_separator
                         // def foo(a, /, /, b): ...
-                        // # def foo(a, /, b, c, /): ...
+                        // def foo(a, /, b, c, /): ...
                         parser.add_error(
                             ParseErrorType::OtherError(
                                 "Only one '/' separator allowed".to_string(),
@@ -2620,8 +2629,13 @@ impl<'src> Parser<'src> {
                         );
                     }
 
-                    std::mem::swap(&mut parameters.args, &mut parameters.posonlyargs);
-                    seen_positional_only_separator = true;
+                    if !seen_positional_only_separator {
+                        // We should only swap if we're seeing the separator for the
+                        // first time, otherwise it's a user error.
+                        std::mem::swap(&mut parameters.args, &mut parameters.posonlyargs);
+                        seen_positional_only_separator = true;
+                    }
+
                     last_keyword_only_separator_range = None;
                 }
                 TokenKind::Name => {
@@ -2677,11 +2691,7 @@ impl<'src> Parser<'src> {
 
         // test_err params_duplicate_names
         // def foo(a, a=10, *a, a, a: str, **a): ...
-        if let Err(errors) = helpers::validate_parameters(&parameters) {
-            for error in errors {
-                self.add_error(error.error, error.location);
-            }
-        }
+        self.validate_parameters(&parameters);
 
         parameters
     }
@@ -2827,6 +2837,44 @@ impl<'src> Parser<'src> {
             ),
             Expr::Name(_) | Expr::Attribute(_) | Expr::Subscript(_) => {}
             _ => self.add_error(ParseErrorType::InvalidAnnotatedAssignmentTarget, expr),
+        }
+    }
+
+    /// Validate that the given parameters doesn't have any duplicate names.
+    ///
+    /// Report errors for all the duplicate names found.
+    fn validate_parameters(&mut self, parameters: &ast::Parameters) {
+        let mut all_arg_names = FxHashSet::with_capacity_and_hasher(
+            parameters.posonlyargs.len()
+                + parameters.args.len()
+                + usize::from(parameters.vararg.is_some())
+                + parameters.kwonlyargs.len()
+                + usize::from(parameters.kwarg.is_some()),
+            BuildHasherDefault::default(),
+        );
+
+        let posonlyargs = parameters.posonlyargs.iter();
+        let args = parameters.args.iter();
+        let kwonlyargs = parameters.kwonlyargs.iter();
+
+        let vararg = parameters.vararg.as_deref();
+        let kwarg = parameters.kwarg.as_deref();
+
+        for arg in posonlyargs
+            .chain(args)
+            .chain(kwonlyargs)
+            .map(|arg| &arg.parameter)
+            .chain(vararg)
+            .chain(kwarg)
+        {
+            let range = arg.name.range;
+            let arg_name = arg.name.as_str();
+            if !all_arg_names.insert(arg_name) {
+                self.add_error(
+                    ParseErrorType::DuplicateParameter(arg_name.to_string()),
+                    range,
+                );
+            }
         }
     }
 

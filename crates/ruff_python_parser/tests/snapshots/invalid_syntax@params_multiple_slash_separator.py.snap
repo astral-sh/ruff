@@ -7,7 +7,7 @@ input_file: crates/ruff_python_parser/resources/inline/err/params_multiple_slash
 ```
 Module(
     ModModule {
-        range: 0..55,
+        range: 0..53,
         body: [
             FunctionDef(
                 StmtFunctionDef {
@@ -21,8 +21,7 @@ Module(
                     type_params: None,
                     parameters: Parameters {
                         range: 7..19,
-                        posonlyargs: [],
-                        args: [
+                        posonlyargs: [
                             ParameterWithDefault {
                                 range: 8..9,
                                 parameter: Parameter {
@@ -35,6 +34,8 @@ Module(
                                 },
                                 default: None,
                             },
+                        ],
+                        args: [
                             ParameterWithDefault {
                                 range: 17..18,
                                 parameter: Parameter {
@@ -67,6 +68,77 @@ Module(
                     ],
                 },
             ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 25..52,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: "foo",
+                        range: 29..32,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 32..47,
+                        posonlyargs: [
+                            ParameterWithDefault {
+                                range: 33..34,
+                                parameter: Parameter {
+                                    range: 33..34,
+                                    name: Identifier {
+                                        id: "a",
+                                        range: 33..34,
+                                    },
+                                    annotation: None,
+                                },
+                                default: None,
+                            },
+                        ],
+                        args: [
+                            ParameterWithDefault {
+                                range: 39..40,
+                                parameter: Parameter {
+                                    range: 39..40,
+                                    name: Identifier {
+                                        id: "b",
+                                        range: 39..40,
+                                    },
+                                    annotation: None,
+                                },
+                                default: None,
+                            },
+                            ParameterWithDefault {
+                                range: 42..43,
+                                parameter: Parameter {
+                                    range: 42..43,
+                                    name: Identifier {
+                                        id: "c",
+                                        range: 42..43,
+                                    },
+                                    annotation: None,
+                                },
+                                default: None,
+                            },
+                        ],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 49..52,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 49..52,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
         ],
     },
 )
@@ -76,5 +148,12 @@ Module(
   |
 1 | def foo(a, /, /, b): ...
   |               ^ Syntax Error: Only one '/' separator allowed
-2 | # def foo(a, /, b, c, /): ...
+2 | def foo(a, /, b, c, /): ...
+  |
+
+
+  |
+1 | def foo(a, /, /, b): ...
+2 | def foo(a, /, b, c, /): ...
+  |                     ^ Syntax Error: Only one '/' separator allowed
   |
