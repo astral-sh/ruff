@@ -1422,12 +1422,34 @@ impl<'src> Parser<'src> {
         }
     }
 
-    /// See: <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-while_stmt>
+    /// Parses a `while` statement.
+    ///
+    /// # Panics
+    ///
+    /// If the parser isn't positioned at a `while` token.
+    ///
+    /// See: <https://docs.python.org/3/reference/compound_stmts.html#the-while-statement>
     fn parse_while_statement(&mut self) -> ast::StmtWhile {
-        let while_start = self.node_start();
+        let start = self.node_start();
         self.bump(TokenKind::While);
 
+        // test_err while_stmt_missing_test
+        // while : ...
+        // while :
+        //     a = 1
+
+        // test_err while_stmt_invalid_test_expr
+        // while *x: ...
+        // while yield x: ...
+        // while a, b: ...
+        // while a := 1, b: ...
         let test = self.parse_named_expression_or_higher(AllowStarredExpression::No);
+
+        // test_err while_stmt_missing_colon
+        // while (
+        //     a < 30 # comment
+        // )
+        //     pass
         self.expect(TokenKind::Colon);
 
         let body = self.parse_body(Clause::While);
@@ -1443,7 +1465,7 @@ impl<'src> Parser<'src> {
             test: Box::new(test.expr),
             body,
             orelse,
-            range: self.node_range(while_start),
+            range: self.node_range(start),
         }
     }
 

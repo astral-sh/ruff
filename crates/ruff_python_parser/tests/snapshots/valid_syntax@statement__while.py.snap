@@ -7,7 +7,7 @@ input_file: crates/ruff_python_parser/resources/valid/statement/while.py
 ```
 Module(
     ModModule {
-        range: 0..169,
+        range: 0..314,
         body: [
             While(
                 StmtWhile {
@@ -36,18 +36,18 @@ Module(
             ),
             While(
                 StmtWhile {
-                    range: 17..60,
+                    range: 18..61,
                     test: BoolOp(
                         ExprBoolOp {
-                            range: 23..36,
+                            range: 24..37,
                             op: And,
                             values: [
                                 Compare(
                                     ExprCompare {
-                                        range: 24..29,
+                                        range: 25..30,
                                         left: Name(
                                             ExprName {
-                                                range: 24..25,
+                                                range: 25..26,
                                                 id: "x",
                                                 ctx: Load,
                                             },
@@ -58,7 +58,7 @@ Module(
                                         comparators: [
                                             NumberLiteral(
                                                 ExprNumberLiteral {
-                                                    range: 28..29,
+                                                    range: 29..30,
                                                     value: Int(
                                                         1,
                                                     ),
@@ -69,7 +69,7 @@ Module(
                                 ),
                                 Name(
                                     ExprName {
-                                        range: 35..36,
+                                        range: 36..37,
                                         id: "y",
                                         ctx: Load,
                                     },
@@ -80,17 +80,17 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
-                                range: 42..46,
+                                range: 43..47,
                             },
                         ),
                     ],
                     orelse: [
                         Expr(
                             StmtExpr {
-                                range: 57..60,
+                                range: 58..61,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        range: 57..60,
+                                        range: 58..61,
                                     },
                                 ),
                             },
@@ -100,22 +100,22 @@ Module(
             ),
             While(
                 StmtWhile {
-                    range: 61..150,
+                    range: 63..152,
                     test: BoolOp(
                         ExprBoolOp {
-                            range: 67..74,
+                            range: 69..76,
                             op: And,
                             values: [
                                 Name(
                                     ExprName {
-                                        range: 67..68,
+                                        range: 69..70,
                                         id: "x",
                                         ctx: Load,
                                     },
                                 ),
                                 Name(
                                     ExprName {
-                                        range: 73..74,
+                                        range: 75..76,
                                         id: "y",
                                         ctx: Load,
                                     },
@@ -126,37 +126,37 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                range: 80..83,
+                                range: 82..85,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        range: 80..83,
+                                        range: 82..85,
                                     },
                                 ),
                             },
                         ),
                         Expr(
                             StmtExpr {
-                                range: 88..109,
+                                range: 90..111,
                                 value: Call(
                                     ExprCall {
-                                        range: 88..109,
+                                        range: 90..111,
                                         func: Name(
                                             ExprName {
-                                                range: 88..93,
+                                                range: 90..95,
                                                 id: "print",
                                                 ctx: Load,
                                             },
                                         ),
                                         arguments: Arguments {
-                                            range: 93..109,
+                                            range: 95..111,
                                             args: [
                                                 StringLiteral(
                                                     ExprStringLiteral {
-                                                        range: 94..108,
+                                                        range: 96..110,
                                                         value: StringLiteralValue {
                                                             inner: Single(
                                                                 StringLiteral {
-                                                                    range: 94..108,
+                                                                    range: 96..110,
                                                                     value: "Hello World!",
                                                                     flags: StringLiteralFlags {
                                                                         quote_style: Single,
@@ -179,27 +179,27 @@ Module(
                     orelse: [
                         Expr(
                             StmtExpr {
-                                range: 121..142,
+                                range: 123..144,
                                 value: Call(
                                     ExprCall {
-                                        range: 121..142,
+                                        range: 123..144,
                                         func: Name(
                                             ExprName {
-                                                range: 121..126,
+                                                range: 123..128,
                                                 id: "print",
                                                 ctx: Load,
                                             },
                                         ),
                                         arguments: Arguments {
-                                            range: 126..142,
+                                            range: 128..144,
                                             args: [
                                                 StringLiteral(
                                                     ExprStringLiteral {
-                                                        range: 127..141,
+                                                        range: 129..143,
                                                         value: StringLiteralValue {
                                                             inner: Single(
                                                                 StringLiteral {
-                                                                    range: 127..141,
+                                                                    range: 129..143,
                                                                     value: "Olá, Mundo!",
                                                                     flags: StringLiteralFlags {
                                                                         quote_style: Single,
@@ -220,10 +220,10 @@ Module(
                         ),
                         Expr(
                             StmtExpr {
-                                range: 147..150,
+                                range: 149..152,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        range: 147..150,
+                                        range: 149..152,
                                     },
                                 ),
                             },
@@ -233,20 +233,20 @@ Module(
             ),
             While(
                 StmtWhile {
-                    range: 151..168,
+                    range: 154..171,
                     test: Named(
                         ExprNamed {
-                            range: 157..163,
+                            range: 160..166,
                             target: Name(
                                 ExprName {
-                                    range: 157..158,
+                                    range: 160..161,
                                     id: "a",
                                     ctx: Store,
                                 },
                             ),
                             value: Name(
                                 ExprName {
-                                    range: 162..163,
+                                    range: 165..166,
                                     id: "b",
                                     ctx: Load,
                                 },
@@ -256,16 +256,203 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                range: 165..168,
+                                range: 168..171,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        range: 165..168,
+                                        range: 168..171,
                                     },
                                 ),
                             },
                         ),
                     ],
                     orelse: [],
+                },
+            ),
+            While(
+                StmtWhile {
+                    range: 172..197,
+                    test: BoolOp(
+                        ExprBoolOp {
+                            range: 178..192,
+                            op: And,
+                            values: [
+                                Named(
+                                    ExprNamed {
+                                        range: 179..185,
+                                        target: Name(
+                                            ExprName {
+                                                range: 179..180,
+                                                id: "a",
+                                                ctx: Store,
+                                            },
+                                        ),
+                                        value: Name(
+                                            ExprName {
+                                                range: 184..185,
+                                                id: "b",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    },
+                                ),
+                                Name(
+                                    ExprName {
+                                        range: 191..192,
+                                        id: "c",
+                                        ctx: Load,
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 194..197,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 194..197,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                    orelse: [],
+                },
+            ),
+            While(
+                StmtWhile {
+                    range: 198..220,
+                    test: Lambda(
+                        ExprLambda {
+                            range: 204..215,
+                            parameters: Some(
+                                Parameters {
+                                    range: 211..212,
+                                    posonlyargs: [],
+                                    args: [
+                                        ParameterWithDefault {
+                                            range: 211..212,
+                                            parameter: Parameter {
+                                                range: 211..212,
+                                                name: Identifier {
+                                                    id: "x",
+                                                    range: 211..212,
+                                                },
+                                                annotation: None,
+                                            },
+                                            default: None,
+                                        },
+                                    ],
+                                    vararg: None,
+                                    kwonlyargs: [],
+                                    kwarg: None,
+                                },
+                            ),
+                            body: Name(
+                                ExprName {
+                                    range: 214..215,
+                                    id: "x",
+                                    ctx: Load,
+                                },
+                            ),
+                        },
+                    ),
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 217..220,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 217..220,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                    orelse: [],
+                },
+            ),
+            While(
+                StmtWhile {
+                    range: 221..239,
+                    test: Await(
+                        ExprAwait {
+                            range: 227..234,
+                            value: Name(
+                                ExprName {
+                                    range: 233..234,
+                                    id: "x",
+                                    ctx: Load,
+                                },
+                            ),
+                        },
+                    ),
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 236..239,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 236..239,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                    orelse: [],
+                },
+            ),
+            If(
+                StmtIf {
+                    range: 241..313,
+                    test: BooleanLiteral(
+                        ExprBooleanLiteral {
+                            range: 244..248,
+                            value: true,
+                        },
+                    ),
+                    body: [
+                        While(
+                            StmtWhile {
+                                range: 254..298,
+                                test: Name(
+                                    ExprName {
+                                        range: 260..261,
+                                        id: "x",
+                                        ctx: Load,
+                                    },
+                                ),
+                                body: [
+                                    Pass(
+                                        StmtPass {
+                                            range: 271..275,
+                                        },
+                                    ),
+                                ],
+                                orelse: [
+                                    Pass(
+                                        StmtPass {
+                                            range: 294..298,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    ],
+                    elif_else_clauses: [
+                        ElifElseClause {
+                            range: 299..313,
+                            test: None,
+                            body: [
+                                Pass(
+                                    StmtPass {
+                                        range: 309..313,
+                                    },
+                                ),
+                            ],
+                        },
+                    ],
                 },
             ),
         ],
