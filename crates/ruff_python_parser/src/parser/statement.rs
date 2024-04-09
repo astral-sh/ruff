@@ -2021,7 +2021,7 @@ impl<'src> Parser<'src> {
             // test_err clause_expect_single_statement
             // if True: if True: pass
             self.add_error(
-                ParseErrorType::OtherError("Expected a single statement".to_string()),
+                ParseErrorType::OtherError("Expected a simple statement".to_string()),
                 self.current_token_range(),
             );
         }

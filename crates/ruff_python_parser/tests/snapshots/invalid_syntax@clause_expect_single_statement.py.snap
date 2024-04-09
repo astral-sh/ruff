@@ -49,5 +49,5 @@ Module(
 
   |
 1 | if True: if True: pass
-  |          ^^ Syntax Error: Expected a single statement
+  |          ^^ Syntax Error: Expected a simple statement
   |
