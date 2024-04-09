@@ -17,7 +17,6 @@ use crate::{Mode, ParseErrorType, Tok, TokenKind};
 use super::expression::{AllowNamedExpression, AllowStarredExpression};
 use super::Parenthesized;
 
-/// Tokens that can appear after an expression.
 /// Tokens that represent compound statements.
 const COMPOUND_STMT_SET: TokenSet = TokenSet::new([
     TokenKind::Match,
@@ -51,9 +50,11 @@ const SIMPLE_STMT_SET: TokenSet = TokenSet::new([
 ]);
 
 /// Tokens that represent simple statements, including expressions.
-const SIMPLE_STMT_SET2: TokenSet = SIMPLE_STMT_SET.union(EXPR_SET);
+const SIMPLE_STMT_WITH_EXPR_SET: TokenSet = SIMPLE_STMT_SET.union(EXPR_SET);
 
-const STMTS_SET: TokenSet = SIMPLE_STMT_SET2.union(COMPOUND_STMT_SET);
+/// Tokens that represents all possible statements, including simple, compound,
+/// and expression statements.
+const STMTS_SET: TokenSet = SIMPLE_STMT_WITH_EXPR_SET.union(COMPOUND_STMT_SET);
 
 /// Tokens that represent operators that can be used in augmented assignments.
 const AUGMENTED_ASSIGN_SET: TokenSet = TokenSet::new([
@@ -77,8 +78,10 @@ impl<'src> Parser<'src> {
         self.at_ts(COMPOUND_STMT_SET)
     }
 
+    /// Returns `true` if the current token is the start of a simple statement,
+    /// including expressions.
     fn at_simple_stmt(&self) -> bool {
-        self.at_ts(SIMPLE_STMT_SET2)
+        self.at_ts(SIMPLE_STMT_WITH_EXPR_SET)
     }
 
     pub(super) fn at_stmt(&self) -> bool {
@@ -1013,61 +1016,102 @@ impl<'src> Parser<'src> {
         }
     }
 
-    /// See: <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-if_stmt>
+    /// Parses an `if` statement.
+    ///
+    /// # Panics
+    ///
+    /// If the parser isn't positioned at an `if` token.
+    ///
+    /// See: <https://docs.python.org/3/reference/compound_stmts.html#the-if-statement>
     fn parse_if_statement(&mut self) -> ast::StmtIf {
-        let if_start = self.node_start();
+        let start = self.node_start();
         self.bump(TokenKind::If);
 
+        // test_err if_stmt_invalid_test_expr
+        // if *x: ...
+        // if yield x: ...
+        // if yield from x: ...
+
+        // test_err if_stmt_missing_test
+        // if : ...
         let test = self.parse_named_expression_or_higher(AllowStarredExpression::No);
+
+        // test_err if_stmt_missing_colon
+        // if x
+        // if x
+        //     pass
+        // a = 1
         self.expect(TokenKind::Colon);
 
+        // test_err if_stmt_empty_body
+        // if True:
+        // 1 + 1
         let body = self.parse_body(Clause::If);
 
-        let elif_else_clauses = self.parse_elif_else_clauses();
+        // test_err if_stmt_misspelled_elif
+        // if True:
+        //     pass
+        // elf:
+        //     pass
+        // else:
+        //     pass
+        let mut elif_else_clauses = self.parse_clauses(Clause::ElIf, |p| {
+            p.parse_elif_or_else_clause(ElifOrElse::Elif)
+        });
+
+        if self.at(TokenKind::Else) {
+            elif_else_clauses.push(self.parse_elif_or_else_clause(ElifOrElse::Else));
+        }
 
         ast::StmtIf {
             test: Box::new(test.expr),
             body,
             elif_else_clauses,
-            range: self.node_range(if_start),
+            range: self.node_range(start),
         }
     }
 
-    fn parse_elif_else_clauses(&mut self) -> Vec<ast::ElifElseClause> {
-        let mut elif_else_clauses = if self.at(TokenKind::Elif) {
-            self.parse_clauses(Clause::ElIf, |p| {
-                let elif_start = p.node_start();
-                p.bump(TokenKind::Elif);
+    /// Parses an `elif` or `else` clause.
+    ///
+    /// # Panics
+    ///
+    /// If the parser isn't positioned at an `elif` or `else` token.
+    fn parse_elif_or_else_clause(&mut self, kind: ElifOrElse) -> ast::ElifElseClause {
+        let start = self.node_start();
+        self.bump(kind.as_token_kind());
 
-                let test = p.parse_named_expression_or_higher(AllowStarredExpression::No);
-                p.expect(TokenKind::Colon);
-
-                let body = p.parse_body(Clause::ElIf);
-
-                ast::ElifElseClause {
-                    test: Some(test.expr),
-                    body,
-                    range: p.node_range(elif_start),
-                }
-            })
+        let test = if kind.is_elif() {
+            // test_err if_stmt_invalid_elif_test_expr
+            // if x:
+            //     pass
+            // elif *x:
+            //     pass
+            // elif yield x:
+            //     pass
+            Some(
+                self.parse_named_expression_or_higher(AllowStarredExpression::No)
+                    .expr,
+            )
         } else {
-            Vec::new()
+            None
         };
 
-        let else_start = self.node_start();
-        if self.eat(TokenKind::Else) {
-            self.expect(TokenKind::Colon);
+        // test_err if_stmt_elif_missing_colon
+        // if x:
+        //     pass
+        // elif y
+        //     pass
+        // else:
+        //     pass
+        self.expect(TokenKind::Colon);
 
-            let body = self.parse_body(Clause::Else);
+        let body = self.parse_body(kind.as_clause());
 
-            elif_else_clauses.push(ast::ElifElseClause {
-                test: None,
-                body,
-                range: self.node_range(else_start),
-            });
+        ast::ElifElseClause {
+            test,
+            body,
+            range: self.node_range(start),
         }
-
-        elif_else_clauses
     }
 
     /// See: <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-try_stmt>
@@ -1940,27 +1984,56 @@ impl<'src> Parser<'src> {
         }
     }
 
-    /// Parses a single statement that's on the same line as the clause header or
-    /// an indented block.
+    /// Parses the body of the given [`Clause`].
+    ///
+    /// This could either be a single statement that's on the same line as the
+    /// clause header or an indented block.
     fn parse_body(&mut self, parent_clause: Clause) -> Vec<Stmt> {
+        // Note: The test cases in this method chooses a clause at random to test
+        // the error logic.
+
+        let newline_range = self.current_token_range();
         if self.eat(TokenKind::Newline) {
             if self.at(TokenKind::Indent) {
                 return self.parse_block();
             }
-        } else if self.at_simple_stmt() {
-            return self.parse_simple_statements();
+            // test_err clause_expect_indented_block
+            // # Here, the error is highlighted at the `pass` token
+            // if True:
+            // pass
+            // # The parser is at the end of the program, so let's highlight
+            // # at the newline token after `:`
+            // if True:
+            self.add_error(
+                ParseErrorType::OtherError(format!(
+                    "Expected an indented block after {parent_clause}"
+                )),
+                if self.current_token_range().is_empty() {
+                    newline_range
+                } else {
+                    self.current_token_range()
+                },
+            );
+        } else {
+            if self.at_simple_stmt() {
+                return self.parse_simple_statements();
+            }
+            // test_err clause_expect_single_statement
+            // if True: if True: pass
+            self.add_error(
+                ParseErrorType::OtherError("Expected a simple statement".to_string()),
+                self.current_token_range(),
+            );
         }
-
-        self.add_error(
-            ParseErrorType::OtherError(format!(
-                "expected a single statement or an indented body after {parent_clause}"
-            )),
-            self.current_token_range(),
-        );
 
         Vec::new()
     }
 
+    /// Parses a block of statements.
+    ///
+    /// # Panics
+    ///
+    /// If the parser isn't positioned at an `Indent` token.
     fn parse_block(&mut self) -> Vec<Stmt> {
         self.bump(TokenKind::Indent);
 
@@ -2242,10 +2315,10 @@ impl<'src> Parser<'src> {
         }
     }
 
-    /// Specialized [`Parser::parse_sequence`] for parsing a sequence of clauses.
+    /// Specialized [`Parser::parse_list_into_vec`] for parsing a sequence of clauses.
     ///
     /// The difference is that the parser only continues parsing for as long as it sees the token indicating the start
-    /// of the specific clause. This is different from [`Parser::parse_sequence`] that performs error recovery when
+    /// of the specific clause. This is different from [`Parser::parse_list_into_vec`] that performs error recovery when
     /// the next token is not a list terminator or the start of a list element.
     ///
     /// The special method is necessary because Python uses indentation over explicit delimiters to indicate the end of a clause.
@@ -2371,4 +2444,30 @@ struct ParsedWithItem {
     is_parenthesized: bool,
     /// If the parsing used the ambiguous left parenthesis.
     used_ambiguous_lpar: bool,
+}
+
+#[derive(Debug, Copy, Clone)]
+enum ElifOrElse {
+    Elif,
+    Else,
+}
+
+impl ElifOrElse {
+    const fn is_elif(self) -> bool {
+        matches!(self, ElifOrElse::Elif)
+    }
+
+    const fn as_token_kind(self) -> TokenKind {
+        match self {
+            ElifOrElse::Elif => TokenKind::Elif,
+            ElifOrElse::Else => TokenKind::Else,
+        }
+    }
+
+    const fn as_clause(self) -> Clause {
+        match self {
+            ElifOrElse::Elif => Clause::ElIf,
+            ElifOrElse::Else => Clause::Else,
+        }
+    }
 }

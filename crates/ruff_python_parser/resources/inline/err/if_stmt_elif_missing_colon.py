@@ -1,7 +1,6 @@
-if True:
+if x:
     pass
-elif False:
+elif y
     pass
-elf:
+else:
     pass
-
