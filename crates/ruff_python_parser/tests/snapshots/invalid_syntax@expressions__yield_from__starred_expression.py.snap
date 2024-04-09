@@ -89,5 +89,5 @@ Module(
   |
 3 | yield from *x
 4 | yield from *x, y
-  |            ^^^^^ Syntax Error: unparenthesized tuple cannot be used here
+  |            ^^ Syntax Error: starred expression cannot be used here
   |
