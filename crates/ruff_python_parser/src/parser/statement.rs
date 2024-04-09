@@ -1,9 +1,12 @@
 use std::fmt::Display;
+use std::hash::BuildHasherDefault;
+
+use rustc_hash::FxHashSet;
 
 use ruff_python_ast::{
     self as ast, ExceptHandler, Expr, ExprContext, IpyEscapeKind, Operator, Stmt, WithItem,
 };
-use ruff_text_size::{Ranged, TextSize};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::parser::expression::{GeneratorExpressionInParentheses, ParsedExpr};
 use crate::parser::progress::ParserProgress;
@@ -2324,19 +2327,70 @@ impl<'src> Parser<'src> {
         statements
     }
 
-    fn parse_parameter(&mut self, function_kind: FunctionKind) -> ast::Parameter {
+    /// Parses a single parameter for the given function kind.
+    ///
+    /// Matches either the `param_no_default_star_annotation` or `param_no_default`
+    /// rule in the [Python grammar] depending on whether star annotation is allowed
+    /// or not.
+    ///
+    /// Use [`Parser::parse_parameter_with_default`] to allow parameter with default
+    /// values.
+    ///
+    /// [Python grammar]: https://docs.python.org/3/reference/grammar.html
+    fn parse_parameter(
+        &mut self,
+        function_kind: FunctionKind,
+        allow_star_annotation: AllowStarAnnotation,
+    ) -> ast::Parameter {
         let start = self.node_start();
         let name = self.parse_identifier();
-        // If we are at a colon and we're currently parsing a `lambda` expression,
-        // this is the `lambda`'s body, don't try to parse as an annotation.
-        let annotation = if function_kind == FunctionKind::FunctionDef && self.eat(TokenKind::Colon)
-        {
-            Some(Box::new(
-                self.parse_conditional_expression_or_higher(AllowStarredExpression::Yes)
-                    .expr,
-            ))
-        } else {
-            None
+
+        // Annotations are only allowed for function definition. For lambda expression,
+        // the `:` token would indicate its body.
+        let annotation = match function_kind {
+            FunctionKind::FunctionDef if self.eat(TokenKind::Colon) => {
+                if self.at_expr() {
+                    let parsed_expr = match allow_star_annotation {
+                        AllowStarAnnotation::Yes => {
+                            // test_ok param_with_star_annotation
+                            // def foo(*args: *int | str): ...
+                            // def foo(*args: *(int or str)): ...
+
+                            // test_err param_with_invalid_star_annotation
+                            // def foo(*args: *): ...
+                            // def foo(*args: (*tuple[int])): ...
+                            // def foo(*args: *int or str): ...
+                            // def foo(*args: *yield x): ...
+                            // # def foo(*args: **int): ...
+                            self.parse_star_expression_or_higher(AllowNamedExpression::No)
+                        }
+                        AllowStarAnnotation::No => {
+                            // test_ok param_with_annotation
+                            // def foo(arg: int): ...
+                            // def foo(arg: lambda x: x): ...
+                            // def foo(arg: (yield x)): ...
+                            // def foo(arg: (x := int)): ...
+
+                            // test_err param_with_invalid_annotation
+                            // def foo(arg: *int): ...
+                            // def foo(arg: yield int): ...
+                            // def foo(arg: x := int): ...
+                            self.parse_conditional_expression_or_higher(AllowStarredExpression::No)
+                        }
+                    };
+                    Some(Box::new(parsed_expr.expr))
+                } else {
+                    // test_err param_missing_annotation
+                    // def foo(x:): ...
+                    // def foo(x:,): ...
+                    self.add_error(
+                        ParseErrorType::ExpectedExpression,
+                        self.current_token_range(),
+                    );
+                    None
+                }
+            }
+            _ => None,
         };
 
         ast::Parameter {
@@ -2346,19 +2400,50 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// Parses a parameter with an optional default expression.
+    ///
+    /// Matches the `param_maybe_default` rule in the [Python grammar].
+    ///
+    /// This method doesn't allow star annotation. Use [`Parser::parse_parameter`]
+    /// instead.
+    ///
+    /// [Python grammar]: https://docs.python.org/3/reference/grammar.html
     fn parse_parameter_with_default(
         &mut self,
         function_kind: FunctionKind,
     ) -> ast::ParameterWithDefault {
         let start = self.node_start();
-        let parameter = self.parse_parameter(function_kind);
+        let parameter = self.parse_parameter(function_kind, AllowStarAnnotation::No);
 
-        let default = self.eat(TokenKind::Equal).then(|| {
-            Box::new(
-                self.parse_conditional_expression_or_higher(AllowStarredExpression::No)
-                    .expr,
-            )
-        });
+        let default = if self.eat(TokenKind::Equal) {
+            if self.at_expr() {
+                // test_ok param_with_default
+                // def foo(x=lambda y: y): ...
+                // def foo(x=1 if True else 2): ...
+                // def foo(x=await y): ...
+                // def foo(x=(yield y)): ...
+
+                // test_err param_with_invalid_default
+                // def foo(x=*int): ...
+                // def foo(x=(*int)): ...
+                // def foo(x=yield y): ...
+                Some(Box::new(
+                    self.parse_conditional_expression_or_higher(AllowStarredExpression::No)
+                        .expr,
+                ))
+            } else {
+                // test_err param_missing_default
+                // def foo(x=): ...
+                // def foo(x: int = ): ...
+                self.add_error(
+                    ParseErrorType::ExpectedExpression,
+                    self.current_token_range(),
+                );
+                None
+            }
+        } else {
+            None
+        };
 
         ast::ParameterWithDefault {
             range: self.node_range(start),
@@ -2367,85 +2452,246 @@ impl<'src> Parser<'src> {
         }
     }
 
-    /// Parses a parameter list.
+    /// Parses a parameter list for the given function kind.
     ///
     /// See: <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-parameter_list>
     pub(super) fn parse_parameters(&mut self, function_kind: FunctionKind) -> ast::Parameters {
-        let mut args = vec![];
-        let mut posonlyargs = vec![];
-        let mut kwonlyargs = vec![];
-        let mut kwarg = None;
-        let mut vararg = None;
-
-        let mut has_seen_asterisk = false;
-        let mut has_seen_vararg = false;
-        let mut has_seen_default_param = false;
-
         let start = self.node_start();
 
+        // TODO(dhruvmanila): This has the same problem as `parse_match_pattern_mapping`
+        // has where if there are multiple kwarg or vararg, the last one will win and
+        // the parser will drop the previous ones. Another thing is the vararg and kwarg
+        // uses `Parameter` (not `ParameterWithDefault`) which means that the parser cannot
+        // recover well from `*args=(1, 2)`.
+        let mut parameters = ast::Parameters {
+            range: TextRange::default(),
+            posonlyargs: vec![],
+            args: vec![],
+            kwonlyargs: vec![],
+            vararg: None,
+            kwarg: None,
+        };
+
+        let mut seen_default_param = false; // `a=10`
+        let mut seen_positional_only_separator = false; // `/`
+        let mut seen_keyword_only_separator = false; // `*`
+        let mut seen_keyword_only_param_after_separator = false;
+
+        // Range of the keyword only separator if it's the last parameter in the list.
+        let mut last_keyword_only_separator_range = None;
+
         self.parse_comma_separated_list(RecoveryContextKind::Parameters(function_kind), |parser| {
-            // Don't allow any parameter after we have seen a vararg `**kwargs`
-            if has_seen_vararg {
-                parser.add_error(
-                    ParseErrorType::ParamFollowsVarKeywordParam,
-                    parser.current_token_range(),
-                );
+            if parameters.kwarg.is_some() {
+                // TODO(dhruvmanila): This fails AST validation in tests because
+                // of the pre-order visit
+                // test_err params_follows_var_keyword_param
+                // def foo(**kwargs, a, /, b=10, *, *args): ...
+                parser.add_error(ParseErrorType::ParamFollowsVarKeywordParam, parser.current_token_range());
             }
 
-            if parser.eat(TokenKind::Star) {
-                has_seen_asterisk = true;
-                if parser.at(TokenKind::Comma) {
-                    has_seen_default_param = false;
-                } else if parser.at_expr() {
-                    let param = parser.parse_parameter(function_kind);
-                    vararg = Some(Box::new(param));
-                }
-            } else if parser.eat(TokenKind::DoubleStar) {
-                has_seen_vararg = true;
-                let param = parser.parse_parameter(function_kind);
-                kwarg = Some(Box::new(param));
-            } else if parser.eat(TokenKind::Slash) {
-                // Don't allow `/` after a `*`
-                if has_seen_asterisk {
-                    parser.add_error(
-                        ParseErrorType::OtherError("`/` must be ahead of `*`".to_string()),
-                        parser.current_token_range(),
-                    );
-                }
-                std::mem::swap(&mut args, &mut posonlyargs);
-            } else if parser.at(TokenKind::Name) {
-                let param = parser.parse_parameter_with_default(function_kind);
-                // Don't allow non-default parameters after default parameters e.g. `a=1, b`,
-                // can't place `b` after `a=1`. Non-default parameters are only allowed after
-                // default parameters if we have a `*` before them, e.g. `a=1, *, b`.
-                if param.default.is_none() && has_seen_default_param && !has_seen_asterisk {
-                    parser.add_error(
-                        ParseErrorType::DefaultArgumentError,
-                        parser.current_token_range(),
-                    );
-                }
-                has_seen_default_param = param.default.is_some();
+            match parser.current_token_kind() {
+                TokenKind::Star => {
+                    let star_range = parser.current_token_range();
+                    parser.bump(TokenKind::Star);
 
-                if has_seen_asterisk {
-                    kwonlyargs.push(param);
-                } else {
-                    args.push(param);
+                    if parser.at(TokenKind::Name) {
+                        let param = parser.parse_parameter(function_kind, AllowStarAnnotation::Yes);
+                        let param_star_range = parser.node_range(star_range.start());
+
+                        if parser.at(TokenKind::Equal) {
+                            // test_err params_var_positional_with_default
+                            // def foo(a, *args=(1, 2)): ...
+                            parser.add_error(ParseErrorType::VarParameterWithDefault, parser.current_token_range());
+                        }
+
+                        if seen_keyword_only_separator || parameters.vararg.is_some() {
+                            // test_err params_multiple_varargs
+                            // def foo(a, *, *args, b): ...
+                            // # def foo(a, *, b, c, *args): ...
+                            // def foo(a, *args1, *args2, b): ...
+                            // def foo(a, *args1, b, c, *args2): ...
+                            parser.add_error(
+                                ParseErrorType::OtherError("Only one '*' parameter allowed".to_string()),
+                                param_star_range,
+                            );
+                        }
+
+                        // TODO(dhruvmanila): The AST doesn't allow multiple `vararg`, so let's
+                        // choose to keep the first one so that the parameters remain in preorder.
+                        if parameters.vararg.is_none() {
+                            parameters.vararg = Some(Box::new(param));
+                        }
+
+                        last_keyword_only_separator_range = None;
+                    } else {
+                        if seen_keyword_only_separator {
+                            // test_err params_multiple_star_separator
+                            // def foo(a, *, *, b): ...
+                            // def foo(a, *, b, c, *): ...
+                            parser.add_error(
+                                ParseErrorType::OtherError("Only one '*' separator allowed".to_string()),
+                                star_range,
+                            );
+                        }
+
+                        if parameters.vararg.is_some() {
+                            // test_err params_star_separator_after_star_param
+                            // def foo(a, *args, *, b): ...
+                            // def foo(a, *args, b, c, *): ...
+                            parser.add_error(
+                                ParseErrorType::OtherError(
+                                    "Keyword-only parameter separator not allowed after '*' parameter"
+                                        .to_string(),
+                                ),
+                                star_range,
+                            );
+                        }
+
+                        seen_keyword_only_separator = true;
+                        last_keyword_only_separator_range = Some(star_range);
+                    }
+                }
+                TokenKind::DoubleStar => {
+                    let double_star_range = parser.current_token_range();
+                    parser.bump(TokenKind::DoubleStar);
+
+                    let param = parser.parse_parameter(function_kind, AllowStarAnnotation::No);
+                    let param_double_star_range = parser.node_range(double_star_range.start());
+
+                    if parameters.kwarg.is_some() {
+                        // test_err params_multiple_kwargs
+                        // def foo(a, **kwargs1, **kwargs2): ...
+                        parser.add_error(
+                            ParseErrorType::OtherError("Only one '**' parameter allowed".to_string()),
+                            param_double_star_range,
+                        );
+                    }
+
+                    if parser.at(TokenKind::Equal) {
+                        // test_err params_var_keyword_with_default
+                        // def foo(a, **kwargs={'b': 1, 'c': 2}): ...
+                        parser.add_error(ParseErrorType::VarParameterWithDefault, parser.current_token_range());
+                    }
+
+                    if seen_keyword_only_separator && !seen_keyword_only_param_after_separator {
+                        // test_ok params_seen_keyword_only_param_after_star
+                        // def foo(*, a, **kwargs): ...
+                        // def foo(*, a=10, **kwargs): ...
+
+                        // test_err params_kwarg_after_star_separator
+                        // def foo(*, **kwargs): ...
+                        parser.add_error(ParseErrorType::ExpectedKeywordParam, param_double_star_range);
+                    }
+
+                    parameters.kwarg = Some(Box::new(param));
+                    last_keyword_only_separator_range = None;
+                }
+                TokenKind::Slash => {
+                    let slash_range = parser.current_token_range();
+                    parser.bump(TokenKind::Slash);
+
+                    if parameters.is_empty() {
+                        // test_err params_no_arg_before_slash
+                        // def foo(/): ...
+                        // def foo(/, a): ...
+                        parser.add_error(
+                            ParseErrorType::OtherError(
+                                "Position-only parameter separator not allowed as first parameter"
+                                    .to_string(),
+                            ),
+                            slash_range,
+                        );
+                    }
+
+                    if seen_positional_only_separator {
+                        // test_err params_multiple_slash_separator
+                        // def foo(a, /, /, b): ...
+                        // def foo(a, /, b, c, /): ...
+                        parser.add_error(
+                            ParseErrorType::OtherError(
+                                "Only one '/' separator allowed".to_string(),
+                            ),
+                            slash_range,
+                        );
+                    }
+
+                    if seen_keyword_only_separator || parameters.vararg.is_some() {
+                        // test_err params_star_after_slash
+                        // def foo(*a, /): ...
+                        // def foo(a, *args, b, /): ...
+                        // def foo(a, *, /, b): ...
+                        // def foo(a, *, b, c, /, d): ...
+                        parser.add_error(
+                            ParseErrorType::OtherError(
+                                "'/' parameter must appear before '*' parameter".to_string(),
+                            ),
+                            slash_range,
+                        );
+                    }
+
+                    if !seen_positional_only_separator {
+                        // We should only swap if we're seeing the separator for the
+                        // first time, otherwise it's a user error.
+                        std::mem::swap(&mut parameters.args, &mut parameters.posonlyargs);
+                        seen_positional_only_separator = true;
+                    }
+
+                    last_keyword_only_separator_range = None;
+                }
+                TokenKind::Name => {
+                    let param = parser.parse_parameter_with_default(function_kind);
+
+                    // TODO(dhruvmanila): Pyright seems to only highlight the first non-default argument
+                    // https://github.com/microsoft/pyright/blob/3b70417dd549f6663b8f86a76f75d8dfd450f4a8/packages/pyright-internal/src/parser/parser.ts#L2038-L2042
+                    if param.default.is_none()
+                        && seen_default_param
+                        && !seen_keyword_only_separator
+                        && parameters.vararg.is_none()
+                    {
+                        // test_ok params_non_default_after_star
+                        // def foo(a=10, *, b, c=11, d): ...
+                        // def foo(a=10, *args, b, c=11, d): ...
+
+                        // test_err params_non_default_after_default
+                        // def foo(a=10, b, c: int): ...
+                        parser
+                            .add_error(ParseErrorType::NonDefaultParamFollowsDefaultParam, &param);
+                    }
+
+                    seen_default_param |= param.default.is_some();
+
+                    if seen_keyword_only_separator {
+                        seen_keyword_only_param_after_separator = true;
+                    }
+
+                    if seen_keyword_only_separator || parameters.vararg.is_some() {
+                        parameters.kwonlyargs.push(param);
+                    } else {
+                        parameters.args.push(param);
+                    }
+                    last_keyword_only_separator_range = None;
+                }
+                _ => {
+                    // This corresponds to the expected token kinds for `is_list_element`.
+                    unreachable!("Expected Name, '*', '**', or '/'");
                 }
             }
         });
 
-        let parameters = ast::Parameters {
-            range: self.node_range(start),
-            posonlyargs,
-            args,
-            vararg,
-            kwonlyargs,
-            kwarg,
-        };
-
-        if let Err(error) = helpers::validate_parameters(&parameters) {
-            self.add_error(error.error, error.location);
+        if let Some(star_range) = last_keyword_only_separator_range {
+            // test_err params_expected_after_star_separator
+            // def foo(*): ...
+            // def foo(*,): ...
+            // def foo(a, *): ...
+            // def foo(a, *,): ...
+            self.add_error(ParseErrorType::ExpectedKeywordParam, star_range);
         }
+
+        parameters.range = self.node_range(start);
+
+        // test_err params_duplicate_names
+        // def foo(a, a=10, *a, a, a: str, **a): ...
+        self.validate_parameters(&parameters);
 
         parameters
     }
@@ -2591,6 +2837,44 @@ impl<'src> Parser<'src> {
             ),
             Expr::Name(_) | Expr::Attribute(_) | Expr::Subscript(_) => {}
             _ => self.add_error(ParseErrorType::InvalidAnnotatedAssignmentTarget, expr),
+        }
+    }
+
+    /// Validate that the given parameters doesn't have any duplicate names.
+    ///
+    /// Report errors for all the duplicate names found.
+    fn validate_parameters(&mut self, parameters: &ast::Parameters) {
+        let mut all_arg_names = FxHashSet::with_capacity_and_hasher(
+            parameters.posonlyargs.len()
+                + parameters.args.len()
+                + usize::from(parameters.vararg.is_some())
+                + parameters.kwonlyargs.len()
+                + usize::from(parameters.kwarg.is_some()),
+            BuildHasherDefault::default(),
+        );
+
+        let posonlyargs = parameters.posonlyargs.iter();
+        let args = parameters.args.iter();
+        let kwonlyargs = parameters.kwonlyargs.iter();
+
+        let vararg = parameters.vararg.as_deref();
+        let kwarg = parameters.kwarg.as_deref();
+
+        for arg in posonlyargs
+            .chain(args)
+            .chain(kwonlyargs)
+            .map(|arg| &arg.parameter)
+            .chain(vararg)
+            .chain(kwarg)
+        {
+            let range = arg.name.range;
+            let arg_name = arg.name.as_str();
+            if !all_arg_names.insert(arg_name) {
+                self.add_error(
+                    ParseErrorType::DuplicateParameter(arg_name.to_string()),
+                    range,
+                );
+            }
         }
     }
 
@@ -2764,4 +3048,10 @@ impl ExceptClauseKind {
     const fn is_star(self) -> bool {
         matches!(self, ExceptClauseKind::Star)
     }
+}
+
+#[derive(Debug, Copy, Clone)]
+enum AllowStarAnnotation {
+    Yes,
+    No,
 }

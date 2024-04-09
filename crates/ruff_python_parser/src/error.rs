@@ -112,6 +112,17 @@ pub enum ParseErrorType {
     /// An invalid usage of a yield expression was found.
     InvalidYieldExpressionUsage,
 
+    /// A parameter was found after a vararg.
+    ParamFollowsVarKeywordParam,
+    /// A non-default parameter follows a default parameter.
+    NonDefaultParamFollowsDefaultParam,
+    /// Expected one or more keyword parameter after `*` separator.
+    ExpectedKeywordParam,
+    /// A default value was found for a `*` or `**` parameter.
+    VarParameterWithDefault,
+    /// A duplicate parameter was found in a function definition or lambda expression.
+    DuplicateParameter(String),
+
     /// An invalid expression was found in the assignment `target`.
     InvalidAssignmentTarget,
     /// An invalid expression was found in the named assignment `target`.
@@ -128,16 +139,12 @@ pub enum ParseErrorType {
     UnexpectedIndentation,
     /// The statement being parsed cannot be `async`.
     UnexpectedAsyncToken(TokenKind),
-    /// A parameter was found after a vararg
-    ParamFollowsVarKeywordParam,
     /// A positional argument follows a keyword argument.
     PositionalFollowsKeywordArgument,
     /// A positional argument follows a keyword argument unpacking.
     PositionalFollowsKeywordUnpacking,
     /// An iterable argument unpacking `*args` follows keyword argument unpacking `**kwargs`.
     UnpackedArgumentError,
-    /// A non-default argument follows a default argument.
-    DefaultArgumentError,
     /// A simple statement and a compound statement was found in the same line.
     SimpleStmtAndCompoundStmtInSameLine,
     /// An invalid usage of iterable unpacking in a comprehension was found.
@@ -153,14 +160,14 @@ pub enum ParseErrorType {
     ExpectedRealNumber,
     /// Expected an imaginary number for a complex literal pattern.
     ExpectedImaginaryNumber,
+    /// Expected an expression at the current parser location.
+    ExpectedExpression,
 
     /// The parser expected a specific token that was not found.
     ExpectedToken {
         expected: TokenKind,
         found: TokenKind,
     },
-    /// A duplicate argument was found in a function definition.
-    DuplicateArgumentError(String),
     /// A keyword argument was repeated.
     DuplicateKeywordArgumentError(String),
     /// An f-string error containing the [`FStringErrorType`].
@@ -246,10 +253,22 @@ impl std::fmt::Display for ParseErrorType {
                 f.write_str("Expected one or more symbol names after import")
             }
             ParseErrorType::ParamFollowsVarKeywordParam => {
-                write!(f, "parameters cannot follow var-keyword parameter")
+                write!(f, "Parameter cannot follow var-keyword parameter")
             }
-            ParseErrorType::DefaultArgumentError => {
-                write!(f, "non-default argument follows default argument")
+            ParseErrorType::NonDefaultParamFollowsDefaultParam => {
+                write!(
+                    f,
+                    "Parameter without a default cannot follow a parameter with a default"
+                )
+            }
+            ParseErrorType::ExpectedKeywordParam => {
+                write!(
+                    f,
+                    "Expected one or more keyword parameter after '*' separator"
+                )
+            }
+            ParseErrorType::VarParameterWithDefault => {
+                write!(f, "Parameter with '*' or '**' cannot have default value")
             }
             ParseErrorType::InvalidMatchPatternLiteral { pattern } => {
                 write!(f, "invalid pattern `{pattern:?}`")
@@ -263,6 +282,7 @@ impl std::fmt::Display for ParseErrorType {
             ParseErrorType::ExpectedImaginaryNumber => {
                 write!(f, "Expected an imaginary number in complex literal pattern")
             }
+            ParseErrorType::ExpectedExpression => write!(f, "Expected an expression"),
             ParseErrorType::UnexpectedIndentation => write!(f, "unexpected indentation"),
             ParseErrorType::InvalidAssignmentTarget => write!(f, "invalid assignment target"),
             ParseErrorType::InvalidAnnotatedAssignmentTarget => {
@@ -277,8 +297,8 @@ impl std::fmt::Display for ParseErrorType {
             ParseErrorType::InvalidDeleteTarget => {
                 write!(f, "invalid delete target")
             }
-            ParseErrorType::DuplicateArgumentError(arg_name) => {
-                write!(f, "duplicate argument '{arg_name}' in function definition")
+            ParseErrorType::DuplicateParameter(arg_name) => {
+                write!(f, "Duplicate parameter '{arg_name}'")
             }
             ParseErrorType::DuplicateKeywordArgumentError(arg_name) => {
                 write!(f, "keyword argument repeated: {arg_name}")
