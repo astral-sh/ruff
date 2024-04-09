@@ -1,0 +1,64 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/except_stmt_missing_exception_and_as_name.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..34,
+        body: [
+            Try(
+                StmtTry {
+                    range: 0..33,
+                    body: [
+                        Pass(
+                            StmtPass {
+                                range: 9..13,
+                            },
+                        ),
+                    ],
+                    handlers: [
+                        ExceptHandler(
+                            ExceptHandlerExceptHandler {
+                                range: 14..33,
+                                type_: None,
+                                name: None,
+                                body: [
+                                    Pass(
+                                        StmtPass {
+                                            range: 29..33,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    ],
+                    orelse: [],
+                    finalbody: [],
+                    is_star: false,
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | try:
+2 |     pass
+3 | except as:
+  |        ^^ Syntax Error: Expected one or more exception types
+4 |     pass
+  |
+
+
+  |
+1 | try:
+2 |     pass
+3 | except as:
+  |          ^ Syntax Error: Expected name after `as`
+4 |     pass
+  |
