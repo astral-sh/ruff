@@ -1591,26 +1591,52 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// Parses a class definition.
+    ///
+    /// The given `start` offset is the start of either the `def` token or the
+    /// `@` token if the class definition has decorators.
+    ///
+    /// # Panics
+    ///
+    /// If the parser isn't positioned at a `class` token.
+    ///
     /// See: <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-classdef>
     fn parse_class_definition(
         &mut self,
         decorator_list: Vec<ast::Decorator>,
-        start_offset: TextSize,
+        start: TextSize,
     ) -> ast::StmtClassDef {
         self.bump(TokenKind::Class);
 
+        // test_err class_def_missing_name
+        // class : ...
+        // class (): ...
+        // class (metaclass=ABC): ...
         let name = self.parse_identifier();
+
+        // test_err class_def_unclosed_type_param_list
+        // class Foo[T1, *T2(a, b):
+        //     pass
+        // x = 10
         let type_params = self.try_parse_type_params();
+
+        // test_ok class_def_arguments
+        // class Foo: ...
+        // class Foo(): ...
         let arguments = self
             .at(TokenKind::Lpar)
             .then(|| Box::new(self.parse_arguments()));
 
         self.expect(TokenKind::Colon);
 
+        // test_err class_def_empty_body
+        // class Foo:
+        // class Foo():
+        // x = 42
         let body = self.parse_body(Clause::Class);
 
         ast::StmtClassDef {
-            range: self.node_range(start_offset),
+            range: self.node_range(start),
             decorator_list,
             name,
             type_params: type_params.map(Box::new),
