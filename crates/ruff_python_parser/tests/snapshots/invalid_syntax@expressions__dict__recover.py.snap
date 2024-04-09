@@ -491,5 +491,13 @@ Module(
 22 | # Star expression not allowed here
 23 | {*x: y, z: a, *b: c}
 24 | {x: *y, z: *a}
+   |     ^^ Syntax Error: starred expression cannot be used here
+   |
+
+
+   |
+22 | # Star expression not allowed here
+23 | {*x: y, z: a, *b: c}
+24 | {x: *y, z: *a}
    |            ^^ Syntax Error: starred expression cannot be used here
    |

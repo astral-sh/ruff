@@ -109,7 +109,7 @@ Module(
 
   |
 1 | lambda x: yield y
-  |           ^^^^^^^ Syntax Error: unparenthesized yield expression cannot be used here
+  |           ^^^^^^^ Syntax Error: yield expression cannot be used here
 2 | lambda x: yield from y
   |
 
@@ -117,5 +117,5 @@ Module(
   |
 1 | lambda x: yield y
 2 | lambda x: yield from y
-  |           ^^^^^^^^^^^^ Syntax Error: unparenthesized yield expression cannot be used here
+  |           ^^^^^^^^^^^^ Syntax Error: yield expression cannot be used here
   |
