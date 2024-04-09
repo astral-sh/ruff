@@ -127,7 +127,7 @@ pub enum ParseErrorType {
     /// An unexpected indentation was found during parsing.
     UnexpectedIndentation,
     /// The statement being parsed cannot be `async`.
-    StmtIsNotAsync(TokenKind),
+    UnexpectedAsyncToken(TokenKind),
     /// A parameter was found after a vararg
     ParamFollowsVarKeywordParam,
     /// A positional argument follows a keyword argument.
@@ -196,8 +196,11 @@ impl std::fmt::Display for ParseErrorType {
                 f,
                 "compound statements not allowed in the same line as simple statements"
             ),
-            ParseErrorType::StmtIsNotAsync(kind) => {
-                write!(f, "`{kind:?}` statement cannot be async")
+            ParseErrorType::UnexpectedAsyncToken(kind) => {
+                write!(
+                    f,
+                    "Expected 'def', 'with' or 'for' to follow 'async', found {kind:?}"
+                )
             }
             ParseErrorType::UnpackedArgumentError => {
                 write!(
