@@ -1472,37 +1472,111 @@ impl<'src> Parser<'src> {
         }
     }
 
-    /// See: <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-funcdef>
+    /// Parses a function definition.
+    ///
+    /// The given `start` offset is the start of either of the following:
+    /// - `def` token
+    /// - `async` token if it's an asynchronous function definition with no decorators
+    /// - `@` token if the function definition has decorators
+    ///
+    /// # Panics
+    ///
+    /// If the parser isn't positioned at a `def` token.
+    ///
+    /// See: <https://docs.python.org/3/reference/compound_stmts.html#function-definitions>
     fn parse_function_definition(
         &mut self,
         decorator_list: Vec<ast::Decorator>,
-        start_offset: TextSize,
+        start: TextSize,
     ) -> ast::StmtFunctionDef {
         self.bump(TokenKind::Def);
+
+        // test_err function_def_missing_identifier
+        // def (): ...
+        // def () -> int: ...
         let name = self.parse_identifier();
+
+        // test_err function_def_unclosed_type_param_list
+        // def foo[T1, *T2(a, b):
+        //     return a + b
+        // x = 10
         let type_params = self.try_parse_type_params();
 
+        // test_err function_def_unclosed_parameter_list
+        // def foo(a: int, b:
+        // def foo():
+        //     return 42
+        // def foo(a: int, b: str
+        // x = 10
         let parameters_start = self.node_start();
         self.expect(TokenKind::Lpar);
         let mut parameters = self.parse_parameters(FunctionKind::FunctionDef);
         self.expect(TokenKind::Rpar);
+
+        // test_ok function_def_parameter_range
+        // def foo(
+        //     first: int,
+        //     second: int,
+        // ) -> int: ...
         parameters.range = self.node_range(parameters_start);
 
-        let returns = self.eat(TokenKind::Rarrow).then(|| {
-            let returns = self.parse_expression_list(AllowStarredExpression::No);
-            if !returns.is_parenthesized && matches!(returns.expr, Expr::Tuple(_)) {
+        let returns = if self.eat(TokenKind::Rarrow) {
+            if self.at_expr() {
+                // test_ok function_def_valid_return_expr
+                // def foo() -> int | str: ...
+                // def foo() -> lambda x: x: ...
+                // def foo() -> (yield x): ...
+                // def foo() -> int if True else str: ...
+
+                // test_err function_def_invalid_return_expr
+                // def foo() -> *int: ...
+                // def foo() -> (*int): ...
+                // def foo() -> yield x: ...
+                let returns = self.parse_expression_list(AllowStarredExpression::No);
+
+                if matches!(
+                    returns.expr,
+                    Expr::Tuple(ast::ExprTuple {
+                        parenthesized: false,
+                        ..
+                    })
+                ) {
+                    // test_ok function_def_parenthesized_return_types
+                    // def foo() -> (int,): ...
+                    // def foo() -> (int, str): ...
+
+                    // test_err function_def_unparenthesized_return_types
+                    // def foo() -> int,: ...
+                    // def foo() -> int, str: ...
+                    self.add_error(
+                        ParseErrorType::OtherError(
+                            "Multiple return types must be parenthesized".to_string(),
+                        ),
+                        returns.range(),
+                    );
+                }
+
+                Some(Box::new(returns.expr))
+            } else {
+                // test_err function_def_missing_return_type
+                // def foo() -> : ...
                 self.add_error(
-                    ParseErrorType::OtherError(
-                        "multiple return types must be parenthesized".to_string(),
-                    ),
-                    returns.range(),
+                    ParseErrorType::ExpectedExpression,
+                    self.current_token_range(),
                 );
+
+                None
             }
-            Box::new(returns.expr)
-        });
+        } else {
+            None
+        };
 
         self.expect(TokenKind::Colon);
 
+        // test_err function_def_empty_body
+        // def foo():
+        // def foo() -> int:
+        // x = 42
         let body = self.parse_body(Clause::FunctionDef);
 
         ast::StmtFunctionDef {
@@ -1513,7 +1587,7 @@ impl<'src> Parser<'src> {
             decorator_list,
             is_async: false,
             returns,
-            range: self.node_range(start_offset),
+            range: self.node_range(start),
         }
     }
 
