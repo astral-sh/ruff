@@ -1,17 +1,17 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
-input_file: crates/ruff_python_parser/resources/invalid/statements/if_elif.py
+input_file: crates/ruff_python_parser/resources/inline/err/if_stmt_misspelled_elif.py
 ---
 ## AST
 
 ```
 Module(
     ModModule {
-        range: 0..54,
+        range: 0..47,
         body: [
             If(
                 StmtIf {
-                    range: 0..38,
+                    range: 0..17,
                     test: BooleanLiteral(
                         ExprBooleanLiteral {
                             range: 3..7,
@@ -25,41 +25,22 @@ Module(
                             },
                         ),
                     ],
-                    elif_else_clauses: [
-                        ElifElseClause {
-                            range: 18..38,
-                            test: Some(
-                                BooleanLiteral(
-                                    ExprBooleanLiteral {
-                                        range: 23..28,
-                                        value: false,
-                                    },
-                                ),
-                            ),
-                            body: [
-                                Pass(
-                                    StmtPass {
-                                        range: 34..38,
-                                    },
-                                ),
-                            ],
-                        },
-                    ],
+                    elif_else_clauses: [],
                 },
             ),
             AnnAssign(
                 StmtAnnAssign {
-                    range: 39..43,
+                    range: 18..22,
                     target: Name(
                         ExprName {
-                            range: 39..42,
+                            range: 18..21,
                             id: "elf",
                             ctx: Store,
                         },
                     ),
                     annotation: Name(
                         ExprName {
-                            range: 43..43,
+                            range: 22..22,
                             id: "",
                             ctx: Invalid,
                         },
@@ -70,7 +51,12 @@ Module(
             ),
             Pass(
                 StmtPass {
-                    range: 48..52,
+                    range: 27..31,
+                },
+            ),
+            Pass(
+                StmtPass {
+                    range: 42..46,
                 },
             ),
         ],
@@ -80,23 +66,62 @@ Module(
 ## Errors
 
   |
-3 | elif False:
-4 |     pass
-5 | elf:
+1 | if True:
+2 |     pass
+3 | elf:
   |     ^ Syntax Error: Expected an expression
+4 |     pass
+5 | else:
+6 |     pass
+  |
+
+
+  |
+2 |     pass
+3 | elf:
+4 |     pass
+  | ^^^^ Syntax Error: unexpected indentation
+5 | else:
+6 |     pass
+  |
+
+
+  |
+3 | elf:
+4 |     pass
+5 | else:
+  |  Syntax Error: Expected a statement
+6 |     pass
+  |
+
+
+  |
+3 | elf:
+4 |     pass
+5 | else:
+  |     ^ Syntax Error: Expected a statement
+6 |     pass
+  |
+
+
+  |
+3 | elf:
+4 |     pass
+5 | else:
+  |      ^ Syntax Error: Expected a statement
 6 |     pass
   |
 
 
   |
 4 |     pass
-5 | elf:
+5 | else:
 6 |     pass
   | ^^^^ Syntax Error: unexpected indentation
   |
 
 
   |
+5 | else:
 6 |     pass
-7 | 
   |
