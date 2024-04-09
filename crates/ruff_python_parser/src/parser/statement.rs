@@ -2201,7 +2201,7 @@ impl<'src> Parser<'src> {
 
         let cases = self.parse_match_case_blocks();
 
-        self.eat(TokenKind::Dedent);
+        self.expect(TokenKind::Dedent);
 
         ast::StmtMatch {
             subject: Box::new(subject.expr),
@@ -2668,7 +2668,10 @@ impl<'src> Parser<'src> {
                 // of the pre-order visit
                 // test_err params_follows_var_keyword_param
                 // def foo(**kwargs, a, /, b=10, *, *args): ...
-                parser.add_error(ParseErrorType::ParamFollowsVarKeywordParam, parser.current_token_range());
+                parser.add_error(
+                    ParseErrorType::ParamFollowsVarKeywordParam,
+                    parser.current_token_range(),
+                );
             }
 
             match parser.current_token_kind() {
@@ -2683,7 +2686,10 @@ impl<'src> Parser<'src> {
                         if parser.at(TokenKind::Equal) {
                             // test_err params_var_positional_with_default
                             // def foo(a, *args=(1, 2)): ...
-                            parser.add_error(ParseErrorType::VarParameterWithDefault, parser.current_token_range());
+                            parser.add_error(
+                                ParseErrorType::VarParameterWithDefault,
+                                parser.current_token_range(),
+                            );
                         }
 
                         if seen_keyword_only_separator || parameters.vararg.is_some() {
@@ -2693,7 +2699,9 @@ impl<'src> Parser<'src> {
                             // def foo(a, *args1, *args2, b): ...
                             // def foo(a, *args1, b, c, *args2): ...
                             parser.add_error(
-                                ParseErrorType::OtherError("Only one '*' parameter allowed".to_string()),
+                                ParseErrorType::OtherError(
+                                    "Only one '*' parameter allowed".to_string(),
+                                ),
                                 param_star_range,
                             );
                         }
@@ -2711,7 +2719,9 @@ impl<'src> Parser<'src> {
                             // def foo(a, *, *, b): ...
                             // def foo(a, *, b, c, *): ...
                             parser.add_error(
-                                ParseErrorType::OtherError("Only one '*' separator allowed".to_string()),
+                                ParseErrorType::OtherError(
+                                    "Only one '*' separator allowed".to_string(),
+                                ),
                                 star_range,
                             );
                         }
@@ -2744,7 +2754,9 @@ impl<'src> Parser<'src> {
                         // test_err params_multiple_kwargs
                         // def foo(a, **kwargs1, **kwargs2): ...
                         parser.add_error(
-                            ParseErrorType::OtherError("Only one '**' parameter allowed".to_string()),
+                            ParseErrorType::OtherError(
+                                "Only one '**' parameter allowed".to_string(),
+                            ),
                             param_double_star_range,
                         );
                     }
@@ -2752,7 +2764,10 @@ impl<'src> Parser<'src> {
                     if parser.at(TokenKind::Equal) {
                         // test_err params_var_keyword_with_default
                         // def foo(a, **kwargs={'b': 1, 'c': 2}): ...
-                        parser.add_error(ParseErrorType::VarParameterWithDefault, parser.current_token_range());
+                        parser.add_error(
+                            ParseErrorType::VarParameterWithDefault,
+                            parser.current_token_range(),
+                        );
                     }
 
                     if seen_keyword_only_separator && !seen_keyword_only_param_after_separator {
@@ -2762,7 +2777,10 @@ impl<'src> Parser<'src> {
 
                         // test_err params_kwarg_after_star_separator
                         // def foo(*, **kwargs): ...
-                        parser.add_error(ParseErrorType::ExpectedKeywordParam, param_double_star_range);
+                        parser.add_error(
+                            ParseErrorType::ExpectedKeywordParam,
+                            param_double_star_range,
+                        );
                     }
 
                     parameters.kwarg = Some(Box::new(param));
@@ -3062,11 +3080,13 @@ impl<'src> Parser<'src> {
 
     /// Specialized [`Parser::parse_list_into_vec`] for parsing a sequence of clauses.
     ///
-    /// The difference is that the parser only continues parsing for as long as it sees the token indicating the start
-    /// of the specific clause. This is different from [`Parser::parse_list_into_vec`] that performs error recovery when
-    /// the next token is not a list terminator or the start of a list element.
+    /// The difference is that the parser only continues parsing for as long as it sees the token
+    /// indicating the start of the specific clause. This is different from
+    /// [`Parser::parse_list_into_vec`] that performs error recovery when the next token is not a
+    /// list terminator or the start of a list element.
     ///
-    /// The special method is necessary because Python uses indentation over explicit delimiters to indicate the end of a clause.
+    /// The special method is necessary because Python uses indentation over explicit delimiters to
+    /// indicate the end of a clause.
     ///
     /// ```python
     /// if True: ...
@@ -3075,12 +3095,14 @@ impl<'src> Parser<'src> {
     /// else: ...
     /// ```
     ///
-    /// It would be nice if the above example would recover and either skip over the `elf x: ...` or parse it as a nested statement
-    /// so that the parser recognises the `else` clause. But Python makes this hard (without writing custom error recovery logic)
-    /// because `elf x: ` could also be an annotated assignment that went wrong ;)
+    /// It would be nice if the above example would recover and either skip over the `elf x: ...`
+    /// or parse it as a nested statement so that the parser recognises the `else` clause. But
+    /// Python makes this hard (without writing custom error recovery logic) because `elf x: `
+    /// could also be an annotated assignment that went wrong ;)
     ///
-    /// For now, don't recover when parsing clause headers, but add the terminator tokens (e.g. `Else`) to the recovery context
-    /// so that expression recovery stops when it encounters an `else` token.
+    /// For now, don't recover when parsing clause headers, but add the terminator tokens (e.g.
+    /// `Else`) to the recovery context so that expression recovery stops when it encounters an
+    /// `else` token.
     fn parse_clauses<T>(
         &mut self,
         clause: Clause,
