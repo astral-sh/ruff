@@ -286,7 +286,7 @@ Module(
 
   |
 1 | lambda a, a: 1
-  |           ^ Syntax Error: duplicate argument 'a' in function definition
+  |           ^ Syntax Error: Duplicate parameter 'a'
 2 | 
 3 | lambda a, *, a: 1
   |
@@ -296,7 +296,7 @@ Module(
 1 | lambda a, a: 1
 2 | 
 3 | lambda a, *, a: 1
-  |              ^ Syntax Error: duplicate argument 'a' in function definition
+  |              ^ Syntax Error: Duplicate parameter 'a'
 4 | 
 5 | lambda a, a=20: 1
   |
@@ -306,7 +306,7 @@ Module(
 3 | lambda a, *, a: 1
 4 | 
 5 | lambda a, a=20: 1
-  |           ^ Syntax Error: duplicate argument 'a' in function definition
+  |           ^ Syntax Error: Duplicate parameter 'a'
 6 | 
 7 | lambda a, *a: 1
   |
@@ -316,7 +316,7 @@ Module(
 5 | lambda a, a=20: 1
 6 | 
 7 | lambda a, *a: 1
-  |            ^ Syntax Error: duplicate argument 'a' in function definition
+  |            ^ Syntax Error: Duplicate parameter 'a'
 8 | 
 9 | lambda a, *, **a: 1
   |
@@ -326,5 +326,13 @@ Module(
 7 | lambda a, *a: 1
 8 | 
 9 | lambda a, *, **a: 1
-  |                ^ Syntax Error: duplicate argument 'a' in function definition
+  |              ^^^ Syntax Error: Expected one or more keyword parameter after '*' separator
+  |
+
+
+  |
+7 | lambda a, *a: 1
+8 | 
+9 | lambda a, *, **a: 1
+  |                ^ Syntax Error: Duplicate parameter 'a'
   |
