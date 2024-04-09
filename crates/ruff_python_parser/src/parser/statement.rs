@@ -1114,7 +1114,13 @@ impl<'src> Parser<'src> {
         }
     }
 
-    /// See: <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-try_stmt>
+    /// Parses a `try` statement.
+    ///
+    /// # Panics
+    ///
+    /// If the parser isn't positioned at a `try` token.
+    ///
+    /// See: <https://docs.python.org/3/reference/compound_stmts.html#the-try-statement>
     fn parse_try_statement(&mut self) -> ast::StmtTry {
         let try_start = self.node_start();
         self.bump(TokenKind::Try);
@@ -1125,47 +1131,43 @@ impl<'src> Parser<'src> {
         let try_body = self.parse_body(Clause::Try);
 
         let has_except = self.at(TokenKind::Except);
+
+        // TODO(dhruvmanila): Raise syntax error if there are both 'except' and 'except*'
+        // on the same 'try'
+        // test_err try_stmt_mixed_except_kind
+        // try:
+        //     pass
+        // except:
+        //     pass
+        // except* ExceptionGroup:
+        //     pass
+        // try:
+        //     pass
+        // except* ExceptionGroup:
+        //     pass
+        // except:
+        //     pass
         let handlers = self.parse_clauses(Clause::Except, |p| {
-            let except_start = p.node_start();
-            p.bump(TokenKind::Except);
-
-            // TODO(micha): Should this be local to the except block or global for the try statement or do we need to track both?
-            is_star = p.eat(TokenKind::Star);
-
-            let type_ = if p.at(TokenKind::Colon) && !is_star {
-                None
-            } else {
-                let parsed_expr = p.parse_expression_list(AllowStarredExpression::No);
-                if matches!(
-                    parsed_expr.expr,
-                    Expr::Tuple(ast::ExprTuple {
-                        parenthesized: false,
-                        ..
-                    })
-                ) {
-                    p.add_error(
-                        ParseErrorType::OtherError(
-                            "multiple exception types must be parenthesized".to_string(),
-                        ),
-                        &parsed_expr,
-                    );
-                }
-                Some(Box::new(parsed_expr.expr))
-            };
-
-            let name = p.eat(TokenKind::As).then(|| p.parse_identifier());
-
-            p.expect(TokenKind::Colon);
-
-            let except_body = p.parse_body(Clause::Except);
-
-            ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
-                type_,
-                name,
-                body: except_body,
-                range: p.node_range(except_start),
-            })
+            let (handler, kind) = p.parse_except_clause();
+            is_star |= kind.is_star();
+            handler
         });
+
+        // test_err try_stmt_misspelled_except
+        // try:
+        //     pass
+        // exept:  # spellchecker:disable-line
+        //     pass
+        // finally:
+        //     pass
+        // a = 1
+        // try:
+        //     pass
+        // except:
+        //     pass
+        // exept:  # spellchecker:disable-line
+        //     pass
+        // b = 1
 
         let orelse = if self.eat(TokenKind::Else) {
             self.expect(TokenKind::Colon);
@@ -1182,16 +1184,36 @@ impl<'src> Parser<'src> {
         };
 
         if !has_except && !has_finally {
-            let range = self.current_token_range();
+            // test_err try_stmt_missing_except_finally
+            // try:
+            //     pass
+            // try:
+            //     pass
+            // else:
+            //     pass
             self.add_error(
                 ParseErrorType::OtherError(
-                    "expecting `except` or `finally` after `try` block".to_string(),
+                    "Expected `except` or `finally` after `try` block".to_string(),
                 ),
-                range,
+                self.current_token_range(),
             );
         }
 
-        let range = self.node_range(try_start);
+        if has_finally && self.at(TokenKind::Else) {
+            // test_err try_stmt_invalid_order
+            // try:
+            //     pass
+            // finally:
+            //     pass
+            // else:
+            //     pass
+            self.add_error(
+                ParseErrorType::OtherError(
+                    "`else` block must come before `finally` block".to_string(),
+                ),
+                self.current_token_range(),
+            );
+        }
 
         ast::StmtTry {
             body: try_body,
@@ -1199,8 +1221,128 @@ impl<'src> Parser<'src> {
             orelse,
             finalbody,
             is_star,
-            range,
+            range: self.node_range(try_start),
         }
+    }
+
+    /// Parses an `except` clause of a `try` statement.
+    ///
+    /// # Panics
+    ///
+    /// If the parser isn't positioned at an `except` token.
+    fn parse_except_clause(&mut self) -> (ExceptHandler, ExceptClauseKind) {
+        let start = self.node_start();
+        self.bump(TokenKind::Except);
+
+        let block_kind = if self.eat(TokenKind::Star) {
+            ExceptClauseKind::Star
+        } else {
+            ExceptClauseKind::Normal
+        };
+
+        let type_ = if self.at_expr() {
+            // test_err except_stmt_invalid_expression
+            // try:
+            //     pass
+            // except yield x:
+            //     pass
+            // try:
+            //     pass
+            // except* *x:
+            //     pass
+            let parsed_expr = self.parse_expression_list(AllowStarredExpression::No);
+            if matches!(
+                parsed_expr.expr,
+                Expr::Tuple(ast::ExprTuple {
+                    parenthesized: false,
+                    ..
+                })
+            ) {
+                // test_err except_stmt_unparenthesized_tuple
+                // try:
+                //     pass
+                // except x, y:
+                //     pass
+                // except x, y as exc:
+                //     pass
+                // try:
+                //     pass
+                // except* x, y:
+                //     pass
+                // except* x, y as eg:
+                //     pass
+                self.add_error(
+                    ParseErrorType::OtherError(
+                        "Multiple exception types must be parenthesized".to_string(),
+                    ),
+                    &parsed_expr,
+                );
+            }
+            Some(Box::new(parsed_expr.expr))
+        } else {
+            if block_kind.is_star() || self.at(TokenKind::As) {
+                // test_err except_stmt_missing_exception
+                // try:
+                //     pass
+                // except as exc:
+                //     pass
+                // # If a '*' is present then exception type is required
+                // try:
+                //     pass
+                // except*:
+                //     pass
+                // except*
+                //     pass
+                // except* as exc:
+                //     pass
+                self.add_error(
+                    ParseErrorType::OtherError("Expected one or more exception types".to_string()),
+                    self.current_token_range(),
+                );
+            }
+            None
+        };
+
+        let name = if self.eat(TokenKind::As) {
+            if self.at(TokenKind::Name) {
+                Some(self.parse_identifier())
+            } else {
+                // test_err except_stmt_missing_as_name
+                // try:
+                //     pass
+                // except Exception as:
+                //     pass
+                // except Exception as
+                //     pass
+                self.add_error(
+                    ParseErrorType::OtherError("Expected name after `as`".to_string()),
+                    self.current_token_range(),
+                );
+                None
+            }
+        } else {
+            None
+        };
+
+        // test_err except_stmt_missing_exception_and_as_name
+        // try:
+        //     pass
+        // except as:
+        //     pass
+
+        self.expect(TokenKind::Colon);
+
+        let except_body = self.parse_body(Clause::Except);
+
+        (
+            ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
+                type_,
+                name,
+                body: except_body,
+                range: self.node_range(start),
+            }),
+            block_kind,
+        )
     }
 
     /// See: <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-for_stmt>
@@ -2469,5 +2611,20 @@ impl ElifOrElse {
             ElifOrElse::Elif => Clause::ElIf,
             ElifOrElse::Else => Clause::Else,
         }
+    }
+}
+
+/// The kind of the except clause.
+#[derive(Debug, Copy, Clone)]
+enum ExceptClauseKind {
+    /// A normal except clause e.g., `except Exception as e: ...`.
+    Normal,
+    /// An except clause with a star e.g., `except *: ...`.
+    Star,
+}
+
+impl ExceptClauseKind {
+    const fn is_star(self) -> bool {
+        matches!(self, ExceptClauseKind::Star)
     }
 }
