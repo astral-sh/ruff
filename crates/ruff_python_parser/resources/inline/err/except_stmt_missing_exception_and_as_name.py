@@ -1,6 +1,4 @@
 try:
     pass
-try:
-    pass
-else:
+except as:
     pass

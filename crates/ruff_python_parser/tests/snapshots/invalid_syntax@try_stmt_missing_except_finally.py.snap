@@ -7,12 +7,18 @@ input_file: crates/ruff_python_parser/resources/inline/err/try_stmt_missing_exce
 ```
 Module(
     ModModule {
-        range: 0..19,
+        range: 0..43,
         body: [
             Try(
                 StmtTry {
-                    range: 0..4,
-                    body: [],
+                    range: 0..13,
+                    body: [
+                        Pass(
+                            StmtPass {
+                                range: 9..13,
+                            },
+                        ),
+                    ],
                     handlers: [],
                     orelse: [],
                     finalbody: [],
@@ -21,16 +27,22 @@ Module(
             ),
             Try(
                 StmtTry {
-                    range: 5..18,
+                    range: 14..42,
                     body: [
                         Pass(
                             StmtPass {
-                                range: 14..18,
+                                range: 23..27,
                             },
                         ),
                     ],
                     handlers: [],
-                    orelse: [],
+                    orelse: [
+                        Pass(
+                            StmtPass {
+                                range: 38..42,
+                            },
+                        ),
+                    ],
                     finalbody: [],
                     is_star: false,
                 },
@@ -43,13 +55,15 @@ Module(
 
   |
 1 | try:
-2 | try:
-  | ^^^ Syntax Error: Expected an indented block after `try` statement
-3 |     pass
+2 |     pass
+3 | try:
+  | ^^^ Syntax Error: Expected `except` or `finally` after `try` block
+4 |     pass
+5 | else:
   |
 
 
   |
-2 | try:
-3 |     pass
+5 | else:
+6 |     pass
   |

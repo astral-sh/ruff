@@ -1186,7 +1186,10 @@ impl<'src> Parser<'src> {
         if !has_except && !has_finally {
             // test_err try_stmt_missing_except_finally
             // try:
+            //     pass
             // try:
+            //     pass
+            // else:
             //     pass
             self.add_error(
                 ParseErrorType::OtherError(
@@ -1196,7 +1199,7 @@ impl<'src> Parser<'src> {
             );
         }
 
-        if self.at(TokenKind::Else) {
+        if has_finally && self.at(TokenKind::Else) {
             // test_err try_stmt_invalid_order
             // try:
             //     pass
@@ -1312,7 +1315,7 @@ impl<'src> Parser<'src> {
                 // except Exception as
                 //     pass
                 self.add_error(
-                    ParseErrorType::OtherError("Expected symbol name after `as`".to_string()),
+                    ParseErrorType::OtherError("Expected name after `as`".to_string()),
                     self.current_token_range(),
                 );
                 None
@@ -1320,6 +1323,12 @@ impl<'src> Parser<'src> {
         } else {
             None
         };
+
+        // test_err except_stmt_missing_exception_and_as_name
+        // try:
+        //     pass
+        // except as:
+        //     pass
 
         self.expect(TokenKind::Colon);
 
