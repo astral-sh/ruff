@@ -1,0 +1,61 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/match_stmt_missing_pattern.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..110,
+        body: [
+            Match(
+                StmtMatch {
+                    range: 86..99,
+                    subject: Name(
+                        ExprName {
+                            range: 92..93,
+                            id: "x",
+                            ctx: Load,
+                        },
+                    ),
+                    cases: [],
+                },
+            ),
+            AnnAssign(
+                StmtAnnAssign {
+                    range: 99..109,
+                    target: Name(
+                        ExprName {
+                            range: 99..103,
+                            id: "case",
+                            ctx: Store,
+                        },
+                    ),
+                    annotation: EllipsisLiteral(
+                        ExprEllipsisLiteral {
+                            range: 106..109,
+                        },
+                    ),
+                    value: None,
+                    simple: true,
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | # TODO(dhruvmanila): Here, `case` is a name token because of soft keyword transformer
+2 | match x:
+3 |     case : ...
+  |     ^^^^ Syntax Error: Expected `case` block
+  |
+
+
+  |
+2 | match x:
+3 |     case : ...
+  |
