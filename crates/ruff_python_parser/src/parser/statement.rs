@@ -1345,19 +1345,61 @@ impl<'src> Parser<'src> {
         )
     }
 
-    /// See: <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-for_stmt>
-    fn parse_for_statement(&mut self, for_start: TextSize) -> ast::StmtFor {
+    /// Parses a `for` statement.
+    ///
+    /// The given `start` offset is the start of either the `for` token or the
+    /// `async` token if it's an async for statement.
+    ///
+    /// # Panics
+    ///
+    /// If the parser isn't positioned at a `for` token.
+    ///
+    /// See: <https://docs.python.org/3/reference/compound_stmts.html#the-for-statement>
+    fn parse_for_statement(&mut self, start: TextSize) -> ast::StmtFor {
         self.bump(TokenKind::For);
 
+        // This is to avoid the ambiguity of the `in` token which is used in
+        // both the `for` statement and the comparison expression. For example:
+        //
+        // ```python
+        // for x in y:
+        // #   ^^^^^^
+        // #   This is not a comparison expression
+        //     pass
+        // ```
         let saved_context = self.set_ctx(ParserCtxFlags::FOR_TARGET);
+
+        // test_err for_stmt_missing_target
+        // for in x: ...
         let mut target = self.parse_expression_list(AllowStarredExpression::Yes);
+
         self.restore_ctx(ParserCtxFlags::FOR_TARGET, saved_context);
 
         helpers::set_expr_ctx(&mut target.expr, ExprContext::Store);
 
+        // test_err for_stmt_invalid_target
+        // for 1 in x: ...
+        // for "a" in x: ...
+        // for *x and y in z: ...
+        // for *x | y in z: ...
+        // for await x in z: ...
+        // for [x, 1, y, *["a"]] in z: ...
+        self.validate_assignment_target(&target.expr);
+
+        // test_err for_stmt_missing_in_keyword
+        // for a b: ...
+        // for a: ...
         self.expect(TokenKind::In);
 
-        let iter = self.parse_expression_list(AllowStarredExpression::Yes);
+        // test_err for_stmt_missing_iter
+        // for x in:
+        //     a = 1
+
+        // test_err for_stmt_invalid_iter_expr
+        // for x in *a and b: ...
+        // for x in yield a: ...
+        // for target in x := 1: ...
+        let iter = self.parse_star_expression_list();
 
         self.expect(TokenKind::Colon);
 
@@ -1376,7 +1418,7 @@ impl<'src> Parser<'src> {
             is_async: false,
             body,
             orelse,
-            range: self.node_range(for_start),
+            range: self.node_range(start),
         }
     }
 
