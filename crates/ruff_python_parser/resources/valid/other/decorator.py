@@ -4,7 +4,7 @@ def test():
 
 
 @class_decorator
-class Abcd:
+class Test:
     pass
 
 
@@ -27,5 +27,24 @@ def f(): ...
 class T: ...
 
 
-@named_expr := abc
+@x := 1
+@x if True else y
+@lambda x: x
+@x and y
+@(yield x)
+@(*x, *y)
 def f(): ...
+
+
+# This is not multiple decorators on the same line but rather a binary (`@`) expression
+@x @y
+def foo(): ...
+
+
+@x
+
+
+@y
+
+
+def foo(): ...
