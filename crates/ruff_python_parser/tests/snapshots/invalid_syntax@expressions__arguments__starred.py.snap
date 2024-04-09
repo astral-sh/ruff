@@ -168,3 +168,19 @@ Module(
 2 | call(*yield x)
 3 | call(*yield from x)
   |
+
+
+  |
+1 | call(*data for data in iter)
+2 | call(*yield x)
+  |       ^^^^^^^ Syntax Error: yield expression cannot be used here
+3 | call(*yield from x)
+  |
+
+
+  |
+1 | call(*data for data in iter)
+2 | call(*yield x)
+3 | call(*yield from x)
+  |       ^^^^^^^^^^^^ Syntax Error: yield expression cannot be used here
+  |

@@ -16,6 +16,8 @@ use crate::{
     Mode, ParseError, ParseErrorType, Tok, TokenKind,
 };
 
+use self::expression::AllowStarredExpression;
+
 mod expression;
 mod helpers;
 mod pattern;
@@ -177,7 +179,7 @@ impl<'src> Parser<'src> {
     pub(crate) fn parse_program(mut self) -> Program {
         let ast = if self.mode == Mode::Expression {
             let start = self.node_start();
-            let parsed_expr = self.parse_expression_list();
+            let parsed_expr = self.parse_expression_list(AllowStarredExpression::No);
             let mut progress = ParserProgress::default();
 
             // TODO: How should error recovery work here? Just truncate after the expression?
