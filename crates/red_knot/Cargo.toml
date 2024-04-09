@@ -1,0 +1,27 @@
+[package]
+name = "red_knot"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+homepage.workspace = true
+documentation.workspace = true
+repository.workspace = true
+authors.workspace = true
+license.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+ruff_python_parser = { path = "../ruff_python_parser" }
+ruff_python_ast = { path = "../ruff_python_ast" }
+ruff_python_trivia = { path = "../ruff_python_trivia" }
+ruff_text_size = { path = "../ruff_text_size" }
+ruff_index = { path = "../ruff_index" }
+
+anyhow = { workspace = true }
+hashbrown = { workspace = true }
+rustc-hash = { workspace = true }
+parking_lot = { workspace = true }
+
+[lints]
+workspace = true
