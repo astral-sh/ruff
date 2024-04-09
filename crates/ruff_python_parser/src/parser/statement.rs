@@ -831,10 +831,7 @@ impl<'src> Parser<'src> {
     ///
     /// See: <https://docs.python.org/3/reference/simple_stmts.html#assignment-statements>
     fn parse_assign_statement(&mut self, target: ParsedExpr, start: TextSize) -> ast::StmtAssign {
-        // The `parse_list` function could exit without parsing any target if it
-        // doesn't encounter a `=` token at the start, so make sure that isn't the
-        // case. This also ensures the function contract about the panic condition.
-        assert_eq!(self.current_token_kind(), TokenKind::Equal);
+        self.bump(TokenKind::Equal);
 
         let mut targets = vec![target.expr];
 
@@ -845,20 +842,12 @@ impl<'src> Parser<'src> {
         // 2 + 2
         // x = = y
         // 3 + 3
-        self.parse_list(RecoveryContextKind::AssignmentTargets, |parser| {
-            parser.bump(TokenKind::Equal);
 
-            // test_err assign_stmt_keyword_target
-            // a = pass = c
-            // a + b
-            // a = b = pass = c
-            // a + b
-            targets.push(
-                parser
-                    .parse_yield_expression_or_else(Parser::parse_star_expression_list)
-                    .expr,
-            );
-        });
+        // test_err assign_stmt_keyword_target
+        // a = pass = c
+        // a + b
+        // a = b = pass = c
+        // a + b
 
         // test_err assign_stmt_invalid_value_expr
         // x = *a and b
@@ -867,9 +856,21 @@ impl<'src> Parser<'src> {
         // x = *lambda x: x
         // x = x := 1
 
-        // The last target is the value of the assignment statement.
-        // SAFETY: There is at least one element in the vector which is the parameter `target`.
-        let value = targets.pop().unwrap();
+        let mut value = self.parse_yield_expression_or_else(Parser::parse_star_expression_list);
+
+        if self.at(TokenKind::Equal) {
+            // This path is only taken when there are more than one assignment targets.
+            self.parse_list(RecoveryContextKind::AssignmentTargets, |parser| {
+                parser.bump(TokenKind::Equal);
+
+                let mut parsed_expr =
+                    parser.parse_yield_expression_or_else(Parser::parse_star_expression_list);
+
+                std::mem::swap(&mut value, &mut parsed_expr);
+
+                targets.push(parsed_expr.expr);
+            });
+        }
 
         for target in &mut targets {
             helpers::set_expr_ctx(target, ExprContext::Store);
@@ -883,7 +884,7 @@ impl<'src> Parser<'src> {
 
         ast::StmtAssign {
             targets,
-            value: Box::new(value),
+            value: Box::new(value.expr),
             range: self.node_range(start),
         }
     }

@@ -174,7 +174,7 @@ Module(
             ),
             Assign(
                 StmtAssign {
-                    range: 61..69,
+                    range: 61..66,
                     targets: [
                         Name(
                             ExprName {
@@ -252,21 +252,5 @@ Module(
 3 | x = *yield from x
 4 | x = *lambda x: x
 5 | x = x := 1
-  |       ^^ Syntax Error: Expected an assignment target
-  |
-
-
-  |
-3 | x = *yield from x
-4 | x = *lambda x: x
-5 | x = x := 1
-  |          ^ Syntax Error: Expected an assignment target
-  |
-
-
-  |
-3 | x = *yield from x
-4 | x = *lambda x: x
-5 | x = x := 1
-  | ^^^^^^^^^^ Syntax Error: use `;` to separate simple statements
+  |       ^^ Syntax Error: Expected a statement
   |
