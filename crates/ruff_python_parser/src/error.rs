@@ -116,6 +116,8 @@ pub enum ParseErrorType {
     InvalidAssignmentTarget,
     /// An invalid expression was found in the named assignment `target`.
     InvalidNamedAssignmentTarget,
+    /// An invalid expression was found in the annotated assignment `target`.
+    InvalidAnnotatedAssignmentTarget,
     /// An invalid expression was found in the augmented assignment `target`.
     InvalidAugmentedAssignmentTarget,
     /// An invalid expression was found in the delete `target`.
@@ -260,6 +262,9 @@ impl std::fmt::Display for ParseErrorType {
             }
             ParseErrorType::UnexpectedIndentation => write!(f, "unexpected indentation"),
             ParseErrorType::InvalidAssignmentTarget => write!(f, "invalid assignment target"),
+            ParseErrorType::InvalidAnnotatedAssignmentTarget => {
+                write!(f, "invalid annotated assignment target")
+            }
             ParseErrorType::InvalidNamedAssignmentTarget => {
                 write!(f, "assignment expression target must be an identifier")
             }
