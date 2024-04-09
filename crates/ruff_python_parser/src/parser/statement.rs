@@ -1542,8 +1542,17 @@ impl<'src> Parser<'src> {
         }
     }
 
-    /// See: <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-with_stmt>
-    fn parse_with_statement(&mut self, start_offset: TextSize) -> ast::StmtWith {
+    /// Parses a `with` statement
+    ///
+    /// The given `start` offset is the start of either the `with` token or the
+    /// `async` token if it's an async with statement.
+    ///
+    /// # Panics
+    ///
+    /// If the parser isn't positioned at a `with` token.
+    ///
+    /// See: <https://docs.python.org/3/reference/compound_stmts.html#the-with-statement>
+    fn parse_with_statement(&mut self, start: TextSize) -> ast::StmtWith {
         self.bump(TokenKind::With);
 
         let items = self.parse_with_items();
@@ -1555,7 +1564,7 @@ impl<'src> Parser<'src> {
             items,
             body,
             is_async: false,
-            range: self.node_range(start_offset),
+            range: self.node_range(start),
         }
     }
 
@@ -2143,48 +2152,89 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// Parses a decorator list followed by a class, function or async function definition.
+    ///
+    /// See: <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-decorators>
     fn parse_decorators(&mut self) -> Stmt {
-        let start_offset = self.node_start();
+        let start = self.node_start();
 
         let mut decorators = vec![];
         let mut progress = ParserProgress::default();
 
+        // test_err decorator_missing_expression
+        // @def foo(): ...
+        // @
+        // def foo(): ...
+        // @@
+        // def foo(): ...
         while self.at(TokenKind::At) {
             progress.assert_progressing(self);
+
             let decorator_start = self.node_start();
             self.bump(TokenKind::At);
 
+            // test_err decorator_invalid_expression
+            // @*x
+            // @(*x)
+            // @((*x))
+            // @yield x
+            // @yield from x
+            // def foo(): ...
             let parsed_expr = self.parse_named_expression_or_higher(AllowStarredExpression::No);
+
             decorators.push(ast::Decorator {
                 expression: parsed_expr.expr,
                 range: self.node_range(decorator_start),
             });
 
+            // test_err decorator_missing_newline
+            // @x def foo(): ...
+            // @x async def foo(): ...
+            // @x class Foo: ...
             self.expect(TokenKind::Newline);
         }
 
         match self.current_token_kind() {
-            TokenKind::Def => {
-                Stmt::FunctionDef(self.parse_function_definition(decorators, start_offset))
-            }
-            TokenKind::Class => {
-                Stmt::ClassDef(self.parse_class_definition(decorators, start_offset))
-            }
+            TokenKind::Def => Stmt::FunctionDef(self.parse_function_definition(decorators, start)),
+            TokenKind::Class => Stmt::ClassDef(self.parse_class_definition(decorators, start)),
             TokenKind::Async if self.peek() == TokenKind::Def => {
                 self.bump(TokenKind::Async);
 
+                // test_ok decorator_async_function
+                // @decorator
+                // async def foo(): ...
                 Stmt::FunctionDef(ast::StmtFunctionDef {
                     is_async: true,
-                    ..self.parse_function_definition(decorators, start_offset)
+                    ..self.parse_function_definition(decorators, start)
                 })
             }
             _ => {
+                // test_err decorator_unexpected_token
+                // @foo
+                // async with x: ...
+                // @foo
+                // x = 1
                 self.add_error(
                     ParseErrorType::OtherError(
-                        "expected class, function definition or async function definition after decorator".to_string(),
+                        "Expected class, function definition or async function definition after decorator".to_string(),
                     ),
                     self.current_token_range(),
                 );
+
+                // TODO(dhruvmanila): It seems that this recovery drops all the parsed
+                // decorators. Maybe we could convert them into statement expression
+                // with a flag indicating that this expression is part of a decorator.
+                // It's only possible to keep them if it's a function or class definition.
+                // We could possibly keep them if there's indentation error:
+                //
+                // ```python
+                // @decorator
+                //   @decorator
+                // def foo(): ...
+                // ```
+                //
+                // Or, parse it as a binary expression where the left side is missing.
+                // We would need to convert each decorator into a binary expression.
                 self.parse_statement()
             }
         }
