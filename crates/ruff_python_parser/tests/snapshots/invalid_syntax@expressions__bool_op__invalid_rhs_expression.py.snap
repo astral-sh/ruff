@@ -116,5 +116,5 @@ Module(
 1 | x and lambda y: y
 2 | 
 3 | x or yield y
-  |      ^^^^^^^ Syntax Error: `yield` expression cannot be used here
+  |      ^^^^^^^ Syntax Error: yield expression cannot be used here
   |

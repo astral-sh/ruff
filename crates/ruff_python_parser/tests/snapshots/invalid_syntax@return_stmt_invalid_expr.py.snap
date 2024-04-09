@@ -147,6 +147,25 @@ Module(
 
 
   |
+1 | return *
+2 | return yield x
+  |        ^^^^^^^ Syntax Error: yield expression cannot be used here
+3 | return yield from x
+4 | return x := 1
+  |
+
+
+  |
+1 | return *
+2 | return yield x
+3 | return yield from x
+  |        ^^^^^^^^^^^^ Syntax Error: yield expression cannot be used here
+4 | return x := 1
+5 | return *x and y
+  |
+
+
+  |
 2 | return yield x
 3 | return yield from x
 4 | return x := 1
