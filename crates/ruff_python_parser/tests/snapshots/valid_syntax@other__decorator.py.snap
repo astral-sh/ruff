@@ -7,7 +7,7 @@ input_file: crates/ruff_python_parser/resources/valid/other/decorator.py
 ```
 Module(
     ModModule {
-        range: 0..219,
+        range: 0..407,
         body: [
             FunctionDef(
                 StmtFunctionDef {
@@ -64,7 +64,7 @@ Module(
                         },
                     ],
                     name: Identifier {
-                        id: "Abcd",
+                        id: "Test",
                         range: 66..70,
                     },
                     type_params: None,
@@ -352,39 +352,186 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
-                    range: 188..219,
+                    range: 188..269,
                     is_async: false,
                     decorator_list: [
                         Decorator {
-                            range: 188..206,
+                            range: 188..195,
                             expression: Named(
                                 ExprNamed {
-                                    range: 189..206,
+                                    range: 189..195,
                                     target: Name(
                                         ExprName {
-                                            range: 189..199,
-                                            id: "named_expr",
+                                            range: 189..190,
+                                            id: "x",
                                             ctx: Store,
                                         },
                                     ),
-                                    value: Name(
+                                    value: NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 194..195,
+                                            value: Int(
+                                                1,
+                                            ),
+                                        },
+                                    ),
+                                },
+                            ),
+                        },
+                        Decorator {
+                            range: 196..213,
+                            expression: If(
+                                ExprIf {
+                                    range: 197..213,
+                                    test: BooleanLiteral(
+                                        ExprBooleanLiteral {
+                                            range: 202..206,
+                                            value: true,
+                                        },
+                                    ),
+                                    body: Name(
                                         ExprName {
-                                            range: 203..206,
-                                            id: "abc",
+                                            range: 197..198,
+                                            id: "x",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    orelse: Name(
+                                        ExprName {
+                                            range: 212..213,
+                                            id: "y",
                                             ctx: Load,
                                         },
                                     ),
                                 },
                             ),
                         },
+                        Decorator {
+                            range: 214..226,
+                            expression: Lambda(
+                                ExprLambda {
+                                    range: 215..226,
+                                    parameters: Some(
+                                        Parameters {
+                                            range: 222..223,
+                                            posonlyargs: [],
+                                            args: [
+                                                ParameterWithDefault {
+                                                    range: 222..223,
+                                                    parameter: Parameter {
+                                                        range: 222..223,
+                                                        name: Identifier {
+                                                            id: "x",
+                                                            range: 222..223,
+                                                        },
+                                                        annotation: None,
+                                                    },
+                                                    default: None,
+                                                },
+                                            ],
+                                            vararg: None,
+                                            kwonlyargs: [],
+                                            kwarg: None,
+                                        },
+                                    ),
+                                    body: Name(
+                                        ExprName {
+                                            range: 225..226,
+                                            id: "x",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                },
+                            ),
+                        },
+                        Decorator {
+                            range: 227..235,
+                            expression: BoolOp(
+                                ExprBoolOp {
+                                    range: 228..235,
+                                    op: And,
+                                    values: [
+                                        Name(
+                                            ExprName {
+                                                range: 228..229,
+                                                id: "x",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        Name(
+                                            ExprName {
+                                                range: 234..235,
+                                                id: "y",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ],
+                                },
+                            ),
+                        },
+                        Decorator {
+                            range: 236..246,
+                            expression: Yield(
+                                ExprYield {
+                                    range: 238..245,
+                                    value: Some(
+                                        Name(
+                                            ExprName {
+                                                range: 244..245,
+                                                id: "x",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ),
+                                },
+                            ),
+                        },
+                        Decorator {
+                            range: 247..256,
+                            expression: Tuple(
+                                ExprTuple {
+                                    range: 248..256,
+                                    elts: [
+                                        Starred(
+                                            ExprStarred {
+                                                range: 249..251,
+                                                value: Name(
+                                                    ExprName {
+                                                        range: 250..251,
+                                                        id: "x",
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        Starred(
+                                            ExprStarred {
+                                                range: 253..255,
+                                                value: Name(
+                                                    ExprName {
+                                                        range: 254..255,
+                                                        id: "y",
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ],
+                                    ctx: Load,
+                                    parenthesized: true,
+                                },
+                            ),
+                        },
                     ],
                     name: Identifier {
                         id: "f",
-                        range: 211..212,
+                        range: 261..262,
                     },
                     type_params: None,
                     parameters: Parameters {
-                        range: 212..214,
+                        range: 262..264,
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -395,10 +542,121 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                range: 216..219,
+                                range: 266..269,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        range: 216..219,
+                                        range: 266..269,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 360..380,
+                    is_async: false,
+                    decorator_list: [
+                        Decorator {
+                            range: 360..365,
+                            expression: BinOp(
+                                ExprBinOp {
+                                    range: 361..365,
+                                    left: Name(
+                                        ExprName {
+                                            range: 361..362,
+                                            id: "x",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    op: MatMult,
+                                    right: Name(
+                                        ExprName {
+                                            range: 364..365,
+                                            id: "y",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                },
+                            ),
+                        },
+                    ],
+                    name: Identifier {
+                        id: "foo",
+                        range: 370..373,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 373..375,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 377..380,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 377..380,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 383..407,
+                    is_async: false,
+                    decorator_list: [
+                        Decorator {
+                            range: 383..385,
+                            expression: Name(
+                                ExprName {
+                                    range: 384..385,
+                                    id: "x",
+                                    ctx: Load,
+                                },
+                            ),
+                        },
+                        Decorator {
+                            range: 388..390,
+                            expression: Name(
+                                ExprName {
+                                    range: 389..390,
+                                    id: "y",
+                                    ctx: Load,
+                                },
+                            ),
+                        },
+                    ],
+                    name: Identifier {
+                        id: "foo",
+                        range: 397..400,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 400..402,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 404..407,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 404..407,
                                     },
                                 ),
                             },
