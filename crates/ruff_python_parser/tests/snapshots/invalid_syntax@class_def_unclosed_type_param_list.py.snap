@@ -11,7 +11,7 @@ Module(
         body: [
             ClassDef(
                 StmtClassDef {
-                    range: 0..41,
+                    range: 0..40,
                     decorator_list: [],
                     name: Identifier {
                         id: "Foo",
@@ -73,7 +73,7 @@ Module(
                         ),
                         Assign(
                             StmtAssign {
-                                range: 34..41,
+                                range: 34..40,
                                 targets: [
                                     Name(
                                         ExprName {

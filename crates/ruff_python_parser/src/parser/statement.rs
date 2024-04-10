@@ -2201,6 +2201,7 @@ impl<'src> Parser<'src> {
 
         let cases = self.parse_match_case_blocks();
 
+        // TODO(dhruvmanila): Should we expect `Dedent` only if there was an `Indent` present?
         self.expect(TokenKind::Dedent);
 
         ast::StmtMatch {
