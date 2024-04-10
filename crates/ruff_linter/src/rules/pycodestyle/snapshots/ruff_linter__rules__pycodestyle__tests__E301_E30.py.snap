@@ -79,3 +79,23 @@ E30.py:519:5: E301 [*] Expected 1 blank line, found 0
 519 520 |     @classmethod
 520 521 |     def cls_method(cls) -> None:
 521 522 |         pass
+
+E30.py:534:5: E301 [*] Expected 1 blank line, found 0
+    |
+532 |     def bar(self, x: str) -> str:
+533 |         ...
+534 |     def bar(self, x: int | str) -> int | str:
+    |     ^^^ E301
+535 |         return x
+536 | # end
+    |
+    = help: Add missing blank line
+
+ℹ Safe fix
+531 531 |     @overload
+532 532 |     def bar(self, x: str) -> str:
+533 533 |         ...
+    534 |+
+534 535 |     def bar(self, x: int | str) -> int | str:
+535 536 |         return x
+536 537 | # end

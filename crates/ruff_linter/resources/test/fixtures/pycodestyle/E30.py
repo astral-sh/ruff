@@ -522,6 +522,20 @@ class Class:
 # end
 
 
+# E301
+class Foo:
+    """Demo."""
+
+    @overload
+    def bar(self, x: int) -> int: ...
+    @overload
+    def bar(self, x: str) -> str:
+        ...
+    def bar(self, x: int | str) -> int | str:
+        return x
+# end
+
+
 # E302
 """Main module."""
 def fn():
@@ -610,6 +624,12 @@ class Test:
 		
 	def method2():
 		return 22
+# end
+
+
+# E302
+class A:...
+class B: ...
 # end
 
 
