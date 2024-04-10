@@ -1,10 +1,6 @@
-use std::hash::BuildHasherDefault;
+use ruff_python_ast::{self as ast, CmpOp, Expr, ExprContext};
 
-use ast::CmpOp;
-use ruff_python_ast::{self as ast, Expr, ExprContext};
-use rustc_hash::FxHashSet;
-
-use crate::{ParseError, ParseErrorType, TokenKind};
+use crate::TokenKind;
 
 /// Set the `ctx` for `Expr::Id`, `Expr::Attribute`, `Expr::Subscript`, `Expr::Starred`,
 /// `Expr::Tuple` and `Expr::List`. If `expr` is either `Expr::Tuple` or `Expr::List`,
@@ -31,19 +27,6 @@ pub(super) fn set_expr_ctx(expr: &mut Expr, new_ctx: ExprContext) {
     }
 }
 
-/// Check if the given expression is itself or contains an expression that is
-/// valid as a target of a `del` statement.
-pub(super) fn is_valid_del_target(expr: &Expr) -> bool {
-    // https://github.com/python/cpython/blob/d864b0094f9875c5613cbb0b7f7f3ca8f1c6b606/Parser/action_helpers.c#L1150-L1180
-    match expr {
-        Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
-            elts.iter().all(is_valid_del_target)
-        }
-        Expr::Name(_) | Expr::Attribute(_) | Expr::Subscript(_) => true,
-        _ => false,
-    }
-}
-
 /// Converts a [`TokenKind`] array of size 2 to its correspondent [`CmpOp`].
 pub(super) fn token_kind_to_cmp_op(kind: [TokenKind; 2]) -> Result<CmpOp, ()> {
     Ok(match kind {
@@ -59,33 +42,4 @@ pub(super) fn token_kind_to_cmp_op(kind: [TokenKind; 2]) -> Result<CmpOp, ()> {
         [TokenKind::GreaterEqual, _] => CmpOp::GtE,
         _ => return Err(()),
     })
-}
-
-pub(super) fn validate_arguments(arguments: &ast::Arguments) -> Result<(), Vec<ParseError>> {
-    let mut errors = vec![];
-
-    let mut all_arg_names = FxHashSet::with_capacity_and_hasher(
-        arguments.keywords.len(),
-        BuildHasherDefault::default(),
-    );
-
-    for (name, range) in arguments
-        .keywords
-        .iter()
-        .filter_map(|argument| argument.arg.as_ref().map(|arg| (arg, argument.range)))
-    {
-        let arg_name = name.as_str();
-        if !all_arg_names.insert(arg_name) {
-            errors.push(ParseError {
-                error: ParseErrorType::DuplicateKeywordArgumentError(arg_name.to_string()),
-                location: range,
-            });
-        }
-    }
-
-    if errors.is_empty() {
-        Ok(())
-    } else {
-        Err(errors)
-    }
 }
