@@ -209,7 +209,7 @@ Module(
 
   |
 1 | 1 = 1
-  | ^ Syntax Error: invalid assignment target
+  | ^ Syntax Error: Invalid assignment target
 2 | x = 1 = 2
 3 | x = 1 = y = 2 = z
   |
@@ -218,7 +218,7 @@ Module(
   |
 1 | 1 = 1
 2 | x = 1 = 2
-  |     ^ Syntax Error: invalid assignment target
+  |     ^ Syntax Error: Invalid assignment target
 3 | x = 1 = y = 2 = z
 4 | ["a", "b"] = ["a", "b"]
   |
@@ -228,7 +228,7 @@ Module(
 1 | 1 = 1
 2 | x = 1 = 2
 3 | x = 1 = y = 2 = z
-  |     ^ Syntax Error: invalid assignment target
+  |     ^ Syntax Error: Invalid assignment target
 4 | ["a", "b"] = ["a", "b"]
   |
 
@@ -237,7 +237,7 @@ Module(
 1 | 1 = 1
 2 | x = 1 = 2
 3 | x = 1 = y = 2 = z
-  |             ^ Syntax Error: invalid assignment target
+  |             ^ Syntax Error: Invalid assignment target
 4 | ["a", "b"] = ["a", "b"]
   |
 
@@ -246,7 +246,7 @@ Module(
 2 | x = 1 = 2
 3 | x = 1 = y = 2 = z
 4 | ["a", "b"] = ["a", "b"]
-  |  ^^^ Syntax Error: invalid assignment target
+  |  ^^^ Syntax Error: Invalid assignment target
   |
 
 
@@ -254,5 +254,5 @@ Module(
 2 | x = 1 = 2
 3 | x = 1 = y = 2 = z
 4 | ["a", "b"] = ["a", "b"]
-  |       ^^^ Syntax Error: invalid assignment target
+  |       ^^^ Syntax Error: Invalid assignment target
   |

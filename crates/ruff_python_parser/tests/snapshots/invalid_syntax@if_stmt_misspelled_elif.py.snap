@@ -80,7 +80,7 @@ Module(
 2 |     pass
 3 | elf:
 4 |     pass
-  | ^^^^ Syntax Error: unexpected indentation
+  | ^^^^ Syntax Error: Unexpected indentation
 5 | else:
 6 |     pass
   |
@@ -117,7 +117,7 @@ Module(
 4 |     pass
 5 | else:
 6 |     pass
-  | ^^^^ Syntax Error: unexpected indentation
+  | ^^^^ Syntax Error: Unexpected indentation
   |
 
 

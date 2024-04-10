@@ -102,7 +102,7 @@ Module(
   |
 1 | # This is not JavaScript
 2 | x === y
-  | ^^^^ Syntax Error: invalid assignment target
+  | ^^^^ Syntax Error: Invalid assignment target
 3 | x !== y
   |
 
@@ -119,5 +119,5 @@ Module(
 1 | # This is not JavaScript
 2 | x === y
 3 | x !== y
-  | ^^^^ Syntax Error: invalid assignment target
+  | ^^^^ Syntax Error: Invalid assignment target
   |

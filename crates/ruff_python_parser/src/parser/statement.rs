@@ -77,6 +77,7 @@ const AUGMENTED_ASSIGN_SET: TokenSet = TokenSet::new([
 ]);
 
 impl<'src> Parser<'src> {
+    /// Returns `true` if the current token is the start of a compound statement.
     pub(super) fn at_compound_stmt(&self) -> bool {
         self.at_ts(COMPOUND_STMT_SET)
     }
@@ -87,6 +88,8 @@ impl<'src> Parser<'src> {
         self.at_ts(SIMPLE_STMT_WITH_EXPR_SET)
     }
 
+    /// Returns `true` if the current token is the start of a simple, compound or expression
+    /// statement.
     pub(super) fn at_stmt(&self) -> bool {
         self.at_ts(STMTS_SET)
     }
@@ -734,7 +737,7 @@ impl<'src> Parser<'src> {
                 // test_err assert_empty_msg
                 // assert x,
                 self.add_error(
-                    ParseErrorType::OtherError("Expected an expression".to_string()),
+                    ParseErrorType::ExpectedExpression,
                     self.current_token_range(),
                 );
                 None
@@ -1007,7 +1010,7 @@ impl<'src> Parser<'src> {
                 // test_err ann_assign_stmt_missing_rhs
                 // x: int =
                 self.add_error(
-                    ParseErrorType::OtherError("Expected an expression".to_string()),
+                    ParseErrorType::ExpectedExpression,
                     self.current_token_range(),
                 );
                 None
@@ -1781,7 +1784,7 @@ impl<'src> Parser<'src> {
             // fine to raise the error.
             if self.eat(TokenKind::Comma) && !self.at_expr() {
                 self.add_error(
-                    ParseErrorType::OtherError("Expected an expression".to_string()),
+                    ParseErrorType::ExpectedExpression,
                     self.current_token_range(),
                 );
             }
@@ -1915,7 +1918,7 @@ impl<'src> Parser<'src> {
                     }
                     let err = match parsed_with_item.item.context_expr {
                         Expr::Named(_) => ParseErrorType::UnparenthesizedNamedExpression,
-                        Expr::Starred(_) => ParseErrorType::StarredExpressionUsage,
+                        Expr::Starred(_) => ParseErrorType::InvalidStarredExpressionUsage,
                         Expr::Yield(_) | Expr::YieldFrom(_) => {
                             ParseErrorType::InvalidYieldExpressionUsage
                         }
@@ -1985,7 +1988,7 @@ impl<'src> Parser<'src> {
                 //
                 // So, no starred expression allowed.
                 if expr.is_starred_expr() {
-                    self.add_error(ParseErrorType::StarredExpressionUsage, &expr);
+                    self.add_error(ParseErrorType::InvalidStarredExpressionUsage, &expr);
                 }
                 expr
             } else {
@@ -2132,7 +2135,7 @@ impl<'src> Parser<'src> {
                 if !generator_expr.parenthesized {
                     self.add_error(
                         ParseErrorType::OtherError(
-                            "unparenthesized generator expression cannot be used here".to_string(),
+                            "Unparenthesized generator expression cannot be used here".to_string(),
                         ),
                         generator_expr.range(),
                     );
@@ -2235,7 +2238,7 @@ impl<'src> Parser<'src> {
                 // test_err match_stmt_single_starred_subject
                 // match *foo:
                 //     case _: ...
-                self.add_error(ParseErrorType::StarredExpressionUsage, &subject);
+                self.add_error(ParseErrorType::InvalidStarredExpressionUsage, &subject);
             }
             subject
         };
@@ -2410,7 +2413,7 @@ impl<'src> Parser<'src> {
                 // async match test:
                 //     case _: ...
                 self.add_error(
-                    ParseErrorType::UnexpectedAsyncToken(kind),
+                    ParseErrorType::UnexpectedTokenAfterAsync(kind),
                     self.current_token_range(),
                 );
 
@@ -2730,7 +2733,7 @@ impl<'src> Parser<'src> {
                 // test_err params_follows_var_keyword_param
                 // def foo(**kwargs, a, /, b=10, *, *args): ...
                 parser.add_error(
-                    ParseErrorType::ParamFollowsVarKeywordParam,
+                    ParseErrorType::ParamAfterVarKeywordParam,
                     parser.current_token_range(),
                 );
             }
@@ -2916,7 +2919,7 @@ impl<'src> Parser<'src> {
                         // test_err params_non_default_after_default
                         // def foo(a=10, b, c: int): ...
                         parser
-                            .add_error(ParseErrorType::NonDefaultParamFollowsDefaultParam, &param);
+                            .add_error(ParseErrorType::NonDefaultParamAfterDefaultParam, &param);
                     }
 
                     seen_default_param |= param.default.is_some();
@@ -3042,7 +3045,7 @@ impl<'src> Parser<'src> {
                     // type X[T: ] = int
                     // type X[T1: , T2] = int
                     self.add_error(
-                        ParseErrorType::OtherError("Expected an expression".to_string()),
+                        ParseErrorType::ExpectedExpression,
                         self.current_token_range(),
                     );
                     None
@@ -3086,13 +3089,13 @@ impl<'src> Parser<'src> {
         match expr {
             Expr::List(_) => self.add_error(
                 ParseErrorType::OtherError(
-                    "only single target (not list) can be annotated".to_string(),
+                    "Only single target (not list) can be annotated".to_string(),
                 ),
                 expr,
             ),
             Expr::Tuple(_) => self.add_error(
                 ParseErrorType::OtherError(
-                    "only single target (not tuple) can be annotated".to_string(),
+                    "Only single target (not tuple) can be annotated".to_string(),
                 ),
                 expr,
             ),

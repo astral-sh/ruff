@@ -57,7 +57,7 @@ Module(
 
   |
 1 | nonlocal ,
-  |           ^ Syntax Error: `nonlocal` statement must have at least one name
+  |           ^ Syntax Error: Nonlocal statement must have at least one name
 2 | nonlocal x,
 3 | nonlocal x, y,
   |

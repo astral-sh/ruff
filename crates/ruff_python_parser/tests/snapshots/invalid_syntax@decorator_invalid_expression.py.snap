@@ -131,7 +131,7 @@ Module(
 
   |
 1 | @*x
-  |  ^^ Syntax Error: starred expression cannot be used here
+  |  ^^ Syntax Error: Starred expression cannot be used here
 2 | @(*x)
 3 | @((*x))
   |
@@ -140,7 +140,7 @@ Module(
   |
 1 | @*x
 2 | @(*x)
-  |   ^^ Syntax Error: starred expression cannot be used here
+  |   ^^ Syntax Error: Starred expression cannot be used here
 3 | @((*x))
 4 | @yield x
   |
@@ -150,7 +150,7 @@ Module(
 1 | @*x
 2 | @(*x)
 3 | @((*x))
-  |    ^^ Syntax Error: starred expression cannot be used here
+  |    ^^ Syntax Error: Starred expression cannot be used here
 4 | @yield x
 5 | @yield from x
   |
@@ -160,7 +160,7 @@ Module(
 2 | @(*x)
 3 | @((*x))
 4 | @yield x
-  |  ^^^^^^^ Syntax Error: yield expression cannot be used here
+  |  ^^^^^^^ Syntax Error: Yield expression cannot be used here
 5 | @yield from x
 6 | def foo(): ...
   |
@@ -170,6 +170,6 @@ Module(
 3 | @((*x))
 4 | @yield x
 5 | @yield from x
-  |  ^^^^^^^^^^^^ Syntax Error: yield expression cannot be used here
+  |  ^^^^^^^^^^^^ Syntax Error: Yield expression cannot be used here
 6 | def foo(): ...
   |

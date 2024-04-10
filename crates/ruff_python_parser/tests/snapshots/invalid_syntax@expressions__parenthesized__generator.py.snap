@@ -118,7 +118,7 @@ Module(
 
   |
 1 | (*x for x in y)
-  |  ^^ Syntax Error: iterable unpacking cannot be used in a comprehension
+  |  ^^ Syntax Error: Iterable unpacking cannot be used in a comprehension
 2 | (x := 1, for x in y)
   |
 
