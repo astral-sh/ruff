@@ -10,9 +10,7 @@ x = 1  # noqa: F401, W203
 # noqa: F401
 # noqa: F401, W203
 
-
-
-# Ok
+# OK
 x = 2  # noqa: X100
 x = 2  # noqa:X100
 
