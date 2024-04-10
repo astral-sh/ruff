@@ -15,7 +15,7 @@ use ruff_python_ast::{
     StmtFunctionDef,
 };
 use ruff_python_parser::Mode;
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::files::{FileId, Files};
 
@@ -315,23 +315,20 @@ pub struct HirAstId {
 }
 
 #[ruff_index::newtype_index]
-struct AstId;
+pub struct AstId;
 
 // TODO THis is now something that doesn't work well with Ruff's AST because the reverse map requires lifetimes because
 //  cloning the nodes would be silly.
-pub struct AstIds<'a> {
-    ids: IndexVec<AstId, AnyNodeRef<'a>>,
-    reverse: FxHashMap<NonNull<()>, AstId>,
+pub struct AstIds {
+    ids: IndexVec<AstId, NodeKey>,
+    reverse: FxHashMap<NodeKey, AstId>,
 }
 
-impl<'a> AstIds<'a> {
-    pub fn from_module(module: &'a ModModule) -> Self {
-        let mut visitor = AstIdsVisitor {
-            ids: IndexVec::new(),
-            reverse: FxHashMap::default(),
-            deferred: Vec::new(),
-        };
+impl AstIds {
+    pub fn from_module(module: &ModModule) -> Self {
+        let mut visitor = AstIdsVisitor::default();
 
+        // TODO: visit_module?
         visitor.visit_body(&module.body);
 
         while let Some(deferred) = visitor.deferred.pop() {
@@ -349,22 +346,27 @@ impl<'a> AstIds<'a> {
         }
     }
 
-    pub fn get(&self, node: AnyNodeRef<'a>) -> Option<AstId> {
-        self.reverse.get(&node.as_ptr()).copied()
+    pub fn get(&self, node: &NodeKey) -> Option<AstId> {
+        self.reverse.get(node).copied()
     }
 }
 
+#[derive(Default)]
 struct AstIdsVisitor<'a> {
-    ids: IndexVec<AstId, AnyNodeRef<'a>>,
-    reverse: FxHashMap<NonNull<()>, AstId>,
+    ids: IndexVec<AstId, NodeKey>,
+    reverse: FxHashMap<NodeKey, AstId>,
     deferred: Vec<DeferredNode<'a>>,
 }
 
 impl<'a> AstIdsVisitor<'a> {
     fn push<A: Into<AnyNodeRef<'a>>>(&mut self, node: A) {
         let node = node.into();
-        let id = self.ids.push(node);
-        self.reverse.insert(node.as_ptr(), id);
+        let node_key = NodeKey {
+            kind: node.kind(),
+            range: node.range(),
+        };
+        let id = self.ids.push(node_key);
+        self.reverse.insert(node_key, id);
     }
 }
 
@@ -398,7 +400,32 @@ enum DeferredNode<'a> {
 //   `Arc` internally
 // TODO: Implement the logic to resolve a node, given a db (and the correct file).
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
-pub struct WeakNodePtr {
+pub struct NodeKey {
     kind: NodeKind,
     range: TextRange,
 }
+
+// ref counted
+// struct GreenNode {
+//     len: TextSize,
+//     kind: NodeKind,
+//     children: Vec<GreenElement> // GreenElement which can either be a Token or Node
+// }
+
+// enum GreenElement {
+//     Node(GreenNode),
+//     Token(GreenToken)
+// }
+
+// struct GreenToken {
+//     len: TextSize,
+//     kind: TokenKind,
+//     content: String,
+// }
+
+// // ref counted, red nodes
+// struct SyntaxNode {
+//     offset: TextSize,
+//     parent: Option<GreenNode>, // upward pointer
+//     node: GreenNode,
+// }
