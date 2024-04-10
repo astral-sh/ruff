@@ -49,9 +49,3 @@ Module(
 1 | nonlocal x + 1
   |            ^ Syntax Error: expected Comma, found Plus
   |
-
-
-  |
-1 | nonlocal x + 1
-  | ^^^^^^^^^^^^ Syntax Error: use `;` to separate simple statements
-  |

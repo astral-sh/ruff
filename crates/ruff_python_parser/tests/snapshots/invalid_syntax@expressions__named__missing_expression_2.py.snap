@@ -89,26 +89,6 @@ Module(
 
 
   |
-1 |   # Missing expression, instead there's a function definition
-2 |   
-3 | / (x :=
-4 | | 
-5 | | def foo():
-  | |_______^ Syntax Error: use `;` to separate simple statements
-6 |       pass
-  |
-
-
-  |
-3 | (x :=
-4 | 
-5 | def foo():
-  |     ^^^^^ Syntax Error: invalid annotated assignment target
-6 |     pass
-  |
-
-
-  |
 5 | def foo():
 6 |     pass
   |     ^^^^ Syntax Error: Expected an identifier, but found a keyword 'pass' that cannot be used here

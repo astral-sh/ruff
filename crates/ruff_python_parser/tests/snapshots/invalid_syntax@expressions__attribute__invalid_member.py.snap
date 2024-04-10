@@ -116,7 +116,7 @@ Module(
 
   |
 1 | x.1
-  | ^^^ Syntax Error: use `;` to separate simple statements
+  |  ^^ Syntax Error: Simple statements must be separated by newlines or semicolons
 2 | x.1.0
 3 | x.[0]
   |
@@ -125,7 +125,7 @@ Module(
   |
 1 | x.1
 2 | x.1.0
-  | ^^^ Syntax Error: use `;` to separate simple statements
+  |  ^^ Syntax Error: Simple statements must be separated by newlines or semicolons
 3 | x.[0]
   |
 
@@ -133,7 +133,7 @@ Module(
   |
 1 | x.1
 2 | x.1.0
-  |  ^^^^ Syntax Error: use `;` to separate simple statements
+  |    ^^ Syntax Error: Simple statements must be separated by newlines or semicolons
 3 | x.[0]
   |
 

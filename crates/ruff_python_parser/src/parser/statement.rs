@@ -100,19 +100,22 @@ impl<'src> Parser<'src> {
         ) || token.is_keyword()
     }
 
-    /// Parses a compound or a simple statement.
+    /// Parses a compound or a single simple statement.
+    ///
+    /// See:
+    /// - <https://docs.python.org/3/reference/compound_stmts.html>
+    /// - <https://docs.python.org/3/reference/simple_stmts.html>
     pub(super) fn parse_statement(&mut self) -> Stmt {
-        let start_offset = self.node_start();
+        let start = self.node_start();
+
         match self.current_token_kind() {
             TokenKind::If => Stmt::If(self.parse_if_statement()),
-            TokenKind::For => Stmt::For(self.parse_for_statement(start_offset)),
+            TokenKind::For => Stmt::For(self.parse_for_statement(start)),
             TokenKind::While => Stmt::While(self.parse_while_statement()),
-            TokenKind::Def => {
-                Stmt::FunctionDef(self.parse_function_definition(vec![], start_offset))
-            }
-            TokenKind::Class => Stmt::ClassDef(self.parse_class_definition(vec![], start_offset)),
+            TokenKind::Def => Stmt::FunctionDef(self.parse_function_definition(vec![], start)),
+            TokenKind::Class => Stmt::ClassDef(self.parse_class_definition(vec![], start)),
             TokenKind::Try => Stmt::Try(self.parse_try_statement()),
-            TokenKind::With => Stmt::With(self.parse_with_statement(start_offset)),
+            TokenKind::With => Stmt::With(self.parse_with_statement(start)),
             TokenKind::At => self.parse_decorators(),
             TokenKind::Async => self.parse_async_statement(),
             TokenKind::Match => Stmt::Match(self.parse_match_statement()),
@@ -120,10 +123,11 @@ impl<'src> Parser<'src> {
         }
     }
 
-    /// Parses a single simple statement, expecting it to be terminated by a newline or semicolon.
-    /// TODO(micha): It's not entirely clear why this method is necessary. It is called from
-    /// `parse_body` and it only reads out the first simple statement before calling `parse_statement` again.
-    /// This makes me wonder if the parser incorrectly allows `a;if b: pass`
+    /// Parses a single simple statement.
+    ///
+    /// This statement must be terminated by a newline or semicolon.
+    ///
+    /// Use [`Parser::parse_simple_statements`] to parse a sequence of simple statements.
     fn parse_single_simple_statement(&mut self) -> Stmt {
         let stmt = self.parse_simple_statement();
 
@@ -131,38 +135,61 @@ impl<'src> Parser<'src> {
         let has_eaten_newline = self.eat(TokenKind::Newline);
 
         if !has_eaten_newline && !has_eaten_semicolon && self.at_simple_stmt() {
-            let range = self.current_token_range();
+            // test_err simple_stmts_on_same_line
+            // a b
+            // a + b c + d
+            // break; continue pass; continue break
             self.add_error(
-                ParseErrorType::SimpleStmtsInSameLine,
-                stmt.range().cover(range),
+                ParseErrorType::SimpleStatementsOnSameLine,
+                self.current_token_range(),
             );
         }
 
         if !has_eaten_newline && self.at_compound_stmt() {
+            // test_err simple_and_compound_stmt_on_same_line
+            // a; if b: pass; b
             self.add_error(
-                ParseErrorType::SimpleStmtAndCompoundStmtInSameLine,
-                stmt.range().cover(self.current_token_range()),
+                ParseErrorType::SimpleAndCompoundStatementOnSameLine,
+                self.current_token_range(),
             );
         }
 
         stmt
     }
 
+    /// Parses a sequence of simple statements.
+    ///
+    /// If there is more than one statement in this sequence, it is expected to be separated by a
+    /// semicolon. The sequence can optionally end with a semicolon, but regardless of whether
+    /// a semicolon is present or not, it is expected to end with a newline.
+    ///
+    /// Matches the `simple_stmts` rule in the [Python grammar].
+    ///
+    /// [Python grammar]: https://docs.python.org/3/reference/grammar.html
     fn parse_simple_statements(&mut self) -> Vec<Stmt> {
         let mut stmts = vec![];
-        let start = self.node_start();
         let mut progress = ParserProgress::default();
 
         loop {
             progress.assert_progressing(self);
+
             stmts.push(self.parse_simple_statement());
 
             if !self.eat(TokenKind::Semi) {
                 if self.at_simple_stmt() {
-                    for stmt in &stmts {
-                        self.add_error(ParseErrorType::SimpleStmtsInSameLine, stmt.range());
-                    }
+                    // test_err simple_stmts_on_same_line_in_block
+                    // if True: break; continue pass; continue break
+                    self.add_error(
+                        ParseErrorType::SimpleStatementsOnSameLine,
+                        self.current_token_range(),
+                    );
                 } else {
+                    // test_ok simple_stmts_in_block
+                    // if True: pass
+                    // if True: pass;
+                    // if True: pass; continue
+                    // if True: pass; continue;
+                    // x = 1
                     break;
                 }
             }
@@ -172,17 +199,37 @@ impl<'src> Parser<'src> {
             }
         }
 
-        if !self.eat(TokenKind::Newline) && self.at_compound_stmt() {
-            self.add_error(
-                ParseErrorType::SimpleStmtAndCompoundStmtInSameLine,
-                self.node_range(start),
-            );
+        // Ideally, we should use `expect` here but we use `eat` for better error message. Later,
+        // if the parser isn't at the start of a compound statement, we'd `expect` a newline.
+        if !self.eat(TokenKind::Newline) {
+            if self.at_compound_stmt() {
+                // test_err simple_and_compound_stmt_on_same_line_in_block
+                // if True: pass if False: pass
+                // if True: pass; if False: pass
+                self.add_error(
+                    ParseErrorType::SimpleAndCompoundStatementOnSameLine,
+                    self.current_token_range(),
+                );
+            } else {
+                // test_err multiple_clauses_on_same_line
+                // if True: pass elif False: pass else: pass
+                // if True: pass; elif False: pass; else: pass
+                // for x in iter: break else: pass
+                // for x in iter: break; else: pass
+                // try: pass except exc: pass else: pass finally: pass
+                // try: pass; except exc: pass; else: pass; finally: pass
+                self.expect(TokenKind::Newline);
+            }
         }
 
+        // test_ok simple_stmts_with_semicolons
+        // return; import a; from x import y; z; type T = int
         stmts
     }
 
-    /// See: <https://docs.python.org/3/reference/simple_stmts.html#simple-statements>
+    /// Parses a simple statement.
+    ///
+    /// See: <https://docs.python.org/3/reference/simple_stmts.html>
     fn parse_simple_statement(&mut self) -> Stmt {
         match self.current_token_kind() {
             TokenKind::Return => Stmt::Return(self.parse_return_statement()),
@@ -202,6 +249,8 @@ impl<'src> Parser<'src> {
             }
             _ => {
                 let start = self.node_start();
+
+                // simple_stmt: `... | yield_stmt | star_expressions | ...`
                 let parsed_expr =
                     self.parse_yield_expression_or_else(Parser::parse_star_expression_list);
 
@@ -812,6 +861,11 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// Parses an IPython escape command at the statement level.
+    ///
+    /// # Panics
+    ///
+    /// If the parser isn't positioned at an `EscapeCommand` token.
     fn parse_ipython_escape_command_statement(&mut self) -> ast::StmtIpyEscapeCommand {
         let start = self.node_start();
         let (Tok::IpyEscapeCommand { value, kind }, _) = self.bump(TokenKind::EscapeCommand) else {
