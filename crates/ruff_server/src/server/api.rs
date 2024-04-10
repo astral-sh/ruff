@@ -16,8 +16,8 @@ use super::{client::Responder, schedule::BackgroundSchedule, Result};
 /// given the parameter type used by the implementer.
 macro_rules! define_document_url {
     ($params:ident: &$p:ty) => {
-        fn document_url($params: &$p) -> &lsp_types::Url {
-            &$params.text_document.uri
+        fn document_url($params: &$p) -> std::borrow::Cow<lsp_types::Url> {
+            std::borrow::Cow::Borrowed(&$params.text_document.uri)
         }
     };
 }
@@ -28,16 +28,20 @@ pub(super) fn request<'a>(req: server::Request) -> Task<'a> {
     let id = req.id.clone();
 
     match req.method.as_str() {
-        request::CodeAction::METHOD => background_request_task::<request::CodeAction>(
+        request::CodeActions::METHOD => background_request_task::<request::CodeActions>(
             req,
             BackgroundSchedule::LatencySensitive,
         ),
+        request::CodeActionResolve::METHOD => {
+            background_request_task::<request::CodeActionResolve>(req, BackgroundSchedule::Worker)
+        }
         request::DocumentDiagnostic::METHOD => {
             background_request_task::<request::DocumentDiagnostic>(
                 req,
                 BackgroundSchedule::LatencySensitive,
             )
         }
+        request::ExecuteCommand::METHOD => local_request_task::<request::ExecuteCommand>(req),
         request::Format::METHOD => {
             background_request_task::<request::Format>(req, BackgroundSchedule::Fmt)
         }
@@ -84,13 +88,12 @@ pub(super) fn notification<'a>(notif: server::Notification) -> Task<'a> {
     })
 }
 
-#[allow(dead_code)]
 fn local_request_task<'a, R: traits::SyncRequestHandler>(
     req: server::Request,
 ) -> super::Result<Task<'a>> {
     let (id, params) = cast_request::<R>(req)?;
-    Ok(Task::local(|session, notifier, responder| {
-        let result = R::run(session, notifier, params);
+    Ok(Task::local(|session, notifier, requester, responder| {
+        let result = R::run(session, notifier, requester, params);
         respond::<R>(id, result, &responder);
     }))
 }
@@ -102,7 +105,7 @@ fn background_request_task<'a, R: traits::BackgroundDocumentRequestHandler>(
     let (id, params) = cast_request::<R>(req)?;
     Ok(Task::background(schedule, move |session: &Session| {
         // TODO(jane): we should log an error if we can't take a snapshot.
-        let Some(snapshot) = session.take_snapshot(R::document_url(&params)) else {
+        let Some(snapshot) = session.take_snapshot(&R::document_url(&params)) else {
             return Box::new(|_, _| {});
         };
         Box::new(move |notifier, responder| {
@@ -116,7 +119,7 @@ fn local_notification_task<'a, N: traits::SyncNotificationHandler>(
     notif: server::Notification,
 ) -> super::Result<Task<'a>> {
     let (id, params) = cast_notification::<N>(notif)?;
-    Ok(Task::local(move |session, notifier, _| {
+    Ok(Task::local(move |session, notifier, _, _| {
         if let Err(err) = N::run(session, notifier, params) {
             tracing::error!("An error occurred while running {id}: {err}");
         }
@@ -131,7 +134,7 @@ fn background_notification_thread<'a, N: traits::BackgroundDocumentNotificationH
     let (id, params) = cast_notification::<N>(req)?;
     Ok(Task::background(schedule, move |session: &Session| {
         // TODO(jane): we should log an error if we can't take a snapshot.
-        let Some(snapshot) = session.take_snapshot(N::document_url(&params)) else {
+        let Some(snapshot) = session.take_snapshot(&N::document_url(&params)) else {
             return Box::new(|_, _| {});
         };
         Box::new(move |notifier, _| {

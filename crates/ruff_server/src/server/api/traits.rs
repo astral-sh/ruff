@@ -1,6 +1,6 @@
 //! A stateful LSP implementation that calls into the Ruff API.
 
-use crate::server::client::Notifier;
+use crate::server::client::{Notifier, Requester};
 use crate::session::{DocumentSnapshot, Session};
 
 use lsp_types::notification::Notification as LSPNotification;
@@ -20,6 +20,7 @@ pub(super) trait SyncRequestHandler: RequestHandler {
     fn run(
         session: &mut Session,
         notifier: Notifier,
+        requester: &mut Requester,
         params: <<Self as RequestHandler>::RequestType as Request>::Params,
     ) -> super::Result<<<Self as RequestHandler>::RequestType as Request>::Result>;
 }
@@ -31,7 +32,7 @@ pub(super) trait BackgroundDocumentRequestHandler: RequestHandler {
     /// implementation.
     fn document_url(
         params: &<<Self as RequestHandler>::RequestType as Request>::Params,
-    ) -> &lsp_types::Url;
+    ) -> std::borrow::Cow<lsp_types::Url>;
 
     fn run_with_snapshot(
         snapshot: DocumentSnapshot,
@@ -66,7 +67,7 @@ pub(super) trait BackgroundDocumentNotificationHandler: NotificationHandler {
     /// implementation.
     fn document_url(
         params: &<<Self as NotificationHandler>::NotificationType as LSPNotification>::Params,
-    ) -> &lsp_types::Url;
+    ) -> std::borrow::Cow<lsp_types::Url>;
 
     fn run_with_snapshot(
         snapshot: DocumentSnapshot,

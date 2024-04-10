@@ -18,7 +18,6 @@ ruff_python_ast = { path = "../ruff_python_ast" }
 ruff_text_size = { path = "../ruff_text_size" }
 
 anyhow = { workspace = true }
-bitflags = { workspace = true }
 bstr = { workspace = true }
 is-macro = { workspace = true }
 itertools = { workspace = true }

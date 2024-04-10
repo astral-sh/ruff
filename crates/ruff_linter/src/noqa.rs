@@ -147,7 +147,7 @@ impl<'a> Directive<'a> {
 
     /// Lex an individual rule code (e.g., `F401`).
     #[inline]
-    fn lex_code(line: &str) -> Option<&str> {
+    pub(crate) fn lex_code(line: &str) -> Option<&str> {
         // Extract, e.g., the `F` in `F401`.
         let prefix = line.chars().take_while(char::is_ascii_uppercase).count();
         // Extract, e.g., the `401` in `F401`.

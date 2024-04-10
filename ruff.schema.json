@@ -554,7 +554,7 @@
       ]
     },
     "per-file-ignores": {
-      "description": "A list of mappings from file pattern to rule codes or prefixes to exclude, when considering any matching files.",
+      "description": "A list of mappings from file pattern to rule codes or prefixes to exclude, when considering any matching files. An initial '!' negates the file pattern.",
       "deprecated": true,
       "type": [
         "object",
@@ -2168,7 +2168,7 @@
           ]
         },
         "per-file-ignores": {
-          "description": "A list of mappings from file pattern to rule codes or prefixes to exclude, when considering any matching files.",
+          "description": "A list of mappings from file pattern to rule codes or prefixes to exclude, when considering any matching files. An initial '!' negates the file pattern.",
           "type": [
             "object",
             "null"
@@ -3043,6 +3043,7 @@
         "FURB101",
         "FURB105",
         "FURB11",
+        "FURB110",
         "FURB113",
         "FURB118",
         "FURB12",
@@ -3063,6 +3064,7 @@
         "FURB161",
         "FURB163",
         "FURB164",
+        "FURB166",
         "FURB167",
         "FURB168",
         "FURB169",
@@ -3353,6 +3355,7 @@
         "PLR172",
         "PLR1722",
         "PLR173",
+        "PLR1730",
         "PLR1733",
         "PLR1736",
         "PLR2",
@@ -3388,6 +3391,8 @@
         "PLW0131",
         "PLW0133",
         "PLW02",
+        "PLW021",
+        "PLW0211",
         "PLW024",
         "PLW0245",
         "PLW04",
@@ -3864,6 +3869,7 @@
         "UP04",
         "UP040",
         "UP041",
+        "UP042",
         "W",
         "W1",
         "W19",

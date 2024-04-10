@@ -1,6 +1,6 @@
 """Tests for constructs allowed in `.pyi` stub files but not at runtime"""
 
-from typing import Optional, TypeAlias, Union
+from typing import Generic, NewType, Optional, TypeAlias, TypeVar, Union
 
 __version__: str
 __author__: str
@@ -33,6 +33,19 @@ class Leaf: ...
 class Tree(list[Tree | Leaf]): ...  # valid in a `.pyi` stub file, not in a `.py` runtime file
 class Tree2(list["Tree | Leaf"]): ...  # always okay
 
+# Generic bases can have forward references in stubs
+class Foo(Generic[T]): ...
+T = TypeVar("T")
+class Bar(Foo[Baz]): ...
+class Baz: ...
+
+# bases in general can be forward references in stubs
+class Eggs(Spam): ...
+class Spam: ...
+
+# NewType can have forward references
+MyNew = NewType("MyNew", MyClass)
+
 # Annotations are treated as assignments in .pyi files, but not in .py files
 class MyClass:
     foo: int
@@ -42,3 +55,6 @@ class MyClass:
 baz: MyClass
 eggs = baz  # valid in a `.pyi` stub file, not in a `.py` runtime file
 eggs = "baz"  # always okay
+
+class Blah:
+    class Blah2(Blah): ...

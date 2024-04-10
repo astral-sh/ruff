@@ -1,9 +1,10 @@
-use ruff_python_ast::{self as ast, Arguments, Decorator, Expr, Parameters, Stmt};
+use ruff_python_ast::{self as ast, Decorator, Expr, Parameters, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::identifier::Identifier;
+use ruff_python_semantic::analyze;
 use ruff_python_semantic::analyze::visibility::{is_abstract, is_final, is_overload};
 use ruff_python_semantic::{ScopeKind, SemanticModel};
 
@@ -119,7 +120,9 @@ pub(crate) fn non_self_return_type(
     returns: Option<&Expr>,
     parameters: &Parameters,
 ) {
-    let ScopeKind::Class(class_def) = checker.semantic().current_scope().kind else {
+    let semantic = checker.semantic();
+
+    let ScopeKind::Class(class_def) = semantic.current_scope().kind else {
         return;
     };
 
@@ -132,21 +135,19 @@ pub(crate) fn non_self_return_type(
     };
 
     // PEP 673 forbids the use of `typing(_extensions).Self` in metaclasses.
-    if is_metaclass(class_def, checker.semantic()) {
+    if is_metaclass(class_def, semantic) {
         return;
     }
 
     // Skip any abstract or overloaded methods.
-    if is_abstract(decorator_list, checker.semantic())
-        || is_overload(decorator_list, checker.semantic())
-    {
+    if is_abstract(decorator_list, semantic) || is_overload(decorator_list, semantic) {
         return;
     }
 
     if is_async {
         if name == "__aenter__"
             && is_name(returns, &class_def.name)
-            && !is_final(&class_def.decorator_list, checker.semantic())
+            && !is_final(&class_def.decorator_list, semantic)
         {
             checker.diagnostics.push(Diagnostic::new(
                 NonSelfReturnType {
@@ -161,7 +162,7 @@ pub(crate) fn non_self_return_type(
 
     // In-place methods that are expected to return `Self`.
     if is_inplace_bin_op(name) {
-        if !is_self(returns, checker.semantic()) {
+        if !is_self(returns, semantic) {
             checker.diagnostics.push(Diagnostic::new(
                 NonSelfReturnType {
                     class_name: class_def.name.to_string(),
@@ -174,8 +175,7 @@ pub(crate) fn non_self_return_type(
     }
 
     if is_name(returns, &class_def.name) {
-        if matches!(name, "__enter__" | "__new__")
-            && !is_final(&class_def.decorator_list, checker.semantic())
+        if matches!(name, "__enter__" | "__new__") && !is_final(&class_def.decorator_list, semantic)
         {
             checker.diagnostics.push(Diagnostic::new(
                 NonSelfReturnType {
@@ -190,8 +190,8 @@ pub(crate) fn non_self_return_type(
 
     match name {
         "__iter__" => {
-            if is_iterable(returns, checker.semantic())
-                && is_iterator(class_def.arguments.as_deref(), checker.semantic())
+            if is_iterable_or_iterator(returns, semantic)
+                && subclasses_iterator(class_def, semantic)
             {
                 checker.diagnostics.push(Diagnostic::new(
                     NonSelfReturnType {
@@ -203,8 +203,8 @@ pub(crate) fn non_self_return_type(
             }
         }
         "__aiter__" => {
-            if is_async_iterable(returns, checker.semantic())
-                && is_async_iterator(class_def.arguments.as_deref(), checker.semantic())
+            if is_async_iterable_or_iterator(returns, semantic)
+                && subclasses_async_iterator(class_def, semantic)
             {
                 checker.diagnostics.push(Diagnostic::new(
                     NonSelfReturnType {
@@ -221,24 +221,12 @@ pub(crate) fn non_self_return_type(
 
 /// Returns `true` if the given class is a metaclass.
 fn is_metaclass(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> bool {
-    class_def.arguments.as_ref().is_some_and(|arguments| {
-        arguments
-            .args
-            .iter()
-            .any(|expr| is_metaclass_base(expr, semantic))
+    analyze::class::any_qualified_name(class_def, semantic, &|qualified_name| {
+        matches!(
+            qualified_name.segments(),
+            ["" | "builtins", "type"] | ["abc", "ABCMeta"] | ["enum", "EnumMeta" | "EnumType"]
+        )
     })
-}
-
-/// Returns `true` if the given expression resolves to a metaclass.
-fn is_metaclass_base(base: &Expr, semantic: &SemanticModel) -> bool {
-    semantic
-        .resolve_qualified_name(base)
-        .is_some_and(|qualified_name| {
-            matches!(
-                qualified_name.segments(),
-                ["" | "builtins", "type"] | ["abc", "ABCMeta"] | ["enum", "EnumMeta" | "EnumType"]
-            )
-        })
 }
 
 /// Returns `true` if the method is an in-place binary operator.
@@ -275,24 +263,17 @@ fn is_self(expr: &Expr, semantic: &SemanticModel) -> bool {
 }
 
 /// Return `true` if the given class extends `collections.abc.Iterator`.
-fn is_iterator(arguments: Option<&Arguments>, semantic: &SemanticModel) -> bool {
-    let Some(Arguments { args: bases, .. }) = arguments else {
-        return false;
-    };
-    bases.iter().any(|expr| {
-        semantic
-            .resolve_qualified_name(map_subscript(expr))
-            .is_some_and(|qualified_name| {
-                matches!(
-                    qualified_name.segments(),
-                    ["typing", "Iterator"] | ["collections", "abc", "Iterator"]
-                )
-            })
+fn subclasses_iterator(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> bool {
+    analyze::class::any_qualified_name(class_def, semantic, &|qualified_name| {
+        matches!(
+            qualified_name.segments(),
+            ["typing", "Iterator"] | ["collections", "abc", "Iterator"]
+        )
     })
 }
 
-/// Return `true` if the given expression resolves to `collections.abc.Iterable`.
-fn is_iterable(expr: &Expr, semantic: &SemanticModel) -> bool {
+/// Return `true` if the given expression resolves to `collections.abc.Iterable` or `collections.abc.Iterator`.
+fn is_iterable_or_iterator(expr: &Expr, semantic: &SemanticModel) -> bool {
     semantic
         .resolve_qualified_name(map_subscript(expr))
         .is_some_and(|qualified_name| {
@@ -305,24 +286,17 @@ fn is_iterable(expr: &Expr, semantic: &SemanticModel) -> bool {
 }
 
 /// Return `true` if the given class extends `collections.abc.AsyncIterator`.
-fn is_async_iterator(arguments: Option<&Arguments>, semantic: &SemanticModel) -> bool {
-    let Some(Arguments { args: bases, .. }) = arguments else {
-        return false;
-    };
-    bases.iter().any(|expr| {
-        semantic
-            .resolve_qualified_name(map_subscript(expr))
-            .is_some_and(|qualified_name| {
-                matches!(
-                    qualified_name.segments(),
-                    ["typing", "AsyncIterator"] | ["collections", "abc", "AsyncIterator"]
-                )
-            })
+fn subclasses_async_iterator(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> bool {
+    analyze::class::any_qualified_name(class_def, semantic, &|qualified_name| {
+        matches!(
+            qualified_name.segments(),
+            ["typing", "AsyncIterator"] | ["collections", "abc", "AsyncIterator"]
+        )
     })
 }
 
-/// Return `true` if the given expression resolves to `collections.abc.AsyncIterable`.
-fn is_async_iterable(expr: &Expr, semantic: &SemanticModel) -> bool {
+/// Return `true` if the given expression resolves to `collections.abc.AsyncIterable` or `collections.abc.AsyncIterator`.
+fn is_async_iterable_or_iterator(expr: &Expr, semantic: &SemanticModel) -> bool {
     semantic
         .resolve_qualified_name(map_subscript(expr))
         .is_some_and(|qualified_name| {

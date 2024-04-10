@@ -16,6 +16,7 @@ mod tests {
 
     #[test_case(Rule::ReadWholeFile, Path::new("FURB101.py"))]
     #[test_case(Rule::RepeatedAppend, Path::new("FURB113.py"))]
+    #[test_case(Rule::IfExpInsteadOfOrOperator, Path::new("FURB110.py"))]
     #[test_case(Rule::ReimplementedOperator, Path::new("FURB118.py"))]
     #[test_case(Rule::ReadlinesInFor, Path::new("FURB129.py"))]
     #[test_case(Rule::DeleteFullSlice, Path::new("FURB131.py"))]
@@ -32,6 +33,7 @@ mod tests {
     #[test_case(Rule::ImplicitCwd, Path::new("FURB177.py"))]
     #[test_case(Rule::SingleItemMembershipTest, Path::new("FURB171.py"))]
     #[test_case(Rule::BitCount, Path::new("FURB161.py"))]
+    #[test_case(Rule::IntOnSlicedStr, Path::new("FURB166.py"))]
     #[test_case(Rule::RegexFlagAlias, Path::new("FURB167.py"))]
     #[test_case(Rule::IsinstanceTypeNone, Path::new("FURB168.py"))]
     #[test_case(Rule::TypeNoneComparison, Path::new("FURB169.py"))]
