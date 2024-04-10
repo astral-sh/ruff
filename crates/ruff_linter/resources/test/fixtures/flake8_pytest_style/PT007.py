@@ -84,5 +84,9 @@ def test_single_list_of_lists(param):
     "d",
     [("3", "4")],
 )
-def test_multiple_decorators(a, b, c):
+@pytest.mark.parametrize(
+    "e",
+    [("3", "4"),],
+)
+def test_multiple_decorators(a, b, c, d, e):
     pass
