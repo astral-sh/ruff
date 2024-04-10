@@ -15,6 +15,7 @@ use crate::noqa;
 use crate::noqa::{Directive, FileExemption, NoqaDirectives, NoqaMapping};
 use crate::registry::{AsRule, Rule, RuleSet};
 use crate::rule_redirects::get_redirect_target;
+use crate::rules::ruff;
 use crate::rules::ruff::rules::{UnusedCodes, UnusedNOQA};
 use crate::settings::LinterSettings;
 
@@ -210,6 +211,10 @@ pub(crate) fn check_noqa(
                 }
             }
         }
+    }
+
+    if settings.rules.enabled(Rule::RedirectedNOQA) {
+        ruff::rules::redirected_noqa(diagnostics, &noqa_directives);
     }
 
     ignored_diagnostics.sort_unstable();
