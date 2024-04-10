@@ -57,3 +57,9 @@ Module(
 2 | case _: ...
   | ^^^^ Syntax Error: Expected an indented block after `match` statement
   |
+
+
+  |
+1 | match foo:
+2 | case _: ...
+  |
