@@ -395,7 +395,8 @@ impl<'src> Parser<'src> {
                 {
                     self.add_error(
                         ParseErrorType::OtherError(format!(
-                            "unary `{unary_tok}` expression cannot be used here",
+                            "unary {} expression cannot be used here",
+                            unary_tok.display()
                         )),
                         &unary_expr,
                     );

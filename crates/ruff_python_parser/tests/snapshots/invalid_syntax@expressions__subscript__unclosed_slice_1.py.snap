@@ -93,7 +93,7 @@ Module(
 1 | x[::
 2 | 
 3 | def foo():
-  |     ^^^ Syntax Error: expected Rsqb, found Name
+  |     ^^^ Syntax Error: Expected ']', found name
 4 |     pass
   |
 

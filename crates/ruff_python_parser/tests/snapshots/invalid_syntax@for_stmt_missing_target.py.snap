@@ -56,5 +56,5 @@ Module(
 
   |
 1 | for in x: ...
-  |        ^ Syntax Error: expected In, found Name
+  |        ^ Syntax Error: Expected 'in', found name
   |

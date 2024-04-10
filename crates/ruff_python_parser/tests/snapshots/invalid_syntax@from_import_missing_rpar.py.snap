@@ -136,7 +136,7 @@ Module(
   |
 1 | from x import (a, b
 2 | 1 + 1
-  | ^ Syntax Error: expected Comma, found Int
+  | ^ Syntax Error: Expected ',', found int
 3 | from x import (a, b,
 4 | 2 + 2
   |
