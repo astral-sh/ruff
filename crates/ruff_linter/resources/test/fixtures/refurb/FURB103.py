@@ -121,3 +121,12 @@ with open(*filename, mode="w") as f:
 # `buffering`.
 with open(*filename, file="file.txt", mode="w") as f:
     f.write(x)
+
+# Loops imply multiple writes
+with open("file.txt", "w") as f:
+    while x < 0:
+        f.write(foobar)
+
+with open("file.txt", "w") as f:
+    for line in text:
+        f.write(line)

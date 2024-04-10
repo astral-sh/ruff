@@ -1,7 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::visitor::{self, Visitor};
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_python_codegen::Generator;
 use ruff_python_semantic::{BindingId, ResolvedReference, SemanticModel};
 use ruff_text_size::{Ranged, TextRange};
@@ -273,6 +273,7 @@ struct WriteMatcher<'a> {
     candidates: Vec<FileOpen<'a>>,
     matches: Vec<FileOpen<'a>>,
     contents: Vec<Vec<Expr>>,
+    loop_counter: u32,
 }
 
 impl<'a> WriteMatcher<'a> {
@@ -281,6 +282,7 @@ impl<'a> WriteMatcher<'a> {
             candidates,
             matches: vec![],
             contents: vec![],
+            loop_counter: 0,
         }
     }
 
@@ -294,6 +296,16 @@ impl<'a> WriteMatcher<'a> {
 }
 
 impl<'a> Visitor<'a> for WriteMatcher<'a> {
+    fn visit_stmt(&mut self, stmt: &'a Stmt) {
+        if matches!(stmt, ast::Stmt::While(_) | ast::Stmt::For(_)) {
+            self.loop_counter += 1;
+            visitor::walk_stmt(self, stmt);
+            self.loop_counter -= 1;
+        } else {
+            visitor::walk_stmt(self, stmt);
+        }
+    }
+
     fn visit_expr(&mut self, expr: &'a Expr) {
         if let Some((write_to, content)) = match_write_call(expr) {
             if let Some(open) = self
@@ -301,8 +313,12 @@ impl<'a> Visitor<'a> for WriteMatcher<'a> {
                 .iter()
                 .position(|open| open.is_ref(write_to))
             {
-                self.matches.push(self.candidates.remove(open));
-                self.contents.push(content);
+                if self.loop_counter == 0 {
+                    self.matches.push(self.candidates.remove(open));
+                    self.contents.push(content);
+                } else {
+                    self.candidates.remove(open);
+                }
             }
             return;
         }
