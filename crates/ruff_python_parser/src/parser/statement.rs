@@ -335,7 +335,6 @@ impl<'src> Parser<'src> {
         let exc = if self.at(TokenKind::Newline) {
             None
         } else {
-            // TODO(dhruvmanila): Disallow starred and yield expression
             // test_err raise_stmt_invalid_exc
             // raise *x
             // raise yield x
@@ -358,7 +357,6 @@ impl<'src> Parser<'src> {
         };
 
         let cause = (exc.is_some() && self.eat(TokenKind::From)).then(|| {
-            // TODO(dhruvmanila): Disallow starred and yield expression
             // test_err raise_stmt_invalid_cause
             // raise x from *y
             // raise x from yield y
@@ -659,7 +657,6 @@ impl<'src> Parser<'src> {
         // test_err assert_empty_test
         // assert
 
-        // TODO(dhruvmanila): Disallow starred and yield expression
         // test_err assert_invalid_test_expr
         // assert *x
         // assert assert x
@@ -669,7 +666,6 @@ impl<'src> Parser<'src> {
 
         let msg = if self.eat(TokenKind::Comma) {
             if self.at_expr() {
-                // TODO(dhruvmanila): Disallow starred and yield expression
                 // test_err assert_invalid_msg_expr
                 // assert False, *x
                 // assert False, assert x
