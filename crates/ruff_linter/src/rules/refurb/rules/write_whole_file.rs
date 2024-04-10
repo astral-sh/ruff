@@ -8,6 +8,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
+use crate::rules::refurb::helpers;
 
 /// ## What it does
 /// Checks for uses of `open` and `write` that can be replaced by `pathlib`
@@ -85,43 +86,11 @@ pub(crate) fn write_whole_file(checker: &mut Checker, with: &ast::StmtWith) {
     checker.diagnostics.extend(diagnostics);
 }
 
-#[derive(Debug)]
-enum WriteMode {
-    /// "w"  -> `write_text`
-    Text,
-    /// "wb" -> `write_bytes`
-    Bytes,
-}
-
-/// A grab bag struct that joins together every piece of information we need to track
-/// about a file open operation.
-#[derive(Debug)]
-struct FileOpen<'a> {
-    /// With item where the open happens, we use it for the reporting range.
-    item: &'a ast::WithItem,
-    /// Filename expression used as the first argument in `open`, we use it in the diagnostic message.
-    filename: &'a Expr,
-    /// The type of write to choose `write_text` or `write_bytes`.
-    mode: WriteMode,
-    /// Keywords that can be used in the new write call.
-    keywords: Vec<&'a ast::Keyword>,
-    /// We only check `open` operations whose file handles are used exactly once.
-    reference: &'a ResolvedReference,
-}
-
-impl<'a> FileOpen<'a> {
-    /// Determine whether an expression is a reference to the file handle, by comparing
-    /// their ranges. If two expressions have the same range, they must be the same expression.
-    fn is_ref(&self, expr: &Expr) -> bool {
-        expr.range() == self.reference.range()
-    }
-}
-
 /// Find and return all `open` operations in the given `with` statement.
 fn find_file_opens<'a>(
     with: &'a ast::StmtWith,
     semantic: &'a SemanticModel<'a>,
-) -> Vec<FileOpen<'a>> {
+) -> Vec<helpers::FileOpen<'a>> {
     with.items
         .iter()
         .filter_map(|item| find_file_open(item, with, semantic))
@@ -133,7 +102,7 @@ fn find_file_open<'a>(
     item: &'a ast::WithItem,
     with: &'a ast::StmtWith,
     semantic: &'a SemanticModel<'a>,
-) -> Option<FileOpen<'a>> {
+) -> Option<helpers::FileOpen<'a>> {
     // We want to match `open(...) as var`.
     let ast::ExprCall {
         func,
@@ -157,21 +126,22 @@ fn find_file_open<'a>(
     }
 
     // Match positional arguments, get filename and mode.
-    let (filename, pos_mode) = match_open_args(args)?;
+    let (filename, pos_mode) = helpers::match_open_args(args)?;
 
     // Match keyword arguments, get keyword arguments to forward and possibly mode.
     let (keywords, kw_mode) = match_open_keywords(keywords)?;
 
-    let mode = match kw_mode {
-        Some(kw) => kw,
-        None => match pos_mode {
-            Some(pos) => pos,
-            None => return None, // Indicates default mode "r", which is incompatible.
-        },
-    };
+    let mode = kw_mode.unwrap_or(pos_mode);
+
+    if !matches!(
+        mode,
+        helpers::OpenMode::WriteText | helpers::OpenMode::WriteBytes,
+    ) {
+        return None;
+    }
 
     // Path.write_bytes does not support any kwargs.
-    if matches!(mode, WriteMode::Bytes) && !keywords.is_empty() {
+    if matches!(mode, helpers::OpenMode::WriteBytes) && !keywords.is_empty() {
         return None;
     }
 
@@ -201,7 +171,7 @@ fn find_file_open<'a>(
         return None;
     };
 
-    Some(FileOpen {
+    Some(helpers::FileOpen {
         item,
         filename,
         mode,
@@ -210,25 +180,12 @@ fn find_file_open<'a>(
     })
 }
 
-/// Match positional arguments. Return expression for the file name and mode.
-fn match_open_args(args: &[Expr]) -> Option<(&Expr, Option<WriteMode>)> {
-    match args {
-        // If only one argument indicating read mode, the mode could still be set as a kwarg.
-        [filename] => Some((filename, None)),
-        [filename, mode_literal] => {
-            match_open_mode(mode_literal).map(|mode| (filename, Some(mode)))
-        }
-        // The third positional argument is `buffering` and `write_text` doesn't support it.
-        _ => None,
-    }
-}
-
 /// Match keyword arguments. Return keyword arguments to forward and mode.
 fn match_open_keywords(
     keywords: &[ast::Keyword],
-) -> Option<(Vec<&ast::Keyword>, Option<WriteMode>)> {
+) -> Option<(Vec<&ast::Keyword>, Option<helpers::OpenMode>)> {
     let mut result: Vec<&ast::Keyword> = vec![];
-    let mut mode: Option<WriteMode> = None;
+    let mut mode: Option<helpers::OpenMode> = None;
 
     for keyword in keywords {
         match keyword.arg.as_ref()?.as_str() {
@@ -245,7 +202,7 @@ fn match_open_keywords(
             //
             // So, here we return None from this whole function if the mode
             // is incompatible.
-            "mode" => mode = Some(match_open_mode(&keyword.value)?),
+            "mode" => mode = Some(helpers::match_open_mode(&keyword.value)?),
 
             // All other keywords cannot be directly forwarded.
             _ => return None,
@@ -254,30 +211,17 @@ fn match_open_keywords(
     Some((result, mode))
 }
 
-/// Match open mode to see if it is supported.
-fn match_open_mode(mode: &Expr) -> Option<WriteMode> {
-    let ast::ExprStringLiteral { value, .. } = mode.as_string_literal_expr()?;
-    if value.is_implicit_concatenated() {
-        return None;
-    }
-    match value.to_str() {
-        "w" => Some(WriteMode::Text),
-        "wb" => Some(WriteMode::Bytes),
-        _ => None,
-    }
-}
-
 /// AST visitor that matches `open` operations with the corresponding `write` calls.
 #[derive(Debug)]
 struct WriteMatcher<'a> {
-    candidates: Vec<FileOpen<'a>>,
-    matches: Vec<FileOpen<'a>>,
+    candidates: Vec<helpers::FileOpen<'a>>,
+    matches: Vec<helpers::FileOpen<'a>>,
     contents: Vec<Vec<Expr>>,
     loop_counter: u32,
 }
 
 impl<'a> WriteMatcher<'a> {
-    fn new(candidates: Vec<FileOpen<'a>>) -> Self {
+    fn new(candidates: Vec<helpers::FileOpen<'a>>) -> Self {
         Self {
             candidates,
             matches: vec![],
@@ -286,7 +230,7 @@ impl<'a> WriteMatcher<'a> {
         }
     }
 
-    fn into_matches(self) -> Vec<FileOpen<'a>> {
+    fn into_matches(self) -> Vec<helpers::FileOpen<'a>> {
         self.matches
     }
 
@@ -345,16 +289,12 @@ fn match_write_call(expr: &Expr) -> Option<(&Expr, Vec<Expr>)> {
 
 /// Construct the replacement suggestion call.
 fn make_suggestion(
-    open: &FileOpen<'_>,
+    open: &helpers::FileOpen<'_>,
     write_arguments: Vec<Expr>,
     generator: Generator,
 ) -> SourceCodeSnippet {
-    let method_name = match open.mode {
-        WriteMode::Text => "write_text",
-        WriteMode::Bytes => "write_bytes",
-    };
     let name = ast::ExprName {
-        id: method_name.to_string(),
+        id: open.mode.pathlib_method(),
         ctx: ast::ExprContext::Load,
         range: TextRange::default(),
     };
