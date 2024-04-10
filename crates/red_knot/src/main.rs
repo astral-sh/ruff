@@ -22,6 +22,7 @@ fn main() -> anyhow::Result<()> {
     //     let file_id = files.intern(&entry.path());
     //     dbg!(file_id, &entry.path());
     //
+
     //     workspace.open_file(file_id);
     // }
 

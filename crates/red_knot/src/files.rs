@@ -24,7 +24,6 @@ pub struct Files {
 
 impl Files {
     pub fn intern(&self, path: &Path) -> FileId {
-        path;
         self.inner.write().intern(path)
     }
 
