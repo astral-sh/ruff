@@ -634,13 +634,6 @@ impl<'src> Parser<'src> {
 
         false
     }
-
-    fn is_current_token_postfix(&self) -> bool {
-        matches!(
-            self.current_token_kind(),
-            TokenKind::Lpar | TokenKind::Lsqb | TokenKind::Dot
-        )
-    }
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
