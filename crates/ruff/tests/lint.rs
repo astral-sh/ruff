@@ -1168,3 +1168,94 @@ def func():
 
     Ok(())
 }
+
+/// Per-file selects via ! negation in per-file-ignores
+#[test]
+fn negated_per_file_ignores() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+[lint.per-file-ignores]
+"!selected.py" = ["F"]
+"#,
+    )?;
+    let selected = tempdir.path().join("selected.py");
+    fs::write(
+        selected,
+        r#"
+import os
+"#,
+    )?;
+    let ignored = tempdir.path().join("ignored.py");
+    fs::write(
+        ignored,
+        r#"
+import os
+"#,
+    )?;
+
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .arg("--config")
+        .arg(&ruff_toml)
+        .current_dir(&tempdir)
+        , @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    selected.py:2:8: F401 [*] `os` imported but unused
+    Found 1 error.
+    [*] 1 fixable with the `--fix` option.
+
+    ----- stderr -----
+    "###);
+    Ok(())
+}
+
+#[test]
+fn negated_per_file_ignores_absolute() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+[lint.per-file-ignores]
+"!src/**.py" = ["F"]
+"#,
+    )?;
+    let src_dir = tempdir.path().join("src");
+    fs::create_dir(&src_dir)?;
+    let selected = src_dir.join("selected.py");
+    fs::write(
+        selected,
+        r#"
+import os
+"#,
+    )?;
+    let ignored = tempdir.path().join("ignored.py");
+    fs::write(
+        ignored,
+        r#"
+import os
+"#,
+    )?;
+
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .arg("--config")
+        .arg(&ruff_toml)
+        .current_dir(&tempdir)
+        , @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    src/selected.py:2:8: F401 [*] `os` imported but unused
+    Found 1 error.
+    [*] 1 fixable with the `--fix` option.
+
+    ----- stderr -----
+    "###);
+    Ok(())
+}
