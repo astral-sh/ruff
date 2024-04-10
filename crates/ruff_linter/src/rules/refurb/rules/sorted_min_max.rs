@@ -131,7 +131,7 @@ pub(crate) fn sorted_min_max(checker: &mut Checker, subscript: &ast::ExprSubscri
         })
         .map(|keyword| &keyword.value);
 
-    let min_max = match (index, reversed) {
+    let min_max = match (index, is_reversed) {
         (Index::First, false) => MinMax::Min,
         (Index::First, true) => MinMax::Max,
         (Index::Last, false) => MinMax::Max,
