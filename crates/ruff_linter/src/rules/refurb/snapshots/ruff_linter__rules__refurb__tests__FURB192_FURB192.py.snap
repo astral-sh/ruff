@@ -1,0 +1,169 @@
+---
+source: crates/ruff_linter/src/rules/refurb/mod.rs
+---
+FURB192.py:3:1: FURB192 [*] Prefer `min` or `max` over `sorted()` to get the min and max values of a list
+  |
+1 | # Errors
+2 | 
+3 | sorted(l)[0]
+  | ^^^^^^^^^^^^ FURB192
+4 | 
+5 | sorted(l)[-1]
+  |
+  = help: Replace with `min` or `max`
+
+ℹ Safe fix
+1 1 | # Errors
+2 2 | 
+3   |-sorted(l)[0]
+  3 |+min(l)
+4 4 | 
+5 5 | sorted(l)[-1]
+6 6 | 
+
+FURB192.py:5:1: FURB192 [*] Prefer `min` or `max` over `sorted()` to get the min and max values of a list
+  |
+3 | sorted(l)[0]
+4 | 
+5 | sorted(l)[-1]
+  | ^^^^^^^^^^^^^ FURB192
+6 | 
+7 | sorted(l, reverse=True)[0]
+  |
+  = help: Replace with `min` or `max`
+
+ℹ Safe fix
+2 2 | 
+3 3 | sorted(l)[0]
+4 4 | 
+5   |-sorted(l)[-1]
+  5 |+max(l)
+6 6 | 
+7 7 | sorted(l, reverse=True)[0]
+8 8 | 
+
+FURB192.py:7:1: FURB192 [*] Prefer `min` or `max` over `sorted()` to get the min and max values of a list
+  |
+5 | sorted(l)[-1]
+6 | 
+7 | sorted(l, reverse=True)[0]
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB192
+8 | 
+9 | sorted(l, reverse=True)[-1]
+  |
+  = help: Replace with `min` or `max`
+
+ℹ Safe fix
+4 4 | 
+5 5 | sorted(l)[-1]
+6 6 | 
+7   |-sorted(l, reverse=True)[0]
+  7 |+max(l)
+8 8 | 
+9 9 | sorted(l, reverse=True)[-1]
+10 10 | 
+
+FURB192.py:9:1: FURB192 [*] Prefer `min` or `max` over `sorted()` to get the min and max values of a list
+   |
+ 7 | sorted(l, reverse=True)[0]
+ 8 | 
+ 9 | sorted(l, reverse=True)[-1]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB192
+10 | 
+11 | sorted(l, reverse=False)[-1]
+   |
+   = help: Replace with `min` or `max`
+
+ℹ Safe fix
+6  6  | 
+7  7  | sorted(l, reverse=True)[0]
+8  8  | 
+9     |-sorted(l, reverse=True)[-1]
+   9  |+min(l)
+10 10 | 
+11 11 | sorted(l, reverse=False)[-1]
+12 12 | 
+
+FURB192.py:11:1: FURB192 [*] Prefer `min` or `max` over `sorted()` to get the min and max values of a list
+   |
+ 9 | sorted(l, reverse=True)[-1]
+10 | 
+11 | sorted(l, reverse=False)[-1]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB192
+12 | 
+13 | sorted(l, key=lambda x: x)[0]
+   |
+   = help: Replace with `min` or `max`
+
+ℹ Safe fix
+8  8  | 
+9  9  | sorted(l, reverse=True)[-1]
+10 10 | 
+11    |-sorted(l, reverse=False)[-1]
+   11 |+max(l)
+12 12 | 
+13 13 | sorted(l, key=lambda x: x)[0]
+14 14 | 
+
+FURB192.py:13:1: FURB192 [*] Prefer `min` or `max` over `sorted()` to get the min and max values of a list
+   |
+11 | sorted(l, reverse=False)[-1]
+12 | 
+13 | sorted(l, key=lambda x: x)[0]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB192
+14 | 
+15 | sorted(l, key=key_fn, reverse=True)[-1]
+   |
+   = help: Replace with `min` or `max`
+
+ℹ Safe fix
+10 10 | 
+11 11 | sorted(l, reverse=False)[-1]
+12 12 | 
+13    |-sorted(l, key=lambda x: x)[0]
+   13 |+min(l, key=lambda x: x)
+14 14 | 
+15 15 | sorted(l, key=key_fn, reverse=True)[-1]
+16 16 | 
+
+FURB192.py:15:1: FURB192 [*] Prefer `min` or `max` over `sorted()` to get the min and max values of a list
+   |
+13 | sorted(l, key=lambda x: x)[0]
+14 | 
+15 | sorted(l, key=key_fn, reverse=True)[-1]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB192
+16 | 
+17 | sorted(l, key=key_fn)[0]
+   |
+   = help: Replace with `min` or `max`
+
+ℹ Safe fix
+12 12 | 
+13 13 | sorted(l, key=lambda x: x)[0]
+14 14 | 
+15    |-sorted(l, key=key_fn, reverse=True)[-1]
+   15 |+min(l, key=key_fn)
+16 16 | 
+17 17 | sorted(l, key=key_fn)[0]
+18 18 | 
+
+FURB192.py:17:1: FURB192 [*] Prefer `min` or `max` over `sorted()` to get the min and max values of a list
+   |
+15 | sorted(l, key=key_fn, reverse=True)[-1]
+16 | 
+17 | sorted(l, key=key_fn)[0]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^ FURB192
+18 | 
+19 | # Non-errors
+   |
+   = help: Replace with `min` or `max`
+
+ℹ Safe fix
+14 14 | 
+15 15 | sorted(l, key=key_fn, reverse=True)[-1]
+16 16 | 
+17    |-sorted(l, key=key_fn)[0]
+   17 |+min(l, key=key_fn)
+18 18 | 
+19 19 | # Non-errors
+20 20 |
