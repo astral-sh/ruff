@@ -82,11 +82,19 @@ impl<'a> Directive<'a> {
 
                     // Extract the comma-separated list of codes.
                     let mut codes = vec![];
+                    let mut code_ranges = vec![];
                     let mut codes_end = codes_start;
                     let mut leading_space = 0;
                     while let Some(code) = Self::lex_code(&text[codes_end + leading_space..]) {
                         codes.push(code);
                         codes_end += leading_space;
+                        code_ranges.push(
+                            TextRange::new(
+                                TextSize::try_from(codes_end).unwrap(),
+                                TextSize::try_from(codes_end + code.len()).unwrap(),
+                            )
+                            .add(offset),
+                        );
                         codes_end += code.len();
 
                         // Codes can be comma- or whitespace-delimited. Compute the length of the
@@ -114,6 +122,7 @@ impl<'a> Directive<'a> {
                     Self::Codes(Codes {
                         range: range.add(offset),
                         codes,
+                        code_ranges,
                     })
                 }
                 None | Some('#') => {
@@ -178,13 +187,19 @@ impl Ranged for All {
 #[derive(Debug)]
 pub(crate) struct Codes<'a> {
     range: TextRange,
+    #[allow(clippy::struct_field_names)]
     codes: Vec<&'a str>,
+    code_ranges: Vec<TextRange>,
 }
 
 impl Codes<'_> {
     /// The codes that are ignored by the `noqa` directive.
     pub(crate) fn codes(&self) -> &[&str] {
         &self.codes
+    }
+
+    pub(crate) fn code_ranges(&self) -> &Vec<TextRange> {
+        &self.code_ranges
     }
 }
 
@@ -215,7 +230,7 @@ pub(crate) fn rule_is_ignored(
     let line_range = locator.line_range(offset);
     match Directive::try_extract(locator.slice(line_range), line_range.start()) {
         Ok(Some(Directive::All(_))) => true,
-        Ok(Some(Directive::Codes(Codes { codes, range: _ }))) => includes(code, &codes),
+        Ok(Some(Directive::Codes(Codes { codes, .. }))) => includes(code, &codes),
         _ => false,
     }
 }
@@ -525,7 +540,7 @@ fn add_noqa_inner(
                     Directive::All(_) => {
                         continue;
                     }
-                    Directive::Codes(Codes { codes, range: _ }) => {
+                    Directive::Codes(Codes { codes, .. }) => {
                         if includes(diagnostic.kind.rule(), codes) {
                             continue;
                         }
@@ -542,7 +557,7 @@ fn add_noqa_inner(
                 Directive::All(_) => {
                     continue;
                 }
-                Directive::Codes(Codes { codes, range: _ }) => {
+                Directive::Codes(Codes { codes, .. }) => {
                     let rule = diagnostic.kind.rule();
                     if !includes(rule, codes) {
                         matches_by_line
@@ -591,7 +606,7 @@ fn add_noqa_inner(
             Some(Directive::All(_)) => {
                 // Does not get inserted into the map.
             }
-            Some(Directive::Codes(Codes { range, codes })) => {
+            Some(Directive::Codes(Codes { range, codes, .. })) => {
                 // Reconstruct the line based on the preserved rule codes.
                 // This enables us to tally the number of edits.
                 let output_start = output.len();
