@@ -1,6 +1,3 @@
-mod parser;
-mod suite;
-
 use crate::{lex, parse, parse_suite, parse_tokens, Mode};
 
 #[test]
