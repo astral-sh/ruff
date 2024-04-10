@@ -763,7 +763,11 @@ impl<'a> BlankLinesChecker<'a> {
                     if matches!(state.fn_status, Status::Outside) {
                         state.fn_status = Status::Inside(logical_line.indent_length);
                     }
-                    state.follows = Follows::Def;
+                    state.follows = if logical_line.last_token == TokenKind::Ellipsis {
+                        Follows::DummyDef
+                    } else {
+                        Follows::Def
+                    };
                 }
                 LogicalLineKind::Comment => {}
                 LogicalLineKind::Import => {
@@ -775,10 +779,6 @@ impl<'a> BlankLinesChecker<'a> {
                 LogicalLineKind::Other => {
                     state.follows = Follows::Other;
                 }
-            }
-
-            if logical_line.last_token == TokenKind::Ellipsis {
-                state.follows = Follows::DummyDef;
             }
 
             if logical_line.is_docstring {
