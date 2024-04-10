@@ -41,8 +41,8 @@ use crate::fix::snippet::SourceCodeSnippet;
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[violation]
 pub struct NeedlessBool {
-    condition: SourceCodeSnippet,
-    replacement: Option<SourceCodeSnippet>,
+    condition: Option<SourceCodeSnippet>,
+    negate: bool,
 }
 
 impl Violation for NeedlessBool {
@@ -50,21 +50,22 @@ impl Violation for NeedlessBool {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let NeedlessBool { condition, .. } = self;
-        if let Some(condition) = condition.full_display() {
+        let NeedlessBool { condition, negate } = self;
+
+        if let Some(condition) = condition.as_ref().and_then(SourceCodeSnippet::full_display) {
             format!("Return the condition `{condition}` directly")
+        } else if *negate {
+            format!("Return the negated condition directly")
         } else {
             format!("Return the condition directly")
         }
     }
 
     fn fix_title(&self) -> Option<String> {
-        let NeedlessBool { replacement, .. } = self;
-        if let Some(replacement) = replacement
-            .as_ref()
-            .and_then(SourceCodeSnippet::full_display)
-        {
-            Some(format!("Replace with `{replacement}`"))
+        let NeedlessBool { condition, .. } = self;
+
+        if let Some(condition) = condition.as_ref().and_then(SourceCodeSnippet::full_display) {
+            Some(format!("Replace with `return {condition}`"))
         } else {
             Some(format!("Inline condition"))
         }
@@ -191,29 +192,21 @@ pub(crate) fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
         return;
     }
 
-    let condition = checker.locator().slice(if_test);
-    let replacement = if checker.indexer().has_comments(&range, checker.locator()) {
+    // Generate the replacement condition.
+    let condition = if checker.indexer().has_comments(&range, checker.locator()) {
         None
     } else {
         // If the return values are inverted, wrap the condition in a `not`.
         if inverted {
-            let node = ast::StmtReturn {
-                value: Some(Box::new(Expr::UnaryOp(ast::ExprUnaryOp {
-                    op: ast::UnaryOp::Not,
-                    operand: Box::new(if_test.clone()),
-                    range: TextRange::default(),
-                }))),
+            Some(Expr::UnaryOp(ast::ExprUnaryOp {
+                op: ast::UnaryOp::Not,
+                operand: Box::new(if_test.clone()),
                 range: TextRange::default(),
-            };
-            Some(checker.generator().stmt(&node.into()))
+            }))
         } else if if_test.is_compare_expr() {
             // If the condition is a comparison, we can replace it with the condition, since we
             // know it's a boolean.
-            let node = ast::StmtReturn {
-                value: Some(Box::new(if_test.clone())),
-                range: TextRange::default(),
-            };
-            Some(checker.generator().stmt(&node.into()))
+            Some(if_test.clone())
         } else if checker.semantic().is_builtin("bool") {
             // Otherwise, we need to wrap the condition in a call to `bool`.
             let func_node = ast::ExprName {
@@ -221,7 +214,7 @@ pub(crate) fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
                 ctx: ExprContext::Load,
                 range: TextRange::default(),
             };
-            let value_node = ast::ExprCall {
+            let call_node = ast::ExprCall {
                 func: Box::new(func_node.into()),
                 arguments: Arguments {
                     args: Box::from([if_test.clone()]),
@@ -230,20 +223,32 @@ pub(crate) fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
                 },
                 range: TextRange::default(),
             };
-            let return_node = ast::StmtReturn {
-                value: Some(Box::new(value_node.into())),
-                range: TextRange::default(),
-            };
-            Some(checker.generator().stmt(&return_node.into()))
+            Some(Expr::Call(call_node))
         } else {
             None
         }
     };
 
+    // Generate the replacement `return` statement.
+    let replacement = condition.as_ref().map(|expr| {
+        Stmt::Return(ast::StmtReturn {
+            value: Some(Box::new(expr.clone())),
+            range: TextRange::default(),
+        })
+    });
+
+    // Generate source code.
+    let replacement = replacement
+        .as_ref()
+        .map(|stmt| checker.generator().stmt(stmt));
+    let condition = condition
+        .as_ref()
+        .map(|expr| checker.generator().expr(expr));
+
     let mut diagnostic = Diagnostic::new(
         NeedlessBool {
-            condition: SourceCodeSnippet::from_str(condition),
-            replacement: replacement.clone().map(SourceCodeSnippet::new),
+            condition: condition.map(SourceCodeSnippet::new),
+            negate: inverted,
         },
         range,
     );
