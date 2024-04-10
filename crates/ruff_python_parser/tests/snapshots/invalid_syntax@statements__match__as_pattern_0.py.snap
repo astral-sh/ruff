@@ -127,7 +127,7 @@ Module(
 6 |     #     ^^^^^^
 7 |     #    as-pattern
 8 |         pass
-  | ^^^^^^^^ Syntax Error: unexpected indentation
+  | ^^^^^^^^ Syntax Error: expected Dedent, found Indent
   |
 
 
