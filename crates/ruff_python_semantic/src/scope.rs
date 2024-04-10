@@ -95,7 +95,7 @@ impl<'a> Scope<'a> {
     }
 
     /// Returns a tuple of the name and ID of all bindings defined in this scope.
-    pub fn bindings(&self) -> impl Iterator<Item = (&str, BindingId)> + '_ {
+    pub fn bindings(&self) -> impl Iterator<Item = (&'a str, BindingId)> + '_ {
         self.bindings.iter().map(|(&name, &id)| (name, id))
     }
 
@@ -185,6 +185,7 @@ pub enum ScopeKind<'a> {
     Function(&'a ast::StmtFunctionDef),
     Generator,
     Module,
+    /// A Python 3.12+ ["annotation scope"](https://docs.python.org/3/reference/executionmodel.html#annotation-scopes)
     Type,
     Lambda(&'a ast::ExprLambda),
 }
@@ -238,7 +239,7 @@ impl<'a> Scopes<'a> {
     }
 
     /// Returns an iterator over all [`Scope`] ancestors, starting from the given [`ScopeId`].
-    pub fn ancestors(&self, scope_id: ScopeId) -> impl Iterator<Item = &Scope> + '_ {
+    pub fn ancestors(&self, scope_id: ScopeId) -> impl Iterator<Item = &Scope<'a>> + '_ {
         std::iter::successors(Some(&self[scope_id]), |&scope| {
             scope.parent.map(|scope_id| &self[scope_id])
         })

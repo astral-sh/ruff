@@ -42,7 +42,7 @@ use crate::rules::flake8_tidy_imports::settings::Strictness;
 /// ```
 ///
 /// ## Options
-/// - `flake8-tidy-imports.ban-relative-imports`
+/// - `lint.flake8-tidy-imports.ban-relative-imports`
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#imports
 #[violation]
@@ -82,9 +82,7 @@ fn fix_banned_relative_import(
     generator: Generator,
 ) -> Option<Fix> {
     // Only fix is the module path is known.
-    let Some(module_path) = resolve_imported_module_path(level, module, module_path) else {
-        return None;
-    };
+    let module_path = resolve_imported_module_path(level, module, module_path)?;
 
     // Require import to be a valid module:
     // https://python.org/dev/peps/pep-0008/#package-and-module-names

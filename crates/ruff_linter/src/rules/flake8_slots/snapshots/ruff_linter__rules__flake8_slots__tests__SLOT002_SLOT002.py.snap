@@ -8,4 +8,9 @@ SLOT002.py:5:7: SLOT002 Subclasses of `collections.namedtuple()` should define `
 6 |     pass
   |
 
-
+SLOT002.py:9:7: SLOT002 Subclasses of call-based `typing.NamedTuple()` should define `__slots__`
+   |
+ 9 | class UnusualButStillBad(NamedTuple("foo", [("x", int, "y", int)])):  # SLOT002
+   |       ^^^^^^^^^^^^^^^^^^ SLOT002
+10 |     pass
+   |

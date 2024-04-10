@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use anyhow::Result;
 use log::debug;
@@ -11,19 +11,17 @@ use ruff_workspace::resolver::{
     Relativity,
 };
 
-use crate::args::CliOverrides;
+use crate::args::ConfigArguments;
 
 /// Resolve the relevant settings strategy and defaults for the current
 /// invocation.
 pub fn resolve(
-    isolated: bool,
-    config: Option<&Path>,
-    overrides: &CliOverrides,
+    config_arguments: &ConfigArguments,
     stdin_filename: Option<&Path>,
 ) -> Result<PyprojectConfig> {
     // First priority: if we're running in isolated mode, use the default settings.
-    if isolated {
-        let config = overrides.transform(Configuration::default());
+    if config_arguments.isolated {
+        let config = config_arguments.transform(Configuration::default());
         let settings = config.into_settings(&path_dedot::CWD)?;
         debug!("Isolated mode, not reading any pyproject.toml");
         return Ok(PyprojectConfig::new(
@@ -36,12 +34,8 @@ pub fn resolve(
     // Second priority: the user specified a `pyproject.toml` file. Use that
     // `pyproject.toml` for _all_ configuration, and resolve paths relative to the
     // current working directory. (This matches ESLint's behavior.)
-    if let Some(pyproject) = config
-        .map(|config| config.display().to_string())
-        .map(|config| shellexpand::full(&config).map(|config| PathBuf::from(config.as_ref())))
-        .transpose()?
-    {
-        let settings = resolve_root_settings(&pyproject, Relativity::Cwd, overrides)?;
+    if let Some(pyproject) = config_arguments.config_file() {
+        let settings = resolve_root_settings(pyproject, Relativity::Cwd, config_arguments)?;
         debug!(
             "Using user-specified configuration file at: {}",
             pyproject.display()
@@ -49,7 +43,7 @@ pub fn resolve(
         return Ok(PyprojectConfig::new(
             PyprojectDiscoveryStrategy::Fixed,
             settings,
-            Some(pyproject),
+            Some(pyproject.to_path_buf()),
         ));
     }
 
@@ -67,7 +61,7 @@ pub fn resolve(
             "Using configuration file (via parent) at: {}",
             pyproject.display()
         );
-        let settings = resolve_root_settings(&pyproject, Relativity::Parent, overrides)?;
+        let settings = resolve_root_settings(&pyproject, Relativity::Parent, config_arguments)?;
         return Ok(PyprojectConfig::new(
             PyprojectDiscoveryStrategy::Hierarchical,
             settings,
@@ -84,7 +78,7 @@ pub fn resolve(
             "Using configuration file (via cwd) at: {}",
             pyproject.display()
         );
-        let settings = resolve_root_settings(&pyproject, Relativity::Cwd, overrides)?;
+        let settings = resolve_root_settings(&pyproject, Relativity::Cwd, config_arguments)?;
         return Ok(PyprojectConfig::new(
             PyprojectDiscoveryStrategy::Hierarchical,
             settings,
@@ -97,7 +91,7 @@ pub fn resolve(
     // "closest" `pyproject.toml` file for every Python file later on, so these act
     // as the "default" settings.)
     debug!("Using Ruff default settings");
-    let config = overrides.transform(Configuration::default());
+    let config = config_arguments.transform(Configuration::default());
     let settings = config.into_settings(&path_dedot::CWD)?;
     Ok(PyprojectConfig::new(
         PyprojectDiscoveryStrategy::Hierarchical,

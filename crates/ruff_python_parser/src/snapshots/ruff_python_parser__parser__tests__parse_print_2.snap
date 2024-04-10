@@ -27,7 +27,11 @@ expression: parse_ast
                                             StringLiteral {
                                                 range: 6..19,
                                                 value: "Hello world",
-                                                unicode: false,
+                                                flags: StringLiteralFlags {
+                                                    quote_style: Single,
+                                                    prefix: Empty,
+                                                    triple_quoted: false,
+                                                },
                                             },
                                         ),
                                     },

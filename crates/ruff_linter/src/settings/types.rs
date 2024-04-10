@@ -7,7 +7,7 @@ use std::string::ToString;
 
 use anyhow::{bail, Result};
 use globset::{Glob, GlobMatcher, GlobSet, GlobSetBuilder};
-use pep440_rs::{Version as Pep440Version, VersionSpecifiers};
+use pep440_rs::{Version as Pep440Version, VersionSpecifier, VersionSpecifiers};
 use rustc_hash::FxHashMap;
 use serde::{de, Deserialize, Deserializer, Serialize};
 use strum::IntoEnumIterator;
@@ -296,13 +296,22 @@ impl CacheKey for FilePatternSet {
 pub struct PerFileIgnore {
     pub(crate) basename: String,
     pub(crate) absolute: PathBuf,
+    pub(crate) negated: bool,
     pub(crate) rules: RuleSet,
 }
 
 impl PerFileIgnore {
-    pub fn new(pattern: String, prefixes: &[RuleSelector], project_root: Option<&Path>) -> Self {
+    pub fn new(
+        mut pattern: String,
+        prefixes: &[RuleSelector],
+        project_root: Option<&Path>,
+    ) -> Self {
         // Rules in preview are included here even if preview mode is disabled; it's safe to ignore disabled rules
         let rules: RuleSet = prefixes.iter().flat_map(RuleSelector::all_rules).collect();
+        let negated = pattern.starts_with('!');
+        if negated {
+            pattern.drain(..1);
+        }
         let path = Path::new(&pattern);
         let absolute = match project_root {
             Some(project_root) => fs::normalize_path_to(path, project_root),
@@ -312,6 +321,7 @@ impl PerFileIgnore {
         Self {
             basename: pattern,
             absolute,
+            negated,
             rules,
         }
     }
@@ -492,6 +502,8 @@ impl FromIterator<ExtensionPair> for ExtensionMapping {
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub enum SerializationFormat {
     Text,
+    Concise,
+    Full,
     Json,
     JsonLines,
     Junit,
@@ -507,6 +519,8 @@ impl Display for SerializationFormat {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Text => write!(f, "text"),
+            Self::Concise => write!(f, "concise"),
+            Self::Full => write!(f, "full"),
             Self::Json => write!(f, "json"),
             Self::JsonLines => write!(f, "json_lines"),
             Self::Junit => write!(f, "junit"),
@@ -520,30 +534,56 @@ impl Display for SerializationFormat {
     }
 }
 
-impl Default for SerializationFormat {
-    fn default() -> Self {
-        Self::Text
+impl SerializationFormat {
+    pub fn default(preview: bool) -> Self {
+        if preview {
+            Self::Full
+        } else {
+            Self::Concise
+        }
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Hash)]
 #[serde(try_from = "String")]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
-pub struct Version(String);
+pub struct RequiredVersion(VersionSpecifiers);
 
-impl TryFrom<String> for Version {
-    type Error = semver::Error;
+impl TryFrom<String> for RequiredVersion {
+    type Error = pep440_rs::VersionSpecifiersParseError;
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
-        semver::Version::parse(&value).map(|_| Self(value))
+        // Treat `0.3.1` as `==0.3.1`, for backwards compatibility.
+        if let Ok(version) = pep440_rs::Version::from_str(&value) {
+            Ok(Self(VersionSpecifiers::from(
+                VersionSpecifier::equals_version(version),
+            )))
+        } else {
+            Ok(Self(VersionSpecifiers::from_str(&value)?))
+        }
     }
 }
 
-impl Deref for Version {
-    type Target = str;
+#[cfg(feature = "schemars")]
+impl schemars::JsonSchema for RequiredVersion {
+    fn schema_name() -> String {
+        "RequiredVersion".to_string()
+    }
 
-    fn deref(&self) -> &Self::Target {
-        &self.0
+    fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+        gen.subschema_for::<String>()
+    }
+}
+
+impl RequiredVersion {
+    /// Return `true` if the given version is required.
+    pub fn contains(&self, version: &pep440_rs::Version) -> bool {
+        self.0.contains(version)
+    }
+}
+
+impl Display for RequiredVersion {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        Display::fmt(&self.0, f)
     }
 }
 
@@ -560,10 +600,10 @@ impl Deref for Version {
 /// pattern matching.
 pub type IdentifierPattern = glob::Pattern;
 
-#[derive(Debug, CacheKey, Default)]
+#[derive(Debug, Clone, CacheKey, Default)]
 pub struct PerFileIgnores {
     // Ordered as (absolute path matcher, basename matcher, rules)
-    ignores: Vec<(GlobMatcher, GlobMatcher, RuleSet)>,
+    ignores: Vec<(GlobMatcher, GlobMatcher, bool, RuleSet)>,
 }
 
 impl PerFileIgnores {
@@ -579,7 +619,12 @@ impl PerFileIgnores {
                 // Construct basename matcher.
                 let basename = Glob::new(&per_file_ignore.basename)?.compile_matcher();
 
-                Ok((absolute, basename, per_file_ignore.rules))
+                Ok((
+                    absolute,
+                    basename,
+                    per_file_ignore.negated,
+                    per_file_ignore.rules,
+                ))
             })
             .collect();
         Ok(Self { ignores: ignores? })
@@ -592,10 +637,10 @@ impl Display for PerFileIgnores {
             write!(f, "{{}}")?;
         } else {
             writeln!(f, "{{")?;
-            for (absolute, basename, rules) in &self.ignores {
+            for (absolute, basename, negated, rules) in &self.ignores {
                 writeln!(
                     f,
-                    "\t{{ absolute = {absolute:#?}, basename = {basename:#?}, rules = {rules} }},"
+                    "\t{{ absolute = {absolute:#?}, basename = {basename:#?}, negated = {negated:#?}, rules = {rules} }},"
                 )?;
             }
             write!(f, "}}")?;
@@ -605,7 +650,7 @@ impl Display for PerFileIgnores {
 }
 
 impl Deref for PerFileIgnores {
-    type Target = Vec<(GlobMatcher, GlobMatcher, RuleSet)>;
+    type Target = Vec<(GlobMatcher, GlobMatcher, bool, RuleSet)>;
 
     fn deref(&self) -> &Self::Target {
         &self.ignores

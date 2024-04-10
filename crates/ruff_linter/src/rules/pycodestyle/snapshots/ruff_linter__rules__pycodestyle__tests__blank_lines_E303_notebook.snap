@@ -1,0 +1,39 @@
+---
+source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+---
+E30.ipynb:29:5: E303 [*] Too many blank lines (2)
+   |
+29 |     # arbitrary comment
+   |     ^^^^^^^^^^^^^^^^^^^ E303
+30 | 
+31 |     def inner():  # E306 not expected (pycodestyle detects E306)
+   |
+   = help: Remove extraneous blank line(s)
+
+ℹ Safe fix
+25 25 | def fn():
+26 26 |     _ = None
+27 27 | 
+28    |-
+29 28 |     # arbitrary comment
+30 29 | 
+31 30 |     def inner():  # E306 not expected (pycodestyle detects E306)
+
+E30.ipynb:39:1: E303 [*] Too many blank lines (4)
+   |
+39 | def fn():
+   | ^^^ E303
+40 |     pass
+41 | # end
+   |
+   = help: Remove extraneous blank line(s)
+
+ℹ Safe fix
+34 34 | # E303
+35 35 | 
+36 36 | 
+37    |-
+38    |-
+39 37 | def fn():
+40 38 | 	pass
+41 39 | # end

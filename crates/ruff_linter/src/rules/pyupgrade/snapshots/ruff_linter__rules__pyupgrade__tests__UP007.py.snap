@@ -9,7 +9,7 @@ UP007.py:6:10: UP007 [*] Use `X | Y` for type annotations
   |
   = help: Convert to `X | Y`
 
-ℹ Unsafe fix
+ℹ Safe fix
 3 3 | from typing import Union
 4 4 | 
 5 5 | 
@@ -27,7 +27,7 @@ UP007.py:10:10: UP007 [*] Use `X | Y` for type annotations
    |
    = help: Convert to `X | Y`
 
-ℹ Unsafe fix
+ℹ Safe fix
 7  7  |     ...
 8  8  | 
 9  9  | 
@@ -45,7 +45,7 @@ UP007.py:14:10: UP007 [*] Use `X | Y` for type annotations
    |
    = help: Convert to `X | Y`
 
-ℹ Unsafe fix
+ℹ Safe fix
 11 11 |     ...
 12 12 | 
 13 13 | 
@@ -63,7 +63,7 @@ UP007.py:14:26: UP007 [*] Use `X | Y` for type annotations
    |
    = help: Convert to `X | Y`
 
-ℹ Unsafe fix
+ℹ Safe fix
 11 11 |     ...
 12 12 | 
 13 13 | 
@@ -81,7 +81,7 @@ UP007.py:18:10: UP007 [*] Use `X | Y` for type annotations
    |
    = help: Convert to `X | Y`
 
-ℹ Unsafe fix
+ℹ Safe fix
 15 15 |     ...
 16 16 | 
 17 17 | 
@@ -99,7 +99,7 @@ UP007.py:22:10: UP007 [*] Use `X | Y` for type annotations
    |
    = help: Convert to `X | Y`
 
-ℹ Unsafe fix
+ℹ Safe fix
 19 19 |     ...
 20 20 | 
 21 21 | 
@@ -117,7 +117,7 @@ UP007.py:26:10: UP007 [*] Use `X | Y` for type annotations
    |
    = help: Convert to `X | Y`
 
-ℹ Unsafe fix
+ℹ Safe fix
 23 23 |     ...
 24 24 | 
 25 25 | 
@@ -135,7 +135,7 @@ UP007.py:30:10: UP007 [*] Use `X | Y` for type annotations
    |
    = help: Convert to `X | Y`
 
-ℹ Unsafe fix
+ℹ Safe fix
 27 27 |     ...
 28 28 | 
 29 29 | 
@@ -153,7 +153,7 @@ UP007.py:34:10: UP007 [*] Use `X | Y` for type annotations
    |
    = help: Convert to `X | Y`
 
-ℹ Unsafe fix
+ℹ Safe fix
 31 31 |     ...
 32 32 | 
 33 33 | 
@@ -171,7 +171,7 @@ UP007.py:38:11: UP007 [*] Use `X | Y` for type annotations
    |
    = help: Convert to `X | Y`
 
-ℹ Unsafe fix
+ℹ Safe fix
 35 35 |     ...
 36 36 | 
 37 37 | 
@@ -189,7 +189,7 @@ UP007.py:38:27: UP007 [*] Use `X | Y` for type annotations
    |
    = help: Convert to `X | Y`
 
-ℹ Unsafe fix
+ℹ Safe fix
 35 35 |     ...
 36 36 | 
 37 37 | 
@@ -207,7 +207,7 @@ UP007.py:42:11: UP007 [*] Use `X | Y` for type annotations
    |
    = help: Convert to `X | Y`
 
-ℹ Unsafe fix
+ℹ Safe fix
 39 39 |     ...
 40 40 | 
 41 41 | 
@@ -226,7 +226,7 @@ UP007.py:55:8: UP007 [*] Use `X | Y` for type annotations
    |
    = help: Convert to `X | Y`
 
-ℹ Unsafe fix
+ℹ Safe fix
 52 52 | 
 53 53 | 
 54 54 | def f() -> None:
@@ -268,7 +268,7 @@ UP007.py:60:8: UP007 [*] Use `X | Y` for type annotations
    |
    = help: Convert to `X | Y`
 
-ℹ Unsafe fix
+ℹ Safe fix
 57 57 | 
 58 58 |     x = Union[str, int]
 59 59 |     x = Union["str", "int"]
@@ -287,7 +287,7 @@ UP007.py:61:8: UP007 [*] Use `X | Y` for type annotations
    |
    = help: Convert to `X | Y`
 
-ℹ Unsafe fix
+ℹ Safe fix
 58 58 |     x = Union[str, int]
 59 59 |     x = Union["str", "int"]
 60 60 |     x: Union[str, int]
@@ -382,7 +382,7 @@ UP007.py:102:28: UP007 [*] Use `X | Y` for type annotations
     |
     = help: Convert to `X | Y`
 
-ℹ Unsafe fix
+ℹ Safe fix
 99  99  | 
 100 100 | # Regression test for: https://github.com/astral-sh/ruff/issues/7131
 101 101 | class ServiceRefOrValue:
@@ -404,7 +404,7 @@ UP007.py:110:28: UP007 [*] Use `X | Y` for type annotations
     |
     = help: Convert to `X | Y`
 
-ℹ Unsafe fix
+ℹ Safe fix
 107 107 | 
 108 108 | # Regression test for: https://github.com/astral-sh/ruff/issues/7201
 109 109 | class ServiceRefOrValue:
@@ -423,7 +423,7 @@ UP007.py:120:10: UP007 [*] Use `X | Y` for type annotations
     |
     = help: Convert to `X | Y`
 
-ℹ Unsafe fix
+ℹ Safe fix
 117 117 | 
 118 118 | 
 119 119 | # Regression test for: https://github.com/astral-sh/ruff/issues/8609

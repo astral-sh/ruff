@@ -8,7 +8,7 @@ use syn::{
     Ident, ItemFn, LitStr, Pat, Path, Stmt, Token,
 };
 
-use crate::rule_code_prefix::{get_prefix_ident, if_all_same};
+use crate::rule_code_prefix::{get_prefix_ident, intersection_all};
 
 /// A rule entry in the big match statement such a
 /// `(Pycodestyle, "E112") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::NoIndentedBlock),`
@@ -142,12 +142,13 @@ pub(crate) fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
 
         for (prefix, rules) in &rules_by_prefix {
             let prefix_ident = get_prefix_ident(prefix);
-            let attr = match if_all_same(rules.iter().map(|(.., attrs)| attrs)) {
-                Some(attr) => quote!(#(#attr)*),
-                None => quote!(),
+            let attrs = intersection_all(rules.iter().map(|(.., attrs)| attrs.as_slice()));
+            let attrs = match attrs.as_slice() {
+                [] => quote!(),
+                [..] => quote!(#(#attrs)*),
             };
             all_codes.push(quote! {
-                #attr Self::#linter(#linter::#prefix_ident)
+                #attrs Self::#linter(#linter::#prefix_ident)
             });
         }
 
@@ -159,12 +160,13 @@ pub(crate) fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
                 quote!(#(#attrs)* Rule::#rule_name)
             });
             let prefix_ident = get_prefix_ident(&prefix);
-            let attr = match if_all_same(rules.iter().map(|(.., attrs)| attrs)) {
-                Some(attr) => quote!(#(#attr)*),
-                None => quote!(),
+            let attrs = intersection_all(rules.iter().map(|(.., attrs)| attrs.as_slice()));
+            let attrs = match attrs.as_slice() {
+                [] => quote!(),
+                [..] => quote!(#(#attrs)*),
             };
             prefix_into_iter_match_arms.extend(quote! {
-                #attr #linter::#prefix_ident => vec![#(#rule_paths,)*].into_iter(),
+                #attrs #linter::#prefix_ident => vec![#(#rule_paths,)*].into_iter(),
             });
         }
 
@@ -315,9 +317,21 @@ See also https://github.com/astral-sh/ruff/issues/2186.
                 matches!(self.group(), RuleGroup::Preview)
             }
 
+            pub fn is_stable(&self) -> bool {
+                matches!(self.group(), RuleGroup::Stable)
+            }
+
             #[allow(deprecated)]
             pub fn is_nursery(&self) -> bool {
                 matches!(self.group(), RuleGroup::Nursery)
+            }
+
+            pub fn is_deprecated(&self) -> bool {
+                matches!(self.group(), RuleGroup::Deprecated)
+            }
+
+            pub fn is_removed(&self) -> bool {
+                matches!(self.group(), RuleGroup::Removed)
             }
         }
 
@@ -377,8 +391,10 @@ fn generate_iter_impl(
             pub fn iter() -> impl Iterator<Item = RuleCodePrefix> {
                 use strum::IntoEnumIterator;
 
-                std::iter::empty()
-                    #(.chain(#linter_idents::iter().map(|x| Self::#linter_idents(x))))*
+                let mut prefixes = Vec::new();
+
+                #(prefixes.extend(#linter_idents::iter().map(|x| Self::#linter_idents(x)));)*
+                prefixes.into_iter()
             }
         }
     }

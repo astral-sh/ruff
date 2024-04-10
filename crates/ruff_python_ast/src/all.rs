@@ -1,4 +1,5 @@
 use bitflags::bitflags;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::helpers::map_subscript;
 use crate::{self as ast, Expr, Stmt};
@@ -15,17 +16,75 @@ bitflags! {
     }
 }
 
+/// Abstraction for a string inside an `__all__` definition,
+/// e.g. `"foo"` in `__all__ = ["foo"]`
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DunderAllName<'a> {
+    /// The value of the string inside the `__all__` definition
+    name: &'a str,
+
+    /// The range of the string inside the `__all__` definition
+    range: TextRange,
+}
+
+impl DunderAllName<'_> {
+    pub fn name(&self) -> &str {
+        self.name
+    }
+}
+
+impl Ranged for DunderAllName<'_> {
+    fn range(&self) -> TextRange {
+        self.range
+    }
+}
+
+/// Abstraction for a collection of names inside an `__all__` definition,
+/// e.g. `["foo", "bar"]` in `__all__ = ["foo", "bar"]`
+#[derive(Debug, Clone)]
+pub struct DunderAllDefinition<'a> {
+    /// The range of the `__all__` identifier.
+    range: TextRange,
+    /// The names inside the `__all__` definition.
+    names: Vec<DunderAllName<'a>>,
+}
+
+impl<'a> DunderAllDefinition<'a> {
+    /// Initialize a new [`DunderAllDefinition`] instance.
+    pub fn new(range: TextRange, names: Vec<DunderAllName<'a>>) -> Self {
+        Self { range, names }
+    }
+
+    /// The names inside the `__all__` definition.
+    pub fn names(&self) -> &[DunderAllName<'a>] {
+        &self.names
+    }
+}
+
+impl Ranged for DunderAllDefinition<'_> {
+    fn range(&self) -> TextRange {
+        self.range
+    }
+}
+
 /// Extract the names bound to a given __all__ assignment.
 ///
 /// Accepts a closure that determines whether a given name (e.g., `"list"`) is a Python builtin.
-pub fn extract_all_names<F>(stmt: &Stmt, is_builtin: F) -> (Vec<&str>, DunderAllFlags)
+pub fn extract_all_names<F>(stmt: &Stmt, is_builtin: F) -> (Vec<DunderAllName>, DunderAllFlags)
 where
     F: Fn(&str) -> bool,
 {
-    fn add_to_names<'a>(elts: &'a [Expr], names: &mut Vec<&'a str>, flags: &mut DunderAllFlags) {
+    fn add_to_names<'a>(
+        elts: &'a [Expr],
+        names: &mut Vec<DunderAllName<'a>>,
+        flags: &mut DunderAllFlags,
+    ) {
         for elt in elts {
-            if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = elt {
-                names.push(value.to_str());
+            if let Expr::StringLiteral(ast::ExprStringLiteral { value, range }) = elt {
+                names.push(DunderAllName {
+                    name: value.to_str(),
+                    range: *range,
+                });
             } else {
                 *flags |= DunderAllFlags::INVALID_OBJECT;
             }
@@ -60,16 +119,14 @@ where
                 }
             }
             Expr::Call(ast::ExprCall {
-                func,
-                arguments: ast::Arguments { args, keywords, .. },
-                ..
+                func, arguments, ..
             }) => {
                 // Allow `tuple()`, `list()`, and their generic forms, like `list[int]()`.
-                if keywords.is_empty() && args.len() <= 1 {
+                if arguments.keywords.is_empty() && arguments.args.len() <= 1 {
                     if let Expr::Name(ast::ExprName { id, .. }) = map_subscript(func) {
                         let id = id.as_str();
                         if matches!(id, "tuple" | "list") && is_builtin(id) {
-                            let [arg] = args.as_slice() else {
+                            let [arg] = arguments.args.as_ref() else {
                                 return (None, DunderAllFlags::empty());
                             };
                             match arg {
@@ -89,7 +146,7 @@ where
                     }
                 }
             }
-            Expr::NamedExpr(ast::ExprNamedExpr { value, .. }) => {
+            Expr::Named(ast::ExprNamed { value, .. }) => {
                 // Allow, e.g., `__all__ += (value := ["A", "B"])`.
                 return extract_elts(value, is_builtin);
             }
@@ -98,7 +155,7 @@ where
         (None, DunderAllFlags::INVALID_FORMAT)
     }
 
-    let mut names: Vec<&str> = vec![];
+    let mut names: Vec<DunderAllName> = vec![];
     let mut flags = DunderAllFlags::empty();
 
     if let Some(value) = match stmt {

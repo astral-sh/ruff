@@ -21,6 +21,7 @@ def unconventional_aliases():
     import tkinter as tkr
     import networkx as nxy
 
+
 def conventional_aliases():
     import altair as alt
     import matplotlib.pyplot as plt

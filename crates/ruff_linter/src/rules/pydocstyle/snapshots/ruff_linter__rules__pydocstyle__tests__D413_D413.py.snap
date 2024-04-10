@@ -1,0 +1,83 @@
+---
+source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
+---
+D413.py:7:1: D413 [*] Missing blank line after last section ("Returns")
+  |
+5 |         with a hanging indent
+6 | 
+7 | Returns:
+  | ^^^^^^^ D413
+8 |     the value
+9 | """
+  |
+  = help: Add blank line after "Returns"
+
+ℹ Safe fix
+6  6  | 
+7  7  | Returns:
+8  8  |     the value
+   9  |+
+9  10 | """
+10 11 | 
+11 12 | 
+
+D413.py:19:5: D413 [*] Missing blank line after last section ("Returns")
+   |
+17 |             with a hanging indent
+18 | 
+19 |     Returns:
+   |     ^^^^^^^ D413
+20 |         the value
+21 |     """
+   |
+   = help: Add blank line after "Returns"
+
+ℹ Safe fix
+18 18 | 
+19 19 |     Returns:
+20 20 |         the value
+   21 |+
+21 22 |     """
+22 23 | 
+23 24 | 
+
+D413.py:58:5: D413 [*] Missing blank line after last section ("Returns")
+   |
+56 |             with a hanging indent
+57 | 
+58 |     Returns:
+   |     ^^^^^^^ D413
+59 |         the value"""
+   |
+   = help: Add blank line after "Returns"
+
+ℹ Safe fix
+56 56 |             with a hanging indent
+57 57 | 
+58 58 |     Returns:
+59    |-        the value"""
+   59 |+        the value
+   60 |+
+   61 |+    """
+60 62 | 
+61 63 | 
+62 64 | def func():
+
+D413.py:69:5: D413 [*] Missing blank line after last section ("Returns")
+   |
+67 |             with a hanging indent
+68 | 
+69 |     Returns:
+   |     ^^^^^^^ D413
+70 |         the value
+71 |         """
+   |
+   = help: Add blank line after "Returns"
+
+ℹ Safe fix
+68 68 | 
+69 69 |     Returns:
+70 70 |         the value
+71    |-        """
+   71 |+
+   72 |+    """

@@ -114,8 +114,8 @@ There are a few other minor incompatibilities between Ruff and the originating F
 
 ## How does Ruff's linter compare to Pylint?
 
-At time of writing, Pylint implements ~409 total rules, while Ruff implements over 700, of which at
-least 172 overlap with the Pylint rule set (see: [#970](https://github.com/astral-sh/ruff/issues/970)).
+At time of writing, Pylint implements ~409 total rules, while Ruff implements over 800, of which at
+least 209 overlap with the Pylint rule set (see: [#970](https://github.com/astral-sh/ruff/issues/970)).
 
 Pylint implements many rules that Ruff does not, and vice versa. For example, Pylint does more type
 inference than Ruff (e.g., Pylint can validate the number of arguments in a function call). As such,
@@ -126,8 +126,16 @@ Despite these differences, many users have successfully switched from Pylint to 
 those using Ruff alongside a [type checker](faq.md#how-does-ruff-compare-to-mypy-or-pyright-or-pyre),
 which can cover some of the functionality that Pylint provides.
 
-Like Flake8, Pylint supports plugins (called "checkers"), while Ruff implements all rules natively.
-Unlike Pylint, Ruff is capable of automatically fixing its own lint violations.
+Like Flake8, Pylint supports plugins (called "checkers"), while Ruff implements all rules natively
+and does not support custom or third-party rules. Unlike Pylint, Ruff is capable of automatically
+fixing its own lint violations.
+
+In some cases, Ruff's rules may yield slightly different results than their Pylint counterparts. For
+example, Ruff's [`too-many-branches`](rules/too-many-branches.md) does not count `try` blocks as
+their own branches, unlike Pylint's `R0912`. Ruff's `PL` rule group also includes a small number of
+rules from Pylint _extensions_ (like [`magic-value-comparison`](rules/magic-value-comparison.md)),
+which need to be explicitly activated when using Pylint. By enabling Ruff's `PL` group, you may
+see violations for rules that weren't previously enabled through your Pylint configuration.
 
 Pylint parity is being tracked in [#970](https://github.com/astral-sh/ruff/issues/970).
 
@@ -261,8 +269,8 @@ from numpy import tan, uint8, uint16, uint32, uint64
 Like isort, Ruff's import sorting is compatible with Black.
 
 Ruff does not yet support all of isort's configuration options, though it does support many of
-them. You can find the supported settings in the [API reference](settings.md#isort).
-For example, you can set [`known-first-party`](settings.md#isort-known-first-party)
+them. You can find the supported settings in the [API reference](settings.md#lintisort).
+For example, you can set [`known-first-party`](settings.md#lint_isort_known-first-party)
 like so:
 
 === "pyproject.toml"
@@ -426,7 +434,7 @@ Found 3 errors.
 
 ## Does Ruff support NumPy- or Google-style docstrings?
 
-Yes! To enforce a docstring convention, add a [`convention`](settings.md#pydocstyle-convention)
+Yes! To enforce a docstring convention, add a [`convention`](settings.md#lint_pydocstyle_convention)
 setting following to your configuration file:
 
 === "pyproject.toml"
@@ -447,7 +455,7 @@ For example, if you're coming from flake8-docstrings, and your originating confi
 `--docstring-convention=numpy`, you'd instead set `convention = "numpy"` in your `pyproject.toml`,
 as above.
 
-Alongside [`convention`](settings.md#pydocstyle-convention), you'll want to
+Alongside [`convention`](settings.md#lint_pydocstyle_convention), you'll want to
 explicitly enable the `D` rule code prefix, since the `D` rules are not enabled by default:
 
 === "pyproject.toml"
@@ -470,7 +478,7 @@ explicitly enable the `D` rule code prefix, since the `D` rules are not enabled 
     convention = "google"
     ```
 
-Enabling a [`convention`](settings.md#pydocstyle-convention) will disable any rules that are not
+Enabling a [`convention`](settings.md#lint_pydocstyle_convention) will disable any rules that are not
 included in the specified convention. As such, the intended workflow is to enable a convention and
 then selectively enable or disable any additional rules on top of it:
 
@@ -556,8 +564,8 @@ The Google convention includes all `D` errors apart from:
 [`D409`](rules/section-underline-matches-section-length.md), and
 [`D413`](rules/no-blank-line-after-section.md).
 
-By default, no [`convention`](settings.md#pydocstyle-convention) is set, and so the enabled rules
-are determined by the [`select`](settings.md#select) setting alone.
+By default, no [`convention`](settings.md#lint_pydocstyle_convention) is set, and so the enabled rules
+are determined by the [`select`](settings.md#lint_select) setting alone.
 
 ## What is "preview"?
 
@@ -620,11 +628,12 @@ Even still, given the dynamic nature of Python, it's difficult to have _complete
 making changes to code, even for seemingly trivial fixes. If a "safe" fix breaks your code, please
 [file an Issue](https://github.com/astral-sh/ruff/issues/new).
 
-## How can I disable Ruff's color output?
+## How can I disable/force Ruff's color output?
 
 Ruff's color output is powered by the [`colored`](https://crates.io/crates/colored) crate, which
 attempts to automatically detect whether the output stream supports color. However, you can force
-colors off by setting the `NO_COLOR` environment variable to any value (e.g., `NO_COLOR=1`).
+colors off by setting the `NO_COLOR` environment variable to any value (e.g., `NO_COLOR=1`), or
+force colors on by setting `FORCE_COLOR` to any non-empty value (e.g. `FORCE_COLOR=1`).
 
 [`colored`](https://crates.io/crates/colored) also supports the `CLICOLOR` and `CLICOLOR_FORCE`
 environment variables (see the [spec](https://bixense.com/clicolors/)).

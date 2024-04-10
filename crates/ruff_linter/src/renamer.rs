@@ -4,8 +4,9 @@ use anyhow::{anyhow, Result};
 use itertools::Itertools;
 
 use ruff_diagnostics::Edit;
+use ruff_python_codegen::Stylist;
 use ruff_python_semantic::{Binding, BindingKind, Scope, ScopeId, SemanticModel};
-use ruff_text_size::Ranged;
+use ruff_text_size::{Ranged, TextSize};
 
 pub(crate) struct Renamer;
 
@@ -104,6 +105,7 @@ impl Renamer {
         target: &str,
         scope: &Scope,
         semantic: &SemanticModel,
+        stylist: &Stylist,
     ) -> Result<(Edit, Vec<Edit>)> {
         let mut edits = vec![];
 
@@ -130,7 +132,9 @@ impl Renamer {
         });
 
         let scope = scope_id.map_or(scope, |scope_id| &semantic.scopes[scope_id]);
-        edits.extend(Renamer::rename_in_scope(name, target, scope, semantic));
+        edits.extend(Renamer::rename_in_scope(
+            name, target, scope, semantic, stylist,
+        ));
 
         // Find any scopes in which the symbol is referenced as `nonlocal` or `global`. For example,
         // given:
@@ -160,7 +164,9 @@ impl Renamer {
             .copied()
         {
             let scope = &semantic.scopes[scope_id];
-            edits.extend(Renamer::rename_in_scope(name, target, scope, semantic));
+            edits.extend(Renamer::rename_in_scope(
+                name, target, scope, semantic, stylist,
+            ));
         }
 
         // Deduplicate any edits.
@@ -180,6 +186,7 @@ impl Renamer {
         target: &str,
         scope: &Scope,
         semantic: &SemanticModel,
+        stylist: &Stylist,
     ) -> Vec<Edit> {
         let mut edits = vec![];
 
@@ -202,7 +209,17 @@ impl Renamer {
                 // Rename the references to the binding.
                 edits.extend(binding.references().map(|reference_id| {
                     let reference = semantic.reference(reference_id);
-                    Edit::range_replacement(target.to_string(), reference.range())
+                    let replacement = {
+                        if reference.in_dunder_all_definition() {
+                            debug_assert!(!reference.range().is_empty());
+                            let quote = stylist.quote();
+                            format!("{quote}{target}{quote}")
+                        } else {
+                            debug_assert_eq!(TextSize::of(name), reference.range().len());
+                            target.to_string()
+                        }
+                    };
+                    Edit::range_replacement(replacement, reference.range())
                 }));
             }
         }
@@ -232,7 +249,7 @@ impl Renamer {
             }
             BindingKind::SubmoduleImport(import) => {
                 // Ex) Rename `import pandas.core` to `import pandas as pd`.
-                let module_name = import.call_path.first().unwrap();
+                let module_name = import.qualified_name.segments().first().unwrap();
                 Some(Edit::range_replacement(
                     format!("{module_name} as {target}"),
                     binding.range(),
@@ -248,12 +265,14 @@ impl Renamer {
             | BindingKind::Assignment
             | BindingKind::BoundException
             | BindingKind::LoopVar
+            | BindingKind::ComprehensionVar
             | BindingKind::WithItemVar
             | BindingKind::Global
             | BindingKind::Nonlocal(_)
             | BindingKind::ClassDefinition(_)
             | BindingKind::FunctionDefinition(_)
             | BindingKind::Deletion
+            | BindingKind::ConditionalDeletion(_)
             | BindingKind::UnboundException(_) => {
                 Some(Edit::range_replacement(target.to_string(), binding.range()))
             }

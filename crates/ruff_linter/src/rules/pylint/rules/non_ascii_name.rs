@@ -52,6 +52,7 @@ pub(crate) fn non_ascii_name(binding: &Binding, locator: &Locator) -> Option<Dia
         BindingKind::Assignment => Kind::Assignment,
         BindingKind::TypeParam => Kind::TypeParam,
         BindingKind::LoopVar => Kind::LoopVar,
+        BindingKind::ComprehensionVar => Kind::ComprenhensionVar,
         BindingKind::WithItemVar => Kind::WithItemVar,
         BindingKind::Global => Kind::Global,
         BindingKind::Nonlocal(_) => Kind::Nonlocal,
@@ -66,6 +67,7 @@ pub(crate) fn non_ascii_name(binding: &Binding, locator: &Locator) -> Option<Dia
         | BindingKind::FromImport(_)
         | BindingKind::SubmoduleImport(_)
         | BindingKind::Deletion
+        | BindingKind::ConditionalDeletion(_)
         | BindingKind::UnboundException(_) => {
             return None;
         }
@@ -88,6 +90,7 @@ enum Kind {
     Assignment,
     TypeParam,
     LoopVar,
+    ComprenhensionVar,
     WithItemVar,
     Global,
     Nonlocal,
@@ -105,6 +108,7 @@ impl fmt::Display for Kind {
             Kind::Assignment => f.write_str("Variable"),
             Kind::TypeParam => f.write_str("Type parameter"),
             Kind::LoopVar => f.write_str("Variable"),
+            Kind::ComprenhensionVar => f.write_str("Variable"),
             Kind::WithItemVar => f.write_str("Variable"),
             Kind::Global => f.write_str("Global"),
             Kind::Nonlocal => f.write_str("Nonlocal"),

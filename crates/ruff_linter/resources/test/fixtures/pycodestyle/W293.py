@@ -14,3 +14,6 @@ class Chassis(RobotModuleTemplate):
  " \
     \
     
+'''blank line with whitespace
+ 
+inside a multiline string'''

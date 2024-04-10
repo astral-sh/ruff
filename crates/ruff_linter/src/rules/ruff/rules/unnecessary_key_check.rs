@@ -72,11 +72,11 @@ pub(crate) fn unnecessary_key_check(checker: &mut Checker, expr: &Expr) {
         return;
     };
 
-    if !matches!(ops.as_slice(), [CmpOp::In]) {
+    if !matches!(&**ops, [CmpOp::In]) {
         return;
     }
 
-    let [obj_left] = comparators.as_slice() else {
+    let [obj_left] = &**comparators else {
         return;
     };
 

@@ -3,6 +3,7 @@ use anyhow::Result;
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Keyword};
+use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -53,10 +54,14 @@ impl Violation for ReplaceStdoutStderr {
 
 /// UP022
 pub(crate) fn replace_stdout_stderr(checker: &mut Checker, call: &ast::ExprCall) {
+    if !checker.semantic().seen_module(Modules::SUBPROCESS) {
+        return;
+    }
+
     if checker
         .semantic()
-        .resolve_call_path(&call.func)
-        .is_some_and(|call_path| matches!(call_path.as_slice(), ["subprocess", "run"]))
+        .resolve_qualified_name(&call.func)
+        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["subprocess", "run"]))
     {
         // Find `stdout` and `stderr` kwargs.
         let Some(stdout) = call.arguments.find_keyword("stdout") else {
@@ -69,12 +74,16 @@ pub(crate) fn replace_stdout_stderr(checker: &mut Checker, call: &ast::ExprCall)
         // Verify that they're both set to `subprocess.PIPE`.
         if !checker
             .semantic()
-            .resolve_call_path(&stdout.value)
-            .is_some_and(|call_path| matches!(call_path.as_slice(), ["subprocess", "PIPE"]))
+            .resolve_qualified_name(&stdout.value)
+            .is_some_and(|qualified_name| {
+                matches!(qualified_name.segments(), ["subprocess", "PIPE"])
+            })
             || !checker
                 .semantic()
-                .resolve_call_path(&stderr.value)
-                .is_some_and(|call_path| matches!(call_path.as_slice(), ["subprocess", "PIPE"]))
+                .resolve_qualified_name(&stderr.value)
+                .is_some_and(|qualified_name| {
+                    matches!(qualified_name.segments(), ["subprocess", "PIPE"])
+                })
         {
             return;
         }

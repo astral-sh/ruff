@@ -1,12 +1,12 @@
 use anyhow::Result;
 
 use ruff_diagnostics::Edit;
-use ruff_python_ast::call_path::from_qualified_name;
-use ruff_python_ast::helpers::map_callable;
+use ruff_python_ast::helpers::{map_callable, map_subscript};
+use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{self as ast, Decorator, Expr};
 use ruff_python_codegen::{Generator, Stylist};
 use ruff_python_semantic::{
-    analyze, Binding, BindingKind, NodeId, ResolvedReference, SemanticModel,
+    analyze, Binding, BindingKind, Modules, NodeId, ResolvedReference, ScopeKind, SemanticModel,
 };
 use ruff_source_file::Locator;
 use ruff_text_size::Ranged;
@@ -77,10 +77,10 @@ fn runtime_required_base_class(
     base_classes: &[String],
     semantic: &SemanticModel,
 ) -> bool {
-    analyze::class::any_call_path(class_def, semantic, &|call_path| {
+    analyze::class::any_qualified_name(class_def, semantic, &|qualified_name| {
         base_classes
             .iter()
-            .any(|base_class| from_qualified_name(base_class) == call_path)
+            .any(|base_class| QualifiedName::from_dotted_name(base_class) == qualified_name)
     })
 }
 
@@ -95,13 +95,46 @@ fn runtime_required_decorators(
 
     decorator_list.iter().any(|decorator| {
         semantic
-            .resolve_call_path(map_callable(&decorator.expression))
-            .is_some_and(|call_path| {
+            .resolve_qualified_name(map_callable(&decorator.expression))
+            .is_some_and(|qualified_name| {
                 decorators
                     .iter()
-                    .any(|base_class| from_qualified_name(base_class) == call_path)
+                    .any(|base_class| QualifiedName::from_dotted_name(base_class) == qualified_name)
             })
     })
+}
+
+/// Returns `true` if an annotation will be inspected at runtime by the `dataclasses` module.
+///
+/// Specifically, detects whether an annotation is to either `dataclasses.InitVar` or
+/// `typing.ClassVar` within a `@dataclass` class definition.
+///
+/// See: <https://docs.python.org/3/library/dataclasses.html#init-only-variables>
+pub(crate) fn is_dataclass_meta_annotation(annotation: &Expr, semantic: &SemanticModel) -> bool {
+    if !semantic.seen_module(Modules::DATACLASSES) {
+        return false;
+    }
+
+    // Determine whether the assignment is in a `@dataclass` class definition.
+    if let ScopeKind::Class(class_def) = semantic.current_scope().kind {
+        if class_def.decorator_list.iter().any(|decorator| {
+            semantic
+                .resolve_qualified_name(map_callable(&decorator.expression))
+                .is_some_and(|qualified_name| {
+                    matches!(qualified_name.segments(), ["dataclasses", "dataclass"])
+                })
+        }) {
+            // Determine whether the annotation is `typing.ClassVar` or `dataclasses.InitVar`.
+            return semantic
+                .resolve_qualified_name(map_subscript(annotation))
+                .is_some_and(|qualified_name| {
+                    matches!(qualified_name.segments(), ["dataclasses", "InitVar"])
+                        || semantic.match_typing_qualified_name(&qualified_name, "ClassVar")
+                });
+        }
+    }
+
+    false
 }
 
 /// Returns `true` if a function is registered as a `singledispatch` interface.
@@ -109,6 +142,7 @@ fn runtime_required_decorators(
 /// For example, `fun` below is a `singledispatch` interface:
 /// ```python
 /// from functools import singledispatch
+///
 ///
 /// @singledispatch
 /// def fun(arg, verbose=False):
@@ -120,9 +154,9 @@ pub(crate) fn is_singledispatch_interface(
 ) -> bool {
     function_def.decorator_list.iter().any(|decorator| {
         semantic
-            .resolve_call_path(&decorator.expression)
-            .is_some_and(|call_path| {
-                matches!(call_path.as_slice(), ["functools", "singledispatch"])
+            .resolve_qualified_name(&decorator.expression)
+            .is_some_and(|qualified_name| {
+                matches!(qualified_name.segments(), ["functools", "singledispatch"])
             })
     })
 }
@@ -133,6 +167,7 @@ pub(crate) fn is_singledispatch_interface(
 /// For example:
 /// ```python
 /// from functools import singledispatch
+///
 ///
 /// @singledispatch
 /// def fun(arg, verbose=False):

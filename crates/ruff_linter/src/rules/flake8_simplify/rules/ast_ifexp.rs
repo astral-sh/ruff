@@ -61,7 +61,7 @@ impl Violation for IfExprWithTrueFalse {
 /// condition.
 ///
 /// ## Why is this bad?
-/// `if` expressions that evaluate to `False` for a truthy condition an `True`
+/// `if` expressions that evaluate to `False` for a truthy condition and `True`
 /// for a falsey condition can be replaced with `not` operators, which are more
 /// concise and readable.
 ///
@@ -185,8 +185,8 @@ pub(crate) fn if_expr_with_true_false(
                         .into(),
                     ),
                     arguments: Arguments {
-                        args: vec![test.clone()],
-                        keywords: vec![],
+                        args: Box::from([test.clone()]),
+                        keywords: Box::from([]),
                         range: TextRange::default(),
                     },
                     range: TextRange::default(),
@@ -267,7 +267,7 @@ pub(crate) fn twisted_arms_in_ifexpr(
     let node = body.clone();
     let node1 = orelse.clone();
     let node2 = orelse.clone();
-    let node3 = ast::ExprIfExp {
+    let node3 = ast::ExprIf {
         test: Box::new(node2),
         body: Box::new(node1),
         orelse: Box::new(node),

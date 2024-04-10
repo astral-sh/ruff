@@ -3,8 +3,9 @@
 Ruff includes an opt-in preview mode to provide an opportunity for community feedback and increase confidence that
 changes are a net-benefit before enabling them for everyone.
 
-Preview mode enables a collection of newer lint rules, fixes, and formatter style changes that are
-considered experimental or unstable,.
+Preview mode enables a collection of unstable features such as new lint rules and fixes, formatter style changes, interface updates, and more. Warnings about deprecated features may turn into errors when using preview mode.
+
+Enabling preview mode does not on its own enable all preview rules. See the [rules section](#using-rules-that-are-in-preview) for details on selecting preview rules.
 
 ## Enabling preview mode
 
@@ -27,6 +28,13 @@ Preview mode can be configured separately for linting and formatting (requires R
     preview = true
     ```
 
+=== "CLI"
+
+    ```console
+    ruff check --preview
+    ```
+
+
 To enable preview style formatting without enabling any preview lint rules:
 
 === "pyproject.toml"
@@ -43,11 +51,16 @@ To enable preview style formatting without enabling any preview lint rules:
     preview = true
     ```
 
+=== "CLI"
+
+    ```console
+    ruff format --preview
+    ```
+
 ## Using rules that are in preview
 
 If a rule is marked as preview, it can only be selected if preview mode is enabled. For example, consider a
-hypothetical rule, `HYP001`. If `HYP001` were in preview, it would _not_ be enabled by adding following to your
-config file:
+hypothetical rule, `HYP001`. If `HYP001` were in preview, it would _not_ be enabled by adding it to the selected rule set.
 
 === "pyproject.toml"
 
@@ -62,6 +75,13 @@ config file:
     [lint]
     extend-select = ["HYP001"]
     ```
+
+=== "CLI"
+
+    ```console
+    ruff check --extend-select HYP001
+    ```
+
 
 It also would _not_ be enabled by selecting the `HYP` category, like so:
 
@@ -79,6 +99,13 @@ It also would _not_ be enabled by selecting the `HYP` category, like so:
     extend-select = ["HYP"]
     ```
 
+=== "CLI"
+
+    ```console
+    ruff check --extend-select HYP
+    ```
+
+
 Similarly, it would _not_ be enabled via the `ALL` selector:
 
 === "pyproject.toml"
@@ -95,7 +122,13 @@ Similarly, it would _not_ be enabled via the `ALL` selector:
     select = ["ALL"]
     ```
 
-However, it would be enabled in any of the above cases if you enabled preview in your configuration file:
+=== "CLI"
+
+    ```console
+    ruff check --select ALL
+    ```
+
+However, it _would_ be enabled in any of the above cases if you enabled preview mode:
 
 === "pyproject.toml"
 
@@ -113,14 +146,18 @@ However, it would be enabled in any of the above cases if you enabled preview in
     preview = true
     ```
 
-Or, if you provided the `--preview` CLI flag.
+=== "CLI"
+
+    ```console
+    ruff check --extend-select HYP --preview
+    ```
 
 To see which rules are currently in preview, visit the [rules reference](rules.md).
 
 ## Selecting single preview rules
 
 When preview mode is enabled, selecting rule categories or prefixes will include all preview rules that match.
-If you'd prefer to opt-in to each preview rule individually, you can toggle the `explicit-preview-rules`
+If you'd prefer to opt in to each preview rule individually, you can toggle the `explicit-preview-rules`
 setting in your configuration file:
 
 === "pyproject.toml"
@@ -144,11 +181,7 @@ rule will need to be selected with its exact code, e.g. `--select ALL,HYP001`.
 
 If preview mode is not enabled, this setting has no effect.
 
-## Legacy behavior
+## Deprecated rules
 
-Before the preview mode was introduced, new rules were added in a "nursery" category that required selection of
-rules with their exact codes — similar to if `explicit-preview-rules` is enabled.
-
-The nursery category has been deprecated and all rules in the nursery are now considered to be in preview.
-For backwards compatibility, nursery rules are selectable with their exact codes without enabling preview mode.
-However, this behavior will display a warning and support will be removed in a future release.
+When preview mode is enabled, deprecated rules will be disabled. If a deprecated rule is selected explicitly, an
+error will be raised. Deprecated rules will not be included if selected via a rule category or prefix.

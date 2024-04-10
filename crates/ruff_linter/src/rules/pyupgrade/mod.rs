@@ -1,5 +1,5 @@
 //! Rules from [pyupgrade](https://pypi.org/project/pyupgrade/).
-mod fixes;
+pub(crate) mod fixes;
 mod helpers;
 pub(crate) mod rules;
 pub mod settings;
@@ -61,6 +61,7 @@ mod tests {
     #[test_case(Rule::ReplaceUniversalNewlines, Path::new("UP021.py"))]
     #[test_case(Rule::SuperCallWithParameters, Path::new("UP008.py"))]
     #[test_case(Rule::TimeoutErrorAlias, Path::new("UP041.py"))]
+    #[test_case(Rule::ReplaceStrEnum, Path::new("UP042.py"))]
     #[test_case(Rule::TypeOfPrimitive, Path::new("UP003.py"))]
     #[test_case(Rule::TypingTextStrAlias, Path::new("UP019.py"))]
     #[test_case(Rule::UTF8EncodingDeclaration, Path::new("UP009_0.py"))]

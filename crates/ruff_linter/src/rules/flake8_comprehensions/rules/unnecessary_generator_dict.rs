@@ -58,7 +58,7 @@ pub(crate) fn unnecessary_generator_dict(
     else {
         return;
     };
-    let Expr::GeneratorExp(ast::ExprGeneratorExp { elt, .. }) = argument else {
+    let Expr::Generator(ast::ExprGenerator { elt, .. }) = argument else {
         return;
     };
     let Expr::Tuple(ast::ExprTuple { elts, .. }) = elt.as_ref() else {

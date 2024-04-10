@@ -1,13 +1,15 @@
-use ruff_python_ast::str::raw_contents_range;
+use ruff_python_ast::{all::DunderAllName, str::raw_contents_range};
 use ruff_text_size::{Ranged, TextRange};
 
-use ruff_python_semantic::{BindingKind, ContextualizedDefinition, Export};
+use ruff_python_semantic::{
+    BindingKind, ContextualizedDefinition, Definition, Export, Member, MemberKind,
+};
 
 use crate::checkers::ast::Checker;
 use crate::codes::Rule;
 use crate::docstrings::Docstring;
 use crate::fs::relativize_path;
-use crate::rules::{flake8_annotations, flake8_pyi, pydocstyle};
+use crate::rules::{flake8_annotations, flake8_pyi, pydocstyle, pylint};
 use crate::{docstrings, warn_user};
 
 /// Run lint rules over all [`Definition`] nodes in the [`SemanticModel`].
@@ -31,6 +33,7 @@ pub(crate) fn definitions(checker: &mut Checker) {
     ]);
     let enforce_stubs = checker.source_type.is_stub() && checker.enabled(Rule::DocstringInStub);
     let enforce_stubs_and_runtime = checker.enabled(Rule::IterMethodReturnIterable);
+    let enforce_dunder_method = checker.enabled(Rule::BadDunderMethodName);
     let enforce_docstrings = checker.any_enabled(&[
         Rule::BlankLineAfterLastSection,
         Rule::BlankLineAfterSummary,
@@ -80,12 +83,17 @@ pub(crate) fn definitions(checker: &mut Checker) {
         Rule::UndocumentedPublicPackage,
     ]);
 
-    if !enforce_annotations && !enforce_docstrings && !enforce_stubs && !enforce_stubs_and_runtime {
+    if !enforce_annotations
+        && !enforce_docstrings
+        && !enforce_stubs
+        && !enforce_stubs_and_runtime
+        && !enforce_dunder_method
+    {
         return;
     }
 
     // Compute visibility of all definitions.
-    let exports: Option<Vec<&str>> = {
+    let exports: Option<Vec<DunderAllName>> = {
         checker
             .semantic
             .global_scope()
@@ -144,6 +152,19 @@ pub(crate) fn definitions(checker: &mut Checker) {
         if enforce_stubs_and_runtime {
             if checker.enabled(Rule::IterMethodReturnIterable) {
                 flake8_pyi::rules::iter_method_return_iterable(checker, definition);
+            }
+        }
+
+        // pylint
+        if enforce_dunder_method {
+            if checker.enabled(Rule::BadDunderMethodName) {
+                if let Definition::Member(Member {
+                    kind: MemberKind::Method(method),
+                    ..
+                }) = definition
+                {
+                    pylint::rules::bad_dunder_method_name(checker, method);
+                }
             }
         }
 

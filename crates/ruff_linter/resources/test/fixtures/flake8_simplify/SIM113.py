@@ -193,3 +193,11 @@ def func():
         for y in range(5):
             g(x, idx)
             idx += 1
+
+async def func():
+    # OK (for loop is async)
+    idx = 0
+
+    async for x in async_gen():
+        g(x, idx)
+        idx += 1

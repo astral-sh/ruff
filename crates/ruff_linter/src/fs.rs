@@ -9,24 +9,37 @@ use crate::registry::RuleSet;
 /// Create a set with codes matching the pattern/code pairs.
 pub(crate) fn ignores_from_path(
     path: &Path,
-    pattern_code_pairs: &[(GlobMatcher, GlobMatcher, RuleSet)],
+    pattern_code_pairs: &[(GlobMatcher, GlobMatcher, bool, RuleSet)],
 ) -> RuleSet {
     let file_name = path.file_name().expect("Unable to parse filename");
     pattern_code_pairs
         .iter()
-        .filter_map(|(absolute, basename, rules)| {
+        .filter_map(|(absolute, basename, negated, rules)| {
             if basename.is_match(file_name) {
+                if *negated { None } else {
+                    debug!(
+                        "Adding per-file ignores for {:?} due to basename match on {:?}: {:?}",
+                        path,
+                        basename.glob().regex(),
+                        rules
+                    );
+                    Some(rules)
+                }
+            } else if absolute.is_match(path) {
+                if *negated { None } else {
+                    debug!(
+                        "Adding per-file ignores for {:?} due to absolute match on {:?}: {:?}",
+                        path,
+                        absolute.glob().regex(),
+                        rules
+                    );
+                    Some(rules)
+                }
+            } else if *negated {
                 debug!(
-                    "Adding per-file ignores for {:?} due to basename match on {:?}: {:?}",
+                    "Adding per-file ignores for {:?} due to negated pattern matching neither {:?} nor {:?}: {:?}",
                     path,
                     basename.glob().regex(),
-                    rules
-                );
-                Some(rules)
-            } else if absolute.is_match(path) {
-                debug!(
-                    "Adding per-file ignores for {:?} due to absolute match on {:?}: {:?}",
-                    path,
                     absolute.glob().regex(),
                     rules
                 );

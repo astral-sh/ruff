@@ -13,7 +13,7 @@ use crate::settings::LinterSettings;
 /// For flowing long blocks of text (docstrings or comments), overlong lines
 /// can hurt readability. [PEP 8], for example, recommends that such lines be
 /// limited to 72 characters, while this rule enforces the limit specified by
-/// the [`pycodestyle.max-doc-length`] setting. (If no value is provided, this
+/// the [`lint.pycodestyle.max-doc-length`] setting. (If no value is provided, this
 /// rule will be ignored, even if it's added to your `--select` list.)
 ///
 /// In the context of this rule, a "doc line" is defined as a line consisting
@@ -32,8 +32,8 @@ use crate::settings::LinterSettings;
 ///    overlong if a pragma comment _causes_ it to exceed the line length.
 ///    (This behavior aligns with that of the Ruff formatter.)
 ///
-/// If [`pycodestyle.ignore-overlong-task-comments`] is `true`, this rule will
-/// also ignore comments that start with any of the specified [`task-tags`]
+/// If [`lint.pycodestyle.ignore-overlong-task-comments`] is `true`, this rule will
+/// also ignore comments that start with any of the specified [`lint.task-tags`]
 /// (e.g., `# TODO:`).
 ///
 /// ## Example
@@ -65,9 +65,9 @@ use crate::settings::LinterSettings;
 /// ```
 ///
 /// ## Options
-/// - `task-tags`
-/// - `pycodestyle.max-doc-length`
-/// - `pycodestyle.ignore-overlong-task-comments`
+/// - `lint.task-tags`
+/// - `lint.pycodestyle.max-doc-length`
+/// - `lint.pycodestyle.ignore-overlong-task-comments`
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#maximum-line-length
 #[violation]
@@ -87,10 +87,7 @@ pub(crate) fn doc_line_too_long(
     indexer: &Indexer,
     settings: &LinterSettings,
 ) -> Option<Diagnostic> {
-    let Some(limit) = settings.pycodestyle.max_doc_length else {
-        return None;
-    };
-
+    let limit = settings.pycodestyle.max_doc_length?;
     Overlong::try_from_line(
         line,
         indexer,

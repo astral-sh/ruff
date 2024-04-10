@@ -59,7 +59,7 @@ impl Violation for SingleLineImplicitStringConcatenation {
 ///
 /// By default, this rule will only trigger if the string literal is
 /// concatenated via a backslash. To disallow implicit string concatenation
-/// altogether, set the [`flake8-implicit-str-concat.allow-multiline`] option
+/// altogether, set the [`lint.flake8-implicit-str-concat.allow-multiline`] option
 /// to `false`.
 ///
 /// ## Example
@@ -77,7 +77,7 @@ impl Violation for SingleLineImplicitStringConcatenation {
 /// ```
 ///
 /// ## Options
-/// - `flake8-implicit-str-concat.allow-multiline`
+/// - `lint.flake8-implicit-str-concat.allow-multiline`
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#maximum-line-length
 #[violation]
@@ -110,7 +110,7 @@ pub(crate) fn implicit(
     {
         let (a_range, b_range) = match (a_tok, b_tok) {
             (Tok::String { .. }, Tok::String { .. }) => (*a_range, *b_range),
-            (Tok::String { .. }, Tok::FStringStart) => {
+            (Tok::String { .. }, Tok::FStringStart(_)) => {
                 match indexer.fstring_ranges().innermost(b_range.start()) {
                     Some(b_range) => (*a_range, b_range),
                     None => continue,
@@ -122,7 +122,7 @@ pub(crate) fn implicit(
                     None => continue,
                 }
             }
-            (Tok::FStringEnd, Tok::FStringStart) => {
+            (Tok::FStringEnd, Tok::FStringStart(_)) => {
                 match (
                     indexer.fstring_ranges().innermost(a_range.start()),
                     indexer.fstring_ranges().innermost(b_range.start()),

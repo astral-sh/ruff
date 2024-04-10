@@ -2,16 +2,15 @@ use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
 use ruff_python_ast::{self as ast};
-use ruff_text_size::Ranged;
+use ruff_python_semantic::Modules;
 
 use crate::checkers::ast::Checker;
-use crate::rules::flake8_datetimez::rules::helpers::has_non_none_keyword;
 
-use super::helpers;
+use super::helpers::{self, DatetimeModuleAntipattern};
 
 /// ## What it does
-/// Checks for usage of `datetime.datetime.fromtimestamp()` without a `tz`
-/// argument.
+/// Checks for usage of `datetime.datetime.fromtimestamp()` that do not specify
+/// a timezone.
 ///
 /// ## Why is this bad?
 /// Python datetime objects can be naive or timezone-aware. While an aware
@@ -20,9 +19,10 @@ use super::helpers;
 /// datetime objects. Since this can lead to errors, it is recommended to
 /// always use timezone-aware objects.
 ///
-/// `datetime.datetime.fromtimestamp(ts)` returns a naive datetime object.
-/// Instead, use `datetime.datetime.fromtimestamp(ts, tz=)` to return a
-/// timezone-aware object.
+/// `datetime.datetime.fromtimestamp(ts)` or
+/// `datetime.datetime.fromtimestampe(ts, tz=None)` returns a naive datetime
+/// object. Instead, use `datetime.datetime.fromtimestamp(ts, tz=<timezone>)`
+/// to create a timezone-aware object.
 ///
 /// ## Example
 /// ```python
@@ -38,7 +38,7 @@ use super::helpers;
 /// datetime.datetime.fromtimestamp(946684800, tz=datetime.timezone.utc)
 /// ```
 ///
-/// Or, for Python 3.11 and later:
+/// Or, on Python 3.11 and later:
 /// ```python
 /// import datetime
 ///
@@ -48,24 +48,38 @@ use super::helpers;
 /// ## References
 /// - [Python documentation: Aware and Naive Objects](https://docs.python.org/3/library/datetime.html#aware-and-naive-objects)
 #[violation]
-pub struct CallDatetimeFromtimestamp;
+pub struct CallDatetimeFromtimestamp(DatetimeModuleAntipattern);
 
 impl Violation for CallDatetimeFromtimestamp {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!(
-            "The use of `datetime.datetime.fromtimestamp()` without `tz` argument is not allowed"
-        )
+        let CallDatetimeFromtimestamp(antipattern) = self;
+        match antipattern {
+            DatetimeModuleAntipattern::NoTzArgumentPassed => {
+                format!("`datetime.datetime.fromtimestamp()` called without a `tz` argument")
+            }
+            DatetimeModuleAntipattern::NonePassedToTzArgument => {
+                format!("`tz=None` passed to `datetime.datetime.fromtimestamp()`")
+            }
+        }
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        Some("Pass a `datetime.timezone` object to the `tz` parameter".to_string())
     }
 }
 
 pub(crate) fn call_datetime_fromtimestamp(checker: &mut Checker, call: &ast::ExprCall) {
+    if !checker.semantic().seen_module(Modules::DATETIME) {
+        return;
+    }
+
     if !checker
         .semantic()
-        .resolve_call_path(&call.func)
-        .is_some_and(|call_path| {
+        .resolve_qualified_name(&call.func)
+        .is_some_and(|qualified_name| {
             matches!(
-                call_path.as_slice(),
+                qualified_name.segments(),
                 ["datetime", "datetime", "fromtimestamp"]
             )
         })
@@ -77,26 +91,14 @@ pub(crate) fn call_datetime_fromtimestamp(checker: &mut Checker, call: &ast::Exp
         return;
     }
 
-    // no args / no args unqualified
-    if call.arguments.args.len() < 2 && call.arguments.keywords.is_empty() {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(CallDatetimeFromtimestamp, call.range()));
-        return;
-    }
+    let antipattern = match call.arguments.find_argument("tz", 1) {
+        Some(ast::Expr::NoneLiteral(_)) => DatetimeModuleAntipattern::NonePassedToTzArgument,
+        Some(_) => return,
+        None => DatetimeModuleAntipattern::NoTzArgumentPassed,
+    };
 
-    // none args
-    if call.arguments.args.len() > 1 && call.arguments.args[1].is_none_literal_expr() {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(CallDatetimeFromtimestamp, call.range()));
-        return;
-    }
-
-    // wrong keywords / none keyword
-    if !call.arguments.keywords.is_empty() && !has_non_none_keyword(&call.arguments, "tz") {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(CallDatetimeFromtimestamp, call.range()));
-    }
+    checker.diagnostics.push(Diagnostic::new(
+        CallDatetimeFromtimestamp(antipattern),
+        call.range,
+    ));
 }

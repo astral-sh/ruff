@@ -166,6 +166,10 @@ fn find_file_open<'a>(
     // keyword mode should override that.
     let mode = kw_mode.unwrap_or(pos_mode);
 
+    if matches!(mode, ReadMode::Bytes) && !keywords.is_empty() {
+        return None;
+    }
+
     // Now we need to find what is this variable bound to...
     let scope = semantic.current_scope();
     let bindings: Vec<BindingId> = scope.get_all(var.id.as_str()).collect();
@@ -322,7 +326,7 @@ fn make_suggestion(open: &FileOpen<'_>, generator: Generator) -> SourceCodeSnipp
     let call = ast::ExprCall {
         func: Box::new(name.into()),
         arguments: ast::Arguments {
-            args: vec![],
+            args: Box::from([]),
             keywords: open.keywords.iter().copied().cloned().collect(),
             range: TextRange::default(),
         },

@@ -223,10 +223,7 @@ impl<'a> ExceptionHandlerVisitor<'a> {
     }
 }
 
-impl<'a, 'b> Visitor<'b> for ExceptionHandlerVisitor<'a>
-where
-    'b: 'a,
-{
+impl<'a> Visitor<'a> for ExceptionHandlerVisitor<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
         match stmt {
             Stmt::Assert(_) => {
@@ -411,7 +408,7 @@ fn to_pytest_raises_args<'a>(
 ) -> Option<Cow<'a, str>> {
     let args = match attr {
         "assertRaises" | "failUnlessRaises" => {
-            match (arguments.args.as_slice(), arguments.keywords.as_slice()) {
+            match (&*arguments.args, &*arguments.keywords) {
                 // Ex) `assertRaises(Exception)`
                 ([arg], []) => Cow::Borrowed(checker.locator().slice(arg)),
                 // Ex) `assertRaises(expected_exception=Exception)`
@@ -427,7 +424,7 @@ fn to_pytest_raises_args<'a>(
             }
         }
         "assertRaisesRegex" | "assertRaisesRegexp" => {
-            match (arguments.args.as_slice(), arguments.keywords.as_slice()) {
+            match (&*arguments.args, &*arguments.keywords) {
                 // Ex) `assertRaisesRegex(Exception, regex)`
                 ([arg1, arg2], []) => Cow::Owned(format!(
                     "{}, match={}",

@@ -3,6 +3,7 @@ use ruff_text_size::TextRange;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_semantic::Modules;
 
 use crate::checkers::ast::Checker;
 
@@ -19,7 +20,7 @@ use super::helpers;
 /// always use timezone-aware objects.
 ///
 /// `datetime.datetime.utcnow()` returns a naive datetime object; instead, use
-/// `datetime.datetime.now(tz=)` to return a timezone-aware object.
+/// `datetime.datetime.now(tz=...)` to create a timezone-aware object.
 ///
 /// ## Example
 /// ```python
@@ -50,18 +51,29 @@ pub struct CallDatetimeUtcnow;
 impl Violation for CallDatetimeUtcnow {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!(
-            "The use of `datetime.datetime.utcnow()` is not allowed, use \
-             `datetime.datetime.now(tz=)` instead"
-        )
+        format!("`datetime.datetime.utcnow()` used")
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        Some("Use `datetime.datetime.now(tz=...)` instead".to_string())
     }
 }
 
+/// DTZ003
 pub(crate) fn call_datetime_utcnow(checker: &mut Checker, func: &Expr, location: TextRange) {
+    if !checker.semantic().seen_module(Modules::DATETIME) {
+        return;
+    }
+
     if !checker
         .semantic()
-        .resolve_call_path(func)
-        .is_some_and(|call_path| matches!(call_path.as_slice(), ["datetime", "datetime", "utcnow"]))
+        .resolve_qualified_name(func)
+        .is_some_and(|qualified_name| {
+            matches!(
+                qualified_name.segments(),
+                ["datetime", "datetime", "utcnow"]
+            )
+        })
     {
         return;
     }

@@ -4,6 +4,7 @@ This script will clone astral-sh/schemastore, update the schema and push the cha
 to a new branch tagged with the ruff git hash. You should see a URL to create the PR
 to schemastore in the CLI.
 """
+
 from __future__ import annotations
 
 import json
@@ -17,7 +18,7 @@ ruff_repo = "https://github.com/astral-sh/ruff"
 root = Path(
     check_output(["git", "rev-parse", "--show-toplevel"], text=True).strip(),
 )
-ruff_json = Path("src/schemas/json/ruff.json")
+ruff_json = Path("schemas/json/ruff.json")
 
 
 def update_schemastore(schemastore: Path) -> None:
@@ -47,13 +48,26 @@ def update_schemastore(schemastore: Path) -> None:
         cwd=schemastore,
     )
 
+    # Run npm install
+    src = schemastore.joinpath("src")
+    check_call(["npm", "install"], cwd=src)
+
     # Update the schema and format appropriately
     schema = json.loads(root.joinpath("ruff.schema.json").read_text())
     schema["$id"] = "https://json.schemastore.org/ruff.json"
-    schemastore.joinpath(ruff_json).write_text(
-        json.dumps(dict(sorted(schema.items())), indent=2, ensure_ascii=False),
+    src.joinpath(ruff_json).write_text(
+        json.dumps(dict(schema.items()), indent=2, ensure_ascii=False),
     )
-    check_call(["prettier", "--write", ruff_json], cwd=schemastore)
+    check_call(
+        [
+            "node_modules/.bin/prettier",
+            "--plugin",
+            "prettier-plugin-sort-json",
+            "--write",
+            ruff_json,
+        ],
+        cwd=src,
+    )
 
     # Check if the schema has changed
     # https://stackoverflow.com/a/9393642/3549270
