@@ -1262,10 +1262,10 @@ fn negated_per_file_ignores_overlap() -> Result<()> {
 "!foo.py" = ["RUF"]
 "#,
     )?;
-    let foo = tempdir.path().join("foo.py");
-    fs::write(foo, "")?;
-    let bar = tempdir.path().join("bar.py");
-    fs::write(bar, "")?;
+    let foo_file = tempdir.path().join("foo.py");
+    fs::write(foo_file, "")?;
+    let bar_file = tempdir.path().join("bar.py");
+    fs::write(bar_file, "")?;
 
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
