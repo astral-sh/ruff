@@ -1242,20 +1242,25 @@ import os
 "#,
     )?;
 
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(STDIN_BASE_OPTIONS)
-        .arg("--config")
-        .arg(&ruff_toml)
-        .current_dir(&tempdir)
-        , @r###"
-    success: false
-    exit_code: 1
-    ----- stdout -----
-    src/selected.py:2:8: F401 [*] `os` imported but unused
-    Found 1 error.
-    [*] 1 fixable with the `--fix` option.
+    insta::with_settings!({filters => vec![
+        // Replace windows paths
+        (r"\\", "/"),
+    ]}, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+            .args(STDIN_BASE_OPTIONS)
+            .arg("--config")
+            .arg(&ruff_toml)
+            .current_dir(&tempdir)
+            , @r###"
+        success: false
+        exit_code: 1
+        ----- stdout -----
+        src/selected.py:2:8: F401 [*] `os` imported but unused
+        Found 1 error.
+        [*] 1 fixable with the `--fix` option.
 
-    ----- stderr -----
-    "###);
+        ----- stderr -----
+        "###);
+    });
     Ok(())
 }
