@@ -1,7 +1,9 @@
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_codegen::Generator;
-use ruff_python_semantic::ResolvedReference;
+use ruff_python_semantic::{BindingId, ResolvedReference, SemanticModel};
 use ruff_text_size::{Ranged, TextRange};
+
+use crate::fix::snippet::SourceCodeSnippet;
 
 /// Format a code snippet to call `name.method()`.
 pub(super) fn generate_method_call(name: &str, method: &str, generator: Generator) -> String {
@@ -63,6 +65,7 @@ pub(super) fn generate_none_identity_comparison(
     generator.expr(&compare.into())
 }
 
+// Helpers for read-whole-file and write-whole-file
 #[derive(Debug)]
 pub(crate) enum OpenMode {
     /// "r"
@@ -76,7 +79,7 @@ pub(crate) enum OpenMode {
 }
 
 impl OpenMode {
-    pub(crate) fn pathlib_method(&self) -> String {
+    fn pathlib_method(&self) -> String {
         match self {
             OpenMode::ReadText => "read_text".to_string(),
             OpenMode::ReadBytes => "read_bytes".to_string(),
@@ -110,8 +113,110 @@ impl<'a> FileOpen<'a> {
     }
 }
 
+/// Find and return all `open` operations in the given `with` statement.
+pub(crate) fn find_file_opens<'a>(
+    with: &'a ast::StmtWith,
+    semantic: &'a SemanticModel<'a>,
+    read_mode: bool,
+) -> Vec<FileOpen<'a>> {
+    with.items
+        .iter()
+        .filter_map(|item| find_file_open(item, with, semantic, read_mode))
+        .collect()
+}
+
+/// Find `open` operation in the given `with` item.
+fn find_file_open<'a>(
+    item: &'a ast::WithItem,
+    with: &'a ast::StmtWith,
+    semantic: &'a SemanticModel<'a>,
+    read_mode: bool,
+) -> Option<FileOpen<'a>> {
+    // We want to match `open(...) as var`.
+    let ast::ExprCall {
+        func,
+        arguments: ast::Arguments { args, keywords, .. },
+        ..
+    } = item.context_expr.as_call_expr()?;
+
+    if func.as_name_expr()?.id != "open" {
+        return None;
+    }
+
+    let var = item.optional_vars.as_deref()?.as_name_expr()?;
+
+    // Ignore calls with `*args` and `**kwargs`. In the exact case of `open(*filename, mode="w")`,
+    // it could be a match; but in all other cases, the call _could_ contain unsupported keyword
+    // arguments, like `buffering`.
+    if args.iter().any(Expr::is_starred_expr)
+        || keywords.iter().any(|keyword| keyword.arg.is_none())
+    {
+        return None;
+    }
+
+    // Match positional arguments, get filename and mode.
+    let (filename, pos_mode) = match_open_args(args)?;
+
+    // Match keyword arguments, get keyword arguments to forward and possibly mode.
+    let (keywords, kw_mode) = match_open_keywords(keywords, read_mode)?;
+
+    let mode = kw_mode.unwrap_or(pos_mode);
+
+    match mode {
+        OpenMode::ReadText | OpenMode::ReadBytes => {
+            if !read_mode {
+                return None;
+            }
+        }
+        OpenMode::WriteText | OpenMode::WriteBytes => {
+            if read_mode {
+                return None;
+            }
+        }
+    }
+
+    // Path.read_bytes and Path.write_bytes do not support any kwargs.
+    if matches!(mode, OpenMode::ReadBytes | OpenMode::WriteBytes) && !keywords.is_empty() {
+        return None;
+    }
+
+    // Now we need to find what is this variable bound to...
+    let scope = semantic.current_scope();
+    let bindings: Vec<BindingId> = scope.get_all(var.id.as_str()).collect();
+
+    let binding = bindings
+        .iter()
+        .map(|x| semantic.binding(*x))
+        // We might have many bindings with the same name, but we only care
+        // for the one we are looking at right now.
+        .find(|binding| binding.range() == var.range())?;
+
+    // Since many references can share the same binding, we can limit our attention span
+    // exclusively to the body of the current `with` statement.
+    let references: Vec<&ResolvedReference> = binding
+        .references
+        .iter()
+        .map(|id| semantic.reference(*id))
+        .filter(|reference| with.range().contains_range(reference.range()))
+        .collect();
+
+    // And even with all these restrictions, if the file handle gets used not exactly once,
+    // it doesn't fit the bill.
+    let [reference] = references.as_slice() else {
+        return None;
+    };
+
+    Some(FileOpen {
+        item,
+        filename,
+        mode,
+        keywords,
+        reference,
+    })
+}
+
 /// Match positional arguments. Return expression for the file name and open mode.
-pub(crate) fn match_open_args(args: &[Expr]) -> Option<(&Expr, OpenMode)> {
+fn match_open_args(args: &[Expr]) -> Option<(&Expr, OpenMode)> {
     match args {
         [filename] => Some((filename, OpenMode::ReadText)),
         [filename, mode_literal] => match_open_mode(mode_literal).map(|mode| (filename, mode)),
@@ -120,8 +225,47 @@ pub(crate) fn match_open_args(args: &[Expr]) -> Option<(&Expr, OpenMode)> {
     }
 }
 
+/// Match keyword arguments. Return keyword arguments to forward and mode.
+fn match_open_keywords(
+    keywords: &[ast::Keyword],
+    read_mode: bool,
+) -> Option<(Vec<&ast::Keyword>, Option<OpenMode>)> {
+    let mut result: Vec<&ast::Keyword> = vec![];
+    let mut mode: Option<OpenMode> = None;
+
+    for keyword in keywords {
+        match keyword.arg.as_ref()?.as_str() {
+            "encoding" | "errors" => result.push(keyword),
+            // newline is only valid for write_text
+            "newline" => {
+                if read_mode {
+                    return None;
+                }
+                result.push(keyword);
+            }
+
+            // This might look bizarre, - why do we re-wrap this optional?
+            //
+            // The answer is quite simple, in the result of the current function
+            // mode being `None` is a possible and correct option meaning that there
+            // was NO "mode" keyword argument.
+            //
+            // The result of `match_open_mode` on the other hand is None
+            // in the cases when the mode is not compatible with `write_text`/`write_bytes`.
+            //
+            // So, here we return None from this whole function if the mode
+            // is incompatible.
+            "mode" => mode = Some(match_open_mode(&keyword.value)?),
+
+            // All other keywords cannot be directly forwarded.
+            _ => return None,
+        };
+    }
+    Some((result, mode))
+}
+
 /// Match open mode to see if it is supported.
-pub(crate) fn match_open_mode(mode: &Expr) -> Option<OpenMode> {
+fn match_open_mode(mode: &Expr) -> Option<OpenMode> {
     let ast::ExprStringLiteral { value, .. } = mode.as_string_literal_expr()?;
     if value.is_implicit_concatenated() {
         return None;
@@ -133,4 +277,27 @@ pub(crate) fn match_open_mode(mode: &Expr) -> Option<OpenMode> {
         "wb" => Some(OpenMode::WriteBytes),
         _ => None,
     }
+}
+
+/// Construct the replacement suggestion call.
+pub(crate) fn make_suggestion(
+    open: &FileOpen<'_>,
+    arguments: Vec<Expr>,
+    generator: Generator,
+) -> SourceCodeSnippet {
+    let name = ast::ExprName {
+        id: open.mode.pathlib_method(),
+        ctx: ast::ExprContext::Load,
+        range: TextRange::default(),
+    };
+    let call = ast::ExprCall {
+        func: Box::new(name.into()),
+        arguments: ast::Arguments {
+            args: Box::from(arguments),
+            keywords: open.keywords.iter().copied().cloned().collect(),
+            range: TextRange::default(),
+        },
+        range: TextRange::default(),
+    };
+    SourceCodeSnippet::from_str(&generator.expr(&call.into()))
 }
