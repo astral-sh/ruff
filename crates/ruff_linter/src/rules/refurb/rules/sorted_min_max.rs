@@ -69,6 +69,7 @@ pub(crate) fn sorted_min_max(checker: &mut Checker, subscript: &ast::ExprSubscri
     else {
         return;
     };
+
     // Check if the value is a call to `sorted()`
     if !matches!(func.as_ref(), Expr::Name(name) if name.id == "sorted" && checker.semantic().is_builtin(name.id.as_str()))
     {
@@ -100,17 +101,24 @@ pub(crate) fn sorted_min_max(checker: &mut Checker, subscript: &ast::ExprSubscri
         _ => return,
     };
 
-    let reversed = arguments.keywords.iter().any(|keyword| {
+    let reverse_keyword = arguments.keywords.iter().find(|keyword| {
         // Is the keyword "reverse" and is the value `true`?
         keyword
             .arg
             .as_ref()
             .map_or(false, |arg| arg.as_str() == "reverse")
-            && keyword
-                .value
-                .as_boolean_literal_expr()
-                .map_or(false, |b| b.value)
     });
+
+    let is_reversed = if let Some(reverse_keyword) = reverse_keyword {
+        match reverse_keyword.value.as_boolean_literal_expr() {
+            Some(ast::ExprBooleanLiteral { value, .. }) => *value,
+            // If the value is not a boolean literal, we can't determine if it is reversed
+            _ => return,
+        }
+    } else {
+        // No reverse keyword, so it is not reversed
+        false
+    };
 
     let keyword_expr = arguments
         .keywords
@@ -119,7 +127,7 @@ pub(crate) fn sorted_min_max(checker: &mut Checker, subscript: &ast::ExprSubscri
             keyword
                 .arg
                 .as_ref()
-                .map_or(false, |arg| arg.as_str() == "keys")
+                .map_or(false, |arg| arg.as_str() == "key")
         })
         .map(|keyword| &keyword.value);
 
