@@ -402,3 +402,58 @@ RUF100_0.py:117:12: RUF100 [*] Unused `noqa` directive (duplicated: `F841`, `F84
     117 |+    z = 2  # noqa: F841
 118 118 | 
 119 119 |     return
+120 120 | 
+
+RUF100_0.py:124:20: RUF100 [*] Unused `noqa` directive (duplicated: `S307`, `S307`, `S307`)
+    |
+122 | # Allow code redirects
+123 | x = eval(command)  # noqa: PGH001, S307
+124 | x = eval(command)  # noqa: S307, PGH001, S307, S307, S307
+    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF100
+125 | x = eval(command)  # noqa: PGH001, S307, PGH001
+126 | x = eval(command)  # noqa: PGH001, S307, PGH001, S307
+    |
+    = help: Remove unused `noqa` directive
+
+ℹ Safe fix
+121 121 | 
+122 122 | # Allow code redirects
+123 123 | x = eval(command)  # noqa: PGH001, S307
+124     |-x = eval(command)  # noqa: S307, PGH001, S307, S307, S307
+    124 |+x = eval(command)  # noqa: S307, PGH001
+125 125 | x = eval(command)  # noqa: PGH001, S307, PGH001
+126 126 | x = eval(command)  # noqa: PGH001, S307, PGH001, S307
+
+RUF100_0.py:125:20: RUF100 [*] Unused `noqa` directive (duplicated: `PGH001`)
+    |
+123 | x = eval(command)  # noqa: PGH001, S307
+124 | x = eval(command)  # noqa: S307, PGH001, S307, S307, S307
+125 | x = eval(command)  # noqa: PGH001, S307, PGH001
+    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF100
+126 | x = eval(command)  # noqa: PGH001, S307, PGH001, S307
+    |
+    = help: Remove unused `noqa` directive
+
+ℹ Safe fix
+122 122 | # Allow code redirects
+123 123 | x = eval(command)  # noqa: PGH001, S307
+124 124 | x = eval(command)  # noqa: S307, PGH001, S307, S307, S307
+125     |-x = eval(command)  # noqa: PGH001, S307, PGH001
+    125 |+x = eval(command)  # noqa: PGH001, S307
+126 126 | x = eval(command)  # noqa: PGH001, S307, PGH001, S307
+
+RUF100_0.py:126:20: RUF100 [*] Unused `noqa` directive (duplicated: `PGH001`, `S307`)
+    |
+124 | x = eval(command)  # noqa: S307, PGH001, S307, S307, S307
+125 | x = eval(command)  # noqa: PGH001, S307, PGH001
+126 | x = eval(command)  # noqa: PGH001, S307, PGH001, S307
+    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF100
+    |
+    = help: Remove unused `noqa` directive
+
+ℹ Safe fix
+123 123 | x = eval(command)  # noqa: PGH001, S307
+124 124 | x = eval(command)  # noqa: S307, PGH001, S307, S307, S307
+125 125 | x = eval(command)  # noqa: PGH001, S307, PGH001
+126     |-x = eval(command)  # noqa: PGH001, S307, PGH001, S307
+    126 |+x = eval(command)  # noqa: PGH001, S307

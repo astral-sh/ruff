@@ -117,3 +117,10 @@ def foo():
     z = 2  # noqa: F841 F841  F841, F841, F841
 
     return
+
+
+# Allow code redirects
+x = eval(command)  # noqa: PGH001, S307
+x = eval(command)  # noqa: S307, PGH001, S307, S307, S307
+x = eval(command)  # noqa: PGH001, S307, PGH001
+x = eval(command)  # noqa: PGH001, S307, PGH001, S307

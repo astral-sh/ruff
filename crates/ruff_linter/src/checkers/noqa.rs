@@ -133,22 +133,22 @@ pub(crate) fn check_noqa(
                     let mut valid_codes = vec![];
                     let mut self_ignore = per_file_ignores.contains(Rule::UnusedNOQA);
                     let mut seen_codes = HashSet::new();
-                    for code in directive.codes() {
-                        let code = get_redirect_target(code).unwrap_or(code);
+                    for original_code in directive.codes() {
+                        let code = get_redirect_target(original_code).unwrap_or(original_code);
                         if Rule::UnusedNOQA.noqa_code() == code {
                             self_ignore = true;
                             break;
                         }
 
-                        if !seen_codes.insert(code) {
-                            duplicated_codes.push(code);
+                        if !seen_codes.insert(*original_code) {
+                            duplicated_codes.push(*original_code);
                         } else if line.matches.iter().any(|match_| *match_ == code)
                             || settings
                                 .external
                                 .iter()
                                 .any(|external| code.starts_with(external))
                         {
-                            valid_codes.push(code);
+                            valid_codes.push(*original_code);
                         } else {
                             if let Ok(rule) = Rule::from_code(code) {
                                 if settings.rules.enabled(rule) {
