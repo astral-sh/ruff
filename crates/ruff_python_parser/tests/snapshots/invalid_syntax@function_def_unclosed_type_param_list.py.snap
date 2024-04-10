@@ -11,7 +11,7 @@ Module(
         body: [
             FunctionDef(
                 StmtFunctionDef {
-                    range: 0..47,
+                    range: 0..46,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
@@ -108,7 +108,7 @@ Module(
                         ),
                         Assign(
                             StmtAssign {
-                                range: 40..47,
+                                range: 40..46,
                                 targets: [
                                     Name(
                                         ExprName {
