@@ -15,7 +15,7 @@ use rustc_hash::FxHashMap;
 use crate::edit::{Document, DocumentVersion};
 use crate::PositionEncoding;
 
-use self::capabilities::ResolvedClientCapabilities;
+pub(crate) use self::capabilities::ResolvedClientCapabilities;
 use self::settings::ResolvedClientSettings;
 pub(crate) use self::settings::{AllSettings, ClientSettings};
 
@@ -36,7 +36,6 @@ pub(crate) struct Session {
 pub(crate) struct DocumentSnapshot {
     configuration: Arc<RuffConfiguration>,
     resolved_client_capabilities: Arc<ResolvedClientCapabilities>,
-    #[allow(dead_code)]
     client_settings: settings::ResolvedClientSettings,
     document_ref: DocumentRef,
     position_encoding: PositionEncoding,
@@ -96,12 +95,10 @@ impl Session {
     }
 
     pub(crate) fn take_snapshot(&self, url: &Url) -> Option<DocumentSnapshot> {
-        let resolved_settings = self.workspaces.client_settings(url, &self.global_settings);
-        tracing::info!("Resolved settings for document {url}: {resolved_settings:?}");
         Some(DocumentSnapshot {
             configuration: self.workspaces.configuration(url)?.clone(),
             resolved_client_capabilities: self.resolved_client_capabilities.clone(),
-            client_settings: resolved_settings,
+            client_settings: self.workspaces.client_settings(url, &self.global_settings),
             document_ref: self.workspaces.snapshot(url)?,
             position_encoding: self.position_encoding,
             url: url.clone(),
@@ -138,6 +135,10 @@ impl Session {
     pub(crate) fn close_workspace_folder(&mut self, url: &Url) -> crate::Result<()> {
         self.workspaces.close_workspace_folder(url)?;
         Ok(())
+    }
+
+    pub(crate) fn resolved_client_capabilities(&self) -> &ResolvedClientCapabilities {
+        &self.resolved_client_capabilities
     }
 
     pub(crate) fn encoding(&self) -> PositionEncoding {
@@ -213,6 +214,10 @@ impl DocumentSnapshot {
 
     pub(crate) fn resolved_client_capabilities(&self) -> &ResolvedClientCapabilities {
         &self.resolved_client_capabilities
+    }
+
+    pub(crate) fn client_settings(&self) -> &ResolvedClientSettings {
+        &self.client_settings
     }
 
     pub(crate) fn document(&self) -> &DocumentRef {

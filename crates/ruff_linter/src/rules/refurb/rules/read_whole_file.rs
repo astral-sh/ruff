@@ -142,6 +142,10 @@ fn find_file_open<'a>(
         return None;
     }
 
+    if matches!(mode, helpers::OpenMode::ReadBytes) && !keywords.is_empty() {
+        return None;
+    }
+
     // Now we need to find what is this variable bound to...
     let scope = semantic.current_scope();
     let bindings: Vec<BindingId> = scope.get_all(var.id.as_str()).collect();

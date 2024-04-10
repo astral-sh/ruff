@@ -287,6 +287,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "R1711") => (RuleGroup::Stable, rules::pylint::rules::UselessReturn),
         (Pylint, "R1714") => (RuleGroup::Stable, rules::pylint::rules::RepeatedEqualityComparison),
         (Pylint, "R1722") => (RuleGroup::Stable, rules::pylint::rules::SysExitAlias),
+        (Pylint, "R1730") => (RuleGroup::Preview, rules::pylint::rules::IfStmtMinMax),
         (Pylint, "R1733") => (RuleGroup::Preview, rules::pylint::rules::UnnecessaryDictIndexLookup),
         (Pylint, "R1736") => (RuleGroup::Preview, rules::pylint::rules::UnnecessaryListIndexLookup),
         (Pylint, "R2004") => (RuleGroup::Stable, rules::pylint::rules::MagicValueComparison),
@@ -547,6 +548,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pyupgrade, "039") => (RuleGroup::Stable, rules::pyupgrade::rules::UnnecessaryClassParentheses),
         (Pyupgrade, "040") => (RuleGroup::Stable, rules::pyupgrade::rules::NonPEP695TypeAlias),
         (Pyupgrade, "041") => (RuleGroup::Stable, rules::pyupgrade::rules::TimeoutErrorAlias),
+        (Pyupgrade, "042") => (RuleGroup::Preview, rules::pyupgrade::rules::ReplaceStrEnum),
 
         // pydocstyle
         (Pydocstyle, "100") => (RuleGroup::Stable, rules::pydocstyle::rules::UndocumentedPublicModule),
@@ -1037,6 +1039,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Refurb, "101") => (RuleGroup::Preview, rules::refurb::rules::ReadWholeFile),
         (Refurb, "103") => (RuleGroup::Preview, rules::refurb::rules::WriteWholeFile),
         (Refurb, "105") => (RuleGroup::Preview, rules::refurb::rules::PrintEmptyString),
+        (Refurb, "110") => (RuleGroup::Preview, rules::refurb::rules::IfExpInsteadOfOrOperator),
         #[allow(deprecated)]
         (Refurb, "113") => (RuleGroup::Nursery, rules::refurb::rules::RepeatedAppend),
         (Refurb, "118") => (RuleGroup::Preview, rules::refurb::rules::ReimplementedOperator),

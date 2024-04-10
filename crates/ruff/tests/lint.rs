@@ -1168,3 +1168,83 @@ def func():
 
     Ok(())
 }
+
+/// Per-file selects via ! negation in per-file-ignores
+#[test]
+fn negated_per_file_ignores() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+[lint.per-file-ignores]
+"!selected.py" = ["RUF"]
+"#,
+    )?;
+    let selected = tempdir.path().join("selected.py");
+    fs::write(selected, "")?;
+    let ignored = tempdir.path().join("ignored.py");
+    fs::write(ignored, "")?;
+
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .arg("--config")
+        .arg(&ruff_toml)
+        .arg("--select")
+        .arg("RUF901")
+        .current_dir(&tempdir)
+        , @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    selected.py:1:1: RUF901 [*] Hey this is a stable test rule with a safe fix.
+    Found 1 error.
+    [*] 1 fixable with the `--fix` option.
+
+    ----- stderr -----
+    "###);
+    Ok(())
+}
+
+#[test]
+fn negated_per_file_ignores_absolute() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+[lint.per-file-ignores]
+"!src/**.py" = ["RUF"]
+"#,
+    )?;
+    let src_dir = tempdir.path().join("src");
+    fs::create_dir(&src_dir)?;
+    let selected = src_dir.join("selected.py");
+    fs::write(selected, "")?;
+    let ignored = tempdir.path().join("ignored.py");
+    fs::write(ignored, "")?;
+
+    insta::with_settings!({filters => vec![
+        // Replace windows paths
+        (r"\\", "/"),
+    ]}, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+            .args(STDIN_BASE_OPTIONS)
+            .arg("--config")
+            .arg(&ruff_toml)
+            .arg("--select")
+            .arg("RUF901")
+            .current_dir(&tempdir)
+            , @r###"
+        success: false
+        exit_code: 1
+        ----- stdout -----
+        src/selected.py:1:1: RUF901 [*] Hey this is a stable test rule with a safe fix.
+        Found 1 error.
+        [*] 1 fixable with the `--fix` option.
+
+        ----- stderr -----
+        "###);
+    });
+    Ok(())
+}

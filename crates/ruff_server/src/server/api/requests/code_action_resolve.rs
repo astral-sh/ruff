@@ -1,9 +1,10 @@
 use std::borrow::Cow;
 
+use crate::edit::{DocumentVersion, WorkspaceEditTracker};
 use crate::server::api::LSPResult;
 use crate::server::SupportedCodeAction;
 use crate::server::{client::Notifier, Result};
-use crate::session::DocumentSnapshot;
+use crate::session::{DocumentSnapshot, ResolvedClientCapabilities};
 use crate::PositionEncoding;
 use lsp_server::ErrorCode;
 use lsp_types::{self as types, request as req};
@@ -42,18 +43,22 @@ impl super::BackgroundDocumentRequestHandler for CodeActionResolve {
             SupportedCodeAction::SourceFixAll => Some(
                 resolve_edit_for_fix_all(
                     document,
+                    snapshot.resolved_client_capabilities(),
                     snapshot.url(),
                     &snapshot.configuration().linter,
                     snapshot.encoding(),
+                    document.version(),
                 )
                 .with_failure_code(ErrorCode::InternalError)?,
             ),
             SupportedCodeAction::SourceOrganizeImports => Some(
                 resolve_edit_for_organize_imports(
                     document,
+                    snapshot.resolved_client_capabilities(),
                     snapshot.url(),
                     &snapshot.configuration().linter,
                     snapshot.encoding(),
+                    document.version(),
                 )
                 .with_failure_code(ErrorCode::InternalError)?,
             ),
@@ -71,29 +76,51 @@ impl super::BackgroundDocumentRequestHandler for CodeActionResolve {
 
 pub(super) fn resolve_edit_for_fix_all(
     document: &crate::edit::Document,
+    client_capabilities: &ResolvedClientCapabilities,
     url: &types::Url,
     linter_settings: &LinterSettings,
     encoding: PositionEncoding,
+    version: DocumentVersion,
 ) -> crate::Result<types::WorkspaceEdit> {
-    Ok(types::WorkspaceEdit {
-        changes: Some(
-            [(
-                url.clone(),
-                crate::fix::fix_all(document, linter_settings, encoding)?,
-            )]
-            .into_iter()
-            .collect(),
-        ),
-        ..Default::default()
-    })
+    let mut tracker = WorkspaceEditTracker::new(client_capabilities);
+    tracker.set_edits_for_document(
+        url.clone(),
+        version,
+        fix_all_edit(document, linter_settings, encoding)?,
+    )?;
+    Ok(tracker.into_workspace_edit())
+}
+
+pub(super) fn fix_all_edit(
+    document: &crate::edit::Document,
+    linter_settings: &LinterSettings,
+    encoding: PositionEncoding,
+) -> crate::Result<Vec<types::TextEdit>> {
+    crate::fix::fix_all(document, linter_settings, encoding)
 }
 
 pub(super) fn resolve_edit_for_organize_imports(
     document: &crate::edit::Document,
+    client_capabilities: &ResolvedClientCapabilities,
     url: &types::Url,
     linter_settings: &ruff_linter::settings::LinterSettings,
     encoding: PositionEncoding,
+    version: DocumentVersion,
 ) -> crate::Result<types::WorkspaceEdit> {
+    let mut tracker = WorkspaceEditTracker::new(client_capabilities);
+    tracker.set_edits_for_document(
+        url.clone(),
+        version,
+        organize_imports_edit(document, linter_settings, encoding)?,
+    )?;
+    Ok(tracker.into_workspace_edit())
+}
+
+pub(super) fn organize_imports_edit(
+    document: &crate::edit::Document,
+    linter_settings: &LinterSettings,
+    encoding: PositionEncoding,
+) -> crate::Result<Vec<types::TextEdit>> {
     let mut linter_settings = linter_settings.clone();
     linter_settings.rules = [
         Rule::UnsortedImports,       // I001
@@ -102,15 +129,5 @@ pub(super) fn resolve_edit_for_organize_imports(
     .into_iter()
     .collect();
 
-    Ok(types::WorkspaceEdit {
-        changes: Some(
-            [(
-                url.clone(),
-                crate::fix::fix_all(document, &linter_settings, encoding)?,
-            )]
-            .into_iter()
-            .collect(),
-        ),
-        ..Default::default()
-    })
+    crate::fix::fix_all(document, &linter_settings, encoding)
 }
