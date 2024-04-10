@@ -931,6 +931,10 @@ impl<'src> Parser<'src> {
         // x: yield a = 1
         // x: yield from b = 1
         // x: y := int = 1
+
+        // test_err ann_assign_stmt_type_alias_annotation
+        // a: type X = int
+        // lambda: type X = int
         let annotation = self.parse_conditional_expression_or_higher(AllowStarredExpression::No);
 
         let value = if self.eat(TokenKind::Equal) {
