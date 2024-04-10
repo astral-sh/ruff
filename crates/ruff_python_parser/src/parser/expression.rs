@@ -379,7 +379,8 @@ impl<'src> Parser<'src> {
     /// be [`Precedence::Await`].
     fn parse_lhs_expression(&mut self, previous_precedence: Precedence) -> ParsedExpr {
         let start = self.node_start();
-        let mut lhs = match self.current_token_kind() {
+
+        let lhs = match self.current_token_kind() {
             unary_tok @ (TokenKind::Plus | TokenKind::Minus | TokenKind::Tilde) => {
                 let unary_expr = self.parse_unary_expression();
                 if previous_precedence > Precedence::PosNegBitNot
@@ -448,11 +449,10 @@ impl<'src> Parser<'src> {
             _ => self.parse_atom(),
         };
 
-        if self.is_current_token_postfix() {
-            lhs = self.parse_postfix_expression(lhs.expr, start).into();
+        ParsedExpr {
+            expr: self.parse_postfix_expression(lhs.expr, start),
+            is_parenthesized: lhs.is_parenthesized,
         }
-
-        lhs
     }
 
     /// Parses an expression with a minimum precedence of bitwise `or`.
@@ -669,6 +669,12 @@ impl<'src> Parser<'src> {
         lhs.into()
     }
 
+    /// Parses a postfix expression in a loop until there are no postfix expressions left to parse.
+    ///
+    /// For a given left-hand side, a postfix expression can begin with either `(` for a call
+    /// expression, `[` for a subscript expression, or `.` for an attribute expression.
+    ///
+    /// This method does nothing if the current token is not a candidate for a postfix expression.
     pub(super) fn parse_postfix_expression(&mut self, mut lhs: Expr, start: TextSize) -> Expr {
         loop {
             lhs = match self.current_token_kind() {
