@@ -116,7 +116,7 @@ Module(
 3 |     # where it might be confused as a complex literal pattern.
 4 |     case x as y + 1j:
 5 |         pass
-  | ^^^^^^^^ Syntax Error: unexpected indentation
+  | ^^^^^^^^ Syntax Error: expected Dedent, found Indent
   |
 
 
