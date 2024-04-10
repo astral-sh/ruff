@@ -34,7 +34,6 @@ use ruff_text_size::Ranged;
 /// ## References
 /// - [Python documentation: `min`](https://docs.python.org/3/library/functions.html#min)
 /// - [Python documentation: `max`](https://docs.python.org/3/library/functions.html#max)
-
 #[violation]
 pub struct SortedMinMax;
 
@@ -43,11 +42,11 @@ impl Violation for SortedMinMax {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Prefer `min` and `max` over `sorted()` to get the min and max values of a list")
+        format!("Prefer `min` or `max` over `sorted()` to get the min and max values of a list")
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some(format!("Replace with `min` and `max`"))
+        Some(format!("Replace with `min` or `max`"))
     }
 }
 
@@ -113,12 +112,16 @@ pub(crate) fn sorted_min_max(checker: &mut Checker, subscript: &ast::ExprSubscri
                 .map_or(false, |b| b.value)
     });
 
-    let keys = arguments.keywords.iter().find(|keyword| {
-        keyword
-            .arg
-            .as_ref()
-            .map_or(false, |arg| arg.as_str() == "keys")
-    });
+    let keyword_expr = arguments
+        .keywords
+        .iter()
+        .find(|keyword| {
+            keyword
+                .arg
+                .as_ref()
+                .map_or(false, |arg| arg.as_str() == "keys")
+        })
+        .map(|keyword| &keyword.value);
 
     let min_max = match (index, reversed) {
         (Index::First, false) => MinMax::Min,
@@ -127,12 +130,20 @@ pub(crate) fn sorted_min_max(checker: &mut Checker, subscript: &ast::ExprSubscri
         (Index::Last, true) => MinMax::Min,
     };
 
-    let Some(Expr::Name(list_expr)) = arguments.args.get(0) else {
+    let Some(Expr::Name(list_expr)) = arguments.args.first() else {
         return;
     };
 
-    // let replacement = format!("{}({})", min_max.as_str(), keys);
-    let replacement = format!("{}({})", min_max.as_str(), list_expr.id);
+    let replacement = if let Some(key) = &keyword_expr {
+        format!(
+            "{}({}, key={})",
+            min_max.as_str(),
+            list_expr.id,
+            checker.generator().expr(key)
+        )
+    } else {
+        format!("{}({})", min_max.as_str(), list_expr.id)
+    };
 
     let mut diagnostic = Diagnostic::new(SortedMinMax, subscript.range());
     diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
