@@ -651,13 +651,13 @@ impl<'stmt> BasicBlocksBuilder<'stmt> {
                         | Expr::Tuple(_)
                         | Expr::Slice(_) => self.unconditional_next_block(after),
                         // TODO: handle these expressions.
-                        Expr::NamedExpr(_)
+                        Expr::Named(_)
                         | Expr::Lambda(_)
-                        | Expr::IfExp(_)
+                        | Expr::If(_)
                         | Expr::ListComp(_)
                         | Expr::SetComp(_)
                         | Expr::DictComp(_)
-                        | Expr::GeneratorExp(_)
+                        | Expr::Generator(_)
                         | Expr::Await(_)
                         | Expr::Yield(_)
                         | Expr::YieldFrom(_) => self.unconditional_next_block(after),
