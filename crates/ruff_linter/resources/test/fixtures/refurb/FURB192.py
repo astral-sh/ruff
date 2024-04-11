@@ -25,3 +25,15 @@ sorted([1, 2, 3])[0]
 sorted(l)[1]
 
 sorted(get_list())[1]
+
+sorted()[0]
+
+sorted(l)[1]
+
+sorted(l)[-2]
+
+b = True
+
+sorted(l, reverse=b)[0]
+0
+sorted(l, invalid_kwarg=True)[0]
