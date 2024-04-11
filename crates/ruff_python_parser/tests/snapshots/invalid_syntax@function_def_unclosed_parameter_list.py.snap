@@ -202,11 +202,10 @@ Module(
 
 
   |
-1 | def foo(a: int, b:
 2 | def foo():
 3 |     return 42
-  |     ^^^^^^^^^ Syntax Error: compound statements not allowed in the same line as simple statements
 4 | def foo(a: int, b: str
+  | ^^^ Syntax Error: Compound statements are not allowed on the same line as simple statements
 5 | x = 10
   |
 

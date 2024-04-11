@@ -133,8 +133,6 @@ pub enum ParseErrorType {
     InvalidAugmentedAssignmentTarget,
     /// An invalid expression was found in the delete `target`.
     InvalidDeleteTarget,
-    /// Multiple simple statements were found in the same line without a `;` separating them.
-    SimpleStmtsInSameLine,
     /// An unexpected indentation was found during parsing.
     UnexpectedIndentation,
     /// The statement being parsed cannot be `async`.
@@ -145,12 +143,15 @@ pub enum ParseErrorType {
     PositionalFollowsKeywordUnpacking,
     /// An iterable argument unpacking `*args` follows keyword argument unpacking `**kwargs`.
     UnpackedArgumentError,
-    /// A simple statement and a compound statement was found in the same line.
-    SimpleStmtAndCompoundStmtInSameLine,
     /// An invalid usage of iterable unpacking in a comprehension was found.
     IterableUnpackingInComprehension,
     /// An invalid usage of a starred expression was found.
     StarredExpressionUsage,
+
+    /// Multiple simple statements were found in the same line without a `;` separating them.
+    SimpleStatementsOnSameLine,
+    /// A simple statement and a compound statement was found in the same line.
+    SimpleAndCompoundStatementOnSameLine,
 
     /// An invalid `match` case pattern was found.
     InvalidMatchPatternLiteral { pattern: TokenKind },
@@ -196,12 +197,15 @@ impl std::fmt::Display for ParseErrorType {
                 write!(f, "expected {expected:?}, found {found:?}")
             }
             ParseErrorType::Lexical(ref lex_error) => write!(f, "{lex_error}"),
-            ParseErrorType::SimpleStmtsInSameLine => {
-                write!(f, "use `;` to separate simple statements")
+            ParseErrorType::SimpleStatementsOnSameLine => {
+                write!(
+                    f,
+                    "Simple statements must be separated by newlines or semicolons"
+                )
             }
-            ParseErrorType::SimpleStmtAndCompoundStmtInSameLine => write!(
+            ParseErrorType::SimpleAndCompoundStatementOnSameLine => write!(
                 f,
-                "compound statements not allowed in the same line as simple statements"
+                "Compound statements are not allowed on the same line as simple statements"
             ),
             ParseErrorType::UnexpectedAsyncToken(kind) => {
                 write!(

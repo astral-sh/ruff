@@ -74,7 +74,7 @@ Module(
   |
 1 | type
 2 | type x
-  | ^^^^^^ Syntax Error: use `;` to separate simple statements
+  |      ^ Syntax Error: Simple statements must be separated by newlines or semicolons
 3 | type x =
   |
 

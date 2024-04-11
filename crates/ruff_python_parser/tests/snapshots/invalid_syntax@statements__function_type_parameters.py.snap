@@ -383,7 +383,7 @@ Module(
 17 | def multiple_trailing_commas[A,,](): ...
 18 | 
 19 | def multiple_commas_and_recovery[A,,100](): ...
-   |                                        ^ Syntax Error: Expected a statement
+   |                                        ^ Syntax Error: expected Newline, found Rsqb
    |
 
 
