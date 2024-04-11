@@ -7,6 +7,7 @@ use crate::files::FileId;
 pub mod ast_ids;
 pub mod db;
 pub mod files;
+pub mod hir;
 
 #[derive(Debug)]
 pub struct Workspace {
@@ -48,5 +49,15 @@ impl Workspace {
 
     pub fn is_file_open(&self, file_id: FileId) -> bool {
         self.open_files.contains(&file_id)
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+pub struct Name(smol_str::SmolStr);
+
+impl Name {
+    #[inline]
+    pub fn new(name: &str) -> Self {
+        Self(smol_str::SmolStr::new(name))
     }
 }

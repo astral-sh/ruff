@@ -12,7 +12,6 @@ pub trait AstNode: Ranged {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized;
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self>;
 
     /// Returns the [`AnyNodeRef`] referencing this node.
     fn as_any_node_ref(&self) -> AnyNodeRef;
@@ -740,14 +739,6 @@ impl AstNode for ast::ModModule {
         }
     }
 
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::ModModule(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
     fn as_any_node_ref(&self) -> AnyNodeRef {
         AnyNodeRef::from(self)
     }
@@ -777,14 +768,6 @@ impl AstNode for ast::ModExpression {
         }
     }
 
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::ModExpression(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
     fn as_any_node_ref(&self) -> AnyNodeRef {
         AnyNodeRef::from(self)
     }
@@ -807,14 +790,6 @@ impl AstNode for ast::StmtFunctionDef {
         Self: Sized,
     {
         if let AnyNode::StmtFunctionDef(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::StmtFunctionDef(node) = kind {
             Some(node)
         } else {
             None
@@ -871,14 +846,6 @@ impl AstNode for ast::StmtClassDef {
         }
     }
 
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::StmtClassDef(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
     fn as_any_node_ref(&self) -> AnyNodeRef {
         AnyNodeRef::from(self)
     }
@@ -926,14 +893,6 @@ impl AstNode for ast::StmtReturn {
         }
     }
 
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::StmtReturn(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
     fn as_any_node_ref(&self) -> AnyNodeRef {
         AnyNodeRef::from(self)
     }
@@ -964,14 +923,6 @@ impl AstNode for ast::StmtDelete {
         }
     }
 
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::StmtDelete(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
     fn as_any_node_ref(&self) -> AnyNodeRef {
         AnyNodeRef::from(self)
     }
@@ -996,14 +947,6 @@ impl AstNode for ast::StmtTypeAlias {
         Self: Sized,
     {
         if let AnyNode::StmtTypeAlias(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::StmtTypeAlias(node) = kind {
             Some(node)
         } else {
             None
@@ -1048,14 +991,6 @@ impl AstNode for ast::StmtAssign {
         }
     }
 
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::StmtAssign(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
     fn as_any_node_ref(&self) -> AnyNodeRef {
         AnyNodeRef::from(self)
     }
@@ -1093,14 +1028,6 @@ impl AstNode for ast::StmtAugAssign {
         }
     }
 
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::StmtAugAssign(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
     fn as_any_node_ref(&self) -> AnyNodeRef {
         AnyNodeRef::from(self)
     }
@@ -1131,14 +1058,6 @@ impl AstNode for ast::StmtAnnAssign {
         Self: Sized,
     {
         if let AnyNode::StmtAnnAssign(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::StmtAnnAssign(node) = kind {
             Some(node)
         } else {
             None
@@ -1184,14 +1103,6 @@ impl AstNode for ast::StmtFor {
         }
     }
 
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::StmtFor(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
     fn as_any_node_ref(&self) -> AnyNodeRef {
         AnyNodeRef::from(self)
     }
@@ -1230,14 +1141,6 @@ impl AstNode for ast::StmtWhile {
         }
     }
 
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::StmtWhile(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
     fn as_any_node_ref(&self) -> AnyNodeRef {
         AnyNodeRef::from(self)
     }
@@ -1268,14 +1171,6 @@ impl AstNode for ast::StmtIf {
         Self: Sized,
     {
         if let AnyNode::StmtIf(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::StmtIf(node) = kind {
             Some(node)
         } else {
             None
@@ -1320,14 +1215,6 @@ impl AstNode for ast::ElifElseClause {
         }
     }
 
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::ElifElseClause(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
     fn as_any_node_ref(&self) -> AnyNodeRef {
         AnyNodeRef::from(self)
     }
@@ -1357,14 +1244,6 @@ impl AstNode for ast::StmtWith {
         Self: Sized,
     {
         if let AnyNode::StmtWith(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::StmtWith(node) = kind {
             Some(node)
         } else {
             None
@@ -1408,14 +1287,6 @@ impl AstNode for ast::StmtMatch {
         }
     }
 
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::StmtMatch(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
     fn as_any_node_ref(&self) -> AnyNodeRef {
         AnyNodeRef::from(self)
     }
@@ -1446,14 +1317,6 @@ impl AstNode for ast::StmtRaise {
         Self: Sized,
     {
         if let AnyNode::StmtRaise(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::StmtRaise(node) = kind {
             Some(node)
         } else {
             None
@@ -1492,14 +1355,6 @@ impl AstNode for ast::StmtTry {
         Self: Sized,
     {
         if let AnyNode::StmtTry(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::StmtTry(node) = kind {
             Some(node)
         } else {
             None
@@ -1547,14 +1402,6 @@ impl AstNode for ast::StmtAssert {
         }
     }
 
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::StmtAssert(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
     fn as_any_node_ref(&self) -> AnyNodeRef {
         AnyNodeRef::from(self)
     }
@@ -1590,14 +1437,6 @@ impl AstNode for ast::StmtImport {
         }
     }
 
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::StmtImport(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
     fn as_any_node_ref(&self) -> AnyNodeRef {
         AnyNodeRef::from(self)
     }
@@ -1623,14 +1462,6 @@ impl AstNode for ast::StmtImportFrom {
         Self: Sized,
     {
         if let AnyNode::StmtImportFrom(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::StmtImportFrom(node) = kind {
             Some(node)
         } else {
             None
@@ -1673,14 +1504,6 @@ impl AstNode for ast::StmtGlobal {
         }
     }
 
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::StmtGlobal(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
     fn as_any_node_ref(&self) -> AnyNodeRef {
         AnyNodeRef::from(self)
     }
@@ -1708,14 +1531,6 @@ impl AstNode for ast::StmtNonlocal {
         }
     }
 
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::StmtNonlocal(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
     fn as_any_node_ref(&self) -> AnyNodeRef {
         AnyNodeRef::from(self)
     }
@@ -1737,14 +1552,6 @@ impl AstNode for ast::StmtExpr {
         Self: Sized,
     {
         if let AnyNode::StmtExpr(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::StmtExpr(node) = kind {
             Some(node)
         } else {
             None
@@ -1780,14 +1587,6 @@ impl AstNode for ast::StmtPass {
         }
     }
 
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::StmtPass(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
     fn as_any_node_ref(&self) -> AnyNodeRef {
         AnyNodeRef::from(self)
     }
@@ -1814,15 +1613,6 @@ impl AstNode for ast::StmtBreak {
             None
         }
     }
-
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::StmtBreak(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
     fn as_any_node_ref(&self) -> AnyNodeRef {
         AnyNodeRef::from(self)
     }
@@ -1844,14 +1634,6 @@ impl AstNode for ast::StmtContinue {
         Self: Sized,
     {
         if let AnyNode::StmtContinue(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::StmtContinue(node) = kind {
             Some(node)
         } else {
             None
@@ -1885,14 +1667,6 @@ impl AstNode for ast::StmtIpyEscapeCommand {
         }
     }
 
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::StmtIpyEscapeCommand(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
     fn as_any_node_ref(&self) -> AnyNodeRef {
         AnyNodeRef::from(self)
     }
@@ -1914,14 +1688,6 @@ impl AstNode for ast::ExprBoolOp {
         Self: Sized,
     {
         if let AnyNode::ExprBoolOp(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::ExprBoolOp(node) = kind {
             Some(node)
         } else {
             None
@@ -1971,14 +1737,6 @@ impl AstNode for ast::ExprNamed {
         }
     }
 
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::ExprNamed(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
     fn as_any_node_ref(&self) -> AnyNodeRef {
         AnyNodeRef::from(self)
     }
@@ -2006,14 +1764,6 @@ impl AstNode for ast::ExprBinOp {
         Self: Sized,
     {
         if let AnyNode::ExprBinOp(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::ExprBinOp(node) = kind {
             Some(node)
         } else {
             None
@@ -2055,14 +1805,6 @@ impl AstNode for ast::ExprUnaryOp {
         }
     }
 
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::ExprUnaryOp(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
     fn as_any_node_ref(&self) -> AnyNodeRef {
         AnyNodeRef::from(self)
     }
@@ -2091,14 +1833,6 @@ impl AstNode for ast::ExprLambda {
         Self: Sized,
     {
         if let AnyNode::ExprLambda(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::ExprLambda(node) = kind {
             Some(node)
         } else {
             None
@@ -2141,14 +1875,6 @@ impl AstNode for ast::ExprIf {
         }
     }
 
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::ExprIf(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
     fn as_any_node_ref(&self) -> AnyNodeRef {
         AnyNodeRef::from(self)
     }
@@ -2180,14 +1906,6 @@ impl AstNode for ast::ExprDict {
         Self: Sized,
     {
         if let AnyNode::ExprDict(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::ExprDict(node) = kind {
             Some(node)
         } else {
             None
@@ -2232,14 +1950,6 @@ impl AstNode for ast::ExprSet {
         }
     }
 
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::ExprSet(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
     fn as_any_node_ref(&self) -> AnyNodeRef {
         AnyNodeRef::from(self)
     }
@@ -2265,14 +1975,6 @@ impl AstNode for ast::ExprListComp {
         Self: Sized,
     {
         if let AnyNode::ExprListComp(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::ExprListComp(node) = kind {
             Some(node)
         } else {
             None
@@ -2315,14 +2017,6 @@ impl AstNode for ast::ExprSetComp {
         }
     }
 
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::ExprSetComp(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
     fn as_any_node_ref(&self) -> AnyNodeRef {
         AnyNodeRef::from(self)
     }
@@ -2353,14 +2047,6 @@ impl AstNode for ast::ExprDictComp {
         Self: Sized,
     {
         if let AnyNode::ExprDictComp(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::ExprDictComp(node) = kind {
             Some(node)
         } else {
             None
@@ -2406,14 +2092,6 @@ impl AstNode for ast::ExprGenerator {
         }
     }
 
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::ExprGenerator(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
     fn as_any_node_ref(&self) -> AnyNodeRef {
         AnyNodeRef::from(self)
     }
@@ -2450,14 +2128,6 @@ impl AstNode for ast::ExprAwait {
         }
     }
 
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::ExprAwait(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
     fn as_any_node_ref(&self) -> AnyNodeRef {
         AnyNodeRef::from(self)
     }
@@ -2480,14 +2150,6 @@ impl AstNode for ast::ExprYield {
         Self: Sized,
     {
         if let AnyNode::ExprYield(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::ExprYield(node) = kind {
             Some(node)
         } else {
             None
@@ -2524,14 +2186,6 @@ impl AstNode for ast::ExprYieldFrom {
         }
     }
 
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::ExprYieldFrom(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
     fn as_any_node_ref(&self) -> AnyNodeRef {
         AnyNodeRef::from(self)
     }
@@ -2554,14 +2208,6 @@ impl AstNode for ast::ExprCompare {
         Self: Sized,
     {
         if let AnyNode::ExprCompare(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::ExprCompare(node) = kind {
             Some(node)
         } else {
             None
@@ -2607,14 +2253,6 @@ impl AstNode for ast::ExprCall {
         }
     }
 
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::ExprCall(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
     fn as_any_node_ref(&self) -> AnyNodeRef {
         AnyNodeRef::from(self)
     }
@@ -2648,14 +2286,6 @@ impl AstNode for ast::FStringFormatSpec {
         }
     }
 
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::FStringFormatSpec(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
     fn as_any_node_ref(&self) -> AnyNodeRef {
         AnyNodeRef::from(self)
     }
@@ -2679,14 +2309,6 @@ impl AstNode for ast::FStringExpressionElement {
         Self: Sized,
     {
         if let AnyNode::FStringExpressionElement(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::FStringExpressionElement(node) = kind {
             Some(node)
         } else {
             None
@@ -2731,14 +2353,6 @@ impl AstNode for ast::FStringLiteralElement {
         }
     }
 
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::FStringLiteralElement(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
     fn as_any_node_ref(&self) -> AnyNodeRef {
         AnyNodeRef::from(self)
     }
@@ -2759,14 +2373,6 @@ impl AstNode for ast::ExprFString {
         Self: Sized,
     {
         if let AnyNode::ExprFString(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::ExprFString(node) = kind {
             Some(node)
         } else {
             None
@@ -2811,14 +2417,6 @@ impl AstNode for ast::ExprStringLiteral {
         }
     }
 
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::ExprStringLiteral(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
     fn as_any_node_ref(&self) -> AnyNodeRef {
         AnyNodeRef::from(self)
     }
@@ -2844,14 +2442,6 @@ impl AstNode for ast::ExprBytesLiteral {
         Self: Sized,
     {
         if let AnyNode::ExprBytesLiteral(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::ExprBytesLiteral(node) = kind {
             Some(node)
         } else {
             None
@@ -2889,14 +2479,6 @@ impl AstNode for ast::ExprNumberLiteral {
         }
     }
 
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::ExprNumberLiteral(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
     fn as_any_node_ref(&self) -> AnyNodeRef {
         AnyNodeRef::from(self)
     }
@@ -2917,14 +2499,6 @@ impl AstNode for ast::ExprBooleanLiteral {
         Self: Sized,
     {
         if let AnyNode::ExprBooleanLiteral(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::ExprBooleanLiteral(node) = kind {
             Some(node)
         } else {
             None
@@ -2957,14 +2531,6 @@ impl AstNode for ast::ExprNoneLiteral {
         }
     }
 
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::ExprNoneLiteral(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
     fn as_any_node_ref(&self) -> AnyNodeRef {
         AnyNodeRef::from(self)
     }
@@ -2991,14 +2557,6 @@ impl AstNode for ast::ExprEllipsisLiteral {
         }
     }
 
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::ExprEllipsisLiteral(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
     fn as_any_node_ref(&self) -> AnyNodeRef {
         AnyNodeRef::from(self)
     }
@@ -3019,14 +2577,6 @@ impl AstNode for ast::ExprAttribute {
         Self: Sized,
     {
         if let AnyNode::ExprAttribute(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::ExprAttribute(node) = kind {
             Some(node)
         } else {
             None
@@ -3067,14 +2617,6 @@ impl AstNode for ast::ExprSubscript {
         }
     }
 
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::ExprSubscript(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
     fn as_any_node_ref(&self) -> AnyNodeRef {
         AnyNodeRef::from(self)
     }
@@ -3103,14 +2645,6 @@ impl AstNode for ast::ExprStarred {
         Self: Sized,
     {
         if let AnyNode::ExprStarred(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::ExprStarred(node) = kind {
             Some(node)
         } else {
             None
@@ -3150,14 +2684,6 @@ impl AstNode for ast::ExprName {
         }
     }
 
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::ExprName(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
     fn as_any_node_ref(&self) -> AnyNodeRef {
         AnyNodeRef::from(self)
     }
@@ -3184,14 +2710,6 @@ impl AstNode for ast::ExprList {
         Self: Sized,
     {
         if let AnyNode::ExprList(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::ExprList(node) = kind {
             Some(node)
         } else {
             None
@@ -3233,14 +2751,6 @@ impl AstNode for ast::ExprTuple {
         }
     }
 
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::ExprTuple(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
     fn as_any_node_ref(&self) -> AnyNodeRef {
         AnyNodeRef::from(self)
     }
@@ -3271,14 +2781,6 @@ impl AstNode for ast::ExprSlice {
         Self: Sized,
     {
         if let AnyNode::ExprSlice(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::ExprSlice(node) = kind {
             Some(node)
         } else {
             None
@@ -3326,14 +2828,6 @@ impl AstNode for ast::ExprIpyEscapeCommand {
         }
     }
 
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::ExprIpyEscapeCommand(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
     fn as_any_node_ref(&self) -> AnyNodeRef {
         AnyNodeRef::from(self)
     }
@@ -3360,14 +2854,6 @@ impl AstNode for ast::ExceptHandlerExceptHandler {
         Self: Sized,
     {
         if let AnyNode::ExceptHandlerExceptHandler(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::ExceptHandlerExceptHandler(node) = kind {
             Some(node)
         } else {
             None
@@ -3410,14 +2896,6 @@ impl AstNode for ast::PatternMatchValue {
         }
     }
 
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::PatternMatchValue(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
     fn as_any_node_ref(&self) -> AnyNodeRef {
         AnyNodeRef::from(self)
     }
@@ -3440,14 +2918,6 @@ impl AstNode for ast::PatternMatchSingleton {
         Self: Sized,
     {
         if let AnyNode::PatternMatchSingleton(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::PatternMatchSingleton(node) = kind {
             Some(node)
         } else {
             None
@@ -3482,14 +2952,6 @@ impl AstNode for ast::PatternMatchSequence {
         }
     }
 
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::PatternMatchSequence(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
     fn as_any_node_ref(&self) -> AnyNodeRef {
         AnyNodeRef::from(self)
     }
@@ -3514,14 +2976,6 @@ impl AstNode for ast::PatternMatchMapping {
         Self: Sized,
     {
         if let AnyNode::PatternMatchMapping(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::PatternMatchMapping(node) = kind {
             Some(node)
         } else {
             None
@@ -3564,14 +3018,6 @@ impl AstNode for ast::PatternMatchClass {
         }
     }
 
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::PatternMatchClass(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
     fn as_any_node_ref(&self) -> AnyNodeRef {
         AnyNodeRef::from(self)
     }
@@ -3605,14 +3051,6 @@ impl AstNode for ast::PatternMatchStar {
         }
     }
 
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::PatternMatchStar(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
     fn as_any_node_ref(&self) -> AnyNodeRef {
         AnyNodeRef::from(self)
     }
@@ -3635,14 +3073,6 @@ impl AstNode for ast::PatternMatchAs {
         Self: Sized,
     {
         if let AnyNode::PatternMatchAs(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::PatternMatchAs(node) = kind {
             Some(node)
         } else {
             None
@@ -3683,14 +3113,6 @@ impl AstNode for ast::PatternMatchOr {
         }
     }
 
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::PatternMatchOr(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
     fn as_any_node_ref(&self) -> AnyNodeRef {
         AnyNodeRef::from(self)
     }
@@ -3715,14 +3137,6 @@ impl AstNode for PatternArguments {
         Self: Sized,
     {
         if let AnyNode::PatternArguments(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::PatternArguments(node) = kind {
             Some(node)
         } else {
             None
@@ -3768,14 +3182,6 @@ impl AstNode for PatternKeyword {
         }
     }
 
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::PatternKeyword(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
     fn as_any_node_ref(&self) -> AnyNodeRef {
         AnyNodeRef::from(self)
     }
@@ -3804,14 +3210,6 @@ impl AstNode for Comprehension {
         Self: Sized,
     {
         if let AnyNode::Comprehension(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::Comprehension(node) = kind {
             Some(node)
         } else {
             None
@@ -3857,14 +3255,6 @@ impl AstNode for Arguments {
         }
     }
 
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::Arguments(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
     fn as_any_node_ref(&self) -> AnyNodeRef {
         AnyNodeRef::from(self)
     }
@@ -3891,14 +3281,6 @@ impl AstNode for Parameters {
         Self: Sized,
     {
         if let AnyNode::Parameters(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::Parameters(node) = kind {
             Some(node)
         } else {
             None
@@ -3954,14 +3336,6 @@ impl AstNode for Parameter {
         }
     }
 
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::Parameter(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
     fn as_any_node_ref(&self) -> AnyNodeRef {
         AnyNodeRef::from(self)
     }
@@ -3991,14 +3365,6 @@ impl AstNode for ParameterWithDefault {
         Self: Sized,
     {
         if let AnyNode::ParameterWithDefault(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::ParameterWithDefault(node) = kind {
             Some(node)
         } else {
             None
@@ -4040,14 +3406,6 @@ impl AstNode for Keyword {
         }
     }
 
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::Keyword(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
     fn as_any_node_ref(&self) -> AnyNodeRef {
         AnyNodeRef::from(self)
     }
@@ -4075,14 +3433,6 @@ impl AstNode for Alias {
         Self: Sized,
     {
         if let AnyNode::Alias(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::Alias(node) = kind {
             Some(node)
         } else {
             None
@@ -4121,14 +3471,6 @@ impl AstNode for WithItem {
         }
     }
 
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::WithItem(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
     fn as_any_node_ref(&self) -> AnyNodeRef {
         AnyNodeRef::from(self)
     }
@@ -4160,14 +3502,6 @@ impl AstNode for MatchCase {
         Self: Sized,
     {
         if let AnyNode::MatchCase(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::MatchCase(node) = kind {
             Some(node)
         } else {
             None
@@ -4213,14 +3547,6 @@ impl AstNode for Decorator {
         }
     }
 
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::Decorator(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
     fn as_any_node_ref(&self) -> AnyNodeRef {
         AnyNodeRef::from(self)
     }
@@ -4247,14 +3573,6 @@ impl AstNode for ast::TypeParams {
         Self: Sized,
     {
         if let AnyNode::TypeParams(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::TypeParams(node) = kind {
             Some(node)
         } else {
             None
@@ -4289,14 +3607,6 @@ impl AstNode for ast::TypeParamTypeVar {
         Self: Sized,
     {
         if let AnyNode::TypeParamTypeVar(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::TypeParamTypeVar(node) = kind {
             Some(node)
         } else {
             None
@@ -4338,14 +3648,6 @@ impl AstNode for ast::TypeParamTypeVarTuple {
         }
     }
 
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::TypeParamTypeVarTuple(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
     fn as_any_node_ref(&self) -> AnyNodeRef {
         AnyNodeRef::from(self)
     }
@@ -4374,14 +3676,6 @@ impl AstNode for ast::TypeParamParamSpec {
         }
     }
 
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::TypeParamParamSpec(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
     fn as_any_node_ref(&self) -> AnyNodeRef {
         AnyNodeRef::from(self)
     }
@@ -4404,14 +3698,6 @@ impl AstNode for ast::FString {
         Self: Sized,
     {
         if let AnyNode::FString(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::FString(node) = kind {
             Some(node)
         } else {
             None
@@ -4453,14 +3739,6 @@ impl AstNode for ast::StringLiteral {
         }
     }
 
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::StringLiteral(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
     fn as_any_node_ref(&self) -> AnyNodeRef {
         AnyNodeRef::from(self)
     }
@@ -4487,14 +3765,6 @@ impl AstNode for ast::BytesLiteral {
         }
     }
 
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::BytesLiteral(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
     fn as_any_node_ref(&self) -> AnyNodeRef {
         AnyNodeRef::from(self)
     }
@@ -4507,6 +3777,149 @@ impl AstNode for ast::BytesLiteral {
     where
         V: PreorderVisitor<'a> + ?Sized,
     {
+    }
+}
+
+impl AstNode for Stmt {
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        kind.statement()
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        match self {
+            Stmt::FunctionDef(stmt) => stmt.as_any_node_ref(),
+            Stmt::ClassDef(stmt) => stmt.as_any_node_ref(),
+            Stmt::Return(stmt) => stmt.as_any_node_ref(),
+            Stmt::Delete(stmt) => stmt.as_any_node_ref(),
+            Stmt::Assign(stmt) => stmt.as_any_node_ref(),
+            Stmt::AugAssign(stmt) => stmt.as_any_node_ref(),
+            Stmt::AnnAssign(stmt) => stmt.as_any_node_ref(),
+            Stmt::TypeAlias(stmt) => stmt.as_any_node_ref(),
+            Stmt::For(stmt) => stmt.as_any_node_ref(),
+            Stmt::While(stmt) => stmt.as_any_node_ref(),
+            Stmt::If(stmt) => stmt.as_any_node_ref(),
+            Stmt::With(stmt) => stmt.as_any_node_ref(),
+            Stmt::Match(stmt) => stmt.as_any_node_ref(),
+            Stmt::Raise(stmt) => stmt.as_any_node_ref(),
+            Stmt::Try(stmt) => stmt.as_any_node_ref(),
+            Stmt::Assert(stmt) => stmt.as_any_node_ref(),
+            Stmt::Import(stmt) => stmt.as_any_node_ref(),
+            Stmt::ImportFrom(stmt) => stmt.as_any_node_ref(),
+            Stmt::Global(stmt) => stmt.as_any_node_ref(),
+            Stmt::Nonlocal(stmt) => stmt.as_any_node_ref(),
+            Stmt::Expr(stmt) => stmt.as_any_node_ref(),
+            Stmt::Pass(stmt) => stmt.as_any_node_ref(),
+            Stmt::Break(stmt) => stmt.as_any_node_ref(),
+            Stmt::Continue(stmt) => stmt.as_any_node_ref(),
+            Stmt::IpyEscapeCommand(stmt) => stmt.as_any_node_ref(),
+        }
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        match self {
+            Stmt::FunctionDef(stmt) => stmt.into_any_node(),
+            Stmt::ClassDef(stmt) => stmt.into_any_node(),
+            Stmt::Return(stmt) => stmt.into_any_node(),
+            Stmt::Delete(stmt) => stmt.into_any_node(),
+            Stmt::Assign(stmt) => stmt.into_any_node(),
+            Stmt::AugAssign(stmt) => stmt.into_any_node(),
+            Stmt::AnnAssign(stmt) => stmt.into_any_node(),
+            Stmt::TypeAlias(stmt) => stmt.into_any_node(),
+            Stmt::For(stmt) => stmt.into_any_node(),
+            Stmt::While(stmt) => stmt.into_any_node(),
+            Stmt::If(stmt) => stmt.into_any_node(),
+            Stmt::With(stmt) => stmt.into_any_node(),
+            Stmt::Match(stmt) => stmt.into_any_node(),
+            Stmt::Raise(stmt) => stmt.into_any_node(),
+            Stmt::Try(stmt) => stmt.into_any_node(),
+            Stmt::Assert(stmt) => stmt.into_any_node(),
+            Stmt::Import(stmt) => stmt.into_any_node(),
+            Stmt::ImportFrom(stmt) => stmt.into_any_node(),
+            Stmt::Global(stmt) => stmt.into_any_node(),
+            Stmt::Nonlocal(stmt) => stmt.into_any_node(),
+            Stmt::Expr(stmt) => stmt.into_any_node(),
+            Stmt::Pass(stmt) => stmt.into_any_node(),
+            Stmt::Break(stmt) => stmt.into_any_node(),
+            Stmt::Continue(stmt) => stmt.into_any_node(),
+            Stmt::IpyEscapeCommand(stmt) => stmt.into_any_node(),
+        }
+    }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        match self {
+            Stmt::FunctionDef(stmt) => stmt.visit_preorder(visitor),
+            Stmt::ClassDef(stmt) => stmt.visit_preorder(visitor),
+            Stmt::Return(stmt) => stmt.visit_preorder(visitor),
+            Stmt::Delete(stmt) => stmt.visit_preorder(visitor),
+            Stmt::Assign(stmt) => stmt.visit_preorder(visitor),
+            Stmt::AugAssign(stmt) => stmt.visit_preorder(visitor),
+            Stmt::AnnAssign(stmt) => stmt.visit_preorder(visitor),
+            Stmt::TypeAlias(stmt) => stmt.visit_preorder(visitor),
+            Stmt::For(stmt) => stmt.visit_preorder(visitor),
+            Stmt::While(stmt) => stmt.visit_preorder(visitor),
+            Stmt::If(stmt) => stmt.visit_preorder(visitor),
+            Stmt::With(stmt) => stmt.visit_preorder(visitor),
+            Stmt::Match(stmt) => stmt.visit_preorder(visitor),
+            Stmt::Raise(stmt) => stmt.visit_preorder(visitor),
+            Stmt::Try(stmt) => stmt.visit_preorder(visitor),
+            Stmt::Assert(stmt) => stmt.visit_preorder(visitor),
+            Stmt::Import(stmt) => stmt.visit_preorder(visitor),
+            Stmt::ImportFrom(stmt) => stmt.visit_preorder(visitor),
+            Stmt::Global(stmt) => stmt.visit_preorder(visitor),
+            Stmt::Nonlocal(stmt) => stmt.visit_preorder(visitor),
+            Stmt::Expr(stmt) => stmt.visit_preorder(visitor),
+            Stmt::Pass(stmt) => stmt.visit_preorder(visitor),
+            Stmt::Break(stmt) => stmt.visit_preorder(visitor),
+            Stmt::Continue(stmt) => stmt.visit_preorder(visitor),
+            Stmt::IpyEscapeCommand(stmt) => stmt.visit_preorder(visitor),
+        }
+    }
+}
+
+impl AstNode for TypeParam {
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        match kind {
+            AnyNode::TypeParamTypeVar(node) => Some(TypeParam::TypeVar(node)),
+            AnyNode::TypeParamTypeVarTuple(node) => Some(TypeParam::TypeVarTuple(node)),
+            AnyNode::TypeParamParamSpec(node) => Some(TypeParam::ParamSpec(node)),
+            _ => None,
+        }
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        match self {
+            TypeParam::TypeVar(node) => node.as_any_node_ref(),
+            TypeParam::TypeVarTuple(node) => node.as_any_node_ref(),
+            TypeParam::ParamSpec(node) => node.as_any_node_ref(),
+        }
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        match self {
+            TypeParam::TypeVar(node) => node.into_any_node(),
+            TypeParam::TypeVarTuple(node) => node.into_any_node(),
+            TypeParam::ParamSpec(node) => node.into_any_node(),
+        }
+    }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        match self {
+            TypeParam::TypeVar(node) => node.visit_preorder(visitor),
+            TypeParam::TypeVarTuple(node) => node.visit_preorder(visitor),
+            TypeParam::ParamSpec(node) => node.visit_preorder(visitor),
+        }
     }
 }
 

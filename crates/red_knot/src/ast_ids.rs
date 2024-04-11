@@ -1,4 +1,5 @@
 use std::fmt::Formatter;
+use std::marker::PhantomData;
 
 use rustc_hash::FxHashMap;
 
@@ -6,13 +7,39 @@ use ruff_index::{Idx, IndexVec};
 use ruff_python_ast::visitor::preorder;
 use ruff_python_ast::visitor::preorder::PreorderVisitor;
 use ruff_python_ast::{
-    AstNode, ModModule, NodeKind, Stmt, StmtAnnAssign, StmtAssign, StmtAugAssign, StmtClassDef,
-    StmtFunctionDef, StmtImport, StmtImportFrom, StmtTypeAlias,
+    AstNode, ModModule, NodeKind, Parameter, Stmt, StmtAnnAssign, StmtAssign, StmtAugAssign,
+    StmtClassDef, StmtFunctionDef, StmtImport, StmtImportFrom, StmtTypeAlias, TypeParam,
+    TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple,
 };
 use ruff_text_size::TextRange;
 
 #[ruff_index::newtype_index]
 pub struct AstId;
+
+#[derive(Debug, Eq, PartialEq, Hash)]
+pub struct FileAstId<N: HasAstId> {
+    ast_id: AstId,
+    _marker: PhantomData<fn() -> N>,
+}
+
+impl<N: HasAstId> FileAstId<N> {
+    pub fn upcast<M: HasAstId>(self) -> FileAstId<M>
+    where
+        N: Into<M>,
+    {
+        FileAstId {
+            ast_id: self.ast_id,
+            _marker: PhantomData,
+        }
+    }
+}
+
+impl<N: HasAstId> Copy for FileAstId<N> {}
+impl<N: HasAstId> Clone for FileAstId<N> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
 
 pub struct AstIds {
     ids: IndexVec<AstId, NodeKey>,
@@ -54,9 +81,12 @@ impl AstIds {
     }
 
     // TODO: Limit this API to only nodes that have an AstId (marker trait?)
-    pub fn ast_id<N: HasAstId>(&self, node: N) -> AstId {
+    pub fn ast_id<N: HasAstId>(&self, node: N) -> FileAstId<N> {
         let key = node.node_key();
-        self.reverse.get(&key).copied().unwrap()
+        FileAstId {
+            ast_id: self.reverse.get(&key).copied().unwrap(),
+            _marker: PhantomData,
+        }
     }
 }
 
@@ -179,3 +209,11 @@ impl HasAstId for ModModule {}
 impl HasAstId for StmtImport {}
 
 impl HasAstId for StmtImportFrom {}
+
+impl HasAstId for Parameter {}
+
+impl HasAstId for TypeParam {}
+impl HasAstId for Stmt {}
+impl HasAstId for TypeParamTypeVar {}
+impl HasAstId for TypeParamTypeVarTuple {}
+impl HasAstId for TypeParamParamSpec {}
