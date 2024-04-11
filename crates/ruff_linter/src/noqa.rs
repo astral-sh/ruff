@@ -89,11 +89,8 @@ impl<'a> Directive<'a> {
                         codes.push(code);
                         codes_end += leading_space;
                         code_ranges.push(
-                            TextRange::at(
-                                TextSize::try_from(codes_end).unwrap(),
-                                code.text_len(),
-                            )
-                            .add(offset),
+                            TextRange::at(TextSize::try_from(codes_end).unwrap(), code.text_len())
+                                .add(offset),
                         );
                         codes_end += code.len();
 
