@@ -249,7 +249,7 @@ impl<'src> Parser<'src> {
         let parsed_expr = self.parse_expression_with_precedence(Precedence::Initial);
 
         if allow_starred_expression.is_no() && parsed_expr.is_unparenthesized_starred_expr() {
-            self.add_error(ParseErrorType::StarredExpressionUsage, &parsed_expr);
+            self.add_error(ParseErrorType::InvalidStarredExpressionUsage, &parsed_expr);
         }
 
         parsed_expr
@@ -395,7 +395,7 @@ impl<'src> Parser<'src> {
                 {
                     self.add_error(
                         ParseErrorType::OtherError(format!(
-                            "unary {unary_tok} expression cannot be used here",
+                            "Unary {unary_tok} expression cannot be used here",
                         )),
                         &unary_expr,
                     );
@@ -407,7 +407,7 @@ impl<'src> Parser<'src> {
                 if previous_precedence > Precedence::Not {
                     self.add_error(
                         ParseErrorType::OtherError(
-                            "boolean `not` expression cannot be used here".to_string(),
+                            "Boolean 'not' expression cannot be used here".to_string(),
                         ),
                         &unary_expr,
                     );
@@ -418,7 +418,7 @@ impl<'src> Parser<'src> {
                 let starred_expr =
                     self.parse_starred_expression(StarredExpressionPrecedence::Conditional);
                 if previous_precedence > Precedence::Initial {
-                    self.add_error(ParseErrorType::StarredExpressionUsage, &starred_expr);
+                    self.add_error(ParseErrorType::InvalidStarredExpressionUsage, &starred_expr);
                 }
                 Expr::Starred(starred_expr).into()
             }
@@ -428,7 +428,7 @@ impl<'src> Parser<'src> {
                 if previous_precedence >= Precedence::Await {
                     self.add_error(
                         ParseErrorType::OtherError(
-                            "`await` expression cannot be used here".to_string(),
+                            "Await expression cannot be used here".to_string(),
                         ),
                         &await_expr,
                     );
@@ -474,14 +474,14 @@ impl<'src> Parser<'src> {
         }
 
         let expr_name = match parsed_expr.expr {
-            Expr::Compare(_) => "comparison",
+            Expr::Compare(_) => "Comparison",
             Expr::BoolOp(_)
             | Expr::UnaryOp(ast::ExprUnaryOp {
                 op: ast::UnaryOp::Not,
                 ..
-            }) => "boolean",
-            Expr::If(_) => "conditional",
-            Expr::Lambda(_) => "lambda",
+            }) => "Boolean",
+            Expr::If(_) => "Conditional",
+            Expr::Lambda(_) => "Lambda",
             _ => return parsed_expr,
         };
 
@@ -657,7 +657,7 @@ impl<'src> Parser<'src> {
                     Expr::Name(self.parse_name())
                 } else {
                     self.add_error(
-                        ParseErrorType::OtherError("Expected an expression".to_string()),
+                        ParseErrorType::ExpectedExpression,
                         self.current_token_range(),
                     );
                     Expr::Name(ast::ExprName {
@@ -760,7 +760,10 @@ impl<'src> Parser<'src> {
                     }
                     _ => {
                         if seen_keyword_unpacking && parsed_expr.is_unparenthesized_starred_expr() {
-                            parser.add_error(ParseErrorType::UnpackedArgumentError, &parsed_expr);
+                            parser.add_error(
+                                ParseErrorType::InvalidArgumentUnpackingOrder,
+                                &parsed_expr,
+                            );
                         }
                     }
                 }
@@ -798,12 +801,12 @@ impl<'src> Parser<'src> {
                     if !parsed_expr.is_unparenthesized_starred_expr() {
                         if seen_keyword_unpacking {
                             parser.add_error(
-                                ParseErrorType::PositionalFollowsKeywordUnpacking,
+                                ParseErrorType::PositionalAfterKeywordUnpacking,
                                 &parsed_expr,
                             );
                         } else if seen_keyword_argument {
                             parser.add_error(
-                                ParseErrorType::PositionalFollowsKeywordArgument,
+                                ParseErrorType::PositionalAfterKeywordArgument,
                                 &parsed_expr,
                             );
                         }
@@ -924,7 +927,7 @@ impl<'src> Parser<'src> {
             if !lower.is_parenthesized {
                 match lower.expr {
                     Expr::Starred(_) => {
-                        self.add_error(ParseErrorType::StarredExpressionUsage, &lower);
+                        self.add_error(ParseErrorType::InvalidStarredExpressionUsage, &lower);
                     }
                     Expr::Named(_) => {
                         self.add_error(ParseErrorType::UnparenthesizedNamedExpression, &lower);
@@ -1235,7 +1238,7 @@ impl<'src> Parser<'src> {
                     // 'first' f'second' b'third'
                     self.add_error(
                         ParseErrorType::OtherError(
-                            "cannot mix bytes and non-bytes literals".to_string(),
+                            "Bytes literal cannot be mixed with non-bytes literals".to_string(),
                         ),
                         range,
                     );
@@ -1671,7 +1674,7 @@ impl<'src> Parser<'src> {
                 if !key_or_element.is_parenthesized {
                     match key_or_element.expr {
                         Expr::Starred(_) => self.add_error(
-                            ParseErrorType::StarredExpressionUsage,
+                            ParseErrorType::InvalidStarredExpressionUsage,
                             &key_or_element.expr,
                         ),
                         Expr::Named(_) => self.add_error(
@@ -1775,7 +1778,7 @@ impl<'src> Parser<'src> {
             _ => {
                 // grammar: `group`
                 if parsed_expr.expr.is_starred_expr() {
-                    self.add_error(ParseErrorType::StarredExpressionUsage, &parsed_expr);
+                    self.add_error(ParseErrorType::InvalidStarredExpressionUsage, &parsed_expr);
                 }
 
                 self.expect(TokenKind::Rpar);
@@ -2215,12 +2218,7 @@ impl<'src> Parser<'src> {
 
         match &expr {
             Expr::Tuple(tuple) if !tuple.parenthesized => {
-                self.add_error(
-                    ParseErrorType::OtherError(
-                        "unparenthesized tuple cannot be used here".to_string(),
-                    ),
-                    &expr,
-                );
+                self.add_error(ParseErrorType::UnparenthesizedTupleExpression, &expr);
             }
             _ => {}
         }

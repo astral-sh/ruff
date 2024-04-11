@@ -187,7 +187,7 @@ Module(
   |
 1 | match x:
 2 |     case y if *a: ...
-  |               ^^ Syntax Error: starred expression cannot be used here
+  |               ^^ Syntax Error: Starred expression cannot be used here
 3 | match x:
 4 |     case y if (*a): ...
   |
@@ -197,7 +197,7 @@ Module(
 2 |     case y if *a: ...
 3 | match x:
 4 |     case y if (*a): ...
-  |                ^^ Syntax Error: starred expression cannot be used here
+  |                ^^ Syntax Error: Starred expression cannot be used here
 5 | match x:
 6 |     case y if yield x: ...
   |
@@ -207,5 +207,5 @@ Module(
 4 |     case y if (*a): ...
 5 | match x:
 6 |     case y if yield x: ...
-  |               ^^^^^^^ Syntax Error: yield expression cannot be used here
+  |               ^^^^^^^ Syntax Error: Yield expression cannot be used here
   |

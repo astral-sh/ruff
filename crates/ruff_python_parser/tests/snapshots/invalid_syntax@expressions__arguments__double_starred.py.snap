@@ -181,7 +181,7 @@ Module(
 
   |
 1 | call(**yield x)
-  |        ^^^^^^^ Syntax Error: yield expression cannot be used here
+  |        ^^^^^^^ Syntax Error: Yield expression cannot be used here
 2 | call(** *x)
 3 | call(***x)
   |
@@ -190,7 +190,7 @@ Module(
   |
 1 | call(**yield x)
 2 | call(** *x)
-  |         ^^ Syntax Error: starred expression cannot be used here
+  |         ^^ Syntax Error: Starred expression cannot be used here
 3 | call(***x)
   |
 
@@ -199,7 +199,7 @@ Module(
 1 | call(**yield x)
 2 | call(** *x)
 3 | call(***x)
-  |        ^^ Syntax Error: starred expression cannot be used here
+  |        ^^ Syntax Error: Starred expression cannot be used here
 4 | 
 5 | call(**x := 1)
   |
@@ -217,5 +217,5 @@ Module(
 3 | call(***x)
 4 | 
 5 | call(**x := 1)
-  |             ^ Syntax Error: positional argument follows keyword argument unpacking
+  |             ^ Syntax Error: Positional argument cannot follow keyword argument unpacking
   |

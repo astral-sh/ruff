@@ -23,5 +23,5 @@ Module(
 
   |
 1 | global
-  |       ^ Syntax Error: `global` statement must have at least one name
+  |       ^ Syntax Error: Global statement must have at least one name
   |

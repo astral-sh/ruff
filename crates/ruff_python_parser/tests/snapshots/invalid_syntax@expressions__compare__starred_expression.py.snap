@@ -157,7 +157,7 @@ Module(
 
   |
 1 | x >= *y
-  |      ^^ Syntax Error: starred expression cannot be used here
+  |      ^^ Syntax Error: Starred expression cannot be used here
 2 | x not in *y
   |
 
@@ -165,7 +165,7 @@ Module(
   |
 1 | x >= *y
 2 | x not in *y
-  |          ^^ Syntax Error: starred expression cannot be used here
+  |          ^^ Syntax Error: Starred expression cannot be used here
 3 | 
 4 | *x < y
   |
@@ -175,7 +175,7 @@ Module(
 2 | x not in *y
 3 | 
 4 | *x < y
-  |  ^^^^^ Syntax Error: comparison expression cannot be used here
+  |  ^^^^^ Syntax Error: Comparison expression cannot be used here
 5 | *x is not y
   |
 
@@ -183,5 +183,5 @@ Module(
   |
 4 | *x < y
 5 | *x is not y
-  |  ^^^^^^^^^^ Syntax Error: comparison expression cannot be used here
+  |  ^^^^^^^^^^ Syntax Error: Comparison expression cannot be used here
   |

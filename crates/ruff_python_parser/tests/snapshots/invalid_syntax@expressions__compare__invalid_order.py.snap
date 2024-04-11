@@ -132,7 +132,7 @@ Module(
 
   |
 1 | x in not y
-  |      ^^^^^ Syntax Error: boolean `not` expression cannot be used here
+  |      ^^^^^ Syntax Error: Boolean 'not' expression cannot be used here
 2 | 
 3 | # `=>` instead of `>=`
   |

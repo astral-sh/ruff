@@ -239,7 +239,7 @@ Module(
 6 | # of the soft keyword # transformer
 7 | async match test:
 8 |     case _: ...
-  | ^^^^ Syntax Error: unexpected indentation
+  | ^^^^ Syntax Error: Unexpected indentation
   |
 
 
