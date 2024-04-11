@@ -1,18 +1,19 @@
+use std::fmt::Formatter;
+
+use rustc_hash::FxHashMap;
+
 use ruff_index::{Idx, IndexVec};
 use ruff_python_ast::visitor::preorder;
-use ruff_python_ast::visitor::preorder::{PreorderVisitor, TraversalSignal};
+use ruff_python_ast::visitor::preorder::PreorderVisitor;
 use ruff_python_ast::{
-    AnyNodeRef, AstNode, ModModule, NodeKind, Stmt, StmtClassDef, StmtFunctionDef,
+    AstNode, ModModule, NodeKind, Stmt, StmtAnnAssign, StmtAssign, StmtAugAssign, StmtClassDef,
+    StmtFunctionDef, StmtImport, StmtImportFrom, StmtTypeAlias,
 };
-use ruff_text_size::{Ranged, TextRange};
-use rustc_hash::FxHashMap;
-use std::fmt::Formatter;
+use ruff_text_size::TextRange;
 
 #[ruff_index::newtype_index]
 pub struct AstId;
 
-// TODO THis is now something that doesn't work well with Ruff's AST because the reverse map requires lifetimes because
-//  cloning the nodes would be silly.
 pub struct AstIds {
     ids: IndexVec<AstId, NodeKey>,
     reverse: FxHashMap<NodeKey, AstId>,
@@ -26,7 +27,7 @@ impl AstIds {
 
         // TODO: visit_module?
         // Make sure we visit the root
-        visitor.enter_node(module.into());
+        visitor.crate_id(module);
         visitor.visit_body(&module.body);
 
         while let Some(deferred) = visitor.deferred.pop() {
@@ -53,11 +54,8 @@ impl AstIds {
     }
 
     // TODO: Limit this API to only nodes that have an AstId (marker trait?)
-    pub fn ast_id<N: AstNode>(&self, node: N) -> AstId {
-        let key = NodeKey {
-            kind: node.as_any_node_ref().kind(),
-            range: node.range(),
-        };
+    pub fn ast_id<N: HasAstId>(&self, node: N) -> AstId {
+        let key = node.node_key();
         self.reverse.get(&key).copied().unwrap()
     }
 }
@@ -89,40 +87,57 @@ struct AstIdsVisitor<'a> {
 }
 
 impl<'a> AstIdsVisitor<'a> {
-    fn push<A: Into<AnyNodeRef<'a>>>(&mut self, node: A) {
-        let node = node.into();
-        let node_key = NodeKey {
-            kind: node.kind(),
-            range: node.range(),
-        };
+    fn crate_id<A: HasAstId>(&mut self, node: &A) {
+        let node_key = node.node_key();
+
         let id = self.ids.push(node_key);
         self.reverse.insert(node_key, id);
     }
 }
 
 impl<'a> PreorderVisitor<'a> for AstIdsVisitor<'a> {
-    fn enter_node(&mut self, node: AnyNodeRef<'a>) -> TraversalSignal {
-        if node.is_expression() {
-            return TraversalSignal::Skip;
-        }
-
-        self.push(node);
-        TraversalSignal::Traverse
-    }
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
         match stmt {
             Stmt::FunctionDef(def) => {
                 self.deferred.push(DeferredNode::FunctionDefinition(def));
+                return;
             }
             // TODO defer visiting the assignment body, type alias parameters etc?
             Stmt::ClassDef(def) => {
                 self.deferred.push(DeferredNode::ClassDefinition(def));
+                return;
             }
             Stmt::Expr(_) => {
                 // Skip
+                return;
             }
-            _ => preorder::walk_stmt(self, stmt),
+            Stmt::Return(_) => {}
+            Stmt::Delete(_) => {}
+            Stmt::Assign(assignment) => self.crate_id(assignment),
+            Stmt::AugAssign(assignment) => {
+                self.crate_id(assignment);
+            }
+            Stmt::AnnAssign(assignment) => self.crate_id(assignment),
+            Stmt::TypeAlias(assignment) => self.crate_id(assignment),
+            Stmt::For(_) => {}
+            Stmt::While(_) => {}
+            Stmt::If(_) => {}
+            Stmt::With(_) => {}
+            Stmt::Match(_) => {}
+            Stmt::Raise(_) => {}
+            Stmt::Try(_) => {}
+            Stmt::Assert(_) => {}
+            Stmt::Import(import) => self.crate_id(import),
+            Stmt::ImportFrom(import_from) => self.crate_id(import_from),
+            Stmt::Global(_) => {}
+            Stmt::Nonlocal(_) => {}
+            Stmt::Pass(_) => {}
+            Stmt::Break(_) => {}
+            Stmt::Continue(_) => {}
+            Stmt::IpyEscapeCommand(_) => {}
         }
+
+        preorder::walk_stmt(self, stmt);
     }
 }
 
@@ -141,3 +156,26 @@ pub struct NodeKey {
     kind: NodeKind,
     range: TextRange,
 }
+
+/// Marker trait implemented by AST nodes for which we extract the `AstId`.
+pub trait HasAstId: AstNode {
+    fn node_key(&self) -> NodeKey {
+        NodeKey {
+            kind: self.as_any_node_ref().kind(),
+            range: self.range(),
+        }
+    }
+}
+
+impl HasAstId for StmtFunctionDef {}
+impl HasAstId for StmtClassDef {}
+impl HasAstId for StmtAnnAssign {}
+impl HasAstId for StmtAugAssign {}
+impl HasAstId for StmtAssign {}
+impl HasAstId for StmtTypeAlias {}
+
+impl HasAstId for ModModule {}
+
+impl HasAstId for StmtImport {}
+
+impl HasAstId for StmtImportFrom {}
