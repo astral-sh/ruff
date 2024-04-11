@@ -148,6 +148,7 @@ const EXPR_SET: TokenSet = TokenSet::new([
     TokenKind::Not,
     TokenKind::Yield,
     TokenKind::FStringStart,
+    TokenKind::IpyEscapeCommand,
 ])
 .union(LITERAL_SET);
 
