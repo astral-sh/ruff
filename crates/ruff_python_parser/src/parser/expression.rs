@@ -1934,7 +1934,15 @@ impl<'src> Parser<'src> {
         let start = self.node_start();
 
         let is_async = self.eat(TokenKind::Async);
-        self.bump(TokenKind::For);
+
+        if is_async {
+            // test_err comprehension_missing_for_after_async
+            // (async)
+            // (x async x in iter)
+            self.expect(TokenKind::For);
+        } else {
+            self.bump(TokenKind::For);
+        };
 
         let saved_context = self.set_ctx(ParserCtxFlags::FOR_TARGET);
         let mut target = self.parse_expression_list(AllowStarredExpression::Yes);
