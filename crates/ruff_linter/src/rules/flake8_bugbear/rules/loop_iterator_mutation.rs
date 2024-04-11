@@ -3,14 +3,17 @@ use std::collections::HashMap;
 use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::comparable::ComparableExpr;
+use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_ast::{
     visitor::{self, Visitor},
-    Arguments, ElifElseClause, Expr, ExprAttribute, ExprCall, ExprName, ExprSubscript, Operator,
-    Stmt, StmtAssign, StmtAugAssign, StmtBreak, StmtDelete, StmtFor, StmtIf,
+    ElifElseClause, Expr, ExprAttribute, ExprCall, ExprSubscript, Operator, Stmt, StmtAssign,
+    StmtAugAssign, StmtBreak, StmtDelete, StmtFor, StmtIf,
 };
 use ruff_text_size::TextRange;
 
 use crate::checkers::ast::Checker;
+use crate::fix::snippet::SourceCodeSnippet;
 
 /// ## What it does
 /// Checks for mutations to an iterable during a loop iteration.
@@ -22,6 +25,7 @@ use crate::checkers::ast::Checker;
 /// ## Example
 /// ```python
 /// items = [1,2,3]
+///
 /// for item in items:
 ///     print(item)
 ///
@@ -32,43 +36,19 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: Mutable Sequence Types](https://docs.python.org/3/library/stdtypes.html#typesseq-mutable)
 #[violation]
-pub struct LoopIteratorMutation;
+pub struct LoopIteratorMutation {
+    name: Option<SourceCodeSnippet>,
+}
 
 impl Violation for LoopIteratorMutation {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Mutation to loop iterable during iteration")
-    }
-}
+        let LoopIteratorMutation { name } = self;
 
-fn _to_name_str(node: &Expr) -> String {
-    match node {
-        Expr::Name(ExprName { id, .. }) => {
-            return id.to_string();
-        }
-        Expr::Attribute(ExprAttribute {
-            range: _,
-            value,
-            attr,
-            ..
-        }) => {
-            let mut inner = _to_name_str(value);
-            match inner.as_str() {
-                "" => {
-                    return "".into();
-                }
-                _ => {
-                    inner.push_str(".");
-                    inner.push_str(attr);
-                    return inner;
-                }
-            }
-        }
-        Expr::Call(ExprCall { range: _, func, .. }) => {
-            return _to_name_str(func);
-        }
-        _ => {
-            return "".into();
+        if let Some(name) = name.as_ref().and_then(SourceCodeSnippet::full_display) {
+            format!("Mutation to loop iterable `{}` during iteration", name)
+        } else {
+            format!("Mutation to loop iterable during iteration")
         }
     }
 }
@@ -83,29 +63,26 @@ pub(crate) fn loop_iterator_mutation(checker: &mut Checker, stmt_for: &StmtFor) 
         is_async: _,
         range: _,
     } = stmt_for;
-    let name;
 
-    match iter.as_ref() {
-        Expr::Name(ExprName { .. }) => {
-            name = _to_name_str(iter.as_ref());
-        }
-        Expr::Attribute(ExprAttribute { .. }) => {
-            name = _to_name_str(iter.as_ref());
-        }
-        _ => {
-            unreachable!()
-        }
+    if !matches!(iter.as_ref(), Expr::Name(_) | Expr::Attribute(_)) {
+        return;
     }
-    let mut visitor = LoopMutationsVisitor {
-        name: &name,
-        mutations: HashMap::new(),
-        branch: 0,
+
+    // Collect mutations to the iterable.
+    let mutations = {
+        let mut visitor = LoopMutationsVisitor::new(iter);
+        visitor.visit_body(body);
+        visitor.mutations
     };
-    visitor.visit_body(body);
-    for mutation in visitor.mutations.values().flatten() {
+
+    // Create a diagnostic for each mutation.
+    for mutation in mutations.values().flatten() {
+        let name = UnqualifiedName::from_expr(iter)
+            .map(|name| name.to_string())
+            .map(SourceCodeSnippet::new);
         checker
             .diagnostics
-            .push(Diagnostic::new(LoopIteratorMutation, *mutation));
+            .push(Diagnostic::new(LoopIteratorMutation { name }, *mutation));
     }
 }
 
@@ -132,107 +109,110 @@ fn is_mutating_function(function_name: &str) -> bool {
     )
 }
 
+/// A visitor to collect mutations to a variable in a loop.
+#[derive(Debug, Clone)]
 struct LoopMutationsVisitor<'a> {
-    name: &'a str,
+    name: &'a Expr,
     mutations: HashMap<u8, Vec<TextRange>>,
+    branches: Vec<u8>,
     branch: u8,
 }
 
 impl<'a> LoopMutationsVisitor<'a> {
-    fn add_mutation(&mut self, range: &TextRange) {
-        if !self.mutations.contains_key(&self.branch) {
-            self.mutations.insert(self.branch, Vec::new());
-        }
-        match self.mutations.get_mut(&self.branch) {
-            Some(a) => a.push(*range),
-            None => {}
+    /// Initialize the visitor.
+    fn new(name: &'a Expr) -> Self {
+        Self {
+            name,
+            mutations: HashMap::new(),
+            branches: vec![0],
+            branch: 0,
         }
     }
 
-    fn handle_delete(&mut self, range: &TextRange, targets: &'a Vec<Expr>) {
+    /// Register a mutation.
+    fn add_mutation(&mut self, range: TextRange) {
+        self.mutations
+            .entry(self.branch)
+            .or_insert(Vec::new())
+            .push(range);
+    }
+
+    /// Handle, e.g., `del items[0]`.
+    fn handle_delete(&mut self, range: TextRange, targets: &'a Vec<Expr>) {
         for target in targets {
-            let name;
-            match target {
-                Expr::Subscript(ExprSubscript {
-                    range: _,
-                    value,
-                    slice: _,
-                    ctx: _,
-                }) => {
-                    name = _to_name_str(value);
+            if let Expr::Subscript(ExprSubscript {
+                range: _,
+                value,
+                slice: _,
+                ctx: _,
+            }) = target
+            {
+                if ComparableExpr::from(self.name) == ComparableExpr::from(value) {
+                    self.add_mutation(range);
                 }
-
-                Expr::Attribute(_) | Expr::Name(_) => {
-                    name = String::new(); // ignore reference deletion
-                }
-                _ => {
-                    name = String::new();
-                    visitor::walk_expr(self, target);
-                }
-            }
-            if self.name.eq(&name) {
-                self.add_mutation(range);
             }
         }
     }
 
-    fn handle_assign(&mut self, range: &TextRange, targets: &'a Vec<Expr>, _value: &Box<Expr>) {
+    /// Handle, e.g., `items[0] = 1`.
+    fn handle_assign(&mut self, range: TextRange, targets: &'a Vec<Expr>, _value: &Box<Expr>) {
         for target in targets {
-            match target {
-                Expr::Subscript(ExprSubscript {
-                    range: _,
-                    value,
-                    slice: _,
-                    ctx: _,
-                }) => {
-                    if self.name.eq(&_to_name_str(value)) {
-                        self.add_mutation(range)
-                    }
+            if let Expr::Subscript(ExprSubscript {
+                range: _,
+                value,
+                slice: _,
+                ctx: _,
+            }) = target
+            {
+                if ComparableExpr::from(self.name) == ComparableExpr::from(value) {
+                    self.add_mutation(range);
                 }
-                _ => visitor::walk_expr(self, target),
             }
         }
     }
 
+    /// Handle, e.g., `items += [1]`.
     fn handle_aug_assign(
         &mut self,
-        range: &TextRange,
+        range: TextRange,
         target: &Box<Expr>,
         _op: &Operator,
         _value: &Box<Expr>,
     ) {
-        if self.name.eq(&_to_name_str(target)) {
-            self.add_mutation(range)
+        if ComparableExpr::from(self.name) == ComparableExpr::from(target) {
+            self.add_mutation(range);
         }
     }
 
-    fn handle_call(&mut self, _range: &TextRange, func: &Box<Expr>, _arguments: &Arguments) {
-        match func.as_ref() {
-            Expr::Attribute(ExprAttribute {
-                range,
-                value,
-                attr,
-                ctx: _,
-            }) => {
-                let name = _to_name_str(value);
-                if self.name.eq(&name) && is_mutating_function(&attr.as_str()) {
-                    self.add_mutation(range);
+    /// Handle, e.g., `items.append(1)`.
+    fn handle_call(&mut self, func: &Expr) {
+        if let Expr::Attribute(ExprAttribute {
+            range,
+            value,
+            attr,
+            ctx: _,
+        }) = func
+        {
+            if is_mutating_function(attr.as_str()) {
+                if ComparableExpr::from(self.name) == ComparableExpr::from(value) {
+                    self.add_mutation(*range);
                 }
             }
-            _ => {}
         }
     }
 
-    fn handle_if(
-        &mut self,
-        _range: &TextRange,
-        _test: &Box<Expr>,
-        body: &'a Vec<Stmt>,
-        _elif_else_clauses: &Vec<ElifElseClause>,
-    ) {
+    fn handle_branches(&mut self, body: &'a [Stmt], elif_else_clauses: &'a [ElifElseClause]) {
         self.branch += 1;
+        self.branches.push(self.branch);
         self.visit_body(body);
-        self.branch += 1;
+        self.branches.pop();
+
+        for clause in elif_else_clauses {
+            self.branch += 1;
+            self.branches.push(self.branch);
+            self.visit_body(&clause.body);
+            self.branches.pop();
+        }
     }
 }
 
@@ -240,30 +220,50 @@ impl<'a> LoopMutationsVisitor<'a> {
 impl<'a> Visitor<'a> for LoopMutationsVisitor<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
         match stmt {
-            Stmt::Delete(StmtDelete { range, targets }) => self.handle_delete(range, targets),
+            // Ex) `del items[0]`
+            Stmt::Delete(StmtDelete { range, targets }) => {
+                self.handle_delete(*range, targets);
+                visitor::walk_stmt(self, stmt);
+            }
+
+            // Ex) `items[0] = 1`
             Stmt::Assign(StmtAssign {
                 range,
                 targets,
                 value,
-            }) => self.handle_assign(range, targets, value),
+            }) => {
+                self.handle_assign(*range, targets, value);
+                visitor::walk_stmt(self, stmt);
+            }
+
+            // Ex) `items += [1]`
             Stmt::AugAssign(StmtAugAssign {
                 range,
                 target,
                 op,
                 value,
             }) => {
-                self.handle_aug_assign(range, target, op, value);
+                self.handle_aug_assign(*range, target, op, value);
+                visitor::walk_stmt(self, stmt);
             }
+
+            // Ex) `if True: items.append(1)`
             Stmt::If(StmtIf {
-                range,
-                test,
                 body,
                 elif_else_clauses,
-            }) => self.handle_if(range, test, body, elif_else_clauses),
+                ..
+            }) => self.handle_branches(body, elif_else_clauses),
+
+            // On break, clear the mutations for the current branch.
             Stmt::Break(StmtBreak { range: _ }) => match self.mutations.get_mut(&self.branch) {
                 Some(a) => a.clear(),
                 None => {}
             },
+
+            // Avoid recursion for class and function definitions.
+            Stmt::ClassDef(_) | Stmt::FunctionDef(_) => {}
+
+            // Default case.
             _ => {
                 visitor::walk_stmt(self, stmt);
             }
@@ -271,14 +271,11 @@ impl<'a> Visitor<'a> for LoopMutationsVisitor<'a> {
     }
 
     fn visit_expr(&mut self, expr: &'a Expr) {
-        match expr {
-            Expr::Call(ExprCall {
-                range,
-                func,
-                arguments,
-            }) => self.handle_call(range, func, arguments),
-            _ => {}
+        // Ex) `items.append(1)`
+        if let Expr::Call(ExprCall { func, .. }) = expr {
+            self.handle_call(&*func);
         }
+
         visitor::walk_expr(self, expr);
     }
 }

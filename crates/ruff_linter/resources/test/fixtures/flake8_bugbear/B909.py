@@ -127,3 +127,10 @@ for _ in foo:
         bar.remove(1)
         break
     break
+
+# should error
+for _ in foo:
+    if bar:
+        pass
+    else:
+        foo.remove(1)
