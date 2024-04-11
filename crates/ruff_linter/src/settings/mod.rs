@@ -131,6 +131,9 @@ macro_rules! display_settings {
     (@field $fmt:ident, $prefix:ident, $settings:ident.$field:ident | quoted) => {
         writeln!($fmt, "{}{} = \"{}\"", $prefix, stringify!($field), $settings.$field)?;
     };
+    (@field $fmt:ident, $prefix:ident, $settings:ident.$field:ident | globmatcher) => {
+        writeln!($fmt, "{}{} = \"{}\"", $prefix, stringify!($field), $settings.$field.glob())?;
+    };
     (@field $fmt:ident, $prefix:ident, $settings:ident.$field:ident | nested) => {
         write!($fmt, "{}", $settings.$field)?;
     };

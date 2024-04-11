@@ -610,14 +610,16 @@ pub struct CompiledPerFileIgnore {
 
 impl Display for CompiledPerFileIgnore {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        writeln!(
-            f,
-            "{{ absolute_matcher = {:#?}, \
-                basename_matcher = {:#?}, \
-                negated = {}, \
-                rules = {} }}",
-            self.absolute_matcher, self.basename_matcher, self.negated, self.rules
-        )
+        display_settings! {
+            formatter = f,
+            fields = [
+                self.absolute_matcher | globmatcher,
+                self.basename_matcher | globmatcher,
+                self.negated,
+                self.rules,
+            ]
+        }
+        Ok(())
     }
 }
 
