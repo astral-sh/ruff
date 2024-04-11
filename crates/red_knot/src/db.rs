@@ -1,3 +1,4 @@
+use std::fmt::Formatter;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -7,7 +8,7 @@ use parking_lot::RwLock;
 use rustc_hash::FxHashMap;
 use salsa::Event;
 
-use ruff_index::IndexVec;
+use ruff_index::{Idx, IndexVec};
 use ruff_python_ast::visitor::preorder::{PreorderVisitor, TraversalSignal};
 use ruff_python_ast::visitor::{preorder, Visitor};
 use ruff_python_ast::{
@@ -44,12 +45,6 @@ pub struct Parsed {
 }
 
 #[salsa::tracked(jar=SourceJar)]
-pub struct Dependencies {
-    #[returned_ref]
-    pub modules: Vec<Dependency>,
-}
-
-#[salsa::tracked(jar=SourceJar)]
 pub struct SyntaxCheck {
     #[returned_ref]
     pub diagnostics: Vec<String>,
@@ -67,11 +62,11 @@ pub struct SourceJar(
     Parsed,
     SyntaxCheck,
     PhysicalLinesCheck,
-    Dependencies,
     parse,
     dependencies,
     check_syntax,
     check_physical_lines,
+    ast_ids,
 );
 
 pub trait Db: salsa::DbWithJar<SourceJar> {
@@ -177,7 +172,7 @@ pub fn parse(db: &dyn Db, source: SourceText) -> Parsed {
 }
 
 #[salsa::tracked(jar=SourceJar)]
-pub fn dependencies(db: &dyn Db, source_text: SourceText) -> Dependencies {
+pub fn dependencies(db: &dyn Db, source_text: SourceText) -> Arc<Vec<Dependency>> {
     let parsed = parse(db, source_text);
 
     let mut visitor = DependenciesVisitor {
@@ -192,7 +187,7 @@ pub fn dependencies(db: &dyn Db, source_text: SourceText) -> Dependencies {
     // TODO change the visitor so that `visit_mod` accepts a `ModRef` node that we can construct from module.
     visitor.visit_body(&parsed.ast(db).body);
 
-    Dependencies::new(db, visitor.dependencies)
+    Arc::new(visitor.dependencies)
 
     // TODO we should extract the names of dependencies during parsing to avoid an extra traversal here.
 }
@@ -308,6 +303,14 @@ pub struct HirAstId {
     node_id: AstId,
 }
 
+#[salsa::tracked(jar=SourceJar)]
+pub fn ast_ids(db: &dyn Db, source: SourceText) -> Arc<AstIds> {
+    let parsed = parse(db, source);
+    let ast = parsed.ast(db);
+
+    Arc::new(AstIds::from_module(ast))
+}
+
 #[ruff_index::newtype_index]
 pub struct AstId;
 
@@ -319,10 +322,14 @@ pub struct AstIds {
 }
 
 impl AstIds {
+    // TODO rust analyzer doesn't allocate an ID for every node. It only allocates ids for
+    //  nodes with a corresponding HIR element, that is nodes that are definitions.
     pub fn from_module(module: &ModModule) -> Self {
         let mut visitor = AstIdsVisitor::default();
 
         // TODO: visit_module?
+        // Make sure we visit the root
+        visitor.enter_node(module.into());
         visitor.visit_body(&module.body);
 
         while let Some(deferred) = visitor.deferred.pop() {
@@ -343,7 +350,39 @@ impl AstIds {
     pub fn get(&self, node: &NodeKey) -> Option<AstId> {
         self.reverse.get(node).copied()
     }
+
+    pub fn root(&self) -> NodeKey {
+        self.ids[AstId::new(0)]
+    }
+
+    // TODO: Limit this API to only nodes that have an AstId (marker trait?)
+    pub fn ast_id<N: AstNode>(&self, node: N) -> AstId {
+        let key = NodeKey {
+            kind: node.as_any_node_ref().kind(),
+            range: node.range(),
+        };
+        self.reverse.get(&key).copied().unwrap()
+    }
 }
+
+impl std::fmt::Debug for AstIds {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let mut map = f.debug_map();
+        for (key, value) in self.ids.iter_enumerated() {
+            map.entry(&key, &value);
+        }
+
+        map.finish()
+    }
+}
+
+impl PartialEq for AstIds {
+    fn eq(&self, other: &Self) -> bool {
+        self.ids == other.ids
+    }
+}
+
+impl Eq for AstIds {}
 
 #[derive(Default)]
 struct AstIdsVisitor<'a> {
@@ -366,6 +405,10 @@ impl<'a> AstIdsVisitor<'a> {
 
 impl<'a> PreorderVisitor<'a> for AstIdsVisitor<'a> {
     fn enter_node(&mut self, node: AnyNodeRef<'a>) -> TraversalSignal {
+        if node.is_expression() {
+            return TraversalSignal::Skip;
+        }
+
         self.push(node);
         TraversalSignal::Traverse
     }
@@ -377,6 +420,9 @@ impl<'a> PreorderVisitor<'a> for AstIdsVisitor<'a> {
             // TODO defer visiting the assignment body, type alias parameters etc?
             Stmt::ClassDef(def) => {
                 self.deferred.push(DeferredNode::ClassDefinition(def));
+            }
+            Stmt::Expr(_) => {
+                // Skip
             }
             _ => preorder::walk_stmt(self, stmt),
         }
