@@ -323,14 +323,13 @@ impl<'src> Parser<'src> {
                     parser.parse_conditional_expression_or_higher(AllowStarredExpression::Yes);
                 helpers::set_expr_ctx(&mut target.expr, ExprContext::Del);
 
-                if !helpers::is_valid_del_target(&target.expr) {
-                    // test_err invalid_del_target
-                    // del x + 1
-                    // del {'x': 1}
-                    // del {'x', 'y'}
-                    // del None, True, False, 1, 1.0, "abc"
-                    parser.add_error(ParseErrorType::InvalidDeleteTarget, &target.expr);
-                }
+                // test_err invalid_del_target
+                // del x + 1
+                // del {'x': 1}
+                // del {'x', 'y'}
+                // del None, True, False, 1, 1.0, "abc"
+                parser.validate_delete_target(&target.expr);
+
                 target.expr
             },
         );
@@ -3099,6 +3098,23 @@ impl<'src> Parser<'src> {
             ),
             Expr::Name(_) | Expr::Attribute(_) | Expr::Subscript(_) => {}
             _ => self.add_error(ParseErrorType::InvalidAnnotatedAssignmentTarget, expr),
+        }
+    }
+
+    /// Validate that the given expression is a valid delete target.
+    ///
+    /// If the expression is a list or tuple, then validate each element in the list.
+    ///
+    /// See: <https://github.com/python/cpython/blob/d864b0094f9875c5613cbb0b7f7f3ca8f1c6b606/Parser/action_helpers.c#L1150-L1180>
+    fn validate_delete_target(&mut self, expr: &Expr) {
+        match expr {
+            Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+                for expr in elts {
+                    self.validate_delete_target(expr);
+                }
+            }
+            Expr::Name(_) | Expr::Attribute(_) | Expr::Subscript(_) => {}
+            _ => self.add_error(ParseErrorType::InvalidDeleteTarget, expr),
         }
     }
 
