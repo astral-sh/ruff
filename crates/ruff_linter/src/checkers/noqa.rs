@@ -10,7 +10,6 @@ use ruff_python_trivia::CommentRanges;
 use ruff_source_file::Locator;
 
 use crate::fix::edits::delete_comment;
-use crate::noqa;
 use crate::noqa::{Directive, FileExemption, NoqaDirectives, NoqaMapping};
 use crate::registry::{AsRule, Rule, RuleSet};
 use crate::rule_redirects::get_redirect_target;
@@ -86,7 +85,7 @@ pub(crate) fn check_noqa(
                         true
                     }
                     Directive::Codes(directive) => {
-                        if noqa::includes(diagnostic.kind.rule(), directive.codes()) {
+                        if directive.includes(diagnostic.kind.rule()) {
                             directive_line
                                 .matches
                                 .push(diagnostic.kind.rule().noqa_code());
@@ -133,7 +132,7 @@ pub(crate) fn check_noqa(
                     let mut unmatched_codes = vec![];
                     let mut valid_codes = vec![];
                     let mut self_ignore = false;
-                    for code in directive.codes() {
+                    for code in directive.names() {
                         let code = get_redirect_target(code).unwrap_or(code);
                         if Rule::UnusedNOQA.noqa_code() == code {
                             self_ignore = true;
