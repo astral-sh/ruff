@@ -116,24 +116,24 @@ B909.py:47:5: B909 editing a loop's mutable iterable often leads to unexpected r
 46 |     # errors
 47 |     mydicts.popitem()
    |     ^^^^^^^^^^^^^^^ B909
-48 |     mydicts.setdefault('foo', 1)
-49 |     mydicts.update({'foo': 'bar'})
+48 |     mydicts.setdefault("foo", 1)
+49 |     mydicts.update({"foo": "bar"})
    |
 
 B909.py:48:5: B909 editing a loop's mutable iterable often leads to unexpected results/bugs
    |
 46 |     # errors
 47 |     mydicts.popitem()
-48 |     mydicts.setdefault('foo', 1)
+48 |     mydicts.setdefault("foo", 1)
    |     ^^^^^^^^^^^^^^^^^^ B909
-49 |     mydicts.update({'foo': 'bar'})
+49 |     mydicts.update({"foo": "bar"})
    |
 
 B909.py:49:5: B909 editing a loop's mutable iterable often leads to unexpected results/bugs
    |
 47 |     mydicts.popitem()
-48 |     mydicts.setdefault('foo', 1)
-49 |     mydicts.update({'foo': 'bar'})
+48 |     mydicts.setdefault("foo", 1)
+49 |     mydicts.update({"foo": "bar"})
    |     ^^^^^^^^^^^^^^ B909
 50 | 
 51 |     # no errors
@@ -261,13 +261,13 @@ B909.py:97:5: B909 editing a loop's mutable iterable often leads to unexpected r
 97 |     foo[1:2:3] = bar
    |     ^^^^^^^^^^^^^^^^ B909
 98 | 
-99 | foo = {1,2,3}
+99 | foo = {1, 2, 3}
    |
 
 B909.py:102:5: B909 editing a loop's mutable iterable often leads to unexpected results/bugs
     |
-100 | bar = {4,5,6}
-101 | for _ in foo: # should error
+100 | bar = {4, 5, 6}
+101 | for _ in foo:  # should error
 102 |     foo |= bar
     |     ^^^^^^^^^^ B909
 103 |     foo &= bar
@@ -276,7 +276,7 @@ B909.py:102:5: B909 editing a loop's mutable iterable often leads to unexpected 
 
 B909.py:103:5: B909 editing a loop's mutable iterable often leads to unexpected results/bugs
     |
-101 | for _ in foo: # should error
+101 | for _ in foo:  # should error
 102 |     foo |= bar
 103 |     foo &= bar
     |     ^^^^^^^^^^ B909

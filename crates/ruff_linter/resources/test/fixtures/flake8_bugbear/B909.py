@@ -1,6 +1,6 @@
 """
 Should emit:
-B999 - on lines 11, 25, 26, 40, 46
+B909 - on lines 11, 25, 26, 40, 46
 """
 
 # lists
@@ -40,18 +40,18 @@ for elem in some_list:
 
 
 # dicts
-mydicts = {'a': {'foo': 1, 'bar': 2}}
+mydicts = {"a": {"foo": 1, "bar": 2}}
 
 for elem in mydicts:
     # errors
     mydicts.popitem()
-    mydicts.setdefault('foo', 1)
-    mydicts.update({'foo': 'bar'})
+    mydicts.setdefault("foo", 1)
+    mydicts.update({"foo": "bar"})
 
     # no errors
     elem.popitem()
-    elem.setdefault('foo', 1)
-    elem.update({'foo': 'bar'})
+    elem.setdefault("foo", 1)
+    elem.update({"foo": "bar"})
 
 # sets
 
@@ -96,9 +96,9 @@ for _ in foo:
     foo[1:2] = bar
     foo[1:2:3] = bar
 
-foo = {1,2,3}
-bar = {4,5,6}
-for _ in foo: # should error
+foo = {1, 2, 3}
+bar = {4, 5, 6}
+for _ in foo:  # should error
     foo |= bar
     foo &= bar
     foo -= bar
