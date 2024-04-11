@@ -204,7 +204,7 @@ Module(
                                     ],
                                     vararg: Some(
                                         Parameter {
-                                            range: 65..66,
+                                            range: 64..66,
                                             name: Identifier {
                                                 id: "a",
                                                 range: 65..66,
@@ -256,7 +256,7 @@ Module(
                                     kwonlyargs: [],
                                     kwarg: Some(
                                         Parameter {
-                                            range: 86..87,
+                                            range: 84..87,
                                             name: Identifier {
                                                 id: "a",
                                                 range: 86..87,

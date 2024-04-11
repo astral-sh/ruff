@@ -2671,10 +2671,10 @@ impl<'src> Parser<'src> {
     /// [Python grammar]: https://docs.python.org/3/reference/grammar.html
     fn parse_parameter(
         &mut self,
+        start: TextSize,
         function_kind: FunctionKind,
         allow_star_annotation: AllowStarAnnotation,
     ) -> ast::Parameter {
-        let start = self.node_start();
         let name = self.parse_identifier();
 
         // Annotations are only allowed for function definition. For lambda expression,
@@ -2742,10 +2742,10 @@ impl<'src> Parser<'src> {
     /// [Python grammar]: https://docs.python.org/3/reference/grammar.html
     fn parse_parameter_with_default(
         &mut self,
+        start: TextSize,
         function_kind: FunctionKind,
     ) -> ast::ParameterWithDefault {
-        let start = self.node_start();
-        let parameter = self.parse_parameter(function_kind, AllowStarAnnotation::No);
+        let parameter = self.parse_parameter(start, function_kind, AllowStarAnnotation::No);
 
         let default = if self.eat(TokenKind::Equal) {
             if self.at_expr() {
@@ -2813,6 +2813,8 @@ impl<'src> Parser<'src> {
         let mut last_keyword_only_separator_range = None;
 
         self.parse_comma_separated_list(RecoveryContextKind::Parameters(function_kind), |parser| {
+            let param_start = parser.node_start();
+
             if parameters.kwarg.is_some() {
                 // TODO(dhruvmanila): This fails AST validation in tests because
                 // of the pre-order visit
@@ -2830,7 +2832,7 @@ impl<'src> Parser<'src> {
                     parser.bump(TokenKind::Star);
 
                     if parser.at(TokenKind::Name) {
-                        let param = parser.parse_parameter(function_kind, AllowStarAnnotation::Yes);
+                        let param = parser.parse_parameter(param_start, function_kind, AllowStarAnnotation::Yes);
                         let param_star_range = parser.node_range(star_range.start());
 
                         if parser.at(TokenKind::Equal) {
@@ -2897,7 +2899,7 @@ impl<'src> Parser<'src> {
                     let double_star_range = parser.current_token_range();
                     parser.bump(TokenKind::DoubleStar);
 
-                    let param = parser.parse_parameter(function_kind, AllowStarAnnotation::No);
+                    let param = parser.parse_parameter(param_start, function_kind, AllowStarAnnotation::No);
                     let param_double_star_range = parser.node_range(double_star_range.start());
 
                     if parameters.kwarg.is_some() {
@@ -2989,7 +2991,7 @@ impl<'src> Parser<'src> {
                     last_keyword_only_separator_range = None;
                 }
                 TokenKind::Name => {
-                    let param = parser.parse_parameter_with_default(function_kind);
+                    let param = parser.parse_parameter_with_default(param_start, function_kind);
 
                     // TODO(dhruvmanila): Pyright seems to only highlight the first non-default argument
                     // https://github.com/microsoft/pyright/blob/3b70417dd549f6663b8f86a76f75d8dfd450f4a8/packages/pyright-internal/src/parser/parser.ts#L2038-L2042
