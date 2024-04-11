@@ -23,3 +23,5 @@ sorted(l, reverse=foo())[0]
 sorted([1, 2, 3])[0]
 
 sorted(l)[1]
+
+sorted(get_list())[1]
