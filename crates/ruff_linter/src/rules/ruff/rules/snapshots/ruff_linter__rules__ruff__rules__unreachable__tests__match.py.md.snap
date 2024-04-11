@@ -1,0 +1,815 @@
+---
+source: crates/ruff_linter/src/rules/ruff/rules/unreachable.rs
+description: "This is a Mermaid graph. You can use https://mermaid.live to visualize it as a diagram."
+---
+## Function 0
+### Source
+```python
+def func(status):
+    match status:
+        case _:
+            return 0
+    return "unreachable"
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0["return #quot;unreachable#quot;\n"]
+  block1["return 0\n"]
+  block2["match status:
+        case _:
+            return 0\n"]
+
+  start --> block2
+  block2 --> block1
+  block1 --> return
+  block0 --> return
+```
+
+## Function 1
+### Source
+```python
+def func(status):
+    match status:
+        case 1:
+            return 1
+    return 0
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0["return 0\n"]
+  block1["return 1\n"]
+  block2["match status:
+        case 1:
+            return 1\n"]
+
+  start --> block2
+  block2 -- "case 1" --> block1
+  block2 -- "else" --> block0
+  block1 --> return
+  block0 --> return
+```
+
+## Function 2
+### Source
+```python
+def func(status):
+    match status:
+        case 1:
+            return 1
+        case _:
+            return 0
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0["return 0\n"]
+  block1["match status:
+        case 1:
+            return 1
+        case _:
+            return 0\n"]
+  block2["return 1\n"]
+  block3["match status:
+        case 1:
+            return 1
+        case _:
+            return 0\n"]
+
+  start --> block3
+  block3 -- "case 1" --> block2
+  block3 -- "else" --> block1
+  block2 --> return
+  block1 --> block0
+  block0 --> return
+```
+
+## Function 3
+### Source
+```python
+def func(status):
+    match status:
+        case 1 | 2 | 3:
+            return 5
+    return 6
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0["return 6\n"]
+  block1["return 5\n"]
+  block2["match status:
+        case 1 | 2 | 3:
+            return 5\n"]
+
+  start --> block2
+  block2 -- "case 1 | 2 | 3" --> block1
+  block2 -- "else" --> block0
+  block1 --> return
+  block0 --> return
+```
+
+## Function 4
+### Source
+```python
+def func(status):
+    match status:
+        case 1 | 2 | 3:
+            return 5
+        case _:
+            return 10
+    return 0
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0["return 0\n"]
+  block1["return 10\n"]
+  block2["match status:
+        case 1 | 2 | 3:
+            return 5
+        case _:
+            return 10\n"]
+  block3["return 5\n"]
+  block4["match status:
+        case 1 | 2 | 3:
+            return 5
+        case _:
+            return 10\n"]
+
+  start --> block4
+  block4 -- "case 1 | 2 | 3" --> block3
+  block4 -- "else" --> block2
+  block3 --> return
+  block2 --> block1
+  block1 --> return
+  block0 --> return
+```
+
+## Function 5
+### Source
+```python
+def func(status):
+    match status:
+        case 0:
+            return 0
+        case 1:
+            return 1
+        case 1:
+            return "1 again"
+        case _:
+            return 3
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0["return 3\n"]
+  block1["match status:
+        case 0:
+            return 0
+        case 1:
+            return 1
+        case 1:
+            return #quot;1 again#quot;
+        case _:
+            return 3\n"]
+  block2["return #quot;1 again#quot;\n"]
+  block3["match status:
+        case 0:
+            return 0
+        case 1:
+            return 1
+        case 1:
+            return #quot;1 again#quot;
+        case _:
+            return 3\n"]
+  block4["return 1\n"]
+  block5["match status:
+        case 0:
+            return 0
+        case 1:
+            return 1
+        case 1:
+            return #quot;1 again#quot;
+        case _:
+            return 3\n"]
+  block6["return 0\n"]
+  block7["match status:
+        case 0:
+            return 0
+        case 1:
+            return 1
+        case 1:
+            return #quot;1 again#quot;
+        case _:
+            return 3\n"]
+
+  start --> block7
+  block7 -- "case 0" --> block6
+  block7 -- "else" --> block5
+  block6 --> return
+  block5 -- "case 1" --> block4
+  block5 -- "else" --> block3
+  block4 --> return
+  block3 -- "case 1" --> block2
+  block3 -- "else" --> block1
+  block2 --> return
+  block1 --> block0
+  block0 --> return
+```
+
+## Function 6
+### Source
+```python
+def func(status):
+    i = 0
+    match status, i:
+        case _, _:
+            return 0
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0[["`*(empty)*`"]]
+  block1["return 0\n"]
+  block2["match status, i:
+        case _, _:
+            return 0\n"]
+  block3["i = 0\n"]
+
+  start --> block3
+  block3 --> block2
+  block2 -- "case _, _" --> block1
+  block2 -- "else" --> block0
+  block1 --> return
+  block0 --> return
+```
+
+## Function 7
+### Source
+```python
+def func(status):
+    i = 0
+    match status, i:
+        case _, 0:
+            return 0
+        case _, 2:
+            return 0
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0[["`*(empty)*`"]]
+  block1["return 0\n"]
+  block2["match status, i:
+        case _, 0:
+            return 0
+        case _, 2:
+            return 0\n"]
+  block3["return 0\n"]
+  block4["match status, i:
+        case _, 0:
+            return 0
+        case _, 2:
+            return 0\n"]
+  block5["i = 0\n"]
+
+  start --> block5
+  block5 --> block4
+  block4 -- "case _, 0" --> block3
+  block4 -- "else" --> block2
+  block3 --> return
+  block2 -- "case _, 2" --> block1
+  block2 -- "else" --> block0
+  block1 --> return
+  block0 --> return
+```
+
+## Function 8
+### Source
+```python
+def func(point):
+    match point:
+        case (0, 0):
+            print("Origin")
+        case _:
+            raise ValueError("oops")
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0[["`*(empty)*`"]]
+  block1["raise ValueError(#quot;oops#quot;)\n"]
+  block2["match point:
+        case (0, 0):
+            print(#quot;Origin#quot;)
+        case _:
+            raise ValueError(#quot;oops#quot;)\n"]
+  block3["print(#quot;Origin#quot;)\n"]
+  block4["match point:
+        case (0, 0):
+            print(#quot;Origin#quot;)
+        case _:
+            raise ValueError(#quot;oops#quot;)\n"]
+
+  start --> block4
+  block4 -- "case (0, 0)" --> block3
+  block4 -- "else" --> block2
+  block3 --> block0
+  block2 --> block1
+  block1 --> return
+  block0 --> return
+```
+
+## Function 9
+### Source
+```python
+def func(point):
+    match point:
+        case (0, 0):
+            print("Origin")
+        case (0, y):
+            print(f"Y={y}")
+        case (x, 0):
+            print(f"X={x}")
+        case (x, y):
+            print(f"X={x}, Y={y}")
+        case _:
+            raise ValueError("Not a point")
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0[["`*(empty)*`"]]
+  block1["raise ValueError(#quot;Not a point#quot;)\n"]
+  block2["match point:
+        case (0, 0):
+            print(#quot;Origin#quot;)
+        case (0, y):
+            print(f#quot;Y={y}#quot;)
+        case (x, 0):
+            print(f#quot;X={x}#quot;)
+        case (x, y):
+            print(f#quot;X={x}, Y={y}#quot;)
+        case _:
+            raise ValueError(#quot;Not a point#quot;)\n"]
+  block3["print(f#quot;X={x}, Y={y}#quot;)\n"]
+  block4["match point:
+        case (0, 0):
+            print(#quot;Origin#quot;)
+        case (0, y):
+            print(f#quot;Y={y}#quot;)
+        case (x, 0):
+            print(f#quot;X={x}#quot;)
+        case (x, y):
+            print(f#quot;X={x}, Y={y}#quot;)
+        case _:
+            raise ValueError(#quot;Not a point#quot;)\n"]
+  block5["print(f#quot;X={x}#quot;)\n"]
+  block6["match point:
+        case (0, 0):
+            print(#quot;Origin#quot;)
+        case (0, y):
+            print(f#quot;Y={y}#quot;)
+        case (x, 0):
+            print(f#quot;X={x}#quot;)
+        case (x, y):
+            print(f#quot;X={x}, Y={y}#quot;)
+        case _:
+            raise ValueError(#quot;Not a point#quot;)\n"]
+  block7["print(f#quot;Y={y}#quot;)\n"]
+  block8["match point:
+        case (0, 0):
+            print(#quot;Origin#quot;)
+        case (0, y):
+            print(f#quot;Y={y}#quot;)
+        case (x, 0):
+            print(f#quot;X={x}#quot;)
+        case (x, y):
+            print(f#quot;X={x}, Y={y}#quot;)
+        case _:
+            raise ValueError(#quot;Not a point#quot;)\n"]
+  block9["print(#quot;Origin#quot;)\n"]
+  block10["match point:
+        case (0, 0):
+            print(#quot;Origin#quot;)
+        case (0, y):
+            print(f#quot;Y={y}#quot;)
+        case (x, 0):
+            print(f#quot;X={x}#quot;)
+        case (x, y):
+            print(f#quot;X={x}, Y={y}#quot;)
+        case _:
+            raise ValueError(#quot;Not a point#quot;)\n"]
+
+  start --> block10
+  block10 -- "case (0, 0)" --> block9
+  block10 -- "else" --> block8
+  block9 --> block0
+  block8 -- "case (0, y)" --> block7
+  block8 -- "else" --> block6
+  block7 --> block0
+  block6 -- "case (x, 0)" --> block5
+  block6 -- "else" --> block4
+  block5 --> block0
+  block4 -- "case (x, y)" --> block3
+  block4 -- "else" --> block2
+  block3 --> block0
+  block2 --> block1
+  block1 --> return
+  block0 --> return
+```
+
+## Function 10
+### Source
+```python
+def where_is(point):
+    class Point:
+        x: int
+        y: int
+
+    match point:
+        case Point(x=0, y=0):
+            print("Origin")
+        case Point(x=0, y=y):
+            print(f"Y={y}")
+        case Point(x=x, y=0):
+            print(f"X={x}")
+        case Point():
+            print("Somewhere else")
+        case _:
+            print("Not a point")
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0[["`*(empty)*`"]]
+  block1["print(#quot;Not a point#quot;)\n"]
+  block2["match point:
+        case Point(x=0, y=0):
+            print(#quot;Origin#quot;)
+        case Point(x=0, y=y):
+            print(f#quot;Y={y}#quot;)
+        case Point(x=x, y=0):
+            print(f#quot;X={x}#quot;)
+        case Point():
+            print(#quot;Somewhere else#quot;)
+        case _:
+            print(#quot;Not a point#quot;)\n"]
+  block3["print(#quot;Somewhere else#quot;)\n"]
+  block4["match point:
+        case Point(x=0, y=0):
+            print(#quot;Origin#quot;)
+        case Point(x=0, y=y):
+            print(f#quot;Y={y}#quot;)
+        case Point(x=x, y=0):
+            print(f#quot;X={x}#quot;)
+        case Point():
+            print(#quot;Somewhere else#quot;)
+        case _:
+            print(#quot;Not a point#quot;)\n"]
+  block5["print(f#quot;X={x}#quot;)\n"]
+  block6["match point:
+        case Point(x=0, y=0):
+            print(#quot;Origin#quot;)
+        case Point(x=0, y=y):
+            print(f#quot;Y={y}#quot;)
+        case Point(x=x, y=0):
+            print(f#quot;X={x}#quot;)
+        case Point():
+            print(#quot;Somewhere else#quot;)
+        case _:
+            print(#quot;Not a point#quot;)\n"]
+  block7["print(f#quot;Y={y}#quot;)\n"]
+  block8["match point:
+        case Point(x=0, y=0):
+            print(#quot;Origin#quot;)
+        case Point(x=0, y=y):
+            print(f#quot;Y={y}#quot;)
+        case Point(x=x, y=0):
+            print(f#quot;X={x}#quot;)
+        case Point():
+            print(#quot;Somewhere else#quot;)
+        case _:
+            print(#quot;Not a point#quot;)\n"]
+  block9["print(#quot;Origin#quot;)\n"]
+  block10["match point:
+        case Point(x=0, y=0):
+            print(#quot;Origin#quot;)
+        case Point(x=0, y=y):
+            print(f#quot;Y={y}#quot;)
+        case Point(x=x, y=0):
+            print(f#quot;X={x}#quot;)
+        case Point():
+            print(#quot;Somewhere else#quot;)
+        case _:
+            print(#quot;Not a point#quot;)\n"]
+  block11["class Point:
+        x: int
+        y: int\n"]
+
+  start --> block11
+  block11 --> block10
+  block10 -- "case Point(x=0, y=0)" --> block9
+  block10 -- "else" --> block8
+  block9 --> block0
+  block8 -- "case Point(x=0, y=y)" --> block7
+  block8 -- "else" --> block6
+  block7 --> block0
+  block6 -- "case Point(x=x, y=0)" --> block5
+  block6 -- "else" --> block4
+  block5 --> block0
+  block4 -- "case Point()" --> block3
+  block4 -- "else" --> block2
+  block3 --> block0
+  block2 --> block1
+  block1 --> block0
+  block0 --> return
+```
+
+## Function 11
+### Source
+```python
+def func(points):
+    match points:
+        case []:
+            print("No points")
+        case [Point(0, 0)]:
+            print("The origin")
+        case [Point(x, y)]:
+            print(f"Single point {x}, {y}")
+        case [Point(0, y1), Point(0, y2)]:
+            print(f"Two on the Y axis at {y1}, {y2}")
+        case _:
+            print("Something else")
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0[["`*(empty)*`"]]
+  block1["print(#quot;Something else#quot;)\n"]
+  block2["match points:
+        case []:
+            print(#quot;No points#quot;)
+        case [Point(0, 0)]:
+            print(#quot;The origin#quot;)
+        case [Point(x, y)]:
+            print(f#quot;Single point {x}, {y}#quot;)
+        case [Point(0, y1), Point(0, y2)]:
+            print(f#quot;Two on the Y axis at {y1}, {y2}#quot;)
+        case _:
+            print(#quot;Something else#quot;)\n"]
+  block3["print(f#quot;Two on the Y axis at {y1}, {y2}#quot;)\n"]
+  block4["match points:
+        case []:
+            print(#quot;No points#quot;)
+        case [Point(0, 0)]:
+            print(#quot;The origin#quot;)
+        case [Point(x, y)]:
+            print(f#quot;Single point {x}, {y}#quot;)
+        case [Point(0, y1), Point(0, y2)]:
+            print(f#quot;Two on the Y axis at {y1}, {y2}#quot;)
+        case _:
+            print(#quot;Something else#quot;)\n"]
+  block5["print(f#quot;Single point {x}, {y}#quot;)\n"]
+  block6["match points:
+        case []:
+            print(#quot;No points#quot;)
+        case [Point(0, 0)]:
+            print(#quot;The origin#quot;)
+        case [Point(x, y)]:
+            print(f#quot;Single point {x}, {y}#quot;)
+        case [Point(0, y1), Point(0, y2)]:
+            print(f#quot;Two on the Y axis at {y1}, {y2}#quot;)
+        case _:
+            print(#quot;Something else#quot;)\n"]
+  block7["print(#quot;The origin#quot;)\n"]
+  block8["match points:
+        case []:
+            print(#quot;No points#quot;)
+        case [Point(0, 0)]:
+            print(#quot;The origin#quot;)
+        case [Point(x, y)]:
+            print(f#quot;Single point {x}, {y}#quot;)
+        case [Point(0, y1), Point(0, y2)]:
+            print(f#quot;Two on the Y axis at {y1}, {y2}#quot;)
+        case _:
+            print(#quot;Something else#quot;)\n"]
+  block9["print(#quot;No points#quot;)\n"]
+  block10["match points:
+        case []:
+            print(#quot;No points#quot;)
+        case [Point(0, 0)]:
+            print(#quot;The origin#quot;)
+        case [Point(x, y)]:
+            print(f#quot;Single point {x}, {y}#quot;)
+        case [Point(0, y1), Point(0, y2)]:
+            print(f#quot;Two on the Y axis at {y1}, {y2}#quot;)
+        case _:
+            print(#quot;Something else#quot;)\n"]
+
+  start --> block10
+  block10 -- "case []" --> block9
+  block10 -- "else" --> block8
+  block9 --> block0
+  block8 -- "case [Point(0, 0)]" --> block7
+  block8 -- "else" --> block6
+  block7 --> block0
+  block6 -- "case [Point(x, y)]" --> block5
+  block6 -- "else" --> block4
+  block5 --> block0
+  block4 -- "case [Point(0, y1), Point(0, y2)]" --> block3
+  block4 -- "else" --> block2
+  block3 --> block0
+  block2 --> block1
+  block1 --> block0
+  block0 --> return
+```
+
+## Function 12
+### Source
+```python
+def func(point):
+    match point:
+        case Point(x, y) if x == y:
+            print(f"Y=X at {x}")
+        case Point(x, y):
+            print(f"Not on the diagonal")
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0[["`*(empty)*`"]]
+  block1["print(f#quot;Not on the diagonal#quot;)\n"]
+  block2["match point:
+        case Point(x, y) if x == y:
+            print(f#quot;Y=X at {x}#quot;)
+        case Point(x, y):
+            print(f#quot;Not on the diagonal#quot;)\n"]
+  block3["print(f#quot;Y=X at {x}#quot;)\n"]
+  block4["match point:
+        case Point(x, y) if x == y:
+            print(f#quot;Y=X at {x}#quot;)
+        case Point(x, y):
+            print(f#quot;Not on the diagonal#quot;)\n"]
+
+  start --> block4
+  block4 -- "case Point(x, y) if x == y" --> block3
+  block4 -- "else" --> block2
+  block3 --> block0
+  block2 -- "case Point(x, y)" --> block1
+  block2 -- "else" --> block0
+  block1 --> block0
+  block0 --> return
+```
+
+## Function 13
+### Source
+```python
+def func():
+    from enum import Enum
+    class Color(Enum):
+        RED = 'red'
+        GREEN = 'green'
+        BLUE = 'blue'
+
+    color = Color(input("Enter your choice of 'red', 'blue' or 'green': "))
+
+    match color:
+        case Color.RED:
+            print("I see red!")
+        case Color.GREEN:
+            print("Grass is green")
+        case Color.BLUE:
+            print("I'm feeling the blues :(")
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0[["`*(empty)*`"]]
+  block1["print(#quot;I'm feeling the blues :(#quot;)\n"]
+  block2["match color:
+        case Color.RED:
+            print(#quot;I see red!#quot;)
+        case Color.GREEN:
+            print(#quot;Grass is green#quot;)
+        case Color.BLUE:
+            print(#quot;I'm feeling the blues :(#quot;)\n"]
+  block3["print(#quot;Grass is green#quot;)\n"]
+  block4["match color:
+        case Color.RED:
+            print(#quot;I see red!#quot;)
+        case Color.GREEN:
+            print(#quot;Grass is green#quot;)
+        case Color.BLUE:
+            print(#quot;I'm feeling the blues :(#quot;)\n"]
+  block5["print(#quot;I see red!#quot;)\n"]
+  block6["match color:
+        case Color.RED:
+            print(#quot;I see red!#quot;)
+        case Color.GREEN:
+            print(#quot;Grass is green#quot;)
+        case Color.BLUE:
+            print(#quot;I'm feeling the blues :(#quot;)\n"]
+  block7["from enum import Enum\nclass Color(Enum):
+        RED = 'red'
+        GREEN = 'green'
+        BLUE = 'blue'\ncolor = Color(input(#quot;Enter your choice of 'red', 'blue' or 'green': #quot;))\n"]
+
+  start --> block7
+  block7 --> block6
+  block6 -- "case Color.RED" --> block5
+  block6 -- "else" --> block4
+  block5 --> block0
+  block4 -- "case Color.GREEN" --> block3
+  block4 -- "else" --> block2
+  block3 --> block0
+  block2 -- "case Color.BLUE" --> block1
+  block2 -- "else" --> block0
+  block1 --> block0
+  block0 --> return
+```
+
+## Function 14
+### Source
+```python
+def func(point):
+    match point:
+        case (0, 0):
+            print("Origin")
+        case foo:
+            raise ValueError("oops")
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0[["`*(empty)*`"]]
+  block1["raise ValueError(#quot;oops#quot;)\n"]
+  block2["match point:
+        case (0, 0):
+            print(#quot;Origin#quot;)
+        case foo:
+            raise ValueError(#quot;oops#quot;)\n"]
+  block3["print(#quot;Origin#quot;)\n"]
+  block4["match point:
+        case (0, 0):
+            print(#quot;Origin#quot;)
+        case foo:
+            raise ValueError(#quot;oops#quot;)\n"]
+
+  start --> block4
+  block4 -- "case (0, 0)" --> block3
+  block4 -- "else" --> block2
+  block3 --> block0
+  block2 --> block1
+  block1 --> return
+  block0 --> return
+```
+
+
