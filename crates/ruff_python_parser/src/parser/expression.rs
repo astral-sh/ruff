@@ -1933,8 +1933,16 @@ impl<'src> Parser<'src> {
     fn parse_comprehension(&mut self) -> ast::Comprehension {
         let start = self.node_start();
 
-        let is_async = self.eat(TokenKind::Async);
-        self.bump(TokenKind::For);
+        let is_async = if self.eat(TokenKind::Async) {
+            // test_err comprehension_missing_for_after_async
+            // (async)
+            // (x async x in iter)
+            self.expect(TokenKind::For);
+            true
+        } else {
+            self.bump(TokenKind::For);
+            false
+        };
 
         let saved_context = self.set_ctx(ParserCtxFlags::FOR_TARGET);
         let mut target = self.parse_expression_list(AllowStarredExpression::Yes);
