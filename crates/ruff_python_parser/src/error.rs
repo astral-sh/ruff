@@ -172,6 +172,8 @@ pub enum ParseErrorType {
     UnexpectedIndentation,
     /// The statement being parsed cannot be `async`.
     UnexpectedTokenAfterAsync(TokenKind),
+    /// Ipython escape command was found
+    UnexpectedIpythonEscapeCommand,
 
     /// An f-string error containing the [`FStringErrorType`].
     FStringError(FStringErrorType),
@@ -291,6 +293,9 @@ impl std::fmt::Display for ParseErrorType {
             }
             ParseErrorType::DuplicateKeywordArgumentError(arg_name) => {
                 write!(f, "Duplicate keyword argument {arg_name:?}")
+            }
+            ParseErrorType::UnexpectedIpythonEscapeCommand => {
+                f.write_str("IPython escape commands are only allowed in `Mode::Ipython`")
             }
             ParseErrorType::FStringError(ref fstring_error) => {
                 write!(f, "f-string: {fstring_error}")

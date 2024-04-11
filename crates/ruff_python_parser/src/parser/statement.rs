@@ -49,7 +49,7 @@ const SIMPLE_STMT_SET: TokenSet = TokenSet::new([
     TokenKind::Import,
     TokenKind::From,
     TokenKind::Type,
-    TokenKind::EscapeCommand,
+    TokenKind::IpyEscapeCommand,
 ]);
 
 /// Tokens that represent simple statements, including expressions.
@@ -254,7 +254,7 @@ impl<'src> Parser<'src> {
             TokenKind::Global => Stmt::Global(self.parse_global_statement()),
             TokenKind::Nonlocal => Stmt::Nonlocal(self.parse_nonlocal_statement()),
             TokenKind::Type => Stmt::TypeAlias(self.parse_type_alias_statement()),
-            TokenKind::EscapeCommand if self.mode == Mode::Ipython => {
+            TokenKind::IpyEscapeCommand => {
                 Stmt::IpyEscapeCommand(self.parse_ipython_escape_command_statement())
             }
             _ => {
@@ -274,23 +274,10 @@ impl<'src> Parser<'src> {
                         op,
                         start,
                     ))
-                } else if self.mode == Mode::Ipython && self.eat(TokenKind::Question) {
-                    let mut kind = IpyEscapeKind::Help;
-
-                    if self.eat(TokenKind::Question) {
-                        kind = IpyEscapeKind::Help2;
-                    }
-
-                    // FIXME(micha): Is this range correct
-                    let range = self.node_range(start);
-                    Stmt::IpyEscapeCommand(ast::StmtIpyEscapeCommand {
-                        value: self
-                            .src_text(parsed_expr.range())
-                            .to_string()
-                            .into_boxed_str(),
-                        kind,
-                        range,
-                    })
+                } else if self.mode == Mode::Ipython && self.at(TokenKind::Question) {
+                    Stmt::IpyEscapeCommand(
+                        self.parse_ipython_help_end_escape_command_statement(&parsed_expr),
+                    )
                 } else {
                     Stmt::Expr(ast::StmtExpr {
                         range: self.node_range(start),
@@ -874,17 +861,116 @@ impl<'src> Parser<'src> {
     ///
     /// # Panics
     ///
-    /// If the parser isn't positioned at an `EscapeCommand` token.
+    /// If the parser isn't positioned at an `IpyEscapeCommand` token.
     fn parse_ipython_escape_command_statement(&mut self) -> ast::StmtIpyEscapeCommand {
         let start = self.node_start();
-        let (Tok::IpyEscapeCommand { value, kind }, _) = self.bump(TokenKind::EscapeCommand) else {
+
+        let (Tok::IpyEscapeCommand { value, kind }, _) = self.bump(TokenKind::IpyEscapeCommand)
+        else {
             unreachable!()
         };
 
+        let range = self.node_range(start);
+        if self.mode != Mode::Ipython {
+            self.add_error(ParseErrorType::UnexpectedIpythonEscapeCommand, range);
+        }
+
+        ast::StmtIpyEscapeCommand { range, kind, value }
+    }
+
+    /// Parses an IPython help end escape command at the statement level.
+    ///
+    /// # Panics
+    ///
+    /// If the parser isn't positioned at a `?` token.
+    fn parse_ipython_help_end_escape_command_statement(
+        &mut self,
+        parsed_expr: &ParsedExpr,
+    ) -> ast::StmtIpyEscapeCommand {
+        // We are permissive than the original implementation because we would allow whitespace
+        // between the expression and the suffix while the IPython implementation doesn't allow it.
+        // For example, `foo ?` would be valid in our case but invalid for IPython.
+        fn unparse_expr(parser: &mut Parser, expr: &Expr, buffer: &mut String) {
+            match expr {
+                Expr::Name(ast::ExprName { id, .. }) => {
+                    buffer.push_str(id.as_str());
+                }
+                Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
+                    unparse_expr(parser, value, buffer);
+                    buffer.push('[');
+
+                    if let Expr::NumberLiteral(ast::ExprNumberLiteral {
+                        value: ast::Number::Int(integer),
+                        ..
+                    }) = &**slice
+                    {
+                        buffer.push_str(&format!("{integer}"));
+                    } else {
+                        parser.add_error(
+                            ParseErrorType::OtherError(
+                                "Only integer literals are allowed in subscript expressions in help end escape command"
+                                    .to_string()
+                            ),
+                            slice.range(),
+                        );
+                        buffer.push_str(parser.src_text(slice.range()));
+                    }
+
+                    buffer.push(']');
+                }
+                Expr::Attribute(ast::ExprAttribute { value, attr, .. }) => {
+                    unparse_expr(parser, value, buffer);
+                    buffer.push('.');
+                    buffer.push_str(attr.as_str());
+                }
+                _ => {
+                    parser.add_error(
+                        ParseErrorType::OtherError(
+                            "Expected name, subscript or attribute expression in help end escape command"
+                                .to_string()
+                        ),
+                        expr,
+                    );
+                }
+            }
+        }
+
+        let start = self.node_start();
+        self.bump(TokenKind::Question);
+
+        let kind = if self.eat(TokenKind::Question) {
+            IpyEscapeKind::Help2
+        } else {
+            IpyEscapeKind::Help
+        };
+
+        if parsed_expr.is_parenthesized {
+            let token_range = self.node_range(start);
+            self.add_error(
+                ParseErrorType::OtherError(
+                    "Help end escape command cannot be applied on a parenthesized expression"
+                        .to_string(),
+                ),
+                token_range,
+            );
+        }
+
+        if self.at(TokenKind::Question) {
+            self.add_error(
+                ParseErrorType::OtherError(
+                    "Maximum of 2 `?` tokens are allowed in help end escape command".to_string(),
+                ),
+                self.current_token_range(),
+            );
+        }
+
+        let mut value = String::new();
+        unparse_expr(self, &parsed_expr.expr, &mut value);
+
         ast::StmtIpyEscapeCommand {
-            range: self.node_range(start),
+            value: value.into_boxed_str(),
             kind,
-            value,
+            range: self.node_range(parsed_expr.start()),
         }
     }
 
