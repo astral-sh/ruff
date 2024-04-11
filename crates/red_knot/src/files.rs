@@ -45,6 +45,14 @@ impl Debug for Files {
     }
 }
 
+impl PartialEq for Files {
+    fn eq(&self, other: &Self) -> bool {
+        self.inner.read().eq(&other.inner.read())
+    }
+}
+
+impl Eq for Files {}
+
 #[derive(Default)]
 struct FilesInner {
     by_path: Map<FileId, ()>,
@@ -58,6 +66,7 @@ impl FilesInner {
     /// Inserts the path and returns a new id for it or returns the id if it is an existing path.
     // TODO should this accept Path or PathBuf?
     pub(crate) fn intern(&mut self, path: &Path) -> FileId {
+        debug_assert!(path.is_file());
         let mut hasher = FxHasher::default();
         path.hash(&mut hasher);
         let hash = hasher.finish();
@@ -88,6 +97,14 @@ impl FilesInner {
             .map(|id| (*id, self.by_id[*id].as_path()))
     }
 }
+
+impl PartialEq for FilesInner {
+    fn eq(&self, other: &Self) -> bool {
+        self.by_id == other.by_id
+    }
+}
+
+impl Eq for FilesInner {}
 
 #[cfg(test)]
 mod tests {
