@@ -110,21 +110,15 @@ pub(crate) fn if_stmt_min_max(checker: &mut Checker, stmt_if: &ast::StmtIf) {
     // Determine whether to use `min()` or `max()`, and whether to flip the
     // order of the arguments, which is relevant for breaking ties.
     let (min_max, flip_args) = match op {
-        CmpOp::Gt => (MinMax::Max, true),
-        CmpOp::GtE => (MinMax::Max, false),
-        CmpOp::Lt => (MinMax::Min, true),
-        CmpOp::LtE => (MinMax::Min, false),
+        CmpOp::Gt => (MinMax::Min, true),
+        CmpOp::GtE => (MinMax::Min, false),
+        CmpOp::Lt => (MinMax::Max, true),
+        CmpOp::LtE => (MinMax::Max, false),
         _ => return,
     };
 
     let [right] = &**comparators else {
         return;
-    };
-
-    let _min_or_max = match op {
-        CmpOp::Gt | CmpOp::GtE => MinMax::Min,
-        CmpOp::Lt | CmpOp::LtE => MinMax::Max,
-        _ => return,
     };
 
     let left_cmp = ComparableExpr::from(left);
