@@ -82,7 +82,7 @@ fn _to_name_str(node: &Expr) -> String {
         }
     }
 }
-// B038
+// B909
 pub(crate) fn loop_iterator_mutation(checker: &mut Checker, stmt_for: &StmtFor) {
     let StmtFor {
         target: _,
