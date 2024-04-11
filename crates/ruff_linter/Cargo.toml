@@ -15,16 +15,17 @@ license = { workspace = true }
 [dependencies]
 ruff_cache = { path = "../ruff_cache" }
 ruff_diagnostics = { path = "../ruff_diagnostics", features = ["serde"] }
-ruff_notebook = { path = "../ruff_notebook" }
+ruff_index = { path = "../ruff_index" }
 ruff_macros = { path = "../ruff_macros" }
+ruff_notebook = { path = "../ruff_notebook" }
 ruff_python_ast = { path = "../ruff_python_ast", features = ["serde"] }
 ruff_python_codegen = { path = "../ruff_python_codegen" }
 ruff_python_index = { path = "../ruff_python_index" }
 ruff_python_literal = { path = "../ruff_python_literal" }
+ruff_python_parser = { path = "../ruff_python_parser" }
 ruff_python_semantic = { path = "../ruff_python_semantic" }
 ruff_python_stdlib = { path = "../ruff_python_stdlib" }
 ruff_python_trivia = { path = "../ruff_python_trivia" }
-ruff_python_parser = { path = "../ruff_python_parser" }
 ruff_source_file = { path = "../ruff_source_file", features = ["serde"] }
 ruff_text_size = { path = "../ruff_text_size" }
 
