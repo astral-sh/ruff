@@ -27,7 +27,7 @@ Module(
                         kwonlyargs: [],
                         kwarg: Some(
                             Parameter {
-                                range: 13..19,
+                                range: 11..19,
                                 name: Identifier {
                                     id: "kwargs",
                                     range: 13..19,
