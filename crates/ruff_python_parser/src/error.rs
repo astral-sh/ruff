@@ -177,6 +177,7 @@ pub enum ParseErrorType {
     Lexical(LexicalErrorType),
 
     // RustPython specific.
+    // TODO(dhruvmanila): Remove these once the old parser is removed
     /// Parser encountered an extra token
     ExtraToken(Tok),
     /// Parser encountered an invalid token
@@ -194,23 +195,19 @@ impl std::fmt::Display for ParseErrorType {
         match self {
             ParseErrorType::OtherError(msg) => write!(f, "{msg}"),
             ParseErrorType::ExpectedToken { found, expected } => {
-                write!(f, "expected {expected:?}, found {found:?}")
+                write!(f, "Expected {expected}, found {found}",)
             }
             ParseErrorType::Lexical(ref lex_error) => write!(f, "{lex_error}"),
             ParseErrorType::SimpleStatementsOnSameLine => {
-                write!(
-                    f,
-                    "Simple statements must be separated by newlines or semicolons"
-                )
+                f.write_str("Simple statements must be separated by newlines or semicolons")
             }
-            ParseErrorType::SimpleAndCompoundStatementOnSameLine => write!(
-                f,
-                "Compound statements are not allowed on the same line as simple statements"
+            ParseErrorType::SimpleAndCompoundStatementOnSameLine => f.write_str(
+                "Compound statements are not allowed on the same line as simple statements",
             ),
             ParseErrorType::UnexpectedAsyncToken(kind) => {
                 write!(
                     f,
-                    "Expected 'def', 'with' or 'for' to follow 'async', found {kind:?}"
+                    "Expected 'def', 'with' or 'for' to follow 'async', found {kind}",
                 )
             }
             ParseErrorType::UnpackedArgumentError => {

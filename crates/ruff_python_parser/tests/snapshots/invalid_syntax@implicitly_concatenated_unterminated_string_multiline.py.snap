@@ -208,7 +208,7 @@ Module(
 2 |     'hello'
 3 |     f'world {x}
 4 | )
-  |  ^ Syntax Error: expected FStringEnd, found Newline
+  |  ^ Syntax Error: Expected FStringEnd, found newline
 5 | 1 + 1
 6 | (
 7 |     'first'

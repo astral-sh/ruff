@@ -47,5 +47,5 @@ Module(
 
   |
 1 | global x + 1
-  |          ^ Syntax Error: expected Comma, found Plus
+  |          ^ Syntax Error: Expected ',', found '+'
   |

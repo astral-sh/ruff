@@ -106,7 +106,7 @@ Module(
 3 |     #            class pattern
 4 |     #            v
 5 |     case (x as y)(a, b):
-  |                  ^ Syntax Error: expected Colon, found Lpar
+  |                  ^ Syntax Error: Expected ':', found '('
 6 |     #     ^^^^^^
 7 |     #    as-pattern
   |
@@ -127,7 +127,7 @@ Module(
 6 |     #     ^^^^^^
 7 |     #    as-pattern
 8 |         pass
-  | ^^^^^^^^ Syntax Error: expected Dedent, found Indent
+  | ^^^^^^^^ Syntax Error: Expected dedent, found indent
   |
 
 

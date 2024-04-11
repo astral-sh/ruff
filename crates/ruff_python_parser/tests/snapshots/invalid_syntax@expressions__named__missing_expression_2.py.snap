@@ -83,7 +83,7 @@ Module(
 3 | (x :=
 4 | 
 5 | def foo():
-  |     ^^^ Syntax Error: expected Rpar, found Name
+  |     ^^^ Syntax Error: Expected ')', found name
 6 |     pass
   |
 

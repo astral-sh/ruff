@@ -76,7 +76,7 @@ Module(
 
   |
 1 | type X[**T: int] = int
-  |           ^ Syntax Error: expected Rsqb, found Colon
+  |           ^ Syntax Error: Expected ']', found ':'
   |
 
 

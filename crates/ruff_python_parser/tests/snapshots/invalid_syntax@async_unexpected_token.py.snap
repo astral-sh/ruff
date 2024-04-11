@@ -173,7 +173,7 @@ Module(
 
   |
 1 | async class Foo: ...
-  |       ^^^^^ Syntax Error: Expected 'def', 'with' or 'for' to follow 'async', found Class
+  |       ^^^^^ Syntax Error: Expected 'def', 'with' or 'for' to follow 'async', found 'class'
 2 | async while test: ...
 3 | async x = 1
   |
@@ -182,7 +182,7 @@ Module(
   |
 1 | async class Foo: ...
 2 | async while test: ...
-  |       ^^^^^ Syntax Error: Expected 'def', 'with' or 'for' to follow 'async', found While
+  |       ^^^^^ Syntax Error: Expected 'def', 'with' or 'for' to follow 'async', found 'while'
 3 | async x = 1
 4 | async async def foo(): ...
   |
@@ -192,7 +192,7 @@ Module(
 1 | async class Foo: ...
 2 | async while test: ...
 3 | async x = 1
-  |       ^ Syntax Error: Expected 'def', 'with' or 'for' to follow 'async', found Name
+  |       ^ Syntax Error: Expected 'def', 'with' or 'for' to follow 'async', found name
 4 | async async def foo(): ...
 5 | # TODO(dhruvmanila): Here, `match` is actually a Name token because
   |
@@ -202,7 +202,7 @@ Module(
 2 | async while test: ...
 3 | async x = 1
 4 | async async def foo(): ...
-  |       ^^^^^ Syntax Error: Expected 'def', 'with' or 'for' to follow 'async', found Async
+  |       ^^^^^ Syntax Error: Expected 'def', 'with' or 'for' to follow 'async', found 'async'
 5 | # TODO(dhruvmanila): Here, `match` is actually a Name token because
 6 | # of the soft keyword # transformer
   |
@@ -212,7 +212,7 @@ Module(
 5 | # TODO(dhruvmanila): Here, `match` is actually a Name token because
 6 | # of the soft keyword # transformer
 7 | async match test:
-  |       ^^^^^ Syntax Error: Expected 'def', 'with' or 'for' to follow 'async', found Name
+  |       ^^^^^ Syntax Error: Expected 'def', 'with' or 'for' to follow 'async', found name
 8 |     case _: ...
   |
 

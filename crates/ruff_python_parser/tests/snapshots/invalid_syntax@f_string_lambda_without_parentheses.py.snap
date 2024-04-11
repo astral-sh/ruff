@@ -110,7 +110,7 @@ Module(
 
   |
 1 | f"{lambda x: x}"
-  |               ^ Syntax Error: expected FStringEnd, found Rbrace
+  |               ^ Syntax Error: Expected FStringEnd, found '}'
   |
 
 

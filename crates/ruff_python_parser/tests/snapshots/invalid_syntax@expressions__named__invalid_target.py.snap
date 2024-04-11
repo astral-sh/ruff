@@ -207,7 +207,7 @@ Module(
 3 | (x.y := 1)
 4 | (x[y] := 1)
 5 | (*x := 1)
-  |     ^^ Syntax Error: expected Rpar, found ColonEqual
+  |     ^^ Syntax Error: Expected ')', found ':='
 6 | ([x, y] := [1, 2])
   |
 
