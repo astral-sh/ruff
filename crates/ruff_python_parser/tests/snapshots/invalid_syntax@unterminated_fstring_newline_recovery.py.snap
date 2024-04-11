@@ -322,24 +322,12 @@ Module(
 
 
   |
-1 |   f"hello
-2 |   1 + 1
-3 | / f"hello {x
-4 | | 2 + 2
-  | |_^ Syntax Error: use `;` to separate simple statements
-5 |   f"hello {x:
-6 |   3 + 3
-  |
-
-
-  |
-2 |   1 + 1
-3 |   f"hello {x
-4 | / 2 + 2
-5 | | f"hello {x:
-  | |__^ Syntax Error: use `;` to separate simple statements
-6 |   3 + 3
-7 |   f"hello {x}
+3 | f"hello {x
+4 | 2 + 2
+5 | f"hello {x:
+  | ^^ Syntax Error: Simple statements must be separated by newlines or semicolons
+6 | 3 + 3
+7 | f"hello {x}
   |
 
 
@@ -354,23 +342,11 @@ Module(
 
 
   |
-3 |   f"hello {x
-4 |   2 + 2
-5 | / f"hello {x:
-6 | | 3 + 3
-  | |_^ Syntax Error: use `;` to separate simple statements
-7 |   f"hello {x}
-8 |   4 + 4
-  |
-
-
-  |
-4 |   2 + 2
-5 |   f"hello {x:
-6 | / 3 + 3
-7 | | f"hello {x}
-  | |__^ Syntax Error: use `;` to separate simple statements
-8 |   4 + 4
+5 | f"hello {x:
+6 | 3 + 3
+7 | f"hello {x}
+  | ^^ Syntax Error: Simple statements must be separated by newlines or semicolons
+8 | 4 + 4
   |
 
 
@@ -388,15 +364,6 @@ Module(
 7 | f"hello {x}
 8 | 4 + 4
   | ^ Syntax Error: Expected an f-string element or the end of the f-string
-  |
-
-
-  |
-5 |   f"hello {x:
-6 |   3 + 3
-7 | / f"hello {x}
-8 | | 4 + 4
-  | |_^ Syntax Error: use `;` to separate simple statements
   |
 
 

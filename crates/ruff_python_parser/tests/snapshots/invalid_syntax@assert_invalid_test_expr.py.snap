@@ -125,7 +125,7 @@ Module(
   |
 1 | assert *x
 2 | assert assert x
-  | ^^^^^^^^^^^^^^^ Syntax Error: use `;` to separate simple statements
+  |               ^ Syntax Error: Simple statements must be separated by newlines or semicolons
 3 | assert yield x
 4 | assert x := 1
   |

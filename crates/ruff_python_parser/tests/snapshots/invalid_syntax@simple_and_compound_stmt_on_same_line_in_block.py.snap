@@ -1,0 +1,105 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/simple_and_compound_stmt_on_same_line_in_block.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..59,
+        body: [
+            If(
+                StmtIf {
+                    range: 0..13,
+                    test: BooleanLiteral(
+                        ExprBooleanLiteral {
+                            range: 3..7,
+                            value: true,
+                        },
+                    ),
+                    body: [
+                        Pass(
+                            StmtPass {
+                                range: 9..13,
+                            },
+                        ),
+                    ],
+                    elif_else_clauses: [],
+                },
+            ),
+            If(
+                StmtIf {
+                    range: 14..28,
+                    test: BooleanLiteral(
+                        ExprBooleanLiteral {
+                            range: 17..22,
+                            value: false,
+                        },
+                    ),
+                    body: [
+                        Pass(
+                            StmtPass {
+                                range: 24..28,
+                            },
+                        ),
+                    ],
+                    elif_else_clauses: [],
+                },
+            ),
+            If(
+                StmtIf {
+                    range: 29..42,
+                    test: BooleanLiteral(
+                        ExprBooleanLiteral {
+                            range: 32..36,
+                            value: true,
+                        },
+                    ),
+                    body: [
+                        Pass(
+                            StmtPass {
+                                range: 38..42,
+                            },
+                        ),
+                    ],
+                    elif_else_clauses: [],
+                },
+            ),
+            If(
+                StmtIf {
+                    range: 44..58,
+                    test: BooleanLiteral(
+                        ExprBooleanLiteral {
+                            range: 47..52,
+                            value: false,
+                        },
+                    ),
+                    body: [
+                        Pass(
+                            StmtPass {
+                                range: 54..58,
+                            },
+                        ),
+                    ],
+                    elif_else_clauses: [],
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | if True: pass if False: pass
+  |               ^^ Syntax Error: Compound statements are not allowed on the same line as simple statements
+2 | if True: pass; if False: pass
+  |
+
+
+  |
+1 | if True: pass if False: pass
+2 | if True: pass; if False: pass
+  |                ^^ Syntax Error: Compound statements are not allowed on the same line as simple statements
+  |

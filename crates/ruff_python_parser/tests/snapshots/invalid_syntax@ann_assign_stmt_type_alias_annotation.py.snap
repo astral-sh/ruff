@@ -103,20 +103,6 @@ Module(
 
   |
 1 | a: type X = int
-  | ^^^^^^^ Syntax Error: use `;` to separate simple statements
-2 | lambda: type X = int
-  |
-
-
-  |
-1 | a: type X = int
 2 | lambda: type X = int
   |         ^^^^ Syntax Error: Expected an expression
-  |
-
-
-  |
-1 | a: type X = int
-2 | lambda: type X = int
-  | ^^^^^^^^^^^^ Syntax Error: use `;` to separate simple statements
   |
