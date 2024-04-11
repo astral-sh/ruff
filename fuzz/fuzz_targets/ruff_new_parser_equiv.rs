@@ -20,16 +20,27 @@ fn do_fuzz(case: &[u8]) -> Corpus {
         return Corpus::Keep; // keep even rejected source code as this may allow us to explore later
     };
 
-    set_new_parser(true);
-    let module_new = parse_tokens(tokens.clone(), source, source_type.as_mode());
-
     set_new_parser(false);
-    let module_lalrpop = parse_tokens(tokens, source, source_type.as_mode());
+    let result_lalrpop = parse_tokens(tokens.clone(), source, source_type.as_mode());
 
-    assert_eq!(module_lalrpop.is_ok(), module_new.is_ok());
+    if result_lalrpop.as_ref().is_ok_and(|ast_lalrpop| {
+        ast_lalrpop
+            .as_module()
+            .is_some_and(|module_lalrpop| module_lalrpop.range.is_empty())
+    }) {
+        // Reject the corpus which only contains whitespaces, comments, and newlines. This is
+        // because the module range produced by LALRPOP is empty while it is the source length in
+        // case of the new parser.
+        return Corpus::Reject;
+    }
 
-    if let (Ok(module_lalrpop), Ok(module_new)) = (module_lalrpop, module_new) {
-        assert_eq!(module_lalrpop, module_new);
+    set_new_parser(true);
+    let result_new = parse_tokens(tokens, source, source_type.as_mode());
+
+    assert_eq!(result_lalrpop.is_ok(), result_new.is_ok());
+
+    if let (Ok(ast_lalrpop), Ok(ast_new)) = (result_lalrpop, result_new) {
+        assert_eq!(ast_lalrpop, ast_new);
     }
 
     Corpus::Keep
