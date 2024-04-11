@@ -25,7 +25,7 @@ Module(
                         args: [],
                         vararg: Some(
                             Parameter {
-                                range: 9..10,
+                                range: 8..10,
                                 name: Identifier {
                                     id: "a",
                                     range: 9..10,
@@ -80,7 +80,7 @@ Module(
                         args: [],
                         vararg: Some(
                             Parameter {
-                                range: 32..36,
+                                range: 31..36,
                                 name: Identifier {
                                     id: "args",
                                     range: 32..36,
