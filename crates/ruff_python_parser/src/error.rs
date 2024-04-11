@@ -195,12 +195,7 @@ impl std::fmt::Display for ParseErrorType {
         match self {
             ParseErrorType::OtherError(msg) => write!(f, "{msg}"),
             ParseErrorType::ExpectedToken { found, expected } => {
-                write!(
-                    f,
-                    "Expected {}, found {}",
-                    expected.display(),
-                    found.display()
-                )
+                write!(f, "Expected {expected}, found {found}",)
             }
             ParseErrorType::Lexical(ref lex_error) => write!(f, "{lex_error}"),
             ParseErrorType::SimpleStatementsOnSameLine => {
@@ -212,8 +207,7 @@ impl std::fmt::Display for ParseErrorType {
             ParseErrorType::UnexpectedAsyncToken(kind) => {
                 write!(
                     f,
-                    "Expected 'def', 'with' or 'for' to follow 'async', found {}",
-                    kind.display()
+                    "Expected 'def', 'with' or 'for' to follow 'async', found {kind}",
                 )
             }
             ParseErrorType::UnpackedArgumentError => {

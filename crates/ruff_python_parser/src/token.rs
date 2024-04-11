@@ -922,9 +922,9 @@ impl TryFrom<TokenKind> for UnaryOp {
     }
 }
 
-impl TokenKind {
-    pub(crate) fn display(self) -> &'static str {
-        match self {
+impl fmt::Display for TokenKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let value = match self {
             TokenKind::Unknown => "Unknown",
             TokenKind::StartModule => "StartModule",
             TokenKind::StartExpression => "StartExpression",
@@ -933,7 +933,7 @@ impl TokenKind {
             TokenKind::NonLogicalNewline => "NonLogicalNewline",
             TokenKind::Indent => "indent",
             TokenKind::Dedent => "dedent",
-            TokenKind::EndOfFile => "EOF",
+            TokenKind::EndOfFile => "end of file",
             TokenKind::Name => "name",
             TokenKind::Int => "int",
             TokenKind::Float => "float",
@@ -1031,7 +1031,8 @@ impl TokenKind {
             TokenKind::Case => "'case'",
             TokenKind::With => "'with'",
             TokenKind::Yield => "'yield'",
-        }
+        };
+        f.write_str(value)
     }
 }
 
