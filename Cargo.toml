@@ -23,7 +23,7 @@ cachedir = { version = "0.3.1" }
 chrono = { version = "0.4.35", default-features = false, features = ["clock"] }
 clap = { version = "4.5.3", features = ["derive"] }
 clap_complete_command = { version = "0.5.1" }
-clearscreen = { version = "2.0.0" }
+clearscreen = { version = "3.0.0" }
 codspeed-criterion-compat = { version = "2.4.0", default-features = false }
 colored = { version = "2.1.0" }
 console_error_panic_hook = { version = "0.1.7" }
