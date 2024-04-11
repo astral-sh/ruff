@@ -290,15 +290,6 @@ Module(
    |
  9 | # Missing comma
 10 | (1 2)
-   | ^^^^ Syntax Error: use `;` to separate simple statements
-11 | 
-12 | # Dictionary element in a list
-   |
-
-
-   |
- 9 | # Missing comma
-10 | (1 2)
    |     ^ Syntax Error: Expected a statement
 11 | 
 12 | # Dictionary element in a list

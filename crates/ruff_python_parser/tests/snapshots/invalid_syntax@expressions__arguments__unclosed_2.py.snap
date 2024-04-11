@@ -83,15 +83,6 @@ Module(
 
 
   |
-1 | / call(x,
-2 | | 
-3 | | def foo():
-  | |___^ Syntax Error: compound statements not allowed in the same line as simple statements
-4 |       pass
-  |
-
-
-  |
 3 | def foo():
 4 |     pass
   |          Syntax Error: unexpected EOF while parsing

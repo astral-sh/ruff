@@ -1,0 +1,66 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/simple_stmts_on_same_line_in_block.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..46,
+        body: [
+            If(
+                StmtIf {
+                    range: 0..45,
+                    test: BooleanLiteral(
+                        ExprBooleanLiteral {
+                            range: 3..7,
+                            value: true,
+                        },
+                    ),
+                    body: [
+                        Break(
+                            StmtBreak {
+                                range: 9..14,
+                            },
+                        ),
+                        Continue(
+                            StmtContinue {
+                                range: 16..24,
+                            },
+                        ),
+                        Pass(
+                            StmtPass {
+                                range: 25..29,
+                            },
+                        ),
+                        Continue(
+                            StmtContinue {
+                                range: 31..39,
+                            },
+                        ),
+                        Break(
+                            StmtBreak {
+                                range: 40..45,
+                            },
+                        ),
+                    ],
+                    elif_else_clauses: [],
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | if True: break; continue pass; continue break
+  |                          ^^^^ Syntax Error: Simple statements must be separated by newlines or semicolons
+  |
+
+
+  |
+1 | if True: break; continue pass; continue break
+  |                                         ^^^^^ Syntax Error: Simple statements must be separated by newlines or semicolons
+  |
