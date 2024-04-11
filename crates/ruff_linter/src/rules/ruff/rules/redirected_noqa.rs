@@ -46,7 +46,7 @@ pub(crate) fn redirected_noqa(diagnostics: &mut Vec<Diagnostic>, noqa_directives
             continue;
         };
 
-        for (original_code, code_range) in directive.codes().iter().zip(directive.code_ranges()) {
+        for (original_code, code_range) in directive.iter() {
             if let Some(redirected) = get_redirect_target(original_code) {
                 let mut diagnostic = Diagnostic::new(
                     RedirectedNOQA {
@@ -57,7 +57,7 @@ pub(crate) fn redirected_noqa(diagnostics: &mut Vec<Diagnostic>, noqa_directives
                 );
 
                 diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                    code.to_string(),
+                    redirected.to_string(),
                     *code_range,
                 )));
                 diagnostics.push(diagnostic);

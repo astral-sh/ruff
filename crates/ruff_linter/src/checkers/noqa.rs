@@ -11,7 +11,6 @@ use ruff_python_trivia::CommentRanges;
 use ruff_source_file::Locator;
 
 use crate::fix::edits::delete_comment;
-use crate::noqa;
 use crate::noqa::{Directive, FileExemption, NoqaDirectives, NoqaMapping};
 use crate::registry::{AsRule, Rule, RuleSet};
 use crate::rule_redirects::get_redirect_target;
@@ -86,7 +85,7 @@ pub(crate) fn check_noqa(
                         true
                     }
                     Directive::Codes(directive) => {
-                        if noqa::includes(diagnostic.kind.rule(), directive.codes()) {
+                        if directive.includes(diagnostic.kind.rule()) {
                             directive_line
                                 .matches
                                 .push(diagnostic.kind.rule().noqa_code());
@@ -134,22 +133,22 @@ pub(crate) fn check_noqa(
                     let mut valid_codes = vec![];
                     let mut self_ignore = per_file_ignores.contains(Rule::UnusedNOQA);
                     let mut seen_codes = HashSet::new();
-                    for original_code in directive.codes() {
+                    for original_code in directive.names() {
                         let code = get_redirect_target(original_code).unwrap_or(original_code);
                         if Rule::UnusedNOQA.noqa_code() == code {
                             self_ignore = true;
                             break;
                         }
 
-                        if !seen_codes.insert(*original_code) {
-                            duplicated_codes.push(*original_code);
+                        if !seen_codes.insert(original_code) {
+                            duplicated_codes.push(original_code);
                         } else if line.matches.iter().any(|match_| *match_ == code)
                             || settings
                                 .external
                                 .iter()
                                 .any(|external| code.starts_with(external))
                         {
-                            valid_codes.push(*original_code);
+                            valid_codes.push(original_code);
                         } else {
                             if let Ok(rule) = Rule::from_code(code) {
                                 if settings.rules.enabled(rule) {
