@@ -5,8 +5,8 @@ use std::ops::Deref;
 use rustc_hash::FxHashSet;
 
 use ruff_python_ast::{
-    self as ast, BoolOp, CmpOp, ConversionFlag, Expr, ExprContext, FStringElement, Number,
-    Operator, UnaryOp,
+    self as ast, BoolOp, CmpOp, ConversionFlag, Expr, ExprContext, FStringElement, IpyEscapeKind,
+    Number, Operator, UnaryOp,
 };
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
@@ -620,35 +620,13 @@ impl<'src> Parser<'src> {
                 })
             }
             TokenKind::Name => Expr::Name(self.parse_name()),
-            TokenKind::EscapeCommand => {
-                let (Tok::IpyEscapeCommand { value, kind }, _) =
-                    self.bump(TokenKind::EscapeCommand)
-                else {
-                    unreachable!()
-                };
-
-                let command = ast::ExprIpyEscapeCommand {
-                    range: self.node_range(start),
-                    kind,
-                    value,
-                };
-
-                if self.mode != Mode::Ipython {
-                    self.add_error(
-                        ParseErrorType::OtherError(
-                            "IPython escape commands are only allowed in `Mode::Ipython`".into(),
-                        ),
-                        &command,
-                    );
-                }
-
-                Expr::IpyEscapeCommand(command)
+            TokenKind::IpyEscapeCommand => {
+                Expr::IpyEscapeCommand(self.parse_ipython_escape_command_expression())
             }
             TokenKind::String | TokenKind::FStringStart => self.parse_strings(),
             TokenKind::Lpar => {
                 return self.parse_parenthesized_expression();
             }
-
             TokenKind::Lsqb => self.parse_list_like_expression(),
             TokenKind::Lbrace => self.parse_set_or_dict_like_expression(),
 
@@ -2326,6 +2304,38 @@ impl<'src> Parser<'src> {
             orelse: Box::new(orelse.expr),
             range: self.node_range(start),
         }
+    }
+
+    /// Parses an IPython escape command at the expression level.
+    ///
+    /// # Panics
+    ///
+    /// If the parser isn't positioned at a `IpyEscapeCommand` token.
+    /// If the escape command kind is not `%` or `!`.
+    fn parse_ipython_escape_command_expression(&mut self) -> ast::ExprIpyEscapeCommand {
+        let start = self.node_start();
+
+        let (Tok::IpyEscapeCommand { value, kind }, _) = self.bump(TokenKind::IpyEscapeCommand)
+        else {
+            unreachable!()
+        };
+
+        if !matches!(kind, IpyEscapeKind::Magic | IpyEscapeKind::Shell) {
+            // This should never occur as the lexer won't allow it.
+            unreachable!("IPython escape command expression is only allowed for % and !");
+        }
+
+        let command = ast::ExprIpyEscapeCommand {
+            range: self.node_range(start),
+            kind,
+            value,
+        };
+
+        if self.mode != Mode::Ipython {
+            self.add_error(ParseErrorType::UnexpectedIpythonEscapeCommand, &command);
+        }
+
+        command
     }
 
     /// Validate that the given arguments doesn't have any duplicate keyword argument.
