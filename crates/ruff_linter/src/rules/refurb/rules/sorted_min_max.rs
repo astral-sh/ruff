@@ -31,6 +31,14 @@ use ruff_text_size::Ranged;
 /// highest = max(nums)
 /// ```
 ///
+/// ## Note
+///
+/// If the original statement uses `reverse=True`, the `min` and `max` replacement will not
+/// be equivalent if the intended result is to get a non-stable min and max.
+///
+/// In other words, `sorted(data, key=itemgetter(0), reverse=True)[0]` is not a stable min,
+/// but `min(data, key=itemgetter(0))` is a stable min.
+///
 /// ## References
 /// - [Python documentation: `min`](https://docs.python.org/3/library/functions.html#min)
 /// - [Python documentation: `max`](https://docs.python.org/3/library/functions.html#max)
@@ -184,6 +192,3 @@ enum Index {
     // -1
     Last,
 }
-
-// TODO:
-// - Caveat reverse=True with -1 as unsafe
