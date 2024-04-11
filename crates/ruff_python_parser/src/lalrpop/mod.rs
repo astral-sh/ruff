@@ -9,6 +9,7 @@ use ruff_python_ast::{
     ExprIf, ExprIpyEscapeCommand, ExprLambda, ExprList, ExprListComp, ExprName, ExprNamed,
     ExprNoneLiteral, ExprNumberLiteral, ExprSet, ExprSetComp, ExprSlice, ExprStarred,
     ExprStringLiteral, ExprSubscript, ExprTuple, ExprUnaryOp, ExprYield, ExprYieldFrom, Mod,
+    ModModule,
 };
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -49,6 +50,10 @@ pub(crate) fn parse_tokens(
     source: &str,
     mode: Mode,
 ) -> Result<Mod, ParseError> {
+    let tokens_range = TextRange::new(
+        position(tokens.as_slice()).unwrap_or_default(),
+        end(tokens.as_slice()).unwrap_or_default(),
+    );
     let marker_token = (Tok::start_marker(mode), TextRange::default());
     let lexer = std::iter::once(Ok(marker_token)).chain(
         tokens
@@ -62,6 +67,39 @@ pub(crate) fn parse_tokens(
             lexer.map_ok(|(t, range)| (range.start(), t, range.end())),
         )
         .map_err(parse_error_from_lalrpop)
+        .map(|ast| match ast {
+            Mod::Module(module) => Mod::Module(ModModule {
+                range: tokens_range,
+                ..module
+            }),
+            Mod::Expression(expr) => Mod::Expression(expr),
+        })
+}
+
+/// Returns the position of the current token.
+///
+/// This is the position before any whitespace or comments.
+fn position(tokens: &[LexResult]) -> Option<TextSize> {
+    let first = tokens.first()?;
+
+    let range = match first {
+        Ok((_, range)) => *range,
+        Err(error) => error.location(),
+    };
+
+    Some(range.start())
+}
+
+/// Returns the end of the last token
+fn end(tokens: &[LexResult]) -> Option<TextSize> {
+    let last = tokens.last()?;
+
+    let range = match last {
+        Ok((_, range)) => *range,
+        Err(error) => error.location(),
+    };
+
+    Some(range.end())
 }
 
 fn parse_error_from_lalrpop(err: LalrpopError<TextSize, Tok, LexicalError>) -> ParseError {
