@@ -97,13 +97,6 @@ Module(
 
   |
 1 | import *
-  | ^^^^^^^^ Syntax Error: use `;` to separate simple statements
-2 | import x, *, y
-  |
-
-
-  |
-1 | import *
   |         ^ Syntax Error: Expected an expression
 2 | import x, *, y
   |
@@ -126,7 +119,7 @@ Module(
   |
 1 | import *
 2 | import x, *, y
-  | ^^^^^^^^^^^ Syntax Error: use `;` to separate simple statements
+  |           ^ Syntax Error: Simple statements must be separated by newlines or semicolons
   |
 
 
