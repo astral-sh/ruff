@@ -12,12 +12,47 @@ use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::parser::helpers::token_kind_to_cmp_op;
 use crate::parser::progress::ParserProgress;
-use crate::parser::{helpers, FunctionKind, Parser, ParserCtxFlags, EXPR_SET, NEWLINE_EOF_SET};
+use crate::parser::{helpers, FunctionKind, Parser, ParserCtxFlags};
 use crate::string::{parse_fstring_literal_element, parse_string_literal, StringType};
 use crate::token_set::TokenSet;
 use crate::{FStringErrorType, Mode, ParseErrorType, Tok, TokenKind};
 
 use super::{Parenthesized, RecoveryContextKind};
+
+/// A token set consisting of a newline or end of file.
+const NEWLINE_EOF_SET: TokenSet = TokenSet::new([TokenKind::Newline, TokenKind::EndOfFile]);
+
+/// Tokens that represents a literal expression.
+const LITERAL_SET: TokenSet = TokenSet::new([
+    TokenKind::Int,
+    TokenKind::Float,
+    TokenKind::Complex,
+    TokenKind::String,
+    TokenKind::Ellipsis,
+    TokenKind::True,
+    TokenKind::False,
+    TokenKind::None,
+]);
+
+/// Tokens that represents either an expression or the start of one.
+pub(super) const EXPR_SET: TokenSet = TokenSet::new([
+    TokenKind::Name,
+    TokenKind::Minus,
+    TokenKind::Plus,
+    TokenKind::Tilde,
+    TokenKind::Star,
+    TokenKind::DoubleStar,
+    TokenKind::Lpar,
+    TokenKind::Lbrace,
+    TokenKind::Lsqb,
+    TokenKind::Lambda,
+    TokenKind::Await,
+    TokenKind::Not,
+    TokenKind::Yield,
+    TokenKind::FStringStart,
+    TokenKind::IpyEscapeCommand,
+])
+.union(LITERAL_SET);
 
 /// Tokens that can appear after an expression.
 pub(super) const END_EXPR_SET: TokenSet = TokenSet::new([
