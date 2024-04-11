@@ -76,7 +76,7 @@ Module(
 4 | [1, 2
 5 | 
 6 | def foo():
-  | ^^^ Syntax Error: expected Comma, found Def
+  | ^^^ Syntax Error: Expected ',', found 'def'
 7 |     pass
   |
 
