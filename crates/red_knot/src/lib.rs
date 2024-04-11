@@ -4,6 +4,7 @@ use rustc_hash::FxHashSet;
 
 use crate::files::FileId;
 
+pub mod ast_ids;
 pub mod db;
 pub mod files;
 
