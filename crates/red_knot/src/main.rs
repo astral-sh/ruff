@@ -1,5 +1,4 @@
 use std::path::PathBuf;
-use std::sync::Arc;
 
 use rustc_hash::FxHashSet;
 
@@ -30,7 +29,7 @@ fn main() -> anyhow::Result<()> {
 
     println!("start analysis for {workspace:#?}");
 
-    let db = Database::new(Arc::new(files));
+    let db = Database::new(files.clone());
     let mut queue: Vec<_> = workspace.open_files().collect();
     let mut queued: FxHashSet<_> = queue.iter().copied().collect();
     // Should we use an accumulator for this?
@@ -39,13 +38,18 @@ fn main() -> anyhow::Result<()> {
     // TODO we could now consider spawning the analysis of the dependencies into their own threads.
     while let Some(file) = queue.pop() {
         let content = db.source_text(file).unwrap();
+        let module_path = files.path(file_id);
+
         // TODO this looks weird: dependencies.files. Let's figure out a better naming and structure.
-        let dependencies = dependencies(&db, content).files(&db);
+        let dependencies = dependencies(&db, content).modules(&db);
 
         // We know that we need to analyse all dependencies, but we don't need to check them.
-        for file in dependencies {
-            if queued.insert(file) {
-                queue.push(file);
+        for dependency in dependencies {
+            let dependency_path = module_path.join(&dependency.path).canonicalize().unwrap();
+            let dependency_file_id = files.intern(&dependency_path);
+
+            if queued.insert(dependency_file_id) {
+                queue.push(dependency_file_id);
             }
         }
 
