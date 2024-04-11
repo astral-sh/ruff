@@ -6,7 +6,7 @@
 
 - \[`pylint`\] Implement `bad-staticmethod-argument` (`PLW0211`) ([#10781](https://github.com/astral-sh/ruff/pull/10781))
 - \[`pylint`\] Implement `if-stmt-min-max` (`PLR1730`, `PLR1731`) ([#10002](https://github.com/astral-sh/ruff/pull/10002))
-- \[`pyupgrade`\] Replace str,Enum with StrEnum `UP042` ([#10713](https://github.com/astral-sh/ruff/pull/10713))
+- \[`pyupgrade`\] Replace `str,Enum` multiple inheritance with `StrEnum` `UP042` ([#10713](https://github.com/astral-sh/ruff/pull/10713))
 - \[`refurb`\] Implement `if-expr-instead-of-or-operator` (`FURB110`) ([#10687](https://github.com/astral-sh/ruff/pull/10687))
 - \[`refurb`\] Implement `int-on-sliced-str` (`FURB166`) ([#10650](https://github.com/astral-sh/ruff/pull/10650))
 - \[`refurb`\] Implement `write-whole-file` (`FURB103`) ([#10802](https://github.com/astral-sh/ruff/pull/10802))
@@ -15,7 +15,7 @@
 
 ### Rule changes
 
-- \[`pydocstyle`\] Require capitalizing single word sentence (`D403`) ([#10776](https://github.com/astral-sh/ruff/pull/10776))
+- \[`pydocstyle`\] Require capitalizing docstrings where the first sentence is a single word (`D403`) ([#10776](https://github.com/astral-sh/ruff/pull/10776))
 - \[`pycodestyle`\] Ignore annotated lambdas in class scopes (`E731`) ([#10720](https://github.com/astral-sh/ruff/pull/10720))
 - \[`flake8-pyi`\] Various improvements to PYI034 ([#10807](https://github.com/astral-sh/ruff/pull/10807))
 - \[`flake8-slots`\] Flag subclasses of call-based `typing.NamedTuple`s as well as subclasses of `collections.namedtuple()` (`SLOT002`) ([#10808](https://github.com/astral-sh/ruff/pull/10808))
@@ -24,7 +24,7 @@
 
 ### CLI
 
-- Support FORCE_COLOR env var ([#10839](https://github.com/astral-sh/ruff/pull/10839))
+- Support `FORCE_COLOR` env var ([#10839](https://github.com/astral-sh/ruff/pull/10839))
 
 ### Configuration
 
