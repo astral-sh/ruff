@@ -110,7 +110,7 @@ Module(
 1 | try:
 2 |     pass
 3 | except yield x:
-  |        ^^^^^^^ Syntax Error: yield expression cannot be used here
+  |        ^^^^^^^ Syntax Error: Yield expression cannot be used here
 4 |     pass
 5 | try:
   |
@@ -120,6 +120,6 @@ Module(
 5 | try:
 6 |     pass
 7 | except* *x:
-  |         ^^ Syntax Error: starred expression cannot be used here
+  |         ^^ Syntax Error: Starred expression cannot be used here
 8 |     pass
   |

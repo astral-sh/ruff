@@ -391,5 +391,5 @@ Module(
 17 | def multiple_trailing_commas[A,,](): ...
 18 | 
 19 | def multiple_commas_and_recovery[A,,100](): ...
-   |                                         ^^ Syntax Error: only single target (not tuple) can be annotated
+   |                                         ^^ Syntax Error: Only single target (not tuple) can be annotated
    |

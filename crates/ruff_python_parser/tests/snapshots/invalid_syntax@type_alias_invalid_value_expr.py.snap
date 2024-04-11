@@ -128,7 +128,7 @@ Module(
 
   |
 1 | type x = *y
-  |          ^^ Syntax Error: starred expression cannot be used here
+  |          ^^ Syntax Error: Starred expression cannot be used here
 2 | type x = yield y
 3 | type x = yield from y
   |
@@ -137,7 +137,7 @@ Module(
   |
 1 | type x = *y
 2 | type x = yield y
-  |          ^^^^^^^ Syntax Error: yield expression cannot be used here
+  |          ^^^^^^^ Syntax Error: Yield expression cannot be used here
 3 | type x = yield from y
 4 | type x = x := 1
   |
@@ -147,7 +147,7 @@ Module(
 1 | type x = *y
 2 | type x = yield y
 3 | type x = yield from y
-  |          ^^^^^^^^^^^^ Syntax Error: yield expression cannot be used here
+  |          ^^^^^^^^^^^^ Syntax Error: Yield expression cannot be used here
 4 | type x = x := 1
   |
 

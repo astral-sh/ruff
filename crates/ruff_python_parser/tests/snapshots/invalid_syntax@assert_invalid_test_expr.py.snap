@@ -107,7 +107,7 @@ Module(
 
   |
 1 | assert *x
-  |        ^^ Syntax Error: starred expression cannot be used here
+  |        ^^ Syntax Error: Starred expression cannot be used here
 2 | assert assert x
 3 | assert yield x
   |
@@ -135,7 +135,7 @@ Module(
 1 | assert *x
 2 | assert assert x
 3 | assert yield x
-  |        ^^^^^^^ Syntax Error: yield expression cannot be used here
+  |        ^^^^^^^ Syntax Error: Yield expression cannot be used here
 4 | assert x := 1
   |
 
