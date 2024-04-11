@@ -109,7 +109,7 @@ Module(
 2 |     #     Not in the mapping start token set, so the list parsing bails
 3 |     #     v
 4 |     case {(x as y): 1}:
-  |          ^ Syntax Error: invalid value for a class pattern
+  |          ^ Syntax Error: Invalid value for a class pattern
 5 |         pass
   |
 
@@ -145,7 +145,7 @@ Module(
 3 |     #     v
 4 |     case {(x as y): 1}:
 5 |         pass
-  | ^^^^^^^^ Syntax Error: unexpected indentation
+  | ^^^^^^^^ Syntax Error: Unexpected indentation
   |
 
 

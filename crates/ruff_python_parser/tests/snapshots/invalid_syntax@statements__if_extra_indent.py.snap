@@ -90,7 +90,7 @@ Module(
 2 | if True:
 3 |     pass
 4 |         a + b
-  | ^^^^^^^^ Syntax Error: unexpected indentation
+  | ^^^^^^^^ Syntax Error: Unexpected indentation
 5 | 
 6 |     pass
   |

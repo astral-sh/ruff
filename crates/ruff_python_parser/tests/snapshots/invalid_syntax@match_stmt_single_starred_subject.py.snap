@@ -60,6 +60,6 @@ Module(
 
   |
 1 | match *foo:
-  |       ^^^^ Syntax Error: starred expression cannot be used here
+  |       ^^^^ Syntax Error: Starred expression cannot be used here
 2 |     case _: ...
   |

@@ -92,85 +92,87 @@ pub enum ParseErrorType {
     /// An unexpected error occurred.
     OtherError(String),
 
-    /// An empty slice was found during parsing, e.g `l[]`.
+    /// An empty slice was found during parsing, e.g `data[]`.
     EmptySlice,
-    /// An empty global names list was found during parsing, e.g `global`.
+    /// An empty global names list was found during parsing.
     EmptyGlobalNames,
-    /// An empty nonlocal names list was found during parsing, e.g `nonlocal`.
+    /// An empty nonlocal names list was found during parsing.
     EmptyNonlocalNames,
-    /// An empty delete targets list was found during parsing, e.g `del`.
+    /// An empty delete targets list was found during parsing.
     EmptyDeleteTargets,
-    /// An empty import names list was found during parsing, e.g., `import`.
+    /// An empty import names list was found during parsing.
     EmptyImportNames,
 
     /// An unparenthesized named expression was found where it is not allowed.
     UnparenthesizedNamedExpression,
     /// An unparenthesized tuple expression was found where it is not allowed.
     UnparenthesizedTupleExpression,
+
     /// An invalid usage of a lambda expression was found.
     InvalidLambdaExpressionUsage,
     /// An invalid usage of a yield expression was found.
     InvalidYieldExpressionUsage,
+    /// An invalid usage of a starred expression was found.
+    InvalidStarredExpressionUsage,
+    /// A star pattern was found outside a sequence pattern.
+    InvalidStarPatternUsage,
 
     /// A parameter was found after a vararg.
-    ParamFollowsVarKeywordParam,
+    ParamAfterVarKeywordParam,
     /// A non-default parameter follows a default parameter.
-    NonDefaultParamFollowsDefaultParam,
-    /// Expected one or more keyword parameter after `*` separator.
-    ExpectedKeywordParam,
+    NonDefaultParamAfterDefaultParam,
     /// A default value was found for a `*` or `**` parameter.
     VarParameterWithDefault,
+
     /// A duplicate parameter was found in a function definition or lambda expression.
     DuplicateParameter(String),
+    /// A keyword argument was repeated.
+    DuplicateKeywordArgumentError(String),
 
-    /// An invalid expression was found in the assignment `target`.
+    /// An invalid expression was found in the assignment target.
     InvalidAssignmentTarget,
-    /// An invalid expression was found in the named assignment `target`.
+    /// An invalid expression was found in the named assignment target.
     InvalidNamedAssignmentTarget,
-    /// An invalid expression was found in the annotated assignment `target`.
+    /// An invalid expression was found in the annotated assignment target.
     InvalidAnnotatedAssignmentTarget,
-    /// An invalid expression was found in the augmented assignment `target`.
+    /// An invalid expression was found in the augmented assignment target.
     InvalidAugmentedAssignmentTarget,
-    /// An invalid expression was found in the delete `target`.
+    /// An invalid expression was found in the delete target.
     InvalidDeleteTarget,
-    /// An unexpected indentation was found during parsing.
-    UnexpectedIndentation,
-    /// The statement being parsed cannot be `async`.
-    UnexpectedAsyncToken(TokenKind),
-    /// A positional argument follows a keyword argument.
-    PositionalFollowsKeywordArgument,
-    /// A positional argument follows a keyword argument unpacking.
-    PositionalFollowsKeywordUnpacking,
-    /// An iterable argument unpacking `*args` follows keyword argument unpacking `**kwargs`.
-    UnpackedArgumentError,
+
+    /// A positional argument was found after a keyword argument.
+    PositionalAfterKeywordArgument,
+    /// A positional argument was found after a keyword argument unpacking.
+    PositionalAfterKeywordUnpacking,
+    /// An iterable argument unpacking was found after keyword argument unpacking.
+    InvalidArgumentUnpackingOrder,
     /// An invalid usage of iterable unpacking in a comprehension was found.
     IterableUnpackingInComprehension,
-    /// An invalid usage of a starred expression was found.
-    StarredExpressionUsage,
 
     /// Multiple simple statements were found in the same line without a `;` separating them.
     SimpleStatementsOnSameLine,
     /// A simple statement and a compound statement was found in the same line.
     SimpleAndCompoundStatementOnSameLine,
 
-    /// An invalid `match` case pattern was found.
-    InvalidMatchPatternLiteral { pattern: TokenKind },
-    /// A star pattern was found outside a sequence pattern.
-    StarPatternUsageError,
+    /// Expected one or more keyword parameter after `*` separator.
+    ExpectedKeywordParam,
     /// Expected a real number for a complex literal pattern.
     ExpectedRealNumber,
     /// Expected an imaginary number for a complex literal pattern.
     ExpectedImaginaryNumber,
     /// Expected an expression at the current parser location.
     ExpectedExpression,
-
     /// The parser expected a specific token that was not found.
     ExpectedToken {
         expected: TokenKind,
         found: TokenKind,
     },
-    /// A keyword argument was repeated.
-    DuplicateKeywordArgumentError(String),
+
+    /// An unexpected indentation was found during parsing.
+    UnexpectedIndentation,
+    /// The statement being parsed cannot be `async`.
+    UnexpectedTokenAfterAsync(TokenKind),
+
     /// An f-string error containing the [`FStringErrorType`].
     FStringError(FStringErrorType),
     /// Parser encountered an error during lexing.
@@ -204,105 +206,91 @@ impl std::fmt::Display for ParseErrorType {
             ParseErrorType::SimpleAndCompoundStatementOnSameLine => f.write_str(
                 "Compound statements are not allowed on the same line as simple statements",
             ),
-            ParseErrorType::UnexpectedAsyncToken(kind) => {
+            ParseErrorType::UnexpectedTokenAfterAsync(kind) => {
                 write!(
                     f,
                     "Expected 'def', 'with' or 'for' to follow 'async', found {kind}",
                 )
             }
-            ParseErrorType::UnpackedArgumentError => {
-                write!(
-                    f,
-                    "iterable argument unpacking follows keyword argument unpacking"
-                )
+            ParseErrorType::InvalidArgumentUnpackingOrder => {
+                f.write_str("Iterable argument unpacking cannot follow keyword argument unpacking")
             }
             ParseErrorType::IterableUnpackingInComprehension => {
-                write!(f, "iterable unpacking cannot be used in a comprehension")
+                f.write_str("Iterable unpacking cannot be used in a comprehension")
             }
             ParseErrorType::UnparenthesizedNamedExpression => {
-                write!(f, "unparenthesized named expression cannot be used here")
+                f.write_str("Unparenthesized named expression cannot be used here")
             }
             ParseErrorType::UnparenthesizedTupleExpression => {
-                write!(f, "unparenthesized tuple expression cannot be used here")
+                f.write_str("Unparenthesized tuple expression cannot be used here")
             }
             ParseErrorType::InvalidYieldExpressionUsage => {
-                write!(f, "yield expression cannot be used here")
+                f.write_str("Yield expression cannot be used here")
             }
             ParseErrorType::InvalidLambdaExpressionUsage => {
-                write!(f, "`lambda` expression cannot be used here")
+                f.write_str("Lambda expression cannot be used here")
             }
-            ParseErrorType::StarredExpressionUsage => {
-                write!(f, "starred expression cannot be used here")
+            ParseErrorType::InvalidStarredExpressionUsage => {
+                f.write_str("Starred expression cannot be used here")
             }
-            ParseErrorType::PositionalFollowsKeywordArgument => {
-                write!(f, "positional argument follows keyword argument")
+            ParseErrorType::PositionalAfterKeywordArgument => {
+                f.write_str("Positional argument cannot follow keyword argument")
             }
-            ParseErrorType::PositionalFollowsKeywordUnpacking => {
-                write!(f, "positional argument follows keyword argument unpacking")
+            ParseErrorType::PositionalAfterKeywordUnpacking => {
+                f.write_str("Positional argument cannot follow keyword argument unpacking")
             }
-            ParseErrorType::EmptySlice => write!(f, "slice cannot be empty"),
+            ParseErrorType::EmptySlice => f.write_str("Expected index or slice expression"),
             ParseErrorType::EmptyGlobalNames => {
-                f.write_str("`global` statement must have at least one name")
+                f.write_str("Global statement must have at least one name")
             }
             ParseErrorType::EmptyNonlocalNames => {
-                f.write_str("`nonlocal` statement must have at least one name")
+                f.write_str("Nonlocal statement must have at least one name")
             }
             ParseErrorType::EmptyDeleteTargets => {
-                f.write_str("`del` statement must have at least one target")
+                f.write_str("Delete statement must have at least one target")
             }
             ParseErrorType::EmptyImportNames => {
                 f.write_str("Expected one or more symbol names after import")
             }
-            ParseErrorType::ParamFollowsVarKeywordParam => {
-                write!(f, "Parameter cannot follow var-keyword parameter")
+            ParseErrorType::ParamAfterVarKeywordParam => {
+                f.write_str("Parameter cannot follow var-keyword parameter")
             }
-            ParseErrorType::NonDefaultParamFollowsDefaultParam => {
-                write!(
-                    f,
-                    "Parameter without a default cannot follow a parameter with a default"
-                )
+            ParseErrorType::NonDefaultParamAfterDefaultParam => {
+                f.write_str("Parameter without a default cannot follow a parameter with a default")
             }
             ParseErrorType::ExpectedKeywordParam => {
-                write!(
-                    f,
-                    "Expected one or more keyword parameter after '*' separator"
-                )
+                f.write_str("Expected one or more keyword parameter after '*' separator")
             }
             ParseErrorType::VarParameterWithDefault => {
-                write!(f, "Parameter with '*' or '**' cannot have default value")
+                f.write_str("Parameter with '*' or '**' cannot have default value")
             }
-            ParseErrorType::InvalidMatchPatternLiteral { pattern } => {
-                write!(f, "invalid pattern `{pattern:?}`")
-            }
-            ParseErrorType::StarPatternUsageError => {
-                write!(f, "Star pattern cannot be used here")
+            ParseErrorType::InvalidStarPatternUsage => {
+                f.write_str("Star pattern cannot be used here")
             }
             ParseErrorType::ExpectedRealNumber => {
-                write!(f, "Expected a real number in complex literal pattern")
+                f.write_str("Expected a real number in complex literal pattern")
             }
             ParseErrorType::ExpectedImaginaryNumber => {
-                write!(f, "Expected an imaginary number in complex literal pattern")
+                f.write_str("Expected an imaginary number in complex literal pattern")
             }
-            ParseErrorType::ExpectedExpression => write!(f, "Expected an expression"),
-            ParseErrorType::UnexpectedIndentation => write!(f, "unexpected indentation"),
-            ParseErrorType::InvalidAssignmentTarget => write!(f, "invalid assignment target"),
+            ParseErrorType::ExpectedExpression => f.write_str("Expected an expression"),
+            ParseErrorType::UnexpectedIndentation => f.write_str("Unexpected indentation"),
+            ParseErrorType::InvalidAssignmentTarget => f.write_str("Invalid assignment target"),
             ParseErrorType::InvalidAnnotatedAssignmentTarget => {
-                write!(f, "invalid annotated assignment target")
+                f.write_str("Invalid annotated assignment target")
             }
             ParseErrorType::InvalidNamedAssignmentTarget => {
-                write!(f, "assignment expression target must be an identifier")
+                f.write_str("Assignment expression target must be an identifier")
             }
             ParseErrorType::InvalidAugmentedAssignmentTarget => {
-                write!(f, "invalid augmented assignment target")
+                f.write_str("Invalid augmented assignment target")
             }
-            ParseErrorType::InvalidDeleteTarget => {
-                write!(f, "invalid delete target")
-            }
+            ParseErrorType::InvalidDeleteTarget => f.write_str("Invalid delete target"),
             ParseErrorType::DuplicateParameter(arg_name) => {
-                write!(f, "Duplicate parameter '{arg_name}'")
+                write!(f, "Duplicate parameter {arg_name:?}")
             }
             ParseErrorType::DuplicateKeywordArgumentError(arg_name) => {
-                write!(f, "keyword argument repeated: {arg_name}")
+                write!(f, "Duplicate keyword argument {arg_name:?}")
             }
             ParseErrorType::FStringError(ref fstring_error) => {
                 write!(f, "f-string: {fstring_error}")

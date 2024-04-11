@@ -197,7 +197,7 @@ Module(
 
   |
 1 | call(x = yield y)
-  |          ^^^^^^^ Syntax Error: yield expression cannot be used here
+  |          ^^^^^^^ Syntax Error: Yield expression cannot be used here
 2 | call(x = yield from y)
 3 | call(x = *y)
   |
@@ -206,7 +206,7 @@ Module(
   |
 1 | call(x = yield y)
 2 | call(x = yield from y)
-  |          ^^^^^^^^^^^^ Syntax Error: yield expression cannot be used here
+  |          ^^^^^^^^^^^^ Syntax Error: Yield expression cannot be used here
 3 | call(x = *y)
 4 | call(x = (*y))
   |
@@ -216,7 +216,7 @@ Module(
 1 | call(x = yield y)
 2 | call(x = yield from y)
 3 | call(x = *y)
-  |          ^^ Syntax Error: starred expression cannot be used here
+  |          ^^ Syntax Error: Starred expression cannot be used here
 4 | call(x = (*y))
   |
 
@@ -225,5 +225,5 @@ Module(
 2 | call(x = yield from y)
 3 | call(x = *y)
 4 | call(x = (*y))
-  |           ^^ Syntax Error: starred expression cannot be used here
+  |           ^^ Syntax Error: Starred expression cannot be used here
   |
