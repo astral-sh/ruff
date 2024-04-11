@@ -33,7 +33,7 @@ pub(crate) fn parse_tokens(
     mode: Mode,
 ) -> Result<Mod, ParseError> {
     let program = Parser::new(source, mode, TokenSource::new(tokens)).parse_program();
-    if program.parse_errors.is_empty() {
+    if program.is_valid() {
         Ok(program.ast)
     } else {
         Err(program.parse_errors.into_iter().next().unwrap())
@@ -90,9 +90,7 @@ pub(crate) struct Parser<'src> {
     /// Stores all the syntax errors found during the parsing.
     errors: Vec<ParseError>,
 
-    /// This tracks the current expression or statement being parsed. For example,
-    /// if we're parsing a tuple expression, e.g. `(1, 2)`, `ctx` has the value
-    /// `ParserCtxFlags::TUPLE_EXPR`.
+    /// This tracks the current expression or statement being parsed.
     ///
     /// The `ctx` is also used to create custom error messages and forbid certain
     /// expressions or statements of being parsed. The `ctx` should be empty after
@@ -102,6 +100,7 @@ pub(crate) struct Parser<'src> {
     /// Specify the mode in which the code will be parsed.
     mode: Mode,
 
+    /// Current token along with its range.
     current: Spanned,
 
     /// The ID of the current token. This is used to track the progress of the parser
@@ -113,44 +112,14 @@ pub(crate) struct Parser<'src> {
 
     /// The range of the tokens to parse.
     ///
-    /// The range is equal to [0; source.len()) when parsing an entire file.
-    /// The range can be different when parsing only a part of a file using the `lex_starts_at` and `parse_expression_starts_at` APIs
-    /// in which case the the range is equal to [offset; subrange.len()).
+    /// The range is equal to `[0; source.len())` when parsing an entire file. The range can be
+    /// different when parsing only a part of a file using the [`crate::lex_starts_at`] and
+    /// [`crate::parse_expression_starts_at`] APIs in which case the the range is equal to
+    /// `[offset; subrange.len())`.
     tokens_range: TextRange,
 
     recovery_context: RecoveryContext,
 }
-
-const NEWLINE_EOF_SET: TokenSet = TokenSet::new([TokenKind::Newline, TokenKind::EndOfFile]);
-const LITERAL_SET: TokenSet = TokenSet::new([
-    TokenKind::Int,
-    TokenKind::Float,
-    TokenKind::Complex,
-    TokenKind::String,
-    TokenKind::Ellipsis,
-    TokenKind::True,
-    TokenKind::False,
-    TokenKind::None,
-]);
-/// Tokens that are usually an expression or the start of one.
-const EXPR_SET: TokenSet = TokenSet::new([
-    TokenKind::Name,
-    TokenKind::Minus,
-    TokenKind::Plus,
-    TokenKind::Tilde,
-    TokenKind::Star,
-    TokenKind::DoubleStar,
-    TokenKind::Lpar,
-    TokenKind::Lbrace,
-    TokenKind::Lsqb,
-    TokenKind::Lambda,
-    TokenKind::Await,
-    TokenKind::Not,
-    TokenKind::Yield,
-    TokenKind::FStringStart,
-    TokenKind::IpyEscapeCommand,
-])
-.union(LITERAL_SET);
 
 impl<'src> Parser<'src> {
     pub(crate) fn new(source: &'src str, mode: Mode, mut tokens: TokenSource) -> Parser<'src> {
@@ -318,8 +287,9 @@ impl<'src> Parser<'src> {
         TextRange::empty(self.last_token_end)
     }
 
-    /// Moves the parser to the next token. Returns the old current token as an owned value.
-    /// FIXME(micha): Using `next_token` is almost always incorrect if there's a case where the current token is not of the expected type.
+    /// Moves the parser to the next token.
+    ///
+    /// Returns the old current token as an owned value.
     fn next_token(&mut self) -> Spanned {
         let next = self
             .tokens
@@ -355,8 +325,8 @@ impl<'src> Parser<'src> {
 
     /// Returns the current token kind along with its range.
     ///
-    /// Use `current_token_kind` or `current_token_range` to only get the kind or range
-    /// respectively.
+    /// Use [`Parser::current_token_kind`] or [`Parser::current_token_range`] to only get the kind
+    /// or range respectively.
     #[inline]
     fn current_token(&self) -> (TokenKind, TextRange) {
         (self.current_token_kind(), self.current_token_range())
@@ -394,13 +364,11 @@ impl<'src> Parser<'src> {
 
     /// Bumps the current token assuming it is of the given kind.
     ///
+    /// Returns the current token as an owned value.
+    ///
     /// # Panics
     ///
     /// If the current token is not of the given kind.
-    ///
-    /// # Returns
-    ///
-    /// The current token
     fn bump(&mut self, kind: TokenKind) -> (Tok, TextRange) {
         assert_eq!(self.current_token_kind(), kind);
 
@@ -409,13 +377,11 @@ impl<'src> Parser<'src> {
 
     /// Bumps the current token assuming it is found in the given token set.
     ///
+    /// Returns the current token as an owned value.
+    ///
     /// # Panics
     ///
     /// If the current token is not found in the given token set.
-    ///
-    /// # Returns
-    ///
-    /// The current token.
     fn bump_ts(&mut self, ts: TokenSet) -> (Tok, TextRange) {
         assert!(ts.contains(self.current_token_kind()));
 
@@ -468,8 +434,9 @@ impl<'src> Parser<'src> {
         T: Ranged,
     {
         let range = ranged.range();
-        // `ranged` uses absolute ranges to the source text of an entire file.
-        // Fix the source by subtracting the start offset when parsing only a part of a file (when parsing the tokens from `lex_starts_at`).
+        // `ranged` uses absolute ranges to the source text of an entire file. Fix the source by
+        // subtracting the start offset when parsing only a part of a file (when parsing the tokens
+        // from `lex_starts_at`).
         &self.source[range - self.tokens_range.start()]
     }
 
@@ -517,12 +484,14 @@ impl<'src> Parser<'src> {
             } else if recovery_context_kind.is_list_terminator(self) {
                 break;
             } else {
-                // Not a recognised element. Add an error and either skip the token or break parsing the list
-                // if the token is recognised as an element or terminator of an enclosing list.
+                // Not a recognised element. Add an error and either skip the token or break
+                // parsing the list if the token is recognised as an element or terminator of an
+                // enclosing list.
                 let error = recovery_context_kind.create_error(self);
                 self.add_error(error, self.current_token_range());
 
-                // Run the error recovery: This also handles the case when an element is missing between two commas: `a,,b`
+                // Run the error recovery: This also handles the case when an element is missing
+                // between two commas: `a,,b`
                 if self.is_enclosing_list_element_or_terminator() {
                     break;
                 }
@@ -593,12 +562,14 @@ impl<'src> Parser<'src> {
             } else if recovery_context_kind.is_list_terminator(self) {
                 break;
             } else {
-                // Not a recognised element. Add an error and either skip the token or break parsing the list
-                // if the token is recognised as an element or terminator of an enclosing list.
+                // Not a recognised element. Add an error and either skip the token or break
+                // parsing the list if the token is recognised as an element or terminator of an
+                // enclosing list.
                 let error = recovery_context_kind.create_error(self);
                 self.add_error(error, self.current_token_range());
 
-                // Run the error recovery: This also handles the case when an element is missing between two commas: `a,,b`
+                // Run the error recovery: This also handles the case when an element is missing
+                // between two commas: `a,,b`
                 if self.is_enclosing_list_element_or_terminator() {
                     break;
                 }
