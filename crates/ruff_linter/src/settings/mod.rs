@@ -22,7 +22,9 @@ use crate::rules::{
     flake8_self, flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, isort, mccabe,
     pep8_naming, pycodestyle, pydocstyle, pyflakes, pylint, pyupgrade,
 };
-use crate::settings::types::{ExtensionMapping, FilePatternSet, PerFileIgnores, PythonVersion};
+use crate::settings::types::{
+    CompiledPerFileIgnoreList, ExtensionMapping, FilePatternSet, PythonVersion,
+};
 use crate::{codes, RuleSelector};
 
 use super::line_width::IndentWidth;
@@ -129,6 +131,9 @@ macro_rules! display_settings {
     (@field $fmt:ident, $prefix:ident, $settings:ident.$field:ident | quoted) => {
         writeln!($fmt, "{}{} = \"{}\"", $prefix, stringify!($field), $settings.$field)?;
     };
+    (@field $fmt:ident, $prefix:ident, $settings:ident.$field:ident | globmatcher) => {
+        writeln!($fmt, "{}{} = \"{}\"", $prefix, stringify!($field), $settings.$field.glob())?;
+    };
     (@field $fmt:ident, $prefix:ident, $settings:ident.$field:ident | nested) => {
         write!($fmt, "{}", $settings.$field)?;
     };
@@ -213,7 +218,7 @@ pub struct LinterSettings {
     pub project_root: PathBuf,
 
     pub rules: RuleTable,
-    pub per_file_ignores: PerFileIgnores,
+    pub per_file_ignores: CompiledPerFileIgnoreList,
     pub fix_safety: FixSafetyTable,
 
     pub target_version: PythonVersion,
@@ -388,7 +393,7 @@ impl LinterSettings {
             logger_objects: vec![],
             namespace_packages: vec![],
 
-            per_file_ignores: PerFileIgnores::default(),
+            per_file_ignores: CompiledPerFileIgnoreList::default(),
             fix_safety: FixSafetyTable::default(),
 
             src: vec![path_dedot::CWD.clone()],
