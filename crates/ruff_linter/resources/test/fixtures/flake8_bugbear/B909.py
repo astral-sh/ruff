@@ -151,3 +151,8 @@ for elem in some_list:
         pass
     else:
         break
+
+# should not error
+for elem in some_list:
+    del some_list[elem]
+    some_list[elem] = 1

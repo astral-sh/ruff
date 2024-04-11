@@ -56,7 +56,7 @@ impl Violation for LoopIteratorMutation {
 /// B909
 pub(crate) fn loop_iterator_mutation(checker: &mut Checker, stmt_for: &StmtFor) {
     let StmtFor {
-        target: _,
+        target,
         iter,
         body,
         orelse: _,
@@ -70,7 +70,7 @@ pub(crate) fn loop_iterator_mutation(checker: &mut Checker, stmt_for: &StmtFor) 
 
     // Collect mutations to the iterable.
     let mutations = {
-        let mut visitor = LoopMutationsVisitor::new(iter);
+        let mut visitor = LoopMutationsVisitor::new(iter, target);
         visitor.visit_body(body);
         visitor.mutations
     };
@@ -112,7 +112,8 @@ fn is_mutating_function(function_name: &str) -> bool {
 /// A visitor to collect mutations to a variable in a loop.
 #[derive(Debug, Clone)]
 struct LoopMutationsVisitor<'a> {
-    name: &'a Expr,
+    iter: &'a Expr,
+    target: &'a Expr,
     mutations: HashMap<u8, Vec<TextRange>>,
     branches: Vec<u8>,
     branch: u8,
@@ -120,9 +121,10 @@ struct LoopMutationsVisitor<'a> {
 
 impl<'a> LoopMutationsVisitor<'a> {
     /// Initialize the visitor.
-    fn new(name: &'a Expr) -> Self {
+    fn new(iter: &'a Expr, target: &'a Expr) -> Self {
         Self {
-            name,
+            iter,
+            target,
             mutations: HashMap::new(),
             branches: vec![0],
             branch: 0,
@@ -140,12 +142,16 @@ impl<'a> LoopMutationsVisitor<'a> {
             if let Expr::Subscript(ExprSubscript {
                 range: _,
                 value,
-                slice: _,
+                slice,
                 ctx: _,
             }) = target
             {
-                if ComparableExpr::from(self.name) == ComparableExpr::from(value) {
-                    self.add_mutation(range);
+                // Find, e.g., `del items[0]`.
+                if ComparableExpr::from(self.iter) == ComparableExpr::from(value) {
+                    // But allow, e.g., `for item in items: del items[item]`.
+                    if ComparableExpr::from(self.target) != ComparableExpr::from(slice) {
+                        self.add_mutation(range);
+                    }
                 }
             }
         }
@@ -157,12 +163,16 @@ impl<'a> LoopMutationsVisitor<'a> {
             if let Expr::Subscript(ExprSubscript {
                 range: _,
                 value,
-                slice: _,
+                slice,
                 ctx: _,
             }) = target
             {
-                if ComparableExpr::from(self.name) == ComparableExpr::from(value) {
-                    self.add_mutation(range);
+                // Find, e.g., `items[0] = 1`.
+                if ComparableExpr::from(self.iter) == ComparableExpr::from(value) {
+                    // But allow, e.g., `for item in items: items[item] = 1`.
+                    if ComparableExpr::from(self.target) != ComparableExpr::from(slice) {
+                        self.add_mutation(range);
+                    }
                 }
             }
         }
@@ -170,7 +180,7 @@ impl<'a> LoopMutationsVisitor<'a> {
 
     /// Handle, e.g., `items += [1]`.
     fn handle_aug_assign(&mut self, range: TextRange, target: &Expr) {
-        if ComparableExpr::from(self.name) == ComparableExpr::from(target) {
+        if ComparableExpr::from(self.iter) == ComparableExpr::from(target) {
             self.add_mutation(range);
         }
     }
@@ -185,7 +195,7 @@ impl<'a> LoopMutationsVisitor<'a> {
         }) = func
         {
             if is_mutating_function(attr.as_str()) {
-                if ComparableExpr::from(self.name) == ComparableExpr::from(value) {
+                if ComparableExpr::from(self.iter) == ComparableExpr::from(value) {
                     self.add_mutation(*range);
                 }
             }
