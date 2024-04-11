@@ -131,27 +131,28 @@ impl<'src> Parser<'src> {
     fn parse_single_simple_statement(&mut self) -> Stmt {
         let stmt = self.parse_simple_statement();
 
+        // The order of the token is important here.
         let has_eaten_semicolon = self.eat(TokenKind::Semi);
         let has_eaten_newline = self.eat(TokenKind::Newline);
 
-        if !has_eaten_newline && !has_eaten_semicolon && self.at_simple_stmt() {
-            // test_err simple_stmts_on_same_line
-            // a b
-            // a + b c + d
-            // break; continue pass; continue break
-            self.add_error(
-                ParseErrorType::SimpleStatementsOnSameLine,
-                self.current_token_range(),
-            );
-        }
-
-        if !has_eaten_newline && self.at_compound_stmt() {
-            // test_err simple_and_compound_stmt_on_same_line
-            // a; if b: pass; b
-            self.add_error(
-                ParseErrorType::SimpleAndCompoundStatementOnSameLine,
-                self.current_token_range(),
-            );
+        if !has_eaten_newline {
+            if !has_eaten_semicolon && self.at_simple_stmt() {
+                // test_err simple_stmts_on_same_line
+                // a b
+                // a + b c + d
+                // break; continue pass; continue break
+                self.add_error(
+                    ParseErrorType::SimpleStatementsOnSameLine,
+                    self.current_token_range(),
+                );
+            } else if self.at_compound_stmt() {
+                // test_err simple_and_compound_stmt_on_same_line
+                // a; if b: pass; b
+                self.add_error(
+                    ParseErrorType::SimpleAndCompoundStatementOnSameLine,
+                    self.current_token_range(),
+                );
+            }
         }
 
         stmt
@@ -218,7 +219,13 @@ impl<'src> Parser<'src> {
                 // for x in iter: break; else: pass
                 // try: pass except exc: pass else: pass finally: pass
                 // try: pass; except exc: pass; else: pass; finally: pass
-                self.expect(TokenKind::Newline);
+                self.add_error(
+                    ParseErrorType::ExpectedToken {
+                        found: self.current_token_kind(),
+                        expected: TokenKind::Newline,
+                    },
+                    self.current_token_range(),
+                );
             }
         }
 
