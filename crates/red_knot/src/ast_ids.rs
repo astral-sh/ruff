@@ -5,13 +5,13 @@ use rustc_hash::FxHashMap;
 
 use ruff_index::{Idx, IndexVec};
 use ruff_python_ast::visitor::preorder;
-use ruff_python_ast::visitor::preorder::PreorderVisitor;
+use ruff_python_ast::visitor::preorder::{PreorderVisitor, TraversalSignal};
 use ruff_python_ast::{
-    AstNode, ModModule, NodeKind, Parameter, Stmt, StmtAnnAssign, StmtAssign, StmtAugAssign,
-    StmtClassDef, StmtFunctionDef, StmtImport, StmtImportFrom, StmtTypeAlias, TypeParam,
-    TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple,
+    AnyNodeRef, AstNode, ModModule, NodeKind, Parameter, Stmt, StmtAnnAssign, StmtAssign,
+    StmtAugAssign, StmtClassDef, StmtFunctionDef, StmtImport, StmtImportFrom, StmtTypeAlias,
+    TypeParam, TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple,
 };
-use ruff_text_size::TextRange;
+use ruff_text_size::{Ranged, TextRange};
 
 #[ruff_index::newtype_index]
 pub struct AstId;
@@ -42,8 +42,8 @@ impl<N: HasAstId> Clone for FileAstId<N> {
 }
 
 pub struct AstIds {
-    ids: IndexVec<AstId, NodeKey>,
-    reverse: FxHashMap<NodeKey, AstId>,
+    ids: IndexVec<AstId, SyntaxNodeKey>,
+    reverse: FxHashMap<SyntaxNodeKey, AstId>,
 }
 
 impl AstIds {
@@ -54,7 +54,7 @@ impl AstIds {
 
         // TODO: visit_module?
         // Make sure we visit the root
-        visitor.crate_id(module);
+        visitor.create_id(module);
         visitor.visit_body(&module.body);
 
         while let Some(deferred) = visitor.deferred.pop() {
@@ -72,21 +72,43 @@ impl AstIds {
         }
     }
 
-    pub fn get(&self, node: &NodeKey) -> Option<AstId> {
-        self.reverse.get(node).copied()
-    }
-
-    pub fn root(&self) -> NodeKey {
+    pub fn root(&self) -> SyntaxNodeKey {
         self.ids[AstId::new(0)]
     }
 
     // TODO: Limit this API to only nodes that have an AstId (marker trait?)
-    pub fn ast_id<N: HasAstId>(&self, node: N) -> FileAstId<N> {
-        let key = node.node_key();
+    pub fn ast_id<N: HasAstId>(&self, node: &N) -> FileAstId<N> {
+        let key = node.syntax_node_key();
         FileAstId {
             ast_id: self.reverse.get(&key).copied().unwrap(),
             _marker: PhantomData,
         }
+    }
+
+    pub fn ast_id_for_key<N: HasAstId>(&self, node: AstNodeKey<N>) -> FileAstId<N> {
+        let ast_id = self.ast_id_for_syntax_key(node.syntax_key);
+
+        FileAstId {
+            ast_id,
+            _marker: PhantomData,
+        }
+    }
+
+    pub fn ast_id_for_syntax_key(&self, node: SyntaxNodeKey) -> AstId {
+        self.reverse
+            .get(&node)
+            .copied()
+            .expect("Can't find node in AstIds map.")
+    }
+
+    pub fn key<N: HasAstId>(&self, id: FileAstId<N>) -> AstNodeKey<N> {
+        let syntax_key = self.ids[id.ast_id];
+
+        AstNodeKey::new(syntax_key).unwrap()
+    }
+
+    pub fn syntax_key<H: HasAstId>(&self, id: FileAstId<H>) -> SyntaxNodeKey {
+        self.ids[id.ast_id]
     }
 }
 
@@ -111,14 +133,14 @@ impl Eq for AstIds {}
 
 #[derive(Default)]
 struct AstIdsVisitor<'a> {
-    ids: IndexVec<AstId, NodeKey>,
-    reverse: FxHashMap<NodeKey, AstId>,
+    ids: IndexVec<AstId, SyntaxNodeKey>,
+    reverse: FxHashMap<SyntaxNodeKey, AstId>,
     deferred: Vec<DeferredNode<'a>>,
 }
 
 impl<'a> AstIdsVisitor<'a> {
-    fn crate_id<A: HasAstId>(&mut self, node: &A) {
-        let node_key = node.node_key();
+    fn create_id<A: HasAstId>(&mut self, node: &A) {
+        let node_key = node.syntax_node_key();
 
         let id = self.ids.push(node_key);
         self.reverse.insert(node_key, id);
@@ -129,11 +151,13 @@ impl<'a> PreorderVisitor<'a> for AstIdsVisitor<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
         match stmt {
             Stmt::FunctionDef(def) => {
+                self.create_id(def);
                 self.deferred.push(DeferredNode::FunctionDefinition(def));
                 return;
             }
             // TODO defer visiting the assignment body, type alias parameters etc?
             Stmt::ClassDef(def) => {
+                self.create_id(def);
                 self.deferred.push(DeferredNode::ClassDefinition(def));
                 return;
             }
@@ -143,12 +167,12 @@ impl<'a> PreorderVisitor<'a> for AstIdsVisitor<'a> {
             }
             Stmt::Return(_) => {}
             Stmt::Delete(_) => {}
-            Stmt::Assign(assignment) => self.crate_id(assignment),
+            Stmt::Assign(assignment) => self.create_id(assignment),
             Stmt::AugAssign(assignment) => {
-                self.crate_id(assignment);
+                self.create_id(assignment);
             }
-            Stmt::AnnAssign(assignment) => self.crate_id(assignment),
-            Stmt::TypeAlias(assignment) => self.crate_id(assignment),
+            Stmt::AnnAssign(assignment) => self.create_id(assignment),
+            Stmt::TypeAlias(assignment) => self.create_id(assignment),
             Stmt::For(_) => {}
             Stmt::While(_) => {}
             Stmt::If(_) => {}
@@ -157,8 +181,8 @@ impl<'a> PreorderVisitor<'a> for AstIdsVisitor<'a> {
             Stmt::Raise(_) => {}
             Stmt::Try(_) => {}
             Stmt::Assert(_) => {}
-            Stmt::Import(import) => self.crate_id(import),
-            Stmt::ImportFrom(import_from) => self.crate_id(import_from),
+            Stmt::Import(import) => self.create_id(import),
+            Stmt::ImportFrom(import_from) => self.create_id(import_from),
             Stmt::Global(_) => {}
             Stmt::Nonlocal(_) => {}
             Stmt::Pass(_) => {}
@@ -176,21 +200,101 @@ enum DeferredNode<'a> {
     ClassDefinition(&'a StmtClassDef),
 }
 
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+pub struct AstNodeKey<N: AstNode> {
+    syntax_key: SyntaxNodeKey,
+    _marker: PhantomData<fn() -> N>,
+}
+
+impl<N: AstNode> AstNodeKey<N> {
+    pub fn new(syntax_key: SyntaxNodeKey) -> Option<Self> {
+        N::can_cast(syntax_key.kind).then(|| AstNodeKey {
+            syntax_key,
+            _marker: PhantomData,
+        })
+    }
+
+    pub fn resolve<'a>(&self, root: AnyNodeRef<'a>) -> Option<N::Ref<'a>> {
+        let syntax_node = self.syntax_key.resolve(root)?;
+
+        // UGH, we need `cast_ref`.
+        Some(N::cast_ref(syntax_node).unwrap())
+    }
+}
+
+struct FindSyntaxNodeVisitor<'a> {
+    key: SyntaxNodeKey,
+    result: Option<AnyNodeRef<'a>>,
+}
+
+impl<'a> PreorderVisitor<'a> for FindSyntaxNodeVisitor<'a> {
+    fn enter_node(&mut self, node: AnyNodeRef<'a>) -> TraversalSignal {
+        if self.result.is_some() {
+            return TraversalSignal::Skip;
+        }
+
+        if node.range() == self.key.range && node.kind() == self.key.kind {
+            self.result = Some(node);
+            TraversalSignal::Skip
+        } else if node.range().contains_range(self.key.range) {
+            TraversalSignal::Traverse
+        } else {
+            TraversalSignal::Skip
+        }
+    }
+
+    fn visit_body(&mut self, body: &'a [Stmt]) {
+        for stmt in body {
+            if stmt.range().start() > self.key.range.end() {
+                break;
+            }
+
+            self.visit_stmt(stmt);
+        }
+    }
+}
+
 // TODO an alternative to this is to have a `NodeId` on each node (in increasing order depending on the position).
 //  This would allow to reduce the size of this to a u32.
 //  What would be nice if we could use an `Arc::weak_ref` here but that only works if we use
 //   `Arc` internally
 // TODO: Implement the logic to resolve a node, given a db (and the correct file).
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
-pub struct NodeKey {
+pub struct SyntaxNodeKey {
     kind: NodeKind,
     range: TextRange,
 }
 
+impl SyntaxNodeKey {
+    pub fn resolve<'a>(&self, root: AnyNodeRef<'a>) -> Option<AnyNodeRef<'a>> {
+        // We need to do a binary search here. Only traverse into a node if the range is withint the node
+        let mut visitor = FindSyntaxNodeVisitor {
+            key: *self,
+            result: None,
+        };
+
+        if visitor.enter_node(root) == TraversalSignal::Traverse {
+            root.visit_preorder(&mut visitor);
+        }
+
+        visitor.result
+    }
+}
+
 /// Marker trait implemented by AST nodes for which we extract the `AstId`.
 pub trait HasAstId: AstNode {
-    fn node_key(&self) -> NodeKey {
-        NodeKey {
+    fn node_key(&self) -> AstNodeKey<Self>
+    where
+        Self: Sized,
+    {
+        AstNodeKey {
+            syntax_key: self.syntax_node_key(),
+            _marker: PhantomData,
+        }
+    }
+
+    fn syntax_node_key(&self) -> SyntaxNodeKey {
+        SyntaxNodeKey {
             kind: self.as_any_node_ref().kind(),
             range: self.range(),
         }
