@@ -373,7 +373,7 @@ pub enum TokenKind {
     /// Token value for the end of an f-string. This includes the closing quote.
     FStringEnd,
     /// Token value for a IPython escape command.
-    EscapeCommand,
+    IpyEscapeCommand,
     /// Token value for a comment. These are filtered out of the token stream prior to parsing.
     Comment,
     /// Token value for a newline.
@@ -752,7 +752,7 @@ impl TokenKind {
             Tok::FStringStart(_) => TokenKind::FStringStart,
             Tok::FStringMiddle { .. } => TokenKind::FStringMiddle,
             Tok::FStringEnd => TokenKind::FStringEnd,
-            Tok::IpyEscapeCommand { .. } => TokenKind::EscapeCommand,
+            Tok::IpyEscapeCommand { .. } => TokenKind::IpyEscapeCommand,
             Tok::Comment(_) => TokenKind::Comment,
             Tok::Newline => TokenKind::Newline,
             Tok::NonLogicalNewline => TokenKind::NonLogicalNewline,
@@ -942,7 +942,7 @@ impl fmt::Display for TokenKind {
             TokenKind::FStringStart => "FStringStart",
             TokenKind::FStringMiddle => "FStringMiddle",
             TokenKind::FStringEnd => "FStringEnd",
-            TokenKind::EscapeCommand => "IPython escape command",
+            TokenKind::IpyEscapeCommand => "IPython escape command",
             TokenKind::Comment => "comment",
             TokenKind::Question => "'?'",
             TokenKind::Exclamation => "'!'",
