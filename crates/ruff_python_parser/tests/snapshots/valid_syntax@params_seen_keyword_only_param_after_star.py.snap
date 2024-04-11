@@ -40,7 +40,7 @@ Module(
                         ],
                         kwarg: Some(
                             Parameter {
-                                range: 16..22,
+                                range: 14..22,
                                 name: Identifier {
                                     id: "kwargs",
                                     range: 16..22,
@@ -104,7 +104,7 @@ Module(
                         ],
                         kwarg: Some(
                             Parameter {
-                                range: 48..54,
+                                range: 46..54,
                                 name: Identifier {
                                     id: "kwargs",
                                     range: 48..54,

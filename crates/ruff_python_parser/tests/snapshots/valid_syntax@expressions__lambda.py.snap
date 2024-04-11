@@ -437,7 +437,7 @@ Module(
                                     args: [],
                                     vararg: Some(
                                         Parameter {
-                                            range: 139..140,
+                                            range: 138..140,
                                             name: Identifier {
                                                 id: "a",
                                                 range: 139..140,
@@ -473,7 +473,7 @@ Module(
                                     args: [],
                                     vararg: Some(
                                         Parameter {
-                                            range: 152..153,
+                                            range: 151..153,
                                             name: Identifier {
                                                 id: "a",
                                                 range: 152..153,
@@ -781,7 +781,7 @@ Module(
                                     kwonlyargs: [],
                                     kwarg: Some(
                                         Parameter {
-                                            range: 251..257,
+                                            range: 249..257,
                                             name: Identifier {
                                                 id: "kwargs",
                                                 range: 251..257,
@@ -825,7 +825,7 @@ Module(
                                     args: [],
                                     vararg: Some(
                                         Parameter {
-                                            range: 271..275,
+                                            range: 270..275,
                                             name: Identifier {
                                                 id: "args",
                                                 range: 271..275,
@@ -836,7 +836,7 @@ Module(
                                     kwonlyargs: [],
                                     kwarg: Some(
                                         Parameter {
-                                            range: 279..285,
+                                            range: 277..285,
                                             name: Identifier {
                                                 id: "kwargs",
                                                 range: 279..285,
@@ -894,7 +894,7 @@ Module(
                                     args: [],
                                     vararg: Some(
                                         Parameter {
-                                            range: 303..307,
+                                            range: 302..307,
                                             name: Identifier {
                                                 id: "args",
                                                 range: 303..307,
@@ -939,7 +939,7 @@ Module(
                                     ],
                                     kwarg: Some(
                                         Parameter {
-                                            range: 319..325,
+                                            range: 317..325,
                                             name: Identifier {
                                                 id: "kwargs",
                                                 range: 319..325,
