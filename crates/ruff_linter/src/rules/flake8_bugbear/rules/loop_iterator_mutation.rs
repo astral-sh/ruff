@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{
@@ -10,44 +11,23 @@ use ruff_python_ast::{
 use ruff_text_size::TextRange;
 
 use crate::checkers::ast::Checker;
-use ruff_diagnostics::Diagnostic;
 
-fn is_mutating_function(function_name: &str) -> bool {
-    matches!(
-        function_name,
-        "append"
-            | "sort"
-            | "reverse"
-            | "remove"
-            | "clear"
-            | "extend"
-            | "insert"
-            | "pop"
-            | "popitem"
-            | "setdefault"
-            | "update"
-            | "intersection_update"
-            | "difference_update"
-            | "symmetric_difference_update"
-            | "add"
-            | "discard"
-    )
-}
 /// ## What it does
-/// Checks for mutation of the iterator of a loop in the loop's body
+/// Checks for mutations to an iterable during a loop iteration.
 ///
 /// ## Why is this bad?
-/// Changing the structure that is being iterated over will usually lead to
-/// unintended behavior as not all elements will be addressed.
+/// When iterating over an iterable, mutating the iterable can lead to unexpected
+/// behavior, like skipping elements or infinite loops.
 ///
 /// ## Example
 /// ```python
-/// some_list = [1,2,3]
-/// for i in some_list:
-///   some_list.remove(i) # this will lead to not all elements being printed
-///   print(i)
-/// ```
+/// items = [1,2,3]
+/// for item in items:
+///     print(item)
 ///
+///     # Create an infinite loop by appending to the list.
+///     items.append(item)
+/// ```
 ///
 /// ## References
 /// - [Python documentation: Mutable Sequence Types](https://docs.python.org/3/library/stdtypes.html#typesseq-mutable)
@@ -57,7 +37,7 @@ pub struct LoopIteratorMutation;
 impl Violation for LoopIteratorMutation {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("editing a loop's mutable iterable often leads to unexpected results/bugs")
+        format!("Mutation to loop iterable during iteration")
     }
 }
 
@@ -92,7 +72,8 @@ fn _to_name_str(node: &Expr) -> String {
         }
     }
 }
-// B909
+
+/// B909
 pub(crate) fn loop_iterator_mutation(checker: &mut Checker, stmt_for: &StmtFor) {
     let StmtFor {
         target: _,
@@ -118,7 +99,7 @@ pub(crate) fn loop_iterator_mutation(checker: &mut Checker, stmt_for: &StmtFor) 
     let mut visitor = LoopMutationsVisitor {
         name: &name,
         mutations: HashMap::new(),
-        _contidional_block: 0,
+        branch: 0,
     };
     visitor.visit_body(body);
     for mutation in visitor.mutations.values().flatten() {
@@ -128,18 +109,41 @@ pub(crate) fn loop_iterator_mutation(checker: &mut Checker, stmt_for: &StmtFor) 
     }
 }
 
+/// Returns `true` if the method mutates when called on an iterator.
+fn is_mutating_function(function_name: &str) -> bool {
+    matches!(
+        function_name,
+        "append"
+            | "sort"
+            | "reverse"
+            | "remove"
+            | "clear"
+            | "extend"
+            | "insert"
+            | "pop"
+            | "popitem"
+            | "setdefault"
+            | "update"
+            | "intersection_update"
+            | "difference_update"
+            | "symmetric_difference_update"
+            | "add"
+            | "discard"
+    )
+}
+
 struct LoopMutationsVisitor<'a> {
     name: &'a str,
     mutations: HashMap<u8, Vec<TextRange>>,
-    _contidional_block: u8,
+    branch: u8,
 }
 
 impl<'a> LoopMutationsVisitor<'a> {
     fn add_mutation(&mut self, range: &TextRange) {
-        if !self.mutations.contains_key(&self._contidional_block) {
-            self.mutations.insert(self._contidional_block, Vec::new());
+        if !self.mutations.contains_key(&self.branch) {
+            self.mutations.insert(self.branch, Vec::new());
         }
-        match self.mutations.get_mut(&self._contidional_block) {
+        match self.mutations.get_mut(&self.branch) {
             Some(a) => a.push(*range),
             None => {}
         }
@@ -226,11 +230,12 @@ impl<'a> LoopMutationsVisitor<'a> {
         body: &'a Vec<Stmt>,
         _elif_else_clauses: &Vec<ElifElseClause>,
     ) {
-        self._contidional_block += 1;
+        self.branch += 1;
         self.visit_body(body);
-        self._contidional_block += 1;
+        self.branch += 1;
     }
 }
+
 /// `Visitor` to collect all used identifiers in a statement.
 impl<'a> Visitor<'a> for LoopMutationsVisitor<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
@@ -255,12 +260,10 @@ impl<'a> Visitor<'a> for LoopMutationsVisitor<'a> {
                 body,
                 elif_else_clauses,
             }) => self.handle_if(range, test, body, elif_else_clauses),
-            Stmt::Break(StmtBreak { range: _ }) => {
-                match self.mutations.get_mut(&self._contidional_block) {
-                    Some(a) => a.clear(),
-                    None => {}
-                }
-            }
+            Stmt::Break(StmtBreak { range: _ }) => match self.mutations.get_mut(&self.branch) {
+                Some(a) => a.clear(),
+                None => {}
+            },
             _ => {
                 visitor::walk_stmt(self, stmt);
             }

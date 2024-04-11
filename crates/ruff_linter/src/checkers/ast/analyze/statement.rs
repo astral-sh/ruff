@@ -1268,10 +1268,10 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.any_enabled(&[
                 Rule::EnumerateForLoop,
                 Rule::IncorrectDictIterator,
+                Rule::LoopIteratorMutation,
                 Rule::UnnecessaryEnumerate,
                 Rule::UnusedLoopControlVariable,
                 Rule::YieldInForLoop,
-                Rule::LoopIteratorMutation,
             ]) {
                 checker.analyze.for_loops.push(checker.semantic.snapshot());
             }
