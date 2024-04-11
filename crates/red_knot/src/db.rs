@@ -13,7 +13,7 @@ use ruff_python_ast::{AnyNodeRef, Expr, Mod, ModModule, Stmt, StmtExpr};
 use ruff_python_parser::Mode;
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::ast_ids::{AstId, AstIds};
+use crate::ast_ids::{AstIds, FileAstId, HasAstId};
 use crate::files::{FileId, Files};
 
 // TODO salsa recommends to have one jar per crate and call it `Jar`. We're not doing this here
@@ -293,10 +293,29 @@ pub fn check_physical_lines(db: &dyn Db, source_text: SourceText) -> PhysicalLin
     PhysicalLinesCheck::new(db, diagnostics)
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Hash)]
-pub struct HirAstId {
+#[derive(Eq, PartialEq, Hash, Debug)]
+pub struct HirAstId<N: HasAstId> {
     file_id: FileId,
-    node_id: AstId,
+    node_id: FileAstId<N>,
+}
+
+impl<N: HasAstId> Copy for HirAstId<N> {}
+impl<N: HasAstId> Clone for HirAstId<N> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<N: HasAstId> HirAstId<N> {
+    pub fn upcast<M: HasAstId>(self) -> HirAstId<M>
+    where
+        N: Into<M>,
+    {
+        HirAstId {
+            file_id: self.file_id,
+            node_id: self.node_id.upcast(),
+        }
+    }
 }
 
 #[salsa::tracked(jar=SourceJar)]
@@ -306,28 +325,3 @@ pub fn ast_ids(db: &dyn Db, source: SourceText) -> Arc<AstIds> {
 
     Arc::new(AstIds::from_module(ast))
 }
-
-// ref counted
-// struct GreenNode {
-//     len: TextSize,
-//     kind: NodeKind,
-//     children: Vec<GreenElement> // GreenElement which can either be a Token or Node
-// }
-
-// enum GreenElement {
-//     Node(GreenNode),
-//     Token(GreenToken)
-// }
-
-// struct GreenToken {
-//     len: TextSize,
-//     kind: TokenKind,
-//     content: String,
-// }
-
-// // ref counted, red nodes
-// struct SyntaxNode {
-//     offset: TextSize,
-//     parent: Option<GreenNode>, // upward pointer
-//     node: GreenNode,
-// }
