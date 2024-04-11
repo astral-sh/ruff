@@ -94,3 +94,27 @@ impl FilesInner {
             .map(|id| (*id, self.by_id[*id].as_path()))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn insert_path_twice_same_id() {
+        let files = Files::default();
+        let path = PathBuf::from("foo/bar");
+        let id1 = files.intern(&path);
+        let id2 = files.intern(&path);
+        assert_eq!(id1, id2);
+    }
+
+    #[test]
+    fn insert_different_paths_different_ids() {
+        let files = Files::default();
+        let path1 = PathBuf::from("foo/bar");
+        let path2 = PathBuf::from("foo/bar/baz");
+        let id1 = files.intern(&path1);
+        let id2 = files.intern(&path2);
+        assert_ne!(id1, id2);
+    }
+}
