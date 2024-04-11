@@ -880,9 +880,11 @@ impl RecoveryContextKind {
             RecoveryContextKind::Except => {
                 matches!(p.current_token_kind(), TokenKind::Finally | TokenKind::Else)
             }
-
-            // TODO: Should `semi` be part of the simple statement recovery set instead?
             RecoveryContextKind::AssignmentTargets => {
+                // test_ok assign_targets_terminator
+                // x = y = z = 1; a, b
+                // x = y = z = 1
+                // a, b
                 matches!(p.current_token_kind(), TokenKind::Newline | TokenKind::Semi)
             }
 
@@ -898,16 +900,25 @@ impl RecoveryContextKind {
                         | TokenKind::Lpar
                 )
             }
-            // The names of an import statement cannot be parenthesized, so it
-            // always ends with a newline.
-            RecoveryContextKind::ImportNames => p.at(TokenKind::Newline),
+            // The names of an import statement cannot be parenthesized, so `)` is not a
+            // terminator.
+            RecoveryContextKind::ImportNames => {
+                // test_ok import_stmt_terminator
+                // import a, b; import c, d
+                // import a, b
+                // c, d
+                matches!(p.current_token_kind(), TokenKind::Semi | TokenKind::Newline)
+            }
             RecoveryContextKind::ImportFromAsNames(_) => {
+                // test_ok from_import_stmt_terminator
+                // from a import (b, c)
+                // from a import (b, c); x, y
+                // from a import b, c; x, y
+                // from a import b, c
+                // x, y
                 matches!(
                     p.current_token_kind(),
-                    // `from a import (b, c)`
-                    TokenKind::Rpar
-                    // `from a import b, c`
-                    | TokenKind::Newline
+                    TokenKind::Rpar | TokenKind::Semi | TokenKind::Newline
                 )
             }
             // The elements in a container expression cannot end with a newline
@@ -920,7 +931,6 @@ impl RecoveryContextKind {
             }
             RecoveryContextKind::TupleElements(parenthesized) => {
                 if parenthesized.is_yes() {
-                    // TODO(dhruvmanila): Confirm if this is ok
                     p.at(TokenKind::Rpar)
                 } else {
                     p.at_sequence_end()
@@ -934,7 +944,11 @@ impl RecoveryContextKind {
             RecoveryContextKind::MatchPatternClassArguments => p.at(TokenKind::Rpar),
             RecoveryContextKind::Arguments => p.at(TokenKind::Rpar),
             RecoveryContextKind::DeleteTargets | RecoveryContextKind::Identifiers => {
-                p.at(TokenKind::Newline)
+                // test_ok del_targets_terminator
+                // del a, b; c, d
+                // del a, b
+                // c, d
+                matches!(p.current_token_kind(), TokenKind::Semi | TokenKind::Newline)
             }
             RecoveryContextKind::Parameters(function_kind) => {
                 // `lambda x, y: ...` or `def f(x, y): ...`
