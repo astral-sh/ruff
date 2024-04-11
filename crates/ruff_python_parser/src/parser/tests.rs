@@ -1,7 +1,11 @@
 use crate::{lex, parse, parse_suite, parse_tokens, Mode};
 
+// TODO(dhruvmanila): Remove `set_new_parser`
+
 #[test]
 fn test_modes() {
+    crate::set_new_parser(true);
+
     let source = "a[0][1][2][3][4]";
 
     assert!(parse(source, Mode::Expression).is_ok());
@@ -10,6 +14,8 @@ fn test_modes() {
 
 #[test]
 fn test_unicode_aliases() {
+    crate::set_new_parser(true);
+
     // https://github.com/RustPython/RustPython/issues/4566
     let source = r#"x = "\N{BACKSPACE}another cool trick""#;
     let parse_ast = parse_suite(source).unwrap();
@@ -19,6 +25,8 @@ fn test_unicode_aliases() {
 
 #[test]
 fn test_ipython_escape_commands() {
+    crate::set_new_parser(true);
+
     let parse_ast = parse(
         r"
 # Normal Python code
@@ -95,6 +103,8 @@ foo.bar[0].baz[2].egg??
 
 #[test]
 fn test_ipython_escape_command_parse_error() {
+    crate::set_new_parser(true);
+
     let source = r"
 a = 1
 %timeit a == 1
