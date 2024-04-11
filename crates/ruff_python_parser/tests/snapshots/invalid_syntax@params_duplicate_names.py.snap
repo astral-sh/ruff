@@ -135,29 +135,29 @@ Module(
 
   |
 1 | def foo(a, a=10, *a, a, a: str, **a): ...
-  |            ^ Syntax Error: Duplicate parameter 'a'
+  |            ^ Syntax Error: Duplicate parameter "a"
   |
 
 
   |
 1 | def foo(a, a=10, *a, a, a: str, **a): ...
-  |                      ^ Syntax Error: Duplicate parameter 'a'
+  |                      ^ Syntax Error: Duplicate parameter "a"
   |
 
 
   |
 1 | def foo(a, a=10, *a, a, a: str, **a): ...
-  |                         ^ Syntax Error: Duplicate parameter 'a'
+  |                         ^ Syntax Error: Duplicate parameter "a"
   |
 
 
   |
 1 | def foo(a, a=10, *a, a, a: str, **a): ...
-  |                   ^ Syntax Error: Duplicate parameter 'a'
+  |                   ^ Syntax Error: Duplicate parameter "a"
   |
 
 
   |
 1 | def foo(a, a=10, *a, a, a: str, **a): ...
-  |                                   ^ Syntax Error: Duplicate parameter 'a'
+  |                                   ^ Syntax Error: Duplicate parameter "a"
   |

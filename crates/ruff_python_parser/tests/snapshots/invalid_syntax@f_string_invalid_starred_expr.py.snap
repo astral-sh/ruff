@@ -191,7 +191,7 @@ Module(
 1 | # Starred expression inside f-string has a minimum precedence of bitwise or.
 2 | f"{*}"
 3 | f"{*x and y}"
-  |     ^^^^^^^ Syntax Error: boolean expression cannot be used here
+  |     ^^^^^^^ Syntax Error: Boolean expression cannot be used here
 4 | f"{*yield x}"
   |
 
@@ -200,5 +200,5 @@ Module(
 2 | f"{*}"
 3 | f"{*x and y}"
 4 | f"{*yield x}"
-  |     ^^^^^^^ Syntax Error: yield expression cannot be used here
+  |     ^^^^^^^ Syntax Error: Yield expression cannot be used here
   |

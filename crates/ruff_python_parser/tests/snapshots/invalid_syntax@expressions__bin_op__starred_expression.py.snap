@@ -79,7 +79,7 @@ Module(
 
   |
 1 | x + *y
-  |     ^^ Syntax Error: starred expression cannot be used here
+  |     ^^ Syntax Error: Starred expression cannot be used here
 2 | x ** *y
   |
 
@@ -87,5 +87,5 @@ Module(
   |
 1 | x + *y
 2 | x ** *y
-  |      ^^ Syntax Error: starred expression cannot be used here
+  |      ^^ Syntax Error: Starred expression cannot be used here
   |
