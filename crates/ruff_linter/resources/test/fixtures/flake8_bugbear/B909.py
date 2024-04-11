@@ -79,33 +79,33 @@ class A:
 
 
 a = A((1, 2, 3))
-# ensure member accesses are handled
+# ensure member accesses are handled as errors
 for elem in a.some_list:
     a.some_list.remove(elem)
     del a.some_list[2]
 
 
-# Augassign
+# Augassign should error
 
 foo = [1, 2, 3]
 bar = [4, 5, 6]
 for _ in foo:
     foo *= 2
     foo += bar
-    foo[1] = 9 #todo
+    foo[1] = 9
     foo[1:2] = bar
     foo[1:2:3] = bar
 
 foo = {1,2,3}
 bar = {4,5,6}
-for _ in foo:
+for _ in foo: # should error
     foo |= bar
     foo &= bar
     foo -= bar
     foo ^= bar
 
 
-# more tests for unconditional breaks
+# more tests for unconditional breaks - should not error
 for _ in foo:
     foo.remove(1)
     for _ in bar:
