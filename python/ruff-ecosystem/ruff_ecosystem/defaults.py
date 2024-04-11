@@ -1,9 +1,9 @@
 """
 Default projects for ecosystem checks
 """
+
 from ruff_ecosystem.projects import (
     CheckOptions,
-    ConfigOverrides,
     FormatOptions,
     Project,
     Repository,
@@ -19,6 +19,7 @@ DEFAULT_TARGETS = [
     Project(repo=Repository(owner="Snowflake-Labs", name="snowcli", ref="main")),
     Project(repo=Repository(owner="aiven", name="aiven-client", ref="main")),
     Project(repo=Repository(owner="alteryx", name="featuretools", ref="main")),
+    Project(repo=Repository(owner="PlasmaPy", name="PlasmaPy", ref="main")),
     Project(
         repo=Repository(owner="apache", name="airflow", ref="main"),
         check_options=CheckOptions(select="ALL"),
@@ -55,11 +56,6 @@ DEFAULT_TARGETS = [
     Project(repo=Repository(owner="pypa", name="pip", ref="main")),
     Project(
         repo=Repository(owner="pypa", name="setuptools", ref="main"),
-        # Since `setuptools` opts into the "preserve" quote style which
-        # require preview mode, we must disable it during the `--no-preview` run
-        config_overrides=ConfigOverrides(
-            when_no_preview={"format.quote-style": "double"}
-        ),
     ),
     Project(repo=Repository(owner="python", name="mypy", ref="master")),
     Project(
@@ -68,7 +64,7 @@ DEFAULT_TARGETS = [
             name="typeshed",
             ref="main",
         ),
-        check_options=CheckOptions(select="PYI"),
+        check_options=CheckOptions(select="E,F,FA,I,PYI,RUF,UP,W"),
     ),
     Project(repo=Repository(owner="python-poetry", name="poetry", ref="master")),
     Project(repo=Repository(owner="reflex-dev", name="reflex", ref="main")),
@@ -77,17 +73,19 @@ DEFAULT_TARGETS = [
     Project(
         repo=Repository(owner="scikit-build", name="scikit-build-core", ref="main")
     ),
-    Project(
-        repo=Repository(
-            owner="sphinx-doc",
-            name="sphinx",
-            ref="master",
-        ),
-        format_options=FormatOptions(
-            # Does not contain valid UTF-8
-            exclude="tests/roots/test-pycode/cp_1251_coded.py"
-        ),
-    ),
+    # TODO(charlie): Ecosystem check fails in non-preview due to the direct
+    # selection of preview rules.
+    # Project(
+    #     repo=Repository(
+    #         owner="sphinx-doc",
+    #         name="sphinx",
+    #         ref="master",
+    #     ),
+    #     format_options=FormatOptions(
+    #         # Does not contain valid UTF-8
+    #         exclude="tests/roots/test-pycode/cp_1251_coded.py"
+    #     ),
+    # ),
     Project(repo=Repository(owner="spruceid", name="siwe-py", ref="main")),
     Project(repo=Repository(owner="tiangolo", name="fastapi", ref="master")),
     Project(repo=Repository(owner="yandex", name="ch-backup", ref="main")),
@@ -95,6 +93,7 @@ DEFAULT_TARGETS = [
         repo=Repository(owner="zulip", name="zulip", ref="main"),
         check_options=CheckOptions(select="ALL"),
     ),
+    Project(repo=Repository(owner="indico", name="indico", ref="master")),
     # Jupyter Notebooks
     Project(
         # fork of `huggingface` without syntax errors in notebooks
@@ -109,6 +108,13 @@ DEFAULT_TARGETS = [
     Project(
         repo=Repository(owner="openai", name="openai-cookbook", ref="main"),
         check_options=CheckOptions(select=JUPYTER_NOTEBOOK_SELECT),
-        config_overrides={"include": ["*.ipynb"]},
+        config_overrides={
+            "include": ["*.ipynb"],
+            # TODO(charlie): Re-enable after fixing typo.
+            "exclude": [
+                "examples/dalle/Image_generations_edits_and_variations_with_DALL-E.ipynb",
+                "examples/How_to_handle_rate_limits.ipynb",
+            ],
+        },
     ),
 ]

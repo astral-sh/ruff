@@ -1,9 +1,11 @@
-use ruff_python_ast::Stmt;
 use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::Stmt;
 use ruff_text_size::Ranged;
+
+use crate::rules::flake8_import_conventions::settings::BannedAliases;
 
 /// ## What it does
 /// Checks for imports that use non-standard naming conventions, like
@@ -29,7 +31,7 @@ use ruff_text_size::Ranged;
 /// ```
 ///
 /// ## Options
-/// - `flake8-import-conventions.banned-aliases`
+/// - `lint.flake8-import-conventions.banned-aliases`
 #[violation]
 pub struct BannedImportAlias {
     name: String,
@@ -49,7 +51,7 @@ pub(crate) fn banned_import_alias(
     stmt: &Stmt,
     name: &str,
     asname: &str,
-    banned_conventions: &FxHashMap<String, Vec<String>>,
+    banned_conventions: &FxHashMap<String, BannedAliases>,
 ) -> Option<Diagnostic> {
     if let Some(banned_aliases) = banned_conventions.get(name) {
         if banned_aliases

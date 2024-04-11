@@ -1,0 +1,43 @@
+[package]
+name = "ruff_server"
+version = "0.2.2"
+publish = false
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+
+[lib]
+
+[dependencies]
+ruff_diagnostics = { path = "../ruff_diagnostics" }
+ruff_formatter = { path = "../ruff_formatter" }
+ruff_linter = { path = "../ruff_linter" }
+ruff_python_ast = { path = "../ruff_python_ast" }
+ruff_python_codegen = { path = "../ruff_python_codegen" }
+ruff_python_formatter = { path = "../ruff_python_formatter" }
+ruff_python_index = { path = "../ruff_python_index" }
+ruff_python_parser = { path = "../ruff_python_parser" }
+ruff_source_file = { path = "../ruff_source_file" }
+ruff_text_size = { path = "../ruff_text_size" }
+ruff_workspace = { path = "../ruff_workspace" }
+
+anyhow = { workspace = true }
+crossbeam = { workspace = true }
+jod-thread = { workspace = true }
+libc = { workspace = true }
+lsp-server = { workspace = true }
+lsp-types = { workspace = true }
+rustc-hash = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+insta = { workspace = true }
+
+[lints]
+workspace = true

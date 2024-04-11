@@ -39,21 +39,21 @@ pub(crate) fn assignment_target(target: &Expr) -> Result<(), LexicalError> {
 
     let err = |location: TextSize| -> LexicalError {
         let error = LexicalErrorType::AssignmentError;
-        LexicalError { error, location }
+        LexicalError::new(error, location)
     };
     match *target {
         BoolOp(ref e) => Err(err(e.range.start())),
-        NamedExpr(ref e) => Err(err(e.range.start())),
+        Named(ref e) => Err(err(e.range.start())),
         BinOp(ref e) => Err(err(e.range.start())),
         UnaryOp(ref e) => Err(err(e.range.start())),
         Lambda(ref e) => Err(err(e.range.start())),
-        IfExp(ref e) => Err(err(e.range.start())),
+        If(ref e) => Err(err(e.range.start())),
         Dict(ref e) => Err(err(e.range.start())),
         Set(ref e) => Err(err(e.range.start())),
         ListComp(ref e) => Err(err(e.range.start())),
         SetComp(ref e) => Err(err(e.range.start())),
         DictComp(ref e) => Err(err(e.range.start())),
-        GeneratorExp(ref e) => Err(err(e.range.start())),
+        Generator(ref e) => Err(err(e.range.start())),
         Await(ref e) => Err(err(e.range.start())),
         Yield(ref e) => Err(err(e.range.start())),
         YieldFrom(ref e) => Err(err(e.range.start())),

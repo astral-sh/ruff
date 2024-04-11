@@ -195,7 +195,7 @@ a[aaaaaaa, b] = (
     cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc  # comment
 )
 
-# Format both as flat, but don't loos the comment.
+# Format both as flat, but don't lose the comment.
 a[aaaaaaa, b] = bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb  # comment
 
 #######################################################

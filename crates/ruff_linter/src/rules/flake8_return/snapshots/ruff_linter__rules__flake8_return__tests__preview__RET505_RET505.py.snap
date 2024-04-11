@@ -182,101 +182,283 @@ RET505.py:99:5: RET505 [*] Unnecessary `else` after `return` statement
     102 |+        return None
 104 103 | 
 105 104 | 
-106 105 | ###
+106 105 | def fibo(n):
 
-RET505.py:137:5: RET505 [*] Unnecessary `else` after `return` statement
+RET505.py:109:5: RET505 [*] Unnecessary `else` after `return` statement
     |
-135 |     if True:
-136 |         return
-137 |     else:
+107 |     if n<2:
+108 |         return n;
+109 |     else:
     |     ^^^^ RET505
-138 |         # comment
-139 |         pass
+110 |         last = 1;
+111 |         last2 = 0;
     |
     = help: Remove unnecessary `else`
 
 ℹ Safe fix
-134 134 | def bar4(x):
-135 135 |     if True:
-136 136 |         return
-137     |-    else:
-138     |-        # comment
-139     |-        pass
-    137 |+    # comment
-    138 |+    pass
-140 139 | 
-141 140 | 
-142 141 | def bar5():
+106 106 | def fibo(n):
+107 107 |     if n<2:
+108 108 |         return n;
+109     |-    else:
+110     |-        last = 1;
+111     |-        last2 = 0;
+    109 |+    last = 1;
+    110 |+    last2 = 0;
+112 111 | 
+113 112 | 
+114 113 | ###
 
 RET505.py:145:5: RET505 [*] Unnecessary `else` after `return` statement
     |
 143 |     if True:
 144 |         return
-145 |     else:  # comment
+145 |     else:
     |     ^^^^ RET505
-146 |         pass
+146 |         # comment
+147 |         pass
     |
     = help: Remove unnecessary `else`
 
 ℹ Safe fix
-142 142 | def bar5():
+142 142 | def bar4(x):
 143 143 |     if True:
 144 144 |         return
-145     |-    else:  # comment
-146     |-        pass
+145     |-    else:
+146     |-        # comment
+147     |-        pass
     145 |+    # comment
     146 |+    pass
-147 147 | 
-148 148 | 
-149 149 | def bar6():
+148 147 | 
+149 148 | 
+150 149 | def bar5():
 
-RET505.py:152:5: RET505 [*] Unnecessary `else` after `return` statement
+RET505.py:153:5: RET505 [*] Unnecessary `else` after `return` statement
     |
-150 |     if True:
-151 |         return
-152 |     else\
+151 |     if True:
+152 |         return
+153 |     else:  # comment
     |     ^^^^ RET505
-153 |         :\
-154 |         # comment
+154 |         pass
     |
     = help: Remove unnecessary `else`
 
 ℹ Safe fix
-149 149 | def bar6():
-150 150 |     if True:
-151 151 |         return
-152     |-    else\
-153     |-        :\
-154     |-        # comment
-155     |-        pass
-    152 |+    # comment
-    153 |+    pass
-156 154 | 
-157 155 | 
-158 156 | def bar7():
+150 150 | def bar5():
+151 151 |     if True:
+152 152 |         return
+153     |-    else:  # comment
+154     |-        pass
+    153 |+    # comment
+    154 |+    pass
+155 155 | 
+156 156 | 
+157 157 | def bar6():
 
-RET505.py:161:5: RET505 [*] Unnecessary `else` after `return` statement
+RET505.py:160:5: RET505 [*] Unnecessary `else` after `return` statement
     |
-159 |     if True:
-160 |         return
-161 |     else\
+158 |     if True:
+159 |         return
+160 |     else\
     |     ^^^^ RET505
-162 |         :  # comment
-163 |         pass
+161 |         :\
+162 |         # comment
     |
     = help: Remove unnecessary `else`
 
 ℹ Safe fix
-158 158 | def bar7():
-159 159 |     if True:
-160 160 |         return
-161     |-    else\
-162     |-        :  # comment
+157 157 | def bar6():
+158 158 |     if True:
+159 159 |         return
+160     |-    else\
+161     |-        :\
+162     |-        # comment
 163     |-        pass
-    161 |+    # comment
-    162 |+    pass
-164 163 | 
-165 164 | x = 0
-166 165 | 
+    160 |+    # comment
+    161 |+    pass
+164 162 | 
+165 163 | 
+166 164 | def bar7():
+
+RET505.py:169:5: RET505 [*] Unnecessary `else` after `return` statement
+    |
+167 |     if True:
+168 |         return
+169 |     else\
+    |     ^^^^ RET505
+170 |         :  # comment
+171 |         pass
+    |
+    = help: Remove unnecessary `else`
+
+ℹ Safe fix
+166 166 | def bar7():
+167 167 |     if True:
+168 168 |         return
+169     |-    else\
+170     |-        :  # comment
+171     |-        pass
+    169 |+    # comment
+    170 |+    pass
+172 171 | 
+173 172 | 
+174 173 | def bar8():
+
+RET505.py:177:5: RET505 [*] Unnecessary `else` after `return` statement
+    |
+175 |     if True:
+176 |         return
+177 |     else: pass
+    |     ^^^^ RET505
+    |
+    = help: Remove unnecessary `else`
+
+ℹ Safe fix
+174 174 | def bar8():
+175 175 |     if True:
+176 176 |         return
+177     |-    else: pass
+    177 |+    pass
+178 178 | 
+179 179 | 
+180 180 | def bar9():
+
+RET505.py:183:5: RET505 [*] Unnecessary `else` after `return` statement
+    |
+181 |     if True:
+182 |         return
+183 |     else:\
+    |     ^^^^ RET505
+184 |         pass
+    |
+    = help: Remove unnecessary `else`
+
+ℹ Safe fix
+180 180 | def bar9():
+181 181 |     if True:
+182 182 |         return
+183     |-    else:\
+184     |-        pass
+    183 |+    pass
+185 184 | 
+186 185 | 
+187 186 | x = 0
+
+RET505.py:200:5: RET505 [*] Unnecessary `else` after `return` statement
+    |
+198 | def sb(self):
+199 |     if self._sb is not None: return self._sb
+200 |     else: self._sb = '\033[01;%dm'; self._sa = '\033[0;0m';
+    |     ^^^^ RET505
+    |
+    = help: Remove unnecessary `else`
+
+ℹ Safe fix
+197 197 | # Regression test for: https://github.com/astral-sh/ruff/issues/9732
+198 198 | def sb(self):
+199 199 |     if self._sb is not None: return self._sb
+200     |-    else: self._sb = '\033[01;%dm'; self._sa = '\033[0;0m';
+    200 |+    self._sb = '\033[01;%dm'; self._sa = '\033[0;0m';
+201 201 | 
+202 202 | 
+203 203 | def indent(x, y, w, z):
+
+RET505.py:207:5: RET505 [*] Unnecessary `else` after `return` statement
+    |
+205 |         a = 1
+206 |         return y
+207 |     else:
+    |     ^^^^ RET505
+208 | 
+209 |         c = 3
+    |
+    = help: Remove unnecessary `else`
+
+ℹ Safe fix
+204 204 |     if x:  # [no-else-return]
+205 205 |         a = 1
+206 206 |         return y
+207     |-    else:
+208 207 | 
+209     |-        c = 3
+210     |-        return z
+    208 |+    c = 3
+    209 |+    return z
+211 210 | 
+212 211 | 
+213 212 | def indent(x, y, w, z):
+
+RET505.py:217:5: RET505 [*] Unnecessary `else` after `return` statement
+    |
+215 |         a = 1
+216 |         return y
+217 |     else:
+    |     ^^^^ RET505
+218 |         # comment
+219 |         c = 3
+    |
+    = help: Remove unnecessary `else`
+
+ℹ Safe fix
+214 214 |     if x:  # [no-else-return]
+215 215 |         a = 1
+216 216 |         return y
+217     |-    else:
+218     |-        # comment
+219     |-        c = 3
+220     |-        return z
+    217 |+    # comment
+    218 |+    c = 3
+    219 |+    return z
+221 220 | 
+222 221 | 
+223 222 | def indent(x, y, w, z):
+
+RET505.py:227:5: RET505 [*] Unnecessary `else` after `return` statement
+    |
+225 |         a = 1
+226 |         return y
+227 |     else:
+    |     ^^^^ RET505
+228 |           # comment
+229 |         c = 3
+    |
+    = help: Remove unnecessary `else`
+
+ℹ Safe fix
+224 224 |     if x:  # [no-else-return]
+225 225 |         a = 1
+226 226 |         return y
+227     |-    else:
+228     |-          # comment
+229     |-        c = 3
+230     |-        return z
+    227 |+      # comment
+    228 |+    c = 3
+    229 |+    return z
+231 230 | 
+232 231 | 
+233 232 | def indent(x, y, w, z):
+
+RET505.py:237:5: RET505 [*] Unnecessary `else` after `return` statement
+    |
+235 |         a = 1
+236 |         return y
+237 |     else:
+    |     ^^^^ RET505
+238 |   # comment
+239 |         c = 3
+    |
+    = help: Remove unnecessary `else`
+
+ℹ Safe fix
+234 234 |     if x:  # [no-else-return]
+235 235 |         a = 1
+236 236 |         return y
+237     |-    else:
+238 237 |   # comment
+239     |-        c = 3
+240     |-        return z
+    238 |+    c = 3
+    239 |+    return z
 
 

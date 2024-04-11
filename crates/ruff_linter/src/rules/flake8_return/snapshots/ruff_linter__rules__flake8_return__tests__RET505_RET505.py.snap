@@ -89,14 +89,14 @@ RET505.py:99:5: RET505 Unnecessary `else` after `return` statement
     |
     = help: Remove unnecessary `else`
 
-RET505.py:137:5: RET505 Unnecessary `else` after `return` statement
+RET505.py:109:5: RET505 Unnecessary `else` after `return` statement
     |
-135 |     if True:
-136 |         return
-137 |     else:
+107 |     if n<2:
+108 |         return n;
+109 |     else:
     |     ^^^^ RET505
-138 |         # comment
-139 |         pass
+110 |         last = 1;
+111 |         last2 = 0;
     |
     = help: Remove unnecessary `else`
 
@@ -104,31 +104,114 @@ RET505.py:145:5: RET505 Unnecessary `else` after `return` statement
     |
 143 |     if True:
 144 |         return
-145 |     else:  # comment
+145 |     else:
     |     ^^^^ RET505
-146 |         pass
+146 |         # comment
+147 |         pass
     |
     = help: Remove unnecessary `else`
 
-RET505.py:152:5: RET505 Unnecessary `else` after `return` statement
+RET505.py:153:5: RET505 Unnecessary `else` after `return` statement
     |
-150 |     if True:
-151 |         return
-152 |     else\
+151 |     if True:
+152 |         return
+153 |     else:  # comment
     |     ^^^^ RET505
-153 |         :\
-154 |         # comment
+154 |         pass
     |
     = help: Remove unnecessary `else`
 
-RET505.py:161:5: RET505 Unnecessary `else` after `return` statement
+RET505.py:160:5: RET505 Unnecessary `else` after `return` statement
     |
-159 |     if True:
-160 |         return
-161 |     else\
+158 |     if True:
+159 |         return
+160 |     else\
     |     ^^^^ RET505
-162 |         :  # comment
-163 |         pass
+161 |         :\
+162 |         # comment
+    |
+    = help: Remove unnecessary `else`
+
+RET505.py:169:5: RET505 Unnecessary `else` after `return` statement
+    |
+167 |     if True:
+168 |         return
+169 |     else\
+    |     ^^^^ RET505
+170 |         :  # comment
+171 |         pass
+    |
+    = help: Remove unnecessary `else`
+
+RET505.py:177:5: RET505 Unnecessary `else` after `return` statement
+    |
+175 |     if True:
+176 |         return
+177 |     else: pass
+    |     ^^^^ RET505
+    |
+    = help: Remove unnecessary `else`
+
+RET505.py:183:5: RET505 Unnecessary `else` after `return` statement
+    |
+181 |     if True:
+182 |         return
+183 |     else:\
+    |     ^^^^ RET505
+184 |         pass
+    |
+    = help: Remove unnecessary `else`
+
+RET505.py:200:5: RET505 Unnecessary `else` after `return` statement
+    |
+198 | def sb(self):
+199 |     if self._sb is not None: return self._sb
+200 |     else: self._sb = '\033[01;%dm'; self._sa = '\033[0;0m';
+    |     ^^^^ RET505
+    |
+    = help: Remove unnecessary `else`
+
+RET505.py:207:5: RET505 Unnecessary `else` after `return` statement
+    |
+205 |         a = 1
+206 |         return y
+207 |     else:
+    |     ^^^^ RET505
+208 | 
+209 |         c = 3
+    |
+    = help: Remove unnecessary `else`
+
+RET505.py:217:5: RET505 Unnecessary `else` after `return` statement
+    |
+215 |         a = 1
+216 |         return y
+217 |     else:
+    |     ^^^^ RET505
+218 |         # comment
+219 |         c = 3
+    |
+    = help: Remove unnecessary `else`
+
+RET505.py:227:5: RET505 Unnecessary `else` after `return` statement
+    |
+225 |         a = 1
+226 |         return y
+227 |     else:
+    |     ^^^^ RET505
+228 |           # comment
+229 |         c = 3
+    |
+    = help: Remove unnecessary `else`
+
+RET505.py:237:5: RET505 Unnecessary `else` after `return` statement
+    |
+235 |         a = 1
+236 |         return y
+237 |     else:
+    |     ^^^^ RET505
+238 |   # comment
+239 |         c = 3
     |
     = help: Remove unnecessary `else`
 

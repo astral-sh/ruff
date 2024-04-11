@@ -141,12 +141,12 @@ fn is_constant_like(expr: &Expr) -> bool {
                 | Expr::ListComp(_)
                 | Expr::SetComp(_)
                 | Expr::DictComp(_)
-                | Expr::GeneratorExp(_)
+                | Expr::Generator(_)
                 | Expr::Await(_)
                 | Expr::Yield(_)
                 | Expr::YieldFrom(_)
                 | Expr::Call(_)
-                | Expr::NamedExpr(_)
+                | Expr::Named(_)
         )
     })
 }
@@ -160,11 +160,11 @@ fn fix_unnecessary_dict_comprehension(value: &Expr, generator: &Comprehension) -
     let iterable = generator.iter.clone();
     let args = Arguments {
         args: if value.is_none_literal_expr() {
-            vec![iterable]
+            Box::from([iterable])
         } else {
-            vec![iterable, value.clone()]
+            Box::from([iterable, value.clone()])
         },
-        keywords: vec![],
+        keywords: Box::from([]),
         range: TextRange::default(),
     };
     Expr::Call(ExprCall {

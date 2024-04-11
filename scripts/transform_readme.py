@@ -4,6 +4,7 @@ By default, we assume that our README.md will be rendered on GitHub. However, di
 targets have different strategies for rendering light- and dark-mode images. This script
 adjusts the images in the README.md to support the given target.
 """
+
 from __future__ import annotations
 
 import argparse

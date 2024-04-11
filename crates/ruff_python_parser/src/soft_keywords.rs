@@ -203,7 +203,7 @@ fn soft_to_name(tok: &Tok) -> Tok {
         _ => unreachable!("other tokens never reach here"),
     };
     Tok::Name {
-        name: name.to_owned(),
+        name: name.to_string().into_boxed_str(),
     }
 }
 

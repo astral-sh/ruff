@@ -201,7 +201,7 @@ a[aaaaaaa, b] = (
     cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc  # comment
 )
 
-# Format both as flat, but don't loos the comment.
+# Format both as flat, but don't lose the comment.
 a[aaaaaaa, b] = bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb  # comment
 
 #######################################################
@@ -254,6 +254,7 @@ docstring-code             = Disabled
 docstring-code-line-width  = "dynamic"
 preview                    = Enabled
 target_version             = Py38
+source_type                = Python
 ```
 
 ```python
@@ -454,7 +455,7 @@ a[aaaaaaa, b] = (
     cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc  # comment
 )
 
-# Format both as flat, but don't loos the comment.
+# Format both as flat, but don't lose the comment.
 a[aaaaaaa, b] = bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb  # comment
 
 #######################################################
@@ -487,6 +488,3 @@ type A[
     VeryLongTypeNameThatShouldBreakFirstToTheRightBeforeSplitngtinthatExceedsTheWidth
 ] = str
 ```
-
-
-

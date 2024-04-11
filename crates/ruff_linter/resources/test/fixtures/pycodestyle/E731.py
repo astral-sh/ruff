@@ -60,7 +60,7 @@ class Scope:
 class Scope:
     from typing import Callable
 
-    # E731
+    # OK
     f: Callable[[int], int] = lambda x: 2 * x
 
 
@@ -147,3 +147,12 @@ def scope():
     f = lambda: (
         i := 1,
     )
+
+
+from dataclasses import dataclass
+from typing import Callable
+
+@dataclass
+class FilterDataclass:
+    # OK
+    filter: Callable[[str], bool] = lambda _: True

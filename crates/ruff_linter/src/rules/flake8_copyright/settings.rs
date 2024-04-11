@@ -7,7 +7,7 @@ use std::fmt::{Display, Formatter};
 use crate::display_settings;
 use ruff_macros::CacheKey;
 
-#[derive(Debug, CacheKey)]
+#[derive(Debug, Clone, CacheKey)]
 pub struct Settings {
     pub notice_rgx: Regex,
     pub author: Option<String>,
@@ -15,7 +15,7 @@ pub struct Settings {
 }
 
 pub static COPYRIGHT: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"(?i)Copyright\s+(\(C\)\s+)?\d{4}(-\d{4})*").unwrap());
+    Lazy::new(|| Regex::new(r"(?i)Copyright\s+((?:\(C\)|©)\s+)?\d{4}((-|,\s)\d{4})*").unwrap());
 
 impl Default for Settings {
     fn default() -> Self {

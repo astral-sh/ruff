@@ -11,15 +11,13 @@ mod tests {
     use test_case::test_case;
 
     use crate::registry::Rule;
-    use crate::settings::types::PreviewMode;
-    use crate::settings::LinterSettings;
+
     use crate::test::test_path;
     use crate::{assert_messages, settings};
 
     #[test_case(Rule::RaiseVanillaClass, Path::new("TRY002.py"))]
     #[test_case(Rule::RaiseVanillaArgs, Path::new("TRY003.py"))]
     #[test_case(Rule::TypeCheckWithoutTypeError, Path::new("TRY004.py"))]
-    #[test_case(Rule::ReraiseNoCause, Path::new("TRY200.py"))]
     #[test_case(Rule::VerboseRaise, Path::new("TRY201.py"))]
     #[test_case(Rule::TryConsiderElse, Path::new("TRY300.py"))]
     #[test_case(Rule::RaiseWithinTry, Path::new("TRY301.py"))]
@@ -31,24 +29,6 @@ mod tests {
         let diagnostics = test_path(
             Path::new("tryceratops").join(path).as_path(),
             &settings::LinterSettings::for_rule(rule_code),
-        )?;
-        assert_messages!(snapshot, diagnostics);
-        Ok(())
-    }
-
-    #[test_case(Rule::ErrorInsteadOfException, Path::new("TRY400.py"))]
-    fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!(
-            "preview__{}_{}",
-            rule_code.noqa_code(),
-            path.to_string_lossy()
-        );
-        let diagnostics = test_path(
-            Path::new("tryceratops").join(path).as_path(),
-            &LinterSettings {
-                preview: PreviewMode::Enabled,
-                ..LinterSettings::for_rule(rule_code)
-            },
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())

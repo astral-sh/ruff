@@ -1,43 +1,7 @@
 use libcst_native::{
-    Expression, Name, NameOrAttribute, ParenthesizableWhitespace, SimpleWhitespace, UnaryOperation,
+    Expression, LeftParen, Name, ParenthesizableWhitespace, ParenthesizedNode, RightParen,
+    SimpleWhitespace, UnaryOperation,
 };
-
-fn compose_call_path_inner<'a>(expr: &'a Expression, parts: &mut Vec<&'a str>) {
-    match expr {
-        Expression::Call(expr) => {
-            compose_call_path_inner(&expr.func, parts);
-        }
-        Expression::Attribute(expr) => {
-            compose_call_path_inner(&expr.value, parts);
-            parts.push(expr.attr.value);
-        }
-        Expression::Name(expr) => {
-            parts.push(expr.value);
-        }
-        _ => {}
-    }
-}
-
-pub(crate) fn compose_call_path(expr: &Expression) -> Option<String> {
-    let mut segments = vec![];
-    compose_call_path_inner(expr, &mut segments);
-    if segments.is_empty() {
-        None
-    } else {
-        Some(segments.join("."))
-    }
-}
-
-pub(crate) fn compose_module_path(module: &NameOrAttribute) -> String {
-    match module {
-        NameOrAttribute::N(name) => name.value.to_string(),
-        NameOrAttribute::A(attr) => {
-            let name = attr.attr.value;
-            let prefix = compose_call_path(&attr.value);
-            prefix.map_or_else(|| name.to_string(), |prefix| format!("{prefix}.{name}"))
-        }
-    }
-}
 
 /// Return a [`ParenthesizableWhitespace`] containing a single space.
 pub(crate) fn space() -> ParenthesizableWhitespace<'static> {
@@ -61,6 +25,7 @@ pub(crate) fn negate<'a>(expression: &Expression<'a>) -> Expression<'a> {
         }
     }
 
+    // If the expression is `True` or `False`, return the opposite.
     if let Expression::Name(ref expression) = expression {
         match expression.value {
             "True" => {
@@ -81,11 +46,32 @@ pub(crate) fn negate<'a>(expression: &Expression<'a>) -> Expression<'a> {
         }
     }
 
+    // If the expression is higher precedence than the unary `not`, we need to wrap it in
+    // parentheses.
+    //
+    // For example: given `a and b`, we need to return `not (a and b)`, rather than `not a and b`.
+    //
+    // See: <https://docs.python.org/3/reference/expressions.html#operator-precedence>
+    let needs_parens = matches!(
+        expression,
+        Expression::BooleanOperation(_)
+            | Expression::IfExp(_)
+            | Expression::Lambda(_)
+            | Expression::NamedExpr(_)
+    );
+    let has_parens = !expression.lpar().is_empty() && !expression.rpar().is_empty();
+    // Otherwise, wrap in a `not` operator.
     Expression::UnaryOperation(Box::new(UnaryOperation {
         operator: libcst_native::UnaryOp::Not {
             whitespace_after: space(),
         },
-        expression: Box::new(expression.clone()),
+        expression: Box::new(if needs_parens && !has_parens {
+            expression
+                .clone()
+                .with_parens(LeftParen::default(), RightParen::default())
+        } else {
+            expression.clone()
+        }),
         lpar: vec![],
         rpar: vec![],
     }))

@@ -13,9 +13,12 @@ use crate::checkers::ast::Checker;
 /// According to [PEP 8], "imports are always put at the top of the file, just after any
 /// module comments and docstrings, and before module globals and constants."
 ///
-/// In [preview], this rule makes an exception for `sys.path` modifications,
-/// allowing for `sys.path.insert`, `sys.path.append`, and similar
-/// modifications between import statements.
+/// This rule makes an exception for `sys.path` modifications,  allowing for
+/// `sys.path.insert`, `sys.path.append`, and similar modifications between import
+/// statements.
+///
+/// In [preview], this rule also allows `os.environ` modifications between import
+/// statements.
 ///
 /// ## Example
 /// ```python

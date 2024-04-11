@@ -6,8 +6,7 @@
 //! [CPython source]: https://github.com/python/cpython/blob/dfc2e065a2e71011017077e549cd2f9bf4944c54/Include/internal/pycore_token.h;
 use crate::Mode;
 
-use ruff_python_ast::{Int, IpyEscapeKind};
-use ruff_text_size::TextSize;
+use ruff_python_ast::{AnyStringKind, Int, IpyEscapeKind};
 use std::fmt;
 
 /// The set of tokens the Python source code can be tokenized in.
@@ -16,7 +15,10 @@ pub enum Tok {
     /// Token value for a name, commonly known as an identifier.
     Name {
         /// The name value.
-        name: String,
+        ///
+        /// Unicode names are NFKC-normalized by the lexer,
+        /// matching [the behaviour of Python's lexer](https://docs.python.org/3/reference/lexical_analysis.html#identifiers)
+        name: Box<str>,
     },
     /// Token value for an integer.
     Int {
@@ -38,22 +40,22 @@ pub enum Tok {
     /// Token value for a string.
     String {
         /// The string value.
-        value: String,
-        /// The kind of string.
-        kind: StringKind,
-        /// Whether the string is triple quoted.
-        triple_quoted: bool,
+        value: Box<str>,
+        /// Flags that can be queried to determine the quote style
+        /// and prefixes of the string
+        kind: AnyStringKind,
     },
     /// Token value for the start of an f-string. This includes the `f`/`F`/`fr` prefix
     /// and the opening quote(s).
-    FStringStart,
+    FStringStart(AnyStringKind),
     /// Token value that includes the portion of text inside the f-string that's not
     /// part of the expression part and isn't an opening or closing brace.
     FStringMiddle {
         /// The string value.
-        value: String,
-        /// Whether the string is raw or not.
-        is_raw: bool,
+        value: Box<str>,
+        /// Flags that can be queried to determine the quote style
+        /// and prefixes of the string
+        kind: AnyStringKind,
     },
     /// Token value for the end of an f-string. This includes the closing quote.
     FStringEnd,
@@ -61,12 +63,12 @@ pub enum Tok {
     /// only when the mode is [`Mode::Ipython`].
     IpyEscapeCommand {
         /// The magic command value.
-        value: String,
+        value: Box<str>,
         /// The kind of magic command.
         kind: IpyEscapeKind,
     },
     /// Token value for a comment. These are filtered out of the token stream prior to parsing.
-    Comment(String),
+    Comment(Box<str>),
     /// Token value for a newline.
     Newline,
     /// Token value for a newline that is not a logical line break. These are filtered out of
@@ -241,15 +243,10 @@ impl fmt::Display for Tok {
             Int { value } => write!(f, "'{value}'"),
             Float { value } => write!(f, "'{value}'"),
             Complex { real, imag } => write!(f, "{real}j{imag}"),
-            String {
-                value,
-                kind,
-                triple_quoted,
-            } => {
-                let quotes = "\"".repeat(if *triple_quoted { 3 } else { 1 });
-                write!(f, "{kind}{quotes}{value}{quotes}")
+            String { value, kind } => {
+                write!(f, "{}", kind.format_string_contents(value))
             }
-            FStringStart => f.write_str("FStringStart"),
+            FStringStart(_) => f.write_str("FStringStart"),
             FStringMiddle { value, .. } => f.write_str(value),
             FStringEnd => f.write_str("FStringEnd"),
             IpyEscapeCommand { kind, value } => write!(f, "{kind}{value}"),
@@ -352,103 +349,6 @@ impl fmt::Display for Tok {
     }
 }
 
-/// The kind of string literal as described in the [String and Bytes literals]
-/// section of the Python reference.
-///
-/// Note that f-strings are not included here, because as of [PEP 701] they
-/// emit different tokens than other string literals.
-///
-/// [String and Bytes literals]: https://docs.python.org/3/reference/lexical_analysis.html#string-and-bytes-literals
-/// [PEP 701]: https://peps.python.org/pep-0701/
-#[derive(PartialEq, Eq, Debug, Clone, Hash, Copy)] // TODO: is_macro::Is
-pub enum StringKind {
-    /// A normal string literal with no prefix.
-    String,
-    /// A byte string literal, with a `b` or `B` prefix.
-    Bytes,
-    /// A raw string literal, with a `r` or `R` prefix.
-    RawString,
-    /// A raw byte string literal, with a `rb`/`br` or `rB`/`Br` or `Rb`/`bR` or `RB`/`BR` prefix.
-    RawBytes,
-    /// A unicode string literal, with a `u` or `U` prefix.
-    Unicode,
-}
-
-impl TryFrom<char> for StringKind {
-    type Error = String;
-
-    fn try_from(ch: char) -> Result<Self, String> {
-        match ch {
-            'r' | 'R' => Ok(StringKind::RawString),
-            'u' | 'U' => Ok(StringKind::Unicode),
-            'b' | 'B' => Ok(StringKind::Bytes),
-            c => Err(format!("Unexpected string prefix: {c}")),
-        }
-    }
-}
-
-impl TryFrom<[char; 2]> for StringKind {
-    type Error = String;
-
-    fn try_from(chars: [char; 2]) -> Result<Self, String> {
-        match chars {
-            ['r' | 'R', 'b' | 'B'] => Ok(StringKind::RawBytes),
-            ['b' | 'B', 'r' | 'R'] => Ok(StringKind::RawBytes),
-            [c1, c2] => Err(format!("Unexpected string prefix: {c1}{c2}")),
-        }
-    }
-}
-
-impl fmt::Display for StringKind {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(self.as_str())
-    }
-}
-
-impl StringKind {
-    /// Returns true if the string is a raw string, i,e one of
-    /// [`StringKind::RawString`] or [`StringKind::RawBytes`].
-    pub fn is_raw(&self) -> bool {
-        use StringKind::{RawBytes, RawString};
-        matches!(self, RawString | RawBytes)
-    }
-
-    /// Returns true if the string is a byte string, i,e one of
-    /// [`StringKind::Bytes`] or [`StringKind::RawBytes`].
-    pub fn is_any_bytes(&self) -> bool {
-        use StringKind::{Bytes, RawBytes};
-        matches!(self, Bytes | RawBytes)
-    }
-
-    /// Returns true if the string is a unicode string, i,e [`StringKind::Unicode`].
-    pub fn is_unicode(&self) -> bool {
-        matches!(self, StringKind::Unicode)
-    }
-
-    /// Returns the number of characters in the prefix.
-    pub fn prefix_len(&self) -> TextSize {
-        use StringKind::{Bytes, RawBytes, RawString, String, Unicode};
-        let len = match self {
-            String => 0,
-            RawString | Unicode | Bytes => 1,
-            RawBytes => 2,
-        };
-        len.into()
-    }
-
-    pub fn as_str(&self) -> &'static str {
-        use StringKind::{Bytes, RawBytes, RawString, String, Unicode};
-        match self {
-            String => "",
-            Bytes => "b",
-            RawString => "r",
-            RawBytes => "rb",
-            Unicode => "u",
-        }
-    }
-}
-
-// TODO move to ruff_python_parser?
 #[derive(Copy, Clone, PartialEq, Eq, Hash, Debug)]
 pub enum TokenKind {
     /// Token value for a name, commonly known as an identifier.
@@ -802,7 +702,7 @@ impl TokenKind {
             Tok::Float { .. } => TokenKind::Float,
             Tok::Complex { .. } => TokenKind::Complex,
             Tok::String { .. } => TokenKind::String,
-            Tok::FStringStart => TokenKind::FStringStart,
+            Tok::FStringStart(_) => TokenKind::FStringStart,
             Tok::FStringMiddle { .. } => TokenKind::FStringMiddle,
             Tok::FStringEnd => TokenKind::FStringEnd,
             Tok::IpyEscapeCommand { .. } => TokenKind::EscapeCommand,
@@ -909,4 +809,15 @@ impl From<&Tok> for TokenKind {
     fn from(value: &Tok) -> Self {
         Self::from_token(value)
     }
+}
+
+#[cfg(target_pointer_width = "64")]
+mod sizes {
+    use crate::lexer::{LexicalError, LexicalErrorType};
+    use crate::Tok;
+    use static_assertions::assert_eq_size;
+
+    assert_eq_size!(Tok, [u8; 24]);
+    assert_eq_size!(LexicalErrorType, [u8; 24]);
+    assert_eq_size!(Result<Tok, LexicalError>, [u8; 32]);
 }

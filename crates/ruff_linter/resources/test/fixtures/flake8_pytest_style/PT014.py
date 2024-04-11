@@ -51,3 +51,8 @@ def test_error_parentheses_trailing_comma(x):
 @pytest.mark.parametrize("x", [1, 2])
 def test_ok(x):
     ...
+
+
+@pytest.mark.parametrize('data, spec', [(1.0, 1.0), (1.0, 1.0)])
+def test_numbers(data, spec):
+    ...

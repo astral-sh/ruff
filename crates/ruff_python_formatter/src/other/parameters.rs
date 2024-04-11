@@ -3,12 +3,12 @@ use std::usize;
 use ruff_formatter::{format_args, write, FormatRuleWithOptions};
 use ruff_python_ast::Parameters;
 use ruff_python_ast::{AnyNodeRef, AstNode};
-use ruff_python_trivia::{SimpleToken, SimpleTokenKind, SimpleTokenizer};
+use ruff_python_trivia::{CommentLinePosition, SimpleToken, SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::comments::{
     dangling_comments, dangling_open_parenthesis_comments, leading_comments, leading_node_comments,
-    trailing_comments, CommentLinePosition, SourceComment,
+    trailing_comments, SourceComment,
 };
 use crate::context::{NodeLevel, WithNodeLevel};
 use crate::expression::parentheses::empty_parenthesized;
@@ -450,6 +450,7 @@ pub(crate) fn find_parameter_separators(
     // * `f(a, /, b)`
     // * `f(a, /, *b)`
     // * `f(a, /, *, b)`
+    // * `f(a, /, *, **b)`
     // * `f(a, /)`
     let slash_following_start = parameters
         .args
@@ -457,6 +458,7 @@ pub(crate) fn find_parameter_separators(
         .map(Ranged::start)
         .or(parameters.vararg.as_ref().map(|first| first.start()))
         .or(star.as_ref().map(|star| star.separator.start()))
+        .or(parameters.kwarg.as_deref().map(Ranged::start))
         .unwrap_or(parameters.end());
     let slash = slash.map(|(preceding_end, slash)| ParameterSeparator {
         preceding_end,

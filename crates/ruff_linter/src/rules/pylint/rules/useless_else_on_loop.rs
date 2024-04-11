@@ -6,11 +6,12 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::identifier;
 use ruff_python_ast::{self as ast, ExceptHandler, MatchCase, Stmt};
 use ruff_python_codegen::Stylist;
+use ruff_python_index::Indexer;
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
-use crate::rules::pyupgrade::fixes::adjust_indentation;
+use crate::fix::edits::adjust_indentation;
 
 /// ## What it does
 /// Checks for `else` clauses on loops without a `break` statement.
@@ -75,19 +76,16 @@ pub(crate) fn useless_else_on_loop(
     let else_range = identifier::else_(stmt, checker.locator().contents()).expect("else clause");
 
     let mut diagnostic = Diagnostic::new(UselessElseOnLoop, else_range);
-
-    if checker.settings.preview.is_enabled() {
-        diagnostic.try_set_fix(|| {
-            remove_else(
-                stmt,
-                orelse,
-                else_range,
-                checker.locator(),
-                checker.stylist(),
-            )
-        });
-    }
-
+    diagnostic.try_set_fix(|| {
+        remove_else(
+            stmt,
+            orelse,
+            else_range,
+            checker.locator(),
+            checker.indexer(),
+            checker.stylist(),
+        )
+    });
     checker.diagnostics.push(diagnostic);
 }
 
@@ -138,6 +136,7 @@ fn remove_else(
     orelse: &[Stmt],
     else_range: TextRange,
     locator: &Locator,
+    indexer: &Indexer,
     stylist: &Stylist,
 ) -> Result<Fix> {
     let Some(start) = orelse.first() else {
@@ -168,6 +167,7 @@ fn remove_else(
             ),
             desired_indentation,
             locator,
+            indexer,
             stylist,
         )?;
 

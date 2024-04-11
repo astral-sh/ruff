@@ -1,16 +1,15 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
-use ruff_python_ast::{self as ast, Expr};
-use ruff_text_size::Ranged;
+use ruff_python_ast as ast;
+use ruff_python_semantic::Modules;
 
 use crate::checkers::ast::Checker;
-use crate::rules::flake8_datetimez::rules::helpers::has_non_none_keyword;
 
-use super::helpers;
+use super::helpers::{self, DatetimeModuleAntipattern};
 
 /// ## What it does
-/// Checks for usage of `datetime.datetime.now()` without a `tz` argument.
+/// Checks for usages of `datetime.datetime.now()` that do not specify a timezone.
 ///
 /// ## Why is this bad?
 /// Python datetime objects can be naive or timezone-aware. While an aware
@@ -19,8 +18,9 @@ use super::helpers;
 /// datetime objects. Since this can lead to errors, it is recommended to
 /// always use timezone-aware objects.
 ///
-/// `datetime.datetime.now()` returns a naive datetime object. Instead, use
-/// `datetime.datetime.now(tz=)` to return a timezone-aware object.
+/// `datetime.datetime.now()` or `datetime.datetime.now(tz=None)` returns a naive
+/// datetime object. Instead, use `datetime.datetime.now(tz=<timezone>)` to create
+/// a timezone-aware object.
 ///
 /// ## Example
 /// ```python
@@ -46,20 +46,38 @@ use super::helpers;
 /// ## References
 /// - [Python documentation: Aware and Naive Objects](https://docs.python.org/3/library/datetime.html#aware-and-naive-objects)
 #[violation]
-pub struct CallDatetimeNowWithoutTzinfo;
+pub struct CallDatetimeNowWithoutTzinfo(DatetimeModuleAntipattern);
 
 impl Violation for CallDatetimeNowWithoutTzinfo {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("The use of `datetime.datetime.now()` without `tz` argument is not allowed")
+        let CallDatetimeNowWithoutTzinfo(antipattern) = self;
+        match antipattern {
+            DatetimeModuleAntipattern::NoTzArgumentPassed => {
+                format!("`datetime.datetime.now()` called without a `tz` argument")
+            }
+            DatetimeModuleAntipattern::NonePassedToTzArgument => {
+                format!("`tz=None` passed to `datetime.datetime.now()`")
+            }
+        }
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        Some("Pass a `datetime.timezone` object to the `tz` parameter".to_string())
     }
 }
 
 pub(crate) fn call_datetime_now_without_tzinfo(checker: &mut Checker, call: &ast::ExprCall) {
+    if !checker.semantic().seen_module(Modules::DATETIME) {
+        return;
+    }
+
     if !checker
         .semantic()
-        .resolve_call_path(&call.func)
-        .is_some_and(|call_path| matches!(call_path.as_slice(), ["datetime", "datetime", "now"]))
+        .resolve_qualified_name(&call.func)
+        .is_some_and(|qualified_name| {
+            matches!(qualified_name.segments(), ["datetime", "datetime", "now"])
+        })
     {
         return;
     }
@@ -68,31 +86,14 @@ pub(crate) fn call_datetime_now_without_tzinfo(checker: &mut Checker, call: &ast
         return;
     }
 
-    // no args / no args unqualified
-    if call.arguments.args.is_empty() && call.arguments.keywords.is_empty() {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(CallDatetimeNowWithoutTzinfo, call.range()));
-        return;
-    }
+    let antipattern = match call.arguments.find_argument("tz", 0) {
+        Some(ast::Expr::NoneLiteral(_)) => DatetimeModuleAntipattern::NonePassedToTzArgument,
+        Some(_) => return,
+        None => DatetimeModuleAntipattern::NoTzArgumentPassed,
+    };
 
-    // none args
-    if call
-        .arguments
-        .args
-        .first()
-        .is_some_and(Expr::is_none_literal_expr)
-    {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(CallDatetimeNowWithoutTzinfo, call.range()));
-        return;
-    }
-
-    // wrong keywords / none keyword
-    if !call.arguments.keywords.is_empty() && !has_non_none_keyword(&call.arguments, "tz") {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(CallDatetimeNowWithoutTzinfo, call.range()));
-    }
+    checker.diagnostics.push(Diagnostic::new(
+        CallDatetimeNowWithoutTzinfo(antipattern),
+        call.range,
+    ));
 }

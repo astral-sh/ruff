@@ -217,5 +217,43 @@ RET504.py:365:12: RET504 [*] Unnecessary assignment to `D` before `return` state
 364     |-    D=0.4853881 + 3.6006116*P - 0.0117368*(P-1.3822)**2
 365     |-    return D
     364 |+    return 0.4853881 + 3.6006116*P - 0.0117368*(P-1.3822)**2
+366 365 | 
+367 366 | 
+368 367 | # contextlib suppress in with statement
 
+RET504.py:400:12: RET504 [*] Unnecessary assignment to `y` before `return` statement
+    |
+398 |         x = 1
+399 |     y = y + 2
+400 |     return y  # RET504
+    |            ^ RET504
+    |
+    = help: Remove unnecessary assignment
 
+ℹ Unsafe fix
+396 396 |     x = 2
+397 397 |     with contextlib.suppress(Exception):
+398 398 |         x = 1
+399     |-    y = y + 2
+400     |-    return y  # RET504
+    399 |+    return y + 2
+401 400 | 
+402 401 | 
+403 402 | def foo():
+
+RET504.py:423:16: RET504 [*] Unnecessary assignment to `services` before `return` statement
+    |
+421 |     if "services" in a:
+422 |         services = a["services"]
+423 |         return services
+    |                ^^^^^^^^ RET504
+    |
+    = help: Remove unnecessary assignment
+
+ℹ Unsafe fix
+419 419 | # See: https://github.com/astral-sh/ruff/issues/10732
+420 420 | def func(a: dict[str, int]) -> list[dict[str, int]]:
+421 421 |     if "services" in a:
+422     |-        services = a["services"]
+423     |-        return services
+    422 |+        return a["services"]

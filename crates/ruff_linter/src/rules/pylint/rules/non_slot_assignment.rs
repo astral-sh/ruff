@@ -66,8 +66,8 @@ pub(crate) fn non_slot_assignment(checker: &mut Checker, class_def: &ast::StmtCl
     if !class_def.bases().iter().all(|base| {
         checker
             .semantic()
-            .resolve_call_path(base)
-            .is_some_and(|call_path| matches!(call_path.as_slice(), ["", "object"]))
+            .resolve_qualified_name(base)
+            .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["", "object"]))
     }) {
         return;
     }
@@ -142,7 +142,7 @@ fn is_attributes_not_in_slots(body: &[Stmt]) -> Vec<AttributeAssignment> {
         }
     }
 
-    if slots.is_empty() {
+    if slots.is_empty() || slots.contains("__dict__") {
         return vec![];
     }
 

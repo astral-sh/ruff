@@ -19,7 +19,11 @@ expression: parse_ast
                                             StringLiteral {
                                                 range: 8..14,
                                                 value: "test",
-                                                unicode: false,
+                                                flags: StringLiteralFlags {
+                                                    quote_style: Double,
+                                                    prefix: Empty,
+                                                    triple_quoted: false,
+                                                },
                                             },
                                         ),
                                     },
@@ -108,7 +112,11 @@ expression: parse_ast
                                             StringLiteral {
                                                 range: 81..88,
                                                 value: "label",
-                                                unicode: false,
+                                                flags: StringLiteralFlags {
+                                                    quote_style: Double,
+                                                    prefix: Empty,
+                                                    triple_quoted: false,
+                                                },
                                             },
                                         ),
                                     },
@@ -125,7 +133,11 @@ expression: parse_ast
                                         StringLiteral {
                                             range: 90..96,
                                             value: "test",
-                                            unicode: false,
+                                            flags: StringLiteralFlags {
+                                                quote_style: Double,
+                                                prefix: Empty,
+                                                triple_quoted: false,
+                                            },
                                         },
                                     ),
                                 },
@@ -149,7 +161,11 @@ expression: parse_ast
                                                 StringLiteral {
                                                     range: 118..125,
                                                     value: "label",
-                                                    unicode: false,
+                                                    flags: StringLiteralFlags {
+                                                        quote_style: Double,
+                                                        prefix: Empty,
+                                                        triple_quoted: false,
+                                                    },
                                                 },
                                             ),
                                         },
@@ -469,6 +485,7 @@ expression: parse_ast
                         ),
                     ],
                     ctx: Load,
+                    parenthesized: false,
                 },
             ),
             cases: [
@@ -521,6 +538,7 @@ expression: parse_ast
                         ),
                     ],
                     ctx: Load,
+                    parenthesized: false,
                 },
             ),
             cases: [
@@ -573,6 +591,7 @@ expression: parse_ast
                         ),
                     ],
                     ctx: Load,
+                    parenthesized: false,
                 },
             ),
             cases: [

@@ -4,7 +4,7 @@
 // See also: https://greentreesnakes.readthedocs.io/en/latest/nodes.html#keyword
 
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
-use ruff_python_ast::{self as ast, Int, IpyEscapeKind};
+use ruff_python_ast::{self as ast, Int, IpyEscapeKind, AnyStringKind};
 use crate::{
     FStringErrorType,
     Mode,
@@ -12,7 +12,7 @@ use crate::{
     function::{ArgumentList, parse_arguments, validate_pos_params, validate_arguments},
     context::set_context,
     string::{StringType, concatenated_strings, parse_fstring_literal_element, parse_string_literal},
-    token::{self, StringKind},
+    token,
     invalid,
 };
 use lalrpop_util::ParseError;
@@ -289,7 +289,7 @@ ImportAsAlias<I>: ast::Alias = {
 DottedName: ast::Identifier = {
     <location:@L> <n:name> <end_location:@R> => ast::Identifier::new(n, (location..end_location).into()),
     <location:@L> <n:name> <n2: ("." Identifier)+> <end_location:@R> => {
-        let mut r = n;
+        let mut r = String::from(n);
         for x in n2 {
             r.push('.');
             r.push_str(x.1.as_str());
@@ -337,10 +337,10 @@ IpyEscapeCommandStatement: ast::Stmt = {
                 }
             ))
         } else {
-            Err(LexicalError {
-                error: LexicalErrorType::OtherError("IPython escape commands are only allowed in `Mode::Ipython`".to_string()),
+            Err(LexicalError::new(
+                LexicalErrorType::OtherError("IPython escape commands are only allowed in `Mode::Ipython`".to_string().into_boxed_str()),
                 location,
-            })?
+            ))?
         }
     }
 }
@@ -350,10 +350,10 @@ IpyEscapeCommandExpr: crate::parser::ParenthesizedExpr = {
         if mode == Mode::Ipython {
             // This should never occur as the lexer won't allow it.
             if !matches!(c.0, IpyEscapeKind::Magic | IpyEscapeKind::Shell) {
-                return Err(LexicalError {
-                    error: LexicalErrorType::OtherError("IPython escape command expr is only allowed for % and !".to_string()),
+                return Err(LexicalError::new(
+                    LexicalErrorType::OtherError("IPython escape command expr is only allowed for % and !".to_string().into_boxed_str()),
                     location,
-                })?;
+                ))?;
             }
             Ok(ast::ExprIpyEscapeCommand {
                 kind: c.0,
@@ -361,10 +361,10 @@ IpyEscapeCommandExpr: crate::parser::ParenthesizedExpr = {
                 range: (location..end_location).into()
             }.into())
         } else {
-            Err(LexicalError {
-                error: LexicalErrorType::OtherError("IPython escape commands are only allowed in `Mode::Ipython`".to_string()),
+            Err(LexicalError::new(
+                LexicalErrorType::OtherError("IPython escape commands are only allowed in `Mode::Ipython`".to_string().into_boxed_str()),
                 location,
-            })?
+            ))?
         }
     }
 }
@@ -381,10 +381,10 @@ IpyHelpEndEscapeCommandStatement: ast::Stmt = {
                 },
                 ast::Expr::Subscript(ast::ExprSubscript { value, slice, range, .. }) => {
                     let ast::Expr::NumberLiteral(ast::ExprNumberLiteral { value: ast::Number::Int(integer), .. }) = slice.as_ref() else {
-                        return Err(LexicalError {
-                            error: LexicalErrorType::OtherError("only integer literals are allowed in Subscript expressions in help end escape command".to_string()),
-                            location: range.start(),
-                        });
+                        return Err(LexicalError::new(
+                            LexicalErrorType::OtherError("only integer literals are allowed in Subscript expressions in help end escape command".to_string().into_boxed_str()),
+                            range.start(),
+                        ));
                     };
                     unparse_expr(value, buffer)?;
                     buffer.push('[');
@@ -397,10 +397,10 @@ IpyHelpEndEscapeCommandStatement: ast::Stmt = {
                     buffer.push_str(attr.as_str());
                 },
                 _ => {
-                    return Err(LexicalError {
-                        error: LexicalErrorType::OtherError("only Name, Subscript and Attribute expressions are allowed in help end escape command".to_string()),
-                        location: expr.start(),
-                    });
+                    return Err(LexicalError::new(
+                        LexicalErrorType::OtherError("only Name, Subscript and Attribute expressions are allowed in help end escape command".to_string().into_boxed_str()),
+                        expr.start(),
+                    ));
                 }
             }
             Ok(())
@@ -408,10 +408,10 @@ IpyHelpEndEscapeCommandStatement: ast::Stmt = {
 
         if mode != Mode::Ipython {
             return Err(ParseError::User {
-                error: LexicalError {
-                    error: LexicalErrorType::OtherError("IPython escape commands are only allowed in `Mode::Ipython`".to_string()),
+                error: LexicalError::new(
+                    LexicalErrorType::OtherError("IPython escape commands are only allowed in `Mode::Ipython`".to_string().into_boxed_str()),
                     location,
-                },
+                ),
             });
         }
 
@@ -420,10 +420,10 @@ IpyHelpEndEscapeCommandStatement: ast::Stmt = {
             2 => IpyEscapeKind::Help2,
             _ => {
                 return Err(ParseError::User {
-                    error: LexicalError {
-                        error: LexicalErrorType::OtherError("maximum of 2 `?` tokens are allowed in help end escape command".to_string()),
+                    error: LexicalError::new(
+                        LexicalErrorType::OtherError("maximum of 2 `?` tokens are allowed in help end escape command".to_string().into_boxed_str()),
                         location,
-                    },
+                    ),
                 });
             }
         };
@@ -434,7 +434,7 @@ IpyHelpEndEscapeCommandStatement: ast::Stmt = {
         Ok(ast::Stmt::IpyEscapeCommand(
             ast::StmtIpyEscapeCommand {
                 kind,
-                value,
+                value: value.into_boxed_str(),
                 range: (location..end_location).into()
             }
         ))
@@ -483,7 +483,8 @@ MatchStatement: ast::Stmt = {
                     ast::ExprTuple {
                         elts: vec![subject.into()],
                         ctx: ast::ExprContext::Load,
-                        range: (tuple_location..tuple_end_location).into()
+                        range: (tuple_location..tuple_end_location).into(),
+                        parenthesized: false
                     },
                 )),
                 cases,
@@ -506,7 +507,8 @@ MatchStatement: ast::Stmt = {
                     ast::ExprTuple {
                         elts,
                         ctx: ast::ExprContext::Load,
-                        range: (tuple_location..tuple_end_location).into()
+                        range: (tuple_location..tuple_end_location).into(),
+                        parenthesized: false
                     },
                 )),
                 cases,
@@ -561,10 +563,10 @@ Pattern: ast::Pattern = {
 AsPattern: ast::Pattern = {
     <location:@L> <pattern:OrPattern> "as" <name:Identifier> <end_location:@R> =>? {
         if name.as_str() == "_" {
-            Err(LexicalError {
-                error: LexicalErrorType::OtherError("cannot use '_' as a target".to_string()),
+            Err(LexicalError::new(
+                LexicalErrorType::OtherError("cannot use '_' as a target".to_string().into_boxed_str()),
                 location,
-            })?
+            ))?
         } else {
             Ok(ast::Pattern::MatchAs(
                 ast::PatternMatchAs {
@@ -1026,7 +1028,7 @@ WithItems: Vec<ast::WithItem> = {
         // ```
         // In this case, the `(` and `)` are part of the `with` statement.
         // The same applies to `yield` and `yield from`.
-        let item = if item.optional_vars.is_none() && matches!(item.context_expr, ast::Expr::NamedExpr(_) | ast::Expr::Yield(_) | ast::Expr::YieldFrom(_)) {
+        let item = if item.optional_vars.is_none() && matches!(item.context_expr, ast::Expr::Named(_) | ast::Expr::Yield(_) | ast::Expr::YieldFrom(_)) {
             ast::WithItem {
                 range: item.range().add_start(TextSize::new(1)).sub_end(TextSize::new(1)),
                 context_expr: item.context_expr,
@@ -1148,24 +1150,6 @@ ParameterList<ParameterType, StarParameterType, DoubleStarParameterType>: ast::P
             range: (location..end_location).into()
         })
     },
-    <location:@L> <param1:ParameterDefs<ParameterType>> <kw:("," <KwargParameter<DoubleStarParameterType>>)> ","? <end_location:@R> =>? {
-        validate_pos_params(&param1)?;
-        let (posonlyargs, args) = param1;
-
-        // Now gather rest of parameters:
-        let vararg = None;
-        let kwonlyargs = vec![];
-        let kwarg = kw;
-
-        Ok(ast::Parameters {
-            posonlyargs,
-            args,
-            kwonlyargs,
-            vararg,
-            kwarg,
-            range: (location..end_location).into()
-        })
-    },
     <location:@L> <params:ParameterListStarArgs<ParameterType, StarParameterType, DoubleStarParameterType>> ","? <end_location:@R> => {
         let (vararg, kwonlyargs, kwarg) = params;
         ast::Parameters {
@@ -1173,16 +1157,6 @@ ParameterList<ParameterType, StarParameterType, DoubleStarParameterType>: ast::P
             args: vec![],
             kwonlyargs,
             vararg,
-            kwarg,
-            range: (location..end_location).into()
-        }
-    },
-    <location:@L> <kwarg:KwargParameter<DoubleStarParameterType>> ","? <end_location:@R> => {
-        ast::Parameters {
-            posonlyargs: vec![],
-            args: vec![],
-            kwonlyargs: vec![],
-            vararg: None,
             kwarg,
             range: (location..end_location).into()
         }
@@ -1216,7 +1190,11 @@ UntypedParameter: ast::ParameterWithDefault = {
     },
 };
 StarUntypedParameter: ast::Parameter = {
-    <location:@L> <arg:Identifier> <end_location:@R> => ast::Parameter { name:arg, annotation: None, range: (location..end_location).into() },
+    <location:@L> "*" <arg:Identifier> <end_location:@R> => ast::Parameter { name:arg, annotation: None, range: (location..end_location).into() },
+};
+
+DoubleStarUntypedParameter: ast::Parameter = {
+    <location:@L> "**" <arg:Identifier> <end_location:@R> => ast::Parameter { name:arg, annotation: None, range: (location..end_location).into() },
 };
 
 TypedParameter: ast::ParameterWithDefault = {
@@ -1228,14 +1206,14 @@ TypedParameter: ast::ParameterWithDefault = {
 };
 
 StarTypedParameter: ast::Parameter = {
-    <location:@L> <name:Identifier> <annotation:(":" <TestOrStarExpr>)?> <end_location:@R> => {
+    <location:@L> "*" <name:Identifier> <annotation:(":" <TestOrStarExpr>)?> <end_location:@R> => {
         let annotation = annotation.map(ast::Expr::from).map(Box::new);
         ast::Parameter { name, annotation, range: (location..end_location).into() }
     },
 };
 
 DoubleStarTypedParameter: ast::Parameter = {
-    <location:@L> <name:Identifier> <annotation:(":" <Test<"all">>)?> <end_location:@R> => {
+    <location:@L> "**" <name:Identifier> <annotation:(":" <Test<"all">>)?> <end_location:@R> => {
         let annotation = annotation.map(ast::Expr::from).map(Box::new);
         ast::Parameter { name, annotation, range: (location..end_location).into() }
     },
@@ -1245,25 +1223,29 @@ DoubleStarTypedParameter: ast::Parameter = {
 // TODO: figure out another grammar that makes this inline no longer required.
 #[inline]
 ParameterListStarArgs<ParameterType, StarParameterType, DoubleStarParameterType>: (Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>) = {
-    <location:@L> "*" <va:StarParameterType?> <kwonlyargs:("," <ParameterDef<ParameterType>>)*> <kwarg:("," <KwargParameter<DoubleStarParameterType>>)?> =>? {
-        if va.is_none() && kwonlyargs.is_empty() && kwarg.is_none() {
-            return Err(LexicalError {
-                error: LexicalErrorType::OtherError("named arguments must follow bare *".to_string()),
-                location,
-            })?;
-        }
-
-        let kwarg = kwarg.flatten();
-        let va = va.map(Box::new);
+    <location:@L> <va:StarParameterType> <kwonlyargs:("," <ParameterDef<ParameterType>>)*> <kwarg:("," <DoubleStarParameterType>)?> =>? {
+        let kwarg = kwarg.map(Box::new);
+        let va = Some(Box::new(va));
 
         Ok((va, kwonlyargs, kwarg))
-    }
-};
+    },
+    <location:@L> "*" <kwonlyargs:("," <ParameterDef<ParameterType>>)*> <kwarg:("," <DoubleStarParameterType>)?> =>? {
+        if kwonlyargs.is_empty() {
+            return Err(LexicalError::new(
+                LexicalErrorType::OtherError("named arguments must follow bare *".to_string().into_boxed_str()),
+                location,
+            ))?;
+        }
 
-KwargParameter<ParameterType>: Option<Box<ast::Parameter>> = {
-    "**" <kwarg:ParameterType?> => {
-        kwarg.map(Box::new)
-    }
+        let kwarg = kwarg.map(Box::new);
+
+        Ok((None, kwonlyargs, kwarg))
+    },
+    <location:@L> <kwarg:(<DoubleStarParameterType>)> =>? {
+        let kwarg = Some(Box::new(kwarg));
+
+        Ok((None, vec![], kwarg))
+    },
 };
 
 ClassDef: ast::Stmt = {
@@ -1328,7 +1310,7 @@ YieldExpr: crate::parser::ParenthesizedExpr = {
 };
 
 Test<Goal>: crate::parser::ParenthesizedExpr = {
-    <location:@L> <body:OrTest<"all">> "if" <test:OrTest<"all">> "else" <orelse:Test<"all">> <end_location:@R> => ast::ExprIfExp {
+    <location:@L> <body:OrTest<"all">> "if" <test:OrTest<"all">> "else" <orelse:Test<"all">> <end_location:@R> => ast::ExprIf {
         test: Box::new(test.into()),
         body: Box::new(body.into()),
         orelse: Box::new(orelse.into()),
@@ -1353,7 +1335,7 @@ NamedExpressionName: crate::parser::ParenthesizedExpr = {
 
 NamedExpression: crate::parser::ParenthesizedExpr = {
     <location:@L> <target:NamedExpressionName> ":=" <value:Test<"all">> <end_location:@R> => {
-        ast::ExprNamedExpr {
+        ast::ExprNamed {
             target: Box::new(target.into()),
             value: Box::new(value.into()),
             range: (location..end_location).into(),
@@ -1362,12 +1344,12 @@ NamedExpression: crate::parser::ParenthesizedExpr = {
 };
 
 LambdaDef: crate::parser::ParenthesizedExpr = {
-    <location:@L> "lambda" <location_args:@L> <parameters:ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter>?> <end_location_args:@R> ":" <fstring_middle:fstring_middle?> <body:Test<"all">> <end_location:@R> =>? {
+    <location:@L> "lambda" <location_args:@L> <parameters:ParameterList<UntypedParameter, StarUntypedParameter, DoubleStarUntypedParameter>?> <end_location_args:@R> ":" <fstring_middle:fstring_middle?> <body:Test<"all">> <end_location:@R> =>? {
         if fstring_middle.is_some() {
-            return Err(LexicalError {
-                error: LexicalErrorType::FStringError(FStringErrorType::LambdaWithoutParentheses),
+            return Err(LexicalError::new(
+                LexicalErrorType::FStringError(FStringErrorType::LambdaWithoutParentheses),
                 location,
-            })?;
+            ))?;
         }
         parameters.as_ref().map(validate_arguments).transpose()?;
 
@@ -1406,8 +1388,18 @@ NotTest<Goal>: crate::parser::ParenthesizedExpr = {
 
 Comparison<Goal>: crate::parser::ParenthesizedExpr = {
     <location:@L> <left:Expression<"all">> <comparisons:(CompOp Expression<"all">)+> <end_location:@R> => {
-        let (ops, comparators) = comparisons.into_iter().map(|(op, comparator)| (op, ast::Expr::from(comparator))).unzip();
-        ast::ExprCompare { left: Box::new(left.into()), ops, comparators, range: (location..end_location).into() }.into()
+        let mut ops = Vec::with_capacity(comparisons.len());
+        let mut comparators = Vec::with_capacity(comparisons.len());
+        for (op, comparator) in comparisons {
+            ops.push(op);
+            comparators.push(comparator.into());
+        }
+        ast::ExprCompare {
+            left: Box::new(left.into()),
+            ops: ops.into_boxed_slice(),
+            comparators: comparators.into_boxed_slice(),
+            range: (location..end_location).into(),
+        }.into()
     },
     Expression<Goal>,
 };
@@ -1563,6 +1555,7 @@ SubscriptList: crate::parser::ParenthesizedExpr = {
             elts: vec![s1.into()],
             ctx: ast::ExprContext::Load,
             range: (location..end_location).into(),
+            parenthesized: false
         }.into()
     },
     <location:@L> <elts:TwoOrMoreSep<Subscript, ",">> ","? <end_location:@R> => {
@@ -1571,6 +1564,7 @@ SubscriptList: crate::parser::ParenthesizedExpr = {
             elts,
             ctx: ast::ExprContext::Load,
             range: (location..end_location).into(),
+            parenthesized: false
         }.into()
     }
 };
@@ -1605,16 +1599,17 @@ StringLiteralOrFString: StringType = {
 
 StringLiteral: StringType = {
     <location:@L> <string:string> <end_location:@R> =>? {
-        let (source, kind, triple_quoted) = string;
-        Ok(parse_string_literal(&source, kind, triple_quoted, (location..end_location).into())?)
+        let (source, kind) = string;
+        Ok(parse_string_literal(source, kind, (location..end_location).into())?)
     }
 };
 
 FStringExpr: StringType = {
-    <location:@L> FStringStart <elements:FStringMiddlePattern*> FStringEnd <end_location:@R> => {
+    <location:@L> <start:fstring_start> <elements:FStringMiddlePattern*> FStringEnd <end_location:@R> => {
         StringType::FString(ast::FString {
             elements,
-            range: (location..end_location).into()
+            range: (location..end_location).into(),
+            flags: start.into()
         })
     }
 };
@@ -1622,18 +1617,18 @@ FStringExpr: StringType = {
 FStringMiddlePattern: ast::FStringElement = {
     FStringReplacementField,
     <location:@L> <fstring_middle:fstring_middle> <end_location:@R> =>? {
-        let (source, is_raw) = fstring_middle;
-        Ok(parse_fstring_literal_element(&source, is_raw, (location..end_location).into())?)
+        let (source, kind) = fstring_middle;
+        Ok(parse_fstring_literal_element(source, kind, (location..end_location).into())?)
     }
 };
 
 FStringReplacementField: ast::FStringElement = {
     <location:@L> "{" <value:TestListOrYieldExpr> <debug:"="?> <conversion:FStringConversion?> <format_spec:FStringFormatSpecSuffix?> "}" <end_location:@R> =>? {
         if value.expr.is_lambda_expr() && !value.is_parenthesized() {
-            return Err(LexicalError {
-                error: LexicalErrorType::FStringError(FStringErrorType::LambdaWithoutParentheses),
-                location: value.start(),
-            })?;
+            return Err(LexicalError::new(
+                LexicalErrorType::FStringError(FStringErrorType::LambdaWithoutParentheses),
+                value.start(),
+            ))?;
         }
         let debug_text = debug.map(|_| {
             let start_offset = location + "{".text_len();
@@ -1646,8 +1641,8 @@ FStringReplacementField: ast::FStringElement = {
                 )
             };
             ast::DebugText {
-                leading: source_code[TextRange::new(start_offset, value.start())].to_string(),
-                trailing: source_code[TextRange::new(value.end(), end_offset)].to_string(),
+                leading: source_code[TextRange::new(start_offset, value.expr.start())].to_string(),
+                trailing: source_code[TextRange::new(value.expr.end(), end_offset)].to_string(),
             }
         });
         Ok(
@@ -1677,14 +1672,14 @@ FStringFormatSpec: ast::FStringFormatSpec = {
 
 FStringConversion: (TextSize, ast::ConversionFlag) = {
     <location:@L> "!" <name_location:@L> <s:name> =>? {
-        let conversion = match s.as_str() {
+        let conversion = match s.as_ref() {
             "s" => ast::ConversionFlag::Str,
             "r" => ast::ConversionFlag::Repr,
             "a" => ast::ConversionFlag::Ascii,
-            _ => Err(LexicalError {
-                error: LexicalErrorType::FStringError(FStringErrorType::InvalidConversionFlag),
-                location: name_location,
-            })?
+            _ => Err(LexicalError::new(
+                LexicalErrorType::FStringError(FStringErrorType::InvalidConversionFlag),
+                name_location,
+            ))?
         };
         Ok((location, conversion))
     }
@@ -1716,16 +1711,21 @@ Atom<Goal>: crate::parser::ParenthesizedExpr = {
             }
         } else {
             let elts = elts.into_iter().map(ast::Expr::from).collect();
-            ast::ExprTuple { elts, ctx: ast::ExprContext::Load, range: (location..end_location).into() }.into()
+            ast::ExprTuple {
+              elts,
+              ctx: ast::ExprContext::Load,
+              range: (location..end_location).into(),
+              parenthesized: true
+            }.into()
         }
     },
     <location:@L> "(" <left:(<OneOrMore<Test<"all">>> ",")?> <mid:NamedOrStarExpr> <right:("," <TestOrStarNamedExpr>)*> <trailing_comma:","?> ")" <end_location:@R> =>? {
         if left.is_none() && right.is_empty() && trailing_comma.is_none() {
             if mid.expr.is_starred_expr() {
-                return Err(LexicalError{
-                    error: LexicalErrorType::OtherError("cannot use starred expression here".to_string()),
-                    location: mid.start(),
-                })?;
+                return Err(LexicalError::new(
+                    LexicalErrorType::OtherError("cannot use starred expression here".to_string().into_boxed_str()),
+                    mid.start(),
+                ))?;
             }
             Ok(crate::parser::ParenthesizedExpr {
                 expr: mid.into(),
@@ -1733,28 +1733,35 @@ Atom<Goal>: crate::parser::ParenthesizedExpr = {
             })
         } else {
             let elts = left.into_iter().flatten().chain([mid]).chain(right).map(ast::Expr::from).collect();
-            Ok(ast::ExprTuple { elts, ctx: ast::ExprContext::Load, range: (location..end_location).into() }.into())
+            Ok(ast::ExprTuple {
+              elts,
+              ctx: ast::ExprContext::Load,
+              range: (location..end_location).into(),
+              parenthesized: true
+            }.into())
         }
     },
     <location:@L> "(" ")" <end_location:@R> => ast::ExprTuple {
         elts: Vec::new(),
         ctx: ast::ExprContext::Load,
         range: (location..end_location).into(),
+        parenthesized: true
     }.into(),
     <location:@L> "(" <e:YieldExpr> ")" <end_location:@R> => crate::parser::ParenthesizedExpr {
         expr: e.into(),
         range: (location..end_location).into(),
     },
-    <location:@L> "(" <elt:NamedExpressionTest> <generators:CompFor> ")" <end_location:@R> => ast::ExprGeneratorExp {
+    <location:@L> "(" <elt:NamedExpressionTest> <generators:CompFor> ")" <end_location:@R> => ast::ExprGenerator {
         elt: Box::new(elt.into()),
         generators,
         range: (location..end_location).into(),
+        parenthesized: true
     }.into(),
     "(" <location:@L> "**" <e:Expression<"all">> ")" <end_location:@R> =>? {
-        Err(LexicalError{
-            error : LexicalErrorType::OtherError("cannot use double starred expression here".to_string()),
+        Err(LexicalError::new(
+            LexicalErrorType::OtherError("cannot use double starred expression here".to_string().into_boxed_str()),
             location,
-        }.into())
+        ).into())
     },
     <location:@L> "{" <e:DictLiteralValues?> "}" <end_location:@R> => {
         let (keys, values) = e
@@ -1842,7 +1849,12 @@ GenericList<Element>: crate::parser::ParenthesizedExpr = {
             }
         } else {
             let elts = elts.into_iter().map(ast::Expr::from).collect();
-            ast::ExprTuple { elts, ctx: ast::ExprContext::Load, range: (location..end_location).into() }.into()
+            ast::ExprTuple {
+              elts,
+              ctx: ast::ExprContext::Load,
+              range: (location..end_location).into(),
+              parenthesized: false
+            }.into()
         }
     }
 }
@@ -1880,8 +1892,8 @@ Arguments: ast::Arguments = {
     <location:@L> "(" <e: Comma<FunctionArgument>> ")" <end_location:@R> =>? {
         let ArgumentList { args, keywords } = parse_arguments(e)?;
         Ok(ast::Arguments {
-            args,
-            keywords,
+            args: args.into_boxed_slice(),
+            keywords: keywords.into_boxed_slice(),
             range: (location..end_location).into()
         })
     }
@@ -1890,11 +1902,12 @@ Arguments: ast::Arguments = {
 FunctionArgument: (Option<(TextSize, TextSize, Option<ast::Identifier>)>, ast::Expr) = {
     <location:@L> <elt:NamedExpressionTest> <generators:CompFor?> <end_location:@R> => {
         let expr = match generators {
-            Some(generators) => ast::Expr::GeneratorExp(
-                ast::ExprGeneratorExp {
+            Some(generators) => ast::Expr::Generator(
+                ast::ExprGenerator {
                     elt: Box::new(elt.into()),
                     generators,
-                    range: (location..end_location).into()
+                    range: (location..end_location).into(),
+                    parenthesized: false
                 }
             ),
             None => elt.into(),
@@ -1922,7 +1935,7 @@ Comma<T>: Vec<T> = {
     }
 };
 
-/// One ore more items that are separated by a comma.
+/// One or more items that are separated by a comma.
 OneOrMore<T>: Vec<T> = {
     <e:T> => vec![e],
     <mut v: OneOrMore<T>> "," <e:T> => {
@@ -1969,7 +1982,7 @@ extern {
         Dedent => token::Tok::Dedent,
         StartModule => token::Tok::StartModule,
         StartExpression => token::Tok::StartExpression,
-        FStringStart => token::Tok::FStringStart,
+        fstring_start => token::Tok::FStringStart(<AnyStringKind>),
         FStringEnd => token::Tok::FStringEnd,
         "!" => token::Tok::Exclamation,
         "?" => token::Tok::Question,
@@ -2061,18 +2074,17 @@ extern {
         float => token::Tok::Float { value: <f64> },
         complex => token::Tok::Complex { real: <f64>, imag: <f64> },
         string => token::Tok::String {
-            value: <String>,
-            kind: <StringKind>,
-            triple_quoted: <bool>
+            value: <Box<str>>,
+            kind: <AnyStringKind>,
         },
         fstring_middle => token::Tok::FStringMiddle {
-            value: <String>,
-            is_raw: <bool>
+            value: <Box<str>>,
+            kind: <AnyStringKind>,
         },
-        name => token::Tok::Name { name: <String> },
+        name => token::Tok::Name { name: <Box<str>> },
         ipy_escape_command => token::Tok::IpyEscapeCommand {
             kind: <IpyEscapeKind>,
-            value: <String>
+            value: <Box<str>>
         },
         "\n" => token::Tok::Newline,
         ";" => token::Tok::Semi,

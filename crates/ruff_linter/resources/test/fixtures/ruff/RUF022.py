@@ -48,7 +48,7 @@ __all__ = [
 # we implement an "isort-style sort":
 # SCEAMING_CASE constants first,
 # then CamelCase classes,
-# then anything thats lowercase_snake_case.
+# then anything that's lowercase_snake_case.
 # This (which is currently alphabetically sorted)
 # should get reordered accordingly:
 __all__ = [
@@ -217,6 +217,55 @@ __all__ = (
 )
 
 __all__ = ("don't" "care" "about", "__all__" "with", "concatenated" "strings")
+
+############################################################
+# Trailing-comma edge cases that should be flagged and fixed
+############################################################
+
+__all__ = (
+    "loads",
+    "dumps",)
+
+__all__ = [
+    "loads",
+    "dumps"       ,     ]
+
+__all__ = ['xp', 'yp',
+                'canvas'
+
+                # very strangely placed comment
+
+                ,
+
+                # another strangely placed comment
+                ]
+
+__all__ = (
+    "foo"
+    # strange comment 1
+    ,
+    # comment about bar
+    "bar"
+    # strange comment 2
+    ,
+)
+
+__all__ = (  # comment about the opening paren
+    # multiline strange comment 0a
+    # multiline strange comment 0b
+    "foo"  # inline comment about foo
+    # multiline strange comment 1a
+    # multiline strange comment 1b
+    ,  # comment about the comma??
+    # comment about bar part a
+    # comment about bar part b
+    "bar"  # inline comment about bar
+    # strange multiline comment comment 2a
+    # strange multiline comment 2b
+    ,
+    # strange multiline comment 3a
+    # strange multiline comment 3b
+)  # comment about the closing paren
 
 ###################################
 # These should all not get flagged:

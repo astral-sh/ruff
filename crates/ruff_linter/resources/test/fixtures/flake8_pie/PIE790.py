@@ -207,3 +207,31 @@ class Repro:
     def stub(self) -> str:
         """Docstring"""
         ...
+
+
+class Repro(Protocol[int]):
+    def func(self) -> str:
+        """Docstring"""
+        ...
+
+    def impl(self) -> str:
+        """Docstring"""
+        return self.func()
+
+
+class Repro[int](Protocol):
+    def func(self) -> str:
+        """Docstring"""
+        ...
+
+    def impl(self) -> str:
+        """Docstring"""
+        return self.func()
+
+
+import typing
+
+if typing.TYPE_CHECKING:
+    def contains_meaningful_ellipsis() -> list[int]:
+        """Allow this in a TYPE_CHECKING block."""
+        ...

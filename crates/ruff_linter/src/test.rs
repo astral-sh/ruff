@@ -9,7 +9,7 @@ use anyhow::Result;
 use itertools::Itertools;
 use rustc_hash::FxHashMap;
 
-use ruff_diagnostics::{Diagnostic, FixAvailability};
+use ruff_diagnostics::{Applicability, Diagnostic, FixAvailability};
 use ruff_python_ast::PySourceType;
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
@@ -92,7 +92,7 @@ pub fn test_snippet(contents: &str, settings: &LinterSettings) -> Vec<Message> {
 }
 
 thread_local! {
-    static MAX_ITERATIONS: std::cell::Cell<usize> = std::cell::Cell::new(8);
+    static MAX_ITERATIONS: std::cell::Cell<usize> = const { std::cell::Cell::new(8) };
 }
 
 pub fn set_max_iterations(max: usize) {
@@ -241,7 +241,7 @@ Source with applied fixes:
         .into_iter()
         .map(|diagnostic| {
             let rule = diagnostic.kind.rule();
-            let fixable = diagnostic.fix.is_some();
+            let fixable = diagnostic.fix.as_ref().is_some_and(|fix| matches!(fix.applicability(), Applicability::Safe | Applicability::Unsafe));
 
             match (fixable, rule.fixable()) {
                 (true, FixAvailability::Sometimes | FixAvailability::Always)

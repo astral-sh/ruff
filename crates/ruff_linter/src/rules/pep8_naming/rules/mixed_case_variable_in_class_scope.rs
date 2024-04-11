@@ -1,7 +1,6 @@
-use ruff_python_ast::{Arguments, Expr};
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -55,17 +54,8 @@ pub(crate) fn mixed_case_variable_in_class_scope(
     checker: &mut Checker,
     expr: &Expr,
     name: &str,
-    arguments: Option<&Arguments>,
+    class_def: &ast::StmtClassDef,
 ) {
-    if checker
-        .settings
-        .pep8_naming
-        .ignore_names
-        .iter()
-        .any(|ignore_name| ignore_name.matches(name))
-    {
-        return;
-    }
     if !helpers::is_mixed_case(name) {
         return;
     }
@@ -73,8 +63,12 @@ pub(crate) fn mixed_case_variable_in_class_scope(
     let parent = checker.semantic().current_statement();
 
     if helpers::is_named_tuple_assignment(parent, checker.semantic())
-        || helpers::is_typed_dict_class(arguments, checker.semantic())
+        || helpers::is_typed_dict_class(class_def, checker.semantic())
     {
+        return;
+    }
+
+    if checker.settings.pep8_naming.ignore_names.matches(name) {
         return;
     }
 

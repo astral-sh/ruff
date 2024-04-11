@@ -74,7 +74,7 @@ impl Format<PyFormatContext<'_>> for DotDelimitedIdentifier<'_> {
                 .chars()
                 .filter(|c| !is_python_whitespace(*c) && !matches!(c, '\n' | '\r' | '\\'))
                 .collect();
-            text(&no_whitespace, Some(self.0.start())).fmt(f)
+            text(&no_whitespace).fmt(f)
         } else {
             source_text_slice(self.0.range()).fmt(f)
         }

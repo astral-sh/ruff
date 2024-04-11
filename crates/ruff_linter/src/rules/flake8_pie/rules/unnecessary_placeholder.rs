@@ -1,6 +1,7 @@
 use ruff_diagnostics::AlwaysFixableViolation;
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::whitespace::trailing_comment_start_offset;
 use ruff_python_ast::Stmt;
 use ruff_python_semantic::{ScopeKind, SemanticModel};
@@ -10,11 +11,8 @@ use crate::checkers::ast::Checker;
 use crate::fix;
 
 /// ## What it does
-/// Checks for unnecessary `pass` statements in functions, classes, and other
-/// blocks.
-///
-/// In [preview], this rule also checks for unnecessary ellipsis (`...`)
-/// literals.
+/// Checks for unnecessary `pass` statements and ellipsis (`...`) literals in
+/// functions, classes, and other blocks.
 ///
 /// ## Why is this bad?
 /// In Python, the `pass` statement and ellipsis (`...`) literal serve as
@@ -40,7 +38,7 @@ use crate::fix;
 ///     """Placeholder docstring."""
 /// ```
 ///
-/// In [preview]:
+/// Or, given:
 /// ```python
 /// def func():
 ///     """Placeholder docstring."""
@@ -55,8 +53,6 @@ use crate::fix;
 ///
 /// ## References
 /// - [Python documentation: The `pass` statement](https://docs.python.org/3/reference/simple_stmts.html#the-pass-statement)
-///
-/// [preview]: https://docs.astral.sh/ruff/preview/
 #[violation]
 pub struct UnnecessaryPlaceholder {
     kind: Placeholder,
@@ -90,10 +86,13 @@ pub(crate) fn unnecessary_placeholder(checker: &mut Checker, body: &[Stmt]) {
     for stmt in body {
         let kind = match stmt {
             Stmt::Pass(_) => Placeholder::Pass,
-            Stmt::Expr(expr)
-                if expr.value.is_ellipsis_literal_expr()
-                    && checker.settings.preview.is_enabled() =>
-            {
+            Stmt::Expr(expr) if expr.value.is_ellipsis_literal_expr() => {
+                // In a type-checking block, a trailing ellipsis might be meaningful. A
+                // user might be using the type-checking context to declare a stub.
+                if checker.semantic().in_type_checking_block() {
+                    return;
+                }
+
                 // Ellipses are significant in protocol methods and abstract methods. Specifically,
                 // Pyright uses the presence of an ellipsis to indicate that a method is a stub,
                 // rather than a default implementation.
@@ -140,7 +139,7 @@ fn in_protocol_or_abstract_method(semantic: &SemanticModel) -> bool {
         ScopeKind::Class(class_def) => class_def
             .bases()
             .iter()
-            .any(|base| semantic.match_typing_expr(base, "Protocol")),
+            .any(|base| semantic.match_typing_expr(map_subscript(base), "Protocol")),
         ScopeKind::Function(function_def) => {
             ruff_python_semantic::analyze::visibility::is_abstract(
                 &function_def.decorator_list,

@@ -85,7 +85,7 @@ impl Notebook {
         Self::from_reader(Cursor::new(source_code))
     }
 
-    /// Read a Jupyter Notebook from a [`Read`] implementor.
+    /// Read a Jupyter Notebook from a [`Read`] implementer.
     ///
     /// See also the black implementation
     /// <https://github.com/psf/black/blob/69ca0a4c7a365c5f5eea519a90980bab72cab764/src/black/__init__.py#L1017-L1046>
@@ -386,7 +386,7 @@ impl Notebook {
             .map_or(true, |language| language.name == "python")
     }
 
-    /// Write the notebook back to the given [`Write`] implementor.
+    /// Write the notebook back to the given [`Write`] implementer.
     pub fn write(&self, writer: &mut dyn Write) -> Result<(), NotebookError> {
         // https://github.com/psf/black/blob/69ca0a4c7a365c5f5eea519a90980bab72cab764/src/black/__init__.py#LL1041
         let formatter = serde_json::ser::PrettyFormatter::with_indent(b" ");
@@ -454,6 +454,7 @@ mod tests {
     #[test_case("cell_magic", false)]
     #[test_case("valid_cell_magic", true)]
     #[test_case("automagic", false)]
+    #[test_case("automagic_assignment", true)]
     #[test_case("automagics", false)]
     #[test_case("automagic_before_code", false)]
     #[test_case("automagic_after_code", true)]

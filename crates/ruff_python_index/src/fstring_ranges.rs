@@ -14,6 +14,14 @@ pub struct FStringRanges {
 }
 
 impl FStringRanges {
+    /// Returns `true` if the given range intersects with any f-string range.
+    pub fn intersects(&self, target: TextRange) -> bool {
+        self.raw
+            .values()
+            .take_while(|range| range.start() < target.end())
+            .any(|range| target.intersect(*range).is_some())
+    }
+
     /// Return the [`TextRange`] of the innermost f-string at the given offset.
     pub fn innermost(&self, offset: TextSize) -> Option<TextRange> {
         self.raw
@@ -79,7 +87,7 @@ pub(crate) struct FStringRangesBuilder {
 impl FStringRangesBuilder {
     pub(crate) fn visit_token(&mut self, token: &Tok, range: TextRange) {
         match token {
-            Tok::FStringStart => {
+            Tok::FStringStart(_) => {
                 self.start_locations.push(range.start());
             }
             Tok::FStringEnd => {

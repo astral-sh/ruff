@@ -89,4 +89,20 @@ PYI034.py:195:9: PYI034 `__aiter__` methods in classes like `BadAsyncIterator` u
     |
     = help: Consider using `typing_extensions.Self` as return type
 
+PYI034.py:199:9: PYI034 `__iter__` methods in classes like `SubclassOfBadIterator3` usually return `self` at runtime
+    |
+198 | class SubclassOfBadIterator3(BadIterator3):
+199 |     def __iter__(self) -> Iterator[int]:  # Y034
+    |         ^^^^^^^^ PYI034
+200 |         ...
+    |
+    = help: Consider using `typing_extensions.Self` as return type
 
+PYI034.py:203:9: PYI034 `__aiter__` methods in classes like `SubclassOfBadAsyncIterator` usually return `self` at runtime
+    |
+202 | class SubclassOfBadAsyncIterator(BadAsyncIterator):
+203 |     def __aiter__(self) -> collections.abc.AsyncIterator[str]:  # Y034
+    |         ^^^^^^^^^ PYI034
+204 |         ...
+    |
+    = help: Consider using `typing_extensions.Self` as return type

@@ -30,31 +30,4 @@ runtime_evaluated_decorators_3.py:6:18: TCH003 [*] Move standard library import 
 13 16 | 
 14 17 | @attrs.define(auto_attribs=True)
 
-runtime_evaluated_decorators_3.py:7:29: TCH003 [*] Move standard library import `collections.abc.Sequence` into a type-checking block
-  |
-5 | from dataclasses import dataclass
-6 | from uuid import UUID  # TCH003
-7 | from collections.abc import Sequence
-  |                             ^^^^^^^^ TCH003
-8 | from pydantic import validate_call
-  |
-  = help: Move into type-checking block
-
-ℹ Unsafe fix
-4  4  | from array import array
-5  5  | from dataclasses import dataclass
-6  6  | from uuid import UUID  # TCH003
-7     |-from collections.abc import Sequence
-8  7  | from pydantic import validate_call
-9  8  | 
-10 9  | import attrs
-11 10 | from attrs import frozen
-   11 |+from typing import TYPE_CHECKING
-   12 |+
-   13 |+if TYPE_CHECKING:
-   14 |+    from collections.abc import Sequence
-12 15 | 
-13 16 | 
-14 17 | @attrs.define(auto_attribs=True)
-
 

@@ -1,6 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::Expr;
+use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -152,10 +153,14 @@ enum Compatibility {
 }
 /// NPY201
 pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
+    if !checker.semantic().seen_module(Modules::NUMPY) {
+        return;
+    }
+
     let maybe_replacement = checker
         .semantic()
-        .resolve_call_path(expr)
-        .and_then(|call_path| match call_path.as_slice() {
+        .resolve_qualified_name(expr)
+        .and_then(|qualified_name| match qualified_name.segments() {
             // NumPy's main namespace np.* members removed in 2.0
             ["numpy", "add_docstring"] => Some(Replacement {
                 existing: "add_docstring",
@@ -515,6 +520,14 @@ pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
                 existing: "who",
                 details: Details::Manual {
                     guideline: Some("Use an IDE variable explorer or `locals()` instead."),
+                },
+            }),
+            ["numpy", "row_stack"] => Some(Replacement {
+                existing: "row_stack",
+                details: Details::AutoImport {
+                    path: "numpy",
+                    name: "vstack",
+                    compatibility: Compatibility::BackwardsCompatible,
                 },
             }),
             _ => None,

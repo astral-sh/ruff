@@ -36,7 +36,7 @@ use crate::rules::pydocstyle::helpers::logical_line;
 /// ```
 ///
 /// ## Options
-/// - `pydocstyle.convention`
+/// - `lint.pydocstyle.convention`
 ///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)

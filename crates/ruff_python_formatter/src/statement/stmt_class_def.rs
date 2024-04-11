@@ -1,5 +1,5 @@
 use ruff_formatter::write;
-use ruff_python_ast::{Decorator, StmtClassDef};
+use ruff_python_ast::{Decorator, NodeKind, StmtClassDef};
 use ruff_python_trivia::lines_after_ignoring_end_of_line_trivia;
 use ruff_text_size::Ranged;
 
@@ -152,7 +152,10 @@ impl FormatNodeRule<StmtClassDef> for FormatStmtClassDef {
         //
         // # comment
         // ```
-        empty_lines_before_trailing_comments(f, comments.trailing(item)).fmt(f)
+        empty_lines_before_trailing_comments(f, comments.trailing(item), NodeKind::StmtClassDef)
+            .fmt(f)?;
+
+        Ok(())
     }
 
     fn fmt_dangling_comments(

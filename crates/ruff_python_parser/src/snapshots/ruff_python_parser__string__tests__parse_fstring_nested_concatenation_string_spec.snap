@@ -44,12 +44,20 @@ expression: parse_ast
                                                                                             StringLiteral {
                                                                                                 range: 8..10,
                                                                                                 value: "",
-                                                                                                unicode: false,
+                                                                                                flags: StringLiteralFlags {
+                                                                                                    quote_style: Single,
+                                                                                                    prefix: Empty,
+                                                                                                    triple_quoted: false,
+                                                                                                },
                                                                                             },
                                                                                             StringLiteral {
                                                                                                 range: 11..13,
                                                                                                 value: "",
-                                                                                                unicode: false,
+                                                                                                flags: StringLiteralFlags {
+                                                                                                    quote_style: Single,
+                                                                                                    prefix: Empty,
+                                                                                                    triple_quoted: false,
+                                                                                                },
                                                                                             },
                                                                                         ],
                                                                                         value: "",
@@ -69,6 +77,11 @@ expression: parse_ast
                                             },
                                         ),
                                     ],
+                                    flags: FStringFlags {
+                                        quote_style: Double,
+                                        prefix: Regular,
+                                        triple_quoted: false,
+                                    },
                                 },
                             ),
                         ),
