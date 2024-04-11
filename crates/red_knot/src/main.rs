@@ -77,7 +77,18 @@ fn main() -> anyhow::Result<()> {
 
         dbg!(ids.root());
 
-        dbg!(ids.get(&ids.root()));
+        dbg!(ids.ast_id_for_syntax_key(ids.root()));
+
+        let ast = parsed.ast(&db);
+
+        if let Some(function) = ast.body.iter().find_map(|stmt| stmt.as_function_def_stmt()) {
+            let id = ids.ast_id(function);
+            dbg!(&id);
+
+            let key = ids.key(id);
+
+            dbg!(key.resolve(ast.into()));
+        }
 
         // This is the HIR
         // I forgot how rust-analyzer reference from the HIR to the AST.
