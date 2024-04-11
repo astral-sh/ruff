@@ -1,7 +1,7 @@
 use std::path::PathBuf;
-use std::ptr::NonNull;
 use std::sync::Arc;
 
+use log::warn;
 use parking_lot::lock_api::RwLockUpgradableReadGuard;
 use parking_lot::RwLock;
 use rustc_hash::FxHashMap;
@@ -15,7 +15,7 @@ use ruff_python_ast::{
     StmtFunctionDef,
 };
 use ruff_python_parser::Mode;
-use ruff_text_size::{Ranged, TextRange, TextSize};
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::files::{FileId, Files};
 
@@ -46,7 +46,7 @@ pub struct Parsed {
 #[salsa::tracked(jar=SourceJar)]
 pub struct Dependencies {
     #[returned_ref]
-    pub files: Vec<FileId>,
+    pub modules: Vec<Dependency>,
 }
 
 #[salsa::tracked(jar=SourceJar)]
@@ -92,11 +92,11 @@ pub struct Database {
     // TODO how to reuse file ids across runs? Do we want this to be part of salsa or shout the id
     //   mapping happen out side because we don't want to read them from disk every time?
     sources: Arc<RwLock<FxHashMap<FileId, SourceText>>>,
-    files: Arc<Files>,
+    files: Files,
 }
 
 impl Database {
-    pub fn new(files: Arc<Files>) -> Self {
+    pub fn new(files: Files) -> Self {
         Self {
             sources: Arc::new(RwLock::new(FxHashMap::default())),
             files,
@@ -130,7 +130,7 @@ impl Db for Database {
 
 impl salsa::Database for Database {
     fn salsa_event(&self, event: Event) {
-        &event;
+        log::debug!("{:#?}", event);
     }
 }
 
@@ -181,11 +181,7 @@ pub fn dependencies(db: &dyn Db, source_text: SourceText) -> Dependencies {
     let parsed = parse(db, source_text);
 
     let mut visitor = DependenciesVisitor {
-        db,
-        // FIXME I think using files here is wrong. It leads to non-deterministic results.
-        //  We should change files back to not use internal-mutability and only return the dependency paths from here.
-        //  It's up to the caller to resolve the dependencies from path to file-ids.k
-        base_path: db
+        module_path: db
             .files()
             .path(source_text.file(db))
             .parent()
@@ -201,13 +197,25 @@ pub fn dependencies(db: &dyn Db, source_text: SourceText) -> Dependencies {
     // TODO we should extract the names of dependencies during parsing to avoid an extra traversal here.
 }
 
-struct DependenciesVisitor<'a> {
-    db: &'a dyn Db,
-    base_path: PathBuf,
-    dependencies: Vec<FileId>,
+struct DependenciesVisitor {
+    module_path: PathBuf,
+    dependencies: Vec<Dependency>,
 }
 
-impl PreorderVisitor<'_> for DependenciesVisitor<'_> {
+impl DependenciesVisitor {
+    fn push_dependency(&mut self, path: PathBuf) {
+        // TODO handle error case by pushing a diagnostic?
+        let joined = self.module_path.join(path);
+        if let Ok(normalized) = joined.canonicalize() {
+            self.dependencies.push(Dependency { path: normalized });
+        } else {
+            warn!("Could not canonicalize path: {:?}", joined);
+        }
+    }
+}
+
+// TODO support package imports
+impl PreorderVisitor<'_> for DependenciesVisitor {
     fn enter_node(&mut self, node: AnyNodeRef) -> TraversalSignal {
         // Don't traverse into expressions
         if node.is_expression() {
@@ -221,39 +229,19 @@ impl PreorderVisitor<'_> for DependenciesVisitor<'_> {
         match stmt {
             Stmt::Import(import) => {
                 for alias in &import.names {
-                    let mut path = self.base_path.clone();
-                    for part in alias.name.split('.') {
-                        path.push(part);
-                    }
+                    let path: PathBuf = alias.name.split('.').collect();
 
-                    path = path.with_extension("py");
-                    let id = self.db.files().intern(&path);
-
-                    self.dependencies.push(id);
+                    self.push_dependency(path.with_extension("py"));
                 }
             }
 
             Stmt::ImportFrom(from) => {
                 if let Some(module) = &from.module {
-                    let mut path = self.base_path.clone();
-                    for part in module.split('.') {
-                        path.push(part);
-                    }
-
-                    path = path.with_extension("py");
-                    let id = self.db.files().intern(&path);
-
-                    self.dependencies.push(id);
+                    let path: PathBuf = module.split('.').collect();
+                    self.push_dependency(path.with_extension("py"));
                 } else if let Some(level) = &from.level {
-                    let mut path = self.base_path.clone();
-                    for _ in 0..*level {
-                        path.pop();
-                    }
-
-                    path = path.with_extension("py");
-                    let id = self.db.files().intern(&path);
-
-                    self.dependencies.push(id);
+                    let path: PathBuf = (0..*level).map(|_| "..").collect();
+                    self.push_dependency(path.with_extension("py"));
                 } else {
                     // Should never happen, let's assume we didn't see it.
                 }
@@ -262,6 +250,12 @@ impl PreorderVisitor<'_> for DependenciesVisitor<'_> {
         }
         preorder::walk_stmt(self, stmt);
     }
+}
+
+#[derive(Eq, PartialEq, Hash, Clone, Debug)]
+pub struct Dependency {
+    // A relative path from the current module to the dependency
+    pub path: PathBuf,
 }
 
 // TODO it's unclear to me if the function should accept a parsed or a source text?
