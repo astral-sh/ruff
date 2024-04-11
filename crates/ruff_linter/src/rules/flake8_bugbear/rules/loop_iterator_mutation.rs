@@ -112,8 +112,7 @@ pub(crate) fn loop_iterator_mutation(checker: &mut Checker, stmt_for: &StmtFor) 
             name = _to_name_str(iter.as_ref());
         }
         _ => {
-            println!("Shouldn't happen");
-            return;
+            unreachable!()
         }
     }
     let mut visitor = LoopMutationsVisitor {
