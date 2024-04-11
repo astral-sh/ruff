@@ -2,7 +2,9 @@ use std::path::PathBuf;
 
 use rustc_hash::FxHashSet;
 
-use red_knot::db::{check_physical_lines, check_syntax, dependencies, parse, Database, Db};
+use red_knot::db::{
+    ast_ids, check_physical_lines, check_syntax, dependencies, parse, Database, Db,
+};
 use red_knot::{files, Workspace};
 
 fn main() -> anyhow::Result<()> {
@@ -41,10 +43,10 @@ fn main() -> anyhow::Result<()> {
         let module_path = files.path(file_id);
 
         // TODO this looks weird: dependencies.files. Let's figure out a better naming and structure.
-        let dependencies = dependencies(&db, content).modules(&db);
+        let dependencies = dependencies(&db, content);
 
         // We know that we need to analyse all dependencies, but we don't need to check them.
-        for dependency in dependencies {
+        for dependency in &*dependencies {
             let dependency_path = module_path.join(&dependency.path).canonicalize().unwrap();
             let dependency_file_id = files.intern(&dependency_path);
 
@@ -71,11 +73,17 @@ fn main() -> anyhow::Result<()> {
             diagnostics.extend(check_syntax(&db, parsed).diagnostics(&db));
         }
 
+        let ids = ast_ids(&db, content);
+
+        dbg!(ids.root());
+
+        dbg!(ids.get(&ids.root()));
+
         // This is the HIR
         // I forgot how rust-analyzer reference from the HIR to the AST.
         // let item_tree = build_item_tree(&db, parsed.ast(&db)); // construct the item tree from the AST (the item tree is location agnostic)
         // The bindings should only resolve internally. Imports should be resolved to full qualified paths
-        // but not resolved to bindings to ensure that result can be caculated on a per-file basis.
+        // but not resolved to bindings to ensure that result can be calculated on a per-file basis.
         // let bindings = binder(&db, item_tree); // Run the item tree through the binder
 
         // let types = type_inference(&db, bindings); // Run the type checker on the bindings
