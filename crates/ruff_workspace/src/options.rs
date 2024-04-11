@@ -906,7 +906,9 @@ pub struct LintCommonOptions {
     // Tables are required to go last.
     /// A list of mappings from file pattern to rule codes or prefixes to
     /// exclude, when considering any matching files. An initial '!' negates
-    /// the file pattern.
+    /// the file pattern, meaning the listed rule(s) will be ignored in all files not matching the
+    /// pattern, and will not be ignored in files matching the pattern (possibly overriding
+    /// previous ignore rules.)
     #[option(
         default = "{}",
         value_type = "dict[str, list[RuleSelector]]",
@@ -915,8 +917,10 @@ pub struct LintCommonOptions {
             # Ignore `E402` (import violations) in all `__init__.py` files, and in `path/to/file.py`.
             "__init__.py" = ["E402"]
             "path/to/file.py" = ["E402"]
-            # Ignore `D` rules everywhere except for the `src/` directory.
-            "!src/**.py" = ["D"]
+            # Ignore `E402` rules everywhere except for the `src/` directory.
+            # This will mean `E402` is not ignored in `__init__.py` files in `src/`; to change this,
+            # list the ignore rule for `__init__.py` after this rule instead of before it.
+            "!src/**.py" = ["E402"]
         "#
     )]
     pub per_file_ignores: Option<FxHashMap<String, Vec<RuleSelector>>>,

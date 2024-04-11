@@ -1249,9 +1249,9 @@ fn negated_per_file_ignores_absolute() -> Result<()> {
     Ok(())
 }
 
-/// patterns are additive, can't use negative patterns to "un-ignore"
+/// negated patterns can be used to un-ignore previously-ignored rules
 #[test]
-fn negated_per_file_ignores_overlap() -> Result<()> {
+fn negated_per_file_ignores_can_unignore() -> Result<()> {
     let tempdir = TempDir::new()?;
     let ruff_toml = tempdir.path().join("ruff.toml");
     fs::write(
@@ -1275,10 +1275,51 @@ fn negated_per_file_ignores_overlap() -> Result<()> {
         .arg("RUF901")
         .current_dir(&tempdir)
         , @r###"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 1
     ----- stdout -----
-    All checks passed!
+    foo.py:1:1: RUF901 [*] Hey this is a stable test rule with a safe fix.
+    Found 1 error.
+    [*] 1 fixable with the `--fix` option.
+
+    ----- stderr -----
+    "###);
+    Ok(())
+}
+
+/// extend-per-file-ignores can un-ignore from per-file-ignores
+#[test]
+fn negated_extend_per_file_ignores_can_unignore() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+[lint.per-file-ignores]
+"*.py" = ["RUF"]
+[lint.extend-per-file-ignores]
+"!foo.py" = ["RUF"]
+"#,
+    )?;
+    let foo_file = tempdir.path().join("foo.py");
+    fs::write(foo_file, "")?;
+    let bar_file = tempdir.path().join("bar.py");
+    fs::write(bar_file, "")?;
+
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .arg("--config")
+        .arg(&ruff_toml)
+        .arg("--select")
+        .arg("RUF901")
+        .current_dir(&tempdir)
+        , @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    foo.py:1:1: RUF901 [*] Hey this is a stable test rule with a safe fix.
+    Found 1 error.
+    [*] 1 fixable with the `--fix` option.
 
     ----- stderr -----
     "###);

@@ -554,7 +554,7 @@
       ]
     },
     "per-file-ignores": {
-      "description": "A list of mappings from file pattern to rule codes or prefixes to exclude, when considering any matching files. An initial '!' negates the file pattern.",
+      "description": "A list of mappings from file pattern to rule codes or prefixes to exclude, when considering any matching files. An initial '!' negates the file pattern, meaning the listed rule(s) will be ignored in all files not matching the pattern, and will not be ignored in files matching the pattern (possibly overriding previous ignore rules.)",
       "deprecated": true,
       "type": [
         "object",
@@ -2168,7 +2168,7 @@
           ]
         },
         "per-file-ignores": {
-          "description": "A list of mappings from file pattern to rule codes or prefixes to exclude, when considering any matching files. An initial '!' negates the file pattern.",
+          "description": "A list of mappings from file pattern to rule codes or prefixes to exclude, when considering any matching files. An initial '!' negates the file pattern, meaning the listed rule(s) will be ignored in all files not matching the pattern, and will not be ignored in files matching the pattern (possibly overriding previous ignore rules.)",
           "type": [
             "object",
             "null"
