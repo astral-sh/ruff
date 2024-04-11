@@ -204,10 +204,6 @@ impl<'a> Codes<'a> {
         self.names()
             .any(|code| needle == get_redirect_target(code).unwrap_or(code))
     }
-
-    pub(crate) fn ranges(&self) -> impl Iterator<Item = TextRange> + '_ {
-        self.codes.iter().map(|&(_, range)| range)
-    }
 }
 
 impl Ranged for Codes<'_> {
