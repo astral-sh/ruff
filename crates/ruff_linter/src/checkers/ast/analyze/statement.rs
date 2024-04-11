@@ -366,6 +366,11 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::AsyncFunctionWithTimeout) {
                 flake8_async::rules::async_function_with_timeout(checker, function_def);
             }
+            if checker.enabled(Rule::UnreachableCode) {
+                checker
+                    .diagnostics
+                    .extend(ruff::rules::unreachable::in_function(name, body));
+            }
             if checker.enabled(Rule::ReimplementedOperator) {
                 refurb::rules::reimplemented_operator(checker, &function_def.into());
             }
