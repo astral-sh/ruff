@@ -7,8 +7,8 @@ use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_ast::{
     visitor::{self, Visitor},
-    Expr, ExprAttribute, ExprCall, ExprSubscript, Stmt, StmtAssign, StmtAugAssign, StmtBreak,
-    StmtDelete, StmtFor, StmtIf,
+    Arguments, Expr, ExprAttribute, ExprCall, ExprSubscript, Stmt, StmtAssign, StmtAugAssign,
+    StmtBreak, StmtDelete, StmtFor, StmtIf,
 };
 use ruff_text_size::TextRange;
 
@@ -186,7 +186,7 @@ impl<'a> LoopMutationsVisitor<'a> {
     }
 
     /// Handle, e.g., `items.append(1)`.
-    fn handle_call(&mut self, func: &Expr) {
+    fn handle_call(&mut self, func: &Expr, arguments: &Arguments) {
         if let Expr::Attribute(ExprAttribute {
             range,
             value,
@@ -195,7 +195,19 @@ impl<'a> LoopMutationsVisitor<'a> {
         }) = func
         {
             if is_mutating_function(attr.as_str()) {
+                // Find, e.g., `items.remove(1)`.
                 if ComparableExpr::from(self.iter) == ComparableExpr::from(value) {
+                    // But allow, e.g., `for item in items: items.remove(item)`.
+                    if matches!(attr.as_str(), "remove" | "discard" | "pop") {
+                        if arguments.len() == 1 {
+                            if let [arg] = &*arguments.args {
+                                if ComparableExpr::from(self.target) == ComparableExpr::from(arg) {
+                                    return;
+                                }
+                            }
+                        }
+                    }
+
                     self.add_mutation(*range);
                 }
             }
@@ -271,8 +283,11 @@ impl<'a> Visitor<'a> for LoopMutationsVisitor<'a> {
 
     fn visit_expr(&mut self, expr: &'a Expr) {
         // Ex) `items.append(1)`
-        if let Expr::Call(ExprCall { func, .. }) = expr {
-            self.handle_call(func);
+        if let Expr::Call(ExprCall {
+            func, arguments, ..
+        }) = expr
+        {
+            self.handle_call(func, arguments);
         }
 
         visitor::walk_expr(self, expr);

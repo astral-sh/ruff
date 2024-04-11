@@ -5,7 +5,7 @@ B909.py:12:5: B909 Mutation to loop iterable `some_list` during iteration
    |
 10 | for elem in some_list:
 11 |     # errors
-12 |     some_list.remove(elem)
+12 |     some_list.remove(0)
    |     ^^^^^^^^^^^^^^^^ B909
 13 |     del some_list[2]
 14 |     some_list.append(elem)
@@ -14,7 +14,7 @@ B909.py:12:5: B909 Mutation to loop iterable `some_list` during iteration
 B909.py:13:5: B909 Mutation to loop iterable `some_list` during iteration
    |
 11 |     # errors
-12 |     some_list.remove(elem)
+12 |     some_list.remove(0)
 13 |     del some_list[2]
    |     ^^^^^^^^^^^^^^^^ B909
 14 |     some_list.append(elem)
@@ -23,7 +23,7 @@ B909.py:13:5: B909 Mutation to loop iterable `some_list` during iteration
 
 B909.py:14:5: B909 Mutation to loop iterable `some_list` during iteration
    |
-12 |     some_list.remove(elem)
+12 |     some_list.remove(0)
 13 |     del some_list[2]
 14 |     some_list.append(elem)
    |     ^^^^^^^^^^^^^^^^ B909
@@ -104,7 +104,7 @@ B909.py:25:9: B909 Mutation to loop iterable `some_list` during iteration
    |
 23 |     # conditional break should error
 24 |     if elem == 2:
-25 |         some_list.remove(elem)
+25 |         some_list.remove(0)
    |         ^^^^^^^^^^^^^^^^ B909
 26 |         if elem == 3:
 27 |             break
@@ -202,7 +202,7 @@ B909.py:84:5: B909 Mutation to loop iterable `a.some_list` during iteration
    |
 82 | # ensure member accesses are handled as errors
 83 | for elem in a.some_list:
-84 |     a.some_list.remove(elem)
+84 |     a.some_list.remove(0)
    |     ^^^^^^^^^^^^^^^^^^ B909
 85 |     del a.some_list[2]
    |
@@ -210,7 +210,7 @@ B909.py:84:5: B909 Mutation to loop iterable `a.some_list` during iteration
 B909.py:85:5: B909 Mutation to loop iterable `a.some_list` during iteration
    |
 83 | for elem in a.some_list:
-84 |     a.some_list.remove(elem)
+84 |     a.some_list.remove(0)
 85 |     del a.some_list[2]
    |     ^^^^^^^^^^^^^^^^^^ B909
    |

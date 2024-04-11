@@ -9,7 +9,7 @@ some_list = [1, 2, 3]
 some_other_list = [1, 2, 3]
 for elem in some_list:
     # errors
-    some_list.remove(elem)
+    some_list.remove(0)
     del some_list[2]
     some_list.append(elem)
     some_list.sort()
@@ -22,7 +22,7 @@ for elem in some_list:
 
     # conditional break should error
     if elem == 2:
-        some_list.remove(elem)
+        some_list.remove(0)
         if elem == 3:
             break
 
@@ -81,7 +81,7 @@ class A:
 a = A((1, 2, 3))
 # ensure member accesses are handled as errors
 for elem in a.some_list:
-    a.some_list.remove(elem)
+    a.some_list.remove(0)
     del a.some_list[2]
 
 
@@ -156,3 +156,5 @@ for elem in some_list:
 for elem in some_list:
     del some_list[elem]
     some_list[elem] = 1
+    some_list.remove(elem)
+    some_list.discard(elem)
