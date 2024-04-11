@@ -1037,6 +1037,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
 
         // refurb
         (Refurb, "101") => (RuleGroup::Preview, rules::refurb::rules::ReadWholeFile),
+        (Refurb, "103") => (RuleGroup::Preview, rules::refurb::rules::WriteWholeFile),
         (Refurb, "105") => (RuleGroup::Preview, rules::refurb::rules::PrintEmptyString),
         (Refurb, "110") => (RuleGroup::Preview, rules::refurb::rules::IfExpInsteadOfOrOperator),
         #[allow(deprecated)]
