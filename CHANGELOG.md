@@ -45,15 +45,6 @@
 - \[`pydocstyle`\] Use section name range for all section-related docstring diagnostics ([#10740](https://github.com/astral-sh/ruff/pull/10740))
 - Respect `# noqa` directives on `__all__` openers ([#10798](https://github.com/astral-sh/ruff/pull/10798))
 
-### Documentation
-
-- Correct some oversights in the documentation from #10756 ([#10796](https://github.com/astral-sh/ruff/pull/10796))
-- Rework docs for pydocstyle rules ([#10754](https://github.com/astral-sh/ruff/pull/10754))
-- \[`flake8_comprehensions`\] update docs for unnecessary-comprehension-any-all (C419) ([#10744](https://github.com/astral-sh/ruff/pull/10744))
-- Update `ruff_linter` crate name in CONTRIBUTING.md ([#10745](https://github.com/astral-sh/ruff/pull/10745))
-- More precise Pylint comparison ([#10756](https://github.com/astral-sh/ruff/pull/10756))
-- Change `Lint` to `Format` in formatter.md ([#10777](https://github.com/astral-sh/ruff/pull/10777))
-
 ## 0.3.5
 
 ### Preview features
