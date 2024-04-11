@@ -1,5 +1,5 @@
 use std::fmt::{Debug, Formatter};
-use std::hash::{BuildHasherDefault, Hash, Hasher};
+use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -9,7 +9,7 @@ use rustc_hash::FxHasher;
 
 use ruff_index::{newtype_index, IndexVec};
 
-type Map<K, V> = hashbrown::HashMap<K, V, BuildHasherDefault<rustc_hash::FxHasher>>;
+type Map<K, V> = hashbrown::HashMap<K, V, ()>;
 
 #[newtype_index]
 pub struct FileId;
@@ -71,13 +71,7 @@ impl FilesInner {
             RawEntryMut::Occupied(entry) => *entry.key(),
             RawEntryMut::Vacant(entry) => {
                 let id = self.by_id.push(path.to_owned());
-
-                entry.insert_with_hasher(hash, id, (), |file| {
-                    let mut hasher = FxHasher::default();
-                    self.by_id[*file].hash(&mut hasher);
-                    hasher.finish()
-                });
-
+                entry.insert_with_hasher(hash, id, (), |_| hash);
                 id
             }
         }
