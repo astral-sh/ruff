@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+assertion_line: 180
 ---
 F541.py:6:5: F541 [*] f-string without any placeholders
   |
@@ -374,6 +375,7 @@ F541.py:42:4: F541 [*] f-string without any placeholders
    42 |+("" ""r"")
 43 43 | f"{v:{f"0.2f"}}"
 44 44 | f"\{{x}}"
+45 45 | 
 
 F541.py:43:7: F541 [*] f-string without any placeholders
    |
@@ -392,6 +394,8 @@ F541.py:43:7: F541 [*] f-string without any placeholders
 43    |-f"{v:{f"0.2f"}}"
    43 |+f"{v:{"0.2f"}}"
 44 44 | f"\{{x}}"
+45 45 | 
+46 46 | (
 
 F541.py:44:1: F541 [*] f-string without any placeholders
    |
@@ -399,6 +403,8 @@ F541.py:44:1: F541 [*] f-string without any placeholders
 43 | f"{v:{f"0.2f"}}"
 44 | f"\{{x}}"
    | ^^^^^^^^^ F541
+45 | 
+46 | (
    |
    = help: Remove extraneous `f` prefix
 
@@ -408,5 +414,25 @@ F541.py:44:1: F541 [*] f-string without any placeholders
 43 43 | f"{v:{f"0.2f"}}"
 44    |-f"\{{x}}"
    44 |+"\{x}"
+45 45 | 
+46 46 | (
+47 47 |     f"no placeholder"
 
+F541.py:47:5: F541 [*] f-string without any placeholders
+   |
+46 | (
+47 |     f"no placeholder"
+   |     ^^^^^^^^^^^^^^^^^ F541
+48 |     f"placeholder: {a}"
+49 | )
+   |
+   = help: Remove extraneous `f` prefix
 
+ℹ Safe fix
+44 44 | f"\{{x}}"
+45 45 | 
+46 46 | (
+47    |-    f"no placeholder"
+   47 |+    "no placeholder"
+48 48 |     f"placeholder: {a}"
+49 49 | )

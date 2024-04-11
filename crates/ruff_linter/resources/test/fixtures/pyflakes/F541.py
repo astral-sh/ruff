@@ -42,3 +42,8 @@ f"{{{{x}}}}"
 (""f""r"")
 f"{v:{f"0.2f"}}"
 f"\{{x}}"
+
+(
+    f"no placeholder"
+    f"placeholder: {a}"
+)
