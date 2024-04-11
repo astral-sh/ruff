@@ -114,7 +114,7 @@ Module(
 
   |
 1 | def foo(a, *args=(1, 2)): ...
-  |                        ^ Syntax Error: expected Newline, found Rpar
+  |                        ^ Syntax Error: Expected newline, found ')'
   |
 
 
