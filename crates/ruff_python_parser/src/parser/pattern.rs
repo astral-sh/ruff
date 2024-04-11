@@ -71,7 +71,7 @@ impl<'src> Parser<'src> {
         } else {
             // We know it's not a sequence pattern now, so check for star pattern usage.
             if pattern.is_match_star() {
-                self.add_error(ParseErrorType::StarPatternUsageError, &pattern);
+                self.add_error(ParseErrorType::InvalidStarPatternUsage, &pattern);
             }
             pattern
         }
@@ -91,7 +91,7 @@ impl<'src> Parser<'src> {
         if self.at(TokenKind::Vbar) {
             // We know it's an `or` pattern now, so check for star pattern usage.
             if lhs.is_match_star() {
-                self.add_error(ParseErrorType::StarPatternUsageError, &lhs);
+                self.add_error(ParseErrorType::InvalidStarPatternUsage, &lhs);
             }
 
             let mut patterns = vec![lhs];
@@ -113,7 +113,7 @@ impl<'src> Parser<'src> {
         if self.eat(TokenKind::As) {
             // We know it's an `as` pattern now, so check for star pattern usage.
             if lhs.is_match_star() {
-                self.add_error(ParseErrorType::StarPatternUsageError, &lhs);
+                self.add_error(ParseErrorType::InvalidStarPatternUsage, &lhs);
             }
 
             let ident = self.parse_identifier();
@@ -138,7 +138,7 @@ impl<'src> Parser<'src> {
             TokenKind::Star => {
                 let star_pattern = self.parse_match_pattern_star();
                 if allow_star_pattern.is_no() {
-                    self.add_error(ParseErrorType::StarPatternUsageError, &star_pattern);
+                    self.add_error(ParseErrorType::InvalidStarPatternUsage, &star_pattern);
                 }
                 Pattern::MatchStar(star_pattern)
             }
@@ -241,7 +241,7 @@ impl<'src> Parser<'src> {
                     }
                     pattern => {
                         parser.add_error(
-                            ParseErrorType::OtherError("invalid mapping pattern key".to_string()),
+                            ParseErrorType::OtherError("Invalid mapping pattern key".to_string()),
                             &pattern,
                         );
                         // SAFETY: The `parse_match_pattern_lhs` function can only return
@@ -326,7 +326,7 @@ impl<'src> Parser<'src> {
             // parenthesis, it'll consider `case` a name token instead.
             self.add_error(
                 ParseErrorType::OtherError(format!(
-                    "missing `{closing}`",
+                    "Missing '{closing}'",
                     closing = if parentheses.is_list() { "]" } else { ")" }
                 )),
                 self.current_token_range(),
@@ -519,7 +519,7 @@ impl<'src> Parser<'src> {
                 if unary_expr.op.is_u_add() {
                     self.add_error(
                         ParseErrorType::OtherError(
-                            "Unary plus is not allowed as a literal pattern".to_string(),
+                            "Unary '+' is not allowed as a literal pattern".to_string(),
                         ),
                         &unary_expr,
                     );
@@ -661,7 +661,7 @@ impl<'src> Parser<'src> {
             }
             pattern => {
                 self.add_error(
-                    ParseErrorType::OtherError("invalid value for a class pattern".to_string()),
+                    ParseErrorType::OtherError("Invalid value for a class pattern".to_string()),
                     &pattern,
                 );
                 Box::new(recovery::pattern_to_expr(pattern))
@@ -720,7 +720,7 @@ impl<'src> Parser<'src> {
                 if has_seen_keyword_pattern && has_seen_pattern {
                     parser.add_error(
                         ParseErrorType::OtherError(
-                            "positional patterns follow keyword patterns".to_string(),
+                            "Positional patterns cannot follow keyword patterns".to_string(),
                         ),
                         parser.node_range(pattern_start),
                     );

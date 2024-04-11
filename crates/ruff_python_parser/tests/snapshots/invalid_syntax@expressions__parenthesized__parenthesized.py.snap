@@ -61,7 +61,7 @@ Module(
   |
 1 | # Starred expression isn't allowed in a parenthesized expression.
 2 | (*x)
-  |  ^^ Syntax Error: starred expression cannot be used here
+  |  ^^ Syntax Error: Starred expression cannot be used here
 3 | 
 4 | # Unparenthesized named expression is allowed.
   |

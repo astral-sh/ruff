@@ -180,7 +180,7 @@ Module(
 
   |
 1 | 1 += 1
-  | ^ Syntax Error: invalid augmented assignment target
+  | ^ Syntax Error: Invalid augmented assignment target
 2 | "a" += "b"
 3 | *x += 1
   |
@@ -189,7 +189,7 @@ Module(
   |
 1 | 1 += 1
 2 | "a" += "b"
-  | ^^^ Syntax Error: invalid augmented assignment target
+  | ^^^ Syntax Error: Invalid augmented assignment target
 3 | *x += 1
 4 | pass += 1
   |
@@ -199,7 +199,7 @@ Module(
 1 | 1 += 1
 2 | "a" += "b"
 3 | *x += 1
-  | ^^ Syntax Error: invalid augmented assignment target
+  | ^^ Syntax Error: Invalid augmented assignment target
 4 | pass += 1
 5 | x += pass
   |
@@ -228,5 +228,5 @@ Module(
 4 | pass += 1
 5 | x += pass
 6 | (x + y) += 1
-  |  ^^^^^ Syntax Error: invalid augmented assignment target
+  |  ^^^^^ Syntax Error: Invalid augmented assignment target
   |

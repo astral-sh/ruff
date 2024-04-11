@@ -144,7 +144,7 @@ Module(
   |
 4 | # Unparenthesized tuple expression
 5 | yield from x, y
-  |            ^^^^ Syntax Error: unparenthesized tuple cannot be used here
+  |            ^^^^ Syntax Error: Unparenthesized tuple expression cannot be used here
 6 | 
 7 | # This is a tuple expression parsing
   |
@@ -154,5 +154,5 @@ Module(
 7 | # This is a tuple expression parsing
 8 | #          vvvvvvvvvvvvv
 9 | yield from (x, *x and y)
-  |                 ^^^^^^^ Syntax Error: boolean expression cannot be used here
+  |                 ^^^^^^^ Syntax Error: Boolean expression cannot be used here
   |

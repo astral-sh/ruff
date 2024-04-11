@@ -436,7 +436,7 @@ Module(
 
   |
 1 | "abc": str = "def"
-  | ^^^^^ Syntax Error: invalid annotated assignment target
+  | ^^^^^ Syntax Error: Invalid annotated assignment target
 2 | call(): str = "no"
 3 | *x: int = 1, 2
   |
@@ -445,7 +445,7 @@ Module(
   |
 1 | "abc": str = "def"
 2 | call(): str = "no"
-  | ^^^^^^ Syntax Error: invalid annotated assignment target
+  | ^^^^^^ Syntax Error: Invalid annotated assignment target
 3 | *x: int = 1, 2
 4 | # Tuple assignment
   |
@@ -455,7 +455,7 @@ Module(
 1 | "abc": str = "def"
 2 | call(): str = "no"
 3 | *x: int = 1, 2
-  | ^^ Syntax Error: invalid annotated assignment target
+  | ^^ Syntax Error: Invalid annotated assignment target
 4 | # Tuple assignment
 5 | x,: int = 1
   |
@@ -465,7 +465,7 @@ Module(
 3 | *x: int = 1, 2
 4 | # Tuple assignment
 5 | x,: int = 1
-  | ^^ Syntax Error: only single target (not tuple) can be annotated
+  | ^^ Syntax Error: Only single target (not tuple) can be annotated
 6 | x, y: int = 1, 2
 7 | (x, y): int = 1, 2
   |
@@ -475,7 +475,7 @@ Module(
 4 | # Tuple assignment
 5 | x,: int = 1
 6 | x, y: int = 1, 2
-  | ^^^^ Syntax Error: only single target (not tuple) can be annotated
+  | ^^^^ Syntax Error: Only single target (not tuple) can be annotated
 7 | (x, y): int = 1, 2
 8 | # List assignment
   |
@@ -485,7 +485,7 @@ Module(
 5 | x,: int = 1
 6 | x, y: int = 1, 2
 7 | (x, y): int = 1, 2
-  | ^^^^^^ Syntax Error: only single target (not tuple) can be annotated
+  | ^^^^^^ Syntax Error: Only single target (not tuple) can be annotated
 8 | # List assignment
 9 | [x]: int = 1
   |
@@ -495,7 +495,7 @@ Module(
  7 | (x, y): int = 1, 2
  8 | # List assignment
  9 | [x]: int = 1
-   | ^^^ Syntax Error: only single target (not list) can be annotated
+   | ^^^ Syntax Error: Only single target (not list) can be annotated
 10 | [x, y]: int = 1, 2
    |
 
@@ -504,5 +504,5 @@ Module(
  8 | # List assignment
  9 | [x]: int = 1
 10 | [x, y]: int = 1, 2
-   | ^^^^^^ Syntax Error: only single target (not list) can be annotated
+   | ^^^^^^ Syntax Error: Only single target (not list) can be annotated
    |

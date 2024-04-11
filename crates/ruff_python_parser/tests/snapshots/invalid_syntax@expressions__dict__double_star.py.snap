@@ -488,7 +488,7 @@ Module(
   |
 4 | {**x := 1}
 5 | {a: 1, **x if True else y}
-  |          ^^^^^^^^^^^^^^^^ Syntax Error: conditional expression cannot be used here
+  |          ^^^^^^^^^^^^^^^^ Syntax Error: Conditional expression cannot be used here
 6 | {**lambda x: x, b: 2}
 7 | {a: 1, **x or y}
   |
@@ -498,7 +498,7 @@ Module(
 4 | {**x := 1}
 5 | {a: 1, **x if True else y}
 6 | {**lambda x: x, b: 2}
-  |    ^^^^^^^^^^^ Syntax Error: lambda expression cannot be used here
+  |    ^^^^^^^^^^^ Syntax Error: Lambda expression cannot be used here
 7 | {a: 1, **x or y}
 8 | {**x and y, b: 2}
   |
@@ -508,7 +508,7 @@ Module(
 5 | {a: 1, **x if True else y}
 6 | {**lambda x: x, b: 2}
 7 | {a: 1, **x or y}
-  |          ^^^^^^ Syntax Error: boolean expression cannot be used here
+  |          ^^^^^^ Syntax Error: Boolean expression cannot be used here
 8 | {**x and y, b: 2}
 9 | {a: 1, **not x, b: 2}
   |
@@ -518,7 +518,7 @@ Module(
  6 | {**lambda x: x, b: 2}
  7 | {a: 1, **x or y}
  8 | {**x and y, b: 2}
-   |    ^^^^^^^ Syntax Error: boolean expression cannot be used here
+   |    ^^^^^^^ Syntax Error: Boolean expression cannot be used here
  9 | {a: 1, **not x, b: 2}
 10 | {**x in y}
    |
@@ -528,7 +528,7 @@ Module(
  7 | {a: 1, **x or y}
  8 | {**x and y, b: 2}
  9 | {a: 1, **not x, b: 2}
-   |          ^^^^^ Syntax Error: boolean expression cannot be used here
+   |          ^^^^^ Syntax Error: Boolean expression cannot be used here
 10 | {**x in y}
 11 | {**x not in y}
    |
@@ -538,7 +538,7 @@ Module(
  8 | {**x and y, b: 2}
  9 | {a: 1, **not x, b: 2}
 10 | {**x in y}
-   |    ^^^^^^ Syntax Error: comparison expression cannot be used here
+   |    ^^^^^^ Syntax Error: Comparison expression cannot be used here
 11 | {**x not in y}
 12 | {**x < y}
    |
@@ -548,7 +548,7 @@ Module(
  9 | {a: 1, **not x, b: 2}
 10 | {**x in y}
 11 | {**x not in y}
-   |    ^^^^^^^^^^ Syntax Error: comparison expression cannot be used here
+   |    ^^^^^^^^^^ Syntax Error: Comparison expression cannot be used here
 12 | {**x < y}
    |
 
@@ -557,5 +557,5 @@ Module(
 10 | {**x in y}
 11 | {**x not in y}
 12 | {**x < y}
-   |    ^^^^^ Syntax Error: comparison expression cannot be used here
+   |    ^^^^^ Syntax Error: Comparison expression cannot be used here
    |

@@ -91,7 +91,7 @@ Module(
 1 | if x:
 2 |     pass
 3 | elif *x:
-  |      ^^ Syntax Error: starred expression cannot be used here
+  |      ^^ Syntax Error: Starred expression cannot be used here
 4 |     pass
 5 | elif yield x:
   |
@@ -101,6 +101,6 @@ Module(
 3 | elif *x:
 4 |     pass
 5 | elif yield x:
-  |      ^^^^^^^ Syntax Error: yield expression cannot be used here
+  |      ^^^^^^^ Syntax Error: Yield expression cannot be used here
 6 |     pass
   |
