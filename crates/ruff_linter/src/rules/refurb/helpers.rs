@@ -3,8 +3,6 @@ use ruff_python_codegen::Generator;
 use ruff_python_semantic::{BindingId, ResolvedReference, SemanticModel};
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::fix::snippet::SourceCodeSnippet;
-
 /// Format a code snippet to call `name.method()`.
 pub(super) fn generate_method_call(name: &str, method: &str, generator: Generator) -> String {
     // Construct `name`.
@@ -66,8 +64,8 @@ pub(super) fn generate_none_identity_comparison(
 }
 
 // Helpers for read-whole-file and write-whole-file
-#[derive(Debug)]
-pub(crate) enum OpenMode {
+#[derive(Debug, Copy, Clone)]
+pub(super) enum OpenMode {
     /// "r"
     ReadText,
     /// "rb"
@@ -79,7 +77,7 @@ pub(crate) enum OpenMode {
 }
 
 impl OpenMode {
-    fn pathlib_method(&self) -> String {
+    pub(super) fn pathlib_method(self) -> String {
         match self {
             OpenMode::ReadText => "read_text".to_string(),
             OpenMode::ReadBytes => "read_bytes".to_string(),
@@ -92,29 +90,29 @@ impl OpenMode {
 /// A grab bag struct that joins together every piece of information we need to track
 /// about a file open operation.
 #[derive(Debug)]
-pub(crate) struct FileOpen<'a> {
+pub(super) struct FileOpen<'a> {
     /// With item where the open happens, we use it for the reporting range.
-    pub(crate) item: &'a ast::WithItem,
+    pub(super) item: &'a ast::WithItem,
     /// Filename expression used as the first argument in `open`, we use it in the diagnostic message.
-    pub(crate) filename: &'a Expr,
+    pub(super) filename: &'a Expr,
     /// The file open mode.
-    pub(crate) mode: OpenMode,
+    pub(super) mode: OpenMode,
     /// The file open keywords.
-    pub(crate) keywords: Vec<&'a ast::Keyword>,
+    pub(super) keywords: Vec<&'a ast::Keyword>,
     /// We only check `open` operations whose file handles are used exactly once.
-    pub(crate) reference: &'a ResolvedReference,
+    pub(super) reference: &'a ResolvedReference,
 }
 
 impl<'a> FileOpen<'a> {
     /// Determine whether an expression is a reference to the file handle, by comparing
     /// their ranges. If two expressions have the same range, they must be the same expression.
-    pub(crate) fn is_ref(&self, expr: &Expr) -> bool {
+    pub(super) fn is_ref(&self, expr: &Expr) -> bool {
         expr.range() == self.reference.range()
     }
 }
 
 /// Find and return all `open` operations in the given `with` statement.
-pub(crate) fn find_file_opens<'a>(
+pub(super) fn find_file_opens<'a>(
     with: &'a ast::StmtWith,
     semantic: &'a SemanticModel<'a>,
     read_mode: bool,
@@ -277,27 +275,4 @@ fn match_open_mode(mode: &Expr) -> Option<OpenMode> {
         "wb" => Some(OpenMode::WriteBytes),
         _ => None,
     }
-}
-
-/// Construct the replacement suggestion call.
-pub(crate) fn make_suggestion(
-    open: &FileOpen<'_>,
-    arguments: Vec<Expr>,
-    generator: Generator,
-) -> SourceCodeSnippet {
-    let name = ast::ExprName {
-        id: open.mode.pathlib_method(),
-        ctx: ast::ExprContext::Load,
-        range: TextRange::default(),
-    };
-    let call = ast::ExprCall {
-        func: Box::new(name.into()),
-        arguments: ast::Arguments {
-            args: Box::from(arguments),
-            keywords: open.keywords.iter().copied().cloned().collect(),
-            range: TextRange::default(),
-        },
-        range: TextRange::default(),
-    };
-    SourceCodeSnippet::from_str(&generator.expr(&call.into()))
 }

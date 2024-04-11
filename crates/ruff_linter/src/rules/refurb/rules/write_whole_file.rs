@@ -1,12 +1,15 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::relocate::relocate_expr;
 use ruff_python_ast::visitor::{self, Visitor};
 use ruff_python_ast::{self as ast, Expr, Stmt};
-use ruff_text_size::Ranged;
+use ruff_python_codegen::Generator;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
-use crate::rules::refurb::helpers;
+
+use super::super::helpers::{find_file_opens, FileOpen};
 
 /// ## What it does
 /// Checks for uses of `open` and `write` that can be replaced by `pathlib`
@@ -56,26 +59,27 @@ pub(crate) fn write_whole_file(checker: &mut Checker, with: &ast::StmtWith) {
     }
 
     // First we go through all the items in the statement and find all `open` operations.
-    let candidates = helpers::find_file_opens(with, checker.semantic(), false);
+    let candidates = find_file_opens(with, checker.semantic(), false);
     if candidates.is_empty() {
         return;
     }
 
     // Then we need to match each `open` operation with exactly one `write` call.
-    let mut matcher = WriteMatcher::new(candidates);
-    visitor::walk_body(&mut matcher, &with.body);
-    let contents = matcher.contents();
+    let (matches, contents) = {
+        let mut matcher = WriteMatcher::new(candidates);
+        visitor::walk_body(&mut matcher, &with.body);
+        matcher.finish()
+    };
 
     // All the matched operations should be reported.
-    let diagnostics: Vec<Diagnostic> = matcher
-        .into_matches()
+    let diagnostics: Vec<Diagnostic> = matches
         .iter()
         .zip(contents)
         .map(|(open, content)| {
             Diagnostic::new(
                 WriteWholeFile {
                     filename: SourceCodeSnippet::from_str(&checker.generator().expr(open.filename)),
-                    suggestion: helpers::make_suggestion(open, content, checker.generator()),
+                    suggestion: make_suggestion(open, content, checker.generator()),
                 },
                 open.item.range(),
             )
@@ -87,14 +91,14 @@ pub(crate) fn write_whole_file(checker: &mut Checker, with: &ast::StmtWith) {
 /// AST visitor that matches `open` operations with the corresponding `write` calls.
 #[derive(Debug)]
 struct WriteMatcher<'a> {
-    candidates: Vec<helpers::FileOpen<'a>>,
-    matches: Vec<helpers::FileOpen<'a>>,
-    contents: Vec<Vec<Expr>>,
+    candidates: Vec<FileOpen<'a>>,
+    matches: Vec<FileOpen<'a>>,
+    contents: Vec<&'a Expr>,
     loop_counter: u32,
 }
 
 impl<'a> WriteMatcher<'a> {
-    fn new(candidates: Vec<helpers::FileOpen<'a>>) -> Self {
+    fn new(candidates: Vec<FileOpen<'a>>) -> Self {
         Self {
             candidates,
             matches: vec![],
@@ -103,12 +107,8 @@ impl<'a> WriteMatcher<'a> {
         }
     }
 
-    fn into_matches(self) -> Vec<helpers::FileOpen<'a>> {
-        self.matches
-    }
-
-    fn contents(&self) -> Vec<Vec<Expr>> {
-        self.contents.clone()
+    fn finish(self) -> (Vec<FileOpen<'a>>, Vec<&'a Expr>) {
+        (self.matches, self.contents)
     }
 }
 
@@ -144,7 +144,7 @@ impl<'a> Visitor<'a> for WriteMatcher<'a> {
 }
 
 /// Match `x.write(foo)` expression and return expression `x` and `foo` on success.
-fn match_write_call(expr: &Expr) -> Option<(&Expr, Vec<Expr>)> {
+fn match_write_call(expr: &Expr) -> Option<(&Expr, &Expr)> {
     let call = expr.as_call_expr()?;
     let attr = call.func.as_attribute_expr()?;
     let method_name = &attr.attr;
@@ -157,5 +157,26 @@ fn match_write_call(expr: &Expr) -> Option<(&Expr, Vec<Expr>)> {
         return None;
     }
 
-    Some((attr.value.as_ref(), call.arguments.args.as_ref().to_vec()))
+    // `write` only takes in a single positional argument.
+    Some((&*attr.value, call.arguments.args.first()?))
+}
+
+fn make_suggestion(open: &FileOpen<'_>, arg: &Expr, generator: Generator) -> SourceCodeSnippet {
+    let name = ast::ExprName {
+        id: open.mode.pathlib_method(),
+        ctx: ast::ExprContext::Load,
+        range: TextRange::default(),
+    };
+    let mut arg = arg.clone();
+    relocate_expr(&mut arg, TextRange::default());
+    let call = ast::ExprCall {
+        func: Box::new(name.into()),
+        arguments: ast::Arguments {
+            args: Box::new([arg]),
+            keywords: open.keywords.iter().copied().cloned().collect(),
+            range: TextRange::default(),
+        },
+        range: TextRange::default(),
+    };
+    SourceCodeSnippet::from_str(&generator.expr(&call.into()))
 }

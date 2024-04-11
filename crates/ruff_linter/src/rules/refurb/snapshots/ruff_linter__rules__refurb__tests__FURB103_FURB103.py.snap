@@ -25,7 +25,7 @@ FURB103.py:20:6: FURB103 `open` and `write` should be replaced by `Path("file.tx
 21 |     f.write(b"abc")
    |
 
-FURB103.py:24:6: FURB103 `open` and `write` should be replaced by `Path("file.txt").write_text(encoding="utf8", foobar)`
+FURB103.py:24:6: FURB103 `open` and `write` should be replaced by `Path("file.txt").write_text(foobar, encoding="utf8")`
    |
 23 | # FURB103
 24 | with open("file.txt", "w", encoding="utf8") as f:
@@ -33,7 +33,7 @@ FURB103.py:24:6: FURB103 `open` and `write` should be replaced by `Path("file.tx
 25 |     f.write(foobar)
    |
 
-FURB103.py:28:6: FURB103 `open` and `write` should be replaced by `Path("file.txt").write_text(errors="ignore", foobar)`
+FURB103.py:28:6: FURB103 `open` and `write` should be replaced by `Path("file.txt").write_text(foobar, errors="ignore")`
    |
 27 | # FURB103
 28 | with open("file.txt", "w", errors="ignore") as f:
@@ -85,7 +85,7 @@ FURB103.py:49:18: FURB103 `open` and `write` should be replaced by `Path("file.t
 51 |     # writes a single time to file and that bit they can replace.
    |
 
-FURB103.py:58:6: FURB103 `open` and `write` should be replaced by `Path("file.txt").write_text(newline="\r\n", foobar)`
+FURB103.py:58:6: FURB103 `open` and `write` should be replaced by `Path("file.txt").write_text(foobar, newline="\r\n")`
    |
 57 | # FURB103
 58 | with open("file.txt", "w", newline="\r\n") as f:

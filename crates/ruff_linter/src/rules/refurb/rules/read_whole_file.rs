@@ -2,11 +2,13 @@ use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::visitor::{self, Visitor};
 use ruff_python_ast::{self as ast, Expr};
-use ruff_text_size::Ranged;
+use ruff_python_codegen::Generator;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
-use crate::rules::refurb::helpers;
+
+use super::super::helpers::{find_file_opens, FileOpen};
 
 /// ## What it does
 /// Checks for uses of `open` and `read` that can be replaced by `pathlib`
@@ -56,7 +58,7 @@ pub(crate) fn read_whole_file(checker: &mut Checker, with: &ast::StmtWith) {
     }
 
     // First we go through all the items in the statement and find all `open` operations.
-    let candidates = helpers::find_file_opens(with, checker.semantic(), true);
+    let candidates = find_file_opens(with, checker.semantic(), true);
     if candidates.is_empty() {
         return;
     }
@@ -75,7 +77,7 @@ pub(crate) fn read_whole_file(checker: &mut Checker, with: &ast::StmtWith) {
             Diagnostic::new(
                 ReadWholeFile {
                     filename: SourceCodeSnippet::from_str(&checker.generator().expr(open.filename)),
-                    suggestion: helpers::make_suggestion(open, vec![], checker.generator()),
+                    suggestion: make_suggestion(open, checker.generator()),
                 },
                 open.item.range(),
             )
@@ -87,19 +89,19 @@ pub(crate) fn read_whole_file(checker: &mut Checker, with: &ast::StmtWith) {
 /// AST visitor that matches `open` operations with the corresponding `read` calls.
 #[derive(Debug)]
 struct ReadMatcher<'a> {
-    candidates: Vec<helpers::FileOpen<'a>>,
-    matches: Vec<helpers::FileOpen<'a>>,
+    candidates: Vec<FileOpen<'a>>,
+    matches: Vec<FileOpen<'a>>,
 }
 
 impl<'a> ReadMatcher<'a> {
-    fn new(candidates: Vec<helpers::FileOpen<'a>>) -> Self {
+    fn new(candidates: Vec<FileOpen<'a>>) -> Self {
         Self {
             candidates,
             matches: vec![],
         }
     }
 
-    fn into_matches(self) -> Vec<helpers::FileOpen<'a>> {
+    fn into_matches(self) -> Vec<FileOpen<'a>> {
         self.matches
     }
 }
@@ -134,5 +136,23 @@ fn match_read_call(expr: &Expr) -> Option<&Expr> {
         return None;
     }
 
-    Some(attr.value.as_ref())
+    Some(&*attr.value)
+}
+
+fn make_suggestion(open: &FileOpen<'_>, generator: Generator) -> SourceCodeSnippet {
+    let name = ast::ExprName {
+        id: open.mode.pathlib_method(),
+        ctx: ast::ExprContext::Load,
+        range: TextRange::default(),
+    };
+    let call = ast::ExprCall {
+        func: Box::new(name.into()),
+        arguments: ast::Arguments {
+            args: Box::from([]),
+            keywords: open.keywords.iter().copied().cloned().collect(),
+            range: TextRange::default(),
+        },
+        range: TextRange::default(),
+    };
+    SourceCodeSnippet::from_str(&generator.expr(&call.into()))
 }
