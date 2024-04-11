@@ -132,7 +132,7 @@ Module(
   |
 1 | extra..dot
 2 | multiple....dots
-  | ^^^^^^^^^^^ Syntax Error: use `;` to separate simple statements
+  |         ^^^ Syntax Error: Simple statements must be separated by newlines or semicolons
 3 | multiple.....dots
   |
 
@@ -141,7 +141,7 @@ Module(
 1 | extra..dot
 2 | multiple....dots
 3 | multiple.....dots
-  | ^^^^^^^^^^^ Syntax Error: use `;` to separate simple statements
+  |         ^^^ Syntax Error: Simple statements must be separated by newlines or semicolons
   |
 
 

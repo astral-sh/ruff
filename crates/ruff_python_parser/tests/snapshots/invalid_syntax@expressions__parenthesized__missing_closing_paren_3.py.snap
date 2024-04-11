@@ -83,17 +83,6 @@ Module(
 
 
   |
-2 |   # token starts a statement.
-3 |   
-4 | / (1, 2
-5 | | 
-6 | | def foo():
-  | |___^ Syntax Error: compound statements not allowed in the same line as simple statements
-7 |       pass
-  |
-
-
-  |
 6 | def foo():
 7 |     pass
   |          Syntax Error: unexpected EOF while parsing

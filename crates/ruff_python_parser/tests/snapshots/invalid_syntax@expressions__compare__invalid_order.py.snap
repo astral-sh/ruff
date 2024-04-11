@@ -150,7 +150,7 @@ Module(
   |
 6 | # Same here as well, `not` without `in` is considered to be a unary operator
 7 | x not is y
-  | ^^^^^ Syntax Error: use `;` to separate simple statements
+  |   ^^^ Syntax Error: Simple statements must be separated by newlines or semicolons
   |
 
 
@@ -164,5 +164,5 @@ Module(
   |
 6 | # Same here as well, `not` without `in` is considered to be a unary operator
 7 | x not is y
-  |   ^^^^^^^^ Syntax Error: use `;` to separate simple statements
+  |          ^ Syntax Error: Simple statements must be separated by newlines or semicolons
   |

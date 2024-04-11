@@ -154,7 +154,7 @@ Module(
 
   |
 1 | def foo(a, **kwargs={'b': 1, 'c': 2}): ...
-  |                                     ^ Syntax Error: Expected a statement
+  |                                     ^ Syntax Error: expected Newline, found Rpar
   |
 
 

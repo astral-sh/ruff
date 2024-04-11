@@ -49,9 +49,3 @@ Module(
 1 | global x + 1
   |          ^ Syntax Error: expected Comma, found Plus
   |
-
-
-  |
-1 | global x + 1
-  | ^^^^^^^^^^ Syntax Error: use `;` to separate simple statements
-  |
