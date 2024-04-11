@@ -317,4 +317,25 @@ B909.py:136:9: B909 Mutation to loop iterable `foo` during iteration
 135 |     else:
 136 |         foo.remove(1)
     |         ^^^^^^^^^^ B909
+137 | 
+138 | # should error
+    |
+
+B909.py:140:8: B909 Mutation to loop iterable `some_list` during iteration
+    |
+138 | # should error
+139 | for elem in some_list:
+140 |     if some_list.pop() == 2:
+    |        ^^^^^^^^^^^^^ B909
+141 |         pass
+    |
+
+B909.py:150:8: B909 Mutation to loop iterable `some_list` during iteration
+    |
+148 | # should error
+149 | for elem in some_list:
+150 |     if some_list.pop() == 2:
+    |        ^^^^^^^^^^^^^ B909
+151 |         pass
+152 |     else:
     |

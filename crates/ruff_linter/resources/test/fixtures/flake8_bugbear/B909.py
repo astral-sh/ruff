@@ -134,3 +134,20 @@ for _ in foo:
         pass
     else:
         foo.remove(1)
+
+# should error
+for elem in some_list:
+    if some_list.pop() == 2:
+        pass
+
+# should not error
+for elem in some_list:
+    if some_list.pop() == 2:
+        break
+
+# should error
+for elem in some_list:
+    if some_list.pop() == 2:
+        pass
+    else:
+        break

@@ -7,8 +7,8 @@ use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_ast::{
     visitor::{self, Visitor},
-    ElifElseClause, Expr, ExprAttribute, ExprCall, ExprSubscript, Operator, Stmt, StmtAssign,
-    StmtAugAssign, StmtBreak, StmtDelete, StmtFor, StmtIf,
+    Expr, ExprAttribute, ExprCall, ExprSubscript, Stmt, StmtAssign, StmtAugAssign, StmtBreak,
+    StmtDelete, StmtFor, StmtIf,
 };
 use ruff_text_size::TextRange;
 
@@ -46,7 +46,7 @@ impl Violation for LoopIteratorMutation {
         let LoopIteratorMutation { name } = self;
 
         if let Some(name) = name.as_ref().and_then(SourceCodeSnippet::full_display) {
-            format!("Mutation to loop iterable `{}` during iteration", name)
+            format!("Mutation to loop iterable `{name}` during iteration")
         } else {
             format!("Mutation to loop iterable during iteration")
         }
@@ -131,14 +131,11 @@ impl<'a> LoopMutationsVisitor<'a> {
 
     /// Register a mutation.
     fn add_mutation(&mut self, range: TextRange) {
-        self.mutations
-            .entry(self.branch)
-            .or_insert(Vec::new())
-            .push(range);
+        self.mutations.entry(self.branch).or_default().push(range);
     }
 
     /// Handle, e.g., `del items[0]`.
-    fn handle_delete(&mut self, range: TextRange, targets: &'a Vec<Expr>) {
+    fn handle_delete(&mut self, range: TextRange, targets: &'a [Expr]) {
         for target in targets {
             if let Expr::Subscript(ExprSubscript {
                 range: _,
@@ -155,7 +152,7 @@ impl<'a> LoopMutationsVisitor<'a> {
     }
 
     /// Handle, e.g., `items[0] = 1`.
-    fn handle_assign(&mut self, range: TextRange, targets: &'a Vec<Expr>, _value: &Box<Expr>) {
+    fn handle_assign(&mut self, range: TextRange, targets: &[Expr]) {
         for target in targets {
             if let Expr::Subscript(ExprSubscript {
                 range: _,
@@ -172,13 +169,7 @@ impl<'a> LoopMutationsVisitor<'a> {
     }
 
     /// Handle, e.g., `items += [1]`.
-    fn handle_aug_assign(
-        &mut self,
-        range: TextRange,
-        target: &Box<Expr>,
-        _op: &Operator,
-        _value: &Box<Expr>,
-    ) {
+    fn handle_aug_assign(&mut self, range: TextRange, target: &Expr) {
         if ComparableExpr::from(self.name) == ComparableExpr::from(target) {
             self.add_mutation(range);
         }
@@ -200,20 +191,6 @@ impl<'a> LoopMutationsVisitor<'a> {
             }
         }
     }
-
-    fn handle_branches(&mut self, body: &'a [Stmt], elif_else_clauses: &'a [ElifElseClause]) {
-        self.branch += 1;
-        self.branches.push(self.branch);
-        self.visit_body(body);
-        self.branches.pop();
-
-        for clause in elif_else_clauses {
-            self.branch += 1;
-            self.branches.push(self.branch);
-            self.visit_body(&clause.body);
-            self.branches.pop();
-        }
-    }
 }
 
 /// `Visitor` to collect all used identifiers in a statement.
@@ -227,38 +204,50 @@ impl<'a> Visitor<'a> for LoopMutationsVisitor<'a> {
             }
 
             // Ex) `items[0] = 1`
-            Stmt::Assign(StmtAssign {
-                range,
-                targets,
-                value,
-            }) => {
-                self.handle_assign(*range, targets, value);
+            Stmt::Assign(StmtAssign { range, targets, .. }) => {
+                self.handle_assign(*range, targets);
                 visitor::walk_stmt(self, stmt);
             }
 
             // Ex) `items += [1]`
-            Stmt::AugAssign(StmtAugAssign {
-                range,
-                target,
-                op,
-                value,
-            }) => {
-                self.handle_aug_assign(*range, target, op, value);
+            Stmt::AugAssign(StmtAugAssign { range, target, .. }) => {
+                self.handle_aug_assign(*range, target);
                 visitor::walk_stmt(self, stmt);
             }
 
             // Ex) `if True: items.append(1)`
             Stmt::If(StmtIf {
+                test,
                 body,
                 elif_else_clauses,
                 ..
-            }) => self.handle_branches(body, elif_else_clauses),
+            }) => {
+                // Handle the `if` branch.
+                self.branch += 1;
+                self.branches.push(self.branch);
+                self.visit_expr(test);
+                self.visit_body(body);
+                self.branches.pop();
+
+                // Handle the `elif` and `else` branches.
+                for clause in elif_else_clauses {
+                    self.branch += 1;
+                    self.branches.push(self.branch);
+                    if let Some(test) = &clause.test {
+                        self.visit_expr(test);
+                    }
+                    self.visit_body(&clause.body);
+                    self.branches.pop();
+                }
+            }
 
             // On break, clear the mutations for the current branch.
-            Stmt::Break(StmtBreak { range: _ }) => match self.mutations.get_mut(&self.branch) {
-                Some(a) => a.clear(),
-                None => {}
-            },
+            Stmt::Break(StmtBreak { range: _ }) => {
+                if let Some(mutations) = self.mutations.get_mut(&self.branch) {
+                    mutations.clear();
+                }
+                visitor::walk_stmt(self, stmt);
+            }
 
             // Avoid recursion for class and function definitions.
             Stmt::ClassDef(_) | Stmt::FunctionDef(_) => {}
@@ -273,7 +262,7 @@ impl<'a> Visitor<'a> for LoopMutationsVisitor<'a> {
     fn visit_expr(&mut self, expr: &'a Expr) {
         // Ex) `items.append(1)`
         if let Expr::Call(ExprCall { func, .. }) = expr {
-            self.handle_call(&*func);
+            self.handle_call(func);
         }
 
         visitor::walk_expr(self, expr);
