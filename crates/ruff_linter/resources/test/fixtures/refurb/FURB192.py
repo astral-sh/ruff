@@ -35,5 +35,10 @@ sorted(l)[-2]
 b = True
 
 sorted(l, reverse=b)[0]
-0
+
 sorted(l, invalid_kwarg=True)[0]
+
+def sorted():
+	pass
+
+sorted(l)[0]
