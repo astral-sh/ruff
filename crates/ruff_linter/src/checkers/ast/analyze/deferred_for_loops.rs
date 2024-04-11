@@ -30,6 +30,9 @@ pub(crate) fn deferred_for_loops(checker: &mut Checker) {
             if checker.enabled(Rule::EnumerateForLoop) {
                 flake8_simplify::rules::enumerate_for_loop(checker, stmt_for);
             }
+            if checker.enabled(Rule::LoopIteratorMutation) {
+                flake8_bugbear::rules::loop_iterator_mutation(checker, stmt_for);
+            }
         }
     }
 }
