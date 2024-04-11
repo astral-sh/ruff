@@ -88,7 +88,7 @@ Module(
 
   |
 1 | raise *x
-  |       ^^ Syntax Error: starred expression cannot be used here
+  |       ^^ Syntax Error: Starred expression cannot be used here
 2 | raise yield x
 3 | raise x := 1
   |
@@ -97,7 +97,7 @@ Module(
   |
 1 | raise *x
 2 | raise yield x
-  |       ^^^^^^^ Syntax Error: yield expression cannot be used here
+  |       ^^^^^^^ Syntax Error: Yield expression cannot be used here
 3 | raise x := 1
   |
 

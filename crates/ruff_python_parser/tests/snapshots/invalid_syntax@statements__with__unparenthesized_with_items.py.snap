@@ -318,7 +318,7 @@ Module(
 3 | with item,: pass
 4 | with item as x,: pass
 5 | with *item: pass
-  |      ^^^^^ Syntax Error: starred expression cannot be used here
+  |      ^^^^^ Syntax Error: Starred expression cannot be used here
 6 | with *item as x: pass
 7 | with *item1, item2 as f: pass
   |
@@ -328,7 +328,7 @@ Module(
 4 | with item as x,: pass
 5 | with *item: pass
 6 | with *item as x: pass
-  |      ^^^^^ Syntax Error: starred expression cannot be used here
+  |      ^^^^^ Syntax Error: Starred expression cannot be used here
 7 | with *item1, item2 as f: pass
 8 | with item1 as f, *item2: pass
   |
@@ -338,7 +338,7 @@ Module(
 5 | with *item: pass
 6 | with *item as x: pass
 7 | with *item1, item2 as f: pass
-  |      ^^^^^^ Syntax Error: starred expression cannot be used here
+  |      ^^^^^^ Syntax Error: Starred expression cannot be used here
 8 | with item1 as f, *item2: pass
 9 | with item := 0 as f: pass
   |
@@ -348,7 +348,7 @@ Module(
 6 | with *item as x: pass
 7 | with *item1, item2 as f: pass
 8 | with item1 as f, *item2: pass
-  |                  ^^^^^^ Syntax Error: starred expression cannot be used here
+  |                  ^^^^^^ Syntax Error: Starred expression cannot be used here
 9 | with item := 0 as f: pass
   |
 

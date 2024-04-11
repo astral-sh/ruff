@@ -93,7 +93,7 @@ Module(
 2 |     # This `as` pattern is unparenthesized so the parser never takes the path
 3 |     # where it might be confused as a mapping key pattern.
 4 |     case {x as y: 1}:
-  |           ^ Syntax Error: invalid mapping pattern key
+  |           ^ Syntax Error: Invalid mapping pattern key
 5 |         pass
   |
 

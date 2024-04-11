@@ -178,7 +178,7 @@ Module(
 
   |
 1 | match (*x):
-  |        ^^ Syntax Error: starred expression cannot be used here
+  |        ^^ Syntax Error: Starred expression cannot be used here
 2 |     case _: ...
 3 | # Starred expression precedence test
   |
@@ -188,7 +188,7 @@ Module(
 2 |     case _: ...
 3 | # Starred expression precedence test
 4 | match *x and y, z:
-  |        ^^^^^^^ Syntax Error: boolean expression cannot be used here
+  |        ^^^^^^^ Syntax Error: Boolean expression cannot be used here
 5 |     case _: ...
 6 | match yield x:
   |
@@ -198,6 +198,6 @@ Module(
 4 | match *x and y, z:
 5 |     case _: ...
 6 | match yield x:
-  |       ^^^^^^^ Syntax Error: yield expression cannot be used here
+  |       ^^^^^^^ Syntax Error: Yield expression cannot be used here
 7 |     case _: ...
   |

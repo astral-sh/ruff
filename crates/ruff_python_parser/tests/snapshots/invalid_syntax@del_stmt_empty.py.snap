@@ -23,5 +23,5 @@ Module(
 
   |
 1 | del
-  |    ^ Syntax Error: `del` statement must have at least one target
+  |    ^ Syntax Error: Delete statement must have at least one target
   |

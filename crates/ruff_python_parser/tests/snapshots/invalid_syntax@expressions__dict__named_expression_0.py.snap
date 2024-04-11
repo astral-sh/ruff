@@ -120,7 +120,7 @@ Module(
 1 | # Unparenthesized named expression not allowed in key
 2 | 
 3 | {x := 1: y, z := 2: a}
-  |  ^^^^^^ Syntax Error: unparenthesized named expression cannot be used here
+  |  ^^^^^^ Syntax Error: Unparenthesized named expression cannot be used here
 4 | 
 5 | x + y
   |
