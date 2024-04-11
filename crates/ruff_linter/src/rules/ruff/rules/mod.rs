@@ -40,7 +40,6 @@ pub(crate) use unnecessary_nested_literal::*;
 pub(crate) use unnecessary_regular_expression::*;
 pub(crate) use unnecessary_round::*;
 pub(crate) use unraw_re_pattern::*;
-#[cfg(feature = "unreachable-code")]
 pub(crate) use unreachable::*;
 pub(crate) use unsafe_markup_use::*;
 pub(crate) use unused_async::*;
@@ -95,7 +94,6 @@ mod unnecessary_nested_literal;
 mod unnecessary_regular_expression;
 mod unnecessary_round;
 mod unraw_re_pattern;
-#[cfg(feature = "unreachable-code")]
 pub(crate) mod unreachable;
 mod unsafe_markup_use;
 mod unused_async;
