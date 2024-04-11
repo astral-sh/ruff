@@ -24,7 +24,7 @@ use crate::fix::snippet::SourceCodeSnippet;
 ///
 /// ## Example
 /// ```python
-/// items = [1,2,3]
+/// items = [1, 2, 3]
 ///
 /// for item in items:
 ///     print(item)
@@ -135,7 +135,7 @@ impl<'a> LoopMutationsVisitor<'a> {
     }
 
     /// Handle, e.g., `del items[0]`.
-    fn handle_delete(&mut self, range: TextRange, targets: &'a [Expr]) {
+    fn handle_delete(&mut self, range: TextRange, targets: &[Expr]) {
         for target in targets {
             if let Expr::Subscript(ExprSubscript {
                 range: _,
