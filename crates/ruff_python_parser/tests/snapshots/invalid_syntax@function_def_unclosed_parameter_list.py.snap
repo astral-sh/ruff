@@ -214,7 +214,7 @@ Module(
 3 |     return 42
 4 | def foo(a: int, b: str
 5 | x = 10
-  | ^ Syntax Error: expected Comma, found Name
+  | ^ Syntax Error: Expected ',', found name
   |
 
 

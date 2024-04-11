@@ -155,7 +155,7 @@ Module(
 
   |
 1 | @def foo(): ...
-  |      ^^^ Syntax Error: expected Newline, found Name
+  |      ^^^ Syntax Error: Expected newline, found name
 2 | @
 3 | def foo(): ...
   |

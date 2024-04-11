@@ -83,7 +83,7 @@ Module(
 
   |
 1 | for a b: ...
-  |       ^ Syntax Error: expected In, found Name
+  |       ^ Syntax Error: Expected 'in', found name
 2 | for a: ...
   |
 
@@ -91,5 +91,5 @@ Module(
   |
 1 | for a b: ...
 2 | for a: ...
-  |      ^ Syntax Error: expected In, found Colon
+  |      ^ Syntax Error: Expected 'in', found ':'
   |

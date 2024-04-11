@@ -104,7 +104,7 @@ Module(
 
   |
 1 | class Foo[T1, *T2(a, b):
-  |                  ^ Syntax Error: expected Rsqb, found Lpar
+  |                  ^ Syntax Error: Expected ']', found '('
 2 |     pass
 3 | x = 10
   |

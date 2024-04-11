@@ -116,7 +116,7 @@ Module(
 2 | # it's actually a comprehension.
 3 | 
 4 | {**x: y for x, y in data}
-  |         ^^^ Syntax Error: expected Colon, found For
+  |         ^^^ Syntax Error: Expected ':', found 'for'
 5 | 
 6 | # TODO(dhruvmanila): This test case fails because there's no way to represent `**y`
   |
@@ -126,7 +126,7 @@ Module(
 2 | # it's actually a comprehension.
 3 | 
 4 | {**x: y for x, y in data}
-  |             ^ Syntax Error: expected Comma, found Name
+  |             ^ Syntax Error: Expected ',', found name
 5 | 
 6 | # TODO(dhruvmanila): This test case fails because there's no way to represent `**y`
   |
@@ -136,7 +136,7 @@ Module(
 2 | # it's actually a comprehension.
 3 | 
 4 | {**x: y for x, y in data}
-  |              ^ Syntax Error: expected Colon, found Comma
+  |              ^ Syntax Error: Expected ':', found ','
 5 | 
 6 | # TODO(dhruvmanila): This test case fails because there's no way to represent `**y`
   |
@@ -146,7 +146,7 @@ Module(
 2 | # it's actually a comprehension.
 3 | 
 4 | {**x: y for x, y in data}
-  |                         ^ Syntax Error: expected Colon, found Rbrace
+  |                         ^ Syntax Error: Expected ':', found '}'
 5 | 
 6 | # TODO(dhruvmanila): This test case fails because there's no way to represent `**y`
   |

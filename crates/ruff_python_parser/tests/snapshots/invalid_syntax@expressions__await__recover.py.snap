@@ -294,7 +294,7 @@ Module(
 12 | await yield x
 13 | await lambda x: x
 14 | await +x
-   |       ^^ Syntax Error: unary `+` expression cannot be used here
+   |       ^^ Syntax Error: unary '+' expression cannot be used here
 15 | await -x
 16 | await ~x
    |
@@ -304,7 +304,7 @@ Module(
 13 | await lambda x: x
 14 | await +x
 15 | await -x
-   |       ^^ Syntax Error: unary `-` expression cannot be used here
+   |       ^^ Syntax Error: unary '-' expression cannot be used here
 16 | await ~x
 17 | await not x
    |
@@ -314,7 +314,7 @@ Module(
 14 | await +x
 15 | await -x
 16 | await ~x
-   |       ^^ Syntax Error: unary `~` expression cannot be used here
+   |       ^^ Syntax Error: unary '~' expression cannot be used here
 17 | await not x
    |
 

@@ -54,5 +54,5 @@ Module(
 
   |
 1 | call(x y)
-  |        ^ Syntax Error: expected Comma, found Name
+  |        ^ Syntax Error: Expected ',', found name
   |
