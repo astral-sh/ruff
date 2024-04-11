@@ -63,3 +63,9 @@ Module(
 1 | match foo: case _: ...
   |            ^^^^ Syntax Error: expected Newline, found Name
   |
+
+
+  |
+1 | match foo: case _: ...
+  |                 ^ Syntax Error: Simple statements must be separated by newlines or semicolons
+  |

@@ -221,6 +221,15 @@ Module(
 5 | # TODO(dhruvmanila): Here, `match` is actually a Name token because
 6 | # of the soft keyword # transformer
 7 | async match test:
+  |             ^^^^ Syntax Error: Simple statements must be separated by newlines or semicolons
+8 |     case _: ...
+  |
+
+
+  |
+5 | # TODO(dhruvmanila): Here, `match` is actually a Name token because
+6 | # of the soft keyword # transformer
+7 | async match test:
   |                  ^ Syntax Error: Expected an expression
 8 |     case _: ...
   |
