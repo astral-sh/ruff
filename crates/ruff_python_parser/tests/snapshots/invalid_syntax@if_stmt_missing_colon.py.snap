@@ -73,7 +73,7 @@ Module(
 
   |
 1 | if x
-  |     ^ Syntax Error: expected Colon, found Newline
+  |     ^ Syntax Error: Expected ':', found newline
 2 | if x
 3 |     pass
 4 | a = 1
@@ -92,7 +92,7 @@ Module(
   |
 1 | if x
 2 | if x
-  |     ^ Syntax Error: expected Colon, found Newline
+  |     ^ Syntax Error: Expected ':', found newline
 3 |     pass
 4 | a = 1
   |

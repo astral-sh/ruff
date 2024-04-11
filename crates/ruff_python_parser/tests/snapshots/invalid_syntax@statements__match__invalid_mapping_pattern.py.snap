@@ -393,7 +393,7 @@ Module(
 1 | # Starred expression is not allowed as a mapping pattern key
 2 | match subject:
 3 |     case {*key}:
-  |               ^ Syntax Error: expected Colon, found Rbrace
+  |               ^ Syntax Error: Expected ':', found '}'
 4 |         pass
 5 |     case {*key: 1}:
   |
@@ -423,7 +423,7 @@ Module(
 5 |     case {*key: 1}:
 6 |         pass
 7 |     case {*key 1}:
-  |                ^ Syntax Error: expected Colon, found Int
+  |                ^ Syntax Error: Expected ':', found int
 8 |         pass
 9 |     case {*key, None: 1}:
   |
@@ -442,7 +442,7 @@ Module(
  7 |     case {*key 1}:
  8 |         pass
  9 |     case {*key, None: 1}:
-   |               ^ Syntax Error: expected Colon, found Comma
+   |               ^ Syntax Error: Expected ':', found ','
 10 |         pass
    |
 

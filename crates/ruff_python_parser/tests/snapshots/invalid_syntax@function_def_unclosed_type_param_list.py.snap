@@ -139,7 +139,7 @@ Module(
 
   |
 1 | def foo[T1, *T2(a, b):
-  |                ^ Syntax Error: expected Rsqb, found Lpar
+  |                ^ Syntax Error: Expected ']', found '('
 2 |     return a + b
 3 | x = 10
   |

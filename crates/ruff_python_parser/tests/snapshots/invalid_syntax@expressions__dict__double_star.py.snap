@@ -469,7 +469,7 @@ Module(
 2 | # the ones which are higher than that.
 3 | 
 4 | {**x := 1}
-  |      ^^ Syntax Error: expected Comma, found ColonEqual
+  |      ^^ Syntax Error: Expected ',', found ':='
 5 | {a: 1, **x if True else y}
 6 | {**lambda x: x, b: 2}
   |
@@ -479,7 +479,7 @@ Module(
 2 | # the ones which are higher than that.
 3 | 
 4 | {**x := 1}
-  |          ^ Syntax Error: expected Colon, found Rbrace
+  |          ^ Syntax Error: Expected ':', found '}'
 5 | {a: 1, **x if True else y}
 6 | {**lambda x: x, b: 2}
   |
