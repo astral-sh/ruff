@@ -1,5 +1,8 @@
 use std::cmp::Ordering;
+use std::hash::BuildHasherDefault;
 use std::ops::Deref;
+
+use rustc_hash::FxHashSet;
 
 use ruff_python_ast::{
     self as ast, BoolOp, CmpOp, ConversionFlag, Expr, ExprContext, FStringElement, Number,
@@ -818,11 +821,7 @@ impl<'src> Parser<'src> {
             keywords: keywords.into_boxed_slice(),
         };
 
-        if let Err(errors) = helpers::validate_arguments(&arguments) {
-            for error in errors {
-                self.add_error(error.error, error.location);
-            }
-        }
+        self.validate_arguments(&arguments);
 
         arguments
     }
@@ -2328,6 +2327,30 @@ impl<'src> Parser<'src> {
             test: Box::new(test.expr),
             orelse: Box::new(orelse.expr),
             range: self.node_range(start),
+        }
+    }
+
+    /// Validate that the given arguments doesn't have any duplicate keyword argument.
+    ///
+    /// Report errors for all the duplicate names found.
+    fn validate_arguments(&mut self, arguments: &ast::Arguments) {
+        let mut all_arg_names = FxHashSet::with_capacity_and_hasher(
+            arguments.keywords.len(),
+            BuildHasherDefault::default(),
+        );
+
+        for (name, range) in arguments
+            .keywords
+            .iter()
+            .filter_map(|argument| argument.arg.as_ref().map(|arg| (arg, argument.range)))
+        {
+            let arg_name = name.as_str();
+            if !all_arg_names.insert(arg_name) {
+                self.add_error(
+                    ParseErrorType::DuplicateKeywordArgumentError(arg_name.to_string()),
+                    range,
+                );
+            }
         }
     }
 }
