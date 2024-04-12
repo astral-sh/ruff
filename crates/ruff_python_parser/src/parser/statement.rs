@@ -452,10 +452,10 @@ impl<'src> Parser<'src> {
         // import ,
         // import x, y,
 
-        let names = self.parse_comma_separated_list_into_vec(
-            RecoveryContextKind::ImportNames,
-            Parser::parse_alias,
-        );
+        let names = self
+            .parse_comma_separated_list_into_vec(RecoveryContextKind::ImportNames, |p| {
+                p.parse_alias(ImportStyle::Import)
+            });
 
         if names.is_empty() {
             // test_err import_stmt_empty
@@ -528,7 +528,11 @@ impl<'src> Parser<'src> {
         self.parse_comma_separated_list(
             RecoveryContextKind::ImportFromAsNames(parenthesized),
             |parser| {
-                let alias = parser.parse_alias();
+                // test_err from_import_dotted_names
+                // from x import a.
+                // from x import a.b
+                // from x import a, b.c, d, e.f, g
+                let alias = parser.parse_alias(ImportStyle::ImportFrom);
                 seen_star_import |= alias.name.id == "*";
                 names.push(alias);
             },
@@ -576,7 +580,7 @@ impl<'src> Parser<'src> {
     /// See:
     /// - <https://docs.python.org/3/reference/simple_stmts.html#the-import-statement>
     /// - <https://docs.python.org/3/library/ast.html#ast.alias>
-    fn parse_alias(&mut self) -> ast::Alias {
+    fn parse_alias(&mut self, style: ImportStyle) -> ast::Alias {
         let start = self.node_start();
         if self.eat(TokenKind::Star) {
             let range = self.node_range(start);
@@ -590,7 +594,10 @@ impl<'src> Parser<'src> {
             };
         }
 
-        let name = self.parse_dotted_name();
+        let name = match style {
+            ImportStyle::Import => self.parse_dotted_name(),
+            ImportStyle::ImportFrom => self.parse_identifier(),
+        };
 
         let asname = if self.eat(TokenKind::As) {
             if self.at(TokenKind::Name) {
@@ -3432,4 +3439,12 @@ impl ExceptClauseKind {
 enum AllowStarAnnotation {
     Yes,
     No,
+}
+
+#[derive(Debug, Copy, Clone)]
+enum ImportStyle {
+    /// E.g., `import foo, bar`
+    Import,
+    /// E.g., `from foo import bar, baz`
+    ImportFrom,
 }
