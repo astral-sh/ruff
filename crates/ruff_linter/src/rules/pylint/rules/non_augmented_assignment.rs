@@ -85,14 +85,11 @@ pub(crate) fn non_augmented_assignment(checker: &mut Checker, assign: &ast::Stmt
         return;
     };
 
+    let operator = AugmentedOperator::from(value.op);
+
     // Match, e.g., `x = x + 1`.
     if ComparableExpr::from(target) == ComparableExpr::from(&value.left) {
-        let mut diagnostic = Diagnostic::new(
-            NonAugmentedAssignment {
-                operator: AugmentedOperator::from(value.op),
-            },
-            assign.range(),
-        );
+        let mut diagnostic = Diagnostic::new(NonAugmentedAssignment { operator }, assign.range());
         diagnostic.set_fix(Fix::unsafe_edit(augmented_assignment(
             checker.generator(),
             target,
@@ -104,14 +101,11 @@ pub(crate) fn non_augmented_assignment(checker: &mut Checker, assign: &ast::Stmt
         return;
     }
 
-    // Match, e.g., `x = 1 + x`.
-    if ComparableExpr::from(target) == ComparableExpr::from(&value.right) {
-        let mut diagnostic = Diagnostic::new(
-            NonAugmentedAssignment {
-                operator: AugmentedOperator::from(value.op),
-            },
-            assign.range(),
-        );
+    // If the operator is commutative, match, e.g., `x = 1 + x`.
+    if operator.is_commutative()
+        && ComparableExpr::from(target) == ComparableExpr::from(&value.right)
+    {
+        let mut diagnostic = Diagnostic::new(NonAugmentedAssignment { operator }, assign.range());
         diagnostic.set_fix(Fix::unsafe_edit(augmented_assignment(
             checker.generator(),
             target,
@@ -159,6 +153,16 @@ enum AugmentedOperator {
     Pow,
     RShift,
     Sub,
+}
+
+impl AugmentedOperator {
+    /// Returns `true` if the operator is commutative.
+    fn is_commutative(self) -> bool {
+        matches!(
+            self,
+            Self::Add | Self::BitAnd | Self::BitOr | Self::BitXor | Self::Mult
+        )
+    }
 }
 
 impl From<Operator> for AugmentedOperator {
