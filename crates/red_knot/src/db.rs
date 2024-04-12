@@ -15,6 +15,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::ast_ids::AstIds;
 use crate::files::{FileId, Files};
+use crate::hir::definition::Definitions;
 
 // TODO salsa recommends to have one jar per crate and call it `Jar`. We're not doing this here
 // because I don't want that many crates just yet.
@@ -63,6 +64,7 @@ pub struct SourceJar(
     check_syntax,
     check_physical_lines,
     ast_ids,
+    definitions,
 );
 
 pub trait Db: salsa::DbWithJar<SourceJar> {
@@ -299,4 +301,13 @@ pub fn ast_ids(db: &dyn Db, source: SourceText) -> Arc<AstIds> {
     let ast = parsed.ast(db);
 
     Arc::new(AstIds::from_module(ast))
+}
+
+#[salsa::tracked(jar=SourceJar)]
+pub fn definitions(db: &dyn Db, source_text: SourceText) -> Arc<Definitions> {
+    let parsed = parse(db, source_text);
+    let ast = parsed.ast(db);
+    let ids = ast_ids(db, source_text);
+
+    Arc::new(Definitions::from_module(ast, &*ids, source_text.file(db)))
 }
