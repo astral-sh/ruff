@@ -494,10 +494,14 @@ impl<'src> Parser<'src> {
                 };
                 let range = self.node_range(start);
 
+                // test_ok match_as_pattern
+                // match foo:
+                //     case foo_bar: ...
+                //     case _: ...
                 Pattern::MatchAs(ast::PatternMatchAs {
                     range,
                     pattern: None,
-                    name: if name.contains('_') {
+                    name: if &*name == "_" {
                         None
                     } else {
                         Some(ast::Identifier {
