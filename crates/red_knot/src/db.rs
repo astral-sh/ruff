@@ -13,7 +13,7 @@ use ruff_python_ast::{AnyNodeRef, Expr, Mod, ModModule, Stmt, StmtExpr};
 use ruff_python_parser::Mode;
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::ast_ids::{AstIds, FileAstId, HasAstId};
+use crate::ast_ids::AstIds;
 use crate::files::{FileId, Files};
 
 // TODO salsa recommends to have one jar per crate and call it `Jar`. We're not doing this here
@@ -291,31 +291,6 @@ pub fn check_physical_lines(db: &dyn Db, source_text: SourceText) -> PhysicalLin
     }
 
     PhysicalLinesCheck::new(db, diagnostics)
-}
-
-#[derive(Eq, PartialEq, Hash, Debug)]
-pub struct HirAstId<N: HasAstId> {
-    file_id: FileId,
-    node_id: FileAstId<N>,
-}
-
-impl<N: HasAstId> Copy for HirAstId<N> {}
-impl<N: HasAstId> Clone for HirAstId<N> {
-    fn clone(&self) -> Self {
-        *self
-    }
-}
-
-impl<N: HasAstId> HirAstId<N> {
-    pub fn upcast<M: HasAstId>(self) -> HirAstId<M>
-    where
-        N: Into<M>,
-    {
-        HirAstId {
-            file_id: self.file_id,
-            node_id: self.node_id.upcast(),
-        }
-    }
 }
 
 #[salsa::tracked(jar=SourceJar)]

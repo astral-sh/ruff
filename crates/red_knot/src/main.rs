@@ -77,7 +77,7 @@ fn main() -> anyhow::Result<()> {
 
         dbg!(ids.root());
 
-        dbg!(ids.ast_id_for_syntax_key(ids.root()));
+        dbg!(ids.ast_id_for_node_key(ids.root()));
 
         let ast = parsed.ast(&db);
 
