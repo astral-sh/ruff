@@ -2,229 +2,204 @@ use ast::{Expr, StmtAugAssign};
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
+use ruff_python_ast::comparable::ComparableExpr;
+use ruff_python_ast::Operator;
+use ruff_python_codegen::Generator;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for normal assignment statements whose target is the same as the
-/// left operand of a binary operator, in which cases, augmented assignment
-/// could potentially be used instead.
+/// Checks for assignments that can be replaced with augmented assignment
+/// statements.
 ///
 /// ## Why is this bad?
-/// Augmented assignment operators are more concise to perform a binary
-/// operation and assign results back to one of the operands.
+/// If an assignment statement consists of a binary operation in which one
+/// operand is the same as the assignment target, it can be rewritten as an
+/// augmented assignment. For example, `x = x + 1` can be rewritten as
+/// `x += 1`.
+///
+/// When performing such an operation, augmented assignments are more concise
+/// and idiomatic.
 ///
 /// ## Example
 /// ```python
-/// a = a + 1
+/// x = x + 1
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// a += 1
+/// x += 1
 /// ```
 ///
 /// ## Fix safety
-/// This rule's fix is marked as being unsafe, in that it could alter semantics
-/// of the given Python code in some scenarios.
+/// This rule's fix is marked as unsafe, as augmented assignments have
+/// different semantics when the target is a mutable data type, like a list or
+/// dictionary.
 ///
-/// For example, the following code using mutable data types as the assignment
-/// target
+/// For example, consider the following:
+///
 /// ```python
-/// a = [1]
-/// b = a
-/// a = a + [2]
-/// assert (a, b) == ([1, 2], [1])
+/// foo = [1]
+/// bar = foo
+/// foo = foo + [2]
+/// assert (foo, bar) == ([1, 2], [1])
 /// ```
 ///
-/// is not the same as
+/// If the assignment is replaced with an augmented assignment, the update
+/// operation will apply to both `foo` and `bar`, as they refer to the same
+/// object:
+///
 /// ```python
-/// a = [1]
-/// b = a
-/// a += [2]
-/// assert (a, b) == ([1, 2], [1, 2])
+/// foo = [1]
+/// bar = foo
+/// foo += [2]
+/// assert (foo, bar) == ([1, 2], [1, 2])
 /// ```
 #[violation]
-pub struct BinaryOpAndNormalAssignment;
+pub struct BinaryOpAndNormalAssignment {
+    operator: AugmentedOperator,
+}
 
 impl Violation for BinaryOpAndNormalAssignment {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!(
-            "Normal assignment with left operand of binary operator being the same as the target."
-        )
+        let BinaryOpAndNormalAssignment { operator } = self;
+        format!("Use `{operator}` to perform an augmented assignment directly")
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some("Use augmented assignment instead.".to_string())
+        Some("Replace with augmented assignment".to_string())
     }
 }
 
-pub(crate) fn binary_op_and_normal_assignment(
-    checker: &mut Checker,
-    assign @ ast::StmtAssign { value, targets, .. }: &ast::StmtAssign,
-) {
-    if targets.len() != 1 {
+/// PLR6104
+pub(crate) fn binary_op_and_normal_assignment(checker: &mut Checker, assign: &ast::StmtAssign) {
+    // Ignore multiple assignment targets.
+    let [target] = assign.targets.as_slice() else {
         return;
-    }
-    let target = targets.first().unwrap();
+    };
 
-    let rhs_expr = value
-        .as_bin_op_expr()
-        .map(|e| (e.left.as_ref(), e.op, e.right.as_ref()));
-    if rhs_expr.is_none() {
+    // Match, e.g., `x = x + 1`.
+    let Expr::BinOp(value) = &*assign.value else {
         return;
-    }
-    let (left_operand, operator, right_operand) = rhs_expr.unwrap();
+    };
 
-    if name_expr(target, left_operand)
-        || object_attribute_expr(target, left_operand)
-        || index_subscript_expr(target, left_operand)
-        || slice_subscript_expr(target, left_operand)
-    {
-        let diagnostic = Diagnostic::new(BinaryOpAndNormalAssignment, assign.range()).with_fix(
-            generate_fix(checker, target, operator, right_operand, assign.range()),
+    // Match, e.g., `x = x + 1`.
+    if ComparableExpr::from(target) == ComparableExpr::from(&value.left) {
+        let mut diagnostic = Diagnostic::new(
+            BinaryOpAndNormalAssignment {
+                operator: AugmentedOperator::from(value.op),
+            },
+            assign.range(),
         );
+        diagnostic.set_fix(Fix::unsafe_edit(augmented_assignment(
+            checker.generator(),
+            target,
+            value.op,
+            &value.right,
+            assign.range(),
+        )));
         checker.diagnostics.push(diagnostic);
+        return;
+    }
+
+    // Match, e.g., `x = 1 + x`.
+    if ComparableExpr::from(target) == ComparableExpr::from(&value.right) {
+        let mut diagnostic = Diagnostic::new(
+            BinaryOpAndNormalAssignment {
+                operator: AugmentedOperator::from(value.op),
+            },
+            assign.range(),
+        );
+        diagnostic.set_fix(Fix::unsafe_edit(augmented_assignment(
+            checker.generator(),
+            target,
+            value.op,
+            &value.left,
+            assign.range(),
+        )));
+        checker.diagnostics.push(diagnostic);
+        return;
     }
 }
 
-fn name_expr(target: &Expr, left_operand: &Expr) -> bool {
-    matches!(
-        (
-            target.as_name_expr(),
-            left_operand.as_name_expr()
-        ),
-        (
-            Some(ast::ExprName {
-                id: target_name_id, ..
-            }),
-            Some(ast::ExprName {
-                id: left_name_id, ..
-            }),
-        ) if target_name_id == left_name_id
-    )
-}
-
-fn object_attribute_expr(target: &Expr, left_operand: &Expr) -> bool {
-    matches!((
-            target
-                .as_attribute_expr()
-                .and_then(|attr| attr.value.as_name_expr())
-                .map(|name| &name.id),
-            target
-                .as_attribute_expr()
-                .map(|attr| attr.attr.as_str()),
-            left_operand
-                .as_attribute_expr()
-                .and_then(|attr| attr.value.as_name_expr())
-                .map(|name| &name.id),
-            left_operand
-                .as_attribute_expr()
-                .map(|attr| attr.attr.as_str())
-        ),
-        (
-            Some(target_name_id),
-            Some(target_attr_id),
-            Some(left_name_id),
-            Some(left_attr_id)
-        )
-        if target_name_id == left_name_id && target_attr_id == left_attr_id
-    )
-}
-
-fn index_subscript_expr(target: &Expr, left_operand: &Expr) -> bool {
-    matches!((
-            target
-                .as_subscript_expr()
-                .and_then(|subs| subs.value.as_name_expr())
-                .map(|name| &name.id),
-            target
-                .as_subscript_expr()
-                .and_then(|subs| subs.slice.as_number_literal_expr())
-                .map(|num| &num.value),
-            left_operand
-                .as_subscript_expr()
-                .and_then(|subs| subs.value.as_name_expr())
-                .map(|name| &name.id),
-            left_operand
-                .as_subscript_expr()
-                .and_then(|subs| subs.slice.as_number_literal_expr())
-                .map(|num| &num.value),
-        ),
-        (
-            Some(target_name),
-            Some(target_subs),
-            Some(left_name),
-            Some(left_subs)
-        )
-        if target_name == left_name && target_subs == left_subs
-    )
-}
-
-fn slice_subscript_expr(target: &Expr, left_operand: &Expr) -> bool {
-    match (
-        target
-            .as_subscript_expr()
-            .and_then(|subs| subs.value.as_name_expr())
-            .map(|name| &name.id),
-        target
-            .as_subscript_expr()
-            .and_then(|subs| subs.slice.as_slice_expr()),
-        left_operand
-            .as_subscript_expr()
-            .and_then(|subs| subs.value.as_name_expr())
-            .map(|name| &name.id),
-        left_operand
-            .as_subscript_expr()
-            .and_then(|subs| subs.slice.as_slice_expr()),
-    ) {
-        (Some(target_name), Some(target_slice), Some(left_name), Some(left_slice))
-            if target_name == left_name =>
-        {
-            let target_lower = target_slice
-                .lower
-                .as_ref()
-                .and_then(|lower| lower.as_number_literal_expr())
-                .map(|num| &num.value);
-            let target_upper = target_slice
-                .upper
-                .as_ref()
-                .and_then(|upper| upper.as_number_literal_expr())
-                .map(|num| &num.value);
-            let left_lower = left_slice
-                .lower
-                .as_ref()
-                .and_then(|lower| lower.as_number_literal_expr())
-                .map(|num| &num.value);
-            let left_upper = left_slice
-                .upper
-                .as_ref()
-                .and_then(|upper| upper.as_number_literal_expr())
-                .map(|num| &num.value);
-
-            target_lower == left_lower && target_upper == left_upper
-        }
-        _ => false,
-    }
-}
-
-fn generate_fix(
-    checker: &Checker,
+/// Generate a fix to convert an assignment statement to an augmented assignment.
+///
+/// For example, given `x = x + 1`, the fix would be `x += 1`.
+fn augmented_assignment(
+    generator: Generator,
     target: &Expr,
-    operator: ast::Operator,
+    operator: Operator,
     right_operand: &Expr,
-    text_range: TextRange,
-) -> Fix {
-    let new_stmt = ast::Stmt::AugAssign(StmtAugAssign {
-        range: TextRange::default(),
-        target: Box::new(target.clone()),
-        op: operator,
-        value: Box::new(right_operand.clone()),
-    });
-    let content = checker.generator().stmt(&new_stmt);
-    Fix::unsafe_edit(Edit::range_replacement(content, text_range))
+    range: TextRange,
+) -> Edit {
+    Edit::range_replacement(
+        generator.stmt(&ast::Stmt::AugAssign(StmtAugAssign {
+            range: TextRange::default(),
+            target: Box::new(target.clone()),
+            op: operator,
+            value: Box::new(right_operand.clone()),
+        })),
+        range,
+    )
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum AugmentedOperator {
+    Add,
+    BitAnd,
+    BitOr,
+    BitXor,
+    Div,
+    FloorDiv,
+    LShift,
+    MatMult,
+    Mod,
+    Mult,
+    Pow,
+    RShift,
+    Sub,
+}
+
+impl From<Operator> for AugmentedOperator {
+    fn from(value: Operator) -> Self {
+        match value {
+            Operator::Add => Self::Add,
+            Operator::BitAnd => Self::BitAnd,
+            Operator::BitOr => Self::BitOr,
+            Operator::BitXor => Self::BitXor,
+            Operator::Div => Self::Div,
+            Operator::FloorDiv => Self::FloorDiv,
+            Operator::LShift => Self::LShift,
+            Operator::MatMult => Self::MatMult,
+            Operator::Mod => Self::Mod,
+            Operator::Mult => Self::Mult,
+            Operator::Pow => Self::Pow,
+            Operator::RShift => Self::RShift,
+            Operator::Sub => Self::Sub,
+        }
+    }
+}
+
+impl std::fmt::Display for AugmentedOperator {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Add => f.write_str("+="),
+            Self::BitAnd => f.write_str("&="),
+            Self::BitOr => f.write_str("|="),
+            Self::BitXor => f.write_str("^="),
+            Self::Div => f.write_str("/="),
+            Self::FloorDiv => f.write_str("//="),
+            Self::LShift => f.write_str("<<="),
+            Self::MatMult => f.write_str("@="),
+            Self::Mod => f.write_str("%="),
+            Self::Mult => f.write_str("*="),
+            Self::Pow => f.write_str("**="),
+            Self::RShift => f.write_str(">>="),
+            Self::Sub => f.write_str("-="),
+        }
+    }
 }
