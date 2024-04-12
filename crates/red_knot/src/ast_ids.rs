@@ -13,37 +13,44 @@ use ruff_python_ast::{
 };
 use ruff_text_size::{Ranged, TextRange};
 
+/// A type agnostic ID that uniquely identifies an AST node in a file.
 #[ruff_index::newtype_index]
 pub struct AstId;
 
+/// A typed ID that uniquely identifies an AST node in a file.
+///
+/// This is different from [`AstId`] in that it is a combination of ID and the type of the node the ID identifies.
+/// Typing the ID prevents mixing IDs of different node types and allows to restrict the API to only accept
+/// nodes for which an ID has been created (not all AST nodes get an ID).
 #[derive(Debug, Eq, PartialEq, Hash)]
-pub struct FileAstId<N: HasAstId> {
-    ast_id: AstId,
+pub struct TypedAstId<N: HasAstId> {
+    erased: AstId,
     _marker: PhantomData<fn() -> N>,
 }
 
-impl<N: HasAstId> FileAstId<N> {
-    pub fn upcast<M: HasAstId>(self) -> FileAstId<M>
+impl<N: HasAstId> TypedAstId<N> {
+    /// Upcasts this ID from a more specific node type to a more general node type.
+    pub fn upcast<M: HasAstId>(self) -> TypedAstId<M>
     where
         N: Into<M>,
     {
-        FileAstId {
-            ast_id: self.ast_id,
+        TypedAstId {
+            erased: self.erased,
             _marker: PhantomData,
         }
     }
 }
 
-impl<N: HasAstId> Copy for FileAstId<N> {}
-impl<N: HasAstId> Clone for FileAstId<N> {
+impl<N: HasAstId> Copy for TypedAstId<N> {}
+impl<N: HasAstId> Clone for TypedAstId<N> {
     fn clone(&self) -> Self {
         *self
     }
 }
 
 pub struct AstIds {
-    ids: IndexVec<AstId, SyntaxNodeKey>,
-    reverse: FxHashMap<SyntaxNodeKey, AstId>,
+    ids: IndexVec<AstId, NodeKey>,
+    reverse: FxHashMap<NodeKey, AstId>,
 }
 
 impl AstIds {
@@ -72,42 +79,47 @@ impl AstIds {
         }
     }
 
-    pub fn root(&self) -> SyntaxNodeKey {
+    /// Returns the ID to the root node.
+    pub fn root(&self) -> NodeKey {
         self.ids[AstId::new(0)]
     }
 
-    pub fn ast_id<N: HasAstId>(&self, node: &N) -> FileAstId<N> {
+    /// Returns the [`TypedAstId`] for a node.
+    pub fn ast_id<N: HasAstId>(&self, node: &N) -> TypedAstId<N> {
         let key = node.syntax_node_key();
-        FileAstId {
-            ast_id: self.reverse.get(&key).copied().unwrap(),
+        TypedAstId {
+            erased: self.reverse.get(&key).copied().unwrap(),
             _marker: PhantomData,
         }
     }
 
-    pub fn ast_id_for_key<N: HasAstId>(&self, node: AstNodeKey<N>) -> FileAstId<N> {
-        let ast_id = self.ast_id_for_syntax_key(node.syntax_key);
+    /// Returns the [`TypedAstId`] for the node identified with the given [`TypedNodeKey`].
+    pub fn ast_id_for_key<N: HasAstId>(&self, node: TypedNodeKey<N>) -> TypedAstId<N> {
+        let ast_id = self.ast_id_for_node_key(node.inner);
 
-        FileAstId {
-            ast_id,
+        TypedAstId {
+            erased: ast_id,
             _marker: PhantomData,
         }
     }
 
-    pub fn ast_id_for_syntax_key(&self, node: SyntaxNodeKey) -> AstId {
+    /// Returns the untyped [`AstId`] for the node identified by the given `node` key.
+    pub fn ast_id_for_node_key(&self, node: NodeKey) -> AstId {
         self.reverse
             .get(&node)
             .copied()
             .expect("Can't find node in AstIds map.")
     }
 
-    pub fn key<N: HasAstId>(&self, id: FileAstId<N>) -> AstNodeKey<N> {
-        let syntax_key = self.ids[id.ast_id];
+    /// Returns the [`TypedNodeKey`] for the node identified by the given [`TypedAstId`].
+    pub fn key<N: HasAstId>(&self, id: TypedAstId<N>) -> TypedNodeKey<N> {
+        let syntax_key = self.ids[id.erased];
 
-        AstNodeKey::new(syntax_key).unwrap()
+        TypedNodeKey::new(syntax_key).unwrap()
     }
 
-    pub fn syntax_key<H: HasAstId>(&self, id: FileAstId<H>) -> SyntaxNodeKey {
-        self.ids[id.ast_id]
+    pub fn node_key<H: HasAstId>(&self, id: TypedAstId<H>) -> NodeKey {
+        self.ids[id.erased]
     }
 }
 
@@ -132,8 +144,8 @@ impl Eq for AstIds {}
 
 #[derive(Default)]
 struct AstIdsVisitor<'a> {
-    ids: IndexVec<AstId, SyntaxNodeKey>,
-    reverse: FxHashMap<SyntaxNodeKey, AstId>,
+    ids: IndexVec<AstId, NodeKey>,
+    reverse: FxHashMap<NodeKey, AstId>,
     deferred: Vec<DeferredNode<'a>>,
 }
 
@@ -200,33 +212,33 @@ enum DeferredNode<'a> {
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
-pub struct AstNodeKey<N: AstNode> {
-    syntax_key: SyntaxNodeKey,
+pub struct TypedNodeKey<N: AstNode> {
+    /// The type erased node key.
+    inner: NodeKey,
     _marker: PhantomData<fn() -> N>,
 }
 
-impl<N: AstNode> AstNodeKey<N> {
-    pub fn new(syntax_key: SyntaxNodeKey) -> Option<Self> {
-        N::can_cast(syntax_key.kind).then(|| AstNodeKey {
-            syntax_key,
+impl<N: AstNode> TypedNodeKey<N> {
+    pub fn new(node_key: NodeKey) -> Option<Self> {
+        N::can_cast(node_key.kind).then(|| TypedNodeKey {
+            inner: node_key,
             _marker: PhantomData,
         })
     }
 
     pub fn resolve<'a>(&self, root: AnyNodeRef<'a>) -> Option<N::Ref<'a>> {
-        let syntax_node = self.syntax_key.resolve(root)?;
+        let node_ref = self.inner.resolve(root)?;
 
-        // UGH, we need `cast_ref`.
-        Some(N::cast_ref(syntax_node).unwrap())
+        Some(N::cast_ref(node_ref).unwrap())
     }
 }
 
-struct FindSyntaxNodeVisitor<'a> {
-    key: SyntaxNodeKey,
+struct FindNodeKeyVisitor<'a> {
+    key: NodeKey,
     result: Option<AnyNodeRef<'a>>,
 }
 
-impl<'a> PreorderVisitor<'a> for FindSyntaxNodeVisitor<'a> {
+impl<'a> PreorderVisitor<'a> for FindNodeKeyVisitor<'a> {
     fn enter_node(&mut self, node: AnyNodeRef<'a>) -> TraversalSignal {
         if self.result.is_some() {
             return TraversalSignal::Skip;
@@ -259,15 +271,15 @@ impl<'a> PreorderVisitor<'a> for FindSyntaxNodeVisitor<'a> {
 //   `Arc` internally
 // TODO: Implement the logic to resolve a node, given a db (and the correct file).
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
-pub struct SyntaxNodeKey {
+pub struct NodeKey {
     kind: NodeKind,
     range: TextRange,
 }
 
-impl SyntaxNodeKey {
+impl NodeKey {
     pub fn resolve<'a>(&self, root: AnyNodeRef<'a>) -> Option<AnyNodeRef<'a>> {
         // We need to do a binary search here. Only traverse into a node if the range is withint the node
-        let mut visitor = FindSyntaxNodeVisitor {
+        let mut visitor = FindNodeKeyVisitor {
             key: *self,
             result: None,
         };
@@ -282,18 +294,18 @@ impl SyntaxNodeKey {
 
 /// Marker trait implemented by AST nodes for which we extract the `AstId`.
 pub trait HasAstId: AstNode {
-    fn node_key(&self) -> AstNodeKey<Self>
+    fn node_key(&self) -> TypedNodeKey<Self>
     where
         Self: Sized,
     {
-        AstNodeKey {
-            syntax_key: self.syntax_node_key(),
+        TypedNodeKey {
+            inner: self.syntax_node_key(),
             _marker: PhantomData,
         }
     }
 
-    fn syntax_node_key(&self) -> SyntaxNodeKey {
-        SyntaxNodeKey {
+    fn syntax_node_key(&self) -> NodeKey {
+        NodeKey {
             kind: self.as_any_node_ref().kind(),
             range: self.range(),
         }
