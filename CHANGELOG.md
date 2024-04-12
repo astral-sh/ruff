@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.3.7
+
+### Preview features
+
+- \[`flake8-bugbear`\] Implement `loop-iterator-mutation` (`B909`) ([#9578](https://github.com/astral-sh/ruff/pull/9578))
+- \[`pylint`\] Implement rule to prefer augmented assignment (`PLR6104`) ([#9932](https://github.com/astral-sh/ruff/pull/9932))
+
+### Bug fixes
+
+- Avoid TOCTOU errors in cache initialization ([#10884](https://github.com/astral-sh/ruff/pull/10884))
+- \[`pylint`\] Recode `nan-comparison` rule to `W0177` ([#10894](https://github.com/astral-sh/ruff/pull/10894))
+- \[`pylint`\] Reverse min-max logic in `if-stmt-min-max` ([#10890](https://github.com/astral-sh/ruff/pull/10890))
+
 ## 0.3.6
 
 ### Preview features
