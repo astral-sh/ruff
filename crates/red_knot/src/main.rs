@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use rustc_hash::FxHashSet;
 
 use red_knot::db::{
-    ast_ids, check_physical_lines, check_syntax, dependencies, parse, Database, Db,
+    ast_ids, check_physical_lines, check_syntax, definitions, dependencies, parse, Database, Db,
 };
 use red_knot::{files, Workspace};
 
@@ -89,6 +89,10 @@ fn main() -> anyhow::Result<()> {
 
             dbg!(key.resolve(ast.into()));
         }
+
+        let definitions = definitions(&db, content);
+
+        dbg!(&definitions);
 
         // This is the HIR
         // I forgot how rust-analyzer reference from the HIR to the AST.
