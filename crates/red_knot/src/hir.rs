@@ -15,14 +15,40 @@
 
 use std::ops::{Index, Range};
 
+use crate::ast_ids::{HasAstId, TypedAstId};
 use ruff_index::{newtype_index, IndexVec};
 use ruff_python_ast::{
     Stmt, StmtAnnAssign, StmtAssign, StmtClassDef, StmtFunctionDef, StmtTypeAlias, TypeParam,
     TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple,
 };
 
-use crate::db::HirAstId;
+use crate::files::FileId;
 use crate::Name;
+
+#[derive(Eq, PartialEq, Hash, Debug)]
+pub struct HirAstId<N: HasAstId> {
+    file_id: FileId,
+    node_id: TypedAstId<N>,
+}
+
+impl<N: HasAstId> Copy for HirAstId<N> {}
+impl<N: HasAstId> Clone for HirAstId<N> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<N: HasAstId> HirAstId<N> {
+    pub fn upcast<M: HasAstId>(self) -> HirAstId<M>
+    where
+        N: Into<M>,
+    {
+        HirAstId {
+            file_id: self.file_id,
+            node_id: self.node_id.upcast(),
+        }
+    }
+}
 
 #[newtype_index]
 pub struct FunctionId;
