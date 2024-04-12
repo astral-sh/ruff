@@ -111,6 +111,7 @@ pub(crate) fn check_noqa(
             FileExemption::All => true,
             FileExemption::Codes(codes) => codes.contains(&Rule::UnusedNOQA.noqa_code()),
         })
+        && !per_file_ignores.contains(Rule::UnusedNOQA)
     {
         for line in noqa_directives.lines() {
             match &line.directive {
@@ -129,7 +130,7 @@ pub(crate) fn check_noqa(
                     let mut unknown_codes = vec![];
                     let mut unmatched_codes = vec![];
                     let mut valid_codes = vec![];
-                    let mut self_ignore = per_file_ignores.contains(Rule::UnusedNOQA);
+                    let mut self_ignore = false;
                     for code in directive.codes() {
                         let code = get_redirect_target(code).unwrap_or(code);
                         if Rule::UnusedNOQA.noqa_code() == code {
