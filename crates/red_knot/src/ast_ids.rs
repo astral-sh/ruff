@@ -76,7 +76,6 @@ impl AstIds {
         self.ids[AstId::new(0)]
     }
 
-    // TODO: Limit this API to only nodes that have an AstId (marker trait?)
     pub fn ast_id<N: HasAstId>(&self, node: &N) -> FileAstId<N> {
         let key = node.syntax_node_key();
         FileAstId {
