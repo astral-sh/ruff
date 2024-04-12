@@ -55,3 +55,4 @@ a_list[0] = a_list[:] * 3
 index = a_number = a_number + 1
 a_number = index = a_number + 1
 index = index * index + 10
+some_string = "a very long start to the string" + some_string

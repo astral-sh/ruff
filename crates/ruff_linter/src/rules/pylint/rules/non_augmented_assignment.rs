@@ -22,6 +22,18 @@ use crate::checkers::ast::Checker;
 /// When performing such an operation, augmented assignments are more concise
 /// and idiomatic.
 ///
+/// ## Known problems
+/// In some cases, this rule will not detect assignments in which the target
+/// is on the right-hand side of a binary operation (e.g., `x = y + x`, as
+/// opposed to `x = x + y`), as such operations are not commutative for
+/// certain data types, like strings.
+///
+/// For example, `x = "prefix-" + x` is not equivalent to `x += "prefix-"`,
+/// while `x = 1 + x` is equivalent to `x += 1`.
+///
+/// If the type of the left-hand side cannot be inferred trivially, the rule
+/// will ignore the assignment.
+///
 /// ## Example
 /// ```python
 /// x = x + 1
@@ -101,8 +113,10 @@ pub(crate) fn non_augmented_assignment(checker: &mut Checker, assign: &ast::Stmt
         return;
     }
 
-    // If the operator is commutative, match, e.g., `x = 1 + x`.
+    // If the operator is commutative, match, e.g., `x = 1 + x`, but limit such matches to primitive
+    // types.
     if operator.is_commutative()
+        && (value.left.is_number_literal_expr() || value.left.is_boolean_literal_expr())
         && ComparableExpr::from(target) == ComparableExpr::from(&value.right)
     {
         let mut diagnostic = Diagnostic::new(NonAugmentedAssignment { operator }, assign.range());
