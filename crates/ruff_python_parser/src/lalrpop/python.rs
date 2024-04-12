@@ -1,5 +1,5 @@
 // auto-generated: "lalrpop 0.20.0"
-// sha3: 19d8a130ba177ffe72627037ce6cf93d642d4698a48d58f49622191534f77fb4
+// sha3: defe105edf1f7227b0c0a1e2d525aa628159fe6145aef96c6c99b18ac93faebb
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use ruff_python_ast::{self as ast, Int, IpyEscapeKind, AnyStringKind};
 use super::{
@@ -32761,7 +32761,7 @@ fn __action28<
 ) -> Result<ast::Stmt,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     {
-        let simple = target.expr.is_name_expr();
+        let simple = target.expr.is_name_expr() && !target.is_parenthesized();
         invalid::assignment_target(&target.expr)?;
         Ok(ast::Stmt::AnnAssign(
             ast::StmtAnnAssign {

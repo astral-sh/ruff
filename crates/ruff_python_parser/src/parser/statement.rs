@@ -1069,6 +1069,11 @@ impl<'src> Parser<'src> {
 
         helpers::set_expr_ctx(&mut target.expr, ExprContext::Store);
 
+        // test_ok ann_assign_stmt_simple_target
+        // a: int  # simple
+        // (a): int
+        // a.b: int
+        // a[0]: int
         let simple = target.is_name_expr() && !target.is_parenthesized;
 
         // test_err ann_assign_stmt_invalid_annotation
