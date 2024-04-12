@@ -1,489 +1,476 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-binary_op_and_normal_assignment.py:7:1: PLR6104 [*] Normal assignment with left operand of binary operator being the same as the target.
-   |
- 5 |   mat1, mat2 = None, None # PLR6104
- 6 |   
- 7 | / some_string = (
- 8 | |   some_string
- 9 | |   + "a very long end of string"
-10 | | ) # PLR6104
-   | |_^ PLR6104
-11 |   index = index - 1 # PLR6104
-12 |   a_list = a_list + ["to concat"] # PLR6104
-   |
-   = help: Use augmented assignment instead.
-
-ℹ Unsafe fix
-4  4  | some_set = {"elem"} # PLR6104
-5  5  | mat1, mat2 = None, None # PLR6104
-6  6  | 
-7     |-some_string = (
-8     |-  some_string
-9     |-  + "a very long end of string"
-10    |-) # PLR6104
-   7  |+some_string += "a very long end of string" # PLR6104
-11 8  | index = index - 1 # PLR6104
-12 9  | a_list = a_list + ["to concat"] # PLR6104
-13 10 | some_set = some_set | {"to concat"} # PLR6104
-
-binary_op_and_normal_assignment.py:11:1: PLR6104 [*] Normal assignment with left operand of binary operator being the same as the target.
-   |
- 9 |   + "a very long end of string"
-10 | ) # PLR6104
-11 | index = index - 1 # PLR6104
-   | ^^^^^^^^^^^^^^^^^ PLR6104
-12 | a_list = a_list + ["to concat"] # PLR6104
-13 | some_set = some_set | {"to concat"} # PLR6104
-   |
-   = help: Use augmented assignment instead.
-
-ℹ Unsafe fix
-8  8  |   some_string
-9  9  |   + "a very long end of string"
-10 10 | ) # PLR6104
-11    |-index = index - 1 # PLR6104
-   11 |+index -= 1 # PLR6104
-12 12 | a_list = a_list + ["to concat"] # PLR6104
-13 13 | some_set = some_set | {"to concat"} # PLR6104
-14 14 | to_multiply = to_multiply * 5 # PLR6104
-
-binary_op_and_normal_assignment.py:12:1: PLR6104 [*] Normal assignment with left operand of binary operator being the same as the target.
-   |
-10 | ) # PLR6104
-11 | index = index - 1 # PLR6104
-12 | a_list = a_list + ["to concat"] # PLR6104
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLR6104
-13 | some_set = some_set | {"to concat"} # PLR6104
-14 | to_multiply = to_multiply * 5 # PLR6104
-   |
-   = help: Use augmented assignment instead.
-
-ℹ Unsafe fix
-9  9  |   + "a very long end of string"
-10 10 | ) # PLR6104
-11 11 | index = index - 1 # PLR6104
-12    |-a_list = a_list + ["to concat"] # PLR6104
-   12 |+a_list += ["to concat"] # PLR6104
-13 13 | some_set = some_set | {"to concat"} # PLR6104
-14 14 | to_multiply = to_multiply * 5 # PLR6104
-15 15 | to_divide = to_divide / 5 # PLR6104
-
-binary_op_and_normal_assignment.py:13:1: PLR6104 [*] Normal assignment with left operand of binary operator being the same as the target.
-   |
-11 | index = index - 1 # PLR6104
-12 | a_list = a_list + ["to concat"] # PLR6104
-13 | some_set = some_set | {"to concat"} # PLR6104
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLR6104
-14 | to_multiply = to_multiply * 5 # PLR6104
-15 | to_divide = to_divide / 5 # PLR6104
-   |
-   = help: Use augmented assignment instead.
-
-ℹ Unsafe fix
-10 10 | ) # PLR6104
-11 11 | index = index - 1 # PLR6104
-12 12 | a_list = a_list + ["to concat"] # PLR6104
-13    |-some_set = some_set | {"to concat"} # PLR6104
-   13 |+some_set |= {"to concat"} # PLR6104
-14 14 | to_multiply = to_multiply * 5 # PLR6104
-15 15 | to_divide = to_divide / 5 # PLR6104
-16 16 | to_divide = to_divide // 5 # PLR6104
-
-binary_op_and_normal_assignment.py:14:1: PLR6104 [*] Normal assignment with left operand of binary operator being the same as the target.
-   |
-12 | a_list = a_list + ["to concat"] # PLR6104
-13 | some_set = some_set | {"to concat"} # PLR6104
-14 | to_multiply = to_multiply * 5 # PLR6104
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLR6104
-15 | to_divide = to_divide / 5 # PLR6104
-16 | to_divide = to_divide // 5 # PLR6104
-   |
-   = help: Use augmented assignment instead.
-
-ℹ Unsafe fix
-11 11 | index = index - 1 # PLR6104
-12 12 | a_list = a_list + ["to concat"] # PLR6104
-13 13 | some_set = some_set | {"to concat"} # PLR6104
-14    |-to_multiply = to_multiply * 5 # PLR6104
-   14 |+to_multiply *= 5 # PLR6104
-15 15 | to_divide = to_divide / 5 # PLR6104
-16 16 | to_divide = to_divide // 5 # PLR6104
-17 17 | to_cube = to_cube ** 3 # PLR6104
-
-binary_op_and_normal_assignment.py:15:1: PLR6104 [*] Normal assignment with left operand of binary operator being the same as the target.
-   |
-13 | some_set = some_set | {"to concat"} # PLR6104
-14 | to_multiply = to_multiply * 5 # PLR6104
-15 | to_divide = to_divide / 5 # PLR6104
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^ PLR6104
-16 | to_divide = to_divide // 5 # PLR6104
-17 | to_cube = to_cube ** 3 # PLR6104
-   |
-   = help: Use augmented assignment instead.
-
-ℹ Unsafe fix
-12 12 | a_list = a_list + ["to concat"] # PLR6104
-13 13 | some_set = some_set | {"to concat"} # PLR6104
-14 14 | to_multiply = to_multiply * 5 # PLR6104
-15    |-to_divide = to_divide / 5 # PLR6104
-   15 |+to_divide /= 5 # PLR6104
-16 16 | to_divide = to_divide // 5 # PLR6104
-17 17 | to_cube = to_cube ** 3 # PLR6104
-18 18 | timeDiffSeconds = timeDiffSeconds % 60 # PLR6104
-
 binary_op_and_normal_assignment.py:16:1: PLR6104 [*] Normal assignment with left operand of binary operator being the same as the target.
    |
-14 | to_multiply = to_multiply * 5 # PLR6104
-15 | to_divide = to_divide / 5 # PLR6104
-16 | to_divide = to_divide // 5 # PLR6104
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^ PLR6104
-17 | to_cube = to_cube ** 3 # PLR6104
-18 | timeDiffSeconds = timeDiffSeconds % 60 # PLR6104
+14 | mat1, mat2 = None, None
+15 | 
+16 | some_string = some_string + "a very long end of string"
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLR6104
+17 | index = index - 1
+18 | a_list = a_list + ["to concat"]
    |
    = help: Use augmented assignment instead.
 
 ℹ Unsafe fix
-13 13 | some_set = some_set | {"to concat"} # PLR6104
-14 14 | to_multiply = to_multiply * 5 # PLR6104
-15 15 | to_divide = to_divide / 5 # PLR6104
-16    |-to_divide = to_divide // 5 # PLR6104
-   16 |+to_divide //= 5 # PLR6104
-17 17 | to_cube = to_cube ** 3 # PLR6104
-18 18 | timeDiffSeconds = timeDiffSeconds % 60 # PLR6104
-19 19 | flags = flags & 0x1 # PLR6104
+13 13 | some_set = {"elem"}
+14 14 | mat1, mat2 = None, None
+15 15 | 
+16    |-some_string = some_string + "a very long end of string"
+   16 |+some_string += "a very long end of string"
+17 17 | index = index - 1
+18 18 | a_list = a_list + ["to concat"]
+19 19 | some_set = some_set | {"to concat"}
 
 binary_op_and_normal_assignment.py:17:1: PLR6104 [*] Normal assignment with left operand of binary operator being the same as the target.
    |
-15 | to_divide = to_divide / 5 # PLR6104
-16 | to_divide = to_divide // 5 # PLR6104
-17 | to_cube = to_cube ** 3 # PLR6104
-   | ^^^^^^^^^^^^^^^^^^^^^^ PLR6104
-18 | timeDiffSeconds = timeDiffSeconds % 60 # PLR6104
-19 | flags = flags & 0x1 # PLR6104
+16 | some_string = some_string + "a very long end of string"
+17 | index = index - 1
+   | ^^^^^^^^^^^^^^^^^ PLR6104
+18 | a_list = a_list + ["to concat"]
+19 | some_set = some_set | {"to concat"}
    |
    = help: Use augmented assignment instead.
 
 ℹ Unsafe fix
-14 14 | to_multiply = to_multiply * 5 # PLR6104
-15 15 | to_divide = to_divide / 5 # PLR6104
-16 16 | to_divide = to_divide // 5 # PLR6104
-17    |-to_cube = to_cube ** 3 # PLR6104
-   17 |+to_cube **= 3 # PLR6104
-18 18 | timeDiffSeconds = timeDiffSeconds % 60 # PLR6104
-19 19 | flags = flags & 0x1 # PLR6104
-20 20 | flags = flags | 0x1 # PLR6104
+14 14 | mat1, mat2 = None, None
+15 15 | 
+16 16 | some_string = some_string + "a very long end of string"
+17    |-index = index - 1
+   17 |+index -= 1
+18 18 | a_list = a_list + ["to concat"]
+19 19 | some_set = some_set | {"to concat"}
+20 20 | to_multiply = to_multiply * 5
 
 binary_op_and_normal_assignment.py:18:1: PLR6104 [*] Normal assignment with left operand of binary operator being the same as the target.
    |
-16 | to_divide = to_divide // 5 # PLR6104
-17 | to_cube = to_cube ** 3 # PLR6104
-18 | timeDiffSeconds = timeDiffSeconds % 60 # PLR6104
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLR6104
-19 | flags = flags & 0x1 # PLR6104
-20 | flags = flags | 0x1 # PLR6104
+16 | some_string = some_string + "a very long end of string"
+17 | index = index - 1
+18 | a_list = a_list + ["to concat"]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLR6104
+19 | some_set = some_set | {"to concat"}
+20 | to_multiply = to_multiply * 5
    |
    = help: Use augmented assignment instead.
 
 ℹ Unsafe fix
-15 15 | to_divide = to_divide / 5 # PLR6104
-16 16 | to_divide = to_divide // 5 # PLR6104
-17 17 | to_cube = to_cube ** 3 # PLR6104
-18    |-timeDiffSeconds = timeDiffSeconds % 60 # PLR6104
-   18 |+timeDiffSeconds %= 60 # PLR6104
-19 19 | flags = flags & 0x1 # PLR6104
-20 20 | flags = flags | 0x1 # PLR6104
-21 21 | flags = flags ^ 0x1 # PLR6104
+15 15 | 
+16 16 | some_string = some_string + "a very long end of string"
+17 17 | index = index - 1
+18    |-a_list = a_list + ["to concat"]
+   18 |+a_list += ["to concat"]
+19 19 | some_set = some_set | {"to concat"}
+20 20 | to_multiply = to_multiply * 5
+21 21 | to_divide = to_divide / 5
 
 binary_op_and_normal_assignment.py:19:1: PLR6104 [*] Normal assignment with left operand of binary operator being the same as the target.
    |
-17 | to_cube = to_cube ** 3 # PLR6104
-18 | timeDiffSeconds = timeDiffSeconds % 60 # PLR6104
-19 | flags = flags & 0x1 # PLR6104
-   | ^^^^^^^^^^^^^^^^^^^ PLR6104
-20 | flags = flags | 0x1 # PLR6104
-21 | flags = flags ^ 0x1 # PLR6104
+17 | index = index - 1
+18 | a_list = a_list + ["to concat"]
+19 | some_set = some_set | {"to concat"}
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLR6104
+20 | to_multiply = to_multiply * 5
+21 | to_divide = to_divide / 5
    |
    = help: Use augmented assignment instead.
 
 ℹ Unsafe fix
-16 16 | to_divide = to_divide // 5 # PLR6104
-17 17 | to_cube = to_cube ** 3 # PLR6104
-18 18 | timeDiffSeconds = timeDiffSeconds % 60 # PLR6104
-19    |-flags = flags & 0x1 # PLR6104
-   19 |+flags &= 1 # PLR6104
-20 20 | flags = flags | 0x1 # PLR6104
-21 21 | flags = flags ^ 0x1 # PLR6104
-22 22 | flags = flags << 1 # PLR6104
+16 16 | some_string = some_string + "a very long end of string"
+17 17 | index = index - 1
+18 18 | a_list = a_list + ["to concat"]
+19    |-some_set = some_set | {"to concat"}
+   19 |+some_set |= {"to concat"}
+20 20 | to_multiply = to_multiply * 5
+21 21 | to_divide = to_divide / 5
+22 22 | to_divide = to_divide // 5
 
 binary_op_and_normal_assignment.py:20:1: PLR6104 [*] Normal assignment with left operand of binary operator being the same as the target.
    |
-18 | timeDiffSeconds = timeDiffSeconds % 60 # PLR6104
-19 | flags = flags & 0x1 # PLR6104
-20 | flags = flags | 0x1 # PLR6104
-   | ^^^^^^^^^^^^^^^^^^^ PLR6104
-21 | flags = flags ^ 0x1 # PLR6104
-22 | flags = flags << 1 # PLR6104
+18 | a_list = a_list + ["to concat"]
+19 | some_set = some_set | {"to concat"}
+20 | to_multiply = to_multiply * 5
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLR6104
+21 | to_divide = to_divide / 5
+22 | to_divide = to_divide // 5
    |
    = help: Use augmented assignment instead.
 
 ℹ Unsafe fix
-17 17 | to_cube = to_cube ** 3 # PLR6104
-18 18 | timeDiffSeconds = timeDiffSeconds % 60 # PLR6104
-19 19 | flags = flags & 0x1 # PLR6104
-20    |-flags = flags | 0x1 # PLR6104
-   20 |+flags |= 1 # PLR6104
-21 21 | flags = flags ^ 0x1 # PLR6104
-22 22 | flags = flags << 1 # PLR6104
-23 23 | flags = flags >> 1 # PLR6104
+17 17 | index = index - 1
+18 18 | a_list = a_list + ["to concat"]
+19 19 | some_set = some_set | {"to concat"}
+20    |-to_multiply = to_multiply * 5
+   20 |+to_multiply *= 5
+21 21 | to_divide = to_divide / 5
+22 22 | to_divide = to_divide // 5
+23 23 | to_cube = to_cube**3
 
 binary_op_and_normal_assignment.py:21:1: PLR6104 [*] Normal assignment with left operand of binary operator being the same as the target.
    |
-19 | flags = flags & 0x1 # PLR6104
-20 | flags = flags | 0x1 # PLR6104
-21 | flags = flags ^ 0x1 # PLR6104
-   | ^^^^^^^^^^^^^^^^^^^ PLR6104
-22 | flags = flags << 1 # PLR6104
-23 | flags = flags >> 1 # PLR6104
+19 | some_set = some_set | {"to concat"}
+20 | to_multiply = to_multiply * 5
+21 | to_divide = to_divide / 5
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^ PLR6104
+22 | to_divide = to_divide // 5
+23 | to_cube = to_cube**3
    |
    = help: Use augmented assignment instead.
 
 ℹ Unsafe fix
-18 18 | timeDiffSeconds = timeDiffSeconds % 60 # PLR6104
-19 19 | flags = flags & 0x1 # PLR6104
-20 20 | flags = flags | 0x1 # PLR6104
-21    |-flags = flags ^ 0x1 # PLR6104
-   21 |+flags ^= 1 # PLR6104
-22 22 | flags = flags << 1 # PLR6104
-23 23 | flags = flags >> 1 # PLR6104
-24 24 | mat1 = mat1 @ mat2 # PLR6104
+18 18 | a_list = a_list + ["to concat"]
+19 19 | some_set = some_set | {"to concat"}
+20 20 | to_multiply = to_multiply * 5
+21    |-to_divide = to_divide / 5
+   21 |+to_divide /= 5
+22 22 | to_divide = to_divide // 5
+23 23 | to_cube = to_cube**3
+24 24 | timeDiffSeconds = timeDiffSeconds % 60
 
 binary_op_and_normal_assignment.py:22:1: PLR6104 [*] Normal assignment with left operand of binary operator being the same as the target.
    |
-20 | flags = flags | 0x1 # PLR6104
-21 | flags = flags ^ 0x1 # PLR6104
-22 | flags = flags << 1 # PLR6104
-   | ^^^^^^^^^^^^^^^^^^ PLR6104
-23 | flags = flags >> 1 # PLR6104
-24 | mat1 = mat1 @ mat2 # PLR6104
+20 | to_multiply = to_multiply * 5
+21 | to_divide = to_divide / 5
+22 | to_divide = to_divide // 5
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^ PLR6104
+23 | to_cube = to_cube**3
+24 | timeDiffSeconds = timeDiffSeconds % 60
    |
    = help: Use augmented assignment instead.
 
 ℹ Unsafe fix
-19 19 | flags = flags & 0x1 # PLR6104
-20 20 | flags = flags | 0x1 # PLR6104
-21 21 | flags = flags ^ 0x1 # PLR6104
-22    |-flags = flags << 1 # PLR6104
-   22 |+flags <<= 1 # PLR6104
-23 23 | flags = flags >> 1 # PLR6104
-24 24 | mat1 = mat1 @ mat2 # PLR6104
-25 25 | a_list[1] = a_list[1] + 1 # PLR6104
+19 19 | some_set = some_set | {"to concat"}
+20 20 | to_multiply = to_multiply * 5
+21 21 | to_divide = to_divide / 5
+22    |-to_divide = to_divide // 5
+   22 |+to_divide //= 5
+23 23 | to_cube = to_cube**3
+24 24 | timeDiffSeconds = timeDiffSeconds % 60
+25 25 | flags = flags & 0x1
 
 binary_op_and_normal_assignment.py:23:1: PLR6104 [*] Normal assignment with left operand of binary operator being the same as the target.
    |
-21 | flags = flags ^ 0x1 # PLR6104
-22 | flags = flags << 1 # PLR6104
-23 | flags = flags >> 1 # PLR6104
-   | ^^^^^^^^^^^^^^^^^^ PLR6104
-24 | mat1 = mat1 @ mat2 # PLR6104
-25 | a_list[1] = a_list[1] + 1 # PLR6104
+21 | to_divide = to_divide / 5
+22 | to_divide = to_divide // 5
+23 | to_cube = to_cube**3
+   | ^^^^^^^^^^^^^^^^^^^^ PLR6104
+24 | timeDiffSeconds = timeDiffSeconds % 60
+25 | flags = flags & 0x1
    |
    = help: Use augmented assignment instead.
 
 ℹ Unsafe fix
-20 20 | flags = flags | 0x1 # PLR6104
-21 21 | flags = flags ^ 0x1 # PLR6104
-22 22 | flags = flags << 1 # PLR6104
-23    |-flags = flags >> 1 # PLR6104
-   23 |+flags >>= 1 # PLR6104
-24 24 | mat1 = mat1 @ mat2 # PLR6104
-25 25 | a_list[1] = a_list[1] + 1 # PLR6104
-26 26 | 
+20 20 | to_multiply = to_multiply * 5
+21 21 | to_divide = to_divide / 5
+22 22 | to_divide = to_divide // 5
+23    |-to_cube = to_cube**3
+   23 |+to_cube **= 3
+24 24 | timeDiffSeconds = timeDiffSeconds % 60
+25 25 | flags = flags & 0x1
+26 26 | flags = flags | 0x1
 
 binary_op_and_normal_assignment.py:24:1: PLR6104 [*] Normal assignment with left operand of binary operator being the same as the target.
    |
-22 | flags = flags << 1 # PLR6104
-23 | flags = flags >> 1 # PLR6104
-24 | mat1 = mat1 @ mat2 # PLR6104
-   | ^^^^^^^^^^^^^^^^^^ PLR6104
-25 | a_list[1] = a_list[1] + 1 # PLR6104
+22 | to_divide = to_divide // 5
+23 | to_cube = to_cube**3
+24 | timeDiffSeconds = timeDiffSeconds % 60
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLR6104
+25 | flags = flags & 0x1
+26 | flags = flags | 0x1
    |
    = help: Use augmented assignment instead.
 
 ℹ Unsafe fix
-21 21 | flags = flags ^ 0x1 # PLR6104
-22 22 | flags = flags << 1 # PLR6104
-23 23 | flags = flags >> 1 # PLR6104
-24    |-mat1 = mat1 @ mat2 # PLR6104
-   24 |+mat1 @= mat2 # PLR6104
-25 25 | a_list[1] = a_list[1] + 1 # PLR6104
-26 26 | 
-27 27 | a_list[0:2] = a_list[0:2] * 3 # PLR6104
+21 21 | to_divide = to_divide / 5
+22 22 | to_divide = to_divide // 5
+23 23 | to_cube = to_cube**3
+24    |-timeDiffSeconds = timeDiffSeconds % 60
+   24 |+timeDiffSeconds %= 60
+25 25 | flags = flags & 0x1
+26 26 | flags = flags | 0x1
+27 27 | flags = flags ^ 0x1
 
 binary_op_and_normal_assignment.py:25:1: PLR6104 [*] Normal assignment with left operand of binary operator being the same as the target.
    |
-23 | flags = flags >> 1 # PLR6104
-24 | mat1 = mat1 @ mat2 # PLR6104
-25 | a_list[1] = a_list[1] + 1 # PLR6104
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^ PLR6104
-26 | 
-27 | a_list[0:2] = a_list[0:2] * 3 # PLR6104
+23 | to_cube = to_cube**3
+24 | timeDiffSeconds = timeDiffSeconds % 60
+25 | flags = flags & 0x1
+   | ^^^^^^^^^^^^^^^^^^^ PLR6104
+26 | flags = flags | 0x1
+27 | flags = flags ^ 0x1
    |
    = help: Use augmented assignment instead.
 
 ℹ Unsafe fix
-22 22 | flags = flags << 1 # PLR6104
-23 23 | flags = flags >> 1 # PLR6104
-24 24 | mat1 = mat1 @ mat2 # PLR6104
-25    |-a_list[1] = a_list[1] + 1 # PLR6104
-   25 |+a_list[1] += 1 # PLR6104
-26 26 | 
-27 27 | a_list[0:2] = a_list[0:2] * 3 # PLR6104
-28 28 | a_list[:2] = a_list[:2] * 3 # PLR6104
+22 22 | to_divide = to_divide // 5
+23 23 | to_cube = to_cube**3
+24 24 | timeDiffSeconds = timeDiffSeconds % 60
+25    |-flags = flags & 0x1
+   25 |+flags &= 1
+26 26 | flags = flags | 0x1
+27 27 | flags = flags ^ 0x1
+28 28 | flags = flags << 1
+
+binary_op_and_normal_assignment.py:26:1: PLR6104 [*] Normal assignment with left operand of binary operator being the same as the target.
+   |
+24 | timeDiffSeconds = timeDiffSeconds % 60
+25 | flags = flags & 0x1
+26 | flags = flags | 0x1
+   | ^^^^^^^^^^^^^^^^^^^ PLR6104
+27 | flags = flags ^ 0x1
+28 | flags = flags << 1
+   |
+   = help: Use augmented assignment instead.
+
+ℹ Unsafe fix
+23 23 | to_cube = to_cube**3
+24 24 | timeDiffSeconds = timeDiffSeconds % 60
+25 25 | flags = flags & 0x1
+26    |-flags = flags | 0x1
+   26 |+flags |= 1
+27 27 | flags = flags ^ 0x1
+28 28 | flags = flags << 1
+29 29 | flags = flags >> 1
 
 binary_op_and_normal_assignment.py:27:1: PLR6104 [*] Normal assignment with left operand of binary operator being the same as the target.
    |
-25 | a_list[1] = a_list[1] + 1 # PLR6104
-26 | 
-27 | a_list[0:2] = a_list[0:2] * 3 # PLR6104
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLR6104
-28 | a_list[:2] = a_list[:2] * 3 # PLR6104
-29 | a_list[1:] = a_list[1:] * 3 # PLR6104
+25 | flags = flags & 0x1
+26 | flags = flags | 0x1
+27 | flags = flags ^ 0x1
+   | ^^^^^^^^^^^^^^^^^^^ PLR6104
+28 | flags = flags << 1
+29 | flags = flags >> 1
    |
    = help: Use augmented assignment instead.
 
 ℹ Unsafe fix
-24 24 | mat1 = mat1 @ mat2 # PLR6104
-25 25 | a_list[1] = a_list[1] + 1 # PLR6104
-26 26 | 
-27    |-a_list[0:2] = a_list[0:2] * 3 # PLR6104
-   27 |+a_list[0:2] *= 3 # PLR6104
-28 28 | a_list[:2] = a_list[:2] * 3 # PLR6104
-29 29 | a_list[1:] = a_list[1:] * 3 # PLR6104
-30 30 | a_list[:] = a_list[:] * 3 # PLR6104
+24 24 | timeDiffSeconds = timeDiffSeconds % 60
+25 25 | flags = flags & 0x1
+26 26 | flags = flags | 0x1
+27    |-flags = flags ^ 0x1
+   27 |+flags ^= 1
+28 28 | flags = flags << 1
+29 29 | flags = flags >> 1
+30 30 | mat1 = mat1 @ mat2
 
 binary_op_and_normal_assignment.py:28:1: PLR6104 [*] Normal assignment with left operand of binary operator being the same as the target.
    |
-27 | a_list[0:2] = a_list[0:2] * 3 # PLR6104
-28 | a_list[:2] = a_list[:2] * 3 # PLR6104
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLR6104
-29 | a_list[1:] = a_list[1:] * 3 # PLR6104
-30 | a_list[:] = a_list[:] * 3 # PLR6104
+26 | flags = flags | 0x1
+27 | flags = flags ^ 0x1
+28 | flags = flags << 1
+   | ^^^^^^^^^^^^^^^^^^ PLR6104
+29 | flags = flags >> 1
+30 | mat1 = mat1 @ mat2
    |
    = help: Use augmented assignment instead.
 
 ℹ Unsafe fix
-25 25 | a_list[1] = a_list[1] + 1 # PLR6104
-26 26 | 
-27 27 | a_list[0:2] = a_list[0:2] * 3 # PLR6104
-28    |-a_list[:2] = a_list[:2] * 3 # PLR6104
-   28 |+a_list[:2] *= 3 # PLR6104
-29 29 | a_list[1:] = a_list[1:] * 3 # PLR6104
-30 30 | a_list[:] = a_list[:] * 3 # PLR6104
-31 31 | 
+25 25 | flags = flags & 0x1
+26 26 | flags = flags | 0x1
+27 27 | flags = flags ^ 0x1
+28    |-flags = flags << 1
+   28 |+flags <<= 1
+29 29 | flags = flags >> 1
+30 30 | mat1 = mat1 @ mat2
+31 31 | a_list[1] = a_list[1] + 1
 
 binary_op_and_normal_assignment.py:29:1: PLR6104 [*] Normal assignment with left operand of binary operator being the same as the target.
    |
-27 | a_list[0:2] = a_list[0:2] * 3 # PLR6104
-28 | a_list[:2] = a_list[:2] * 3 # PLR6104
-29 | a_list[1:] = a_list[1:] * 3 # PLR6104
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLR6104
-30 | a_list[:] = a_list[:] * 3 # PLR6104
+27 | flags = flags ^ 0x1
+28 | flags = flags << 1
+29 | flags = flags >> 1
+   | ^^^^^^^^^^^^^^^^^^ PLR6104
+30 | mat1 = mat1 @ mat2
+31 | a_list[1] = a_list[1] + 1
    |
    = help: Use augmented assignment instead.
 
 ℹ Unsafe fix
-26 26 | 
-27 27 | a_list[0:2] = a_list[0:2] * 3 # PLR6104
-28 28 | a_list[:2] = a_list[:2] * 3 # PLR6104
-29    |-a_list[1:] = a_list[1:] * 3 # PLR6104
-   29 |+a_list[1:] *= 3 # PLR6104
-30 30 | a_list[:] = a_list[:] * 3 # PLR6104
-31 31 | 
-32 32 | index = index * (index + 10)  # PLR6104
+26 26 | flags = flags | 0x1
+27 27 | flags = flags ^ 0x1
+28 28 | flags = flags << 1
+29    |-flags = flags >> 1
+   29 |+flags >>= 1
+30 30 | mat1 = mat1 @ mat2
+31 31 | a_list[1] = a_list[1] + 1
+32 32 | 
 
 binary_op_and_normal_assignment.py:30:1: PLR6104 [*] Normal assignment with left operand of binary operator being the same as the target.
    |
-28 | a_list[:2] = a_list[:2] * 3 # PLR6104
-29 | a_list[1:] = a_list[1:] * 3 # PLR6104
-30 | a_list[:] = a_list[:] * 3 # PLR6104
+28 | flags = flags << 1
+29 | flags = flags >> 1
+30 | mat1 = mat1 @ mat2
+   | ^^^^^^^^^^^^^^^^^^ PLR6104
+31 | a_list[1] = a_list[1] + 1
+   |
+   = help: Use augmented assignment instead.
+
+ℹ Unsafe fix
+27 27 | flags = flags ^ 0x1
+28 28 | flags = flags << 1
+29 29 | flags = flags >> 1
+30    |-mat1 = mat1 @ mat2
+   30 |+mat1 @= mat2
+31 31 | a_list[1] = a_list[1] + 1
+32 32 | 
+33 33 | a_list[0:2] = a_list[0:2] * 3
+
+binary_op_and_normal_assignment.py:31:1: PLR6104 [*] Normal assignment with left operand of binary operator being the same as the target.
+   |
+29 | flags = flags >> 1
+30 | mat1 = mat1 @ mat2
+31 | a_list[1] = a_list[1] + 1
    | ^^^^^^^^^^^^^^^^^^^^^^^^^ PLR6104
-31 | 
-32 | index = index * (index + 10)  # PLR6104
+32 | 
+33 | a_list[0:2] = a_list[0:2] * 3
    |
    = help: Use augmented assignment instead.
 
 ℹ Unsafe fix
-27 27 | a_list[0:2] = a_list[0:2] * 3 # PLR6104
-28 28 | a_list[:2] = a_list[:2] * 3 # PLR6104
-29 29 | a_list[1:] = a_list[1:] * 3 # PLR6104
-30    |-a_list[:] = a_list[:] * 3 # PLR6104
-   30 |+a_list[:] *= 3 # PLR6104
-31 31 | 
-32 32 | index = index * (index + 10)  # PLR6104
-33 33 | 
+28 28 | flags = flags << 1
+29 29 | flags = flags >> 1
+30 30 | mat1 = mat1 @ mat2
+31    |-a_list[1] = a_list[1] + 1
+   31 |+a_list[1] += 1
+32 32 | 
+33 33 | a_list[0:2] = a_list[0:2] * 3
+34 34 | a_list[:2] = a_list[:2] * 3
 
-binary_op_and_normal_assignment.py:32:1: PLR6104 [*] Normal assignment with left operand of binary operator being the same as the target.
+binary_op_and_normal_assignment.py:33:1: PLR6104 [*] Normal assignment with left operand of binary operator being the same as the target.
    |
-30 | a_list[:] = a_list[:] * 3 # PLR6104
-31 | 
-32 | index = index * (index + 10)  # PLR6104
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLR6104
-33 | 
-34 | class T:
+31 | a_list[1] = a_list[1] + 1
+32 | 
+33 | a_list[0:2] = a_list[0:2] * 3
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLR6104
+34 | a_list[:2] = a_list[:2] * 3
+35 | a_list[1:] = a_list[1:] * 3
    |
    = help: Use augmented assignment instead.
 
 ℹ Unsafe fix
-29 29 | a_list[1:] = a_list[1:] * 3 # PLR6104
-30 30 | a_list[:] = a_list[:] * 3 # PLR6104
-31 31 | 
-32    |-index = index * (index + 10)  # PLR6104
-   32 |+index *= index + 10  # PLR6104
-33 33 | 
-34 34 | class T:
-35 35 |     def t(self):
+30 30 | mat1 = mat1 @ mat2
+31 31 | a_list[1] = a_list[1] + 1
+32 32 | 
+33    |-a_list[0:2] = a_list[0:2] * 3
+   33 |+a_list[0:2] *= 3
+34 34 | a_list[:2] = a_list[:2] * 3
+35 35 | a_list[1:] = a_list[1:] * 3
+36 36 | a_list[:] = a_list[:] * 3
 
-binary_op_and_normal_assignment.py:36:9: PLR6104 [*] Normal assignment with left operand of binary operator being the same as the target.
+binary_op_and_normal_assignment.py:34:1: PLR6104 [*] Normal assignment with left operand of binary operator being the same as the target.
    |
-34 | class T:
-35 |     def t(self):
-36 |         self.a = self.a + 1 # PLR6104
-   |         ^^^^^^^^^^^^^^^^^^^ PLR6104
+33 | a_list[0:2] = a_list[0:2] * 3
+34 | a_list[:2] = a_list[:2] * 3
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLR6104
+35 | a_list[1:] = a_list[1:] * 3
+36 | a_list[:] = a_list[:] * 3
+   |
+   = help: Use augmented assignment instead.
+
+ℹ Unsafe fix
+31 31 | a_list[1] = a_list[1] + 1
+32 32 | 
+33 33 | a_list[0:2] = a_list[0:2] * 3
+34    |-a_list[:2] = a_list[:2] * 3
+   34 |+a_list[:2] *= 3
+35 35 | a_list[1:] = a_list[1:] * 3
+36 36 | a_list[:] = a_list[:] * 3
+37 37 | 
+
+binary_op_and_normal_assignment.py:35:1: PLR6104 [*] Normal assignment with left operand of binary operator being the same as the target.
+   |
+33 | a_list[0:2] = a_list[0:2] * 3
+34 | a_list[:2] = a_list[:2] * 3
+35 | a_list[1:] = a_list[1:] * 3
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLR6104
+36 | a_list[:] = a_list[:] * 3
+   |
+   = help: Use augmented assignment instead.
+
+ℹ Unsafe fix
+32 32 | 
+33 33 | a_list[0:2] = a_list[0:2] * 3
+34 34 | a_list[:2] = a_list[:2] * 3
+35    |-a_list[1:] = a_list[1:] * 3
+   35 |+a_list[1:] *= 3
+36 36 | a_list[:] = a_list[:] * 3
+37 37 | 
+38 38 | index = index * (index + 10)
+
+binary_op_and_normal_assignment.py:36:1: PLR6104 [*] Normal assignment with left operand of binary operator being the same as the target.
+   |
+34 | a_list[:2] = a_list[:2] * 3
+35 | a_list[1:] = a_list[1:] * 3
+36 | a_list[:] = a_list[:] * 3
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^ PLR6104
 37 | 
-38 | obj = T()
+38 | index = index * (index + 10)
    |
    = help: Use augmented assignment instead.
 
 ℹ Unsafe fix
-33 33 | 
-34 34 | class T:
-35 35 |     def t(self):
-36    |-        self.a = self.a + 1 # PLR6104
-   36 |+        self.a += 1 # PLR6104
+33 33 | a_list[0:2] = a_list[0:2] * 3
+34 34 | a_list[:2] = a_list[:2] * 3
+35 35 | a_list[1:] = a_list[1:] * 3
+36    |-a_list[:] = a_list[:] * 3
+   36 |+a_list[:] *= 3
 37 37 | 
-38 38 | obj = T()
-39 39 | obj.a = obj.a + 1 # PLR6104
+38 38 | index = index * (index + 10)
+39 39 | 
 
-binary_op_and_normal_assignment.py:39:1: PLR6104 [*] Normal assignment with left operand of binary operator being the same as the target.
+binary_op_and_normal_assignment.py:38:1: PLR6104 [*] Normal assignment with left operand of binary operator being the same as the target.
    |
-38 | obj = T()
-39 | obj.a = obj.a + 1 # PLR6104
-   | ^^^^^^^^^^^^^^^^^ PLR6104
-40 | 
-41 | a_list[0] = a_list[:] * 3 # OK
+36 | a_list[:] = a_list[:] * 3
+37 | 
+38 | index = index * (index + 10)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLR6104
    |
    = help: Use augmented assignment instead.
 
 ℹ Unsafe fix
-36 36 |         self.a = self.a + 1 # PLR6104
+35 35 | a_list[1:] = a_list[1:] * 3
+36 36 | a_list[:] = a_list[:] * 3
 37 37 | 
-38 38 | obj = T()
-39    |-obj.a = obj.a + 1 # PLR6104
-   39 |+obj.a += 1 # PLR6104
+38    |-index = index * (index + 10)
+   38 |+index *= index + 10
+39 39 | 
 40 40 | 
-41 41 | a_list[0] = a_list[:] * 3 # OK
-42 42 | index = a_number = a_number + 1 # OK
+41 41 | class T:
 
+binary_op_and_normal_assignment.py:43:9: PLR6104 [*] Normal assignment with left operand of binary operator being the same as the target.
+   |
+41 | class T:
+42 |     def t(self):
+43 |         self.a = self.a + 1
+   |         ^^^^^^^^^^^^^^^^^^^ PLR6104
+   |
+   = help: Use augmented assignment instead.
 
+ℹ Unsafe fix
+40 40 | 
+41 41 | class T:
+42 42 |     def t(self):
+43    |-        self.a = self.a + 1
+   43 |+        self.a += 1
+44 44 | 
+45 45 | 
+46 46 | obj = T()
+
+binary_op_and_normal_assignment.py:47:1: PLR6104 [*] Normal assignment with left operand of binary operator being the same as the target.
+   |
+46 | obj = T()
+47 | obj.a = obj.a + 1
+   | ^^^^^^^^^^^^^^^^^ PLR6104
+48 | 
+49 | # OK
+   |
+   = help: Use augmented assignment instead.
+
+ℹ Unsafe fix
+44 44 | 
+45 45 | 
+46 46 | obj = T()
+47    |-obj.a = obj.a + 1
+   47 |+obj.a += 1
+48 48 | 
+49 49 | # OK
+50 50 | a_list[0] = a_list[:] * 3
