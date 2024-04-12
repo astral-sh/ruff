@@ -145,7 +145,7 @@ ExpressionStatement: ast::Stmt = {
         ))
     },
     <location:@L> <target:Test<"all">> ":" <annotation:Test<"all">> <rhs:AssignSuffix?> <end_location:@R> =>? {
-        let simple = target.expr.is_name_expr();
+        let simple = target.expr.is_name_expr() && !target.is_parenthesized();
         invalid::assignment_target(&target.expr)?;
         Ok(ast::Stmt::AnnAssign(
             ast::StmtAnnAssign {
