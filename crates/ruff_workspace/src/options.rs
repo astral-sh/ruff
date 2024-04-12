@@ -916,7 +916,7 @@ pub struct LintCommonOptions {
             "__init__.py" = ["E402"]
             "path/to/file.py" = ["E402"]
             # Ignore `D` rules everywhere except for the `src/` directory.
-            "!src/**.py" = ["F401"]
+            "!src/**.py" = ["D"]
         "#
     )]
     pub per_file_ignores: Option<FxHashMap<String, Vec<RuleSelector>>>,

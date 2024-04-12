@@ -1248,3 +1248,39 @@ fn negated_per_file_ignores_absolute() -> Result<()> {
     });
     Ok(())
 }
+
+/// patterns are additive, can't use negative patterns to "un-ignore"
+#[test]
+fn negated_per_file_ignores_overlap() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+[lint.per-file-ignores]
+"*.py" = ["RUF"]
+"!foo.py" = ["RUF"]
+"#,
+    )?;
+    let foo_file = tempdir.path().join("foo.py");
+    fs::write(foo_file, "")?;
+    let bar_file = tempdir.path().join("bar.py");
+    fs::write(bar_file, "")?;
+
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .arg("--config")
+        .arg(&ruff_toml)
+        .arg("--select")
+        .arg("RUF901")
+        .current_dir(&tempdir)
+        , @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    "###);
+    Ok(())
+}
