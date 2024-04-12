@@ -2,15 +2,14 @@ use std::str::FromStr;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::str::{leading_quote, trailing_quote};
-use ruff_python_ast::Expr;
+use ruff_python_ast::{AnyStringKind, Expr};
 use ruff_python_literal::{
     cformat::{CFormatErrorType, CFormatString},
     format::FormatPart,
     format::FromTemplate,
     format::{FormatSpec, FormatSpecError, FormatString},
 };
-use ruff_python_parser::{lexer, Mode};
+use ruff_python_parser::{lexer, Mode, Tok};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -93,15 +92,15 @@ pub(crate) fn call(checker: &mut Checker, string: &str, range: TextRange) {
 /// Ex) `"%z" % "1"`
 pub(crate) fn percent(checker: &mut Checker, expr: &Expr) {
     // Grab each string segment (in case there's an implicit concatenation).
-    let mut strings: Vec<TextRange> = vec![];
+    let mut strings: Vec<(TextRange, AnyStringKind)> = vec![];
     for (tok, range) in
         lexer::lex_starts_at(checker.locator().slice(expr), Mode::Module, expr.start()).flatten()
     {
-        if tok.is_string() {
-            strings.push(range);
-        } else if tok.is_percent() {
+        match tok {
+            Tok::String { kind, .. } => strings.push((range, kind)),
             // Break as soon as we find the modulo symbol.
-            break;
+            Tok::Percent => break,
+            _ => {}
         }
     }
 
@@ -110,12 +109,10 @@ pub(crate) fn percent(checker: &mut Checker, expr: &Expr) {
         return;
     }
 
-    for range in &strings {
+    for (range, kind) in &strings {
         let string = checker.locator().slice(*range);
-        let (Some(leader), Some(trailer)) = (leading_quote(string), trailing_quote(string)) else {
-            return;
-        };
-        let string = &string[leader.len()..string.len() - trailer.len()];
+        let string = &string
+            [usize::from(kind.opener_len())..(string.len() - usize::from(kind.closer_len()))];
 
         // Parse the format string (e.g. `"%s"`) into a list of `PercentFormat`.
         if let Err(format_error) = CFormatString::from_str(string) {

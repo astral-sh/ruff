@@ -4,7 +4,15 @@ expression: lex_source(source)
 ---
 [
     (
-        FStringStart,
+        FStringStart(
+            StringKind {
+                prefix: Format(
+                    Regular,
+                ),
+                triple_quoted: false,
+                quote_style: Double,
+            },
+        ),
         0..2,
     ),
     (
@@ -12,7 +20,15 @@ expression: lex_source(source)
         2..3,
     ),
     (
-        FStringStart,
+        FStringStart(
+            StringKind {
+                prefix: Format(
+                    Regular,
+                ),
+                triple_quoted: false,
+                quote_style: Double,
+            },
+        ),
         4..6,
     ),
     (
@@ -20,7 +36,17 @@ expression: lex_source(source)
         6..7,
     ),
     (
-        FStringStart,
+        FStringStart(
+            StringKind {
+                prefix: Format(
+                    Raw {
+                        uppercase_r: false,
+                    },
+                ),
+                triple_quoted: false,
+                quote_style: Double,
+            },
+        ),
         8..11,
     ),
     (
@@ -28,7 +54,17 @@ expression: lex_source(source)
         11..12,
     ),
     (
-        FStringStart,
+        FStringStart(
+            StringKind {
+                prefix: Format(
+                    Raw {
+                        uppercase_r: false,
+                    },
+                ),
+                triple_quoted: false,
+                quote_style: Double,
+            },
+        ),
         13..16,
     ),
     (
@@ -36,7 +72,17 @@ expression: lex_source(source)
         16..17,
     ),
     (
-        FStringStart,
+        FStringStart(
+            StringKind {
+                prefix: Format(
+                    Raw {
+                        uppercase_r: true,
+                    },
+                ),
+                triple_quoted: false,
+                quote_style: Double,
+            },
+        ),
         18..21,
     ),
     (
@@ -44,7 +90,17 @@ expression: lex_source(source)
         21..22,
     ),
     (
-        FStringStart,
+        FStringStart(
+            StringKind {
+                prefix: Format(
+                    Raw {
+                        uppercase_r: true,
+                    },
+                ),
+                triple_quoted: false,
+                quote_style: Double,
+            },
+        ),
         23..26,
     ),
     (
@@ -52,7 +108,17 @@ expression: lex_source(source)
         26..27,
     ),
     (
-        FStringStart,
+        FStringStart(
+            StringKind {
+                prefix: Format(
+                    Raw {
+                        uppercase_r: false,
+                    },
+                ),
+                triple_quoted: false,
+                quote_style: Double,
+            },
+        ),
         28..31,
     ),
     (
@@ -60,7 +126,17 @@ expression: lex_source(source)
         31..32,
     ),
     (
-        FStringStart,
+        FStringStart(
+            StringKind {
+                prefix: Format(
+                    Raw {
+                        uppercase_r: false,
+                    },
+                ),
+                triple_quoted: false,
+                quote_style: Double,
+            },
+        ),
         33..36,
     ),
     (
@@ -68,7 +144,17 @@ expression: lex_source(source)
         36..37,
     ),
     (
-        FStringStart,
+        FStringStart(
+            StringKind {
+                prefix: Format(
+                    Raw {
+                        uppercase_r: true,
+                    },
+                ),
+                triple_quoted: false,
+                quote_style: Double,
+            },
+        ),
         38..41,
     ),
     (
@@ -76,7 +162,17 @@ expression: lex_source(source)
         41..42,
     ),
     (
-        FStringStart,
+        FStringStart(
+            StringKind {
+                prefix: Format(
+                    Raw {
+                        uppercase_r: true,
+                    },
+                ),
+                triple_quoted: false,
+                quote_style: Double,
+            },
+        ),
         43..46,
     ),
     (

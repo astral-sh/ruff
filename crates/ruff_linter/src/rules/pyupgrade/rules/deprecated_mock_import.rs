@@ -7,7 +7,7 @@ use log::error;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::call_path::collect_call_path;
+use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_ast::whitespace::indentation;
 use ruff_python_ast::{self as ast, Stmt};
 use ruff_python_codegen::Stylist;
@@ -255,8 +255,8 @@ pub(crate) fn deprecated_mock_attribute(checker: &mut Checker, attribute: &ast::
         return;
     }
 
-    if collect_call_path(&attribute.value)
-        .is_some_and(|call_path| matches!(call_path.as_slice(), ["mock", "mock"]))
+    if UnqualifiedName::from_expr(&attribute.value)
+        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["mock", "mock"]))
     {
         let mut diagnostic = Diagnostic::new(
             DeprecatedMockImport {

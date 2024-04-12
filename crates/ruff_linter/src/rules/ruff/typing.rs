@@ -1,18 +1,18 @@
 use itertools::Either::{Left, Right};
+use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{self as ast, Expr, Operator};
 
-use ruff_python_ast::call_path::CallPath;
 use ruff_python_parser::typing::parse_type_annotation;
 use ruff_python_semantic::SemanticModel;
 use ruff_python_stdlib::sys::is_known_standard_library;
 use ruff_source_file::Locator;
 
-/// Returns `true` if the given call path is a known type.
+/// Returns `true` if the given qualified name is a known type.
 ///
 /// A known type is either a builtin type, any object from the standard library,
 /// or a type from the `typing_extensions` module.
-fn is_known_type(call_path: &CallPath, minor_version: u8) -> bool {
-    match call_path.as_slice() {
+fn is_known_type(qualified_name: &QualifiedName, minor_version: u8) -> bool {
+    match qualified_name.segments() {
         ["" | "typing_extensions", ..] => true,
         [module, ..] => is_known_standard_library(minor_version, module),
         _ => false,
@@ -79,23 +79,24 @@ impl<'a> TypingTarget<'a> {
     ) -> Option<Self> {
         match expr {
             Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
-                semantic.resolve_call_path(value).map_or(
+                semantic.resolve_qualified_name(value).map_or(
                     // If we can't resolve the call path, it must be defined
                     // in the same file and could be a type alias.
                     Some(TypingTarget::Unknown),
-                    |call_path| {
-                        if semantic.match_typing_call_path(&call_path, "Optional") {
+                    |qualified_name| {
+                        if semantic.match_typing_qualified_name(&qualified_name, "Optional") {
                             Some(TypingTarget::Optional(slice.as_ref()))
-                        } else if semantic.match_typing_call_path(&call_path, "Literal") {
+                        } else if semantic.match_typing_qualified_name(&qualified_name, "Literal") {
                             Some(TypingTarget::Literal(slice.as_ref()))
-                        } else if semantic.match_typing_call_path(&call_path, "Union") {
+                        } else if semantic.match_typing_qualified_name(&qualified_name, "Union") {
                             Some(TypingTarget::Union(slice.as_ref()))
-                        } else if semantic.match_typing_call_path(&call_path, "Annotated") {
+                        } else if semantic.match_typing_qualified_name(&qualified_name, "Annotated")
+                        {
                             resolve_slice_value(slice.as_ref())
                                 .next()
                                 .map(TypingTarget::Annotated)
                         } else {
-                            if is_known_type(&call_path, minor_version) {
+                            if is_known_type(&qualified_name, minor_version) {
                                 Some(TypingTarget::Known)
                             } else {
                                 Some(TypingTarget::Unknown)
@@ -115,20 +116,23 @@ impl<'a> TypingTarget<'a> {
                 parse_type_annotation(value.to_str(), *range, locator.contents())
                     .map_or(None, |(expr, _)| Some(TypingTarget::ForwardReference(expr)))
             }
-            _ => semantic.resolve_call_path(expr).map_or(
+            _ => semantic.resolve_qualified_name(expr).map_or(
                 // If we can't resolve the call path, it must be defined in the
                 // same file, so we assume it's `Any` as it could be a type alias.
                 Some(TypingTarget::Unknown),
-                |call_path| {
-                    if semantic.match_typing_call_path(&call_path, "Any") {
+                |qualified_name| {
+                    if semantic.match_typing_qualified_name(&qualified_name, "Any") {
                         Some(TypingTarget::Any)
-                    } else if matches!(call_path.as_slice(), ["" | "builtins", "object"]) {
+                    } else if matches!(qualified_name.segments(), ["" | "builtins", "object"]) {
                         Some(TypingTarget::Object)
-                    } else if semantic.match_typing_call_path(&call_path, "Hashable")
-                        || matches!(call_path.as_slice(), ["collections", "abc", "Hashable"])
+                    } else if semantic.match_typing_qualified_name(&qualified_name, "Hashable")
+                        || matches!(
+                            qualified_name.segments(),
+                            ["collections", "abc", "Hashable"]
+                        )
                     {
                         Some(TypingTarget::Hashable)
-                    } else if !is_known_type(&call_path, minor_version) {
+                    } else if !is_known_type(&qualified_name, minor_version) {
                         // If it's not a known type, we assume it's `Any`.
                         Some(TypingTarget::Unknown)
                     } else {
@@ -289,31 +293,30 @@ pub(crate) fn type_hint_resolves_to_any(
 
 #[cfg(test)]
 mod tests {
-    use ruff_python_ast::call_path::CallPath;
-
     use super::is_known_type;
+    use ruff_python_ast::name::QualifiedName;
 
     #[test]
     fn test_is_known_type() {
-        assert!(is_known_type(&CallPath::from_slice(&["", "int"]), 11));
+        assert!(is_known_type(&QualifiedName::builtin("int"), 11));
         assert!(is_known_type(
-            &CallPath::from_slice(&["builtins", "int"]),
+            &QualifiedName::from_iter(["builtins", "int"]),
             11
         ));
         assert!(is_known_type(
-            &CallPath::from_slice(&["typing", "Optional"]),
+            &QualifiedName::from_iter(["typing", "Optional"]),
             11
         ));
         assert!(is_known_type(
-            &CallPath::from_slice(&["typing_extensions", "Literal"]),
+            &QualifiedName::from_iter(["typing_extensions", "Literal"]),
             11
         ));
         assert!(is_known_type(
-            &CallPath::from_slice(&["zoneinfo", "ZoneInfo"]),
+            &QualifiedName::from_iter(["zoneinfo", "ZoneInfo"]),
             11
         ));
         assert!(!is_known_type(
-            &CallPath::from_slice(&["zoneinfo", "ZoneInfo"]),
+            &QualifiedName::from_iter(["zoneinfo", "ZoneInfo"]),
             8
         ));
     }

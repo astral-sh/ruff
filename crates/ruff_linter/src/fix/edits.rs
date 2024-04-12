@@ -40,10 +40,7 @@ pub(crate) fn delete_stmt(
     locator: &Locator,
     indexer: &Indexer,
 ) -> Edit {
-    if parent
-        .map(|parent| is_lone_child(stmt, parent))
-        .unwrap_or_default()
-    {
+    if parent.is_some_and(|parent| is_lone_child(stmt, parent)) {
         // If removing this node would lead to an invalid syntax tree, replace
         // it with a `pass`.
         Edit::range_replacement("pass".to_string(), stmt.range())
@@ -59,6 +56,54 @@ pub(crate) fn delete_stmt(
             let range = locator.full_lines_range(stmt.range());
             Edit::range_deletion(range)
         }
+    }
+}
+
+/// Generate a [`Edit`] to delete a comment (for example: a `noqa` directive).
+pub(crate) fn delete_comment(range: TextRange, locator: &Locator) -> Edit {
+    let line_range = locator.line_range(range.start());
+
+    // Compute the leading space.
+    let prefix = locator.slice(TextRange::new(line_range.start(), range.start()));
+    let leading_space_len = prefix.text_len() - prefix.trim_whitespace_end().text_len();
+
+    // Compute the trailing space.
+    let suffix = locator.slice(TextRange::new(range.end(), line_range.end()));
+    let trailing_space_len = suffix.text_len() - suffix.trim_whitespace_start().text_len();
+
+    // Ex) `# noqa`
+    if line_range
+        == TextRange::new(
+            range.start() - leading_space_len,
+            range.end() + trailing_space_len,
+        )
+    {
+        let full_line_end = locator.full_line_end(line_range.end());
+        Edit::deletion(line_range.start(), full_line_end)
+    }
+    // Ex) `x = 1  # noqa`
+    else if range.end() + trailing_space_len == line_range.end() {
+        // Replace `x = 1  # noqa` with `x = 1`.
+        Edit::deletion(range.start() - leading_space_len, line_range.end())
+    }
+    // Ex) `x = 1  # noqa  # type: ignore`
+    else if locator
+        .slice(TextRange::new(
+            range.end() + trailing_space_len,
+            line_range.end(),
+        ))
+        .starts_with('#')
+    {
+        // Replace `# noqa  # type: ignore` with `# type: ignore`.
+        Edit::deletion(range.start(), range.end() + trailing_space_len)
+    }
+    // Ex) `x = 1  # noqa here`
+    else {
+        // Replace `# noqa here` with `# here`.
+        Edit::range_replacement(
+            "# ".to_string(),
+            TextRange::new(range.start(), range.end() + trailing_space_len),
+        )
     }
 }
 
@@ -371,29 +416,6 @@ pub(crate) fn fits(
     tab_size: IndentWidth,
 ) -> bool {
     all_lines_fit(fix, node, locator, line_length.value() as usize, tab_size)
-}
-
-/// Returns `true` if the fix fits within the maximum configured line length, or produces lines that
-/// are shorter than the maximum length of the existing AST node.
-pub(crate) fn fits_or_shrinks(
-    fix: &str,
-    node: AnyNodeRef,
-    locator: &Locator,
-    line_length: LineLength,
-    tab_size: IndentWidth,
-) -> bool {
-    // Use the larger of the line length limit, or the longest line in the existing AST node.
-    let line_length = std::iter::once(line_length.value() as usize)
-        .chain(
-            locator
-                .slice(locator.lines_range(node.range()))
-                .universal_newlines()
-                .map(|line| LineWidthBuilder::new(tab_size).add_str(&line).get()),
-        )
-        .max()
-        .unwrap_or(line_length.value() as usize);
-
-    all_lines_fit(fix, node, locator, line_length, tab_size)
 }
 
 /// Returns `true` if all lines in the fix are shorter than the given line length.

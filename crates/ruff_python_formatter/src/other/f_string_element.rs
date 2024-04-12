@@ -9,7 +9,6 @@ use ruff_text_size::Ranged;
 use crate::comments::{dangling_open_parenthesis_comments, trailing_comments};
 use crate::context::{FStringState, NodeLevel, WithFStringState, WithNodeLevel};
 use crate::prelude::*;
-use crate::preview::is_hex_codes_in_unicode_sequences_enabled;
 use crate::string::normalize_string;
 use crate::verbatim::verbatim_text;
 
@@ -57,12 +56,7 @@ impl<'a> FormatFStringLiteralElement<'a> {
 impl Format<PyFormatContext<'_>> for FormatFStringLiteralElement<'_> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
         let literal_content = f.context().locator().slice(self.element.range());
-        let normalized = normalize_string(
-            literal_content,
-            self.context.quotes(),
-            self.context.prefix(),
-            is_hex_codes_in_unicode_sequences_enabled(f.context()),
-        );
+        let normalized = normalize_string(literal_content, 0, self.context.kind(), true);
         match &normalized {
             Cow::Borrowed(_) => source_text_slice(self.element.range()).fmt(f),
             Cow::Owned(normalized) => text(normalized).fmt(f),

@@ -4,7 +4,7 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::fix::edits::pad;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::call_path::compose_call_path;
+use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
@@ -56,27 +56,29 @@ impl AlwaysFixableViolation for OSErrorAlias {
 
 /// Return `true` if an [`Expr`] is an alias of `OSError`.
 fn is_alias(expr: &Expr, semantic: &SemanticModel) -> bool {
-    semantic.resolve_call_path(expr).is_some_and(|call_path| {
-        matches!(
-            call_path.as_slice(),
-            ["", "EnvironmentError" | "IOError" | "WindowsError"]
-                | ["mmap" | "select" | "socket" | "os", "error"]
-        )
-    })
+    semantic
+        .resolve_qualified_name(expr)
+        .is_some_and(|qualified_name| {
+            matches!(
+                qualified_name.segments(),
+                ["", "EnvironmentError" | "IOError" | "WindowsError"]
+                    | ["mmap" | "select" | "socket" | "os", "error"]
+            )
+        })
 }
 
 /// Return `true` if an [`Expr`] is `OSError`.
 fn is_os_error(expr: &Expr, semantic: &SemanticModel) -> bool {
     semantic
-        .resolve_call_path(expr)
-        .is_some_and(|call_path| matches!(call_path.as_slice(), ["", "OSError"]))
+        .resolve_qualified_name(expr)
+        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["", "OSError"]))
 }
 
 /// Create a [`Diagnostic`] for a single target, like an [`Expr::Name`].
 fn atom_diagnostic(checker: &mut Checker, target: &Expr) {
     let mut diagnostic = Diagnostic::new(
         OSErrorAlias {
-            name: compose_call_path(target),
+            name: UnqualifiedName::from_expr(target).map(|name| name.to_string()),
         },
         target.range(),
     );
@@ -127,6 +129,7 @@ fn tuple_diagnostic(checker: &mut Checker, tuple: &ast::ExprTuple, aliases: &[&E
                 elts: remaining,
                 ctx: ExprContext::Load,
                 range: TextRange::default(),
+                parenthesized: true,
             };
             format!("({})", checker.generator().expr(&node.into()))
         };

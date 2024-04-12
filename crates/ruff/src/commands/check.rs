@@ -252,6 +252,7 @@ mod test {
         for file in [&pyproject_toml, &python_file, &notebook] {
             fs::OpenOptions::new()
                 .create(true)
+                .truncate(true)
                 .write(true)
                 .mode(0o000)
                 .open(file)?;

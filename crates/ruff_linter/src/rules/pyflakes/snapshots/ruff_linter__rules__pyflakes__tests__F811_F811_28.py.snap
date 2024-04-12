@@ -1,0 +1,12 @@
+---
+source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+---
+F811_28.py:4:22: F811 Redefinition of unused `datetime` from line 3
+  |
+3 | import datetime
+4 | from datetime import datetime
+  |                      ^^^^^^^^ F811
+5 | 
+6 | datetime(1, 2, 3)
+  |
+  = help: Remove definition: `datetime`

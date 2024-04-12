@@ -27,6 +27,7 @@ mod tests {
     #[test_case(Rule::ImplicitOptional, Path::new("RUF013_0.py"))]
     #[test_case(Rule::ImplicitOptional, Path::new("RUF013_1.py"))]
     #[test_case(Rule::ImplicitOptional, Path::new("RUF013_2.py"))]
+    #[test_case(Rule::ImplicitOptional, Path::new("RUF013_3.py"))]
     #[test_case(Rule::MutableClassDefault, Path::new("RUF012.py"))]
     #[test_case(Rule::MutableDataclassDefault, Path::new("RUF008.py"))]
     #[test_case(Rule::PairwiseOverZipped, Path::new("RUF007.py"))]
@@ -49,6 +50,7 @@ mod tests {
     #[test_case(Rule::MissingFStringSyntax, Path::new("RUF027_0.py"))]
     #[test_case(Rule::MissingFStringSyntax, Path::new("RUF027_1.py"))]
     #[test_case(Rule::MissingFStringSyntax, Path::new("RUF027_2.py"))]
+    #[test_case(Rule::InvalidFormatterSuppressionComment, Path::new("RUF028.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(

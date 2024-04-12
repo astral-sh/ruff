@@ -121,7 +121,7 @@ impl LogLevel {
     }
 }
 
-pub fn set_up_logging(level: &LogLevel) -> Result<()> {
+pub fn set_up_logging(level: LogLevel) -> Result<()> {
     fern::Dispatch::new()
         .format(|out, message, record| match record.level() {
             Level::Error => {

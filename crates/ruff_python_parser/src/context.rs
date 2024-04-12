@@ -3,10 +3,16 @@ use ruff_python_ast::{self as ast, Expr, ExprContext};
 pub(crate) fn set_context(expr: Expr, ctx: ExprContext) -> Expr {
     match expr {
         Expr::Name(ast::ExprName { id, range, .. }) => ast::ExprName { range, id, ctx }.into(),
-        Expr::Tuple(ast::ExprTuple { elts, range, .. }) => ast::ExprTuple {
+        Expr::Tuple(ast::ExprTuple {
+            elts,
+            range,
+            parenthesized: is_parenthesized,
+            ctx: _,
+        }) => ast::ExprTuple {
             elts: elts.into_iter().map(|elt| set_context(elt, ctx)).collect(),
             range,
             ctx,
+            parenthesized: is_parenthesized,
         }
         .into(),
 

@@ -17,11 +17,11 @@ pub(super) use lalrpop_util::ParseError as LalrpopError;
 
 use ruff_python_ast::{
     Expr, ExprAttribute, ExprAwait, ExprBinOp, ExprBoolOp, ExprBooleanLiteral, ExprBytesLiteral,
-    ExprCall, ExprCompare, ExprDict, ExprDictComp, ExprEllipsisLiteral, ExprFString,
-    ExprGeneratorExp, ExprIfExp, ExprIpyEscapeCommand, ExprLambda, ExprList, ExprListComp,
-    ExprName, ExprNamedExpr, ExprNoneLiteral, ExprNumberLiteral, ExprSet, ExprSetComp, ExprSlice,
-    ExprStarred, ExprStringLiteral, ExprSubscript, ExprTuple, ExprUnaryOp, ExprYield,
-    ExprYieldFrom, Mod, ModModule, Suite,
+    ExprCall, ExprCompare, ExprDict, ExprDictComp, ExprEllipsisLiteral, ExprFString, ExprGenerator,
+    ExprIf, ExprIpyEscapeCommand, ExprLambda, ExprList, ExprListComp, ExprName, ExprNamed,
+    ExprNoneLiteral, ExprNumberLiteral, ExprSet, ExprSetComp, ExprSlice, ExprStarred,
+    ExprStringLiteral, ExprSubscript, ExprTuple, ExprUnaryOp, ExprYield, ExprYieldFrom, Mod,
+    ModModule, Suite,
 };
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -166,7 +166,7 @@ pub fn parse(source: &str, mode: Mode) -> Result<Mod, ParseError> {
 
 /// Parse the given Python source code using the specified [`Mode`] and [`TextSize`].
 ///
-/// This function allows to specify the location of the the source code, other than
+/// This function allows to specify the location of the source code, other than
 /// that, it behaves exactly like [`parse`].
 ///
 /// # Example
@@ -409,9 +409,9 @@ impl From<ExprBoolOp> for ParenthesizedExpr {
         Expr::BoolOp(payload).into()
     }
 }
-impl From<ExprNamedExpr> for ParenthesizedExpr {
-    fn from(payload: ExprNamedExpr) -> Self {
-        Expr::NamedExpr(payload).into()
+impl From<ExprNamed> for ParenthesizedExpr {
+    fn from(payload: ExprNamed) -> Self {
+        Expr::Named(payload).into()
     }
 }
 impl From<ExprBinOp> for ParenthesizedExpr {
@@ -429,9 +429,9 @@ impl From<ExprLambda> for ParenthesizedExpr {
         Expr::Lambda(payload).into()
     }
 }
-impl From<ExprIfExp> for ParenthesizedExpr {
-    fn from(payload: ExprIfExp) -> Self {
-        Expr::IfExp(payload).into()
+impl From<ExprIf> for ParenthesizedExpr {
+    fn from(payload: ExprIf) -> Self {
+        Expr::If(payload).into()
     }
 }
 impl From<ExprDict> for ParenthesizedExpr {
@@ -459,9 +459,9 @@ impl From<ExprDictComp> for ParenthesizedExpr {
         Expr::DictComp(payload).into()
     }
 }
-impl From<ExprGeneratorExp> for ParenthesizedExpr {
-    fn from(payload: ExprGeneratorExp) -> Self {
-        Expr::GeneratorExp(payload).into()
+impl From<ExprGenerator> for ParenthesizedExpr {
+    fn from(payload: ExprGenerator) -> Self {
+        Expr::Generator(payload).into()
     }
 }
 impl From<ExprAwait> for ParenthesizedExpr {
@@ -1503,6 +1503,22 @@ u"foo" f"bar {baz} really" u"bar" "no"
     fn test_unicode_aliases() {
         // https://github.com/RustPython/RustPython/issues/4566
         let parse_ast = parse_suite(r#"x = "\N{BACKSPACE}another cool trick""#).unwrap();
+        insta::assert_debug_snapshot!(parse_ast);
+    }
+
+    #[test]
+    fn test_tuple() {
+        let parse_ast = parse_suite(
+            r#"
+a,b
+(a,b)
+()
+(a,)
+((a,b))
+"#
+            .trim(),
+        )
+        .unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 }

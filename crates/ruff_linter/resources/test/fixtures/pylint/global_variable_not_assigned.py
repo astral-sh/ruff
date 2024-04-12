@@ -11,6 +11,13 @@ def f():
     print(X)
 
 
+def f():
+    global X
+
+    if X > 0:
+        del X
+
+
 ###
 # Non-errors.
 ###

@@ -70,11 +70,36 @@ pub(crate) fn missing_fstring_syntax(
         }
     }
 
+    // We also want to avoid expressions that are intended to be translated.
+    if semantic.current_expressions().any(is_gettext) {
+        return;
+    }
+
     if should_be_fstring(literal, locator, semantic) {
         let diagnostic = Diagnostic::new(MissingFStringSyntax, literal.range())
             .with_fix(fix_fstring_syntax(literal.range()));
         diagnostics.push(diagnostic);
     }
+}
+
+/// Returns `true` if an expression appears to be a `gettext` call.
+///
+/// We want to avoid statement expressions and assignments related to aliases
+/// of the gettext API.
+///
+/// See <https://docs.python.org/3/library/gettext.html> for details. When one
+/// uses `_` to mark a string for translation, the tools look for these markers
+/// and replace the original string with its translated counterpart. If the
+/// string contains variable placeholders or formatting, it can complicate the
+/// translation process, lead to errors or incorrect translations.
+fn is_gettext(expr: &ast::Expr) -> bool {
+    let ast::Expr::Call(ast::ExprCall { func, .. }) = expr else {
+        return false;
+    };
+    let ast::Expr::Name(ast::ExprName { id, .. }) = func.as_ref() else {
+        return false;
+    };
+    matches!(id.as_str(), "_" | "gettext" | "ngettext")
 }
 
 /// Returns `true` if `literal` is likely an f-string with a missing `f` prefix.
@@ -143,11 +168,7 @@ fn should_be_fstring(
 
     for f_string in value.f_strings() {
         let mut has_name = false;
-        for element in f_string
-            .elements
-            .iter()
-            .filter_map(|element| element.as_expression())
-        {
+        for element in f_string.expressions() {
             if let ast::Expr::Name(ast::ExprName { id, .. }) = element.expression.as_ref() {
                 if arg_names.contains(id.as_str()) {
                     return false;

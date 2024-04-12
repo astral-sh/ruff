@@ -22,6 +22,11 @@ expression: parse_ast
                                             },
                                         ),
                                     ],
+                                    flags: FStringFlags {
+                                        quote_style: Single,
+                                        prefix: Regular,
+                                        triple_quoted: false,
+                                    },
                                 },
                             ),
                         ),

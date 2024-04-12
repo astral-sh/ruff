@@ -11,7 +11,7 @@ mod tests {
 
     use crate::assert_messages;
     use crate::registry::Rule;
-    use crate::rules::flake8_import_conventions::settings::default_aliases;
+    use crate::rules::flake8_import_conventions::settings::{default_aliases, BannedAliases};
     use crate::settings::LinterSettings;
     use crate::test::test_path;
 
@@ -27,7 +27,7 @@ mod tests {
 
     #[test]
     fn custom() -> Result<()> {
-        let mut aliases = super::settings::default_aliases();
+        let mut aliases = default_aliases();
         aliases.extend(FxHashMap::from_iter([
             ("dask.array".to_string(), "da".to_string()),
             ("dask.dataframe".to_string(), "dd".to_string()),
@@ -57,17 +57,20 @@ mod tests {
                     banned_aliases: FxHashMap::from_iter([
                         (
                             "typing".to_string(),
-                            vec!["t".to_string(), "ty".to_string()],
+                            BannedAliases::from_iter(["t".to_string(), "ty".to_string()]),
                         ),
                         (
                             "numpy".to_string(),
-                            vec!["nmp".to_string(), "npy".to_string()],
+                            BannedAliases::from_iter(["nmp".to_string(), "npy".to_string()]),
                         ),
                         (
                             "tensorflow.keras.backend".to_string(),
-                            vec!["K".to_string()],
+                            BannedAliases::from_iter(["K".to_string()]),
                         ),
-                        ("torch.nn.functional".to_string(), vec!["F".to_string()]),
+                        (
+                            "torch.nn.functional".to_string(),
+                            BannedAliases::from_iter(["F".to_string()]),
+                        ),
                     ]),
                     banned_from: FxHashSet::default(),
                 },
@@ -123,7 +126,7 @@ mod tests {
 
     #[test]
     fn override_defaults() -> Result<()> {
-        let mut aliases = super::settings::default_aliases();
+        let mut aliases = default_aliases();
         aliases.extend(FxHashMap::from_iter([(
             "numpy".to_string(),
             "nmp".to_string(),
@@ -146,7 +149,7 @@ mod tests {
 
     #[test]
     fn from_imports() -> Result<()> {
-        let mut aliases = super::settings::default_aliases();
+        let mut aliases = default_aliases();
         aliases.extend(FxHashMap::from_iter([
             ("xml.dom.minidom".to_string(), "md".to_string()),
             (
@@ -175,6 +178,28 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_import_conventions/tricky.py"),
             &LinterSettings::for_rule(Rule::UnconventionalImportAlias),
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn same_name() -> Result<()> {
+        let mut aliases = default_aliases();
+        aliases.extend(FxHashMap::from_iter([(
+            "django.conf.settings".to_string(),
+            "settings".to_string(),
+        )]));
+        let diagnostics = test_path(
+            Path::new("flake8_import_conventions/same_name.py"),
+            &LinterSettings {
+                flake8_import_conventions: super::settings::Settings {
+                    aliases,
+                    banned_aliases: FxHashMap::default(),
+                    banned_from: FxHashSet::default(),
+                },
+                ..LinterSettings::for_rule(Rule::UnconventionalImportAlias)
+            },
         )?;
         assert_messages!(diagnostics);
         Ok(())

@@ -211,8 +211,14 @@ impl Violation for SuspiciousXmlPulldomImport {
     }
 }
 
+/// ## Removed
+/// This rule was removed as the `lxml` library has been modified to address
+/// known vulnerabilities and unsafe defaults. As such, the `defusedxml`
+/// library is no longer necessary, `defusedxml` has [deprecated] its `lxml`
+/// module.
+///
 /// ## What it does
-/// Checks for imports of the`lxml` module.
+/// Checks for imports of the `lxml` module.
 ///
 /// ## Why is this bad?
 /// Using various methods from the `lxml` module to parse untrusted XML data is
@@ -223,6 +229,8 @@ impl Violation for SuspiciousXmlPulldomImport {
 /// ```python
 /// import lxml
 /// ```
+///
+/// [deprecated]: https://github.com/tiran/defusedxml/blob/c7445887f5e1bcea470a16f61369d29870cfcfe1/README.md#defusedxmllxml
 #[violation]
 pub struct SuspiciousLxmlImport;
 
@@ -237,7 +245,7 @@ impl Violation for SuspiciousLxmlImport {
 /// Checks for imports of the `xmlrpc` module.
 ///
 /// ## Why is this bad?
-/// XMLRPC is a particularly dangerous XML module as it is also concerned with
+/// XMLRPC is a particularly dangerous XML module, as it is also concerned with
 /// communicating data over a network. Use the `defused.xmlrpc.monkey_patch()`
 /// function to monkey-patch the `xmlrpclib` module and mitigate remote XML
 /// attacks.

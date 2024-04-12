@@ -4,7 +4,7 @@ use bitflags::bitflags;
 
 use ruff_diagnostics::{Diagnostic, DiagnosticKind, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::StringLike;
+use ruff_python_ast::{self as ast, StringLike};
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
@@ -83,7 +83,7 @@ impl Violation for AmbiguousUnicodeCharacterString {
 /// spec recommends `GREEK CAPITAL LETTER OMEGA` over `OHM SIGN`.
 ///
 /// You can omit characters from being flagged as ambiguous via the
-/// [`allowed-confusables`] setting.
+/// [`lint.allowed-confusables`] setting.
 ///
 /// ## Example
 /// ```python
@@ -136,7 +136,7 @@ impl Violation for AmbiguousUnicodeCharacterDocstring {
 /// spec recommends `GREEK CAPITAL LETTER OMEGA` over `OHM SIGN`.
 ///
 /// You can omit characters from being flagged as ambiguous via the
-/// [`allowed-confusables`] setting.
+/// [`lint.allowed-confusables`] setting.
 ///
 /// ## Example
 /// ```python
@@ -193,29 +193,47 @@ pub(crate) fn ambiguous_unicode_character_string(checker: &mut Checker, string_l
     };
 
     match string_like {
-        StringLike::StringLiteral(string_literal) => {
-            for string in &string_literal.value {
-                let text = checker.locator().slice(string);
+        StringLike::String(node) => {
+            for literal in &node.value {
+                let text = checker.locator().slice(literal);
                 ambiguous_unicode_character(
                     &mut checker.diagnostics,
                     text,
-                    string.range(),
+                    literal.range(),
                     context,
                     checker.settings,
                 );
             }
         }
-        StringLike::FStringLiteral(f_string_literal) => {
-            let text = checker.locator().slice(f_string_literal);
-            ambiguous_unicode_character(
-                &mut checker.diagnostics,
-                text,
-                f_string_literal.range(),
-                context,
-                checker.settings,
-            );
+        StringLike::FString(node) => {
+            for part in &node.value {
+                match part {
+                    ast::FStringPart::Literal(literal) => {
+                        let text = checker.locator().slice(literal);
+                        ambiguous_unicode_character(
+                            &mut checker.diagnostics,
+                            text,
+                            literal.range(),
+                            context,
+                            checker.settings,
+                        );
+                    }
+                    ast::FStringPart::FString(f_string) => {
+                        for literal in f_string.literals() {
+                            let text = checker.locator().slice(literal);
+                            ambiguous_unicode_character(
+                                &mut checker.diagnostics,
+                                text,
+                                literal.range(),
+                                context,
+                                checker.settings,
+                            );
+                        }
+                    }
+                }
+            }
         }
-        StringLike::BytesLiteral(_) => (),
+        StringLike::Bytes(_) => (),
     }
 }
 

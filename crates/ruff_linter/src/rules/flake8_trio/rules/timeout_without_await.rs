@@ -56,8 +56,10 @@ pub(crate) fn timeout_without_await(
 
     let Some(method_name) = with_items.iter().find_map(|item| {
         let call = item.context_expr.as_call_expr()?;
-        let call_path = checker.semantic().resolve_call_path(call.func.as_ref())?;
-        MethodName::try_from(&call_path)
+        let qualified_name = checker
+            .semantic()
+            .resolve_qualified_name(call.func.as_ref())?;
+        MethodName::try_from(&qualified_name)
     }) else {
         return;
     };

@@ -65,7 +65,7 @@ pub(crate) fn flask_debug_true(checker: &mut Checker, call: &ExprCall) {
     }
 
     if typing::resolve_assignment(value, checker.semantic())
-        .is_some_and(|call_path| matches!(call_path.as_slice(), ["flask", "Flask"]))
+        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["flask", "Flask"]))
     {
         checker
             .diagnostics

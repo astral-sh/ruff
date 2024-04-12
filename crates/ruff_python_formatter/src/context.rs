@@ -1,8 +1,8 @@
 use crate::comments::Comments;
 use crate::other::f_string::FStringContext;
-use crate::string::QuoteChar;
 use crate::PyFormatOptions;
 use ruff_formatter::{Buffer, FormatContext, GroupId, IndentWidth, SourceCode};
+use ruff_python_ast::str::Quote;
 use ruff_source_file::Locator;
 use std::fmt::{Debug, Formatter};
 use std::ops::{Deref, DerefMut};
@@ -22,7 +22,7 @@ pub struct PyFormatContext<'a> {
     /// works. For example, multi-line strings will always be written with a
     /// quote style that is inverted from the one here in order to ensure that
     /// the formatted Python code will be valid.
-    docstring: Option<QuoteChar>,
+    docstring: Option<Quote>,
     /// The state of the formatter with respect to f-strings.
     f_string_state: FStringState,
 }
@@ -74,7 +74,7 @@ impl<'a> PyFormatContext<'a> {
     ///
     /// The quote character returned corresponds to the quoting used for the
     /// docstring containing the code snippet currently being formatted.
-    pub(crate) fn docstring(&self) -> Option<QuoteChar> {
+    pub(crate) fn docstring(&self) -> Option<Quote> {
         self.docstring
     }
 
@@ -83,7 +83,7 @@ impl<'a> PyFormatContext<'a> {
     ///
     /// The quote character given should correspond to the quote character used
     /// for the docstring containing the code snippets.
-    pub(crate) fn in_docstring(self, quote: QuoteChar) -> PyFormatContext<'a> {
+    pub(crate) fn in_docstring(self, quote: Quote) -> PyFormatContext<'a> {
         PyFormatContext {
             docstring: Some(quote),
             ..self
@@ -99,6 +99,7 @@ impl<'a> PyFormatContext<'a> {
     }
 
     /// Returns `true` if preview mode is enabled.
+    #[allow(unused)]
     pub(crate) const fn is_preview(&self) -> bool {
         self.options.preview().is_enabled()
     }
@@ -247,7 +248,7 @@ where
 
 /// The current indent level of the formatter.
 ///
-/// One can determine the the width of the indent itself (in number of ASCII
+/// One can determine the width of the indent itself (in number of ASCII
 /// space characters) by multiplying the indent level by the configured indent
 /// width.
 ///

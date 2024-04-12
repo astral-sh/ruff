@@ -1,6 +1,6 @@
 ---
 source: crates/ruff_python_parser/src/parser.rs
-expression: "parse_suite(source, \"<test>\").unwrap()"
+expression: parse_suite(source).unwrap()
 ---
 [
     TypeAlias(
@@ -86,7 +86,11 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                                     StringLiteral {
                                         range: 48..61,
                                         value: "ForwardRefY",
-                                        unicode: false,
+                                        flags: StringLiteralFlags {
+                                            quote_style: Double,
+                                            prefix: Empty,
+                                            triple_quoted: false,
+                                        },
                                     },
                                 ),
                             },
@@ -354,6 +358,7 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                         ),
                     ],
                     ctx: Load,
+                    parenthesized: true,
                 },
             ),
         },
@@ -438,6 +443,7 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                         ),
                     ],
                     ctx: Load,
+                    parenthesized: true,
                 },
             ),
         },
@@ -484,6 +490,7 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                                                 ),
                                             ],
                                             ctx: Load,
+                                            parenthesized: true,
                                         },
                                     ),
                                 ),
@@ -537,6 +544,7 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                         ),
                     ],
                     ctx: Load,
+                    parenthesized: true,
                 },
             ),
         },

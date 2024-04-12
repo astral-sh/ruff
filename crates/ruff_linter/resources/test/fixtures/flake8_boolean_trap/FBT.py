@@ -31,8 +31,7 @@ def function(
     kwonly_nonboolvalued_boolhint: bool = 1,
     kwonly_nonboolvalued_boolstrhint: "bool" = 1,
     **kw,
-):
-    ...
+): ...
 
 
 def used(do):
@@ -119,3 +118,39 @@ def func(x: bool):
 
 
 settings(True)
+
+
+from dataclasses import dataclass, InitVar
+
+
+@dataclass
+class Fit:
+    force: InitVar[bool] = False
+
+    def __post_init__(self, force: bool) -> None:
+        print(force)
+
+
+Fit(force=True)
+
+
+# https://github.com/astral-sh/ruff/issues/10356
+from django.db.models import Case, Q, Value, When
+
+
+qs.annotate(
+    is_foo_or_bar=Case(
+        When(Q(is_foo=True) | Q(is_bar=True)),
+        then=Value(True),
+    ),
+    default=Value(False),
+)
+
+
+# https://github.com/astral-sh/ruff/issues/10485
+from pydantic import Field
+from pydantic_settings import BaseSettings
+
+
+class Settings(BaseSettings):
+    foo: bool = Field(True, exclude=True)

@@ -4,7 +4,7 @@ use crate::display_settings;
 use ruff_macros::CacheKey;
 use std::fmt::{Display, Formatter};
 
-#[derive(Debug, Default, CacheKey)]
+#[derive(Debug, Clone, Default, CacheKey)]
 pub struct Settings {
     pub builtins_ignorelist: Vec<String>,
 }

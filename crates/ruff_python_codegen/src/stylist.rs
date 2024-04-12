@@ -1,17 +1,15 @@
 //! Detect code style from Python source code.
 
-use std::fmt;
 use std::ops::Deref;
 
 use once_cell::unsync::OnceCell;
-use ruff_python_literal::escape::Quote as StrQuote;
+
+use ruff_python_ast::str::Quote;
 use ruff_python_parser::lexer::LexResult;
 use ruff_python_parser::Tok;
-use ruff_source_file::{find_newline, LineEnding};
+use ruff_source_file::{find_newline, LineEnding, Locator};
 
-use ruff_python_ast::str::leading_quote;
-use ruff_source_file::Locator;
-
+#[derive(Debug, Clone)]
 pub struct Stylist<'a> {
     locator: &'a Locator<'a>,
     indentation: Indentation,
@@ -43,37 +41,20 @@ impl<'a> Stylist<'a> {
         Self {
             locator,
             indentation,
-            quote: detect_quote(tokens, locator),
+            quote: detect_quote(tokens),
             line_ending: OnceCell::default(),
         }
     }
 }
 
-fn detect_quote(tokens: &[LexResult], locator: &Locator) -> Quote {
-    let quote_range = tokens.iter().flatten().find_map(|(t, range)| match t {
-        Tok::String {
-            triple_quoted: false,
-            ..
-        } => Some(*range),
-        // No need to check if it's triple-quoted as f-strings cannot be used
-        // as docstrings.
-        Tok::FStringStart => Some(*range),
-        _ => None,
-    });
-
-    if let Some(quote_range) = quote_range {
-        let content = &locator.slice(quote_range);
-        if let Some(quotes) = leading_quote(content) {
-            return if quotes.contains('\'') {
-                Quote::Single
-            } else if quotes.contains('"') {
-                Quote::Double
-            } else {
-                unreachable!("Expected string to start with a valid quote prefix")
-            };
+fn detect_quote(tokens: &[LexResult]) -> Quote {
+    for (token, _) in tokens.iter().flatten() {
+        match token {
+            Tok::String { kind, .. } if !kind.is_triple_quoted() => return kind.quote_style(),
+            Tok::FStringStart(kind) => return kind.quote_style(),
+            _ => continue,
         }
     }
-
     Quote::default()
 }
 
@@ -109,43 +90,8 @@ fn detect_indention(tokens: &[LexResult], locator: &Locator) -> Indentation {
     }
 }
 
-/// The quotation style used in Python source code.
-#[derive(Debug, Default, PartialEq, Eq, Copy, Clone)]
-pub enum Quote {
-    Single,
-    #[default]
-    Double,
-}
-
-impl From<Quote> for char {
-    fn from(val: Quote) -> Self {
-        match val {
-            Quote::Single => '\'',
-            Quote::Double => '"',
-        }
-    }
-}
-
-impl From<Quote> for StrQuote {
-    fn from(val: Quote) -> Self {
-        match val {
-            Quote::Single => StrQuote::Single,
-            Quote::Double => StrQuote::Double,
-        }
-    }
-}
-
-impl fmt::Display for Quote {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Quote::Single => write!(f, "\'"),
-            Quote::Double => write!(f, "\""),
-        }
-    }
-}
-
 /// The indentation style used in Python source code.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Indentation(String);
 
 impl Indentation {

@@ -52,3 +52,8 @@ value = rf'\{{1}}'
 value = rf'\{1}'
 value = rf'{1:\}'
 value = f"{rf"\{1}"}"
+
+# Regression tests for https://github.com/astral-sh/ruff/issues/10434
+f"{{}}+-\d"
+f"\n{{}}+-\d+"
+f"\n{{}}�+-\d+"

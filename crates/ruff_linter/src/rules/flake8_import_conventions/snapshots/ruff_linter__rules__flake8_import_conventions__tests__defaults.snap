@@ -256,7 +256,7 @@ defaults.py:21:23: ICN001 [*] `tkinter` should be imported as `tk`
    21 |+    import tkinter as tk
 22 22 |     import networkx as nxy
 23 23 | 
-24 24 | def conventional_aliases():
+24 24 | 
 
 defaults.py:22:24: ICN001 [*] `networkx` should be imported as `nx`
    |
@@ -264,8 +264,6 @@ defaults.py:22:24: ICN001 [*] `networkx` should be imported as `nx`
 21 |     import tkinter as tkr
 22 |     import networkx as nxy
    |                        ^^^ ICN001
-23 | 
-24 | def conventional_aliases():
    |
    = help: Alias `networkx` to `nx`
 
@@ -276,7 +274,5 @@ defaults.py:22:24: ICN001 [*] `networkx` should be imported as `nx`
 22    |-    import networkx as nxy
    22 |+    import networkx as nx
 23 23 | 
-24 24 | def conventional_aliases():
-25 25 |     import altair as alt
-
-
+24 24 | 
+25 25 | def conventional_aliases():

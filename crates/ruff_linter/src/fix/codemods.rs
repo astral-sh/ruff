@@ -2,14 +2,16 @@
 //! and return the modified code snippet as output.
 use anyhow::{bail, Result};
 use libcst_native::{
-    Codegen, CodegenState, ImportNames, ParenthesizableWhitespace, SmallStatement, Statement,
+    Codegen, CodegenState, Expression, ImportNames, NameOrAttribute, ParenthesizableWhitespace,
+    SmallStatement, Statement,
 };
+use ruff_python_ast::name::UnqualifiedName;
+use smallvec::{smallvec, SmallVec};
 
 use ruff_python_ast::Stmt;
 use ruff_python_codegen::Stylist;
 use ruff_source_file::Locator;
 
-use crate::cst::helpers::compose_module_path;
 use crate::cst::matchers::match_statement;
 
 /// Glue code to make libcst codegen work with ruff's Stylist
@@ -78,7 +80,7 @@ pub(crate) fn remove_imports<'a>(
     for member in member_names {
         let alias_index = aliases
             .iter()
-            .position(|alias| member == compose_module_path(&alias.name));
+            .position(|alias| member == qualified_name_from_name_or_attribute(&alias.name));
         if let Some(index) = alias_index {
             aliases.remove(index);
         }
@@ -142,7 +144,7 @@ pub(crate) fn retain_imports(
     aliases.retain(|alias| {
         member_names
             .iter()
-            .any(|member| *member == compose_module_path(&alias.name))
+            .any(|member| *member == qualified_name_from_name_or_attribute(&alias.name))
     });
 
     // But avoid destroying any trailing comments.
@@ -163,4 +165,41 @@ pub(crate) fn retain_imports(
     }
 
     Ok(tree.codegen_stylist(stylist))
+}
+
+fn collect_segments<'a>(expr: &'a Expression, parts: &mut SmallVec<[&'a str; 8]>) {
+    match expr {
+        Expression::Call(expr) => {
+            collect_segments(&expr.func, parts);
+        }
+        Expression::Attribute(expr) => {
+            collect_segments(&expr.value, parts);
+            parts.push(expr.attr.value);
+        }
+        Expression::Name(expr) => {
+            parts.push(expr.value);
+        }
+        _ => {}
+    }
+}
+
+fn unqualified_name_from_expression<'a>(expr: &'a Expression<'a>) -> Option<UnqualifiedName<'a>> {
+    let mut segments = smallvec![];
+    collect_segments(expr, &mut segments);
+    if segments.is_empty() {
+        None
+    } else {
+        Some(segments.into_iter().collect())
+    }
+}
+
+fn qualified_name_from_name_or_attribute(module: &NameOrAttribute) -> String {
+    match module {
+        NameOrAttribute::N(name) => name.value.to_string(),
+        NameOrAttribute::A(attr) => {
+            let name = attr.attr.value;
+            let prefix = unqualified_name_from_expression(&attr.value);
+            prefix.map_or_else(|| name.to_string(), |prefix| format!("{prefix}.{name}"))
+        }
+    }
 }

@@ -13,6 +13,10 @@ all(x.id for x in bar)
 all(x.id for x in bar)
 any(x.id for x in bar)
 all((x.id for x in bar))
+# we don't lint on these in stable yet
+sum([x.val for x in bar])
+min([x.val for x in bar])
+max([x.val for x in bar])
 
 
 async def f() -> bool:

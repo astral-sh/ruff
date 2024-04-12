@@ -25,3 +25,9 @@ def non_ascii():
 
 def all_caps():
     """th•s is not capitalized."""
+
+def single_word():
+    """singleword."""
+
+def single_word_no_dot():
+    """singleword"""

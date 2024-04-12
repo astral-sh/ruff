@@ -29,10 +29,6 @@ with open("file.txt", errors="ignore") as f:
     x = f.read()
 
 # FURB101
-with open("file.txt", errors="ignore", mode="rb") as f:
-    x = f.read()
-
-# FURB101
 with open("file.txt", mode="r") as f:  # noqa: FURB120
     x = f.read()
 
@@ -59,6 +55,11 @@ with foo() as a, open("file.txt") as b, foo() as c:
 
 
 # Non-errors.
+
+# Path.read_bytes does not support any kwargs
+with open("file.txt", errors="ignore", mode="rb") as f:
+    x = f.read()
+
 
 f2 = open("file2.txt")
 with open("file.txt") as f:

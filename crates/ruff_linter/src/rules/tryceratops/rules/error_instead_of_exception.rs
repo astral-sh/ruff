@@ -90,9 +90,9 @@ pub(crate) fn error_instead_of_exception(checker: &mut Checker, handlers: &[Exce
                                 // the object _may_ not be a logger.
                                 if checker
                                     .semantic()
-                                    .resolve_call_path(expr.func.as_ref())
-                                    .is_some_and(|call_path| {
-                                        matches!(call_path.as_slice(), ["logging", "error"])
+                                    .resolve_qualified_name(expr.func.as_ref())
+                                    .is_some_and(|qualified_name| {
+                                        matches!(qualified_name.segments(), ["logging", "error"])
                                     })
                                 {
                                     Applicability::Safe
@@ -117,9 +117,12 @@ pub(crate) fn error_instead_of_exception(checker: &mut Checker, handlers: &[Exce
                                     // the object _may_ not be a logger.
                                     if checker
                                         .semantic()
-                                        .resolve_call_path(expr.func.as_ref())
-                                        .is_some_and(|call_path| {
-                                            matches!(call_path.as_slice(), ["logging", "error"])
+                                        .resolve_qualified_name(expr.func.as_ref())
+                                        .is_some_and(|qualified_name| {
+                                            matches!(
+                                                qualified_name.segments(),
+                                                ["logging", "error"]
+                                            )
                                         })
                                     {
                                         Applicability::Safe
