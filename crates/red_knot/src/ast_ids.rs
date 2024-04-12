@@ -1,4 +1,6 @@
-use std::fmt::Formatter;
+use std::any::type_name;
+use std::fmt::{Debug, Formatter};
+use std::hash::{Hash, Hasher};
 use std::marker::PhantomData;
 
 use rustc_hash::FxHashMap;
@@ -7,9 +9,10 @@ use ruff_index::{Idx, IndexVec};
 use ruff_python_ast::visitor::preorder;
 use ruff_python_ast::visitor::preorder::{PreorderVisitor, TraversalSignal};
 use ruff_python_ast::{
-    AnyNodeRef, AstNode, ModModule, NodeKind, Parameter, Stmt, StmtAnnAssign, StmtAssign,
-    StmtAugAssign, StmtClassDef, StmtFunctionDef, StmtImport, StmtImportFrom, StmtTypeAlias,
-    TypeParam, TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple,
+    AnyNodeRef, AstNode, ExceptHandler, ExceptHandlerExceptHandler, Expr, MatchCase, ModModule,
+    NodeKind, Parameter, Stmt, StmtAnnAssign, StmtAssign, StmtAugAssign, StmtClassDef,
+    StmtFunctionDef, StmtGlobal, StmtImport, StmtImportFrom, StmtNonlocal, StmtTypeAlias,
+    TypeParam, TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple, WithItem,
 };
 use ruff_text_size::{Ranged, TextRange};
 
@@ -22,7 +25,6 @@ pub struct AstId;
 /// This is different from [`AstId`] in that it is a combination of ID and the type of the node the ID identifies.
 /// Typing the ID prevents mixing IDs of different node types and allows to restrict the API to only accept
 /// nodes for which an ID has been created (not all AST nodes get an ID).
-#[derive(Debug, Eq, PartialEq, Hash)]
 pub struct TypedAstId<N: HasAstId> {
     erased: AstId,
     _marker: PhantomData<fn() -> N>,
@@ -45,6 +47,28 @@ impl<N: HasAstId> Copy for TypedAstId<N> {}
 impl<N: HasAstId> Clone for TypedAstId<N> {
     fn clone(&self) -> Self {
         *self
+    }
+}
+
+impl<N: HasAstId> PartialEq for TypedAstId<N> {
+    fn eq(&self, other: &Self) -> bool {
+        self.erased == other.erased
+    }
+}
+
+impl<N: HasAstId> Eq for TypedAstId<N> {}
+impl<N: HasAstId> Hash for TypedAstId<N> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.erased.hash(state);
+    }
+}
+
+impl<N: HasAstId> Debug for TypedAstId<N> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("TypedAstId")
+            .field(&self.erased)
+            .field(&type_name::<N>())
+            .finish()
     }
 }
 
@@ -194,8 +218,8 @@ impl<'a> PreorderVisitor<'a> for AstIdsVisitor<'a> {
             Stmt::Assert(_) => {}
             Stmt::Import(import) => self.create_id(import),
             Stmt::ImportFrom(import_from) => self.create_id(import_from),
-            Stmt::Global(_) => {}
-            Stmt::Nonlocal(_) => {}
+            Stmt::Global(global) => self.create_id(global),
+            Stmt::Nonlocal(non_local) => self.create_id(non_local),
             Stmt::Pass(_) => {}
             Stmt::Break(_) => {}
             Stmt::Continue(_) => {}
@@ -203,6 +227,37 @@ impl<'a> PreorderVisitor<'a> for AstIdsVisitor<'a> {
         }
 
         preorder::walk_stmt(self, stmt);
+    }
+
+    fn visit_expr(&mut self, _expr: &'a Expr) {}
+
+    fn visit_parameter(&mut self, parameter: &'a Parameter) {
+        self.create_id(parameter);
+        preorder::walk_parameter(self, parameter);
+    }
+
+    fn visit_except_handler(&mut self, except_handler: &'a ExceptHandler) {
+        match except_handler {
+            ExceptHandler::ExceptHandler(except_handler) => {
+                self.create_id(except_handler);
+            }
+        }
+
+        preorder::walk_except_handler(self, except_handler);
+    }
+
+    fn visit_with_item(&mut self, with_item: &'a WithItem) {
+        self.create_id(with_item);
+        preorder::walk_with_item(self, with_item);
+    }
+
+    fn visit_match_case(&mut self, match_case: &'a MatchCase) {
+        self.create_id(match_case);
+        preorder::walk_match_case(self, match_case);
+    }
+
+    fn visit_type_param(&mut self, type_param: &'a TypeParam) {
+        self.create_id(type_param);
     }
 }
 
@@ -332,3 +387,9 @@ impl HasAstId for Stmt {}
 impl HasAstId for TypeParamTypeVar {}
 impl HasAstId for TypeParamTypeVarTuple {}
 impl HasAstId for TypeParamParamSpec {}
+impl HasAstId for StmtGlobal {}
+impl HasAstId for StmtNonlocal {}
+
+impl HasAstId for ExceptHandlerExceptHandler {}
+impl HasAstId for WithItem {}
+impl HasAstId for MatchCase {}
