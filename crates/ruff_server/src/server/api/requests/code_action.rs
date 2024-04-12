@@ -41,13 +41,14 @@ impl super::BackgroundDocumentRequestHandler for CodeActions {
         if snapshot.client_settings().fix_all()
             && supported_code_actions.contains(&SupportedCodeAction::SourceFixAll)
         {
-            response.push(fix_all(&snapshot).with_failure_code(ErrorCode::InternalError)?);
+            response.extend(fix_all(&snapshot).with_failure_code(ErrorCode::InternalError)?);
         }
 
         if snapshot.client_settings().organize_imports()
             && supported_code_actions.contains(&SupportedCodeAction::SourceOrganizeImports)
         {
-            response.push(organize_imports(&snapshot).with_failure_code(ErrorCode::InternalError)?);
+            response
+                .extend(organize_imports(&snapshot).with_failure_code(ErrorCode::InternalError)?);
         }
 
         Ok(Some(response))
@@ -87,7 +88,7 @@ fn quick_fix(
         .collect()
 }
 
-fn fix_all(snapshot: &DocumentSnapshot) -> crate::Result<CodeActionOrCommand> {
+fn fix_all(snapshot: &DocumentSnapshot) -> crate::Result<Vec<CodeActionOrCommand>> {
     let document = snapshot.document();
 
     let (edit, data) = if snapshot
@@ -112,17 +113,21 @@ fn fix_all(snapshot: &DocumentSnapshot) -> crate::Result<CodeActionOrCommand> {
             None,
         )
     };
-    let action = types::CodeAction {
-        title: format!("{DIAGNOSTIC_NAME}: Fix all auto-fixable problems"),
-        kind: Some(types::CodeActionKind::SOURCE_FIX_ALL),
-        edit,
-        data,
-        ..Default::default()
-    };
-    Ok(types::CodeActionOrCommand::CodeAction(action))
+    Ok(SupportedCodeAction::SourceFixAll
+        .kinds()
+        .into_iter()
+        .map(move |kind| types::CodeAction {
+            title: format!("{DIAGNOSTIC_NAME}: Fix all auto-fixable problems"),
+            kind: Some(kind),
+            edit: edit.clone(),
+            data: data.clone(),
+            ..Default::default()
+        })
+        .map(CodeActionOrCommand::CodeAction)
+        .collect())
 }
 
-fn organize_imports(snapshot: &DocumentSnapshot) -> crate::Result<CodeActionOrCommand> {
+fn organize_imports(snapshot: &DocumentSnapshot) -> crate::Result<Vec<CodeActionOrCommand>> {
     let document = snapshot.document();
 
     let (edit, data) = if snapshot
@@ -147,14 +152,18 @@ fn organize_imports(snapshot: &DocumentSnapshot) -> crate::Result<CodeActionOrCo
             None,
         )
     };
-    let action = types::CodeAction {
-        title: format!("{DIAGNOSTIC_NAME}: Organize imports"),
-        kind: Some(types::CodeActionKind::SOURCE_ORGANIZE_IMPORTS),
-        edit,
-        data,
-        ..Default::default()
-    };
-    Ok(types::CodeActionOrCommand::CodeAction(action))
+    Ok(SupportedCodeAction::SourceOrganizeImports
+        .kinds()
+        .into_iter()
+        .map(move |kind| types::CodeAction {
+            title: format!("{DIAGNOSTIC_NAME}: Organize imports"),
+            kind: Some(kind),
+            edit: edit.clone(),
+            data: data.clone(),
+            ..Default::default()
+        })
+        .map(CodeActionOrCommand::CodeAction)
+        .collect())
 }
 
 /// If `action_filter` is `None`, this returns [`SupportedCodeActionKind::all()`]. Otherwise,
