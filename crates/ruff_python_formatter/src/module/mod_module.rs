@@ -17,7 +17,7 @@ impl FormatNodeRule<ModModule> for FormatModModule {
         if body.is_empty() {
             // Only preserve an empty line if the source contains an empty line too.
             if !f.context().comments().has_leading(item)
-                && lines_after(range.end(), f.context().source()) != 0
+                && lines_after(range.start(), f.context().source()) != 0
             {
                 empty_line().fmt(f)
             } else {
