@@ -66,7 +66,6 @@ impl FilesInner {
     /// Inserts the path and returns a new id for it or returns the id if it is an existing path.
     // TODO should this accept Path or PathBuf?
     pub(crate) fn intern(&mut self, path: &Path) -> FileId {
-        debug_assert!(path.is_file());
         let mut hasher = FxHasher::default();
         path.hash(&mut hasher);
         let hash = hasher.finish();
