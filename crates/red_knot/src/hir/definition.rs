@@ -132,6 +132,7 @@ pub struct GlobalId;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Global {
+    // TODO track names
     ast_id: HirAstId<StmtGlobal>,
 }
 
@@ -140,6 +141,7 @@ pub struct NonLocalId;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct NonLocal {
+    // TODO track names
     ast_id: HirAstId<StmtNonlocal>,
 }
 
