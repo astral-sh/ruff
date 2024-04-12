@@ -1,5 +1,5 @@
 use ast::{Expr, StmtAugAssign};
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
 use ruff_python_ast::comparable::ComparableExpr;
@@ -57,26 +57,24 @@ use crate::checkers::ast::Checker;
 /// assert (foo, bar) == ([1, 2], [1, 2])
 /// ```
 #[violation]
-pub struct BinaryOpAndNormalAssignment {
+pub struct NonAugmentedAssignment {
     operator: AugmentedOperator,
 }
 
-impl Violation for BinaryOpAndNormalAssignment {
-    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
-
+impl AlwaysFixableViolation for NonAugmentedAssignment {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let BinaryOpAndNormalAssignment { operator } = self;
+        let NonAugmentedAssignment { operator } = self;
         format!("Use `{operator}` to perform an augmented assignment directly")
     }
 
-    fn fix_title(&self) -> Option<String> {
-        Some("Replace with augmented assignment".to_string())
+    fn fix_title(&self) -> String {
+        "Replace with augmented assignment".to_string()
     }
 }
 
 /// PLR6104
-pub(crate) fn binary_op_and_normal_assignment(checker: &mut Checker, assign: &ast::StmtAssign) {
+pub(crate) fn non_augmented_assignment(checker: &mut Checker, assign: &ast::StmtAssign) {
     // Ignore multiple assignment targets.
     let [target] = assign.targets.as_slice() else {
         return;
@@ -90,7 +88,7 @@ pub(crate) fn binary_op_and_normal_assignment(checker: &mut Checker, assign: &as
     // Match, e.g., `x = x + 1`.
     if ComparableExpr::from(target) == ComparableExpr::from(&value.left) {
         let mut diagnostic = Diagnostic::new(
-            BinaryOpAndNormalAssignment {
+            NonAugmentedAssignment {
                 operator: AugmentedOperator::from(value.op),
             },
             assign.range(),
@@ -109,7 +107,7 @@ pub(crate) fn binary_op_and_normal_assignment(checker: &mut Checker, assign: &as
     // Match, e.g., `x = 1 + x`.
     if ComparableExpr::from(target) == ComparableExpr::from(&value.right) {
         let mut diagnostic = Diagnostic::new(
-            BinaryOpAndNormalAssignment {
+            NonAugmentedAssignment {
                 operator: AugmentedOperator::from(value.op),
             },
             assign.range(),
@@ -122,7 +120,6 @@ pub(crate) fn binary_op_and_normal_assignment(checker: &mut Checker, assign: &as
             assign.range(),
         )));
         checker.diagnostics.push(diagnostic);
-        return;
     }
 }
 

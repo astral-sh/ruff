@@ -186,10 +186,7 @@ mod tests {
         Rule::UnnecessaryDictIndexLookup,
         Path::new("unnecessary_dict_index_lookup.py")
     )]
-    #[test_case(
-        Rule::BinaryOpAndNormalAssignment,
-        Path::new("binary_op_and_normal_assignment.py")
-    )]
+    #[test_case(Rule::NonAugmentedAssignment, Path::new("non_augmented_assignment.py"))]
     #[test_case(
         Rule::UselessExceptionStatement,
         Path::new("useless_exception_statement.py")

@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-binary_op_and_normal_assignment.py:16:1: PLR6104 [*] Use `+=` to perform an augmented assignment directly
+non_augmented_assignment.py:16:1: PLR6104 [*] Use `+=` to perform an augmented assignment directly
    |
 14 | mat1, mat2 = None, None
 15 | 
@@ -22,7 +22,7 @@ binary_op_and_normal_assignment.py:16:1: PLR6104 [*] Use `+=` to perform an augm
 18 18 | a_list = a_list + ["to concat"]
 19 19 | some_set = some_set | {"to concat"}
 
-binary_op_and_normal_assignment.py:17:1: PLR6104 [*] Use `-=` to perform an augmented assignment directly
+non_augmented_assignment.py:17:1: PLR6104 [*] Use `-=` to perform an augmented assignment directly
    |
 16 | some_string = some_string + "a very long end of string"
 17 | index = index - 1
@@ -42,7 +42,7 @@ binary_op_and_normal_assignment.py:17:1: PLR6104 [*] Use `-=` to perform an augm
 19 19 | some_set = some_set | {"to concat"}
 20 20 | to_multiply = to_multiply * 5
 
-binary_op_and_normal_assignment.py:18:1: PLR6104 [*] Use `+=` to perform an augmented assignment directly
+non_augmented_assignment.py:18:1: PLR6104 [*] Use `+=` to perform an augmented assignment directly
    |
 16 | some_string = some_string + "a very long end of string"
 17 | index = index - 1
@@ -63,7 +63,7 @@ binary_op_and_normal_assignment.py:18:1: PLR6104 [*] Use `+=` to perform an augm
 20 20 | to_multiply = to_multiply * 5
 21 21 | to_divide = to_divide / 5
 
-binary_op_and_normal_assignment.py:19:1: PLR6104 [*] Use `|=` to perform an augmented assignment directly
+non_augmented_assignment.py:19:1: PLR6104 [*] Use `|=` to perform an augmented assignment directly
    |
 17 | index = index - 1
 18 | a_list = a_list + ["to concat"]
@@ -84,7 +84,7 @@ binary_op_and_normal_assignment.py:19:1: PLR6104 [*] Use `|=` to perform an augm
 21 21 | to_divide = to_divide / 5
 22 22 | to_divide = to_divide // 5
 
-binary_op_and_normal_assignment.py:20:1: PLR6104 [*] Use `*=` to perform an augmented assignment directly
+non_augmented_assignment.py:20:1: PLR6104 [*] Use `*=` to perform an augmented assignment directly
    |
 18 | a_list = a_list + ["to concat"]
 19 | some_set = some_set | {"to concat"}
@@ -105,7 +105,7 @@ binary_op_and_normal_assignment.py:20:1: PLR6104 [*] Use `*=` to perform an augm
 22 22 | to_divide = to_divide // 5
 23 23 | to_cube = to_cube**3
 
-binary_op_and_normal_assignment.py:21:1: PLR6104 [*] Use `/=` to perform an augmented assignment directly
+non_augmented_assignment.py:21:1: PLR6104 [*] Use `/=` to perform an augmented assignment directly
    |
 19 | some_set = some_set | {"to concat"}
 20 | to_multiply = to_multiply * 5
@@ -126,7 +126,7 @@ binary_op_and_normal_assignment.py:21:1: PLR6104 [*] Use `/=` to perform an augm
 23 23 | to_cube = to_cube**3
 24 24 | to_cube = 3**to_cube
 
-binary_op_and_normal_assignment.py:22:1: PLR6104 [*] Use `//=` to perform an augmented assignment directly
+non_augmented_assignment.py:22:1: PLR6104 [*] Use `//=` to perform an augmented assignment directly
    |
 20 | to_multiply = to_multiply * 5
 21 | to_divide = to_divide / 5
@@ -147,7 +147,7 @@ binary_op_and_normal_assignment.py:22:1: PLR6104 [*] Use `//=` to perform an aug
 24 24 | to_cube = 3**to_cube
 25 25 | to_cube = to_cube**to_cube
 
-binary_op_and_normal_assignment.py:23:1: PLR6104 [*] Use `**=` to perform an augmented assignment directly
+non_augmented_assignment.py:23:1: PLR6104 [*] Use `**=` to perform an augmented assignment directly
    |
 21 | to_divide = to_divide / 5
 22 | to_divide = to_divide // 5
@@ -168,7 +168,7 @@ binary_op_and_normal_assignment.py:23:1: PLR6104 [*] Use `**=` to perform an aug
 25 25 | to_cube = to_cube**to_cube
 26 26 | timeDiffSeconds = timeDiffSeconds % 60
 
-binary_op_and_normal_assignment.py:24:1: PLR6104 [*] Use `**=` to perform an augmented assignment directly
+non_augmented_assignment.py:24:1: PLR6104 [*] Use `**=` to perform an augmented assignment directly
    |
 22 | to_divide = to_divide // 5
 23 | to_cube = to_cube**3
@@ -189,7 +189,7 @@ binary_op_and_normal_assignment.py:24:1: PLR6104 [*] Use `**=` to perform an aug
 26 26 | timeDiffSeconds = timeDiffSeconds % 60
 27 27 | flags = flags & 0x1
 
-binary_op_and_normal_assignment.py:25:1: PLR6104 [*] Use `**=` to perform an augmented assignment directly
+non_augmented_assignment.py:25:1: PLR6104 [*] Use `**=` to perform an augmented assignment directly
    |
 23 | to_cube = to_cube**3
 24 | to_cube = 3**to_cube
@@ -210,7 +210,7 @@ binary_op_and_normal_assignment.py:25:1: PLR6104 [*] Use `**=` to perform an aug
 27 27 | flags = flags & 0x1
 28 28 | flags = flags | 0x1
 
-binary_op_and_normal_assignment.py:26:1: PLR6104 [*] Use `%=` to perform an augmented assignment directly
+non_augmented_assignment.py:26:1: PLR6104 [*] Use `%=` to perform an augmented assignment directly
    |
 24 | to_cube = 3**to_cube
 25 | to_cube = to_cube**to_cube
@@ -231,7 +231,7 @@ binary_op_and_normal_assignment.py:26:1: PLR6104 [*] Use `%=` to perform an augm
 28 28 | flags = flags | 0x1
 29 29 | flags = flags ^ 0x1
 
-binary_op_and_normal_assignment.py:27:1: PLR6104 [*] Use `&=` to perform an augmented assignment directly
+non_augmented_assignment.py:27:1: PLR6104 [*] Use `&=` to perform an augmented assignment directly
    |
 25 | to_cube = to_cube**to_cube
 26 | timeDiffSeconds = timeDiffSeconds % 60
@@ -252,7 +252,7 @@ binary_op_and_normal_assignment.py:27:1: PLR6104 [*] Use `&=` to perform an augm
 29 29 | flags = flags ^ 0x1
 30 30 | flags = flags << 1
 
-binary_op_and_normal_assignment.py:28:1: PLR6104 [*] Use `|=` to perform an augmented assignment directly
+non_augmented_assignment.py:28:1: PLR6104 [*] Use `|=` to perform an augmented assignment directly
    |
 26 | timeDiffSeconds = timeDiffSeconds % 60
 27 | flags = flags & 0x1
@@ -273,7 +273,7 @@ binary_op_and_normal_assignment.py:28:1: PLR6104 [*] Use `|=` to perform an augm
 30 30 | flags = flags << 1
 31 31 | flags = flags >> 1
 
-binary_op_and_normal_assignment.py:29:1: PLR6104 [*] Use `^=` to perform an augmented assignment directly
+non_augmented_assignment.py:29:1: PLR6104 [*] Use `^=` to perform an augmented assignment directly
    |
 27 | flags = flags & 0x1
 28 | flags = flags | 0x1
@@ -294,7 +294,7 @@ binary_op_and_normal_assignment.py:29:1: PLR6104 [*] Use `^=` to perform an augm
 31 31 | flags = flags >> 1
 32 32 | mat1 = mat1 @ mat2
 
-binary_op_and_normal_assignment.py:30:1: PLR6104 [*] Use `<<=` to perform an augmented assignment directly
+non_augmented_assignment.py:30:1: PLR6104 [*] Use `<<=` to perform an augmented assignment directly
    |
 28 | flags = flags | 0x1
 29 | flags = flags ^ 0x1
@@ -315,7 +315,7 @@ binary_op_and_normal_assignment.py:30:1: PLR6104 [*] Use `<<=` to perform an aug
 32 32 | mat1 = mat1 @ mat2
 33 33 | a_list[1] = a_list[1] + 1
 
-binary_op_and_normal_assignment.py:31:1: PLR6104 [*] Use `>>=` to perform an augmented assignment directly
+non_augmented_assignment.py:31:1: PLR6104 [*] Use `>>=` to perform an augmented assignment directly
    |
 29 | flags = flags ^ 0x1
 30 | flags = flags << 1
@@ -336,7 +336,7 @@ binary_op_and_normal_assignment.py:31:1: PLR6104 [*] Use `>>=` to perform an aug
 33 33 | a_list[1] = a_list[1] + 1
 34 34 | 
 
-binary_op_and_normal_assignment.py:32:1: PLR6104 [*] Use `@=` to perform an augmented assignment directly
+non_augmented_assignment.py:32:1: PLR6104 [*] Use `@=` to perform an augmented assignment directly
    |
 30 | flags = flags << 1
 31 | flags = flags >> 1
@@ -356,7 +356,7 @@ binary_op_and_normal_assignment.py:32:1: PLR6104 [*] Use `@=` to perform an augm
 34 34 | 
 35 35 | a_list[0:2] = a_list[0:2] * 3
 
-binary_op_and_normal_assignment.py:33:1: PLR6104 [*] Use `+=` to perform an augmented assignment directly
+non_augmented_assignment.py:33:1: PLR6104 [*] Use `+=` to perform an augmented assignment directly
    |
 31 | flags = flags >> 1
 32 | mat1 = mat1 @ mat2
@@ -377,7 +377,7 @@ binary_op_and_normal_assignment.py:33:1: PLR6104 [*] Use `+=` to perform an augm
 35 35 | a_list[0:2] = a_list[0:2] * 3
 36 36 | a_list[:2] = a_list[:2] * 3
 
-binary_op_and_normal_assignment.py:35:1: PLR6104 [*] Use `*=` to perform an augmented assignment directly
+non_augmented_assignment.py:35:1: PLR6104 [*] Use `*=` to perform an augmented assignment directly
    |
 33 | a_list[1] = a_list[1] + 1
 34 | 
@@ -398,7 +398,7 @@ binary_op_and_normal_assignment.py:35:1: PLR6104 [*] Use `*=` to perform an augm
 37 37 | a_list[1:] = a_list[1:] * 3
 38 38 | a_list[:] = a_list[:] * 3
 
-binary_op_and_normal_assignment.py:36:1: PLR6104 [*] Use `*=` to perform an augmented assignment directly
+non_augmented_assignment.py:36:1: PLR6104 [*] Use `*=` to perform an augmented assignment directly
    |
 35 | a_list[0:2] = a_list[0:2] * 3
 36 | a_list[:2] = a_list[:2] * 3
@@ -418,7 +418,7 @@ binary_op_and_normal_assignment.py:36:1: PLR6104 [*] Use `*=` to perform an augm
 38 38 | a_list[:] = a_list[:] * 3
 39 39 | 
 
-binary_op_and_normal_assignment.py:37:1: PLR6104 [*] Use `*=` to perform an augmented assignment directly
+non_augmented_assignment.py:37:1: PLR6104 [*] Use `*=` to perform an augmented assignment directly
    |
 35 | a_list[0:2] = a_list[0:2] * 3
 36 | a_list[:2] = a_list[:2] * 3
@@ -438,7 +438,7 @@ binary_op_and_normal_assignment.py:37:1: PLR6104 [*] Use `*=` to perform an augm
 39 39 | 
 40 40 | index = index * (index + 10)
 
-binary_op_and_normal_assignment.py:38:1: PLR6104 [*] Use `*=` to perform an augmented assignment directly
+non_augmented_assignment.py:38:1: PLR6104 [*] Use `*=` to perform an augmented assignment directly
    |
 36 | a_list[:2] = a_list[:2] * 3
 37 | a_list[1:] = a_list[1:] * 3
@@ -459,7 +459,7 @@ binary_op_and_normal_assignment.py:38:1: PLR6104 [*] Use `*=` to perform an augm
 40 40 | index = index * (index + 10)
 41 41 | 
 
-binary_op_and_normal_assignment.py:40:1: PLR6104 [*] Use `*=` to perform an augmented assignment directly
+non_augmented_assignment.py:40:1: PLR6104 [*] Use `*=` to perform an augmented assignment directly
    |
 38 | a_list[:] = a_list[:] * 3
 39 | 
@@ -478,7 +478,7 @@ binary_op_and_normal_assignment.py:40:1: PLR6104 [*] Use `*=` to perform an augm
 42 42 | 
 43 43 | class T:
 
-binary_op_and_normal_assignment.py:45:9: PLR6104 [*] Use `+=` to perform an augmented assignment directly
+non_augmented_assignment.py:45:9: PLR6104 [*] Use `+=` to perform an augmented assignment directly
    |
 43 | class T:
 44 |     def t(self):
@@ -497,7 +497,7 @@ binary_op_and_normal_assignment.py:45:9: PLR6104 [*] Use `+=` to perform an augm
 47 47 | 
 48 48 | obj = T()
 
-binary_op_and_normal_assignment.py:49:1: PLR6104 [*] Use `+=` to perform an augmented assignment directly
+non_augmented_assignment.py:49:1: PLR6104 [*] Use `+=` to perform an augmented assignment directly
    |
 48 | obj = T()
 49 | obj.a = obj.a + 1
