@@ -8,11 +8,11 @@ use ruff_python_ast::{
 };
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
-use crate::parser::expression::{GeneratorExpressionInParentheses, ParsedExpr};
+use crate::parser::expression::{GeneratorExpressionInParentheses, ParsedExpr, EXPR_SET};
 use crate::parser::progress::ParserProgress;
 use crate::parser::{
     helpers, FunctionKind, Parser, ParserCtxFlags, RecoveryContext, RecoveryContextKind,
-    WithItemKind, EXPR_SET,
+    WithItemKind,
 };
 use crate::token_set::TokenSet;
 use crate::{Mode, ParseErrorType, Tok, TokenKind};
