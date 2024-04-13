@@ -1,7 +1,6 @@
-use ruff_python_ast::{self as ast, Expr};
-
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -58,12 +57,12 @@ pub(crate) fn unreliable_callable_check(
     func: &Expr,
     args: &[Expr],
 ) {
-    let Expr::Name(ast::ExprName { id, .. }) = func else {
+    let Some(qualified_name) = checker.semantic().resolve_qualified_name(func) else {
         return;
     };
-    if !matches!(id.as_str(), "hasattr" | "getattr") {
+    let ["" | "builtins", function @ ("hasattr" | "getattr")] = qualified_name.segments() else {
         return;
-    }
+    };
     let [obj, attr, ..] = args else {
         return;
     };
@@ -75,7 +74,7 @@ pub(crate) fn unreliable_callable_check(
     }
 
     let mut diagnostic = Diagnostic::new(UnreliableCallableCheck, expr.range());
-    if id == "hasattr" {
+    if *function == "hasattr" {
         if checker.semantic().is_builtin("callable") {
             diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                 format!("callable({})", checker.locator().slice(obj)),

@@ -28,7 +28,7 @@ pub(super) fn is_untyped_exception(type_: Option<&Expr>, semantic: &SemanticMode
                     .is_some_and(|qualified_name| {
                         matches!(
                             qualified_name.segments(),
-                            ["", "Exception" | "BaseException"]
+                            ["" | "builtins", "Exception" | "BaseException"]
                         )
                     })
             })
@@ -38,7 +38,7 @@ pub(super) fn is_untyped_exception(type_: Option<&Expr>, semantic: &SemanticMode
                 .is_some_and(|qualified_name| {
                     matches!(
                         qualified_name.segments(),
-                        ["", "Exception" | "BaseException"]
+                        ["" | "builtins", "Exception" | "BaseException"]
                     )
                 })
         }

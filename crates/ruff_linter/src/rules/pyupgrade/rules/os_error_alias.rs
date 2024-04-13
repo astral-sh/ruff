@@ -61,17 +61,12 @@ fn is_alias(expr: &Expr, semantic: &SemanticModel) -> bool {
         .is_some_and(|qualified_name| {
             matches!(
                 qualified_name.segments(),
-                ["", "EnvironmentError" | "IOError" | "WindowsError"]
-                    | ["mmap" | "select" | "socket" | "os", "error"]
+                [
+                    "" | "builtins",
+                    "EnvironmentError" | "IOError" | "WindowsError"
+                ] | ["mmap" | "select" | "socket" | "os", "error"]
             )
         })
-}
-
-/// Return `true` if an [`Expr`] is `OSError`.
-fn is_os_error(expr: &Expr, semantic: &SemanticModel) -> bool {
-    semantic
-        .resolve_qualified_name(expr)
-        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["", "OSError"]))
 }
 
 /// Create a [`Diagnostic`] for a single target, like an [`Expr::Name`].
@@ -112,7 +107,7 @@ fn tuple_diagnostic(checker: &mut Checker, tuple: &ast::ExprTuple, aliases: &[&E
         if tuple
             .elts
             .iter()
-            .all(|elt| !is_os_error(elt, checker.semantic()))
+            .all(|elt| !checker.semantic().match_builtin_expr(elt, "OSError"))
         {
             let node = ast::ExprName {
                 id: "OSError".into(),

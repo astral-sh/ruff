@@ -100,8 +100,8 @@ pub(crate) fn assert_raises_exception(checker: &mut Checker, items: &[WithItem])
                 .semantic()
                 .resolve_qualified_name(arg)
                 .and_then(|qualified_name| match qualified_name.segments() {
-                    ["", "Exception"] => Some(ExceptionKind::Exception),
-                    ["", "BaseException"] => Some(ExceptionKind::BaseException),
+                    ["" | "builtins", "Exception"] => Some(ExceptionKind::Exception),
+                    ["" | "builtins", "BaseException"] => Some(ExceptionKind::BaseException),
                     _ => None,
                 })
         else {

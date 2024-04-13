@@ -100,13 +100,9 @@ fn is_nan_float(expr: &Expr, semantic: &SemanticModel) -> bool {
         return false;
     };
 
-    let Expr::Name(ast::ExprName { id, .. }) = call.func.as_ref() else {
+    if !semantic.match_builtin_expr(&call.func, "float") {
         return false;
     };
-
-    if id.as_str() != "float" {
-        return false;
-    }
 
     if !call.arguments.keywords.is_empty() {
         return false;
@@ -124,10 +120,6 @@ fn is_nan_float(expr: &Expr, semantic: &SemanticModel) -> bool {
         value.to_str(),
         "nan" | "NaN" | "NAN" | "Nan" | "nAn" | "naN" | "nAN" | "NAn"
     ) {
-        return false;
-    }
-
-    if !semantic.is_builtin("float") {
         return false;
     }
 

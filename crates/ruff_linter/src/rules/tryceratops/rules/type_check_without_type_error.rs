@@ -81,7 +81,7 @@ fn check_type_check_call(checker: &mut Checker, call: &Expr) -> bool {
         .is_some_and(|qualified_name| {
             matches!(
                 qualified_name.segments(),
-                ["", "isinstance" | "issubclass" | "callable"]
+                ["" | "builtins", "isinstance" | "issubclass" | "callable"]
             )
         })
 }

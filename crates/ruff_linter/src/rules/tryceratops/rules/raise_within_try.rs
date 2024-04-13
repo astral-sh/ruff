@@ -115,7 +115,7 @@ pub(crate) fn raise_within_try(checker: &mut Checker, body: &[Stmt], handlers: &
                     .is_some_and(|qualified_name| {
                         matches!(
                             qualified_name.segments(),
-                            ["", "Exception" | "BaseException"]
+                            ["" | "builtins", "Exception" | "BaseException"]
                         )
                     })
             })

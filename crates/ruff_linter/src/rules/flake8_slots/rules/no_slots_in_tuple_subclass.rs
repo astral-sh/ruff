@@ -55,16 +55,11 @@ pub(crate) fn no_slots_in_tuple_subclass(checker: &mut Checker, stmt: &Stmt, cla
         return;
     };
 
+    let semantic = checker.semantic();
+
     if bases.iter().any(|base| {
-        checker
-            .semantic()
-            .resolve_qualified_name(map_subscript(base))
-            .is_some_and(|qualified_name| {
-                matches!(qualified_name.segments(), ["" | "builtins", "tuple"])
-                    || checker
-                        .semantic()
-                        .match_typing_qualified_name(&qualified_name, "Tuple")
-            })
+        let base = map_subscript(base);
+        semantic.match_builtin_expr(base, "tuple") || semantic.match_typing_expr(base, "Tuple")
     }) {
         if !has_slots(&class.body) {
             checker

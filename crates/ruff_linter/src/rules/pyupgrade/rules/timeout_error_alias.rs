@@ -81,13 +81,6 @@ fn is_alias(expr: &Expr, semantic: &SemanticModel, target_version: PythonVersion
         })
 }
 
-/// Return `true` if an [`Expr`] is `TimeoutError`.
-fn is_timeout_error(expr: &Expr, semantic: &SemanticModel) -> bool {
-    semantic
-        .resolve_qualified_name(expr)
-        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["", "TimeoutError"]))
-}
-
 /// Create a [`Diagnostic`] for a single target, like an [`Expr::Name`].
 fn atom_diagnostic(checker: &mut Checker, target: &Expr) {
     let mut diagnostic = Diagnostic::new(
@@ -126,7 +119,7 @@ fn tuple_diagnostic(checker: &mut Checker, tuple: &ast::ExprTuple, aliases: &[&E
         if tuple
             .elts
             .iter()
-            .all(|elt| !is_timeout_error(elt, checker.semantic()))
+            .all(|elt| !checker.semantic().match_builtin_expr(elt, "TimeoutError"))
         {
             let node = ast::ExprName {
                 id: "TimeoutError".into(),

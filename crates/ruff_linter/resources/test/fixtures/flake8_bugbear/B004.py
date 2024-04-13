@@ -6,6 +6,15 @@ def this_is_a_bug():
         print("Ooh, callable! Or is it?")
 
 
+def still_a_bug():
+    import builtins
+    o = object()
+    if builtins.hasattr(o, "__call__"):
+        print("B U G")
+    if builtins.getattr(o, "__call__", False):
+        print("B   U   G")
+
+
 def this_is_fine():
     o = object()
     if callable(o):

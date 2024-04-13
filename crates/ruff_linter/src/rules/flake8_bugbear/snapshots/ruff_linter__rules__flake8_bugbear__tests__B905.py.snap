@@ -162,6 +162,8 @@ B905.py:24:1: B905 [*] `zip()` without an explicit `strict=` parameter
 24    |-zip([1, 2, 3], repeat(1, 1))
    24 |+zip([1, 2, 3], repeat(1, 1), strict=False)
 25 25 | zip([1, 2, 3], repeat(1, times=4))
+26 26 | 
+27 27 | import builtins
 
 B905.py:25:1: B905 [*] `zip()` without an explicit `strict=` parameter
    |
@@ -169,6 +171,8 @@ B905.py:25:1: B905 [*] `zip()` without an explicit `strict=` parameter
 24 | zip([1, 2, 3], repeat(1, 1))
 25 | zip([1, 2, 3], repeat(1, times=4))
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ B905
+26 | 
+27 | import builtins
    |
    = help: Add explicit `strict=False`
 
@@ -178,5 +182,22 @@ B905.py:25:1: B905 [*] `zip()` without an explicit `strict=` parameter
 24 24 | zip([1, 2, 3], repeat(1, 1))
 25    |-zip([1, 2, 3], repeat(1, times=4))
    25 |+zip([1, 2, 3], repeat(1, times=4), strict=False)
+26 26 | 
+27 27 | import builtins
+28 28 | # Still an error even though it uses the qualified name
 
+B905.py:29:1: B905 [*] `zip()` without an explicit `strict=` parameter
+   |
+27 | import builtins
+28 | # Still an error even though it uses the qualified name
+29 | builtins.zip([1, 2, 3])
+   | ^^^^^^^^^^^^^^^^^^^^^^^ B905
+   |
+   = help: Add explicit `strict=False`
 
+ℹ Safe fix
+26 26 | 
+27 27 | import builtins
+28 28 | # Still an error even though it uses the qualified name
+29    |-builtins.zip([1, 2, 3])
+   29 |+builtins.zip([1, 2, 3], strict=False)

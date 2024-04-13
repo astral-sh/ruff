@@ -1,6 +1,9 @@
 # PIE808
 range(0, 10)
 
+import builtins
+builtins.range(0, 10)
+
 # OK
 range(x, 10)
 range(-15, 10)

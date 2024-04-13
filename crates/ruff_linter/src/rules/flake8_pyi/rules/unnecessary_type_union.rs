@@ -71,25 +71,18 @@ pub(crate) fn unnecessary_type_union<'a>(checker: &mut Checker, union: &'a Expr)
     let mut type_exprs = Vec::new();
     let mut other_exprs = Vec::new();
 
-    let mut collect_type_exprs = |expr: &'a Expr, _parent: &'a Expr| {
-        let subscript = expr.as_subscript_expr();
-
-        if subscript.is_none() {
-            other_exprs.push(expr);
-        } else {
-            let unwrapped = subscript.unwrap();
+    let mut collect_type_exprs = |expr: &'a Expr, _parent: &'a Expr| match expr {
+        Expr::Subscript(subscript) => {
             if checker
                 .semantic()
-                .resolve_qualified_name(unwrapped.value.as_ref())
-                .is_some_and(|qualified_name| {
-                    matches!(qualified_name.segments(), ["" | "builtins", "type"])
-                })
+                .match_builtin_expr(&subscript.value, "type")
             {
-                type_exprs.push(unwrapped.slice.as_ref());
+                type_exprs.push(&*subscript.slice);
             } else {
                 other_exprs.push(expr);
             }
         }
+        _ => other_exprs.push(expr),
     };
 
     traverse_union(&mut collect_type_exprs, checker.semantic(), union);

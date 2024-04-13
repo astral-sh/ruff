@@ -73,13 +73,7 @@ pub(crate) fn mutable_fromkeys_value(checker: &mut Checker, call: &ast::ExprCall
     if attr != "fromkeys" {
         return;
     }
-    let Some(name_expr) = value.as_name_expr() else {
-        return;
-    };
-    if name_expr.id != "dict" {
-        return;
-    }
-    if !checker.semantic().is_builtin("dict") {
+    if !checker.semantic().match_builtin_expr(value, "dict") {
         return;
     }
 

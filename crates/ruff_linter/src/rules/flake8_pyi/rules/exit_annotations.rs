@@ -324,15 +324,7 @@ fn is_object_or_unused(expr: &Expr, semantic: &SemanticModel) -> bool {
 
 /// Return `true` if the [`Expr`] is `BaseException`.
 fn is_base_exception(expr: &Expr, semantic: &SemanticModel) -> bool {
-    semantic
-        .resolve_qualified_name(expr)
-        .as_ref()
-        .is_some_and(|qualified_name| {
-            matches!(
-                qualified_name.segments(),
-                ["" | "builtins", "BaseException"]
-            )
-        })
+    semantic.match_builtin_expr(expr, "BaseException")
 }
 
 /// Return `true` if the [`Expr`] is the `types.TracebackType` type.
@@ -351,14 +343,7 @@ fn is_base_exception_type(expr: &Expr, semantic: &SemanticModel) -> bool {
         return false;
     };
 
-    if semantic.match_typing_expr(value, "Type")
-        || semantic
-            .resolve_qualified_name(value)
-            .as_ref()
-            .is_some_and(|qualified_name| {
-                matches!(qualified_name.segments(), ["" | "builtins", "type"])
-            })
-    {
+    if semantic.match_typing_expr(value, "Type") || semantic.match_builtin_expr(value, "type") {
         is_base_exception(slice, semantic)
     } else {
         false

@@ -97,37 +97,32 @@ impl Violation for PPrint {
 
 /// T201, T203
 pub(crate) fn print_call(checker: &mut Checker, call: &ast::ExprCall) {
-    let mut diagnostic = {
-        let qualified_name = checker.semantic().resolve_qualified_name(&call.func);
-        if qualified_name
-            .as_ref()
-            .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["", "print"]))
-        {
+    let semantic = checker.semantic();
+
+    let Some(qualified_name) = semantic.resolve_qualified_name(&call.func) else {
+        return;
+    };
+
+    let mut diagnostic = match qualified_name.segments() {
+        ["" | "builtins", "print"] => {
             // If the print call has a `file=` argument (that isn't `None`, `"sys.stdout"`,
             // or `"sys.stderr"`), don't trigger T201.
             if let Some(keyword) = call.arguments.find_keyword("file") {
                 if !keyword.value.is_none_literal_expr() {
-                    if checker
-                        .semantic()
-                        .resolve_qualified_name(&keyword.value)
-                        .map_or(true, |qualified_name| {
-                            qualified_name.segments() != ["sys", "stdout"]
-                                && qualified_name.segments() != ["sys", "stderr"]
-                        })
-                    {
+                    if semantic.resolve_qualified_name(&keyword.value).map_or(
+                        true,
+                        |qualified_name| {
+                            !matches!(qualified_name.segments(), ["sys", "stdout" | "stderr"])
+                        },
+                    ) {
                         return;
                     }
                 }
             }
             Diagnostic::new(Print, call.func.range())
-        } else if qualified_name
-            .as_ref()
-            .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["pprint", "pprint"]))
-        {
-            Diagnostic::new(PPrint, call.func.range())
-        } else {
-            return;
         }
+        ["pprint", "pprint"] => Diagnostic::new(PPrint, call.func.range()),
+        _ => return,
     };
 
     if !checker.enabled(diagnostic.kind.rule()) {
@@ -135,13 +130,14 @@ pub(crate) fn print_call(checker: &mut Checker, call: &ast::ExprCall) {
     }
 
     // Remove the `print`, if it's a standalone statement.
-    if checker.semantic().current_expression_parent().is_none() {
-        let statement = checker.semantic().current_statement();
-        let parent = checker.semantic().current_statement_parent();
+    if semantic.current_expression_parent().is_none() {
+        let statement = semantic.current_statement();
+        let parent = semantic.current_statement_parent();
         let edit = delete_stmt(statement, parent, checker.locator(), checker.indexer());
-        diagnostic.set_fix(Fix::unsafe_edit(edit).isolate(Checker::isolation(
-            checker.semantic().current_statement_parent_id(),
-        )));
+        diagnostic.set_fix(
+            Fix::unsafe_edit(edit)
+                .isolate(Checker::isolation(semantic.current_statement_parent_id())),
+        );
     }
 
     checker.diagnostics.push(diagnostic);

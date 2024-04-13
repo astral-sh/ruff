@@ -12,6 +12,8 @@ dict.fromkeys(pierogi_fillings, {})
 dict.fromkeys(pierogi_fillings, set())
 dict.fromkeys(pierogi_fillings, {"pre": "populated!"})
 dict.fromkeys(pierogi_fillings, dict())
+import builtins
+builtins.dict.fromkeys(pierogi_fillings, dict())
 
 # Okay.
 dict.fromkeys(pierogi_fillings)

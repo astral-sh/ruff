@@ -125,12 +125,7 @@ fn enumerate_items<'a>(
     } = call_expr.as_call_expr()?;
 
     // Check that the function is the `enumerate` builtin.
-    if !semantic
-        .resolve_qualified_name(func.as_ref())
-        .is_some_and(|qualified_name| {
-            matches!(qualified_name.segments(), ["builtins" | "", "enumerate"])
-        })
-    {
+    if !semantic.match_builtin_expr(func, "enumerate") {
         return None;
     }
 

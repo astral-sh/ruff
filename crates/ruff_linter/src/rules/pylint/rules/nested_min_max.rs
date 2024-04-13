@@ -68,15 +68,11 @@ impl MinMax {
         if !keywords.is_empty() {
             return None;
         }
-        let Expr::Name(ast::ExprName { id, .. }) = func else {
-            return None;
-        };
-        if id.as_str() == "min" && semantic.is_builtin("min") {
-            Some(MinMax::Min)
-        } else if id.as_str() == "max" && semantic.is_builtin("max") {
-            Some(MinMax::Max)
-        } else {
-            None
+        let qualified_name = semantic.resolve_qualified_name(func)?;
+        match qualified_name.segments() {
+            ["" | "builtins", "min"] => Some(MinMax::Min),
+            ["" | "builtins", "max"] => Some(MinMax::Max),
+            _ => None,
         }
     }
 }

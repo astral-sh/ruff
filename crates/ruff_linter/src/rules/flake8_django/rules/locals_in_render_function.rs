@@ -73,7 +73,5 @@ fn is_locals_call(expr: &Expr, semantic: &SemanticModel) -> bool {
     let Expr::Call(ast::ExprCall { func, .. }) = expr else {
         return false;
     };
-    semantic
-        .resolve_qualified_name(func)
-        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["", "locals"]))
+    semantic.match_builtin_expr(func, "locals")
 }

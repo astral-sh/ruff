@@ -786,13 +786,13 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 for type_ in extract_handled_exceptions(handlers) {
                     if let Some(qualified_name) = self.semantic.resolve_qualified_name(type_) {
                         match qualified_name.segments() {
-                            ["", "NameError"] => {
+                            ["" | "builtins", "NameError"] => {
                                 handled_exceptions |= Exceptions::NAME_ERROR;
                             }
-                            ["", "ModuleNotFoundError"] => {
+                            ["" | "builtins", "ModuleNotFoundError"] => {
                                 handled_exceptions |= Exceptions::MODULE_NOT_FOUND_ERROR;
                             }
-                            ["", "ImportError"] => {
+                            ["" | "builtins", "ImportError"] => {
                                 handled_exceptions |= Exceptions::IMPORT_ERROR;
                             }
                             _ => {}
@@ -1125,7 +1125,8 @@ impl<'a> Visitor<'a> for Checker<'a> {
                                 ]
                             ) {
                                 Some(typing::Callable::MypyExtension)
-                            } else if matches!(qualified_name.segments(), ["", "bool"]) {
+                            } else if matches!(qualified_name.segments(), ["" | "builtins", "bool"])
+                            {
                                 Some(typing::Callable::Bool)
                             } else {
                                 None
