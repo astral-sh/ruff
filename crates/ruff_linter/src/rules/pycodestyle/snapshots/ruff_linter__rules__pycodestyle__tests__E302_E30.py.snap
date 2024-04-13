@@ -202,4 +202,24 @@ E30.py:632:1: E302 [*] Expected 2 blank lines, found 0
     633 |+
 632 634 | class B: ...
 633 635 | # end
-634 636 |
+634 636 | 
+
+E30.py:642:1: E302 [*] Expected 2 blank lines, found 1
+    |
+640 | def fn(a: str) -> str: ...
+641 | 
+642 | def fn(a: int | str) -> int | str:
+    | ^^^ E302
+643 |     ...
+644 | # end
+    |
+    = help: Add missing blank line(s)
+
+ℹ Safe fix
+639 639 | @overload
+640 640 | def fn(a: str) -> str: ...
+641 641 | 
+    642 |+
+642 643 | def fn(a: int | str) -> int | str:
+643 644 |     ...
+644 645 | # end

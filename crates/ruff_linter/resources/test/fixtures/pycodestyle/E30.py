@@ -633,6 +633,17 @@ class B: ...
 # end
 
 
+# E302
+@overload
+def fn(a: int) -> int: ...
+@overload
+def fn(a: str) -> str: ...
+
+def fn(a: int | str) -> int | str:
+    ...
+# end
+
+
 # E303
 def fn():
     _ = None
