@@ -213,7 +213,9 @@ fn check_positional_args(
 
     let validations: [(ErrorKind, AnnotationValidator); 3] = [
         (ErrorKind::FirstArgBadAnnotation, is_base_exception_type),
-        (ErrorKind::SecondArgBadAnnotation, is_base_exception),
+        (ErrorKind::SecondArgBadAnnotation, |expr, semantic| {
+            semantic.match_builtin_expr(expr, "BaseException")
+        }),
         (ErrorKind::ThirdArgBadAnnotation, is_traceback_type),
     ];
 
@@ -322,11 +324,6 @@ fn is_object_or_unused(expr: &Expr, semantic: &SemanticModel) -> bool {
         })
 }
 
-/// Return `true` if the [`Expr`] is `BaseException`.
-fn is_base_exception(expr: &Expr, semantic: &SemanticModel) -> bool {
-    semantic.match_builtin_expr(expr, "BaseException")
-}
-
 /// Return `true` if the [`Expr`] is the `types.TracebackType` type.
 fn is_traceback_type(expr: &Expr, semantic: &SemanticModel) -> bool {
     semantic
@@ -344,7 +341,7 @@ fn is_base_exception_type(expr: &Expr, semantic: &SemanticModel) -> bool {
     };
 
     if semantic.match_typing_expr(value, "Type") || semantic.match_builtin_expr(value, "type") {
-        is_base_exception(slice, semantic)
+        semantic.match_builtin_expr(slice, "BaseException")
     } else {
         false
     }

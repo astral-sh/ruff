@@ -137,10 +137,6 @@ fn find_file_open<'a>(
         ..
     } = item.context_expr.as_call_expr()?;
 
-    if func.as_name_expr()?.id != "open" {
-        return None;
-    }
-
     let var = item.optional_vars.as_deref()?.as_name_expr()?;
 
     // Ignore calls with `*args` and `**kwargs`. In the exact case of `open(*filename, mode="w")`,
@@ -149,6 +145,10 @@ fn find_file_open<'a>(
     if args.iter().any(Expr::is_starred_expr)
         || keywords.iter().any(|keyword| keyword.arg.is_none())
     {
+        return None;
+    }
+
+    if !semantic.match_builtin_expr(func, "open") {
         return None;
     }
 
