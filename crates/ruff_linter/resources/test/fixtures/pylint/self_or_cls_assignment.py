@@ -6,6 +6,7 @@ class Fruit:
         cls += "orange"  # PLW0642
         cls, blah = "apple", "orange"  # PLW0642
         blah, (cls, blah2) = "apple", ("orange", "banana")  # PLW0642
+        blah, [cls, blah2] = "apple", ("orange", "banana")  # PLW0642
 
     def print_color(self) -> None:
         self = "red"  # PLW0642
@@ -13,6 +14,20 @@ class Fruit:
         self += "blue"  # PLW0642
         self, blah = "red", "blue"  # PLW0642
         blah, (self, blah2) = "apple", ("orange", "banana")  # PLW0642
-    
+        blah, [self, blah2] = "apple", ("orange", "banana")  # PLW0642
+
     def ok(self) -> None:
         cls = None  # OK because the rule looks for the name in the signature
+
+    @classmethod
+    def ok(cls) -> None:
+        self = None
+
+    @staticmethod
+    def list_fruits_static(self, cls) -> None:
+        self = "apple"  # Ok
+        cls = "banana"  # Ok
+
+def list_fruits(self, cls) -> None:
+    self = "apple"  # Ok
+    cls = "banana"  # Ok
