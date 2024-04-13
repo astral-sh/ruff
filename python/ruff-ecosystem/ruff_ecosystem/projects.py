@@ -91,9 +91,10 @@ class ConfigOverrides(Serializable):
 
         args = []
         for key, value in overrides.items():
-            if value is None:  # FIXME TEMP
-                continue
-            args.extend(["--config", f"{key} = {value}"])
+            if value is None:
+                args.extend(["--config", f"{key} = ''"])
+            else:
+                args.extend(["--config", f"{key} = {value}"])
 
         return args
 
