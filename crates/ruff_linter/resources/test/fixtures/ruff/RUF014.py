@@ -145,6 +145,13 @@ def while_if_true():
             return "reachable"
     return "unreachable"
 
+def while_break():
+    while True:
+        print("reachable")
+        break
+        print("unreachable")
+    return "reachable"
+
 # Test case found in the Bokeh repository that trigger a false positive.
 def bokeh1(self, obj: BytesRep) -> bytes:
     data = obj["data"]

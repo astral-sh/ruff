@@ -243,7 +243,14 @@ RUF014.py:146:5: RUF014 Unreachable code in while_if_true
 146 |     return "unreachable"
     |     ^^^^^^^^^^^^^^^^^^^^ RUF014
 147 | 
-148 | # Test case found in the Bokeh repository that trigger a false positive.
+148 | def while_break():
     |
 
-
+RUF014.py:152:9: RUF014 Unreachable code in while_break
+    |
+150 |         print("reachable")
+151 |         break
+152 |         print("unreachable")
+    |         ^^^^^^^^^^^^^^^^^^^^ RUF014
+153 |     return "reachable"
+    |

@@ -203,7 +203,7 @@ flowchart TD
   start --> block2
   block2 -- "range(13)" --> block1
   block2 -- "else" --> block0
-  block1 --> block0
+  block1 --> return
   block0 --> return
 ```
 
@@ -234,7 +234,7 @@ flowchart TD
   block3 -- "else" --> block0
   block2 -- "True" --> block1
   block2 -- "else" --> block3
-  block1 --> block0
+  block1 --> return
   block0 --> return
 ```
 
@@ -298,5 +298,3 @@ flowchart TD
   block1 --> block3
   block0 --> return
 ```
-
-
