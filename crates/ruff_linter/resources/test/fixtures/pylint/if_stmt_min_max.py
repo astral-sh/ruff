@@ -134,3 +134,18 @@ if value.attr > 3:
         value.
         attr
     ) = 3
+
+class Foo:
+    _min = 0
+    _max = 0
+
+    def foo(self, value) -> None:
+        if value < self._min:
+            self._min = value
+        if value > self._max:
+            self._max = value
+
+        if self._min < value:
+            self._min = value
+        if self._max > value:
+            self._max = value
