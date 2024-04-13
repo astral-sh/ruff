@@ -873,7 +873,7 @@ impl<'a> BlankLinesChecker<'a> {
             && !matches!(state.follows, Follows::Decorator)
             // Allow groups of one-liners.
             && !(state.follows.is_any_def() && line.last_token != TokenKind::Colon)
-            && !state.follows.follows_def_with_dummy_body()
+            && !(state.follows.follows_def_with_dummy_body() && line.preceding_blank_lines == 0)
             // Only trigger on non-indented classes and functions (for example functions within an if are ignored)
             && line.indent_length == 0
             // Only apply to functions or classes.
