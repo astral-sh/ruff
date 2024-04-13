@@ -99,6 +99,38 @@ def func():
         if True:
             break
 
+def func():
+    while True:
+        x = 0
+        x = 1
+        break
+        x = 2
+    x = 3
+
+def func():
+    while True:
+        x = 0
+        x = 1
+        continue
+        x = 2
+    x = 3
+
+def func():
+    while True:
+        x = 0
+        x = 1
+        return
+        x = 2
+    x = 3
+
+def func():
+    while True:
+        x = 0
+        x = 1
+        raise Exception
+        x = 2
+    x = 3
+
 '''
 TODO: because `try` statements aren't handled this triggers a false positive as
 the last statement is reached, but the rules thinks it isn't (it doesn't

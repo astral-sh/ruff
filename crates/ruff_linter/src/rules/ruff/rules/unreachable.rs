@@ -164,6 +164,7 @@ fn mark_reached(
                 condition,
                 next,
                 orelse,
+                ..
             } => {
                 match taken(condition) {
                     Some(true) => idx = *next,    // Always taken.
@@ -282,6 +283,8 @@ enum NextBlock<'stmt> {
         next: BlockIndex,
         /// Next block if `condition` is false.
         orelse: BlockIndex,
+        /// Exit block. None indicates Terminate.
+        exit: Option<BlockIndex>,
     },
     /// The end.
     Terminate,
@@ -385,6 +388,7 @@ fn loop_block<'stmt>(
         condition,
         next: last_statement_index,
         orelse: last_orelse_statement,
+        exit: after,
     }
 }
 
@@ -424,6 +428,7 @@ fn match_case<'stmt>(
             condition: Condition::Match { subject, case },
             next: next_block_index,
             orelse: orelse_after_block,
+            exit: Some(orelse_after_block),
         }
     };
     BasicBlock { stmts, next }
@@ -518,6 +523,7 @@ impl<'stmt> BasicBlocksBuilder<'stmt> {
                                 condition: Condition::Test(test),
                                 next: consequent,
                                 orelse: next_branch,
+                                exit: after,
                             };
                             let stmts = std::slice::from_ref(stmt);
                             let block = BasicBlock { stmts, next };
@@ -531,6 +537,7 @@ impl<'stmt> BasicBlocksBuilder<'stmt> {
                         condition: Condition::Test(&stmt_if.test),
                         next: consequent,
                         orelse: next_branch,
+                        exit: after,
                     }
                 }
                 Stmt::While(StmtWhile {
@@ -624,6 +631,7 @@ impl<'stmt> BasicBlocksBuilder<'stmt> {
                         condition: Condition::Test(&stmt.test),
                         next,
                         orelse,
+                        exit: after,
                     }
                 }
                 Stmt::Expr(stmt) => {
@@ -801,11 +809,13 @@ impl<'stmt> BasicBlocksBuilder<'stmt> {
                     condition,
                     next,
                     orelse,
+                    exit,
                 }) => {
                     let idx = fixup_index;
                     let condition = condition.clone();
                     let next = *next;
                     let orelse = *orelse;
+                    let exit = *exit;
                     let new_next = if is_target(&self.blocks[idx], next, from, check_condition) {
                         // Found our target in the next branch, change it (below).
                         Some(to)
@@ -843,6 +853,7 @@ impl<'stmt> BasicBlocksBuilder<'stmt> {
                         condition,
                         next,
                         orelse,
+                        exit,
                     };
                 }
                 Some(NextBlock::Terminate) | None => return,
@@ -850,9 +861,70 @@ impl<'stmt> BasicBlocksBuilder<'stmt> {
         }
     }
 
+    fn post_process(
+        &mut self,
+        start_index: BlockIndex,
+        loop_start: Option<BlockIndex>,
+        loop_exit: Option<BlockIndex>,
+    ) {
+        let mut idx = start_index;
+
+        loop {
+            let block = &mut self.blocks[idx];
+            match block.next {
+                NextBlock::Always(next) => {
+                    match block.stmts.last() {
+                        Some(Stmt::Break(_)) => {
+                            block.next = match loop_exit {
+                                Some(exit) => NextBlock::Always(exit),
+                                None => NextBlock::Terminate,
+                            }
+                        }
+                        Some(Stmt::Continue(_)) => {
+                            block.next = NextBlock::Always(loop_start.unwrap());
+                        }
+                        _ => {}
+                    };
+                    idx = next;
+                }
+                NextBlock::If {
+                    condition: _,
+                    next,
+                    orelse,
+                    exit,
+                } => {
+                    match block.stmts.last() {
+                        Some(Stmt::For(_) | Stmt::While(_)) => {
+                            self.post_process(next, Some(idx), exit);
+                        }
+                        _ => {
+                            self.post_process(next, loop_start, loop_exit);
+                        }
+                    };
+
+                    idx = orelse;
+                }
+                NextBlock::Terminate => return,
+            }
+
+            if let Some(exit) = loop_exit {
+                if idx == exit {
+                    return;
+                }
+            }
+            if let Some(start) = loop_start {
+                if idx == start {
+                    return;
+                }
+            }
+        }
+    }
+
     fn finish(mut self) -> BasicBlocks<'stmt> {
         if self.blocks.is_empty() {
             self.blocks.push(BasicBlock::EMPTY);
+        } else {
+            self.post_process(self.blocks.indices().last().unwrap(), None, None);
         }
 
         BasicBlocks {
@@ -994,6 +1066,7 @@ impl<'stmt, 'source> fmt::Display for MermaidGraph<'stmt, 'source> {
                     condition,
                     next,
                     orelse,
+                    ..
                 } => {
                     let condition_code = &self.source[condition.range()].trim();
                     writeln!(
