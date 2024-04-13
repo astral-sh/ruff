@@ -257,6 +257,23 @@ impl<'a> SemanticModel<'a> {
             .is_some_and(|binding| binding.kind.is_builtin())
     }
 
+    /// Return `true` if `member` is a reference to `builtins.$target`,
+    /// i.e. either `object` (where `object` is not overridden in the global scope),
+    /// or `builtins.object` (where `builtins` is imported as a module at the top level)
+    pub fn match_builtin_expr(&self, expr: &Expr, symbol: &str) -> bool {
+        debug_assert!(!symbol.contains('.'));
+        if self.seen_module(Modules::BUILTINS) {
+            // slow path
+            self.resolve_qualified_name(expr)
+                .is_some_and(|qualified_name| {
+                    matches!(qualified_name.segments(), ["builtins" | "", member] if *member == symbol)
+                })
+        } else {
+            // fast(er) path
+            matches!(expr, Expr::Name(ast::ExprName {id, ..}) if id == symbol && self.is_builtin(symbol))
+        }
+    }
+
     /// Return `true` if `member` is an "available" symbol, i.e., a symbol that has not been bound
     /// in the current scope, or in any containing scope.
     pub fn is_available(&self, member: &str) -> bool {
@@ -1138,6 +1155,7 @@ impl<'a> SemanticModel<'a> {
     pub fn add_module(&mut self, module: &str) {
         match module {
             "_typeshed" => self.seen.insert(Modules::TYPESHED),
+            "builtins" => self.seen.insert(Modules::BUILTINS),
             "collections" => self.seen.insert(Modules::COLLECTIONS),
             "dataclasses" => self.seen.insert(Modules::DATACLASSES),
             "datetime" => self.seen.insert(Modules::DATETIME),
@@ -1708,6 +1726,7 @@ bitflags! {
         const TYPING_EXTENSIONS = 1 << 15;
         const TYPESHED = 1 << 16;
         const DATACLASSES = 1 << 17;
+        const BUILTINS = 1 << 18;
     }
 }
 
