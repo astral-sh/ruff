@@ -40,10 +40,7 @@ pub(crate) fn delete_stmt(
     locator: &Locator,
     indexer: &Indexer,
 ) -> Edit {
-    if parent
-        .map(|parent| is_lone_child(stmt, parent))
-        .unwrap_or_default()
-    {
+    if parent.is_some_and(|parent| is_lone_child(stmt, parent)) {
         // If removing this node would lead to an invalid syntax tree, replace
         // it with a `pass`.
         Edit::range_replacement("pass".to_string(), stmt.range())
@@ -86,6 +83,7 @@ pub(crate) fn delete_comment(range: TextRange, locator: &Locator) -> Edit {
     }
     // Ex) `x = 1  # noqa`
     else if range.end() + trailing_space_len == line_range.end() {
+        // Replace `x = 1  # noqa` with `x = 1`.
         Edit::deletion(range.start() - leading_space_len, line_range.end())
     }
     // Ex) `x = 1  # noqa  # type: ignore`
@@ -96,13 +94,15 @@ pub(crate) fn delete_comment(range: TextRange, locator: &Locator) -> Edit {
         ))
         .starts_with('#')
     {
+        // Replace `# noqa  # type: ignore` with `# type: ignore`.
         Edit::deletion(range.start(), range.end() + trailing_space_len)
     }
     // Ex) `x = 1  # noqa here`
     else {
-        Edit::deletion(
-            range.start() + "# ".text_len(),
-            range.end() + trailing_space_len,
+        // Replace `# noqa here` with `# here`.
+        Edit::range_replacement(
+            "# ".to_string(),
+            TextRange::new(range.start(), range.end() + trailing_space_len),
         )
     }
 }

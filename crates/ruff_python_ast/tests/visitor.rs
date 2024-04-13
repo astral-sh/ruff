@@ -181,7 +181,7 @@ where
 }
 
 /// Emits a `tree` with a node for every visited AST node (labelled by the AST node's kind)
-/// and leafs for attributes.
+/// and leaves for attributes.
 #[derive(Default)]
 struct RecordVisitor {
     depth: usize,

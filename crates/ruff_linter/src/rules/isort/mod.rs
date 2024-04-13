@@ -342,6 +342,7 @@ mod tests {
     #[test_case(Path::new("star_before_others.py"))]
     #[test_case(Path::new("trailing_suffix.py"))]
     #[test_case(Path::new("type_comments.py"))]
+    #[test_case(Path::new("unicode.py"))]
     fn default(path: &Path) -> Result<()> {
         let snapshot = format!("{}", path.to_string_lossy());
         let diagnostics = test_path(
@@ -460,6 +461,31 @@ mod tests {
                         vec![],
                         FxHashMap::default(),
                     ),
+                    ..super::settings::Settings::default()
+                },
+                src: vec![test_resource_path("fixtures/isort")],
+                ..LinterSettings::for_rule(Rule::UnsortedImports)
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Path::new("separate_local_folder_imports.py"))]
+    fn known_local_folder_closest(path: &Path) -> Result<()> {
+        let snapshot = format!("known_local_folder_closest_{}", path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("isort").join(path).as_path(),
+            &LinterSettings {
+                isort: super::settings::Settings {
+                    known_modules: KnownModules::new(
+                        vec![],
+                        vec![],
+                        vec![pattern("ruff")],
+                        vec![],
+                        FxHashMap::default(),
+                    ),
+                    relative_imports_order: RelativeImportsOrder::ClosestToFurthest,
                     ..super::settings::Settings::default()
                 },
                 src: vec![test_resource_path("fixtures/isort")],

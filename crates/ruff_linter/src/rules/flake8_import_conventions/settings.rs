@@ -57,7 +57,7 @@ impl FromIterator<String> for BannedAliases {
     }
 }
 
-#[derive(Debug, CacheKey)]
+#[derive(Debug, Clone, CacheKey)]
 pub struct Settings {
     pub aliases: FxHashMap<String, String>,
     pub banned_aliases: FxHashMap<String, BannedAliases>,

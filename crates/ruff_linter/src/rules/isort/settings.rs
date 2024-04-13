@@ -44,7 +44,7 @@ impl Display for RelativeImportsOrder {
     }
 }
 
-#[derive(Debug, CacheKey)]
+#[derive(Debug, Clone, CacheKey)]
 #[allow(clippy::struct_excessive_bools)]
 pub struct Settings {
     pub required_imports: BTreeSet<String>,

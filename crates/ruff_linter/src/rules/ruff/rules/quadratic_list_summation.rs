@@ -24,9 +24,12 @@ use crate::importer::ImportRequest;
 /// quadratic complexity. The following methods are all linear in the number of
 /// lists:
 ///
-/// - `functools.reduce(operator.iconcat, lists, [])`
+/// - `functools.reduce(operator.iadd, lists, [])`
 /// - `list(itertools.chain.from_iterable(lists))`
 /// - `[item for sublist in lists for item in sublist]`
+///
+/// When fixing relevant violations, Ruff defaults to the `functools.reduce`
+/// form, which outperforms the other methods in [microbenchmarks].
 ///
 /// ## Example
 /// ```python
@@ -41,12 +44,14 @@ use crate::importer::ImportRequest;
 ///
 ///
 /// lists = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
-/// functools.reduce(operator.iconcat, lists, [])
+/// functools.reduce(operator.iadd, lists, [])
 /// ```
 ///
 /// ## References
 /// - [_How Not to Flatten a List of Lists in Python_](https://mathieularose.com/how-not-to-flatten-a-list-of-lists-in-python)
 /// - [_How do I make a flat list out of a list of lists?_](https://stackoverflow.com/questions/952914/how-do-i-make-a-flat-list-out-of-a-list-of-lists/953097#953097)
+///
+/// [microbenchmarks]: https://github.com/astral-sh/ruff/issues/5073#issuecomment-1591836349
 #[violation]
 pub struct QuadraticListSummation;
 

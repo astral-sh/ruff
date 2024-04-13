@@ -67,14 +67,15 @@ pub(crate) fn invalid_escape_sequence(
     token_range: TextRange,
 ) {
     let (token_source_code, string_start_location, kind) = match token {
-        Tok::FStringMiddle { value, kind } => {
+        Tok::FStringMiddle { kind, .. } => {
             if kind.is_raw_string() {
                 return;
             }
-            let Some(range) = indexer.fstring_ranges().innermost(token_range.start()) else {
+            let Some(f_string_range) = indexer.fstring_ranges().innermost(token_range.start())
+            else {
                 return;
             };
-            (&**value, range.start(), kind)
+            (locator.slice(token_range), f_string_range.start(), kind)
         }
         Tok::String { kind, .. } => {
             if kind.is_raw_string() {

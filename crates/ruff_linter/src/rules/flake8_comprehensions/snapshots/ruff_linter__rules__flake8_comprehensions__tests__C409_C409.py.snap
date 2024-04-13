@@ -143,6 +143,8 @@ C409.py:16:1: C409 [*] Unnecessary `list` literal passed to `tuple()` (rewrite a
 17 | |     1, 2
 18 | | ])
    | |__^ C409
+19 |   
+20 |   tuple((
    |
    = help: Rewrite as a `tuple` literal
 
@@ -155,5 +157,85 @@ C409.py:16:1: C409 [*] Unnecessary `list` literal passed to `tuple()` (rewrite a
 17 17 |     1, 2
 18    |-])
    18 |+)
+19 19 | 
+20 20 | tuple((
+21 21 |     1,
 
+C409.py:20:1: C409 [*] Unnecessary `tuple` literal passed to `tuple()` (remove the outer call to `tuple()`)
+   |
+18 |   ])
+19 |   
+20 | / tuple((
+21 | |     1,
+22 | | ))
+   | |__^ C409
+23 |   
+24 |   t6 = tuple([1])
+   |
+   = help: Remove outer `tuple` call
 
+ℹ Unsafe fix
+17 17 |     1, 2
+18 18 | ])
+19 19 | 
+20    |-tuple((
+   20 |+(
+21 21 |     1,
+22    |-))
+   22 |+)
+23 23 | 
+24 24 | t6 = tuple([1])
+25 25 | t7 = tuple((1,))
+
+C409.py:24:6: C409 [*] Unnecessary `list` literal passed to `tuple()` (rewrite as a `tuple` literal)
+   |
+22 | ))
+23 | 
+24 | t6 = tuple([1])
+   |      ^^^^^^^^^^ C409
+25 | t7 = tuple((1,))
+26 | t8 = tuple([1,])
+   |
+   = help: Rewrite as a `tuple` literal
+
+ℹ Unsafe fix
+21 21 |     1,
+22 22 | ))
+23 23 | 
+24    |-t6 = tuple([1])
+   24 |+t6 = (1,)
+25 25 | t7 = tuple((1,))
+26 26 | t8 = tuple([1,])
+
+C409.py:25:6: C409 [*] Unnecessary `tuple` literal passed to `tuple()` (remove the outer call to `tuple()`)
+   |
+24 | t6 = tuple([1])
+25 | t7 = tuple((1,))
+   |      ^^^^^^^^^^^ C409
+26 | t8 = tuple([1,])
+   |
+   = help: Remove outer `tuple` call
+
+ℹ Unsafe fix
+22 22 | ))
+23 23 | 
+24 24 | t6 = tuple([1])
+25    |-t7 = tuple((1,))
+   25 |+t7 = (1,)
+26 26 | t8 = tuple([1,])
+
+C409.py:26:6: C409 [*] Unnecessary `list` literal passed to `tuple()` (rewrite as a `tuple` literal)
+   |
+24 | t6 = tuple([1])
+25 | t7 = tuple((1,))
+26 | t8 = tuple([1,])
+   |      ^^^^^^^^^^^ C409
+   |
+   = help: Rewrite as a `tuple` literal
+
+ℹ Unsafe fix
+23 23 | 
+24 24 | t6 = tuple([1])
+25 25 | t7 = tuple((1,))
+26    |-t8 = tuple([1,])
+   26 |+t8 = (1,)

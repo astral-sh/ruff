@@ -1,4 +1,5 @@
 """Generate an MkDocs-compatible `docs` and `mkdocs.yml` from the README.md."""
+
 from __future__ import annotations
 
 import argparse
@@ -9,7 +10,10 @@ import subprocess
 from pathlib import Path
 from typing import NamedTuple
 
+import mdformat
 import yaml
+
+from _mdformat_utils import add_no_escape_text_plugin
 
 
 class Section(NamedTuple):
@@ -139,6 +143,11 @@ def main() -> None:
                     )
 
             f.write(clean_file_content(file_content, title))
+
+    # Format rules docs
+    add_no_escape_text_plugin()
+    for rule_doc in Path("docs/rules").glob("*.md"):
+        mdformat.file(rule_doc, extensions=["mkdocs", "admonition", "no-escape-text"])
 
     with Path("mkdocs.template.yml").open(encoding="utf8") as fp:
         config = yaml.safe_load(fp)

@@ -16,13 +16,15 @@ use ruff_macros::CacheKey;
 use crate::line_width::LineLength;
 use crate::registry::{Linter, Rule};
 use crate::rules::{
-    flake8_annotations, flake8_bandit, flake8_bugbear, flake8_builtins, flake8_comprehensions,
-    flake8_copyright, flake8_errmsg, flake8_gettext, flake8_implicit_str_concat,
-    flake8_import_conventions, flake8_pytest_style, flake8_quotes, flake8_self,
-    flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, isort, mccabe, pep8_naming,
-    pycodestyle, pydocstyle, pyflakes, pylint, pyupgrade,
+    flake8_annotations, flake8_bandit, flake8_boolean_trap, flake8_bugbear, flake8_builtins,
+    flake8_comprehensions, flake8_copyright, flake8_errmsg, flake8_gettext,
+    flake8_implicit_str_concat, flake8_import_conventions, flake8_pytest_style, flake8_quotes,
+    flake8_self, flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, isort, mccabe,
+    pep8_naming, pycodestyle, pydocstyle, pyflakes, pylint, pyupgrade,
 };
-use crate::settings::types::{ExtensionMapping, FilePatternSet, PerFileIgnores, PythonVersion};
+use crate::settings::types::{
+    CompiledPerFileIgnoreList, ExtensionMapping, FilePatternSet, PythonVersion,
+};
 use crate::{codes, RuleSelector};
 
 use super::line_width::IndentWidth;
@@ -129,6 +131,9 @@ macro_rules! display_settings {
     (@field $fmt:ident, $prefix:ident, $settings:ident.$field:ident | quoted) => {
         writeln!($fmt, "{}{} = \"{}\"", $prefix, stringify!($field), $settings.$field)?;
     };
+    (@field $fmt:ident, $prefix:ident, $settings:ident.$field:ident | globmatcher) => {
+        writeln!($fmt, "{}{} = \"{}\"", $prefix, stringify!($field), $settings.$field.glob())?;
+    };
     (@field $fmt:ident, $prefix:ident, $settings:ident.$field:ident | nested) => {
         write!($fmt, "{}", $settings.$field)?;
     };
@@ -206,14 +211,14 @@ macro_rules! display_settings {
     };
 }
 
-#[derive(Debug, CacheKey)]
+#[derive(Debug, Clone, CacheKey)]
 pub struct LinterSettings {
     pub exclude: FilePatternSet,
     pub extension: ExtensionMapping,
     pub project_root: PathBuf,
 
     pub rules: RuleTable,
-    pub per_file_ignores: PerFileIgnores,
+    pub per_file_ignores: CompiledPerFileIgnoreList,
     pub fix_safety: FixSafetyTable,
 
     pub target_version: PythonVersion,
@@ -237,6 +242,7 @@ pub struct LinterSettings {
     // Plugins
     pub flake8_annotations: flake8_annotations::settings::Settings,
     pub flake8_bandit: flake8_bandit::settings::Settings,
+    pub flake8_boolean_trap: flake8_boolean_trap::settings::Settings,
     pub flake8_bugbear: flake8_bugbear::settings::Settings,
     pub flake8_builtins: flake8_builtins::settings::Settings,
     pub flake8_comprehensions: flake8_comprehensions::settings::Settings,
@@ -387,7 +393,7 @@ impl LinterSettings {
             logger_objects: vec![],
             namespace_packages: vec![],
 
-            per_file_ignores: PerFileIgnores::default(),
+            per_file_ignores: CompiledPerFileIgnoreList::default(),
             fix_safety: FixSafetyTable::default(),
 
             src: vec![path_dedot::CWD.clone()],
@@ -399,16 +405,17 @@ impl LinterSettings {
             typing_modules: vec![],
             flake8_annotations: flake8_annotations::settings::Settings::default(),
             flake8_bandit: flake8_bandit::settings::Settings::default(),
+            flake8_boolean_trap: flake8_boolean_trap::settings::Settings::default(),
             flake8_bugbear: flake8_bugbear::settings::Settings::default(),
             flake8_builtins: flake8_builtins::settings::Settings::default(),
             flake8_comprehensions: flake8_comprehensions::settings::Settings::default(),
             flake8_copyright: flake8_copyright::settings::Settings::default(),
             flake8_errmsg: flake8_errmsg::settings::Settings::default(),
+            flake8_gettext: flake8_gettext::settings::Settings::default(),
             flake8_implicit_str_concat: flake8_implicit_str_concat::settings::Settings::default(),
             flake8_import_conventions: flake8_import_conventions::settings::Settings::default(),
             flake8_pytest_style: flake8_pytest_style::settings::Settings::default(),
             flake8_quotes: flake8_quotes::settings::Settings::default(),
-            flake8_gettext: flake8_gettext::settings::Settings::default(),
             flake8_self: flake8_self::settings::Settings::default(),
             flake8_tidy_imports: flake8_tidy_imports::settings::Settings::default(),
             flake8_type_checking: flake8_type_checking::settings::Settings::default(),

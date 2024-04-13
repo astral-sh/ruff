@@ -2,6 +2,7 @@
 
 use std::fs::File;
 use std::io::{self, stdout, BufWriter, Write};
+use std::num::NonZeroUsize;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::sync::mpsc::channel;
@@ -148,6 +149,13 @@ pub fn run(
     #[cfg(windows)]
     assert!(colored::control::set_virtual_terminal(true).is_ok());
 
+    // support FORCE_COLOR env var
+    if let Some(force_color) = std::env::var_os("FORCE_COLOR") {
+        if force_color.len() > 0 {
+            colored::control::set_override(true);
+        }
+    }
+
     set_up_logging(global_options.log_level())?;
 
     if let Some(deprecated_alias_warning) = deprecated_alias_warning {
@@ -204,10 +212,15 @@ fn format(args: FormatCommand, global_options: GlobalConfigArgs) -> Result<ExitS
     }
 }
 
-#[allow(clippy::needless_pass_by_value)] // TODO: remove once we start taking arguments from here
 fn server(args: ServerCommand, log_level: LogLevel) -> Result<ExitStatus> {
     let ServerCommand { preview } = args;
-    commands::server::run_server(preview, log_level)
+    // by default, we set the number of worker threads to `num_cpus`, with a maximum of 4.
+    let worker_threads = num_cpus::get().max(4);
+    commands::server::run_server(
+        preview,
+        NonZeroUsize::try_from(worker_threads).expect("a non-zero worker thread count"),
+        log_level,
+    )
 }
 
 pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<ExitStatus> {

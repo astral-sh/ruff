@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Check code snippets in docs are formatted by black."""
+
 from __future__ import annotations
 
 import argparse

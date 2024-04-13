@@ -127,8 +127,7 @@ impl<'src, 'loc> UselessSuppressionComments<'src, 'loc> {
         // check if the comment is inside of an expression.
         if comment
             .enclosing
-            .map(|n| !is_valid_enclosing_node(n))
-            .unwrap_or_default()
+            .is_some_and(|n| !is_valid_enclosing_node(n))
         {
             return Err(IgnoredReason::InNonStatement);
         }

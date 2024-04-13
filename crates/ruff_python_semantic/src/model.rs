@@ -397,7 +397,10 @@ impl<'a> SemanticModel<'a> {
                     //
                     // The `name` in `print(name)` should be treated as unresolved, but the `name` in
                     // `name: str` should be treated as used.
-                    BindingKind::Annotation => continue,
+                    //
+                    // Stub files are an exception. In a stub file, it _is_ considered valid to
+                    // resolve to a type annotation.
+                    BindingKind::Annotation if !self.in_stub_file() => continue,
 
                     // If it's a deletion, don't treat it as resolved, since the name is now
                     // unbound. For example, given:
@@ -677,7 +680,7 @@ impl<'a> SemanticModel<'a> {
     /// print(python_version)
     /// ```
     ///
-    /// ...then `resolve_call_path(${python_version})` will resolve to `sys.version_info`.
+    /// ...then `resolve_qualified_name(${python_version})` will resolve to `sys.version_info`.
     pub fn resolve_qualified_name<'name, 'expr: 'name>(
         &self,
         value: &'expr Expr,
@@ -1462,31 +1465,36 @@ impl<'a> SemanticModel<'a> {
         self.flags.intersects(SemanticModelFlags::TYPE_DEFINITION)
     }
 
-    /// Return `true` if the model is in a string type definition.
+    /// Return `true` if the model is visiting a "string type definition"
+    /// that was previously deferred when initially traversing the AST
     pub const fn in_string_type_definition(&self) -> bool {
         self.flags
             .intersects(SemanticModelFlags::STRING_TYPE_DEFINITION)
     }
 
-    /// Return `true` if the model is in a "simple" string type definition.
+    /// Return `true` if the model is visiting a "simple string type definition"
+    /// that was previously deferred when initially traversing the AST
     pub const fn in_simple_string_type_definition(&self) -> bool {
         self.flags
             .intersects(SemanticModelFlags::SIMPLE_STRING_TYPE_DEFINITION)
     }
 
-    /// Return `true` if the model is in a "complex" string type definition.
+    /// Return `true` if the model is visiting a "complex string type definition"
+    /// that was previously deferred when initially traversing the AST
     pub const fn in_complex_string_type_definition(&self) -> bool {
         self.flags
             .intersects(SemanticModelFlags::COMPLEX_STRING_TYPE_DEFINITION)
     }
 
-    /// Return `true` if the model is in a `__future__` type definition.
+    /// Return `true` if the model is visiting a "`__future__` type definition"
+    /// that was previously deferred when initially traversing the AST
     pub const fn in_future_type_definition(&self) -> bool {
         self.flags
             .intersects(SemanticModelFlags::FUTURE_TYPE_DEFINITION)
     }
 
-    /// Return `true` if the model is in any kind of deferred type definition.
+    /// Return `true` if the model is visiting any kind of type definition
+    /// that was previously deferred when initially traversing the AST
     pub const fn in_deferred_type_definition(&self) -> bool {
         self.flags
             .intersects(SemanticModelFlags::DEFERRED_TYPE_DEFINITION)
@@ -1520,6 +1528,12 @@ impl<'a> SemanticModel<'a> {
     /// Return `true` if the model is in an f-string.
     pub const fn in_f_string(&self) -> bool {
         self.flags.intersects(SemanticModelFlags::F_STRING)
+    }
+
+    /// Return `true` if the model is in an f-string replacement field.
+    pub const fn in_f_string_replacement_field(&self) -> bool {
+        self.flags
+            .intersects(SemanticModelFlags::F_STRING_REPLACEMENT_FIELD)
     }
 
     /// Return `true` if the model is in boolean test.
@@ -1565,9 +1579,14 @@ impl<'a> SemanticModel<'a> {
     }
 
     /// Return `true` if `__future__`-style type annotations are enabled.
-    pub const fn future_annotations(&self) -> bool {
+    pub const fn future_annotations_or_stub(&self) -> bool {
         self.flags
-            .intersects(SemanticModelFlags::FUTURE_ANNOTATIONS)
+            .intersects(SemanticModelFlags::FUTURE_ANNOTATIONS_OR_STUB)
+    }
+
+    /// Return `true` if the model is in a stub file (i.e., a file with a `.pyi` extension).
+    pub const fn in_stub_file(&self) -> bool {
+        self.flags.intersects(SemanticModelFlags::STUB_FILE)
     }
 
     /// Return `true` if the model is in a named expression assignment (e.g., `x := 1`).
@@ -1580,6 +1599,27 @@ impl<'a> SemanticModel<'a> {
     pub const fn in_comprehension_assignment(&self) -> bool {
         self.flags
             .intersects(SemanticModelFlags::COMPREHENSION_ASSIGNMENT)
+    }
+
+    /// Return `true` if the model is visiting the r.h.s. of an `__all__` definition
+    /// (e.g. `"foo"` in `__all__ = ["foo"]`)
+    pub const fn in_dunder_all_definition(&self) -> bool {
+        self.flags
+            .intersects(SemanticModelFlags::DUNDER_ALL_DEFINITION)
+    }
+
+    /// Return `true` if the model is visiting an item in a class's bases tuple
+    /// (e.g. `Foo` in `class Bar(Foo): ...`)
+    pub const fn in_class_base(&self) -> bool {
+        self.flags.intersects(SemanticModelFlags::CLASS_BASE)
+    }
+
+    /// Return `true` if the model is visiting an item in a class's bases tuple
+    /// that was initially deferred while traversing the AST.
+    /// (This only happens in stub files.)
+    pub const fn in_deferred_class_base(&self) -> bool {
+        self.flags
+            .intersects(SemanticModelFlags::DEFERRED_CLASS_BASE)
     }
 
     /// Return an iterator over all bindings shadowed by the given [`BindingId`], within the
@@ -1675,7 +1715,7 @@ bitflags! {
     /// Flags indicating the current model state.
     #[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
     pub struct SemanticModelFlags: u32 {
-       /// The model is in a type annotation that will only be evaluated when running a type
+        /// The model is in a type annotation that will only be evaluated when running a type
         /// checker.
         ///
         /// For example, the model could be visiting `int` in:
@@ -1749,6 +1789,9 @@ bitflags! {
         ///
         /// "Simple" string type definitions are those that consist of a single string literal,
         /// as opposed to an implicitly concatenated string literal.
+        ///
+        /// Note that this flag is only set when we are actually *visiting* the deferred definition,
+        /// not when we "pass by" it when initially traversing the source tree.
         const SIMPLE_STRING_TYPE_DEFINITION =  1 << 4;
 
         /// The model is in a (deferred) "complex" string type definition.
@@ -1760,6 +1803,9 @@ bitflags! {
         ///
         /// "Complex" string type definitions are those that consist of a implicitly concatenated
         /// string literals. These are uncommon but valid.
+        ///
+        /// Note that this flag is only set when we are actually *visiting* the deferred definition,
+        /// not when we "pass by" it when initially traversing the source tree.
         const COMPLEX_STRING_TYPE_DEFINITION = 1 << 5;
 
         /// The model is in a (deferred) `__future__` type definition.
@@ -1773,6 +1819,20 @@ bitflags! {
         ///
         /// `__future__`-style type annotations are only enabled if the `annotations` feature
         /// is enabled via `from __future__ import annotations`.
+        ///
+        /// This flag should only be set in contexts where PEP-563 semantics are relevant to
+        /// resolution of the type definition. For example, the flag should not be set
+        /// in the following context, because the type definition is not inside a type annotation,
+        /// so whether or not `from __future__ import annotations` is active has no relevance:
+        /// ```python
+        /// from __future__ import annotations
+        /// from typing import TypeAlias
+        ///
+        /// X: TypeAlias = list[int]
+        /// ```
+        ///
+        /// Note also that this flag is only set when we are actually *visiting* the deferred definition,
+        /// not when we "pass by" it when initially traversing the source tree.
         const FUTURE_TYPE_DEFINITION = 1 << 6;
 
         /// The model is in an exception handler.
@@ -1863,7 +1923,8 @@ bitflags! {
         /// any other non-`__future__`-importing statements.
         const FUTURES_BOUNDARY = 1 << 14;
 
-        /// `__future__`-style type annotations are enabled in this model.
+        /// The model is in a file that has `from __future__ import annotations`
+        /// at the top of the module.
         ///
         /// For example, the model could be visiting `x` in:
         /// ```python
@@ -1875,6 +1936,15 @@ bitflags! {
         /// ```
         const FUTURE_ANNOTATIONS = 1 << 15;
 
+        /// The model is in a Python stub file (i.e., a `.pyi` file).
+        const STUB_FILE = 1 << 16;
+
+        /// `__future__`-style type annotations are enabled in this model.
+        /// That could be because it's a stub file,
+        /// or it could be because it's a non-stub file that has `from __future__ import annotations`
+        /// a the top of the module.
+        const FUTURE_ANNOTATIONS_OR_STUB = Self::FUTURE_ANNOTATIONS.bits() | Self::STUB_FILE.bits();
+
         /// The model has traversed past the module docstring.
         ///
         /// For example, the model could be visiting `x` in:
@@ -1883,17 +1953,31 @@ bitflags! {
         ///
         /// x: int = 1
         /// ```
-        const MODULE_DOCSTRING_BOUNDARY = 1 << 16;
+        const MODULE_DOCSTRING_BOUNDARY = 1 << 17;
 
-        /// The model is in a type parameter definition.
+        /// The model is in a (deferred) [type parameter definition].
         ///
-        /// For example, the model could be visiting `Record` in:
+        /// For example, the model could be visiting `T`, `P` or `Ts` in:
         /// ```python
-        /// from typing import TypeVar
+        /// class Foo[T, *Ts, **P]: pass
+        /// ```
         ///
-        /// Record = TypeVar("Record")
+        /// Note that this flag is *not* set for "pre-PEP-695" TypeVars, ParamSpecs or TypeVarTuples.
+        /// None of the following would lead to the flag being set:
         ///
-        const TYPE_PARAM_DEFINITION = 1 << 17;
+        /// ```python
+        /// from typing import TypeVar, ParamSpec, TypeVarTuple
+        ///
+        /// T = TypeVar("T")
+        /// P = ParamSpec("P")
+        /// Ts = TypeVarTuple("Ts")
+        /// ```
+        ///
+        /// Note also that this flag is only set when we are actually *visiting* the deferred definition,
+        /// not when we "pass by" it when initially traversing the source tree.
+        ///
+        /// [type parameter definition]: https://docs.python.org/3/reference/executionmodel.html#annotation-scopes
+        const TYPE_PARAM_DEFINITION = 1 << 18;
 
         /// The model is in a named expression assignment.
         ///
@@ -1901,7 +1985,7 @@ bitflags! {
         /// ```python
         /// if (x := 1): ...
         /// ```
-        const NAMED_EXPRESSION_ASSIGNMENT = 1 << 18;
+        const NAMED_EXPRESSION_ASSIGNMENT = 1 << 19;
 
         /// The model is in a comprehension variable assignment.
         ///
@@ -1909,7 +1993,7 @@ bitflags! {
         /// ```python
         /// [_ for x in range(10)]
         /// ```
-        const COMPREHENSION_ASSIGNMENT = 1 << 19;
+        const COMPREHENSION_ASSIGNMENT = 1 << 20;
 
         /// The model is in a module / class / function docstring.
         ///
@@ -1928,7 +2012,42 @@ bitflags! {
         ///     """Function docstring."""
         ///     pass
         /// ```
-        const DOCSTRING = 1 << 20;
+        const DOCSTRING = 1 << 21;
+
+        /// The model is visiting the r.h.s. of a module-level `__all__` definition.
+        ///
+        /// This could be any module-level statement that assigns or alters `__all__`,
+        /// for example:
+        /// ```python
+        /// __all__ = ["foo"]
+        /// __all__: str = ["foo"]
+        /// __all__ = ("bar",)
+        /// __all__ += ("baz,")
+        /// ```
+        const DUNDER_ALL_DEFINITION = 1 << 22;
+
+        /// The model is in an f-string replacement field.
+        ///
+        /// For example, the model could be visiting `x` or `y` in:
+        ///
+        /// ```python
+        /// f"first {x} second {y}"
+        /// ```
+        const F_STRING_REPLACEMENT_FIELD = 1 << 23;
+
+        /// The model is visiting the bases tuple of a class.
+        ///
+        /// For example, the model could be visiting `Foo` or `Bar` in:
+        ///
+        /// ```python
+        /// class Baz(Foo, Bar):
+        ///     pass
+        /// ```
+        const CLASS_BASE = 1 << 24;
+
+        /// The model is visiting a class base that was initially deferred
+        /// while traversing the AST. (This only happens in stub files.)
+        const DEFERRED_CLASS_BASE = 1 << 25;
 
         /// The context is in any type annotation.
         const ANNOTATION = Self::TYPING_ONLY_ANNOTATION.bits() | Self::RUNTIME_EVALUATED_ANNOTATION.bits() | Self::RUNTIME_REQUIRED_ANNOTATION.bits();
@@ -1951,11 +2070,11 @@ bitflags! {
 
 impl SemanticModelFlags {
     pub fn new(path: &Path) -> Self {
-        let mut flags = Self::default();
         if is_python_stub_file(path) {
-            flags |= Self::FUTURE_ANNOTATIONS;
+            Self::STUB_FILE
+        } else {
+            Self::default()
         }
-        flags
     }
 }
 

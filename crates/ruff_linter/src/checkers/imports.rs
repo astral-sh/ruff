@@ -20,12 +20,7 @@ use crate::rules::isort::block::{Block, BlockBuilder};
 use crate::settings::LinterSettings;
 
 fn extract_import_map(path: &Path, package: Option<&Path>, blocks: &[&Block]) -> Option<ImportMap> {
-    let Some(package) = package else {
-        return None;
-    };
-    let Some(module_path) = to_module_path(package, path) else {
-        return None;
-    };
+    let module_path = to_module_path(package?, path)?;
 
     let num_imports = blocks.iter().map(|block| block.imports.len()).sum();
     let mut module_imports = Vec::with_capacity(num_imports);

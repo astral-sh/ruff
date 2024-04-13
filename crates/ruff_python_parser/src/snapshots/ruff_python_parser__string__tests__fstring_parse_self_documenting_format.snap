@@ -50,7 +50,7 @@ expression: parse_ast
                                     ],
                                     flags: FStringFlags {
                                         quote_style: Double,
-                                        raw: false,
+                                        prefix: Regular,
                                         triple_quoted: false,
                                     },
                                 },

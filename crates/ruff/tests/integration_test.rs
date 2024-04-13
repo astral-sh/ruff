@@ -1353,6 +1353,7 @@ fn unreadable_pyproject_toml() -> Result<()> {
     // Create an empty file with 000 permissions
     fs::OpenOptions::new()
         .create(true)
+        .truncate(true)
         .write(true)
         .mode(0o000)
         .open(pyproject_toml)?;

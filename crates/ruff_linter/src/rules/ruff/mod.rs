@@ -16,7 +16,9 @@ mod tests {
 
     use crate::pyproject_toml::lint_pyproject_toml;
     use crate::registry::Rule;
-    use crate::settings::types::{PerFileIgnore, PerFileIgnores, PreviewMode, PythonVersion};
+    use crate::settings::types::{
+        CompiledPerFileIgnoreList, PerFileIgnore, PreviewMode, PythonVersion,
+    };
     use crate::test::{test_path, test_resource_path};
     use crate::{assert_messages, settings};
 
@@ -27,6 +29,7 @@ mod tests {
     #[test_case(Rule::ImplicitOptional, Path::new("RUF013_0.py"))]
     #[test_case(Rule::ImplicitOptional, Path::new("RUF013_1.py"))]
     #[test_case(Rule::ImplicitOptional, Path::new("RUF013_2.py"))]
+    #[test_case(Rule::ImplicitOptional, Path::new("RUF013_3.py"))]
     #[test_case(Rule::MutableClassDefault, Path::new("RUF012.py"))]
     #[test_case(Rule::MutableDataclassDefault, Path::new("RUF008.py"))]
     #[test_case(Rule::PairwiseOverZipped, Path::new("RUF007.py"))]
@@ -178,7 +181,7 @@ mod tests {
         let mut settings =
             settings::LinterSettings::for_rules(vec![Rule::UnusedNOQA, Rule::UnusedImport]);
 
-        settings.per_file_ignores = PerFileIgnores::resolve(vec![PerFileIgnore::new(
+        settings.per_file_ignores = CompiledPerFileIgnoreList::resolve(vec![PerFileIgnore::new(
             "RUF100_2.py".to_string(),
             &["F401".parse().unwrap()],
             None,
@@ -235,7 +238,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("ruff/ruff_per_file_ignores.py"),
             &settings::LinterSettings {
-                per_file_ignores: PerFileIgnores::resolve(vec![PerFileIgnore::new(
+                per_file_ignores: CompiledPerFileIgnoreList::resolve(vec![PerFileIgnore::new(
                     "ruff_per_file_ignores.py".to_string(),
                     &["F401".parse().unwrap(), "RUF100".parse().unwrap()],
                     None,

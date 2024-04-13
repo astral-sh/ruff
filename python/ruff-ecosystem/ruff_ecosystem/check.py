@@ -1,6 +1,7 @@
 """
 Execution, comparison, and summary of `ruff check` ecosystem checks.
 """
+
 from __future__ import annotations
 
 import asyncio

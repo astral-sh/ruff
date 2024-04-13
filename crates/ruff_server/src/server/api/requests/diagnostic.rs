@@ -19,11 +19,15 @@ impl super::BackgroundDocumentRequestHandler for DocumentDiagnostic {
         _notifier: Notifier,
         _params: types::DocumentDiagnosticParams,
     ) -> Result<DocumentDiagnosticReportResult> {
-        let diagnostics = crate::lint::check(
-            snapshot.document(),
-            &snapshot.configuration().linter,
-            snapshot.encoding(),
-        );
+        let diagnostics = if snapshot.client_settings().lint() {
+            crate::lint::check(
+                snapshot.document(),
+                &snapshot.configuration().linter,
+                snapshot.encoding(),
+            )
+        } else {
+            vec![]
+        };
 
         Ok(DocumentDiagnosticReportResult::Report(
             types::DocumentDiagnosticReport::Full(RelatedFullDocumentDiagnosticReport {

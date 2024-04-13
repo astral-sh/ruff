@@ -39,7 +39,7 @@ impl Display for Strictness {
     }
 }
 
-#[derive(Debug, CacheKey, Default)]
+#[derive(Debug, Clone, CacheKey, Default)]
 pub struct Settings {
     pub ban_relative_imports: Strictness,
     pub banned_api: FxHashMap<String, ApiBan>,

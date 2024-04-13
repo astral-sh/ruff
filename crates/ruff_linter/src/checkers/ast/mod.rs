@@ -31,14 +31,14 @@ use std::path::Path;
 use itertools::Itertools;
 use log::debug;
 use ruff_python_ast::{
-    self as ast, Comprehension, ElifElseClause, ExceptHandler, Expr, ExprContext, Keyword,
-    MatchCase, Parameter, ParameterWithDefault, Parameters, Pattern, Stmt, Suite, UnaryOp,
+    self as ast, Comprehension, ElifElseClause, ExceptHandler, Expr, ExprContext, FStringElement,
+    Keyword, MatchCase, Parameter, ParameterWithDefault, Parameters, Pattern, Stmt, Suite, UnaryOp,
 };
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use ruff_diagnostics::{Diagnostic, IsolationLevel};
 use ruff_notebook::{CellOffsets, NotebookIndex};
-use ruff_python_ast::all::{extract_all_names, DunderAllFlags};
+use ruff_python_ast::all::{extract_all_names, DunderAllDefinition, DunderAllFlags};
 use ruff_python_ast::helpers::{
     collect_import_from_member, extract_handled_exceptions, is_docstring_stmt, to_module_path,
 };
@@ -364,6 +364,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 self.semantic.flags |= SemanticModelFlags::MODULE_DOCSTRING_BOUNDARY;
                 self.semantic.flags |= SemanticModelFlags::FUTURES_BOUNDARY;
                 if !(self.semantic.seen_import_boundary()
+                    || stmt.is_ipy_escape_command_stmt()
                     || helpers::is_assignment_to_a_dunder(stmt)
                     || helpers::in_nested_block(self.semantic.current_statements())
                     || imports::is_matplotlib_activation(stmt, self.semantic())
@@ -570,6 +571,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
         match stmt {
             Stmt::FunctionDef(
                 function_def @ ast::StmtFunctionDef {
+                    name,
                     body,
                     parameters,
                     decorator_list,
@@ -689,9 +691,21 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 if let Some(globals) = Globals::from_body(body) {
                     self.semantic.set_globals(globals);
                 }
+                let scope_id = self.semantic.scope_id;
+                self.analyze.scopes.push(scope_id);
+                self.semantic.pop_scope(); // Function scope
+                self.semantic.pop_definition();
+                self.semantic.pop_scope(); // Type parameter scope
+                self.add_binding(
+                    name,
+                    stmt.identifier(),
+                    BindingKind::FunctionDefinition(scope_id),
+                    BindingFlags::empty(),
+                );
             }
             Stmt::ClassDef(
                 class_def @ ast::StmtClassDef {
+                    name,
                     body,
                     arguments,
                     decorator_list,
@@ -710,7 +724,9 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 }
 
                 if let Some(arguments) = arguments {
+                    self.semantic.flags |= SemanticModelFlags::CLASS_BASE;
                     self.visit_arguments(arguments);
+                    self.semantic.flags -= SemanticModelFlags::CLASS_BASE;
                 }
 
                 let definition = docstrings::extraction::extract_definition(
@@ -730,6 +746,18 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 // Set the docstring state before visiting the class body.
                 self.docstring_state = DocstringState::Expected;
                 self.visit_body(body);
+
+                let scope_id = self.semantic.scope_id;
+                self.analyze.scopes.push(scope_id);
+                self.semantic.pop_scope(); // Class scope
+                self.semantic.pop_definition();
+                self.semantic.pop_scope(); // Type parameter scope
+                self.add_binding(
+                    name,
+                    stmt.identifier(),
+                    BindingKind::ClassDefinition(scope_id),
+                    BindingFlags::empty(),
+                );
             }
             Stmt::TypeAlias(ast::StmtTypeAlias {
                 range: _,
@@ -886,35 +914,6 @@ impl<'a> Visitor<'a> for Checker<'a> {
         };
 
         // Step 3: Clean-up
-        match stmt {
-            Stmt::FunctionDef(ast::StmtFunctionDef { name, .. }) => {
-                let scope_id = self.semantic.scope_id;
-                self.analyze.scopes.push(scope_id);
-                self.semantic.pop_scope(); // Function scope
-                self.semantic.pop_definition();
-                self.semantic.pop_scope(); // Type parameter scope
-                self.add_binding(
-                    name,
-                    stmt.identifier(),
-                    BindingKind::FunctionDefinition(scope_id),
-                    BindingFlags::empty(),
-                );
-            }
-            Stmt::ClassDef(ast::StmtClassDef { name, .. }) => {
-                let scope_id = self.semantic.scope_id;
-                self.analyze.scopes.push(scope_id);
-                self.semantic.pop_scope(); // Class scope
-                self.semantic.pop_definition();
-                self.semantic.pop_scope(); // Type parameter scope
-                self.add_binding(
-                    name,
-                    stmt.identifier(),
-                    BindingKind::ClassDefinition(scope_id),
-                    BindingFlags::empty(),
-                );
-            }
-            _ => {}
-        }
 
         // Step 4: Analysis
         analyze::statement(stmt, self);
@@ -933,11 +932,24 @@ impl<'a> Visitor<'a> for Checker<'a> {
 
     fn visit_expr(&mut self, expr: &'a Expr) {
         // Step 0: Pre-processing
+        if self.source_type.is_stub()
+            && self.semantic.in_class_base()
+            && !self.semantic.in_deferred_class_base()
+        {
+            self.visit
+                .class_bases
+                .push((expr, self.semantic.snapshot()));
+            return;
+        }
+
         if !self.semantic.in_typing_literal()
+            // `in_deferred_type_definition()` will only be `true` if we're now visiting the deferred nodes
+            // after having already traversed the source tree once. If we're now visiting the deferred nodes,
+            // we can't defer again, or we'll infinitely recurse!
             && !self.semantic.in_deferred_type_definition()
             && self.semantic.in_type_definition()
-            && self.semantic.future_annotations()
-            && (self.semantic.in_typing_only_annotation() || self.source_type.is_stub())
+            && self.semantic.future_annotations_or_stub()
+            && (self.semantic.in_annotation() || self.source_type.is_stub())
         {
             if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = expr {
                 self.visit.string_type_definitions.push((
@@ -1578,6 +1590,15 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 .push((bound, self.semantic.snapshot()));
         }
     }
+
+    fn visit_f_string_element(&mut self, f_string_element: &'a FStringElement) {
+        let snapshot = self.semantic.flags;
+        if f_string_element.is_expression() {
+            self.semantic.flags |= SemanticModelFlags::F_STRING_REPLACEMENT_FIELD;
+        }
+        visitor::walk_f_string_element(self, f_string_element);
+        self.semantic.flags = snapshot;
+    }
 }
 
 impl<'a> Checker<'a> {
@@ -1836,7 +1857,7 @@ impl<'a> Checker<'a> {
         if matches!(
             parent,
             Stmt::AnnAssign(ast::StmtAnnAssign { value: None, .. })
-        ) && !(self.semantic.in_annotation() || self.source_type.is_stub())
+        ) && !self.semantic.in_annotation()
         {
             self.add_binding(id, expr.range(), BindingKind::Annotation, flags);
             return;
@@ -1954,12 +1975,66 @@ impl<'a> Checker<'a> {
         scope.add(id, binding_id);
     }
 
+    /// After initial traversal of the AST, visit all class bases that were deferred.
+    ///
+    /// This method should only be relevant in stub files, where forward references are
+    /// legal in class bases. For other kinds of Python files, using a forward reference
+    /// in a class base is never legal, so `self.visit.class_bases` should always be empty.
+    ///
+    /// For example, in a stub file:
+    /// ```python
+    /// class Foo(list[Bar]): ...  # <-- `Bar` is a forward reference in a class base
+    /// class Bar: ...
+    /// ```
+    fn visit_deferred_class_bases(&mut self) {
+        let snapshot = self.semantic.snapshot();
+        let deferred_bases = std::mem::take(&mut self.visit.class_bases);
+        debug_assert!(
+            self.source_type.is_stub() || deferred_bases.is_empty(),
+            "Class bases should never be deferred outside of stub files"
+        );
+        for (expr, snapshot) in deferred_bases {
+            self.semantic.restore(snapshot);
+            // Set this flag to avoid infinite recursion, or we'll just defer it again:
+            self.semantic.flags |= SemanticModelFlags::DEFERRED_CLASS_BASE;
+            self.visit_expr(expr);
+        }
+        self.semantic.restore(snapshot);
+    }
+
+    /// After initial traversal of the AST, visit all "future type definitions".
+    ///
+    /// A "future type definition" is a type definition where [PEP 563] semantics
+    /// apply (i.e., an annotation in a module that has `from __future__ import annotations`
+    /// at the top of the file, or an annotation in a stub file). These type definitions
+    /// support forward references, so they are deferred on initial traversal
+    /// of the source tree.
+    ///
+    /// For example:
+    /// ```python
+    /// from __future__ import annotations
+    ///
+    /// def foo() -> Bar:  # <-- return annotation is a "future type definition"
+    ///     return Bar()
+    ///
+    /// class Bar: pass
+    /// ```
+    ///
+    /// [PEP 563]: https://peps.python.org/pep-0563/
     fn visit_deferred_future_type_definitions(&mut self) {
         let snapshot = self.semantic.snapshot();
         while !self.visit.future_type_definitions.is_empty() {
             let type_definitions = std::mem::take(&mut self.visit.future_type_definitions);
             for (expr, snapshot) in type_definitions {
                 self.semantic.restore(snapshot);
+
+                // Type definitions should only be considered "`__future__` type definitions"
+                // if they are annotations in a module where `from __future__ import
+                // annotations` is active, or they are type definitions in a stub file.
+                debug_assert!(
+                    self.semantic.future_annotations_or_stub()
+                        && (self.source_type.is_stub() || self.semantic.in_annotation())
+                );
 
                 self.semantic.flags |= SemanticModelFlags::TYPE_DEFINITION
                     | SemanticModelFlags::FUTURE_TYPE_DEFINITION;
@@ -1969,6 +2044,19 @@ impl<'a> Checker<'a> {
         self.semantic.restore(snapshot);
     }
 
+    /// After initial traversal of the AST, visit all [type parameter definitions].
+    ///
+    /// Type parameters natively support forward references,
+    /// so are always deferred during initial traversal of the source tree.
+    ///
+    /// For example:
+    /// ```python
+    /// class Foo[T: Bar]: pass  # <-- Forward reference used in definition of type parameter `T`
+    /// type X[T: Bar] = Foo[T]  # <-- Ditto
+    /// class Bar: pass
+    /// ```
+    ///
+    /// [type parameter definitions]: https://docs.python.org/3/reference/executionmodel.html#annotation-scopes
     fn visit_deferred_type_param_definitions(&mut self) {
         let snapshot = self.semantic.snapshot();
         while !self.visit.type_param_definitions.is_empty() {
@@ -1984,6 +2072,17 @@ impl<'a> Checker<'a> {
         self.semantic.restore(snapshot);
     }
 
+    /// After initial traversal of the AST, visit all "string type definitions",
+    /// i.e., type definitions that are enclosed within quotes so as to allow
+    /// the type definition to use forward references.
+    ///
+    /// For example:
+    /// ```python
+    /// def foo() -> "Bar":  # <-- return annotation is a "string type definition"
+    ///     return Bar()
+    ///
+    /// class Bar: pass
+    /// ```
     fn visit_deferred_string_type_definitions(&mut self, allocator: &'a typed_arena::Arena<Expr>) {
         let snapshot = self.semantic.snapshot();
         while !self.visit.string_type_definitions.is_empty() {
@@ -1996,7 +2095,7 @@ impl<'a> Checker<'a> {
 
                     self.semantic.restore(snapshot);
 
-                    if self.semantic.in_annotation() && self.semantic.future_annotations() {
+                    if self.semantic.in_annotation() && self.semantic.future_annotations_or_stub() {
                         if self.enabled(Rule::QuotedAnnotation) {
                             pyupgrade::rules::quoted_annotation(self, value, range);
                         }
@@ -2032,6 +2131,11 @@ impl<'a> Checker<'a> {
         self.semantic.restore(snapshot);
     }
 
+    /// After initial traversal of the AST, visit all function bodies.
+    ///
+    /// Function bodies are always deferred on initial traversal of the source tree,
+    /// as the body of a function may validly contain references to global-scope symbols
+    /// that were not yet defined at the point when the function was defined.
     fn visit_deferred_functions(&mut self) {
         let snapshot = self.semantic.snapshot();
         while !self.visit.functions.is_empty() {
@@ -2055,8 +2159,9 @@ impl<'a> Checker<'a> {
         self.semantic.restore(snapshot);
     }
 
-    /// Visit all deferred lambdas. Returns a list of snapshots, such that the caller can restore
-    /// the semantic model to the state it was in before visiting the deferred lambdas.
+    /// After initial traversal of the source tree has been completed,
+    /// visit all lambdas. Lambdas are deferred during the initial traversal
+    /// for the same reason as function bodies.
     fn visit_deferred_lambdas(&mut self) {
         let snapshot = self.semantic.snapshot();
         while !self.visit.lambdas.is_empty() {
@@ -2082,10 +2187,12 @@ impl<'a> Checker<'a> {
         self.semantic.restore(snapshot);
     }
 
-    /// Recursively visit all deferred AST nodes, including lambdas, functions, and type
-    /// annotations.
+    /// After initial traversal of the source tree has been completed,
+    /// recursively visit all AST nodes that were deferred on the first pass.
+    /// This includes lambdas, functions, type parameters, and type annotations.
     fn visit_deferred(&mut self, allocator: &'a typed_arena::Arena<Expr>) {
         while !self.visit.is_empty() {
+            self.visit_deferred_class_bases();
             self.visit_deferred_functions();
             self.visit_deferred_type_param_definitions();
             self.visit_deferred_lambdas();
@@ -2098,46 +2205,54 @@ impl<'a> Checker<'a> {
     fn visit_exports(&mut self) {
         let snapshot = self.semantic.snapshot();
 
-        let exports: Vec<(&str, TextRange)> = self
+        let definitions: Vec<DunderAllDefinition> = self
             .semantic
             .global_scope()
             .get_all("__all__")
             .map(|binding_id| &self.semantic.bindings[binding_id])
             .filter_map(|binding| match &binding.kind {
                 BindingKind::Export(Export { names }) => {
-                    Some(names.iter().map(|name| (*name, binding.range())))
+                    Some(DunderAllDefinition::new(binding.range(), names.to_vec()))
                 }
                 _ => None,
             })
-            .flatten()
             .collect();
 
-        for (name, range) in exports {
-            if let Some(binding_id) = self.semantic.global_scope().get(name) {
-                // Mark anything referenced in `__all__` as used.
-                // TODO(charlie): `range` here should be the range of the name in `__all__`, not
-                // the range of `__all__` itself.
-                self.semantic
-                    .add_global_reference(binding_id, ExprContext::Load, range);
-            } else {
-                if self.semantic.global_scope().uses_star_imports() {
-                    if self.enabled(Rule::UndefinedLocalWithImportStarUsage) {
-                        self.diagnostics.push(Diagnostic::new(
-                            pyflakes::rules::UndefinedLocalWithImportStarUsage {
-                                name: (*name).to_string(),
-                            },
-                            range,
-                        ));
-                    }
+        for definition in definitions {
+            for export in definition.names() {
+                let (name, range) = (export.name(), export.range());
+                if let Some(binding_id) = self.semantic.global_scope().get(name) {
+                    self.semantic.flags |= SemanticModelFlags::DUNDER_ALL_DEFINITION;
+                    // Mark anything referenced in `__all__` as used.
+                    self.semantic
+                        .add_global_reference(binding_id, ExprContext::Load, range);
+                    self.semantic.flags -= SemanticModelFlags::DUNDER_ALL_DEFINITION;
                 } else {
-                    if self.enabled(Rule::UndefinedExport) {
-                        if !self.path.ends_with("__init__.py") {
-                            self.diagnostics.push(Diagnostic::new(
-                                pyflakes::rules::UndefinedExport {
-                                    name: (*name).to_string(),
-                                },
-                                range,
-                            ));
+                    if self.semantic.global_scope().uses_star_imports() {
+                        if self.enabled(Rule::UndefinedLocalWithImportStarUsage) {
+                            self.diagnostics.push(
+                                Diagnostic::new(
+                                    pyflakes::rules::UndefinedLocalWithImportStarUsage {
+                                        name: name.to_string(),
+                                    },
+                                    range,
+                                )
+                                .with_parent(definition.start()),
+                            );
+                        }
+                    } else {
+                        if self.enabled(Rule::UndefinedExport) {
+                            if !self.path.ends_with("__init__.py") {
+                                self.diagnostics.push(
+                                    Diagnostic::new(
+                                        pyflakes::rules::UndefinedExport {
+                                            name: name.to_string(),
+                                        },
+                                        range,
+                                    )
+                                    .with_parent(definition.start()),
+                                );
+                            }
                         }
                     }
                 }

@@ -1,36 +1,46 @@
 use std::path::{Path, PathBuf};
 
-use globset::GlobMatcher;
 use log::debug;
 use path_absolutize::Absolutize;
 
 use crate::registry::RuleSet;
+use crate::settings::types::CompiledPerFileIgnoreList;
 
 /// Create a set with codes matching the pattern/code pairs.
-pub(crate) fn ignores_from_path(
-    path: &Path,
-    pattern_code_pairs: &[(GlobMatcher, GlobMatcher, RuleSet)],
-) -> RuleSet {
+pub(crate) fn ignores_from_path(path: &Path, ignore_list: &CompiledPerFileIgnoreList) -> RuleSet {
     let file_name = path.file_name().expect("Unable to parse filename");
-    pattern_code_pairs
+    ignore_list
         .iter()
-        .filter_map(|(absolute, basename, rules)| {
-            if basename.is_match(file_name) {
+        .filter_map(|entry| {
+            if entry.basename_matcher.is_match(file_name) {
+                if entry.negated { None } else {
+                    debug!(
+                        "Adding per-file ignores for {:?} due to basename match on {:?}: {:?}",
+                        path,
+                        entry.basename_matcher.glob().regex(),
+                        entry.rules
+                    );
+                    Some(&entry.rules)
+                }
+            } else if entry.absolute_matcher.is_match(path) {
+                if entry.negated { None } else {
+                    debug!(
+                        "Adding per-file ignores for {:?} due to absolute match on {:?}: {:?}",
+                        path,
+                        entry.absolute_matcher.glob().regex(),
+                        entry.rules
+                    );
+                    Some(&entry.rules)
+                }
+            } else if entry.negated {
                 debug!(
-                    "Adding per-file ignores for {:?} due to basename match on {:?}: {:?}",
+                    "Adding per-file ignores for {:?} due to negated pattern matching neither {:?} nor {:?}: {:?}",
                     path,
-                    basename.glob().regex(),
-                    rules
+                    entry.basename_matcher.glob().regex(),
+                    entry.absolute_matcher.glob().regex(),
+                    entry.rules
                 );
-                Some(rules)
-            } else if absolute.is_match(path) {
-                debug!(
-                    "Adding per-file ignores for {:?} due to absolute match on {:?}: {:?}",
-                    path,
-                    absolute.glob().regex(),
-                    rules
-                );
-                Some(rules)
+                Some(&entry.rules)
             } else {
                 None
             }

@@ -80,10 +80,12 @@ enum Reason<'a> {
     Future,
     KnownStandardLibrary,
     SamePackage,
+    #[allow(dead_code)]
     SourceMatch(&'a Path),
     NoMatch,
     UserDefinedSection,
     NoSections,
+    #[allow(dead_code)]
     DisabledSection(&'a ImportSection),
 }
 
@@ -268,7 +270,7 @@ pub(crate) fn categorize_imports<'a>(
     block_by_type
 }
 
-#[derive(Debug, Default, CacheKey)]
+#[derive(Debug, Clone, Default, CacheKey)]
 pub struct KnownModules {
     /// A map of known modules to their section.
     known: Vec<(glob::Pattern, ImportSection)>,

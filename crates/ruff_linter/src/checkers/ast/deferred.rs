@@ -12,6 +12,8 @@ pub(crate) struct Visit<'a> {
     pub(crate) type_param_definitions: Vec<(&'a Expr, Snapshot)>,
     pub(crate) functions: Vec<Snapshot>,
     pub(crate) lambdas: Vec<Snapshot>,
+    /// N.B. This field should always be empty unless it's a stub file
+    pub(crate) class_bases: Vec<(&'a Expr, Snapshot)>,
 }
 
 impl Visit<'_> {
@@ -22,6 +24,7 @@ impl Visit<'_> {
             && self.type_param_definitions.is_empty()
             && self.functions.is_empty()
             && self.lambdas.is_empty()
+            && self.class_bases.is_empty()
     }
 }
 

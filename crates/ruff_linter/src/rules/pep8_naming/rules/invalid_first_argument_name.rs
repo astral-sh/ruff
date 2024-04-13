@@ -4,6 +4,7 @@ use ruff_diagnostics::{Diagnostic, DiagnosticKind, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
 use ruff_python_ast::ParameterWithDefault;
+use ruff_python_codegen::Stylist;
 use ruff_python_semantic::analyze::function_type;
 use ruff_python_semantic::{Scope, ScopeKind, SemanticModel};
 use ruff_text_size::Ranged;
@@ -239,6 +240,7 @@ pub(crate) fn invalid_first_argument_name(
             parameters,
             checker.semantic(),
             function_type,
+            checker.stylist(),
         )
     });
     diagnostics.push(diagnostic);
@@ -251,6 +253,7 @@ fn rename_parameter(
     parameters: &ast::Parameters,
     semantic: &SemanticModel<'_>,
     function_type: FunctionType,
+    stylist: &Stylist,
 ) -> Result<Option<Fix>> {
     // Don't fix if another parameter has the valid name.
     if parameters
@@ -272,6 +275,7 @@ fn rename_parameter(
         function_type.valid_first_argument_name(),
         scope,
         semantic,
+        stylist,
     )?;
     Ok(Some(Fix::unsafe_edits(edit, rest)))
 }

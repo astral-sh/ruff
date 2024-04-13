@@ -1,18 +1,23 @@
 //! Data model, state management, and configuration resolution.
 
-mod types;
+mod capabilities;
+mod settings;
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::{ops::Deref, sync::Arc};
 
 use anyhow::anyhow;
-use lsp_types::{ServerCapabilities, Url};
+use lsp_types::{ClientCapabilities, Url};
 use ruff_workspace::resolver::{ConfigurationTransformer, Relativity};
 use rustc_hash::FxHashMap;
 
 use crate::edit::{Document, DocumentVersion};
 use crate::PositionEncoding;
+
+pub(crate) use self::capabilities::ResolvedClientCapabilities;
+use self::settings::ResolvedClientSettings;
+pub(crate) use self::settings::{AllSettings, ClientSettings};
 
 /// The global state for the LSP
 pub(crate) struct Session {
@@ -20,15 +25,18 @@ pub(crate) struct Session {
     workspaces: Workspaces,
     /// The global position encoding, negotiated during LSP initialization.
     position_encoding: PositionEncoding,
-    /// Extension-specific settings, set by the client, that apply to all workspace folders.
-    #[allow(dead_code)]
-    lsp_settings: types::ExtensionSettings,
+    /// Global settings provided by the client.
+    global_settings: ClientSettings,
+    /// Tracks what LSP features the client supports and doesn't support.
+    resolved_client_capabilities: Arc<ResolvedClientCapabilities>,
 }
 
 /// An immutable snapshot of `Session` that references
 /// a specific document.
 pub(crate) struct DocumentSnapshot {
     configuration: Arc<RuffConfiguration>,
+    resolved_client_capabilities: Arc<ResolvedClientCapabilities>,
+    client_settings: settings::ResolvedClientSettings,
     document_ref: DocumentRef,
     position_encoding: PositionEncoding,
     url: Url,
@@ -48,6 +56,7 @@ pub(crate) struct Workspaces(BTreeMap<PathBuf, Workspace>);
 pub(crate) struct Workspace {
     open_documents: OpenDocuments,
     configuration: Arc<RuffConfiguration>,
+    settings: ClientSettings,
 }
 
 #[derive(Default)]
@@ -70,16 +79,17 @@ pub(crate) struct DocumentRef {
 
 impl Session {
     pub(crate) fn new(
-        server_capabilities: &ServerCapabilities,
-        workspaces: &[Url],
+        client_capabilities: &ClientCapabilities,
+        position_encoding: PositionEncoding,
+        global_settings: ClientSettings,
+        workspaces: Vec<(Url, ClientSettings)>,
     ) -> crate::Result<Self> {
         Ok(Self {
-            position_encoding: server_capabilities
-                .position_encoding
-                .as_ref()
-                .and_then(|encoding| encoding.try_into().ok())
-                .unwrap_or_default(),
-            lsp_settings: types::ExtensionSettings,
+            position_encoding,
+            global_settings,
+            resolved_client_capabilities: Arc::new(ResolvedClientCapabilities::new(
+                client_capabilities,
+            )),
             workspaces: Workspaces::new(workspaces)?,
         })
     }
@@ -87,6 +97,8 @@ impl Session {
     pub(crate) fn take_snapshot(&self, url: &Url) -> Option<DocumentSnapshot> {
         Some(DocumentSnapshot {
             configuration: self.workspaces.configuration(url)?.clone(),
+            resolved_client_capabilities: self.resolved_client_capabilities.clone(),
+            client_settings: self.workspaces.client_settings(url, &self.global_settings),
             document_ref: self.workspaces.snapshot(url)?,
             position_encoding: self.position_encoding,
             url: url.clone(),
@@ -111,6 +123,10 @@ impl Session {
             .ok_or_else(|| anyhow!("Tried to open unavailable document `{url}`"))
     }
 
+    pub(crate) fn reload_configuration(&mut self, url: &Url) -> crate::Result<()> {
+        self.workspaces.reload_configuration(url)
+    }
+
     pub(crate) fn open_workspace_folder(&mut self, url: &Url) -> crate::Result<()> {
         self.workspaces.open_workspace_folder(url)?;
         Ok(())
@@ -119,6 +135,10 @@ impl Session {
     pub(crate) fn close_workspace_folder(&mut self, url: &Url) -> crate::Result<()> {
         self.workspaces.close_workspace_folder(url)?;
         Ok(())
+    }
+
+    pub(crate) fn resolved_client_capabilities(&self) -> &ResolvedClientCapabilities {
+        &self.resolved_client_capabilities
     }
 
     pub(crate) fn encoding(&self) -> PositionEncoding {
@@ -192,6 +212,14 @@ impl DocumentSnapshot {
         &self.configuration
     }
 
+    pub(crate) fn resolved_client_capabilities(&self) -> &ResolvedClientCapabilities {
+        &self.resolved_client_capabilities
+    }
+
+    pub(crate) fn client_settings(&self) -> &ResolvedClientSettings {
+        &self.client_settings
+    }
+
     pub(crate) fn document(&self) -> &DocumentRef {
         &self.document_ref
     }
@@ -206,16 +234,18 @@ impl DocumentSnapshot {
 }
 
 impl Workspaces {
-    fn new(urls: &[Url]) -> crate::Result<Self> {
+    fn new(workspaces: Vec<(Url, ClientSettings)>) -> crate::Result<Self> {
         Ok(Self(
-            urls.iter()
-                .map(Workspace::new)
+            workspaces
+                .into_iter()
+                .map(|(url, settings)| Workspace::new(&url, settings))
                 .collect::<crate::Result<_>>()?,
         ))
     }
 
     fn open_workspace_folder(&mut self, folder_url: &Url) -> crate::Result<()> {
-        let (path, workspace) = Workspace::new(folder_url)?;
+        // TODO(jane): find a way to allow for workspace settings to be updated dynamically
+        let (path, workspace) = Workspace::new(folder_url, ClientSettings::default())?;
         self.0.insert(path, workspace);
         Ok(())
     }
@@ -231,23 +261,32 @@ impl Workspaces {
     }
 
     fn snapshot(&self, document_url: &Url) -> Option<DocumentRef> {
-        self.workspace_for_url(document_url)
-            .and_then(|w| w.open_documents.snapshot(document_url))
+        self.workspace_for_url(document_url)?
+            .open_documents
+            .snapshot(document_url)
     }
 
     fn controller(&mut self, document_url: &Url) -> Option<&mut DocumentController> {
-        self.workspace_for_url_mut(document_url)
-            .and_then(|w| w.open_documents.controller(document_url))
+        self.workspace_for_url_mut(document_url)?
+            .open_documents
+            .controller(document_url)
     }
 
     fn configuration(&self, document_url: &Url) -> Option<&Arc<RuffConfiguration>> {
-        self.workspace_for_url(document_url)
-            .map(|w| &w.configuration)
+        Some(&self.workspace_for_url(document_url)?.configuration)
+    }
+
+    fn reload_configuration(&mut self, changed_url: &Url) -> crate::Result<()> {
+        let (path, workspace) = self
+            .entry_for_url_mut(changed_url)
+            .ok_or_else(|| anyhow!("Workspace not found for {changed_url}"))?;
+        workspace.reload_configuration(path);
+        Ok(())
     }
 
     fn open(&mut self, url: &Url, contents: String, version: DocumentVersion) {
-        if let Some(w) = self.workspace_for_url_mut(url) {
-            w.open_documents.open(url, contents, version);
+        if let Some(workspace) = self.workspace_for_url_mut(url) {
+            workspace.open_documents.open(url, contents, version);
         }
     }
 
@@ -258,25 +297,51 @@ impl Workspaces {
             .close(url)
     }
 
+    fn client_settings(
+        &self,
+        url: &Url,
+        global_settings: &ClientSettings,
+    ) -> ResolvedClientSettings {
+        self.workspace_for_url(url).map_or_else(
+            || {
+                tracing::warn!(
+                    "Workspace not found for {url}. Global settings will be used for this document"
+                );
+                ResolvedClientSettings::global(global_settings)
+            },
+            |workspace| {
+                ResolvedClientSettings::with_workspace(&workspace.settings, global_settings)
+            },
+        )
+    }
+
     fn workspace_for_url(&self, url: &Url) -> Option<&Workspace> {
+        Some(self.entry_for_url(url)?.1)
+    }
+
+    fn workspace_for_url_mut(&mut self, url: &Url) -> Option<&mut Workspace> {
+        Some(self.entry_for_url_mut(url)?.1)
+    }
+
+    fn entry_for_url(&self, url: &Url) -> Option<(&Path, &Workspace)> {
         let path = url.to_file_path().ok()?;
         self.0
             .range(..path)
             .next_back()
-            .map(|(_, workspace)| workspace)
+            .map(|(path, workspace)| (path.as_path(), workspace))
     }
 
-    fn workspace_for_url_mut(&mut self, url: &Url) -> Option<&mut Workspace> {
+    fn entry_for_url_mut(&mut self, url: &Url) -> Option<(&Path, &mut Workspace)> {
         let path = url.to_file_path().ok()?;
         self.0
             .range_mut(..path)
             .next_back()
-            .map(|(_, workspace)| workspace)
+            .map(|(path, workspace)| (path.as_path(), workspace))
     }
 }
 
 impl Workspace {
-    pub(crate) fn new(root: &Url) -> crate::Result<(PathBuf, Self)> {
+    pub(crate) fn new(root: &Url, settings: ClientSettings) -> crate::Result<(PathBuf, Self)> {
         let path = root
             .to_file_path()
             .map_err(|()| anyhow!("workspace URL was not a file path!"))?;
@@ -288,8 +353,13 @@ impl Workspace {
             Self {
                 open_documents: OpenDocuments::default(),
                 configuration: Arc::new(configuration),
+                settings,
             },
         ))
+    }
+
+    fn reload_configuration(&mut self, path: &Path) {
+        self.configuration = Arc::new(Self::find_configuration_or_fallback(path));
     }
 
     fn find_configuration_or_fallback(root: &Path) -> RuffConfiguration {

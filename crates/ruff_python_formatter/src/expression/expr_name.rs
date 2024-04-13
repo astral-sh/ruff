@@ -1,4 +1,4 @@
-use ruff_formatter::{write, FormatContext};
+use ruff_formatter::write;
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::ExprName;
 
@@ -11,16 +11,11 @@ pub struct FormatExprName;
 
 impl FormatNodeRule<ExprName> for FormatExprName {
     fn fmt_fields(&self, item: &ExprName, f: &mut PyFormatter) -> FormatResult<()> {
-        let ExprName { id, range, ctx: _ } = item;
-
-        debug_assert_eq!(
-            id.as_str(),
-            f.context()
-                .source_code()
-                .slice(*range)
-                .text(f.context().source_code())
-        );
-
+        let ExprName {
+            id: _,
+            range,
+            ctx: _,
+        } = item;
         write!(f, [source_text_slice(*range)])
     }
 

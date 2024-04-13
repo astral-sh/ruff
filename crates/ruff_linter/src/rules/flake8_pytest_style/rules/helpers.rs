@@ -8,9 +8,7 @@ pub(super) fn get_mark_decorators(
     decorators: &[Decorator],
 ) -> impl Iterator<Item = (&Decorator, &str)> {
     decorators.iter().filter_map(|decorator| {
-        let Some(name) = UnqualifiedName::from_expr(map_callable(&decorator.expression)) else {
-            return None;
-        };
+        let name = UnqualifiedName::from_expr(map_callable(&decorator.expression))?;
         let ["pytest", "mark", marker] = name.segments() else {
             return None;
         };
