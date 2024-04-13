@@ -181,12 +181,15 @@ fn check_short_args_list(checker: &mut Checker, parameters: &Parameters, func_ki
                 annotation.range(),
             );
 
-            if checker.semantic().is_builtin("object") {
-                diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                    "object".to_string(),
-                    annotation.range(),
-                )));
-            }
+            diagnostic.try_set_fix(|| {
+                let (import_edit, binding) = checker.importer().get_or_import_builtin_symbol(
+                    "object",
+                    annotation.start(),
+                    checker.semantic(),
+                )?;
+                let binding_edit = Edit::range_replacement(binding, annotation.range());
+                Ok(Fix::safe_edits(binding_edit, import_edit))
+            });
 
             checker.diagnostics.push(diagnostic);
         }

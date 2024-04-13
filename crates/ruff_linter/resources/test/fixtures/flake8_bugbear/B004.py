@@ -15,6 +15,16 @@ def still_a_bug():
         print("B   U   G")
 
 
+def trickier_fix_for_this_one():
+    o = object()
+
+    def callable(x):
+        return True
+
+    if hasattr(o, "__call__"):
+        print("STILL a bug!")
+
+
 def this_is_fine():
     o = object()
     if callable(o):

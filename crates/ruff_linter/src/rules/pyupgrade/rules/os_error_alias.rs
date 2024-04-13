@@ -77,12 +77,17 @@ fn atom_diagnostic(checker: &mut Checker, target: &Expr) {
         },
         target.range(),
     );
-    if checker.semantic().is_builtin("OSError") {
-        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-            "OSError".to_string(),
-            target.range(),
-        )));
-    }
+    diagnostic.try_set_fix(|| {
+        let (import_edit, binding) = checker.importer().get_or_import_builtin_symbol(
+            "OSError",
+            target.start(),
+            checker.semantic(),
+        )?;
+        Ok(Fix::safe_edits(
+            Edit::range_replacement(binding, target.range()),
+            import_edit,
+        ))
+    });
     checker.diagnostics.push(diagnostic);
 }
 

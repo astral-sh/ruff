@@ -75,12 +75,18 @@ pub(crate) fn unreliable_callable_check(
 
     let mut diagnostic = Diagnostic::new(UnreliableCallableCheck, expr.range());
     if *function == "hasattr" {
-        if checker.semantic().is_builtin("callable") {
-            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                format!("callable({})", checker.locator().slice(obj)),
+        diagnostic.try_set_fix(|| {
+            let (import_edit, binding) = checker.importer().get_or_import_builtin_symbol(
+                "callable",
+                expr.start(),
+                checker.semantic(),
+            )?;
+            let binding_edit = Edit::range_replacement(
+                format!("{binding}({})", checker.locator().slice(obj)),
                 expr.range(),
-            )));
-        }
+            );
+            Ok(Fix::safe_edits(binding_edit, import_edit))
+        });
     }
     checker.diagnostics.push(diagnostic);
 }
