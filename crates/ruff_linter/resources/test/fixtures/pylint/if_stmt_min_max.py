@@ -149,3 +149,13 @@ class Foo:
             self._min = value
         if self._max > value:
             self._max = value
+
+        if value <= self._min:
+            self._min = value
+        if value >= self._max:
+            self._max = value
+
+        if self._min <= value:
+            self._min = value
+        if self._max >= value:
+            self._max = value
