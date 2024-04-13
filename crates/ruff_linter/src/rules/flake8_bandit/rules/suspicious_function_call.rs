@@ -344,7 +344,7 @@ impl Violation for SuspiciousMarkSafeUsage {
 }
 
 /// ## What it does
-/// Checks for uses of URL open functions that unexpected schemes.
+/// Checks for uses of URL open functions that use unexpected schemes.
 ///
 /// ## Why is this bad?
 /// Some URL open functions allow the use of `file:` or custom schemes (for use
