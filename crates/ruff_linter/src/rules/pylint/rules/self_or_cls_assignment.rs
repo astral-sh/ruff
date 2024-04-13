@@ -16,10 +16,12 @@ use crate::checkers::ast::Checker;
 /// the first argument of instance methods and class methods, respectively.
 ///
 /// ## Example
+///
 /// ```python
 /// class A:
 ///     def method(self):
 ///         self = 1
+///
 ///     def class_method(cls):
 ///         cls = 1
 /// ```
