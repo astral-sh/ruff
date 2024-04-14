@@ -125,6 +125,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::PotentialIndexError) {
                 pylint::rules::potential_index_error(checker, value, slice);
             }
+            if checker.enabled(Rule::FStringNumberFormat) {
+                refurb::rules::fstring_number_format(checker, subscript);
+            }
 
             pandas_vet::rules::subscript(checker, value, expr);
         }
