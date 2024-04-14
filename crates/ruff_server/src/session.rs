@@ -30,7 +30,6 @@ pub(crate) struct Session {
 /// An immutable snapshot of `Session` that references
 /// a specific document.
 pub(crate) struct DocumentSnapshot {
-    configuration: Arc<workspace::RuffConfiguration>,
     resolved_client_capabilities: Arc<ResolvedClientCapabilities>,
     client_settings: settings::ResolvedClientSettings,
     document_ref: workspace::DocumentRef,
@@ -57,7 +56,6 @@ impl Session {
 
     pub(crate) fn take_snapshot(&self, url: &Url) -> Option<DocumentSnapshot> {
         Some(DocumentSnapshot {
-            configuration: self.workspaces.configuration(url)?.clone(),
             resolved_client_capabilities: self.resolved_client_capabilities.clone(),
             client_settings: self.workspaces.client_settings(url, &self.global_settings),
             document_ref: self.workspaces.snapshot(url)?,
@@ -109,7 +107,7 @@ impl Session {
 
 impl DocumentSnapshot {
     pub(crate) fn configuration(&self) -> &workspace::RuffConfiguration {
-        &self.configuration
+        self.document().configuration()
     }
 
     pub(crate) fn resolved_client_capabilities(&self) -> &ResolvedClientCapabilities {

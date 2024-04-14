@@ -21,13 +21,13 @@ pub(crate) struct Workspaces(BTreeMap<PathBuf, Workspace>);
 
 pub(crate) struct Workspace {
     open_documents: OpenDocuments,
-    configuration: Arc<RuffConfiguration>,
     settings: ClientSettings,
 }
 
 #[derive(Default)]
 pub(crate) struct OpenDocuments {
     documents: FxHashMap<Url, DocumentController>,
+    configuration_index: configuration::ConfigurationIndex,
 }
 
 /// A mutable handler to an underlying document.
@@ -35,12 +35,14 @@ pub(crate) struct OpenDocuments {
 /// calling `deref_mut`.
 pub(crate) struct DocumentController {
     document: Arc<Document>,
+    configuration: Arc<RuffConfiguration>,
 }
 
 /// A read-only reference to a document.
 #[derive(Clone)]
 pub(crate) struct DocumentRef {
     document: Arc<Document>,
+    configuration: Arc<RuffConfiguration>,
 }
 
 impl Workspaces {
@@ -82,15 +84,11 @@ impl Workspaces {
             .controller(document_url)
     }
 
-    pub(super) fn configuration(&self, document_url: &Url) -> Option<&Arc<RuffConfiguration>> {
-        Some(&self.workspace_for_url(document_url)?.configuration)
-    }
-
     pub(super) fn reload_configuration(&mut self, changed_url: &Url) -> crate::Result<()> {
-        let (path, workspace) = self
-            .entry_for_url_mut(changed_url)
+        let workspace = self
+            .workspace_for_url_mut(changed_url)
             .ok_or_else(|| anyhow!("Workspace not found for {changed_url}"))?;
-        workspace.reload_configuration(path);
+        workspace.reload_configuration();
         Ok(())
     }
 
@@ -158,29 +156,18 @@ impl Workspace {
         let path = root
             .to_file_path()
             .map_err(|()| anyhow!("workspace URL was not a file path!"))?;
-        // Fall-back to default configuration
-        let configuration = Self::find_configuration_or_fallback(&path);
 
         Ok((
             path,
             Self {
                 open_documents: OpenDocuments::default(),
-                configuration: Arc::new(configuration),
                 settings,
             },
         ))
     }
 
-    fn reload_configuration(&mut self, path: &Path) {
-        self.configuration = Arc::new(Self::find_configuration_or_fallback(path));
-    }
-
-    fn find_configuration_or_fallback(root: &Path) -> RuffConfiguration {
-        configuration::find_configuration_from_root(root).unwrap_or_else(|err| {
-            tracing::error!("The following error occurred when trying to find a configuration file at `{}`:\n{err}", root.display());
-            tracing::error!("Falling back to default configuration for `{}`", root.display());
-            RuffConfiguration::default()
-        })
+    fn reload_configuration(&mut self) {
+        self.open_documents.reload_configuration();
     }
 }
 
@@ -194,9 +181,13 @@ impl OpenDocuments {
     }
 
     fn open(&mut self, url: &Url, contents: String, version: DocumentVersion) {
+        let configuration = self.configuration_index.get_or_insert(url);
         if self
             .documents
-            .insert(url.clone(), DocumentController::new(contents, version))
+            .insert(
+                url.clone(),
+                DocumentController::new(contents, version, configuration),
+            )
             .is_some()
         {
             tracing::warn!("Opening document `{url}` that is already open!");
@@ -211,18 +202,37 @@ impl OpenDocuments {
         };
         Ok(())
     }
+
+    fn reload_configuration(&mut self) {
+        self.configuration_index.clear();
+
+        for (path, document) in &mut self.documents {
+            let new_configuration = self.configuration_index.get_or_insert(path);
+            document.update_configuration(new_configuration);
+        }
+    }
 }
 
 impl DocumentController {
-    fn new(contents: String, version: DocumentVersion) -> Self {
+    fn new(
+        contents: String,
+        version: DocumentVersion,
+        configuration: Arc<RuffConfiguration>,
+    ) -> Self {
         Self {
             document: Arc::new(Document::new(contents, version)),
+            configuration,
         }
+    }
+
+    pub(crate) fn update_configuration(&mut self, new_configuration: Arc<RuffConfiguration>) {
+        self.configuration = new_configuration;
     }
 
     pub(crate) fn make_ref(&self) -> DocumentRef {
         DocumentRef {
             document: self.document.clone(),
+            configuration: self.configuration.clone(),
         }
     }
 
@@ -242,5 +252,11 @@ impl Deref for DocumentRef {
     type Target = Document;
     fn deref(&self) -> &Self::Target {
         &self.document
+    }
+}
+
+impl DocumentRef {
+    pub(crate) fn configuration(&self) -> &RuffConfiguration {
+        &self.configuration
     }
 }

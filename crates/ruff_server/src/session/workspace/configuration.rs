@@ -1,6 +1,6 @@
-use anyhow::anyhow;
-use ruff_workspace::resolver::{ConfigurationTransformer, Relativity};
-use std::path::Path;
+use lsp_types::Url;
+use ruff_workspace::resolver::ConfigurationTransformer;
+use std::{collections::BTreeMap, path::PathBuf, sync::Arc};
 
 #[derive(Default)]
 pub(crate) struct RuffConfiguration {
@@ -10,18 +10,19 @@ pub(crate) struct RuffConfiguration {
     pub(crate) formatter: ruff_workspace::FormatterSettings,
 }
 
-pub(crate) fn find_configuration_from_root(root: &Path) -> crate::Result<RuffConfiguration> {
-    let pyproject = ruff_workspace::pyproject::find_settings_toml(root)?
-        .ok_or_else(|| anyhow!("No pyproject.toml/ruff.toml/.ruff.toml file was found"))?;
-    let settings = ruff_workspace::resolver::resolve_root_settings(
-        &pyproject,
-        Relativity::Parent,
-        &LSPConfigTransformer,
-    )?;
-    Ok(RuffConfiguration {
-        linter: settings.linter,
-        formatter: settings.formatter,
-    })
+#[derive(Default)]
+pub(super) struct ConfigurationIndex {
+    index: BTreeMap<PathBuf, Arc<RuffConfiguration>>,
+}
+
+impl ConfigurationIndex {
+    pub(super) fn get_or_insert(&mut self, path: &Url) -> Arc<RuffConfiguration> {
+        todo!("impl");
+    }
+
+    pub(super) fn clear(&mut self) {
+        self.index.clear();
+    }
 }
 
 struct LSPConfigTransformer;
