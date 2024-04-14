@@ -16,7 +16,7 @@ use crate::registry::{AsRule, Rule};
 use crate::rules::pycodestyle::rules::BlankLinesChecker;
 use crate::rules::{
     eradicate, flake8_commas, flake8_executable, flake8_fixme, flake8_implicit_str_concat,
-    flake8_pyi, flake8_quotes, flake8_todos, pycodestyle, pygrep_hooks, pylint, pyupgrade, ruff,
+    flake8_pyi, flake8_todos, pycodestyle, pygrep_hooks, pylint, pyupgrade, ruff,
 };
 use crate::settings::LinterSettings;
 
@@ -120,10 +120,6 @@ pub(crate) fn check_tokens(
             source_type,
             cell_offsets,
         );
-    }
-
-    if settings.rules.enabled(Rule::AvoidableEscapedQuote) && settings.flake8_quotes.avoid_escape {
-        flake8_quotes::rules::avoidable_escaped_quote(&mut diagnostics, tokens, locator, settings);
     }
 
     if settings.rules.any_enabled(&[
