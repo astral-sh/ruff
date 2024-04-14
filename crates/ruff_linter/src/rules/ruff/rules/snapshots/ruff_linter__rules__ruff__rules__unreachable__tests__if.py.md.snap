@@ -69,16 +69,18 @@ def func():
 flowchart TD
   start(("Start"))
   return(("End"))
-  block0["return 0\n"]
-  block1["return 1\n"]
-  block2["if False:
+  block0[["`*(empty)*`"]]
+  block1["return 0\n"]
+  block2["return 1\n"]
+  block3["if False:
         return 0
     else:
         return 1\n"]
 
-  start --> block2
-  block2 -- "False" --> block0
-  block2 -- "else" --> block1
+  start --> block3
+  block3 -- "False" --> block1
+  block3 -- "else" --> block2
+  block2 --> return
   block1 --> return
   block0 --> return
 ```
@@ -98,16 +100,18 @@ def func():
 flowchart TD
   start(("Start"))
   return(("End"))
-  block0["return 1\n"]
-  block1["return 0\n"]
-  block2["if True:
+  block0[["`*(empty)*`"]]
+  block1["return 1\n"]
+  block2["return 0\n"]
+  block3["if True:
         return 1
     else:
         return 0\n"]
 
-  start --> block2
-  block2 -- "True" --> block0
-  block2 -- "else" --> block1
+  start --> block3
+  block3 -- "True" --> block1
+  block3 -- "else" --> block2
+  block2 --> return
   block1 --> return
   block0 --> return
 ```
@@ -285,27 +289,29 @@ def func():
 flowchart TD
   start(("Start"))
   return(("End"))
-  block0["return 1\n"]
-  block1["return 0\n"]
-  block2["return 2\n"]
-  block3["if True:
-        return 1
-    elif False:
-        return 2
-    else:
-        return 0\n"]
+  block0[["`*(empty)*`"]]
+  block1["return 1\n"]
+  block2["return 0\n"]
+  block3["return 2\n"]
   block4["if True:
         return 1
     elif False:
         return 2
     else:
         return 0\n"]
+  block5["if True:
+        return 1
+    elif False:
+        return 2
+    else:
+        return 0\n"]
 
-  start --> block4
-  block4 -- "True" --> block0
-  block4 -- "else" --> block3
-  block3 -- "False" --> block2
-  block3 -- "else" --> block1
+  start --> block5
+  block5 -- "True" --> block1
+  block5 -- "else" --> block4
+  block4 -- "False" --> block3
+  block4 -- "else" --> block2
+  block3 --> return
   block2 --> return
   block1 --> return
   block0 --> return
@@ -328,27 +334,29 @@ def func():
 flowchart TD
   start(("Start"))
   return(("End"))
-  block0["return 1\n"]
-  block1["return 0\n"]
-  block2["return 2\n"]
-  block3["if False:
-        return 1
-    elif True:
-        return 2
-    else:
-        return 0\n"]
+  block0[["`*(empty)*`"]]
+  block1["return 1\n"]
+  block2["return 0\n"]
+  block3["return 2\n"]
   block4["if False:
         return 1
     elif True:
         return 2
     else:
         return 0\n"]
+  block5["if False:
+        return 1
+    elif True:
+        return 2
+    else:
+        return 0\n"]
 
-  start --> block4
-  block4 -- "False" --> block0
-  block4 -- "else" --> block3
-  block3 -- "True" --> block2
-  block3 -- "else" --> block1
+  start --> block5
+  block5 -- "False" --> block1
+  block5 -- "else" --> block4
+  block4 -- "True" --> block3
+  block4 -- "else" --> block2
+  block3 --> return
   block2 --> return
   block1 --> return
   block0 --> return
@@ -550,4 +558,127 @@ flowchart TD
   block0 --> return
 ```
 
+## Function 14
+### Source
+```python
+def func(x):
+    if x == 1:
+        return 1
+    elif False:
+        return 2
+    elif x == 3:
+        return 3
+    elif True:
+        return 4
+    elif x == 5:
+        return 5
+    elif x == 6:
+        return 6
+```
 
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0[["`*(empty)*`"]]
+  block1["return 1\n"]
+  block2["return 6\n"]
+  block3["if x == 1:
+        return 1
+    elif False:
+        return 2
+    elif x == 3:
+        return 3
+    elif True:
+        return 4
+    elif x == 5:
+        return 5
+    elif x == 6:
+        return 6\n"]
+  block4["return 5\n"]
+  block5["if x == 1:
+        return 1
+    elif False:
+        return 2
+    elif x == 3:
+        return 3
+    elif True:
+        return 4
+    elif x == 5:
+        return 5
+    elif x == 6:
+        return 6\n"]
+  block6["return 4\n"]
+  block7["if x == 1:
+        return 1
+    elif False:
+        return 2
+    elif x == 3:
+        return 3
+    elif True:
+        return 4
+    elif x == 5:
+        return 5
+    elif x == 6:
+        return 6\n"]
+  block8["return 3\n"]
+  block9["if x == 1:
+        return 1
+    elif False:
+        return 2
+    elif x == 3:
+        return 3
+    elif True:
+        return 4
+    elif x == 5:
+        return 5
+    elif x == 6:
+        return 6\n"]
+  block10["return 2\n"]
+  block11["if x == 1:
+        return 1
+    elif False:
+        return 2
+    elif x == 3:
+        return 3
+    elif True:
+        return 4
+    elif x == 5:
+        return 5
+    elif x == 6:
+        return 6\n"]
+  block12["if x == 1:
+        return 1
+    elif False:
+        return 2
+    elif x == 3:
+        return 3
+    elif True:
+        return 4
+    elif x == 5:
+        return 5
+    elif x == 6:
+        return 6\n"]
+
+  start --> block12
+  block12 -- "x == 1" --> block1
+  block12 -- "else" --> block11
+  block11 -- "False" --> block10
+  block11 -- "else" --> block9
+  block10 --> return
+  block9 -- "x == 3" --> block8
+  block9 -- "else" --> block7
+  block8 --> return
+  block7 -- "True" --> block6
+  block7 -- "else" --> block5
+  block6 --> return
+  block5 -- "x == 5" --> block4
+  block5 -- "else" --> block3
+  block4 --> return
+  block3 -- "x == 6" --> block2
+  block3 -- "else" --> block0
+  block2 --> return
+  block1 --> return
+  block0 --> return
+```
