@@ -70,36 +70,37 @@ impl Violation for FStringNumberFormat {
 pub(crate) fn fstring_number_format(checker: &mut Checker, subscript: &ast::ExprSubscript) {
     // Validate the slice to be what we expect, `[2:]`
     let Expr::Slice(ast::ExprSlice {
-        lower,
-        upper,
-        step,
-        range: _,
+        lower: Some(lower),
+        upper: None,
+        step: None,
+        ..
     }) = subscript.slice.as_ref()
     else {
         return;
     };
 
-    match (lower, upper, step) {
-        (Some(lower), None, None) => {
-            let Expr::NumberLiteral(ast::ExprNumberLiteral { value, .. }) = lower.as_ref() else {
-                return;
-            };
+    let Expr::NumberLiteral(ast::ExprNumberLiteral {
+        value: ast::Number::Int(int),
+        ..
+    }) = lower.as_ref()
+    else {
+        return;
+    };
 
-            // Ensure the starting slice value is 2
-            if value.as_int().is_some_and(|v| *v != 2) {
-                return;
-            }
-        }
-        _ => return,
+    // Ensure the starting slice value is 2
+    if *int != 2 {
+        return;
     }
 
     // Validate the value to be an integer base-changing function call
     let Expr::Call(ExprCall {
-        func,
-        arguments,
-        range: _,
+        func, arguments, ..
     }) = subscript.value.as_ref()
     else {
+        return;
+    };
+
+    let [inner] = &*arguments.args else {
         return;
     };
 
@@ -111,14 +112,7 @@ pub(crate) fn fstring_number_format(checker: &mut Checker, subscript: &ast::Expr
         return;
     }
 
-    let base = match id.as_str() {
-        "hex" => IntBase::Hex,
-        "bin" => IntBase::Bin,
-        "oct" => IntBase::Oct,
-        _ => return,
-    };
-
-    let [inner] = &*arguments.args else {
+    let Some(base) = IntBase::from_str(id) else {
         return;
     };
 
@@ -180,6 +174,15 @@ impl IntBase {
             IntBase::Hex => "hex",
             IntBase::Bin => "bin",
             IntBase::Oct => "oct",
+        }
+    }
+
+    fn from_str(s: &str) -> Option<Self> {
+        match s {
+            "hex" => Some(IntBase::Hex),
+            "bin" => Some(IntBase::Bin),
+            "oct" => Some(IntBase::Oct),
+            _ => None,
         }
     }
 }
