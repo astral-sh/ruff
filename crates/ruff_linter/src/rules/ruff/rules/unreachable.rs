@@ -373,6 +373,8 @@ fn loop_block<'stmt>(
     // while block (we're about to create) to create the loop.
     // NOTE: `blocks.len()` is an invalid index at time of creation
     // as it points to the block which we're about to create.
+    //
+    // FIXME: This should check the last block, not the first block.
     blocks.change_next_block(
         last_statement_index,
         after_block,
@@ -499,25 +501,15 @@ impl<'stmt> BasicBlocksBuilder<'stmt> {
                 }
                 // Statements that (can) divert the control flow.
                 Stmt::If(stmt_if) => {
-                    let after_consequent_block =
-                        self.maybe_next_block_index(after, || needs_next_block(&stmt_if.body));
-                    let after_alternate_block = self.maybe_next_block_index(after, || {
-                        stmt_if
-                            .elif_else_clauses
-                            .last()
-                            .map_or(true, |clause| needs_next_block(&clause.body))
-                    });
-
-                    let consequent =
-                        self.append_blocks_if_not_empty(&stmt_if.body, after_consequent_block);
+                    // Always get an after_block to avoid having to get one for each branch that needs it.
+                    let after_block = self.maybe_next_block_index(after, || true);
+                    let consequent = self.append_blocks_if_not_empty(&stmt_if.body, after_block);
 
                     // Block ID of the next elif or else clause.
-                    let mut next_branch = after_alternate_block;
+                    let mut next_branch = after_block;
 
                     for clause in stmt_if.elif_else_clauses.iter().rev() {
-                        let consequent =
-                            self.append_blocks_if_not_empty(&clause.body, after_consequent_block);
-
+                        let consequent = self.append_blocks_if_not_empty(&clause.body, after_block);
                         next_branch = if let Some(test) = &clause.test {
                             let next = NextBlock::If {
                                 condition: Condition::Test(test),
@@ -753,12 +745,12 @@ impl<'stmt> BasicBlocksBuilder<'stmt> {
             // block in `blocks`).
             idx
         } else if condition() {
-            // Or if there are no blocks, but need one based on `condition` than we
+            // Or if there are no blocks, but need one based on `condition` then we
             // add a fake end block.
             self.blocks.push(BasicBlock::EMPTY)
         } else {
             // NOTE: invalid, but because `condition` returned false this shouldn't
-            // be used. This only used as an optimisation to avoid adding fake end
+            // be used. This is only used as an optimisation to avoid adding fake end
             // blocks.
             BlockIndex::MAX
         }
@@ -917,6 +909,9 @@ impl<'stmt> BasicBlocksBuilder<'stmt> {
                     return;
                 }
             }
+            // if idx == BlockIndex::MAX {
+            //     return;
+            // }
         }
     }
 
