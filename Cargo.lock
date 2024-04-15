@@ -123,15 +123,15 @@ dependencies = [
 
 [[package]]
 name = "anyhow"
-version = "1.0.81"
+version = "1.0.82"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0952808a6c2afd1aa8947271f3a60f1a6763c7b912d210184c5149b5cf147247"
+checksum = "f538837af36e6f6a9be0faa67f9a314f8119e4e4b5867c6ab40ed60360142519"
 
 [[package]]
 name = "argfile"
-version = "0.1.6"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1287c4f82a41c5085e65ee337c7934d71ab43d5187740a81fb69129013f6a5f6"
+checksum = "b7c5c8e418080ef8aa932039d12eda7b6f5043baf48f1523c166fbc32d004534"
 dependencies = [
  "fs-err",
  "os_str_bytes",
@@ -243,6 +243,12 @@ name = "cfg-if"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
+
+[[package]]
+name = "cfg_aliases"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fd16c4719339c4530435d38e511904438d07cce7950afa3718a84ac36c10e89e"
 
 [[package]]
 name = "chic"
@@ -376,9 +382,9 @@ checksum = "98cc8fbded0c607b7ba9dd60cd98df59af97e84d24e49c8557331cfc26d301ce"
 
 [[package]]
 name = "clearscreen"
-version = "2.0.1"
+version = "3.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "72f3f22f1a586604e62efd23f78218f3ccdecf7a33c4500db2d37d85a24fe994"
+checksum = "2f8c93eb5f77c9050c7750e14f13ef1033a40a0aac70c6371535b6763a01438c"
 dependencies = [
  "nix",
  "terminfo",
@@ -389,9 +395,9 @@ dependencies = [
 
 [[package]]
 name = "codspeed"
-version = "2.4.0"
+version = "2.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4b85b056aa0541d1975ebc524149dde72803a5d7352b6aebf9eabc44f9017246"
+checksum = "655a6d8e698ef8de25b6fb160dc904d98cf3642df48fae8bb05711db1893f47d"
 dependencies = [
  "colored",
  "libc",
@@ -400,9 +406,9 @@ dependencies = [
 
 [[package]]
 name = "codspeed-criterion-compat"
-version = "2.4.0"
+version = "2.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "02ae9de916d6315a5129bca2fc7957285f0b9f77a2f6a8734a0a146caee2b0b6"
+checksum = "cb377d73b85084b1ca5615e42fdbf3b52631d6d8feda4be6dfc2150646f53cea"
 dependencies = [
  "codspeed",
  "colored",
@@ -1072,9 +1078,9 @@ dependencies = [
 
 [[package]]
 name = "insta-cmd"
-version = "0.5.0"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1980f17994b79f75670aa90cfc8d35edc4aa248f16aa48b5e27835b080e452a2"
+checksum = "ffeeefa927925cced49ccb01bf3e57c9d4cd132df21e576eb9415baeab2d3de6"
 dependencies = [
  "insta",
  "serde",
@@ -1439,12 +1445,13 @@ checksum = "e4a24736216ec316047a1fc4252e27dabb04218aa4a3f37c6e7ddbf1f9782b54"
 
 [[package]]
 name = "nix"
-version = "0.26.4"
+version = "0.28.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "598beaf3cc6fdd9a5dfb1630c2800c7acd31df7aaf0f565796fba2b53ca1af1b"
+checksum = "ab2156c4fce2f8df6c499cc1c763e4394b7482525bf2a9701c9d79d215f519e4"
 dependencies = [
- "bitflags 1.3.2",
+ "bitflags 2.5.0",
  "cfg-if",
+ "cfg_aliases",
  "libc",
 ]
 
@@ -1648,9 +1655,9 @@ dependencies = [
 
 [[package]]
 name = "pep440_rs"
-version = "0.5.0"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "15efd4d885c29126cc93e12af3087896e2518bd5ca0fb328c19c4ef9cecfa8be"
+checksum = "ca0a570e7ec9171250cac57614e901f62408094b54b3798bb920d3cf0d4a0e09"
 dependencies = [
  "once_cell",
  "serde",
@@ -1784,9 +1791,9 @@ dependencies = [
 
 [[package]]
 name = "proc-macro2"
-version = "1.0.79"
+version = "1.0.80"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e835ff2298f5721608eb1a980ecaee1aef2c132bf95ecc026a11b7bf3c01c02e"
+checksum = "a56dea16b0a29e94408b9aa5e2940a4eedbd128a1ba20e8f7ae60fd3d465af0e"
 dependencies = [
  "unicode-ident",
 ]
@@ -1829,9 +1836,9 @@ dependencies = [
 
 [[package]]
 name = "quote"
-version = "1.0.35"
+version = "1.0.36"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "291ec9ab5efd934aaf503a6466c5d5251535d108ee747472c3977cc5acc868ef"
+checksum = "0fa76aaf39101c457836aec0ce2316dbdc3ab723cdda1c6bd4e6ad4208acaca7"
 dependencies = [
  "proc-macro2",
 ]
@@ -1988,7 +1995,7 @@ dependencies = [
 
 [[package]]
 name = "ruff"
-version = "0.3.5"
+version = "0.3.7"
 dependencies = [
  "anyhow",
  "argfile",
@@ -2150,7 +2157,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_linter"
-version = "0.3.5"
+version = "0.3.7"
 dependencies = [
  "aho-corasick",
  "annotate-snippets 0.9.2",
@@ -2174,7 +2181,7 @@ dependencies = [
  "once_cell",
  "path-absolutize",
  "pathdiff",
- "pep440_rs 0.5.0",
+ "pep440_rs 0.6.0",
  "pyproject-toml",
  "quick-junit",
  "regex",
@@ -2422,7 +2429,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_shrinking"
-version = "0.3.5"
+version = "0.3.7"
 dependencies = [
  "anyhow",
  "clap",
@@ -2495,7 +2502,7 @@ dependencies = [
  "itertools 0.12.1",
  "log",
  "path-absolutize",
- "pep440_rs 0.5.0",
+ "pep440_rs 0.6.0",
  "regex",
  "ruff_cache",
  "ruff_formatter",
@@ -3508,14 +3515,14 @@ dependencies = [
 
 [[package]]
 name = "which"
-version = "4.4.2"
+version = "6.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "87ba24419a2078cd2b0f2ede2691b6c66d8e47836da3b6db8265ebad47afbfc7"
+checksum = "8211e4f58a2b2805adfbefbc07bab82958fc91e3836339b1ab7ae32465dce0d7"
 dependencies = [
  "either",
  "home",
- "once_cell",
  "rustix",
+ "winsafe",
 ]
 
 [[package]]
@@ -3707,6 +3714,12 @@ checksum = "dffa400e67ed5a4dd237983829e66475f0a4a26938c4b04c21baede6262215b8"
 dependencies = [
  "memchr",
 ]
+
+[[package]]
+name = "winsafe"
+version = "0.0.19"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d135d17ab770252ad95e9a872d365cf3090e3be864a34ab46f48555993efc904"
 
 [[package]]
 name = "yansi"

@@ -61,6 +61,7 @@ mod tests {
     #[test_case(Rule::UselessContextlibSuppress, Path::new("B022.py"))]
     #[test_case(Rule::UselessExpression, Path::new("B018.ipynb"))]
     #[test_case(Rule::UselessExpression, Path::new("B018.py"))]
+    #[test_case(Rule::LoopIteratorMutation, Path::new("B909.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(

@@ -375,15 +375,17 @@ pub(crate) fn init(path: &Path) -> Result<()> {
     fs::create_dir_all(path.join(VERSION))?;
 
     // Add the CACHEDIR.TAG.
-    if !cachedir::is_tagged(path)? {
-        cachedir::add_tag(path)?;
-    }
+    cachedir::ensure_tag(path)?;
 
     // Add the .gitignore.
-    let gitignore_path = path.join(".gitignore");
-    if !gitignore_path.exists() {
-        let mut file = fs::File::create(gitignore_path)?;
-        file.write_all(b"# Automatically created by ruff.\n*\n")?;
+    match fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(path.join(".gitignore"))
+    {
+        Ok(mut file) => file.write_all(b"# Automatically created by ruff.\n*\n")?,
+        Err(err) if err.kind() == io::ErrorKind::AlreadyExists => (),
+        Err(err) => return Err(err.into()),
     }
 
     Ok(())

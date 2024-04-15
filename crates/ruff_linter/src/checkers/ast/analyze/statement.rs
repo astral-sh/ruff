@@ -1228,6 +1228,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::ReadWholeFile) {
                 refurb::rules::read_whole_file(checker, with_stmt);
             }
+            if checker.enabled(Rule::WriteWholeFile) {
+                refurb::rules::write_whole_file(checker, with_stmt);
+            }
             if checker.enabled(Rule::UselessWithLock) {
                 pylint::rules::useless_with_lock(checker, with_stmt);
             }
@@ -1268,6 +1271,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.any_enabled(&[
                 Rule::EnumerateForLoop,
                 Rule::IncorrectDictIterator,
+                Rule::LoopIteratorMutation,
                 Rule::UnnecessaryEnumerate,
                 Rule::UnusedLoopControlVariable,
                 Rule::YieldInForLoop,
@@ -1482,6 +1486,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.settings.rules.enabled(Rule::TypeBivariance) {
                 pylint::rules::type_bivariance(checker, value);
+            }
+            if checker.enabled(Rule::NonAugmentedAssignment) {
+                pylint::rules::non_augmented_assignment(checker, assign);
             }
             if checker.settings.rules.enabled(Rule::UnsortedDunderAll) {
                 ruff::rules::sort_dunder_all_assign(checker, assign);

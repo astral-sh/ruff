@@ -107,33 +107,46 @@ pub(crate) fn if_stmt_min_max(checker: &mut Checker, stmt_if: &ast::StmtIf) {
         return;
     };
 
-    // Determine whether to use `min()` or `max()`, and whether to flip the
-    // order of the arguments, which is relevant for breaking ties.
-    let (min_max, flip_args) = match op {
-        CmpOp::Gt => (MinMax::Max, true),
-        CmpOp::GtE => (MinMax::Max, false),
-        CmpOp::Lt => (MinMax::Min, true),
-        CmpOp::LtE => (MinMax::Min, false),
-        _ => return,
-    };
-
     let [right] = &**comparators else {
         return;
     };
 
-    let _min_or_max = match op {
-        CmpOp::Gt | CmpOp::GtE => MinMax::Min,
-        CmpOp::Lt | CmpOp::LtE => MinMax::Max,
-        _ => return,
-    };
-
     let left_cmp = ComparableExpr::from(left);
     let body_target_cmp = ComparableExpr::from(body_target);
-    let right_statement_cmp = ComparableExpr::from(right);
+    let right_cmp = ComparableExpr::from(right);
     let body_value_cmp = ComparableExpr::from(body_value);
-    if left_cmp != body_target_cmp || right_statement_cmp != body_value_cmp {
-        return;
-    }
+
+    let left_is_target = left_cmp == body_target_cmp;
+    let right_is_target = right_cmp == body_target_cmp;
+    let left_is_value = left_cmp == body_value_cmp;
+    let right_is_value = right_cmp == body_value_cmp;
+
+    // Determine whether to use `min()` or `max()`, and whether to flip the
+    // order of the arguments, which is relevant for breaking ties.
+    // Also ensure that we understand the operation we're trying to do,
+    // by checking both sides of the comparison and assignment.
+    let (min_max, flip_args) = match (
+        left_is_target,
+        right_is_target,
+        left_is_value,
+        right_is_value,
+    ) {
+        (true, false, false, true) => match op {
+            CmpOp::Lt => (MinMax::Max, true),
+            CmpOp::LtE => (MinMax::Max, false),
+            CmpOp::Gt => (MinMax::Min, true),
+            CmpOp::GtE => (MinMax::Min, false),
+            _ => return,
+        },
+        (false, true, true, false) => match op {
+            CmpOp::Lt => (MinMax::Min, true),
+            CmpOp::LtE => (MinMax::Min, false),
+            CmpOp::Gt => (MinMax::Max, true),
+            CmpOp::GtE => (MinMax::Max, false),
+            _ => return,
+        },
+        _ => return,
+    };
 
     let (arg1, arg2) = if flip_args {
         (left.as_ref(), right)

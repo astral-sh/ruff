@@ -47,7 +47,7 @@ impl Violation for NanComparison {
     }
 }
 
-/// PLW0117
+/// PLW0177
 pub(crate) fn nan_comparison(checker: &mut Checker, left: &Expr, comparators: &[Expr]) {
     for expr in std::iter::once(left).chain(comparators.iter()) {
         if let Some(qualified_name) = checker.semantic().resolve_qualified_name(expr) {

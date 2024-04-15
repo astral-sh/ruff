@@ -293,11 +293,12 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "R2004") => (RuleGroup::Stable, rules::pylint::rules::MagicValueComparison),
         (Pylint, "R2044") => (RuleGroup::Preview, rules::pylint::rules::EmptyComment),
         (Pylint, "R5501") => (RuleGroup::Stable, rules::pylint::rules::CollapsibleElseIf),
+        (Pylint, "R6104") => (RuleGroup::Preview, rules::pylint::rules::NonAugmentedAssignment),
         (Pylint, "R6201") => (RuleGroup::Preview, rules::pylint::rules::LiteralMembership),
         #[allow(deprecated)]
         (Pylint, "R6301") => (RuleGroup::Nursery, rules::pylint::rules::NoSelfUse),
         (Pylint, "W0108") => (RuleGroup::Preview, rules::pylint::rules::UnnecessaryLambda),
-        (Pylint, "W0117") => (RuleGroup::Preview, rules::pylint::rules::NanComparison),
+        (Pylint, "W0177") => (RuleGroup::Preview, rules::pylint::rules::NanComparison),
         (Pylint, "W0120") => (RuleGroup::Stable, rules::pylint::rules::UselessElseOnLoop),
         (Pylint, "W0127") => (RuleGroup::Stable, rules::pylint::rules::SelfAssigningVariable),
         (Pylint, "W0128") => (RuleGroup::Preview, rules::pylint::rules::RedeclaredAssignedName),
@@ -379,6 +380,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Bugbear, "035") => (RuleGroup::Stable, rules::flake8_bugbear::rules::StaticKeyDictComprehension),
         (Flake8Bugbear, "904") => (RuleGroup::Stable, rules::flake8_bugbear::rules::RaiseWithoutFromInsideExcept),
         (Flake8Bugbear, "905") => (RuleGroup::Stable, rules::flake8_bugbear::rules::ZipWithoutExplicitStrict),
+        (Flake8Bugbear, "909") => (RuleGroup::Preview, rules::flake8_bugbear::rules::LoopIteratorMutation),
 
         // flake8-blind-except
         (Flake8BlindExcept, "001") => (RuleGroup::Stable, rules::flake8_blind_except::rules::BlindExcept),
@@ -1038,6 +1040,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
 
         // refurb
         (Refurb, "101") => (RuleGroup::Preview, rules::refurb::rules::ReadWholeFile),
+        (Refurb, "103") => (RuleGroup::Preview, rules::refurb::rules::WriteWholeFile),
         (Refurb, "105") => (RuleGroup::Preview, rules::refurb::rules::PrintEmptyString),
         (Refurb, "110") => (RuleGroup::Preview, rules::refurb::rules::IfExpInsteadOfOrOperator),
         #[allow(deprecated)]

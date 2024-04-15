@@ -27,8 +27,8 @@ use ruff_linter::rules::pycodestyle;
 use ruff_linter::settings::fix_safety_table::FixSafetyTable;
 use ruff_linter::settings::rule_table::RuleTable;
 use ruff_linter::settings::types::{
-    ExtensionMapping, FilePattern, FilePatternSet, PerFileIgnore, PerFileIgnores, PreviewMode,
-    PythonVersion, RequiredVersion, SerializationFormat, UnsafeFixes,
+    CompiledPerFileIgnoreList, ExtensionMapping, FilePattern, FilePatternSet, PerFileIgnore,
+    PreviewMode, PythonVersion, RequiredVersion, SerializationFormat, UnsafeFixes,
 };
 use ruff_linter::settings::{LinterSettings, DEFAULT_SELECTORS, DUMMY_VARIABLE_RGX, TASK_TAGS};
 use ruff_linter::{
@@ -259,7 +259,7 @@ impl Configuration {
                 line_length,
                 tab_size: self.indent_width.unwrap_or_default(),
                 namespace_packages: self.namespace_packages.unwrap_or_default(),
-                per_file_ignores: PerFileIgnores::resolve(
+                per_file_ignores: CompiledPerFileIgnoreList::resolve(
                     lint.per_file_ignores
                         .unwrap_or_default()
                         .into_iter()
