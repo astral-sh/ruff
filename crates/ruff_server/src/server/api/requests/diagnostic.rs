@@ -22,7 +22,7 @@ impl super::BackgroundDocumentRequestHandler for DocumentDiagnostic {
         let diagnostics = if snapshot.client_settings().lint() {
             crate::lint::check(
                 snapshot.document(),
-                &snapshot.configuration().linter,
+                &snapshot.ruff_settings().linter,
                 snapshot.encoding(),
             )
         } else {

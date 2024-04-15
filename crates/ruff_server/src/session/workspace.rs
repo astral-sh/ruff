@@ -12,9 +12,9 @@ use crate::{edit::DocumentVersion, Document};
 
 use super::{settings, ClientSettings};
 
-mod configuration;
+mod ruff_settings;
 
-pub(crate) use configuration::RuffConfiguration;
+pub(crate) use ruff_settings::RuffSettings;
 
 #[derive(Default)]
 pub(crate) struct Workspaces(BTreeMap<PathBuf, Workspace>);
@@ -27,7 +27,7 @@ pub(crate) struct Workspace {
 #[derive(Default)]
 pub(crate) struct OpenDocuments {
     documents: FxHashMap<Url, DocumentController>,
-    configuration_index: configuration::ConfigurationIndex,
+    ruff_settings_index: ruff_settings::RuffSettingsIndex,
 }
 
 /// A mutable handler to an underlying document.
@@ -35,14 +35,14 @@ pub(crate) struct OpenDocuments {
 /// calling `deref_mut`.
 pub(crate) struct DocumentController {
     document: Arc<Document>,
-    configuration: Arc<RuffConfiguration>,
+    configuration: Arc<RuffSettings>,
 }
 
 /// A read-only reference to a document.
 #[derive(Clone)]
 pub(crate) struct DocumentRef {
     document: Arc<Document>,
-    configuration: Arc<RuffConfiguration>,
+    ruff_settings: Arc<RuffSettings>,
 }
 
 impl Workspaces {
@@ -84,11 +84,11 @@ impl Workspaces {
             .controller(document_url)
     }
 
-    pub(super) fn reload_configuration(&mut self, changed_url: &Url) -> crate::Result<()> {
+    pub(super) fn reload_ruff_settings(&mut self, changed_url: &Url) -> crate::Result<()> {
         let workspace = self
             .workspace_for_url_mut(changed_url)
             .ok_or_else(|| anyhow!("Workspace not found for {changed_url}"))?;
-        workspace.reload_configuration();
+        workspace.reload_ruff_settings();
         Ok(())
     }
 
@@ -166,8 +166,8 @@ impl Workspace {
         ))
     }
 
-    fn reload_configuration(&mut self) {
-        self.open_documents.reload_configuration();
+    fn reload_ruff_settings(&mut self) {
+        self.open_documents.reload_ruff_settings();
     }
 }
 
@@ -181,7 +181,7 @@ impl OpenDocuments {
     }
 
     fn open(&mut self, url: &Url, contents: String, version: DocumentVersion) {
-        let configuration = self.configuration_index.get_or_insert(url);
+        let configuration = self.ruff_settings_index.get_or_insert(url);
         if self
             .documents
             .insert(
@@ -203,12 +203,12 @@ impl OpenDocuments {
         Ok(())
     }
 
-    fn reload_configuration(&mut self) {
-        self.configuration_index.clear();
+    fn reload_ruff_settings(&mut self) {
+        self.ruff_settings_index.clear();
 
         for (path, document) in &mut self.documents {
-            let new_configuration = self.configuration_index.get_or_insert(path);
-            document.update_configuration(new_configuration);
+            let new_settings = self.ruff_settings_index.get_or_insert(path);
+            document.update_ruff_settings(new_settings);
         }
     }
 }
@@ -217,7 +217,7 @@ impl DocumentController {
     fn new(
         contents: String,
         version: DocumentVersion,
-        configuration: Arc<RuffConfiguration>,
+        configuration: Arc<RuffSettings>,
     ) -> Self {
         Self {
             document: Arc::new(Document::new(contents, version)),
@@ -225,14 +225,14 @@ impl DocumentController {
         }
     }
 
-    pub(crate) fn update_configuration(&mut self, new_configuration: Arc<RuffConfiguration>) {
+    pub(crate) fn update_ruff_settings(&mut self, new_configuration: Arc<RuffSettings>) {
         self.configuration = new_configuration;
     }
 
     pub(crate) fn make_ref(&self) -> DocumentRef {
         DocumentRef {
             document: self.document.clone(),
-            configuration: self.configuration.clone(),
+            ruff_settings: self.configuration.clone(),
         }
     }
 
@@ -256,7 +256,7 @@ impl Deref for DocumentRef {
 }
 
 impl DocumentRef {
-    pub(crate) fn configuration(&self) -> &RuffConfiguration {
-        &self.configuration
+    pub(crate) fn ruff_settings(&self) -> &RuffSettings {
+        &self.ruff_settings
     }
 }
