@@ -35,7 +35,6 @@ pub(crate) struct OpenDocuments {
 /// calling `deref_mut`.
 pub(crate) struct DocumentController {
     document: Arc<Document>,
-    configuration: Arc<RuffSettings>,
 }
 
 /// A read-only reference to a document.
@@ -85,10 +84,10 @@ impl Workspaces {
     }
 
     pub(super) fn reload_ruff_settings(&mut self, changed_url: &Url) -> crate::Result<()> {
-        let workspace = self
-            .workspace_for_url_mut(changed_url)
+        let (root, workspace) = self
+            .entry_for_url_mut(changed_url)
             .ok_or_else(|| anyhow!("Workspace not found for {changed_url}"))?;
-        workspace.reload_ruff_settings();
+        workspace.reload_ruff_settings(root);
         Ok(())
     }
 
@@ -166,14 +165,18 @@ impl Workspace {
         ))
     }
 
-    fn reload_ruff_settings(&mut self) {
-        self.open_documents.reload_ruff_settings();
+    fn reload_ruff_settings(&mut self, root: &Path) {
+        self.open_documents.reload_ruff_settings(root);
     }
 }
 
 impl OpenDocuments {
     fn snapshot(&self, url: &Url) -> Option<DocumentRef> {
-        Some(self.documents.get(url)?.make_ref())
+        let path = url
+            .to_file_path()
+            .expect("document URL should convert to file path: {url}");
+        let document_settings = self.ruff_settings_index.get(&path).clone();
+        Some(self.documents.get(url)?.make_ref(document_settings))
     }
 
     fn controller(&mut self, url: &Url) -> Option<&mut DocumentController> {
@@ -181,13 +184,9 @@ impl OpenDocuments {
     }
 
     fn open(&mut self, url: &Url, contents: String, version: DocumentVersion) {
-        let configuration = self.ruff_settings_index.get_or_insert(url);
         if self
             .documents
-            .insert(
-                url.clone(),
-                DocumentController::new(contents, version, configuration),
-            )
+            .insert(url.clone(), DocumentController::new(contents, version))
             .is_some()
         {
             tracing::warn!("Opening document `{url}` that is already open!");
@@ -203,36 +202,22 @@ impl OpenDocuments {
         Ok(())
     }
 
-    fn reload_ruff_settings(&mut self) {
-        self.ruff_settings_index.clear();
-
-        for (path, document) in &mut self.documents {
-            let new_settings = self.ruff_settings_index.get_or_insert(path);
-            document.update_ruff_settings(new_settings);
-        }
+    fn reload_ruff_settings(&mut self, root: &Path) {
+        self.ruff_settings_index.reload(root);
     }
 }
 
 impl DocumentController {
-    fn new(
-        contents: String,
-        version: DocumentVersion,
-        configuration: Arc<RuffSettings>,
-    ) -> Self {
+    fn new(contents: String, version: DocumentVersion) -> Self {
         Self {
             document: Arc::new(Document::new(contents, version)),
-            configuration,
         }
     }
 
-    pub(crate) fn update_ruff_settings(&mut self, new_configuration: Arc<RuffSettings>) {
-        self.configuration = new_configuration;
-    }
-
-    pub(crate) fn make_ref(&self) -> DocumentRef {
+    pub(crate) fn make_ref(&self, document_settings: Arc<RuffSettings>) -> DocumentRef {
         DocumentRef {
             document: self.document.clone(),
-            ruff_settings: self.configuration.clone(),
+            ruff_settings: document_settings,
         }
     }
 

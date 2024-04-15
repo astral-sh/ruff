@@ -1,6 +1,7 @@
-use anyhow::anyhow;
-use lsp_types::Url;
-use ruff_workspace::resolver::{ConfigurationTransformer, Relativity};
+use ruff_workspace::{
+    pyproject::settings_toml,
+    resolver::{ConfigurationTransformer, Relativity},
+};
 use std::{
     collections::BTreeMap,
     path::{Path, PathBuf},
@@ -18,47 +19,52 @@ pub(crate) struct RuffSettings {
 #[derive(Default)]
 pub(super) struct RuffSettingsIndex {
     index: BTreeMap<PathBuf, Arc<RuffSettings>>,
+    fallback: Arc<RuffSettings>,
 }
 
 impl RuffSettingsIndex {
-    pub(super) fn get_or_insert(&mut self, document_url: &Url) -> Arc<RuffSettings> {
-        let document_path = document_url
-            .to_file_path()
-            .expect("document URL should be a valid path");
-        let folder = document_path
-            .parent()
-            .expect("document URL should be a file path and have a parent");
-        if let Some(config) = self.index.get(folder) {
-            return config.clone();
+    pub(super) fn reload(&mut self, root: &Path) {
+        self.clear();
+
+        for directory in std::fs::read_dir(root).unwrap().filter_map(|entry| {
+            entry
+                .ok()
+                .and_then(|entry| entry.file_type().ok()?.is_dir().then_some(entry))
+        }) {
+            let path = directory.path();
+            if let Some(pyproject) = settings_toml(&path).ok().flatten() {
+                let Ok(settings) = ruff_workspace::resolver::resolve_root_settings(
+                    &pyproject,
+                    Relativity::Parent,
+                    &LSPConfigTransformer,
+                ) else {
+                    continue;
+                };
+                self.index.insert(
+                    path,
+                    Arc::new(RuffSettings {
+                        linter: settings.linter,
+                        formatter: settings.formatter,
+                    }),
+                );
+            }
+        }
+    }
+
+    pub(super) fn get(&self, document_path: &Path) -> &Arc<RuffSettings> {
+        if let Some((_, ruff_settings)) =
+            self.index.range(..document_path.to_path_buf()).next_back()
+        {
+            return ruff_settings;
         }
 
-        let config = Arc::new(Self::find_configuration_at_path(folder).unwrap_or_else(|err| {
-            tracing::error!("The following error occurred when trying to find a configuration file at `{}`:\n{err}", document_path.display());
-            tracing::error!("Falling back to default configuration for `{}`", document_path.display());
-            RuffSettings::default()
-        }));
+        tracing::warn!("No ruff settings file (pyproject.toml/ruff.toml/.ruff.toml) found for {} - falling back to default configuration", document_path.display());
 
-        self.index.insert(folder.to_path_buf(), config.clone());
-
-        config
+        &self.fallback
     }
 
-    pub(super) fn clear(&mut self) {
+    fn clear(&mut self) {
         self.index.clear();
-    }
-
-    fn find_configuration_at_path(folder: &Path) -> crate::Result<RuffSettings> {
-        let pyproject = ruff_workspace::pyproject::find_settings_toml(folder)?
-            .ok_or_else(|| anyhow!("No pyproject.toml/ruff.toml/.ruff.toml file was found"))?;
-        let settings = ruff_workspace::resolver::resolve_root_settings(
-            &pyproject,
-            Relativity::Parent,
-            &LSPConfigTransformer,
-        )?;
-        Ok(RuffSettings {
-            linter: settings.linter,
-            formatter: settings.formatter,
-        })
     }
 }
 
