@@ -33,7 +33,6 @@ use crate::checkers::ast::Checker;
 /// However, a DeprecationWarning (`DeprecationWarning: __index__ returned non-int (type bool)`)
 /// for such cases was already introduced, thus this is a conscious difference between the original
 /// pylint rule and the current ruff implementation.
-/// 
 /// ## References
 /// - [Python documentation: The `__index__` method](https://docs.python.org/3/reference/datamodel.html#object.__index__)
 #[violation]
