@@ -129,9 +129,9 @@ checksum = "f538837af36e6f6a9be0faa67f9a314f8119e4e4b5867c6ab40ed60360142519"
 
 [[package]]
 name = "argfile"
-version = "0.1.6"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1287c4f82a41c5085e65ee337c7934d71ab43d5187740a81fb69129013f6a5f6"
+checksum = "b7c5c8e418080ef8aa932039d12eda7b6f5043baf48f1523c166fbc32d004534"
 dependencies = [
  "fs-err",
  "os_str_bytes",
