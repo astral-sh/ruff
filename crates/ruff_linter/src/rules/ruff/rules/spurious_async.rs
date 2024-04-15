@@ -3,7 +3,6 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, Expr, Stmt};
-use ruff_text_size::TextRange;
 
 use crate::checkers::ast::Checker;
 
@@ -70,18 +69,21 @@ impl<'a> Visitor<'a> for YieldingExprVisitor {
 /// RUF029
 pub(crate) fn spurious_async(
     checker: &mut Checker,
-    is_async: bool,
-    name: &str,
-    body: &[Stmt],
-    range: TextRange,
+    ast::StmtFunctionDef {
+        is_async,
+        name,
+        body,
+        range,
+        ..
+    }: &ast::StmtFunctionDef,
 ) {
     if !is_async {
         return;
     }
 
     let yields = {
-        let mut visitor = YieldingExprVisitor { found_yield: false };
-        visitor.visit_body(body);
+        let mut visitor = YieldingExprVisitor::default();
+        visitor.visit_body(&body);
         visitor.found_yield
     };
 
@@ -90,7 +92,7 @@ pub(crate) fn spurious_async(
             SpuriousAsync {
                 name: name.to_string(),
             },
-            range,
+            *range,
         ));
     }
 }
