@@ -9,14 +9,14 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for methods that conflict with `__slots__`.
+/// Checks for members that conflict with `__slots__`.
 ///
 /// ## Why is this bad?
-/// Defining a method with the same name as a slot entry in the `__slots__`
+/// Defining a member with the same name as a slot entry in the `__slots__`
 /// collection can lead to unexpected behavior and bugs. The `__slots__`
 /// declaration is used to explicitly declare data members to optimize
 /// memory usage by avoiding the creation of a `__dict__` for each instance.
-/// If a method shares a name with a slot, it can overshadow the intended
+/// If a member shares a name with a slot, it can overshadow the intended
 /// slot, preventing it from functioning as a data attribute, which could
 /// lead to attribute errors or incorrect data handling in the class.
 ///
