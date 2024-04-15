@@ -41,7 +41,7 @@ async def pass_case_4():  # OK: awaits a coroutine
     return foo
 
 
-async def pass_case_5():  # OK: yields a value
+async def fail_case_5():  # RUF029: yield does not require async
     yield "hello"
 
 
