@@ -1,31 +1,41 @@
-use ast::ParameterWithDefault;
-use ruff_python_ast::{self as ast, Expr};
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_semantic::{analyze::function_type, ScopeKind};
+use ruff_python_ast::{self as ast, Expr, ParameterWithDefault};
+use ruff_python_semantic::analyze::function_type::{self as function_type, FunctionType};
+use ruff_python_semantic::ScopeKind;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for assignment of `self` and `cls` in methods.
+/// Checks for assignment of `self` and `cls` in instance and class methods respectively.
 ///
 /// ## Why is this bad?
-/// The identifiers `self` and `cls` are conventional in Python for
-/// the first argument of instance methods and class methods, respectively.
+/// The identifiers `self` and `cls` are conventional in Python for the first argument of instance
+/// methods and class methods, respectively.
 ///
 /// ## Example
 ///
 /// ```python
-/// class A:
-///     def method(self):
-///         self = 1
+/// class Versions:
+///     def add(self, version):
+///         self = version
 ///
-///     def class_method(cls):
-///         cls = 1
+///     @classmethod
+///     def from_list(cls, versions):
+///         cls = versions
 /// ```
 ///
+/// Use instead:
+/// ```python
+/// class Versions:
+///     def add(self, version):
+///         self.versions.append(version)
+///
+///     @classmethod
+///     def from_list(cls, versions):
+///         return cls(versions)
+/// ```
 #[violation]
 pub struct SelfOrClsAssignment {
     method_type: MethodType,
@@ -37,9 +47,8 @@ impl Violation for SelfOrClsAssignment {
         let SelfOrClsAssignment { method_type } = self;
 
         format!(
-            "Invalid assignment to `{}` argument in {} method",
+            "Invalid assignment to `{}` argument in {method_type} method",
             method_type.arg_name(),
-            method_type.function_type()
         )
     }
 }
@@ -84,8 +93,8 @@ pub(crate) fn self_or_cls_assignment(checker: &mut Checker, target: &Expr) {
     );
 
     let method_type = match (function_type, self_or_cls.name.as_str()) {
-        (function_type::FunctionType::Method { .. }, "self") => MethodType::Instance,
-        (function_type::FunctionType::ClassMethod { .. }, "cls") => MethodType::Class,
+        (FunctionType::Method { .. }, "self") => MethodType::Instance,
+        (FunctionType::ClassMethod { .. }, "cls") => MethodType::Class,
         _ => return,
     };
 
@@ -109,6 +118,7 @@ fn check_expr(checker: &mut Checker, target: &Expr, method_type: MethodType) {
                 check_expr(checker, element, method_type);
             }
         }
+        Expr::Starred(ast::ExprStarred { value, .. }) => check_expr(checker, value, method_type),
         _ => {}
     }
 }
@@ -126,11 +136,13 @@ impl MethodType {
             MethodType::Class => "cls",
         }
     }
+}
 
-    fn function_type(self) -> &'static str {
+impl std::fmt::Display for MethodType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            MethodType::Instance => "instance",
-            MethodType::Class => "class",
+            MethodType::Instance => f.write_str("instance"),
+            MethodType::Class => f.write_str("class"),
         }
     }
 }
