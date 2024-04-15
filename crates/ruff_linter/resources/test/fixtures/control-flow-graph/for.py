@@ -54,3 +54,9 @@ def func():
     else:
         return 1
     x = 1
+
+def func():
+    for i in range(5):
+        pass
+    else:
+        pass
