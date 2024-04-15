@@ -1,0 +1,32 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+invalid_return_type_bytes.py:5:16: PLE0308 `__bytes__` does not return `bytes`
+  |
+3 | class Float:
+4 |     def __bytes__(self):
+5 |         return 3.05  # [invalid-bytes-return]
+  |                ^^^^ PLE0308
+6 | 
+7 | class Int:
+  |
+
+invalid_return_type_bytes.py:9:16: PLE0308 `__bytes__` does not return `bytes`
+   |
+ 7 | class Int:
+ 8 |     def __bytes__(self):
+ 9 |         return 0  # [invalid-bytes-return]
+   |                ^ PLE0308
+10 | 
+11 | class Str:
+   |
+
+invalid_return_type_bytes.py:13:16: PLE0308 `__bytes__` does not return `bytes`
+   |
+11 | class Str:
+12 |     def __bytes__(self):
+13 |         return "some bytes"  # [invalid-bytes-return]
+   |                ^^^^^^^^^^^^ PLE0308
+14 | 
+15 | # TODO: Once Ruff has better type checking
+   |
