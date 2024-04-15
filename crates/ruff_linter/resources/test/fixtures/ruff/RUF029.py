@@ -32,3 +32,25 @@ async def pass_case_3():  # OK: uses an async loop
 async def fail_case_3():  # RUF029
     for i in []:
         pass
+
+
+async def pass_case_4():  # OK: awaits a coroutine
+    def foo(optional_arg=await bar()):
+        pass
+
+    return foo
+
+
+async def pass_case_5():  # OK: yields a value
+    yield "hello"
+
+
+async def fail_case_6():  # RUF029: the outer function does not await or yield
+    async def foo():
+        await bla
+
+
+async def fail_case_6():  # RUF029: the outer function does not await or yield
+    class Foo:
+        async def foo():
+            await bla
