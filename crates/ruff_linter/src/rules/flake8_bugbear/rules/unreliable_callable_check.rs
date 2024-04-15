@@ -57,12 +57,6 @@ pub(crate) fn unreliable_callable_check(
     func: &Expr,
     args: &[Expr],
 ) {
-    let Some(qualified_name) = checker.semantic().resolve_qualified_name(func) else {
-        return;
-    };
-    let ["" | "builtins", function @ ("hasattr" | "getattr")] = qualified_name.segments() else {
-        return;
-    };
     let [obj, attr, ..] = args else {
         return;
     };
@@ -72,6 +66,12 @@ pub(crate) fn unreliable_callable_check(
     if value != "__call__" {
         return;
     }
+    let Some(qualified_name) = checker.semantic().resolve_qualified_name(func) else {
+        return;
+    };
+    let ["" | "builtins", function @ ("hasattr" | "getattr")] = qualified_name.segments() else {
+        return;
+    };
 
     let mut diagnostic = Diagnostic::new(UnreliableCallableCheck, expr.range());
     if *function == "hasattr" {

@@ -43,11 +43,6 @@ impl AlwaysFixableViolation for UnnecessaryRangeStart {
 
 /// PIE808
 pub(crate) fn unnecessary_range_start(checker: &mut Checker, call: &ast::ExprCall) {
-    // Verify that the call is to the `range` builtin.
-    if !checker.semantic().match_builtin_expr(&call.func, "range") {
-        return;
-    };
-
     // `range` doesn't accept keyword arguments.
     if !call.arguments.keywords.is_empty() {
         return;
@@ -67,6 +62,11 @@ pub(crate) fn unnecessary_range_start(checker: &mut Checker, call: &ast::ExprCal
         return;
     };
     if *value != 0 {
+        return;
+    };
+
+    // Verify that the call is to the `range` builtin.
+    if !checker.semantic().match_builtin_expr(&call.func, "range") {
         return;
     };
 

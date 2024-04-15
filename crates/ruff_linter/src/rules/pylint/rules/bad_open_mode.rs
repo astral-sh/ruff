@@ -95,8 +95,10 @@ fn is_open(func: &Expr, semantic: &SemanticModel) -> Option<Kind> {
     if attr != "open" {
         return None;
     }
-    let ast::ExprCall { func, .. } = value.as_call_expr()?;
-    let qualified_name = semantic.resolve_qualified_name(func)?;
+    let ast::ExprCall {
+        func: value_func, ..
+    } = value.as_call_expr()?;
+    let qualified_name = semantic.resolve_qualified_name(value_func)?;
     match qualified_name.segments() {
         ["pathlib", "Path"] => Some(Kind::Pathlib),
         _ => None,

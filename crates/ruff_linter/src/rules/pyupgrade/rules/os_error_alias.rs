@@ -94,7 +94,8 @@ fn atom_diagnostic(checker: &mut Checker, target: &Expr) {
 /// Create a [`Diagnostic`] for a tuple of expressions.
 fn tuple_diagnostic(checker: &mut Checker, tuple: &ast::ExprTuple, aliases: &[&Expr]) {
     let mut diagnostic = Diagnostic::new(OSErrorAlias { name: None }, tuple.range());
-    if checker.semantic().is_builtin("OSError") {
+    let semantic = checker.semantic();
+    if semantic.is_builtin("OSError") {
         // Filter out any `OSErrors` aliases.
         let mut remaining: Vec<Expr> = tuple
             .elts
@@ -112,7 +113,7 @@ fn tuple_diagnostic(checker: &mut Checker, tuple: &ast::ExprTuple, aliases: &[&E
         if tuple
             .elts
             .iter()
-            .all(|elt| !checker.semantic().match_builtin_expr(elt, "OSError"))
+            .all(|elt| !semantic.match_builtin_expr(elt, "OSError"))
         {
             let node = ast::ExprName {
                 id: "OSError".into(),

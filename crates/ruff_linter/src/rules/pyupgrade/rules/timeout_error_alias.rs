@@ -106,7 +106,8 @@ fn atom_diagnostic(checker: &mut Checker, target: &Expr) {
 /// Create a [`Diagnostic`] for a tuple of expressions.
 fn tuple_diagnostic(checker: &mut Checker, tuple: &ast::ExprTuple, aliases: &[&Expr]) {
     let mut diagnostic = Diagnostic::new(TimeoutErrorAlias { name: None }, tuple.range());
-    if checker.semantic().is_builtin("TimeoutError") {
+    let semantic = checker.semantic();
+    if semantic.is_builtin("TimeoutError") {
         // Filter out any `TimeoutErrors` aliases.
         let mut remaining: Vec<Expr> = tuple
             .elts
@@ -124,7 +125,7 @@ fn tuple_diagnostic(checker: &mut Checker, tuple: &ast::ExprTuple, aliases: &[&E
         if tuple
             .elts
             .iter()
-            .all(|elt| !checker.semantic().match_builtin_expr(elt, "TimeoutError"))
+            .all(|elt| !semantic.match_builtin_expr(elt, "TimeoutError"))
         {
             let node = ast::ExprName {
                 id: "TimeoutError".into(),

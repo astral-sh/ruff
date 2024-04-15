@@ -126,11 +126,14 @@ fn is_open(semantic: &SemanticModel, func: &Expr) -> bool {
     if attr != "open" {
         return false;
     }
-    let Expr::Call(ast::ExprCall { func, .. }) = &**value else {
+    let Expr::Call(ast::ExprCall {
+        func: value_func, ..
+    }) = &**value
+    else {
         return false;
     };
     semantic
-        .resolve_qualified_name(func)
+        .resolve_qualified_name(value_func)
         .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["pathlib", "Path"]))
 }
 

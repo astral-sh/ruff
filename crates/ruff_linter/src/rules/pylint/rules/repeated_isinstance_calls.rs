@@ -92,12 +92,12 @@ pub(crate) fn repeated_isinstance_calls(
         else {
             continue;
         };
-        if !checker.semantic().match_builtin_expr(func, "isinstance") {
-            continue;
-        }
         let [obj, types] = &args[..] else {
             continue;
         };
+        if !checker.semantic().match_builtin_expr(func, "isinstance") {
+            continue;
+        }
         let (num_calls, matches) = obj_to_types
             .entry(obj.into())
             .or_insert_with(|| (0, FxHashSet::default()));

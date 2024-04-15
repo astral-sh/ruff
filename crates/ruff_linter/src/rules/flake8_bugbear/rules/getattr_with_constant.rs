@@ -54,9 +54,6 @@ pub(crate) fn getattr_with_constant(
     func: &Expr,
     args: &[Expr],
 ) {
-    if !checker.semantic().match_builtin_expr(func, "getattr") {
-        return;
-    };
     let [obj, arg] = args else {
         return;
     };
@@ -70,6 +67,9 @@ pub(crate) fn getattr_with_constant(
         return;
     }
     if is_mangled_private(value.to_str()) {
+        return;
+    }
+    if !checker.semantic().match_builtin_expr(func, "getattr") {
         return;
     }
 
