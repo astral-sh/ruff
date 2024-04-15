@@ -32,7 +32,6 @@ use crate::checkers::ast::Checker;
 /// Note: Strictly speaking `bool` is a subclass of `int`, thus returning `True`/`False` is valid.
 /// To be consistent with other rules (e.g. PLE0305 invalid-index-returned), ruff will raise, compared
 /// to pylint which will not raise.
-/// 
 /// ## References
 /// - [Python documentation: The `__len__` method](https://docs.python.org/3/reference/datamodel.html#object.__len__)
 #[violation]
@@ -67,7 +66,8 @@ pub(crate) fn invalid_length_return(checker: &mut Checker, name: &str, body: &[S
                 ResolvedPythonType::from(value),
                 ResolvedPythonType::Unknown
                     | ResolvedPythonType::Atom(PythonType::Number(NumberLike::Integer))
-            ) || is_negative_integer(value) {
+            ) || is_negative_integer(value)
+            {
                 checker
                     .diagnostics
                     .push(Diagnostic::new(InvalidLengthReturnType, value.range()));
@@ -82,9 +82,8 @@ pub(crate) fn invalid_length_return(checker: &mut Checker, name: &str, body: &[S
 }
 
 fn is_negative_integer(value: &Expr) -> bool {
-    let Expr::UnaryOp(ast::ExprUnaryOp { op, .. }) = value else { return false; };
-    match op {
-        ast::UnaryOp::USub => true,
-        _ => false,
-    }
+    let Expr::UnaryOp(ast::ExprUnaryOp { op, .. }) = value else {
+        return false;
+    };
+    matches!(op, ast::UnaryOp::USub)
 }

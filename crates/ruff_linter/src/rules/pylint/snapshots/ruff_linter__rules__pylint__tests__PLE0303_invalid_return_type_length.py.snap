@@ -30,3 +30,13 @@ invalid_return_type_length.py:13:16: PLE0303 `__len__` does not return a non-neg
 14 | 
 15 | class LengthNegative:
    |
+
+invalid_return_type_length.py:17:16: PLE0303 `__len__` does not return a non-negative `integer`
+   |
+15 | class LengthNegative:
+16 |     def __len__(self):
+17 |         return -42  # [invalid-length-return]
+   |                ^^^ PLE0303
+18 | 
+19 | # TODO: Once Ruff has better type checking
+   |
