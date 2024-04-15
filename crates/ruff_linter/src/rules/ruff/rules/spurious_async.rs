@@ -15,6 +15,18 @@ use crate::checkers::ast::Checker;
 /// Declaring a function `async` when it's not is usually a mistake, and will artificially limit the
 /// contexts where that function may be called. In some cases, labeling a function `async` is
 /// semantically meaningful (e.g. with the trio library).
+///
+/// ## Examples
+/// ```python
+/// async def foo():
+///     bar()
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def foo():
+///     bar()
+/// ```
 #[violation]
 pub struct SpuriousAsync {
     name: String,
