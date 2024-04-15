@@ -97,6 +97,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::InvalidBoolReturnType) {
                 pylint::rules::invalid_bool_return(checker, name, body);
             }
+            if checker.enabled(Rule::InvalidLengthReturnType) {
+                pylint::rules::invalid_length_return(checker, name, body);
+            }
             if checker.enabled(Rule::InvalidStrReturnType) {
                 pylint::rules::invalid_str_return(checker, name, body);
             }
