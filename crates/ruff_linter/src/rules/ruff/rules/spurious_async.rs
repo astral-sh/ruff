@@ -41,14 +41,14 @@ impl Violation for SpuriousAsync {
 
 #[derive(Default)]
 struct YieldingExprVisitor {
-    found_yield: bool,
+    found_await_or_yield: bool,
 }
 
 impl<'a> Visitor<'a> for YieldingExprVisitor {
     fn visit_expr(&mut self, expr: &'a Expr) {
         match expr {
             Expr::Await(_) => {
-                self.found_yield = true;
+                self.found_await_or_yield = true;
             }
             _ => visitor::walk_expr(self, expr),
         }
@@ -56,10 +56,10 @@ impl<'a> Visitor<'a> for YieldingExprVisitor {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
         match stmt {
             Stmt::With(ast::StmtWith { is_async: true, .. }) => {
-                self.found_yield = true;
+                self.found_await_or_yield = true;
             }
             Stmt::For(ast::StmtFor { is_async: true, .. }) => {
-                self.found_yield = true;
+                self.found_await_or_yield = true;
             }
             _ => visitor::walk_stmt(self, stmt),
         }
@@ -84,7 +84,7 @@ pub(crate) fn spurious_async(
     let yields = {
         let mut visitor = YieldingExprVisitor::default();
         visitor.visit_body(&body);
-        visitor.found_yield
+        visitor.found_await_or_yield
     };
 
     if !yields {
