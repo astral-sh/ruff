@@ -103,6 +103,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::InvalidBytesReturnType) {
                 pylint::rules::invalid_bytes_return(checker, function_def);
             }
+            if checker.enabled(Rule::InvalidHashReturnType) {
+                pylint::rules::invalid_hash_return(checker, name, body);
+            }
             if checker.enabled(Rule::InvalidStrReturnType) {
                 pylint::rules::invalid_str_return(checker, function_def);
             }
