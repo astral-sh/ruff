@@ -1,0 +1,29 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+class_variable_slots_conflict.py:3:5: PLE0242 `name` in `__slots__` conflicts with class variable
+  |
+1 | class Person:
+2 |     __slots__ = ("age", "name", "say_hi")
+3 |     name = None
+  |     ^^^^ PLE0242
+4 | 
+5 |     def __init__(self, age, name):
+  |
+
+class_variable_slots_conflict.py:10:9: PLE0242 `age` in `__slots__` conflicts with class variable
+   |
+ 9 |     @property
+10 |     def age(self):
+   |         ^^^ PLE0242
+11 |         return self.age
+   |
+
+class_variable_slots_conflict.py:13:9: PLE0242 `say_hi` in `__slots__` conflicts with class variable
+   |
+11 |         return self.age
+12 | 
+13 |     def say_hi(self):
+   |         ^^^^^^ PLE0242
+14 |         print(f"Hi, I'm {self.name}.")
+   |

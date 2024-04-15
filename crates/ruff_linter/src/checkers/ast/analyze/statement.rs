@@ -367,6 +367,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 range: _,
             },
         ) => {
+            if checker.enabled(Rule::ClassVariableSlotsConflict) {
+                pylint::rules::class_variable_slots_conflict(checker, body);
+            }
             if checker.enabled(Rule::NoClassmethodDecorator) {
                 pylint::rules::no_classmethod_decorator(checker, stmt);
             }
