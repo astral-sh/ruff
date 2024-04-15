@@ -12,14 +12,15 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Why is this bad?
 /// If a function has a default value where the literal representation is
-/// greater than 50 characters, it is likely to be an implementation detail or
-/// a constant that varies depending on the system you're running on.
+/// greater than 50 characters, the value is likely to be an implementation
+/// detail or a constant that varies depending on the system you're running on.
 ///
-/// Consider replacing such constants with ellipses (`...`).
+/// Default values like these should generally be omitted from stubs. Use
+/// ellipses (`...`) instead.
 ///
 /// ## Example
 /// ```python
-/// def foo(arg: int = 12345678901) -> None:
+/// def foo(arg: int = 693568516352839939918568862861217771399698285293568) -> None:
 ///     ...
 /// ```
 ///

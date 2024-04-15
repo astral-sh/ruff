@@ -25,12 +25,12 @@ impl fmt::Display for VarKind {
 }
 
 /// ## What it does
-/// Checks that type `TypeVar`, `ParamSpec`, and `TypeVarTuple` definitions in
-/// stubs are prefixed with `_`.
+/// Checks that type `TypeVar`s, `ParamSpec`s, and `TypeVarTuple`s in stubs
+/// have names prefixed with `_`.
 ///
 /// ## Why is this bad?
-/// By prefixing type parameters with `_`, we can avoid accidentally exposing
-/// names internal to the stub.
+/// Prefixing type parameters with `_` avoids accidentally exposing names
+/// internal to the stub.
 ///
 /// ## Example
 /// ```python
@@ -81,21 +81,21 @@ pub(crate) fn prefix_type_params(checker: &mut Checker, value: &Expr, targets: &
 
     let Some(kind) = checker
         .semantic()
-        .resolve_call_path(func)
-        .and_then(|call_path| {
+        .resolve_qualified_name(func)
+        .and_then(|qualified_name| {
             if checker
                 .semantic()
-                .match_typing_call_path(&call_path, "ParamSpec")
+                .match_typing_qualified_name(&qualified_name, "ParamSpec")
             {
                 Some(VarKind::ParamSpec)
             } else if checker
                 .semantic()
-                .match_typing_call_path(&call_path, "TypeVar")
+                .match_typing_qualified_name(&qualified_name, "TypeVar")
             {
                 Some(VarKind::TypeVar)
             } else if checker
                 .semantic()
-                .match_typing_call_path(&call_path, "TypeVarTuple")
+                .match_typing_qualified_name(&qualified_name, "TypeVarTuple")
             {
                 Some(VarKind::TypeVarTuple)
             } else {

@@ -1,0 +1,29 @@
+---
+source: crates/ruff_linter/src/rules/flake8_quotes/mod.rs
+---
+docstring_doubles_mixed_quotes_class_var_1.py:2:5: Q002 Double quote docstring found but single quotes preferred
+  |
+1 | class SingleLineDocstrings():
+2 |     ""'Start with empty string' ' and lint docstring safely'
+  |     ^^ Q002
+3 |     """ Not a docstring """
+  |
+  = help: Replace double quotes docstring with single quotes
+
+docstring_doubles_mixed_quotes_class_var_1.py:6:9: Q002 Double quote docstring found but single quotes preferred
+  |
+5 |     def foo(self, bar="""not a docstring"""):
+6 |         ""'Start with empty string' ' and lint docstring safely'
+  |         ^^ Q002
+7 |         pass
+  |
+  = help: Replace double quotes docstring with single quotes
+
+docstring_doubles_mixed_quotes_class_var_1.py:9:29: Q002 Double quote docstring found but single quotes preferred
+  |
+7 |         pass
+8 | 
+9 |     class Nested(foo()[:]): ""'Start with empty string' ' and lint docstring safely'; pass
+  |                             ^^ Q002
+  |
+  = help: Replace double quotes docstring with single quotes

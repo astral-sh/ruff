@@ -1,0 +1,341 @@
+---
+source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
+---
+B909.py:12:5: B909 Mutation to loop iterable `some_list` during iteration
+   |
+10 | for elem in some_list:
+11 |     # errors
+12 |     some_list.remove(0)
+   |     ^^^^^^^^^^^^^^^^ B909
+13 |     del some_list[2]
+14 |     some_list.append(elem)
+   |
+
+B909.py:13:5: B909 Mutation to loop iterable `some_list` during iteration
+   |
+11 |     # errors
+12 |     some_list.remove(0)
+13 |     del some_list[2]
+   |     ^^^^^^^^^^^^^^^^ B909
+14 |     some_list.append(elem)
+15 |     some_list.sort()
+   |
+
+B909.py:14:5: B909 Mutation to loop iterable `some_list` during iteration
+   |
+12 |     some_list.remove(0)
+13 |     del some_list[2]
+14 |     some_list.append(elem)
+   |     ^^^^^^^^^^^^^^^^ B909
+15 |     some_list.sort()
+16 |     some_list.reverse()
+   |
+
+B909.py:15:5: B909 Mutation to loop iterable `some_list` during iteration
+   |
+13 |     del some_list[2]
+14 |     some_list.append(elem)
+15 |     some_list.sort()
+   |     ^^^^^^^^^^^^^^ B909
+16 |     some_list.reverse()
+17 |     some_list.clear()
+   |
+
+B909.py:16:5: B909 Mutation to loop iterable `some_list` during iteration
+   |
+14 |     some_list.append(elem)
+15 |     some_list.sort()
+16 |     some_list.reverse()
+   |     ^^^^^^^^^^^^^^^^^ B909
+17 |     some_list.clear()
+18 |     some_list.extend([1, 2])
+   |
+
+B909.py:17:5: B909 Mutation to loop iterable `some_list` during iteration
+   |
+15 |     some_list.sort()
+16 |     some_list.reverse()
+17 |     some_list.clear()
+   |     ^^^^^^^^^^^^^^^ B909
+18 |     some_list.extend([1, 2])
+19 |     some_list.insert(1, 1)
+   |
+
+B909.py:18:5: B909 Mutation to loop iterable `some_list` during iteration
+   |
+16 |     some_list.reverse()
+17 |     some_list.clear()
+18 |     some_list.extend([1, 2])
+   |     ^^^^^^^^^^^^^^^^ B909
+19 |     some_list.insert(1, 1)
+20 |     some_list.pop(1)
+   |
+
+B909.py:19:5: B909 Mutation to loop iterable `some_list` during iteration
+   |
+17 |     some_list.clear()
+18 |     some_list.extend([1, 2])
+19 |     some_list.insert(1, 1)
+   |     ^^^^^^^^^^^^^^^^ B909
+20 |     some_list.pop(1)
+21 |     some_list.pop()
+   |
+
+B909.py:20:5: B909 Mutation to loop iterable `some_list` during iteration
+   |
+18 |     some_list.extend([1, 2])
+19 |     some_list.insert(1, 1)
+20 |     some_list.pop(1)
+   |     ^^^^^^^^^^^^^ B909
+21 |     some_list.pop()
+   |
+
+B909.py:21:5: B909 Mutation to loop iterable `some_list` during iteration
+   |
+19 |     some_list.insert(1, 1)
+20 |     some_list.pop(1)
+21 |     some_list.pop()
+   |     ^^^^^^^^^^^^^ B909
+22 | 
+23 |     # conditional break should error
+   |
+
+B909.py:25:9: B909 Mutation to loop iterable `some_list` during iteration
+   |
+23 |     # conditional break should error
+24 |     if elem == 2:
+25 |         some_list.remove(0)
+   |         ^^^^^^^^^^^^^^^^ B909
+26 |         if elem == 3:
+27 |             break
+   |
+
+B909.py:47:5: B909 Mutation to loop iterable `mydicts` during iteration
+   |
+45 | for elem in mydicts:
+46 |     # errors
+47 |     mydicts.popitem()
+   |     ^^^^^^^^^^^^^^^ B909
+48 |     mydicts.setdefault("foo", 1)
+49 |     mydicts.update({"foo": "bar"})
+   |
+
+B909.py:48:5: B909 Mutation to loop iterable `mydicts` during iteration
+   |
+46 |     # errors
+47 |     mydicts.popitem()
+48 |     mydicts.setdefault("foo", 1)
+   |     ^^^^^^^^^^^^^^^^^^ B909
+49 |     mydicts.update({"foo": "bar"})
+   |
+
+B909.py:49:5: B909 Mutation to loop iterable `mydicts` during iteration
+   |
+47 |     mydicts.popitem()
+48 |     mydicts.setdefault("foo", 1)
+49 |     mydicts.update({"foo": "bar"})
+   |     ^^^^^^^^^^^^^^ B909
+50 | 
+51 |     # no errors
+   |
+
+B909.py:62:5: B909 Mutation to loop iterable `myset` during iteration
+   |
+60 | for _ in myset:
+61 |     # errors
+62 |     myset.update({4, 5})
+   |     ^^^^^^^^^^^^ B909
+63 |     myset.intersection_update({4, 5})
+64 |     myset.difference_update({4, 5})
+   |
+
+B909.py:63:5: B909 Mutation to loop iterable `myset` during iteration
+   |
+61 |     # errors
+62 |     myset.update({4, 5})
+63 |     myset.intersection_update({4, 5})
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^ B909
+64 |     myset.difference_update({4, 5})
+65 |     myset.symmetric_difference_update({4, 5})
+   |
+
+B909.py:64:5: B909 Mutation to loop iterable `myset` during iteration
+   |
+62 |     myset.update({4, 5})
+63 |     myset.intersection_update({4, 5})
+64 |     myset.difference_update({4, 5})
+   |     ^^^^^^^^^^^^^^^^^^^^^^^ B909
+65 |     myset.symmetric_difference_update({4, 5})
+66 |     myset.add(4)
+   |
+
+B909.py:65:5: B909 Mutation to loop iterable `myset` during iteration
+   |
+63 |     myset.intersection_update({4, 5})
+64 |     myset.difference_update({4, 5})
+65 |     myset.symmetric_difference_update({4, 5})
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ B909
+66 |     myset.add(4)
+67 |     myset.discard(3)
+   |
+
+B909.py:66:5: B909 Mutation to loop iterable `myset` during iteration
+   |
+64 |     myset.difference_update({4, 5})
+65 |     myset.symmetric_difference_update({4, 5})
+66 |     myset.add(4)
+   |     ^^^^^^^^^ B909
+67 |     myset.discard(3)
+   |
+
+B909.py:67:5: B909 Mutation to loop iterable `myset` during iteration
+   |
+65 |     myset.symmetric_difference_update({4, 5})
+66 |     myset.add(4)
+67 |     myset.discard(3)
+   |     ^^^^^^^^^^^^^ B909
+68 | 
+69 |     # no errors
+   |
+
+B909.py:84:5: B909 Mutation to loop iterable `a.some_list` during iteration
+   |
+82 | # ensure member accesses are handled as errors
+83 | for elem in a.some_list:
+84 |     a.some_list.remove(0)
+   |     ^^^^^^^^^^^^^^^^^^ B909
+85 |     del a.some_list[2]
+   |
+
+B909.py:85:5: B909 Mutation to loop iterable `a.some_list` during iteration
+   |
+83 | for elem in a.some_list:
+84 |     a.some_list.remove(0)
+85 |     del a.some_list[2]
+   |     ^^^^^^^^^^^^^^^^^^ B909
+   |
+
+B909.py:93:5: B909 Mutation to loop iterable `foo` during iteration
+   |
+91 | bar = [4, 5, 6]
+92 | for _ in foo:
+93 |     foo *= 2
+   |     ^^^^^^^^ B909
+94 |     foo += bar
+95 |     foo[1] = 9
+   |
+
+B909.py:94:5: B909 Mutation to loop iterable `foo` during iteration
+   |
+92 | for _ in foo:
+93 |     foo *= 2
+94 |     foo += bar
+   |     ^^^^^^^^^^ B909
+95 |     foo[1] = 9
+96 |     foo[1:2] = bar
+   |
+
+B909.py:95:5: B909 Mutation to loop iterable `foo` during iteration
+   |
+93 |     foo *= 2
+94 |     foo += bar
+95 |     foo[1] = 9
+   |     ^^^^^^^^^^ B909
+96 |     foo[1:2] = bar
+97 |     foo[1:2:3] = bar
+   |
+
+B909.py:96:5: B909 Mutation to loop iterable `foo` during iteration
+   |
+94 |     foo += bar
+95 |     foo[1] = 9
+96 |     foo[1:2] = bar
+   |     ^^^^^^^^^^^^^^ B909
+97 |     foo[1:2:3] = bar
+   |
+
+B909.py:97:5: B909 Mutation to loop iterable `foo` during iteration
+   |
+95 |     foo[1] = 9
+96 |     foo[1:2] = bar
+97 |     foo[1:2:3] = bar
+   |     ^^^^^^^^^^^^^^^^ B909
+98 | 
+99 | foo = {1, 2, 3}
+   |
+
+B909.py:102:5: B909 Mutation to loop iterable `foo` during iteration
+    |
+100 | bar = {4, 5, 6}
+101 | for _ in foo:  # should error
+102 |     foo |= bar
+    |     ^^^^^^^^^^ B909
+103 |     foo &= bar
+104 |     foo -= bar
+    |
+
+B909.py:103:5: B909 Mutation to loop iterable `foo` during iteration
+    |
+101 | for _ in foo:  # should error
+102 |     foo |= bar
+103 |     foo &= bar
+    |     ^^^^^^^^^^ B909
+104 |     foo -= bar
+105 |     foo ^= bar
+    |
+
+B909.py:104:5: B909 Mutation to loop iterable `foo` during iteration
+    |
+102 |     foo |= bar
+103 |     foo &= bar
+104 |     foo -= bar
+    |     ^^^^^^^^^^ B909
+105 |     foo ^= bar
+    |
+
+B909.py:105:5: B909 Mutation to loop iterable `foo` during iteration
+    |
+103 |     foo &= bar
+104 |     foo -= bar
+105 |     foo ^= bar
+    |     ^^^^^^^^^^ B909
+    |
+
+B909.py:125:5: B909 Mutation to loop iterable `foo` during iteration
+    |
+123 | # should error (?)
+124 | for _ in foo:
+125 |     foo.remove(1)
+    |     ^^^^^^^^^^ B909
+126 |     if bar:
+127 |         bar.remove(1)
+    |
+
+B909.py:136:9: B909 Mutation to loop iterable `foo` during iteration
+    |
+134 |         pass
+135 |     else:
+136 |         foo.remove(1)
+    |         ^^^^^^^^^^ B909
+137 | 
+138 | # should error
+    |
+
+B909.py:140:8: B909 Mutation to loop iterable `some_list` during iteration
+    |
+138 | # should error
+139 | for elem in some_list:
+140 |     if some_list.pop() == 2:
+    |        ^^^^^^^^^^^^^ B909
+141 |         pass
+    |
+
+B909.py:150:8: B909 Mutation to loop iterable `some_list` during iteration
+    |
+148 | # should error
+149 | for elem in some_list:
+150 |     if some_list.pop() == 2:
+    |        ^^^^^^^^^^^^^ B909
+151 |         pass
+152 |     else:
+    |

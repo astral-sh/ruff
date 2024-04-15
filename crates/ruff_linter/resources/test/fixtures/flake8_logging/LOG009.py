@@ -1,9 +1,12 @@
-import logging
+def func():
+    import logging
 
-logging.WARN  # LOG009
-logging.WARNING  # OK
+    logging.WARN  # LOG009
+    logging.WARNING  # OK
 
-from logging import WARN, WARNING
 
-WARN  # LOG009
-WARNING  # OK
+def func():
+    from logging import WARN, WARNING
+
+    WARN  # LOG009
+    WARNING  # OK

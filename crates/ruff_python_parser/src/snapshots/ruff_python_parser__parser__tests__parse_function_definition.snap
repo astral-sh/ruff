@@ -1,6 +1,6 @@
 ---
 source: crates/ruff_python_parser/src/parser.rs
-expression: "parse_suite(source, \"<test>\").unwrap()"
+expression: parse_suite(source).unwrap()
 ---
 [
     FunctionDef(
@@ -254,6 +254,7 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                                                 ),
                                             ],
                                             ctx: Load,
+                                            parenthesized: true,
                                         },
                                     ),
                                 ),
@@ -345,7 +346,7 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                 args: [],
                 vararg: Some(
                     Parameter {
-                        range: 155..161,
+                        range: 154..161,
                         name: Identifier {
                             id: "a",
                             range: 155..156,
@@ -416,7 +417,7 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                 args: [],
                 vararg: Some(
                     Parameter {
-                        range: 188..200,
+                        range: 187..200,
                         name: Identifier {
                             id: "args",
                             range: 188..192,
@@ -445,7 +446,7 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                 kwonlyargs: [],
                 kwarg: Some(
                     Parameter {
-                        range: 204..220,
+                        range: 202..220,
                         name: Identifier {
                             id: "kwargs",
                             range: 204..210,

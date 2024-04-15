@@ -1,0 +1,44 @@
+---
+source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
+---
+PYI025_1.py:10:33: PYI025 [*] Use `from collections.abc import Set as AbstractSet` to avoid confusion with the `set` builtin
+   |
+ 9 | def f():
+10 |     from collections.abc import Set  # PYI025
+   |                                 ^^^ PYI025
+   |
+   = help: Alias `Set` to `AbstractSet`
+
+ℹ Safe fix
+7  7  | 
+8  8  | 
+9  9  | def f():
+10    |-    from collections.abc import Set  # PYI025
+   10 |+    from collections.abc import Set as AbstractSet  # PYI025
+11 11 | 
+12 12 | 
+13 13 | def f():
+
+PYI025_1.py:14:51: PYI025 [*] Use `from collections.abc import Set as AbstractSet` to avoid confusion with the `set` builtin
+   |
+13 | def f():
+14 |     from collections.abc import Container, Sized, Set, ValuesView  # PYI025
+   |                                                   ^^^ PYI025
+15 | 
+16 |     GLOBAL: Set[int] = set()
+   |
+   = help: Alias `Set` to `AbstractSet`
+
+ℹ Safe fix
+11 11 | 
+12 12 | 
+13 13 | def f():
+14    |-    from collections.abc import Container, Sized, Set, ValuesView  # PYI025
+   14 |+    from collections.abc import Container, Sized, Set as AbstractSet, ValuesView  # PYI025
+15 15 | 
+16    |-    GLOBAL: Set[int] = set()
+   16 |+    GLOBAL: AbstractSet[int] = set()
+17 17 | 
+18 18 |     class Class:
+19    |-        member: Set[int]
+   19 |+        member: AbstractSet[int]

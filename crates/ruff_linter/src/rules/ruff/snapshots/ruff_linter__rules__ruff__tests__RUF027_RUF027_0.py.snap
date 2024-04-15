@@ -285,6 +285,8 @@ RUF027_0.py:70:18: RUF027 [*] Possible f-string without an `f` prefix
 69 |     last = "Appleseed"
 70 |     value.method("{first} {last}")  # RUF027
    |                  ^^^^^^^^^^^^^^^^ RUF027
+71 | 
+72 | def format_specifiers():
    |
    = help: Add `f` prefix
 
@@ -294,5 +296,24 @@ RUF027_0.py:70:18: RUF027 [*] Possible f-string without an `f` prefix
 69 69 |     last = "Appleseed"
 70    |-    value.method("{first} {last}")  # RUF027
    70 |+    value.method(f"{first} {last}")  # RUF027
+71 71 | 
+72 72 | def format_specifiers():
+73 73 |     a = 4
+
+RUF027_0.py:74:9: RUF027 [*] Possible f-string without an `f` prefix
+   |
+72 | def format_specifiers():
+73 |     a = 4
+74 |     b = "{a:b} {a:^5}"
+   |         ^^^^^^^^^^^^^^ RUF027
+   |
+   = help: Add `f` prefix
+
+ℹ Unsafe fix
+71 71 | 
+72 72 | def format_specifiers():
+73 73 |     a = 4
+74    |-    b = "{a:b} {a:^5}"
+   74 |+    b = f"{a:b} {a:^5}"
 
 

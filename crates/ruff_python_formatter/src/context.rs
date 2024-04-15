@@ -1,7 +1,8 @@
 use crate::comments::Comments;
-use crate::string::QuoteChar;
+use crate::other::f_string::FStringContext;
 use crate::PyFormatOptions;
 use ruff_formatter::{Buffer, FormatContext, GroupId, IndentWidth, SourceCode};
+use ruff_python_ast::str::Quote;
 use ruff_source_file::Locator;
 use std::fmt::{Debug, Formatter};
 use std::ops::{Deref, DerefMut};
@@ -21,7 +22,9 @@ pub struct PyFormatContext<'a> {
     /// works. For example, multi-line strings will always be written with a
     /// quote style that is inverted from the one here in order to ensure that
     /// the formatted Python code will be valid.
-    docstring: Option<QuoteChar>,
+    docstring: Option<Quote>,
+    /// The state of the formatter with respect to f-strings.
+    f_string_state: FStringState,
 }
 
 impl<'a> PyFormatContext<'a> {
@@ -33,6 +36,7 @@ impl<'a> PyFormatContext<'a> {
             node_level: NodeLevel::TopLevel(TopLevelStatementPosition::Other),
             indent_level: IndentLevel::new(0),
             docstring: None,
+            f_string_state: FStringState::Outside,
         }
     }
 
@@ -70,7 +74,7 @@ impl<'a> PyFormatContext<'a> {
     ///
     /// The quote character returned corresponds to the quoting used for the
     /// docstring containing the code snippet currently being formatted.
-    pub(crate) fn docstring(&self) -> Option<QuoteChar> {
+    pub(crate) fn docstring(&self) -> Option<Quote> {
         self.docstring
     }
 
@@ -79,14 +83,23 @@ impl<'a> PyFormatContext<'a> {
     ///
     /// The quote character given should correspond to the quote character used
     /// for the docstring containing the code snippets.
-    pub(crate) fn in_docstring(self, quote: QuoteChar) -> PyFormatContext<'a> {
+    pub(crate) fn in_docstring(self, quote: Quote) -> PyFormatContext<'a> {
         PyFormatContext {
             docstring: Some(quote),
             ..self
         }
     }
 
+    pub(crate) fn f_string_state(&self) -> FStringState {
+        self.f_string_state
+    }
+
+    pub(crate) fn set_f_string_state(&mut self, f_string_state: FStringState) {
+        self.f_string_state = f_string_state;
+    }
+
     /// Returns `true` if preview mode is enabled.
+    #[allow(unused)]
     pub(crate) const fn is_preview(&self) -> bool {
         self.options.preview().is_enabled()
     }
@@ -113,6 +126,18 @@ impl Debug for PyFormatContext<'_> {
             .field("source", &self.contents)
             .finish()
     }
+}
+
+#[derive(Copy, Clone, Debug, Default)]
+pub(crate) enum FStringState {
+    /// The formatter is inside an f-string expression element i.e., between the
+    /// curly brace in `f"foo {x}"`.
+    ///
+    /// The containing `FStringContext` is the surrounding f-string context.
+    InsideExpressionElement(FStringContext),
+    /// The formatter is outside an f-string.
+    #[default]
+    Outside,
 }
 
 /// The position of a top-level statement in the module.
@@ -223,7 +248,7 @@ where
 
 /// The current indent level of the formatter.
 ///
-/// One can determine the the width of the indent itself (in number of ASCII
+/// One can determine the width of the indent itself (in number of ASCII
 /// space characters) by multiplying the indent level by the configured indent
 /// width.
 ///
@@ -330,5 +355,67 @@ where
             .state_mut()
             .context_mut()
             .set_indent_level(self.saved_level);
+    }
+}
+
+pub(crate) struct WithFStringState<'a, B, D>
+where
+    D: DerefMut<Target = B>,
+    B: Buffer<Context = PyFormatContext<'a>>,
+{
+    buffer: D,
+    saved_location: FStringState,
+}
+
+impl<'a, B, D> WithFStringState<'a, B, D>
+where
+    D: DerefMut<Target = B>,
+    B: Buffer<Context = PyFormatContext<'a>>,
+{
+    pub(crate) fn new(expr_location: FStringState, mut buffer: D) -> Self {
+        let context = buffer.state_mut().context_mut();
+        let saved_location = context.f_string_state();
+
+        context.set_f_string_state(expr_location);
+
+        Self {
+            buffer,
+            saved_location,
+        }
+    }
+}
+
+impl<'a, B, D> Deref for WithFStringState<'a, B, D>
+where
+    D: DerefMut<Target = B>,
+    B: Buffer<Context = PyFormatContext<'a>>,
+{
+    type Target = B;
+
+    fn deref(&self) -> &Self::Target {
+        &self.buffer
+    }
+}
+
+impl<'a, B, D> DerefMut for WithFStringState<'a, B, D>
+where
+    D: DerefMut<Target = B>,
+    B: Buffer<Context = PyFormatContext<'a>>,
+{
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.buffer
+    }
+}
+
+impl<'a, B, D> Drop for WithFStringState<'a, B, D>
+where
+    D: DerefMut<Target = B>,
+    B: Buffer<Context = PyFormatContext<'a>>,
+{
+    fn drop(&mut self) {
+        self.buffer
+            .state_mut()
+            .context_mut()
+            .set_f_string_state(self.saved_location);
     }
 }

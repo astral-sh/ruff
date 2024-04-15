@@ -8,6 +8,7 @@ use std::{borrow::Cow, collections::VecDeque};
 use itertools::Itertools;
 
 use ruff_formatter::printer::SourceMapGeneration;
+use ruff_python_ast::str::Quote;
 use ruff_python_parser::ParseError;
 use {once_cell::sync::Lazy, regex::Regex};
 use {
@@ -17,9 +18,10 @@ use {
     ruff_text_size::{Ranged, TextLen, TextRange, TextSize},
 };
 
+use crate::string::StringQuotes;
 use crate::{prelude::*, DocstringCodeLineWidth, FormatModuleError};
 
-use super::{NormalizedString, QuoteChar};
+use super::NormalizedString;
 
 /// Format a docstring by trimming whitespace and adjusting the indentation.
 ///
@@ -109,7 +111,7 @@ use super::{NormalizedString, QuoteChar};
 /// `indent-width * spaces` to tabs because doing so could break ASCII art and other docstrings
 /// that use spaces for alignment.
 pub(crate) fn format(normalized: &NormalizedString, f: &mut PyFormatter) -> FormatResult<()> {
-    let docstring = &normalized.text;
+    let docstring = &normalized.text();
 
     // Black doesn't change the indentation of docstrings that contain an escaped newline
     if contains_unescaped_newline(docstring) {
@@ -125,7 +127,9 @@ pub(crate) fn format(normalized: &NormalizedString, f: &mut PyFormatter) -> Form
     let mut lines = docstring.split('\n').peekable();
 
     // Start the string
-    write!(f, [normalized.prefix, normalized.quotes])?;
+    let kind = normalized.kind();
+    let quotes = StringQuotes::from(kind);
+    write!(f, [kind.prefix(), quotes])?;
     // We track where in the source docstring we are (in source code byte offsets)
     let mut offset = normalized.start();
 
@@ -141,7 +145,7 @@ pub(crate) fn format(normalized: &NormalizedString, f: &mut PyFormatter) -> Form
 
     // Edge case: The first line is `""" "content`, so we need to insert chaperone space that keep
     // inner quotes and closing quotes from getting to close to avoid `""""content`
-    if trim_both.starts_with(normalized.quotes.quote_char.as_char()) {
+    if trim_both.starts_with(quotes.quote_char.as_char()) {
         space().fmt(f)?;
     }
 
@@ -168,7 +172,7 @@ pub(crate) fn format(normalized: &NormalizedString, f: &mut PyFormatter) -> Form
         {
             space().fmt(f)?;
         }
-        normalized.quotes.fmt(f)?;
+        quotes.fmt(f)?;
         return Ok(());
     }
 
@@ -194,7 +198,7 @@ pub(crate) fn format(normalized: &NormalizedString, f: &mut PyFormatter) -> Form
         offset,
         stripped_indentation,
         already_normalized,
-        quote_char: normalized.quotes.quote_char,
+        quote_char: quotes.quote_char,
         code_example: CodeExample::default(),
     }
     .add_iter(lines)?;
@@ -207,7 +211,7 @@ pub(crate) fn format(normalized: &NormalizedString, f: &mut PyFormatter) -> Form
         space().fmt(f)?;
     }
 
-    write!(f, [normalized.quotes])
+    write!(f, [quotes])
 }
 
 fn contains_unescaped_newline(haystack: &str) -> bool {
@@ -253,7 +257,7 @@ struct DocstringLinePrinter<'ast, 'buf, 'fmt, 'src> {
     already_normalized: bool,
 
     /// The quote character used by the docstring being printed.
-    quote_char: QuoteChar,
+    quote_char: Quote,
 
     /// The current code example detected in the docstring.
     code_example: CodeExample<'src>,
@@ -550,8 +554,8 @@ impl<'ast, 'buf, 'fmt, 'src> DocstringLinePrinter<'ast, 'buf, 'fmt, 'src> {
         // remove this check. See the `doctest_invalid_skipped` tests in
         // `docstring_code_examples.py` for when this check is relevant.
         let wrapped = match self.quote_char {
-            QuoteChar::Single => std::format!("'''{}'''", printed.as_code()),
-            QuoteChar::Double => {
+            Quote::Single => std::format!("'''{}'''", printed.as_code()),
+            Quote::Double => {
                 std::format!(r#""""{}""""#, printed.as_code())
             }
         };
@@ -1542,7 +1546,7 @@ enum CodeExampleAddAction<'src> {
 /// inside of a docstring.
 fn docstring_format_source(
     options: crate::PyFormatOptions,
-    docstring_quote_style: QuoteChar,
+    docstring_quote_style: Quote,
     source: &str,
 ) -> Result<Printed, FormatModuleError> {
     use ruff_python_parser::AsMode;
@@ -1569,7 +1573,7 @@ fn docstring_format_source(
 /// that avoids `content""""` and `content\"""`. This does only applies to un-escaped backslashes,
 /// so `content\\ """` doesn't need a space while `content\\\ """` does.
 fn needs_chaperone_space(normalized: &NormalizedString, trim_end: &str) -> bool {
-    trim_end.ends_with(normalized.quotes.quote_char.as_char())
+    trim_end.ends_with(normalized.kind().quote_style().as_char())
         || trim_end.chars().rev().take_while(|c| *c == '\\').count() % 2 == 1
 }
 

@@ -873,11 +873,11 @@ impl Ranged for LogicalLine {
     }
 }
 
-struct VerbatimText {
+pub(crate) struct VerbatimText {
     verbatim_range: TextRange,
 }
 
-fn verbatim_text<T>(item: T) -> VerbatimText
+pub(crate) fn verbatim_text<T>(item: T) -> VerbatimText
 where
     T: Ranged,
 {

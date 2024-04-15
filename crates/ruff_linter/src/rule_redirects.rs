@@ -109,5 +109,7 @@ static REDIRECTS: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| {
         // Test redirect by prefix
         #[cfg(feature = "test-rules")]
         ("RUF96", "RUF95"),
+        // See: https://github.com/astral-sh/ruff/issues/10791
+        ("PLW0117", "PLW0177"),
     ])
 });

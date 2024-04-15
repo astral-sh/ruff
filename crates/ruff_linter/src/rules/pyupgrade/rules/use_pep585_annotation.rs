@@ -2,7 +2,7 @@ use ruff_python_ast::Expr;
 
 use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::call_path::compose_call_path;
+use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_semantic::analyze::typing::ModuleMember;
 use ruff_text_size::Ranged;
 
@@ -81,12 +81,12 @@ pub(crate) fn use_pep585_annotation(
     expr: &Expr,
     replacement: &ModuleMember,
 ) {
-    let Some(from) = compose_call_path(expr) else {
+    let Some(from) = UnqualifiedName::from_expr(expr) else {
         return;
     };
     let mut diagnostic = Diagnostic::new(
         NonPEP585Annotation {
-            from,
+            from: from.to_string(),
             to: replacement.to_string(),
         },
         expr.range(),

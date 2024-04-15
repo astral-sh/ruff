@@ -100,12 +100,19 @@ impl<'a> GroupNameFinder<'a> {
             self.usage_count += value;
         }
     }
+
+    /// Reset the usage count for the group name by the given value.
+    /// This function is called when there is a `continue`, `break`, or `return` statement.
+    fn reset_usage_count(&mut self) {
+        if let Some(last) = self.counter_stack.last_mut() {
+            *last.last_mut().unwrap() = 0;
+        } else {
+            self.usage_count = 0;
+        }
+    }
 }
 
-impl<'a, 'b> Visitor<'b> for GroupNameFinder<'a>
-where
-    'b: 'a,
-{
+impl<'a> Visitor<'a> for GroupNameFinder<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
         if self.overridden {
             return;
@@ -200,6 +207,15 @@ where
                     self.visit_expr(expr);
                 }
             }
+            Stmt::Continue(_) | Stmt::Break(_) => {
+                self.reset_usage_count();
+            }
+            Stmt::Return(ast::StmtReturn { value, range: _ }) => {
+                if let Some(expr) = value {
+                    self.visit_expr(expr);
+                }
+                self.reset_usage_count();
+            }
             _ => visitor::walk_stmt(self, stmt),
         }
     }
@@ -220,7 +236,7 @@ where
     }
 
     fn visit_expr(&mut self, expr: &'a Expr) {
-        if let Expr::NamedExpr(ast::ExprNamedExpr { target, .. }) = expr {
+        if let Expr::Named(ast::ExprNamed { target, .. }) = expr {
             if self.name_matches(target) {
                 self.overridden = true;
             }
@@ -313,8 +329,8 @@ pub(crate) fn reuse_of_groupby_generator(
     // Check if the function call is `itertools.groupby`
     if !checker
         .semantic()
-        .resolve_call_path(func)
-        .is_some_and(|call_path| matches!(call_path.as_slice(), ["itertools", "groupby"]))
+        .resolve_qualified_name(func)
+        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["itertools", "groupby"]))
     {
         return;
     }

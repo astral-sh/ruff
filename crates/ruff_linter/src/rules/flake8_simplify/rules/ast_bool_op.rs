@@ -428,6 +428,7 @@ pub(crate) fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
                         .collect(),
                     ctx: ExprContext::Load,
                     range: TextRange::default(),
+                    parenthesized: true,
                 };
                 let node1 = ast::ExprName {
                     id: "isinstance".into(),
@@ -540,9 +541,10 @@ pub(crate) fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
 
         // Create a `x in (a, b)` expression.
         let node = ast::ExprTuple {
-            elts: comparators.into_iter().map(Clone::clone).collect(),
+            elts: comparators.into_iter().cloned().collect(),
             ctx: ExprContext::Load,
             range: TextRange::default(),
+            parenthesized: true,
         };
         let node1 = ast::ExprName {
             id: id.into(),
@@ -718,7 +720,7 @@ fn get_short_circuit_edit(
         generator.expr(expr)
     };
     Edit::range_replacement(
-        if matches!(expr, Expr::Tuple(ast::ExprTuple { elts, ctx: _, range: _}) if !elts.is_empty())
+        if matches!(expr, Expr::Tuple(ast::ExprTuple { elts, ctx: _, range: _, parenthesized: _}) if !elts.is_empty())
         {
             format!("({content})")
         } else {

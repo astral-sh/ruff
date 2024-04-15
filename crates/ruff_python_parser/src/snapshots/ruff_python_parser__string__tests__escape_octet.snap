@@ -20,6 +20,11 @@ expression: parse_ast
                                     83,
                                     52,
                                 ],
+                                flags: BytesLiteralFlags {
+                                    quote_style: Single,
+                                    prefix: Regular,
+                                    triple_quoted: false,
+                                },
                             },
                         ),
                     },

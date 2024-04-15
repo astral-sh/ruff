@@ -1,0 +1,105 @@
+---
+source: crates/ruff_python_parser/src/function.rs
+expression: parse_ast
+---
+Ok(
+    [
+        Expr(
+            StmtExpr {
+                range: 0..32,
+                value: Lambda(
+                    ExprLambda {
+                        range: 0..32,
+                        parameters: Some(
+                            Parameters {
+                                range: 7..29,
+                                posonlyargs: [
+                                    ParameterWithDefault {
+                                        range: 7..8,
+                                        parameter: Parameter {
+                                            range: 7..8,
+                                            name: Identifier {
+                                                id: "a",
+                                                range: 7..8,
+                                            },
+                                            annotation: None,
+                                        },
+                                        default: None,
+                                    },
+                                    ParameterWithDefault {
+                                        range: 10..11,
+                                        parameter: Parameter {
+                                            range: 10..11,
+                                            name: Identifier {
+                                                id: "b",
+                                                range: 10..11,
+                                            },
+                                            annotation: None,
+                                        },
+                                        default: None,
+                                    },
+                                ],
+                                args: [
+                                    ParameterWithDefault {
+                                        range: 16..17,
+                                        parameter: Parameter {
+                                            range: 16..17,
+                                            name: Identifier {
+                                                id: "c",
+                                                range: 16..17,
+                                            },
+                                            annotation: None,
+                                        },
+                                        default: None,
+                                    },
+                                ],
+                                vararg: Some(
+                                    Parameter {
+                                        range: 19..21,
+                                        name: Identifier {
+                                            id: "d",
+                                            range: 20..21,
+                                        },
+                                        annotation: None,
+                                    },
+                                ),
+                                kwonlyargs: [
+                                    ParameterWithDefault {
+                                        range: 23..24,
+                                        parameter: Parameter {
+                                            range: 23..24,
+                                            name: Identifier {
+                                                id: "e",
+                                                range: 23..24,
+                                            },
+                                            annotation: None,
+                                        },
+                                        default: None,
+                                    },
+                                ],
+                                kwarg: Some(
+                                    Parameter {
+                                        range: 26..29,
+                                        name: Identifier {
+                                            id: "f",
+                                            range: 28..29,
+                                        },
+                                        annotation: None,
+                                    },
+                                ),
+                            },
+                        ),
+                        body: NumberLiteral(
+                            ExprNumberLiteral {
+                                range: 31..32,
+                                value: Int(
+                                    0,
+                                ),
+                            },
+                        ),
+                    },
+                ),
+            },
+        ),
+    ],
+)

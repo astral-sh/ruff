@@ -115,10 +115,13 @@ pub(crate) fn logging_call(checker: &mut Checker, call: &ast::ExprCall) {
             }
         }
         Expr::Name(_) => {
-            let Some(call_path) = checker.semantic().resolve_call_path(call.func.as_ref()) else {
+            let Some(qualified_name) = checker
+                .semantic()
+                .resolve_qualified_name(call.func.as_ref())
+            else {
                 return;
             };
-            let ["logging", attribute] = call_path.as_slice() else {
+            let ["logging", attribute] = qualified_name.segments() else {
                 return;
             };
             if LoggingLevel::from_attribute(attribute).is_none() {

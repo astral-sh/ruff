@@ -793,7 +793,7 @@ pub(crate) fn fix_unnecessary_map(
 }
 
 /// (C419) Convert `[i for i in a]` into `i for i in a`
-pub(crate) fn fix_unnecessary_comprehension_any_all(
+pub(crate) fn fix_unnecessary_comprehension_in_call(
     expr: &Expr,
     locator: &Locator,
     stylist: &Stylist,

@@ -1,6 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_codegen::Quote;
+use ruff_python_ast::str::Quote;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -27,10 +27,16 @@ use crate::docstrings::Docstring;
 ///     """Return the pathname of the KOS root directory."""
 /// ```
 ///
+/// ## Formatter compatibility
+/// We recommend against using this rule alongside the [formatter]. The
+/// formatter enforces consistent quotes, making the rule redundant.
+///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
+///
+/// [formatter]: https://docs.astral.sh/ruff/formatter/
 #[violation]
 pub struct TripleSingleQuotes {
     expected_quote: Quote,

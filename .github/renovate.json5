@@ -1,0 +1,68 @@
+{
+  $schema: "https://docs.renovatebot.com/renovate-schema.json",
+  dependencyDashboard: true,
+  suppressNotifications: ["prEditedNotification"],
+  extends: ["config:recommended"],
+  labels: ["internal"],
+  schedule: ["before 4am on Monday"],
+  semanticCommits: "disabled",
+  separateMajorMinor: false,
+  prHourlyLimit: 10,
+  enabledManagers: ["github-actions", "pre-commit", "cargo", "pep621", "npm"],
+  cargo: {
+    // See https://docs.renovatebot.com/configuration-options/#rangestrategy
+    rangeStrategy: "update-lockfile",
+  },
+  pep621: {
+    fileMatch: ["^(python|scripts)/.*pyproject\\.toml$"],
+  },
+  npm: {
+    fileMatch: ["^playground/.*package\\.json$"],
+  },
+  "pre-commit": {
+    enabled: true,
+  },
+  packageRules: [
+    {
+      // Group upload/download artifact updates, the versions are dependent
+      groupName: "Artifact GitHub Actions dependencies",
+      matchManagers: ["github-actions"],
+      matchPackagePatterns: ["actions/.*-artifact"],
+      description: "Weekly update of artifact-related GitHub Actions dependencies",
+    },
+    {
+      groupName: "pre-commit dependencies",
+      matchManagers: ["pre-commit"],
+      description: "Weekly update of pre-commit dependencies",
+    },
+    {
+      groupName: "NPM Development dependencies",
+      matchManagers: ["npm"],
+      matchDepTypes: ["devDependencies"],
+      description: "Weekly update of NPM development dependencies",
+    },
+    {
+      groupName: "Monaco",
+      matchManagers: ["npm"],
+      matchPackagePatterns: ["monaco"],
+      description: "Weekly update of the Monaco editor",
+    },
+    {
+      groupName: "strum",
+      matchManagers: ["cargo"],
+      matchPackagePatterns: ["strum"],
+      description: "Weekly update of strum dependencies",
+    },
+    {
+      groupName: "ESLint",
+      matchManagers: ["npm"],
+      matchPackageNames: ["eslint"],
+      allowedVersions: "<9",
+      description: "Constraint ESLint to version 8 until TypeScript-eslint supports ESLint 9", // https://github.com/typescript-eslint/typescript-eslint/issues/8211
+    },
+  ],
+  vulnerabilityAlerts: {
+    commitMessageSuffix: "",
+    labels: ["internal", "security"],
+  },
+}

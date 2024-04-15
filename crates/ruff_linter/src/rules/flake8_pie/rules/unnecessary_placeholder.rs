@@ -87,6 +87,12 @@ pub(crate) fn unnecessary_placeholder(checker: &mut Checker, body: &[Stmt]) {
         let kind = match stmt {
             Stmt::Pass(_) => Placeholder::Pass,
             Stmt::Expr(expr) if expr.value.is_ellipsis_literal_expr() => {
+                // In a type-checking block, a trailing ellipsis might be meaningful. A
+                // user might be using the type-checking context to declare a stub.
+                if checker.semantic().in_type_checking_block() {
+                    return;
+                }
+
                 // Ellipses are significant in protocol methods and abstract methods. Specifically,
                 // Pyright uses the presence of an ellipsis to indicate that a method is a stub,
                 // rather than a default implementation.

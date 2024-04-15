@@ -24,7 +24,6 @@ tracing = { workspace = true }
 unicode-width = { workspace = true }
 
 [dev-dependencies]
-insta = { workspace = true }
 
 [features]
 serde = ["dep:serde", "ruff_text_size/serde"]

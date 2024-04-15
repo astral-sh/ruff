@@ -22,6 +22,27 @@ no_method_decorator.py:15:5: PLR0203 [*] Static method defined without decorator
 17 18 |         return choice(Fruit.COLORS)
 18 19 | 
 19    |-    pick_one_color = staticmethod(pick_one_color)
-   20 |+
+20 20 | 
+21 21 | class Class:
+22 22 |     def class_method(cls):
 
+no_method_decorator.py:27:5: PLR0203 [*] Static method defined without decorator
+   |
+25 |     class_method = classmethod(class_method);another_statement
+26 | 
+27 |     def static_method():
+   |      PLR0203
+28 |         pass
+   |
+   = help: Add @staticmethod decorator
 
+ℹ Safe fix
+24 24 | 
+25 25 |     class_method = classmethod(class_method);another_statement
+26 26 | 
+   27 |+    @staticmethod
+27 28 |     def static_method():
+28 29 |         pass
+29 30 | 
+30    |-    static_method = staticmethod(static_method);
+   31 |+

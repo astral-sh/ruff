@@ -8,6 +8,8 @@ separate_local_folder_imports.py:1:1: I001 [*] Import block is un-sorted or un-f
 3 | | import leading_prefix
 4 | | import os
 5 | | from . import leading_prefix
+6 | | from .. import trailing_prefix
+7 | | from ruff import check
   |
   = help: Organize imports
 
@@ -20,6 +22,7 @@ separate_local_folder_imports.py:1:1: I001 [*] Import block is un-sorted or un-f
 2 6 | import ruff
 3   |-import leading_prefix
 4   |-import os
-5 7 | from . import leading_prefix
-
-
+  7 |+from .. import trailing_prefix
+5 8 | from . import leading_prefix
+6   |-from .. import trailing_prefix
+7 9 | from ruff import check
