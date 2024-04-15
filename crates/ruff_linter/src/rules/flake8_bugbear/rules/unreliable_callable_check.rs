@@ -66,15 +66,15 @@ pub(crate) fn unreliable_callable_check(
     if value != "__call__" {
         return;
     }
-    let Some(qualified_name) = checker.semantic().resolve_qualified_name(func) else {
+    let Some(builtins_function) = checker.semantic().resolve_builtin_symbol(func) else {
         return;
     };
-    let ["" | "builtins", function @ ("hasattr" | "getattr")] = qualified_name.segments() else {
+    if !matches!(builtins_function, "hasattr" | "getattr") {
         return;
-    };
+    }
 
     let mut diagnostic = Diagnostic::new(UnreliableCallableCheck, expr.range());
-    if *function == "hasattr" {
+    if builtins_function == "hasattr" {
         diagnostic.try_set_fix(|| {
             let (import_edit, binding) = checker.importer().get_or_import_builtin_symbol(
                 "callable",

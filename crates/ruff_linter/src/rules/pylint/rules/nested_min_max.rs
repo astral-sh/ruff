@@ -68,10 +68,9 @@ impl MinMax {
         if !keywords.is_empty() {
             return None;
         }
-        let qualified_name = semantic.resolve_qualified_name(func)?;
-        match qualified_name.segments() {
-            ["" | "builtins", "min"] => Some(MinMax::Min),
-            ["" | "builtins", "max"] => Some(MinMax::Max),
+        match semantic.resolve_builtin_symbol(func)? {
+            "min" => Some(Self::Min),
+            "max" => Some(Self::Max),
             _ => None,
         }
     }

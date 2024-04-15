@@ -97,21 +97,17 @@ pub(crate) fn bit_count(checker: &mut Checker, call: &ExprCall) {
         return;
     };
 
-    // Ensure that we're performing a `bin(...)`.
-    if !checker
-        .semantic()
-        .resolve_qualified_name(func)
-        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["" | "builtins", "bin"]))
-    {
-        return;
-    }
-
     if !arguments.keywords.is_empty() {
         return;
     };
     let [arg] = &*arguments.args else {
         return;
     };
+
+    // Ensure that we're performing a `bin(...)`.
+    if !checker.semantic().match_builtin_expr(func, "bin") {
+        return;
+    }
 
     // Extract, e.g., `x` in `bin(x)`.
     let literal_text = checker.locator().slice(arg);

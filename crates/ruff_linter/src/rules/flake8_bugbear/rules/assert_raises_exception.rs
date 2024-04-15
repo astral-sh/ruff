@@ -95,24 +95,22 @@ pub(crate) fn assert_raises_exception(checker: &mut Checker, items: &[WithItem])
             return;
         };
 
-        let Some(exception) =
-            checker
-                .semantic()
-                .resolve_qualified_name(arg)
-                .and_then(|qualified_name| match qualified_name.segments() {
-                    ["" | "builtins", "Exception"] => Some(ExceptionKind::Exception),
-                    ["" | "builtins", "BaseException"] => Some(ExceptionKind::BaseException),
-                    _ => None,
-                })
-        else {
+        let semantic = checker.semantic();
+
+        let Some(builtin_symbol) = semantic.resolve_builtin_symbol(arg) else {
             return;
+        };
+
+        let exception = match builtin_symbol {
+            "Exception" => ExceptionKind::Exception,
+            "BaseException" => ExceptionKind::BaseException,
+            _ => return,
         };
 
         let assertion = if matches!(func.as_ref(), Expr::Attribute(ast::ExprAttribute { attr, .. }) if attr == "assertRaises")
         {
             AssertionKind::AssertRaises
-        } else if checker
-            .semantic()
+        } else if semantic
             .resolve_qualified_name(func)
             .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["pytest", "raises"]))
             && arguments.find_keyword("match").is_none()

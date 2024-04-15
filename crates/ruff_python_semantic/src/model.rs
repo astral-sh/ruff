@@ -251,27 +251,51 @@ impl<'a> SemanticModel<'a> {
     }
 
     /// Return `true` if `member` is bound as a builtin.
+    ///
+    /// Note that a "builtin binding" does *not* include explicit lookups via the `builtins`
+    /// module, e.g. `import builtins; builtins.open`. It *only* includes the bindings
+    /// that are pre-populated in Python's global scope before any imports have taken place.
     pub fn is_builtin(&self, member: &str) -> bool {
         self.lookup_symbol(member)
             .map(|binding_id| &self.bindings[binding_id])
             .is_some_and(|binding| binding.kind.is_builtin())
     }
 
-    /// Return `true` if `member` is a reference to `builtins.$target`,
+    /// If `expr` is a reference to a builtins symbol,
+    /// return the name of that symbol. Else, return `None`.
+    ///
+    /// This method returns `true` both for "builtin bindings"
+    /// (present even without any imports, e.g. `open()`), and for explicit lookups
+    /// via the `builtins` module (e.g. `import builtins; builtins.open()`).
+    pub fn resolve_builtin_symbol<'expr>(&'a self, expr: &'expr Expr) -> Option<&'a str>
+    where
+        'expr: 'a,
+    {
+        // Fast path: we only need to worry about name expressions
+        if !self.seen_module(Modules::BUILTINS) {
+            let name = &expr.as_name_expr()?.id;
+            return if self.is_builtin(name) {
+                Some(name)
+            } else {
+                None
+            };
+        }
+
+        // Slow path: we have to consider names and attributes
+        let qualified_name = self.resolve_qualified_name(expr)?;
+        match qualified_name.segments() {
+            ["" | "builtins", name] => Some(*name),
+            _ => None,
+        }
+    }
+
+    /// Return `true` if `expr` is a reference to `builtins.$target`,
     /// i.e. either `object` (where `object` is not overridden in the global scope),
     /// or `builtins.object` (where `builtins` is imported as a module at the top level)
     pub fn match_builtin_expr(&self, expr: &Expr, symbol: &str) -> bool {
         debug_assert!(!symbol.contains('.'));
-        if self.seen_module(Modules::BUILTINS) {
-            // slow path
-            self.resolve_qualified_name(expr)
-                .is_some_and(|qualified_name| {
-                    matches!(qualified_name.segments(), ["builtins" | "", member] if *member == symbol)
-                })
-        } else {
-            // fast(er) path
-            matches!(expr, Expr::Name(ast::ExprName {id, ..}) if id == symbol && self.is_builtin(symbol))
-        }
+        self.resolve_builtin_symbol(expr)
+            .is_some_and(|name| name == symbol)
     }
 
     /// Return `true` if `member` is an "available" symbol, i.e., a symbol that has not been bound
