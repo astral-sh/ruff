@@ -54,3 +54,8 @@ async def fail_case_6():  # RUF029: the outer function does not await or yield
     class Foo:
         async def foo():
             await bla
+
+
+class Foo:
+    async def pass_case_7():  # OK: method of a class
+        pass
