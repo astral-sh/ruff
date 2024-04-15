@@ -40,15 +40,15 @@ impl Violation for SpuriousAsync {
 }
 
 #[derive(Default)]
-struct YieldingExprVisitor {
-    found_await_or_yield: bool,
+struct AsyncExprVisitor {
+    found_await_or_async: bool,
 }
 
-impl<'a> Visitor<'a> for YieldingExprVisitor {
+impl<'a> Visitor<'a> for AsyncExprVisitor {
     fn visit_expr(&mut self, expr: &'a Expr) {
         match expr {
             Expr::Await(_) => {
-                self.found_await_or_yield = true;
+                self.found_await_or_async = true;
             }
             _ => visitor::walk_expr(self, expr),
         }
@@ -56,10 +56,10 @@ impl<'a> Visitor<'a> for YieldingExprVisitor {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
         match stmt {
             Stmt::With(ast::StmtWith { is_async: true, .. }) => {
-                self.found_await_or_yield = true;
+                self.found_await_or_async = true;
             }
             Stmt::For(ast::StmtFor { is_async: true, .. }) => {
-                self.found_await_or_yield = true;
+                self.found_await_or_async = true;
             }
             _ => visitor::walk_stmt(self, stmt),
         }
@@ -81,13 +81,13 @@ pub(crate) fn spurious_async(
         return;
     }
 
-    let yields = {
-        let mut visitor = YieldingExprVisitor::default();
+    let found_await_or_async = {
+        let mut visitor = AsyncExprVisitor::default();
         visitor.visit_body(&body);
-        visitor.found_await_or_yield
+        visitor.found_await_or_async
     };
 
-    if !yields {
+    if !found_await_or_async {
         checker.diagnostics.push(Diagnostic::new(
             SpuriousAsync {
                 name: name.to_string(),
