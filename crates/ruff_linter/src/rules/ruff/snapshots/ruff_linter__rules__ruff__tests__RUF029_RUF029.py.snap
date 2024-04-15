@@ -1,35 +1,27 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-RUF029.py:9:1: RUF029 Function `fail_case` is declared `async`, but doesn't yield or use async features.
+RUF029.py:11:1: RUF029 Function `fail_case` is declared `async`, but doesn't yield or use async features.
    |
- 7 |       print("world")
- 8 |   
- 9 | / async def fail_case(): # RUF029
-10 | |     print("hello")
-11 | |     time.sleep(1)
-12 | |     print("world")
+11 | / async def fail_case():  # RUF029
+12 | |     print("hello")
+13 | |     time.sleep(1)
+14 | |     print("world")
    | |__________________^ RUF029
    |
 
-RUF029.py:19:1: RUF029 Function `fail_case_2` is declared `async`, but doesn't yield or use async features.
+RUF029.py:22:1: RUF029 Function `fail_case_2` is declared `async`, but doesn't yield or use async features.
    |
-17 |           pass
-18 |   
-19 | / async def fail_case_2(): # RUF029
-20 | |     with None as i:
-21 | |         pass
+22 | / async def fail_case_2():  # RUF029
+23 | |     with None as i:
+24 | |         pass
    | |____________^ RUF029
    |
 
-RUF029.py:28:1: RUF029 Function `fail_case_3` is declared `async`, but doesn't yield or use async features.
+RUF029.py:32:1: RUF029 Function `fail_case_3` is declared `async`, but doesn't yield or use async features.
    |
-26 |           pass
-27 |   
-28 | / async def fail_case_3(): # RUF029
-29 | |     for i in []:
-30 | |         pass
+32 | / async def fail_case_3():  # RUF029
+33 | |     for i in []:
+34 | |         pass
    | |____________^ RUF029
    |
-
-
