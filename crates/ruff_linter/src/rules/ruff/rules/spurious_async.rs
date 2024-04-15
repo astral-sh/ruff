@@ -12,8 +12,9 @@ use crate::checkers::ast::Checker;
 /// function to be declared `async`.
 ///
 /// ## Why is this bad?
-/// Declaring a function `async` when it's not is usually a mistake, and may artificially limit the
-/// contexts where that function may be called.
+/// Declaring a function `async` when it's not is usually a mistake, and will artificially limit the
+/// contexts where that function may be called. In some cases, labeling a function `async` is
+/// semantically meaningful (e.g. with the trio library).
 #[violation]
 pub struct SpuriousAsync {
     name: String,
