@@ -363,7 +363,7 @@ fn loop_block<'stmt>(
     orelse: &'stmt [Stmt],
     after: Option<BlockIndex>,
 ) -> NextBlock<'stmt> {
-    let after_block = blocks.maybe_next_block_index(after, || orelse.is_empty());
+    let after_block = blocks.maybe_next_block_index(after, || true);
     // NOTE: a while loop's body must not be empty, so we can safely
     // create at least one block from it.
     let last_statement_index = blocks.append_blocks(body, after);
@@ -909,9 +909,6 @@ impl<'stmt> BasicBlocksBuilder<'stmt> {
                     return;
                 }
             }
-            // if idx == BlockIndex::MAX {
-            //     return;
-            // }
         }
     }
 
