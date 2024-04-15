@@ -16,14 +16,16 @@ flowchart TD
   start(("Start"))
   return(("End"))
   block0[["`*(empty)*`"]]
-  block1["print(i)\n"]
-  block2["async for i in range(5):
+  block1[["Loop continue"]]
+  block2["print(i)\n"]
+  block3["async for i in range(5):
         print(i)\n"]
 
-  start --> block2
-  block2 -- "range(5)" --> block1
-  block2 -- "else" --> block0
-  block1 --> block2
+  start --> block3
+  block3 -- "range(5)" --> block2
+  block3 -- "else" --> block0
+  block2 --> block1
+  block1 --> block3
   block0 --> return
 ```
 
@@ -43,18 +45,20 @@ flowchart TD
   start(("Start"))
   return(("End"))
   block0[["`*(empty)*`"]]
-  block1["print(i)\n"]
-  block2["return 0\n"]
-  block3["async for i in range(20):
+  block1["return 0\n"]
+  block2[["Loop continue"]]
+  block3["print(i)\n"]
+  block4["async for i in range(20):
         print(i)
     else:
         return 0\n"]
 
-  start --> block3
-  block3 -- "range(20)" --> block1
-  block3 -- "else" --> block2
-  block2 --> return
-  block1 --> block3
+  start --> block4
+  block4 -- "range(20)" --> block3
+  block4 -- "else" --> block1
+  block3 --> block2
+  block2 --> block4
+  block1 --> return
   block0 --> return
 ```
 
@@ -74,19 +78,21 @@ flowchart TD
   start(("Start"))
   return(("End"))
   block0["return 0\n"]
-  block1["return 1\n"]
-  block2["if i == 5:
+  block1[["Loop continue"]]
+  block2["return 1\n"]
+  block3["if i == 5:
             return 1\n"]
-  block3["async for i in range(10):
+  block4["async for i in range(10):
         if i == 5:
             return 1\n"]
 
-  start --> block3
-  block3 -- "range(10)" --> block2
-  block3 -- "else" --> block0
-  block2 -- "i == 5" --> block1
-  block2 -- "else" --> block3
-  block1 --> return
+  start --> block4
+  block4 -- "range(10)" --> block3
+  block4 -- "else" --> block0
+  block3 -- "i == 5" --> block2
+  block3 -- "else" --> block1
+  block2 --> return
+  block1 --> block4
   block0 --> return
 ```
 
@@ -108,22 +114,24 @@ flowchart TD
   start(("Start"))
   return(("End"))
   block0["return 2\n"]
-  block1["return 1\n"]
-  block2["if i == 5:
+  block1["return 0\n"]
+  block2[["Loop continue"]]
+  block3["return 1\n"]
+  block4["if i == 5:
             return 1\n"]
-  block3["return 0\n"]
-  block4["async for i in range(111):
+  block5["async for i in range(111):
         if i == 5:
             return 1
     else:
         return 0\n"]
 
-  start --> block4
-  block4 -- "range(111)" --> block2
-  block4 -- "else" --> block3
+  start --> block5
+  block5 -- "range(111)" --> block4
+  block5 -- "else" --> block1
+  block4 -- "i == 5" --> block3
+  block4 -- "else" --> block2
   block3 --> return
-  block2 -- "i == 5" --> block1
-  block2 -- "else" --> block4
+  block2 --> block5
   block1 --> return
   block0 --> return
 ```
@@ -142,14 +150,16 @@ flowchart TD
   start(("Start"))
   return(("End"))
   block0[["`*(empty)*`"]]
-  block1["continue\n"]
-  block2["async for i in range(12):
+  block1[["Loop continue"]]
+  block2["continue\n"]
+  block3["async for i in range(12):
         continue\n"]
 
-  start --> block2
-  block2 -- "range(12)" --> block1
-  block2 -- "else" --> block0
-  block1 --> block2
+  start --> block3
+  block3 -- "range(12)" --> block2
+  block3 -- "else" --> block0
+  block2 --> block3
+  block1 --> block3
   block0 --> return
 ```
 
@@ -168,19 +178,21 @@ flowchart TD
   start(("Start"))
   return(("End"))
   block0[["`*(empty)*`"]]
-  block1["continue\n"]
-  block2["if True:
+  block1[["Loop continue"]]
+  block2["continue\n"]
+  block3["if True:
             continue\n"]
-  block3["async for i in range(1110):
+  block4["async for i in range(1110):
         if True:
             continue\n"]
 
-  start --> block3
-  block3 -- "range(1110)" --> block2
-  block3 -- "else" --> block0
-  block2 -- "True" --> block1
-  block2 -- "else" --> block3
-  block1 --> block3
+  start --> block4
+  block4 -- "range(1110)" --> block3
+  block4 -- "else" --> block0
+  block3 -- "True" --> block2
+  block3 -- "else" --> block1
+  block2 --> block4
+  block1 --> block4
   block0 --> return
 ```
 
@@ -198,14 +210,16 @@ flowchart TD
   start(("Start"))
   return(("End"))
   block0[["`*(empty)*`"]]
-  block1["break\n"]
-  block2["async for i in range(13):
+  block1[["Loop continue"]]
+  block2["break\n"]
+  block3["async for i in range(13):
         break\n"]
 
-  start --> block2
-  block2 -- "range(13)" --> block1
-  block2 -- "else" --> block0
-  block1 --> return
+  start --> block3
+  block3 -- "range(13)" --> block2
+  block3 -- "else" --> block0
+  block2 --> return
+  block1 --> block3
   block0 --> return
 ```
 
@@ -224,18 +238,20 @@ flowchart TD
   start(("Start"))
   return(("End"))
   block0[["`*(empty)*`"]]
-  block1["break\n"]
-  block2["if True:
+  block1[["Loop continue"]]
+  block2["break\n"]
+  block3["if True:
             break\n"]
-  block3["async for i in range(1110):
+  block4["async for i in range(1110):
         if True:
             break\n"]
 
-  start --> block3
-  block3 -- "range(1110)" --> block2
-  block3 -- "else" --> block0
-  block2 -- "True" --> block1
-  block2 -- "else" --> block3
-  block1 --> return
+  start --> block4
+  block4 -- "range(1110)" --> block3
+  block4 -- "else" --> block0
+  block3 -- "True" --> block2
+  block3 -- "else" --> block1
+  block2 --> return
+  block1 --> block4
   block0 --> return
 ```
