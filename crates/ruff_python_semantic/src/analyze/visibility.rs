@@ -15,20 +15,16 @@ pub enum Visibility {
 
 /// Returns `true` if a function is a "static method".
 pub fn is_staticmethod(decorator_list: &[Decorator], semantic: &SemanticModel) -> bool {
-    decorator_list.iter().any(|decorator| {
-        semantic
-            .resolve_qualified_name(map_callable(&decorator.expression))
-            .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["", "staticmethod"]))
-    })
+    decorator_list
+        .iter()
+        .any(|decorator| semantic.match_builtin_expr(&decorator.expression, "staticmethod"))
 }
 
 /// Returns `true` if a function is a "class method".
 pub fn is_classmethod(decorator_list: &[Decorator], semantic: &SemanticModel) -> bool {
-    decorator_list.iter().any(|decorator| {
-        semantic
-            .resolve_qualified_name(map_callable(&decorator.expression))
-            .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["", "classmethod"]))
-    })
+    decorator_list
+        .iter()
+        .any(|decorator| semantic.match_builtin_expr(&decorator.expression, "classmethod"))
 }
 
 /// Returns `true` if a function definition is an `@overload`.
@@ -79,7 +75,7 @@ pub fn is_property(
             .is_some_and(|qualified_name| {
                 matches!(
                     qualified_name.segments(),
-                    ["", "property"] | ["functools", "cached_property"]
+                    ["" | "builtins", "property"] | ["functools", "cached_property"]
                 ) || extra_properties
                     .iter()
                     .any(|extra_property| extra_property.segments() == qualified_name.segments())

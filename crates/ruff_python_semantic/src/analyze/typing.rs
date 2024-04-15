@@ -686,7 +686,7 @@ impl TypeChecker for IoBaseChecker {
             .is_some_and(|qualified_name| {
                 matches!(
                     qualified_name.segments(),
-                    ["io", "open" | "open_code"] | ["os" | "", "open"]
+                    ["io", "open" | "open_code"] | ["os" | "" | "builtins", "open"]
                 )
             })
     }
