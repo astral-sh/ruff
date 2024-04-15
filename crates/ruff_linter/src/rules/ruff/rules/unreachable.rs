@@ -3,7 +3,7 @@ use std::{fmt, iter, usize};
 use log::error;
 use ruff_python_ast::{
     Expr, ExprBooleanLiteral, Identifier, MatchCase, Pattern, PatternMatchAs, PatternMatchOr, Stmt,
-    StmtFor, StmtMatch, StmtReturn, StmtTry, StmtWhile, StmtWith,
+    StmtContinue, StmtFor, StmtMatch, StmtReturn, StmtTry, StmtWhile, StmtWith,
 };
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -263,14 +263,14 @@ impl<'stmt> From<&'stmt [Stmt]> for BasicBlocks<'stmt> {
 
 /// Basic code block, sequence of statements unconditionally executed
 /// "together".
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 struct BasicBlock<'stmt> {
     stmts: &'stmt [Stmt],
     next: NextBlock<'stmt>,
 }
 
 /// Edge between basic blocks (in the control-flow graph).
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 enum NextBlock<'stmt> {
     /// Always continue with a block.
     Always(BlockIndex),
@@ -339,9 +339,16 @@ impl<'stmt> BasicBlock<'stmt> {
         next: NextBlock::Terminate,
     };
 
+    const LOOP_CONTINUE: BasicBlock<'static> = BasicBlock {
+        stmts: &[Stmt::Continue(StmtContinue {
+            range: TextRange::new(TextSize::new(0), TextSize::new(0)),
+        })],
+        next: NextBlock::Terminate,
+    };
+
     /// Return true if the block is a sentinel or fake block.
     fn is_sentinel(&self) -> bool {
-        self.is_empty() || self.is_exception()
+        self.is_empty() || self.is_exception() || self.is_loop_continue()
     }
 
     /// Returns an empty block that terminates.
@@ -352,6 +359,10 @@ impl<'stmt> BasicBlock<'stmt> {
     /// Returns true if `self` an [`BasicBlock::EXCEPTION`].
     fn is_exception(&self) -> bool {
         matches!(self.next, NextBlock::Terminate) && BasicBlock::EXCEPTION.stmts == self.stmts
+    }
+
+    fn is_loop_continue(&self) -> bool {
+        self.stmts == BasicBlock::LOOP_CONTINUE.stmts
     }
 }
 
@@ -364,28 +375,14 @@ fn loop_block<'stmt>(
     after: Option<BlockIndex>,
 ) -> NextBlock<'stmt> {
     let after_block = blocks.maybe_next_block_index(after, || true);
+    let last_orelse_statement = blocks.append_blocks_if_not_empty(orelse, after_block);
+
+    let loop_continue_index = blocks.blocks.push(BasicBlock::LOOP_CONTINUE.clone());
     // NOTE: a while loop's body must not be empty, so we can safely
     // create at least one block from it.
-    let last_statement_index = blocks.append_blocks(body, after);
-    let last_orelse_statement = blocks.append_blocks_if_not_empty(orelse, after_block);
-    // `create_blocks` always continues to the next block by
-    // default. However in a while loop we want to continue with the
-    // while block (we're about to create) to create the loop.
-    // NOTE: `blocks.len()` is an invalid index at time of creation
-    // as it points to the block which we're about to create.
-    //
-    // FIXME: This should check the last block, not the first block.
-    blocks.change_next_block(
-        last_statement_index,
-        after_block,
-        blocks.blocks.next_index(),
-        |block| {
-            // For `break` statements we don't want to continue with the
-            // loop, but instead with the statement after the loop (i.e.
-            // not change anything).
-            !block.stmts.last().is_some_and(Stmt::is_break_stmt)
-        },
-    );
+    let last_statement_index = blocks.append_blocks(body, Some(loop_continue_index));
+    blocks.blocks[loop_continue_index].next = NextBlock::Always(blocks.blocks.next_index());
+
     NextBlock::If {
         condition,
         next: last_statement_index,
@@ -491,12 +488,11 @@ impl<'stmt> BasicBlocksBuilder<'stmt> {
                 | Stmt::Assign(_)
                 | Stmt::AugAssign(_)
                 | Stmt::AnnAssign(_)
-                | Stmt::Break(_)
                 | Stmt::TypeAlias(_)
                 | Stmt::IpyEscapeCommand(_)
                 | Stmt::Pass(_) => self.unconditional_next_block(after),
-                Stmt::Continue(_) => {
-                    // NOTE: the next branch gets fixed up in `change_next_block`.
+                Stmt::Break(_) | Stmt::Continue(_) => {
+                    // NOTE: These are handled in post_processing.
                     self.unconditional_next_block(after)
                 }
                 // Statements that (can) divert the control flow.
@@ -868,6 +864,11 @@ impl<'stmt> BasicBlocksBuilder<'stmt> {
             }
 
             let block = &mut self.blocks[idx];
+
+            if block.is_loop_continue() {
+                return;
+            }
+
             match block.next {
                 NextBlock::Always(next) => {
                     match block.stmts.last() {
@@ -1029,6 +1030,8 @@ impl<'stmt, 'source> fmt::Display for MermaidGraph<'stmt, 'source> {
                 write!(f, "`*(empty)*`")?;
             } else if block.is_exception() {
                 write!(f, "Exception raised")?;
+            } else if block.is_loop_continue() {
+                write!(f, "Loop continue")?;
             } else {
                 for stmt in block.stmts {
                     let code_line = &self.source[stmt.range()].trim();

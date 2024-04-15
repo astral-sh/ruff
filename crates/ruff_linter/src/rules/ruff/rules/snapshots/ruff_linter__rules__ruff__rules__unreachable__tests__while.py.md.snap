@@ -17,14 +17,16 @@ flowchart TD
   start(("Start"))
   return(("End"))
   block0["return 1\n"]
-  block1["return #quot;unreachable#quot;\n"]
-  block2["while False:
+  block1[["Loop continue"]]
+  block2["return #quot;unreachable#quot;\n"]
+  block3["while False:
         return #quot;unreachable#quot;\n"]
 
-  start --> block2
-  block2 -- "False" --> block1
-  block2 -- "else" --> block0
-  block1 --> return
+  start --> block3
+  block3 -- "False" --> block2
+  block3 -- "else" --> block0
+  block2 --> return
+  block1 --> block3
   block0 --> return
 ```
 
@@ -44,17 +46,19 @@ flowchart TD
   start(("Start"))
   return(("End"))
   block0[["`*(empty)*`"]]
-  block1["return #quot;unreachable#quot;\n"]
-  block2["return 1\n"]
-  block3["while False:
+  block1["return 1\n"]
+  block2[["Loop continue"]]
+  block3["return #quot;unreachable#quot;\n"]
+  block4["while False:
         return #quot;unreachable#quot;
     else:
         return 1\n"]
 
-  start --> block3
-  block3 -- "False" --> block1
-  block3 -- "else" --> block2
-  block2 --> return
+  start --> block4
+  block4 -- "False" --> block3
+  block4 -- "else" --> block1
+  block3 --> return
+  block2 --> block4
   block1 --> return
   block0 --> return
 ```
@@ -76,17 +80,19 @@ flowchart TD
   start(("Start"))
   return(("End"))
   block0["return #quot;also unreachable#quot;\n"]
-  block1["return #quot;unreachable#quot;\n"]
-  block2["return 1\n"]
-  block3["while False:
+  block1["return 1\n"]
+  block2[["Loop continue"]]
+  block3["return #quot;unreachable#quot;\n"]
+  block4["while False:
         return #quot;unreachable#quot;
     else:
         return 1\n"]
 
-  start --> block3
-  block3 -- "False" --> block1
-  block3 -- "else" --> block2
-  block2 --> return
+  start --> block4
+  block4 -- "False" --> block3
+  block4 -- "else" --> block1
+  block3 --> return
+  block2 --> block4
   block1 --> return
   block0 --> return
 ```
@@ -106,14 +112,16 @@ flowchart TD
   start(("Start"))
   return(("End"))
   block0["return #quot;unreachable#quot;\n"]
-  block1["return 1\n"]
-  block2["while True:
+  block1[["Loop continue"]]
+  block2["return 1\n"]
+  block3["while True:
         return 1\n"]
 
-  start --> block2
-  block2 -- "True" --> block1
-  block2 -- "else" --> block0
-  block1 --> return
+  start --> block3
+  block3 -- "True" --> block2
+  block3 -- "else" --> block0
+  block2 --> return
+  block1 --> block3
   block0 --> return
 ```
 
@@ -133,17 +141,19 @@ flowchart TD
   start(("Start"))
   return(("End"))
   block0[["`*(empty)*`"]]
-  block1["return 1\n"]
-  block2["return #quot;unreachable#quot;\n"]
-  block3["while True:
+  block1["return #quot;unreachable#quot;\n"]
+  block2[["Loop continue"]]
+  block3["return 1\n"]
+  block4["while True:
         return 1
     else:
         return #quot;unreachable#quot;\n"]
 
-  start --> block3
-  block3 -- "True" --> block1
-  block3 -- "else" --> block2
-  block2 --> return
+  start --> block4
+  block4 -- "True" --> block3
+  block4 -- "else" --> block1
+  block3 --> return
+  block2 --> block4
   block1 --> return
   block0 --> return
 ```
@@ -165,17 +175,19 @@ flowchart TD
   start(("Start"))
   return(("End"))
   block0["return #quot;also unreachable#quot;\n"]
-  block1["return 1\n"]
-  block2["return #quot;unreachable#quot;\n"]
-  block3["while True:
+  block1["return #quot;unreachable#quot;\n"]
+  block2[["Loop continue"]]
+  block3["return 1\n"]
+  block4["while True:
         return 1
     else:
         return #quot;unreachable#quot;\n"]
 
-  start --> block3
-  block3 -- "True" --> block1
-  block3 -- "else" --> block2
-  block2 --> return
+  start --> block4
+  block4 -- "True" --> block3
+  block4 -- "else" --> block1
+  block3 --> return
+  block2 --> block4
   block1 --> return
   block0 --> return
 ```
@@ -196,14 +208,16 @@ flowchart TD
   start(("Start"))
   return(("End"))
   block0["return i\n"]
-  block1["i += 1\n"]
-  block2["i = 0\nwhile False:
+  block1[["Loop continue"]]
+  block2["i += 1\n"]
+  block3["i = 0\nwhile False:
         i += 1\n"]
 
-  start --> block2
-  block2 -- "False" --> block1
-  block2 -- "else" --> block0
-  block1 --> block2
+  start --> block3
+  block3 -- "False" --> block2
+  block3 -- "else" --> block0
+  block2 --> block1
+  block1 --> block3
   block0 --> return
 ```
 
@@ -223,14 +237,16 @@ flowchart TD
   start(("Start"))
   return(("End"))
   block0["return i\n"]
-  block1["i += 1\n"]
-  block2["i = 0\nwhile True:
+  block1[["Loop continue"]]
+  block2["i += 1\n"]
+  block3["i = 0\nwhile True:
         i += 1\n"]
 
-  start --> block2
-  block2 -- "True" --> block1
-  block2 -- "else" --> block0
-  block1 --> block2
+  start --> block3
+  block3 -- "True" --> block2
+  block3 -- "else" --> block0
+  block2 --> block1
+  block1 --> block3
   block0 --> return
 ```
 
@@ -249,14 +265,16 @@ flowchart TD
   start(("Start"))
   return(("End"))
   block0["return 1\n"]
-  block1["pass\n"]
-  block2["while True:
+  block1[["Loop continue"]]
+  block2["pass\n"]
+  block3["while True:
         pass\n"]
 
-  start --> block2
-  block2 -- "True" --> block1
-  block2 -- "else" --> block0
-  block1 --> block2
+  start --> block3
+  block3 -- "True" --> block2
+  block3 -- "else" --> block0
+  block2 --> block1
+  block1 --> block3
   block0 --> return
 ```
 
@@ -278,22 +296,24 @@ flowchart TD
   start(("Start"))
   return(("End"))
   block0["return i\n"]
-  block1["i += 1\n"]
-  block2["print(#quot;ok#quot;)\n"]
-  block3["if True:
+  block1[["Loop continue"]]
+  block2["i += 1\n"]
+  block3["print(#quot;ok#quot;)\n"]
+  block4["if True:
             print(#quot;ok#quot;)\n"]
-  block4["i = 0\nwhile True:
+  block5["i = 0\nwhile True:
         if True:
             print(#quot;ok#quot;)
         i += 1\n"]
 
-  start --> block4
+  start --> block5
+  block5 -- "True" --> block4
+  block5 -- "else" --> block0
   block4 -- "True" --> block3
-  block4 -- "else" --> block0
-  block3 -- "True" --> block2
-  block3 -- "else" --> block1
+  block4 -- "else" --> block2
+  block3 --> block2
   block2 --> block1
-  block1 --> block4
+  block1 --> block5
   block0 --> return
 ```
 
@@ -315,22 +335,24 @@ flowchart TD
   start(("Start"))
   return(("End"))
   block0["return i\n"]
-  block1["i += 1\n"]
-  block2["print(#quot;ok#quot;)\n"]
-  block3["if False:
+  block1[["Loop continue"]]
+  block2["i += 1\n"]
+  block3["print(#quot;ok#quot;)\n"]
+  block4["if False:
             print(#quot;ok#quot;)\n"]
-  block4["i = 0\nwhile True:
+  block5["i = 0\nwhile True:
         if False:
             print(#quot;ok#quot;)
         i += 1\n"]
 
-  start --> block4
-  block4 -- "True" --> block3
-  block4 -- "else" --> block0
-  block3 -- "False" --> block2
-  block3 -- "else" --> block1
+  start --> block5
+  block5 -- "True" --> block4
+  block5 -- "else" --> block0
+  block4 -- "False" --> block3
+  block4 -- "else" --> block2
+  block3 --> block2
   block2 --> block1
-  block1 --> block4
+  block1 --> block5
   block0 --> return
 ```
 
@@ -350,19 +372,21 @@ flowchart TD
   start(("Start"))
   return(("End"))
   block0["return 0\n"]
-  block1["return 1\n"]
-  block2["if True:
+  block1[["Loop continue"]]
+  block2["return 1\n"]
+  block3["if True:
             return 1\n"]
-  block3["while True:
+  block4["while True:
         if True:
             return 1\n"]
 
-  start --> block3
+  start --> block4
+  block4 -- "True" --> block3
+  block4 -- "else" --> block0
   block3 -- "True" --> block2
-  block3 -- "else" --> block0
-  block2 -- "True" --> block1
-  block2 -- "else" --> block3
-  block1 --> return
+  block3 -- "else" --> block1
+  block2 --> return
+  block1 --> block4
   block0 --> return
 ```
 
@@ -380,14 +404,16 @@ flowchart TD
   start(("Start"))
   return(("End"))
   block0[["`*(empty)*`"]]
-  block1["continue\n"]
-  block2["while True:
+  block1[["Loop continue"]]
+  block2["continue\n"]
+  block3["while True:
         continue\n"]
 
-  start --> block2
-  block2 -- "True" --> block1
-  block2 -- "else" --> block0
-  block1 --> block2
+  start --> block3
+  block3 -- "True" --> block2
+  block3 -- "else" --> block0
+  block2 --> block3
+  block1 --> block3
   block0 --> return
 ```
 
@@ -405,14 +431,16 @@ flowchart TD
   start(("Start"))
   return(("End"))
   block0[["`*(empty)*`"]]
-  block1["continue\n"]
-  block2["while False:
+  block1[["Loop continue"]]
+  block2["continue\n"]
+  block3["while False:
         continue\n"]
 
-  start --> block2
-  block2 -- "False" --> block1
-  block2 -- "else" --> block0
-  block1 --> block2
+  start --> block3
+  block3 -- "False" --> block2
+  block3 -- "else" --> block0
+  block2 --> block3
+  block1 --> block3
   block0 --> return
 ```
 
@@ -430,14 +458,16 @@ flowchart TD
   start(("Start"))
   return(("End"))
   block0[["`*(empty)*`"]]
-  block1["break\n"]
-  block2["while True:
+  block1[["Loop continue"]]
+  block2["break\n"]
+  block3["while True:
         break\n"]
 
-  start --> block2
-  block2 -- "True" --> block1
-  block2 -- "else" --> block0
-  block1 --> return
+  start --> block3
+  block3 -- "True" --> block2
+  block3 -- "else" --> block0
+  block2 --> return
+  block1 --> block3
   block0 --> return
 ```
 
@@ -455,14 +485,16 @@ flowchart TD
   start(("Start"))
   return(("End"))
   block0[["`*(empty)*`"]]
-  block1["break\n"]
-  block2["while False:
+  block1[["Loop continue"]]
+  block2["break\n"]
+  block3["while False:
         break\n"]
 
-  start --> block2
-  block2 -- "False" --> block1
-  block2 -- "else" --> block0
-  block1 --> return
+  start --> block3
+  block3 -- "False" --> block2
+  block3 -- "else" --> block0
+  block2 --> return
+  block1 --> block3
   block0 --> return
 ```
 
@@ -481,19 +513,21 @@ flowchart TD
   start(("Start"))
   return(("End"))
   block0[["`*(empty)*`"]]
-  block1["continue\n"]
-  block2["if True:
+  block1[["Loop continue"]]
+  block2["continue\n"]
+  block3["if True:
             continue\n"]
-  block3["while True:
+  block4["while True:
         if True:
             continue\n"]
 
-  start --> block3
+  start --> block4
+  block4 -- "True" --> block3
+  block4 -- "else" --> block0
   block3 -- "True" --> block2
-  block3 -- "else" --> block0
-  block2 -- "True" --> block1
-  block2 -- "else" --> block3
-  block1 --> block3
+  block3 -- "else" --> block1
+  block2 --> block4
+  block1 --> block4
   block0 --> return
 ```
 
@@ -512,19 +546,21 @@ flowchart TD
   start(("Start"))
   return(("End"))
   block0[["`*(empty)*`"]]
-  block1["break\n"]
-  block2["if True:
+  block1[["Loop continue"]]
+  block2["break\n"]
+  block3["if True:
             break\n"]
-  block3["while True:
+  block4["while True:
         if True:
             break\n"]
 
-  start --> block3
+  start --> block4
+  block4 -- "True" --> block3
+  block4 -- "else" --> block0
   block3 -- "True" --> block2
-  block3 -- "else" --> block0
-  block2 -- "True" --> block1
-  block2 -- "else" --> block3
-  block1 --> return
+  block3 -- "else" --> block1
+  block2 --> return
+  block1 --> block4
   block0 --> return
 ```
 
@@ -546,19 +582,21 @@ flowchart TD
   start(("Start"))
   return(("End"))
   block0["x = 3\n"]
-  block1["x = 2\n"]
-  block2["x = 0\nx = 1\nbreak\n"]
-  block3["while True:
+  block1[["Loop continue"]]
+  block2["x = 2\n"]
+  block3["x = 0\nx = 1\nbreak\n"]
+  block4["while True:
         x = 0
         x = 1
         break
         x = 2\n"]
 
-  start --> block3
-  block3 -- "True" --> block2
-  block3 -- "else" --> block0
-  block2 --> block0
-  block1 --> block0
+  start --> block4
+  block4 -- "True" --> block3
+  block4 -- "else" --> block0
+  block3 --> block0
+  block2 --> block1
+  block1 --> block4
   block0 --> return
 ```
 
@@ -580,19 +618,21 @@ flowchart TD
   start(("Start"))
   return(("End"))
   block0["x = 3\n"]
-  block1["x = 2\n"]
-  block2["x = 0\nx = 1\ncontinue\n"]
-  block3["while True:
+  block1[["Loop continue"]]
+  block2["x = 2\n"]
+  block3["x = 0\nx = 1\ncontinue\n"]
+  block4["while True:
         x = 0
         x = 1
         continue
         x = 2\n"]
 
-  start --> block3
-  block3 -- "True" --> block2
-  block3 -- "else" --> block0
-  block2 --> block3
-  block1 --> block0
+  start --> block4
+  block4 -- "True" --> block3
+  block4 -- "else" --> block0
+  block3 --> block4
+  block2 --> block1
+  block1 --> block4
   block0 --> return
 ```
 
@@ -614,19 +654,21 @@ flowchart TD
   start(("Start"))
   return(("End"))
   block0["x = 3\n"]
-  block1["x = 2\n"]
-  block2["x = 0\nx = 1\nreturn\n"]
-  block3["while True:
+  block1[["Loop continue"]]
+  block2["x = 2\n"]
+  block3["x = 0\nx = 1\nreturn\n"]
+  block4["while True:
         x = 0
         x = 1
         return
         x = 2\n"]
 
-  start --> block3
-  block3 -- "True" --> block2
-  block3 -- "else" --> block0
-  block2 --> return
-  block1 --> block0
+  start --> block4
+  block4 -- "True" --> block3
+  block4 -- "else" --> block0
+  block3 --> return
+  block2 --> block1
+  block1 --> block4
   block0 --> return
 ```
 
@@ -648,19 +690,21 @@ flowchart TD
   start(("Start"))
   return(("End"))
   block0["x = 3\n"]
-  block1["x = 2\n"]
-  block2["x = 0\nx = 1\nraise Exception\n"]
-  block3["while True:
+  block1[["Loop continue"]]
+  block2["x = 2\n"]
+  block3["x = 0\nx = 1\nraise Exception\n"]
+  block4["while True:
         x = 0
         x = 1
         raise Exception
         x = 2\n"]
 
-  start --> block3
-  block3 -- "True" --> block2
-  block3 -- "else" --> block0
-  block2 --> return
-  block1 --> block0
+  start --> block4
+  block4 -- "True" --> block3
+  block4 -- "else" --> block0
+  block3 --> return
+  block2 --> block1
+  block1 --> block4
   block0 --> return
 ```
 
@@ -688,7 +732,8 @@ flowchart TD
   start(("Start"))
   return(("End"))
   block0["self.thread = threading.Thread(target=self._run_web_server)\n"]
-  block1["try:
+  block1[["Loop continue"]]
+  block2["try:
             self.server = HTTPServer((host, port), HtmlOnlyHandler)
             self.host = host
             self.port = port
@@ -696,7 +741,7 @@ flowchart TD
         except OSError:
             log.debug(f#quot;port {port} is in use, trying to next one#quot;)
             port += 1\n"]
-  block2["self.stop_serving = False\nwhile True:
+  block3["self.stop_serving = False\nwhile True:
         try:
             self.server = HTTPServer((host, port), HtmlOnlyHandler)
             self.host = host
@@ -706,9 +751,10 @@ flowchart TD
             log.debug(f#quot;port {port} is in use, trying to next one#quot;)
             port += 1\n"]
 
-  start --> block2
-  block2 -- "True" --> block1
-  block2 -- "else" --> block0
-  block1 --> block2
+  start --> block3
+  block3 -- "True" --> block2
+  block3 -- "else" --> block0
+  block2 --> block1
+  block1 --> block3
   block0 --> return
 ```

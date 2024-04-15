@@ -19,3 +19,19 @@ def func():
 def func():
     for i in range(3):
         assert i < x
+
+def func():
+    for j in range(3):
+        x = 2
+    else:
+        assert False
+    return 1
+
+def func():
+    for j in range(3):
+        if j == 2:
+            print('yay')
+            break
+    else:
+        assert False
+    return 1
