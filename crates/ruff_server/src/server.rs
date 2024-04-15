@@ -30,6 +30,8 @@ mod api;
 mod client;
 mod schedule;
 
+pub(crate) use client::ClientSender;
+
 pub(crate) type Result<T> = std::result::Result<T, api::Error>;
 
 pub struct Server {
@@ -43,6 +45,8 @@ pub struct Server {
 impl Server {
     pub fn new(worker_threads: NonZeroUsize) -> crate::Result<Self> {
         let (conn, threads) = lsp::Connection::stdio();
+
+        crate::message::init_messenger(&conn.sender);
 
         let (id, params) = conn.initialize_start()?;
 
