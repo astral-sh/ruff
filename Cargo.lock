@@ -1078,9 +1078,9 @@ dependencies = [
 
 [[package]]
 name = "insta-cmd"
-version = "0.5.0"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1980f17994b79f75670aa90cfc8d35edc4aa248f16aa48b5e27835b080e452a2"
+checksum = "ffeeefa927925cced49ccb01bf3e57c9d4cd132df21e576eb9415baeab2d3de6"
 dependencies = [
  "insta",
  "serde",

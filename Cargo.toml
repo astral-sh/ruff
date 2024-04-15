@@ -46,7 +46,7 @@ imperative = { version = "1.0.4" }
 indicatif = { version = "0.17.8" }
 indoc = { version = "2.0.4" }
 insta = { version = "1.35.1", feature = ["filters", "glob"] }
-insta-cmd = { version = "0.5.0" }
+insta-cmd = { version = "0.6.0" }
 is-macro = { version = "0.3.5" }
 is-wsl = { version = "0.4.0" }
 itertools = { version = "0.12.1" }
