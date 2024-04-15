@@ -858,10 +858,15 @@ impl<'stmt> BasicBlocksBuilder<'stmt> {
         start_index: BlockIndex,
         loop_start: Option<BlockIndex>,
         loop_exit: Option<BlockIndex>,
+        clause_exit: Option<BlockIndex>,
     ) {
         let mut idx = start_index;
 
         loop {
+            if Some(idx) == clause_exit || Some(idx) == loop_start {
+                return;
+            }
+
             let block = &mut self.blocks[idx];
             match block.next {
                 NextBlock::Always(next) => {
@@ -887,27 +892,16 @@ impl<'stmt> BasicBlocksBuilder<'stmt> {
                 } => {
                     match block.stmts.last() {
                         Some(Stmt::For(_) | Stmt::While(_)) => {
-                            self.post_process(next, Some(idx), exit);
+                            self.post_process(next, Some(idx), exit, exit);
                         }
                         _ => {
-                            self.post_process(next, loop_start, loop_exit);
+                            self.post_process(next, loop_start, loop_exit, exit);
                         }
                     };
 
                     idx = orelse;
                 }
                 NextBlock::Terminate => return,
-            }
-
-            if let Some(exit) = loop_exit {
-                if idx == exit {
-                    return;
-                }
-            }
-            if let Some(start) = loop_start {
-                if idx == start {
-                    return;
-                }
             }
         }
     }
@@ -916,7 +910,7 @@ impl<'stmt> BasicBlocksBuilder<'stmt> {
         if self.blocks.is_empty() {
             self.blocks.push(BasicBlock::EMPTY);
         } else {
-            self.post_process(self.blocks.indices().last().unwrap(), None, None);
+            self.post_process(self.blocks.indices().last().unwrap(), None, None, None);
         }
 
         BasicBlocks {
