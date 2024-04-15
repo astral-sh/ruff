@@ -2067,6 +2067,16 @@ impl<'src> Parser<'src> {
             }
         }
 
+        if with_item_kind == WithItemKind::Parenthesized && !self.at(TokenKind::Rpar) {
+            // test_err with_items_parenthesized_missing_comma
+            // with (item1 item2): ...
+            // with (item1 as f1 item2): ...
+            // with (item1, item2 item3, item4): ...
+            // with (item1, item2 as f1 item3, item4): ...
+            // with (item1, item2: ...
+            self.expect(TokenKind::Comma);
+        }
+
         // Transform the items if it's a parenthesized expression.
         if with_item_kind.is_parenthesized_expression() {
             // The generator expression has already consumed the `)`, so avoid
