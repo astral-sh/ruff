@@ -224,7 +224,8 @@ impl Server {
                 CodeActionOptions {
                     code_action_kinds: Some(
                         SupportedCodeAction::all()
-                            .flat_map(|action| action.kinds().into_iter())
+                            .flat_map(|action| action.kinds().iter())
+                            .cloned()
                             .collect(),
                     ),
                     work_done_progress_options: WorkDoneProgressOptions {
@@ -285,14 +286,18 @@ pub(crate) enum SupportedCodeAction {
 
 impl SupportedCodeAction {
     /// Returns the possible LSP code action kind(s) that map to this code action.
-    fn kinds(self) -> Vec<CodeActionKind> {
+    fn kinds(self) -> &'static [CodeActionKind] {
+        static QUICKFIX: [CodeActionKind; 1] = [CodeActionKind::QUICKFIX];
+        static SOURCE_FIX_ALL: [CodeActionKind; 2] =
+            [CodeActionKind::SOURCE_FIX_ALL, crate::SOURCE_FIX_ALL_RUFF];
+        static SOURCE_ORGANIZE_IMPORTS: [CodeActionKind; 2] = [
+            CodeActionKind::SOURCE_ORGANIZE_IMPORTS,
+            crate::SOURCE_ORGANIZE_IMPORTS_RUFF,
+        ];
         match self {
-            Self::QuickFix => vec![CodeActionKind::QUICKFIX],
-            Self::SourceFixAll => vec![CodeActionKind::SOURCE_FIX_ALL, crate::SOURCE_FIX_ALL_RUFF],
-            Self::SourceOrganizeImports => vec![
-                CodeActionKind::SOURCE_ORGANIZE_IMPORTS,
-                crate::SOURCE_ORGANIZE_IMPORTS_RUFF,
-            ],
+            Self::QuickFix => &QUICKFIX,
+            Self::SourceFixAll => &SOURCE_FIX_ALL,
+            Self::SourceOrganizeImports => &SOURCE_ORGANIZE_IMPORTS,
         }
     }
 
