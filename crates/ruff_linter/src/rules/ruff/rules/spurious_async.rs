@@ -7,7 +7,7 @@ use ruff_python_ast::{self as ast, Expr, Stmt};
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for functions declared `async` that do not yield or otherwise use features requiring the
+/// Checks for functions declared `async` that do not await or otherwise use features requiring the
 /// function to be declared `async`.
 ///
 /// ## Why is this bad?
@@ -35,7 +35,7 @@ impl Violation for SpuriousAsync {
     #[derive_message_formats]
     fn message(&self) -> String {
         let SpuriousAsync { name } = self;
-        format!("Function `{name}` is declared `async`, but doesn't yield or use async features.")
+        format!("Function `{name}` is declared `async`, but doesn't await or use async features.")
     }
 }
 

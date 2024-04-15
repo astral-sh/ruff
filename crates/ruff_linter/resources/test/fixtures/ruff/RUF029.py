@@ -45,12 +45,12 @@ async def fail_case_5():  # RUF029: yield does not require async
     yield "hello"
 
 
-async def fail_case_6():  # RUF029: the outer function does not await or yield
+async def fail_case_6():  # RUF029: the /outer/ function does not await
     async def foo():
         await bla
 
 
-async def fail_case_6():  # RUF029: the outer function does not await or yield
+async def fail_case_6():  # RUF029: the /outer/ function does not await
     class Foo:
         async def foo():
             await bla
