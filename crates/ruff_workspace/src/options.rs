@@ -1307,7 +1307,7 @@ impl Flake8ImplicitStrConcatOptions {
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct Flake8ImportConventionsOptions {
     /// The conventional aliases for imports. These aliases can be extended by
-    /// the `extend_aliases` option.
+    /// the `extend-aliases` option.
     #[option(
         default = r#"{"altair": "alt", "matplotlib": "mpl", "matplotlib.pyplot": "plt", "numpy": "np", "pandas": "pd", "seaborn": "sns", "tensorflow": "tf", "tkinter":  "tk", "holoviews": "hv", "panel": "pn", "plotly.express": "px", "polars": "pl", "pyarrow": "pa"}"#,
         value_type = "dict[str, str]",
