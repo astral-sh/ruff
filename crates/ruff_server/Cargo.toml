@@ -35,6 +35,7 @@ rustc-hash = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tracing = { workspace = true }
+walkdir = { workspace = true }
 
 [dev-dependencies]
 insta = { workspace = true }

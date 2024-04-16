@@ -1,3 +1,4 @@
+use ruff_linter::display_settings;
 use ruff_workspace::{
     pyproject::settings_toml,
     resolver::{ConfigurationTransformer, Relativity},
@@ -7,6 +8,7 @@ use std::{
     path::{Path, PathBuf},
     sync::Arc,
 };
+use walkdir::{DirEntry, WalkDir};
 
 #[derive(Default)]
 pub(crate) struct RuffSettings {
@@ -16,23 +18,46 @@ pub(crate) struct RuffSettings {
     pub(crate) formatter: ruff_workspace::FormatterSettings,
 }
 
-#[derive(Default)]
 pub(super) struct RuffSettingsIndex {
     index: BTreeMap<PathBuf, Arc<RuffSettings>>,
     fallback: Arc<RuffSettings>,
 }
 
+impl std::fmt::Display for RuffSettings {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        display_settings! {
+            formatter = f,
+            fields = [
+                self.linter,
+                self.formatter
+            ]
+        }
+        Ok(())
+    }
+}
+
 impl RuffSettingsIndex {
+    pub(super) fn new(path: &Path) -> Self {
+        let mut index = Self {
+            index: BTreeMap::default(),
+            fallback: Arc::default(),
+        };
+
+        index.reload(path);
+
+        index
+    }
+
     pub(super) fn reload(&mut self, root: &Path) {
         self.clear();
 
-        for directory in std::fs::read_dir(root).unwrap().filter_map(|entry| {
-            entry
-                .ok()
-                .and_then(|entry| entry.file_type().ok()?.is_dir().then_some(entry))
-        }) {
-            let path = directory.path();
-            if let Some(pyproject) = settings_toml(&path).ok().flatten() {
+        for directory in WalkDir::new(root)
+            .into_iter()
+            .filter_map(Result::ok)
+            .filter(|entry| entry.file_type().is_dir())
+            .map(DirEntry::into_path)
+        {
+            if let Some(pyproject) = settings_toml(&directory).ok().flatten() {
                 let Ok(settings) = ruff_workspace::resolver::resolve_root_settings(
                     &pyproject,
                     Relativity::Parent,
@@ -41,7 +66,7 @@ impl RuffSettingsIndex {
                     continue;
                 };
                 self.index.insert(
-                    path,
+                    directory,
                     Arc::new(RuffSettings {
                         linter: settings.linter,
                         formatter: settings.formatter,
@@ -52,8 +77,11 @@ impl RuffSettingsIndex {
     }
 
     pub(super) fn get(&self, document_path: &Path) -> &Arc<RuffSettings> {
-        if let Some((_, ruff_settings)) =
-            self.index.range(..document_path.to_path_buf()).next_back()
+        if let Some((_, ruff_settings)) = self
+            .index
+            .range(..document_path.to_path_buf())
+            .rev()
+            .find(|(path, _)| document_path.starts_with(path))
         {
             return ruff_settings;
         }
