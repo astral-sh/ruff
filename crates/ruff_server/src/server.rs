@@ -224,7 +224,7 @@ impl Server {
                 CodeActionOptions {
                     code_action_kinds: Some(
                         SupportedCodeAction::all()
-                            .flat_map(|action| action.kinds().into_iter())
+                            .map(SupportedCodeAction::to_kind)
                             .collect(),
                     ),
                     work_done_progress_options: WorkDoneProgressOptions {
@@ -284,16 +284,19 @@ pub(crate) enum SupportedCodeAction {
 }
 
 impl SupportedCodeAction {
-    /// Returns the possible LSP code action kind(s) that map to this code action.
-    fn kinds(self) -> Vec<CodeActionKind> {
+    /// Returns the LSP code action kind that map to this code action.
+    fn to_kind(self) -> CodeActionKind {
         match self {
-            Self::QuickFix => vec![CodeActionKind::QUICKFIX],
-            Self::SourceFixAll => vec![CodeActionKind::SOURCE_FIX_ALL, crate::SOURCE_FIX_ALL_RUFF],
-            Self::SourceOrganizeImports => vec![
-                CodeActionKind::SOURCE_ORGANIZE_IMPORTS,
-                crate::SOURCE_ORGANIZE_IMPORTS_RUFF,
-            ],
+            Self::QuickFix => CodeActionKind::QUICKFIX,
+            Self::SourceFixAll => crate::SOURCE_FIX_ALL_RUFF,
+            Self::SourceOrganizeImports => crate::SOURCE_ORGANIZE_IMPORTS_RUFF,
         }
+    }
+
+    fn from_kind(kind: CodeActionKind) -> impl Iterator<Item = Self> {
+        Self::all().filter(move |supported_kind| {
+            supported_kind.to_kind().as_str().starts_with(kind.as_str())
+        })
     }
 
     /// Returns all code actions kinds that the server currently supports.
@@ -304,18 +307,5 @@ impl SupportedCodeAction {
             Self::SourceOrganizeImports,
         ]
         .into_iter()
-    }
-}
-
-impl TryFrom<CodeActionKind> for SupportedCodeAction {
-    type Error = ();
-
-    fn try_from(kind: CodeActionKind) -> std::result::Result<Self, Self::Error> {
-        for supported_kind in Self::all() {
-            if supported_kind.kinds().contains(&kind) {
-                return Ok(supported_kind);
-            }
-        }
-        Err(())
     }
 }
