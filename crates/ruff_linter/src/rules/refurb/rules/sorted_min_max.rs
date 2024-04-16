@@ -46,7 +46,7 @@ use ruff_text_size::Ranged;
 pub struct SortedMinMax;
 
 impl Violation for SortedMinMax {
-    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Always;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -156,27 +156,29 @@ pub(crate) fn sorted_min_max(checker: &mut Checker, subscript: &ast::ExprSubscri
         return;
     };
 
-    let replacement = if let Some(key) = &key_keyword_expr {
-        format!(
-            "{}({}, key={})",
-            min_max.as_str(),
-            checker.generator().expr(list_expr),
-            checker.generator().expr(key)
-        )
-    } else {
-        format!(
-            "{}({})",
-            min_max.as_str(),
-            checker.generator().expr(list_expr)
-        )
-    };
-
     let mut diagnostic = Diagnostic::new(SortedMinMax, subscript.range());
-    diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
-        replacement,
-        subscript.start(),
-        subscript.end(),
-    )));
+    diagnostic.set_fix({
+        let replacement = if let Some(key) = key_keyword_expr {
+            format!(
+                "{}({}, key={})",
+                min_max.as_str(),
+                checker.generator().expr(list_expr),
+                checker.generator().expr(key)
+            )
+        } else {
+            format!(
+                "{}({})",
+                min_max.as_str(),
+                checker.generator().expr(list_expr)
+            )
+        };
+
+        let replacement = Edit::replacement(replacement, subscript.start(), subscript.end());
+        match is_reversed {
+            true => Fix::unsafe_edit(replacement),
+            false => Fix::safe_edit(replacement),
+        }
+    });
     checker.diagnostics.push(diagnostic);
 }
 
