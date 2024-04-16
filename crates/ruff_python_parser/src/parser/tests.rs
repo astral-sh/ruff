@@ -1,4 +1,4 @@
-use crate::{lex, parse, parse_suite, parse_tokens, Mode};
+use crate::{lex, parse, parse_expression, parse_suite, parse_tokens, Mode};
 
 // TODO(dhruvmanila): Remove `set_new_parser`
 
@@ -10,6 +10,56 @@ fn test_modes() {
 
     assert!(parse(source, Mode::Expression).is_ok());
     assert!(parse(source, Mode::Module).is_ok());
+}
+
+#[test]
+fn test_expr_mode_invalid_syntax1() {
+    crate::set_new_parser(true);
+
+    let source = "first second";
+    let error = parse_expression(source).unwrap_err();
+
+    insta::assert_debug_snapshot!(error);
+}
+
+#[test]
+fn test_expr_mode_invalid_syntax2() {
+    crate::set_new_parser(true);
+
+    let source = r"first
+
+second
+";
+    let error = parse_expression(source).unwrap_err();
+
+    insta::assert_debug_snapshot!(error);
+}
+
+#[test]
+fn test_expr_mode_invalid_syntax3() {
+    crate::set_new_parser(true);
+
+    let source = r"first
+
+second
+
+third
+";
+    let error = parse_expression(source).unwrap_err();
+
+    insta::assert_debug_snapshot!(error);
+}
+
+#[test]
+fn test_expr_mode_valid_syntax() {
+    crate::set_new_parser(true);
+
+    let source = "first
+
+";
+    let expr = parse_expression(source).unwrap();
+
+    insta::assert_debug_snapshot!(expr);
 }
 
 #[test]

@@ -150,15 +150,27 @@ impl<'src> Parser<'src> {
         let ast = if self.mode == Mode::Expression {
             let start = self.node_start();
             let parsed_expr = self.parse_expression_list(AllowStarredExpression::No);
-            let mut progress = ParserProgress::default();
 
-            // TODO: How should error recovery work here? Just truncate after the expression?
-            loop {
-                progress.assert_progressing(&self);
-                if !self.eat(TokenKind::Newline) {
-                    break;
+            // All of the remaining newlines are actually going to be non-logical newlines.
+            self.eat(TokenKind::Newline);
+
+            if !self.at(TokenKind::EndOfFile) {
+                self.add_error(
+                    ParseErrorType::UnexpectedExpressionToken,
+                    self.current_token_range(),
+                );
+
+                // TODO(dhruvmanila): How should error recovery work here? Just truncate after the expression?
+                let mut progress = ParserProgress::default();
+                loop {
+                    progress.assert_progressing(&self);
+                    if self.at(TokenKind::EndOfFile) {
+                        break;
+                    }
+                    self.next_token();
                 }
             }
+
             self.bump(TokenKind::EndOfFile);
 
             Mod::Expression(ast::ModExpression {
