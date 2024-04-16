@@ -12,6 +12,10 @@ class Str:
     def __len__(self):
         return "ruff"  # [invalid-length-return]
 
+class LengthNoReturn:
+    def __len__(self):
+        print("ruff")  # [invalid-length-return]
+
 class LengthNegative:
     def __len__(self):
         return -42  # [invalid-length-return]

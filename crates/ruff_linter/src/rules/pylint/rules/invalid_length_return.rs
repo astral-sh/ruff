@@ -60,13 +60,21 @@ pub(crate) fn invalid_length_return(checker: &mut Checker, name: &str, body: &[S
         visitor.returns
     };
 
+    if returns.is_empty() {
+        checker.diagnostics.push(Diagnostic::new(
+            InvalidLengthReturnType,
+            body.last().unwrap().range(),
+        ));
+    }
+
     for stmt in returns {
         if let Some(value) = stmt.value.as_deref() {
-            if !matches!(
-                ResolvedPythonType::from(value),
-                ResolvedPythonType::Unknown
-                    | ResolvedPythonType::Atom(PythonType::Number(NumberLike::Integer))
-            ) || is_negative_integer(value)
+            if is_negative_integer(value)
+                || !matches!(
+                    ResolvedPythonType::from(value),
+                    ResolvedPythonType::Unknown
+                        | ResolvedPythonType::Atom(PythonType::Number(NumberLike::Integer))
+                )
             {
                 checker
                     .diagnostics
@@ -82,8 +90,11 @@ pub(crate) fn invalid_length_return(checker: &mut Checker, name: &str, body: &[S
 }
 
 fn is_negative_integer(value: &Expr) -> bool {
-    let Expr::UnaryOp(ast::ExprUnaryOp { op, .. }) = value else {
-        return false;
-    };
-    matches!(op, ast::UnaryOp::USub)
+    matches!(
+        value,
+        Expr::UnaryOp(ast::ExprUnaryOp {
+            op: ast::UnaryOp::USub,
+            ..
+        })
+    )
 }
