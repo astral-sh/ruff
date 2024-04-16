@@ -57,6 +57,13 @@ pub(crate) fn invalid_bytes_return(checker: &mut Checker, name: &str, body: &[St
         visitor.returns
     };
 
+    if returns.is_empty() {
+        checker.diagnostics.push(Diagnostic::new(
+            InvalidBytesReturnType,
+            body.last().unwrap().range(),
+        ));
+    }
+
     for stmt in returns {
         if let Some(value) = stmt.value.as_deref() {
             if !matches!(

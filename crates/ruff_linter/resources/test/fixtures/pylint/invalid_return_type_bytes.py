@@ -12,6 +12,10 @@ class Str:
     def __bytes__(self):
         return "some bytes"  # [invalid-bytes-return]
 
+class BytesNoReturn:
+    def __bytes__(self):
+        print("ruff")  # [invalid-bytes-return]
+
 # TODO: Once Ruff has better type checking
 def return_bytes():
     return "some string"

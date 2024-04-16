@@ -28,5 +28,15 @@ invalid_return_type_bytes.py:13:16: PLE0308 `__bytes__` does not return `bytes`
 13 |         return "some bytes"  # [invalid-bytes-return]
    |                ^^^^^^^^^^^^ PLE0308
 14 | 
-15 | # TODO: Once Ruff has better type checking
+15 | class BytesNoReturn:
+   |
+
+invalid_return_type_bytes.py:17:9: PLE0308 `__bytes__` does not return `bytes`
+   |
+15 | class BytesNoReturn:
+16 |     def __bytes__(self):
+17 |         print("ruff")  # [invalid-bytes-return]
+   |         ^^^^^^^^^^^^^ PLE0308
+18 | 
+19 | # TODO: Once Ruff has better type checking
    |
