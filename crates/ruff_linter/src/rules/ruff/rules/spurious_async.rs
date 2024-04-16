@@ -1,7 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::visitor;
-use ruff_python_ast::visitor::Visitor;
+use ruff_python_ast::identifier::Identifier;
+use ruff_python_ast::visitor::preorder;
 use ruff_python_ast::{self as ast, Expr, Stmt};
 
 use crate::checkers::ast::Checker;
@@ -44,13 +44,13 @@ struct AsyncExprVisitor {
     found_await_or_async: bool,
 }
 
-impl<'a> Visitor<'a> for AsyncExprVisitor {
+impl<'a> preorder::PreorderVisitor<'a> for AsyncExprVisitor {
     fn visit_expr(&mut self, expr: &'a Expr) {
         match expr {
             Expr::Await(_) => {
                 self.found_await_or_async = true;
             }
-            _ => visitor::walk_expr(self, expr),
+            _ => preorder::walk_expr(self, expr),
         }
     }
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
@@ -61,7 +61,7 @@ impl<'a> Visitor<'a> for AsyncExprVisitor {
             Stmt::For(ast::StmtFor { is_async: true, .. }) => {
                 self.found_await_or_async = true;
             }
-            _ => visitor::walk_stmt(self, stmt),
+            _ => preorder::walk_stmt(self, stmt),
         }
     }
 }
@@ -83,7 +83,7 @@ pub(crate) fn spurious_async(
 
     let found_await_or_async = {
         let mut visitor = AsyncExprVisitor::default();
-        visitor.visit_body(&body);
+        preorder::walk_body(&mut visitor, &body);
         visitor.found_await_or_async
     };
 
