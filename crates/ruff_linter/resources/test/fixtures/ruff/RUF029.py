@@ -21,10 +21,9 @@ async def pass_3():  # OK: uses an async loop
         pass
 
 
-## FALSE_POSITIVE b/c the rule is fired for every function definition and afaik there isn't a way to turn it off while traversing a class
-##class Foo:
-##    async def pass_4():  # OK: method of a class
-##        pass
+class Foo:
+    async def pass_4():  # OK: method of a class
+        pass
 
 
 def foo():

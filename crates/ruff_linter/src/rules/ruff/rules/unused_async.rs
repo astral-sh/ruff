@@ -154,6 +154,10 @@ pub(crate) fn unused_async(
         return;
     }
 
+    if checker.semantic().current_scope().kind.is_class() {
+        return;
+    }
+
     let found_await_or_async = {
         let mut visitor = AsyncExprVisitor::default();
         preorder::walk_body(&mut visitor, body);
