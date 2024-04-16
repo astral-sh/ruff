@@ -69,11 +69,10 @@ impl<'a> preorder::PreorderVisitor<'a> for AsyncExprVisitor {
 /// RUF029
 pub(crate) fn spurious_async(
     checker: &mut Checker,
-    ast::StmtFunctionDef {
+    function_def @ ast::StmtFunctionDef {
         is_async,
         name,
         body,
-        range,
         ..
     }: &ast::StmtFunctionDef,
 ) {
@@ -92,7 +91,7 @@ pub(crate) fn spurious_async(
             SpuriousAsync {
                 name: name.to_string(),
             },
-            *range,
+            function_def.identifier(),
         ));
     }
 }
