@@ -73,7 +73,7 @@ impl<'a> preorder::PreorderVisitor<'a> for AsyncExprVisitor {
             }
             // avoid counting inner classes' or functions' bodies toward the search
             Stmt::FunctionDef(function_def) => {
-                function_def_visit_preorder_except_body(function_def, self)
+                function_def_visit_preorder_except_body(function_def, self);
             }
             Stmt::ClassDef(class_def) => class_def_visit_preorder_except_body(class_def, self),
             _ => preorder::walk_stmt(self, stmt),
@@ -81,7 +81,7 @@ impl<'a> preorder::PreorderVisitor<'a> for AsyncExprVisitor {
     }
 }
 
-/// Very nearly crate::node::StmtFunctionDef.visit_preorder, except it is specialized and,
+/// Very nearly `crate::node::StmtFunctionDef.visit_preorder`, except it is specialized and,
 /// crucially, doesn't traverse the body.
 fn function_def_visit_preorder_except_body<'a, V>(
     function_def: &'a ast::StmtFunctionDef,
@@ -112,7 +112,7 @@ fn function_def_visit_preorder_except_body<'a, V>(
     }
 }
 
-/// Very nearly crate::node::StmtClassDef.visit_preorder, except it is specialized and,
+/// Very nearly `crate::node::StmtClassDef.visit_preorder`, except it is specialized and,
 /// crucially, doesn't traverse the body.
 fn class_def_visit_preorder_except_body<'a, V>(class_def: &'a ast::StmtClassDef, visitor: &mut V)
 where
@@ -154,7 +154,7 @@ pub(crate) fn spurious_async(
 
     let found_await_or_async = {
         let mut visitor = AsyncExprVisitor::default();
-        preorder::walk_body(&mut visitor, &body);
+        preorder::walk_body(&mut visitor, body);
         visitor.found_await_or_async
     };
 
