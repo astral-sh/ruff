@@ -6,7 +6,6 @@ use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Expr, PySourceType};
 use ruff_python_parser::{lexer, AsMode};
-use ruff_python_semantic::SemanticModel;
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextSize};
 
@@ -63,14 +62,14 @@ impl AlwaysFixableViolation for RedundantOpenModes {
 
 /// UP015
 pub(crate) fn redundant_open_modes(checker: &mut Checker, call: &ast::ExprCall) {
-    if !is_open_builtin(call.func.as_ref(), checker.semantic()) {
+    if !checker.semantic().match_builtin_expr(&call.func, "open") {
         return;
     }
 
     match call.arguments.find_argument("mode", 1) {
         None => {
             if !call.arguments.is_empty() {
-                if let Some(keyword) = call.arguments.find_keyword(MODE_KEYWORD_ARGUMENT) {
+                if let Some(keyword) = call.arguments.find_keyword("mode") {
                     if let Expr::StringLiteral(ast::ExprStringLiteral {
                         value: mode_param_value,
                         ..
@@ -103,17 +102,6 @@ pub(crate) fn redundant_open_modes(checker: &mut Checker, call: &ast::ExprCall) 
             }
         }
     }
-}
-
-const OPEN_FUNC_NAME: &str = "open";
-const MODE_KEYWORD_ARGUMENT: &str = "mode";
-
-/// Returns `true` if the given `call` is a call to the `open` builtin.
-fn is_open_builtin(func: &Expr, semantic: &SemanticModel) -> bool {
-    let Some(ast::ExprName { id, .. }) = func.as_name_expr() else {
-        return false;
-    };
-    id.as_str() == OPEN_FUNC_NAME && semantic.is_builtin(id)
 }
 
 #[derive(Debug, Copy, Clone)]
