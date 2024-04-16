@@ -894,13 +894,17 @@ impl<'stmt> BasicBlocksBuilder<'stmt> {
                     match block.stmts.last() {
                         Some(Stmt::For(_) | Stmt::While(_)) => {
                             self.post_process(next, Some(idx), exit, exit);
+                            idx = orelse;
+                        }
+                        Some(Stmt::Assert(_)) => {
+                            self.post_process(orelse, loop_start, loop_exit, exit);
+                            idx = next;
                         }
                         _ => {
                             self.post_process(next, loop_start, loop_exit, exit);
+                            idx = orelse;
                         }
                     };
-
-                    idx = orelse;
                 }
                 NextBlock::Terminate => return,
             }
