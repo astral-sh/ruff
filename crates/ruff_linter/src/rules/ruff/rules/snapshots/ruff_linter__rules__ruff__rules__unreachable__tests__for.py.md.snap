@@ -355,3 +355,51 @@ flowchart TD
   block1 --> block0
   block0 --> return
 ```
+
+## Function 11
+### Source
+```python
+def func():
+        for i in range(3):
+            if i == 2:
+                assert i is not None
+                break
+        else:
+            raise Exception()
+        x = 0
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0["x = 0\n"]
+  block1["raise Exception()\n"]
+  block2[["Loop continue"]]
+  block3["break\n"]
+  block4[["Exception raised"]]
+  block5["assert i is not None\n"]
+  block6["if i == 2:
+                assert i is not None
+                break\n"]
+  block7["for i in range(3):
+            if i == 2:
+                assert i is not None
+                break
+        else:
+            raise Exception()\n"]
+
+  start --> block7
+  block7 -- "range(3)" --> block6
+  block7 -- "else" --> block1
+  block6 -- "i == 2" --> block5
+  block6 -- "else" --> block2
+  block5 -- "i is not None" --> block3
+  block5 -- "else" --> block4
+  block4 --> return
+  block3 --> block0
+  block2 --> block7
+  block1 --> return
+  block0 --> return
+```
