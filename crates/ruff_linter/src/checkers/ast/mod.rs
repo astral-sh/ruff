@@ -50,11 +50,11 @@ use ruff_python_ast::{helpers, str, visitor, PySourceType};
 use ruff_python_codegen::{Generator, Stylist};
 use ruff_python_index::Indexer;
 use ruff_python_parser::typing::{parse_type_annotation, AnnotationKind};
-use ruff_python_semantic::analyze::{imports, typing, visibility};
+use ruff_python_semantic::analyze::{imports, typing};
 use ruff_python_semantic::{
     BindingFlags, BindingId, BindingKind, Exceptions, Export, FromImport, Globals, Import, Module,
-    ModuleKind, NodeId, ScopeId, ScopeKind, SemanticModel, SemanticModelFlags, StarImport,
-    SubmoduleImport,
+    ModuleKind, ModuleSource, NodeId, ScopeId, ScopeKind, SemanticModel, SemanticModelFlags,
+    StarImport, SubmoduleImport,
 };
 use ruff_python_stdlib::builtins::{IPYTHON_BUILTINS, MAGIC_GLOBALS, PYTHON_BUILTINS};
 use ruff_source_file::{Locator, OneIndexed, SourceRow};
@@ -110,7 +110,7 @@ pub(crate) struct Checker<'a> {
     /// The [`Path`] to the package containing the current file.
     package: Option<&'a Path>,
     /// The module representation of the current file (e.g., `foo.bar`).
-    module_path: Option<&'a [String]>,
+    module: Module<'a>,
     /// The [`PySourceType`] of the current file.
     pub(crate) source_type: PySourceType,
     /// The [`CellOffsets`] for the current file, if it's a Jupyter notebook.
@@ -174,7 +174,7 @@ impl<'a> Checker<'a> {
             noqa,
             path,
             package,
-            module_path: module.path(),
+            module,
             source_type,
             locator,
             stylist,
@@ -2283,9 +2283,9 @@ pub(crate) fn check_ast(
             ModuleKind::Module
         },
         source: if let Some(module_path) = module_path.as_ref() {
-            visibility::ModuleSource::Path(module_path)
+            ModuleSource::Path(module_path)
         } else {
-            visibility::ModuleSource::File(path)
+            ModuleSource::File(path)
         },
         python_ast,
     };
