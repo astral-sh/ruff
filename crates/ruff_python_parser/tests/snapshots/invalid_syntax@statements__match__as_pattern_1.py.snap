@@ -11,7 +11,7 @@ Module(
         body: [
             Match(
                 StmtMatch {
-                    range: 0..159,
+                    range: 0..209,
                     subject: Name(
                         ExprName {
                             range: 6..13,
@@ -21,71 +21,44 @@ Module(
                     ),
                     cases: [
                         MatchCase {
-                            range: 140..159,
-                            pattern: MatchAs(
-                                PatternMatchAs {
-                                    range: 146..152,
-                                    pattern: Some(
-                                        MatchAs(
-                                            PatternMatchAs {
-                                                range: 146..147,
-                                                pattern: None,
-                                                name: Some(
-                                                    Identifier {
-                                                        id: "x",
-                                                        range: 146..147,
+                            range: 140..209,
+                            pattern: MatchValue(
+                                PatternMatchValue {
+                                    range: 145..158,
+                                    value: BinOp(
+                                        ExprBinOp {
+                                            range: 145..158,
+                                            left: Name(
+                                                ExprName {
+                                                    range: 146..152,
+                                                    id: "",
+                                                    ctx: Invalid,
+                                                },
+                                            ),
+                                            op: Add,
+                                            right: NumberLiteral(
+                                                ExprNumberLiteral {
+                                                    range: 156..158,
+                                                    value: Complex {
+                                                        real: 0.0,
+                                                        imag: 1.0,
                                                     },
-                                                ),
-                                            },
-                                        ),
-                                    ),
-                                    name: Some(
-                                        Identifier {
-                                            id: "y",
-                                            range: 151..152,
+                                                },
+                                            ),
                                         },
                                     ),
                                 },
                             ),
                             guard: None,
                             body: [
-                                AnnAssign(
-                                    StmtAnnAssign {
-                                        range: 154..159,
-                                        target: UnaryOp(
-                                            ExprUnaryOp {
-                                                range: 154..158,
-                                                op: UAdd,
-                                                operand: NumberLiteral(
-                                                    ExprNumberLiteral {
-                                                        range: 156..158,
-                                                        value: Complex {
-                                                            real: 0.0,
-                                                            imag: 1.0,
-                                                        },
-                                                    },
-                                                ),
-                                            },
-                                        ),
-                                        annotation: Name(
-                                            ExprName {
-                                                range: 159..159,
-                                                id: "",
-                                                ctx: Invalid,
-                                            },
-                                        ),
-                                        value: None,
-                                        simple: false,
+                                Pass(
+                                    StmtPass {
+                                        range: 205..209,
                                     },
                                 ),
                             ],
                         },
                     ],
-                },
-            ),
-            Pass(
-                StmtPass {
-                    range: 205..209,
                 },
             ),
         ],
@@ -98,32 +71,7 @@ Module(
 3 |     #             complex literal pattern
 4 |     #             v
 5 |     case (x as y) + 1j:
-  |                   ^ Syntax Error: Expected ':', found '+'
+  |           ^^^^^^ Syntax Error: Expected a real number in complex literal pattern
 6 |     #     ^^^^^^
 7 |     #    as-pattern
-  |
-
-
-  |
-3 |     #             complex literal pattern
-4 |     #             v
-5 |     case (x as y) + 1j:
-  |                        ^ Syntax Error: Expected an expression
-6 |     #     ^^^^^^
-7 |     #    as-pattern
-8 |         pass
-  |
-
-
-  |
-6 |     #     ^^^^^^
-7 |     #    as-pattern
-8 |         pass
-  | ^^^^^^^^ Syntax Error: Expected dedent, found indent
-  |
-
-
-  |
-7 |     #    as-pattern
-8 |         pass
   |

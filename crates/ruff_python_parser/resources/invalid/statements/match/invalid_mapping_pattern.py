@@ -18,3 +18,6 @@ match subject:
         pass
     case {**rest1, None: 1, **rest2}:
         pass
+
+match subject:
+    case {Foo(a as b): 1}: ...

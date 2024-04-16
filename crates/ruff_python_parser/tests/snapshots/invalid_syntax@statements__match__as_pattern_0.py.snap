@@ -11,7 +11,7 @@ Module(
         body: [
             Match(
                 StmtMatch {
-                    range: 0..147,
+                    range: 0..197,
                     subject: Name(
                         ExprName {
                             range: 6..13,
@@ -21,79 +21,59 @@ Module(
                     ),
                     cases: [
                         MatchCase {
-                            range: 127..147,
-                            pattern: MatchAs(
-                                PatternMatchAs {
-                                    range: 133..139,
-                                    pattern: Some(
-                                        MatchAs(
-                                            PatternMatchAs {
-                                                range: 133..134,
-                                                pattern: None,
-                                                name: Some(
-                                                    Identifier {
-                                                        id: "x",
-                                                        range: 133..134,
-                                                    },
-                                                ),
-                                            },
-                                        ),
-                                    ),
-                                    name: Some(
-                                        Identifier {
-                                            id: "y",
-                                            range: 138..139,
+                            range: 127..197,
+                            pattern: MatchClass(
+                                PatternMatchClass {
+                                    range: 132..146,
+                                    cls: Name(
+                                        ExprName {
+                                            range: 133..139,
+                                            id: "",
+                                            ctx: Invalid,
                                         },
                                     ),
+                                    arguments: PatternArguments {
+                                        range: 140..146,
+                                        patterns: [
+                                            MatchAs(
+                                                PatternMatchAs {
+                                                    range: 141..142,
+                                                    pattern: None,
+                                                    name: Some(
+                                                        Identifier {
+                                                            id: "a",
+                                                            range: 141..142,
+                                                        },
+                                                    ),
+                                                },
+                                            ),
+                                            MatchAs(
+                                                PatternMatchAs {
+                                                    range: 144..145,
+                                                    pattern: None,
+                                                    name: Some(
+                                                        Identifier {
+                                                            id: "b",
+                                                            range: 144..145,
+                                                        },
+                                                    ),
+                                                },
+                                            ),
+                                        ],
+                                        keywords: [],
+                                    },
                                 },
                             ),
                             guard: None,
                             body: [
-                                AnnAssign(
-                                    StmtAnnAssign {
-                                        range: 140..147,
-                                        target: Tuple(
-                                            ExprTuple {
-                                                range: 140..146,
-                                                elts: [
-                                                    Name(
-                                                        ExprName {
-                                                            range: 141..142,
-                                                            id: "a",
-                                                            ctx: Store,
-                                                        },
-                                                    ),
-                                                    Name(
-                                                        ExprName {
-                                                            range: 144..145,
-                                                            id: "b",
-                                                            ctx: Store,
-                                                        },
-                                                    ),
-                                                ],
-                                                ctx: Store,
-                                                parenthesized: true,
-                                            },
-                                        ),
-                                        annotation: Name(
-                                            ExprName {
-                                                range: 147..147,
-                                                id: "",
-                                                ctx: Invalid,
-                                            },
-                                        ),
-                                        value: None,
-                                        simple: false,
+                                Pass(
+                                    StmtPass {
+                                        range: 193..197,
                                     },
                                 ),
                             ],
                         },
                     ],
-                },
-            ),
-            Pass(
-                StmtPass {
-                    range: 193..197,
                 },
             ),
         ],
@@ -106,32 +86,7 @@ Module(
 3 |     #            class pattern
 4 |     #            v
 5 |     case (x as y)(a, b):
-  |                  ^ Syntax Error: Expected ':', found '('
+  |           ^^^^^^ Syntax Error: Invalid value for a class pattern
 6 |     #     ^^^^^^
 7 |     #    as-pattern
-  |
-
-
-  |
-3 |     #            class pattern
-4 |     #            v
-5 |     case (x as y)(a, b):
-  |                         ^ Syntax Error: Expected an expression
-6 |     #     ^^^^^^
-7 |     #    as-pattern
-8 |         pass
-  |
-
-
-  |
-6 |     #     ^^^^^^
-7 |     #    as-pattern
-8 |         pass
-  | ^^^^^^^^ Syntax Error: Expected dedent, found indent
-  |
-
-
-  |
-7 |     #    as-pattern
-8 |         pass
   |

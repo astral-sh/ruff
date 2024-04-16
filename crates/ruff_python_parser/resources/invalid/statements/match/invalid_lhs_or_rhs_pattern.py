@@ -15,6 +15,8 @@ match invalid_lhs_pattern:
         pass
     case -1j + 2j:
         pass
+    case Foo(a as b) + 1j:
+        pass
 
 match invalid_rhs_pattern:
     case 1 + Foo():
@@ -30,6 +32,8 @@ match invalid_rhs_pattern:
     case 6 + {True: 1}:
         pass
     case 1 + 2:
+        pass
+    case 1 + Foo(a as b):
         pass
 
 match invalid_lhs_rhs_pattern:
