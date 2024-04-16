@@ -182,7 +182,7 @@ impl OpenDocuments {
         let path = url
             .to_file_path()
             .expect("document URL should convert to file path: {url}");
-        let document_settings = self.settings_index.get(&path).clone();
+        let document_settings = self.settings_index.get(&path);
         Some(self.documents.get(url)?.make_ref(document_settings))
     }
 
