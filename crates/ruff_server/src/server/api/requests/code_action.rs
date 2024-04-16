@@ -116,8 +116,8 @@ fn fix_all(snapshot: &DocumentSnapshot) -> crate::Result<CodeActionOrCommand> {
     Ok(CodeActionOrCommand::CodeAction(types::CodeAction {
         title: format!("{DIAGNOSTIC_NAME}: Fix all auto-fixable problems"),
         kind: Some(crate::SOURCE_FIX_ALL_RUFF),
-        edit: edit.clone(),
-        data: data.clone(),
+        edit,
+        data,
         ..Default::default()
     }))
 }
@@ -151,8 +151,8 @@ fn organize_imports(snapshot: &DocumentSnapshot) -> crate::Result<CodeActionOrCo
     Ok(CodeActionOrCommand::CodeAction(types::CodeAction {
         title: format!("{DIAGNOSTIC_NAME}: Organize imports"),
         kind: Some(crate::SOURCE_ORGANIZE_IMPORTS_RUFF),
-        edit: edit.clone(),
-        data: data.clone(),
+        edit,
+        data,
         ..Default::default()
     }))
 }
