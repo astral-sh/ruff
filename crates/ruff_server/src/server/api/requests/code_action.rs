@@ -166,14 +166,8 @@ fn supported_code_actions(
         return SupportedCodeAction::all().collect();
     };
 
-    SupportedCodeAction::all()
-        .filter(move |action| {
-            action_filter.iter().any(|filter| {
-                action
-                    .kinds()
-                    .iter()
-                    .any(|kind| kind.as_str().starts_with(filter.as_str()))
-            })
-        })
+    action_filter
+        .into_iter()
+        .flat_map(SupportedCodeAction::from_kind)
         .collect()
 }

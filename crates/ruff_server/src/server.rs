@@ -224,7 +224,7 @@ impl Server {
                 CodeActionOptions {
                     code_action_kinds: Some(
                         SupportedCodeAction::all()
-                            .flat_map(|action| action.kinds().iter())
+                            .map(SupportedCodeAction::to_kind)
                             .cloned()
                             .collect(),
                     ),
@@ -285,20 +285,22 @@ pub(crate) enum SupportedCodeAction {
 }
 
 impl SupportedCodeAction {
-    /// Returns the possible LSP code action kind(s) that map to this code action.
-    fn kinds(self) -> &'static [CodeActionKind] {
-        static QUICKFIX: [CodeActionKind; 1] = [CodeActionKind::QUICKFIX];
-        static SOURCE_FIX_ALL: [CodeActionKind; 2] =
-            [CodeActionKind::SOURCE_FIX_ALL, crate::SOURCE_FIX_ALL_RUFF];
-        static SOURCE_ORGANIZE_IMPORTS: [CodeActionKind; 2] = [
-            CodeActionKind::SOURCE_ORGANIZE_IMPORTS,
-            crate::SOURCE_ORGANIZE_IMPORTS_RUFF,
-        ];
+    /// Returns the LSP code action kind that map to this code action.
+    fn to_kind(self) -> &'static CodeActionKind {
+        static QUICK_FIX: CodeActionKind = CodeActionKind::QUICKFIX;
+        static SOURCE_FIX_ALL: CodeActionKind = crate::SOURCE_FIX_ALL_RUFF;
+        static SOURCE_ORGANIZE_IMPORTS: CodeActionKind = crate::SOURCE_ORGANIZE_IMPORTS_RUFF;
         match self {
-            Self::QuickFix => &QUICKFIX,
+            Self::QuickFix => &QUICK_FIX,
             Self::SourceFixAll => &SOURCE_FIX_ALL,
             Self::SourceOrganizeImports => &SOURCE_ORGANIZE_IMPORTS,
         }
+    }
+
+    fn from_kind(kind: CodeActionKind) -> impl Iterator<Item = Self> {
+        Self::all().filter(move |supported_kind| {
+            supported_kind.to_kind().as_str().starts_with(kind.as_str())
+        })
     }
 
     /// Returns all code actions kinds that the server currently supports.
@@ -309,18 +311,5 @@ impl SupportedCodeAction {
             Self::SourceOrganizeImports,
         ]
         .into_iter()
-    }
-}
-
-impl TryFrom<CodeActionKind> for SupportedCodeAction {
-    type Error = ();
-
-    fn try_from(kind: CodeActionKind) -> std::result::Result<Self, Self::Error> {
-        for supported_kind in Self::all() {
-            if supported_kind.kinds().contains(&kind) {
-                return Ok(supported_kind);
-            }
-        }
-        Err(())
     }
 }

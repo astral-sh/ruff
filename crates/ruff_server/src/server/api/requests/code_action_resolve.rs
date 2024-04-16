@@ -30,14 +30,16 @@ impl super::BackgroundDocumentRequestHandler for CodeActionResolve {
     ) -> Result<types::CodeAction> {
         let document = snapshot.document();
 
-        let action_kind: SupportedCodeAction = action
-            .kind
-            .clone()
-            .ok_or(anyhow::anyhow!("No kind was given for code action"))
-            .with_failure_code(ErrorCode::InvalidParams)?
-            .try_into()
-            .map_err(|()| anyhow::anyhow!("Code action was of an invalid kind"))
-            .with_failure_code(ErrorCode::InvalidParams)?;
+        let action_kind = SupportedCodeAction::from_kind(
+            action
+                .kind
+                .clone()
+                .ok_or(anyhow::anyhow!("No kind was given for code action"))
+                .with_failure_code(ErrorCode::InvalidParams)?,
+        )
+        .next()
+        .ok_or(anyhow::anyhow!("Code action was of an invalid kind"))
+        .with_failure_code(ErrorCode::InvalidParams)?;
 
         action.edit = match action_kind {
             SupportedCodeAction::SourceFixAll => Some(
