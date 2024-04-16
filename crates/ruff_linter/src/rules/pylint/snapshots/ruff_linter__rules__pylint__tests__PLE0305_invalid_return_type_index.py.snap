@@ -38,5 +38,15 @@ invalid_return_type_index.py:18:16: PLE0305 `__index__` does not return `integer
 18 |         return "ruff"  # [invalid-index-return]
    |                ^^^^^^ PLE0305
 19 | 
-20 | # TODO: Once Ruff has better type checking
+20 | class IndexNoReturn:
+   |
+
+invalid_return_type_index.py:22:9: PLE0305 `__index__` does not return `integer`
+   |
+20 | class IndexNoReturn:
+21 |     def __index__(self):
+22 |         print("ruff")  # [invalid-index-return]
+   |         ^^^^^^^^^^^^^ PLE0305
+23 | 
+24 | # TODO: Once Ruff has better type checking
    |

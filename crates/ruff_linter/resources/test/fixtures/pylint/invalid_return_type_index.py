@@ -17,6 +17,10 @@ class Str:
     def __index__(self):
         return "ruff"  # [invalid-index-return]
 
+class IndexNoReturn:
+    def __index__(self):
+        print("ruff")  # [invalid-index-return]
+
 # TODO: Once Ruff has better type checking
 def return_index():
     return "3"

@@ -61,6 +61,13 @@ pub(crate) fn invalid_index_return(checker: &mut Checker, name: &str, body: &[St
         visitor.returns
     };
 
+    if returns.is_empty() {
+        checker.diagnostics.push(Diagnostic::new(
+            InvalidIndexReturnType,
+            body.last().unwrap().range(),
+        ));
+    }
+
     for stmt in returns {
         if let Some(value) = stmt.value.as_deref() {
             if !matches!(
