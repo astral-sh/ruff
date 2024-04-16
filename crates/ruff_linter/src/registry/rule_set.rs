@@ -83,6 +83,7 @@ impl RuleSet {
     /// assert!(union.contains(Rule::BooleanPositionalValueInCall));
     /// ```
     #[must_use]
+    #[inline]
     pub const fn union(mut self, other: &Self) -> Self {
         let mut i = 0;
 
@@ -108,6 +109,7 @@ impl RuleSet {
     /// assert!(!subtract.contains(Rule::AmbiguousFunctionName));
     /// ```
     #[must_use]
+    #[inline]
     pub const fn subtract(mut self, other: &Self) -> Self {
         let mut i = 0;
 
@@ -136,6 +138,7 @@ impl RuleSet {
     ///     Rule::BadQuotesInlineString
     /// ])));
     /// ```
+    #[inline]
     pub const fn intersects(&self, other: &Self) -> bool {
         let mut i = 0;
 
@@ -161,6 +164,7 @@ impl RuleSet {
     ///                 .is_empty()
     ///         );
     /// ```
+    #[inline]
     pub const fn is_empty(&self) -> bool {
         self.len() == 0
     }
@@ -176,6 +180,7 @@ impl RuleSet {
     ///     RuleSet::from_rules(&[Rule::AmbiguousFunctionName, Rule::BadQuotesInlineString]).len(),
     ///     2
     /// );
+    #[inline]
     pub const fn len(&self) -> usize {
         let mut len: u32 = 0;
 
@@ -202,6 +207,7 @@ impl RuleSet {
     ///
     /// assert!(set.contains(Rule::AnyType));
     /// ```
+    #[inline]
     pub fn insert(&mut self, rule: Rule) {
         let set = std::mem::take(self);
         *self = set.union(&RuleSet::from_rule(rule));
@@ -219,6 +225,7 @@ impl RuleSet {
     /// assert!(set.contains(Rule::AnyType));
     /// assert!(!set.contains(Rule::AmbiguousFunctionName));
     /// ```
+    #[inline]
     pub fn remove(&mut self, rule: Rule) {
         let set = std::mem::take(self);
         *self = set.subtract(&RuleSet::from_rule(rule));
@@ -234,6 +241,7 @@ impl RuleSet {
     /// assert!(set.contains(Rule::AmbiguousFunctionName));
     /// assert!(!set.contains(Rule::BreakOutsideLoop));
     /// ```
+    #[inline]
     pub const fn contains(&self, rule: Rule) -> bool {
         let rule = rule as u16;
         let index = rule as usize / Self::SLICE_BITS as usize;
