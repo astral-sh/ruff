@@ -69,20 +69,7 @@ match 1:
 ```diff
 --- Black
 +++ Ruff
-@@ -1,10 +1,10 @@
- match 1:
--    case _ if True:
-+    case _ if (True):
-         pass
- 
- 
- match 1:
--    case _ if True:
-+    case _ if (True):
-         pass
- 
- 
-@@ -25,27 +25,33 @@
+@@ -25,12 +25,16 @@
  
  
  match 1:
@@ -101,18 +88,7 @@ match 1:
          pass
  
  
- match 1:
--    case _ if True:  # this is a comment
-+    case _ if (True):  # this is a comment
-         pass
- 
- 
- match 1:
--    case _ if True:  # comment over the line limit unless parens are removed x
-+    case _ if (
-+        True
-+    ):  # comment over the line limit unless parens are removed x
-         pass
+@@ -45,7 +49,7 @@
  
  
  match 1:
@@ -129,12 +105,12 @@ match 1:
 
 ```python
 match 1:
-    case _ if (True):
+    case _ if True:
         pass
 
 
 match 1:
-    case _ if (True):
+    case _ if True:
         pass
 
 
@@ -169,14 +145,12 @@ match 1:
 
 
 match 1:
-    case _ if (True):  # this is a comment
+    case _ if True:  # this is a comment
         pass
 
 
 match 1:
-    case _ if (
-        True
-    ):  # comment over the line limit unless parens are removed x
+    case _ if True:  # comment over the line limit unless parens are removed x
         pass
 
 
