@@ -225,7 +225,6 @@ impl Server {
                     code_action_kinds: Some(
                         SupportedCodeAction::all()
                             .map(SupportedCodeAction::to_kind)
-                            .cloned()
                             .collect(),
                     ),
                     work_done_progress_options: WorkDoneProgressOptions {
@@ -286,14 +285,11 @@ pub(crate) enum SupportedCodeAction {
 
 impl SupportedCodeAction {
     /// Returns the LSP code action kind that map to this code action.
-    fn to_kind(self) -> &'static CodeActionKind {
-        static QUICK_FIX: CodeActionKind = CodeActionKind::QUICKFIX;
-        static SOURCE_FIX_ALL: CodeActionKind = crate::SOURCE_FIX_ALL_RUFF;
-        static SOURCE_ORGANIZE_IMPORTS: CodeActionKind = crate::SOURCE_ORGANIZE_IMPORTS_RUFF;
+    fn to_kind(self) -> CodeActionKind {
         match self {
-            Self::QuickFix => &QUICK_FIX,
-            Self::SourceFixAll => &SOURCE_FIX_ALL,
-            Self::SourceOrganizeImports => &SOURCE_ORGANIZE_IMPORTS,
+            Self::QuickFix => CodeActionKind::QUICKFIX,
+            Self::SourceFixAll => crate::SOURCE_FIX_ALL_RUFF,
+            Self::SourceOrganizeImports => crate::SOURCE_ORGANIZE_IMPORTS_RUFF,
         }
     }
 
