@@ -22,8 +22,8 @@ pub(crate) fn init_messenger(client_sender: &ClientSender) {
                     method: lsp_types::notification::ShowMessage::METHOD.into(),
                     params: serde_json::to_value(lsp_types::ShowMessageParams {
                         typ: lsp_types::MessageType::ERROR,
-                        message: format!(
-                            "The Ruff language server exited with a panic: {panic_info}"
+                        message: String::from(
+                            "The Ruff language server exited with a panic. See the logs for more details."
                         ),
                     })
                     .unwrap_or_default(),
@@ -32,10 +32,7 @@ pub(crate) fn init_messenger(client_sender: &ClientSender) {
         }
 
         let backtrace = std::backtrace::Backtrace::force_capture();
-        #[allow(clippy::print_stderr)]
-        {
-            eprintln!("{panic_info}\n{backtrace}");
-        }
+        tracing::error!("{panic_info}\n{backtrace}");
     }));
 }
 
