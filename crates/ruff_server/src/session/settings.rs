@@ -1,6 +1,7 @@
-use std::ops::Deref;
+use std::{ffi::OsString, ops::Deref, path::PathBuf};
 
 use lsp_types::Url;
+use ruff_linter::{codes::Rule, line_width::LineLength};
 use rustc_hash::FxHashMap;
 use serde::Deserialize;
 
@@ -21,6 +22,22 @@ pub(crate) struct ResolvedClientSettings {
     #[allow(dead_code)]
     disable_rule_comment_enable: bool,
     fix_violation_enable: bool,
+    // TODO(jane): Remove once editor settings resolution is implemented
+    #[allow(dead_code)]
+    editor_settings: ResolvedEditorSettings,
+}
+
+#[derive(Debug, Default)]
+#[cfg_attr(test, derive(PartialEq, Eq))]
+#[allow(dead_code)] // TODO(jane): Remove once editor settings resolution is implemented
+pub(crate) struct ResolvedEditorSettings {
+    lint_preview: Option<bool>,
+    format_preview: Option<bool>,
+    select: Option<Vec<Rule>>,
+    extend_select: Option<Vec<Rule>>,
+    ignore: Option<Vec<Rule>>,
+    exclude: Option<Vec<PathBuf>>,
+    line_length: Option<LineLength>,
 }
 
 /// This is a direct representation of the settings schema sent by the client.
@@ -31,7 +48,10 @@ pub(crate) struct ClientSettings {
     fix_all: Option<bool>,
     organize_imports: Option<bool>,
     lint: Option<Lint>,
+    format: Option<Format>,
     code_action: Option<CodeAction>,
+    exclude: Option<Vec<String>>,
+    line_length: Option<LineLength>,
 }
 
 /// This is a direct representation of the workspace settings schema,
@@ -51,6 +71,17 @@ struct WorkspaceSettings {
 #[serde(rename_all = "camelCase")]
 struct Lint {
     enable: Option<bool>,
+    preview: Option<bool>,
+    select: Option<Vec<String>>,
+    extend_select: Option<Vec<String>>,
+    ignore: Option<Vec<String>>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[cfg_attr(test, derive(PartialEq, Eq))]
+#[serde(rename_all = "camelCase")]
+struct Format {
+    preview: Option<bool>,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -179,7 +210,66 @@ impl ResolvedClientSettings {
                 },
                 true,
             ),
+            editor_settings: ResolvedEditorSettings {
+                lint_preview: Self::resolve_optional(all_settings, |settings| {
+                    settings.lint.as_ref()?.preview
+                }),
+                format_preview: Self::resolve_optional(all_settings, |settings| {
+                    settings.format.as_ref()?.preview
+                }),
+                select: Self::resolve_optional(all_settings, |settings| {
+                    settings
+                        .lint
+                        .as_ref()?
+                        .select
+                        .as_ref()?
+                        .iter()
+                        .map(|rule| Rule::from_code(rule).ok())
+                        .collect()
+                }),
+                extend_select: Self::resolve_optional(all_settings, |settings| {
+                    settings
+                        .lint
+                        .as_ref()?
+                        .extend_select
+                        .as_ref()?
+                        .iter()
+                        .map(|rule| Rule::from_code(rule).ok())
+                        .collect()
+                }),
+                ignore: Self::resolve_optional(all_settings, |settings| {
+                    settings
+                        .lint
+                        .as_ref()?
+                        .ignore
+                        .as_ref()?
+                        .iter()
+                        .map(|rule| Rule::from_code(rule).ok())
+                        .collect()
+                }),
+                exclude: Self::resolve_optional(all_settings, |settings| {
+                    Some(
+                        settings
+                            .exclude
+                            .as_ref()?
+                            .iter()
+                            .map(|path| PathBuf::from(OsString::from(path)))
+                            .collect(),
+                    )
+                }),
+                line_length: Self::resolve_optional(all_settings, |settings| settings.line_length),
+            },
         }
+    }
+
+    /// Attempts to resolve a setting using a list of available client settings as sources.
+    /// Client settings that come earlier in the list take priority. This function is for fields
+    /// that do not have a default value and should be left unset.
+    fn resolve_optional<T>(
+        all_settings: &[&ClientSettings],
+        get: impl Fn(&ClientSettings) -> Option<T>,
+    ) -> Option<T> {
+        all_settings.iter().map(Deref::deref).find_map(get)
     }
 
     /// Attempts to resolve a setting using a list of available client settings as sources.
@@ -190,11 +280,7 @@ impl ResolvedClientSettings {
         get: impl Fn(&ClientSettings) -> Option<T>,
         default: T,
     ) -> T {
-        all_settings
-            .iter()
-            .map(Deref::deref)
-            .find_map(get)
-            .unwrap_or(default)
+        Self::resolve_optional(all_settings, get).unwrap_or(default)
     }
 }
 
@@ -399,6 +485,7 @@ mod tests {
                 lint_enable: true,
                 disable_rule_comment_enable: false,
                 fix_violation_enable: false,
+                editor_settings: ResolvedEditorSettings::default(),
             }
         );
         let url = Url::parse("file:///Users/test/projects/scipy").expect("url should parse");
@@ -415,6 +502,7 @@ mod tests {
                 lint_enable: true,
                 disable_rule_comment_enable: true,
                 fix_violation_enable: false,
+                editor_settings: ResolvedEditorSettings::default()
             }
         );
     }
@@ -469,6 +557,7 @@ mod tests {
                 lint_enable: true,
                 disable_rule_comment_enable: false,
                 fix_violation_enable: true,
+                editor_settings: ResolvedEditorSettings::default()
             }
         );
     }
