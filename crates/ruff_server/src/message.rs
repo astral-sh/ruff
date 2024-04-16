@@ -56,6 +56,8 @@ pub(crate) fn show_message(message: String, message_type: lsp_types::MessageType
         .expect("message should send");
 }
 
+/// Sends an error to the client with a formatted message. The error is sent in a
+/// `window/showMessage` notification.
 macro_rules! show_err_msg {
     ($msg:expr$(, $($arg:tt),*)?) => {
         crate::message::show_message(::core::format_args!($msg, $($($arg),*)?).to_string(), lsp_types::MessageType::ERROR)
