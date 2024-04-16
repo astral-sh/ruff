@@ -7,7 +7,7 @@ input_file: crates/ruff_python_parser/resources/invalid/statements/match/invalid
 ```
 Module(
     ModModule {
-        range: 0..463,
+        range: 0..509,
         body: [
             Match(
                 StmtMatch {
@@ -373,6 +373,84 @@ Module(
                     ],
                 },
             ),
+            Match(
+                StmtMatch {
+                    range: 464..509,
+                    subject: Name(
+                        ExprName {
+                            range: 470..477,
+                            id: "subject",
+                            ctx: Load,
+                        },
+                    ),
+                    cases: [
+                        MatchCase {
+                            range: 483..509,
+                            pattern: MatchMapping(
+                                PatternMatchMapping {
+                                    range: 488..504,
+                                    keys: [
+                                        Call(
+                                            ExprCall {
+                                                range: 489..500,
+                                                func: Name(
+                                                    ExprName {
+                                                        range: 489..492,
+                                                        id: "Foo",
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                arguments: Arguments {
+                                                    range: 492..500,
+                                                    args: [
+                                                        Name(
+                                                            ExprName {
+                                                                range: 493..499,
+                                                                id: "",
+                                                                ctx: Invalid,
+                                                            },
+                                                        ),
+                                                    ],
+                                                    keywords: [],
+                                                },
+                                            },
+                                        ),
+                                    ],
+                                    patterns: [
+                                        MatchValue(
+                                            PatternMatchValue {
+                                                range: 502..503,
+                                                value: NumberLiteral(
+                                                    ExprNumberLiteral {
+                                                        range: 502..503,
+                                                        value: Int(
+                                                            1,
+                                                        ),
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                    ],
+                                    rest: None,
+                                },
+                            ),
+                            guard: None,
+                            body: [
+                                Expr(
+                                    StmtExpr {
+                                        range: 506..509,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                range: 506..509,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    ],
+                },
+            ),
         ],
     },
 )
@@ -492,4 +570,11 @@ Module(
 19 |     case {**rest1, None: 1, **rest2}:
    |                             ^^^^^^^ Syntax Error: Only one double star pattern is allowed
 20 |         pass
+   |
+
+
+   |
+22 | match subject:
+23 |     case {Foo(a as b): 1}: ...
+   |           ^^^^^^^^^^^ Syntax Error: Invalid mapping pattern key
    |

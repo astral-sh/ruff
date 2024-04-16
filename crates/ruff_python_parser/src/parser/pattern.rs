@@ -142,38 +142,7 @@ impl<'src> Parser<'src> {
                 }
                 Pattern::MatchStar(star_pattern)
             }
-            TokenKind::Lpar | TokenKind::Lsqb => {
-                let pattern = self.parse_parenthesized_or_sequence_pattern();
-
-                if matches!(
-                    pattern,
-                    Pattern::MatchAs(ast::PatternMatchAs {
-                        pattern: Some(_),
-                        name: Some(_),
-                        ..
-                    })
-                ) {
-                    // If the pattern is an `as` pattern with both a pattern and a name,
-                    // then it's a parenthesized `as` pattern. For example:
-                    //
-                    // ```python
-                    // match subject:
-                    //     case (x as y):
-                    //         pass
-                    // ```
-                    //
-                    // In this case, we should return early as it's not a valid value
-                    // for the class and complex literal pattern. This would lead to
-                    // panic when trying to convert it to an expression because there's
-                    // no way to represent it in the AST.
-                    //
-                    // We exit early in this case, while in others we continue parsing,
-                    // even if it's invalid because we can recover from it.
-                    return pattern;
-                }
-
-                pattern
-            }
+            TokenKind::Lpar | TokenKind::Lsqb => self.parse_parenthesized_or_sequence_pattern(),
             _ => self.parse_match_pattern_literal(),
         };
 
@@ -244,10 +213,6 @@ impl<'src> Parser<'src> {
                             ParseErrorType::OtherError("Invalid mapping pattern key".to_string()),
                             &pattern,
                         );
-                        // SAFETY: The `parse_match_pattern_lhs` function can only return
-                        // an `as` pattern if it's parenthesized and the recovery context
-                        // makes sure that this closure is never called in that case.
-                        // This is because `(` is not in the `MAPPING_PATTERN_START_SET`.
                         recovery::pattern_to_expr(pattern)
                     }
                 };
