@@ -50,12 +50,12 @@ async def fail_case_6():  # RUF029: the /outer/ function does not await
         await bla
 
 
-async def fail_case_6():  # RUF029: the /outer/ function does not await
-    class Foo:
-        async def foo():
-            await bla
-
-
 class Foo:
     async def pass_case_7():  # OK: method of a class
         pass
+
+
+async def fail_case_7():  # RUF029: the /outer/ function does not await
+    class Foo:
+        async def foo():
+            await bla
