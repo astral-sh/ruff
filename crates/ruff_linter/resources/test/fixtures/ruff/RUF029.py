@@ -27,6 +27,11 @@ async def pass_3():  # OK: uses an async loop
 ##        pass
 
 
+def foo():
+    async def pass_5():  # OK: uses an await
+        await bla
+
+
 async def fail_1a():  # RUF029
     time.sleep(1)
 
@@ -56,3 +61,8 @@ async def fail_4b():  # RUF029: the /outer/ function does not await
     class Foo:
         async def foo():
             await bla
+
+
+def foo():
+    async def fail_4c():  # RUF029: the /inner/ function does not await
+        pass
