@@ -4,7 +4,8 @@
   suppressNotifications: ["prEditedNotification"],
   extends: ["config:recommended"],
   labels: ["internal"],
-  schedule: ["on Monday"],
+  schedule: ["before 4am on Monday"],
+  semanticCommits: "disabled",
   separateMajorMinor: false,
   prHourlyLimit: 10,
   enabledManagers: ["github-actions", "pre-commit", "cargo", "pep621", "npm"],
@@ -51,6 +52,13 @@
       matchManagers: ["cargo"],
       matchPackagePatterns: ["strum"],
       description: "Weekly update of strum dependencies",
+    },
+    {
+      groupName: "ESLint",
+      matchManagers: ["npm"],
+      matchPackageNames: ["eslint"],
+      allowedVersions: "<9",
+      description: "Constraint ESLint to version 8 until TypeScript-eslint supports ESLint 9", // https://github.com/typescript-eslint/typescript-eslint/issues/8211
     },
   ],
   vulnerabilityAlerts: {

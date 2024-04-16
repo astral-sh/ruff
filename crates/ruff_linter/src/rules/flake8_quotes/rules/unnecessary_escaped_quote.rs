@@ -2,11 +2,11 @@ use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, AnyStringKind, StringLike};
 use ruff_source_file::Locator;
-use ruff_text_size::{Ranged, TextLen, TextRange};
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 
-use super::super::helpers::{contains_escaped_quote, unescape_string};
+use super::super::helpers::{contains_escaped_quote, raw_contents, unescape_string};
 
 /// ## What it does
 /// Checks for strings that include unnecessarily escaped quotes.
@@ -47,6 +47,10 @@ impl AlwaysFixableViolation for UnnecessaryEscapedQuote {
 
 /// Q004
 pub(crate) fn unnecessary_escaped_quote(checker: &mut Checker, string_like: StringLike) {
+    if checker.semantic().in_docstring() {
+        return;
+    }
+
     let locator = checker.locator();
 
     match string_like {
@@ -146,10 +150,4 @@ fn check_f_string(locator: &Locator, f_string: &ast::FString) -> Option<Diagnost
     let mut diagnostic = Diagnostic::new(UnnecessaryEscapedQuote, *range);
     diagnostic.set_fix(Fix::safe_edits(first, edits_iter));
     Some(diagnostic)
-}
-
-/// Returns the raw contents of the string given the string's contents and kind.
-/// This is a string without the prefix and quotes.
-fn raw_contents(contents: &str, kind: AnyStringKind) -> &str {
-    &contents[kind.opener_len().to_usize()..(contents.text_len() - kind.closer_len()).to_usize()]
 }

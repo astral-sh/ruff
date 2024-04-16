@@ -65,7 +65,7 @@ use seahash::SeaHasher;
 /// The main reason is that hashes and cache keys have different constraints:
 ///
 /// * Cache keys are less performance sensitive: Hashes must be super fast to compute for performant hashed-collections. That's
-///   why some standard types don't implement [`Hash`] where it would be safe to to implement [`CacheKey`], e.g. `HashSet`
+///   why some standard types don't implement [`Hash`] where it would be safe to implement [`CacheKey`], e.g. `HashSet`
 /// * Cache keys must be deterministic where hash keys do not have this constraint. That's why pointers don't implement [`CacheKey`] but they implement [`Hash`].
 /// * Ideally, cache keys are portable
 ///

@@ -71,7 +71,7 @@ pub(super) fn generate_newtype_index(item: ItemStruct) -> syn::Result<proc_macro
                 self.0.get() - 1
             }
 
-            /// Returns the index as a `u32` value
+            /// Returns the index as a `usize` value
             #[inline]
             #vis const fn as_usize(self) -> usize {
                 self.as_u32() as usize

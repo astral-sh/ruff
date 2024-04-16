@@ -600,48 +600,68 @@ impl Display for RequiredVersion {
 /// pattern matching.
 pub type IdentifierPattern = glob::Pattern;
 
-#[derive(Debug, Clone, CacheKey, Default)]
-pub struct PerFileIgnores {
-    // Ordered as (absolute path matcher, basename matcher, rules)
-    ignores: Vec<(GlobMatcher, GlobMatcher, bool, RuleSet)>,
+#[derive(Debug, Clone, CacheKey)]
+pub struct CompiledPerFileIgnore {
+    pub absolute_matcher: GlobMatcher,
+    pub basename_matcher: GlobMatcher,
+    pub negated: bool,
+    pub rules: RuleSet,
 }
 
-impl PerFileIgnores {
+impl Display for CompiledPerFileIgnore {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        display_settings! {
+            formatter = f,
+            fields = [
+                self.absolute_matcher | globmatcher,
+                self.basename_matcher | globmatcher,
+                self.negated,
+                self.rules,
+            ]
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, CacheKey, Default)]
+pub struct CompiledPerFileIgnoreList {
+    // Ordered as (absolute path matcher, basename matcher, rules)
+    ignores: Vec<CompiledPerFileIgnore>,
+}
+
+impl CompiledPerFileIgnoreList {
     /// Given a list of patterns, create a `GlobSet`.
     pub fn resolve(per_file_ignores: Vec<PerFileIgnore>) -> Result<Self> {
         let ignores: Result<Vec<_>> = per_file_ignores
             .into_iter()
             .map(|per_file_ignore| {
                 // Construct absolute path matcher.
-                let absolute =
+                let absolute_matcher =
                     Glob::new(&per_file_ignore.absolute.to_string_lossy())?.compile_matcher();
 
                 // Construct basename matcher.
-                let basename = Glob::new(&per_file_ignore.basename)?.compile_matcher();
+                let basename_matcher = Glob::new(&per_file_ignore.basename)?.compile_matcher();
 
-                Ok((
-                    absolute,
-                    basename,
-                    per_file_ignore.negated,
-                    per_file_ignore.rules,
-                ))
+                Ok(CompiledPerFileIgnore {
+                    absolute_matcher,
+                    basename_matcher,
+                    negated: per_file_ignore.negated,
+                    rules: per_file_ignore.rules,
+                })
             })
             .collect();
         Ok(Self { ignores: ignores? })
     }
 }
 
-impl Display for PerFileIgnores {
+impl Display for CompiledPerFileIgnoreList {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        if self.is_empty() {
+        if self.ignores.is_empty() {
             write!(f, "{{}}")?;
         } else {
             writeln!(f, "{{")?;
-            for (absolute, basename, negated, rules) in &self.ignores {
-                writeln!(
-                    f,
-                    "\t{{ absolute = {absolute:#?}, basename = {basename:#?}, negated = {negated:#?}, rules = {rules} }},"
-                )?;
+            for ignore in &self.ignores {
+                writeln!(f, "\t{ignore}")?;
             }
             write!(f, "}}")?;
         }
@@ -649,8 +669,8 @@ impl Display for PerFileIgnores {
     }
 }
 
-impl Deref for PerFileIgnores {
-    type Target = Vec<(GlobMatcher, GlobMatcher, bool, RuleSet)>;
+impl Deref for CompiledPerFileIgnoreList {
+    type Target = Vec<CompiledPerFileIgnore>;
 
     fn deref(&self) -> &Self::Target {
         &self.ignores

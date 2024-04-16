@@ -1055,6 +1055,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
         }
         Stmt::AugAssign(aug_assign @ ast::StmtAugAssign { target, .. }) => {
+            if checker.enabled(Rule::SelfOrClsAssignment) {
+                pylint::rules::self_or_cls_assignment(checker, target);
+            }
             if checker.enabled(Rule::GlobalStatement) {
                 if let Expr::Name(ast::ExprName { id, .. }) = target.as_ref() {
                     pylint::rules::global_statement(checker, id);
@@ -1225,6 +1228,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::ReadWholeFile) {
                 refurb::rules::read_whole_file(checker, with_stmt);
             }
+            if checker.enabled(Rule::WriteWholeFile) {
+                refurb::rules::write_whole_file(checker, with_stmt);
+            }
             if checker.enabled(Rule::UselessWithLock) {
                 pylint::rules::useless_with_lock(checker, with_stmt);
             }
@@ -1265,6 +1271,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.any_enabled(&[
                 Rule::EnumerateForLoop,
                 Rule::IncorrectDictIterator,
+                Rule::LoopIteratorMutation,
                 Rule::UnnecessaryEnumerate,
                 Rule::UnusedLoopControlVariable,
                 Rule::YieldInForLoop,
@@ -1406,6 +1413,11 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
         }
         Stmt::Assign(assign @ ast::StmtAssign { targets, value, .. }) => {
+            if checker.enabled(Rule::SelfOrClsAssignment) {
+                for target in targets {
+                    pylint::rules::self_or_cls_assignment(checker, target);
+                }
+            }
             if checker.enabled(Rule::RedeclaredAssignedName) {
                 pylint::rules::redeclared_assigned_name(checker, targets);
             }
@@ -1475,6 +1487,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.settings.rules.enabled(Rule::TypeBivariance) {
                 pylint::rules::type_bivariance(checker, value);
             }
+            if checker.enabled(Rule::NonAugmentedAssignment) {
+                pylint::rules::non_augmented_assignment(checker, assign);
+            }
             if checker.settings.rules.enabled(Rule::UnsortedDunderAll) {
                 ruff::rules::sort_dunder_all_assign(checker, assign);
             }
@@ -1539,6 +1554,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                         stmt,
                     );
                 }
+            }
+            if checker.enabled(Rule::SelfOrClsAssignment) {
+                pylint::rules::self_or_cls_assignment(checker, target);
             }
             if checker.enabled(Rule::SelfAssigningVariable) {
                 pylint::rules::self_annotated_assignment(checker, assign_stmt);
