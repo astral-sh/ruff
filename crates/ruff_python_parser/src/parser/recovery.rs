@@ -19,11 +19,11 @@ use ruff_text_size::{Ranged, TextLen, TextRange};
 /// Note that the sequence pattern is always converted to a list literal even
 /// if it was surrounded by parentheses.
 ///
-/// # Panics
+/// # Note
 ///
-/// If the given pattern is a `PatternMatchAs` with both the pattern and name present.
-/// It cannot be converted to an expression without dropping one of them. The caller
-/// needs to handle this case, if it ever occurs.
+/// This function returns an invalid [`ast::ExprName`] if the given pattern is a [`Pattern::MatchAs`]
+/// with both the pattern and name present. This is because it cannot be converted to an expression
+/// without dropping one of them as there's no way to represent `x as y` as a valid expression.
 pub(super) fn pattern_to_expr(pattern: Pattern) -> Expr {
     match pattern {
         Pattern::MatchSingleton(ast::PatternMatchSingleton { range, value }) => match value {
@@ -123,9 +123,11 @@ pub(super) fn pattern_to_expr(pattern: Pattern) -> Expr {
             pattern,
             name,
         }) => match (pattern, name) {
-            (Some(_), Some(_)) => {
-                panic!("Cannot convert `as` pattern with both pattern and name.")
-            }
+            (Some(_), Some(_)) => Expr::Name(ast::ExprName {
+                range,
+                id: String::new(),
+                ctx: ExprContext::Invalid,
+            }),
             (Some(pattern), None) => pattern_to_expr(*pattern),
             (None, Some(name)) => Expr::Name(ast::ExprName {
                 range: name.range,
