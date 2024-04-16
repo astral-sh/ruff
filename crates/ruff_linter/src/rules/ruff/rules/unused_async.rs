@@ -75,7 +75,9 @@ impl<'a> preorder::PreorderVisitor<'a> for AsyncExprVisitor {
             Stmt::FunctionDef(function_def) => {
                 function_def_visit_preorder_except_body(function_def, self);
             }
-            Stmt::ClassDef(class_def) => class_def_visit_preorder_except_body(class_def, self),
+            Stmt::ClassDef(class_def) => {
+                class_def_visit_preorder_except_body(class_def, self);
+            }
             _ => preorder::walk_stmt(self, stmt),
         }
     }
