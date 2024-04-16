@@ -28,5 +28,15 @@ invalid_return_type_hash.py:13:16: PLE0309 `__hash__` does not return `integer`
 13 |         return "ruff"  # [invalid-hash-return]
    |                ^^^^^^ PLE0309
 14 | 
-15 | # TODO: Once Ruff has better type checking
+15 | class HashNoReturn:
+   |
+
+invalid_return_type_hash.py:17:9: PLE0309 `__hash__` does not return `integer`
+   |
+15 | class HashNoReturn:
+16 |     def __hash__(self):
+17 |         print("ruff")  # [invalid-hash-return]
+   |         ^^^^^^^^^^^^^ PLE0309
+18 | 
+19 | # TODO: Once Ruff has better type checking
    |

@@ -12,6 +12,10 @@ class Str:
     def __hash__(self):
         return "ruff"  # [invalid-hash-return]
 
+class HashNoReturn:
+    def __hash__(self):
+        print("ruff")  # [invalid-hash-return]
+
 # TODO: Once Ruff has better type checking
 def return_int():
     return "3"

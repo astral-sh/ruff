@@ -60,6 +60,13 @@ pub(crate) fn invalid_hash_return(checker: &mut Checker, name: &str, body: &[Stm
         visitor.returns
     };
 
+    if returns.is_empty() {
+        checker.diagnostics.push(Diagnostic::new(
+            InvalidHashReturnType,
+            body.last().unwrap().range(),
+        ));
+    }
+
     for stmt in returns {
         if let Some(value) = stmt.value.as_deref() {
             if !matches!(
