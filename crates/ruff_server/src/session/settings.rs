@@ -1,7 +1,7 @@
-use std::{ffi::OsString, ops::Deref, path::PathBuf};
+use std::{ffi::OsString, ops::Deref, path::PathBuf, str::FromStr};
 
 use lsp_types::Url;
-use ruff_linter::{codes::Rule, line_width::LineLength};
+use ruff_linter::{line_width::LineLength, RuleSelector};
 use rustc_hash::FxHashMap;
 use serde::Deserialize;
 
@@ -33,9 +33,9 @@ pub(crate) struct ResolvedClientSettings {
 pub(crate) struct ResolvedEditorSettings {
     lint_preview: Option<bool>,
     format_preview: Option<bool>,
-    select: Option<Vec<Rule>>,
-    extend_select: Option<Vec<Rule>>,
-    ignore: Option<Vec<Rule>>,
+    select: Option<Vec<RuleSelector>>,
+    extend_select: Option<Vec<RuleSelector>>,
+    ignore: Option<Vec<RuleSelector>>,
     exclude: Option<Vec<PathBuf>>,
     line_length: Option<LineLength>,
 }
@@ -224,7 +224,7 @@ impl ResolvedClientSettings {
                         .select
                         .as_ref()?
                         .iter()
-                        .map(|rule| Rule::from_code(rule).ok())
+                        .map(|rule| RuleSelector::from_str(rule).ok())
                         .collect()
                 }),
                 extend_select: Self::resolve_optional(all_settings, |settings| {
@@ -234,7 +234,7 @@ impl ResolvedClientSettings {
                         .extend_select
                         .as_ref()?
                         .iter()
-                        .map(|rule| Rule::from_code(rule).ok())
+                        .map(|rule| RuleSelector::from_str(rule).ok())
                         .collect()
                 }),
                 ignore: Self::resolve_optional(all_settings, |settings| {
@@ -244,7 +244,7 @@ impl ResolvedClientSettings {
                         .ignore
                         .as_ref()?
                         .iter()
-                        .map(|rule| Rule::from_code(rule).ok())
+                        .map(|rule| RuleSelector::from_str(rule).ok())
                         .collect()
                 }),
                 exclude: Self::resolve_optional(all_settings, |settings| {
