@@ -2,60 +2,56 @@ import time
 import asyncio
 
 
-async def pass_case():  # OK: awaits a coroutine
-    print("hello")
+async def pass_1a():  # OK: awaits a coroutine
     await asyncio.sleep(1)
-    print("world")
 
 
-async def fail_case():  # RUF029
-    print("hello")
-    time.sleep(1)
-    print("world")
+async def pass_1b():  # OK: awaits a coroutine
+    def foo(optional_arg=await bar()):
+        pass
 
 
-async def pass_case_2():  # OK: uses an async context manager
+async def pass_2():  # OK: uses an async context manager
     async with None as i:
         pass
 
 
-async def fail_case_2():  # RUF029
-    with None as i:
-        pass
-
-
-async def pass_case_3():  # OK: uses an async loop
+async def pass_3():  # OK: uses an async loop
     async for i in []:
         pass
 
 
-async def fail_case_3():  # RUF029
-    for i in []:
+class Foo:
+    async def pass_4():  # OK: method of a class
         pass
 
 
-async def pass_case_4():  # OK: awaits a coroutine
-    def foo(optional_arg=await bar()):
+async def fail_1a():  # RUF029
+    time.sleep(1)
+
+
+async def fail_1b():  # RUF029: yield does not require async
+    yield "hello"
+
+
+async def fail_2():  # RUF029
+    with None as i:
+        pass
+
+
+async def fail_3():  # RUF029
+    for i in []:
         pass
 
     return foo
 
 
-async def fail_case_5():  # RUF029: yield does not require async
-    yield "hello"
-
-
-async def fail_case_6():  # RUF029: the /outer/ function does not await
+async def fail_4a():  # RUF029: the /outer/ function does not await
     async def foo():
         await bla
 
 
-class Foo:
-    async def pass_case_7():  # OK: method of a class
-        pass
-
-
-async def fail_case_7():  # RUF029: the /outer/ function does not await
+async def fail_4b():  # RUF029: the /outer/ function does not await
     class Foo:
         async def foo():
             await bla
