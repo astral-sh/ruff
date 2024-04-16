@@ -34,7 +34,8 @@ use ruff_text_size::Ranged;
 /// ## Note
 ///
 /// If the original statement uses `reverse=True`, the `min` and `max` replacement will not
-/// be equivalent if the intended result is to get a non-stable min and max.
+/// be equivalent if the intended result is to get a non-stable min and max. Therefore, these
+/// replacements are marked unsafe.
 ///
 /// In other words, `sorted(data, key=itemgetter(0), reverse=True)[0]` is not a stable min,
 /// but `min(data, key=itemgetter(0))` is a stable min.
@@ -174,9 +175,10 @@ pub(crate) fn sorted_min_max(checker: &mut Checker, subscript: &ast::ExprSubscri
         };
 
         let replacement = Edit::replacement(replacement, subscript.start(), subscript.end());
-        match is_reversed {
-            true => Fix::unsafe_edit(replacement),
-            false => Fix::safe_edit(replacement),
+        if is_reversed {
+            Fix::unsafe_edit(replacement)
+        } else {
+            Fix::safe_edit(replacement)
         }
     });
     checker.diagnostics.push(diagnostic);
