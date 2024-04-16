@@ -45,7 +45,7 @@ impl super::BackgroundDocumentRequestHandler for CodeActionResolve {
                     document,
                     snapshot.resolved_client_capabilities(),
                     snapshot.url(),
-                    &snapshot.configuration().linter,
+                    &snapshot.settings().linter,
                     snapshot.encoding(),
                     document.version(),
                 )
@@ -56,7 +56,7 @@ impl super::BackgroundDocumentRequestHandler for CodeActionResolve {
                     document,
                     snapshot.resolved_client_capabilities(),
                     snapshot.url(),
-                    &snapshot.configuration().linter,
+                    &snapshot.settings().linter,
                     snapshot.encoding(),
                     document.version(),
                 )
