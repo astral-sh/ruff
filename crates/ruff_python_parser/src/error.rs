@@ -174,6 +174,8 @@ pub enum ParseErrorType {
     UnexpectedTokenAfterAsync(TokenKind),
     /// Ipython escape command was found
     UnexpectedIpythonEscapeCommand,
+    /// An unexpected token was found at the end of an expression parsing
+    UnexpectedExpressionToken,
 
     /// An f-string error containing the [`FStringErrorType`].
     FStringError(FStringErrorType),
@@ -299,6 +301,9 @@ impl std::fmt::Display for ParseErrorType {
             }
             ParseErrorType::FStringError(ref fstring_error) => {
                 write!(f, "f-string: {fstring_error}")
+            }
+            ParseErrorType::UnexpectedExpressionToken => {
+                write!(f, "Unexpected token at the end of an expression")
             }
             // RustPython specific.
             ParseErrorType::Eof => write!(f, "Got unexpected EOF"),
