@@ -2,7 +2,7 @@ use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::visitor::preorder;
-use ruff_python_ast::{self as ast, Expr, Stmt};
+use ruff_python_ast::{self as ast, AnyNodeRef, Expr, Stmt};
 
 use crate::checkers::ast::Checker;
 
@@ -45,6 +45,13 @@ struct AsyncExprVisitor {
 }
 
 impl<'a> preorder::PreorderVisitor<'a> for AsyncExprVisitor {
+    fn enter_node(&mut self, _node: AnyNodeRef<'a>) -> preorder::TraversalSignal {
+        if self.found_await_or_async {
+            preorder::TraversalSignal::Skip
+        } else {
+            preorder::TraversalSignal::Traverse
+        }
+    }
     fn visit_expr(&mut self, expr: &'a Expr) {
         match expr {
             Expr::Await(_) => {
