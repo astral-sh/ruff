@@ -10,6 +10,8 @@ use std::{
 
 use crate::{edit::DocumentVersion, Document};
 
+use self::ruff_settings::RuffSettingsIndex;
+
 use super::{settings, ClientSettings};
 
 mod ruff_settings;
@@ -24,7 +26,6 @@ pub(crate) struct Workspace {
     settings: ClientSettings,
 }
 
-#[derive(Default)]
 pub(crate) struct OpenDocuments {
     documents: FxHashMap<Url, DocumentController>,
     ruff_settings_index: ruff_settings::RuffSettingsIndex,
@@ -156,13 +157,12 @@ impl Workspace {
             .to_file_path()
             .map_err(|()| anyhow!("workspace URL was not a file path!"))?;
 
-        Ok((
-            path,
-            Self {
-                open_documents: OpenDocuments::default(),
-                settings,
-            },
-        ))
+        let workspace = Self {
+            open_documents: OpenDocuments::new(&path),
+            settings,
+        };
+
+        Ok((path, workspace))
     }
 
     fn reload_ruff_settings(&mut self, root: &Path) {
@@ -171,6 +171,13 @@ impl Workspace {
 }
 
 impl OpenDocuments {
+    fn new(path: &Path) -> Self {
+        Self {
+            documents: FxHashMap::default(),
+            ruff_settings_index: RuffSettingsIndex::new(path),
+        }
+    }
+
     fn snapshot(&self, url: &Url) -> Option<DocumentRef> {
         let path = url
             .to_file_path()
