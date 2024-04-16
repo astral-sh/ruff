@@ -3,7 +3,7 @@ use ruff_macros::CacheKey;
 use std::fmt::{Debug, Display, Formatter};
 use std::iter::FusedIterator;
 
-const RULESET_SIZE: usize = 13;
+const RULESET_SIZE: usize = 14;
 
 /// A set of [`Rule`]s.
 ///
@@ -234,6 +234,7 @@ impl RuleSet {
     /// assert!(set.contains(Rule::AmbiguousFunctionName));
     /// assert!(!set.contains(Rule::BreakOutsideLoop));
     /// ```
+    #[inline]
     pub const fn contains(&self, rule: Rule) -> bool {
         let rule = rule as u16;
         let index = rule as usize / Self::SLICE_BITS as usize;
@@ -241,6 +242,20 @@ impl RuleSet {
         let mask = 1 << shift;
 
         self.0[index] & mask != 0
+    }
+
+    /// Returns `true` if any of the rules in `rules` are in this set.
+    #[inline]
+    pub const fn any(&self, rules: &[Rule]) -> bool {
+        let mut any = false;
+        let mut i = 0;
+
+        while i < rules.len() {
+            any |= self.contains(rules[i]);
+            i += 1;
+        }
+
+        any
     }
 
     /// Returns an iterator over the rules in this set.

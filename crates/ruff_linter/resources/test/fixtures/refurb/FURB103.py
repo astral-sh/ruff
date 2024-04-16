@@ -59,6 +59,21 @@ with open("file.txt", "w", newline="\r\n") as f:
     f.write(foobar)
 
 
+import builtins
+
+
+# FURB103
+with builtins.open("file.txt", "w", newline="\r\n") as f:
+    f.write(foobar)
+
+
+from builtins import open as o
+
+
+# FURB103
+with o("file.txt", "w", newline="\r\n") as f:
+    f.write(foobar)
+
 # Non-errors.
 
 with open("file.txt", errors="ignore", mode="wb") as f:

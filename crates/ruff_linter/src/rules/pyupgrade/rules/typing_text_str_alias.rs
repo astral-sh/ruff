@@ -57,12 +57,17 @@ pub(crate) fn typing_text_str_alias(checker: &mut Checker, expr: &Expr) {
         .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["typing", "Text"]))
     {
         let mut diagnostic = Diagnostic::new(TypingTextStrAlias, expr.range());
-        if checker.semantic().is_builtin("str") {
-            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                "str".to_string(),
-                expr.range(),
-            )));
-        }
+        diagnostic.try_set_fix(|| {
+            let (import_edit, binding) = checker.importer().get_or_import_builtin_symbol(
+                "str",
+                expr.start(),
+                checker.semantic(),
+            )?;
+            Ok(Fix::safe_edits(
+                Edit::range_replacement(binding, expr.range()),
+                import_edit,
+            ))
+        });
         checker.diagnostics.push(diagnostic);
     }
 }

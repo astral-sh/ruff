@@ -283,6 +283,8 @@ nested_min_max.py:41:1: PLW3301 [*] Nested `max` calls can be flattened
 40 | # Starred argument should be copied as it is.
 41 | max(1, max(*a))
    | ^^^^^^^^^^^^^^^ PLW3301
+42 | 
+43 | import builtins
    |
    = help: Flatten nested `max` calls
 
@@ -292,5 +294,21 @@ nested_min_max.py:41:1: PLW3301 [*] Nested `max` calls can be flattened
 40 40 | # Starred argument should be copied as it is.
 41    |-max(1, max(*a))
    41 |+max(1, *a)
+42 42 | 
+43 43 | import builtins
+44 44 | builtins.min(1, min(2, 3))
 
+nested_min_max.py:44:1: PLW3301 [*] Nested `min` calls can be flattened
+   |
+43 | import builtins
+44 | builtins.min(1, min(2, 3))
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^ PLW3301
+   |
+   = help: Flatten nested `min` calls
 
+ℹ Unsafe fix
+41 41 | max(1, max(*a))
+42 42 | 
+43 43 | import builtins
+44    |-builtins.min(1, min(2, 3))
+   44 |+builtins.min(1, 2, 3)

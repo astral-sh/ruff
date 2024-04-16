@@ -96,20 +96,20 @@ fn check_annotation(checker: &mut Checker, annotation: &Expr) {
     let mut has_complex = false;
     let mut has_int = false;
 
-    let mut func = |expr: &Expr, _parent: &Expr| {
-        let Some(qualified_name) = checker.semantic().resolve_qualified_name(expr) else {
+    let mut find_numeric_type = |expr: &Expr, _parent: &Expr| {
+        let Some(builtin_type) = checker.semantic().resolve_builtin_symbol(expr) else {
             return;
         };
 
-        match qualified_name.segments() {
-            ["" | "builtins", "int"] => has_int = true,
-            ["" | "builtins", "float"] => has_float = true,
-            ["" | "builtins", "complex"] => has_complex = true,
-            _ => (),
+        match builtin_type {
+            "int" => has_int = true,
+            "float" => has_float = true,
+            "complex" => has_complex = true,
+            _ => {}
         }
     };
 
-    traverse_union(&mut func, checker.semantic(), annotation);
+    traverse_union(&mut find_numeric_type, checker.semantic(), annotation);
 
     if has_complex {
         if has_float {

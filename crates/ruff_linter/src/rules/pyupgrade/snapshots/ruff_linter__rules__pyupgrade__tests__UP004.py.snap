@@ -490,4 +490,20 @@ UP004.py:146:9: UP004 [*] Class `A` inherits from `object`
 148 148 | 
 149 149 | 
 
+UP004.py:159:15: UP004 [*] Class `Unusual` inherits from `object`
+    |
+157 | import builtins
+158 | 
+159 | class Unusual(builtins.object):
+    |               ^^^^^^^^^^^^^^^ UP004
+160 |     ...
+    |
+    = help: Remove `object` inheritance
 
+ℹ Safe fix
+156 156 | 
+157 157 | import builtins
+158 158 | 
+159     |-class Unusual(builtins.object):
+    159 |+class Unusual:
+160 160 |     ...

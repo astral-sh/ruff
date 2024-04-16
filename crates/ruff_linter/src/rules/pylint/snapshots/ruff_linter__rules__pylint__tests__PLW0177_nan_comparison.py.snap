@@ -80,3 +80,11 @@ nan_comparison.py:47:9: PLW0177 Comparing against a NaN value; use `np.isnan` in
    |         ^^^^^^^ PLW0177
 48 |     pass
    |
+
+nan_comparison.py:53:9: PLW0177 Comparing against a NaN value; use `math.isnan` instead
+   |
+52 | # PLW0117
+53 | if x == builtins.float("nan"):
+   |         ^^^^^^^^^^^^^^^^^^^^^ PLW0177
+54 |     pass
+   |

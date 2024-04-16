@@ -124,16 +124,6 @@ fn enumerate_items<'a>(
         func, arguments, ..
     } = call_expr.as_call_expr()?;
 
-    // Check that the function is the `enumerate` builtin.
-    if !semantic
-        .resolve_qualified_name(func.as_ref())
-        .is_some_and(|qualified_name| {
-            matches!(qualified_name.segments(), ["builtins" | "", "enumerate"])
-        })
-    {
-        return None;
-    }
-
     let Expr::Tuple(ast::ExprTuple { elts, .. }) = tuple_expr else {
         return None;
     };
@@ -160,6 +150,11 @@ fn enumerate_items<'a>(
     let Some(Expr::Name(sequence)) = arguments.args.first() else {
         return None;
     };
+
+    // Check that the function is the `enumerate` builtin.
+    if !semantic.match_builtin_expr(func, "enumerate") {
+        return None;
+    }
 
     Some((sequence, index_name, value_name))
 }

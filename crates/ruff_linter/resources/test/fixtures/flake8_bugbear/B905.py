@@ -23,3 +23,7 @@ zip([1, 2, 3], repeat(1, times=None))
 # Errors (limited iterators).
 zip([1, 2, 3], repeat(1, 1))
 zip([1, 2, 3], repeat(1, times=4))
+
+import builtins
+# Still an error even though it uses the qualified name
+builtins.zip([1, 2, 3])

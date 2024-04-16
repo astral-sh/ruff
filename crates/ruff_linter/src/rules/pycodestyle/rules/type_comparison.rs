@@ -76,11 +76,9 @@ fn deprecated_type_comparison(checker: &mut Checker, compare: &ast::ExprCompare)
             continue;
         };
 
-        let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() else {
-            continue;
-        };
+        let semantic = checker.semantic();
 
-        if !(id == "type" && checker.semantic().is_builtin("type")) {
+        if !semantic.match_builtin_expr(func, "type") {
             continue;
         }
 
@@ -90,11 +88,7 @@ fn deprecated_type_comparison(checker: &mut Checker, compare: &ast::ExprCompare)
                 func, arguments, ..
             }) => {
                 // Ex) `type(obj) is type(1)`
-                let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() else {
-                    continue;
-                };
-
-                if id == "type" && checker.semantic().is_builtin("type") {
+                if semantic.match_builtin_expr(func, "type") {
                     // Allow comparison for types which are not obvious.
                     if arguments
                         .args
@@ -112,8 +106,7 @@ fn deprecated_type_comparison(checker: &mut Checker, compare: &ast::ExprCompare)
             }
             Expr::Attribute(ast::ExprAttribute { value, .. }) => {
                 // Ex) `type(obj) is types.NoneType`
-                if checker
-                    .semantic()
+                if semantic
                     .resolve_qualified_name(value.as_ref())
                     .is_some_and(|qualified_name| {
                         matches!(qualified_name.segments(), ["types", ..])
@@ -141,7 +134,7 @@ fn deprecated_type_comparison(checker: &mut Checker, compare: &ast::ExprCompare)
                         | "dict"
                         | "set"
                         | "memoryview"
-                ) && checker.semantic().is_builtin(id)
+                ) && semantic.is_builtin(id)
                 {
                     checker.diagnostics.push(Diagnostic::new(
                         TypeComparison {
@@ -188,20 +181,17 @@ fn is_type(expr: &Expr, semantic: &SemanticModel) -> bool {
         Expr::Call(ast::ExprCall {
             func, arguments, ..
         }) => {
-            // Ex) `type(obj) == type(1)`
-            let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() else {
-                return false;
-            };
-
-            if !(id == "type" && semantic.is_builtin("type")) {
-                return false;
-            };
-
             // Allow comparison for types which are not obvious.
-            arguments
+            if !arguments
                 .args
                 .first()
                 .is_some_and(|arg| !arg.is_name_expr() && !arg.is_none_literal_expr())
+            {
+                return false;
+            }
+
+            // Ex) `type(obj) == type(1)`
+            semantic.match_builtin_expr(func, "type")
         }
         Expr::Name(ast::ExprName { id, .. }) => {
             // Ex) `type(obj) == int`

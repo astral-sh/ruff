@@ -19,3 +19,9 @@ class Bad(Tuple[str, int, float]):  # SLOT001
 
 class Good(Tuple[str, int, float]):  # OK
     __slots__ = ("foo",)
+
+
+import builtins
+
+class AlsoBad(builtins.tuple[int, int]):  # SLOT001
+    pass

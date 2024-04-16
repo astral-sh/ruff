@@ -92,3 +92,19 @@ FURB103.py:58:6: FURB103 `open` and `write` should be replaced by `Path("file.tx
    |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB103
 59 |     f.write(foobar)
    |
+
+FURB103.py:66:6: FURB103 `open` and `write` should be replaced by `Path("file.txt").write_text(foobar, newline="\r\n")`
+   |
+65 | # FURB103
+66 | with builtins.open("file.txt", "w", newline="\r\n") as f:
+   |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB103
+67 |     f.write(foobar)
+   |
+
+FURB103.py:74:6: FURB103 `open` and `write` should be replaced by `Path("file.txt").write_text(foobar, newline="\r\n")`
+   |
+73 | # FURB103
+74 | with o("file.txt", "w", newline="\r\n") as f:
+   |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB103
+75 |     f.write(foobar)
+   |

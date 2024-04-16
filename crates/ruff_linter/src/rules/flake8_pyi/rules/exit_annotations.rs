@@ -181,12 +181,15 @@ fn check_short_args_list(checker: &mut Checker, parameters: &Parameters, func_ki
                 annotation.range(),
             );
 
-            if checker.semantic().is_builtin("object") {
-                diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                    "object".to_string(),
-                    annotation.range(),
-                )));
-            }
+            diagnostic.try_set_fix(|| {
+                let (import_edit, binding) = checker.importer().get_or_import_builtin_symbol(
+                    "object",
+                    annotation.start(),
+                    checker.semantic(),
+                )?;
+                let binding_edit = Edit::range_replacement(binding, annotation.range());
+                Ok(Fix::safe_edits(binding_edit, import_edit))
+            });
 
             checker.diagnostics.push(diagnostic);
         }
@@ -213,7 +216,9 @@ fn check_positional_args(
 
     let validations: [(ErrorKind, AnnotationValidator); 3] = [
         (ErrorKind::FirstArgBadAnnotation, is_base_exception_type),
-        (ErrorKind::SecondArgBadAnnotation, is_base_exception),
+        (ErrorKind::SecondArgBadAnnotation, |expr, semantic| {
+            semantic.match_builtin_expr(expr, "BaseException")
+        }),
         (ErrorKind::ThirdArgBadAnnotation, is_traceback_type),
     ];
 
@@ -322,19 +327,6 @@ fn is_object_or_unused(expr: &Expr, semantic: &SemanticModel) -> bool {
         })
 }
 
-/// Return `true` if the [`Expr`] is `BaseException`.
-fn is_base_exception(expr: &Expr, semantic: &SemanticModel) -> bool {
-    semantic
-        .resolve_qualified_name(expr)
-        .as_ref()
-        .is_some_and(|qualified_name| {
-            matches!(
-                qualified_name.segments(),
-                ["" | "builtins", "BaseException"]
-            )
-        })
-}
-
 /// Return `true` if the [`Expr`] is the `types.TracebackType` type.
 fn is_traceback_type(expr: &Expr, semantic: &SemanticModel) -> bool {
     semantic
@@ -351,15 +343,8 @@ fn is_base_exception_type(expr: &Expr, semantic: &SemanticModel) -> bool {
         return false;
     };
 
-    if semantic.match_typing_expr(value, "Type")
-        || semantic
-            .resolve_qualified_name(value)
-            .as_ref()
-            .is_some_and(|qualified_name| {
-                matches!(qualified_name.segments(), ["" | "builtins", "type"])
-            })
-    {
-        is_base_exception(slice, semantic)
+    if semantic.match_typing_expr(value, "Type") || semantic.match_builtin_expr(value, "type") {
+        semantic.match_builtin_expr(slice, "BaseException")
     } else {
         false
     }
