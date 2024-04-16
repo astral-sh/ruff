@@ -6,9 +6,12 @@
             }
         },
         "lint": {
+            "ignore": ["RUF001"],
             "run": "onSave"
         },
         "fixAll": false,
-        "logLevel": "warn"
+        "logLevel": "warn",
+        "lineLength": 80,
+        "exclude": ["third_party"]
     }
 }

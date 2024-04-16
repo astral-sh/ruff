@@ -311,6 +311,7 @@ impl Default for InitializationOptions {
 #[cfg(test)]
 mod tests {
     use insta::assert_debug_snapshot;
+    use ruff_linter::registry::Linter;
     use serde::de::DeserializeOwned;
 
     use super::*;
@@ -344,6 +345,22 @@ mod tests {
                         enable: Some(
                             true,
                         ),
+                        preview: Some(
+                            true,
+                        ),
+                        select: Some(
+                            [
+                                "F",
+                                "I",
+                            ],
+                        ),
+                        extend_select: None,
+                        ignore: None,
+                    },
+                ),
+                format: Some(
+                    Format {
+                        preview: None,
                     },
                 ),
                 code_action: Some(
@@ -364,6 +381,8 @@ mod tests {
                         ),
                     },
                 ),
+                exclude: None,
+                line_length: None,
             },
             workspace_settings: [
                 WorkspaceSettings {
@@ -379,6 +398,15 @@ mod tests {
                                 enable: Some(
                                     true,
                                 ),
+                                preview: None,
+                                select: None,
+                                extend_select: None,
+                                ignore: None,
+                            },
+                        ),
+                        format: Some(
+                            Format {
+                                preview: None,
                             },
                         ),
                         code_action: Some(
@@ -399,6 +427,8 @@ mod tests {
                                 ),
                             },
                         ),
+                        exclude: None,
+                        line_length: None,
                     },
                     workspace: Url {
                         scheme: "file",
@@ -425,6 +455,17 @@ mod tests {
                                 enable: Some(
                                     true,
                                 ),
+                                preview: Some(
+                                    false,
+                                ),
+                                select: None,
+                                extend_select: None,
+                                ignore: None,
+                            },
+                        ),
+                        format: Some(
+                            Format {
+                                preview: None,
                             },
                         ),
                         code_action: Some(
@@ -445,6 +486,8 @@ mod tests {
                                 ),
                             },
                         ),
+                        exclude: None,
+                        line_length: None,
                     },
                     workspace: Url {
                         scheme: "file",
@@ -485,7 +528,18 @@ mod tests {
                 lint_enable: true,
                 disable_rule_comment_enable: false,
                 fix_violation_enable: false,
-                editor_settings: ResolvedEditorSettings::default(),
+                editor_settings: ResolvedEditorSettings {
+                    lint_preview: Some(true),
+                    format_preview: None,
+                    select: Some(vec![
+                        RuleSelector::Linter(Linter::Pyflakes),
+                        RuleSelector::Linter(Linter::Isort)
+                    ]),
+                    extend_select: None,
+                    ignore: None,
+                    exclude: None,
+                    line_length: None
+                }
             }
         );
         let url = Url::parse("file:///Users/test/projects/scipy").expect("url should parse");
@@ -502,7 +556,18 @@ mod tests {
                 lint_enable: true,
                 disable_rule_comment_enable: true,
                 fix_violation_enable: false,
-                editor_settings: ResolvedEditorSettings::default()
+                editor_settings: ResolvedEditorSettings {
+                    lint_preview: Some(false),
+                    format_preview: None,
+                    select: Some(vec![
+                        RuleSelector::Linter(Linter::Pyflakes),
+                        RuleSelector::Linter(Linter::Isort)
+                    ]),
+                    extend_select: None,
+                    ignore: None,
+                    exclude: None,
+                    line_length: None
+                }
             }
         );
     }
@@ -522,8 +587,17 @@ mod tests {
                     lint: Some(
                         Lint {
                             enable: None,
+                            preview: None,
+                            select: None,
+                            extend_select: None,
+                            ignore: Some(
+                                [
+                                    "RUF001",
+                                ],
+                            ),
                         },
                     ),
+                    format: None,
                     code_action: Some(
                         CodeAction {
                             disable_rule_comment: Some(
@@ -535,6 +609,16 @@ mod tests {
                             ),
                             fix_violation: None,
                         },
+                    ),
+                    exclude: Some(
+                        [
+                            "third_party",
+                        ],
+                    ),
+                    line_length: Some(
+                        LineLength(
+                            80,
+                        ),
                     ),
                 },
             ),
@@ -557,7 +641,15 @@ mod tests {
                 lint_enable: true,
                 disable_rule_comment_enable: false,
                 fix_violation_enable: true,
-                editor_settings: ResolvedEditorSettings::default()
+                editor_settings: ResolvedEditorSettings {
+                    lint_preview: None,
+                    format_preview: None,
+                    select: None,
+                    extend_select: None,
+                    ignore: Some(vec![RuleSelector::from_str("RUF001").unwrap()]),
+                    exclude: Some(vec![PathBuf::from_str("third_party").unwrap()]),
+                    line_length: Some(LineLength::from_u16_for_testing_only(80u16))
+                }
             }
         );
     }
