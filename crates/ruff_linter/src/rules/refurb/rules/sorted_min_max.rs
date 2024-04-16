@@ -152,8 +152,7 @@ pub(crate) fn sorted_min_max(checker: &mut Checker, subscript: &ast::ExprSubscri
         (Index::Last, true) => MinMax::Min,
     };
 
-    // Get the list expression.
-    let Some(Expr::Name(list_expr)) = arguments.args.first() else {
+    let Some(list_expr) = arguments.args.first() else {
         return;
     };
 
@@ -161,11 +160,15 @@ pub(crate) fn sorted_min_max(checker: &mut Checker, subscript: &ast::ExprSubscri
         format!(
             "{}({}, key={})",
             min_max.as_str(),
-            list_expr.id,
+            checker.generator().expr(list_expr),
             checker.generator().expr(key)
         )
     } else {
-        format!("{}({})", min_max.as_str(), list_expr.id)
+        format!(
+            "{}({})",
+            min_max.as_str(),
+            checker.generator().expr(list_expr)
+        )
     };
 
     let mut diagnostic = Diagnostic::new(SortedMinMax, subscript.range());

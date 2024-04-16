@@ -154,7 +154,7 @@ FURB192.py:17:1: FURB192 [*] Prefer `min` or `max` over `sorted()` to get the mi
 17 | sorted(l, key=key_fn)[0]
    | ^^^^^^^^^^^^^^^^^^^^^^^^ FURB192
 18 | 
-19 | # Non-errors
+19 | sorted([1, 2, 3])[0]
    |
    = help: Replace with `min` or `max`
 
@@ -165,5 +165,26 @@ FURB192.py:17:1: FURB192 [*] Prefer `min` or `max` over `sorted()` to get the mi
 17    |-sorted(l, key=key_fn)[0]
    17 |+min(l, key=key_fn)
 18 18 | 
-19 19 | # Non-errors
-20 20 |
+19 19 | sorted([1, 2, 3])[0]
+20 20 | 
+
+FURB192.py:19:1: FURB192 [*] Prefer `min` or `max` over `sorted()` to get the min and max values of a list
+   |
+17 | sorted(l, key=key_fn)[0]
+18 | 
+19 | sorted([1, 2, 3])[0]
+   | ^^^^^^^^^^^^^^^^^^^^ FURB192
+20 | 
+21 | # Non-errors
+   |
+   = help: Replace with `min` or `max`
+
+ℹ Safe fix
+16 16 | 
+17 17 | sorted(l, key=key_fn)[0]
+18 18 | 
+19    |-sorted([1, 2, 3])[0]
+   19 |+min([1, 2, 3])
+20 20 | 
+21 21 | # Non-errors
+22 22 |

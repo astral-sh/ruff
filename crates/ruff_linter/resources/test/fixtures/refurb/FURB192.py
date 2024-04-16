@@ -16,11 +16,11 @@ sorted(l, key=key_fn, reverse=True)[-1]
 
 sorted(l, key=key_fn)[0]
 
+sorted([1, 2, 3])[0]
+
 # Non-errors
 
 sorted(l, reverse=foo())[0]
-
-sorted([1, 2, 3])[0]
 
 sorted(l)[1]
 
