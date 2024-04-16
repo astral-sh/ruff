@@ -19,13 +19,13 @@ pub(crate) use parenthesize_logical_operators::*;
 pub(crate) use quadratic_list_summation::*;
 pub(crate) use sort_dunder_all::*;
 pub(crate) use sort_dunder_slots::*;
-pub(crate) use spurious_async::*;
 pub(crate) use static_key_dict_comprehension::*;
 #[cfg(feature = "test-rules")]
 pub(crate) use test_rules::*;
 pub(crate) use unnecessary_dict_comprehension_for_iterable::*;
 pub(crate) use unnecessary_iterable_allocation_for_first_element::*;
 pub(crate) use unnecessary_key_check::*;
+pub(crate) use unused_async::*;
 pub(crate) use unused_noqa::*;
 
 mod ambiguous_unicode_character;
@@ -52,7 +52,6 @@ mod quadratic_list_summation;
 mod sequence_sorting;
 mod sort_dunder_all;
 mod sort_dunder_slots;
-mod spurious_async;
 mod static_key_dict_comprehension;
 mod suppression_comment_visitor;
 #[cfg(feature = "test-rules")]
@@ -60,6 +59,7 @@ pub(crate) mod test_rules;
 mod unnecessary_dict_comprehension_for_iterable;
 mod unnecessary_iterable_allocation_for_first_element;
 mod unnecessary_key_check;
+mod unused_async;
 mod unused_noqa;
 
 #[derive(Clone, Copy)]

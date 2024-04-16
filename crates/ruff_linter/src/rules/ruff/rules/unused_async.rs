@@ -27,14 +27,14 @@ use crate::checkers::ast::Checker;
 ///     bar()
 /// ```
 #[violation]
-pub struct SpuriousAsync {
+pub struct UnusedAsync {
     name: String,
 }
 
-impl Violation for SpuriousAsync {
+impl Violation for UnusedAsync {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let SpuriousAsync { name } = self;
+        let UnusedAsync { name } = self;
         format!("Function `{name}` is declared `async`, but doesn't await or use async features.")
     }
 }
@@ -139,7 +139,7 @@ where
 }
 
 /// RUF029
-pub(crate) fn spurious_async(
+pub(crate) fn unused_async(
     checker: &mut Checker,
     function_def @ ast::StmtFunctionDef {
         is_async,
@@ -160,7 +160,7 @@ pub(crate) fn spurious_async(
 
     if !found_await_or_async {
         checker.diagnostics.push(Diagnostic::new(
-            SpuriousAsync {
+            UnusedAsync {
                 name: name.to_string(),
             },
             function_def.identifier(),
