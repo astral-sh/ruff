@@ -37,19 +37,8 @@ impl std::fmt::Display for RuffSettings {
 }
 
 impl RuffSettingsIndex {
-    pub(super) fn new(path: &Path) -> Self {
-        let mut index = Self {
-            index: BTreeMap::default(),
-            fallback: Arc::default(),
-        };
-
-        index.reload(path);
-
-        index
-    }
-
-    pub(super) fn reload(&mut self, root: &Path) {
-        self.clear();
+    pub(super) fn new(root: &Path) -> Self {
+        let mut index = BTreeMap::default();
 
         for directory in WalkDir::new(root)
             .into_iter()
@@ -65,7 +54,7 @@ impl RuffSettingsIndex {
                 ) else {
                     continue;
                 };
-                self.index.insert(
+                index.insert(
                     directory,
                     Arc::new(RuffSettings {
                         linter: settings.linter,
@@ -73,6 +62,11 @@ impl RuffSettingsIndex {
                     }),
                 );
             }
+        }
+
+        Self {
+            index,
+            fallback: Arc::default(),
         }
     }
 
@@ -89,10 +83,6 @@ impl RuffSettingsIndex {
         tracing::warn!("No ruff settings file (pyproject.toml/ruff.toml/.ruff.toml) found for {} - falling back to default configuration", document_path.display());
 
         &self.fallback
-    }
-
-    fn clear(&mut self) {
-        self.index.clear();
     }
 }
 

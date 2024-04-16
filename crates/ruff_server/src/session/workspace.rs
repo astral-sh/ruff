@@ -210,7 +210,7 @@ impl OpenDocuments {
     }
 
     fn reload_settings(&mut self, root: &Path) {
-        self.settings_index.reload(root);
+        self.settings_index = RuffSettingsIndex::new(root);
     }
 }
 
