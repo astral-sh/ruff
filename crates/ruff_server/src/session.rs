@@ -82,8 +82,8 @@ impl Session {
             .ok_or_else(|| anyhow!("Tried to open unavailable document `{url}`"))
     }
 
-    pub(crate) fn reload_ruff_settings(&mut self, url: &Url) -> crate::Result<()> {
-        self.workspaces.reload_ruff_settings(url)
+    pub(crate) fn reload_settings(&mut self, url: &Url) -> crate::Result<()> {
+        self.workspaces.reload_settings(url)
     }
 
     pub(crate) fn open_workspace_folder(&mut self, url: &Url) -> crate::Result<()> {
@@ -106,8 +106,8 @@ impl Session {
 }
 
 impl DocumentSnapshot {
-    pub(crate) fn ruff_settings(&self) -> &workspace::RuffSettings {
-        self.document().ruff_settings()
+    pub(crate) fn settings(&self) -> &workspace::RuffSettings {
+        self.document().settings()
     }
 
     pub(crate) fn resolved_client_capabilities(&self) -> &ResolvedClientCapabilities {

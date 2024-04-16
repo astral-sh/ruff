@@ -28,7 +28,7 @@ pub(crate) struct Workspace {
 
 pub(crate) struct OpenDocuments {
     documents: FxHashMap<Url, DocumentController>,
-    ruff_settings_index: ruff_settings::RuffSettingsIndex,
+    settings_index: ruff_settings::RuffSettingsIndex,
 }
 
 /// A mutable handler to an underlying document.
@@ -42,7 +42,7 @@ pub(crate) struct DocumentController {
 #[derive(Clone)]
 pub(crate) struct DocumentRef {
     document: Arc<Document>,
-    ruff_settings: Arc<RuffSettings>,
+    settings: Arc<RuffSettings>,
 }
 
 impl Workspaces {
@@ -84,11 +84,11 @@ impl Workspaces {
             .controller(document_url)
     }
 
-    pub(super) fn reload_ruff_settings(&mut self, changed_url: &Url) -> crate::Result<()> {
+    pub(super) fn reload_settings(&mut self, changed_url: &Url) -> crate::Result<()> {
         let (root, workspace) = self
             .entry_for_url_mut(changed_url)
             .ok_or_else(|| anyhow!("Workspace not found for {changed_url}"))?;
-        workspace.reload_ruff_settings(root);
+        workspace.reload_settings(root);
         Ok(())
     }
 
@@ -165,8 +165,8 @@ impl Workspace {
         Ok((path, workspace))
     }
 
-    fn reload_ruff_settings(&mut self, root: &Path) {
-        self.open_documents.reload_ruff_settings(root);
+    fn reload_settings(&mut self, root: &Path) {
+        self.open_documents.reload_settings(root);
     }
 }
 
@@ -174,7 +174,7 @@ impl OpenDocuments {
     fn new(path: &Path) -> Self {
         Self {
             documents: FxHashMap::default(),
-            ruff_settings_index: RuffSettingsIndex::new(path),
+            settings_index: RuffSettingsIndex::new(path),
         }
     }
 
@@ -182,7 +182,7 @@ impl OpenDocuments {
         let path = url
             .to_file_path()
             .expect("document URL should convert to file path: {url}");
-        let document_settings = self.ruff_settings_index.get(&path).clone();
+        let document_settings = self.settings_index.get(&path).clone();
         Some(self.documents.get(url)?.make_ref(document_settings))
     }
 
@@ -209,8 +209,8 @@ impl OpenDocuments {
         Ok(())
     }
 
-    fn reload_ruff_settings(&mut self, root: &Path) {
-        self.ruff_settings_index.reload(root);
+    fn reload_settings(&mut self, root: &Path) {
+        self.settings_index.reload(root);
     }
 }
 
@@ -224,7 +224,7 @@ impl DocumentController {
     pub(crate) fn make_ref(&self, document_settings: Arc<RuffSettings>) -> DocumentRef {
         DocumentRef {
             document: self.document.clone(),
-            ruff_settings: document_settings,
+            settings: document_settings,
         }
     }
 
@@ -248,7 +248,7 @@ impl Deref for DocumentRef {
 }
 
 impl DocumentRef {
-    pub(crate) fn ruff_settings(&self) -> &RuffSettings {
-        &self.ruff_settings
+    pub(crate) fn settings(&self) -> &RuffSettings {
+        &self.settings
     }
 }

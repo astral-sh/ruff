@@ -77,13 +77,13 @@ impl RuffSettingsIndex {
     }
 
     pub(super) fn get(&self, document_path: &Path) -> &Arc<RuffSettings> {
-        if let Some((_, ruff_settings)) = self
+        if let Some((_, settings)) = self
             .index
             .range(..document_path.to_path_buf())
             .rev()
             .find(|(path, _)| document_path.starts_with(path))
         {
-            return ruff_settings;
+            return settings;
         }
 
         tracing::warn!("No ruff settings file (pyproject.toml/ruff.toml/.ruff.toml) found for {} - falling back to default configuration", document_path.display());

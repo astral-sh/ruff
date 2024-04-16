@@ -19,7 +19,7 @@ impl super::SyncNotificationHandler for DidChangeWatchedFiles {
     ) -> Result<()> {
         for change in params.changes {
             session
-                .reload_ruff_settings(&change.uri)
+                .reload_settings(&change.uri)
                 .with_failure_code(lsp_server::ErrorCode::InternalError)?;
         }
         Ok(())
