@@ -44,6 +44,9 @@ struct AsyncExprVisitor {
     found_await_or_async: bool,
 }
 
+/// Traverse a function's body to find whether it contains an await-expr, an async-with, or an
+/// async-for. Stop traversing after one is found. The bodies of inner-functions and inner-classes
+/// aren't traversed.
 impl<'a> preorder::PreorderVisitor<'a> for AsyncExprVisitor {
     fn enter_node(&mut self, _node: AnyNodeRef<'a>) -> preorder::TraversalSignal {
         if self.found_await_or_async {
@@ -68,8 +71,70 @@ impl<'a> preorder::PreorderVisitor<'a> for AsyncExprVisitor {
             Stmt::For(ast::StmtFor { is_async: true, .. }) => {
                 self.found_await_or_async = true;
             }
+            // avoid counting inner classes' or functions' bodies toward the search
+            Stmt::FunctionDef(function_def) => {
+                function_def_visit_preorder_except_body(function_def, self)
+            }
+            Stmt::ClassDef(class_def) => class_def_visit_preorder_except_body(class_def, self),
             _ => preorder::walk_stmt(self, stmt),
         }
+    }
+}
+
+/// Very nearly crate::node::StmtFunctionDef.visit_preorder, except it is specialized and,
+/// crucially, doesn't traverse the body.
+fn function_def_visit_preorder_except_body<'a, V>(
+    function_def: &'a ast::StmtFunctionDef,
+    visitor: &mut V,
+) where
+    V: preorder::PreorderVisitor<'a>,
+{
+    let ast::StmtFunctionDef {
+        parameters,
+        decorator_list,
+        returns,
+        type_params,
+        ..
+    } = function_def;
+
+    for decorator in decorator_list {
+        visitor.visit_decorator(decorator);
+    }
+
+    if let Some(type_params) = type_params {
+        visitor.visit_type_params(type_params);
+    }
+
+    visitor.visit_parameters(parameters);
+
+    for expr in returns {
+        visitor.visit_annotation(expr);
+    }
+}
+
+/// Very nearly crate::node::StmtClassDef.visit_preorder, except it is specialized and,
+/// crucially, doesn't traverse the body.
+fn class_def_visit_preorder_except_body<'a, V>(class_def: &'a ast::StmtClassDef, visitor: &mut V)
+where
+    V: preorder::PreorderVisitor<'a>,
+{
+    let ast::StmtClassDef {
+        arguments,
+        decorator_list,
+        type_params,
+        ..
+    } = class_def;
+
+    for decorator in decorator_list {
+        visitor.visit_decorator(decorator);
+    }
+
+    if let Some(type_params) = type_params {
+        visitor.visit_type_params(type_params);
+    }
+
+    if let Some(arguments) = arguments {
+        visitor.visit_arguments(arguments);
     }
 }
 
