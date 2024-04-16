@@ -71,18 +71,17 @@ pub(crate) fn unnecessary_from_float(checker: &mut Checker, call: &ExprCall) {
         _ => return,
     };
 
+    let semantic = checker.semantic();
+
     // The value must be either `decimal.Decimal` or `fractions.Fraction`.
-    let Some(constructor) =
-        checker
-            .semantic()
-            .resolve_qualified_name(value)
-            .and_then(|qualified_name| match qualified_name.segments() {
-                ["decimal", "Decimal"] => Some(Constructor::Decimal),
-                ["fractions", "Fraction"] => Some(Constructor::Fraction),
-                _ => None,
-            })
-    else {
+    let Some(qualified_name) = semantic.resolve_qualified_name(value) else {
         return;
+    };
+
+    let constructor = match qualified_name.segments() {
+        ["decimal", "Decimal"] => Constructor::Decimal,
+        ["fractions", "Fraction"] => Constructor::Fraction,
+        _ => return,
     };
 
     // `Decimal.from_decimal` doesn't exist.
@@ -131,14 +130,6 @@ pub(crate) fn unnecessary_from_float(checker: &mut Checker, call: &ExprCall) {
             break 'short_circuit;
         };
 
-        // Must be a call to the `float` builtin.
-        let Some(func_name) = func.as_name_expr() else {
-            break 'short_circuit;
-        };
-        if func_name.id != "float" {
-            break 'short_circuit;
-        };
-
         // Must have exactly one argument, which is a string literal.
         if arguments.keywords.len() != 0 {
             break 'short_circuit;
@@ -156,7 +147,8 @@ pub(crate) fn unnecessary_from_float(checker: &mut Checker, call: &ExprCall) {
             break 'short_circuit;
         }
 
-        if !checker.semantic().is_builtin("float") {
+        // Must be a call to the `float` builtin.
+        if !semantic.match_builtin_expr(func, "float") {
             break 'short_circuit;
         };
 

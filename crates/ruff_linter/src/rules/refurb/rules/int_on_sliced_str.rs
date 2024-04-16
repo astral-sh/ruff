@@ -66,13 +66,7 @@ impl AlwaysFixableViolation for IntOnSlicedStr {
 
 pub(crate) fn int_on_sliced_str(checker: &mut Checker, call: &ExprCall) {
     // Verify that the function is `int`.
-    let Expr::Name(name) = call.func.as_ref() else {
-        return;
-    };
-    if name.id.as_str() != "int" {
-        return;
-    }
-    if !checker.semantic().is_builtin("int") {
+    if !checker.semantic().match_builtin_expr(&call.func, "int") {
         return;
     }
 

@@ -37,7 +37,7 @@ pub fn classify(
             semantic
                 .resolve_qualified_name(map_callable(expr))
                 .is_some_and( |qualified_name| {
-                    matches!(qualified_name.segments(), ["", "type"] | ["abc", "ABCMeta"])
+                    matches!(qualified_name.segments(), ["" | "builtins", "type"] | ["abc", "ABCMeta"])
                 })
         })
         || decorator_list.iter().any(|decorator| is_class_method(decorator, semantic, classmethod_decorators))
@@ -63,7 +63,7 @@ fn is_static_method(
         .is_some_and(|qualified_name| {
             matches!(
                 qualified_name.segments(),
-                ["", "staticmethod"] | ["abc", "abstractstaticmethod"]
+                ["" | "builtins", "staticmethod"] | ["abc", "abstractstaticmethod"]
             ) || staticmethod_decorators
                 .iter()
                 .any(|decorator| qualified_name == QualifiedName::from_dotted_name(decorator))
@@ -103,7 +103,7 @@ fn is_class_method(
         .is_some_and(|qualified_name| {
             matches!(
                 qualified_name.segments(),
-                ["", "classmethod"] | ["abc", "abstractclassmethod"]
+                ["" | "builtins", "classmethod"] | ["abc", "abstractclassmethod"]
             ) || classmethod_decorators
                 .iter()
                 .any(|decorator| qualified_name == QualifiedName::from_dotted_name(decorator))

@@ -63,15 +63,12 @@ impl Violation for RaiseVanillaClass {
 
 /// TRY002
 pub(crate) fn raise_vanilla_class(checker: &mut Checker, expr: &Expr) {
-    if checker
-        .semantic()
-        .resolve_qualified_name(if let Expr::Call(ast::ExprCall { func, .. }) = expr {
-            func
-        } else {
-            expr
-        })
-        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["", "Exception"]))
-    {
+    let node = if let Expr::Call(ast::ExprCall { func, .. }) = expr {
+        func
+    } else {
+        expr
+    };
+    if checker.semantic().match_builtin_expr(node, "Exception") {
         checker
             .diagnostics
             .push(Diagnostic::new(RaiseVanillaClass, expr.range()));

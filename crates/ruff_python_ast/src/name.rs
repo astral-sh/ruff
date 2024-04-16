@@ -47,9 +47,15 @@ impl<'a> QualifiedName<'a> {
         self.0.as_slice()
     }
 
-    /// If the first segment is empty, the `CallPath` is that of a builtin.
+    /// If the first segment is empty, the `CallPath` represents a "builtin binding".
+    ///
+    /// A builtin binding is the binding that a symbol has if it was part of Python's
+    /// global scope without any imports taking place. However, if builtin members are
+    /// accessed explicitly via the `builtins` module, they will not have a
+    /// "builtin binding", so this method will return `false`.
+    ///
     /// Ex) `["", "bool"]` -> `"bool"`
-    pub fn is_builtin(&self) -> bool {
+    fn is_builtin(&self) -> bool {
         matches!(self.segments(), ["", ..])
     }
 

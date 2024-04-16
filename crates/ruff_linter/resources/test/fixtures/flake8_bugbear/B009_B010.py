@@ -64,3 +64,6 @@ setattr(*foo, "bar", None)
 # Regression test for: https://github.com/astral-sh/ruff/issues/7455#issuecomment-1739800901
 getattr(self.
    registration.registry, '__name__')
+
+import builtins
+builtins.getattr(foo, "bar")

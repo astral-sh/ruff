@@ -61,14 +61,15 @@ impl Violation for NonSlotAssignment {
 
 /// E0237
 pub(crate) fn non_slot_assignment(checker: &mut Checker, class_def: &ast::StmtClassDef) {
+    let semantic = checker.semantic();
+
     // If the class inherits from another class (aside from `object`), then it's possible that
     // the parent class defines the relevant `__slots__`.
-    if !class_def.bases().iter().all(|base| {
-        checker
-            .semantic()
-            .resolve_qualified_name(base)
-            .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["", "object"]))
-    }) {
+    if !class_def
+        .bases()
+        .iter()
+        .all(|base| semantic.match_builtin_expr(base, "object"))
+    {
         return;
     }
 

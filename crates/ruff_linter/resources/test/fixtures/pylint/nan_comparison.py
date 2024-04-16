@@ -47,6 +47,12 @@ if y == np.nan:
 if y == npy_nan:
     pass
 
+import builtins
+
+# PLW0117
+if x == builtins.float("nan"):
+    pass
+
 # OK
 if math.isnan(x):
     pass
