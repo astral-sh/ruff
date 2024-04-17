@@ -255,7 +255,7 @@ impl<'a> SemanticModel<'a> {
     /// Note that a "builtin binding" does *not* include explicit lookups via the `builtins`
     /// module, e.g. `import builtins; builtins.open`. It *only* includes the bindings
     /// that are pre-populated in Python's global scope before any imports have taken place.
-    pub fn is_builtin(&self, member: &str) -> bool {
+    pub fn has_builtin_binding(&self, member: &str) -> bool {
         self.lookup_symbol(member)
             .map(|binding_id| &self.bindings[binding_id])
             .is_some_and(|binding| binding.kind.is_builtin())
@@ -274,7 +274,7 @@ impl<'a> SemanticModel<'a> {
         // Fast path: we only need to worry about name expressions
         if !self.seen_module(Modules::BUILTINS) {
             let name = &expr.as_name_expr()?.id;
-            return if self.is_builtin(name) {
+            return if self.has_builtin_binding(name) {
                 Some(name)
             } else {
                 None
@@ -299,7 +299,7 @@ impl<'a> SemanticModel<'a> {
             let Expr::Name(ast::ExprName { id, .. }) = expr else {
                 return false;
             };
-            return id == symbol && self.is_builtin(symbol);
+            return id == symbol && self.has_builtin_binding(symbol);
         }
 
         // slow path: we need to consider attribute accesses and aliased imports

@@ -246,7 +246,7 @@ impl<'a> Importer<'a> {
         at: TextSize,
         semantic: &SemanticModel,
     ) -> Result<(Option<Edit>, String), ResolutionError> {
-        if semantic.is_builtin(symbol) {
+        if semantic.has_builtin_binding(symbol) {
             return Ok((None, symbol.to_string()));
         }
         let (import_edit, binding) =

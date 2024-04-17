@@ -108,7 +108,7 @@ pub(crate) fn unnecessary_dict_comprehension_for_iterable(
         dict_comp.range(),
     );
 
-    if checker.semantic().is_builtin("dict") {
+    if checker.semantic().has_builtin_binding("dict") {
         diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
             checker
                 .generator()

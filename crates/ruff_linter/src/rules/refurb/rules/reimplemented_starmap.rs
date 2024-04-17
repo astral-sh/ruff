@@ -275,7 +275,7 @@ fn try_construct_call(
 ) -> Result<String> {
     // We can only do our fix if `builtin` identifier is still bound to
     // the built-in type.
-    if !checker.semantic().is_builtin(builtin) {
+    if !checker.semantic().has_builtin_binding(builtin) {
         bail!("Can't use built-in `{builtin}` constructor")
     }
 

@@ -85,7 +85,8 @@ fn exc_info_arg_is_falsey(call: &ExprCall, checker: &mut Checker) -> bool {
         .find_keyword("exc_info")
         .map(|keyword| &keyword.value)
         .is_some_and(|value| {
-            let truthiness = Truthiness::from_expr(value, |id| checker.semantic().is_builtin(id));
+            let truthiness =
+                Truthiness::from_expr(value, |id| checker.semantic().has_builtin_binding(id));
             matches!(truthiness, Truthiness::False | Truthiness::Falsey)
         })
 }

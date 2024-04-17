@@ -173,7 +173,9 @@ pub(crate) fn unnecessary_enumerate(checker: &mut Checker, stmt_for: &ast::StmtF
                 },
                 func.range(),
             );
-            if checker.semantic().is_builtin("range") && checker.semantic().is_builtin("len") {
+            if checker.semantic().has_builtin_binding("range")
+                && checker.semantic().has_builtin_binding("len")
+            {
                 // If the `start` argument is set to something other than the `range` default,
                 // there's no clear fix.
                 let start = arguments.find_argument("start", 1);

@@ -1909,7 +1909,7 @@ impl<'a> Checker<'a> {
             }
         {
             let (all_names, all_flags) =
-                extract_all_names(parent, |name| self.semantic.is_builtin(name));
+                extract_all_names(parent, |name| self.semantic.has_builtin_binding(name));
 
             if all_flags.intersects(DunderAllFlags::INVALID_OBJECT) {
                 flags |= BindingFlags::INVALID_ALL_OBJECT;

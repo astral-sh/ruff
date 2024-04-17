@@ -464,7 +464,7 @@ fn find_shell_keyword<'a>(
     semantic: &SemanticModel,
 ) -> Option<ShellKeyword<'a>> {
     arguments.find_keyword("shell").map(|keyword| ShellKeyword {
-        truthiness: Truthiness::from_expr(&keyword.value, |id| semantic.is_builtin(id)),
+        truthiness: Truthiness::from_expr(&keyword.value, |id| semantic.has_builtin_binding(id)),
         keyword,
     })
 }
