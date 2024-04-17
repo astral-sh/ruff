@@ -1,6 +1,6 @@
-## Neovim Setup Guide for `ruff server`
+# Neovim Setup Guide for `ruff server`
 
-### Using `nvim-lspconfig`
+## Using `nvim-lspconfig`
 
 1. Install [`nvim-lspconfig`](https://github.com/neovim/nvim-lspconfig).
 1. Setup `nvim-lspconfig` with the [suggested configuration](https://github.com/neovim/nvim-lspconfig/tree/master#suggested-configuration).
@@ -17,7 +17,7 @@ on how to configure the server from there.
 >
 > If you have the older language server (`ruff-lsp`) configured in NeoVim, make sure to disable it to prevent any conflicts.
 
-#### Tips
+### Tips
 
 If you're using Ruff alongside another LSP (like Pyright), you may want to defer to that LSP for certain capabilities, like `textDocument/hover`:
 
