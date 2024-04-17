@@ -229,6 +229,29 @@ pub(crate) fn extraneous_whitespace(line: &LogicalLine, context: &mut LogicalLin
                                         )));
                                         context.push_diagnostic(diagnostic);
                                     }
+                                } else if iter.peek().is_some_and(|token| {
+                                    matches!(token.kind(), TokenKind::NonLogicalNewline)
+                                }) {
+                                    // Allow [
+                                    //      long_expression_calculating_the_index() :
+                                    // ]
+                                    // But not [
+                                    //      long_expression_calculating_the_index()  :
+                                    // ]
+                                    // distinct from the above case, because ruff format produces a
+                                    // whitespace before the expression and so should fix
+                                    if let (Whitespace::Many | Whitespace::Tab, offset) = whitespace
+                                    {
+                                        let mut diagnostic = Diagnostic::new(
+                                            WhitespaceBeforePunctuation { symbol },
+                                            TextRange::at(token.start() - offset, offset),
+                                        );
+                                        diagnostic.set_fix(Fix::safe_edits(
+                                            Edit::range_deletion(diagnostic.range()),
+                                            [Edit::insertion(" ".into(), token.start() - offset)],
+                                        ));
+                                        context.push_diagnostic(diagnostic);
+                                    }
                                 } else {
                                     // Allow, e.g., `foo[1:2]` or `foo[1 : 2]` or `foo[1 :: 2]`.
                                     let token = iter

@@ -126,157 +126,178 @@ E20.py:71:13: E203 [*] Whitespace before ','
 73 73 | if x == 4:
 74 74 |     print x, y
 
-E20.py:100:19: E203 [*] Whitespace before ':'
+E20.py:86:61: E203 [*] Whitespace before ':'
+   |
+84 | #: E203 linebreak before ]
+85 | predictions = predictions[
+86 |     len(past_covariates) // datamodule.hparams["downsample"]  :
+   |                                                             ^^ E203
+87 | ]
+88 | #:
+   |
+   = help: Remove whitespace before ':'
+
+ℹ Safe fix
+83 83 | 
+84 84 | #: E203 linebreak before ]
+85 85 | predictions = predictions[
+86    |-    len(past_covariates) // datamodule.hparams["downsample"]  :
+   86 |+    len(past_covariates) // datamodule.hparams["downsample"] :
+87 87 | ]
+88 88 | #:
+89 89 | 
+
+E20.py:110:19: E203 [*] Whitespace before ':'
     |
- 99 | #: E203:1:19
-100 | ham{lower + offset : upper + offset}
+109 | #: E203:1:19
+110 | ham{lower + offset : upper + offset}
     |                   ^ E203
-101 | 
-102 | #: E203:1:19
+111 | 
+112 | #: E203:1:19
     |
     = help: Remove whitespace before ':'
 
 ℹ Safe fix
-97  97  | ham[(lower + offset) : upper + offset]
-98  98  | 
-99  99  | #: E203:1:19
-100     |-ham{lower + offset : upper + offset}
-    100 |+ham{lower + offset: upper + offset}
-101 101 | 
-102 102 | #: E203:1:19
-103 103 | ham[lower + offset  : upper + offset]
+107 107 | ham[(lower + offset) : upper + offset]
+108 108 | 
+109 109 | #: E203:1:19
+110     |-ham{lower + offset : upper + offset}
+    110 |+ham{lower + offset: upper + offset}
+111 111 | 
+112 112 | #: E203:1:19
+113 113 | ham[lower + offset  : upper + offset]
 
-E20.py:103:19: E203 [*] Whitespace before ':'
+E20.py:113:19: E203 [*] Whitespace before ':'
     |
-102 | #: E203:1:19
-103 | ham[lower + offset  : upper + offset]
+112 | #: E203:1:19
+113 | ham[lower + offset  : upper + offset]
     |                   ^^ E203
-104 | 
-105 | #: Okay
+114 | 
+115 | #: Okay
     |
     = help: Remove whitespace before ':'
 
 ℹ Safe fix
-100 100 | ham{lower + offset : upper + offset}
-101 101 | 
-102 102 | #: E203:1:19
-103     |-ham[lower + offset  : upper + offset]
-    103 |+ham[lower + offset: upper + offset]
-104 104 | 
-105 105 | #: Okay
-106 106 | release_lines = history_file_lines[history_file_lines.index('## Unreleased') + 1: -1]
+110 110 | ham{lower + offset : upper + offset}
+111 111 | 
+112 112 | #: E203:1:19
+113     |-ham[lower + offset  : upper + offset]
+    113 |+ham[lower + offset: upper + offset]
+114 114 | 
+115 115 | #: Okay
+116 116 | release_lines = history_file_lines[history_file_lines.index('## Unreleased') + 1: -1]
 
-E20.py:131:21: E203 [*] Whitespace before ':'
+E20.py:141:21: E203 [*] Whitespace before ':'
     |
-130 | #: E203:1:21
-131 | ham[lower + offset : : upper + offset]
+140 | #: E203:1:21
+141 | ham[lower + offset : : upper + offset]
     |                     ^ E203
-132 | 
-133 | #: E203:1:20
+142 | 
+143 | #: E203:1:20
     |
     = help: Remove whitespace before ':'
 
 ℹ Safe fix
-128 128 | ham[lower + offset::upper + offset]
-129 129 | 
-130 130 | #: E203:1:21
-131     |-ham[lower + offset : : upper + offset]
-    131 |+ham[lower + offset :: upper + offset]
-132 132 | 
-133 133 | #: E203:1:20
-134 134 | ham[lower + offset: :upper + offset]
+138 138 | ham[lower + offset::upper + offset]
+139 139 | 
+140 140 | #: E203:1:21
+141     |-ham[lower + offset : : upper + offset]
+    141 |+ham[lower + offset :: upper + offset]
+142 142 | 
+143 143 | #: E203:1:20
+144 144 | ham[lower + offset: :upper + offset]
 
-E20.py:134:20: E203 [*] Whitespace before ':'
+E20.py:144:20: E203 [*] Whitespace before ':'
     |
-133 | #: E203:1:20
-134 | ham[lower + offset: :upper + offset]
+143 | #: E203:1:20
+144 | ham[lower + offset: :upper + offset]
     |                    ^ E203
-135 | 
-136 | #: E203:1:20
+145 | 
+146 | #: E203:1:20
     |
     = help: Remove whitespace before ':'
 
 ℹ Safe fix
-131 131 | ham[lower + offset : : upper + offset]
-132 132 | 
-133 133 | #: E203:1:20
-134     |-ham[lower + offset: :upper + offset]
-    134 |+ham[lower + offset::upper + offset]
-135 135 | 
-136 136 | #: E203:1:20
-137 137 | ham[{lower + offset : upper + offset} : upper + offset]
+141 141 | ham[lower + offset : : upper + offset]
+142 142 | 
+143 143 | #: E203:1:20
+144     |-ham[lower + offset: :upper + offset]
+    144 |+ham[lower + offset::upper + offset]
+145 145 | 
+146 146 | #: E203:1:20
+147 147 | ham[{lower + offset : upper + offset} : upper + offset]
 
-E20.py:137:20: E203 [*] Whitespace before ':'
+E20.py:147:20: E203 [*] Whitespace before ':'
     |
-136 | #: E203:1:20
-137 | ham[{lower + offset : upper + offset} : upper + offset]
+146 | #: E203:1:20
+147 | ham[{lower + offset : upper + offset} : upper + offset]
     |                    ^ E203
-138 | 
-139 | #: Okay
+148 | 
+149 | #: Okay
     |
     = help: Remove whitespace before ':'
 
 ℹ Safe fix
-134 134 | ham[lower + offset: :upper + offset]
-135 135 | 
-136 136 | #: E203:1:20
-137     |-ham[{lower + offset : upper + offset} : upper + offset]
-    137 |+ham[{lower + offset: upper + offset} : upper + offset]
-138 138 | 
-139 139 | #: Okay
-140 140 | ham[upper:]
+144 144 | ham[lower + offset: :upper + offset]
+145 145 | 
+146 146 | #: E203:1:20
+147     |-ham[{lower + offset : upper + offset} : upper + offset]
+    147 |+ham[{lower + offset: upper + offset} : upper + offset]
+148 148 | 
+149 149 | #: Okay
+150 150 | ham[upper:]
 
-E20.py:149:10: E203 [*] Whitespace before ':'
+E20.py:159:10: E203 [*] Whitespace before ':'
     |
-148 | #: E203:1:10
-149 | ham[upper  :]
+158 | #: E203:1:10
+159 | ham[upper  :]
     |          ^^ E203
-150 | 
-151 | #: Okay
+160 | 
+161 | #: Okay
     |
     = help: Remove whitespace before ':'
 
 ℹ Safe fix
-146 146 | ham[upper : ]
-147 147 | 
-148 148 | #: E203:1:10
-149     |-ham[upper  :]
-    149 |+ham[upper:]
-150 150 | 
-151 151 | #: Okay
-152 152 | ham[lower +1 :, "columnname"]
+156 156 | ham[upper : ]
+157 157 | 
+158 158 | #: E203:1:10
+159     |-ham[upper  :]
+    159 |+ham[upper:]
+160 160 | 
+161 161 | #: Okay
+162 162 | ham[lower +1 :, "columnname"]
 
-E20.py:155:14: E203 [*] Whitespace before ':'
+E20.py:165:14: E203 [*] Whitespace before ':'
     |
-154 | #: E203:1:13
-155 | ham[lower + 1  :, "columnname"]
+164 | #: E203:1:13
+165 | ham[lower + 1  :, "columnname"]
     |              ^^ E203
-156 | 
-157 | #: Okay
+166 | 
+167 | #: Okay
     |
     = help: Remove whitespace before ':'
 
 ℹ Safe fix
-152 152 | ham[lower +1 :, "columnname"]
-153 153 | 
-154 154 | #: E203:1:13
-155     |-ham[lower + 1  :, "columnname"]
-    155 |+ham[lower + 1:, "columnname"]
-156 156 | 
-157 157 | #: Okay
-158 158 | f"{ham[lower +1 :, "columnname"]}"
+162 162 | ham[lower +1 :, "columnname"]
+163 163 | 
+164 164 | #: E203:1:13
+165     |-ham[lower + 1  :, "columnname"]
+    165 |+ham[lower + 1:, "columnname"]
+166 166 | 
+167 167 | #: Okay
+168 168 | f"{ham[lower +1 :, "columnname"]}"
 
-E20.py:161:17: E203 [*] Whitespace before ':'
+E20.py:171:17: E203 [*] Whitespace before ':'
     |
-160 | #: E203:1:13
-161 | f"{ham[lower + 1  :, "columnname"]}"
+170 | #: E203:1:13
+171 | f"{ham[lower + 1  :, "columnname"]}"
     |                 ^^ E203
     |
     = help: Remove whitespace before ':'
 
 ℹ Safe fix
-158 158 | f"{ham[lower +1 :, "columnname"]}"
-159 159 | 
-160 160 | #: E203:1:13
-161     |-f"{ham[lower + 1  :, "columnname"]}"
-    161 |+f"{ham[lower + 1:, "columnname"]}"
+168 168 | f"{ham[lower +1 :, "columnname"]}"
+169 169 | 
+170 170 | #: E203:1:13
+171     |-f"{ham[lower + 1  :, "columnname"]}"
+    171 |+f"{ham[lower + 1:, "columnname"]}"
