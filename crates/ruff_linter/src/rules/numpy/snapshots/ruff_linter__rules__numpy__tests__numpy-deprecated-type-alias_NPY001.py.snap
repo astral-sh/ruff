@@ -144,7 +144,7 @@ NPY001.py:20:16: NPY001 [*] Type alias `np.int` is deprecated, replace with buil
 22 22 | # Regression test for: https://github.com/astral-sh/ruff/issues/6952
 23 23 | from numpy import float
 
-NPY001.py:25:1: NPY001 Type alias `np.float` is deprecated, replace with builtin type
+NPY001.py:25:1: NPY001 [*] Type alias `np.float` is deprecated, replace with builtin type
    |
 23 | from numpy import float
 24 | 
@@ -153,4 +153,11 @@ NPY001.py:25:1: NPY001 Type alias `np.float` is deprecated, replace with builtin
    |
    = help: Replace `np.float` with builtin type
 
-
+ℹ Safe fix
+21 21 | 
+22 22 | # Regression test for: https://github.com/astral-sh/ruff/issues/6952
+23 23 | from numpy import float
+   24 |+import builtins
+24 25 | 
+25    |-float(1)
+   26 |+builtins.float(1)
