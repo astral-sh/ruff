@@ -38,5 +38,15 @@ invalid_return_type_hash.py:17:9: PLE0309 `__hash__` does not return `integer`
 17 |         print("ruff")  # [invalid-hash-return]
    |         ^^^^^^^^^^^^^ PLE0309
 18 | 
-19 | # TODO: Once Ruff has better type checking
+19 | class HashWrongRaise:
+   |
+
+invalid_return_type_hash.py:22:9: PLE0309 `__hash__` does not return `integer`
+   |
+20 |     def __hash__(self):
+21 |         print("raise some error")
+22 |         raise NotImplementedError  # [invalid-hash-return]
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^ PLE0309
+23 | 
+24 | # TODO: Once Ruff has better type checking
    |

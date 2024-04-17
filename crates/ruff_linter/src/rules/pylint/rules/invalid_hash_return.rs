@@ -54,6 +54,14 @@ pub(crate) fn invalid_hash_return(checker: &mut Checker, name: &str, body: &[Stm
         return;
     }
 
+    if body.len() == 1
+        && (matches!(&body[0], Stmt::Expr(expr) if expr.value.is_ellipsis_literal_expr())
+            || body[0].is_pass_stmt()
+            || body[0].is_raise_stmt())
+    {
+        return;
+    }
+
     let returns = {
         let mut visitor = ReturnStatementVisitor::default();
         visitor.visit_body(body);

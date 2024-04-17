@@ -16,6 +16,11 @@ class HashNoReturn:
     def __hash__(self):
         print("ruff")  # [invalid-hash-return]
 
+class HashWrongRaise:
+    def __hash__(self):
+        print("raise some error")
+        raise NotImplementedError  # [invalid-hash-return]
+
 # TODO: Once Ruff has better type checking
 def return_int():
     return "3"
@@ -31,3 +36,20 @@ class ComplexReturn:
 class Hash:
     def __hash__(self):
         return 7741
+
+class Hash2:
+    def __hash__(self):
+        x = 7741
+        return x
+
+class Hash3:
+    def __hash__(self):
+        ...
+
+class Has4:
+    def __hash__(self):
+        pass
+
+class Hash5:
+    def __hash__(self):
+        raise NotImplementedError
