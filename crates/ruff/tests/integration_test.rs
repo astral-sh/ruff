@@ -71,6 +71,7 @@ impl<'a> RuffCheck<'a> {
     /// Generate a [`Command`] for the `ruff check` command.
     fn build(self) -> Command {
         let mut cmd = ruff_cmd();
+        cmd.arg("check");
         if let Some(output_format) = self.output_format {
             cmd.args(["--output-format", output_format]);
         }
@@ -100,6 +101,7 @@ fn stdin_success() {
     success: true
     exit_code: 0
     ----- stdout -----
+    All checks passed!
 
     ----- stderr -----
     "###);
@@ -221,6 +223,7 @@ fn stdin_source_type_pyi() {
     success: true
     exit_code: 0
     ----- stdout -----
+    All checks passed!
 
     ----- stderr -----
     "###);
@@ -589,6 +592,7 @@ fn stdin_fix_when_no_issues_should_still_print_contents() {
     print(sys.version)
 
     ----- stderr -----
+    All checks passed!
     "###);
 }
 
@@ -805,13 +809,13 @@ fn full_output_format() {
 }
 
 #[test]
-fn explain_status_codes_f401() {
-    assert_cmd_snapshot!(ruff_cmd().args(["--explain", "F401"]));
+fn rule_f401() {
+    assert_cmd_snapshot!(ruff_cmd().args(["rule", "F401"]));
 }
 
 #[test]
-fn explain_status_codes_ruf404() {
-    assert_cmd_snapshot!(ruff_cmd().args(["--explain", "RUF404"]), @r###"
+fn rule_invalid_rule_name() {
+    assert_cmd_snapshot!(ruff_cmd().args(["rule", "RUF404"]), @r###"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -1022,6 +1026,7 @@ fn preview_disabled_direct() {
     success: true
     exit_code: 0
     ----- stdout -----
+    All checks passed!
 
     ----- stderr -----
     warning: Selection `RUF911` has no effect because preview is not enabled.
@@ -1038,6 +1043,7 @@ fn preview_disabled_prefix_empty() {
     success: true
     exit_code: 0
     ----- stdout -----
+    All checks passed!
 
     ----- stderr -----
     warning: Selection `RUF91` has no effect because preview is not enabled.
@@ -1054,6 +1060,7 @@ fn preview_disabled_does_not_warn_for_empty_ignore_selections() {
     success: true
     exit_code: 0
     ----- stdout -----
+    All checks passed!
 
     ----- stderr -----
     "###);
@@ -1069,6 +1076,7 @@ fn preview_disabled_does_not_warn_for_empty_fixable_selections() {
     success: true
     exit_code: 0
     ----- stdout -----
+    All checks passed!
 
     ----- stderr -----
     "###);
@@ -1174,6 +1182,7 @@ fn removed_indirect() {
     success: true
     exit_code: 0
     ----- stdout -----
+    All checks passed!
 
     ----- stderr -----
     "###);
@@ -1204,6 +1213,7 @@ fn redirect_indirect() {
     success: true
     exit_code: 0
     ----- stdout -----
+    All checks passed!
 
     ----- stderr -----
     "###);
@@ -1306,6 +1316,7 @@ fn deprecated_indirect_preview_enabled() {
     success: true
     exit_code: 0
     ----- stdout -----
+    All checks passed!
 
     ----- stderr -----
     "###);
@@ -1342,13 +1353,14 @@ fn unreadable_pyproject_toml() -> Result<()> {
     // Create an empty file with 000 permissions
     fs::OpenOptions::new()
         .create(true)
+        .truncate(true)
         .write(true)
         .mode(0o000)
         .open(pyproject_toml)?;
 
     // Don't `--isolated` since the configuration discovery is where the error happens
     let args = Args::parse_from(["", "check", "--no-cache", tempdir.path().to_str().unwrap()]);
-    let err = run(args).err().context("Unexpected success")?;
+    let err = run(args, None).err().context("Unexpected success")?;
     assert_eq!(
         err.chain()
             .map(std::string::ToString::to_string)
@@ -1382,6 +1394,7 @@ fn unreadable_dir() -> Result<()> {
     success: true
     exit_code: 0
     ----- stdout -----
+    All checks passed!
 
     ----- stderr -----
     warning: Encountered error: Permission denied (os error 13)
@@ -1896,6 +1909,7 @@ def log(x, base) -> float:
     success: true
     exit_code: 0
     ----- stdout -----
+    All checks passed!
 
     ----- stderr -----
     "###

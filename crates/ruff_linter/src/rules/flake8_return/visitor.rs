@@ -13,6 +13,21 @@ pub(super) struct Stack<'data> {
     pub(super) elifs_elses: Vec<(&'data [Stmt], &'data ElifElseClause)>,
     /// The non-local variables in the current function.
     pub(super) non_locals: FxHashSet<&'data str>,
+    /// The annotated variables in the current function.
+    ///
+    /// For example, consider:
+    /// ```python
+    /// x: int
+    ///
+    /// if True:
+    ///    x = foo()
+    ///    return x
+    /// ```
+    ///
+    /// In this case, the annotation on `x` is used to cast the return value
+    /// of `foo()` to an `int`. Removing the `x = foo()` statement would
+    /// change the return type of the function.
+    pub(super) annotations: FxHashSet<&'data str>,
     /// Whether the current function is a generator.
     pub(super) is_generator: bool,
     /// The `assignment`-to-`return` statement pairs in the current function.
@@ -85,6 +100,14 @@ impl<'semantic, 'a> Visitor<'a> for ReturnVisitor<'semantic, 'a> {
                 self.stack
                     .non_locals
                     .extend(names.iter().map(Identifier::as_str));
+            }
+            Stmt::AnnAssign(ast::StmtAnnAssign { target, value, .. }) => {
+                // Ex) `x: int`
+                if value.is_none() {
+                    if let Expr::Name(name) = target.as_ref() {
+                        self.stack.annotations.insert(name.id.as_str());
+                    }
+                }
             }
             Stmt::Return(stmt_return) => {
                 // If the `return` statement is preceded by an `assignment` statement, then the
@@ -163,19 +186,6 @@ impl<'semantic, 'a> Visitor<'a> for ReturnVisitor<'semantic, 'a> {
     }
 }
 
-/// RET504
-/// If the last statement is a `return` statement, and the second-to-last statement is a
-/// `with` statement that suppresses an exception, then we should not analyze the `return`
-/// statement for unnecessary assignments. Otherwise we will suggest removing the assignment
-/// and the `with` statement, which would change the behavior of the code.
-///
-/// Example:
-/// ```python
-/// def foo(data):
-///    with suppress(JSONDecoderError):
-///       data = data.decode()
-///   return data
-
 /// Returns `true` if the [`With`] statement is known to have a conditional body. In other words:
 /// if the [`With`] statement's body may or may not run.
 ///
@@ -198,8 +208,8 @@ fn has_conditional_body(with: &ast::StmtWith, semantic: &SemanticModel) -> bool 
         else {
             return false;
         };
-        if let Some(call_path) = semantic.resolve_call_path(func) {
-            if call_path.as_slice() == ["contextlib", "suppress"] {
+        if let Some(qualified_name) = semantic.resolve_qualified_name(func) {
+            if qualified_name.segments() == ["contextlib", "suppress"] {
                 return true;
             }
         }

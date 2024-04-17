@@ -78,8 +78,8 @@ pub(crate) fn os_sep_split(checker: &mut Checker, call: &ast::ExprCall) {
 
     if !checker
         .semantic()
-        .resolve_call_path(sep)
-        .is_some_and(|call_path| matches!(call_path.as_slice(), ["os", "sep"]))
+        .resolve_qualified_name(sep)
+        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["os", "sep"]))
     {
         return;
     }

@@ -173,6 +173,8 @@ fn format_import_block(
         &settings.known_modules,
         target_version,
         settings.no_sections,
+        &settings.section_order,
+        &settings.default_section,
     );
 
     let mut output = String::new();
@@ -276,7 +278,7 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
-    use rustc_hash::FxHashMap;
+    use rustc_hash::{FxHashMap, FxHashSet};
     use test_case::test_case;
 
     use ruff_text_size::Ranged;
@@ -340,6 +342,7 @@ mod tests {
     #[test_case(Path::new("star_before_others.py"))]
     #[test_case(Path::new("trailing_suffix.py"))]
     #[test_case(Path::new("type_comments.py"))]
+    #[test_case(Path::new("unicode.py"))]
     fn default(path: &Path) -> Result<()> {
         let snapshot = format!("{}", path.to_string_lossy());
         let diagnostics = test_path(
@@ -468,6 +471,31 @@ mod tests {
         Ok(())
     }
 
+    #[test_case(Path::new("separate_local_folder_imports.py"))]
+    fn known_local_folder_closest(path: &Path) -> Result<()> {
+        let snapshot = format!("known_local_folder_closest_{}", path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("isort").join(path).as_path(),
+            &LinterSettings {
+                isort: super::settings::Settings {
+                    known_modules: KnownModules::new(
+                        vec![],
+                        vec![],
+                        vec![pattern("ruff")],
+                        vec![],
+                        FxHashMap::default(),
+                    ),
+                    relative_imports_order: RelativeImportsOrder::ClosestToFurthest,
+                    ..super::settings::Settings::default()
+                },
+                src: vec![test_resource_path("fixtures/isort")],
+                ..LinterSettings::for_rule(Rule::UnsortedImports)
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
     #[test_case(Path::new("case_sensitive.py"))]
     fn case_sensitive(path: &Path) -> Result<()> {
         let snapshot = format!("case_sensitive_{}", path.to_string_lossy());
@@ -493,7 +521,7 @@ mod tests {
             Path::new("isort").join(path).as_path(),
             &LinterSettings {
                 isort: super::settings::Settings {
-                    force_to_top: BTreeSet::from([
+                    force_to_top: FxHashSet::from_iter([
                         "z".to_string(),
                         "lib1".to_string(),
                         "lib3".to_string(),
@@ -573,9 +601,10 @@ mod tests {
             &LinterSettings {
                 isort: super::settings::Settings {
                     force_single_line: true,
-                    single_line_exclusions: vec!["os".to_string(), "logging.handlers".to_string()]
-                        .into_iter()
-                        .collect::<BTreeSet<_>>(),
+                    single_line_exclusions: FxHashSet::from_iter([
+                        "os".to_string(),
+                        "logging.handlers".to_string(),
+                    ]),
                     ..super::settings::Settings::default()
                 },
                 src: vec![test_resource_path("fixtures/isort")],
@@ -634,7 +663,7 @@ mod tests {
             &LinterSettings {
                 isort: super::settings::Settings {
                     order_by_type: true,
-                    classes: BTreeSet::from([
+                    classes: FxHashSet::from_iter([
                         "SVC".to_string(),
                         "SELU".to_string(),
                         "N_CLASS".to_string(),
@@ -662,7 +691,7 @@ mod tests {
             &LinterSettings {
                 isort: super::settings::Settings {
                     order_by_type: true,
-                    constants: BTreeSet::from([
+                    constants: FxHashSet::from_iter([
                         "Const".to_string(),
                         "constant".to_string(),
                         "First".to_string(),
@@ -692,7 +721,7 @@ mod tests {
             &LinterSettings {
                 isort: super::settings::Settings {
                     order_by_type: true,
-                    variables: BTreeSet::from([
+                    variables: FxHashSet::from_iter([
                         "VAR".to_string(),
                         "Variable".to_string(),
                         "MyVar".to_string(),
@@ -719,7 +748,7 @@ mod tests {
             &LinterSettings {
                 isort: super::settings::Settings {
                     force_sort_within_sections: true,
-                    force_to_top: BTreeSet::from(["z".to_string()]),
+                    force_to_top: FxHashSet::from_iter(["z".to_string()]),
                     ..super::settings::Settings::default()
                 },
                 src: vec![test_resource_path("fixtures/isort")],
@@ -769,7 +798,7 @@ mod tests {
             &LinterSettings {
                 src: vec![test_resource_path("fixtures/isort")],
                 isort: super::settings::Settings {
-                    required_imports: BTreeSet::from([
+                    required_imports: BTreeSet::from_iter([
                         "from __future__ import annotations".to_string()
                     ]),
                     ..super::settings::Settings::default()
@@ -799,7 +828,7 @@ mod tests {
             &LinterSettings {
                 src: vec![test_resource_path("fixtures/isort")],
                 isort: super::settings::Settings {
-                    required_imports: BTreeSet::from([
+                    required_imports: BTreeSet::from_iter([
                         "from __future__ import annotations as _annotations".to_string(),
                     ]),
                     ..super::settings::Settings::default()
@@ -822,7 +851,7 @@ mod tests {
             &LinterSettings {
                 src: vec![test_resource_path("fixtures/isort")],
                 isort: super::settings::Settings {
-                    required_imports: BTreeSet::from([
+                    required_imports: BTreeSet::from_iter([
                         "from __future__ import annotations".to_string(),
                         "from __future__ import generator_stop".to_string(),
                     ]),
@@ -846,7 +875,7 @@ mod tests {
             &LinterSettings {
                 src: vec![test_resource_path("fixtures/isort")],
                 isort: super::settings::Settings {
-                    required_imports: BTreeSet::from(["from __future__ import annotations, \
+                    required_imports: BTreeSet::from_iter(["from __future__ import annotations, \
                                                        generator_stop"
                         .to_string()]),
                     ..super::settings::Settings::default()
@@ -869,7 +898,7 @@ mod tests {
             &LinterSettings {
                 src: vec![test_resource_path("fixtures/isort")],
                 isort: super::settings::Settings {
-                    required_imports: BTreeSet::from(["import os".to_string()]),
+                    required_imports: BTreeSet::from_iter(["import os".to_string()]),
                     ..super::settings::Settings::default()
                 },
                 ..LinterSettings::for_rule(Rule::MissingRequiredImport)
@@ -934,6 +963,65 @@ mod tests {
         Ok(())
     }
 
+    #[test_case(Path::new("default_section_user_defined.py"))]
+    fn default_section_can_map_to_user_defined_section(path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "default_section_can_map_to_user_defined_section_{}",
+            path.to_string_lossy()
+        );
+        let diagnostics = test_path(
+            Path::new("isort").join(path).as_path(),
+            &LinterSettings {
+                isort: super::settings::Settings {
+                    known_modules: KnownModules::new(
+                        vec![],
+                        vec![],
+                        vec![],
+                        vec![],
+                        FxHashMap::from_iter([("django".to_string(), vec![pattern("django")])]),
+                    ),
+                    section_order: vec![
+                        ImportSection::Known(ImportType::Future),
+                        ImportSection::UserDefined("django".to_string()),
+                        ImportSection::Known(ImportType::FirstParty),
+                        ImportSection::Known(ImportType::LocalFolder),
+                    ],
+                    force_sort_within_sections: true,
+                    default_section: ImportSection::UserDefined("django".to_string()),
+                    ..super::settings::Settings::default()
+                },
+                src: vec![test_resource_path("fixtures/isort")],
+                ..LinterSettings::for_rule(Rule::UnsortedImports)
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Path::new("no_standard_library.py"))]
+    fn no_standard_library(path: &Path) -> Result<()> {
+        let snapshot = format!("no_standard_library_{}", path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("isort").join(path).as_path(),
+            &LinterSettings {
+                isort: super::settings::Settings {
+                    section_order: vec![
+                        ImportSection::Known(ImportType::Future),
+                        ImportSection::Known(ImportType::ThirdParty),
+                        ImportSection::Known(ImportType::FirstParty),
+                        ImportSection::Known(ImportType::LocalFolder),
+                    ],
+                    force_sort_within_sections: true,
+                    ..super::settings::Settings::default()
+                },
+                src: vec![test_resource_path("fixtures/isort")],
+                ..LinterSettings::for_rule(Rule::UnsortedImports)
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
     #[test_case(Path::new("no_lines_before.py"))]
     fn no_lines_before(path: &Path) -> Result<()> {
         let snapshot = format!("no_lines_before.py_{}", path.to_string_lossy());
@@ -941,7 +1029,7 @@ mod tests {
             Path::new("isort").join(path).as_path(),
             &LinterSettings {
                 isort: super::settings::Settings {
-                    no_lines_before: BTreeSet::from([
+                    no_lines_before: FxHashSet::from_iter([
                         ImportSection::Known(ImportType::Future),
                         ImportSection::Known(ImportType::StandardLibrary),
                         ImportSection::Known(ImportType::ThirdParty),
@@ -969,7 +1057,7 @@ mod tests {
             Path::new("isort").join(path).as_path(),
             &LinterSettings {
                 isort: super::settings::Settings {
-                    no_lines_before: BTreeSet::from([
+                    no_lines_before: FxHashSet::from_iter([
                         ImportSection::Known(ImportType::StandardLibrary),
                         ImportSection::Known(ImportType::LocalFolder),
                     ]),

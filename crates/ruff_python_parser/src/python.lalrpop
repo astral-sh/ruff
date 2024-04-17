@@ -4,7 +4,7 @@
 // See also: https://greentreesnakes.readthedocs.io/en/latest/nodes.html#keyword
 
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
-use ruff_python_ast::{self as ast, Int, IpyEscapeKind};
+use ruff_python_ast::{self as ast, Int, IpyEscapeKind, AnyStringKind};
 use crate::{
     FStringErrorType,
     Mode,
@@ -12,7 +12,7 @@ use crate::{
     function::{ArgumentList, parse_arguments, validate_pos_params, validate_arguments},
     context::set_context,
     string::{StringType, concatenated_strings, parse_fstring_literal_element, parse_string_literal},
-    token::{self, StringKind},
+    token,
     invalid,
 };
 use lalrpop_util::ParseError;
@@ -1028,7 +1028,7 @@ WithItems: Vec<ast::WithItem> = {
         // ```
         // In this case, the `(` and `)` are part of the `with` statement.
         // The same applies to `yield` and `yield from`.
-        let item = if item.optional_vars.is_none() && matches!(item.context_expr, ast::Expr::NamedExpr(_) | ast::Expr::Yield(_) | ast::Expr::YieldFrom(_)) {
+        let item = if item.optional_vars.is_none() && matches!(item.context_expr, ast::Expr::Named(_) | ast::Expr::Yield(_) | ast::Expr::YieldFrom(_)) {
             ast::WithItem {
                 range: item.range().add_start(TextSize::new(1)).sub_end(TextSize::new(1)),
                 context_expr: item.context_expr,
@@ -1150,24 +1150,6 @@ ParameterList<ParameterType, StarParameterType, DoubleStarParameterType>: ast::P
             range: (location..end_location).into()
         })
     },
-    <location:@L> <param1:ParameterDefs<ParameterType>> <kw:("," <KwargParameter<DoubleStarParameterType>>)> ","? <end_location:@R> =>? {
-        validate_pos_params(&param1)?;
-        let (posonlyargs, args) = param1;
-
-        // Now gather rest of parameters:
-        let vararg = None;
-        let kwonlyargs = vec![];
-        let kwarg = kw;
-
-        Ok(ast::Parameters {
-            posonlyargs,
-            args,
-            kwonlyargs,
-            vararg,
-            kwarg,
-            range: (location..end_location).into()
-        })
-    },
     <location:@L> <params:ParameterListStarArgs<ParameterType, StarParameterType, DoubleStarParameterType>> ","? <end_location:@R> => {
         let (vararg, kwonlyargs, kwarg) = params;
         ast::Parameters {
@@ -1175,16 +1157,6 @@ ParameterList<ParameterType, StarParameterType, DoubleStarParameterType>: ast::P
             args: vec![],
             kwonlyargs,
             vararg,
-            kwarg,
-            range: (location..end_location).into()
-        }
-    },
-    <location:@L> <kwarg:KwargParameter<DoubleStarParameterType>> ","? <end_location:@R> => {
-        ast::Parameters {
-            posonlyargs: vec![],
-            args: vec![],
-            kwonlyargs: vec![],
-            vararg: None,
             kwarg,
             range: (location..end_location).into()
         }
@@ -1218,7 +1190,11 @@ UntypedParameter: ast::ParameterWithDefault = {
     },
 };
 StarUntypedParameter: ast::Parameter = {
-    <location:@L> <arg:Identifier> <end_location:@R> => ast::Parameter { name:arg, annotation: None, range: (location..end_location).into() },
+    <location:@L> "*" <arg:Identifier> <end_location:@R> => ast::Parameter { name:arg, annotation: None, range: (location..end_location).into() },
+};
+
+DoubleStarUntypedParameter: ast::Parameter = {
+    <location:@L> "**" <arg:Identifier> <end_location:@R> => ast::Parameter { name:arg, annotation: None, range: (location..end_location).into() },
 };
 
 TypedParameter: ast::ParameterWithDefault = {
@@ -1230,14 +1206,14 @@ TypedParameter: ast::ParameterWithDefault = {
 };
 
 StarTypedParameter: ast::Parameter = {
-    <location:@L> <name:Identifier> <annotation:(":" <TestOrStarExpr>)?> <end_location:@R> => {
+    <location:@L> "*" <name:Identifier> <annotation:(":" <TestOrStarExpr>)?> <end_location:@R> => {
         let annotation = annotation.map(ast::Expr::from).map(Box::new);
         ast::Parameter { name, annotation, range: (location..end_location).into() }
     },
 };
 
 DoubleStarTypedParameter: ast::Parameter = {
-    <location:@L> <name:Identifier> <annotation:(":" <Test<"all">>)?> <end_location:@R> => {
+    <location:@L> "**" <name:Identifier> <annotation:(":" <Test<"all">>)?> <end_location:@R> => {
         let annotation = annotation.map(ast::Expr::from).map(Box::new);
         ast::Parameter { name, annotation, range: (location..end_location).into() }
     },
@@ -1247,25 +1223,29 @@ DoubleStarTypedParameter: ast::Parameter = {
 // TODO: figure out another grammar that makes this inline no longer required.
 #[inline]
 ParameterListStarArgs<ParameterType, StarParameterType, DoubleStarParameterType>: (Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>) = {
-    <location:@L> "*" <va:StarParameterType?> <kwonlyargs:("," <ParameterDef<ParameterType>>)*> <kwarg:("," <KwargParameter<DoubleStarParameterType>>)?> =>? {
-        if va.is_none() && kwonlyargs.is_empty() && kwarg.is_none() {
+    <location:@L> <va:StarParameterType> <kwonlyargs:("," <ParameterDef<ParameterType>>)*> <kwarg:("," <DoubleStarParameterType>)?> =>? {
+        let kwarg = kwarg.map(Box::new);
+        let va = Some(Box::new(va));
+
+        Ok((va, kwonlyargs, kwarg))
+    },
+    <location:@L> "*" <kwonlyargs:("," <ParameterDef<ParameterType>>)*> <kwarg:("," <DoubleStarParameterType>)?> =>? {
+        if kwonlyargs.is_empty() {
             return Err(LexicalError::new(
                 LexicalErrorType::OtherError("named arguments must follow bare *".to_string().into_boxed_str()),
                 location,
             ))?;
         }
 
-        let kwarg = kwarg.flatten();
-        let va = va.map(Box::new);
+        let kwarg = kwarg.map(Box::new);
 
-        Ok((va, kwonlyargs, kwarg))
-    }
-};
+        Ok((None, kwonlyargs, kwarg))
+    },
+    <location:@L> <kwarg:(<DoubleStarParameterType>)> =>? {
+        let kwarg = Some(Box::new(kwarg));
 
-KwargParameter<ParameterType>: Option<Box<ast::Parameter>> = {
-    "**" <kwarg:ParameterType?> => {
-        kwarg.map(Box::new)
-    }
+        Ok((None, vec![], kwarg))
+    },
 };
 
 ClassDef: ast::Stmt = {
@@ -1330,7 +1310,7 @@ YieldExpr: crate::parser::ParenthesizedExpr = {
 };
 
 Test<Goal>: crate::parser::ParenthesizedExpr = {
-    <location:@L> <body:OrTest<"all">> "if" <test:OrTest<"all">> "else" <orelse:Test<"all">> <end_location:@R> => ast::ExprIfExp {
+    <location:@L> <body:OrTest<"all">> "if" <test:OrTest<"all">> "else" <orelse:Test<"all">> <end_location:@R> => ast::ExprIf {
         test: Box::new(test.into()),
         body: Box::new(body.into()),
         orelse: Box::new(orelse.into()),
@@ -1355,7 +1335,7 @@ NamedExpressionName: crate::parser::ParenthesizedExpr = {
 
 NamedExpression: crate::parser::ParenthesizedExpr = {
     <location:@L> <target:NamedExpressionName> ":=" <value:Test<"all">> <end_location:@R> => {
-        ast::ExprNamedExpr {
+        ast::ExprNamed {
             target: Box::new(target.into()),
             value: Box::new(value.into()),
             range: (location..end_location).into(),
@@ -1364,7 +1344,7 @@ NamedExpression: crate::parser::ParenthesizedExpr = {
 };
 
 LambdaDef: crate::parser::ParenthesizedExpr = {
-    <location:@L> "lambda" <location_args:@L> <parameters:ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter>?> <end_location_args:@R> ":" <fstring_middle:fstring_middle?> <body:Test<"all">> <end_location:@R> =>? {
+    <location:@L> "lambda" <location_args:@L> <parameters:ParameterList<UntypedParameter, StarUntypedParameter, DoubleStarUntypedParameter>?> <end_location_args:@R> ":" <fstring_middle:fstring_middle?> <body:Test<"all">> <end_location:@R> =>? {
         if fstring_middle.is_some() {
             return Err(LexicalError::new(
                 LexicalErrorType::FStringError(FStringErrorType::LambdaWithoutParentheses),
@@ -1619,16 +1599,17 @@ StringLiteralOrFString: StringType = {
 
 StringLiteral: StringType = {
     <location:@L> <string:string> <end_location:@R> =>? {
-        let (source, kind, triple_quoted) = string;
-        Ok(parse_string_literal(source, kind, triple_quoted, (location..end_location).into())?)
+        let (source, kind) = string;
+        Ok(parse_string_literal(source, kind, (location..end_location).into())?)
     }
 };
 
 FStringExpr: StringType = {
-    <location:@L> FStringStart <elements:FStringMiddlePattern*> FStringEnd <end_location:@R> => {
+    <location:@L> <start:fstring_start> <elements:FStringMiddlePattern*> FStringEnd <end_location:@R> => {
         StringType::FString(ast::FString {
             elements,
-            range: (location..end_location).into()
+            range: (location..end_location).into(),
+            flags: start.into()
         })
     }
 };
@@ -1636,8 +1617,8 @@ FStringExpr: StringType = {
 FStringMiddlePattern: ast::FStringElement = {
     FStringReplacementField,
     <location:@L> <fstring_middle:fstring_middle> <end_location:@R> =>? {
-        let (source, is_raw, _) = fstring_middle;
-        Ok(parse_fstring_literal_element(source, is_raw, (location..end_location).into())?)
+        let (source, kind) = fstring_middle;
+        Ok(parse_fstring_literal_element(source, kind, (location..end_location).into())?)
     }
 };
 
@@ -1770,7 +1751,7 @@ Atom<Goal>: crate::parser::ParenthesizedExpr = {
         expr: e.into(),
         range: (location..end_location).into(),
     },
-    <location:@L> "(" <elt:NamedExpressionTest> <generators:CompFor> ")" <end_location:@R> => ast::ExprGeneratorExp {
+    <location:@L> "(" <elt:NamedExpressionTest> <generators:CompFor> ")" <end_location:@R> => ast::ExprGenerator {
         elt: Box::new(elt.into()),
         generators,
         range: (location..end_location).into(),
@@ -1921,8 +1902,8 @@ Arguments: ast::Arguments = {
 FunctionArgument: (Option<(TextSize, TextSize, Option<ast::Identifier>)>, ast::Expr) = {
     <location:@L> <elt:NamedExpressionTest> <generators:CompFor?> <end_location:@R> => {
         let expr = match generators {
-            Some(generators) => ast::Expr::GeneratorExp(
-                ast::ExprGeneratorExp {
+            Some(generators) => ast::Expr::Generator(
+                ast::ExprGenerator {
                     elt: Box::new(elt.into()),
                     generators,
                     range: (location..end_location).into(),
@@ -1954,7 +1935,7 @@ Comma<T>: Vec<T> = {
     }
 };
 
-/// One ore more items that are separated by a comma.
+/// One or more items that are separated by a comma.
 OneOrMore<T>: Vec<T> = {
     <e:T> => vec![e],
     <mut v: OneOrMore<T>> "," <e:T> => {
@@ -2001,7 +1982,7 @@ extern {
         Dedent => token::Tok::Dedent,
         StartModule => token::Tok::StartModule,
         StartExpression => token::Tok::StartExpression,
-        FStringStart => token::Tok::FStringStart,
+        fstring_start => token::Tok::FStringStart(<AnyStringKind>),
         FStringEnd => token::Tok::FStringEnd,
         "!" => token::Tok::Exclamation,
         "?" => token::Tok::Question,
@@ -2094,13 +2075,11 @@ extern {
         complex => token::Tok::Complex { real: <f64>, imag: <f64> },
         string => token::Tok::String {
             value: <Box<str>>,
-            kind: <StringKind>,
-            triple_quoted: <bool>
+            kind: <AnyStringKind>,
         },
         fstring_middle => token::Tok::FStringMiddle {
             value: <Box<str>>,
-            is_raw: <bool>,
-            triple_quoted: <bool>
+            kind: <AnyStringKind>,
         },
         name => token::Tok::Name { name: <Box<str>> },
         ipy_escape_command => token::Tok::IpyEscapeCommand {

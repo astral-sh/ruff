@@ -70,12 +70,7 @@ impl Violation for PrintEmptyString {
 
 /// FURB105
 pub(crate) fn print_empty_string(checker: &mut Checker, call: &ast::ExprCall) {
-    if !checker
-        .semantic()
-        .resolve_call_path(&call.func)
-        .as_ref()
-        .is_some_and(|call_path| matches!(call_path.as_slice(), ["", "print"]))
-    {
+    if !checker.semantic().match_builtin_expr(&call.func, "print") {
         return;
     }
 

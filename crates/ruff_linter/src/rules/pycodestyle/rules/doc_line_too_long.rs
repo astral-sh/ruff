@@ -87,10 +87,7 @@ pub(crate) fn doc_line_too_long(
     indexer: &Indexer,
     settings: &LinterSettings,
 ) -> Option<Diagnostic> {
-    let Some(limit) = settings.pycodestyle.max_doc_length else {
-        return None;
-    };
-
+    let limit = settings.pycodestyle.max_doc_length?;
     Overlong::try_from_line(
         line,
         indexer,

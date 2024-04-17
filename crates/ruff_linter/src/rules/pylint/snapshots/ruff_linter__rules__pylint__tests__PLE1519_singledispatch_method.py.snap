@@ -1,0 +1,64 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+singledispatch_method.py:10:5: PLE1519 [*] `@singledispatch` decorator should not be used on methods
+   |
+ 9 | class Board:
+10 |     @singledispatch  # [singledispatch-method]
+   |     ^^^^^^^^^^^^^^^ PLE1519
+11 |     @classmethod
+12 |     def convert_position(cls, position):
+   |
+   = help: Replace with `@singledispatchmethod`
+
+ℹ Unsafe fix
+7  7  | 
+8  8  | 
+9  9  | class Board:
+10    |-    @singledispatch  # [singledispatch-method]
+   10 |+    @singledispatchmethod  # [singledispatch-method]
+11 11 |     @classmethod
+12 12 |     def convert_position(cls, position):
+13 13 |         pass
+
+singledispatch_method.py:15:5: PLE1519 [*] `@singledispatch` decorator should not be used on methods
+   |
+13 |         pass
+14 | 
+15 |     @singledispatch  # [singledispatch-method]
+   |     ^^^^^^^^^^^^^^^ PLE1519
+16 |     def move(self, position):
+17 |         pass
+   |
+   = help: Replace with `@singledispatchmethod`
+
+ℹ Unsafe fix
+12 12 |     def convert_position(cls, position):
+13 13 |         pass
+14 14 | 
+15    |-    @singledispatch  # [singledispatch-method]
+   15 |+    @singledispatchmethod  # [singledispatch-method]
+16 16 |     def move(self, position):
+17 17 |         pass
+18 18 | 
+
+singledispatch_method.py:23:5: PLE1519 [*] `@singledispatch` decorator should not be used on methods
+   |
+21 |         pass
+22 | 
+23 |     @singledispatch  # [singledispatch-method]
+   |     ^^^^^^^^^^^^^^^ PLE1519
+24 |     @staticmethod
+25 |     def do(position):
+   |
+   = help: Replace with `@singledispatchmethod`
+
+ℹ Unsafe fix
+20 20 |     def place(self, position):
+21 21 |         pass
+22 22 | 
+23    |-    @singledispatch  # [singledispatch-method]
+   23 |+    @singledispatchmethod  # [singledispatch-method]
+24 24 |     @staticmethod
+25 25 |     def do(position):
+26 26 |         pass

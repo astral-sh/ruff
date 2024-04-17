@@ -1,0 +1,50 @@
+---
+source: crates/ruff_linter/src/rules/flake8_quotes/mod.rs
+---
+docstring_singles_mixed_quotes_module_singleline_var_2.py:1:1: Q002 [*] Single quote docstring found but double quotes preferred
+  |
+1 | 'Do not'" start with empty string" ' and lint docstring safely'
+  | ^^^^^^^^ Q002
+2 | 
+3 | def foo():
+  |
+  = help: Replace single quotes docstring with double quotes
+
+ℹ Safe fix
+1   |-'Do not'" start with empty string" ' and lint docstring safely'
+  1 |+"Do not"" start with empty string" ' and lint docstring safely'
+2 2 | 
+3 3 | def foo():
+4 4 |     pass
+
+docstring_singles_mixed_quotes_module_singleline_var_2.py:1:36: Q002 [*] Single quote docstring found but double quotes preferred
+  |
+1 | 'Do not'" start with empty string" ' and lint docstring safely'
+  |                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Q002
+2 | 
+3 | def foo():
+  |
+  = help: Replace single quotes docstring with double quotes
+
+ℹ Safe fix
+1   |-'Do not'" start with empty string" ' and lint docstring safely'
+  1 |+'Do not'" start with empty string" " and lint docstring safely"
+2 2 | 
+3 3 | def foo():
+4 4 |     pass
+
+docstring_singles_mixed_quotes_module_singleline_var_2.py:5:1: Q001 [*] Double quote multiline found but single quotes preferred
+  |
+3 | def foo():
+4 |     pass
+5 | """ this is not a docstring """
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Q001
+  |
+  = help: Replace double multiline quotes with single quotes
+
+ℹ Safe fix
+2 2 | 
+3 3 | def foo():
+4 4 |     pass
+5   |-""" this is not a docstring """
+  5 |+''' this is not a docstring '''

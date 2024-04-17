@@ -623,8 +623,8 @@ expression: parse_suite(source).unwrap()
     If(
         StmtIf {
             range: 508..527,
-            test: NamedExpr(
-                ExprNamedExpr {
+            test: Named(
+                ExprNamed {
                     range: 511..521,
                     target: Name(
                         ExprName {

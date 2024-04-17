@@ -1,10 +1,10 @@
 use ruff_formatter::write;
 use ruff_python_ast::StmtRaise;
 
-use crate::comments::{SourceComment, SuppressionKind};
+use crate::comments::SourceComment;
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::Parenthesize;
-use crate::prelude::*;
+use crate::{has_skip_comment, prelude::*};
 
 #[derive(Default)]
 pub struct FormatStmtRaise;
@@ -48,6 +48,6 @@ impl FormatNodeRule<StmtRaise> for FormatStmtRaise {
         trailing_comments: &[SourceComment],
         context: &PyFormatContext,
     ) -> bool {
-        SuppressionKind::has_skip_comment(trailing_comments, context.source())
+        has_skip_comment(trailing_comments, context.source())
     }
 }

@@ -7,7 +7,7 @@ use std::string::ToString;
 
 use anyhow::{bail, Result};
 use globset::{Glob, GlobMatcher, GlobSet, GlobSetBuilder};
-use pep440_rs::{Version as Pep440Version, VersionSpecifiers};
+use pep440_rs::{Version as Pep440Version, VersionSpecifier, VersionSpecifiers};
 use rustc_hash::FxHashMap;
 use serde::{de, Deserialize, Deserializer, Serialize};
 use strum::IntoEnumIterator;
@@ -296,13 +296,22 @@ impl CacheKey for FilePatternSet {
 pub struct PerFileIgnore {
     pub(crate) basename: String,
     pub(crate) absolute: PathBuf,
+    pub(crate) negated: bool,
     pub(crate) rules: RuleSet,
 }
 
 impl PerFileIgnore {
-    pub fn new(pattern: String, prefixes: &[RuleSelector], project_root: Option<&Path>) -> Self {
+    pub fn new(
+        mut pattern: String,
+        prefixes: &[RuleSelector],
+        project_root: Option<&Path>,
+    ) -> Self {
         // Rules in preview are included here even if preview mode is disabled; it's safe to ignore disabled rules
         let rules: RuleSet = prefixes.iter().flat_map(RuleSelector::all_rules).collect();
+        let negated = pattern.starts_with('!');
+        if negated {
+            pattern.drain(..1);
+        }
         let path = Path::new(&pattern);
         let absolute = match project_root {
             Some(project_root) => fs::normalize_path_to(path, project_root),
@@ -312,6 +321,7 @@ impl PerFileIgnore {
         Self {
             basename: pattern,
             absolute,
+            negated,
             rules,
         }
     }
@@ -536,22 +546,44 @@ impl SerializationFormat {
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Hash)]
 #[serde(try_from = "String")]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
-pub struct Version(String);
+pub struct RequiredVersion(VersionSpecifiers);
 
-impl TryFrom<String> for Version {
-    type Error = semver::Error;
+impl TryFrom<String> for RequiredVersion {
+    type Error = pep440_rs::VersionSpecifiersParseError;
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
-        semver::Version::parse(&value).map(|_| Self(value))
+        // Treat `0.3.1` as `==0.3.1`, for backwards compatibility.
+        if let Ok(version) = pep440_rs::Version::from_str(&value) {
+            Ok(Self(VersionSpecifiers::from(
+                VersionSpecifier::equals_version(version),
+            )))
+        } else {
+            Ok(Self(VersionSpecifiers::from_str(&value)?))
+        }
     }
 }
 
-impl Deref for Version {
-    type Target = str;
+#[cfg(feature = "schemars")]
+impl schemars::JsonSchema for RequiredVersion {
+    fn schema_name() -> String {
+        "RequiredVersion".to_string()
+    }
 
-    fn deref(&self) -> &Self::Target {
-        &self.0
+    fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+        gen.subschema_for::<String>()
+    }
+}
+
+impl RequiredVersion {
+    /// Return `true` if the given version is required.
+    pub fn contains(&self, version: &pep440_rs::Version) -> bool {
+        self.0.contains(version)
+    }
+}
+
+impl Display for RequiredVersion {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        Display::fmt(&self.0, f)
     }
 }
 
@@ -568,43 +600,68 @@ impl Deref for Version {
 /// pattern matching.
 pub type IdentifierPattern = glob::Pattern;
 
-#[derive(Debug, CacheKey, Default)]
-pub struct PerFileIgnores {
-    // Ordered as (absolute path matcher, basename matcher, rules)
-    ignores: Vec<(GlobMatcher, GlobMatcher, RuleSet)>,
+#[derive(Debug, Clone, CacheKey)]
+pub struct CompiledPerFileIgnore {
+    pub absolute_matcher: GlobMatcher,
+    pub basename_matcher: GlobMatcher,
+    pub negated: bool,
+    pub rules: RuleSet,
 }
 
-impl PerFileIgnores {
+impl Display for CompiledPerFileIgnore {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        display_settings! {
+            formatter = f,
+            fields = [
+                self.absolute_matcher | globmatcher,
+                self.basename_matcher | globmatcher,
+                self.negated,
+                self.rules,
+            ]
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, CacheKey, Default)]
+pub struct CompiledPerFileIgnoreList {
+    // Ordered as (absolute path matcher, basename matcher, rules)
+    ignores: Vec<CompiledPerFileIgnore>,
+}
+
+impl CompiledPerFileIgnoreList {
     /// Given a list of patterns, create a `GlobSet`.
     pub fn resolve(per_file_ignores: Vec<PerFileIgnore>) -> Result<Self> {
         let ignores: Result<Vec<_>> = per_file_ignores
             .into_iter()
             .map(|per_file_ignore| {
                 // Construct absolute path matcher.
-                let absolute =
+                let absolute_matcher =
                     Glob::new(&per_file_ignore.absolute.to_string_lossy())?.compile_matcher();
 
                 // Construct basename matcher.
-                let basename = Glob::new(&per_file_ignore.basename)?.compile_matcher();
+                let basename_matcher = Glob::new(&per_file_ignore.basename)?.compile_matcher();
 
-                Ok((absolute, basename, per_file_ignore.rules))
+                Ok(CompiledPerFileIgnore {
+                    absolute_matcher,
+                    basename_matcher,
+                    negated: per_file_ignore.negated,
+                    rules: per_file_ignore.rules,
+                })
             })
             .collect();
         Ok(Self { ignores: ignores? })
     }
 }
 
-impl Display for PerFileIgnores {
+impl Display for CompiledPerFileIgnoreList {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        if self.is_empty() {
+        if self.ignores.is_empty() {
             write!(f, "{{}}")?;
         } else {
             writeln!(f, "{{")?;
-            for (absolute, basename, rules) in &self.ignores {
-                writeln!(
-                    f,
-                    "\t{{ absolute = {absolute:#?}, basename = {basename:#?}, rules = {rules} }},"
-                )?;
+            for ignore in &self.ignores {
+                writeln!(f, "\t{ignore}")?;
             }
             write!(f, "}}")?;
         }
@@ -612,8 +669,8 @@ impl Display for PerFileIgnores {
     }
 }
 
-impl Deref for PerFileIgnores {
-    type Target = Vec<(GlobMatcher, GlobMatcher, RuleSet)>;
+impl Deref for CompiledPerFileIgnoreList {
+    type Target = Vec<CompiledPerFileIgnore>;
 
     fn deref(&self) -> &Self::Target {
         &self.ignores

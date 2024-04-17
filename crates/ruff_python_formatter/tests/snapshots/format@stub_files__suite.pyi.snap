@@ -269,6 +269,7 @@ class NewlinesBetweenInnerClasses:
 
     class InnerClass5:
         def a(self): ...
+
     field1 = 1
 
     class InnerClass6:
@@ -278,6 +279,7 @@ class NewlinesBetweenInnerClasses:
 
     class InnerClass7:
         def a(self): ...
+
     print("hi")
 
     class InnerClass8:
@@ -306,29 +308,6 @@ class ComplexStatements:
 
     @classmethod
     def utcnow(cls) -> Self: ...
-```
-
-
-## Preview changes
-```diff
---- Stable
-+++ Preview
-@@ -110,6 +110,7 @@
- 
-     class InnerClass5:
-         def a(self): ...
-+
-     field1 = 1
- 
-     class InnerClass6:
-@@ -119,6 +120,7 @@
- 
-     class InnerClass7:
-         def a(self): ...
-+
-     print("hi")
- 
-     class InnerClass8:
 ```
 
 

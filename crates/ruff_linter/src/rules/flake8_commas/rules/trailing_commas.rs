@@ -243,7 +243,7 @@ pub(crate) fn trailing_commas(
             // F-strings are handled as `String` token type with the complete range
             // of the outermost f-string. This means that the expression inside the
             // f-string is not checked for trailing commas.
-            Tok::FStringStart => {
+            Tok::FStringStart(_) => {
                 fstrings = fstrings.saturating_add(1);
                 None
             }

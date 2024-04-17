@@ -52,18 +52,18 @@ impl AlwaysFixableViolation for ZipWithoutExplicitStrict {
 
 /// B905
 pub(crate) fn zip_without_explicit_strict(checker: &mut Checker, call: &ast::ExprCall) {
-    if let Expr::Name(ast::ExprName { id, .. }) = call.func.as_ref() {
-        if id == "zip"
-            && checker.semantic().is_builtin("zip")
-            && call.arguments.find_keyword("strict").is_none()
-            && !call
-                .arguments
-                .args
-                .iter()
-                .any(|arg| is_infinite_iterator(arg, checker.semantic()))
-        {
-            let mut diagnostic = Diagnostic::new(ZipWithoutExplicitStrict, call.range());
-            diagnostic.set_fix(Fix::applicable_edit(
+    let semantic = checker.semantic();
+
+    if semantic.match_builtin_expr(&call.func, "zip")
+        && call.arguments.find_keyword("strict").is_none()
+        && !call
+            .arguments
+            .args
+            .iter()
+            .any(|arg| is_infinite_iterator(arg, semantic))
+    {
+        checker.diagnostics.push(
+            Diagnostic::new(ZipWithoutExplicitStrict, call.range()).with_fix(Fix::applicable_edit(
                 add_argument(
                     "strict=False",
                     &call.arguments,
@@ -81,9 +81,8 @@ pub(crate) fn zip_without_explicit_strict(checker: &mut Checker, call: &ast::Exp
                 } else {
                     Applicability::Safe
                 },
-            ));
-            checker.diagnostics.push(diagnostic);
-        }
+            )),
+        );
     }
 }
 
@@ -99,32 +98,34 @@ fn is_infinite_iterator(arg: &Expr, semantic: &SemanticModel) -> bool {
         return false;
     };
 
-    semantic.resolve_call_path(func).is_some_and(|call_path| {
-        match call_path.as_slice() {
-            ["itertools", "cycle" | "count"] => true,
-            ["itertools", "repeat"] => {
-                // Ex) `itertools.repeat(1)`
-                if keywords.is_empty() && args.len() == 1 {
-                    return true;
-                }
+    semantic
+        .resolve_qualified_name(func)
+        .is_some_and(|qualified_name| {
+            match qualified_name.segments() {
+                ["itertools", "cycle" | "count"] => true,
+                ["itertools", "repeat"] => {
+                    // Ex) `itertools.repeat(1)`
+                    if keywords.is_empty() && args.len() == 1 {
+                        return true;
+                    }
 
-                // Ex) `itertools.repeat(1, None)`
-                if args.len() == 2 && args[1].is_none_literal_expr() {
-                    return true;
-                }
+                    // Ex) `itertools.repeat(1, None)`
+                    if args.len() == 2 && args[1].is_none_literal_expr() {
+                        return true;
+                    }
 
-                // Ex) `iterools.repeat(1, times=None)`
-                for keyword in keywords.iter() {
-                    if keyword.arg.as_ref().is_some_and(|name| name == "times") {
-                        if keyword.value.is_none_literal_expr() {
-                            return true;
+                    // Ex) `iterools.repeat(1, times=None)`
+                    for keyword in keywords.iter() {
+                        if keyword.arg.as_ref().is_some_and(|name| name == "times") {
+                            if keyword.value.is_none_literal_expr() {
+                                return true;
+                            }
                         }
                     }
-                }
 
-                false
+                    false
+                }
+                _ => false,
             }
-            _ => false,
-        }
-    })
+        })
 }

@@ -41,6 +41,16 @@ RUF006.py:97:5: RUF006 Store a reference to the return value of `loop.create_tas
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF006
    |
 
+RUF006.py:152:13: RUF006 Store a reference to the return value of `asyncio.create_task`
+    |
+150 | async def f(x: bool):
+151 |     if x:
+152 |         t = asyncio.create_task(asyncio.sleep(1))
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF006
+153 |     else:
+154 |         t = None
+    |
+
 RUF006.py:170:5: RUF006 Store a reference to the return value of `loop.create_task`
     |
 168 | def f():
@@ -60,5 +70,3 @@ RUF006.py:175:5: RUF006 Store a reference to the return value of `loop.create_ta
 176 | 
 177 | # OK
     |
-
-

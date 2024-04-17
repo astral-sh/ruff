@@ -1,7 +1,9 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::map_callable;
 use ruff_python_ast::statement_visitor::{walk_stmt, StatementVisitor};
 use ruff_python_ast::{self as ast, Expr, Stmt, StmtIf};
+use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -50,11 +52,8 @@ struct ControlFlowVisitor<'a> {
     continues: Vec<&'a Stmt>,
 }
 
-impl<'a, 'b> StatementVisitor<'b> for ControlFlowVisitor<'a>
-where
-    'b: 'a,
-{
-    fn visit_stmt(&mut self, stmt: &'b Stmt) {
+impl<'a> StatementVisitor<'a> for ControlFlowVisitor<'a> {
+    fn visit_stmt(&mut self, stmt: &'a Stmt) {
         match stmt {
             Stmt::FunctionDef(_) | Stmt::ClassDef(_) => {
                 // Don't recurse.
@@ -75,38 +74,53 @@ fn has_control_flow(stmt: &Stmt) -> bool {
 }
 
 /// Returns `true` if an [`Expr`] is a call to check types.
-fn check_type_check_call(checker: &mut Checker, call: &Expr) -> bool {
-    checker
-        .semantic()
-        .resolve_call_path(call)
-        .is_some_and(|call_path| {
-            matches!(
-                call_path.as_slice(),
-                ["", "isinstance" | "issubclass" | "callable"]
-            )
-        })
+fn check_type_check_call(semantic: &SemanticModel, call: &Expr) -> bool {
+    semantic
+        .resolve_builtin_symbol(call)
+        .is_some_and(|builtin| matches!(builtin, "isinstance" | "issubclass" | "callable"))
 }
 
 /// Returns `true` if an [`Expr`] is a test to check types (e.g. via isinstance)
-fn check_type_check_test(checker: &mut Checker, test: &Expr) -> bool {
+fn check_type_check_test(semantic: &SemanticModel, test: &Expr) -> bool {
     match test {
         Expr::BoolOp(ast::ExprBoolOp { values, .. }) => values
             .iter()
-            .all(|expr| check_type_check_test(checker, expr)),
-        Expr::UnaryOp(ast::ExprUnaryOp { operand, .. }) => check_type_check_test(checker, operand),
-        Expr::Call(ast::ExprCall { func, .. }) => check_type_check_call(checker, func),
+            .all(|expr| check_type_check_test(semantic, expr)),
+        Expr::UnaryOp(ast::ExprUnaryOp { operand, .. }) => check_type_check_test(semantic, operand),
+        Expr::Call(ast::ExprCall { func, .. }) => check_type_check_call(semantic, func),
         _ => false,
     }
 }
 
-/// Returns `true` if `exc` is a reference to a builtin exception.
-fn is_builtin_exception(checker: &mut Checker, exc: &Expr) -> bool {
-    return checker
-        .semantic()
-        .resolve_call_path(exc)
-        .is_some_and(|call_path| {
+fn check_raise(checker: &mut Checker, exc: &Expr, item: &Stmt) {
+    if is_builtin_exception(exc, checker.semantic()) {
+        checker
+            .diagnostics
+            .push(Diagnostic::new(TypeCheckWithoutTypeError, item.range()));
+    }
+}
+
+/// Search the body of an if-condition for raises.
+fn check_body(checker: &mut Checker, body: &[Stmt]) {
+    for item in body {
+        if has_control_flow(item) {
+            return;
+        }
+        if let Stmt::Raise(ast::StmtRaise { exc: Some(exc), .. }) = &item {
+            check_raise(checker, exc, item);
+        }
+    }
+}
+
+/// Returns `true` if the given expression is a builtin exception.
+///
+/// This function only matches to a subset of the builtin exceptions, and omits `TypeError`.
+fn is_builtin_exception(expr: &Expr, semantic: &SemanticModel) -> bool {
+    semantic
+        .resolve_qualified_name(map_callable(expr))
+        .is_some_and(|qualified_name| {
             matches!(
-                call_path.as_slice(),
+                qualified_name.segments(),
                 [
                     "",
                     "ArithmeticError"
@@ -126,42 +140,7 @@ fn is_builtin_exception(checker: &mut Checker, exc: &Expr) -> bool {
                         | "ValueError"
                 ]
             )
-        });
-}
-
-/// Returns `true` if an [`Expr`] is a reference to a builtin exception.
-fn check_raise_type(checker: &mut Checker, exc: &Expr) -> bool {
-    match exc {
-        Expr::Name(_) => is_builtin_exception(checker, exc),
-        Expr::Call(ast::ExprCall { func, .. }) => {
-            if let Expr::Name(_) = func.as_ref() {
-                is_builtin_exception(checker, func)
-            } else {
-                false
-            }
-        }
-        _ => false,
-    }
-}
-
-fn check_raise(checker: &mut Checker, exc: &Expr, item: &Stmt) {
-    if check_raise_type(checker, exc) {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(TypeCheckWithoutTypeError, item.range()));
-    }
-}
-
-/// Search the body of an if-condition for raises.
-fn check_body(checker: &mut Checker, body: &[Stmt]) {
-    for item in body {
-        if has_control_flow(item) {
-            return;
-        }
-        if let Stmt::Raise(ast::StmtRaise { exc: Some(exc), .. }) = &item {
-            check_raise(checker, exc, item);
-        }
-    }
+        })
 }
 
 /// TRY004
@@ -176,14 +155,15 @@ pub(crate) fn type_check_without_type_error(
         elif_else_clauses,
         ..
     } = stmt_if;
+
     if let Some(Stmt::If(ast::StmtIf { test, .. })) = parent {
-        if !check_type_check_test(checker, test) {
+        if !check_type_check_test(checker.semantic(), test) {
             return;
         }
     }
 
     // Only consider the body when the `if` condition is all type-related
-    if !check_type_check_test(checker, test) {
+    if !check_type_check_test(checker.semantic(), test) {
         return;
     }
     check_body(checker, body);
@@ -191,7 +171,7 @@ pub(crate) fn type_check_without_type_error(
     for clause in elif_else_clauses {
         if let Some(test) = &clause.test {
             // If there are any `elif`, they must all also be type-related
-            if !check_type_check_test(checker, test) {
+            if !check_type_check_test(checker.semantic(), test) {
                 return;
             }
         }

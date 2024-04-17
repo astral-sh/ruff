@@ -61,13 +61,8 @@ impl FormatMode {
 pub(crate) fn format(
     cli: FormatArguments,
     config_arguments: &ConfigArguments,
-    log_level: LogLevel,
 ) -> Result<ExitStatus> {
-    let pyproject_config = resolve(
-        cli.isolated,
-        config_arguments,
-        cli.stdin_filename.as_deref(),
-    )?;
+    let pyproject_config = resolve(config_arguments, cli.stdin_filename.as_deref())?;
     let mode = FormatMode::from_cli(&cli);
     let files = resolve_default_files(cli.files, false);
     let (paths, resolver) = python_files_in_path(&files, &pyproject_config, config_arguments)?;
@@ -202,7 +197,7 @@ pub(crate) fn format(
     }
 
     // Report on the formatting changes.
-    if log_level >= LogLevel::Default {
+    if config_arguments.log_level >= LogLevel::Default {
         if mode.is_diff() {
             // Allow piping the diff to e.g. a file by writing the summary to stderr
             results.write_summary(&mut stderr().lock())?;
@@ -532,7 +527,7 @@ impl<'a> FormatResults<'a> {
             })
             .sorted_unstable_by_key(|(path, _, _)| *path)
         {
-            unformatted.diff(formatted, Some(path), f)?;
+            write!(f, "{}", unformatted.diff(formatted, Some(path)).unwrap())?;
         }
 
         Ok(())

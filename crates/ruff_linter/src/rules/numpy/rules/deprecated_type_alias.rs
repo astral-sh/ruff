@@ -15,7 +15,7 @@ use crate::checkers::ast::Checker;
 /// primarily for historic reasons, and have been a cause of
 /// frequent confusion for newcomers.
 ///
-/// These aliases were been deprecated in 1.20, and removed in 1.24.
+/// These aliases were deprecated in 1.20, and removed in 1.24.
 ///
 /// ## Examples
 /// ```python
@@ -54,22 +54,30 @@ pub(crate) fn deprecated_type_alias(checker: &mut Checker, expr: &Expr) {
         return;
     }
 
-    if let Some(type_name) = checker
-        .semantic()
-        .resolve_call_path(expr)
-        .and_then(|call_path| {
-            if matches!(
-                call_path.as_slice(),
-                [
-                    "numpy",
-                    "bool" | "int" | "float" | "complex" | "object" | "str" | "long" | "unicode"
-                ]
-            ) {
-                Some(call_path[1])
-            } else {
-                None
-            }
-        })
+    if let Some(type_name) =
+        checker
+            .semantic()
+            .resolve_qualified_name(expr)
+            .and_then(|qualified_name| {
+                if matches!(
+                    qualified_name.segments(),
+                    [
+                        "numpy",
+                        "bool"
+                            | "int"
+                            | "float"
+                            | "complex"
+                            | "object"
+                            | "str"
+                            | "long"
+                            | "unicode"
+                    ]
+                ) {
+                    Some(qualified_name.segments()[1])
+                } else {
+                    None
+                }
+            })
     {
         let mut diagnostic = Diagnostic::new(
             NumpyDeprecatedTypeAlias {
@@ -82,12 +90,15 @@ pub(crate) fn deprecated_type_alias(checker: &mut Checker, expr: &Expr) {
             "long" => "int",
             _ => type_name,
         };
-        if checker.semantic().is_builtin(type_name) {
-            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                type_name.to_string(),
-                expr.range(),
-            )));
-        }
+        diagnostic.try_set_fix(|| {
+            let (import_edit, binding) = checker.importer().get_or_import_builtin_symbol(
+                type_name,
+                expr.start(),
+                checker.semantic(),
+            )?;
+            let binding_edit = Edit::range_replacement(binding, expr.range());
+            Ok(Fix::safe_edits(binding_edit, import_edit))
+        });
         checker.diagnostics.push(diagnostic);
     }
 }

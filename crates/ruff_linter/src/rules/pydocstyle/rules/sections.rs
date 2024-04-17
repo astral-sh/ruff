@@ -2,6 +2,7 @@ use itertools::Itertools;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use rustc_hash::FxHashSet;
+use std::ops::Add;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
@@ -10,8 +11,8 @@ use ruff_python_ast::docstrings::{clean_space, leading_space};
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::ParameterWithDefault;
 use ruff_python_semantic::analyze::visibility::is_staticmethod;
-use ruff_python_trivia::{textwrap::dedent, PythonWhitespace};
-use ruff_source_file::NewlineWithTrailingNewline;
+use ruff_python_trivia::{textwrap::dedent, Cursor};
+use ruff_source_file::{Line, NewlineWithTrailingNewline};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
@@ -25,13 +26,15 @@ use crate::rules::pydocstyle::settings::Convention;
 /// Checks for over-indented sections in docstrings.
 ///
 /// ## Why is this bad?
-/// Multi-line docstrings are typically composed of a summary line, followed by
-/// a blank line, followed by a series of sections, each with a section header
-/// and a section body.
+/// This rule enforces a consistent style for docstrings with multiple
+/// sections.
 ///
-/// Each section should use consistent indentation, with the section headers
-/// matching the indentation of the docstring's opening quotes, and the
-/// section bodies being indented one level further.
+/// Multiline docstrings are typically composed of a summary line, followed by
+/// a blank line, followed by a series of sections, each with a section header
+/// and a section body. The convention is that all sections should use
+/// consistent indentation. In each section, the header should match the
+/// indentation of the docstring's opening quotes, and the body should be
+/// indented one level further.
 ///
 /// ## Example
 /// ```python
@@ -105,15 +108,20 @@ impl AlwaysFixableViolation for SectionNotOverIndented {
 /// Checks for over-indented section underlines in docstrings.
 ///
 /// ## Why is this bad?
-/// Multi-line docstrings are typically composed of a summary line, followed by
-/// a blank line, followed by a series of sections, each with a section header
-/// and a section body.
+/// This rule enforces a consistent style for multiline numpy-style docstrings,
+/// and helps prevent incorrect syntax in docstrings using reStructuredText.
 ///
-/// Some docstring formats (like reStructuredText) use underlines to separate
-/// section bodies from section headers.
+/// Multiline numpy-style docstrings are typically composed of a summary line,
+/// followed by a blank line, followed by a series of sections. Each section
+/// has a section header and a section body, and there should be a series of
+/// underline characters in the line following the header. The underline should
+/// have the same indentation as the header.
 ///
-/// Avoid over-indenting the section underlines, as this can cause syntax
-/// errors in reStructuredText.
+/// This rule enforces a consistent style for multiline numpy-style docstrings
+/// with sections. If your docstring uses reStructuredText, the rule also
+/// helps protect against incorrect reStructuredText syntax, which would cause
+/// errors if you tried to use a tool such as Sphinx to generate documentation
+/// from the docstring.
 ///
 /// This rule is enabled when using the `numpy` convention, and disabled when
 /// using the `google` or `pep257` conventions.
@@ -131,12 +139,12 @@ impl AlwaysFixableViolation for SectionNotOverIndented {
 ///         Time spent traveling.
 ///
 ///     Returns
-///     -------
+///           -------
 ///     float
 ///         Speed as distance divided by time.
 ///
 ///     Raises
-///     ------
+///       ------
 ///     FasterThanLightError
 ///         If speed is greater than the speed of light.
 ///     """
@@ -204,11 +212,12 @@ impl AlwaysFixableViolation for SectionUnderlineNotOverIndented {
 /// letters.
 ///
 /// ## Why is this bad?
-/// Multi-line docstrings are typically composed of a summary line, followed by
-/// a blank line, followed by a series of sections, each with a section header
-/// and a section body.
+/// For stylistic consistency, all section headers in a docstring should be
+/// capitalized.
 ///
-/// Section headers should be capitalized, for consistency.
+/// Multiline docstrings are typically composed of a summary line, followed by
+/// a blank line, followed by a series of sections. Each section typically has
+/// a header and a body.
 ///
 /// ## Example
 /// ```python
@@ -279,22 +288,24 @@ impl AlwaysFixableViolation for CapitalizeSectionName {
 }
 
 /// ## What it does
-/// Checks that section headers in docstrings that are not followed by a
-/// newline.
+/// Checks for section headers in docstrings that are followed by non-newline
+/// characters.
 ///
 /// ## Why is this bad?
-/// Multi-line docstrings are typically composed of a summary line, followed by
-/// a blank line, followed by a series of sections, each with a section header
-/// and a section body.
+/// This rule enforces a consistent style for multiline numpy-style docstrings.
 ///
-/// Section headers should be followed by a newline, and not by another
-/// character (like a colon), for consistency.
+/// Multiline numpy-style docstrings are typically composed of a summary line,
+/// followed by a blank line, followed by a series of sections. Each section
+/// has a section header and a section body. The section header should be
+/// followed by a newline, rather than by some other character (like a colon).
 ///
 /// This rule is enabled when using the `numpy` convention, and disabled
 /// when using the `google` or `pep257` conventions.
 ///
 /// ## Example
 /// ```python
+/// # The `Parameters`, `Returns` and `Raises` section headers are all followed
+/// # by a colon in this function's docstring:
 /// def calculate_speed(distance: float, time: float) -> float:
 ///     """Calculate speed as distance divided by time.
 ///
@@ -379,12 +390,19 @@ impl AlwaysFixableViolation for NewLineAfterSectionName {
 /// underlines.
 ///
 /// ## Why is this bad?
-/// Multi-line docstrings are typically composed of a summary line, followed by
-/// a blank line, followed by a series of sections, each with a section header
-/// and a section body.
+/// This rule enforces a consistent style for multiline numpy-style docstrings,
+/// and helps prevent incorrect syntax in docstrings using reStructuredText.
 ///
-/// Some docstring formats (like reStructuredText) use underlines to separate
-/// section bodies from section headers.
+/// Multiline numpy-style docstrings are typically composed of a summary line,
+/// followed by a blank line, followed by a series of sections. Each section
+/// has a section header and a section body, and the header should be followed
+/// by a series of underline characters in the following line.
+///
+/// This rule enforces a consistent style for multiline numpy-style docstrings
+/// with sections. If your docstring uses reStructuredText, the rule also
+/// helps protect against incorrect reStructuredText syntax, which would cause
+/// errors if you tried to use a tool such as Sphinx to generate documentation
+/// from the docstring.
 ///
 /// This rule is enabled when using the `numpy` convention, and disabled
 /// when using the `google` or `pep257` conventions.
@@ -475,15 +493,19 @@ impl AlwaysFixableViolation for DashedUnderlineAfterSection {
 /// immediately following the section name.
 ///
 /// ## Why is this bad?
-/// Multi-line docstrings are typically composed of a summary line, followed by
-/// a blank line, followed by a series of sections, each with a section header
-/// and a section body.
+/// This rule enforces a consistent style for multiline numpy-style docstrings,
+/// and helps prevent incorrect syntax in docstrings using reStructuredText.
 ///
-/// Some docstring formats (like reStructuredText) use underlines to separate
-/// section bodies from section headers.
+/// Multiline numpy-style docstrings are typically composed of a summary line,
+/// followed by a blank line, followed by a series of sections. Each section
+/// has a header and a body. There should be a series of underline characters
+/// in the line immediately below the header.
 ///
-/// When present, section underlines should be positioned on the line
-/// immediately following the section header.
+/// This rule enforces a consistent style for multiline numpy-style docstrings
+/// with sections. If your docstring uses reStructuredText, the rule also
+/// helps protect against incorrect reStructuredText syntax, which would cause
+/// errors if you tried to use a tool such as Sphinx to generate documentation
+/// from the docstring.
 ///
 /// This rule is enabled when using the `numpy` convention, and disabled
 /// when using the `google` or `pep257` conventions.
@@ -577,15 +599,20 @@ impl AlwaysFixableViolation for SectionUnderlineAfterName {
 /// the corresponding section header.
 ///
 /// ## Why is this bad?
-/// Multi-line docstrings are typically composed of a summary line, followed by
-/// a blank line, followed by a series of sections, each with a section header
-/// and a section body.
+/// This rule enforces a consistent style for multiline numpy-style docstrings,
+/// and helps prevent incorrect syntax in docstrings using reStructuredText.
 ///
-/// Some docstring formats (like reStructuredText) use underlines to separate
-/// section bodies from section headers.
+/// Multiline numpy-style docstrings are typically composed of a summary line,
+/// followed by a blank line, followed by a series of sections. Each section
+/// has a section header and a section body, and there should be a series of
+/// underline characters in the line following the header. The length of the
+/// underline should exactly match the length of the section header.
 ///
-/// When present, section underlines should match the length of the
-/// corresponding section header.
+/// This rule enforces a consistent style for multiline numpy-style docstrings
+/// with sections. If your docstring uses reStructuredText, the rule also
+/// helps protect against incorrect reStructuredText syntax, which would cause
+/// errors if you tried to use a tool such as Sphinx to generate documentation
+/// from the docstring.
 ///
 /// This rule is enabled when using the `numpy` convention, and disabled
 /// when using the `google` or `pep257` conventions.
@@ -676,12 +703,14 @@ impl AlwaysFixableViolation for SectionUnderlineMatchesSectionLength {
 /// line.
 ///
 /// ## Why is this bad?
-/// Multi-line docstrings are typically composed of a summary line, followed by
-/// a blank line, followed by a series of sections, each with a section header
-/// and a section body.
-///
-/// Docstring sections should be separated by a blank line, for consistency and
+/// This rule enforces consistency in your docstrings, and helps ensure
 /// compatibility with documentation tooling.
+///
+/// Multiline docstrings are typically composed of a summary line, followed by
+/// a blank line, followed by a series of sections, each with a section header
+/// and a section body. If a multiline numpy-style or Google-style docstring
+/// consists of multiple sections, each section should be separated by a single
+/// blank line.
 ///
 /// This rule is enabled when using the `numpy` and `google` conventions, and
 /// disabled when using the `pep257` convention.
@@ -767,15 +796,15 @@ impl AlwaysFixableViolation for NoBlankLineAfterSection {
 }
 
 /// ## What it does
-/// Checks for docstring sections that are separated by a blank line.
+/// Checks for docstring sections that are not separated by a blank line.
 ///
 /// ## Why is this bad?
-/// Multi-line docstrings are typically composed of a summary line, followed by
-/// a blank line, followed by a series of sections, each with a section header
-/// and a section body.
+/// This rule enforces consistency in numpy-style and Google-style docstrings,
+/// and helps ensure compatibility with documentation tooling.
 ///
-/// Docstring sections should be separated by a blank line, for consistency and
-/// compatibility with documentation tooling.
+/// Multiline docstrings are typically composed of a summary line, followed by
+/// a blank line, followed by a series of sections, each with a section header
+/// and a section body. Sections should be separated by a single blank line.
 ///
 /// This rule is enabled when using the `numpy` and `google` conventions, and
 /// disabled when using the `pep257` convention.
@@ -860,19 +889,18 @@ impl AlwaysFixableViolation for NoBlankLineBeforeSection {
 }
 
 /// ## What it does
-/// Checks for missing blank lines after the last section of a multi-line
+/// Checks for missing blank lines after the last section of a multiline
 /// docstring.
 ///
 /// ## Why is this bad?
-/// Multi-line docstrings are typically composed of a summary line, followed by
+/// This rule enforces a consistent style for multiline docstrings.
+///
+/// Multiline docstrings are typically composed of a summary line, followed by
 /// a blank line, followed by a series of sections, each with a section header
 /// and a section body.
 ///
-/// In some projects, the last section of a docstring is followed by a blank line,
-/// for consistency and compatibility.
-///
 /// This rule may not apply to all projects; its applicability is a matter of
-/// convention. By default, this rule is disabled when using the `google`,
+/// convention. By default, the rule is disabled when using the `google`,
 /// `numpy`, and `pep257` conventions.
 ///
 /// ## Example
@@ -956,15 +984,16 @@ impl AlwaysFixableViolation for BlankLineAfterLastSection {
 }
 
 /// ## What it does
-/// Checks for docstrings that contain empty sections.
+/// Checks for docstrings with empty sections.
 ///
 /// ## Why is this bad?
-/// Multi-line docstrings are typically composed of a summary line, followed by
-/// a blank line, followed by a series of sections, each with a section header
-/// and a section body.
+/// An empty section in a multiline docstring likely indicates an unfinished
+/// or incomplete docstring.
 ///
-/// Empty docstring sections are indicative of missing documentation. Empty
-/// sections should either be removed or filled in with relevant documentation.
+/// Multiline docstrings are typically composed of a summary line, followed by
+/// a blank line, followed by a series of sections, each with a section header
+/// and a section body. Each section body should be non-empty; empty sections
+/// should either have content added to them, or be removed entirely.
 ///
 /// ## Example
 /// ```python
@@ -1045,12 +1074,13 @@ impl Violation for EmptyDocstringSection {
 /// Checks for docstring section headers that do not end with a colon.
 ///
 /// ## Why is this bad?
-/// Multi-line docstrings are typically composed of a summary line, followed by
+/// This rule enforces a consistent style for multiline Google-style
+/// docstrings. If a multiline Google-style docstring consists of multiple
+/// sections, each section header should end with a colon.
+///
+/// Multiline docstrings are typically composed of a summary line, followed by
 /// a blank line, followed by a series of sections, each with a section header
 /// and a section body.
-///
-/// In a docstring, each section header should end with a colon, for
-/// consistency.
 ///
 /// This rule is enabled when using the `google` convention, and disabled when
 /// using the `pep257` and `numpy` conventions.
@@ -1127,13 +1157,14 @@ impl AlwaysFixableViolation for SectionNameEndsInColon {
 /// parameters in the function.
 ///
 /// ## Why is this bad?
-/// Multi-line docstrings are typically composed of a summary line, followed by
-/// a blank line, followed by a series of sections, each with a section header
-/// and a section body.
+/// This rule helps prevent you from leaving Google-style docstrings unfinished
+/// or incomplete. Multiline Google-style docstrings should describe all
+/// parameters for the function they are documenting.
 ///
-/// Function docstrings often include a section for function arguments, which
-/// should include documentation for every argument. Undocumented arguments are
-/// indicative of missing documentation.
+/// Multiline docstrings are typically composed of a summary line, followed by
+/// a blank line, followed by a series of sections, each with a section header
+/// and a section body. Function docstrings often include a section for
+/// function arguments; this rule is concerned with that section only.
 ///
 /// This rule is enabled when using the `google` convention, and disabled when
 /// using the `pep257` and `numpy` conventions.
@@ -1209,16 +1240,16 @@ impl Violation for UndocumentedParam {
 }
 
 /// ## What it does
-/// Checks for docstring sections that contain blank lines between the section
-/// header and the section body.
+/// Checks for docstring sections that contain blank lines between a section
+/// header and a section body.
 ///
 /// ## Why is this bad?
-/// Multi-line docstrings are typically composed of a summary line, followed by
-/// a blank line, followed by a series of sections, each with a section header
-/// and a section body.
+/// This rule enforces a consistent style for multiline docstrings.
 ///
-/// Docstring sections should not contain blank lines between the section header
-/// and the section body, for consistency.
+/// Multiline docstrings are typically composed of a summary line, followed by
+/// a blank line, followed by a series of sections, each with a section header
+/// and a section body. There should be no blank lines between a section header
+/// and a section body.
 ///
 /// ## Example
 /// ```python
@@ -1377,50 +1408,41 @@ fn blanks_and_section_underline(
     }
 
     if let Some(non_blank_line) = following_lines.next() {
-        let dash_line_found = is_dashed_underline(&non_blank_line);
-
-        if dash_line_found {
+        if let Some(dashed_line) = find_underline(&non_blank_line, '-') {
             if blank_lines_after_header > 0 {
                 if checker.enabled(Rule::SectionUnderlineAfterName) {
                     let mut diagnostic = Diagnostic::new(
                         SectionUnderlineAfterName {
                             name: context.section_name().to_string(),
                         },
-                        docstring.range(),
+                        dashed_line,
                     );
-                    let range = TextRange::new(context.following_range().start(), blank_lines_end);
+
                     // Delete any blank lines between the header and the underline.
-                    diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(range)));
+                    diagnostic.set_fix(Fix::safe_edit(Edit::deletion(
+                        context.following_range().start(),
+                        blank_lines_end,
+                    )));
+
                     checker.diagnostics.push(diagnostic);
                 }
             }
 
-            if non_blank_line
-                .trim()
-                .chars()
-                .filter(|char| *char == '-')
-                .count()
-                != context.section_name().len()
-            {
+            if dashed_line.len().to_usize() != context.section_name().len() {
                 if checker.enabled(Rule::SectionUnderlineMatchesSectionLength) {
                     let mut diagnostic = Diagnostic::new(
                         SectionUnderlineMatchesSectionLength {
                             name: context.section_name().to_string(),
                         },
-                        docstring.range(),
+                        dashed_line,
                     );
+
                     // Replace the existing underline with a line of the appropriate length.
-                    let content = format!(
-                        "{}{}{}",
-                        clean_space(docstring.indentation),
+                    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                         "-".repeat(context.section_name().len()),
-                        checker.stylist().line_ending().as_str()
-                    );
-                    diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
-                        content,
-                        blank_lines_end,
-                        non_blank_line.full_end(),
+                        dashed_line,
                     )));
+
                     checker.diagnostics.push(diagnostic);
                 }
             }
@@ -1432,8 +1454,9 @@ fn blanks_and_section_underline(
                         SectionUnderlineNotOverIndented {
                             name: context.section_name().to_string(),
                         },
-                        docstring.range(),
+                        dashed_line,
                     );
+
                     // Replace the existing indentation with whitespace of the appropriate length.
                     let range = TextRange::at(
                         blank_lines_end,
@@ -1445,6 +1468,7 @@ fn blanks_and_section_underline(
                     } else {
                         Edit::range_replacement(contents, range)
                     }));
+
                     checker.diagnostics.push(diagnostic);
                 }
             }
@@ -1467,7 +1491,7 @@ fn blanks_and_section_underline(
                                 EmptyDocstringSection {
                                     name: context.section_name().to_string(),
                                 },
-                                docstring.range(),
+                                context.section_name_range(),
                             ));
                         }
                     } else if checker.enabled(Rule::BlankLinesBetweenHeaderAndContent) {
@@ -1475,7 +1499,7 @@ fn blanks_and_section_underline(
                             BlankLinesBetweenHeaderAndContent {
                                 name: context.section_name().to_string(),
                             },
-                            docstring.range(),
+                            context.section_name_range(),
                         );
                         // Delete any blank lines between the header and content.
                         diagnostic.set_fix(Fix::safe_edit(Edit::deletion(
@@ -1491,47 +1515,50 @@ fn blanks_and_section_underline(
                         EmptyDocstringSection {
                             name: context.section_name().to_string(),
                         },
-                        docstring.range(),
+                        context.section_name_range(),
                     ));
                 }
             }
         } else {
-            let equal_line_found = non_blank_line
-                .chars()
-                .all(|char| char.is_whitespace() || char == '=');
-
             if checker.enabled(Rule::DashedUnderlineAfterSection) {
-                let mut diagnostic = Diagnostic::new(
-                    DashedUnderlineAfterSection {
-                        name: context.section_name().to_string(),
-                    },
-                    docstring.range(),
-                );
-                // Add a dashed line (of the appropriate length) under the section header.
-                let content = format!(
-                    "{}{}{}",
-                    checker.stylist().line_ending().as_str(),
-                    clean_space(docstring.indentation),
-                    "-".repeat(context.section_name().len()),
-                );
-                if equal_line_found
-                    && non_blank_line.trim_whitespace().len() == context.section_name().len()
-                {
+                if let Some(equal_line) = find_underline(&non_blank_line, '=') {
+                    let mut diagnostic = Diagnostic::new(
+                        DashedUnderlineAfterSection {
+                            name: context.section_name().to_string(),
+                        },
+                        equal_line,
+                    );
+
                     // If an existing underline is an equal sign line of the appropriate length,
                     // replace it with a dashed line.
-                    diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
-                        content,
-                        context.summary_range().end(),
-                        non_blank_line.end(),
+                    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                        "-".repeat(context.section_name().len()),
+                        equal_line,
                     )));
+
+                    checker.diagnostics.push(diagnostic);
                 } else {
-                    // Otherwise, insert a dashed line after the section header.
+                    let mut diagnostic = Diagnostic::new(
+                        DashedUnderlineAfterSection {
+                            name: context.section_name().to_string(),
+                        },
+                        context.section_name_range(),
+                    );
+
+                    // Add a dashed line (of the appropriate length) under the section header.
+                    let content = format!(
+                        "{}{}{}",
+                        checker.stylist().line_ending().as_str(),
+                        clean_space(docstring.indentation),
+                        "-".repeat(context.section_name().len()),
+                    );
                     diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
                         content,
                         context.summary_range().end(),
                     )));
+
+                    checker.diagnostics.push(diagnostic);
                 }
-                checker.diagnostics.push(diagnostic);
             }
             if blank_lines_after_header > 0 {
                 if checker.enabled(Rule::BlankLinesBetweenHeaderAndContent) {
@@ -1539,7 +1566,7 @@ fn blanks_and_section_underline(
                         BlankLinesBetweenHeaderAndContent {
                             name: context.section_name().to_string(),
                         },
-                        docstring.range(),
+                        context.section_name_range(),
                     );
                     let range = TextRange::new(context.following_range().start(), blank_lines_end);
                     // Delete any blank lines between the header and content.
@@ -1548,16 +1575,16 @@ fn blanks_and_section_underline(
                 }
             }
         }
-    }
-    // Nothing but blank lines after the section header.
-    else {
+    } else {
+        // Nothing but blank lines after the section header.
         if checker.enabled(Rule::DashedUnderlineAfterSection) {
             let mut diagnostic = Diagnostic::new(
                 DashedUnderlineAfterSection {
                     name: context.section_name().to_string(),
                 },
-                docstring.range(),
+                context.section_name_range(),
             );
+
             // Add a dashed line (of the appropriate length) under the section header.
             let content = format!(
                 "{}{}{}",
@@ -1565,11 +1592,11 @@ fn blanks_and_section_underline(
                 clean_space(docstring.indentation),
                 "-".repeat(context.section_name().len()),
             );
-
             diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
                 content,
                 context.summary_range().end(),
             )));
+
             checker.diagnostics.push(diagnostic);
         }
         if checker.enabled(Rule::EmptyDocstringSection) {
@@ -1577,7 +1604,7 @@ fn blanks_and_section_underline(
                 EmptyDocstringSection {
                     name: context.section_name().to_string(),
                 },
-                docstring.range(),
+                context.section_name_range(),
             ));
         }
     }
@@ -1592,15 +1619,15 @@ fn common_section(
     if checker.enabled(Rule::CapitalizeSectionName) {
         let capitalized_section_name = context.kind().as_str();
         if context.section_name() != capitalized_section_name {
+            let section_range = context.section_name_range();
             let mut diagnostic = Diagnostic::new(
                 CapitalizeSectionName {
                     name: context.section_name().to_string(),
                 },
-                docstring.range(),
+                section_range,
             );
             // Replace the section title with the capitalized variant. This requires
             // locating the start and end of the section name.
-            let section_range = context.section_name_range();
             diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                 capitalized_section_name.to_string(),
                 section_range,
@@ -1612,16 +1639,17 @@ fn common_section(
     if checker.enabled(Rule::SectionNotOverIndented) {
         let leading_space = leading_space(context.summary_line());
         if leading_space.len() > docstring.indentation.len() {
+            let section_range = context.section_name_range();
             let mut diagnostic = Diagnostic::new(
                 SectionNotOverIndented {
                     name: context.section_name().to_string(),
                 },
-                docstring.range(),
+                section_range,
             );
+
             // Replace the existing indentation with whitespace of the appropriate length.
             let content = clean_space(docstring.indentation);
             let fix_range = TextRange::at(context.start(), leading_space.text_len());
-
             diagnostic.set_fix(Fix::safe_edit(if content.is_empty() {
                 Edit::range_deletion(fix_range)
             } else {
@@ -1641,11 +1669,12 @@ fn common_section(
                 .take_while(|line| line.trim().is_empty())
                 .count();
             if num_blank_lines < 2 {
+                let section_range = context.section_name_range();
                 let mut diagnostic = Diagnostic::new(
                     NoBlankLineAfterSection {
                         name: context.section_name().to_string(),
                     },
-                    docstring.range(),
+                    section_range,
                 );
                 // Add a newline at the beginning of the next section.
                 diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
@@ -1665,21 +1694,31 @@ fn common_section(
                 .take_while(|line| line.trim().is_empty())
                 .count();
             if num_blank_lines < 2 {
-                let mut diagnostic = Diagnostic::new(
-                    BlankLineAfterLastSection {
-                        name: context.section_name().to_string(),
-                    },
-                    docstring.range(),
-                );
-                // Add a newline after the section.
-                diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
+                let del_len = if num_blank_lines == 1 {
+                    // SAFETY: Guaranteed to not be None, because `num_blank_lines`is 1.
+                    context.following_lines().next_back().unwrap().text_len()
+                } else {
+                    TextSize::new(0)
+                };
+
+                let edit = Edit::replacement(
                     format!(
                         "{}{}",
                         line_end.repeat(2 - num_blank_lines),
                         docstring.indentation
                     ),
+                    context.end() - del_len,
                     context.end(),
-                )));
+                );
+
+                let section_range = context.section_name_range();
+                let mut diagnostic = Diagnostic::new(
+                    BlankLineAfterLastSection {
+                        name: context.section_name().to_string(),
+                    },
+                    section_range,
+                );
+                diagnostic.set_fix(Fix::safe_edit(edit));
                 checker.diagnostics.push(diagnostic);
             }
         }
@@ -1690,11 +1729,12 @@ fn common_section(
             .previous_line()
             .is_some_and(|line| line.trim().is_empty())
         {
+            let section_range = context.section_name_range();
             let mut diagnostic = Diagnostic::new(
                 NoBlankLineBeforeSection {
                     name: context.section_name().to_string(),
                 },
-                docstring.range(),
+                section_range,
             );
             // Add a blank line before the section.
             diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
@@ -1791,10 +1831,11 @@ fn args_section(context: &SectionContext) -> FxHashSet<String> {
     let leading_space = leading_space(first_line.as_str());
     let relevant_lines = std::iter::once(first_line)
         .chain(following_lines)
-        .map(|l| l.as_str())
         .filter(|line| {
-            line.is_empty() || (line.starts_with(leading_space) && !is_dashed_underline(line))
+            line.is_empty()
+                || (line.starts_with(leading_space) && find_underline(line, '-').is_none())
         })
+        .map(|line| line.as_str())
         .join("\n");
     let args_content = dedent(&relevant_lines);
 
@@ -1888,7 +1929,7 @@ fn numpy_section(
                 NewLineAfterSectionName {
                     name: context.section_name().to_string(),
                 },
-                docstring.range(),
+                context.section_name_range(),
             );
             let section_range = context.section_name_range();
             diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(TextRange::at(
@@ -1922,7 +1963,7 @@ fn google_section(
                 SectionNameEndsInColon {
                     name: context.section_name().to_string(),
                 },
-                docstring.range(),
+                context.section_name_range(),
             );
             // Replace the suffix.
             let section_name_range = context.section_name_range();
@@ -1982,7 +2023,35 @@ fn parse_google_sections(
     }
 }
 
-fn is_dashed_underline(line: &str) -> bool {
-    let trimmed_line = line.trim();
-    !trimmed_line.is_empty() && trimmed_line.chars().all(|char| char == '-')
+/// Returns the [`TextRange`] of the underline, if a line consists of only dashes.
+fn find_underline(line: &Line, dash: char) -> Option<TextRange> {
+    let mut cursor = Cursor::new(line.as_str());
+
+    // Eat leading whitespace.
+    cursor.eat_while(char::is_whitespace);
+
+    // Determine the start of the dashes.
+    let offset = cursor.token_len();
+
+    // Consume the dashes.
+    cursor.start_token();
+    cursor.eat_while(|c| c == dash);
+
+    // Determine the end of the dashes.
+    let len = cursor.token_len();
+
+    // If there are no dashes, return None.
+    if len == TextSize::new(0) {
+        return None;
+    }
+
+    // Eat trailing whitespace.
+    cursor.eat_while(char::is_whitespace);
+
+    // If there are any characters after the dashes, return None.
+    if !cursor.is_eof() {
+        return None;
+    }
+
+    Some(TextRange::at(offset, len).add(line.start()))
 }

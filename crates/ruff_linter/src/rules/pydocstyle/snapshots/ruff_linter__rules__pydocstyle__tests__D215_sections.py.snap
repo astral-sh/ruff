@@ -1,19 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 ---
-sections.py:156:5: D215 [*] Section underline is over-indented ("Returns")
+sections.py:159:9: D215 [*] Section underline is over-indented ("Returns")
     |
-154 |   @expect("D215: Section underline is over-indented (in section 'Returns')")
-155 |   def section_underline_overindented():  # noqa: D416
-156 |       """Toggle the gizmo.
-    |  _____^
-157 | | 
-158 | |     Returns
-159 | |         -------
-160 | |     A value of some sort.
-161 | | 
-162 | |     """
-    | |_______^ D215
+158 |     Returns
+159 |         -------
+    |         ^^^^^^^ D215
+160 |     A value of some sort.
     |
     = help: Remove over-indentation from "Returns" underline
 
@@ -27,17 +20,12 @@ sections.py:156:5: D215 [*] Section underline is over-indented ("Returns")
 161 161 | 
 162 162 |     """
 
-sections.py:170:5: D215 [*] Section underline is over-indented ("Returns")
+sections.py:173:9: D215 [*] Section underline is over-indented ("Returns")
     |
-168 |   @expect("D414: Section has no content ('Returns')")
-169 |   def section_underline_overindented_and_contentless():  # noqa: D416
-170 |       """Toggle the gizmo.
-    |  _____^
-171 | | 
-172 | |     Returns
-173 | |         -------
-174 | |     """
-    | |_______^ D215
+172 |     Returns
+173 |         -------
+    |         ^^^^^^^ D215
+174 |     """
     |
     = help: Remove over-indentation from "Returns" underline
 
@@ -49,6 +37,4 @@ sections.py:170:5: D215 [*] Section underline is over-indented ("Returns")
     173 |+    ------
 174 174 |     """
 175 175 | 
-176 176 | 
-
-
+176 176 |

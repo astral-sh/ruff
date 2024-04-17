@@ -72,7 +72,7 @@ pub(crate) fn unnecessary_list_index_lookup(checker: &mut Checker, stmt_for: &St
 
 /// PLR1736
 pub(crate) fn unnecessary_list_index_lookup_comprehension(checker: &mut Checker, expr: &Expr) {
-    let (Expr::GeneratorExp(ast::ExprGeneratorExp {
+    let (Expr::Generator(ast::ExprGenerator {
         elt, generators, ..
     })
     | Expr::DictComp(ast::ExprDictComp {
@@ -124,14 +124,6 @@ fn enumerate_items<'a>(
         func, arguments, ..
     } = call_expr.as_call_expr()?;
 
-    // Check that the function is the `enumerate` builtin.
-    if !semantic
-        .resolve_call_path(func.as_ref())
-        .is_some_and(|call_path| matches!(call_path.as_slice(), ["builtins" | "", "enumerate"]))
-    {
-        return None;
-    }
-
     let Expr::Tuple(ast::ExprTuple { elts, .. }) = tuple_expr else {
         return None;
     };
@@ -158,6 +150,11 @@ fn enumerate_items<'a>(
     let Some(Expr::Name(sequence)) = arguments.args.first() else {
         return None;
     };
+
+    // Check that the function is the `enumerate` builtin.
+    if !semantic.match_builtin_expr(func, "enumerate") {
+        return None;
+    }
 
     Some((sequence, index_name, value_name))
 }

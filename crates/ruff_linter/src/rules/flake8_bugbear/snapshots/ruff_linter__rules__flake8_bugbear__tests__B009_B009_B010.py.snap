@@ -342,6 +342,8 @@ B009_B010.py:65:1: B009 [*] Do not call `getattr` with a constant attribute valu
 65 | / getattr(self.
 66 | |    registration.registry, '__name__')
    | |_____________________________________^ B009
+67 |   
+68 |   import builtins
    |
    = help: Replace `getattr` with attribute access
 
@@ -353,5 +355,21 @@ B009_B010.py:65:1: B009 [*] Do not call `getattr` with a constant attribute valu
 66    |-   registration.registry, '__name__')
    65 |+(self.
    66 |+   registration.registry).__name__
+67 67 | 
+68 68 | import builtins
+69 69 | builtins.getattr(foo, "bar")
 
+B009_B010.py:69:1: B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
+   |
+68 | import builtins
+69 | builtins.getattr(foo, "bar")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ B009
+   |
+   = help: Replace `getattr` with attribute access
 
+ℹ Safe fix
+66 66 |    registration.registry, '__name__')
+67 67 | 
+68 68 | import builtins
+69    |-builtins.getattr(foo, "bar")
+   69 |+foo.bar

@@ -61,14 +61,15 @@ impl Violation for NonSlotAssignment {
 
 /// E0237
 pub(crate) fn non_slot_assignment(checker: &mut Checker, class_def: &ast::StmtClassDef) {
+    let semantic = checker.semantic();
+
     // If the class inherits from another class (aside from `object`), then it's possible that
     // the parent class defines the relevant `__slots__`.
-    if !class_def.bases().iter().all(|base| {
-        checker
-            .semantic()
-            .resolve_call_path(base)
-            .is_some_and(|call_path| matches!(call_path.as_slice(), ["", "object"]))
-    }) {
+    if !class_def
+        .bases()
+        .iter()
+        .all(|base| semantic.match_builtin_expr(base, "object"))
+    {
         return;
     }
 
@@ -142,7 +143,7 @@ fn is_attributes_not_in_slots(body: &[Stmt]) -> Vec<AttributeAssignment> {
         }
     }
 
-    if slots.is_empty() {
+    if slots.is_empty() || slots.contains("__dict__") {
         return vec![];
     }
 

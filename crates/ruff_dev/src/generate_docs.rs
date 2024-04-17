@@ -1,6 +1,7 @@
 //! Generate Markdown documentation for applicable rules.
 #![allow(clippy::print_stdout, clippy::print_stderr)]
 
+use std::collections::HashSet;
 use std::fs;
 use std::path::PathBuf;
 
@@ -97,12 +98,13 @@ pub(crate) fn main(args: &Args) -> Result<()> {
 fn process_documentation(documentation: &str, out: &mut String, rule_name: &str) {
     let mut in_options = false;
     let mut after = String::new();
+    let mut referenced_options = HashSet::new();
 
     // HACK: This is an ugly regex hack that's necessary because mkdocs uses
     // a non-CommonMark-compliant Markdown parser, which doesn't support code
     // tags in link definitions
     // (see https://github.com/Python-Markdown/markdown/issues/280).
-    let documentation = Regex::new(r"\[`([^`]*?)`]($|[^\[])").unwrap().replace_all(
+    let documentation = Regex::new(r"\[`([^`]*?)`]($|[^\[(])").unwrap().replace_all(
         documentation,
         |caps: &Captures| {
             format!(
@@ -135,6 +137,7 @@ fn process_documentation(documentation: &str, out: &mut String, rule_name: &str)
                 let anchor = option.replace('.', "_");
                 out.push_str(&format!("- [`{option}`][{option}]\n"));
                 after.push_str(&format!("[{option}]: ../settings.md#{anchor}\n"));
+                referenced_options.insert(option);
 
                 continue;
             }
@@ -142,6 +145,20 @@ fn process_documentation(documentation: &str, out: &mut String, rule_name: &str)
 
         out.push_str(line);
     }
+
+    let re = Regex::new(r"\[`([^`]*?)`]\[(.*?)]").unwrap();
+    for (_, [option, _]) in re.captures_iter(&documentation).map(|c| c.extract()) {
+        if let Some(OptionEntry::Field(field)) = Options::metadata().find(option) {
+            if referenced_options.insert(option) {
+                let anchor = option.replace('.', "_");
+                after.push_str(&format!("[{option}]: ../settings.md#{anchor}\n"));
+            }
+            if field.deprecated.is_some() {
+                eprintln!("Rule {rule_name} references deprecated option {option}.");
+            }
+        }
+    }
+
     if !after.is_empty() {
         out.push('\n');
         out.push('\n');
@@ -159,7 +176,7 @@ mod tests {
         process_documentation(
             "
 See also [`lint.mccabe.max-complexity`] and [`lint.task-tags`].
-Something [`else`][other].
+Something [`else`][other]. Some [link](https://example.com).
 
 ## Options
 
@@ -174,7 +191,7 @@ Something [`else`][other].
             output,
             "
 See also [`lint.mccabe.max-complexity`][lint.mccabe.max-complexity] and [`lint.task-tags`][lint.task-tags].
-Something [`else`][other].
+Something [`else`][other]. Some [link](https://example.com).
 
 ## Options
 

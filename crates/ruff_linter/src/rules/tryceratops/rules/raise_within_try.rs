@@ -64,11 +64,8 @@ struct RaiseStatementVisitor<'a> {
     raises: Vec<&'a Stmt>,
 }
 
-impl<'a, 'b> StatementVisitor<'b> for RaiseStatementVisitor<'a>
-where
-    'b: 'a,
-{
-    fn visit_stmt(&mut self, stmt: &'b Stmt) {
+impl<'a> StatementVisitor<'a> for RaiseStatementVisitor<'a> {
+    fn visit_stmt(&mut self, stmt: &'a Stmt) {
         match stmt {
             Stmt::Raise(_) => self.raises.push(stmt),
             Stmt::Try(_) => (),
@@ -114,10 +111,8 @@ pub(crate) fn raise_within_try(checker: &mut Checker, body: &[Stmt], handlers: &
             || handled_exceptions.iter().any(|expr| {
                 checker
                     .semantic()
-                    .resolve_call_path(expr)
-                    .is_some_and(|call_path| {
-                        matches!(call_path.as_slice(), ["", "Exception" | "BaseException"])
-                    })
+                    .resolve_builtin_symbol(expr)
+                    .is_some_and(|builtin| matches!(builtin, "Exception" | "BaseException"))
             })
         {
             checker

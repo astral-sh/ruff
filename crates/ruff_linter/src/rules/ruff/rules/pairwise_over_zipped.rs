@@ -83,12 +83,7 @@ fn match_slice_info(expr: &Expr) -> Option<SliceInfo> {
         else {
             return None;
         };
-
-        let Some(slice_start) = int.as_i32() else {
-            return None;
-        };
-
-        Some(slice_start)
+        Some(int.as_i32()?)
     } else {
         None
     };
@@ -101,17 +96,18 @@ fn match_slice_info(expr: &Expr) -> Option<SliceInfo> {
 
 /// RUF007
 pub(crate) fn pairwise_over_zipped(checker: &mut Checker, func: &Expr, args: &[Expr]) {
-    let Expr::Name(ast::ExprName { id, .. }) = func else {
-        return;
-    };
-
     // Require exactly two positional arguments.
     let [first, second] = args else {
         return;
     };
 
+    // Require second argument to be a `Subscript`.
+    if !second.is_subscript_expr() {
+        return;
+    }
+
     // Require the function to be the builtin `zip`.
-    if !(id == "zip" && checker.semantic().is_builtin(id)) {
+    if !checker.semantic().match_builtin_expr(func, "zip") {
         return;
     }
 
@@ -129,10 +125,6 @@ pub(crate) fn pairwise_over_zipped(checker: &mut Checker, func: &Expr, args: &[E
         return;
     };
 
-    // Require second argument to be a `Subscript`.
-    if !second.is_subscript_expr() {
-        return;
-    }
     let Some(second_arg_info) = match_slice_info(second) else {
         return;
     };

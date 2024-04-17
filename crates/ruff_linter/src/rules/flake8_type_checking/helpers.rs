@@ -1,8 +1,8 @@
 use anyhow::Result;
 
 use ruff_diagnostics::Edit;
-use ruff_python_ast::call_path::from_qualified_name;
 use ruff_python_ast::helpers::{map_callable, map_subscript};
+use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{self as ast, Decorator, Expr};
 use ruff_python_codegen::{Generator, Stylist};
 use ruff_python_semantic::{
@@ -77,10 +77,10 @@ fn runtime_required_base_class(
     base_classes: &[String],
     semantic: &SemanticModel,
 ) -> bool {
-    analyze::class::any_call_path(class_def, semantic, &|call_path| {
+    analyze::class::any_qualified_name(class_def, semantic, &|qualified_name| {
         base_classes
             .iter()
-            .any(|base_class| from_qualified_name(base_class) == call_path)
+            .any(|base_class| QualifiedName::from_dotted_name(base_class) == qualified_name)
     })
 }
 
@@ -95,11 +95,11 @@ fn runtime_required_decorators(
 
     decorator_list.iter().any(|decorator| {
         semantic
-            .resolve_call_path(map_callable(&decorator.expression))
-            .is_some_and(|call_path| {
+            .resolve_qualified_name(map_callable(&decorator.expression))
+            .is_some_and(|qualified_name| {
                 decorators
                     .iter()
-                    .any(|base_class| from_qualified_name(base_class) == call_path)
+                    .any(|base_class| QualifiedName::from_dotted_name(base_class) == qualified_name)
             })
     })
 }
@@ -119,17 +119,17 @@ pub(crate) fn is_dataclass_meta_annotation(annotation: &Expr, semantic: &Semanti
     if let ScopeKind::Class(class_def) = semantic.current_scope().kind {
         if class_def.decorator_list.iter().any(|decorator| {
             semantic
-                .resolve_call_path(map_callable(&decorator.expression))
-                .is_some_and(|call_path| {
-                    matches!(call_path.as_slice(), ["dataclasses", "dataclass"])
+                .resolve_qualified_name(map_callable(&decorator.expression))
+                .is_some_and(|qualified_name| {
+                    matches!(qualified_name.segments(), ["dataclasses", "dataclass"])
                 })
         }) {
             // Determine whether the annotation is `typing.ClassVar` or `dataclasses.InitVar`.
             return semantic
-                .resolve_call_path(map_subscript(annotation))
-                .is_some_and(|call_path| {
-                    matches!(call_path.as_slice(), ["dataclasses", "InitVar"])
-                        || semantic.match_typing_call_path(&call_path, "ClassVar")
+                .resolve_qualified_name(map_subscript(annotation))
+                .is_some_and(|qualified_name| {
+                    matches!(qualified_name.segments(), ["dataclasses", "InitVar"])
+                        || semantic.match_typing_qualified_name(&qualified_name, "ClassVar")
                 });
         }
     }
@@ -143,6 +143,7 @@ pub(crate) fn is_dataclass_meta_annotation(annotation: &Expr, semantic: &Semanti
 /// ```python
 /// from functools import singledispatch
 ///
+///
 /// @singledispatch
 /// def fun(arg, verbose=False):
 ///     ...
@@ -153,9 +154,9 @@ pub(crate) fn is_singledispatch_interface(
 ) -> bool {
     function_def.decorator_list.iter().any(|decorator| {
         semantic
-            .resolve_call_path(&decorator.expression)
-            .is_some_and(|call_path| {
-                matches!(call_path.as_slice(), ["functools", "singledispatch"])
+            .resolve_qualified_name(&decorator.expression)
+            .is_some_and(|qualified_name| {
+                matches!(qualified_name.segments(), ["functools", "singledispatch"])
             })
     })
 }
@@ -166,6 +167,7 @@ pub(crate) fn is_singledispatch_interface(
 /// For example:
 /// ```python
 /// from functools import singledispatch
+///
 ///
 /// @singledispatch
 /// def fun(arg, verbose=False):

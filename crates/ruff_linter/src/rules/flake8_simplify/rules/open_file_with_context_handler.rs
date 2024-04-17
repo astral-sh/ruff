@@ -63,9 +63,12 @@ fn match_async_exit_stack(semantic: &SemanticModel) -> bool {
         if let Stmt::With(ast::StmtWith { items, .. }) = parent {
             for item in items {
                 if let Expr::Call(ast::ExprCall { func, .. }) = &item.context_expr {
-                    if semantic.resolve_call_path(func).is_some_and(|call_path| {
-                        matches!(call_path.as_slice(), ["contextlib", "AsyncExitStack"])
-                    }) {
+                    if semantic
+                        .resolve_qualified_name(func)
+                        .is_some_and(|qualified_name| {
+                            matches!(qualified_name.segments(), ["contextlib", "AsyncExitStack"])
+                        })
+                    {
                         return true;
                     }
                 }
@@ -94,9 +97,12 @@ fn match_exit_stack(semantic: &SemanticModel) -> bool {
         if let Stmt::With(ast::StmtWith { items, .. }) = parent {
             for item in items {
                 if let Expr::Call(ast::ExprCall { func, .. }) = &item.context_expr {
-                    if semantic.resolve_call_path(func).is_some_and(|call_path| {
-                        matches!(call_path.as_slice(), ["contextlib", "ExitStack"])
-                    }) {
+                    if semantic
+                        .resolve_qualified_name(func)
+                        .is_some_and(|qualified_name| {
+                            matches!(qualified_name.segments(), ["contextlib", "ExitStack"])
+                        })
+                    {
                         return true;
                     }
                 }
@@ -107,24 +113,28 @@ fn match_exit_stack(semantic: &SemanticModel) -> bool {
 }
 
 /// Return `true` if `func` is the builtin `open` or `pathlib.Path(...).open`.
-fn is_open(checker: &mut Checker, func: &Expr) -> bool {
-    match func {
-        // pathlib.Path(...).open()
-        Expr::Attribute(ast::ExprAttribute { attr, value, .. }) if attr.as_str() == "open" => {
-            match value.as_ref() {
-                Expr::Call(ast::ExprCall { func, .. }) => checker
-                    .semantic()
-                    .resolve_call_path(func)
-                    .is_some_and(|call_path| matches!(call_path.as_slice(), ["pathlib", "Path"])),
-                _ => false,
-            }
-        }
-        // open(...)
-        Expr::Name(ast::ExprName { id, .. }) => {
-            id.as_str() == "open" && checker.semantic().is_builtin("open")
-        }
-        _ => false,
+fn is_open(semantic: &SemanticModel, func: &Expr) -> bool {
+    // open(...)
+    if semantic.match_builtin_expr(func, "open") {
+        return true;
     }
+
+    // pathlib.Path(...).open()
+    let Expr::Attribute(ast::ExprAttribute { attr, value, .. }) = func else {
+        return false;
+    };
+    if attr != "open" {
+        return false;
+    }
+    let Expr::Call(ast::ExprCall {
+        func: value_func, ..
+    }) = &**value
+    else {
+        return false;
+    };
+    semantic
+        .resolve_qualified_name(value_func)
+        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["pathlib", "Path"]))
 }
 
 /// Return `true` if the current expression is followed by a `close` call.
@@ -153,27 +163,29 @@ fn is_closed(semantic: &SemanticModel) -> bool {
 
 /// SIM115
 pub(crate) fn open_file_with_context_handler(checker: &mut Checker, func: &Expr) {
-    if !is_open(checker, func) {
+    let semantic = checker.semantic();
+
+    if !is_open(semantic, func) {
         return;
     }
 
     // Ex) `open("foo.txt").close()`
-    if is_closed(checker.semantic()) {
+    if is_closed(semantic) {
         return;
     }
 
     // Ex) `with open("foo.txt") as f: ...`
-    if checker.semantic().current_statement().is_with_stmt() {
+    if semantic.current_statement().is_with_stmt() {
         return;
     }
 
     // Ex) `with contextlib.ExitStack() as exit_stack: ...`
-    if match_exit_stack(checker.semantic()) {
+    if match_exit_stack(semantic) {
         return;
     }
 
     // Ex) `with contextlib.AsyncExitStack() as exit_stack: ...`
-    if match_async_exit_stack(checker.semantic()) {
+    if match_async_exit_stack(semantic) {
         return;
     }
 

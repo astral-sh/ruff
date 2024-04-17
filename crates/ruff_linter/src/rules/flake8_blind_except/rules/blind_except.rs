@@ -79,15 +79,12 @@ pub(crate) fn blind_except(
     let Some(type_) = type_ else {
         return;
     };
-    let Expr::Name(ast::ExprName { id, .. }) = &type_ else {
+
+    let semantic = checker.semantic();
+    let Some(builtin_exception_type) = semantic.resolve_builtin_symbol(type_) else {
         return;
     };
-
-    if !matches!(id.as_str(), "BaseException" | "Exception") {
-        return;
-    }
-
-    if !checker.semantic().is_builtin(id) {
+    if !matches!(builtin_exception_type, "BaseException" | "Exception") {
         return;
     }
 
@@ -121,7 +118,7 @@ pub(crate) fn blind_except(
                     Expr::Attribute(ast::ExprAttribute { attr, .. }) => {
                         if logging::is_logger_candidate(
                             func,
-                            checker.semantic(),
+                            semantic,
                             &checker.settings.logger_objects,
                         ) {
                             match attr.as_str() {
@@ -138,10 +135,9 @@ pub(crate) fn blind_except(
                         }
                     }
                     Expr::Name(ast::ExprName { .. }) => {
-                        if checker
-                            .semantic()
-                            .resolve_call_path(func.as_ref())
-                            .is_some_and(|call_path| match call_path.as_slice() {
+                        if semantic
+                            .resolve_qualified_name(func)
+                            .is_some_and(|qualified_name| match qualified_name.segments() {
                                 ["logging", "exception"] => true,
                                 ["logging", "error"] => {
                                     if let Some(keyword) = arguments.find_keyword("exc_info") {
@@ -170,7 +166,7 @@ pub(crate) fn blind_except(
 
     checker.diagnostics.push(Diagnostic::new(
         BlindExcept {
-            name: id.to_string(),
+            name: builtin_exception_type.to_string(),
         },
         type_.range(),
     ));

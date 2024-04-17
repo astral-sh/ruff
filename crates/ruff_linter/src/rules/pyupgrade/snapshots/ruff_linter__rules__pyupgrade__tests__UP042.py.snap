@@ -1,0 +1,55 @@
+---
+source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+---
+UP042.py:4:7: UP042 [*] Class A inherits from both `str` and `enum.Enum`
+  |
+4 | class A(str, Enum): ...
+  |       ^ UP042
+  |
+  = help: Inherit from `enum.StrEnum`
+
+ℹ Unsafe fix
+1   |-from enum import Enum
+  1 |+from enum import Enum, StrEnum
+2 2 | 
+3 3 | 
+4   |-class A(str, Enum): ...
+  4 |+class A(StrEnum): ...
+5 5 | 
+6 6 | 
+7 7 | class B(Enum, str): ...
+
+UP042.py:7:7: UP042 [*] Class B inherits from both `str` and `enum.Enum`
+  |
+7 | class B(Enum, str): ...
+  |       ^ UP042
+  |
+  = help: Inherit from `enum.StrEnum`
+
+ℹ Unsafe fix
+1   |-from enum import Enum
+  1 |+from enum import Enum, StrEnum
+2 2 | 
+3 3 | 
+4 4 | class A(str, Enum): ...
+5 5 | 
+6 6 | 
+7   |-class B(Enum, str): ...
+  7 |+class B(StrEnum): ...
+8 8 | 
+9 9 | 
+10 10 | class D(int, str, Enum): ...
+
+UP042.py:10:7: UP042 Class D inherits from both `str` and `enum.Enum`
+   |
+10 | class D(int, str, Enum): ...
+   |       ^ UP042
+   |
+   = help: Inherit from `enum.StrEnum`
+
+UP042.py:13:7: UP042 Class E inherits from both `str` and `enum.Enum`
+   |
+13 | class E(str, int, Enum): ...
+   |       ^ UP042
+   |
+   = help: Inherit from `enum.StrEnum`

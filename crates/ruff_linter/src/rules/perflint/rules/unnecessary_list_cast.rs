@@ -69,11 +69,7 @@ pub(crate) fn unnecessary_list_cast(checker: &mut Checker, iter: &Expr, body: &[
         return;
     };
 
-    let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() else {
-        return;
-    };
-
-    if !(id == "list" && checker.semantic().is_builtin("list")) {
+    if !checker.semantic().match_builtin_expr(func, "list") {
         return;
     }
 
@@ -151,11 +147,8 @@ impl<'a> MutationVisitor<'a> {
     }
 }
 
-impl<'a, 'b> StatementVisitor<'b> for MutationVisitor<'a>
-where
-    'b: 'a,
-{
-    fn visit_stmt(&mut self, stmt: &'b Stmt) {
+impl<'a> StatementVisitor<'a> for MutationVisitor<'a> {
+    fn visit_stmt(&mut self, stmt: &'a Stmt) {
         if match_mutation(stmt, self.target) {
             self.is_mutated = true;
         } else {

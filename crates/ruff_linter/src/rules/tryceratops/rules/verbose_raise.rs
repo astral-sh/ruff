@@ -54,11 +54,8 @@ struct RaiseStatementVisitor<'a> {
     raises: Vec<&'a ast::StmtRaise>,
 }
 
-impl<'a, 'b> StatementVisitor<'b> for RaiseStatementVisitor<'a>
-where
-    'b: 'a,
-{
-    fn visit_stmt(&mut self, stmt: &'b Stmt) {
+impl<'a> StatementVisitor<'a> for RaiseStatementVisitor<'a> {
+    fn visit_stmt(&mut self, stmt: &'a Stmt) {
         match stmt {
             Stmt::Raise(raise @ ast::StmtRaise { .. }) => {
                 self.raises.push(raise);

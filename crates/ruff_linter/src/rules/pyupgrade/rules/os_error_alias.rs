@@ -4,7 +4,7 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::fix::edits::pad;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::call_path::compose_call_path;
+use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
@@ -56,43 +56,46 @@ impl AlwaysFixableViolation for OSErrorAlias {
 
 /// Return `true` if an [`Expr`] is an alias of `OSError`.
 fn is_alias(expr: &Expr, semantic: &SemanticModel) -> bool {
-    semantic.resolve_call_path(expr).is_some_and(|call_path| {
-        matches!(
-            call_path.as_slice(),
-            ["", "EnvironmentError" | "IOError" | "WindowsError"]
-                | ["mmap" | "select" | "socket" | "os", "error"]
-        )
-    })
-}
-
-/// Return `true` if an [`Expr`] is `OSError`.
-fn is_os_error(expr: &Expr, semantic: &SemanticModel) -> bool {
     semantic
-        .resolve_call_path(expr)
-        .is_some_and(|call_path| matches!(call_path.as_slice(), ["", "OSError"]))
+        .resolve_qualified_name(expr)
+        .is_some_and(|qualified_name| {
+            matches!(
+                qualified_name.segments(),
+                [
+                    "" | "builtins",
+                    "EnvironmentError" | "IOError" | "WindowsError"
+                ] | ["mmap" | "select" | "socket" | "os", "error"]
+            )
+        })
 }
 
 /// Create a [`Diagnostic`] for a single target, like an [`Expr::Name`].
 fn atom_diagnostic(checker: &mut Checker, target: &Expr) {
     let mut diagnostic = Diagnostic::new(
         OSErrorAlias {
-            name: compose_call_path(target),
+            name: UnqualifiedName::from_expr(target).map(|name| name.to_string()),
         },
         target.range(),
     );
-    if checker.semantic().is_builtin("OSError") {
-        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-            "OSError".to_string(),
-            target.range(),
-        )));
-    }
+    diagnostic.try_set_fix(|| {
+        let (import_edit, binding) = checker.importer().get_or_import_builtin_symbol(
+            "OSError",
+            target.start(),
+            checker.semantic(),
+        )?;
+        Ok(Fix::safe_edits(
+            Edit::range_replacement(binding, target.range()),
+            import_edit,
+        ))
+    });
     checker.diagnostics.push(diagnostic);
 }
 
 /// Create a [`Diagnostic`] for a tuple of expressions.
 fn tuple_diagnostic(checker: &mut Checker, tuple: &ast::ExprTuple, aliases: &[&Expr]) {
     let mut diagnostic = Diagnostic::new(OSErrorAlias { name: None }, tuple.range());
-    if checker.semantic().is_builtin("OSError") {
+    let semantic = checker.semantic();
+    if semantic.is_builtin("OSError") {
         // Filter out any `OSErrors` aliases.
         let mut remaining: Vec<Expr> = tuple
             .elts
@@ -110,7 +113,7 @@ fn tuple_diagnostic(checker: &mut Checker, tuple: &ast::ExprTuple, aliases: &[&E
         if tuple
             .elts
             .iter()
-            .all(|elt| !is_os_error(elt, checker.semantic()))
+            .all(|elt| !semantic.match_builtin_expr(elt, "OSError"))
         {
             let node = ast::ExprName {
                 id: "OSError".into(),

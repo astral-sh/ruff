@@ -12,17 +12,17 @@ use crate::checkers::ast::Checker;
 /// Checks for the presence of multiple `type`s in a union.
 ///
 /// ## Why is this bad?
-/// The `type` built-in function accepts unions, and it is clearer to
-/// explicitly specify them as a single `type`.
+/// `type[T | S]` has identical semantics to `type[T] | type[S]` in a type
+/// annotation, but is cleaner and more concise.
 ///
 /// ## Example
 /// ```python
-/// field: type[int] | type[float]
+/// field: type[int] | type[float] | str
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// field: type[int | float]
+/// field: type[int | float] | str
 /// ```
 #[violation]
 pub struct UnnecessaryTypeUnion {
@@ -53,44 +53,34 @@ impl Violation for UnnecessaryTypeUnion {
 
 /// PYI055
 pub(crate) fn unnecessary_type_union<'a>(checker: &mut Checker, union: &'a Expr) {
+    let semantic = checker.semantic();
+
     // The `|` operator isn't always safe to allow to runtime-evaluated annotations.
-    if checker.semantic().execution_context().is_runtime() {
+    if semantic.execution_context().is_runtime() {
         return;
     }
 
     // Check if `union` is a PEP604 union (e.g. `float | int`) or a `typing.Union[float, int]`
     let subscript = union.as_subscript_expr();
-    if subscript.is_some_and(|subscript| {
-        !checker
-            .semantic()
-            .match_typing_expr(&subscript.value, "Union")
-    }) {
+    if subscript.is_some_and(|subscript| !semantic.match_typing_expr(&subscript.value, "Union")) {
         return;
     }
 
-    let mut type_exprs = Vec::new();
-    let mut other_exprs = Vec::new();
+    let mut type_exprs: Vec<&Expr> = Vec::new();
+    let mut other_exprs: Vec<&Expr> = Vec::new();
 
-    let mut collect_type_exprs = |expr: &'a Expr, _parent: &'a Expr| {
-        let subscript = expr.as_subscript_expr();
-
-        if subscript.is_none() {
-            other_exprs.push(expr);
-        } else {
-            let unwrapped = subscript.unwrap();
-            if checker
-                .semantic()
-                .resolve_call_path(unwrapped.value.as_ref())
-                .is_some_and(|call_path| matches!(call_path.as_slice(), ["" | "builtins", "type"]))
-            {
-                type_exprs.push(unwrapped.slice.as_ref());
+    let mut collect_type_exprs = |expr: &'a Expr, _parent: &'a Expr| match expr {
+        Expr::Subscript(ast::ExprSubscript { slice, value, .. }) => {
+            if semantic.match_builtin_expr(value, "type") {
+                type_exprs.push(slice);
             } else {
                 other_exprs.push(expr);
             }
         }
+        _ => other_exprs.push(expr),
     };
 
-    traverse_union(&mut collect_type_exprs, checker.semantic(), union);
+    traverse_union(&mut collect_type_exprs, semantic, union);
 
     if type_exprs.len() > 1 {
         let type_members: Vec<String> = type_exprs
@@ -107,7 +97,7 @@ pub(crate) fn unnecessary_type_union<'a>(checker: &mut Checker, union: &'a Expr)
             union.range(),
         );
 
-        if checker.semantic().is_builtin("type") {
+        if semantic.is_builtin("type") {
             let content = if let Some(subscript) = subscript {
                 let types = &Expr::Subscript(ast::ExprSubscript {
                     value: Box::new(Expr::Name(ast::ExprName {

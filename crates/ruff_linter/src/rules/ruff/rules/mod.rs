@@ -6,6 +6,7 @@ pub(crate) use default_factory_kwarg::*;
 pub(crate) use explicit_f_string_type_conversion::*;
 pub(crate) use function_call_in_dataclass_default::*;
 pub(crate) use implicit_optional::*;
+pub(crate) use invalid_formatter_suppression_comment::*;
 pub(crate) use invalid_index_type::*;
 pub(crate) use invalid_pyproject_toml::*;
 pub(crate) use missing_fstring_syntax::*;
@@ -24,6 +25,7 @@ pub(crate) use test_rules::*;
 pub(crate) use unnecessary_dict_comprehension_for_iterable::*;
 pub(crate) use unnecessary_iterable_allocation_for_first_element::*;
 pub(crate) use unnecessary_key_check::*;
+pub(crate) use unused_async::*;
 pub(crate) use unused_noqa::*;
 
 mod ambiguous_unicode_character;
@@ -36,6 +38,7 @@ mod explicit_f_string_type_conversion;
 mod function_call_in_dataclass_default;
 mod helpers;
 mod implicit_optional;
+mod invalid_formatter_suppression_comment;
 mod invalid_index_type;
 mod invalid_pyproject_toml;
 mod missing_fstring_syntax;
@@ -50,11 +53,13 @@ mod sequence_sorting;
 mod sort_dunder_all;
 mod sort_dunder_slots;
 mod static_key_dict_comprehension;
+mod suppression_comment_visitor;
 #[cfg(feature = "test-rules")]
 pub(crate) mod test_rules;
 mod unnecessary_dict_comprehension_for_iterable;
 mod unnecessary_iterable_allocation_for_first_element;
 mod unnecessary_key_check;
+mod unused_async;
 mod unused_noqa;
 
 #[derive(Clone, Copy)]

@@ -24,7 +24,6 @@ mod docstrings;
 mod fix;
 pub mod fs;
 mod importer;
-mod lex;
 pub mod line_width;
 pub mod linter;
 pub mod logging;

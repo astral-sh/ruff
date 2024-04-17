@@ -1,7 +1,7 @@
-use ast::call_path::{from_qualified_name, CallPath};
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_docstring_stmt;
+use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{self as ast, Expr, Parameter, ParameterWithDefault, Stmt};
 use ruff_python_codegen::{Generator, Stylist};
 use ruff_python_index::Indexer;
@@ -98,12 +98,12 @@ pub(crate) fn mutable_argument_default(checker: &mut Checker, function_def: &ast
             continue;
         };
 
-        let extend_immutable_calls: Vec<CallPath> = checker
+        let extend_immutable_calls: Vec<QualifiedName> = checker
             .settings
             .flake8_bugbear
             .extend_immutable_calls
             .iter()
-            .map(|target| from_qualified_name(target))
+            .map(|target| QualifiedName::from_dotted_name(target))
             .collect();
 
         if is_mutable_expr(default, checker.semantic())

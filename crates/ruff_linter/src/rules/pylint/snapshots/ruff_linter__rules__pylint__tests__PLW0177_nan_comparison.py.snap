@@ -1,0 +1,90 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+nan_comparison.py:11:9: PLW0177 Comparing against a NaN value; use `math.isnan` instead
+   |
+10 | # PLW0117
+11 | if x == float("nan"):
+   |         ^^^^^^^^^^^^ PLW0177
+12 |     pass
+   |
+
+nan_comparison.py:15:9: PLW0177 Comparing against a NaN value; use `math.isnan` instead
+   |
+14 | # PLW0117
+15 | if x == float("NaN"):
+   |         ^^^^^^^^^^^^ PLW0177
+16 |     pass
+   |
+
+nan_comparison.py:19:9: PLW0177 Comparing against a NaN value; use `math.isnan` instead
+   |
+18 | # PLW0117
+19 | if x == float("NAN"):
+   |         ^^^^^^^^^^^^ PLW0177
+20 |     pass
+   |
+
+nan_comparison.py:23:9: PLW0177 Comparing against a NaN value; use `math.isnan` instead
+   |
+22 | # PLW0117
+23 | if x == float("Nan"):
+   |         ^^^^^^^^^^^^ PLW0177
+24 |     pass
+   |
+
+nan_comparison.py:27:9: PLW0177 Comparing against a NaN value; use `math.isnan` instead
+   |
+26 | # PLW0117
+27 | if x == math.nan:
+   |         ^^^^^^^^ PLW0177
+28 |     pass
+   |
+
+nan_comparison.py:31:9: PLW0177 Comparing against a NaN value; use `math.isnan` instead
+   |
+30 | # PLW0117
+31 | if x == bad_val:
+   |         ^^^^^^^ PLW0177
+32 |     pass
+   |
+
+nan_comparison.py:35:9: PLW0177 Comparing against a NaN value; use `np.isnan` instead
+   |
+34 | # PLW0117
+35 | if y == np.NaN:
+   |         ^^^^^^ PLW0177
+36 |     pass
+   |
+
+nan_comparison.py:39:9: PLW0177 Comparing against a NaN value; use `np.isnan` instead
+   |
+38 | # PLW0117
+39 | if y == np.NAN:
+   |         ^^^^^^ PLW0177
+40 |     pass
+   |
+
+nan_comparison.py:43:9: PLW0177 Comparing against a NaN value; use `np.isnan` instead
+   |
+42 | # PLW0117
+43 | if y == np.nan:
+   |         ^^^^^^ PLW0177
+44 |     pass
+   |
+
+nan_comparison.py:47:9: PLW0177 Comparing against a NaN value; use `np.isnan` instead
+   |
+46 | # PLW0117
+47 | if y == npy_nan:
+   |         ^^^^^^^ PLW0177
+48 |     pass
+   |
+
+nan_comparison.py:53:9: PLW0177 Comparing against a NaN value; use `math.isnan` instead
+   |
+52 | # PLW0117
+53 | if x == builtins.float("nan"):
+   |         ^^^^^^^^^^^^^^^^^^^^^ PLW0177
+54 |     pass
+   |
