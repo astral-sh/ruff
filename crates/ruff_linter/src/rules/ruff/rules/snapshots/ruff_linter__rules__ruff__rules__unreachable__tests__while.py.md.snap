@@ -733,7 +733,11 @@ flowchart TD
   return(("End"))
   block0["self.thread = threading.Thread(target=self._run_web_server)\n"]
   block1[["Loop continue"]]
-  block2["try:
+  block2["self.server = HTTPServer((host, port), HtmlOnlyHandler)\nself.host = host\nself.port = port\nbreak\n"]
+  block3[["Exception raised"]]
+  block4["log.debug(f#quot;port {port} is in use, trying to next one#quot;)\nport += 1\n"]
+  block5["log.debug(f#quot;port {port} is in use, trying to next one#quot;)\nport += 1\n"]
+  block6["try:
             self.server = HTTPServer((host, port), HtmlOnlyHandler)
             self.host = host
             self.port = port
@@ -741,7 +745,7 @@ flowchart TD
         except OSError:
             log.debug(f#quot;port {port} is in use, trying to next one#quot;)
             port += 1\n"]
-  block3["self.stop_serving = False\nwhile True:
+  block7["self.stop_serving = False\nwhile True:
         try:
             self.server = HTTPServer((host, port), HtmlOnlyHandler)
             self.host = host
@@ -751,10 +755,16 @@ flowchart TD
             log.debug(f#quot;port {port} is in use, trying to next one#quot;)
             port += 1\n"]
 
-  start --> block3
-  block3 -- "True" --> block2
-  block3 -- "else" --> block0
-  block2 --> block1
-  block1 --> block3
+  start --> block7
+  block7 -- "True" --> block6
+  block7 -- "else" --> block0
+  block6 -- "Exception raised" --> block5
+  block6 -- "else" --> block2
+  block5 -- "OSError" --> block4
+  block5 -- "else" --> block3
+  block4 --> block1
+  block3 --> return
+  block2 --> block0
+  block1 --> block7
   block0 --> return
 ```
