@@ -920,10 +920,24 @@ impl RecoveryContextKind {
                     p.at_sequence_end()
                 }
             }
-            RecoveryContextKind::SequenceMatchPattern(parentheses) => p.at(parentheses.map_or(
-                TokenKind::Colon,
-                SequenceMatchPatternParentheses::closing_kind,
-            )),
+            RecoveryContextKind::SequenceMatchPattern(parentheses) => match parentheses {
+                None => {
+                    // test_ok match_sequence_pattern_terminator
+                    // match subject:
+                    //     case a: ...
+                    //     case a if x: ...
+                    //     case a, b: ...
+                    //     case a, b if x: ...
+                    matches!(p.current_token_kind(), TokenKind::Colon | TokenKind::If)
+                }
+                Some(parentheses) => {
+                    // test_ok match_sequence_pattern_parentheses_terminator
+                    // match subject:
+                    //     case [a, b]: ...
+                    //     case (a, b): ...
+                    p.at(parentheses.closing_kind())
+                }
+            },
             RecoveryContextKind::MatchPatternMapping => p.at(TokenKind::Rbrace),
             RecoveryContextKind::MatchPatternClassArguments => p.at(TokenKind::Rpar),
             RecoveryContextKind::Arguments => p.at(TokenKind::Rpar),
