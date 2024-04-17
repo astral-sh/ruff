@@ -13,7 +13,7 @@ require'lspconfig'.ruff.setup{}
 See [`nvim-lspconfig`'s server configuration guide](https://github.com/neovim/nvim-lspconfig/blob/master/doc/server_configurations.md#ruff) for more details
 on how to configure the server from there.
 
-> [!IMPORTANT]
+> \[!IMPORTANT\]
 >
 > If you have the older language server (`ruff-lsp`) configured in NeoVim, make sure to disable it to prevent any conflicts.
 
