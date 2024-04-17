@@ -1748,8 +1748,8 @@ impl<'src> Parser<'src> {
             .into();
         }
 
-        // We need to reset the context when parsing a parenthesized expression otherwise a
-        // parenthesized comparison expression will not be parsed in a `for` target.
+        // We need to unset the `FOR_TARGET` in the context when parsing a parenthesized expression
+        // otherwise a parenthesized comparison expression will not be parsed in a `for` target.
 
         // test_ok parenthesized_compare_expr_in_for
         // for (x in y)[0] in iter: ...
@@ -1758,7 +1758,7 @@ impl<'src> Parser<'src> {
         // test_err parenthesized_compare_expr_in_for
         // for (x in y)() in iter: ...
         // for (x in y) in iter: ...
-        let current_context = ParserCtxFlags::empty();
+        let current_context = self.ctx - ParserCtxFlags::FOR_TARGET;
         let saved_context = self.set_ctx(current_context);
 
         // Use the more general rule of the three to parse the first element
