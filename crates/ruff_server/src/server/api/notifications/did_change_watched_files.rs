@@ -25,7 +25,7 @@ impl super::SyncNotificationHandler for DidChangeWatchedFiles {
                 .with_failure_code(lsp_server::ErrorCode::InternalError)?;
         }
 
-        if !params.changes.is_empty() {
+        if session.resolved_client_capabilities().workspace_refresh && !params.changes.is_empty() {
             requester
                 .request::<types::request::WorkspaceDiagnosticRefresh>((), |()| Task::nothing())
                 .with_failure_code(lsp_server::ErrorCode::InternalError)?;

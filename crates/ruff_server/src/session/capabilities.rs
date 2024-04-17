@@ -1,10 +1,12 @@
 use lsp_types::ClientCapabilities;
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[allow(clippy::struct_excessive_bools)]
 pub(crate) struct ResolvedClientCapabilities {
     pub(crate) code_action_deferred_edit_resolution: bool,
     pub(crate) apply_edit: bool,
     pub(crate) document_changes: bool,
+    pub(crate) workspace_refresh: bool,
 }
 
 impl ResolvedClientCapabilities {
@@ -33,11 +35,19 @@ impl ResolvedClientCapabilities {
             .and_then(|workspace_edit| workspace_edit.document_changes)
             .unwrap_or_default();
 
+        let workspace_refresh = client_capabilities
+            .workspace
+            .as_ref()
+            .and_then(|workspace| workspace.diagnostic.as_ref())
+            .and_then(|diagnostic| diagnostic.refresh_support)
+            .unwrap_or_default();
+
         Self {
             code_action_deferred_edit_resolution: code_action_data_support
                 && code_action_edit_resolution,
             apply_edit,
             document_changes,
+            workspace_refresh,
         }
     }
 }
