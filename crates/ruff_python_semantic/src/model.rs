@@ -294,8 +294,19 @@ impl<'a> SemanticModel<'a> {
     /// or `builtins.object` (where `builtins` is imported as a module at the top level)
     pub fn match_builtin_expr(&self, expr: &Expr, symbol: &str) -> bool {
         debug_assert!(!symbol.contains('.'));
-        self.resolve_builtin_symbol(expr)
-            .is_some_and(|name| name == symbol)
+        // fast path with more short-circuiting
+        if !self.seen_module(Modules::BUILTINS) {
+            let Expr::Name(ast::ExprName { id, .. }) = expr else {
+                return false;
+            };
+            return id == symbol && self.is_builtin(symbol);
+        }
+
+        // slow path: we need to consider attribute accesses and aliased imports
+        let Some(qualified_name) = self.resolve_qualified_name(expr) else {
+            return false;
+        };
+        matches!(qualified_name.segments(), ["" | "builtins", name] if *name == symbol)
     }
 
     /// Return `true` if `member` is an "available" symbol, i.e., a symbol that has not been bound
