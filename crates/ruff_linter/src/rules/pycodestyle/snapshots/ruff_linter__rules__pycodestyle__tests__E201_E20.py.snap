@@ -124,62 +124,62 @@ E20.py:12:15: E201 [*] Whitespace after '{'
 14 14 | spam(ham[1], {eggs: 2})
 15 15 | #:
 
-E20.py:91:6: E201 [*] Whitespace after '['
+E20.py:96:6: E201 [*] Whitespace after '['
    |
-90 | #: E201:1:6
-91 | spam[ ~ham]
+95 | #: E201:1:6
+96 | spam[ ~ham]
    |      ^ E201
-92 | 
-93 | #: Okay
+97 | 
+98 | #: Okay
    |
    = help: Remove whitespace before '['
 
 ℹ Safe fix
-88 88 | #:
-89 89 | 
-90 90 | #: E201:1:6
-91    |-spam[ ~ham]
-   91 |+spam[~ham]
-92 92 | 
-93 93 | #: Okay
-94 94 | x = [  #
+93 93 | #:
+94 94 | 
+95 95 | #: E201:1:6
+96    |-spam[ ~ham]
+   96 |+spam[~ham]
+97 97 | 
+98 98 | #: Okay
+99 99 | x = [  #
 
-E20.py:100:5: E201 [*] Whitespace after '['
+E20.py:105:5: E201 [*] Whitespace after '['
     |
- 98 | # F-strings
- 99 | f"{ {'a': 1} }"
-100 | f"{[ { {'a': 1} } ]}"
+103 | # F-strings
+104 | f"{ {'a': 1} }"
+105 | f"{[ { {'a': 1} } ]}"
     |     ^ E201
-101 | f"normal { {f"{ { [1, 2] } }" } } normal"
+106 | f"normal { {f"{ { [1, 2] } }" } } normal"
     |
     = help: Remove whitespace before '['
 
 ℹ Safe fix
-97  97  | 
-98  98  | # F-strings
-99  99  | f"{ {'a': 1} }"
-100     |-f"{[ { {'a': 1} } ]}"
-    100 |+f"{[{ {'a': 1} } ]}"
-101 101 | f"normal { {f"{ { [1, 2] } }" } } normal"
 102 102 | 
-103 103 | #: Okay
+103 103 | # F-strings
+104 104 | f"{ {'a': 1} }"
+105     |-f"{[ { {'a': 1} } ]}"
+    105 |+f"{[{ {'a': 1} } ]}"
+106 106 | f"normal { {f"{ { [1, 2] } }" } } normal"
+107 107 | 
+108 108 | #: Okay
 
-E20.py:129:5: E201 [*] Whitespace after '['
+E20.py:134:5: E201 [*] Whitespace after '['
     |
-128 | #: E201:1:5
-129 | ham[ : upper]
+133 | #: E201:1:5
+134 | ham[ : upper]
     |     ^ E201
-130 | 
-131 | #: Okay
+135 | 
+136 | #: Okay
     |
     = help: Remove whitespace before '['
 
 ℹ Safe fix
-126 126 | ham[lower + offset : upper + offset]
-127 127 | 
-128 128 | #: E201:1:5
-129     |-ham[ : upper]
-    129 |+ham[: upper]
-130 130 | 
-131 131 | #: Okay
-132 132 | ham[lower + offset :: upper + offset]
+131 131 | ham[lower + offset : upper + offset]
+132 132 | 
+133 133 | #: E201:1:5
+134     |-ham[ : upper]
+    134 |+ham[: upper]
+135 135 | 
+136 136 | #: Okay
+137 137 | ham[lower + offset :: upper + offset]

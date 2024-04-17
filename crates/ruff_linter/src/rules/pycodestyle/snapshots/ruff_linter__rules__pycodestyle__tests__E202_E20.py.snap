@@ -126,42 +126,42 @@ E20.py:29:11: E202 [*] Whitespace before ']'
 31 31 | spam(ham[1], {eggs: 2})
 32 32 | 
 
-E20.py:100:18: E202 [*] Whitespace before ']'
+E20.py:105:18: E202 [*] Whitespace before ']'
     |
- 98 | # F-strings
- 99 | f"{ {'a': 1} }"
-100 | f"{[ { {'a': 1} } ]}"
+103 | # F-strings
+104 | f"{ {'a': 1} }"
+105 | f"{[ { {'a': 1} } ]}"
     |                  ^ E202
-101 | f"normal { {f"{ { [1, 2] } }" } } normal"
+106 | f"normal { {f"{ { [1, 2] } }" } } normal"
     |
     = help: Remove whitespace before ']'
 
 ℹ Safe fix
-97  97  | 
-98  98  | # F-strings
-99  99  | f"{ {'a': 1} }"
-100     |-f"{[ { {'a': 1} } ]}"
-    100 |+f"{[ { {'a': 1} }]}"
-101 101 | f"normal { {f"{ { [1, 2] } }" } } normal"
 102 102 | 
-103 103 | #: Okay
+103 103 | # F-strings
+104 104 | f"{ {'a': 1} }"
+105     |-f"{[ { {'a': 1} } ]}"
+    105 |+f"{[ { {'a': 1} }]}"
+106 106 | f"normal { {f"{ { [1, 2] } }" } } normal"
+107 107 | 
+108 108 | #: Okay
 
-E20.py:156:12: E202 [*] Whitespace before ']'
+E20.py:161:12: E202 [*] Whitespace before ']'
     |
-155 | #: E202:1:12
-156 | ham[upper : ]
+160 | #: E202:1:12
+161 | ham[upper : ]
     |            ^ E202
-157 | 
-158 | #: E203:1:10
+162 | 
+163 | #: E203:1:10
     |
     = help: Remove whitespace before ']'
 
 ℹ Safe fix
-153 153 | ham[upper :]
-154 154 | 
-155 155 | #: E202:1:12
-156     |-ham[upper : ]
-    156 |+ham[upper :]
-157 157 | 
-158 158 | #: E203:1:10
-159 159 | ham[upper  :]
+158 158 | ham[upper :]
+159 159 | 
+160 160 | #: E202:1:12
+161     |-ham[upper : ]
+    161 |+ham[upper :]
+162 162 | 
+163 163 | #: E203:1:10
+164 164 | ham[upper  :]
