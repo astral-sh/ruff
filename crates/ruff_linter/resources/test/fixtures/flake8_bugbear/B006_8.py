@@ -10,3 +10,11 @@ def bar(a: dict = {}):
 def baz(a: list = []):
     """This one raises a different exception"""
     raise IndexError()
+
+
+def qux(a: list = []):
+    raise NotImplementedError
+
+
+def quux(a: list = []):
+    raise NotImplemented
