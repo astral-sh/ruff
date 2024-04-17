@@ -141,6 +141,7 @@ fn move_initialization(
     indexer: &Indexer,
     generator: Generator,
 ) -> Option<Fix> {
+    println!("{:?}", function_def.body);
     let mut body = function_def.body.iter().peekable();
 
     // Avoid attempting to fix single-line functions.
@@ -223,6 +224,7 @@ fn is_stub(function_def: &ast::StmtFunctionDef) -> bool {
                 Expr::StringLiteral(_) | Expr::EllipsisLiteral(_)
             )
         }
+        Stmt::Raise(_) => true,
         _ => false,
     })
 }

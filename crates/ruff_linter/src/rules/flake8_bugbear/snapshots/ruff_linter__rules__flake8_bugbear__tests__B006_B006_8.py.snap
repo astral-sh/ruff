@@ -1,0 +1,36 @@
+---
+source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
+---
+B006_8.py:1:19: B006 [*] Do not use mutable data structures for argument defaults
+  |
+1 | def foo(a: list = []):
+  |                   ^^ B006
+2 |     raise NotImplementedError("")
+  |
+  = help: Replace with `None`; initialize within function
+
+ℹ Unsafe fix
+1   |-def foo(a: list = []):
+  1 |+def foo(a: list = None):
+2 2 |     raise NotImplementedError("")
+3 3 | 
+4 4 | 
+
+B006_8.py:5:19: B006 [*] Do not use mutable data structures for argument defaults
+  |
+5 | def bar(a: dict = {}):
+  |                   ^^ B006
+6 |     """ This one also has a docstring"""
+7 |     raise NotImplementedError("")
+  |
+  = help: Replace with `None`; initialize within function
+
+ℹ Unsafe fix
+2 2 |     raise NotImplementedError("")
+3 3 | 
+4 4 | 
+5   |-def bar(a: dict = {}):
+  5 |+def bar(a: dict = None):
+6 6 |     """ This one also has a docstring"""
+7 7 |     raise NotImplementedError("")
+8 8 |
