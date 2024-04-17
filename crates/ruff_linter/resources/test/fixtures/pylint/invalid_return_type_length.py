@@ -20,6 +20,11 @@ class LengthNegative:
     def __len__(self):
         return -42  # [invalid-length-return]
 
+class LengthWrongRaise:
+    def __len__(self):
+        print("raise some error")
+        raise NotImplementedError  # [invalid-length-return]
+
 # TODO: Once Ruff has better type checking
 def return_int():
     return "3"
@@ -29,9 +34,25 @@ class ComplexReturn:
         return return_int()  # [invalid-length-return]
 
 
-
 # These testcases should NOT raise errors
 
 class Length:
     def __len__(self):
         return 42
+
+class Length2:
+    def __len__(self):
+        x = 42
+        return x
+
+class Length3:
+    def __len__(self):
+        ...
+
+class Length4:
+    def __len__(self):
+        pass
+
+class Length5:
+    def __len__(self):
+        raise NotImplementedError
