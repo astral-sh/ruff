@@ -8,6 +8,7 @@ pub mod ast_ids;
 pub mod db;
 pub mod files;
 pub mod hir;
+mod module;
 
 #[derive(Debug)]
 pub struct Workspace {
