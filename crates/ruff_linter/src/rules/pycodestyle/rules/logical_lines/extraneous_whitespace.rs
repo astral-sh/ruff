@@ -239,7 +239,7 @@ pub(crate) fn extraneous_whitespace(line: &LogicalLine, context: &mut LogicalLin
                                     //      long_expression_calculating_the_index()  :
                                     // ]
                                     // distinct from the above case, because ruff format produces a
-                                    // whitespace before the expression and so should fix
+                                    // whitespace before the colon and so should the fix
                                     if let (Whitespace::Many | Whitespace::Tab, offset) = whitespace
                                     {
                                         let mut diagnostic = Diagnostic::new(
