@@ -38,10 +38,6 @@ name = "ruff_parse_simple"
 path = "fuzz_targets/ruff_parse_simple.rs"
 
 [[bin]]
-name = "ruff_new_parser_equiv"
-path = "fuzz_targets/ruff_new_parser_equiv.rs"
-
-[[bin]]
 name = "ruff_fix_validity"
 path = "fuzz_targets/ruff_fix_validity.rs"
 
