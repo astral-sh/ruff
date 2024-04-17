@@ -21,6 +21,11 @@ class IndexNoReturn:
     def __index__(self):
         print("ruff")  # [invalid-index-return]
 
+class IndexWrongRaise:
+    def __index__(self):
+        print("raise some error")
+        raise NotImplementedError  # [invalid-index-return]
+
 # TODO: Once Ruff has better type checking
 def return_index():
     return "3"
@@ -28,7 +33,6 @@ def return_index():
 class ComplexReturn:
     def __index__(self):
         return return_index()  # [invalid-index-return]
-
 
 
 # These testcases should NOT raise errors
@@ -42,3 +46,15 @@ class Index2:
     def __index__(self):
         x = 1
         return x
+
+class Index3:
+    def __index__(self):
+        ...
+
+class Index4:
+    def __index__(self):
+        pass
+
+class Index5:
+    def __index__(self):
+        raise NotImplementedError
