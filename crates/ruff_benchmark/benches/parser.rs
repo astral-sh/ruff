@@ -4,7 +4,7 @@ use ruff_benchmark::criterion::{
 use ruff_benchmark::{TestCase, TestFile, TestFileDownloadError};
 use ruff_python_ast::statement_visitor::{walk_stmt, StatementVisitor};
 use ruff_python_ast::Stmt;
-use ruff_python_parser::{parse_suite, set_new_parser};
+use ruff_python_parser::parse_suite;
 
 #[cfg(target_os = "windows")]
 #[global_allocator]
@@ -50,8 +50,6 @@ impl<'a> StatementVisitor<'a> for CountVisitor {
 }
 
 fn benchmark_parser(criterion: &mut Criterion<WallTime>) {
-    set_new_parser(true);
-
     let test_cases = create_test_cases().unwrap();
     let mut group = criterion.benchmark_group("parser");
 

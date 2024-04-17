@@ -9,7 +9,6 @@ homepage = { workspace = true }
 documentation = { workspace = true }
 repository = { workspace = true }
 license = { workspace = true }
-build = "build.rs"
 
 [lib]
 
@@ -23,7 +22,6 @@ drop_bomb = { workspace = true }
 bstr = { workspace = true }
 is-macro = { workspace = true }
 itertools = { workspace = true }
-lalrpop-util = { workspace = true, default-features = false }
 memchr = { workspace = true }
 rustc-hash = { workspace = true }
 static_assertions = { workspace = true }
@@ -37,11 +35,6 @@ ruff_source_file = { path = "../ruff_source_file" }
 annotate-snippets = { workspace = true }
 insta = { workspace = true, features = ["glob"] }
 walkdir = { workspace = true }
-
-[build-dependencies]
-anyhow = { workspace = true }
-lalrpop = { version = "0.20.0", default-features = false, optional = true }
-tiny-keccak = { version = "2", features = ["sha3"] }
 
 [lints]
 workspace = true

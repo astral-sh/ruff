@@ -126,10 +126,12 @@ fn test_invalid_syntax(input_path: &Path) {
 #[allow(clippy::print_stdout)]
 fn parser_quick_test() {
     let source = "\
-var: tuple[int] | int = 1,
+data[*x,]
 ";
 
     let program = Program::parse_str(source, Mode::Module);
+
+    println!("AST:\n----\n{:#?}", program.ast());
 
     if !program.is_valid() {
         println!("Errors:\n-------");
@@ -153,8 +155,6 @@ var: tuple[int] | int = 1,
 
         println!();
     }
-
-    println!("AST:\n----\n{:#?}", program.ast());
 }
 
 struct CodeFrame<'a> {

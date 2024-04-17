@@ -7,7 +7,7 @@ input_file: crates/ruff_python_parser/resources/inline/err/params_expected_after
 ```
 Module(
     ModModule {
-        range: 0..72,
+        range: 0..98,
         body: [
             FunctionDef(
                 StmtFunctionDef {
@@ -167,6 +167,48 @@ Module(
                     ],
                 },
             ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 72..97,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: "foo",
+                        range: 76..79,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 79..92,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: Some(
+                            Parameter {
+                                range: 83..91,
+                                name: Identifier {
+                                    id: "kwargs",
+                                    range: 85..91,
+                                },
+                                annotation: None,
+                            },
+                        ),
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 94..97,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 94..97,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
         ],
     },
 )
@@ -196,6 +238,7 @@ Module(
 3 | def foo(a, *): ...
   |            ^ Syntax Error: Expected one or more keyword parameter after '*' separator
 4 | def foo(a, *,): ...
+5 | def foo(*, **kwargs): ...
   |
 
 
@@ -204,4 +247,13 @@ Module(
 3 | def foo(a, *): ...
 4 | def foo(a, *,): ...
   |            ^ Syntax Error: Expected one or more keyword parameter after '*' separator
+5 | def foo(*, **kwargs): ...
+  |
+
+
+  |
+3 | def foo(a, *): ...
+4 | def foo(a, *,): ...
+5 | def foo(*, **kwargs): ...
+  |            ^^^^^^^^ Syntax Error: Expected one or more keyword parameter after '*' separator
   |

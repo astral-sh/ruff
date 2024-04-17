@@ -7,7 +7,7 @@ use ruff_benchmark::{TestCase, TestFile, TestFileDownloadError};
 use ruff_python_formatter::{format_module_ast, PreviewMode, PyFormatOptions};
 use ruff_python_index::CommentRangesBuilder;
 use ruff_python_parser::lexer::lex;
-use ruff_python_parser::{allocate_tokens_vec, parse_tokens, set_new_parser, Mode};
+use ruff_python_parser::{allocate_tokens_vec, parse_tokens, Mode};
 
 #[cfg(target_os = "windows")]
 #[global_allocator]
@@ -42,8 +42,6 @@ fn create_test_cases() -> Result<Vec<TestCase>, TestFileDownloadError> {
 }
 
 fn benchmark_formatter(criterion: &mut Criterion) {
-    set_new_parser(true);
-
     let mut group = criterion.benchmark_group("formatter");
     let test_cases = create_test_cases().unwrap();
 
