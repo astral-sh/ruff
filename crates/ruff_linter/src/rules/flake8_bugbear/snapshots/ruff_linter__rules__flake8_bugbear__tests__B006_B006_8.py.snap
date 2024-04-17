@@ -21,7 +21,7 @@ B006_8.py:5:19: B006 [*] Do not use mutable data structures for argument default
 5 | def bar(a: dict = {}):
   |                   ^^ B006
 6 |     """ This one also has a docstring"""
-7 |     raise NotImplementedError("")
+7 |     raise NotImplementedError("and has some text in here")
   |
   = help: Replace with `None`; initialize within function
 
@@ -32,5 +32,25 @@ B006_8.py:5:19: B006 [*] Do not use mutable data structures for argument default
 5   |-def bar(a: dict = {}):
   5 |+def bar(a: dict = None):
 6 6 |     """ This one also has a docstring"""
-7 7 |     raise NotImplementedError("")
-8 8 |
+7 7 |     raise NotImplementedError("and has some text in here")
+8 8 | 
+
+B006_8.py:10:19: B006 [*] Do not use mutable data structures for argument defaults
+   |
+10 | def baz(a: list = []):
+   |                   ^^ B006
+11 |     """This one raises a different exception"""
+12 |     raise IndexError()
+   |
+   = help: Replace with `None`; initialize within function
+
+ℹ Unsafe fix
+7  7  |     raise NotImplementedError("and has some text in here")
+8  8  | 
+9  9  | 
+10    |-def baz(a: list = []):
+   10 |+def baz(a: list = None):
+11 11 |     """This one raises a different exception"""
+   12 |+    if a is None:
+   13 |+        a = []
+12 14 |     raise IndexError()

@@ -2,7 +2,7 @@ use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_docstring_stmt;
 use ruff_python_ast::name::QualifiedName;
-use ruff_python_ast::{self as ast, Expr, Parameter, ParameterWithDefault, Stmt};
+use ruff_python_ast::{self as ast, Expr, Parameter, ParameterWithDefault, Stmt, StmtRaise};
 use ruff_python_codegen::{Generator, Stylist};
 use ruff_python_index::Indexer;
 use ruff_python_semantic::analyze::typing::{is_immutable_annotation, is_mutable_expr};
@@ -141,7 +141,6 @@ fn move_initialization(
     indexer: &Indexer,
     generator: Generator,
 ) -> Option<Fix> {
-    println!("{:?}", function_def.body);
     let mut body = function_def.body.iter().peekable();
 
     // Avoid attempting to fix single-line functions.
@@ -224,7 +223,18 @@ fn is_stub(function_def: &ast::StmtFunctionDef) -> bool {
                 Expr::StringLiteral(_) | Expr::EllipsisLiteral(_)
             )
         }
-        Stmt::Raise(_) => true,
+        Stmt::Raise(StmtRaise {
+            range: _,
+            exc: exception,
+            cause: _,
+        }) => exception.as_ref().is_some_and(|exc| {
+            exc.as_call_expr().is_some_and(|exc| {
+                exc.func
+                    .as_ref()
+                    .as_name_expr()
+                    .is_some_and(|name| name.id == "NotImplementedError")
+            })
+        }),
         _ => false,
     })
 }
