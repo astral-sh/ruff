@@ -62,6 +62,17 @@ pub(crate) fn invalid_hash_return(checker: &mut Checker, name: &str, body: &[Stm
         return;
     }
 
+    let body_without_comments = body
+        .iter()
+        .filter(|stmt| !matches!(stmt, Stmt::Expr(expr) if expr.value.is_string_literal_expr()))
+        .collect::<Vec<_>>();
+    if body_without_comments.is_empty() {
+        return;
+    }
+    if body_without_comments.len() == 1 && body_without_comments[0].is_raise_stmt() {
+        return;
+    }
+
     let returns = {
         let mut visitor = ReturnStatementVisitor::default();
         visitor.visit_body(body);
