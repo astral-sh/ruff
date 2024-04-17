@@ -27,19 +27,6 @@ mod statement;
 #[cfg(test)]
 mod tests;
 
-pub(crate) fn parse_tokens(
-    tokens: Vec<LexResult>,
-    source: &str,
-    mode: Mode,
-) -> Result<Mod, ParseError> {
-    let program = Parser::new(source, mode, TokenSource::new(tokens)).parse_program();
-    if program.is_valid() {
-        Ok(program.ast)
-    } else {
-        Err(program.parse_errors.into_iter().next().unwrap())
-    }
-}
-
 #[derive(Debug)]
 pub struct Program {
     ast: ast::Mod,

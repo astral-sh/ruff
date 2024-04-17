@@ -2,10 +2,8 @@ use std::fmt;
 
 use ruff_text_size::TextRange;
 
-use crate::{
-    lexer::{LexicalError, LexicalErrorType},
-    Tok, TokenKind,
-};
+use crate::lexer::{LexicalError, LexicalErrorType};
+use crate::TokenKind;
 
 /// Represents represent errors that occur during parsing and are
 /// returned by the `parse_*` functions.
@@ -181,17 +179,6 @@ pub enum ParseErrorType {
     FStringError(FStringErrorType),
     /// Parser encountered an error during lexing.
     Lexical(LexicalErrorType),
-
-    // RustPython specific.
-    // TODO(dhruvmanila): Remove these once the old parser is removed
-    /// Parser encountered an extra token
-    ExtraToken(Tok),
-    /// Parser encountered an invalid token
-    InvalidToken,
-    /// Parser encountered an unexpected token
-    UnrecognizedToken(Tok, Option<String>),
-    /// Parser encountered an unexpected end of input
-    Eof,
 }
 
 impl std::error::Error for ParseErrorType {}
@@ -304,19 +291,6 @@ impl std::fmt::Display for ParseErrorType {
             }
             ParseErrorType::UnexpectedExpressionToken => {
                 write!(f, "Unexpected token at the end of an expression")
-            }
-            // RustPython specific.
-            ParseErrorType::Eof => write!(f, "Got unexpected EOF"),
-            ParseErrorType::ExtraToken(ref tok) => write!(f, "Got extraneous token: {tok:?}"),
-            ParseErrorType::InvalidToken => write!(f, "Got invalid token"),
-            ParseErrorType::UnrecognizedToken(ref tok, ref expected) => {
-                if *tok == Tok::Indent {
-                    write!(f, "Unexpected indent")
-                } else if expected.as_deref() == Some("Indent") {
-                    write!(f, "Expected an indented block")
-                } else {
-                    write!(f, "Unexpected token {tok}")
-                }
             }
         }
     }

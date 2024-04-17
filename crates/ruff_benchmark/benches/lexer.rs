@@ -2,7 +2,7 @@ use ruff_benchmark::criterion::{
     criterion_group, criterion_main, measurement::WallTime, BenchmarkId, Criterion, Throughput,
 };
 use ruff_benchmark::{TestCase, TestFile, TestFileDownloadError};
-use ruff_python_parser::{lexer, set_new_parser, Mode};
+use ruff_python_parser::{lexer, Mode};
 
 #[cfg(target_os = "windows")]
 #[global_allocator]
@@ -37,8 +37,6 @@ fn create_test_cases() -> Result<Vec<TestCase>, TestFileDownloadError> {
 }
 
 fn benchmark_lexer(criterion: &mut Criterion<WallTime>) {
-    set_new_parser(true);
-
     let test_cases = create_test_cases().unwrap();
     let mut group = criterion.benchmark_group("lexer");
 

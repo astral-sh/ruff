@@ -10,11 +10,59 @@ def positional_parameters_with_default_values(a, b=20, c=30):
     pass
 
 
+def positional_parameters_with_default_values2(a, b=20, /, c=30):
+    pass
+
+
+def positional_only_and_positional_parameters(a, /, b, c):
+    pass
+
+
+def pos_args_with_defaults_and_varargs_and_kwargs(a, b=20, /, c=30, *args, **kwargs):
+    pass
+
+
 def keyword_only_parameters(*, a, b, c):
     pass
 
 
 def keyword_only_parameters_with_defaults(*, a, b=20, c=30):
+    pass
+
+
+def kw_only_args_with_defaults_and_varargs(*args, a, b=20, c=30):
+    pass
+
+
+def kw_only_args_with_defaults_and_kwargs(*, a, b=20, c=30, **kwargs):
+    pass
+
+
+def kw_only_args_with_defaults_and_varargs_and_kwargs(*args, a, b=20, c=30, **kwargs):
+    pass
+
+
+def pos_and_kw_only_args(a, b, /, c, *, d, e, f):
+    pass
+
+
+def pos_and_kw_only_args_with_defaults(a, b, /, c, *, d, e=20, f=30):
+    pass
+
+
+def pos_and_kw_only_args_with_defaults_and_varargs(a, b, /, c, *args, d, e=20, f=30):
+    pass
+
+
+def pos_and_kw_only_args_with_defaults_and_kwargs(
+    a, b, /, c, *, d, e=20, f=30, **kwargs
+):
+    pass
+
+
+def pos_and_kw_only_args_with_defaults_and_varargs_and_kwargs(
+    a, b, /, c, *args, d, e=20, f=30, **kwargs
+):
     pass
 
 
