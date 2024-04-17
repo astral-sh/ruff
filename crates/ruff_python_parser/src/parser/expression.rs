@@ -1748,13 +1748,26 @@ impl<'src> Parser<'src> {
             .into();
         }
 
+        // We need to reset the context when parsing a parenthesized expression otherwise a
+        // parenthesized comparison expression will not be parsed in a `for` target.
+
+        // test_ok parenthesized_compare_expr_in_for
+        // for (x in y)[0] in iter: ...
+        // for (x in y).attr in iter: ...
+
+        // test_err parenthesized_compare_expr_in_for
+        // for (x in y)() in iter: ...
+        // for (x in y) in iter: ...
+        let current_context = ParserCtxFlags::empty();
+        let saved_context = self.set_ctx(current_context);
+
         // Use the more general rule of the three to parse the first element
         // and limit it later.
         let mut parsed_expr = self.parse_yield_expression_or_else(|p| {
             p.parse_star_expression_or_higher(AllowNamedExpression::Yes)
         });
 
-        match self.current_token_kind() {
+        let parsed_expr = match self.current_token_kind() {
             TokenKind::Comma => {
                 // grammar: `tuple`
                 let tuple = self.parse_tuple_expression(
@@ -1799,7 +1812,11 @@ impl<'src> Parser<'src> {
                 parsed_expr.is_parenthesized = true;
                 parsed_expr
             }
-        }
+        };
+
+        self.restore_ctx(current_context, saved_context);
+
+        parsed_expr
     }
 
     /// Parses multiple items separated by a comma into a tuple expression.
