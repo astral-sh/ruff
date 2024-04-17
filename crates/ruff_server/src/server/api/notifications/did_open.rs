@@ -1,4 +1,4 @@
-use crate::server::client::Notifier;
+use crate::server::client::{Notifier, Requester};
 use crate::server::Result;
 use crate::session::Session;
 use lsp_types as types;
@@ -15,6 +15,7 @@ impl super::SyncNotificationHandler for DidOpen {
     fn run(
         session: &mut Session,
         _notifier: Notifier,
+        _requester: &mut Requester,
         types::DidOpenTextDocumentParams {
             text_document:
                 types::TextDocumentItem {

@@ -123,8 +123,8 @@ fn local_notification_task<'a, N: traits::SyncNotificationHandler>(
     notif: server::Notification,
 ) -> super::Result<Task<'a>> {
     let (id, params) = cast_notification::<N>(notif)?;
-    Ok(Task::local(move |session, notifier, _, _| {
-        if let Err(err) = N::run(session, notifier, params) {
+    Ok(Task::local(move |session, notifier, requester, _| {
+        if let Err(err) = N::run(session, notifier, requester, params) {
             tracing::error!("An error occurred while running {id}: {err}");
             show_err_msg!("Ruff encountered a problem. Check the logs for more details.");
         }

@@ -1,5 +1,6 @@
 use crate::server::api::LSPResult;
-use crate::server::client::Notifier;
+use crate::server::client::{Notifier, Requester};
+use crate::server::schedule::Task;
 use crate::server::Result;
 use crate::session::Session;
 use lsp_types as types;
@@ -15,13 +16,21 @@ impl super::SyncNotificationHandler for DidChangeWatchedFiles {
     fn run(
         session: &mut Session,
         _notifier: Notifier,
+        requester: &mut Requester,
         params: types::DidChangeWatchedFilesParams,
     ) -> Result<()> {
-        for change in params.changes {
+        for change in &params.changes {
             session
                 .reload_settings(&change.uri)
                 .with_failure_code(lsp_server::ErrorCode::InternalError)?;
         }
+
+        if !params.changes.is_empty() {
+            requester
+                .request::<types::request::WorkspaceDiagnosticRefresh>((), |()| Task::nothing())
+                .with_failure_code(lsp_server::ErrorCode::InternalError)?;
+        }
+
         Ok(())
     }
 }
