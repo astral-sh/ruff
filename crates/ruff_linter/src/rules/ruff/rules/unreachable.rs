@@ -2,8 +2,9 @@ use std::{fmt, iter, usize};
 
 use log::error;
 use ruff_python_ast::{
-    Expr, ExprBooleanLiteral, Identifier, MatchCase, Pattern, PatternMatchAs, PatternMatchOr, Stmt,
-    StmtContinue, StmtFor, StmtMatch, StmtReturn, StmtTry, StmtWhile, StmtWith,
+    self as ast, Expr, ExprBooleanLiteral, Identifier, MatchCase, Pattern, PatternMatchAs,
+    PatternMatchOr, Stmt, StmtContinue, StmtFor, StmtMatch, StmtReturn, StmtTry, StmtWhile,
+    StmtWith,
 };
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -195,6 +196,8 @@ fn taken(condition: &Condition) -> Option<bool> {
         },
         Condition::Iterator(_) => None,
         Condition::Match { .. } => None,
+        Condition::ExceptionCaught(_) => None,
+        Condition::ExceptionRaised => None,
     }
 }
 
@@ -306,12 +309,18 @@ enum Condition<'stmt> {
         /// `case $case`, include pattern, guard, etc.
         case: &'stmt MatchCase,
     },
+    // Exception was raised and caught by `except` clause
+    ExceptionCaught(&'stmt Expr),
+    // Exception was raise in a `try` block
+    ExceptionRaised,
 }
 
 impl<'stmt> Ranged for Condition<'stmt> {
     fn range(&self) -> TextRange {
         match self {
-            Condition::Test(expr) | Condition::Iterator(expr) => expr.range(),
+            Condition::Test(expr)
+            | Condition::Iterator(expr)
+            | Condition::ExceptionCaught(expr) => expr.range(),
             // The case of the match statement, without the body.
             Condition::Match { subject: _, case } => TextRange::new(
                 case.start(),
@@ -319,6 +328,7 @@ impl<'stmt> Ranged for Condition<'stmt> {
                     .as_ref()
                     .map_or(case.pattern.end(), |guard| guard.end()),
             ),
+            Condition::ExceptionRaised => TextRange::new(TextSize::new(0), TextSize::new(0)),
         }
     }
 }
@@ -547,15 +557,52 @@ impl<'stmt> BasicBlocksBuilder<'stmt> {
                     finalbody,
                     ..
                 }) => {
-                    // TODO: handle `try` statements. The `try` control flow is very
-                    // complex, what blocks are and aren't taken and from which
-                    // block the control flow is actually returns is **very**
-                    // specific to the contents of the block. Read
-                    // <https://docs.python.org/3/reference/compound_stmts.html#the-try-statement>
-                    // very carefully.
-                    // For now we'll skip over it.
-                    let _ = (body, handlers, orelse, finalbody); // Silence unused code warnings.
-                    self.unconditional_next_block(after)
+                    let after_block = self.maybe_next_block_index(after, || true);
+                    let finally_block = self.append_blocks_if_not_empty(finalbody, after_block);
+                    let else_block = self.append_blocks_if_not_empty(orelse, finally_block);
+                    let try_block = self.append_blocks_if_not_empty(body, else_block);
+
+                    // If an exception is raised and not caught then terminate with exception
+                    let mut next_branch = self.fake_exception_block_index();
+
+                    for handler in handlers.iter().rev() {
+                        let ast::ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
+                            body,
+                            type_,
+                            ..
+                        }) = handler;
+                        let condition = match type_ {
+                            Some(type_) => Condition::ExceptionCaught(type_.as_ref()),
+                            None => {
+                                let exception = Box::leak(Box::new(Expr::Name(ast::ExprName {
+                                    range: TextRange::new(TextSize::new(0), TextSize::new(0)),
+                                    id: "BaseException".to_string(),
+                                    ctx: ast::ExprContext::Store,
+                                })));
+
+                                Condition::ExceptionCaught(exception)
+                            }
+                        };
+                        let except_block = self.append_blocks_if_not_empty(body, finally_block);
+
+                        let next = NextBlock::If {
+                            condition,
+                            next: except_block,
+                            orelse: next_branch,
+                            exit: after,
+                        };
+                        let block = BasicBlock { stmts: body, next };
+                        next_branch = self.blocks.push(block);
+                    }
+
+                    // We cannot know if the try block will raise an exception (apart from explicit raise statements)
+                    // We therefore assume that both paths may execute
+                    NextBlock::If {
+                        condition: Condition::ExceptionRaised,
+                        next: next_branch, // If exception raised go to except -> except -> .. -> finally
+                        orelse: try_block, // Otherwise try -> else -> finally
+                        exit: after,
+                    }
                 }
                 Stmt::With(StmtWith { items, body, .. }) => {
                     // TODO: handle `with` statements, see
@@ -1061,7 +1108,10 @@ impl<'stmt, 'source> fmt::Display for MermaidGraph<'stmt, 'source> {
                     orelse,
                     ..
                 } => {
-                    let condition_code = &self.source[condition.range()].trim();
+                    let condition_code = match condition {
+                        Condition::ExceptionRaised => "Exception raised",
+                        _ => self.source[condition.range()].trim(),
+                    };
                     writeln!(
                         f,
                         "  block{i} -- \"{condition_code}\" --> block{next}",
