@@ -190,7 +190,7 @@ pub struct CheckCommand {
     pub output_format: Option<SerializationFormat>,
 
     /// Specify file to write the linter output to (default: stdout).
-    #[arg(short, long)]
+    #[arg(short, long, env = "RUFF_OUTPUT_FILE")]
     pub output_file: Option<PathBuf>,
     /// The minimum Python version that should be supported.
     #[arg(long, value_enum)]
