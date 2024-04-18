@@ -1,8 +1,9 @@
 #![allow(unreachable_pub)]
 
+use std::hash::BuildHasherDefault;
 use std::path::{Path, PathBuf};
 
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxHashSet, FxHasher};
 
 use crate::files::FileId;
 
@@ -12,6 +13,9 @@ pub mod files;
 pub mod hir;
 mod module;
 mod symbols;
+
+pub type FxDashMap<K, V> = dashmap::DashMap<K, V, BuildHasherDefault<FxHasher>>;
+pub type FxDashSet<V> = dashmap::DashSet<V, BuildHasherDefault<FxHasher>>;
 
 #[derive(Debug)]
 pub struct Workspace {
