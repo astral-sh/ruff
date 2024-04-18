@@ -449,11 +449,11 @@ impl DefinitionsVisitor<'_> {
         }
     }
 
-    fn lower_import(&mut self, import: &StmtImport) {
+    fn lower_import(&mut self, _import: &StmtImport) {
         // TODO
     }
 
-    fn lower_import_from(&mut self, import_from: &StmtImportFrom) {
+    fn lower_import_from(&mut self, _import_from: &StmtImportFrom) {
         // TODO
     }
 
@@ -469,15 +469,15 @@ impl DefinitionsVisitor<'_> {
         })
     }
 
-    fn lower_except_handler(&mut self, except_handler: &ExceptHandlerExceptHandler) {
+    fn lower_except_handler(&mut self, _except_handler: &ExceptHandlerExceptHandler) {
         // TODO
     }
 
-    fn lower_with_item(&mut self, with_item: &WithItem) {
+    fn lower_with_item(&mut self, _with_item: &WithItem) {
         // TODO
     }
 
-    fn lower_match_case(&mut self, match_case: &MatchCase) {
+    fn lower_match_case(&mut self, _match_case: &MatchCase) {
         // TODO
     }
 }
