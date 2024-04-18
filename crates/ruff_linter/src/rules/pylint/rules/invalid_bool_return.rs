@@ -1,8 +1,10 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::ReturnStatementVisitor;
+use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::visitor::Visitor;
-use ruff_python_ast::Stmt;
+use ruff_python_ast::{self as ast};
+use ruff_python_semantic::analyze::function_type::is_stub;
 use ruff_python_semantic::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
 use ruff_text_size::Ranged;
 
@@ -42,8 +44,8 @@ impl Violation for InvalidBoolReturnType {
 }
 
 /// E0307
-pub(crate) fn invalid_bool_return(checker: &mut Checker, name: &str, body: &[Stmt]) {
-    if name != "__bool__" {
+pub(crate) fn invalid_bool_return(checker: &mut Checker, function_def: &ast::StmtFunctionDef) {
+    if function_def.name.as_str() != "__bool__" {
         return;
     }
 
@@ -51,11 +53,22 @@ pub(crate) fn invalid_bool_return(checker: &mut Checker, name: &str, body: &[Stm
         return;
     }
 
+    if is_stub(function_def, checker.semantic()) {
+        return;
+    }
+
     let returns = {
         let mut visitor = ReturnStatementVisitor::default();
-        visitor.visit_body(body);
+        visitor.visit_body(&function_def.body);
         visitor.returns
     };
+
+    if returns.is_empty() {
+        checker.diagnostics.push(Diagnostic::new(
+            InvalidBoolReturnType,
+            function_def.identifier(),
+        ));
+    }
 
     for stmt in returns {
         if let Some(value) = stmt.value.as_deref() {
