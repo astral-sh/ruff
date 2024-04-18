@@ -75,13 +75,6 @@ To setup `ruff server` with your editor, refer to the [README.md](https://github
 - Consider binary expr for parenthesized with items parsing ([#11012](https://github.com/astral-sh/ruff/pull/11012))
 - Reset `FOR_TARGET` context for all kinds of parentheses ([#11009](https://github.com/astral-sh/ruff/pull/11009))
 
-### Documentation
-
-- Fix `suspicious-url-open-usage` (`S310`) description ([#10917](https://github.com/astral-sh/ruff/pull/10917))
-- Fix typo in `extend-aliases` ([#10978](https://github.com/astral-sh/ruff/pull/10978))
-- Fix last example of `flake8-bugbear` rule `B023` "function uses loop variable" ([#10913](https://github.com/astral-sh/ruff/pull/10913))
-- Improve documentation for block comment rules ([#11007](https://github.com/astral-sh/ruff/pull/11007))
-
 ## 0.3.7
 
 ### Preview features
