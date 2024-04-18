@@ -4,10 +4,11 @@
 //! loosely based on the token definitions found in the [CPython source].
 //!
 //! [CPython source]: https://github.com/python/cpython/blob/dfc2e065a2e71011017077e549cd2f9bf4944c54/Include/internal/pycore_token.h;
-use crate::Mode;
 
-use ruff_python_ast::{AnyStringKind, Int, IpyEscapeKind};
+use ruff_python_ast::{AnyStringKind, BoolOp, Int, IpyEscapeKind, Operator, UnaryOp};
 use std::fmt;
+
+use crate::Mode;
 
 /// The set of tokens the Python source code can be tokenized in.
 #[derive(Clone, Debug, PartialEq, is_macro::Is)]
@@ -220,6 +221,7 @@ pub enum Tok {
     With,
     Yield,
 
+    Unknown,
     // RustPython specific.
     StartModule,
     StartExpression,
@@ -239,9 +241,9 @@ impl fmt::Display for Tok {
         #[allow(clippy::enum_glob_use)]
         use Tok::*;
         match self {
-            Name { name } => write!(f, "'{name}'"),
-            Int { value } => write!(f, "'{value}'"),
-            Float { value } => write!(f, "'{value}'"),
+            Name { name } => write!(f, "{name}"),
+            Int { value } => write!(f, "{value}"),
+            Float { value } => write!(f, "{value}"),
             Complex { real, imag } => write!(f, "{real}j{imag}"),
             String { value, kind } => {
                 write!(f, "{}", kind.format_string_contents(value))
@@ -257,94 +259,95 @@ impl fmt::Display for Tok {
             StartModule => f.write_str("StartProgram"),
             StartExpression => f.write_str("StartExpression"),
             EndOfFile => f.write_str("EOF"),
-            Question => f.write_str("'?'"),
-            Exclamation => f.write_str("'!'"),
-            Lpar => f.write_str("'('"),
-            Rpar => f.write_str("')'"),
-            Lsqb => f.write_str("'['"),
-            Rsqb => f.write_str("']'"),
-            Colon => f.write_str("':'"),
-            Comma => f.write_str("','"),
+            Question => f.write_str("?"),
+            Exclamation => f.write_str("!"),
+            Lpar => f.write_str("("),
+            Rpar => f.write_str(")"),
+            Lsqb => f.write_str("["),
+            Rsqb => f.write_str("]"),
+            Colon => f.write_str(":"),
+            Comma => f.write_str(","),
             Comment(value) => f.write_str(value),
-            Semi => f.write_str("';'"),
-            Plus => f.write_str("'+'"),
-            Minus => f.write_str("'-'"),
-            Star => f.write_str("'*'"),
-            Slash => f.write_str("'/'"),
-            Vbar => f.write_str("'|'"),
-            Amper => f.write_str("'&'"),
-            Less => f.write_str("'<'"),
-            Greater => f.write_str("'>'"),
-            Equal => f.write_str("'='"),
-            Dot => f.write_str("'.'"),
-            Percent => f.write_str("'%'"),
-            Lbrace => f.write_str("'{'"),
-            Rbrace => f.write_str("'}'"),
-            EqEqual => f.write_str("'=='"),
-            NotEqual => f.write_str("'!='"),
-            LessEqual => f.write_str("'<='"),
-            GreaterEqual => f.write_str("'>='"),
-            Tilde => f.write_str("'~'"),
-            CircumFlex => f.write_str("'^'"),
-            LeftShift => f.write_str("'<<'"),
-            RightShift => f.write_str("'>>'"),
-            DoubleStar => f.write_str("'**'"),
-            DoubleStarEqual => f.write_str("'**='"),
-            PlusEqual => f.write_str("'+='"),
-            MinusEqual => f.write_str("'-='"),
-            StarEqual => f.write_str("'*='"),
-            SlashEqual => f.write_str("'/='"),
-            PercentEqual => f.write_str("'%='"),
-            AmperEqual => f.write_str("'&='"),
-            VbarEqual => f.write_str("'|='"),
-            CircumflexEqual => f.write_str("'^='"),
-            LeftShiftEqual => f.write_str("'<<='"),
-            RightShiftEqual => f.write_str("'>>='"),
-            DoubleSlash => f.write_str("'//'"),
-            DoubleSlashEqual => f.write_str("'//='"),
-            At => f.write_str("'@'"),
-            AtEqual => f.write_str("'@='"),
-            Rarrow => f.write_str("'->'"),
-            Ellipsis => f.write_str("'...'"),
-            False => f.write_str("'False'"),
-            None => f.write_str("'None'"),
-            True => f.write_str("'True'"),
-            And => f.write_str("'and'"),
-            As => f.write_str("'as'"),
-            Assert => f.write_str("'assert'"),
-            Async => f.write_str("'async'"),
-            Await => f.write_str("'await'"),
-            Break => f.write_str("'break'"),
-            Class => f.write_str("'class'"),
-            Continue => f.write_str("'continue'"),
-            Def => f.write_str("'def'"),
-            Del => f.write_str("'del'"),
-            Elif => f.write_str("'elif'"),
-            Else => f.write_str("'else'"),
-            Except => f.write_str("'except'"),
-            Finally => f.write_str("'finally'"),
-            For => f.write_str("'for'"),
-            From => f.write_str("'from'"),
-            Global => f.write_str("'global'"),
-            If => f.write_str("'if'"),
-            Import => f.write_str("'import'"),
-            In => f.write_str("'in'"),
-            Is => f.write_str("'is'"),
-            Lambda => f.write_str("'lambda'"),
-            Nonlocal => f.write_str("'nonlocal'"),
-            Not => f.write_str("'not'"),
-            Or => f.write_str("'or'"),
-            Pass => f.write_str("'pass'"),
-            Raise => f.write_str("'raise'"),
-            Return => f.write_str("'return'"),
-            Try => f.write_str("'try'"),
-            While => f.write_str("'while'"),
-            Match => f.write_str("'match'"),
-            Type => f.write_str("'type'"),
-            Case => f.write_str("'case'"),
-            With => f.write_str("'with'"),
-            Yield => f.write_str("'yield'"),
-            ColonEqual => f.write_str("':='"),
+            Semi => f.write_str(";"),
+            Plus => f.write_str("+"),
+            Minus => f.write_str("-"),
+            Star => f.write_str("*"),
+            Slash => f.write_str("/"),
+            Vbar => f.write_str("|"),
+            Amper => f.write_str("&"),
+            Less => f.write_str("<"),
+            Greater => f.write_str(">"),
+            Equal => f.write_str("="),
+            Dot => f.write_str("."),
+            Percent => f.write_str("%"),
+            Lbrace => f.write_str("{"),
+            Rbrace => f.write_str("}"),
+            EqEqual => f.write_str("=="),
+            NotEqual => f.write_str("!="),
+            LessEqual => f.write_str("<="),
+            GreaterEqual => f.write_str(">="),
+            Tilde => f.write_str("~"),
+            CircumFlex => f.write_str("^"),
+            LeftShift => f.write_str("<<"),
+            RightShift => f.write_str(">>"),
+            DoubleStar => f.write_str("**"),
+            DoubleStarEqual => f.write_str("**="),
+            PlusEqual => f.write_str("+="),
+            MinusEqual => f.write_str("-="),
+            StarEqual => f.write_str("*="),
+            SlashEqual => f.write_str("/="),
+            PercentEqual => f.write_str("%="),
+            AmperEqual => f.write_str("&="),
+            VbarEqual => f.write_str("|="),
+            CircumflexEqual => f.write_str("^="),
+            LeftShiftEqual => f.write_str("<<="),
+            RightShiftEqual => f.write_str(">>="),
+            DoubleSlash => f.write_str("//"),
+            DoubleSlashEqual => f.write_str("//="),
+            At => f.write_str("@"),
+            AtEqual => f.write_str("@="),
+            Rarrow => f.write_str("->"),
+            Ellipsis => f.write_str("..."),
+            False => f.write_str("False"),
+            None => f.write_str("None"),
+            True => f.write_str("True"),
+            And => f.write_str("and"),
+            As => f.write_str("as"),
+            Assert => f.write_str("assert"),
+            Async => f.write_str("async"),
+            Await => f.write_str("await"),
+            Break => f.write_str("break"),
+            Class => f.write_str("class"),
+            Continue => f.write_str("continue"),
+            Def => f.write_str("def"),
+            Del => f.write_str("del"),
+            Elif => f.write_str("elif"),
+            Else => f.write_str("else"),
+            Except => f.write_str("except"),
+            Finally => f.write_str("finally"),
+            For => f.write_str("for"),
+            From => f.write_str("from"),
+            Global => f.write_str("global"),
+            If => f.write_str("if"),
+            Import => f.write_str("import"),
+            In => f.write_str("in"),
+            Is => f.write_str("is"),
+            Lambda => f.write_str("lambda"),
+            Nonlocal => f.write_str("nonlocal"),
+            Not => f.write_str("not"),
+            Or => f.write_str("or"),
+            Pass => f.write_str("pass"),
+            Raise => f.write_str("raise"),
+            Return => f.write_str("return"),
+            Try => f.write_str("try"),
+            While => f.write_str("while"),
+            Match => f.write_str("match"),
+            Type => f.write_str("type"),
+            Case => f.write_str("case"),
+            With => f.write_str("with"),
+            Yield => f.write_str("yield"),
+            ColonEqual => f.write_str(":="),
+            Unknown => f.write_str("<Unknown>>"),
         }
     }
 }
@@ -370,7 +373,7 @@ pub enum TokenKind {
     /// Token value for the end of an f-string. This includes the closing quote.
     FStringEnd,
     /// Token value for a IPython escape command.
-    EscapeCommand,
+    IpyEscapeCommand,
     /// Token value for a comment. These are filtered out of the token stream prior to parsing.
     Comment,
     /// Token value for a newline.
@@ -524,6 +527,7 @@ pub enum TokenKind {
     With,
     Yield,
 
+    Unknown,
     // RustPython specific.
     StartModule,
     StartInteractive,
@@ -695,6 +699,49 @@ impl TokenKind {
         matches!(self, TokenKind::Match | TokenKind::Case)
     }
 
+    #[inline]
+    pub const fn is_compare_operator(&self) -> bool {
+        matches!(
+            self,
+            TokenKind::Not
+                | TokenKind::In
+                | TokenKind::Is
+                | TokenKind::EqEqual
+                | TokenKind::NotEqual
+                | TokenKind::Less
+                | TokenKind::LessEqual
+                | TokenKind::Greater
+                | TokenKind::GreaterEqual
+        )
+    }
+
+    #[inline]
+    pub const fn is_bool_operator(&self) -> bool {
+        matches!(self, TokenKind::And | TokenKind::Or)
+    }
+
+    /// Returns the [`Operator`] that corresponds to this token kind, if it is
+    /// an augmented assignment operator, or [`None`] otherwise.
+    #[inline]
+    pub const fn as_augmented_assign_operator(&self) -> Option<Operator> {
+        match self {
+            TokenKind::PlusEqual => Some(Operator::Add),
+            TokenKind::MinusEqual => Some(Operator::Sub),
+            TokenKind::StarEqual => Some(Operator::Mult),
+            TokenKind::AtEqual => Some(Operator::MatMult),
+            TokenKind::DoubleStarEqual => Some(Operator::Pow),
+            TokenKind::SlashEqual => Some(Operator::Div),
+            TokenKind::DoubleSlashEqual => Some(Operator::FloorDiv),
+            TokenKind::PercentEqual => Some(Operator::Mod),
+            TokenKind::AmperEqual => Some(Operator::BitAnd),
+            TokenKind::VbarEqual => Some(Operator::BitOr),
+            TokenKind::CircumflexEqual => Some(Operator::BitXor),
+            TokenKind::LeftShiftEqual => Some(Operator::LShift),
+            TokenKind::RightShiftEqual => Some(Operator::RShift),
+            _ => None,
+        }
+    }
+
     pub const fn from_token(token: &Tok) -> Self {
         match token {
             Tok::Name { .. } => TokenKind::Name,
@@ -705,7 +752,7 @@ impl TokenKind {
             Tok::FStringStart(_) => TokenKind::FStringStart,
             Tok::FStringMiddle { .. } => TokenKind::FStringMiddle,
             Tok::FStringEnd => TokenKind::FStringEnd,
-            Tok::IpyEscapeCommand { .. } => TokenKind::EscapeCommand,
+            Tok::IpyEscapeCommand { .. } => TokenKind::IpyEscapeCommand,
             Tok::Comment(_) => TokenKind::Comment,
             Tok::Newline => TokenKind::Newline,
             Tok::NonLogicalNewline => TokenKind::NonLogicalNewline,
@@ -799,6 +846,7 @@ impl TokenKind {
             Tok::Type => TokenKind::Type,
             Tok::With => TokenKind::With,
             Tok::Yield => TokenKind::Yield,
+            Tok::Unknown => TokenKind::Unknown,
             Tok::StartModule => TokenKind::StartModule,
             Tok::StartExpression => TokenKind::StartExpression,
         }
@@ -808,6 +856,183 @@ impl TokenKind {
 impl From<&Tok> for TokenKind {
     fn from(value: &Tok) -> Self {
         Self::from_token(value)
+    }
+}
+
+impl From<Tok> for TokenKind {
+    fn from(value: Tok) -> Self {
+        Self::from_token(&value)
+    }
+}
+
+impl TryFrom<TokenKind> for Operator {
+    type Error = ();
+
+    fn try_from(value: TokenKind) -> Result<Self, Self::Error> {
+        Ok(match value {
+            TokenKind::At | TokenKind::AtEqual => Operator::MatMult,
+            TokenKind::Plus | TokenKind::PlusEqual => Operator::Add,
+            TokenKind::Star | TokenKind::StarEqual => Operator::Mult,
+            TokenKind::Vbar | TokenKind::VbarEqual => Operator::BitOr,
+            TokenKind::Minus | TokenKind::MinusEqual => Operator::Sub,
+            TokenKind::Slash | TokenKind::SlashEqual => Operator::Div,
+            TokenKind::Amper | TokenKind::AmperEqual => Operator::BitAnd,
+            TokenKind::Percent | TokenKind::PercentEqual => Operator::Mod,
+            TokenKind::DoubleStar | TokenKind::DoubleStarEqual => Operator::Pow,
+            TokenKind::LeftShift | TokenKind::LeftShiftEqual => Operator::LShift,
+            TokenKind::CircumFlex | TokenKind::CircumflexEqual => Operator::BitXor,
+            TokenKind::RightShift | TokenKind::RightShiftEqual => Operator::RShift,
+            TokenKind::DoubleSlash | TokenKind::DoubleSlashEqual => Operator::FloorDiv,
+            _ => return Err(()),
+        })
+    }
+}
+
+impl TryFrom<TokenKind> for BoolOp {
+    type Error = ();
+
+    fn try_from(value: TokenKind) -> Result<Self, Self::Error> {
+        Ok(match value {
+            TokenKind::And => BoolOp::And,
+            TokenKind::Or => BoolOp::Or,
+            _ => return Err(()),
+        })
+    }
+}
+
+impl TryFrom<&Tok> for UnaryOp {
+    type Error = String;
+
+    fn try_from(value: &Tok) -> Result<Self, Self::Error> {
+        TokenKind::from_token(value).try_into()
+    }
+}
+
+impl TryFrom<TokenKind> for UnaryOp {
+    type Error = String;
+
+    fn try_from(value: TokenKind) -> Result<Self, Self::Error> {
+        Ok(match value {
+            TokenKind::Plus => UnaryOp::UAdd,
+            TokenKind::Minus => UnaryOp::USub,
+            TokenKind::Tilde => UnaryOp::Invert,
+            TokenKind::Not => UnaryOp::Not,
+            _ => return Err(format!("unexpected token: {value:?}")),
+        })
+    }
+}
+
+impl fmt::Display for TokenKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let value = match self {
+            TokenKind::Unknown => "Unknown",
+            TokenKind::StartModule => "StartModule",
+            TokenKind::StartExpression => "StartExpression",
+            TokenKind::StartInteractive => "StartInteractive",
+            TokenKind::Newline => "newline",
+            TokenKind::NonLogicalNewline => "NonLogicalNewline",
+            TokenKind::Indent => "indent",
+            TokenKind::Dedent => "dedent",
+            TokenKind::EndOfFile => "end of file",
+            TokenKind::Name => "name",
+            TokenKind::Int => "int",
+            TokenKind::Float => "float",
+            TokenKind::Complex => "complex",
+            TokenKind::String => "string",
+            TokenKind::FStringStart => "FStringStart",
+            TokenKind::FStringMiddle => "FStringMiddle",
+            TokenKind::FStringEnd => "FStringEnd",
+            TokenKind::IpyEscapeCommand => "IPython escape command",
+            TokenKind::Comment => "comment",
+            TokenKind::Question => "'?'",
+            TokenKind::Exclamation => "'!'",
+            TokenKind::Lpar => "'('",
+            TokenKind::Rpar => "')'",
+            TokenKind::Lsqb => "'['",
+            TokenKind::Rsqb => "']'",
+            TokenKind::Lbrace => "'{'",
+            TokenKind::Rbrace => "'}'",
+            TokenKind::Equal => "'='",
+            TokenKind::ColonEqual => "':='",
+            TokenKind::Dot => "'.'",
+            TokenKind::Colon => "':'",
+            TokenKind::Semi => "';'",
+            TokenKind::Comma => "','",
+            TokenKind::Rarrow => "'->'",
+            TokenKind::Plus => "'+'",
+            TokenKind::Minus => "'-'",
+            TokenKind::Star => "'*'",
+            TokenKind::DoubleStar => "'**'",
+            TokenKind::Slash => "'/'",
+            TokenKind::DoubleSlash => "'//'",
+            TokenKind::Percent => "'%'",
+            TokenKind::Vbar => "'|'",
+            TokenKind::Amper => "'&'",
+            TokenKind::CircumFlex => "'^'",
+            TokenKind::LeftShift => "'<<'",
+            TokenKind::RightShift => "'>>'",
+            TokenKind::Tilde => "'~'",
+            TokenKind::At => "'@'",
+            TokenKind::Less => "'<'",
+            TokenKind::Greater => "'>'",
+            TokenKind::EqEqual => "'=='",
+            TokenKind::NotEqual => "'!='",
+            TokenKind::LessEqual => "'<='",
+            TokenKind::GreaterEqual => "'>='",
+            TokenKind::PlusEqual => "'+='",
+            TokenKind::MinusEqual => "'-='",
+            TokenKind::StarEqual => "'*='",
+            TokenKind::DoubleStarEqual => "'**='",
+            TokenKind::SlashEqual => "'/='",
+            TokenKind::DoubleSlashEqual => "'//='",
+            TokenKind::PercentEqual => "'%='",
+            TokenKind::VbarEqual => "'|='",
+            TokenKind::AmperEqual => "'&='",
+            TokenKind::CircumflexEqual => "'^='",
+            TokenKind::LeftShiftEqual => "'<<='",
+            TokenKind::RightShiftEqual => "'>>='",
+            TokenKind::AtEqual => "'@='",
+            TokenKind::Ellipsis => "'...'",
+            TokenKind::False => "'False'",
+            TokenKind::None => "'None'",
+            TokenKind::True => "'True'",
+            TokenKind::And => "'and'",
+            TokenKind::As => "'as'",
+            TokenKind::Assert => "'assert'",
+            TokenKind::Async => "'async'",
+            TokenKind::Await => "'await'",
+            TokenKind::Break => "'break'",
+            TokenKind::Class => "'class'",
+            TokenKind::Continue => "'continue'",
+            TokenKind::Def => "'def'",
+            TokenKind::Del => "'del'",
+            TokenKind::Elif => "'elif'",
+            TokenKind::Else => "'else'",
+            TokenKind::Except => "'except'",
+            TokenKind::Finally => "'finally'",
+            TokenKind::For => "'for'",
+            TokenKind::From => "'from'",
+            TokenKind::Global => "'global'",
+            TokenKind::If => "'if'",
+            TokenKind::Import => "'import'",
+            TokenKind::In => "'in'",
+            TokenKind::Is => "'is'",
+            TokenKind::Lambda => "'lambda'",
+            TokenKind::Nonlocal => "'nonlocal'",
+            TokenKind::Not => "'not'",
+            TokenKind::Or => "'or'",
+            TokenKind::Pass => "'pass'",
+            TokenKind::Raise => "'raise'",
+            TokenKind::Return => "'return'",
+            TokenKind::Try => "'try'",
+            TokenKind::While => "'while'",
+            TokenKind::Match => "'match'",
+            TokenKind::Type => "'type'",
+            TokenKind::Case => "'case'",
+            TokenKind::With => "'with'",
+            TokenKind::Yield => "'yield'",
+        };
+        f.write_str(value)
     }
 }
 

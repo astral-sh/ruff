@@ -1600,7 +1600,7 @@ mod tests {
     fn any_over_stmt_type_alias() {
         let seen = RefCell::new(Vec::new());
         let name = Expr::Name(ExprName {
-            id: "x".to_string(),
+            id: "x".into(),
             range: TextRange::default(),
             ctx: ExprContext::Load,
         });

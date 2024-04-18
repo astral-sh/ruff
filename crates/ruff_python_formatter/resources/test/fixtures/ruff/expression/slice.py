@@ -110,3 +110,14 @@ self.assertEqual(
     suite._tests[0].id().split(".")[0],
     os.path.basename(os.getcwd()),
 )
+
+# PEP 646 introduced starred expression in indexes
+# https://peps.python.org/pep-0646/#change-1-star-expressions-in-indexes
+data[*x]
+data[*x,]
+data[
+    *x,
+]
+data[  # comment 1
+     *x,  # comment 2
+]  # comment 3

@@ -1,6 +1,7 @@
 #![allow(clippy::derive_partial_eq_without_eq)]
 
 use std::cell::OnceCell;
+
 use std::fmt;
 use std::fmt::Debug;
 use std::ops::Deref;
@@ -947,10 +948,17 @@ impl Ranged for FStringExpressionElement {
     }
 }
 
+/// An `FStringLiteralElement` with an empty `value` is an invalid f-string element.
 #[derive(Clone, Debug, PartialEq)]
 pub struct FStringLiteralElement {
     pub range: TextRange,
     pub value: Box<str>,
+}
+
+impl FStringLiteralElement {
+    pub fn is_valid(&self) -> bool {
+        !self.value.is_empty()
+    }
 }
 
 impl Ranged for FStringLiteralElement {
@@ -1571,6 +1579,9 @@ bitflags! {
         /// for why we track the casing of the `r` prefix,
         /// but not for any other prefix
         const R_PREFIX_UPPER = 1 << 4;
+
+        /// The string was deemed invalid by the parser.
+        const INVALID = 1 << 5;
     }
 }
 
@@ -1619,6 +1630,12 @@ impl StringLiteralFlags {
                     - StringLiteralFlagsInner::R_PREFIX_UPPER,
             ),
         }
+    }
+
+    #[must_use]
+    pub fn with_invalid(mut self) -> Self {
+        self.0 |= StringLiteralFlagsInner::INVALID;
+        self
     }
 
     pub const fn prefix(self) -> StringLiteralPrefix {
@@ -1736,6 +1753,15 @@ impl StringLiteral {
     /// Extracts a string slice containing the entire `String`.
     pub fn as_str(&self) -> &str {
         self
+    }
+
+    /// Creates an invalid string literal with the given range.
+    pub fn invalid(range: TextRange) -> Self {
+        Self {
+            range,
+            value: "".into(),
+            flags: StringLiteralFlags::default().with_invalid(),
+        }
     }
 }
 
@@ -1952,6 +1978,9 @@ bitflags! {
         /// See https://black.readthedocs.io/en/stable/the_black_code_style/current_style.html#r-strings-and-r-strings
         /// for why we track the casing of the `r` prefix, but not for any other prefix
         const R_PREFIX_UPPER = 1 << 3;
+
+        /// The bytestring was deemed invalid by the parser.
+        const INVALID = 1 << 4;
     }
 }
 
@@ -2025,6 +2054,12 @@ impl BytesLiteralFlags {
         self
     }
 
+    #[must_use]
+    pub fn with_invalid(mut self) -> Self {
+        self.0 |= BytesLiteralFlagsInner::INVALID;
+        self
+    }
+
     pub const fn prefix(self) -> ByteStringPrefix {
         if self.0.contains(BytesLiteralFlagsInner::R_PREFIX_LOWER) {
             debug_assert!(!self.0.contains(BytesLiteralFlagsInner::R_PREFIX_UPPER));
@@ -2093,6 +2128,15 @@ impl BytesLiteral {
     /// Extracts a byte slice containing the entire [`BytesLiteral`].
     pub fn as_slice(&self) -> &[u8] {
         self
+    }
+
+    /// Creates a new invalid bytes literal with the given range.
+    pub fn invalid(range: TextRange) -> Self {
+        Self {
+            range,
+            value: Box::new([]),
+            flags: BytesLiteralFlags::default().with_invalid(),
+        }
     }
 }
 
@@ -2726,6 +2770,7 @@ pub enum ExprContext {
     Load,
     Store,
     Del,
+    Invalid,
 }
 
 /// See also [boolop](https://docs.python.org/3/library/ast.html#ast.BoolOp)
@@ -3506,10 +3551,17 @@ impl IpyEscapeKind {
     }
 }
 
+/// An `Identifier` with an empty `id` is invalid.
+///
+/// For example, in the following code `id` will be empty.
+/// ```python
+/// def 1():
+///     ...
+/// ```
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Identifier {
-    id: String,
-    range: TextRange,
+    pub id: String,
+    pub range: TextRange,
 }
 
 impl Identifier {
@@ -3519,6 +3571,10 @@ impl Identifier {
             id: id.into(),
             range,
         }
+    }
+
+    pub fn is_valid(&self) -> bool {
+        !self.id.is_empty()
     }
 }
 
