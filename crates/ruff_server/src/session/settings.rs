@@ -347,7 +347,7 @@ mod tests {
                     true,
                 ),
                 lint: Some(
-                    Lint {
+                    LintOptions {
                         enable: Some(
                             true,
                         ),
@@ -365,21 +365,21 @@ mod tests {
                     },
                 ),
                 format: Some(
-                    Format {
+                    FormatOptions {
                         preview: None,
                     },
                 ),
                 code_action: Some(
-                    CodeAction {
+                    CodeActionOptions {
                         disable_rule_comment: Some(
-                            CodeActionSettings {
+                            CodeActionParameters {
                                 enable: Some(
                                     false,
                                 ),
                             },
                         ),
                         fix_violation: Some(
-                            CodeActionSettings {
+                            CodeActionParameters {
                                 enable: Some(
                                     false,
                                 ),
@@ -400,7 +400,7 @@ mod tests {
                             true,
                         ),
                         lint: Some(
-                            Lint {
+                            LintOptions {
                                 enable: Some(
                                     true,
                                 ),
@@ -411,21 +411,21 @@ mod tests {
                             },
                         ),
                         format: Some(
-                            Format {
+                            FormatOptions {
                                 preview: None,
                             },
                         ),
                         code_action: Some(
-                            CodeAction {
+                            CodeActionOptions {
                                 disable_rule_comment: Some(
-                                    CodeActionSettings {
+                                    CodeActionParameters {
                                         enable: Some(
                                             false,
                                         ),
                                     },
                                 ),
                                 fix_violation: Some(
-                                    CodeActionSettings {
+                                    CodeActionParameters {
                                         enable: Some(
                                             false,
                                         ),
@@ -457,7 +457,7 @@ mod tests {
                             true,
                         ),
                         lint: Some(
-                            Lint {
+                            LintOptions {
                                 enable: Some(
                                     true,
                                 ),
@@ -470,21 +470,21 @@ mod tests {
                             },
                         ),
                         format: Some(
-                            Format {
+                            FormatOptions {
                                 preview: None,
                             },
                         ),
                         code_action: Some(
-                            CodeAction {
+                            CodeActionOptions {
                                 disable_rule_comment: Some(
-                                    CodeActionSettings {
+                                    CodeActionParameters {
                                         enable: Some(
                                             true,
                                         ),
                                     },
                                 ),
                                 fix_violation: Some(
-                                    CodeActionSettings {
+                                    CodeActionParameters {
                                         enable: Some(
                                             false,
                                         ),
@@ -591,7 +591,7 @@ mod tests {
                     ),
                     organize_imports: None,
                     lint: Some(
-                        Lint {
+                        LintOptions {
                             enable: None,
                             preview: None,
                             select: None,
@@ -605,9 +605,9 @@ mod tests {
                     ),
                     format: None,
                     code_action: Some(
-                        CodeAction {
+                        CodeActionOptions {
                             disable_rule_comment: Some(
-                                CodeActionSettings {
+                                CodeActionParameters {
                                     enable: Some(
                                         false,
                                     ),
