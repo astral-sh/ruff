@@ -74,15 +74,17 @@ pub(crate) fn quadratic_list_summation(checker: &mut Checker, call: &ast::ExprCa
         range,
     } = call;
 
-    if !func_is_builtin(func, "sum", checker.semantic()) {
-        return;
-    }
-
-    if !start_is_empty_list(arguments, checker.semantic()) {
+    let Some(iterable) = arguments.args.first() else {
         return;
     };
 
-    let Some(iterable) = arguments.args.first() else {
+    let semantic = checker.semantic();
+
+    if !semantic.match_builtin_expr(func, "sum") {
+        return;
+    }
+
+    if !start_is_empty_list(arguments, semantic) {
         return;
     };
 
@@ -124,14 +126,6 @@ fn convert_to_reduce(iterable: &Expr, call: &ast::ExprCall, checker: &Checker) -
     ))
 }
 
-/// Check if a function is a builtin with a given name.
-fn func_is_builtin(func: &Expr, name: &str, semantic: &SemanticModel) -> bool {
-    let Expr::Name(ast::ExprName { id, .. }) = func else {
-        return false;
-    };
-    id == name && semantic.is_builtin(id)
-}
-
 /// Returns `true` if the `start` argument to a `sum()` call is an empty list.
 fn start_is_empty_list(arguments: &Arguments, semantic: &SemanticModel) -> bool {
     let Some(start_arg) = arguments.find_argument("start", 1) else {
@@ -141,7 +135,7 @@ fn start_is_empty_list(arguments: &Arguments, semantic: &SemanticModel) -> bool 
     match start_arg {
         Expr::Call(ast::ExprCall {
             func, arguments, ..
-        }) => arguments.is_empty() && func_is_builtin(func, "list", semantic),
+        }) => arguments.is_empty() && semantic.match_builtin_expr(func, "list"),
         Expr::List(ast::ExprList { elts, ctx, .. }) => elts.is_empty() && ctx.is_load(),
         _ => false,
     }

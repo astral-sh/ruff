@@ -291,7 +291,9 @@ impl Display for RuleSet {
         } else {
             writeln!(f, "[")?;
             for rule in self {
-                writeln!(f, "\t{rule:?},")?;
+                let name = rule.as_ref();
+                let code = rule.noqa_code();
+                writeln!(f, "\t{name} ({code}),")?;
             }
             write!(f, "]")?;
         }

@@ -55,6 +55,9 @@ pub(super) fn request<'a>(req: server::Request) -> Task<'a> {
     }
     .unwrap_or_else(|err| {
         tracing::error!("Encountered error when routing request with ID {id}: {err}");
+        show_err_msg!(
+            "Ruff failed to handle a request from the editor. Check the logs for more details."
+        );
         let result: Result<()> = Err(err);
         Task::immediate(id, result)
     })
@@ -84,6 +87,7 @@ pub(super) fn notification<'a>(notif: server::Notification) -> Task<'a> {
     }
     .unwrap_or_else(|err| {
         tracing::error!("Encountered error when routing notification: {err}");
+        show_err_msg!("Ruff failed to handle a notification from the editor. Check the logs for more details.");
         Task::nothing()
     })
 }
@@ -119,9 +123,10 @@ fn local_notification_task<'a, N: traits::SyncNotificationHandler>(
     notif: server::Notification,
 ) -> super::Result<Task<'a>> {
     let (id, params) = cast_notification::<N>(notif)?;
-    Ok(Task::local(move |session, notifier, _, _| {
-        if let Err(err) = N::run(session, notifier, params) {
+    Ok(Task::local(move |session, notifier, requester, _| {
+        if let Err(err) = N::run(session, notifier, requester, params) {
             tracing::error!("An error occurred while running {id}: {err}");
+            show_err_msg!("Ruff encountered a problem. Check the logs for more details.");
         }
     }))
 }
@@ -140,6 +145,7 @@ fn background_notification_thread<'a, N: traits::BackgroundDocumentNotificationH
         Box::new(move |notifier, _| {
             if let Err(err) = N::run_with_snapshot(snapshot, notifier, params) {
                 tracing::error!("An error occurred while running {id}: {err}");
+                show_err_msg!("Ruff encountered a problem. Check the logs for more details.");
             }
         })
     }))
@@ -182,6 +188,10 @@ fn respond<Req>(
 ) where
     Req: traits::RequestHandler,
 {
+    if let Err(err) = &result {
+        tracing::error!("An error occurred with result ID {id}: {err}");
+        show_err_msg!("Ruff encountered a problem. Check the logs for more details.");
+    }
     if let Err(err) = responder.respond(id, result) {
         tracing::error!("Failed to send response: {err}");
     }

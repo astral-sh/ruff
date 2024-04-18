@@ -1,7 +1,6 @@
-use ruff_python_ast::{self as ast, Expr};
-
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::Expr;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -58,21 +57,15 @@ impl Violation for SysExitAlias {
 
 /// PLR1722
 pub(crate) fn sys_exit_alias(checker: &mut Checker, func: &Expr) {
-    let Expr::Name(ast::ExprName { id, .. }) = func else {
+    let Some(builtin) = checker.semantic().resolve_builtin_symbol(func) else {
         return;
     };
-
-    if !matches!(id.as_str(), "exit" | "quit") {
+    if !matches!(builtin, "exit" | "quit") {
         return;
     }
-
-    if !checker.semantic().is_builtin(id.as_str()) {
-        return;
-    }
-
     let mut diagnostic = Diagnostic::new(
         SysExitAlias {
-            name: id.to_string(),
+            name: builtin.to_string(),
         },
         func.range(),
     );

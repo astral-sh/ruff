@@ -95,16 +95,24 @@ pub(crate) fn use_pep585_annotation(
         match replacement {
             ModuleMember::BuiltIn(name) => {
                 // Built-in type, like `list`.
-                if checker.semantic().is_builtin(name) {
-                    diagnostic.set_fix(Fix::applicable_edit(
-                        Edit::range_replacement((*name).to_string(), expr.range()),
-                        if checker.settings.target_version >= PythonVersion::Py310 {
-                            Applicability::Safe
-                        } else {
-                            Applicability::Unsafe
-                        },
-                    ));
-                }
+                diagnostic.try_set_fix(|| {
+                    let (import_edit, binding) = checker.importer().get_or_import_builtin_symbol(
+                        name,
+                        expr.start(),
+                        checker.semantic(),
+                    )?;
+                    let binding_edit = Edit::range_replacement(binding, expr.range());
+                    let applicability = if checker.settings.target_version >= PythonVersion::Py310 {
+                        Applicability::Safe
+                    } else {
+                        Applicability::Unsafe
+                    };
+                    Ok(Fix::applicable_edits(
+                        binding_edit,
+                        import_edit,
+                        applicability,
+                    ))
+                });
             }
             ModuleMember::Member(module, member) => {
                 // Imported type, like `collections.deque`.
