@@ -265,6 +265,7 @@ impl ResolvedClientSettings {
     /// Attempts to resolve a setting using a list of available client settings as sources.
     /// Client settings that come earlier in the list take priority. This function is for fields
     /// that do not have a default value and should be left unset.
+    /// Use [`ResolvedClientSettings::resolve_or`] for settings that should have default values.
     fn resolve_optional<T>(
         all_settings: &[&ClientSettings],
         get: impl Fn(&ClientSettings) -> Option<T>,
@@ -275,6 +276,8 @@ impl ResolvedClientSettings {
     /// Attempts to resolve a setting using a list of available client settings as sources.
     /// Client settings that come earlier in the list take priority. `default` will be returned
     /// if none of the settings specify the requested setting.
+    /// Use [`ResolvedClientSettings::resolve_optional`] if the setting should be optional instead
+    /// of having a default value.
     fn resolve_or<T>(
         all_settings: &[&ClientSettings],
         get: impl Fn(&ClientSettings) -> Option<T>,
