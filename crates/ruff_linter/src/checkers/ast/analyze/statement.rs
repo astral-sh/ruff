@@ -95,13 +95,13 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 }
             }
             if checker.enabled(Rule::InvalidBoolReturnType) {
-                pylint::rules::invalid_bool_return(checker, name, body);
+                pylint::rules::invalid_bool_return(checker, function_def);
             }
             if checker.enabled(Rule::InvalidBytesReturnType) {
                 pylint::rules::invalid_bytes_return(checker, function_def);
             }
             if checker.enabled(Rule::InvalidStrReturnType) {
-                pylint::rules::invalid_str_return(checker, name, body);
+                pylint::rules::invalid_str_return(checker, function_def);
             }
             if checker.enabled(Rule::InvalidFunctionName) {
                 if let Some(diagnostic) = pep8_naming::rules::invalid_function_name(
