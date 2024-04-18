@@ -309,5 +309,5 @@ pub fn definitions(db: &dyn Db, source_text: SourceText) -> Arc<Definitions> {
     let ast = parsed.ast(db);
     let ids = ast_ids(db, source_text);
 
-    Arc::new(Definitions::from_module(ast, &*ids, source_text.file(db)))
+    Arc::new(Definitions::from_module(ast, &ids, source_text.file(db)))
 }

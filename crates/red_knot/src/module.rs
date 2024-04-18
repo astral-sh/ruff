@@ -53,7 +53,7 @@ impl ModuleName {
         Some(Self(name))
     }
 
-    pub fn components(&self) -> impl Iterator<Item = &str> + DoubleEndedIterator {
+    pub fn components(&self) -> impl DoubleEndedIterator<Item = &str> {
         self.0.split('.')
     }
 
@@ -208,7 +208,7 @@ impl ModuleResolver {
 
     /// Returns the module for a given id.
     pub fn module(&self, id: ModuleId) -> &Module {
-        self.modules.get(&id).unwrap()
+        &self.modules[&id]
     }
 
     /// Updates the last modified time for the module corresponding to `path`.
@@ -234,14 +234,11 @@ impl ModuleResolver {
             return Some(*existing);
         }
 
-        // Issue one, it's possible to have multiple paths that map to the same name but resolve to entirely different modules.
         let root_path = self
             .search_paths
             .iter()
             .find(|root| path.starts_with(root.path()))?
             .clone();
-
-        let mut name = String::new();
 
         // SAFETY: `strip_prefix` is guaranteed to succeed because we search the root that is a prefix of the path.
         let relative_path = path.strip_prefix(root_path.path()).unwrap();
@@ -257,7 +254,7 @@ impl ModuleResolver {
         if module.path().root() == &root_path {
             let normalized = path.canonicalize().ok()?;
 
-            if !module.path().resolved().starts_with(&normalized) {
+            if !module.path().resolved().starts_with(normalized) {
                 // This path is for a module with the same name but with a different precedence. For example:
                 // ```
                 // src/foo.py
@@ -507,8 +504,8 @@ mod tests {
         let baz = bar.join("baz.py");
 
         std::fs::create_dir_all(&bar)?;
-        std::fs::write(&foo.join("__init__.py"), "")?;
-        std::fs::write(&bar.join("__init__.py"), "")?;
+        std::fs::write(foo.join("__init__.py"), "")?;
+        std::fs::write(bar.join("__init__.py"), "")?;
         std::fs::write(&baz, "print('Hello, world!')")?;
 
         let baz_id = test_case.resolver.resolve(ModuleName::new("foo.bar.baz"));
@@ -535,7 +532,7 @@ mod tests {
         let baz = bar.join("baz.py");
 
         std::fs::create_dir_all(&bar)?;
-        std::fs::write(&foo.join("__init__.py"), "")?;
+        std::fs::write(foo.join("__init__.py"), "")?;
         std::fs::write(&baz, "print('Hello, world!')")?;
 
         let baz_id = test_case.resolver.resolve(ModuleName::new("foo.bar.baz"));

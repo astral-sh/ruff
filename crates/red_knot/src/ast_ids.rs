@@ -275,7 +275,7 @@ pub struct TypedNodeKey<N: AstNode> {
 
 impl<N: AstNode> TypedNodeKey<N> {
     pub fn new(node_key: NodeKey) -> Option<Self> {
-        N::can_cast(node_key.kind).then(|| TypedNodeKey {
+        N::can_cast(node_key.kind).then_some(TypedNodeKey {
             inner: node_key,
             _marker: PhantomData,
         })
