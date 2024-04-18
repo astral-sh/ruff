@@ -53,14 +53,14 @@ To setup `ruff server` with your editor, refer to the [README.md](http://README.
 
 ### Server
 
-*This section is devoted to updates for our new LSP, written in Rust.*
+*This section is devoted to updates for our new language server, written in Rust.*
 
 - Enable ruff-specific source actions ([#10916](https://github.com/astral-sh/ruff/pull/10916))
-- `ruff server` Refreshes diagnostics for open files when file configuration is changed ([#10988](https://github.com/astral-sh/ruff/pull/10988))
-- `ruff server`: Important errors are now shown as popups ([#10951](https://github.com/astral-sh/ruff/pull/10951))
-- `ruff server`: Introduce settings for directly configuring the linter and formatter ([#10984](https://github.com/astral-sh/ruff/pull/10984))
-- `ruff server`: Resolve configuration for each document individually ([#10950](https://github.com/astral-sh/ruff/pull/10950))
-- `ruff server`: Write a setup guide for Neovim ([#10987](https://github.com/astral-sh/ruff/pull/10987))
+- Refreshes diagnostics for open files when file configuration is changed ([#10988](https://github.com/astral-sh/ruff/pull/10988))
+- Important errors are now shown as popups ([#10951](https://github.com/astral-sh/ruff/pull/10951))
+- Introduce settings for directly configuring the linter and formatter ([#10984](https://github.com/astral-sh/ruff/pull/10984))
+- Resolve configuration for each document individually ([#10950](https://github.com/astral-sh/ruff/pull/10950))
+- Write a setup guide for Neovim ([#10987](https://github.com/astral-sh/ruff/pull/10987))
 
 ### Configuration
 
