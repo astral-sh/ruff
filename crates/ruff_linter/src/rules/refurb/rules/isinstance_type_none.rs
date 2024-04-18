@@ -48,19 +48,15 @@ impl Violation for IsinstanceTypeNone {
 
 /// FURB168
 pub(crate) fn isinstance_type_none(checker: &mut Checker, call: &ast::ExprCall) {
-    let Expr::Name(ast::ExprName { id, .. }) = call.func.as_ref() else {
-        return;
-    };
-    if id.as_str() != "isinstance" {
-        return;
-    }
-    if !checker.semantic().is_builtin(id) {
-        return;
-    }
     let Some(types) = call.arguments.find_positional(1) else {
         return;
     };
-
+    if !checker
+        .semantic()
+        .match_builtin_expr(&call.func, "isinstance")
+    {
+        return;
+    }
     if is_none(types) {
         let Some(Expr::Name(ast::ExprName {
             id: object_name, ..

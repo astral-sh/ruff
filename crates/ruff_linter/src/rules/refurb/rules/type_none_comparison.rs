@@ -134,13 +134,10 @@ fn type_call_arg<'a>(expr: &'a Expr, semantic: &'a SemanticModel) -> Option<&'a 
     if arguments.len() != 1 {
         return None;
     }
-
     // The function itself must be the builtin `type`.
-    let ast::ExprName { id, .. } = func.as_name_expr()?;
-    if id.as_str() != "type" || !semantic.is_builtin(id) {
+    if !semantic.match_builtin_expr(func, "type") {
         return None;
     }
-
     arguments.find_positional(0)
 }
 

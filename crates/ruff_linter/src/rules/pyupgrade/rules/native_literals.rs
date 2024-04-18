@@ -150,26 +150,23 @@ pub(crate) fn native_literals(
         range: _,
     } = call;
 
-    let Expr::Name(ast::ExprName { ref id, .. }) = func.as_ref() else {
-        return;
-    };
-
     if !keywords.is_empty() || args.len() > 1 {
         return;
     }
 
-    let Ok(literal_type) = LiteralType::from_str(id.as_str()) else {
+    let semantic = checker.semantic();
+
+    let Some(builtin) = semantic.resolve_builtin_symbol(func) else {
         return;
     };
 
-    if !checker.semantic().is_builtin(id) {
+    let Ok(literal_type) = LiteralType::from_str(builtin) else {
         return;
-    }
+    };
 
     // There's no way to rewrite, e.g., `f"{f'{str()}'}"` within a nested f-string.
-    if checker.semantic().in_f_string() {
-        if checker
-            .semantic()
+    if semantic.in_f_string() {
+        if semantic
             .current_expressions()
             .filter(|expr| expr.is_f_string_expr())
             .count()

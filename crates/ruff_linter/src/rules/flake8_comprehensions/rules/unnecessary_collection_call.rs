@@ -65,10 +65,10 @@ pub(crate) fn unnecessary_collection_call(
     if !call.arguments.args.is_empty() {
         return;
     }
-    let Some(func) = call.func.as_name_expr() else {
+    let Some(builtin) = checker.semantic().resolve_builtin_symbol(&call.func) else {
         return;
     };
-    let collection = match func.id.as_str() {
+    let collection = match builtin {
         "dict"
             if call.arguments.keywords.is_empty()
                 || (!settings.allow_dict_calls_with_keyword_arguments
@@ -87,13 +87,10 @@ pub(crate) fn unnecessary_collection_call(
         }
         _ => return,
     };
-    if !checker.semantic().is_builtin(func.id.as_str()) {
-        return;
-    }
 
     let mut diagnostic = Diagnostic::new(
         UnnecessaryCollectionCall {
-            obj_type: func.id.to_string(),
+            obj_type: builtin.to_string(),
         },
         call.range(),
     );

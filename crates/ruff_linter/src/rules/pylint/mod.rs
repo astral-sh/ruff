@@ -81,6 +81,10 @@ mod tests {
         Rule::InvalidLengthReturnType,
         Path::new("invalid_return_type_length.py")
     )]
+    #[test_case(
+        Rule::InvalidBytesReturnType,
+        Path::new("invalid_return_type_bytes.py")
+    )]
     #[test_case(Rule::InvalidStrReturnType, Path::new("invalid_return_type_str.py"))]
     #[test_case(Rule::DuplicateBases, Path::new("duplicate_bases.py"))]
     #[test_case(Rule::InvalidCharacterBackspace, Path::new("invalid_characters.py"))]
