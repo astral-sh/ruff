@@ -1,62 +1,51 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-invalid_return_type_index.py:6:16: PLE0305 `__index__` does not return `integer`
+invalid_return_type_index.py:7:16: PLE0305 `__index__` does not return `integer`
   |
-4 |     """pylint would not raise, but ruff does - see explanation in the docs"""
-5 |     def __index__(self):
-6 |         return True  # [invalid-index-return]
+5 |     """pylint would not raise, but ruff does - see explanation in the docs"""
+6 |     def __index__(self):
+7 |         return True  # [invalid-index-return]
   |                ^^^^ PLE0305
-7 | 
-8 | class Float:
   |
 
-invalid_return_type_index.py:10:16: PLE0305 `__index__` does not return `integer`
+invalid_return_type_index.py:12:16: PLE0305 `__index__` does not return `integer`
    |
- 8 | class Float:
- 9 |     def __index__(self):
-10 |         return 3.05  # [invalid-index-return]
+10 | class Float:
+11 |     def __index__(self):
+12 |         return 3.05  # [invalid-index-return]
    |                ^^^^ PLE0305
-11 | 
-12 | class Dict:
    |
 
-invalid_return_type_index.py:14:16: PLE0305 `__index__` does not return `integer`
+invalid_return_type_index.py:17:16: PLE0305 `__index__` does not return `integer`
    |
-12 | class Dict:
-13 |     def __index__(self):
-14 |         return {"1": "1"}  # [invalid-index-return]
+15 | class Dict:
+16 |     def __index__(self):
+17 |         return {"1": "1"}  # [invalid-index-return]
    |                ^^^^^^^^^^ PLE0305
-15 | 
-16 | class Str:
    |
 
-invalid_return_type_index.py:18:16: PLE0305 `__index__` does not return `integer`
+invalid_return_type_index.py:22:16: PLE0305 `__index__` does not return `integer`
    |
-16 | class Str:
-17 |     def __index__(self):
-18 |         return "ruff"  # [invalid-index-return]
-   |                ^^^^^^ PLE0305
-19 | 
-20 | class IndexNoReturn:
-   |
-
-invalid_return_type_index.py:22:9: PLE0305 `__index__` does not return `integer`
-   |
-20 | class IndexNoReturn:
+20 | class Str:
 21 |     def __index__(self):
-22 |         print("ruff")  # [invalid-index-return]
-   |         ^^^^^^^^^^^^^ PLE0305
-23 | 
-24 | class IndexWrongRaise:
+22 |         return "ruff"  # [invalid-index-return]
+   |                ^^^^^^ PLE0305
    |
 
-invalid_return_type_index.py:27:9: PLE0305 `__index__` does not return `integer`
+invalid_return_type_index.py:26:9: PLE0305 `__index__` does not return `integer`
    |
-25 |     def __index__(self):
-26 |         print("raise some error")
-27 |         raise NotImplementedError  # [invalid-index-return]
-   |         ^^^^^^^^^^^^^^^^^^^^^^^^^ PLE0305
-28 | 
-29 | # TODO: Once Ruff has better type checking
+25 | class IndexNoReturn:
+26 |     def __index__(self):
+   |         ^^^^^^^^^ PLE0305
+27 |         print("ruff")  # [invalid-index-return]
+   |
+
+invalid_return_type_index.py:31:9: PLE0305 `__index__` does not return `integer`
+   |
+30 | class IndexWrongRaise:
+31 |     def __index__(self):
+   |         ^^^^^^^^^ PLE0305
+32 |         print("raise some error")
+33 |         raise NotImplementedError  # [invalid-index-return]
    |
