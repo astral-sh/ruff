@@ -19,6 +19,7 @@ ruff_text_size = { path = "../ruff_text_size" }
 ruff_index = { path = "../ruff_index" }
 
 anyhow = { workspace = true }
+dashmap = { workspace = true }
 filetime = { workspace = true }
 hashbrown = { workspace = true }
 log = { workspace = true }

@@ -1,14 +1,15 @@
 #![allow(unreachable_pub)]
 
-use std::collections::hash_map::Entry;
 use std::fmt::Formatter;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::AtomicU32;
 use std::sync::Arc;
 
 use crate::files::{FileId, Files};
-use filetime::FileTime;
-use rustc_hash::FxHashMap;
+use crate::FxDashMap;
+use dashmap::mapref::entry::Entry;
 
+/// ID uniquely identifying a module.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub struct ModuleId(u32);
 
@@ -63,6 +64,12 @@ impl ModuleName {
     }
 }
 
+impl std::fmt::Display for ModuleName {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+
 /// A search path in which to search modules.
 /// Corresponds to a path in [`sys.path`](https://docs.python.org/3/library/sys_path_init.html) at runtime.
 ///
@@ -114,45 +121,58 @@ pub enum ModuleSearchPathKind {
     StandardLibrary,
 }
 
-#[derive(Clone, Debug)]
+/// A module in a python program.
+///
+/// Cheap clone because it's an `Arc`.
+#[derive(Eq, PartialEq)]
 pub struct Module {
-    name: ModuleName,
-    path: ModulePath,
-    last_modified: FileTime,
+    inner: Arc<ModuleData>,
 }
 
-#[allow(unused)]
 impl Module {
     pub fn name(&self) -> &ModuleName {
-        &self.name
+        &self.inner.name
     }
 
     pub fn path(&self) -> &ModulePath {
-        &self.path
-    }
-
-    pub fn last_modified(&self) -> FileTime {
-        self.last_modified
+        &self.inner.path
     }
 }
 
-#[derive(Debug, Default)]
+impl std::fmt::Debug for Module {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Module")
+            .field("name", &self.name())
+            .field("path", &self.path())
+            .finish()
+    }
+}
+
+#[derive(Debug, Eq, PartialEq)]
+struct ModuleData {
+    name: ModuleName,
+    path: ModulePath,
+}
+
+#[derive(Default)]
 pub struct ModuleResolver {
     /// The search paths where modules are located (and searched). Corresponds to `sys.path` at runtime.
     search_paths: Vec<ModuleSearchPath>,
 
     files: Files,
 
-    /// All known modules, indexed by the module id.
-    modules: FxHashMap<ModuleId, Module>,
-
+    // Locking: Locking is done by acquiring a (write) lock on `by_name`. This is because `by_name` is the primary
+    // lookup method. Acquiring locks in any other ordering can result in deadlocks.
     /// Resolves a module name to it's module id.
-    by_name: FxHashMap<ModuleName, ModuleId>,
+    by_name: FxDashMap<ModuleName, ModuleId>,
+
+    /// All known modules, indexed by the module id.
+    modules: FxDashMap<ModuleId, Arc<ModuleData>>,
 
     /// Lookup from absolute path to module.
     /// The same module might be reachable from different paths when symlinks are involved.
-    by_path: FxHashMap<PathBuf, ModuleId>,
-    next_module_id: u32,
+    by_path: FxDashMap<PathBuf, ModuleId>,
+    next_module_id: AtomicU32,
 }
 
 #[allow(unused)]
@@ -161,42 +181,37 @@ impl ModuleResolver {
         Self {
             search_paths,
             files,
-            modules: FxHashMap::default(),
-            by_name: FxHashMap::default(),
-            by_path: FxHashMap::default(),
-            next_module_id: 0,
+            modules: FxDashMap::default(),
+            by_name: FxDashMap::default(),
+            by_path: FxDashMap::default(),
+            next_module_id: AtomicU32::new(0),
         }
     }
 
     /// Resolves a module name to a module id.
-    // TODO I think resolving should take a referenc because we don't have a mutable `Modules` during type evaluation.
-    pub fn resolve(&mut self, name: ModuleName) -> Option<ModuleId> {
-        // we can't really accept `&mut Files` here but we also don't want to traverse the entire site packages and index all files eagerly.
+    fn resolve(&self, name: ModuleName) -> Option<ModuleId> {
         let entry = self.by_name.entry(name.clone());
 
         match entry {
-            Entry::Occupied(existing) => Some(*existing.get()),
-            Entry::Vacant(vacant) => {
+            Entry::Occupied(entry) => Some(*entry.get()),
+            Entry::Vacant(entry) => {
                 let (root_path, absolute_path) = resolve_name(&name, &self.search_paths)?;
                 let normalized = absolute_path.canonicalize().ok()?;
 
                 let file_id = self.files.intern(&normalized);
-
-                let metadata = normalized.metadata().ok()?;
-                let last_modified = FileTime::from_last_modification_time(&metadata);
-
                 let path = ModulePath::new(root_path.clone(), file_id);
 
-                let id = ModuleId(self.next_module_id);
-                self.next_module_id += 1;
+                let id = ModuleId(
+                    self.next_module_id
+                        .fetch_add(1, std::sync::atomic::Ordering::Relaxed),
+                );
 
                 self.modules.insert(
                     id,
-                    Module {
-                        name,
+                    Arc::from(ModuleData {
+                        name: name.clone(),
                         path,
-                        last_modified,
-                    },
+                    }),
                 );
 
                 // A path can map to multiple modules because of symlinks:
@@ -208,48 +223,40 @@ impl ModuleResolver {
                 // That's why we need to insert the absolute path and not the normalized path here.
                 self.by_path.insert(absolute_path, id);
 
-                vacant.insert(id);
+                entry.insert_entry(id);
+
                 Some(id)
             }
         }
     }
 
+    /// Returns the id of a module with the given name if it exists, without resolving it.
     pub fn id(&self, name: &ModuleName) -> Option<ModuleId> {
-        self.by_name.get(name).copied()
+        self.by_name.get(name).map(|lock| *lock)
     }
 
     /// Returns the module for a given id.
-    pub fn module(&self, id: ModuleId) -> &Module {
-        &self.modules[&id]
+    pub fn module(&self, id: ModuleId) -> Module {
+        let entry = self.modules.get(&id).unwrap();
+        let module = entry.value();
+
+        Module {
+            inner: module.clone(),
+        }
     }
 
-    pub fn path(&self, id: ModuleId) -> Arc<Path> {
-        self.files.path(self.module(id).path().file())
-    }
-
-    /// Updates the last modified time for the module corresponding to `path`.
-    pub fn touch(&mut self, path: &Path) {
-        let Some(id) = self.resolve_path(path) else {
-            return;
-        };
-
-        let module = self.modules.get_mut(&id).unwrap();
-        let module_path = self.files.path(module.path.file());
-
-        if let Ok(metadata) = module_path.metadata() {
-            module.last_modified = FileTime::from_last_modification_time(&metadata);
-        };
-    }
-
-    pub fn add_module_path(&mut self, path: &Path) {
-        self.resolve_path(path);
-    }
-
+    /// Resolves the module id for the file with the given id.
+    ///
+    /// Returns `None` if the file is not a module in `sys.path`.
     pub fn resolve_file(&mut self, file: FileId) -> Option<ModuleId> {
         let path = self.files.path(file);
-        self.by_path.get(&*path).copied()
+        self.resolve_path(&*path)
     }
 
+    /// Resolves the module id for the given path.
+    ///
+    /// Returns `None` if the path is not a module in `sys.path`.
+    // WARNING!: It's important that this method takes `&mut self`. Without, the implementation is prone to race conditions.
     pub fn resolve_path(&mut self, path: &Path) -> Option<ModuleId> {
         debug_assert!(path.is_absolute());
 
@@ -272,11 +279,13 @@ impl ModuleResolver {
         // root paths, but that the module corresponding to the past path is in a lower priority path,
         // in which case we ignore it.
         let module_id = self.resolve(module_name)?;
-        let module = &self.modules[&module_id];
+        // Note: Guaranteed to be race-free because we're holding a mutable reference of `self` here.
+        let module = self.module(module_id);
 
-        if module.path().root() == &root_path {
+        let module_path = module.path();
+        if module_path.root() == &root_path {
             let normalized = path.canonicalize().ok()?;
-            let module_path = self.files.path(module.path().file());
+            let module_path = self.files.path(module_path.file());
 
             if !module_path.starts_with(normalized) {
                 // This path is for a module with the same name but with a different precedence. For example:
@@ -298,14 +307,35 @@ impl ModuleResolver {
         }
     }
 
-    pub fn remove_module_path(&mut self, id: ModuleId) {
-        let module = self.modules.remove(&id).unwrap();
+    pub fn add_module(&mut self, path: &Path) {
+        self.resolve_path(path);
+    }
 
-        self.by_name.remove(&module.name);
+    pub fn remove_module(&mut self, id: ModuleId) {
+        match self.modules.entry(id) {
+            Entry::Occupied(entry) => {
+                // Keep the entry to ensure it locks any writes to the same entry in `resolve`.
 
-        // This isn't fast but removing seems an uncommon operation where I don't think it's worth
-        // to keep a reverse lookup just for it (requires more allocations, involves writing a lot of data).
-        self.by_path.retain(|_, current_id| *current_id != id);
+                self.by_name.remove(&entry.get().name);
+                // This isn't fast but removing seems an uncommon operation where I don't think it's worth
+                // to keep a reverse lookup just for it (requires more allocations, involves writing a lot of data).
+                self.by_path.retain(|_, current_id| *current_id != id);
+
+                entry.remove();
+            }
+            Entry::Vacant(_) => {
+                panic!("Expected entry to exist")
+            }
+        }
+    }
+}
+
+impl std::fmt::Debug for ModuleResolver {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ModuleResolver")
+            .field("search_paths", &self.search_paths)
+            .field("modules", &self.by_name)
+            .finish()
     }
 }
 
@@ -412,8 +442,8 @@ mod tests {
 
         Ok(TestCase {
             temp_dir,
-            files,
             resolver,
+            files,
             src,
             site_packages,
         })
