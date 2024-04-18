@@ -129,3 +129,10 @@ t1 = (x,)
 t2 = (x,y)
 "%s" % t2
 # UP031: deref t2 to n-tuple, this is a bug
+
+# UP031 (no longer false negatives)
+'Hello %s' % bar
+
+'Hello %s' % bar.baz
+
+'Hello %s' % bar['bop']
