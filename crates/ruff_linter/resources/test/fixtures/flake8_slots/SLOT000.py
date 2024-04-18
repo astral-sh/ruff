@@ -11,3 +11,11 @@ from enum import Enum
 
 class Fine(str, Enum):  # Ok
     __slots__ = ["foo"]
+
+
+class SubEnum(Enum):
+    pass
+
+
+class Ok(str, SubEnum):  # Ok
+    pass
