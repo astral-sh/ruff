@@ -10,6 +10,7 @@ use ruff_python_literal::cformat::{
     CConversionFlags, CFormatPart, CFormatPrecision, CFormatQuantity, CFormatString,
 };
 use ruff_python_parser::{lexer, AsMode, Tok};
+use ruff_python_semantic::analyze;
 use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
@@ -288,6 +289,56 @@ fn clean_params_dictionary(right: &Expr, locator: &Locator, stylist: &Stylist) -
     Some(contents)
 }
 
+/// (In the case where the format string has only a single %-placeholder) and the righthand operand
+/// to % is a variable, try to offer a fix.
+///
+/// If the variable is not a tuple, then offer `({})`.
+/// ```python
+/// x = set(["hi", "hello"])
+/// print("%s" % x)
+/// print("{}".format(x))
+/// ```
+///
+/// If the variable is a 1-tuple, then offer `({}[0])`.
+/// ```python
+/// x = (1,)
+/// print("%s" % x)
+/// print("{}".format(x[0]))
+/// ```
+///
+/// If the variable is an n-tuple, the user has a bug in their code. Offer no fix.
+fn clean_params_variable<'a>(checker: &mut Checker, right: &Expr) -> Option<Cow<'a, str>> {
+    let Expr::Name(ast::ExprName { id, .. }) = right else {
+        return None;
+    };
+    let semantic = checker.semantic();
+    let binding_id = semantic.lookup_symbol(id.as_str())?;
+    let binding = semantic.binding(binding_id);
+    let rt = checker.locator().slice(right);
+    if let Some(expr) = analyze::typing::find_binding_value(binding, semantic) {
+        match expr {
+            // n-tuple
+            Expr::Tuple(ast::ExprTuple { elts, .. }) if 1 < elts.len() => {
+                return None;
+            }
+            // 1-tuple
+            Expr::Tuple(ast::ExprTuple { elts, .. }) if 1 == elts.len() => {
+                return Some(Cow::Owned(format!("({}[0])", rt)));
+            }
+            // non-tuple
+            _ => {
+                return Some(Cow::Owned(format!("({})", rt)));
+            }
+        }
+    }
+    // when find_binding_value doesn't work, fall back to offering a fix only for non-tuples
+    if analyze::typing::is_tuple(binding, semantic) {
+        return None;
+    } else {
+        return Some(Cow::Owned(format!("({})", rt)));
+    }
+}
+
 /// Returns `true` if the sequence of [`PercentFormatPart`] indicate that an
 /// [`Expr`] can be converted.
 fn convertible(format_string: &CFormatString, params: &Expr) -> bool {
@@ -426,16 +477,13 @@ pub(crate) fn printf_string_formatting(checker: &mut Checker, expr: &Expr, right
                 // If we have multiple fields, but no named fields, assume the right-hand side is a
                 // tuple.
                 Cow::Owned(format!("(*{})", checker.locator().slice(right)))
+            } else if let Some(cow) = clean_params_variable(checker, right) {
+                // With only one field, if we have a variable we can try to deref it to handle a
+                // few cases.
+                cow
             } else {
-                // Otherwise, if we have a single field, we can't make any assumptions about the
-                // right-hand side. It _could_ be a tuple, but it could also be a single value,
-                // and we can't differentiate between them.
-                // For example:
-                // ```python
-                // x = (1,)
-                // print("%s" % x)
-                // print("{}".format(x))
-                // ```
+                // Otherwise we might have an attribute/subscript/call or a variable that we were
+                // unable to deref.
                 return;
             }
         }

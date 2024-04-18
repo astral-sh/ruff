@@ -117,3 +117,15 @@ path = "%s-%s-%s.pem" % (
     cert.not_valid_after.date().isoformat().replace("-", ""), # expiration date
     hexlify(cert.fingerprint(hashes.SHA256())).decode("ascii")[0:8], # fingerprint prefix
 )
+
+s = set([x, y])
+"%s" % s
+# UP031: deref s to non-tuple, offer fix
+
+t1 = (x,)
+"%s" % t1
+# UP031: deref t1 to 1-tuple, offer fix
+
+t2 = (x,y)
+"%s" % t2
+# UP031: deref t2 to n-tuple, this is a bug

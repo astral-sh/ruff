@@ -39,3 +39,6 @@ pytest.param('"%8s" % (None,)', id="unsafe width-string conversion"),
 'Hello %s' % bar.baz
 
 'Hello %s' % bar['bop']
+
+"%s" % zzz
+# OK: unable to deref zzz
