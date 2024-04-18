@@ -347,8 +347,18 @@ impl<'src> Parser<'src> {
     /// [Pratt parsing algorithm]: https://matklad.github.io/2020/04/13/simple-but-powerful-pratt-parsing.html
     fn parse_expression_with_precedence(&mut self, previous_precedence: Precedence) -> ParsedExpr {
         let start = self.node_start();
-        let mut lhs = self.parse_lhs_expression(previous_precedence);
+        let lhs = self.parse_lhs_expression(previous_precedence);
+        self.parse_expression_with_precedence_recursive(lhs, previous_precedence, start)
+    }
 
+    /// Parses an expression with binding power of at least `previous_precedence` given the
+    /// left-hand side expression.
+    pub(super) fn parse_expression_with_precedence_recursive(
+        &mut self,
+        mut lhs: ParsedExpr,
+        previous_precedence: Precedence,
+        start: TextSize,
+    ) -> ParsedExpr {
         let mut progress = ParserProgress::default();
 
         loop {
@@ -2498,7 +2508,7 @@ enum Associativity {
 ///
 /// See: <https://docs.python.org/3/reference/expressions.html#operator-precedence>
 #[derive(Debug, Ord, Eq, PartialEq, PartialOrd, Copy, Clone)]
-enum Precedence {
+pub(super) enum Precedence {
     /// Precedence for an unknown operator.
     Unknown,
     /// The initital precedence when parsing an expression.
