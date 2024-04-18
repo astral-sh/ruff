@@ -483,7 +483,10 @@ pub(crate) fn printf_string_formatting(checker: &mut Checker, expr: &Expr, right
                 cow
             } else {
                 // Otherwise we might have an attribute/subscript/call or a variable that we were
-                // unable to deref.
+                // unable to deref, so emit a diagnostic with no fix.
+                checker
+                    .diagnostics
+                    .push(Diagnostic::new(PrintfStringFormatting, expr.range()));
                 return;
             }
         }
