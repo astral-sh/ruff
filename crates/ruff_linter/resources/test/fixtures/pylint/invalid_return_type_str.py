@@ -47,3 +47,14 @@ class Str2:
 
 class Str3:
     def __str__(self): ...
+
+
+class Str4:
+    def __str__(self):
+        raise RuntimeError("__str__ not allowed")
+
+
+class Str5:
+    def __str__(self):
+        if x > 0:
+            raise RuntimeError("__str__ not allowed")
