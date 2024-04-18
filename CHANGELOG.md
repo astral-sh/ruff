@@ -4,7 +4,7 @@
 
 ### A new, hand-written parser
 
-This release replaces the generated parser with a hand-written recursive descent parser in Ruff.
+Ruff's new parser is **>2x faster**, which translates to a **20-40% speedup** for all linting and formatting invocations.
 There's a lot to say about this exciting change, so check out the [blog post](https://astral.sh/blog/ruff-v0.4.0) for more details!
 
 See [#10036](https://github.com/astral-sh/ruff/pull/10036) for implementation details.
