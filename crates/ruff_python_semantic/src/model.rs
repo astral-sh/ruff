@@ -836,9 +836,8 @@ impl<'a> SemanticModel<'a> {
                     )
                 } else {
                     // Otherwise, if we're in (e.g.) a script, use the module name.
-                    // let name = self.module.name()?;
                     Some(
-                        std::iter::once("foo")
+                        std::iter::once(self.module.name()?)
                             .chain(
                                 UnqualifiedName::from_expr(value)?
                                     .segments()

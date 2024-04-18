@@ -2282,6 +2282,11 @@ pub(crate) fn check_ast(
         } else {
             ModuleKind::Module
         },
+        name: if let Some(module_path) = &module_path {
+            module_path.last().map(String::as_str)
+        } else {
+            path.file_stem().and_then(std::ffi::OsStr::to_str)
+        },
         source: if let Some(module_path) = module_path.as_ref() {
             ModuleSource::Path(module_path)
         } else {

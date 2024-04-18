@@ -51,6 +51,7 @@ pub struct Module<'a> {
     pub kind: ModuleKind,
     pub source: ModuleSource<'a>,
     pub python_ast: &'a [Stmt],
+    pub name: Option<&'a str>,
 }
 
 impl<'a> Module<'a> {
@@ -64,11 +65,8 @@ impl<'a> Module<'a> {
     }
 
     /// Return the name of the module.
-    pub fn name(&self) -> Option<&'a str> {
-        match self.source {
-            ModuleSource::Path(path) => path.last().map(Deref::deref),
-            ModuleSource::File(file) => file.file_stem().and_then(std::ffi::OsStr::to_str),
-        }
+    pub const fn name(&self) -> Option<&'a str> {
+        self.name
     }
 }
 
