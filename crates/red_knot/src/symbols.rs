@@ -82,7 +82,6 @@ struct Symbol {
     child_scopes: Vec<ScopeId>,
 }
 
-#[derive(Default)]
 struct SymbolTable {
     scopes_by_id: IndexVec<ScopeId, Scope>,
     symbols_by_id: IndexVec<SymbolId, Symbol>,
@@ -90,7 +89,10 @@ struct SymbolTable {
 
 impl SymbolTable {
     pub(crate) fn new() -> Self {
-        let mut table = SymbolTable::default();
+        let mut table = SymbolTable {
+            scopes_by_id: IndexVec::new(),
+            symbols_by_id: IndexVec::new(),
+        };
         table.scopes_by_id.push(Scope {
             kind: ScopeKind::Module,
             symbols_by_name: Map::default(),
