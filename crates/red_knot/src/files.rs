@@ -1,6 +1,6 @@
 use std::fmt::{Debug, Formatter};
 use std::hash::{Hash, Hasher};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::Arc;
 
 use hashbrown::hash_map::RawEntryMut;
@@ -27,9 +27,9 @@ impl Files {
         self.inner.write().intern(path)
     }
 
-    pub fn path(&self, id: FileId) -> PathBuf {
-        // TODO this should return a unowned path
-        self.inner.read().path(id).to_path_buf()
+    // TODO Can we avoid using an `Arc` here? salsa can return references for some reason.
+    pub fn path(&self, id: FileId) -> Arc<Path> {
+        self.inner.read().path(id)
     }
 }
 
@@ -59,7 +59,7 @@ struct FilesInner {
     // TODO should we use a map here to reclaim the space for removed files?
     // TODO I think we should use our own path abstraction here to avoid having to normalize paths
     // and dealing with non-utf paths everywhere.
-    by_id: IndexVec<FileId, PathBuf>,
+    by_id: IndexVec<FileId, Arc<Path>>,
 }
 
 impl FilesInner {
@@ -73,12 +73,12 @@ impl FilesInner {
         let entry = self
             .by_path
             .raw_entry_mut()
-            .from_hash(hash, |existing_file| &self.by_id[*existing_file] == path);
+            .from_hash(hash, |existing_file| &*self.by_id[*existing_file] == path);
 
         match entry {
             RawEntryMut::Occupied(entry) => *entry.key(),
             RawEntryMut::Vacant(entry) => {
-                let id = self.by_id.push(path.to_owned());
+                let id = self.by_id.push(Arc::from(path));
                 entry.insert_with_hasher(hash, id, (), |_| hash);
                 id
             }
@@ -86,14 +86,12 @@ impl FilesInner {
     }
 
     /// Returns the path for the file with the given id.
-    pub(crate) fn path(&self, id: FileId) -> &Path {
-        self.by_id[id].as_path()
+    pub(crate) fn path(&self, id: FileId) -> Arc<Path> {
+        self.by_id[id].clone()
     }
 
-    pub(crate) fn iter(&self) -> impl Iterator<Item = (FileId, &Path)> {
-        self.by_path
-            .keys()
-            .map(|id| (*id, self.by_id[*id].as_path()))
+    pub(crate) fn iter(&self) -> impl Iterator<Item = (FileId, Arc<Path>)> + '_ {
+        self.by_path.keys().map(|id| (*id, self.by_id[*id].clone()))
     }
 }
 
