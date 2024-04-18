@@ -1,4 +1,5 @@
 #![allow(dead_code, unused_imports)]
+use super::Name;
 use hashbrown::hash_map::RawEntryMut;
 use ruff_index::{newtype_index, IndexVec};
 use ruff_python_ast::visitor::preorder::{PreorderVisitor, TraversalSignal};
@@ -78,7 +79,7 @@ struct Scope {
 }
 
 struct Symbol {
-    name: String,
+    name: Name,
     child_scopes: Vec<ScopeId>,
 }
 
@@ -114,6 +115,7 @@ impl SymbolTable {
         let hash = hasher.finish();
 
         let scope = &mut self.scopes_by_id[scope_id];
+        let name = Name::new(name);
 
         let entry = scope
             .symbols_by_name
@@ -124,7 +126,7 @@ impl SymbolTable {
             RawEntryMut::Occupied(entry) => *entry.key(),
             RawEntryMut::Vacant(entry) => {
                 let symbol = Symbol {
-                    name: name.into(),
+                    name,
                     child_scopes: Vec::new(),
                 };
                 let id = self.symbols_by_id.push(symbol);
