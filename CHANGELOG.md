@@ -12,24 +12,24 @@ See [#10036](https://github.com/astral-sh/ruff/pull/10036) for implementation de
 ### A new language server in Rust
 
 With this release, we also want to highlight our new language server. `ruff server` is a Rust-powered language
-server that comes built-in with with Ruff. It can be used with any editor that supports the [Language Server Protocol](https://microsoft.github.io/language-server-protocol/) (LSP).
+server that comes built-in with Ruff. It can be used with any editor that supports the [Language Server Protocol](https://microsoft.github.io/language-server-protocol/) (LSP).
 It uses a multi-threaded, lock-free architecture inspired by `rust-analyzer` and it will open the door for a lot
-of exciting features. It’s also faster than our previous [Python-based language server](https://github.com/astral-sh/ruff-lsp),
-but you probably guessed that already.
+of exciting features. It’s also faster than our previous [Python-based language server](https://github.com/astral-sh/ruff-lsp)
+-- but you probably guessed that already.
 
 `ruff server` is only in alpha, but it has a lot of features that you can try out today:
 
 - Lints Python files automatically and shows quick-fixes when available
 - Formats Python files, with support for range formatting
-- Comes with commands for quickly performing actions: `ruff.applyAutofix` , `ruff.applyFormat`, and `ruff.applyOrganizeImports`
+- Comes with commands for quickly performing actions: `ruff.applyAutofix`, `ruff.applyFormat`, and `ruff.applyOrganizeImports`
 - Supports `source.fixAll` and `source.organizeImports` source actions
-- Automatically reloads project configuration when you change it
+- Automatically reloads your project configuration when you change it
 
 To setup `ruff server` with your editor, refer to the [README.md](http://README.mdhttps://github.com/astral-sh/ruff/blob/main/crates/ruff_server/README.md).
 
 ### Preview features
 
-- \[`pycodestyle`\] Do not trigger `E3` rules on defs following a function/method with a dummy body ([#10704](https://github.com/astral-sh/ruff/pull/10704))
+- \[`pycodestyle`\] Do not trigger `E3` rules on `def`s following a function/method with a dummy body ([#10704](https://github.com/astral-sh/ruff/pull/10704))
 - \[`pylint`\] Implement `invalid-bytes-returned` (`E0308`) ([#10959](https://github.com/astral-sh/ruff/pull/10959))
 - \[`pylint`\] Implement `invalid-length-returned` (`E0303`) ([#10963](https://github.com/astral-sh/ruff/pull/10963))
 - \[`pylint`\] Implement `self-cls-assignment` (`W0642`) ([#9267](https://github.com/astral-sh/ruff/pull/9267))
@@ -38,9 +38,9 @@ To setup `ruff server` with your editor, refer to the [README.md](http://README.
 
 ### Rule changes
 
-- \[`flake8-bandit`\] Allow `urllib.request.urlopen` calls with static `Request` argument ([#10964](https://github.com/astral-sh/ruff/pull/10964))
-- \[`flake8-bugbear`\] Treat `raise NotImplemented`-only bodies as stub functions ([#10990](https://github.com/astral-sh/ruff/pull/10990))
-- \[`flake8-slots`\] Respect same-file `Enum` subclasses ([#11006](https://github.com/astral-sh/ruff/pull/11006))
+- \[`flake8-bandit`\] Allow `urllib.request.urlopen` calls with static `Request` argument (`S310`) ([#10964](https://github.com/astral-sh/ruff/pull/10964))
+- \[`flake8-bugbear`\] Treat `raise NotImplemented`-only bodies as stub functions (`B006`) ([#10990](https://github.com/astral-sh/ruff/pull/10990))
+- \[`flake8-slots`\] Respect same-file `Enum` subclasses (`SLOT000`) ([#11006](https://github.com/astral-sh/ruff/pull/11006))
 - \[`pylint`\] Support inverted comparisons (`PLR1730`) ([#10920](https://github.com/astral-sh/ruff/pull/10920))
 
 ### Linter
@@ -68,8 +68,8 @@ To setup `ruff server` with your editor, refer to the [README.md](http://README.
 
 ### Bug fixes
 
-- Avoid `non-augmented-assignment` for reversed, non-commutative operators ([#10909](https://github.com/astral-sh/ruff/pull/10909))
-- Limit commutative non-augmented-assignments to primitive data types ([#10912](https://github.com/astral-sh/ruff/pull/10912))
+- Avoid `non-augmented-assignment` for reversed, non-commutative operators (`PLR6104`) ([#10909](https://github.com/astral-sh/ruff/pull/10909))
+- Limit commutative non-augmented-assignments to primitive data types (`PLR6104`) ([#10912](https://github.com/astral-sh/ruff/pull/10912))
 - Respect `per-file-ignores` for `RUF100` on blanket `# noqa` ([#10908](https://github.com/astral-sh/ruff/pull/10908))
 
 ### Documentation
