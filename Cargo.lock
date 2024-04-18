@@ -1825,6 +1825,7 @@ name = "red_knot"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "filetime",
  "hashbrown 0.14.3",
  "log",
  "parking_lot",
@@ -1836,6 +1837,7 @@ dependencies = [
  "rustc-hash",
  "salsa-2022",
  "smol_str",
+ "tempfile",
 ]
 
 [[package]]

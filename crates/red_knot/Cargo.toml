@@ -19,12 +19,16 @@ ruff_text_size = { path = "../ruff_text_size" }
 ruff_index = { path = "../ruff_index" }
 
 anyhow = { workspace = true }
+filetime = { workspace = true }
 hashbrown = { workspace = true }
 log = { workspace = true }
 rustc-hash = { workspace = true }
 parking_lot = { workspace = true }
 salsa = { git = "https://github.com/salsa-rs/salsa.git", package = "salsa-2022", rev = "f5aec4abefb4c5e67cba6d8ea91c216bc2838f10" }
 smol_str = "0.2.1"
+
+[dev-dependencies]
+tempfile = { workspace = true }
 
 [lints]
 workspace = true

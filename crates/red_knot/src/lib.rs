@@ -1,3 +1,5 @@
+#![allow(unreachable_pub)]
+
 use std::path::{Path, PathBuf};
 
 use rustc_hash::FxHashSet;
