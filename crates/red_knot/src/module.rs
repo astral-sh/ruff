@@ -1,11 +1,11 @@
-#![allow(unused, unreachable_pub)]
+#![allow(unreachable_pub)]
 
 use std::collections::hash_map::Entry;
-use std::collections::BTreeMap;
 use std::fmt::Formatter;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+use crate::files::{FileId, Files};
 use filetime::FileTime;
 use rustc_hash::FxHashMap;
 
@@ -18,6 +18,7 @@ pub struct ModuleId(u32);
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct ModuleName(smol_str::SmolStr);
 
+#[allow(unused)]
 impl ModuleName {
     pub fn new(name: &str) -> Self {
         debug_assert!(!name.is_empty());
@@ -71,6 +72,7 @@ pub struct ModuleSearchPath {
     inner: Arc<ModuleSearchPathInner>,
 }
 
+#[allow(unused)]
 impl ModuleSearchPath {
     pub fn new(path: PathBuf, kind: ModuleSearchPathKind) -> Self {
         Self {
@@ -99,6 +101,7 @@ struct ModuleSearchPathInner {
     kind: ModuleSearchPathKind,
 }
 
+#[allow(unused)]
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub enum ModuleSearchPathKind {
     // Project dependency
@@ -118,6 +121,7 @@ pub struct Module {
     last_modified: FileTime,
 }
 
+#[allow(unused)]
 impl Module {
     pub fn name(&self) -> &ModuleName {
         &self.name
@@ -137,6 +141,8 @@ pub struct ModuleResolver {
     /// The search paths where modules are located (and searched). Corresponds to `sys.path` at runtime.
     search_paths: Vec<ModuleSearchPath>,
 
+    files: Files,
+
     /// All known modules, indexed by the module id.
     modules: FxHashMap<ModuleId, Module>,
 
@@ -145,23 +151,27 @@ pub struct ModuleResolver {
 
     /// Lookup from absolute path to module.
     /// The same module might be reachable from different paths when symlinks are involved.
-    by_path: BTreeMap<PathBuf, ModuleId>,
+    by_path: FxHashMap<PathBuf, ModuleId>,
     next_module_id: u32,
 }
 
+#[allow(unused)]
 impl ModuleResolver {
-    pub fn new(search_paths: Vec<ModuleSearchPath>) -> Self {
+    pub fn new(search_paths: Vec<ModuleSearchPath>, files: Files) -> Self {
         Self {
             search_paths,
+            files,
             modules: FxHashMap::default(),
             by_name: FxHashMap::default(),
-            by_path: BTreeMap::default(),
+            by_path: FxHashMap::default(),
             next_module_id: 0,
         }
     }
 
     /// Resolves a module name to a module id.
+    // TODO I think resolving should take a referenc because we don't have a mutable `Modules` during type evaluation.
     pub fn resolve(&mut self, name: ModuleName) -> Option<ModuleId> {
+        // we can't really accept `&mut Files` here but we also don't want to traverse the entire site packages and index all files eagerly.
         let entry = self.by_name.entry(name.clone());
 
         match entry {
@@ -170,10 +180,12 @@ impl ModuleResolver {
                 let (root_path, absolute_path) = resolve_name(&name, &self.search_paths)?;
                 let normalized = absolute_path.canonicalize().ok()?;
 
+                let file_id = self.files.intern(&normalized);
+
                 let metadata = normalized.metadata().ok()?;
                 let last_modified = FileTime::from_last_modification_time(&metadata);
 
-                let path = ModulePath::new(root_path.clone(), normalized);
+                let path = ModulePath::new(root_path.clone(), file_id);
 
                 let id = ModuleId(self.next_module_id);
                 self.next_module_id += 1;
@@ -211,6 +223,10 @@ impl ModuleResolver {
         &self.modules[&id]
     }
 
+    pub fn path(&self, id: ModuleId) -> Arc<Path> {
+        self.files.path(self.module(id).path().file())
+    }
+
     /// Updates the last modified time for the module corresponding to `path`.
     pub fn touch(&mut self, path: &Path) {
         let Some(id) = self.resolve_path(path) else {
@@ -218,8 +234,9 @@ impl ModuleResolver {
         };
 
         let module = self.modules.get_mut(&id).unwrap();
+        let module_path = self.files.path(module.path.file());
 
-        if let Ok(metadata) = module.path.resolved_path.metadata() {
+        if let Ok(metadata) = module_path.metadata() {
             module.last_modified = FileTime::from_last_modification_time(&metadata);
         };
     }
@@ -228,8 +245,14 @@ impl ModuleResolver {
         self.resolve_path(path);
     }
 
+    pub fn resolve_file(&mut self, file: FileId) -> Option<ModuleId> {
+        let path = self.files.path(file);
+        self.by_path.get(&*path).copied()
+    }
+
     pub fn resolve_path(&mut self, path: &Path) -> Option<ModuleId> {
         debug_assert!(path.is_absolute());
+
         if let Some(existing) = self.by_path.get(path) {
             return Some(*existing);
         }
@@ -253,8 +276,9 @@ impl ModuleResolver {
 
         if module.path().root() == &root_path {
             let normalized = path.canonicalize().ok()?;
+            let module_path = self.files.path(module.path().file());
 
-            if !module.path().resolved().starts_with(normalized) {
+            if !module_path.starts_with(normalized) {
                 // This path is for a module with the same name but with a different precedence. For example:
                 // ```
                 // src/foo.py
@@ -338,33 +362,32 @@ fn resolve_name(
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ModulePath {
     root: ModuleSearchPath,
-    resolved_path: PathBuf,
+    file_id: FileId,
 }
 
 impl ModulePath {
-    pub fn new(root: ModuleSearchPath, resolved_path: PathBuf) -> Self {
-        Self {
-            root,
-            resolved_path,
-        }
+    pub fn new(root: ModuleSearchPath, file_id: FileId) -> Self {
+        Self { root, file_id }
     }
 
     pub fn root(&self) -> &ModuleSearchPath {
         &self.root
     }
 
-    pub fn resolved(&self) -> &Path {
-        &self.resolved_path
+    pub fn file(&self) -> FileId {
+        self.file_id
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::files::Files;
     use crate::module::{ModuleName, ModuleResolver, ModuleSearchPath, ModuleSearchPathKind};
 
     struct TestCase {
         temp_dir: tempfile::TempDir,
         resolver: ModuleResolver,
+        files: Files,
 
         src: ModuleSearchPath,
         site_packages: ModuleSearchPath,
@@ -383,11 +406,13 @@ mod tests {
         let site_packages = ModuleSearchPath::new(site_packages, ModuleSearchPathKind::ThirdParty);
 
         let roots = vec![src.clone(), site_packages.clone()];
+        let files = Files::default();
 
-        let resolver = ModuleResolver::new(roots);
+        let resolver = ModuleResolver::new(roots, files.clone());
 
         Ok(TestCase {
             temp_dir,
+            files,
             resolver,
             src,
             site_packages,
@@ -396,110 +421,140 @@ mod tests {
 
     #[test]
     fn first_party_module() -> std::io::Result<()> {
-        let mut test_case = create_resolver()?;
+        let TestCase {
+            mut resolver,
+            src,
+            files,
+            temp_dir: _temp_dir,
+            ..
+        } = create_resolver()?;
 
-        let foo_path = test_case.src.path().join("foo.py");
+        let foo_path = src.path().join("foo.py");
         std::fs::write(&foo_path, "print('Hello, world!')")?;
 
-        let foo_id = test_case.resolver.resolve(ModuleName::new("foo"));
+        let foo_id = resolver.resolve(ModuleName::new("foo"));
 
         assert!(foo_id.is_some());
-        assert_eq!(foo_id, test_case.resolver.resolve(ModuleName::new("foo")));
+        assert_eq!(foo_id, resolver.resolve(ModuleName::new("foo")));
 
-        let foo_module = test_case.resolver.module(foo_id.unwrap());
+        let foo_module = resolver.module(foo_id.unwrap());
 
         assert_eq!(&ModuleName::new("foo"), foo_module.name());
-        assert_eq!(&test_case.src, foo_module.path().root());
-        assert_eq!(&foo_path, foo_module.path().resolved());
+        assert_eq!(&src, foo_module.path().root());
+        assert_eq!(&foo_path, &*files.path(foo_module.path().file()));
 
-        assert_eq!(foo_id, test_case.resolver.resolve_path(&foo_path));
+        assert_eq!(foo_id, resolver.resolve_path(&foo_path));
 
         Ok(())
     }
 
     #[test]
     fn resolve_package() -> std::io::Result<()> {
-        let mut test_case = create_resolver()?;
+        let TestCase {
+            src,
+            mut resolver,
+            temp_dir: _temp_dir,
+            files,
+            ..
+        } = create_resolver()?;
 
-        let foo_dir = test_case.src.path().join("foo");
+        let foo_dir = src.path().join("foo");
         let foo_path = foo_dir.join("__init__.py");
         std::fs::create_dir(&foo_dir)?;
         std::fs::write(&foo_path, "print('Hello, world!')")?;
 
-        let foo_id = test_case.resolver.resolve(ModuleName::new("foo"));
+        let foo_id = resolver.resolve(ModuleName::new("foo"));
 
         assert!(foo_id.is_some());
 
-        let foo_module = test_case.resolver.module(foo_id.unwrap());
+        let foo_module = resolver.module(foo_id.unwrap());
 
         assert_eq!(&ModuleName::new("foo"), foo_module.name());
-        assert_eq!(&test_case.src, foo_module.path().root());
-        assert_eq!(&foo_path, foo_module.path().resolved());
+        assert_eq!(&src, foo_module.path().root());
+        assert_eq!(&foo_path, &*files.path(foo_module.path().file()));
 
-        assert_eq!(foo_id, test_case.resolver.resolve_path(&foo_path));
+        assert_eq!(foo_id, resolver.resolve_path(&foo_path));
 
         // TODO: Should resolving by the directory name resolve a module or not?
-        assert_eq!(foo_id, test_case.resolver.resolve_path(&foo_dir));
+        assert_eq!(foo_id, resolver.resolve_path(&foo_dir));
 
         Ok(())
     }
 
     #[test]
     fn package_priority_over_module() -> std::io::Result<()> {
-        let mut test_case = create_resolver()?;
+        let TestCase {
+            mut resolver,
+            temp_dir: _temp_dir,
+            files,
+            src,
+            ..
+        } = create_resolver()?;
 
-        let foo_dir = test_case.src.path().join("foo");
+        let foo_dir = src.path().join("foo");
         let foo_init = foo_dir.join("__init__.py");
         std::fs::create_dir(&foo_dir)?;
         std::fs::write(&foo_init, "print('Hello, world!')")?;
 
-        let foo_py = test_case.src.path().join("foo.py");
+        let foo_py = src.path().join("foo.py");
         std::fs::write(&foo_py, "print('Hello, world!')")?;
 
-        let foo_id = test_case.resolver.resolve(ModuleName::new("foo"));
+        let foo_id = resolver.resolve(ModuleName::new("foo"));
 
         assert!(foo_id.is_some());
 
-        let foo_module = test_case.resolver.module(foo_id.unwrap());
+        let foo_module = resolver.module(foo_id.unwrap());
 
-        assert_eq!(&test_case.src, foo_module.path().root());
-        assert_eq!(&foo_init, foo_module.path().resolved());
+        assert_eq!(&src, foo_module.path().root());
+        assert_eq!(&foo_init, &*files.path(foo_module.path().file()));
 
-        assert_eq!(foo_id, test_case.resolver.resolve_path(&foo_init));
-        assert_eq!(None, test_case.resolver.resolve_path(&foo_py));
+        assert_eq!(foo_id, resolver.resolve_path(&foo_init));
+        assert_eq!(None, resolver.resolve_path(&foo_py));
 
         Ok(())
     }
 
     #[test]
     fn typing_stub_over_module() -> std::io::Result<()> {
-        let mut test_case = create_resolver()?;
+        let TestCase {
+            mut resolver,
+            src,
+            files,
+            temp_dir: _temp_dir,
+            ..
+        } = create_resolver()?;
 
-        let foo_stub = test_case.src.path().join("foo.pyi");
-        let foo_py = test_case.src.path().join("foo.py");
+        let foo_stub = src.path().join("foo.pyi");
+        let foo_py = src.path().join("foo.py");
         std::fs::write(&foo_stub, "x: int")?;
         std::fs::write(&foo_py, "print('Hello, world!')")?;
 
-        let foo_id = test_case.resolver.resolve(ModuleName::new("foo"));
+        let foo_id = resolver.resolve(ModuleName::new("foo"));
 
         assert!(foo_id.is_some());
 
-        let foo_module = test_case.resolver.module(foo_id.unwrap());
+        let foo_module = resolver.module(foo_id.unwrap());
 
-        assert_eq!(&test_case.src, foo_module.path().root());
-        assert_eq!(&foo_stub, foo_module.path().resolved());
+        assert_eq!(&src, foo_module.path().root());
+        assert_eq!(&foo_stub, &*files.path(foo_module.path().file()));
 
-        assert_eq!(foo_id, test_case.resolver.resolve_path(&foo_stub));
-        assert_eq!(None, test_case.resolver.resolve_path(&foo_py));
+        assert_eq!(foo_id, resolver.resolve_path(&foo_stub));
+        assert_eq!(None, resolver.resolve_path(&foo_py));
 
         Ok(())
     }
 
     #[test]
     fn sub_packages() -> std::io::Result<()> {
-        let mut test_case = create_resolver()?;
+        let TestCase {
+            mut resolver,
+            files,
+            src,
+            temp_dir: _temp_dir,
+            ..
+        } = create_resolver()?;
 
-        let foo = test_case.src.path().join("foo");
+        let foo = src.path().join("foo");
         let bar = foo.join("bar");
         let baz = bar.join("baz.py");
 
@@ -508,16 +563,16 @@ mod tests {
         std::fs::write(bar.join("__init__.py"), "")?;
         std::fs::write(&baz, "print('Hello, world!')")?;
 
-        let baz_id = test_case.resolver.resolve(ModuleName::new("foo.bar.baz"));
+        let baz_id = resolver.resolve(ModuleName::new("foo.bar.baz"));
 
         assert!(baz_id.is_some());
 
-        let baz_module = test_case.resolver.module(baz_id.unwrap());
+        let baz_module = resolver.module(baz_id.unwrap());
 
-        assert_eq!(&test_case.src, baz_module.path().root());
-        assert_eq!(&baz, baz_module.path().resolved());
+        assert_eq!(&src, baz_module.path().root());
+        assert_eq!(&baz, &*files.path(baz_module.path().file()));
 
-        assert_eq!(baz_id, test_case.resolver.resolve_path(&baz));
+        assert_eq!(baz_id, resolver.resolve_path(&baz));
 
         Ok(())
     }
@@ -545,25 +600,32 @@ mod tests {
 
     #[test]
     fn module_search_path_priority() -> std::io::Result<()> {
-        let mut test_case = create_resolver()?;
+        let TestCase {
+            mut resolver,
+            src,
+            site_packages,
+            files,
+            temp_dir: _temp_dir,
+            ..
+        } = create_resolver()?;
 
-        let foo_src = test_case.src.path().join("foo.py");
-        let foo_site_packages = test_case.site_packages.path().join("foo.py");
+        let foo_src = src.path().join("foo.py");
+        let foo_site_packages = site_packages.path().join("foo.py");
 
         std::fs::write(&foo_src, "")?;
         std::fs::write(&foo_site_packages, "")?;
 
-        let foo_id = test_case.resolver.resolve(ModuleName::new("foo"));
+        let foo_id = resolver.resolve(ModuleName::new("foo"));
 
         assert!(foo_id.is_some());
 
-        let foo_module = test_case.resolver.module(foo_id.unwrap());
+        let foo_module = resolver.module(foo_id.unwrap());
 
-        assert_eq!(&test_case.src, foo_module.path().root());
-        assert_eq!(&foo_src, foo_module.path().resolved());
+        assert_eq!(&src, foo_module.path().root());
+        assert_eq!(&foo_src, &*files.path(foo_module.path().file()));
 
-        assert_eq!(foo_id, test_case.resolver.resolve_path(&foo_src));
-        assert_eq!(None, test_case.resolver.resolve_path(&foo_site_packages));
+        assert_eq!(foo_id, resolver.resolve_path(&foo_src));
+        assert_eq!(None, resolver.resolve_path(&foo_site_packages));
 
         Ok(())
     }
@@ -571,16 +633,22 @@ mod tests {
     #[test]
     #[cfg(target_family = "unix")]
     fn symlink() -> std::io::Result<()> {
-        let mut test_case = create_resolver()?;
+        let TestCase {
+            mut resolver,
+            files,
+            src,
+            temp_dir: _temp_dir,
+            ..
+        } = create_resolver()?;
 
-        let foo = test_case.src.path().join("foo.py");
-        let bar = test_case.src.path().join("bar.py");
+        let foo = src.path().join("foo.py");
+        let bar = src.path().join("bar.py");
 
         std::fs::write(&foo, "")?;
-        std::os::unix::fs::symlink(&foo, test_case.src.path().join("bar.py"))?;
+        std::os::unix::fs::symlink(&foo, src.path().join("bar.py"))?;
 
-        let foo_id = test_case.resolver.resolve(ModuleName::new("foo"));
-        let bar_id = test_case.resolver.resolve(ModuleName::new("bar"));
+        let foo_id = resolver.resolve(ModuleName::new("foo"));
+        let bar_id = resolver.resolve(ModuleName::new("bar"));
 
         assert!(foo_id.is_some());
         assert!(bar_id.is_some());
@@ -592,18 +660,18 @@ mod tests {
         //  only index by file id and ignore the module id.
         assert_ne!(foo_id, bar_id);
 
-        let foo_module = test_case.resolver.module(foo_id.unwrap());
+        let foo_module = resolver.module(foo_id.unwrap());
 
-        assert_eq!(&test_case.src, foo_module.path().root());
-        assert_eq!(&foo, foo_module.path().resolved());
+        assert_eq!(&src, foo_module.path().root());
+        assert_eq!(&foo, &*files.path(foo_module.path().file()));
 
-        let bar_module = test_case.resolver.module(bar_id.unwrap());
+        let bar_module = resolver.module(bar_id.unwrap());
 
-        assert_eq!(&test_case.src, bar_module.path().root());
-        assert_eq!(&bar_module.path().resolved(), &foo);
+        assert_eq!(&src, bar_module.path().root());
+        assert_eq!(&foo, &*files.path(bar_module.path().file()));
 
-        assert_eq!(foo_id, test_case.resolver.resolve_path(&foo));
-        assert_eq!(bar_id, test_case.resolver.resolve_path(&bar));
+        assert_eq!(foo_id, resolver.resolve_path(&foo));
+        assert_eq!(bar_id, resolver.resolve_path(&bar));
 
         Ok(())
     }
