@@ -5,7 +5,7 @@
 ### A new, hand-written parser
 
 This release replaces the generated parser with a hand-written recursive descent parser in Ruff.
-There's a lot to say about this exciting change, so check out the [blog post](TODO-LINK) for more details!
+There's a lot to say about this exciting change, so check out the [blog post](https://astral.sh/blog/ruff-v0.4.0) for more details!
 
 See [#10036](https://github.com/astral-sh/ruff/pull/10036) for implementation details.
 
@@ -71,6 +71,9 @@ To setup `ruff server` with your editor, refer to the [README.md](https://github
 - Avoid `non-augmented-assignment` for reversed, non-commutative operators (`PLR6104`) ([#10909](https://github.com/astral-sh/ruff/pull/10909))
 - Limit commutative non-augmented-assignments to primitive data types (`PLR6104`) ([#10912](https://github.com/astral-sh/ruff/pull/10912))
 - Respect `per-file-ignores` for `RUF100` on blanket `# noqa` ([#10908](https://github.com/astral-sh/ruff/pull/10908))
+- Consider `if` expression for parenthesized with items parsing ([#11010](https://github.com/astral-sh/ruff/pull/11010))
+- Consider binary expr for parenthesized with items parsing ([#11012](https://github.com/astral-sh/ruff/pull/11012))
+- Reset `FOR_TARGET` context for all kinds of parentheses ([#11009](https://github.com/astral-sh/ruff/pull/11009))
 
 ### Documentation
 
