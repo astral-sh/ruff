@@ -360,7 +360,7 @@ impl<'src> Parser<'src> {
             }
 
             // Don't parse a `CompareExpr` if we are parsing a `Comprehension` or `ForStmt`
-            if token.is_compare_operator() && self.has_ctx(ParserCtxFlags::FOR_TARGET) {
+            if matches!(token, TokenKind::In) && self.has_ctx(ParserCtxFlags::FOR_TARGET) {
                 break;
             }
 
@@ -659,11 +659,38 @@ impl<'src> Parser<'src> {
                 Expr::IpyEscapeCommand(self.parse_ipython_escape_command_expression())
             }
             TokenKind::String | TokenKind::FStringStart => self.parse_strings(),
-            TokenKind::Lpar => {
-                return self.parse_parenthesized_expression();
+            tok @ (TokenKind::Lpar | TokenKind::Lsqb | TokenKind::Lbrace) => {
+                // We need to unset the `FOR_TARGET` in the context when parsing an expression
+                // inside a parentheses, curly brace or brackets otherwise the `in` operator of a
+                // comparison expression will not be parsed in a `for` target.
+
+                // test_ok parenthesized_compare_expr_in_for
+                // for (x in y)[0] in iter: ...
+                // for (x in y).attr in iter: ...
+
+                // test_err parenthesized_compare_expr_in_for
+                // for (x in y)() in iter: ...
+                // for (x in y) in iter: ...
+                // for (x in y, z) in iter: ...
+                // for [x in y, z] in iter: ...
+                // for {x in y, z} in iter: ...
+                let current_context = self.ctx - ParserCtxFlags::FOR_TARGET;
+                let saved_context = self.set_ctx(current_context);
+
+                let expr = match tok {
+                    TokenKind::Lpar => {
+                        let parsed_expr = self.parse_parenthesized_expression();
+                        self.restore_ctx(current_context, saved_context);
+                        return parsed_expr;
+                    }
+                    TokenKind::Lsqb => self.parse_list_like_expression(),
+                    TokenKind::Lbrace => self.parse_set_or_dict_like_expression(),
+                    _ => unreachable!(),
+                };
+
+                self.restore_ctx(current_context, saved_context);
+                expr
             }
-            TokenKind::Lsqb => self.parse_list_like_expression(),
-            TokenKind::Lbrace => self.parse_set_or_dict_like_expression(),
 
             kind => {
                 if kind.is_keyword() {
@@ -692,14 +719,25 @@ impl<'src> Parser<'src> {
     ///
     /// This method does nothing if the current token is not a candidate for a postfix expression.
     pub(super) fn parse_postfix_expression(&mut self, mut lhs: Expr, start: TextSize) -> Expr {
-        loop {
+        // test_ok for_in_target_postfix_expr
+        // for d[x in y] in target: ...
+
+        // test_err for_in_target_postfix_expr
+        // for d(x in y) in target: ...
+        let current_context = self.ctx - ParserCtxFlags::FOR_TARGET;
+        let saved_context = self.set_ctx(current_context);
+
+        lhs = loop {
             lhs = match self.current_token_kind() {
                 TokenKind::Lpar => Expr::Call(self.parse_call_expression(lhs, start)),
                 TokenKind::Lsqb => Expr::Subscript(self.parse_subscript_expression(lhs, start)),
                 TokenKind::Dot => Expr::Attribute(self.parse_attribute_expression(lhs, start)),
                 _ => break lhs,
             };
-        }
+        };
+
+        self.restore_ctx(current_context, saved_context);
+        lhs
     }
 
     /// Parse a call expression.
@@ -1748,26 +1786,13 @@ impl<'src> Parser<'src> {
             .into();
         }
 
-        // We need to unset the `FOR_TARGET` in the context when parsing a parenthesized expression
-        // otherwise a parenthesized comparison expression will not be parsed in a `for` target.
-
-        // test_ok parenthesized_compare_expr_in_for
-        // for (x in y)[0] in iter: ...
-        // for (x in y).attr in iter: ...
-
-        // test_err parenthesized_compare_expr_in_for
-        // for (x in y)() in iter: ...
-        // for (x in y) in iter: ...
-        let current_context = self.ctx - ParserCtxFlags::FOR_TARGET;
-        let saved_context = self.set_ctx(current_context);
-
         // Use the more general rule of the three to parse the first element
         // and limit it later.
         let mut parsed_expr = self.parse_yield_expression_or_else(|p| {
             p.parse_star_expression_or_higher(AllowNamedExpression::Yes)
         });
 
-        let parsed_expr = match self.current_token_kind() {
+        match self.current_token_kind() {
             TokenKind::Comma => {
                 // grammar: `tuple`
                 let tuple = self.parse_tuple_expression(
@@ -1812,11 +1837,7 @@ impl<'src> Parser<'src> {
                 parsed_expr.is_parenthesized = true;
                 parsed_expr
             }
-        };
-
-        self.restore_ctx(current_context, saved_context);
-
-        parsed_expr
+        }
     }
 
     /// Parses multiple items separated by a comma into a tuple expression.
