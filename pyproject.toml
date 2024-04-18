@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "ruff"
-version = "0.3.7"
+version = "0.4.0"
 description = "An extremely fast Python linter and code formatter, written in Rust."
 authors = [{ name = "Astral Software Inc.", email = "hey@astral.sh" }]
 readme = "README.md"
@@ -60,7 +60,8 @@ include = [
 extend-exclude = [
   "crates/ruff/resources/",
   "crates/ruff_linter/resources/",
-  "crates/ruff_python_formatter/resources/"
+  "crates/ruff_python_formatter/resources/",
+  "crates/ruff_python_parser/resources/"
 ]
 
 [tool.ruff.lint]
@@ -74,6 +75,7 @@ force-exclude = '''
 /(
   | crates/ruff_linter/resources
   | crates/ruff_python_formatter/resources
+  | crates/ruff_python_parser/resources
 )/
 '''
 

@@ -73,3 +73,10 @@ class BadFive:
 class BadSix:
     def __exit__(self, typ, exc, tb, weird_extra_arg, extra_arg2 = None) -> None: ... # PYI036: Extra arg must have default
     async def __aexit__(self, typ, exc, tb, *, weird_extra_arg) -> None: ... # PYI036: kwargs must have default
+
+
+def isolated_scope():
+    from builtins import type as Type
+
+    class ShouldNotError:
+        def __exit__(self, typ: Type[BaseException] | None, exc: BaseException | None, tb: TracebackType | None) -> None: ...

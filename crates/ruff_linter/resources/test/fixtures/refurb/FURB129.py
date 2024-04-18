@@ -41,6 +41,22 @@ def func():
             pass
 
 
+import builtins
+
+
+with builtins.open("FURB129.py") as f:
+    for line in f.readlines():
+        pass
+
+
+from builtins import open as o
+
+
+with o("FURB129.py") as f:
+    for line in f.readlines():
+        pass
+
+
 # False positives
 def func(f):
     for _line in f.readlines():

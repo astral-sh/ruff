@@ -80,3 +80,8 @@ for i in list(foo_list):  # OK
 for i in list(foo_list):  # OK
     if True:
         del foo_list[i + 1]
+
+import builtins
+
+for i in builtins.list(nested_tuple):  # PERF101
+    pass

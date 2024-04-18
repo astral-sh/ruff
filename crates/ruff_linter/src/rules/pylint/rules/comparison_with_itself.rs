@@ -95,22 +95,22 @@ pub(crate) fn comparison_with_itself(
                 }
 
                 // Both calls must be to the same function.
-                let Expr::Name(left_func) = left_call.func.as_ref() else {
+                let semantic = checker.semantic();
+                let Some(left_name) = semantic.resolve_builtin_symbol(&left_call.func) else {
                     continue;
                 };
-                let Expr::Name(right_func) = right_call.func.as_ref() else {
+                let Some(right_name) = semantic.resolve_builtin_symbol(&right_call.func) else {
                     continue;
                 };
-                if left_func.id != right_func.id {
+                if left_name != right_name {
                     continue;
                 }
 
                 // The call must be to pure function, like `id`.
                 if matches!(
-                    left_func.id.as_str(),
+                    left_name,
                     "id" | "len" | "type" | "int" | "bool" | "str" | "repr" | "bytes"
-                ) && checker.semantic().is_builtin(&left_func.id)
-                {
+                ) {
                     let actual = format!(
                         "{} {} {}",
                         checker.locator().slice(left),

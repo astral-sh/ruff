@@ -1,0 +1,79 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/statements/if_extra_closing_parentheses.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..110,
+        body: [
+            If(
+                StmtIf {
+                    range: 90..97,
+                    test: BooleanLiteral(
+                        ExprBooleanLiteral {
+                            range: 93..97,
+                            value: true,
+                        },
+                    ),
+                    body: [],
+                    elif_else_clauses: [],
+                },
+            ),
+            Pass(
+                StmtPass {
+                    range: 105..109,
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | # FIXME(micha): This creates two syntax errors instead of just one (and overlapping ones)
+2 | if True)):
+  |        ^ Syntax Error: Expected ':', found ')'
+3 |     pass
+  |
+
+
+  |
+1 | # FIXME(micha): This creates two syntax errors instead of just one (and overlapping ones)
+2 | if True)):
+  |         ^ Syntax Error: Expected a statement
+3 |     pass
+  |
+
+
+  |
+1 | # FIXME(micha): This creates two syntax errors instead of just one (and overlapping ones)
+2 | if True)):
+  |          ^ Syntax Error: Expected a statement
+3 |     pass
+  |
+
+
+  |
+1 | # FIXME(micha): This creates two syntax errors instead of just one (and overlapping ones)
+2 | if True)):
+  |           ^ Syntax Error: Expected a statement
+3 |     pass
+  |
+
+
+  |
+1 | # FIXME(micha): This creates two syntax errors instead of just one (and overlapping ones)
+2 | if True)):
+3 |     pass
+  | ^^^^ Syntax Error: Unexpected indentation
+  |
+
+
+  |
+2 | if True)):
+3 |     pass
+  |

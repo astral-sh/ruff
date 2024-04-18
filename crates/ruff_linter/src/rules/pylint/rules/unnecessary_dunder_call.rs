@@ -93,7 +93,7 @@ pub(crate) fn unnecessary_dunder_call(checker: &mut Checker, call: &ast::ExprCal
 
     // Ignore dunder methods used on `super`.
     if let Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() {
-        if checker.semantic().is_builtin("super") {
+        if checker.semantic().has_builtin_binding("super") {
             if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
                 if id == "super" {
                     return;
@@ -113,7 +113,7 @@ pub(crate) fn unnecessary_dunder_call(checker: &mut Checker, call: &ast::ExprCal
     if let Some(dunder) = DunderReplacement::from_method(attr) {
         match (&*call.arguments.args, dunder) {
             ([], DunderReplacement::Builtin(replacement, message)) => {
-                if !checker.semantic().is_builtin(replacement) {
+                if !checker.semantic().has_builtin_binding(replacement) {
                     return;
                 }
                 fixed = Some(format!(

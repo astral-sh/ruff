@@ -107,7 +107,7 @@ pub(crate) fn unused_loop_control_variable(checker: &mut Checker, stmt_for: &ast
         // Avoid fixing any variables that _may_ be used, but undetectably so.
         let certainty =
             Certainty::from(!helpers::uses_magic_variable_access(&stmt_for.body, |id| {
-                checker.semantic().is_builtin(id)
+                checker.semantic().has_builtin_binding(id)
             }));
 
         // Attempt to rename the variable by prepending an underscore, but avoid

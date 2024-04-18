@@ -72,10 +72,7 @@ pub(crate) fn raise_vanilla_args(checker: &mut Checker, expr: &Expr) {
     // `NotImplementedError`.
     if checker
         .semantic()
-        .resolve_qualified_name(func)
-        .is_some_and(|qualified_name| {
-            matches!(qualified_name.segments(), ["", "NotImplementedError"])
-        })
+        .match_builtin_expr(func, "NotImplementedError")
     {
         return;
     }

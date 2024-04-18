@@ -73,21 +73,17 @@ pub(crate) fn unnecessary_map(
     func: &Expr,
     args: &[Expr],
 ) {
-    let Some(func) = func.as_name_expr() else {
+    let Some(builtin_name) = checker.semantic().resolve_builtin_symbol(func) else {
         return;
     };
 
-    let object_type = match func.id.as_str() {
+    let object_type = match builtin_name {
         "map" => ObjectType::Generator,
         "list" => ObjectType::List,
         "set" => ObjectType::Set,
         "dict" => ObjectType::Dict,
         _ => return,
     };
-
-    if !checker.semantic().is_builtin(&func.id) {
-        return;
-    }
 
     match object_type {
         ObjectType::Generator => {

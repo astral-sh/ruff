@@ -75,11 +75,16 @@ pub(crate) fn raise_not_implemented(checker: &mut Checker, expr: &Expr) {
         return;
     };
     let mut diagnostic = Diagnostic::new(RaiseNotImplemented, expr.range());
-    if checker.semantic().is_builtin("NotImplementedError") {
-        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-            "NotImplementedError".to_string(),
-            expr.range(),
-        )));
-    }
+    diagnostic.try_set_fix(|| {
+        let (import_edit, binding) = checker.importer().get_or_import_builtin_symbol(
+            "NotImplementedError",
+            expr.start(),
+            checker.semantic(),
+        )?;
+        Ok(Fix::safe_edits(
+            Edit::range_replacement(binding, expr.range()),
+            import_edit,
+        ))
+    });
     checker.diagnostics.push(diagnostic);
 }

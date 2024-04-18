@@ -397,5 +397,19 @@ SIM118.py:55:5: SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
    58 |+        
 59 59 | ):
 60 60 |     continue
+61 61 | 
 
+SIM118.py:65:1: SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
+   |
+64 | d = SneakyDict()
+65 | key in d.keys()  # SIM118
+   | ^^^^^^^^^^^^^^^ SIM118
+   |
+   = help: Remove `.keys()`
 
+ℹ Safe fix
+62 62 | from builtins import dict as SneakyDict
+63 63 | 
+64 64 | d = SneakyDict()
+65    |-key in d.keys()  # SIM118
+   65 |+key in d  # SIM118

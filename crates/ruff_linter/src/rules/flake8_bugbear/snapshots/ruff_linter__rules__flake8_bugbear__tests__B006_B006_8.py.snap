@@ -1,0 +1,92 @@
+---
+source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
+---
+B006_8.py:1:19: B006 [*] Do not use mutable data structures for argument defaults
+  |
+1 | def foo(a: list = []):
+  |                   ^^ B006
+2 |     raise NotImplementedError("")
+  |
+  = help: Replace with `None`; initialize within function
+
+ℹ Unsafe fix
+1   |-def foo(a: list = []):
+  1 |+def foo(a: list = None):
+2 2 |     raise NotImplementedError("")
+3 3 | 
+4 4 | 
+
+B006_8.py:5:19: B006 [*] Do not use mutable data structures for argument defaults
+  |
+5 | def bar(a: dict = {}):
+  |                   ^^ B006
+6 |     """ This one also has a docstring"""
+7 |     raise NotImplementedError("and has some text in here")
+  |
+  = help: Replace with `None`; initialize within function
+
+ℹ Unsafe fix
+2 2 |     raise NotImplementedError("")
+3 3 | 
+4 4 | 
+5   |-def bar(a: dict = {}):
+  5 |+def bar(a: dict = None):
+6 6 |     """ This one also has a docstring"""
+7 7 |     raise NotImplementedError("and has some text in here")
+8 8 | 
+
+B006_8.py:10:19: B006 [*] Do not use mutable data structures for argument defaults
+   |
+10 | def baz(a: list = []):
+   |                   ^^ B006
+11 |     """This one raises a different exception"""
+12 |     raise IndexError()
+   |
+   = help: Replace with `None`; initialize within function
+
+ℹ Unsafe fix
+7  7  |     raise NotImplementedError("and has some text in here")
+8  8  | 
+9  9  | 
+10    |-def baz(a: list = []):
+   10 |+def baz(a: list = None):
+11 11 |     """This one raises a different exception"""
+   12 |+    if a is None:
+   13 |+        a = []
+12 14 |     raise IndexError()
+13 15 | 
+14 16 | 
+
+B006_8.py:15:19: B006 [*] Do not use mutable data structures for argument defaults
+   |
+15 | def qux(a: list = []):
+   |                   ^^ B006
+16 |     raise NotImplementedError
+   |
+   = help: Replace with `None`; initialize within function
+
+ℹ Unsafe fix
+12 12 |     raise IndexError()
+13 13 | 
+14 14 | 
+15    |-def qux(a: list = []):
+   15 |+def qux(a: list = None):
+16 16 |     raise NotImplementedError
+17 17 | 
+18 18 | 
+
+B006_8.py:19:20: B006 [*] Do not use mutable data structures for argument defaults
+   |
+19 | def quux(a: list = []):
+   |                    ^^ B006
+20 |     raise NotImplemented
+   |
+   = help: Replace with `None`; initialize within function
+
+ℹ Unsafe fix
+16 16 |     raise NotImplementedError
+17 17 | 
+18 18 | 
+19    |-def quux(a: list = []):
+   19 |+def quux(a: list = None):
+20 20 |     raise NotImplemented

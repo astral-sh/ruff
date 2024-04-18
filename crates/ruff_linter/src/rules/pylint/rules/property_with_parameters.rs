@@ -1,8 +1,6 @@
-use ruff_python_ast::{self as ast, Decorator, Expr, Parameters, Stmt};
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::identifier::Identifier;
+use ruff_python_ast::{identifier::Identifier, Decorator, Parameters, Stmt};
 
 use crate::checkers::ast::Checker;
 
@@ -53,9 +51,10 @@ pub(crate) fn property_with_parameters(
     decorator_list: &[Decorator],
     parameters: &Parameters,
 ) {
+    let semantic = checker.semantic();
     if !decorator_list
         .iter()
-        .any(|decorator| matches!(&decorator.expression, Expr::Name(ast::ExprName { id, .. }) if id == "property"))
+        .any(|decorator| semantic.match_builtin_expr(&decorator.expression, "property"))
     {
         return;
     }
@@ -66,7 +65,6 @@ pub(crate) fn property_with_parameters(
         .chain(&parameters.kwonlyargs)
         .count()
         > 1
-        && checker.semantic().is_builtin("property")
     {
         checker
             .diagnostics

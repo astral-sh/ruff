@@ -1054,7 +1054,7 @@
       "type": "object",
       "properties": {
         "aliases": {
-          "description": "The conventional aliases for imports. These aliases can be extended by the `extend_aliases` option.",
+          "description": "The conventional aliases for imports. These aliases can be extended by the `extend-aliases` option.",
           "type": [
             "object",
             "null"
@@ -3269,8 +3269,10 @@
         "PLE03",
         "PLE030",
         "PLE0302",
+        "PLE0303",
         "PLE0304",
         "PLE0307",
+        "PLE0308",
         "PLE06",
         "PLE060",
         "PLE0604",
@@ -3621,6 +3623,7 @@
         "RUF026",
         "RUF027",
         "RUF028",
+        "RUF029",
         "RUF1",
         "RUF10",
         "RUF100",

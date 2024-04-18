@@ -221,4 +221,20 @@ PERF101.py:69:10: PERF101 [*] Do not cast an iterable to `list` before iterating
 71 71 | 
 72 72 | for i in list(foo_list):  # OK
 
+PERF101.py:86:10: PERF101 [*] Do not cast an iterable to `list` before iterating over it
+   |
+84 | import builtins
+85 | 
+86 | for i in builtins.list(nested_tuple):  # PERF101
+   |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^ PERF101
+87 |     pass
+   |
+   = help: Remove `list()` cast
 
+ℹ Safe fix
+83 83 | 
+84 84 | import builtins
+85 85 | 
+86    |-for i in builtins.list(nested_tuple):  # PERF101
+   86 |+for i in nested_tuple:  # PERF101
+87 87 |     pass

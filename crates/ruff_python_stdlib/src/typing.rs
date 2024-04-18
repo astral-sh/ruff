@@ -5,12 +5,13 @@
 pub fn is_standard_library_generic(qualified_name: &[&str]) -> bool {
     matches!(
         qualified_name,
-        ["", "dict" | "frozenset" | "list" | "set" | "tuple" | "type"]
-            | [
-                "collections" | "typing" | "typing_extensions",
-                "ChainMap" | "Counter"
-            ]
-            | ["collections" | "typing", "OrderedDict"]
+        [
+            "" | "builtins",
+            "dict" | "frozenset" | "list" | "set" | "tuple" | "type"
+        ] | [
+            "collections" | "typing" | "typing_extensions",
+            "ChainMap" | "Counter"
+        ] | ["collections" | "typing", "OrderedDict"]
             | ["collections", "defaultdict" | "deque"]
             | [
                 "collections",
@@ -247,7 +248,7 @@ pub fn is_immutable_non_generic_type(qualified_name: &[&str]) -> bool {
 pub fn is_immutable_generic_type(qualified_name: &[&str]) -> bool {
     matches!(
         qualified_name,
-        ["", "tuple"]
+        ["" | "builtins", "tuple"]
             | [
                 "collections",
                 "abc",
@@ -285,7 +286,7 @@ pub fn is_immutable_generic_type(qualified_name: &[&str]) -> bool {
 pub fn is_mutable_return_type(qualified_name: &[&str]) -> bool {
     matches!(
         qualified_name,
-        ["", "dict" | "list" | "set"]
+        ["" | "builtins", "dict" | "list" | "set"]
             | [
                 "collections",
                 "Counter" | "OrderedDict" | "defaultdict" | "deque"

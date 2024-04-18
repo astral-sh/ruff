@@ -109,27 +109,209 @@
 //! [parsing]: https://en.wikipedia.org/wiki/Parsing
 //! [lexer]: crate::lexer
 
-pub use parser::{
-    parse, parse_expression, parse_expression_starts_at, parse_program, parse_starts_at,
-    parse_suite, parse_tokens, ParseError, ParseErrorType,
-};
-use ruff_python_ast::{Mod, PySourceType, Suite};
-pub use string::FStringErrorType;
-pub use token::{Tok, TokenKind};
+use crate::lexer::{lex, lex_starts_at, LexResult};
 
-use crate::lexer::LexResult;
+pub use crate::error::{FStringErrorType, ParseError, ParseErrorType};
+pub use crate::parser::Program;
+pub use crate::token::{Tok, TokenKind};
 
-mod context;
-mod function;
-mod invalid;
-// Skip flattening lexer to distinguish from full ruff_python_parser
+use ruff_python_ast::{Expr, Mod, ModModule, PySourceType, Suite};
+use ruff_text_size::TextSize;
+
+mod error;
 pub mod lexer;
 mod parser;
 mod soft_keywords;
 mod string;
 mod token;
+mod token_set;
 mod token_source;
 pub mod typing;
+
+/// Parse a full Python program usually consisting of multiple lines.
+///
+/// This is a convenience function that can be used to parse a full Python program without having to
+/// specify the [`Mode`] or the location. It is probably what you want to use most of the time.
+///
+/// # Example
+///
+/// For example, parsing a simple function definition and a call to that function:
+///
+/// ```
+/// use ruff_python_parser as parser;
+/// let source = r#"
+/// def foo():
+///    return 42
+///
+/// print(foo())
+/// "#;
+/// let program = parser::parse_program(source);
+/// assert!(program.is_ok());
+/// ```
+pub fn parse_program(source: &str) -> Result<ModModule, ParseError> {
+    let lexer = lex(source, Mode::Module);
+    match parse_tokens(lexer.collect(), source, Mode::Module)? {
+        Mod::Module(m) => Ok(m),
+        Mod::Expression(_) => unreachable!("Mode::Module doesn't return other variant"),
+    }
+}
+
+pub fn parse_suite(source: &str) -> Result<Suite, ParseError> {
+    parse_program(source).map(|m| m.body)
+}
+
+/// Parses a single Python expression.
+///
+/// This convenience function can be used to parse a single expression without having to
+/// specify the Mode or the location.
+///
+/// # Example
+///
+/// For example, parsing a single expression denoting the addition of two numbers:
+///
+///  ```
+/// use ruff_python_parser as parser;
+/// let expr = parser::parse_expression("1 + 2");
+///
+/// assert!(expr.is_ok());
+///
+/// ```
+pub fn parse_expression(source: &str) -> Result<Expr, ParseError> {
+    let lexer = lex(source, Mode::Expression).collect();
+    match parse_tokens(lexer, source, Mode::Expression)? {
+        Mod::Expression(expression) => Ok(*expression.body),
+        Mod::Module(_m) => unreachable!("Mode::Expression doesn't return other variant"),
+    }
+}
+
+/// Parses a Python expression from a given location.
+///
+/// This function allows to specify the location of the expression in the source code, other than
+/// that, it behaves exactly like [`parse_expression`].
+///
+/// # Example
+///
+/// Parsing a single expression denoting the addition of two numbers, but this time specifying a different,
+/// somewhat silly, location:
+///
+/// ```
+/// use ruff_python_parser::{parse_expression_starts_at};
+/// # use ruff_text_size::TextSize;
+///
+/// let expr = parse_expression_starts_at("1 + 2", TextSize::from(400));
+/// assert!(expr.is_ok());
+/// ```
+pub fn parse_expression_starts_at(source: &str, offset: TextSize) -> Result<Expr, ParseError> {
+    let lexer = lex_starts_at(source, Mode::Module, offset).collect();
+    match parse_tokens(lexer, source, Mode::Expression)? {
+        Mod::Expression(expression) => Ok(*expression.body),
+        Mod::Module(_m) => unreachable!("Mode::Expression doesn't return other variant"),
+    }
+}
+
+/// Parse the given Python source code using the specified [`Mode`].
+///
+/// This function is the most general function to parse Python code. Based on the [`Mode`] supplied,
+/// it can be used to parse a single expression, a full Python program, an interactive expression
+/// or a Python program containing IPython escape commands.
+///
+/// # Example
+///
+/// If we want to parse a simple expression, we can use the [`Mode::Expression`] mode during
+/// parsing:
+///
+/// ```
+/// use ruff_python_parser::{Mode, parse};
+///
+/// let expr = parse("1 + 2", Mode::Expression);
+/// assert!(expr.is_ok());
+/// ```
+///
+/// Alternatively, we can parse a full Python program consisting of multiple lines:
+///
+/// ```
+/// use ruff_python_parser::{Mode, parse};
+///
+/// let source = r#"
+/// class Greeter:
+///
+///   def greet(self):
+///    print("Hello, world!")
+/// "#;
+/// let program = parse(source, Mode::Module);
+/// assert!(program.is_ok());
+/// ```
+///
+/// Additionally, we can parse a Python program containing IPython escapes:
+///
+/// ```
+/// use ruff_python_parser::{Mode, parse};
+///
+/// let source = r#"
+/// %timeit 1 + 2
+/// ?str.replace
+/// !ls
+/// "#;
+/// let program = parse(source, Mode::Ipython);
+/// assert!(program.is_ok());
+/// ```
+pub fn parse(source: &str, mode: Mode) -> Result<Mod, ParseError> {
+    let lxr = lexer::lex(source, mode);
+    parse_tokens(lxr.collect(), source, mode)
+}
+
+/// Parse the given Python source code using the specified [`Mode`] and [`TextSize`].
+///
+/// This function allows to specify the location of the the source code, other than
+/// that, it behaves exactly like [`parse`].
+///
+/// # Example
+///
+/// ```
+/// # use ruff_text_size::TextSize;
+/// use ruff_python_parser::{Mode, parse_starts_at};
+///
+/// let source = r#"
+/// def fib(i):
+///    a, b = 0, 1
+///    for _ in range(i):
+///       a, b = b, a + b
+///    return a
+///
+/// print(fib(42))
+/// "#;
+/// let program = parse_starts_at(source, Mode::Module, TextSize::from(0));
+/// assert!(program.is_ok());
+/// ```
+pub fn parse_starts_at(source: &str, mode: Mode, offset: TextSize) -> Result<Mod, ParseError> {
+    let lxr = lexer::lex_starts_at(source, mode, offset);
+    parse_tokens(lxr.collect(), source, mode)
+}
+
+/// Parse an iterator of [`LexResult`]s using the specified [`Mode`].
+///
+/// This could allow you to perform some preprocessing on the tokens before parsing them.
+///
+/// # Example
+///
+/// As an example, instead of parsing a string, we can parse a list of tokens after we generate
+/// them using the [`lexer::lex`] function:
+///
+/// ```
+/// use ruff_python_parser::{lexer::lex, Mode, parse_tokens};
+///
+/// let source = "1 + 2";
+/// let expr = parse_tokens(lex(source, Mode::Expression).collect(), source, Mode::Expression);
+/// assert!(expr.is_ok());
+/// ```
+pub fn parse_tokens(tokens: Vec<LexResult>, source: &str, mode: Mode) -> Result<Mod, ParseError> {
+    let program = Program::parse_tokens(source, tokens, mode);
+    if program.is_valid() {
+        Ok(program.into_ast())
+    } else {
+        Err(program.into_errors().into_iter().next().unwrap())
+    }
+}
 
 /// Collect tokens up to and including the first error.
 pub fn tokenize(contents: &str, mode: Mode) -> Vec<LexResult> {
@@ -247,29 +429,4 @@ impl std::fmt::Display for ModeParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, r#"mode must be "exec", "eval", "ipython", or "single""#)
     }
-}
-
-#[rustfmt::skip]
-#[allow(unreachable_pub)]
-#[allow(clippy::type_complexity)]
-#[allow(clippy::extra_unused_lifetimes)]
-#[allow(clippy::needless_lifetimes)]
-#[allow(clippy::unused_self)]
-#[allow(clippy::cast_sign_loss)]
-#[allow(clippy::default_trait_access)]
-#[allow(clippy::let_unit_value)]
-#[allow(clippy::just_underscores_and_digits)]
-#[allow(clippy::no_effect_underscore_binding)]
-#[allow(clippy::trivially_copy_pass_by_ref)]
-#[allow(clippy::option_option)]
-#[allow(clippy::unnecessary_wraps)]
-#[allow(clippy::uninlined_format_args)]
-#[allow(clippy::cloned_instead_of_copied)]
-mod python {
-
-    #[cfg(feature = "lalrpop")]
-    include!(concat!(env!("OUT_DIR"), "/src/python.rs"));
-
-    #[cfg(not(feature = "lalrpop"))]
-    include!("python.rs");
 }

@@ -241,8 +241,10 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "E0237") => (RuleGroup::Stable, rules::pylint::rules::NonSlotAssignment),
         (Pylint, "E0241") => (RuleGroup::Stable, rules::pylint::rules::DuplicateBases),
         (Pylint, "E0302") => (RuleGroup::Stable, rules::pylint::rules::UnexpectedSpecialMethodSignature),
+        (Pylint, "E0303") => (RuleGroup::Preview, rules::pylint::rules::InvalidLengthReturnType),
         (Pylint, "E0304") => (RuleGroup::Preview, rules::pylint::rules::InvalidBoolReturnType),
         (Pylint, "E0307") => (RuleGroup::Stable, rules::pylint::rules::InvalidStrReturnType),
+        (Pylint, "E0308") => (RuleGroup::Preview, rules::pylint::rules::InvalidBytesReturnType),
         (Pylint, "E0604") => (RuleGroup::Stable, rules::pylint::rules::InvalidAllObject),
         (Pylint, "E0605") => (RuleGroup::Stable, rules::pylint::rules::InvalidAllFormat),
         (Pylint, "E0643") => (RuleGroup::Preview, rules::pylint::rules::PotentialIndexError),
@@ -963,6 +965,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "026") => (RuleGroup::Preview, rules::ruff::rules::DefaultFactoryKwarg),
         (Ruff, "027") => (RuleGroup::Preview, rules::ruff::rules::MissingFStringSyntax),
         (Ruff, "028") => (RuleGroup::Preview, rules::ruff::rules::InvalidFormatterSuppressionComment),
+        (Ruff, "029") => (RuleGroup::Preview, rules::ruff::rules::UnusedAsync),
         (Ruff, "100") => (RuleGroup::Stable, rules::ruff::rules::UnusedNOQA),
         (Ruff, "200") => (RuleGroup::Stable, rules::ruff::rules::InvalidPyprojectToml),
         #[cfg(feature = "test-rules")]

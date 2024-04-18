@@ -72,7 +72,7 @@ pub(crate) fn unnecessary_generator_set(checker: &mut Checker, call: &ast::ExprC
     ) else {
         return;
     };
-    if !checker.semantic().is_builtin("set") {
+    if !checker.semantic().has_builtin_binding("set") {
         return;
     }
 

@@ -31,7 +31,7 @@ impl RuleTable {
     /// Returns whether any of the given rules should be checked.
     #[inline]
     pub const fn any_enabled(&self, rules: &[Rule]) -> bool {
-        self.enabled.intersects(&RuleSet::from_rules(rules))
+        self.enabled.any(rules)
     }
 
     /// Returns whether violations of the given rule should be fixed.

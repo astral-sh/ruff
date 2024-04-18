@@ -539,7 +539,7 @@ trait BuiltinTypeChecker {
     /// Check annotation expression to match the intended type.
     fn match_annotation(annotation: &Expr, semantic: &SemanticModel) -> bool {
         let value = map_subscript(annotation);
-        Self::match_builtin_type(value, semantic)
+        semantic.match_builtin_expr(value, Self::BUILTIN_TYPE_NAME)
             || semantic.match_typing_expr(value, Self::TYPING_NAME)
     }
 
@@ -562,15 +562,7 @@ trait BuiltinTypeChecker {
         let Expr::Call(ast::ExprCall { func, .. }) = initializer else {
             return false;
         };
-        Self::match_builtin_type(func.as_ref(), semantic)
-    }
-
-    /// Check if the given expression names the builtin type.
-    fn match_builtin_type(type_expr: &Expr, semantic: &SemanticModel) -> bool {
-        let Expr::Name(ast::ExprName { id, .. }) = type_expr else {
-            return false;
-        };
-        id == Self::BUILTIN_TYPE_NAME && semantic.is_builtin(Self::BUILTIN_TYPE_NAME)
+        semantic.match_builtin_expr(func, Self::BUILTIN_TYPE_NAME)
     }
 }
 
@@ -686,7 +678,7 @@ impl TypeChecker for IoBaseChecker {
             .is_some_and(|qualified_name| {
                 matches!(
                     qualified_name.segments(),
-                    ["io", "open" | "open_code"] | ["os" | "", "open"]
+                    ["io", "open" | "open_code"] | ["os" | "" | "builtins", "open"]
                 )
             })
     }

@@ -96,8 +96,8 @@ pub(crate) fn unnecessary_key_check(checker: &mut Checker, expr: &Expr) {
         return;
     }
 
-    if contains_effect(obj_left, |id| checker.semantic().is_builtin(id))
-        || contains_effect(key_left, |id| checker.semantic().is_builtin(id))
+    if contains_effect(obj_left, |id| checker.semantic().has_builtin_binding(id))
+        || contains_effect(key_left, |id| checker.semantic().has_builtin_binding(id))
     {
         return;
     }

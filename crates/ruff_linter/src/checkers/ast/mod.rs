@@ -50,11 +50,11 @@ use ruff_python_ast::{helpers, str, visitor, PySourceType};
 use ruff_python_codegen::{Generator, Stylist};
 use ruff_python_index::Indexer;
 use ruff_python_parser::typing::{parse_type_annotation, AnnotationKind};
-use ruff_python_semantic::analyze::{imports, typing, visibility};
+use ruff_python_semantic::analyze::{imports, typing};
 use ruff_python_semantic::{
     BindingFlags, BindingId, BindingKind, Exceptions, Export, FromImport, Globals, Import, Module,
-    ModuleKind, NodeId, ScopeId, ScopeKind, SemanticModel, SemanticModelFlags, StarImport,
-    SubmoduleImport,
+    ModuleKind, ModuleSource, NodeId, ScopeId, ScopeKind, SemanticModel, SemanticModelFlags,
+    StarImport, SubmoduleImport,
 };
 use ruff_python_stdlib::builtins::{IPYTHON_BUILTINS, MAGIC_GLOBALS, PYTHON_BUILTINS};
 use ruff_source_file::{Locator, OneIndexed, SourceRow};
@@ -110,7 +110,7 @@ pub(crate) struct Checker<'a> {
     /// The [`Path`] to the package containing the current file.
     package: Option<&'a Path>,
     /// The module representation of the current file (e.g., `foo.bar`).
-    module_path: Option<&'a [String]>,
+    module: Module<'a>,
     /// The [`PySourceType`] of the current file.
     pub(crate) source_type: PySourceType,
     /// The [`CellOffsets`] for the current file, if it's a Jupyter notebook.
@@ -174,7 +174,7 @@ impl<'a> Checker<'a> {
             noqa,
             path,
             package,
-            module_path: module.path(),
+            module,
             source_type,
             locator,
             stylist,
@@ -784,17 +784,13 @@ impl<'a> Visitor<'a> for Checker<'a> {
             }) => {
                 let mut handled_exceptions = Exceptions::empty();
                 for type_ in extract_handled_exceptions(handlers) {
-                    if let Some(qualified_name) = self.semantic.resolve_qualified_name(type_) {
-                        match qualified_name.segments() {
-                            ["", "NameError"] => {
-                                handled_exceptions |= Exceptions::NAME_ERROR;
-                            }
-                            ["", "ModuleNotFoundError"] => {
+                    if let Some(builtins_name) = self.semantic.resolve_builtin_symbol(type_) {
+                        match builtins_name {
+                            "NameError" => handled_exceptions |= Exceptions::NAME_ERROR,
+                            "ModuleNotFoundError" => {
                                 handled_exceptions |= Exceptions::MODULE_NOT_FOUND_ERROR;
                             }
-                            ["", "ImportError"] => {
-                                handled_exceptions |= Exceptions::IMPORT_ERROR;
-                            }
+                            "ImportError" => handled_exceptions |= Exceptions::IMPORT_ERROR,
                             _ => {}
                         }
                     }
@@ -1002,6 +998,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 ExprContext::Load => self.handle_node_load(expr),
                 ExprContext::Store => self.handle_node_store(id, expr),
                 ExprContext::Del => self.handle_node_delete(expr),
+                ExprContext::Invalid => {}
             },
             _ => {}
         }
@@ -1125,7 +1122,8 @@ impl<'a> Visitor<'a> for Checker<'a> {
                                 ]
                             ) {
                                 Some(typing::Callable::MypyExtension)
-                            } else if matches!(qualified_name.segments(), ["", "bool"]) {
+                            } else if matches!(qualified_name.segments(), ["" | "builtins", "bool"])
+                            {
                                 Some(typing::Callable::Bool)
                             } else {
                                 None
@@ -1912,7 +1910,7 @@ impl<'a> Checker<'a> {
             }
         {
             let (all_names, all_flags) =
-                extract_all_names(parent, |name| self.semantic.is_builtin(name));
+                extract_all_names(parent, |name| self.semantic.has_builtin_binding(name));
 
             if all_flags.intersects(DunderAllFlags::INVALID_OBJECT) {
                 flags |= BindingFlags::INVALID_ALL_OBJECT;
@@ -2285,10 +2283,15 @@ pub(crate) fn check_ast(
         } else {
             ModuleKind::Module
         },
-        source: if let Some(module_path) = module_path.as_ref() {
-            visibility::ModuleSource::Path(module_path)
+        name: if let Some(module_path) = &module_path {
+            module_path.last().map(String::as_str)
         } else {
-            visibility::ModuleSource::File(path)
+            path.file_stem().and_then(std::ffi::OsStr::to_str)
+        },
+        source: if let Some(module_path) = module_path.as_ref() {
+            ModuleSource::Path(module_path)
+        } else {
+            ModuleSource::File(path)
         },
         python_ast,
     };

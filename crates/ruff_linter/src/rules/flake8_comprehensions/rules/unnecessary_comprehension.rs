@@ -60,7 +60,7 @@ fn add_diagnostic(checker: &mut Checker, expr: &Expr) {
         Expr::DictComp(_) => "dict",
         _ => return,
     };
-    if !checker.semantic().is_builtin(id) {
+    if !checker.semantic().has_builtin_binding(id) {
         return;
     }
     let mut diagnostic = Diagnostic::new(

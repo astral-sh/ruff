@@ -26,7 +26,7 @@ impl super::BackgroundDocumentRequestHandler for Format {
 pub(super) fn format_document(snapshot: &DocumentSnapshot) -> Result<super::FormatResponse> {
     let doc = snapshot.document();
     let source = doc.contents();
-    let formatted = crate::format::format(doc, &snapshot.configuration().formatter)
+    let formatted = crate::format::format(doc, &snapshot.settings().formatter)
         .with_failure_code(lsp_server::ErrorCode::InternalError)?;
     // fast path - if the code is the same, return early
     if formatted == source {
