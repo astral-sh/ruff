@@ -114,6 +114,7 @@ mod tests {
                         "fastapi.Depends".to_string(),
                         "fastapi.Query".to_string(),
                         "custom.ImmutableTypeA".to_string(),
+                        "B008_extended.Class".to_string(),
                     ],
                 },
                 ..LinterSettings::for_rule(Rule::FunctionCallInDefaultArgument)

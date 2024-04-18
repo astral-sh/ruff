@@ -28,7 +28,7 @@ use crate::Imported;
 /// A semantic model for a Python module, to enable querying the module's semantic information.
 pub struct SemanticModel<'a> {
     typing_modules: &'a [String],
-    module_path: Option<&'a [String]>,
+    module: Module<'a>,
 
     /// Stack of all AST nodes in the program.
     nodes: Nodes<'a>,
@@ -134,7 +134,7 @@ impl<'a> SemanticModel<'a> {
     pub fn new(typing_modules: &'a [String], path: &Path, module: Module<'a>) -> Self {
         Self {
             typing_modules,
-            module_path: module.path(),
+            module,
             nodes: Nodes::default(),
             node_id: None,
             branches: Branches::default(),
@@ -791,7 +791,11 @@ impl<'a> SemanticModel<'a> {
                     .first()
                     .map_or(false, |segment| *segment == ".")
                 {
-                    from_relative_import(self.module_path?, qualified_name.segments(), tail)?
+                    from_relative_import(
+                        self.module.qualified_name()?,
+                        qualified_name.segments(),
+                        tail,
+                    )?
                 } else {
                     qualified_name
                         .segments()
@@ -817,14 +821,32 @@ impl<'a> SemanticModel<'a> {
                 }
             }
             BindingKind::ClassDefinition(_) | BindingKind::FunctionDefinition(_) => {
-                let value_name = UnqualifiedName::from_expr(value)?;
-                let resolved: QualifiedName = self
-                    .module_path?
-                    .iter()
-                    .map(String::as_str)
-                    .chain(value_name.segments().iter().copied())
-                    .collect();
-                Some(resolved)
+                // If we have a fully-qualified path for the module, use it.
+                if let Some(path) = self.module.qualified_name() {
+                    Some(
+                        path.iter()
+                            .map(String::as_str)
+                            .chain(
+                                UnqualifiedName::from_expr(value)?
+                                    .segments()
+                                    .iter()
+                                    .copied(),
+                            )
+                            .collect(),
+                    )
+                } else {
+                    // Otherwise, if we're in (e.g.) a script, use the module name.
+                    Some(
+                        std::iter::once(self.module.name()?)
+                            .chain(
+                                UnqualifiedName::from_expr(value)?
+                                    .segments()
+                                    .iter()
+                                    .copied(),
+                            )
+                            .collect(),
+                    )
+                }
             }
             _ => None,
         }
