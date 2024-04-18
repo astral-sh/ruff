@@ -28,6 +28,16 @@ use crate::rules::pyupgrade::helpers::curly_escape;
 /// the newer `str.format` and f-strings constructs over `printf`-style string
 /// formatting.
 ///
+/// ## Example
+/// ```python
+/// "%s, %s" % ("Hello", "World")  # "Hello, World"
+/// ```
+///
+/// Use instead:
+/// ```python
+/// "{}, {}".format("Hello", "World")  # "Hello, World"
+/// ```
+///
 /// ## Known problems
 /// This rule is unable to offer a fix in cases where the format string
 /// contains a single, generic format specifier (e.g. `%s`), and the right-hand side
@@ -51,16 +61,6 @@ use crate::rules::pyupgrade::helpers::curly_escape;
 /// val = (1,)
 /// print("%s" % val)  # "1"
 /// print("{}".format(val))  # "(1,)"
-/// ```
-///
-/// ## Example
-/// ```python
-/// "%s, %s" % ("Hello", "World")  # "Hello, World"
-/// ```
-///
-/// Use instead:
-/// ```python
-/// "{}, {}".format("Hello", "World")  # "Hello, World"
 /// ```
 ///
 /// ## References
