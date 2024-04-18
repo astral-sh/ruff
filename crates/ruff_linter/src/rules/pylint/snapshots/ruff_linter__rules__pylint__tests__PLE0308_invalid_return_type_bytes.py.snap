@@ -25,18 +25,19 @@ invalid_return_type_bytes.py:16:16: PLE0308 `__bytes__` does not return `bytes`
    |                ^^^^^^^^^^^^ PLE0308
    |
 
-invalid_return_type_bytes.py:21:9: PLE0308 `__bytes__` does not return `bytes`
+invalid_return_type_bytes.py:20:9: PLE0308 `__bytes__` does not return `bytes`
    |
 19 | class BytesNoReturn:
 20 |     def __bytes__(self):
+   |         ^^^^^^^^^ PLE0308
 21 |         print("ruff")  # [invalid-bytes-return]
-   |         ^^^^^^^^^^^^^ PLE0308
    |
 
-invalid_return_type_bytes.py:27:9: PLE0308 `__bytes__` does not return `bytes`
+invalid_return_type_bytes.py:25:9: PLE0308 `__bytes__` does not return `bytes`
    |
+24 | class BytesWrongRaise:
 25 |     def __bytes__(self):
+   |         ^^^^^^^^^ PLE0308
 26 |         print("raise some error")
 27 |         raise NotImplementedError  # [invalid-bytes-return]
-   |         ^^^^^^^^^^^^^^^^^^^^^^^^^ PLE0308
    |

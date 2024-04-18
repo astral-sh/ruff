@@ -1,10 +1,11 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::{is_docstring_stmt, map_callable};
+use ruff_python_ast::helpers::is_docstring_stmt;
 use ruff_python_ast::name::QualifiedName;
-use ruff_python_ast::{self as ast, Expr, Parameter, ParameterWithDefault, Stmt, StmtRaise};
+use ruff_python_ast::{self as ast, Expr, Parameter, ParameterWithDefault};
 use ruff_python_codegen::{Generator, Stylist};
 use ruff_python_index::Indexer;
+use ruff_python_semantic::analyze::function_type::is_stub;
 use ruff_python_semantic::analyze::typing::{is_immutable_annotation, is_mutable_expr};
 use ruff_python_semantic::SemanticModel;
 use ruff_python_trivia::{indentation_at_offset, textwrap};
@@ -212,30 +213,4 @@ fn move_initialization(
 
     let initialization_edit = Edit::insertion(content, pos);
     Some(Fix::unsafe_edits(default_edit, [initialization_edit]))
-}
-
-/// Returns `true` if a function has an empty body, and is therefore a stub.
-///
-/// A function body is considered to be empty if it contains only `pass` statements, `...` literals,
-/// `NotImplementedError` raises, or string literal statements (docstrings).
-fn is_stub(function_def: &ast::StmtFunctionDef, semantic: &SemanticModel) -> bool {
-    function_def.body.iter().all(|stmt| match stmt {
-        Stmt::Pass(_) => true,
-        Stmt::Expr(ast::StmtExpr { value, range: _ }) => {
-            matches!(
-                value.as_ref(),
-                Expr::StringLiteral(_) | Expr::EllipsisLiteral(_)
-            )
-        }
-        Stmt::Raise(StmtRaise {
-            range: _,
-            exc: exception,
-            cause: _,
-        }) => exception.as_ref().is_some_and(|exc| {
-            semantic
-                .resolve_builtin_symbol(map_callable(exc))
-                .is_some_and(|name| matches!(name, "NotImplementedError" | "NotImplemented"))
-        }),
-        _ => false,
-    })
 }

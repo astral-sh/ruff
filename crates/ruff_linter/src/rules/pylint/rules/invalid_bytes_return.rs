@@ -1,8 +1,10 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::ReturnStatementVisitor;
+use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::visitor::Visitor;
-use ruff_python_ast::Stmt;
+use ruff_python_ast::{self as ast};
+use ruff_python_semantic::analyze::function_type::is_stub;
 use ruff_python_semantic::analyze::type_inference::{PythonType, ResolvedPythonType};
 use ruff_text_size::Ranged;
 
@@ -42,8 +44,8 @@ impl Violation for InvalidBytesReturnType {
 }
 
 /// E0308
-pub(crate) fn invalid_bytes_return(checker: &mut Checker, name: &str, body: &[Stmt]) {
-    if name != "__bytes__" {
+pub(crate) fn invalid_bytes_return(checker: &mut Checker, function_def: &ast::StmtFunctionDef) {
+    if function_def.name.as_str() != "__bytes__" {
         return;
     }
 
@@ -51,35 +53,20 @@ pub(crate) fn invalid_bytes_return(checker: &mut Checker, name: &str, body: &[St
         return;
     }
 
-    if body.len() == 1
-        && (matches!(&body[0], Stmt::Expr(expr) if expr.value.is_ellipsis_literal_expr())
-            || body[0].is_pass_stmt()
-            || body[0].is_raise_stmt())
-    {
-        return;
-    }
-
-    let body_without_comments = body
-        .iter()
-        .filter(|stmt| !matches!(stmt, Stmt::Expr(expr) if expr.value.is_string_literal_expr()))
-        .collect::<Vec<_>>();
-    if body_without_comments.is_empty() {
-        return;
-    }
-    if body_without_comments.len() == 1 && body_without_comments[0].is_raise_stmt() {
+    if is_stub(function_def, checker.semantic()) {
         return;
     }
 
     let returns = {
         let mut visitor = ReturnStatementVisitor::default();
-        visitor.visit_body(body);
+        visitor.visit_body(&function_def.body);
         visitor.returns
     };
 
     if returns.is_empty() {
         checker.diagnostics.push(Diagnostic::new(
             InvalidBytesReturnType,
-            body.last().unwrap().range(),
+            function_def.identifier(),
         ));
     }
 
