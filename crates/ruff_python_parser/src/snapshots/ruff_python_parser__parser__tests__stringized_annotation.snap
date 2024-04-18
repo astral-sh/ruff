@@ -1,0 +1,117 @@
+---
+source: crates/ruff_python_parser/src/parser.rs
+expression: parse_ast
+---
+[
+    ImportFrom(
+        StmtImportFrom {
+            range: 0..39,
+            module: Some(
+                Identifier {
+                    id: "typing_extensions",
+                    range: 5..22,
+                },
+            ),
+            names: [
+                Alias {
+                    range: 30..39,
+                    name: Identifier {
+                        id: "TypeAlias",
+                        range: 30..39,
+                    },
+                    asname: None,
+                },
+            ],
+            level: Some(
+                0,
+            ),
+        },
+    ),
+    Assign(
+        StmtAssign {
+            range: 42..83,
+            targets: [
+                Name(
+                    ExprName {
+                        range: 42..48,
+                        id: "Alias1",
+                        ctx: Store,
+                    },
+                ),
+            ],
+            value: BinOp(
+                ExprBinOp {
+                    range: 57..81,
+                    left: BinOp(
+                        ExprBinOp {
+                            range: 57..70,
+                            left: Name(
+                                ExprName {
+                                    range: 57..60,
+                                    id: "int",
+                                    ctx: Load,
+                                },
+                            ),
+                            op: BitOr,
+                            right: Name(
+                                ExprName {
+                                    range: 67..70,
+                                    id: "str",
+                                    ctx: Load,
+                                },
+                            ),
+                        },
+                    ),
+                    op: BitOr,
+                    right: Name(
+                        ExprName {
+                            range: 77..81,
+                            id: "bool",
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+        },
+    ),
+    AnnAssign(
+        StmtAnnAssign {
+            range: 109..165,
+            target: Name(
+                ExprName {
+                    range: 109..115,
+                    id: "Alias2",
+                    ctx: Store,
+                },
+            ),
+            annotation: Name(
+                ExprName {
+                    range: 117..126,
+                    id: "TypeAlias",
+                    ctx: Load,
+                },
+            ),
+            value: Some(
+                StringLiteral(
+                    ExprStringLiteral {
+                        range: 129..165,
+                        value: StringLiteralValue {
+                            inner: Single(
+                                StringLiteral {
+                                    range: 129..165,
+                                    value: "\n    int\n    | str\n    | bool\n",
+                                    flags: StringLiteralFlags {
+                                        quote_style: Double,
+                                        prefix: Empty,
+                                        triple_quoted: true,
+                                    },
+                                },
+                            ),
+                        },
+                    },
+                ),
+            ),
+            simple: true,
+        },
+    ),
+]
