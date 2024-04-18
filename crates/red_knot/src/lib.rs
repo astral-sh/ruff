@@ -9,6 +9,7 @@ pub mod db;
 pub mod files;
 pub mod hir;
 mod module;
+mod symbols;
 
 #[derive(Debug)]
 pub struct Workspace {
