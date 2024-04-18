@@ -90,7 +90,7 @@ pub(crate) fn if_exp_instead_of_or_operator(checker: &mut Checker, if_expr: &ast
             ),
             if_expr.range(),
         ),
-        if contains_effect(body, |id| checker.semantic().is_builtin(id)) {
+        if contains_effect(body, |id| checker.semantic().has_builtin_binding(id)) {
             Applicability::Unsafe
         } else {
             Applicability::Safe

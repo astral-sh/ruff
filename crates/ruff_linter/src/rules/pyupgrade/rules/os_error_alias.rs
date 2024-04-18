@@ -95,7 +95,7 @@ fn atom_diagnostic(checker: &mut Checker, target: &Expr) {
 fn tuple_diagnostic(checker: &mut Checker, tuple: &ast::ExprTuple, aliases: &[&Expr]) {
     let mut diagnostic = Diagnostic::new(OSErrorAlias { name: None }, tuple.range());
     let semantic = checker.semantic();
-    if semantic.is_builtin("OSError") {
+    if semantic.has_builtin_binding("OSError") {
         // Filter out any `OSErrors` aliases.
         let mut remaining: Vec<Expr> = tuple
             .elts

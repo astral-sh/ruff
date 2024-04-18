@@ -161,7 +161,9 @@ pub(crate) fn if_else_block_instead_of_dict_get(checker: &mut Checker, stmt_if: 
     }
 
     // Check that the default value is not "complex".
-    if contains_effect(default_value, |id| checker.semantic().is_builtin(id)) {
+    if contains_effect(default_value, |id| {
+        checker.semantic().has_builtin_binding(id)
+    }) {
         return;
     }
 
@@ -261,7 +263,9 @@ pub(crate) fn if_exp_instead_of_dict_get(
     }
 
     // Check that the default value is not "complex".
-    if contains_effect(default_value, |id| checker.semantic().is_builtin(id)) {
+    if contains_effect(default_value, |id| {
+        checker.semantic().has_builtin_binding(id)
+    }) {
         return;
     }
 

@@ -63,7 +63,7 @@ pub(crate) fn unnecessary_literal_dict(
     else {
         return;
     };
-    if !checker.semantic().is_builtin("dict") {
+    if !checker.semantic().has_builtin_binding("dict") {
         return;
     }
     let (kind, elts) = match argument {

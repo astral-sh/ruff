@@ -53,7 +53,7 @@ pub(crate) fn unnecessary_list_call(
     let Some(argument) = helpers::first_argument_with_matching_function("list", func, args) else {
         return;
     };
-    if !checker.semantic().is_builtin("list") {
+    if !checker.semantic().has_builtin_binding("list") {
         return;
     }
     if !argument.is_list_comp_expr() {

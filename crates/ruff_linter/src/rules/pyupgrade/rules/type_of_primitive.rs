@@ -67,7 +67,7 @@ pub(crate) fn type_of_primitive(checker: &mut Checker, expr: &Expr, func: &Expr,
     }
     let mut diagnostic = Diagnostic::new(TypeOfPrimitive { primitive }, expr.range());
     let builtin = primitive.builtin();
-    if semantic.is_builtin(&builtin) {
+    if semantic.has_builtin_binding(&builtin) {
         diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
             pad(primitive.builtin(), expr.range(), checker.locator()),
             expr.range(),

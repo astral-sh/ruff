@@ -71,7 +71,7 @@ pub(crate) fn unnecessary_generator_list(checker: &mut Checker, call: &ast::Expr
     ) else {
         return;
     };
-    if !checker.semantic().is_builtin("list") {
+    if !checker.semantic().has_builtin_binding("list") {
         return;
     }
 

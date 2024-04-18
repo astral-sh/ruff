@@ -60,7 +60,7 @@ pub(crate) fn unnecessary_literal_set(checker: &mut Checker, call: &ast::ExprCal
     ) else {
         return;
     };
-    if !checker.semantic().is_builtin("set") {
+    if !checker.semantic().has_builtin_binding("set") {
         return;
     }
     let kind = match argument {

@@ -207,7 +207,7 @@ pub(crate) fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
             // If the condition is a comparison, we can replace it with the condition, since we
             // know it's a boolean.
             Some(if_test.clone())
-        } else if checker.semantic().is_builtin("bool") {
+        } else if checker.semantic().has_builtin_binding("bool") {
             // Otherwise, we need to wrap the condition in a call to `bool`.
             let func_node = ast::ExprName {
                 id: "bool".into(),
