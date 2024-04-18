@@ -2,6 +2,31 @@
 
 ## 0.4.0
 
+### A new, hand-written parser
+
+This release replaces the generated parser with a hand-written recursive descent parser in Ruff.
+There's a lot to say about this exciting change, so check out the [blog post](TODO-LINK) for more details!
+
+See [#10036](https://github.com/astral-sh/ruff/pull/10036) for implementation details.
+
+### A new language server in Rust
+
+With this release, we also want to highlight our new language server. `ruff server` is a Rust-powered language
+server that comes built-in with with Ruff. It can be used with any editor that supports the [Language Server Protocol](https://microsoft.github.io/language-server-protocol/) (LSP).
+It uses a multi-threaded, lock-free architecture inspired by `rust-analyzer` and it will open the door for a lot
+of exciting features. It’s also faster than our previous [Python-based language server](https://github.com/astral-sh/ruff-lsp),
+but you probably guessed that already.
+
+`ruff server` is only in alpha, but it has a lot of features that you can try out today:
+
+- Lints Python files automatically and shows quick-fixes when available
+- Formats Python files, with support for range formatting
+- Comes with commands for quickly performing actions: `ruff.applyAutofix` , `ruff.applyFormat`, and `ruff.applyOrganizeImports`
+- Supports `source.fixAll` and `source.organizeImports` source actions
+- Automatically reloads project configuration when you change it
+
+To setup `ruff server` with your editor, refer to the [README.md](http://README.mdhttps://github.com/astral-sh/ruff/blob/main/crates/ruff_server/README.md).
+
 ### Preview features
 
 - \[`pycodestyle`\] Do not trigger `E3` rules on defs following a function/method with a dummy body ([#10704](https://github.com/astral-sh/ruff/pull/10704))
@@ -9,6 +34,7 @@
 - \[`pylint`\] Implement `invalid-length-returned` (`E0303`) ([#10963](https://github.com/astral-sh/ruff/pull/10963))
 - \[`pylint`\] Implement `self-cls-assignment` (`W0642`) ([#9267](https://github.com/astral-sh/ruff/pull/9267))
 - \[`pylint`\] Omit stubs from `invalid-bool` and `invalid-str-return-type` ([#11008](https://github.com/astral-sh/ruff/pull/11008))
+- \[`ruff`\] New rule `unused-async` (`RUF029`) to detect unneeded `async` keywords on functions ([#9966](https://github.com/astral-sh/ruff/pull/9966))
 
 ### Rule changes
 
@@ -17,10 +43,20 @@
 - \[`flake8-slots`\] Respect same-file `Enum` subclasses ([#11006](https://github.com/astral-sh/ruff/pull/11006))
 - \[`pylint`\] Support inverted comparisons (`PLR1730`) ([#10920](https://github.com/astral-sh/ruff/pull/10920))
 
+### Linter
+
+- Improve handling of builtin symbols in linter rules ([#10919](https://github.com/astral-sh/ruff/pull/10919))
+- Improve display of rules in `--show-settings` ([#11003](https://github.com/astral-sh/ruff/pull/11003))
+- Improve inference capabilities of the `BuiltinTypeChecker` ([#10976](https://github.com/astral-sh/ruff/pull/10976))
+- Resolve classes and functions relative to script name ([#10965](https://github.com/astral-sh/ruff/pull/10965))
+- Improve performance of `RuleTable::any_enabled` ([#10971](https://github.com/astral-sh/ruff/pull/10971))
+
 ### Server
 
+*This section is devoted to updates for our new LSP, written in Rust.*
+
 - Enable ruff-specific source actions ([#10916](https://github.com/astral-sh/ruff/pull/10916))
-- `ruff server` refreshes diagnostics for open files when file configuration is changed ([#10988](https://github.com/astral-sh/ruff/pull/10988))
+- `ruff server` Refreshes diagnostics for open files when file configuration is changed ([#10988](https://github.com/astral-sh/ruff/pull/10988))
 - `ruff server`: Important errors are now shown as popups ([#10951](https://github.com/astral-sh/ruff/pull/10951))
 - `ruff server`: Introduce settings for directly configuring the linter and formatter ([#10984](https://github.com/astral-sh/ruff/pull/10984))
 - `ruff server`: Resolve configuration for each document individually ([#10950](https://github.com/astral-sh/ruff/pull/10950))
@@ -29,32 +65,19 @@
 ### Configuration
 
 - Add `RUFF_OUTPUT_FILE` environment variable support ([#10992](https://github.com/astral-sh/ruff/pull/10992))
-- Resolve classes and functions relative to script name ([#10965](https://github.com/astral-sh/ruff/pull/10965))
 
 ### Bug fixes
 
 - Avoid `non-augmented-assignment` for reversed, non-commutative operators ([#10909](https://github.com/astral-sh/ruff/pull/10909))
-- Consider `if` expression for parenthesized with items parsing ([#11010](https://github.com/astral-sh/ruff/pull/11010))
 - Limit commutative non-augmented-assignments to primitive data types ([#10912](https://github.com/astral-sh/ruff/pull/10912))
-- Reset `FOR_TARGET` context for all kinds of parentheses ([#11009](https://github.com/astral-sh/ruff/pull/11009))
 - Respect `per-file-ignores` for `RUF100` on blanket `# noqa` ([#10908](https://github.com/astral-sh/ruff/pull/10908))
 
 ### Documentation
 
-- Fix S310 `suspicious-url-open-usage` description ([#10917](https://github.com/astral-sh/ruff/pull/10917))
-- Fix Typo for `extend-aliases` Option ([#10978](https://github.com/astral-sh/ruff/pull/10978))
-- Fix last example of flake8-bugbear rule `B023` "function uses loop variable" ([#10913](https://github.com/astral-sh/ruff/pull/10913))
+- Fix `suspicious-url-open-usage` (`S310`) description ([#10917](https://github.com/astral-sh/ruff/pull/10917))
+- Fix typo in `extend-aliases` ([#10978](https://github.com/astral-sh/ruff/pull/10978))
+- Fix last example of `flake8-bugbear` rule `B023` "function uses loop variable" ([#10913](https://github.com/astral-sh/ruff/pull/10913))
 - Improve documentation for block comment rules ([#11007](https://github.com/astral-sh/ruff/pull/11007))
-
-### Other changes
-
-- Detect unneeded `async` keywords on functions ([#9966](https://github.com/astral-sh/ruff/pull/9966))
-- Improve display of rules in `--show-settings` ([#11003](https://github.com/astral-sh/ruff/pull/11003))
-- Improve handling of builtin symbols in linter rules ([#10919](https://github.com/astral-sh/ruff/pull/10919))
-- Improve inference capabilities of the `BuiltinTypeChecker` ([#10976](https://github.com/astral-sh/ruff/pull/10976))
-- Rename `SemanticModel::is_builtin` to `SemanticModel::has_builtin_binding` ([#10991](https://github.com/astral-sh/ruff/pull/10991))
-- Replace LALRPOP parser with hand-written parser ([#10036](https://github.com/astral-sh/ruff/pull/10036))
-- perf: `RuleTable::any_enabled` ([#10971](https://github.com/astral-sh/ruff/pull/10971))
 
 ## 0.3.7
 
