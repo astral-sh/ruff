@@ -1,5 +1,61 @@
 # Changelog
 
+## 0.4.0
+
+### Preview features
+
+- \[`pycodestyle`\] Do not trigger `E3` rules on defs following a function/method with a dummy body ([#10704](https://github.com/astral-sh/ruff/pull/10704))
+- \[`pylint`\] Implement `invalid-bytes-returned` (`E0308`) ([#10959](https://github.com/astral-sh/ruff/pull/10959))
+- \[`pylint`\] Implement `invalid-length-returned` (`E0303`) ([#10963](https://github.com/astral-sh/ruff/pull/10963))
+- \[`pylint`\] Implement `self-cls-assignment` (`W0642`) ([#9267](https://github.com/astral-sh/ruff/pull/9267))
+- \[`pylint`\] Omit stubs from `invalid-bool` and `invalid-str-return-type` ([#11008](https://github.com/astral-sh/ruff/pull/11008))
+
+### Rule changes
+
+- \[`flake8-bandit`\] Allow `urllib.request.urlopen` calls with static `Request` argument ([#10964](https://github.com/astral-sh/ruff/pull/10964))
+- \[`flake8-bugbear`\] Treat `raise NotImplemented`-only bodies as stub functions ([#10990](https://github.com/astral-sh/ruff/pull/10990))
+- \[`flake8-slots`\] Respect same-file `Enum` subclasses ([#11006](https://github.com/astral-sh/ruff/pull/11006))
+- \[`pylint`\] Support inverted comparisons (`PLR1730`) ([#10920](https://github.com/astral-sh/ruff/pull/10920))
+
+### Server
+
+- Enable ruff-specific source actions ([#10916](https://github.com/astral-sh/ruff/pull/10916))
+- `ruff server` refreshes diagnostics for open files when file configuration is changed ([#10988](https://github.com/astral-sh/ruff/pull/10988))
+- `ruff server`: Important errors are now shown as popups ([#10951](https://github.com/astral-sh/ruff/pull/10951))
+- `ruff server`: Introduce settings for directly configuring the linter and formatter ([#10984](https://github.com/astral-sh/ruff/pull/10984))
+- `ruff server`: Resolve configuration for each document individually ([#10950](https://github.com/astral-sh/ruff/pull/10950))
+- `ruff server`: Write a setup guide for Neovim ([#10987](https://github.com/astral-sh/ruff/pull/10987))
+
+### Configuration
+
+- Add `RUFF_OUTPUT_FILE` environment variable support ([#10992](https://github.com/astral-sh/ruff/pull/10992))
+- Resolve classes and functions relative to script name ([#10965](https://github.com/astral-sh/ruff/pull/10965))
+
+### Bug fixes
+
+- Avoid `non-augmented-assignment` for reversed, non-commutative operators ([#10909](https://github.com/astral-sh/ruff/pull/10909))
+- Consider `if` expression for parenthesized with items parsing ([#11010](https://github.com/astral-sh/ruff/pull/11010))
+- Limit commutative non-augmented-assignments to primitive data types ([#10912](https://github.com/astral-sh/ruff/pull/10912))
+- Reset `FOR_TARGET` context for all kinds of parentheses ([#11009](https://github.com/astral-sh/ruff/pull/11009))
+- Respect `per-file-ignores` for `RUF100` on blanket `# noqa` ([#10908](https://github.com/astral-sh/ruff/pull/10908))
+
+### Documentation
+
+- Fix S310 `suspicious-url-open-usage` description ([#10917](https://github.com/astral-sh/ruff/pull/10917))
+- Fix Typo for `extend-aliases` Option ([#10978](https://github.com/astral-sh/ruff/pull/10978))
+- Fix last example of flake8-bugbear rule `B023` "function uses loop variable" ([#10913](https://github.com/astral-sh/ruff/pull/10913))
+- Improve documentation for block comment rules ([#11007](https://github.com/astral-sh/ruff/pull/11007))
+
+### Other changes
+
+- Detect unneeded `async` keywords on functions ([#9966](https://github.com/astral-sh/ruff/pull/9966))
+- Improve display of rules in `--show-settings` ([#11003](https://github.com/astral-sh/ruff/pull/11003))
+- Improve handling of builtin symbols in linter rules ([#10919](https://github.com/astral-sh/ruff/pull/10919))
+- Improve inference capabilities of the `BuiltinTypeChecker` ([#10976](https://github.com/astral-sh/ruff/pull/10976))
+- Rename `SemanticModel::is_builtin` to `SemanticModel::has_builtin_binding` ([#10991](https://github.com/astral-sh/ruff/pull/10991))
+- Replace LALRPOP parser with hand-written parser ([#10036](https://github.com/astral-sh/ruff/pull/10036))
+- perf: `RuleTable::any_enabled` ([#10971](https://github.com/astral-sh/ruff/pull/10971))
+
 ## 0.3.7
 
 ### Preview features
@@ -1385,7 +1441,7 @@ Read Ruff's new [versioning policy](https://docs.astral.sh/ruff/versioning/).
 - \[`refurb`\] Add `single-item-membership-test` (`FURB171`) ([#7815](https://github.com/astral-sh/ruff/pull/7815))
 - \[`pylint`\] Add `and-or-ternary` (`R1706`) ([#7811](https://github.com/astral-sh/ruff/pull/7811))
 
-_New rules are added in [preview](https://docs.astral.sh/ruff/preview/)._
+*New rules are added in [preview](https://docs.astral.sh/ruff/preview/).*
 
 ### Configuration
 
