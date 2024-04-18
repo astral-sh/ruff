@@ -1,6 +1,6 @@
 use ruff_python_ast::helpers::map_callable;
 use ruff_python_ast::name::{QualifiedName, UnqualifiedName};
-use ruff_python_ast::Decorator;
+use ruff_python_ast::{Decorator, Expr, Stmt, StmtExpr, StmtFunctionDef, StmtRaise};
 
 use crate::model::SemanticModel;
 use crate::scope::{Scope, ScopeKind};
@@ -127,4 +127,30 @@ fn is_class_method(
     }
 
     false
+}
+
+/// Returns `true` if a function has an empty body, and is therefore a stub.
+///
+/// A function body is considered to be empty if it contains only `pass` statements, `...` literals,
+/// `NotImplementedError` raises, or string literal statements (docstrings).
+pub fn is_stub(function_def: &StmtFunctionDef, semantic: &SemanticModel) -> bool {
+    function_def.body.iter().all(|stmt| match stmt {
+        Stmt::Pass(_) => true,
+        Stmt::Expr(StmtExpr { value, range: _ }) => {
+            matches!(
+                value.as_ref(),
+                Expr::StringLiteral(_) | Expr::EllipsisLiteral(_)
+            )
+        }
+        Stmt::Raise(StmtRaise {
+            range: _,
+            exc: exception,
+            cause: _,
+        }) => exception.as_ref().is_some_and(|exc| {
+            semantic
+                .resolve_builtin_symbol(map_callable(exc))
+                .is_some_and(|name| matches!(name, "NotImplementedError" | "NotImplemented"))
+        }),
+        _ => false,
+    })
 }
