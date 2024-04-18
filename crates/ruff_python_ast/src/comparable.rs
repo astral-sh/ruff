@@ -234,7 +234,6 @@ pub enum ComparablePattern<'a> {
     MatchStar(PatternMatchStar<'a>),
     MatchAs(PatternMatchAs<'a>),
     MatchOr(PatternMatchOr<'a>),
-    Invalid,
 }
 
 impl<'a> From<&'a ast::Pattern> for ComparablePattern<'a> {
@@ -865,7 +864,6 @@ pub enum ComparableExpr<'a> {
     Tuple(ExprTuple<'a>),
     Slice(ExprSlice<'a>),
     IpyEscapeCommand(ExprIpyEscapeCommand<'a>),
-    Invalid,
 }
 
 impl<'a> From<&'a Box<ast::Expr>> for Box<ComparableExpr<'a>> {
