@@ -1,0 +1,78 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/ok/for_in_target_postfix_expr.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..29,
+        body: [
+            For(
+                StmtFor {
+                    range: 0..28,
+                    is_async: false,
+                    target: Subscript(
+                        ExprSubscript {
+                            range: 4..13,
+                            value: Name(
+                                ExprName {
+                                    range: 4..5,
+                                    id: "d",
+                                    ctx: Load,
+                                },
+                            ),
+                            slice: Compare(
+                                ExprCompare {
+                                    range: 6..12,
+                                    left: Name(
+                                        ExprName {
+                                            range: 6..7,
+                                            id: "x",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    ops: [
+                                        In,
+                                    ],
+                                    comparators: [
+                                        Name(
+                                            ExprName {
+                                                range: 11..12,
+                                                id: "y",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ],
+                                },
+                            ),
+                            ctx: Store,
+                        },
+                    ),
+                    iter: Name(
+                        ExprName {
+                            range: 17..23,
+                            id: "target",
+                            ctx: Load,
+                        },
+                    ),
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 25..28,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 25..28,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                    orelse: [],
+                },
+            ),
+        ],
+    },
+)
+```
