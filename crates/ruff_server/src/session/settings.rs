@@ -47,9 +47,9 @@ pub(crate) struct ResolvedEditorSettings {
 pub(crate) struct ClientSettings {
     fix_all: Option<bool>,
     organize_imports: Option<bool>,
-    lint: Option<Lint>,
-    format: Option<Format>,
-    code_action: Option<CodeAction>,
+    lint: Option<LintOptions>,
+    format: Option<FormatOptions>,
+    code_action: Option<CodeActionOptions>,
     exclude: Option<Vec<String>>,
     line_length: Option<LineLength>,
 }
@@ -69,7 +69,7 @@ struct WorkspaceSettings {
 #[derive(Debug, Deserialize)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 #[serde(rename_all = "camelCase")]
-struct Lint {
+struct LintOptions {
     enable: Option<bool>,
     preview: Option<bool>,
     select: Option<Vec<String>>,
@@ -80,22 +80,22 @@ struct Lint {
 #[derive(Debug, Default, Deserialize)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 #[serde(rename_all = "camelCase")]
-struct Format {
+struct FormatOptions {
     preview: Option<bool>,
 }
 
 #[derive(Debug, Default, Deserialize)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 #[serde(rename_all = "camelCase")]
-struct CodeAction {
-    disable_rule_comment: Option<CodeActionSettings>,
-    fix_violation: Option<CodeActionSettings>,
+struct CodeActionOptions {
+    disable_rule_comment: Option<CodeActionParameters>,
+    fix_violation: Option<CodeActionParameters>,
 }
 
 #[derive(Debug, Deserialize)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 #[serde(rename_all = "camelCase")]
-struct CodeActionSettings {
+struct CodeActionParameters {
     enable: Option<bool>,
 }
 
