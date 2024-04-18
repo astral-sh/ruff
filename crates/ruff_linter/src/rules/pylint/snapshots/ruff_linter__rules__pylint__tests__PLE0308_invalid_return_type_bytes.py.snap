@@ -1,52 +1,42 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-invalid_return_type_bytes.py:5:16: PLE0308 `__bytes__` does not return `bytes`
+invalid_return_type_bytes.py:6:16: PLE0308 `__bytes__` does not return `bytes`
   |
-3 | class Float:
-4 |     def __bytes__(self):
-5 |         return 3.05  # [invalid-bytes-return]
+4 | class Float:
+5 |     def __bytes__(self):
+6 |         return 3.05  # [invalid-bytes-return]
   |                ^^^^ PLE0308
-6 | 
-7 | class Int:
   |
 
-invalid_return_type_bytes.py:9:16: PLE0308 `__bytes__` does not return `bytes`
+invalid_return_type_bytes.py:11:16: PLE0308 `__bytes__` does not return `bytes`
    |
- 7 | class Int:
- 8 |     def __bytes__(self):
- 9 |         return 0  # [invalid-bytes-return]
+ 9 | class Int:
+10 |     def __bytes__(self):
+11 |         return 0  # [invalid-bytes-return]
    |                ^ PLE0308
-10 | 
-11 | class Str:
    |
 
-invalid_return_type_bytes.py:13:16: PLE0308 `__bytes__` does not return `bytes`
+invalid_return_type_bytes.py:16:16: PLE0308 `__bytes__` does not return `bytes`
    |
-11 | class Str:
-12 |     def __bytes__(self):
-13 |         return "some bytes"  # [invalid-bytes-return]
+14 | class Str:
+15 |     def __bytes__(self):
+16 |         return "some bytes"  # [invalid-bytes-return]
    |                ^^^^^^^^^^^^ PLE0308
-14 | 
-15 | class BytesNoReturn:
    |
 
-invalid_return_type_bytes.py:17:9: PLE0308 `__bytes__` does not return `bytes`
+invalid_return_type_bytes.py:21:9: PLE0308 `__bytes__` does not return `bytes`
    |
-15 | class BytesNoReturn:
-16 |     def __bytes__(self):
-17 |         print("ruff")  # [invalid-bytes-return]
-   |         ^^^^^^^^^^^^^ PLE0308
-18 | 
-19 | class BytesWrongRaise:
-   |
-
-invalid_return_type_bytes.py:22:9: PLE0308 `__bytes__` does not return `bytes`
-   |
+19 | class BytesNoReturn:
 20 |     def __bytes__(self):
-21 |         print("raise some error")
-22 |         raise NotImplementedError  # [invalid-bytes-return]
+21 |         print("ruff")  # [invalid-bytes-return]
+   |         ^^^^^^^^^^^^^ PLE0308
+   |
+
+invalid_return_type_bytes.py:27:9: PLE0308 `__bytes__` does not return `bytes`
+   |
+25 |     def __bytes__(self):
+26 |         print("raise some error")
+27 |         raise NotImplementedError  # [invalid-bytes-return]
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^ PLE0308
-23 | 
-24 | # TODO: Once Ruff has better type checking
    |
