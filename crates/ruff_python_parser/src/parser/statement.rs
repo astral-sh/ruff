@@ -2085,7 +2085,7 @@ impl<'src> Parser<'src> {
                 self.expect(TokenKind::Rpar);
             }
 
-            let lhs = if parsed_with_items.len() == 1 && !has_trailing_comma {
+            let mut lhs = if parsed_with_items.len() == 1 && !has_trailing_comma {
                 // SAFETY: We've checked that `items` has only one item.
                 let expr = parsed_with_items.pop().unwrap().item.context_expr;
 
@@ -2145,7 +2145,18 @@ impl<'src> Parser<'src> {
             // considered when parsing the with item in the case. So, the parser
             // stops when it sees the `)` token and doesn't check for any postfix
             // expressions.
-            let context_expr = self.parse_postfix_expression(lhs, start);
+            lhs = self.parse_postfix_expression(lhs, start);
+
+            // test_ok ambiguous_lpar_with_items_if_expr
+            // with (x) if True else y: ...
+            // with (x for x in iter) if True else y: ...
+            // with (x async for x in iter) if True else y: ...
+            // with (x)[0] if True else y: ...
+            let context_expr = if self.at(TokenKind::If) {
+                Expr::If(self.parse_if_expression(lhs, start))
+            } else {
+                lhs
+            };
 
             let optional_vars = self
                 .at(TokenKind::As)

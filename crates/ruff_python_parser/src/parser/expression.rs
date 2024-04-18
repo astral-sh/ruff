@@ -2370,7 +2370,7 @@ impl<'src> Parser<'src> {
     /// If the parser isn't positioned at an `if` token.
     ///
     /// See: <https://docs.python.org/3/reference/expressions.html#conditional-expressions>
-    fn parse_if_expression(&mut self, body: Expr, start: TextSize) -> ast::ExprIf {
+    pub(super) fn parse_if_expression(&mut self, body: Expr, start: TextSize) -> ast::ExprIf {
         self.bump(TokenKind::If);
 
         let test = self.parse_simple_expression(AllowStarredExpression::No);
