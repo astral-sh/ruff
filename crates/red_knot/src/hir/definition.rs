@@ -417,34 +417,28 @@ impl DefinitionsVisitor<'_> {
     fn lower_type_parameter(&mut self, type_parameter: &TypeParam) -> TypeParameterId {
         match type_parameter {
             TypeParam::TypeVar(type_var) => {
-                let id = self
-                    .definitions
+                self.definitions
                     .type_parameters
                     .push(TypeParameter::TypeVar(TypeParameterTypeVar {
                         name: Name::new(&type_var.name),
                         ast_id: self.ast_id(type_var),
-                    }));
-                id
+                    }))
             }
             TypeParam::ParamSpec(param_spec) => {
-                let id = self
-                    .definitions
+                self.definitions
                     .type_parameters
                     .push(TypeParameter::ParamSpec(TypeParameterParamSpec {
                         name: Name::new(&param_spec.name),
                         ast_id: self.ast_id(param_spec),
-                    }));
-                id
+                    }))
             }
             TypeParam::TypeVarTuple(type_var_tuple) => {
-                let id = self
-                    .definitions
+                self.definitions
                     .type_parameters
                     .push(TypeParameter::TypeVarTuple(TypeParameterTypeVarTuple {
                         name: Name::new(&type_var_tuple.name),
                         ast_id: self.ast_id(type_var_tuple),
-                    }));
-                id
+                    }))
             }
         }
     }
@@ -546,17 +540,17 @@ impl PreorderVisitor<'_> for DefinitionsVisitor<'_> {
     fn visit_except_handler(&mut self, except_handler: &'_ ExceptHandler) {
         match except_handler {
             ExceptHandler::ExceptHandler(except_handler) => {
-                self.lower_except_handler(except_handler)
+                self.lower_except_handler(except_handler);
             }
         }
     }
 
     fn visit_with_item(&mut self, with_item: &'_ WithItem) {
-        self.lower_with_item(&with_item);
+        self.lower_with_item(with_item);
     }
 
     fn visit_match_case(&mut self, match_case: &'_ MatchCase) {
-        self.lower_match_case(&match_case);
+        self.lower_match_case(match_case);
         self.visit_body(&match_case.body);
     }
 }

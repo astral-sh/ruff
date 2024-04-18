@@ -17,7 +17,7 @@ pub trait AstNode: Ranged {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized;
-    fn cast_ref<'a>(kind: AnyNodeRef<'a>) -> Option<Self::Ref<'a>>;
+    fn cast_ref(kind: AnyNodeRef<'_>) -> Option<Self::Ref<'_>>;
 
     fn can_cast(kind: NodeKind) -> bool;
 
