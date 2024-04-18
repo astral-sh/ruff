@@ -25,7 +25,7 @@ of exciting features. It’s also faster than our previous [Python-based languag
 - Supports `source.fixAll` and `source.organizeImports` source actions
 - Automatically reloads your project configuration when you change it
 
-To setup `ruff server` with your editor, refer to the [README.md](http://README.mdhttps://github.com/astral-sh/ruff/blob/main/crates/ruff_server/README.md).
+To setup `ruff server` with your editor, refer to the [README.md](https://github.com/astral-sh/ruff/blob/main/crates/ruff_server/README.md).
 
 ### Preview features
 
