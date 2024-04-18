@@ -17,7 +17,7 @@ use crate::parser::{
 use crate::token_set::TokenSet;
 use crate::{Mode, ParseErrorType, Tok, TokenKind};
 
-use super::expression::{AllowNamedExpression, AllowStarredExpression};
+use super::expression::{AllowNamedExpression, AllowStarredExpression, Precedence};
 use super::Parenthesized;
 
 /// Tokens that represent compound statements.
@@ -2147,15 +2147,31 @@ impl<'src> Parser<'src> {
             // expressions.
             lhs = self.parse_postfix_expression(lhs, start);
 
-            // test_ok ambiguous_lpar_with_items_if_expr
-            // with (x) if True else y: ...
-            // with (x for x in iter) if True else y: ...
-            // with (x async for x in iter) if True else y: ...
-            // with (x)[0] if True else y: ...
             let context_expr = if self.at(TokenKind::If) {
+                // test_ok ambiguous_lpar_with_items_if_expr
+                // with (x) if True else y: ...
+                // with (x for x in iter) if True else y: ...
+                // with (x async for x in iter) if True else y: ...
+                // with (x)[0] if True else y: ...
                 Expr::If(self.parse_if_expression(lhs, start))
             } else {
-                lhs
+                // test_ok ambiguous_lpar_with_items_binary_expr
+                // # It doesn't matter what's inside the parentheses, these tests need to make sure
+                // # all binary expressions parses correctly.
+                // with (a) and b: ...
+                // with (a) is not b: ...
+                // # Make sure precedence works
+                // with (a) or b and c: ...
+                // with (a) and b or c: ...
+                // with (a | b) << c | d: ...
+                // # Postfix should still be parsed first
+                // with (a)[0] + b * c: ...
+                self.parse_expression_with_precedence_recursive(
+                    lhs.into(),
+                    Precedence::Initial,
+                    start,
+                )
+                .expr
             };
 
             let optional_vars = self
