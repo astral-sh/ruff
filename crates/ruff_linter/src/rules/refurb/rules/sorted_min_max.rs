@@ -80,7 +80,7 @@ pub(crate) fn sorted_min_max(checker: &mut Checker, subscript: &ast::ExprSubscri
     };
 
     // Check if the value is a call to `sorted()`.
-    if !matches!(func.as_ref(), Expr::Name(name) if name.id == "sorted" && checker.semantic().is_builtin(name.id.as_str()))
+    if !matches!(func.as_ref(), Expr::Name(name) if name.id == "sorted" && checker.semantic().has_builtin_binding(name.id.as_str()))
     {
         return;
     };
