@@ -27,6 +27,9 @@ pub(crate) struct ResolvedClientSettings {
     editor_settings: ResolvedEditorSettings,
 }
 
+/// Contains the resolved values of 'editor settings' - Ruff configuration for the linter/formatter that was passed in via
+/// LSP client settings. These fields are optional because we don't want to override file-based linter/formatting settings
+/// if these were un-set.
 #[derive(Debug, Default)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 #[allow(dead_code)] // TODO(jane): Remove once editor settings resolution is implemented
