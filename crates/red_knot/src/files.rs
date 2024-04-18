@@ -106,6 +106,7 @@ impl Eq for FilesInner {}
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::PathBuf;
 
     #[test]
     fn insert_path_twice_same_id() {
