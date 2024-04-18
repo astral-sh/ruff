@@ -648,7 +648,7 @@ mod tests {
                     extend_select: None,
                     ignore: Some(vec![RuleSelector::from_str("RUF001").unwrap()]),
                     exclude: Some(vec![PathBuf::from_str("third_party").unwrap()]),
-                    line_length: Some(LineLength::from_u16_for_testing_only(80u16))
+                    line_length: Some(LineLength::try_from(80).unwrap())
                 }
             }
         );

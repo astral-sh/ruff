@@ -32,12 +32,6 @@ impl LineLength {
     pub fn text_len(&self) -> TextSize {
         TextSize::from(u32::from(self.value()))
     }
-
-    pub fn from_u16_for_testing_only(length: u16) -> Self {
-        assert!(length >= 1);
-        assert!(length <= 320);
-        Self(length.try_into().unwrap())
-    }
 }
 
 impl Default for LineLength {
