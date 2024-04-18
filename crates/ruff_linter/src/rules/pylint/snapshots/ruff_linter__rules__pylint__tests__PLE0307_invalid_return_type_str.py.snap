@@ -36,7 +36,7 @@ invalid_return_type_str.py:21:16: PLE0307 `__str__` does not return `str`
 invalid_return_type_str.py:58:9: PLE0307 `__str__` does not return `str`
    |
 57 | class Str5:
-58 |     def __str__(self):
+58 |     def __str__(self):  # PLE0307 (returns None if x <= 0)
    |         ^^^^^^^ PLE0307
 59 |         if x > 0:
 60 |             raise RuntimeError("__str__ not allowed")

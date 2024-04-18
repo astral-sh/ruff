@@ -55,6 +55,6 @@ class Str4:
 
 
 class Str5:
-    def __str__(self):
+    def __str__(self):  # PLE0307 (returns None if x <= 0)
         if x > 0:
             raise RuntimeError("__str__ not allowed")
