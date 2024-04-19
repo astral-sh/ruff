@@ -63,6 +63,8 @@ use crate::rules::pyupgrade::helpers::curly_escape;
 /// print("%s" % val)  # "1"
 /// print("{}".format(val))  # "(1,)"
 /// ```
+/// In most cases, where `val` is not a literal that our analysis can locate,
+/// no fix will be offered (but in these specific examples, a fix exists).
 ///
 /// ## References
 /// - [Python documentation: `printf`-style String Formatting](https://docs.python.org/3/library/stdtypes.html#old-string-formatting)
