@@ -2492,7 +2492,12 @@ impl<'src> Parser<'src> {
         };
 
         self.expect(TokenKind::Colon);
-        let body = self.parse_body(Clause::Match);
+
+        // test_err case_expect_indented_block
+        // match subject:
+        //     case 1:
+        //     case 2: ...
+        let body = self.parse_body(Clause::Case);
 
         ast::MatchCase {
             pattern,
@@ -3363,7 +3368,7 @@ enum Clause {
     Class,
     While,
     FunctionDef,
-    Match,
+    Case,
     Try,
     Except,
     Finally,
@@ -3380,7 +3385,7 @@ impl Display for Clause {
             Clause::Class => write!(f, "`class` definition"),
             Clause::While => write!(f, "`while` statement"),
             Clause::FunctionDef => write!(f, "function definition"),
-            Clause::Match => write!(f, "`match` statement"),
+            Clause::Case => write!(f, "`case` block"),
             Clause::Try => write!(f, "`try` statement"),
             Clause::Except => write!(f, "`except` clause"),
             Clause::Finally => write!(f, "`finally` clause"),

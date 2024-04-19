@@ -5,6 +5,7 @@ use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast};
 use ruff_python_semantic::analyze::function_type::is_stub;
+use ruff_python_semantic::analyze::terminal::Terminal;
 use ruff_python_semantic::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
 use ruff_text_size::Ranged;
 
@@ -43,7 +44,7 @@ impl Violation for InvalidBoolReturnType {
     }
 }
 
-/// E0307
+/// PLE0304
 pub(crate) fn invalid_bool_return(checker: &mut Checker, function_def: &ast::StmtFunctionDef) {
     if function_def.name.as_str() != "__bool__" {
         return;
@@ -57,18 +58,28 @@ pub(crate) fn invalid_bool_return(checker: &mut Checker, function_def: &ast::Stm
         return;
     }
 
+    // Determine the terminal behavior (i.e., implicit return, no return, etc.).
+    let terminal = Terminal::from_function(function_def);
+
+    // If every control flow path raises an exception, ignore the function.
+    if terminal == Terminal::Raise {
+        return;
+    }
+
+    // If there are no return statements, add a diagnostic.
+    if terminal == Terminal::Implicit {
+        checker.diagnostics.push(Diagnostic::new(
+            InvalidBoolReturnType,
+            function_def.identifier(),
+        ));
+        return;
+    }
+
     let returns = {
         let mut visitor = ReturnStatementVisitor::default();
         visitor.visit_body(&function_def.body);
         visitor.returns
     };
-
-    if returns.is_empty() {
-        checker.diagnostics.push(Diagnostic::new(
-            InvalidBoolReturnType,
-            function_def.identifier(),
-        ));
-    }
 
     for stmt in returns {
         if let Some(value) = stmt.value.as_deref() {

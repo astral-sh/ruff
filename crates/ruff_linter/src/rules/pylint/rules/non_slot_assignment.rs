@@ -59,7 +59,7 @@ impl Violation for NonSlotAssignment {
     }
 }
 
-/// E0237
+/// PLE0237
 pub(crate) fn non_slot_assignment(checker: &mut Checker, class_def: &ast::StmtClassDef) {
     let semantic = checker.semantic();
 

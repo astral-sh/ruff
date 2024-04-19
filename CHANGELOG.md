@@ -1,5 +1,80 @@
 # Changelog
 
+## 0.4.0
+
+### A new, hand-written parser
+
+Ruff's new parser is **>2x faster**, which translates to a **20-40% speedup** for all linting and formatting invocations.
+There's a lot to say about this exciting change, so check out the [blog post](https://astral.sh/blog/ruff-v0.4.0) for more details!
+
+See [#10036](https://github.com/astral-sh/ruff/pull/10036) for implementation details.
+
+### A new language server in Rust
+
+With this release, we also want to highlight our new language server. `ruff server` is a Rust-powered language
+server that comes built-in with Ruff. It can be used with any editor that supports the [Language Server Protocol](https://microsoft.github.io/language-server-protocol/) (LSP).
+It uses a multi-threaded, lock-free architecture inspired by `rust-analyzer` and it will open the door for a lot
+of exciting features. It’s also faster than our previous [Python-based language server](https://github.com/astral-sh/ruff-lsp)
+-- but you probably guessed that already.
+
+`ruff server` is only in alpha, but it has a lot of features that you can try out today:
+
+- Lints Python files automatically and shows quick-fixes when available
+- Formats Python files, with support for range formatting
+- Comes with commands for quickly performing actions: `ruff.applyAutofix`, `ruff.applyFormat`, and `ruff.applyOrganizeImports`
+- Supports `source.fixAll` and `source.organizeImports` source actions
+- Automatically reloads your project configuration when you change it
+
+To setup `ruff server` with your editor, refer to the [README.md](https://github.com/astral-sh/ruff/blob/main/crates/ruff_server/README.md).
+
+### Preview features
+
+- \[`pycodestyle`\] Do not trigger `E3` rules on `def`s following a function/method with a dummy body ([#10704](https://github.com/astral-sh/ruff/pull/10704))
+- \[`pylint`\] Implement `invalid-bytes-returned` (`E0308`) ([#10959](https://github.com/astral-sh/ruff/pull/10959))
+- \[`pylint`\] Implement `invalid-length-returned` (`E0303`) ([#10963](https://github.com/astral-sh/ruff/pull/10963))
+- \[`pylint`\] Implement `self-cls-assignment` (`W0642`) ([#9267](https://github.com/astral-sh/ruff/pull/9267))
+- \[`pylint`\] Omit stubs from `invalid-bool` and `invalid-str-return-type` ([#11008](https://github.com/astral-sh/ruff/pull/11008))
+- \[`ruff`\] New rule `unused-async` (`RUF029`) to detect unneeded `async` keywords on functions ([#9966](https://github.com/astral-sh/ruff/pull/9966))
+
+### Rule changes
+
+- \[`flake8-bandit`\] Allow `urllib.request.urlopen` calls with static `Request` argument (`S310`) ([#10964](https://github.com/astral-sh/ruff/pull/10964))
+- \[`flake8-bugbear`\] Treat `raise NotImplemented`-only bodies as stub functions (`B006`) ([#10990](https://github.com/astral-sh/ruff/pull/10990))
+- \[`flake8-slots`\] Respect same-file `Enum` subclasses (`SLOT000`) ([#11006](https://github.com/astral-sh/ruff/pull/11006))
+- \[`pylint`\] Support inverted comparisons (`PLR1730`) ([#10920](https://github.com/astral-sh/ruff/pull/10920))
+
+### Linter
+
+- Improve handling of builtin symbols in linter rules ([#10919](https://github.com/astral-sh/ruff/pull/10919))
+- Improve display of rules in `--show-settings` ([#11003](https://github.com/astral-sh/ruff/pull/11003))
+- Improve inference capabilities of the `BuiltinTypeChecker` ([#10976](https://github.com/astral-sh/ruff/pull/10976))
+- Resolve classes and functions relative to script name ([#10965](https://github.com/astral-sh/ruff/pull/10965))
+- Improve performance of `RuleTable::any_enabled` ([#10971](https://github.com/astral-sh/ruff/pull/10971))
+
+### Server
+
+*This section is devoted to updates for our new language server, written in Rust.*
+
+- Enable ruff-specific source actions ([#10916](https://github.com/astral-sh/ruff/pull/10916))
+- Refreshes diagnostics for open files when file configuration is changed ([#10988](https://github.com/astral-sh/ruff/pull/10988))
+- Important errors are now shown as popups ([#10951](https://github.com/astral-sh/ruff/pull/10951))
+- Introduce settings for directly configuring the linter and formatter ([#10984](https://github.com/astral-sh/ruff/pull/10984))
+- Resolve configuration for each document individually ([#10950](https://github.com/astral-sh/ruff/pull/10950))
+- Write a setup guide for Neovim ([#10987](https://github.com/astral-sh/ruff/pull/10987))
+
+### Configuration
+
+- Add `RUFF_OUTPUT_FILE` environment variable support ([#10992](https://github.com/astral-sh/ruff/pull/10992))
+
+### Bug fixes
+
+- Avoid `non-augmented-assignment` for reversed, non-commutative operators (`PLR6104`) ([#10909](https://github.com/astral-sh/ruff/pull/10909))
+- Limit commutative non-augmented-assignments to primitive data types (`PLR6104`) ([#10912](https://github.com/astral-sh/ruff/pull/10912))
+- Respect `per-file-ignores` for `RUF100` on blanket `# noqa` ([#10908](https://github.com/astral-sh/ruff/pull/10908))
+- Consider `if` expression for parenthesized with items parsing ([#11010](https://github.com/astral-sh/ruff/pull/11010))
+- Consider binary expr for parenthesized with items parsing ([#11012](https://github.com/astral-sh/ruff/pull/11012))
+- Reset `FOR_TARGET` context for all kinds of parentheses ([#11009](https://github.com/astral-sh/ruff/pull/11009))
+
 ## 0.3.7
 
 ### Preview features
@@ -1385,7 +1460,7 @@ Read Ruff's new [versioning policy](https://docs.astral.sh/ruff/versioning/).
 - \[`refurb`\] Add `single-item-membership-test` (`FURB171`) ([#7815](https://github.com/astral-sh/ruff/pull/7815))
 - \[`pylint`\] Add `and-or-ternary` (`R1706`) ([#7811](https://github.com/astral-sh/ruff/pull/7811))
 
-_New rules are added in [preview](https://docs.astral.sh/ruff/preview/)._
+*New rules are added in [preview](https://docs.astral.sh/ruff/preview/).*
 
 ### Configuration
 
