@@ -17,7 +17,8 @@ use crate::fix::edits::add_argument;
 /// iterable. This can lead to subtle bugs.
 ///
 /// Use the `strict` parameter to raise a `ValueError` if the iterables are of
-/// non-uniform length.
+/// non-uniform length. If the iterables are intentionally different lengths the
+/// parameter should be explicitly set to False.
 ///
 /// ## Example
 /// ```python
