@@ -1,0 +1,41 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+invalid_return_type_index.py:8:16: PLE0305 `__index__` does not return an integer
+  |
+7 |     def __index__(self):
+8 |         return True  # [invalid-index-return]
+  |                ^^^^ PLE0305
+  |
+
+invalid_return_type_index.py:13:16: PLE0305 `__index__` does not return an integer
+   |
+11 | class Float:
+12 |     def __index__(self):
+13 |         return 3.05  # [invalid-index-return]
+   |                ^^^^ PLE0305
+   |
+
+invalid_return_type_index.py:18:16: PLE0305 `__index__` does not return an integer
+   |
+16 | class Dict:
+17 |     def __index__(self):
+18 |         return {"1": "1"}  # [invalid-index-return]
+   |                ^^^^^^^^^^ PLE0305
+   |
+
+invalid_return_type_index.py:23:16: PLE0305 `__index__` does not return an integer
+   |
+21 | class Str:
+22 |     def __index__(self):
+23 |         return "ruff"  # [invalid-index-return]
+   |                ^^^^^^ PLE0305
+   |
+
+invalid_return_type_index.py:27:9: PLE0305 `__index__` does not return an integer
+   |
+26 | class IndexNoReturn:
+27 |     def __index__(self):
+   |         ^^^^^^^^^ PLE0305
+28 |         print("ruff")  # [invalid-index-return]
+   |

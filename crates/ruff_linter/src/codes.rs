@@ -243,6 +243,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "E0302") => (RuleGroup::Stable, rules::pylint::rules::UnexpectedSpecialMethodSignature),
         (Pylint, "E0303") => (RuleGroup::Preview, rules::pylint::rules::InvalidLengthReturnType),
         (Pylint, "E0304") => (RuleGroup::Preview, rules::pylint::rules::InvalidBoolReturnType),
+        (Pylint, "E0305") => (RuleGroup::Preview, rules::pylint::rules::InvalidIndexReturnType),
         (Pylint, "E0307") => (RuleGroup::Stable, rules::pylint::rules::InvalidStrReturnType),
         (Pylint, "E0308") => (RuleGroup::Preview, rules::pylint::rules::InvalidBytesReturnType),
         (Pylint, "E0309") => (RuleGroup::Preview, rules::pylint::rules::InvalidHashReturnType),

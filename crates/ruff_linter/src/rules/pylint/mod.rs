@@ -81,6 +81,10 @@ mod tests {
         Rule::InvalidBytesReturnType,
         Path::new("invalid_return_type_bytes.py")
     )]
+    #[test_case(
+        Rule::InvalidIndexReturnType,
+        Path::new("invalid_return_type_index.py")
+    )]
     #[test_case(Rule::InvalidHashReturnType, Path::new("invalid_return_type_hash.py"))]
     #[test_case(
         Rule::InvalidLengthReturnType,
