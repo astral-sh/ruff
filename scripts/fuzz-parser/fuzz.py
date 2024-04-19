@@ -37,7 +37,7 @@ Seed = NewType("Seed", int)
 
 def run_ruff(executable_args: list[str], code: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
-        executable_args + ["check", "--select=E999", "--no-cache", "-"],
+        [*executable_args, "check", "--select=E999", "--no-cache", "-"],
         capture_output=True,
         text=True,
         input=code,
@@ -83,7 +83,7 @@ class FuzzResult:
 
 
 def fuzz_code(seed: Seed, only_new_bugs: bool) -> FuzzResult:
-    """Return a `FuzzResult` instance describing the outcome of fuzzing with this seed."""
+    """Return a `FuzzResult` instance describing the fuzzing result from this seed."""
     code = generate_random_code(seed)
     if contains_bug(code, only_new_bugs=only_new_bugs):
         try:
@@ -181,7 +181,7 @@ def parse_seed_argument(arg: str) -> int | range:
             if len(seed_range) > 1_000_000_000:
                 raise argparse.ArgumentTypeError(range_too_long)
         except OverflowError:
-            raise argparse.ArgumentTypeError(range_too_long)
+            raise argparse.ArgumentTypeError(range_too_long) from None
         return range(int(start), int(end) + 1)
     return int(arg)
 
