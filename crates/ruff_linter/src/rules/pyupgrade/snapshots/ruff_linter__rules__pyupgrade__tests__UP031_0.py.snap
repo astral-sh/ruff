@@ -926,6 +926,8 @@ UP031_0.py:115:8: UP031 [*] Use format specifiers instead of percent format
 118 | |     hexlify(cert.fingerprint(hashes.SHA256())).decode("ascii")[0:8], # fingerprint prefix
 119 | | )
     | |_^ UP031
+120 |   
+121 |   s = set([x, y])
     |
     = help: Replace with format specifiers
 
@@ -939,4 +941,89 @@ UP031_0.py:115:8: UP031 [*] Use format specifiers instead of percent format
 117 117 |     cert.not_valid_after.date().isoformat().replace("-", ""), # expiration date
 118 118 |     hexlify(cert.fingerprint(hashes.SHA256())).decode("ascii")[0:8], # fingerprint prefix
 
+UP031_0.py:122:1: UP031 [*] Use format specifiers instead of percent format
+    |
+121 | s = set([x, y])
+122 | "%s" % s
+    | ^^^^^^^^ UP031
+123 | # UP031: deref s to non-tuple, offer fix
+    |
+    = help: Replace with format specifiers
 
+ℹ Unsafe fix
+119 119 | )
+120 120 | 
+121 121 | s = set([x, y])
+122     |-"%s" % s
+    122 |+"{}".format(s)
+123 123 | # UP031: deref s to non-tuple, offer fix
+124 124 | 
+125 125 | t1 = (x,)
+
+UP031_0.py:126:1: UP031 [*] Use format specifiers instead of percent format
+    |
+125 | t1 = (x,)
+126 | "%s" % t1
+    | ^^^^^^^^^ UP031
+127 | # UP031: deref t1 to 1-tuple, offer fix
+    |
+    = help: Replace with format specifiers
+
+ℹ Unsafe fix
+123 123 | # UP031: deref s to non-tuple, offer fix
+124 124 | 
+125 125 | t1 = (x,)
+126     |-"%s" % t1
+    126 |+"{}".format(t1[0])
+127 127 | # UP031: deref t1 to 1-tuple, offer fix
+128 128 | 
+129 129 | t2 = (x,y)
+
+UP031_0.py:130:1: UP031 Use format specifiers instead of percent format
+    |
+129 | t2 = (x,y)
+130 | "%s" % t2
+    | ^^^^^^^^^ UP031
+131 | # UP031: deref t2 to n-tuple, this is a bug
+    |
+    = help: Replace with format specifiers
+
+UP031_0.py:134:1: UP031 [*] Use format specifiers instead of percent format
+    |
+133 | # UP031 (no longer false negatives)
+134 | 'Hello %s' % bar
+    | ^^^^^^^^^^^^^^^^ UP031
+135 | 
+136 | 'Hello %s' % bar.baz
+    |
+    = help: Replace with format specifiers
+
+ℹ Unsafe fix
+131 131 | # UP031: deref t2 to n-tuple, this is a bug
+132 132 | 
+133 133 | # UP031 (no longer false negatives)
+134     |-'Hello %s' % bar
+    134 |+'Hello {}'.format(bar)
+135 135 | 
+136 136 | 'Hello %s' % bar.baz
+137 137 | 
+
+UP031_0.py:136:1: UP031 Use format specifiers instead of percent format
+    |
+134 | 'Hello %s' % bar
+135 | 
+136 | 'Hello %s' % bar.baz
+    | ^^^^^^^^^^^^^^^^^^^^ UP031
+137 | 
+138 | 'Hello %s' % bar['bop']
+    |
+    = help: Replace with format specifiers
+
+UP031_0.py:138:1: UP031 Use format specifiers instead of percent format
+    |
+136 | 'Hello %s' % bar.baz
+137 | 
+138 | 'Hello %s' % bar['bop']
+    | ^^^^^^^^^^^^^^^^^^^^^^^ UP031
+    |
+    = help: Replace with format specifiers
