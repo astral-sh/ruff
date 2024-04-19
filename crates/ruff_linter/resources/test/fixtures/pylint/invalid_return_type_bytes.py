@@ -21,12 +21,6 @@ class BytesNoReturn:
         print("ruff")  # [invalid-bytes-return]
 
 
-class BytesWrongRaise:
-    def __bytes__(self):
-        print("raise some error")
-        raise NotImplementedError  # [invalid-bytes-return]
-
-
 # TODO: Once Ruff has better type checking
 def return_bytes():
     return "some string"
@@ -62,4 +56,10 @@ class Bytes4:
 
 class Bytes5:
     def __bytes__(self):
+        raise NotImplementedError
+
+
+class Bytes6:
+    def __bytes__(self):
+        print("raise some error")
         raise NotImplementedError

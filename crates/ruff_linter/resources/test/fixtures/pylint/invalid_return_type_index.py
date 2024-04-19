@@ -3,6 +3,7 @@
 
 class Bool:
     """pylint would not raise, but ruff does - see explanation in the docs"""
+
     def __index__(self):
         return True  # [invalid-index-return]
 
@@ -25,12 +26,6 @@ class Str:
 class IndexNoReturn:
     def __index__(self):
         print("ruff")  # [invalid-index-return]
-
-
-class IndexWrongRaise:
-    def __index__(self):
-        print("raise some error")
-        raise NotImplementedError  # [invalid-index-return]
 
 
 # TODO: Once Ruff has better type checking
@@ -69,4 +64,10 @@ class Index4:
 
 class Index5:
     def __index__(self):
+        raise NotImplementedError
+
+
+class Index6:
+    def __index__(self):
+        print("raise some error")
         raise NotImplementedError

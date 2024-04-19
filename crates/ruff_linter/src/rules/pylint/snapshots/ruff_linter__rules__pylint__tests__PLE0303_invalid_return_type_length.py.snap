@@ -40,12 +40,3 @@ invalid_return_type_length.py:26:16: PLE0303 `__len__` does not return a non-neg
 26 |         return -42  # [invalid-length-return]
    |                ^^^ PLE0303
    |
-
-invalid_return_type_length.py:30:9: PLE0303 `__len__` does not return a non-negative integer
-   |
-29 | class LengthWrongRaise:
-30 |     def __len__(self):
-   |         ^^^^^^^ PLE0303
-31 |         print("raise some error")
-32 |         raise NotImplementedError  # [invalid-length-return]
-   |

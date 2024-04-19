@@ -12,48 +12,46 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for `__index__` implementations that return a type other than `integer`.
+/// Checks for `__hash__` implementations that return a type other than `integer`.
 ///
 /// ## Why is this bad?
-/// The `__index__` method should return an `integer`. Returning a different
+/// The `__hash__` method should return an `integer`. Returning a different
 /// type may cause unexpected behavior.
 ///
-/// Note: `bool` is a subclass of `int`, so it's technically valid for `__index__` to
-/// return `True` or `False`. However, a DeprecationWarning (`DeprecationWarning:
-/// __index__ returned non-int (type bool)`) for such cases was already introduced,
-/// thus this is a conscious difference between the original pylint rule and the
-/// current ruff implementation.
+/// Note: `bool` is a subclass of `int`, so it's technically valid for `__hash__` to
+/// return `True` or `False`. However, for consistency with other rules, Ruff will
+/// still raise when `__hash__` returns a `bool`.
 ///
 /// ## Example
 /// ```python
 /// class Foo:
-///     def __index__(self):
+///     def __hash__(self):
 ///         return "2"
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// class Foo:
-///     def __index__(self):
+///     def __hash__(self):
 ///         return 2
 /// ```
 ///
 ///
 /// ## References
-/// - [Python documentation: The `__index__` method](https://docs.python.org/3/reference/datamodel.html#object.__index__)
+/// - [Python documentation: The `__hash__` method](https://docs.python.org/3/reference/datamodel.html#object.__hash__)
 #[violation]
-pub struct InvalidIndexReturnType;
+pub struct InvalidHashReturnType;
 
-impl Violation for InvalidIndexReturnType {
+impl Violation for InvalidHashReturnType {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`__index__` does not return an integer")
+        format!("`__hash__` does not return an integer")
     }
 }
 
-/// E0305
-pub(crate) fn invalid_index_return(checker: &mut Checker, function_def: &ast::StmtFunctionDef) {
-    if function_def.name.as_str() != "__index__" {
+/// E0309
+pub(crate) fn invalid_hash_return(checker: &mut Checker, function_def: &ast::StmtFunctionDef) {
+    if function_def.name.as_str() != "__hash__" {
         return;
     }
 
@@ -76,7 +74,7 @@ pub(crate) fn invalid_index_return(checker: &mut Checker, function_def: &ast::St
     // If there are no return statements, add a diagnostic.
     if terminal == Terminal::Implicit {
         checker.diagnostics.push(Diagnostic::new(
-            InvalidIndexReturnType,
+            InvalidHashReturnType,
             function_def.identifier(),
         ));
         return;
@@ -97,13 +95,13 @@ pub(crate) fn invalid_index_return(checker: &mut Checker, function_def: &ast::St
             ) {
                 checker
                     .diagnostics
-                    .push(Diagnostic::new(InvalidIndexReturnType, value.range()));
+                    .push(Diagnostic::new(InvalidHashReturnType, value.range()));
             }
         } else {
             // Disallow implicit `None`.
             checker
                 .diagnostics
-                .push(Diagnostic::new(InvalidIndexReturnType, stmt.range()));
+                .push(Diagnostic::new(InvalidHashReturnType, stmt.range()));
         }
     }
 }
