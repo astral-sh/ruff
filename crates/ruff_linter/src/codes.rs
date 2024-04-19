@@ -245,6 +245,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "E0304") => (RuleGroup::Preview, rules::pylint::rules::InvalidBoolReturnType),
         (Pylint, "E0307") => (RuleGroup::Stable, rules::pylint::rules::InvalidStrReturnType),
         (Pylint, "E0308") => (RuleGroup::Preview, rules::pylint::rules::InvalidBytesReturnType),
+        (Pylint, "E0309") => (RuleGroup::Preview, rules::pylint::rules::InvalidHashReturnType),
         (Pylint, "E0604") => (RuleGroup::Stable, rules::pylint::rules::InvalidAllObject),
         (Pylint, "E0605") => (RuleGroup::Stable, rules::pylint::rules::InvalidAllFormat),
         (Pylint, "E0643") => (RuleGroup::Preview, rules::pylint::rules::PotentialIndexError),
