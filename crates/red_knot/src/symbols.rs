@@ -292,6 +292,16 @@ impl<'a> PreorderVisitor<'a> for SymbolTableBuilder {
                 ast::visitor::preorder::walk_stmt(self, stmt);
                 self.pop_scope();
             }
+            ast::Stmt::Import(ast::StmtImport { names, .. }) => {
+                for alias in names {
+                    self.add_symbol(alias.name.id.split('.').next().unwrap());
+                }
+            }
+            ast::Stmt::ImportFrom(ast::StmtImportFrom { names, .. }) => {
+                for alias in names {
+                    self.add_symbol(&alias.name.id);
+                }
+            }
             _ => {
                 ast::visitor::preorder::walk_stmt(self, stmt);
             }
@@ -336,6 +346,24 @@ mod tests {
         fn annotation_only() {
             let table = build("x: int");
             assert_eq!(names(table.root_symbols()), vec!["int", "x"]);
+        }
+
+        #[test]
+        fn import() {
+            let table = build("import foo");
+            assert_eq!(names(table.root_symbols()), vec!["foo"]);
+        }
+
+        #[test]
+        fn import_sub() {
+            let table = build("import foo.bar");
+            assert_eq!(names(table.root_symbols()), vec!["foo"]);
+        }
+
+        #[test]
+        fn import_from() {
+            let table = build("from bar import foo");
+            assert_eq!(names(table.root_symbols()), vec!["foo"]);
         }
 
         #[test]
