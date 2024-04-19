@@ -1,10 +1,8 @@
-#![allow(dead_code, unused_imports)]
+#![allow(dead_code)]
 use super::Name;
 use hashbrown::hash_map::{Keys, RawEntryMut};
-use itertools::Itertools;
 use ruff_index::{newtype_index, IndexVec};
-use ruff_python_ast::visitor::preorder::{PreorderVisitor, TraversalSignal};
-use ruff_python_ast::visitor::{preorder, Visitor};
+use ruff_python_ast::visitor::preorder::PreorderVisitor;
 use ruff_python_ast::{self as ast};
 use ruff_python_parser::{Mode, ParseError};
 use ruff_text_size::{Ranged, TextRange};
@@ -343,6 +341,7 @@ impl<'a> PreorderVisitor<'a> for SymbolTableBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use itertools::Itertools;
     use textwrap::dedent;
 
     mod from_ast {
