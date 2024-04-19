@@ -149,17 +149,18 @@ def main(args: ResolvedCliArgs) -> None:
         print(
             f"As you have selected `--only-new-bugs`, "
             f"bugs will only be reported if they appear on your current branch "
-            f"but do *not* appear in `ruff=={ruff_version}"
+            f"but do *not* appear in `ruff=={ruff_version}`"
         )
     if len(args.seeds) <= 5:
         bugs = run_fuzzer_sequentially(args)
     else:
         bugs = run_fuzzer_concurrently(args)
+    noun_phrase = "New bugs" if args.only_new_bugs else "Bugs"
     if bugs:
-        print(colored("Bugs found in the following seeds:", "red"))
+        print(colored(f"{noun_phrase} found in the following seeds:", "red"))
         print(*sorted(bug.seed for bug in bugs))
     else:
-        print(colored("No bugs found!", "green"))
+        print(colored(f"No {noun_phrase.lower()} found!", "green"))
 
 
 def parse_seed_argument(arg: str) -> int | range:
