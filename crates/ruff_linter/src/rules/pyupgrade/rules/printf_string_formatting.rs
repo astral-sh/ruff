@@ -325,20 +325,19 @@ fn clean_params_variable<'a>(checker: &mut Checker, right: &Expr) -> Option<Cow<
             }
             // 1-tuple
             Expr::Tuple(ast::ExprTuple { elts, .. }) if 1 == elts.len() => {
-                return Some(Cow::Owned(format!("({}[0])", rt)));
+                return Some(Cow::Owned(format!("({rt}[0])")));
             }
             // non-tuple
             _ => {
-                return Some(Cow::Owned(format!("({})", rt)));
+                return Some(Cow::Owned(format!("({rt})")));
             }
         }
     }
     // when find_binding_value doesn't work, fall back to offering a fix only for non-tuples
     if analyze::typing::is_tuple(binding, semantic) {
         return None;
-    } else {
-        return Some(Cow::Owned(format!("({})", rt)));
     }
+    return Some(Cow::Owned(format!("({rt})")));
 }
 
 /// Returns `true` if the sequence of [`PercentFormatPart`] indicate that an
