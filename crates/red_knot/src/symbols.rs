@@ -34,7 +34,7 @@ impl Parsed {
     }
 }
 
-fn parse(source: SourceText) -> Parsed {
+fn parse(source: &SourceText) -> Parsed {
     let result = ruff_python_parser::parse(&source.text, Mode::Module);
 
     let (module, errors) = match result {
@@ -143,9 +143,9 @@ impl SymbolTable {
         table
     }
 
-    pub(crate) fn from_ast(module: ast::ModModule) -> SymbolTable {
+    pub(crate) fn from_ast(module: &ast::ModModule) -> SymbolTable {
         let table = SymbolTable::new();
-        let root_scope_id = table.root_scope_id();
+        let root_scope_id = SymbolTable::root_scope_id();
         let mut builder = SymbolTableBuilder {
             table,
             scopes: vec![root_scope_id],
@@ -154,12 +154,12 @@ impl SymbolTable {
         builder.table
     }
 
-    pub(crate) fn root_scope_id(&self) -> ScopeId {
+    pub(crate) fn root_scope_id() -> ScopeId {
         ScopeId::from_usize(0)
     }
 
     pub(crate) fn root_scope(&self) -> &Scope {
-        &self.scopes_by_id[self.root_scope_id()]
+        &self.scopes_by_id[SymbolTable::root_scope_id()]
     }
 
     pub(crate) fn symbols_for_scope(
@@ -174,7 +174,7 @@ impl SymbolTable {
     }
 
     pub(crate) fn root_symbols(&self) -> SymbolIterator<Copied<Keys<SymbolId, ()>>> {
-        self.symbols_for_scope(self.root_scope_id())
+        self.symbols_for_scope(SymbolTable::root_scope_id())
     }
 
     pub(crate) fn child_scopes_of(&self, scope_id: ScopeId) -> &[ScopeId] {
@@ -182,12 +182,12 @@ impl SymbolTable {
     }
 
     pub(crate) fn root_child_scopes(&self) -> &[ScopeId] {
-        &self.child_scopes_of(self.root_scope_id())
+        self.child_scopes_of(SymbolTable::root_scope_id())
     }
 
     pub(crate) fn symbol_by_name(&self, scope_id: ScopeId, name: &str) -> Option<&Symbol> {
         let scope = &self.scopes_by_id[scope_id];
-        let hash = self.hash_name(name);
+        let hash = SymbolTable::hash_name(name);
         let name = Name::new(name);
         scope
             .symbols_by_name
@@ -197,7 +197,7 @@ impl SymbolTable {
     }
 
     pub(crate) fn add_symbol_to_scope(&mut self, scope_id: ScopeId, name: &str) -> SymbolId {
-        let hash = self.hash_name(name);
+        let hash = SymbolTable::hash_name(name);
         let scope = &mut self.scopes_by_id[scope_id];
         let name = Name::new(name);
 
@@ -233,7 +233,7 @@ impl SymbolTable {
         new_scope_id
     }
 
-    fn hash_name(&self, name: &str) -> u64 {
+    fn hash_name(name: &str) -> u64 {
         let mut hasher = FxHasher::default();
         name.hash(&mut hasher);
         hasher.finish()
@@ -272,11 +272,8 @@ impl SymbolTableBuilder {
 
 impl<'a> PreorderVisitor<'a> for SymbolTableBuilder {
     fn visit_expr(&mut self, expr: &'a ast::Expr) {
-        match expr {
-            ast::Expr::Name(ast::ExprName { id, .. }) => {
-                self.add_symbol(id);
-            }
-            _ => {}
+        if let ast::Expr::Name(ast::ExprName { id, .. }) = expr {
+            self.add_symbol(id);
         }
         ast::visitor::preorder::walk_expr(self, expr);
     }
@@ -312,8 +309,8 @@ mod tests {
 
         fn build(code: &str) -> SymbolTable {
             let source_text = SourceText { text: dedent(code) };
-            let parsed = parse(source_text);
-            SymbolTable::from_ast(parsed.ast)
+            let parsed = parse(&source_text);
+            SymbolTable::from_ast(&parsed.ast)
         }
 
         fn names<I>(it: SymbolIterator<I>) -> Vec<&str>
@@ -404,7 +401,7 @@ mod tests {
     #[test]
     fn insert_same_name_symbol_twice() {
         let mut table = SymbolTable::new();
-        let root_scope_id = table.root_scope_id();
+        let root_scope_id = SymbolTable::root_scope_id();
         let symbol_id_1 = table.add_symbol_to_scope(root_scope_id, "foo");
         let symbol_id_2 = table.add_symbol_to_scope(root_scope_id, "foo");
         assert_eq!(symbol_id_1, symbol_id_2);
@@ -413,7 +410,7 @@ mod tests {
     #[test]
     fn insert_different_named_symbols() {
         let mut table = SymbolTable::new();
-        let root_scope_id = table.root_scope_id();
+        let root_scope_id = SymbolTable::root_scope_id();
         let symbol_id_1 = table.add_symbol_to_scope(root_scope_id, "foo");
         let symbol_id_2 = table.add_symbol_to_scope(root_scope_id, "bar");
         assert_ne!(symbol_id_1, symbol_id_2);
@@ -422,7 +419,7 @@ mod tests {
     #[test]
     fn add_child_scope_with_symbol() {
         let mut table = SymbolTable::new();
-        let root_scope_id = table.root_scope_id();
+        let root_scope_id = SymbolTable::root_scope_id();
         let foo_symbol_top = table.add_symbol_to_scope(root_scope_id, "foo");
         let c_scope = table.add_child_scope(root_scope_id, "C", ScopeKind::Class);
         let foo_symbol_inner = table.add_symbol_to_scope(c_scope, "foo");
