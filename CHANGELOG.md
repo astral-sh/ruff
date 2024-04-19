@@ -9,10 +9,10 @@
 
 ### Bug fixes
 
-- Allow `NoReturn`-like functions for `__str__`, `__len__`, etc. ([#11017](https://github.com/astral-sh/ruff/pull/11017))
-- Use empty range when there's "gap" in token source ([#11032](https://github.com/astral-sh/ruff/pull/11032))
+- \[`pylint`\] Allow `NoReturn`-like functions for `__str__`, `__len__`, etc. (`PLE0307`) ([#11017](https://github.com/astral-sh/ruff/pull/11017))
+- Parser: Use empty range when there's "gap" in token source ([#11032](https://github.com/astral-sh/ruff/pull/11032))
 - \[`ruff`\] Ignore stub functions in `unused-async` (`RUF029`) ([#11026](https://github.com/astral-sh/ruff/pull/11026))
-- Expect indented case block instead of match stmt ([#11033](https://github.com/astral-sh/ruff/pull/11033))
+- Parser: Expect indented case block instead of match stmt ([#11033](https://github.com/astral-sh/ruff/pull/11033))
 
 ## 0.4.0
 
