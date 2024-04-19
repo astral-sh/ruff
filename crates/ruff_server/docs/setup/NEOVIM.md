@@ -7,7 +7,7 @@
 1. Finally, add this to your `init.lua`:
 
 ```lua
-require('lspconfig').ruff.setup()
+require('lspconfig').ruff.setup {}
 ```
 
 See [`nvim-lspconfig`'s server configuration guide](https://github.com/neovim/nvim-lspconfig/blob/master/doc/server_configurations.md#ruff) for more details
