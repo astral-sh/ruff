@@ -7,8 +7,11 @@ The following dependencies must be installed into a Python environment to run th
 - `termcolor`
 - A released version of `ruff` itself (only necessary if you pass the `--only-new-bugs` flag)
 
+To install all dependencies into an environment using `uv`, run:
+    uv pip install pysource-codegen pysource-minimize termcolor ruff
+
 Example invocations of the script:
-- Run the fuzzer using seeds 0, 1, 2, 78 and 93` to generate the code:
+- Run the fuzzer using seeds 0, 1, 2, 78 and 93 to generate the code:
   `python crates/ruff_python_parser/scripts/fuzz_parser.py 0-2 78 93`
 - Run the fuzzer concurrently using seeds in range 0-10 inclusive,
   but only reporting bugs that are new on your branch:
@@ -16,6 +19,10 @@ Example invocations of the script:
 - Run the fuzzer concurrently on 10,000 different Python source-code files,
   and only print a summary at the end:
   `python crates/ruff_python_parser/scripts/fuzz_parser.py 1-10000 --quiet
+
+N.B. The script takes a few seconds to get started, as the script needs to compile
+your checked out version of ruff with `--release` as a first step before it
+can actually start fuzzing.
 """
 
 from __future__ import annotations
@@ -60,12 +67,17 @@ def contains_bug(code: str, *, only_new_bugs: bool = False) -> bool:
     return old_result.returncode == 0
 
 
-@dataclass
+@dataclass(slots=True)
 class FuzzResult:
+    # The seed used to generate the random Python file.
+    # The same seed always generates the same file.
     seed: Seed
+    # If we found a bug, this will be the minimum Python code
+    # required to trigger the bug. If not, it will be `None`.
     maybe_bug: MinimizedSourceCode | None
 
     def print_description(self) -> None:
+        """Describe the results of fuzzing the parser with this seed."""
         if self.maybe_bug:
             print(colored(f"Ran fuzzer on seed {self.seed}", "red"))
             print(colored("The following code triggers a bug:", "red"))
@@ -77,9 +89,7 @@ class FuzzResult:
 
 
 def fuzz_code(seed: Seed, only_new_bugs: bool) -> FuzzResult:
-    """If we found a bug, return the minimized example.
-    If we didn't, return `None`.
-    """
+    """Return a `FuzzResult` instance describing the outcome of fuzzing with this seed."""
     code = generate_random_code(seed)
     if contains_bug(code, only_new_bugs=only_new_bugs):
         try:
@@ -103,12 +113,18 @@ def run_fuzzer_concurrently(args: ResolvedCliArgs) -> list[FuzzResult]:
         fuzz_result_futures = [
             executor.submit(fuzz_code, seed, args.only_new_bugs) for seed in args.seeds
         ]
-        for future in concurrent.futures.as_completed(fuzz_result_futures):
-            fuzz_result = future.result()
-            if not args.quiet:
-                fuzz_result.print_description()
-            if fuzz_result.maybe_bug:
-                bugs.append(fuzz_result)
+        try:
+            for future in concurrent.futures.as_completed(fuzz_result_futures):
+                fuzz_result = future.result()
+                if not args.quiet:
+                    fuzz_result.print_description()
+                if fuzz_result.maybe_bug:
+                    bugs.append(fuzz_result)
+        except KeyboardInterrupt:
+            print("\nShutting down the ProcessPoolExecutor due to KeyboardInterrupt...")
+            print("(This might take a few seconds)")
+            executor.shutdown(cancel_futures=True)
+            raise
     return bugs
 
 
@@ -147,7 +163,7 @@ def main(args: ResolvedCliArgs) -> None:
         bugs = run_fuzzer_concurrently(args)
     if bugs:
         print(colored("Bugs found in the following seeds:", "red"))
-        print(*(str(bug.seed) for bug in bugs))
+        print(*sorted(bug.seed for bug in bugs))
     else:
         print(colored("No bugs found!", "green"))
 
@@ -155,12 +171,27 @@ def main(args: ResolvedCliArgs) -> None:
 def parse_seed_argument(arg: str) -> int | range:
     """Helper for argument parsing"""
     if "-" in arg:
-        start, end = arg.split("-")
+        start, end = map(int, arg.split("-"))
+        if end <= start:
+            raise argparse.ArgumentTypeError(
+                f"Error when parsing seed argument {arg!r}: "
+                f"range end must be > range start"
+            )
+        seed_range = range(start, end + 1)
+        range_too_long = (
+            f"Error when parsing seed argument {arg!r}: "
+            f"maximum allowed range length is 1_000_000_000"
+        )
+        try:
+            if len(seed_range) > 1_000_000_000:
+                raise argparse.ArgumentTypeError(range_too_long)
+        except OverflowError:
+            raise argparse.ArgumentTypeError(range_too_long)
         return range(int(start), int(end) + 1)
     return int(arg)
 
 
-@dataclass
+@dataclass(slots=True)
 class ResolvedCliArgs:
     seeds: list[Seed]
     _: KW_ONLY
@@ -171,8 +202,7 @@ class ResolvedCliArgs:
 def parse_args() -> ResolvedCliArgs:
     """Parse command-line arguments"""
     parser = argparse.ArgumentParser(
-        description=__doc__,
-        formatter_class=argparse.RawTextHelpFormatter
+        description=__doc__, formatter_class=argparse.RawTextHelpFormatter
     )
     parser.add_argument(
         "seeds",
