@@ -268,6 +268,29 @@ impl SymbolTableBuilder {
             .last()
             .expect("Scope stack should never be empty")
     }
+
+    fn with_type_params(
+        &mut self,
+        name: &str,
+        params: &Option<Box<ast::TypeParams>>,
+        nested: impl FnOnce(&mut Self),
+    ) {
+        if let Some(type_params) = params {
+            self.push_scope(self.cur_scope(), name, ScopeKind::Annotation);
+            for type_param in &type_params.type_params {
+                let name = match type_param {
+                    ast::TypeParam::TypeVar(ast::TypeParamTypeVar { name, .. }) => name,
+                    ast::TypeParam::ParamSpec(ast::TypeParamParamSpec { name, .. }) => name,
+                    ast::TypeParam::TypeVarTuple(ast::TypeParamTypeVarTuple { name, .. }) => name,
+                };
+                self.add_symbol(name);
+            }
+        }
+        nested(self);
+        if params.is_some() {
+            self.pop_scope();
+        }
+    }
 }
 
 impl<'a> PreorderVisitor<'a> for SymbolTableBuilder {
@@ -280,17 +303,25 @@ impl<'a> PreorderVisitor<'a> for SymbolTableBuilder {
 
     fn visit_stmt(&mut self, stmt: &'a ast::Stmt) {
         match stmt {
-            ast::Stmt::ClassDef(ast::StmtClassDef { name, .. }) => {
+            ast::Stmt::ClassDef(ast::StmtClassDef {
+                name, type_params, ..
+            }) => {
                 self.add_symbol(name);
-                self.push_scope(self.cur_scope(), name, ScopeKind::Class);
-                ast::visitor::preorder::walk_stmt(self, stmt);
-                self.pop_scope();
+                self.with_type_params(name, type_params, |builder| {
+                    builder.push_scope(builder.cur_scope(), name, ScopeKind::Class);
+                    ast::visitor::preorder::walk_stmt(builder, stmt);
+                    builder.pop_scope();
+                });
             }
-            ast::Stmt::FunctionDef(ast::StmtFunctionDef { name, .. }) => {
+            ast::Stmt::FunctionDef(ast::StmtFunctionDef {
+                name, type_params, ..
+            }) => {
                 self.add_symbol(name);
-                self.push_scope(self.cur_scope(), name, ScopeKind::Function);
-                ast::visitor::preorder::walk_stmt(self, stmt);
-                self.pop_scope();
+                self.with_type_params(name, type_params, |builder| {
+                    builder.push_scope(builder.cur_scope(), name, ScopeKind::Function);
+                    ast::visitor::preorder::walk_stmt(builder, stmt);
+                    builder.pop_scope();
+                });
             }
             ast::Stmt::Import(ast::StmtImport { names, .. }) => {
                 for alias in names {
@@ -423,6 +454,56 @@ mod tests {
             assert_eq!(table.scopes_by_id[func_scope_2].name.as_str(), "func");
             assert_eq!(names(table.symbols_for_scope(func_scope_1)), vec!["x"]);
             assert_eq!(names(table.symbols_for_scope(func_scope_2)), vec!["y"]);
+        }
+
+        #[test]
+        fn generic_func() {
+            let table = build(
+                "
+                def func[T]():
+                    x = 1
+                ",
+            );
+            assert_eq!(names(table.root_symbols()), vec!["func"]);
+            let scopes = table.root_child_scopes();
+            assert_eq!(scopes.len(), 1);
+            let ann_scope_id = scopes[0];
+            let ann_scope = &table.scopes_by_id[ann_scope_id];
+            assert_eq!(ann_scope.kind, ScopeKind::Annotation);
+            assert_eq!(ann_scope.name.as_str(), "func");
+            assert_eq!(names(table.symbols_for_scope(ann_scope_id)), vec!["T"]);
+            let scopes = table.child_scopes_of(ann_scope_id);
+            assert_eq!(scopes.len(), 1);
+            let func_scope_id = scopes[0];
+            let func_scope = &table.scopes_by_id[func_scope_id];
+            assert_eq!(func_scope.kind, ScopeKind::Function);
+            assert_eq!(func_scope.name.as_str(), "func");
+            assert_eq!(names(table.symbols_for_scope(func_scope_id)), vec!["x"]);
+        }
+
+        #[test]
+        fn generic_class() {
+            let table = build(
+                "
+                class C[T]:
+                    x = 1
+                ",
+            );
+            assert_eq!(names(table.root_symbols()), vec!["C"]);
+            let scopes = table.root_child_scopes();
+            assert_eq!(scopes.len(), 1);
+            let ann_scope_id = scopes[0];
+            let ann_scope = &table.scopes_by_id[ann_scope_id];
+            assert_eq!(ann_scope.kind, ScopeKind::Annotation);
+            assert_eq!(ann_scope.name.as_str(), "C");
+            assert_eq!(names(table.symbols_for_scope(ann_scope_id)), vec!["T"]);
+            let scopes = table.child_scopes_of(ann_scope_id);
+            assert_eq!(scopes.len(), 1);
+            let func_scope_id = scopes[0];
+            let func_scope = &table.scopes_by_id[func_scope_id];
+            assert_eq!(func_scope.kind, ScopeKind::Class);
+            assert_eq!(func_scope.name.as_str(), "C");
+            assert_eq!(names(table.symbols_for_scope(func_scope_id)), vec!["x"]);
         }
     }
 
