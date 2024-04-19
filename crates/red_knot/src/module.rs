@@ -33,15 +33,18 @@ impl ModuleName {
     }
 
     pub fn from_relative_path(path: &Path) -> Option<Self> {
+        let path = if path.ends_with("__init__.py") || path.ends_with("__init__.pyi") {
+            path.parent()?
+        } else {
+            path
+        };
+
         let name = if let Some(parent) = path.parent() {
-            let mut name = String::new();
+            let mut name = String::with_capacity(path.as_os_str().len());
 
             for component in parent.components() {
-                if !name.is_empty() {
-                    name.push('.');
-                }
-
                 name.push_str(component.as_os_str().to_str()?);
+                name.push('.');
             }
 
             // SAFETY: Unwrap is safe here or `parent` would have returned `None`.
@@ -57,6 +60,16 @@ impl ModuleName {
 
     pub fn components(&self) -> impl DoubleEndedIterator<Item = &str> {
         self.0.split('.')
+    }
+
+    pub fn parent(&self) -> Option<ModuleName> {
+        let (_, parent) = self.0.rsplit_once('.')?;
+
+        Some(Self(smol_str::SmolStr::new(parent)))
+    }
+
+    pub fn starts_with(&self, other: &ModuleName) -> bool {
+        self.0.starts_with(other.0.as_str())
     }
 
     pub fn as_str(&self) -> &str {
@@ -206,13 +219,8 @@ impl ModuleResolver {
                         .fetch_add(1, std::sync::atomic::Ordering::Relaxed),
                 );
 
-                self.modules.insert(
-                    id,
-                    Arc::from(ModuleData {
-                        name: name.clone(),
-                        path,
-                    }),
-                );
+                self.modules
+                    .insert(id, Arc::from(ModuleData { name, path }));
 
                 // A path can map to multiple modules because of symlinks:
                 // ```
@@ -250,7 +258,7 @@ impl ModuleResolver {
     /// Returns `None` if the file is not a module in `sys.path`.
     pub fn resolve_file(&mut self, file: FileId) -> Option<ModuleId> {
         let path = self.files.path(file);
-        self.resolve_path(&*path)
+        self.resolve_path(&path)
     }
 
     /// Resolves the module id for the given path.
@@ -307,26 +315,73 @@ impl ModuleResolver {
         }
     }
 
-    pub fn add_module(&mut self, path: &Path) {
-        self.resolve_path(path);
+    /// Adds a module to the resolver.
+    ///
+    /// Returns `None` if the path doesn't resolve to a module.
+    ///
+    /// Returns `Some` with the id of the module and the ids of the modules that need re-resolving
+    /// because they were part of a namespace package and might now resolve differently.
+    pub fn add_module(&mut self, path: &Path) -> Option<(ModuleId, Vec<ModuleId>)> {
+        // No locking is required because we're holding a mutable reference to `self`.
+
+        // TOOD This needs tests
+
+        let module_id = self.resolve_path(path)?;
+
+        // The code below is to handle the addition of `__init__.py` files.
+        // When an `__init__.py` file is added, we need to remove all modules that are part of the same package.
+        // For example, an `__init__.py` is added to `foo`, we need to remove `foo.bar`, `foo.baz`, etc.
+        // because they were namespace packages before and could have been from different search paths.
+        let Some(filename) = path.file_name() else {
+            return Some((module_id, Vec::new()));
+        };
+
+        if !matches!(filename.to_str(), Some("__init__.py" | "__init__.pyi")) {
+            return Some((module_id, Vec::new()));
+        }
+
+        let module = self.module(module_id);
+
+        let Some(parent_name) = module.name().parent() else {
+            return Some((module_id, Vec::new()));
+        };
+
+        let mut to_remove = Vec::new();
+
+        self.by_path.retain(|path, id| {
+            let module = self.module(*id);
+
+            if module.name().starts_with(&parent_name) {
+                to_remove.push(*id);
+                false
+            } else {
+                true
+            }
+        });
+
+        for id in &to_remove {
+            self.remove_module_by_id(*id);
+        }
+
+        Some((module_id, to_remove))
     }
 
-    pub fn remove_module(&mut self, id: ModuleId) {
-        match self.modules.entry(id) {
-            Entry::Occupied(entry) => {
-                // Keep the entry to ensure it locks any writes to the same entry in `resolve`.
+    pub fn remove_module(&mut self, path: &Path) {
+        // No locking is required because we're holding a mutable reference to `self`.
+        let Some((_, id)) = self.by_path.remove(path) else {
+            return;
+        };
 
-                self.by_name.remove(&entry.get().name);
-                // This isn't fast but removing seems an uncommon operation where I don't think it's worth
-                // to keep a reverse lookup just for it (requires more allocations, involves writing a lot of data).
-                self.by_path.retain(|_, current_id| *current_id != id);
+        self.remove_module_by_id(id);
+    }
 
-                entry.remove();
-            }
-            Entry::Vacant(_) => {
-                panic!("Expected entry to exist")
-            }
-        }
+    fn remove_module_by_id(&mut self, id: ModuleId) {
+        let (_, module) = self.modules.remove(&id).unwrap();
+
+        self.by_name.remove(&module.name).unwrap();
+
+        // It's possible that multiple paths map to the same id. Search all other paths referencing the same module id.
+        self.by_path.retain(|_, current_id| *current_id != id);
     }
 }
 
@@ -337,52 +392,6 @@ impl std::fmt::Debug for ModuleResolver {
             .field("modules", &self.by_name)
             .finish()
     }
-}
-
-fn resolve_name(
-    name: &ModuleName,
-    search_paths: &[ModuleSearchPath],
-) -> Option<(ModuleSearchPath, PathBuf)> {
-    'search_path: for search_path in search_paths {
-        let mut package_path = search_path.path().to_path_buf();
-
-        let mut components = name.components();
-        let module_name = components.next_back()?;
-
-        // For `foo.bar.baz`, test that `foo` and `baz` both contain a `__init__.py`.
-        for folder in components {
-            package_path.push(folder);
-
-            // A folder on the path to the module. Test that it contains a `__init__.py`.
-            if !package_path.join("__init__.py").is_file()
-                && !package_path.join("__init__.pyi").is_file()
-            {
-                // Try the next search path
-                continue 'search_path;
-            }
-        }
-
-        package_path.push(module_name);
-
-        // Must be a `__init__.pyi` or `__init__.py` or it isn't a package.
-        if package_path.is_dir() {
-            package_path.push("__init__");
-        }
-
-        let stub = package_path.with_extension("pyi");
-
-        if stub.is_file() {
-            return Some((search_path.clone(), stub));
-        }
-
-        let module = package_path.with_extension("py");
-
-        if module.is_file() {
-            return Some((search_path.clone(), module));
-        }
-    }
-
-    None
 }
 
 /// The resolved path of a module.
@@ -409,6 +418,139 @@ impl ModulePath {
     }
 }
 
+fn resolve_name(
+    name: &ModuleName,
+    search_paths: &[ModuleSearchPath],
+) -> Option<(ModuleSearchPath, PathBuf)> {
+    for search_path in search_paths {
+        let mut components = name.components();
+        let module_name = components.next_back()?;
+
+        match resolve_package(search_path, components) {
+            Ok(resolved_package) => {
+                let mut package_path = resolved_package.path;
+
+                package_path.push(module_name);
+
+                // Must be a `__init__.pyi` or `__init__.py` or it isn't a package.
+                if package_path.is_dir() {
+                    package_path.push("__init__");
+                }
+
+                // TODO Implement full https://peps.python.org/pep-0561/#type-checker-module-resolution-order resolution
+                let stub = package_path.with_extension("pyi");
+
+                if stub.is_file() {
+                    return Some((search_path.clone(), stub));
+                }
+
+                let module = package_path.with_extension("py");
+
+                if module.is_file() {
+                    return Some((search_path.clone(), module));
+                }
+
+                // For regular packages, don't search the next search path. All files of that
+                // package must be in the same location
+                if resolved_package.kind.is_regular_package() {
+                    return None;
+                }
+            }
+            Err(parent_kind) => {
+                if parent_kind.is_regular_package() {
+                    // For regular packages, don't search the next search path.
+                    return None;
+                }
+            }
+        }
+    }
+
+    None
+}
+
+fn resolve_package<'a, I>(
+    module_search_path: &ModuleSearchPath,
+    components: I,
+) -> Result<ResolvedPackage, PackageKind>
+where
+    I: Iterator<Item = &'a str>,
+{
+    let mut package_path = module_search_path.path().to_path_buf();
+
+    // `true` if inside a folder that is a namespace package (has no `__init__.py`).
+    // Namespace packages are special because they can be spread across multiple search paths.
+    // https://peps.python.org/pep-0420/
+    let mut in_namespace_package = false;
+
+    // `true` if resolving a sub-package. For example, `true` when resolving `bar` of `foo.bar`.
+    let mut in_sub_package = false;
+
+    // For `foo.bar.baz`, test that `foo` and `baz` both contain a `__init__.py`.
+    for folder in components {
+        package_path.push(folder);
+
+        let has_init_py = package_path.join("__init__.py").is_file()
+            || package_path.join("__init__.pyi").is_file();
+
+        if has_init_py {
+            in_namespace_package = false;
+        } else if package_path.is_dir() {
+            // A directory without an `__init__.py` is a namespace package, continue with the next folder.
+            in_namespace_package = true;
+        } else if in_namespace_package {
+            // Package not found but it is part of a namespace package.
+            return Err(PackageKind::Namespace);
+        } else if in_sub_package {
+            // A regular sub package wasn't found.
+            return Err(PackageKind::Regular);
+        } else {
+            // We couldn't find `foo` for `foo.bar.baz`, search the next search path.
+            return Err(PackageKind::Root);
+        }
+
+        in_sub_package = true;
+    }
+
+    let kind = if in_namespace_package {
+        PackageKind::Namespace
+    } else if in_sub_package {
+        PackageKind::Regular
+    } else {
+        PackageKind::Root
+    };
+
+    Ok(ResolvedPackage {
+        kind,
+        path: package_path,
+    })
+}
+
+#[derive(Debug)]
+struct ResolvedPackage {
+    path: PathBuf,
+    kind: PackageKind,
+}
+
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+enum PackageKind {
+    /// A root package or module. E.g. `foo` in `foo.bar.baz` or just `foo`.
+    Root,
+
+    /// A regular sub-package where the parent contains an `__init__.py`. For example `bar` in `foo.bar` when the `foo` directory contains an `__init__.py`.
+    Regular,
+
+    /// A sub-package in a namespace package. A namespace package is a package without an `__init__.py`.
+    ///
+    /// For example, `bar` in `foo.bar` if the `foo` directory contains no `__init__.py`.
+    Namespace,
+}
+
+impl PackageKind {
+    const fn is_regular_package(self) -> bool {
+        matches!(self, PackageKind::Regular)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::files::Files;
@@ -432,8 +574,11 @@ mod tests {
         std::fs::create_dir(&src)?;
         std::fs::create_dir(&site_packages)?;
 
-        let src = ModuleSearchPath::new(src, ModuleSearchPathKind::FirstParty);
-        let site_packages = ModuleSearchPath::new(site_packages, ModuleSearchPathKind::ThirdParty);
+        let src = ModuleSearchPath::new(src.canonicalize()?, ModuleSearchPathKind::FirstParty);
+        let site_packages = ModuleSearchPath::new(
+            site_packages.canonicalize()?,
+            ModuleSearchPathKind::ThirdParty,
+        );
 
         let roots = vec![src.clone(), site_packages.clone()];
         let files = Files::default();
@@ -471,10 +616,7 @@ mod tests {
 
         assert_eq!(&ModuleName::new("foo"), foo_module.name());
         assert_eq!(&src, foo_module.path().root());
-        assert_eq!(
-            &foo_path.canonicalize()?,
-            &*files.path(foo_module.path().file())
-        );
+        assert_eq!(&foo_path, &*files.path(foo_module.path().file()));
 
         assert_eq!(foo_id, resolver.resolve_path(&foo_path));
 
@@ -504,10 +646,7 @@ mod tests {
 
         assert_eq!(&ModuleName::new("foo"), foo_module.name());
         assert_eq!(&src, foo_module.path().root());
-        assert_eq!(
-            &foo_path.canonicalize()?,
-            &*files.path(foo_module.path().file())
-        );
+        assert_eq!(&foo_path, &*files.path(foo_module.path().file()));
 
         assert_eq!(foo_id, resolver.resolve_path(&foo_path));
 
@@ -542,10 +681,7 @@ mod tests {
         let foo_module = resolver.module(foo_id.unwrap());
 
         assert_eq!(&src, foo_module.path().root());
-        assert_eq!(
-            &foo_init.canonicalize()?,
-            &*files.path(foo_module.path().file())
-        );
+        assert_eq!(&foo_init, &*files.path(foo_module.path().file()));
 
         assert_eq!(foo_id, resolver.resolve_path(&foo_init));
         assert_eq!(None, resolver.resolve_path(&foo_py));
@@ -575,10 +711,7 @@ mod tests {
         let foo_module = resolver.module(foo_id.unwrap());
 
         assert_eq!(&src, foo_module.path().root());
-        assert_eq!(
-            &foo_stub.canonicalize()?,
-            &*files.path(foo_module.path().file())
-        );
+        assert_eq!(&foo_stub, &*files.path(foo_module.path().file()));
 
         assert_eq!(foo_id, resolver.resolve_path(&foo_stub));
         assert_eq!(None, resolver.resolve_path(&foo_py));
@@ -612,7 +745,7 @@ mod tests {
         let baz_module = resolver.module(baz_id.unwrap());
 
         assert_eq!(&src, baz_module.path().root());
-        assert_eq!(&baz.canonicalize()?, &*files.path(baz_module.path().file()));
+        assert_eq!(&baz, &*files.path(baz_module.path().file()));
 
         assert_eq!(baz_id, resolver.resolve_path(&baz));
 
@@ -620,23 +753,98 @@ mod tests {
     }
 
     #[test]
-    fn folder_without_init_py() -> std::io::Result<()> {
-        let mut test_case = create_resolver()?;
+    fn namespace_package() -> std::io::Result<()> {
+        let TestCase {
+            mut resolver,
+            temp_dir: _,
+            src,
+            site_packages,
+            ..
+        } = create_resolver()?;
 
-        let foo = test_case.src.path().join("foo");
-        // The folder `bar` has no `__init__.py`
-        let bar = foo.join("bar");
-        let baz = bar.join("baz.py");
+        // From [PEP420](https://peps.python.org/pep-0420/#nested-namespace-packages).
+        // But uses `src` for `project1` and `site_packages2` for `project2`.
+        // ```
+        // src
+        //   parent
+        //     child
+        //       one.py
+        // site_packages
+        //   parent
+        //     child
+        //       two.py
+        // ```
 
-        std::fs::create_dir_all(&bar)?;
-        std::fs::write(foo.join("__init__.py"), "")?;
-        std::fs::write(&baz, "print('Hello, world!')")?;
+        let parent1 = src.path().join("parent");
+        let child1 = parent1.join("child");
+        let one = child1.join("one.py");
 
-        let baz_id = test_case.resolver.resolve(ModuleName::new("foo.bar.baz"));
+        std::fs::create_dir_all(child1)?;
+        std::fs::write(&one, "print('Hello, world!')")?;
 
-        assert_eq!(None, baz_id);
-        assert_eq!(None, test_case.resolver.resolve_path(&baz));
+        let parent2 = site_packages.path().join("parent");
+        let child2 = parent2.join("child");
+        let two = child2.join("two.py");
 
+        std::fs::create_dir_all(&child2)?;
+        std::fs::write(&two, "print('Hello, world!')")?;
+
+        let one_id = resolver.resolve(ModuleName::new("parent.child.one"));
+
+        assert!(one_id.is_some());
+        assert_eq!(one_id, resolver.resolve_path(&one));
+
+        let two_id = resolver.resolve(ModuleName::new("parent.child.two"));
+        assert!(two_id.is_some());
+        assert_eq!(two_id, resolver.resolve_path(&two));
+
+        Ok(())
+    }
+
+    #[test]
+    fn regular_package_in_namespace_package() -> std::io::Result<()> {
+        let TestCase {
+            mut resolver,
+            temp_dir: _,
+            src,
+            site_packages,
+            ..
+        } = create_resolver()?;
+
+        // Adopted test case from the [PEP420 examples](https://peps.python.org/pep-0420/#nested-namespace-packages).
+        // The `src/parent/child` package is a regular package. Therefore, `site_packages/parent/child/two.py` should not be resolved.
+        // ```
+        // src
+        //   parent
+        //     child
+        //       one.py
+        // site_packages
+        //   parent
+        //     child
+        //       two.py
+        // ```
+
+        let parent1 = src.path().join("parent");
+        let child1 = parent1.join("child");
+        let one = child1.join("one.py");
+
+        std::fs::create_dir_all(&child1)?;
+        std::fs::write(child1.join("__init__.py"), "print('Hello, world!')")?;
+        std::fs::write(&one, "print('Hello, world!')")?;
+
+        let parent2 = site_packages.path().join("parent");
+        let child2 = parent2.join("child");
+        let two = child2.join("two.py");
+
+        std::fs::create_dir_all(&child2)?;
+        std::fs::write(two, "print('Hello, world!')")?;
+
+        let one_id = resolver.resolve(ModuleName::new("parent.child.one"));
+
+        assert!(one_id.is_some());
+        assert_eq!(one_id, resolver.resolve_path(&one));
+
+        assert_eq!(None, resolver.resolve(ModuleName::new("parent.child.two")));
         Ok(())
     }
 
@@ -648,7 +856,6 @@ mod tests {
             site_packages,
             files,
             temp_dir: _temp_dir,
-            ..
         } = create_resolver()?;
 
         let foo_src = src.path().join("foo.py");
@@ -664,10 +871,7 @@ mod tests {
         let foo_module = resolver.module(foo_id.unwrap());
 
         assert_eq!(&src, foo_module.path().root());
-        assert_eq!(
-            &foo_src.canonicalize()?,
-            &*files.path(foo_module.path().file())
-        );
+        assert_eq!(&foo_src, &*files.path(foo_module.path().file()));
 
         assert_eq!(foo_id, resolver.resolve_path(&foo_src));
         assert_eq!(None, resolver.resolve_path(&foo_site_packages));
@@ -690,32 +894,26 @@ mod tests {
         let bar = src.path().join("bar.py");
 
         std::fs::write(&foo, "")?;
-        std::os::unix::fs::symlink(&foo, src.path().join("bar.py"))?;
+        std::os::unix::fs::symlink(&foo, &bar)?;
 
         let foo_id = resolver.resolve(ModuleName::new("foo"));
         let bar_id = resolver.resolve(ModuleName::new("bar"));
 
         assert!(foo_id.is_some());
         assert!(bar_id.is_some());
-
-        // TODO: Is this the behavior we want? I think it is, but it means that the module appears as two
-        //  different modules upstream, meaning we parse the file twice.
-        //  I think we could solve this by using `FileId` instead of `PathBuf` in the `ModulePath`.
-        //  This way, higher up layers that only care about the file's content (source text, parser, physical lines) can
-        //  only index by file id and ignore the module id.
         assert_ne!(foo_id, bar_id);
 
         let foo_module = resolver.module(foo_id.unwrap());
 
-        let foo_norm = foo.canonicalize()?;
-
         assert_eq!(&src, foo_module.path().root());
-        assert_eq!(&foo_norm, &*files.path(foo_module.path().file()));
+        assert_eq!(&foo, &*files.path(foo_module.path().file()));
 
+        // Bar has a different name but it should point to the same file.
         let bar_module = resolver.module(bar_id.unwrap());
 
         assert_eq!(&src, bar_module.path().root());
-        assert_eq!(&foo_norm, &*files.path(bar_module.path().file()));
+        assert_eq!(foo_module.path().file(), bar_module.path().file());
+        assert_eq!(&foo, &*files.path(bar_module.path().file()));
 
         assert_eq!(foo_id, resolver.resolve_path(&foo));
         assert_eq!(bar_id, resolver.resolve_path(&bar));
