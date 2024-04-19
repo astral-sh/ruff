@@ -1860,6 +1860,7 @@ dependencies = [
  "ruff_text_size",
  "rustc-hash",
  "salsa-2022",
+ "smallvec",
  "smol_str",
  "tempfile",
  "textwrap",
