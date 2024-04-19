@@ -1,6 +1,6 @@
 #![allow(dead_code, unused_imports)]
 use super::Name;
-use hashbrown::hash_map::RawEntryMut;
+use hashbrown::hash_map::{Keys, RawEntryMut};
 use itertools::Itertools;
 use ruff_index::{newtype_index, IndexVec};
 use ruff_python_ast::visitor::preorder::{PreorderVisitor, TraversalSignal};
@@ -10,6 +10,7 @@ use ruff_python_parser::{Mode, ParseError};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHasher;
 use std::hash::{Hash, Hasher};
+use std::iter::{Copied, DoubleEndedIterator, FusedIterator};
 
 type Map<K, V> = hashbrown::HashMap<K, V, ()>;
 
@@ -91,16 +92,38 @@ struct SymbolTable {
     symbols_by_id: IndexVec<SymbolId, Symbol>,
 }
 
-struct SymbolIterator<'a> {
+struct SymbolIterator<'a, I> {
     table: &'a SymbolTable,
-    ids: Vec<SymbolId>,
+    ids: I,
 }
 
-impl<'a> Iterator for SymbolIterator<'a> {
+impl<'a, I> Iterator for SymbolIterator<'a, I>
+where
+    I: Iterator<Item = SymbolId>,
+{
     type Item = &'a Symbol;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let id = self.ids.pop()?;
+        let id = self.ids.next()?;
+        Some(&self.table.symbols_by_id[id])
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.ids.size_hint()
+    }
+}
+
+impl<'a, I> FusedIterator for SymbolIterator<'a, I> where
+    I: Iterator<Item = SymbolId> + FusedIterator
+{
+}
+
+impl<'a, I> DoubleEndedIterator for SymbolIterator<'a, I>
+where
+    I: Iterator<Item = SymbolId> + DoubleEndedIterator,
+{
+    fn next_back(&mut self) -> Option<Self::Item> {
+        let id = self.ids.next_back()?;
         Some(&self.table.symbols_by_id[id])
     }
 }
@@ -139,15 +162,18 @@ impl SymbolTable {
         &self.scopes_by_id[self.root_scope_id()]
     }
 
-    pub(crate) fn symbols_for_scope(&self, scope_id: ScopeId) -> SymbolIterator {
+    pub(crate) fn symbols_for_scope(
+        &self,
+        scope_id: ScopeId,
+    ) -> SymbolIterator<Copied<Keys<SymbolId, ()>>> {
         let scope = &self.scopes_by_id[scope_id];
         SymbolIterator {
             table: self,
-            ids: scope.symbols_by_name.keys().copied().collect(),
+            ids: scope.symbols_by_name.keys().copied(),
         }
     }
 
-    pub(crate) fn root_symbols(&self) -> SymbolIterator {
+    pub(crate) fn root_symbols(&self) -> SymbolIterator<Copied<Keys<SymbolId, ()>>> {
         self.symbols_for_scope(self.root_scope_id())
     }
 
@@ -290,7 +316,10 @@ mod tests {
             SymbolTable::from_ast(parsed.ast)
         }
 
-        fn names(it: SymbolIterator) -> Vec<&str> {
+        fn names<I>(it: SymbolIterator<I>) -> Vec<&str>
+        where
+            I: Iterator<Item = SymbolId>,
+        {
             it.map(|sym| sym.name.0.as_str()).sorted().collect()
         }
 
