@@ -1663,23 +1663,19 @@ impl<'src> Parser<'src> {
         // x = 10
         let type_params = self.try_parse_type_params();
 
+        // test_ok function_def_parameter_range
+        // def foo(
+        //     first: int,
+        //     second: int,
+        // ) -> int: ...
+
         // test_err function_def_unclosed_parameter_list
         // def foo(a: int, b:
         // def foo():
         //     return 42
         // def foo(a: int, b: str
         // x = 10
-        let parameters_start = self.node_start();
-        self.expect(TokenKind::Lpar);
-        let mut parameters = self.parse_parameters(FunctionKind::FunctionDef);
-        self.expect(TokenKind::Rpar);
-
-        // test_ok function_def_parameter_range
-        // def foo(
-        //     first: int,
-        //     second: int,
-        // ) -> int: ...
-        parameters.range = self.node_range(parameters_start);
+        let parameters = self.parse_parameters(FunctionKind::FunctionDef);
 
         let returns = if self.eat(TokenKind::Rarrow) {
             if self.at_expr() {
@@ -2844,19 +2840,16 @@ impl<'src> Parser<'src> {
     pub(super) fn parse_parameters(&mut self, function_kind: FunctionKind) -> ast::Parameters {
         let start = self.node_start();
 
+        if matches!(function_kind, FunctionKind::FunctionDef) {
+            self.expect(TokenKind::Lpar);
+        }
+
         // TODO(dhruvmanila): This has the same problem as `parse_match_pattern_mapping`
         // has where if there are multiple kwarg or vararg, the last one will win and
         // the parser will drop the previous ones. Another thing is the vararg and kwarg
         // uses `Parameter` (not `ParameterWithDefault`) which means that the parser cannot
         // recover well from `*args=(1, 2)`.
-        let mut parameters = ast::Parameters {
-            range: TextRange::default(),
-            posonlyargs: vec![],
-            args: vec![],
-            kwonlyargs: vec![],
-            vararg: None,
-            kwarg: None,
-        };
+        let mut parameters = ast::Parameters::empty(TextRange::default());
 
         let mut seen_default_param = false; // `a=10`
         let mut seen_positional_only_separator = false; // `/`
@@ -3092,6 +3085,10 @@ impl<'src> Parser<'src> {
             // def foo(a, *,): ...
             // def foo(*, **kwargs): ...
             self.add_error(ParseErrorType::ExpectedKeywordParam, star_range);
+        }
+
+        if matches!(function_kind, FunctionKind::FunctionDef) {
+            self.expect(TokenKind::Rpar);
         }
 
         parameters.range = self.node_range(start);
