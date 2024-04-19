@@ -1738,7 +1738,7 @@ impl<'src> Parser<'src> {
 
         ast::StmtFunctionDef {
             name,
-            type_params,
+            type_params: type_params.map(Box::new),
             parameters: Box::new(parameters),
             body,
             decorator_list,

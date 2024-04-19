@@ -158,7 +158,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     decorator_list,
                     returns.as_ref().map(AsRef::as_ref),
                     parameters,
-                    type_params.as_ref(),
+                    type_params.as_deref(),
                 );
             }
             if checker.source_type.is_stub() {
