@@ -2257,7 +2257,31 @@ pub struct IsortOptions {
 
     // Tables are required to go last.
     /// A list of mappings from section names to modules.
-    /// By default custom sections are output last, but this can be overridden with `section-order`.
+    ///
+    /// By default, imports are categorized according to their type (e.g., `future`, `third-party`,
+    /// and so on). This setting allows you to group modules into custom sections, to augment or
+    /// override the built-in sections.
+    ///
+    /// For example, to group all testing utilities, you could create a `testing` section:
+    /// ```toml
+    /// testing = ["pytest", "hypothesis"]
+    /// ```
+    ///
+    /// Custom sections should typically be inserted into the `section-order` list to ensure that
+    /// they're displayed as a standalone group and in the intended order, as in:
+    /// ```toml
+    /// section-order = [
+    ///   "future",
+    ///   "standard-library",
+    ///   "third-party",
+    ///   "first-party",
+    ///   "local-folder",
+    ///   "testing"
+    /// ]
+    /// ```
+    ///
+    /// If a custom section is omitted from `section-order`, imports in that section will be
+    /// assigned to the `default-section` (which defaults to `third-party`).
     #[option(
         default = "{}",
         value_type = "dict[str, list[str]]",
