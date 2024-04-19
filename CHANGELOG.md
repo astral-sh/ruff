@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.4.1
+
+### Preview features
+
+- \[`pylint`\] Implement `invalid-hash-returned` (`PLE0309`) ([#10961](https://github.com/astral-sh/ruff/pull/10961))
+- \[`pylint`\] Implement `invalid-index-returned` (`PLE0305`) ([#10962](https://github.com/astral-sh/ruff/pull/10962))
+
+### Bug fixes
+
+- Allow `NoReturn`-like functions for `__str__`, `__len__`, etc. ([#11017](https://github.com/astral-sh/ruff/pull/11017))
+- Use empty range when there's "gap" in token source ([#11032](https://github.com/astral-sh/ruff/pull/11032))
+- \[`ruff`\] Ignore stub functions in `unused-async` (`RUF029`) ([#11026](https://github.com/astral-sh/ruff/pull/11026))
+- Expect indented case block instead of match stmt ([#11033](https://github.com/astral-sh/ruff/pull/11033))
+
 ## 0.4.0
 
 ### A new, hand-written parser
