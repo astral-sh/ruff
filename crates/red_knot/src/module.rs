@@ -471,7 +471,10 @@ mod tests {
 
         assert_eq!(&ModuleName::new("foo"), foo_module.name());
         assert_eq!(&src, foo_module.path().root());
-        assert_eq!(&foo_path, &*files.path(foo_module.path().file()));
+        assert_eq!(
+            &foo_path.canonicalize()?,
+            &*files.path(foo_module.path().file())
+        );
 
         assert_eq!(foo_id, resolver.resolve_path(&foo_path));
 
@@ -501,7 +504,10 @@ mod tests {
 
         assert_eq!(&ModuleName::new("foo"), foo_module.name());
         assert_eq!(&src, foo_module.path().root());
-        assert_eq!(&foo_path, &*files.path(foo_module.path().file()));
+        assert_eq!(
+            &foo_path.canonicalize()?,
+            &*files.path(foo_module.path().file())
+        );
 
         assert_eq!(foo_id, resolver.resolve_path(&foo_path));
 
@@ -536,7 +542,10 @@ mod tests {
         let foo_module = resolver.module(foo_id.unwrap());
 
         assert_eq!(&src, foo_module.path().root());
-        assert_eq!(&foo_init, &*files.path(foo_module.path().file()));
+        assert_eq!(
+            &foo_init.canonicalize()?,
+            &*files.path(foo_module.path().file())
+        );
 
         assert_eq!(foo_id, resolver.resolve_path(&foo_init));
         assert_eq!(None, resolver.resolve_path(&foo_py));
@@ -566,7 +575,10 @@ mod tests {
         let foo_module = resolver.module(foo_id.unwrap());
 
         assert_eq!(&src, foo_module.path().root());
-        assert_eq!(&foo_stub, &*files.path(foo_module.path().file()));
+        assert_eq!(
+            &foo_stub.canonicalize()?,
+            &*files.path(foo_module.path().file())
+        );
 
         assert_eq!(foo_id, resolver.resolve_path(&foo_stub));
         assert_eq!(None, resolver.resolve_path(&foo_py));
@@ -600,7 +612,7 @@ mod tests {
         let baz_module = resolver.module(baz_id.unwrap());
 
         assert_eq!(&src, baz_module.path().root());
-        assert_eq!(&baz, &*files.path(baz_module.path().file()));
+        assert_eq!(&baz.canonicalize()?, &*files.path(baz_module.path().file()));
 
         assert_eq!(baz_id, resolver.resolve_path(&baz));
 
@@ -652,7 +664,10 @@ mod tests {
         let foo_module = resolver.module(foo_id.unwrap());
 
         assert_eq!(&src, foo_module.path().root());
-        assert_eq!(&foo_src, &*files.path(foo_module.path().file()));
+        assert_eq!(
+            &foo_src.canonicalize()?,
+            &*files.path(foo_module.path().file())
+        );
 
         assert_eq!(foo_id, resolver.resolve_path(&foo_src));
         assert_eq!(None, resolver.resolve_path(&foo_site_packages));
@@ -692,13 +707,15 @@ mod tests {
 
         let foo_module = resolver.module(foo_id.unwrap());
 
+        let foo_norm = foo.canonicalize()?;
+
         assert_eq!(&src, foo_module.path().root());
-        assert_eq!(&foo, &*files.path(foo_module.path().file()));
+        assert_eq!(&foo_norm, &*files.path(foo_module.path().file()));
 
         let bar_module = resolver.module(bar_id.unwrap());
 
         assert_eq!(&src, bar_module.path().root());
-        assert_eq!(&foo, &*files.path(bar_module.path().file()));
+        assert_eq!(&foo_norm, &*files.path(bar_module.path().file()));
 
         assert_eq!(foo_id, resolver.resolve_path(&foo));
         assert_eq!(bar_id, resolver.resolve_path(&bar));
