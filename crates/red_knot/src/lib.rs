@@ -68,4 +68,8 @@ impl Name {
     pub fn new(name: &str) -> Self {
         Self(smol_str::SmolStr::new(name))
     }
+
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
 }
