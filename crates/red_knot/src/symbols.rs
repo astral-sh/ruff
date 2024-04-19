@@ -75,14 +75,15 @@ enum ScopeKind {
 }
 
 struct Scope {
+    pub name: Name,
     pub kind: ScopeKind,
+    pub child_scopes: Vec<ScopeId>,
     // symbol IDs, hashed by symbol name
     symbols_by_name: Map<SymbolId, ()>,
 }
 
 struct Symbol {
     pub name: Name,
-    pub child_scopes: Vec<ScopeId>,
 }
 
 struct SymbolTable {
@@ -111,7 +112,9 @@ impl SymbolTable {
             symbols_by_id: IndexVec::new(),
         };
         table.scopes_by_id.push(Scope {
+            name: Name::new("<module>"),
             kind: ScopeKind::Module,
+            child_scopes: Vec::new(),
             symbols_by_name: Map::default(),
         });
         table
@@ -148,6 +151,14 @@ impl SymbolTable {
         self.symbols_for_scope(self.root_scope_id())
     }
 
+    pub(crate) fn child_scopes_of(&self, scope_id: ScopeId) -> &[ScopeId] {
+        &self.scopes_by_id[scope_id].child_scopes
+    }
+
+    pub(crate) fn root_child_scopes(&self) -> &[ScopeId] {
+        &self.child_scopes_of(self.root_scope_id())
+    }
+
     pub(crate) fn symbol_by_name(&self, scope_id: ScopeId, name: &str) -> Option<&Symbol> {
         let scope = &self.scopes_by_id[scope_id];
         let hash = self.hash_name(name);
@@ -172,29 +183,28 @@ impl SymbolTable {
         match entry {
             RawEntryMut::Occupied(entry) => *entry.key(),
             RawEntryMut::Vacant(entry) => {
-                let symbol = Symbol {
-                    name,
-                    child_scopes: Vec::new(),
-                };
-                let id = self.symbols_by_id.push(symbol);
+                let id = self.symbols_by_id.push(Symbol { name });
                 entry.insert_with_hasher(hash, id, (), |_| hash);
                 id
             }
         }
     }
 
-    pub(crate) fn add_child_scope_to_symbol(
+    pub(crate) fn add_child_scope(
         &mut self,
-        symbol_id: SymbolId,
+        parent_scope_id: ScopeId,
+        name: &str,
         kind: ScopeKind,
     ) -> ScopeId {
-        let scope_id = self.scopes_by_id.push(Scope {
+        let new_scope_id = self.scopes_by_id.push(Scope {
+            name: Name::new(name),
             kind,
+            child_scopes: Vec::new(),
             symbols_by_name: Map::default(),
         });
-        let symbol = &mut self.symbols_by_id[symbol_id];
-        symbol.child_scopes.push(scope_id);
-        scope_id
+        let parent_scope = &mut self.scopes_by_id[parent_scope_id];
+        parent_scope.child_scopes.push(new_scope_id);
+        new_scope_id
     }
 
     fn hash_name(&self, name: &str) -> u64 {
@@ -214,8 +224,8 @@ impl SymbolTableBuilder {
         self.table.add_symbol_to_scope(self.cur_scope(), identifier)
     }
 
-    fn push_scope(&mut self, child_of: SymbolId, kind: ScopeKind) -> ScopeId {
-        let scope_id = self.table.add_child_scope_to_symbol(child_of, kind);
+    fn push_scope(&mut self, child_of: ScopeId, name: &str, kind: ScopeKind) -> ScopeId {
+        let scope_id = self.table.add_child_scope(child_of, name, kind);
         self.scopes.push(scope_id);
         scope_id
     }
@@ -248,14 +258,14 @@ impl<'a> PreorderVisitor<'a> for SymbolTableBuilder {
     fn visit_stmt(&mut self, stmt: &'a ast::Stmt) {
         match stmt {
             ast::Stmt::ClassDef(ast::StmtClassDef { name, .. }) => {
-                let symbol_id = self.add_symbol(name);
-                self.push_scope(symbol_id, ScopeKind::Class);
+                self.add_symbol(name);
+                self.push_scope(self.cur_scope(), name, ScopeKind::Class);
                 ast::visitor::preorder::walk_stmt(self, stmt);
                 self.pop_scope();
             }
             ast::Stmt::FunctionDef(ast::StmtFunctionDef { name, .. }) => {
-                let symbol_id = self.add_symbol(name);
-                self.push_scope(symbol_id, ScopeKind::Function);
+                self.add_symbol(name);
+                self.push_scope(self.cur_scope(), name, ScopeKind::Function);
                 ast::visitor::preorder::walk_stmt(self, stmt);
                 self.pop_scope();
             }
@@ -312,11 +322,12 @@ mod tests {
                 ",
             );
             assert_eq!(names(table.root_symbols()), vec!["C", "y"]);
-            let sym_c = table.symbol_by_name(table.root_scope_id(), "C").unwrap();
-            assert_eq!(sym_c.child_scopes.len(), 1);
-            let c_scope = sym_c.child_scopes[0];
-            assert_eq!(table.scopes_by_id[c_scope].kind, ScopeKind::Class);
-            assert_eq!(names(table.symbols_for_scope(c_scope)), vec!["x"]);
+            let scopes = table.root_child_scopes();
+            assert_eq!(scopes.len(), 1);
+            let c_scope = &table.scopes_by_id[scopes[0]];
+            assert_eq!(c_scope.kind, ScopeKind::Class);
+            assert_eq!(c_scope.name.as_str(), "C");
+            assert_eq!(names(table.symbols_for_scope(scopes[0])), vec!["x"]);
         }
 
         #[test]
@@ -329,11 +340,12 @@ mod tests {
                 ",
             );
             assert_eq!(names(table.root_symbols()), vec!["func", "y"]);
-            let sym_func = table.symbol_by_name(table.root_scope_id(), "func").unwrap();
-            assert_eq!(sym_func.child_scopes.len(), 1);
-            let func_scope = sym_func.child_scopes[0];
-            assert_eq!(table.scopes_by_id[func_scope].kind, ScopeKind::Function);
-            assert_eq!(names(table.symbols_for_scope(func_scope)), vec!["x"]);
+            let scopes = table.root_child_scopes();
+            assert_eq!(scopes.len(), 1);
+            let func_scope = &table.scopes_by_id[scopes[0]];
+            assert_eq!(func_scope.kind, ScopeKind::Function);
+            assert_eq!(func_scope.name.as_str(), "func");
+            assert_eq!(names(table.symbols_for_scope(scopes[0])), vec!["x"]);
         }
 
         #[test]
@@ -347,12 +359,14 @@ mod tests {
                 ",
             );
             assert_eq!(names(table.root_symbols()), vec!["func"]);
-            let sym_func = table.symbol_by_name(table.root_scope_id(), "func").unwrap();
-            assert_eq!(sym_func.child_scopes.len(), 2);
-            let func_scope_1 = sym_func.child_scopes[0];
-            let func_scope_2 = sym_func.child_scopes[1];
+            let scopes = table.root_child_scopes();
+            assert_eq!(scopes.len(), 2);
+            let func_scope_1 = scopes[0];
+            let func_scope_2 = scopes[1];
             assert_eq!(table.scopes_by_id[func_scope_1].kind, ScopeKind::Function);
+            assert_eq!(table.scopes_by_id[func_scope_1].name.as_str(), "func");
             assert_eq!(table.scopes_by_id[func_scope_2].kind, ScopeKind::Function);
+            assert_eq!(table.scopes_by_id[func_scope_2].name.as_str(), "func");
             assert_eq!(names(table.symbols_for_scope(func_scope_1)), vec!["x"]);
             assert_eq!(names(table.symbols_for_scope(func_scope_2)), vec!["y"]);
         }
@@ -381,8 +395,7 @@ mod tests {
         let mut table = SymbolTable::new();
         let root_scope_id = table.root_scope_id();
         let foo_symbol_top = table.add_symbol_to_scope(root_scope_id, "foo");
-        let c_symbol = table.add_symbol_to_scope(root_scope_id, "C");
-        let c_scope = table.add_child_scope_to_symbol(c_symbol, ScopeKind::Class);
+        let c_scope = table.add_child_scope(root_scope_id, "C", ScopeKind::Class);
         let foo_symbol_inner = table.add_symbol_to_scope(c_scope, "foo");
         assert_ne!(foo_symbol_top, foo_symbol_inner);
     }
