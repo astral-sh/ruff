@@ -10,7 +10,6 @@ use ruff_python_parser::{Mode, ParseError};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHasher;
 use std::hash::{Hash, Hasher};
-use textwrap::dedent;
 
 type Map<K, V> = hashbrown::HashMap<K, V, ()>;
 
@@ -141,7 +140,7 @@ impl SymbolTable {
         let scope = &self.scopes_by_id[scope_id];
         SymbolIterator {
             table: self,
-            ids: scope.symbols_by_name.keys().cloned().collect(),
+            ids: scope.symbols_by_name.keys().copied().collect(),
         }
     }
 
@@ -157,7 +156,7 @@ impl SymbolTable {
             .symbols_by_name
             .raw_entry()
             .from_hash(hash, |symid| self.symbols_by_id[*symid].name == name)
-            .map(|(k, _)| &self.symbols_by_id[*k])
+            .map(|(k, ())| &self.symbols_by_id[*k])
     }
 
     pub(crate) fn add_symbol_to_scope(&mut self, scope_id: ScopeId, name: &str) -> SymbolId {
@@ -270,6 +269,7 @@ impl<'a> PreorderVisitor<'a> for SymbolTableBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use textwrap::dedent;
 
     mod from_ast {
         use super::*;
