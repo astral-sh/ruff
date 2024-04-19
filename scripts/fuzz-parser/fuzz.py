@@ -89,12 +89,17 @@ def fuzz_code(seed: Seed, only_new_bugs: bool) -> FuzzResult:
         try:
             new_code = minimize_repro(code, contains_bug)
         except ValueError:
-            # `pysource_minimize.minimize()` sometimes raises `ValueError` internally.
-            # Just ignore it if so, and use the original generated code;
-            # minimizing the repro is a nice-to-have, but isn't crucial.
-            new_code = code
-        return FuzzResult(seed, MinimizedSourceCode(new_code))
-    return FuzzResult(seed, None)
+            # `pysource_minimize.minimize()` failed to reproduce the bug.
+            # This could indicate that `contains_bug()` failed due to a race condition
+            # from running `cargo build` concurrently, so double-check that the
+            # original snippet does actually reproduce the bug. If so, just go with the
+            # original snippet; if not, report the fuzzing as successful:
+            maybe_bug = MinimizedSourceCode(code) if contains_bug(code) else None
+        else:
+            maybe_bug = MinimizedSourceCode(new_code)
+    else:
+        maybe_bug = None
+    return FuzzResult(seed, maybe_bug)
 
 
 def run_fuzzer_concurrently(args: ResolvedCliArgs) -> list[FuzzResult]:
