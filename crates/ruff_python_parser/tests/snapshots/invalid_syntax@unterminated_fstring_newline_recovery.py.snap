@@ -167,7 +167,7 @@ Module(
                                                         conversion: None,
                                                         format_spec: Some(
                                                             FStringFormatSpec {
-                                                                range: 43..43,
+                                                                range: 42..42,
                                                                 elements: [],
                                                             },
                                                         ),
