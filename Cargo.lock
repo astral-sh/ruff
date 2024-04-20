@@ -2180,7 +2180,6 @@ dependencies = [
  "anyhow",
  "bitflags 2.5.0",
  "bstr",
- "drop_bomb",
  "insta",
  "is-macro",
  "itertools 0.12.1",

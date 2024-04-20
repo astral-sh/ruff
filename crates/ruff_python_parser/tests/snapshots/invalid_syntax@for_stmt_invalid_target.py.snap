@@ -7,7 +7,7 @@ input_file: crates/ruff_python_parser/resources/inline/err/for_stmt_invalid_targ
 ```
 Module(
     ModModule {
-        range: 0..132,
+        range: 0..154,
         body: [
             For(
                 StmtFor {
@@ -233,22 +233,79 @@ Module(
             ),
             For(
                 StmtFor {
-                    range: 100..131,
+                    range: 100..121,
+                    is_async: false,
+                    target: Yield(
+                        ExprYield {
+                            range: 104..116,
+                            value: Some(
+                                Compare(
+                                    ExprCompare {
+                                        range: 110..116,
+                                        left: Name(
+                                            ExprName {
+                                                range: 110..111,
+                                                id: "x",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        ops: [
+                                            In,
+                                        ],
+                                        comparators: [
+                                            Name(
+                                                ExprName {
+                                                    range: 115..116,
+                                                    id: "y",
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ],
+                                    },
+                                ),
+                            ),
+                        },
+                    ),
+                    iter: Name(
+                        ExprName {
+                            range: 116..116,
+                            id: "",
+                            ctx: Invalid,
+                        },
+                    ),
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 118..121,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 118..121,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                    orelse: [],
+                },
+            ),
+            For(
+                StmtFor {
+                    range: 122..153,
                     is_async: false,
                     target: List(
                         ExprList {
-                            range: 104..121,
+                            range: 126..143,
                             elts: [
                                 Name(
                                     ExprName {
-                                        range: 105..106,
+                                        range: 127..128,
                                         id: "x",
                                         ctx: Store,
                                     },
                                 ),
                                 NumberLiteral(
                                     ExprNumberLiteral {
-                                        range: 108..109,
+                                        range: 130..131,
                                         value: Int(
                                             1,
                                         ),
@@ -256,25 +313,25 @@ Module(
                                 ),
                                 Name(
                                     ExprName {
-                                        range: 111..112,
+                                        range: 133..134,
                                         id: "y",
                                         ctx: Store,
                                     },
                                 ),
                                 Starred(
                                     ExprStarred {
-                                        range: 114..120,
+                                        range: 136..142,
                                         value: List(
                                             ExprList {
-                                                range: 115..120,
+                                                range: 137..142,
                                                 elts: [
                                                     StringLiteral(
                                                         ExprStringLiteral {
-                                                            range: 116..119,
+                                                            range: 138..141,
                                                             value: StringLiteralValue {
                                                                 inner: Single(
                                                                     StringLiteral {
-                                                                        range: 116..119,
+                                                                        range: 138..141,
                                                                         value: "a",
                                                                         flags: StringLiteralFlags {
                                                                             quote_style: Double,
@@ -299,7 +356,7 @@ Module(
                     ),
                     iter: Name(
                         ExprName {
-                            range: 125..126,
+                            range: 147..148,
                             id: "z",
                             ctx: Load,
                         },
@@ -307,10 +364,10 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                range: 128..131,
+                                range: 150..153,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        range: 128..131,
+                                        range: 150..153,
                                     },
                                 ),
                             },
@@ -358,7 +415,7 @@ Module(
 4 | for *x | y in z: ...
   |      ^^^^^ Syntax Error: Invalid assignment target
 5 | for await x in z: ...
-6 | for [x, 1, y, *["a"]] in z: ...
+6 | for yield x in y: ...
   |
 
 
@@ -367,21 +424,40 @@ Module(
 4 | for *x | y in z: ...
 5 | for await x in z: ...
   |     ^^^^^^^ Syntax Error: Invalid assignment target
-6 | for [x, 1, y, *["a"]] in z: ...
+6 | for yield x in y: ...
+7 | for [x, 1, y, *["a"]] in z: ...
   |
 
 
   |
 4 | for *x | y in z: ...
 5 | for await x in z: ...
-6 | for [x, 1, y, *["a"]] in z: ...
+6 | for yield x in y: ...
+  |     ^^^^^^^^^^^^ Syntax Error: Yield expression cannot be used here
+7 | for [x, 1, y, *["a"]] in z: ...
+  |
+
+
+  |
+4 | for *x | y in z: ...
+5 | for await x in z: ...
+6 | for yield x in y: ...
+  |                 ^ Syntax Error: Expected 'in', found ':'
+7 | for [x, 1, y, *["a"]] in z: ...
+  |
+
+
+  |
+5 | for await x in z: ...
+6 | for yield x in y: ...
+7 | for [x, 1, y, *["a"]] in z: ...
   |         ^ Syntax Error: Invalid assignment target
   |
 
 
   |
-4 | for *x | y in z: ...
 5 | for await x in z: ...
-6 | for [x, 1, y, *["a"]] in z: ...
+6 | for yield x in y: ...
+7 | for [x, 1, y, *["a"]] in z: ...
   |                 ^^^ Syntax Error: Invalid assignment target
   |

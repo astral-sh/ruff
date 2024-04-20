@@ -84,30 +84,30 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 81..84,
-                    value: Starred(
-                        ExprStarred {
-                            range: 82..84,
-                            value: Name(
-                                ExprName {
-                                    range: 83..84,
-                                    id: "x",
-                                    ctx: Load,
+                    range: 81..90,
+                    value: Named(
+                        ExprNamed {
+                            range: 82..89,
+                            target: Starred(
+                                ExprStarred {
+                                    range: 82..84,
+                                    value: Name(
+                                        ExprName {
+                                            range: 83..84,
+                                            id: "x",
+                                            ctx: Store,
+                                        },
+                                    ),
+                                    ctx: Store,
                                 },
                             ),
-                            ctx: Load,
-                        },
-                    ),
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    range: 88..89,
-                    value: NumberLiteral(
-                        ExprNumberLiteral {
-                            range: 88..89,
-                            value: Int(
-                                1,
+                            value: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 88..89,
+                                    value: Int(
+                                        1,
+                                    ),
+                                },
                             ),
                         },
                     ),
@@ -198,34 +198,7 @@ Module(
 3 | (x.y := 1)
 4 | (x[y] := 1)
 5 | (*x := 1)
-  |  ^^ Syntax Error: Starred expression cannot be used here
-6 | ([x, y] := [1, 2])
-  |
-
-
-  |
-3 | (x.y := 1)
-4 | (x[y] := 1)
-5 | (*x := 1)
-  |     ^^ Syntax Error: Expected ')', found ':='
-6 | ([x, y] := [1, 2])
-  |
-
-
-  |
-3 | (x.y := 1)
-4 | (x[y] := 1)
-5 | (*x := 1)
-  |         ^ Syntax Error: Expected a statement
-6 | ([x, y] := [1, 2])
-  |
-
-
-  |
-3 | (x.y := 1)
-4 | (x[y] := 1)
-5 | (*x := 1)
-  |          ^ Syntax Error: Expected a statement
+  |  ^^ Syntax Error: Assignment expression target must be an identifier
 6 | ([x, y] := [1, 2])
   |
 

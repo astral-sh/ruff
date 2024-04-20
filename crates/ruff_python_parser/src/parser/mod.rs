@@ -1,7 +1,6 @@
 use std::cmp::Ordering;
 
 use bitflags::bitflags;
-use drop_bomb::DebugDropBomb;
 
 use ast::Mod;
 use ruff_python_ast as ast;
@@ -16,7 +15,7 @@ use crate::{
     Mode, ParseError, ParseErrorType, Tok, TokenKind,
 };
 
-use self::expression::AllowStarredExpression;
+use self::expression::ExpressionContext;
 
 mod expression;
 mod helpers;
@@ -77,13 +76,6 @@ pub(crate) struct Parser<'src> {
     /// Stores all the syntax errors found during the parsing.
     errors: Vec<ParseError>,
 
-    /// This tracks the current expression or statement being parsed.
-    ///
-    /// The `ctx` is also used to create custom error messages and forbid certain
-    /// expressions or statements of being parsed. The `ctx` should be empty after
-    /// an expression or statement is done parsing.
-    ctx: ParserCtxFlags,
-
     /// Specify the mode in which the code will be parsed.
     mode: Mode,
 
@@ -123,7 +115,6 @@ impl<'src> Parser<'src> {
             mode,
             source,
             errors: Vec::new(),
-            ctx: ParserCtxFlags::empty(),
             tokens,
             recovery_context: RecoveryContext::empty(),
             last_token_end: tokens_range.start(),
@@ -136,7 +127,7 @@ impl<'src> Parser<'src> {
     pub(crate) fn parse_program(mut self) -> Program {
         let ast = if self.mode == Mode::Expression {
             let start = self.node_start();
-            let parsed_expr = self.parse_expression_list(AllowStarredExpression::No);
+            let parsed_expr = self.parse_expression_list(ExpressionContext::default());
 
             // All of the remaining newlines are actually going to be non-logical newlines.
             self.eat(TokenKind::Newline);
@@ -185,9 +176,6 @@ impl<'src> Parser<'src> {
     }
 
     fn finish(self) -> Vec<ParseError> {
-        // After parsing, the `ctx` and `ctx_stack` should be empty.
-        // If it's not, you probably forgot to call `clear_ctx` somewhere.
-        assert_eq!(self.ctx, ParserCtxFlags::empty());
         assert_eq!(
             self.current_token_kind(),
             TokenKind::EndOfFile,
@@ -230,29 +218,6 @@ impl<'src> Parser<'src> {
         merged.extend(lex_errors.map(ParseError::from));
 
         merged
-    }
-
-    #[inline]
-    #[must_use]
-    fn set_ctx(&mut self, ctx: ParserCtxFlags) -> SavedParserContext {
-        SavedParserContext {
-            flags: std::mem::replace(&mut self.ctx, ctx),
-            bomb: DebugDropBomb::new(
-                "You must restore the old parser context explicit by calling `restore_ctx`",
-            ),
-        }
-    }
-
-    #[inline]
-    fn restore_ctx(&mut self, current: ParserCtxFlags, mut saved_context: SavedParserContext) {
-        assert_eq!(self.ctx, current);
-        saved_context.bomb.defuse();
-        self.ctx = saved_context.flags;
-    }
-
-    #[inline]
-    fn has_ctx(&self, ctx: ParserCtxFlags) -> bool {
-        self.ctx.intersects(ctx)
     }
 
     /// Returns the start position for a node that starts at the current token.
@@ -672,13 +637,6 @@ impl SequenceMatchPatternParentheses {
     /// Returns `true` if the parentheses are for a list pattern e.g., `case [a, b]: ...`.
     const fn is_list(self) -> bool {
         matches!(self, SequenceMatchPatternParentheses::List)
-    }
-}
-
-bitflags! {
-    #[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
-    struct ParserCtxFlags: u8 {
-        const FOR_TARGET = 1 << 2;
     }
 }
 
@@ -1326,10 +1284,4 @@ impl RecoveryContext {
                 .expect("Expected context to be of a single kind.")
         })
     }
-}
-
-#[derive(Debug)]
-struct SavedParserContext {
-    flags: ParserCtxFlags,
-    bomb: DebugDropBomb,
 }
