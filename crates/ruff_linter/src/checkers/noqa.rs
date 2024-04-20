@@ -132,8 +132,8 @@ pub(crate) fn check_noqa(
                     let mut unmatched_codes = vec![];
                     let mut valid_codes = vec![];
                     let mut self_ignore = false;
-                    for code in directive.names() {
-                        let code = get_redirect_target(code).unwrap_or(code);
+                    for original_code in directive.names() {
+                        let code = get_redirect_target(original_code).unwrap_or(original_code);
                         if Rule::UnusedNOQA.noqa_code() == code {
                             self_ignore = true;
                             break;
@@ -145,13 +145,13 @@ pub(crate) fn check_noqa(
                                 .iter()
                                 .any(|external| code.starts_with(external))
                         {
-                            valid_codes.push(code);
+                            valid_codes.push(original_code);
                         } else {
                             if let Ok(rule) = Rule::from_code(code) {
                                 if settings.rules.enabled(rule) {
-                                    unmatched_codes.push(code);
+                                    unmatched_codes.push(original_code);
                                 } else {
-                                    disabled_codes.push(code);
+                                    disabled_codes.push(original_code);
                                 }
                             } else {
                                 unknown_codes.push(code);

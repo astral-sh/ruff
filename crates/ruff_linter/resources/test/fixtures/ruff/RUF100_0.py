@@ -106,3 +106,8 @@ def f():
     # Invalid - nonexistant error code with multibyte character
     d = 1  #noqa: F841, E50
     e = 1  #noqa: E50
+
+
+def f():
+    # Disabled - check redirects are reported correctly
+    eval(command)  # noqa: PGH001
