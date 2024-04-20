@@ -45,10 +45,6 @@ pub(crate) fn check_tokens(
             .check_lines(tokens, &mut diagnostics);
     }
 
-    if settings.rules.enabled(Rule::BlanketNOQA) {
-        pygrep_hooks::rules::blanket_noqa(&mut diagnostics, indexer, locator);
-    }
-
     if settings.rules.enabled(Rule::BlanketTypeIgnore) {
         pygrep_hooks::rules::blanket_type_ignore(&mut diagnostics, indexer, locator);
     }
