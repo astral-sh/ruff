@@ -185,7 +185,7 @@ fn mark_reached(
 /// Determines if `condition` is taken.
 /// Returns `Some(true)` if the condition is always true, e.g. `if True`, same
 /// with `Some(false)` if it's never taken. If it can't be determined it returns
-/// `None`, e.g. `If i == 100`.
+/// `None`, e.g. `if i == 100`.
 fn taken(condition: &Condition) -> Option<bool> {
     // TODO: add more cases to this where we can determine a condition
     // statically. For now we only consider constant booleans.
@@ -300,7 +300,7 @@ enum Condition<'stmt> {
     /// Conditional statement, this should evaluate to a boolean, for e.g. `if`
     /// or `while`.
     Test(&'stmt Expr),
-    /// Iterator for `for` statements, e.g. for `i in range(10)` this will be
+    /// Iterator for `for` statements, e.g. for `for i in range(10)` this will be
     /// `range(10)`.
     Iterator(&'stmt Expr),
     Match {
@@ -311,7 +311,7 @@ enum Condition<'stmt> {
     },
     // Exception was raised and caught by `except` clause
     ExceptionCaught(&'stmt Expr),
-    // Exception was raise in a `try` block
+    // Exception was raised in a `try` block
     ExceptionRaised,
 }
 
@@ -353,7 +353,7 @@ impl<'stmt> BasicBlock<'stmt> {
         stmts: &[Stmt::Continue(StmtContinue {
             range: TextRange::new(TextSize::new(0), TextSize::new(0)),
         })],
-        next: NextBlock::Terminate,
+        next: NextBlock::Terminate, // This must be updated dynamically
     };
 
     /// Return true if the block is a sentinel or fake block.
@@ -361,12 +361,12 @@ impl<'stmt> BasicBlock<'stmt> {
         self.is_empty() || self.is_exception() || self.is_loop_continue()
     }
 
-    /// Returns an empty block that terminates.
+    /// Returns true if `self` is an empty block that terminates.
     fn is_empty(&self) -> bool {
         matches!(self.next, NextBlock::Terminate) && self.stmts.is_empty()
     }
 
-    /// Returns true if `self` an [`BasicBlock::EXCEPTION`].
+    /// Returns true if `self` is a [`BasicBlock::EXCEPTION`].
     fn is_exception(&self) -> bool {
         matches!(self.next, NextBlock::Terminate) && BasicBlock::EXCEPTION.stmts == self.stmts
     }
