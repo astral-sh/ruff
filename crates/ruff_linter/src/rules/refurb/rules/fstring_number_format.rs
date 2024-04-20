@@ -104,13 +104,9 @@ pub(crate) fn fstring_number_format(checker: &mut Checker, subscript: &ast::Expr
         return;
     };
 
-    let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() else {
+    let Some(id) = checker.semantic().resolve_builtin_symbol(func) else {
         return;
     };
-
-    if !checker.semantic().is_builtin(id) {
-        return;
-    }
 
     let Some(base) = IntBase::from_str(id) else {
         return;
