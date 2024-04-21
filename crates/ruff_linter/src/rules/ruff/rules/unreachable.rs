@@ -783,8 +783,18 @@ impl<'stmt> BasicBlocksBuilder<'stmt> {
                 }) => loop_block(self, Condition::Iterator(condition), body, orelse, after),
                 Stmt::Try(_) => try_block(self, stmt, after),
                 Stmt::With(StmtWith { body, .. }) => {
+                    let after_block = self.maybe_next_block_index(after, || true);
                     let with_block = self.append_blocks(body, after);
-                    self.unconditional_next_block(Some(with_block))
+
+                    // The with statement is equivalent to a try statement with an except and finally block
+                    // However, we do not have access to the except and finally.
+                    // We therefore assume that execution may fall through on error.
+                    NextBlock::If {
+                        condition: Condition::ExceptionRaised,
+                        next: after_block,  // If exception raised fall through
+                        orelse: with_block, // Otherwise execute the with statement
+                        exit: after,
+                    }
                 }
                 Stmt::Match(StmtMatch { subject, cases, .. }) => {
                     let next_after_block = self.maybe_next_block_index(after, || {
