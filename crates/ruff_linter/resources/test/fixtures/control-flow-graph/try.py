@@ -1,41 +1,49 @@
+# def func():
+#     try:
+#         print("try")
+#     except Exception:
+#         print("Exception")
+#     except OtherException as e:
+#         print("OtherException")
+#     else:
+#         print("else")
+#     finally:
+#         print("finally")
+
+# def func():
+#     try:
+#         print("try")
+#     except:
+#         print("Exception")
+
+# def func():
+#     try:
+#         print("try")
+#     except Exception:
+#         print("Exception")
+#     except OtherException as e:
+#         print("OtherException")
+
+# def func():
+#     try:
+#         print("try")
+#     except Exception:
+#         print("Exception")
+#     except OtherException as e:
+#         print("OtherException")
+#     else:
+#         print("else")
+
+# def func():
+#     try:
+#         print("try")
+#     finally:
+#         print("finally")
+
 def func():
     try:
-       ...
-    except Exception:
-       ...
-    except OtherException as e:
-       ...
-    else:
-       ...
+        return 0
+    except:
+        return 1
     finally:
-       ...
-
-def func():
-    try:
-       ...
-    except Exception:
-       ...
-
-def func():
-    try:
-       ...
-    except Exception:
-       ...
-    except OtherException as e:
-       ...
-
-def func():
-    try:
-       ...
-    except Exception:
-       ...
-    except OtherException as e:
-       ...
-    else:
-       ...
-
-def func():
-    try:
-       ...
-    finally:
-       ...
+        return 2

@@ -474,12 +474,21 @@ fn post_process_loop<'stmt>(
 /// Handle a try block.
 fn try_block<'stmt>(
     blocks: &mut BasicBlocksBuilder<'stmt>,
-    body: &'stmt [Stmt],
-    handlers: &'stmt [ast::ExceptHandler],
-    orelse: &'stmt [Stmt],
-    finalbody: &'stmt [Stmt],
+    stmt: &'stmt Stmt,
     after: Option<BlockIndex>,
 ) -> NextBlock<'stmt> {
+    let stmts = std::slice::from_ref(stmt);
+    let Stmt::Try(StmtTry {
+        body,
+        handlers,
+        orelse,
+        finalbody,
+        ..
+    }) = stmt
+    else {
+        panic!("Should only be called with StmtTry.");
+    };
+
     let after_block = blocks.maybe_next_block_index(after, || true);
     let finally_block = blocks.append_blocks_if_not_empty(finalbody, after_block);
     let else_block = blocks.append_blocks_if_not_empty(orelse, finally_block);
@@ -526,7 +535,7 @@ fn try_block<'stmt>(
             orelse: next_branch,
             exit: after,
         };
-        let block = BasicBlock { stmts: body, next };
+        let block = BasicBlock { stmts, next };
         next_branch = blocks.blocks.push(block);
     }
 
@@ -564,21 +573,11 @@ fn post_process_try<'stmt>(
         }
 
         let block = &blocks.blocks[idx];
-
         match &block.next {
             NextBlock::Always(next) => {
                 next_index = *next;
                 match block.stmts.last() {
                     Some(Stmt::Continue(_)) => return,
-                    Some(Stmt::Return(_)) => {
-                        // re-route to finally if present and not already re-routed
-                        if let Some(finally_index) = finally_index {
-                            if matches!(blocks.blocks[*next].next, NextBlock::Terminate) {
-                                blocks.blocks[idx].next = NextBlock::Always(finally_index);
-                            }
-                        }
-                        return;
-                    }
                     Some(Stmt::Raise(_)) => {
                         // re-route to except if not already re-routed
                         if let Some(except_index) = except_index {
@@ -622,7 +621,18 @@ fn post_process_try<'stmt>(
                     }
                 };
             }
-            NextBlock::Terminate => return,
+            NextBlock::Terminate => {
+                match block.stmts.last() {
+                    Some(Stmt::Return(_)) => {
+                        // re-route to finally if present and not already re-routed
+                        if let Some(finally_index) = finally_index {
+                            blocks.blocks[idx].next = NextBlock::Always(finally_index);
+                        }
+                        return;
+                    }
+                    _ => return,
+                };
+            }
         }
         idx = next_index;
     }
@@ -777,13 +787,7 @@ impl<'stmt> BasicBlocksBuilder<'stmt> {
                     orelse,
                     ..
                 }) => loop_block(self, Condition::Iterator(condition), body, orelse, after),
-                Stmt::Try(StmtTry {
-                    body,
-                    handlers,
-                    orelse,
-                    finalbody,
-                    ..
-                }) => try_block(self, body, handlers, orelse, finalbody, after),
+                Stmt::Try(_) => try_block(self, stmt, after),
                 Stmt::With(StmtWith { items, body, .. }) => {
                     // TODO: handle `with` statements, see
                     // <https://docs.python.org/3/reference/compound_stmts.html#the-with-statement>.
@@ -1226,6 +1230,14 @@ impl<'stmt, 'source> fmt::Display for MermaidGraph<'stmt, 'source> {
                 } => {
                     let condition_code = match condition {
                         Condition::ExceptionRaised => "Exception raised",
+                        Condition::ExceptionCaught(Expr::Name(exception)) => {
+                            if exception.range == TextRange::new(TextSize::new(0), TextSize::new(0))
+                            {
+                                &exception.id
+                            } else {
+                                self.source[condition.range()].trim()
+                            }
+                        }
                         _ => self.source[condition.range()].trim(),
                     };
                     writeln!(
@@ -1278,7 +1290,7 @@ mod tests {
     #[test_case("while.py")]
     #[test_case("for.py")]
     #[test_case("async-for.py")]
-    //#[test_case("try.py")] // TODO.
+    #[test_case("try.py")]
     #[test_case("raise.py")]
     #[test_case("assert.py")]
     #[test_case("match.py")]
