@@ -360,13 +360,13 @@ flowchart TD
 ### Source
 ```python
 def func():
-        for i in range(3):
-            if i == 2:
-                assert i is not None
-                break
-        else:
-            raise Exception()
-        x = 0
+    for i in range(3):
+        if i == 2:
+            assert i is not None
+            break
+    else:
+        raise Exception()
+    x = 0
 ```
 
 ### Control Flow Graph
@@ -381,14 +381,14 @@ flowchart TD
   block4[["Exception raised"]]
   block5["assert i is not None\n"]
   block6["if i == 2:
-                assert i is not None
-                break\n"]
+            assert i is not None
+            break\n"]
   block7["for i in range(3):
-            if i == 2:
-                assert i is not None
-                break
-        else:
-            raise Exception()\n"]
+        if i == 2:
+            assert i is not None
+            break
+    else:
+        raise Exception()\n"]
 
   start --> block7
   block7 -- "range(3)" --> block6
