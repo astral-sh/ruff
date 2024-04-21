@@ -371,6 +371,7 @@ impl<'stmt> BasicBlock<'stmt> {
         matches!(self.next, NextBlock::Terminate) && BasicBlock::EXCEPTION.stmts == self.stmts
     }
 
+    /// Returns true if `self` is a [`BasicBlock::LOOP_CONTINUE`].
     fn is_loop_continue(&self) -> bool {
         self.stmts == BasicBlock::LOOP_CONTINUE.stmts
     }
@@ -393,11 +394,237 @@ fn loop_block<'stmt>(
     let last_statement_index = blocks.append_blocks(body, Some(loop_continue_index));
     blocks.blocks[loop_continue_index].next = NextBlock::Always(blocks.blocks.next_index());
 
+    post_process_loop(
+        blocks,
+        last_statement_index,
+        blocks.blocks.next_index(),
+        after,
+        after,
+    );
+
     NextBlock::If {
         condition,
         next: last_statement_index,
         orelse: last_orelse_statement,
         exit: after,
+    }
+}
+
+fn post_process_loop<'stmt>(
+    blocks: &mut BasicBlocksBuilder<'stmt>,
+    start_index: BlockIndex,
+    loop_start: BlockIndex,
+    loop_exit: Option<BlockIndex>,
+    clause_exit: Option<BlockIndex>,
+) {
+    let mut idx = start_index;
+
+    loop {
+        if Some(idx) == clause_exit || idx == loop_start {
+            return;
+        }
+
+        let block = &mut blocks.blocks[idx];
+
+        if block.is_loop_continue() {
+            return;
+        }
+
+        match block.next {
+            NextBlock::Always(next) => {
+                match block.stmts.last() {
+                    Some(Stmt::Break(_)) => {
+                        block.next = match loop_exit {
+                            Some(exit) => NextBlock::Always(exit),
+                            None => NextBlock::Terminate,
+                        }
+                    }
+                    Some(Stmt::Continue(_)) => {
+                        block.next = NextBlock::Always(loop_start);
+                    }
+                    _ => {}
+                };
+                idx = next;
+            }
+            NextBlock::If {
+                condition: _,
+                next,
+                orelse,
+                exit,
+            } => {
+                match block.stmts.last() {
+                    Some(Stmt::For(_) | Stmt::While(_)) => {
+                        idx = orelse;
+                    }
+                    Some(Stmt::Assert(_)) => {
+                        post_process_loop(blocks, orelse, loop_start, loop_exit, exit);
+                        idx = next;
+                    }
+                    _ => {
+                        post_process_loop(blocks, next, loop_start, loop_exit, exit);
+                        idx = orelse;
+                    }
+                };
+            }
+            NextBlock::Terminate => return,
+        }
+    }
+}
+
+/// Handle a try block.
+fn try_block<'stmt>(
+    blocks: &mut BasicBlocksBuilder<'stmt>,
+    body: &'stmt [Stmt],
+    handlers: &'stmt [ast::ExceptHandler],
+    orelse: &'stmt [Stmt],
+    finalbody: &'stmt [Stmt],
+    after: Option<BlockIndex>,
+) -> NextBlock<'stmt> {
+    let after_block = blocks.maybe_next_block_index(after, || true);
+    let finally_block = blocks.append_blocks_if_not_empty(finalbody, after_block);
+    let else_block = blocks.append_blocks_if_not_empty(orelse, finally_block);
+    let try_block = blocks.append_blocks_if_not_empty(body, else_block);
+
+    let finally_index = if !finalbody.is_empty() {
+        Some(finally_block)
+    } else {
+        None
+    };
+
+    // If an exception is raised and not caught then terminate with exception
+    let mut next_branch = blocks.fake_exception_block_index();
+
+    for handler in handlers.iter().rev() {
+        let ast::ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
+            body, type_, ..
+        }) = handler;
+        let condition = match type_ {
+            Some(type_) => Condition::ExceptionCaught(type_.as_ref()),
+            None => {
+                let exception = Box::leak(Box::new(Expr::Name(ast::ExprName {
+                    range: TextRange::new(TextSize::new(0), TextSize::new(0)),
+                    id: "BaseException".to_string(),
+                    ctx: ast::ExprContext::Store,
+                })));
+
+                Condition::ExceptionCaught(exception)
+            }
+        };
+        let except_block = blocks.append_blocks_if_not_empty(body, finally_block);
+
+        post_process_try(
+            blocks,
+            except_block,
+            None,
+            finally_index,
+            Some(finally_block),
+        );
+
+        let next = NextBlock::If {
+            condition,
+            next: except_block,
+            orelse: next_branch,
+            exit: after,
+        };
+        let block = BasicBlock { stmts: body, next };
+        next_branch = blocks.blocks.push(block);
+    }
+
+    post_process_try(
+        blocks,
+        try_block,
+        Some(next_branch),
+        finally_index,
+        Some(else_block),
+    );
+
+    // We cannot know if the try block will raise an exception (apart from explicit raise statements)
+    // We therefore assume that both paths may execute
+    NextBlock::If {
+        condition: Condition::ExceptionRaised,
+        next: next_branch, // If exception raised go to except -> except -> ... -> finally
+        orelse: try_block, // Otherwise try -> else -> finally
+        exit: after,
+    }
+}
+
+fn post_process_try<'stmt>(
+    blocks: &mut BasicBlocksBuilder<'stmt>,
+    start_index: BlockIndex,
+    except_index: Option<BlockIndex>,
+    finally_index: Option<BlockIndex>,
+    exit_index: Option<BlockIndex>,
+) {
+    let mut idx = start_index;
+    let mut next_index;
+
+    loop {
+        if Some(idx) == exit_index {
+            return;
+        }
+
+        let block = &blocks.blocks[idx];
+
+        match &block.next {
+            NextBlock::Always(next) => {
+                next_index = *next;
+                match block.stmts.last() {
+                    Some(Stmt::Continue(_)) => return,
+                    Some(Stmt::Return(_)) => {
+                        // re-route to finally if present and not already re-routed
+                        if let Some(finally_index) = finally_index {
+                            if matches!(blocks.blocks[*next].next, NextBlock::Terminate) {
+                                blocks.blocks[idx].next = NextBlock::Always(finally_index);
+                            }
+                        }
+                        return;
+                    }
+                    Some(Stmt::Raise(_)) => {
+                        // re-route to except if not already re-routed
+                        if let Some(except_index) = except_index {
+                            if blocks.blocks[*next].is_exception() {
+                                blocks.blocks[idx].next = NextBlock::Always(except_index);
+                            }
+                        }
+                        return;
+                    }
+                    _ => {}
+                };
+            }
+            NextBlock::If {
+                condition,
+                next,
+                orelse,
+                exit,
+            } => {
+                match block.stmts.last() {
+                    Some(Stmt::Assert(_)) => {
+                        next_index = *next;
+                        // re-route to except if not already re-routed
+                        if let Some(except_index) = except_index {
+                            if blocks.blocks[*next].is_exception() {
+                                blocks.blocks[idx].next = NextBlock::If {
+                                    condition: condition.clone(),
+                                    next: *next,
+                                    orelse: except_index,
+                                    exit: *exit,
+                                };
+                            }
+                        }
+                    }
+                    Some(Stmt::Try(_)) => {
+                        next_index = *next;
+                        post_process_try(blocks, *orelse, except_index, finally_index, *exit);
+                    }
+                    _ => {
+                        next_index = *orelse;
+                        post_process_try(blocks, *next, except_index, finally_index, *exit);
+                    }
+                };
+            }
+            NextBlock::Terminate => return,
+        }
+        idx = next_index;
     }
 }
 
@@ -556,54 +783,7 @@ impl<'stmt> BasicBlocksBuilder<'stmt> {
                     orelse,
                     finalbody,
                     ..
-                }) => {
-                    let after_block = self.maybe_next_block_index(after, || true);
-                    let finally_block = self.append_blocks_if_not_empty(finalbody, after_block);
-                    let else_block = self.append_blocks_if_not_empty(orelse, finally_block);
-                    let try_block = self.append_blocks_if_not_empty(body, else_block);
-
-                    // If an exception is raised and not caught then terminate with exception
-                    let mut next_branch = self.fake_exception_block_index();
-
-                    for handler in handlers.iter().rev() {
-                        let ast::ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
-                            body,
-                            type_,
-                            ..
-                        }) = handler;
-                        let condition = match type_ {
-                            Some(type_) => Condition::ExceptionCaught(type_.as_ref()),
-                            None => {
-                                let exception = Box::leak(Box::new(Expr::Name(ast::ExprName {
-                                    range: TextRange::new(TextSize::new(0), TextSize::new(0)),
-                                    id: "BaseException".to_string(),
-                                    ctx: ast::ExprContext::Store,
-                                })));
-
-                                Condition::ExceptionCaught(exception)
-                            }
-                        };
-                        let except_block = self.append_blocks_if_not_empty(body, finally_block);
-
-                        let next = NextBlock::If {
-                            condition,
-                            next: except_block,
-                            orelse: next_branch,
-                            exit: after,
-                        };
-                        let block = BasicBlock { stmts: body, next };
-                        next_branch = self.blocks.push(block);
-                    }
-
-                    // We cannot know if the try block will raise an exception (apart from explicit raise statements)
-                    // We therefore assume that both paths may execute
-                    NextBlock::If {
-                        condition: Condition::ExceptionRaised,
-                        next: next_branch, // If exception raised go to except -> except -> .. -> finally
-                        orelse: try_block, // Otherwise try -> else -> finally
-                        exit: after,
-                    }
-                }
+                }) => try_block(self, body, handlers, orelse, finalbody, after),
                 Stmt::With(StmtWith { items, body, .. }) => {
                     // TODO: handle `with` statements, see
                     // <https://docs.python.org/3/reference/compound_stmts.html#the-with-statement>.
@@ -896,73 +1076,9 @@ impl<'stmt> BasicBlocksBuilder<'stmt> {
         }
     }
 
-    fn post_process(
-        &mut self,
-        start_index: BlockIndex,
-        loop_start: Option<BlockIndex>,
-        loop_exit: Option<BlockIndex>,
-        clause_exit: Option<BlockIndex>,
-    ) {
-        let mut idx = start_index;
-
-        loop {
-            if Some(idx) == clause_exit || Some(idx) == loop_start {
-                return;
-            }
-
-            let block = &mut self.blocks[idx];
-
-            if block.is_loop_continue() {
-                return;
-            }
-
-            match block.next {
-                NextBlock::Always(next) => {
-                    match block.stmts.last() {
-                        Some(Stmt::Break(_)) => {
-                            block.next = match loop_exit {
-                                Some(exit) => NextBlock::Always(exit),
-                                None => NextBlock::Terminate,
-                            }
-                        }
-                        Some(Stmt::Continue(_)) => {
-                            block.next = NextBlock::Always(loop_start.unwrap());
-                        }
-                        _ => {}
-                    };
-                    idx = next;
-                }
-                NextBlock::If {
-                    condition: _,
-                    next,
-                    orelse,
-                    exit,
-                } => {
-                    match block.stmts.last() {
-                        Some(Stmt::For(_) | Stmt::While(_)) => {
-                            self.post_process(next, Some(idx), exit, exit);
-                            idx = orelse;
-                        }
-                        Some(Stmt::Assert(_)) => {
-                            self.post_process(orelse, loop_start, loop_exit, exit);
-                            idx = next;
-                        }
-                        _ => {
-                            self.post_process(next, loop_start, loop_exit, exit);
-                            idx = orelse;
-                        }
-                    };
-                }
-                NextBlock::Terminate => return,
-            }
-        }
-    }
-
     fn finish(mut self) -> BasicBlocks<'stmt> {
         if self.blocks.is_empty() {
             self.blocks.push(BasicBlock::EMPTY);
-        } else {
-            self.post_process(self.blocks.indices().last().unwrap(), None, None, None);
         }
 
         BasicBlocks {
