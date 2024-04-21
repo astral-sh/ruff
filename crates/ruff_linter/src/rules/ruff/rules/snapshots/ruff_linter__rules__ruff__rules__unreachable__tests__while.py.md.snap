@@ -736,7 +736,14 @@ flowchart TD
   block2["self.server = HTTPServer((host, port), HtmlOnlyHandler)\nself.host = host\nself.port = port\nbreak\n"]
   block3[["Exception raised"]]
   block4["log.debug(f#quot;port {port} is in use, trying to next one#quot;)\nport += 1\n"]
-  block5["log.debug(f#quot;port {port} is in use, trying to next one#quot;)\nport += 1\n"]
+  block5["try:
+            self.server = HTTPServer((host, port), HtmlOnlyHandler)
+            self.host = host
+            self.port = port
+            break
+        except OSError:
+            log.debug(f#quot;port {port} is in use, trying to next one#quot;)
+            port += 1\n"]
   block6["try:
             self.server = HTTPServer((host, port), HtmlOnlyHandler)
             self.host = host

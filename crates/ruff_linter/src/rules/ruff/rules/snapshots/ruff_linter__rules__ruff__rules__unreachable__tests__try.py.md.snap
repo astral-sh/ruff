@@ -1,0 +1,50 @@
+---
+source: crates/ruff_linter/src/rules/ruff/rules/unreachable.rs
+description: "This is a Mermaid graph. You can use https://mermaid.live to visualize it as a diagram."
+---
+## Function 0
+### Source
+```python
+def func():
+    try:
+        return 0
+    except:
+        return 1
+    finally:
+        return 2
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0[["`*(empty)*`"]]
+  block1["return 2\n"]
+  block2["return 0\n"]
+  block3[["Exception raised"]]
+  block4["return 1\n"]
+  block5["try:
+        return 0
+    except:
+        return 1
+    finally:
+        return 2\n"]
+  block6["try:
+        return 0
+    except:
+        return 1
+    finally:
+        return 2\n"]
+
+  start --> block6
+  block6 -- "Exception raised" --> block5
+  block6 -- "else" --> block2
+  block5 -- "BaseException" --> block4
+  block5 -- "else" --> block3
+  block4 --> block1
+  block3 --> return
+  block2 --> block1
+  block1 --> return
+  block0 --> return
+```
