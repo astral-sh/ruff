@@ -231,6 +231,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             ]) {
                 flake8_return::rules::function(
                     checker,
+                    function_def,
                     body,
                     decorator_list,
                     returns.as_ref().map(AsRef::as_ref),

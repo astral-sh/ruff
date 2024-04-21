@@ -451,8 +451,8 @@ fn is_noreturn_func(func: &Expr, semantic: &SemanticModel) -> bool {
     semantic.match_typing_qualified_name(&qualified_name, "NoReturn")
 }
 
-fn add_return_none(checker: &mut Checker, stmt: &Stmt) {
-    let mut diagnostic = Diagnostic::new(ImplicitReturn, stmt.range());
+fn add_return_none(checker: &mut Checker, stmt: &Stmt, range: TextRange) {
+    let mut diagnostic = Diagnostic::new(ImplicitReturn, range);
     if let Some(indent) = indentation(checker.locator(), stmt) {
         let mut content = String::new();
         content.push_str(checker.stylist().line_ending().as_str());
@@ -499,7 +499,7 @@ fn has_implicit_return(checker: &mut Checker, stmt: &Stmt) -> bool {
                 None | Some(ast::ElifElseClause { test: Some(_), .. })
             ) {
                 if checker.settings.preview.is_disabled() {
-                    add_return_none(checker, stmt);
+                    add_return_none(checker, stmt, stmt.range());
                 }
                 return true;
             }
@@ -512,7 +512,7 @@ fn has_implicit_return(checker: &mut Checker, stmt: &Stmt) -> bool {
                 has_implicit_return(checker, last_stmt)
             } else {
                 if checker.settings.preview.is_disabled() {
-                    add_return_none(checker, stmt);
+                    add_return_none(checker, stmt, stmt.range());
                 }
                 true
             }
@@ -551,7 +551,7 @@ fn has_implicit_return(checker: &mut Checker, stmt: &Stmt) -> bool {
         }
         _ => {
             if checker.settings.preview.is_disabled() {
-                add_return_none(checker, stmt);
+                add_return_none(checker, stmt, stmt.range());
             }
             true
         }
@@ -559,9 +559,9 @@ fn has_implicit_return(checker: &mut Checker, stmt: &Stmt) -> bool {
 }
 
 /// RET503
-fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
+fn implicit_return(checker: &mut Checker, function_def: &ast::StmtFunctionDef, stmt: &Stmt) {
     if has_implicit_return(checker, stmt) && checker.settings.preview.is_enabled() {
-        add_return_none(checker, stmt);
+        add_return_none(checker, stmt, function_def.range());
     }
 }
 
@@ -766,6 +766,7 @@ fn superfluous_elif_else(checker: &mut Checker, stack: &Stack) {
 /// Run all checks from the `flake8-return` plugin.
 pub(crate) fn function(
     checker: &mut Checker,
+    function_def: &ast::StmtFunctionDef,
     body: &[Stmt],
     decorator_list: &[Decorator],
     returns: Option<&Expr>,
@@ -815,7 +816,7 @@ pub(crate) fn function(
             implicit_return_value(checker, &stack);
         }
         if checker.enabled(Rule::ImplicitReturn) {
-            implicit_return(checker, last_stmt);
+            implicit_return(checker, function_def, last_stmt);
         }
 
         if checker.enabled(Rule::UnnecessaryAssign) {
