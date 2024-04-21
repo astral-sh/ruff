@@ -6,7 +6,7 @@ pub(super) fn generate_diagnostics(snapshot: &DocumentSnapshot) -> Vec<lsp_types
     if snapshot.client_settings().lint() {
         crate::lint::check(
             snapshot.document(),
-            &snapshot.settings().linter,
+            snapshot.settings().linter(),
             snapshot.encoding(),
         )
     } else {

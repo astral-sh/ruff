@@ -46,11 +46,11 @@ impl Session {
     ) -> crate::Result<Self> {
         Ok(Self {
             position_encoding,
+            workspaces: workspace::Workspaces::new(workspaces, &global_settings)?,
             global_settings,
             resolved_client_capabilities: Arc::new(ResolvedClientCapabilities::new(
                 client_capabilities,
             )),
-            workspaces: workspace::Workspaces::new(workspaces)?,
         })
     }
 
@@ -87,7 +87,8 @@ impl Session {
     }
 
     pub(crate) fn open_workspace_folder(&mut self, url: &Url) -> crate::Result<()> {
-        self.workspaces.open_workspace_folder(url)?;
+        self.workspaces
+            .open_workspace_folder(url, &self.global_settings)?;
         Ok(())
     }
 

@@ -10,12 +10,14 @@ use std::{
 };
 use walkdir::{DirEntry, WalkDir};
 
+use crate::session::settings::ResolvedEditorSettings;
+
 #[derive(Default)]
 pub(crate) struct RuffSettings {
     // settings to pass into the ruff linter
-    pub(crate) linter: ruff_linter::settings::LinterSettings,
+    linter: ruff_linter::settings::LinterSettings,
     // settings to pass into the ruff formatter
-    pub(crate) formatter: ruff_workspace::FormatterSettings,
+    formatter: ruff_workspace::FormatterSettings,
 }
 
 pub(super) struct RuffSettingsIndex {
@@ -36,8 +38,27 @@ impl std::fmt::Display for RuffSettings {
     }
 }
 
+impl RuffSettings {
+    pub(crate) fn resolve(
+        linter: ruff_linter::settings::LinterSettings,
+        formatter: ruff_workspace::FormatterSettings,
+        editor_settings: &ResolvedEditorSettings,
+    ) -> Self {
+        // TODO(jane): impl resolution
+        Self { linter, formatter }
+    }
+
+    pub(crate) fn linter(&self) -> &ruff_linter::settings::LinterSettings {
+        &self.linter
+    }
+
+    pub(crate) fn formatter(&self) -> &ruff_workspace::FormatterSettings {
+        &self.formatter
+    }
+}
+
 impl RuffSettingsIndex {
-    pub(super) fn new(root: &Path) -> Self {
+    pub(super) fn new(root: &Path, editor_settings: &ResolvedEditorSettings) -> Self {
         let mut index = BTreeMap::default();
 
         for directory in WalkDir::new(root)
@@ -56,10 +77,11 @@ impl RuffSettingsIndex {
                 };
                 index.insert(
                     directory,
-                    Arc::new(RuffSettings {
-                        linter: settings.linter,
-                        formatter: settings.formatter,
-                    }),
+                    Arc::new(RuffSettings::resolve(
+                        settings.linter,
+                        settings.formatter,
+                        editor_settings,
+                    )),
                 );
             }
         }
