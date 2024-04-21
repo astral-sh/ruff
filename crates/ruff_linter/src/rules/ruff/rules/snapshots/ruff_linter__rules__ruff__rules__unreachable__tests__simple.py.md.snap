@@ -133,4 +133,54 @@ flowchart TD
   block0 --> return
 ```
 
+## Function 7
+### Source
+```python
+def func():
+    with x:
+        i = 0
+    i = 1
+```
 
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0["i = 1\n"]
+  block1["i = 0\n"]
+  block2["with x:
+        i = 0\n"]
+
+  start --> block2
+  block2 --> block1
+  block1 --> block0
+  block0 --> return
+```
+
+## Function 8
+### Source
+```python
+def func():
+    with x:
+        i = 0
+        return 1
+    i = 1
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0["i = 1\n"]
+  block1["i = 0\nreturn 1\n"]
+  block2["with x:
+        i = 0
+        return 1\n"]
+
+  start --> block2
+  block2 --> block1
+  block1 --> return
+  block0 --> return
+```
