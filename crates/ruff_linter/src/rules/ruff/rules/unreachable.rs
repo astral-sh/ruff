@@ -507,18 +507,6 @@ fn try_block<'stmt>(
         let ast::ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
             body, type_, ..
         }) = handler;
-        let condition = match type_ {
-            Some(type_) => Condition::ExceptionCaught(type_.as_ref()),
-            None => {
-                let exception = Box::leak(Box::new(Expr::Name(ast::ExprName {
-                    range: TextRange::new(TextSize::new(0), TextSize::new(0)),
-                    id: "BaseException".to_string(),
-                    ctx: ast::ExprContext::Store,
-                })));
-
-                Condition::ExceptionCaught(exception)
-            }
-        };
         let except_block = blocks.append_blocks_if_not_empty(body, finally_block);
 
         post_process_try(
@@ -529,14 +517,20 @@ fn try_block<'stmt>(
             Some(finally_block),
         );
 
-        let next = NextBlock::If {
-            condition,
-            next: except_block,
-            orelse: next_branch,
-            exit: after,
-        };
-        let block = BasicBlock { stmts, next };
-        next_branch = blocks.blocks.push(block);
+        if let Some(type_) = type_ {
+            let next = NextBlock::If {
+                condition: Condition::ExceptionCaught(type_.as_ref()),
+                next: except_block,
+                orelse: next_branch,
+                exit: after,
+            };
+            let block = BasicBlock { stmts, next };
+            next_branch = blocks.blocks.push(block);
+        } else {
+            // If no exception type is provided, i.e., `except:`
+            // Then execute the body unconditionally.
+            next_branch = except_block;
+        }
     }
 
     post_process_try(
@@ -1230,14 +1224,6 @@ impl<'stmt, 'source> fmt::Display for MermaidGraph<'stmt, 'source> {
                 } => {
                     let condition_code = match condition {
                         Condition::ExceptionRaised => "Exception raised",
-                        Condition::ExceptionCaught(Expr::Name(exception)) => {
-                            if exception.range == TextRange::new(TextSize::new(0), TextSize::new(0))
-                            {
-                                &exception.id
-                            } else {
-                                self.source[condition.range()].trim()
-                            }
-                        }
                         _ => self.source[condition.range()].trim(),
                     };
                     writeln!(
