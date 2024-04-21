@@ -715,31 +715,43 @@ impl TokenKind {
         )
     }
 
+    /// Returns `true` if the current token is a boolean operator.
     #[inline]
     pub const fn is_bool_operator(&self) -> bool {
-        matches!(self, TokenKind::And | TokenKind::Or)
+        self.as_bool_operator().is_some()
+    }
+
+    /// Returns the [`BoolOp`] that corresponds to this token kind, if it is a boolean operator,
+    /// otherwise return [None].
+    #[inline]
+    pub const fn as_bool_operator(&self) -> Option<BoolOp> {
+        Some(match self {
+            TokenKind::And => BoolOp::And,
+            TokenKind::Or => BoolOp::Or,
+            _ => return None,
+        })
     }
 
     /// Returns the [`Operator`] that corresponds to this token kind, if it is
     /// an augmented assignment operator, or [`None`] otherwise.
     #[inline]
     pub const fn as_augmented_assign_operator(&self) -> Option<Operator> {
-        match self {
-            TokenKind::PlusEqual => Some(Operator::Add),
-            TokenKind::MinusEqual => Some(Operator::Sub),
-            TokenKind::StarEqual => Some(Operator::Mult),
-            TokenKind::AtEqual => Some(Operator::MatMult),
-            TokenKind::DoubleStarEqual => Some(Operator::Pow),
-            TokenKind::SlashEqual => Some(Operator::Div),
-            TokenKind::DoubleSlashEqual => Some(Operator::FloorDiv),
-            TokenKind::PercentEqual => Some(Operator::Mod),
-            TokenKind::AmperEqual => Some(Operator::BitAnd),
-            TokenKind::VbarEqual => Some(Operator::BitOr),
-            TokenKind::CircumflexEqual => Some(Operator::BitXor),
-            TokenKind::LeftShiftEqual => Some(Operator::LShift),
-            TokenKind::RightShiftEqual => Some(Operator::RShift),
-            _ => None,
-        }
+        Some(match self {
+            TokenKind::PlusEqual => Operator::Add,
+            TokenKind::MinusEqual => Operator::Sub,
+            TokenKind::StarEqual => Operator::Mult,
+            TokenKind::AtEqual => Operator::MatMult,
+            TokenKind::DoubleStarEqual => Operator::Pow,
+            TokenKind::SlashEqual => Operator::Div,
+            TokenKind::DoubleSlashEqual => Operator::FloorDiv,
+            TokenKind::PercentEqual => Operator::Mod,
+            TokenKind::AmperEqual => Operator::BitAnd,
+            TokenKind::VbarEqual => Operator::BitOr,
+            TokenKind::CircumflexEqual => Operator::BitXor,
+            TokenKind::LeftShiftEqual => Operator::LShift,
+            TokenKind::RightShiftEqual => Operator::RShift,
+            _ => return None,
+        })
     }
 
     pub const fn from_token(token: &Tok) -> Self {
@@ -888,18 +900,6 @@ impl TryFrom<TokenKind> for Operator {
     }
 }
 
-impl TryFrom<TokenKind> for BoolOp {
-    type Error = ();
-
-    fn try_from(value: TokenKind) -> Result<Self, Self::Error> {
-        Ok(match value {
-            TokenKind::And => BoolOp::And,
-            TokenKind::Or => BoolOp::Or,
-            _ => return Err(()),
-        })
-    }
-}
-
 impl TryFrom<&Tok> for UnaryOp {
     type Error = String;
 
@@ -919,6 +919,16 @@ impl TryFrom<TokenKind> for UnaryOp {
             TokenKind::Not => UnaryOp::Not,
             _ => return Err(format!("unexpected token: {value:?}")),
         })
+    }
+}
+
+impl From<BoolOp> for TokenKind {
+    #[inline]
+    fn from(op: BoolOp) -> Self {
+        match op {
+            BoolOp::And => TokenKind::And,
+            BoolOp::Or => TokenKind::Or,
+        }
     }
 }
 

@@ -348,22 +348,17 @@ impl<'src> Parser<'src> {
                 break;
             }
 
-            // Operator token.
-            self.bump(token);
-
             // We need to create a dedicated node for boolean operations and comparison operations
             // even though they are infix operators.
-            if token.is_bool_operator() {
-                left = Expr::BoolOp(self.parse_bool_operation_expression(
-                    left.expr,
-                    start,
-                    token,
-                    new_precedence,
-                    context,
-                ))
-                .into();
+            if let Some(bool_op) = token.as_bool_operator() {
+                left =
+                    Expr::BoolOp(self.parse_boolean_expression(left.expr, start, bool_op, context))
+                        .into();
                 continue;
             }
+
+            // Operator token.
+            self.bump(token);
 
             if token.is_compare_operator() {
                 left = Expr::Compare(self.parse_compare_expression(
@@ -1043,22 +1038,23 @@ impl<'src> Parser<'src> {
 
     /// Parses a boolean operation expression.
     ///
-    /// Note that the boolean `not` operator is parsed as a unary operator and
-    /// not as a boolean operation.
+    /// Note that the boolean `not` operator is parsed as a unary expression and
+    /// not as a boolean expression.
     ///
     /// # Panics
     ///
     /// If the parser isn't positioned at a `or` or `and` token.
     ///
     /// See: <https://docs.python.org/3/reference/expressions.html#boolean-operations>
-    fn parse_bool_operation_expression(
+    fn parse_boolean_expression(
         &mut self,
         lhs: Expr,
         start: TextSize,
-        operator_token: TokenKind,
-        operator_binding_power: OperatorPrecedence,
+        op: BoolOp,
         context: ExpressionContext,
     ) -> ast::ExprBoolOp {
+        self.bump(TokenKind::from(op));
+
         let mut values = vec![lhs];
         let mut progress = ParserProgress::default();
 
@@ -1068,17 +1064,17 @@ impl<'src> Parser<'src> {
             progress.assert_progressing(self);
 
             let parsed_expr =
-                self.parse_binary_expression_or_higher(operator_binding_power, context);
+                self.parse_binary_expression_or_higher(OperatorPrecedence::from(op), context);
             values.push(parsed_expr.expr);
 
-            if !self.eat(operator_token) {
+            if !self.eat(TokenKind::from(op)) {
                 break;
             }
         }
 
         ast::ExprBoolOp {
             values,
-            op: BoolOp::try_from(operator_token).unwrap(),
+            op,
             range: self.node_range(start),
         }
     }
@@ -2545,6 +2541,16 @@ impl OperatorPrecedence {
     /// from right to left.
     fn is_right_associative(self) -> bool {
         matches!(self, OperatorPrecedence::Exponent)
+    }
+}
+
+impl From<BoolOp> for OperatorPrecedence {
+    #[inline]
+    fn from(op: BoolOp) -> Self {
+        match op {
+            BoolOp::And => OperatorPrecedence::And,
+            BoolOp::Or => OperatorPrecedence::Or,
+        }
     }
 }
 
