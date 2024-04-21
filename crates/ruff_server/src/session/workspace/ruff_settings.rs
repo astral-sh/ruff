@@ -40,12 +40,15 @@ impl std::fmt::Display for RuffSettings {
 
 impl RuffSettings {
     pub(crate) fn resolve(
-        linter: ruff_linter::settings::LinterSettings,
-        formatter: ruff_workspace::FormatterSettings,
+        project_root: &Path,
+        configuration: ruff_workspace::configuration::Configuration,
         editor_settings: &ResolvedEditorSettings,
-    ) -> Self {
-        // TODO(jane): impl resolution
-        Self { linter, formatter }
+    ) -> crate::Result<Self> {
+        let settings = editor_settings.resolve(project_root, configuration)?;
+        Ok(Self {
+            linter: settings.linter,
+            formatter: settings.formatter,
+        })
     }
 
     pub(crate) fn linter(&self) -> &ruff_linter::settings::LinterSettings {
@@ -68,21 +71,18 @@ impl RuffSettingsIndex {
             .map(DirEntry::into_path)
         {
             if let Some(pyproject) = settings_toml(&directory).ok().flatten() {
-                let Ok(settings) = ruff_workspace::resolver::resolve_root_settings(
+                let Ok(configuration) = ruff_workspace::resolver::resolve_configuration(
                     &pyproject,
                     Relativity::Parent,
                     &LSPConfigTransformer,
                 ) else {
                     continue;
                 };
-                index.insert(
-                    directory,
-                    Arc::new(RuffSettings::resolve(
-                        settings.linter,
-                        settings.formatter,
-                        editor_settings,
-                    )),
-                );
+                let Ok(settings) = RuffSettings::resolve(root, configuration, editor_settings)
+                else {
+                    continue;
+                };
+                index.insert(directory, Arc::new(settings));
             }
         }
 
