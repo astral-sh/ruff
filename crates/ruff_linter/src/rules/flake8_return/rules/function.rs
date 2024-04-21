@@ -534,9 +534,6 @@ fn has_implicit_return(checker: &mut Checker, stmt: &Stmt) -> bool {
         Stmt::With(ast::StmtWith { body, .. }) => {
             if let Some(last_stmt) = body.last() {
                 if has_implicit_return(checker, last_stmt) {
-                    if checker.settings.preview.is_disabled() {
-                        add_return_none(checker, stmt);
-                    }
                     return true;
                 }
             }
