@@ -452,7 +452,7 @@ fn is_noreturn_func(func: &Expr, semantic: &SemanticModel) -> bool {
 }
 
 /// RET503
-fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
+fn has_implicit_return(checker: &mut Checker, stmt: &Stmt) -> bool {
     match stmt {
         Stmt::If(ast::StmtIf {
             body,
@@ -460,86 +460,78 @@ fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
             ..
         }) => {
             if let Some(last_stmt) = body.last() {
-                implicit_return(checker, last_stmt);
+                if has_implicit_return(checker, last_stmt) {
+                    return true;
+                }
             }
             for clause in elif_else_clauses {
                 if let Some(last_stmt) = clause.body.last() {
-                    implicit_return(checker, last_stmt);
+                    if has_implicit_return(checker, last_stmt) {
+                        return true;
+                    }
                 }
             }
 
             // Check if we don't have an else clause
-            if matches!(
+            matches!(
                 elif_else_clauses.last(),
                 None | Some(ast::ElifElseClause { test: Some(_), .. })
-            ) {
-                let mut diagnostic = Diagnostic::new(ImplicitReturn, stmt.range());
-                if let Some(indent) = indentation(checker.locator(), stmt) {
-                    let mut content = String::new();
-                    content.push_str(checker.stylist().line_ending().as_str());
-                    content.push_str(indent);
-                    content.push_str("return None");
-                    diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
-                        content,
-                        end_of_last_statement(stmt, checker.locator()),
-                    )));
-                }
-                checker.diagnostics.push(diagnostic);
-            }
+            )
         }
-        Stmt::Assert(ast::StmtAssert { test, .. }) if is_const_false(test) => {}
-        Stmt::While(ast::StmtWhile { test, .. }) if is_const_true(test) => {}
+        Stmt::Assert(ast::StmtAssert { test, .. }) if is_const_false(test) => false,
+        Stmt::While(ast::StmtWhile { test, .. }) if is_const_true(test) => false,
         Stmt::For(ast::StmtFor { orelse, .. }) | Stmt::While(ast::StmtWhile { orelse, .. }) => {
             if let Some(last_stmt) = orelse.last() {
-                implicit_return(checker, last_stmt);
-            } else {
-                let mut diagnostic = Diagnostic::new(ImplicitReturn, stmt.range());
-                if let Some(indent) = indentation(checker.locator(), stmt) {
-                    let mut content = String::new();
-                    content.push_str(checker.stylist().line_ending().as_str());
-                    content.push_str(indent);
-                    content.push_str("return None");
-                    diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
-                        content,
-                        end_of_last_statement(stmt, checker.locator()),
-                    )));
-                }
-                checker.diagnostics.push(diagnostic);
+                return has_implicit_return(checker, last_stmt);
             }
+            true
         }
         Stmt::Match(ast::StmtMatch { cases, .. }) => {
             for case in cases {
                 if let Some(last_stmt) = case.body.last() {
-                    implicit_return(checker, last_stmt);
+                    if has_implicit_return(checker, last_stmt) {
+                        return true;
+                    }
                 }
             }
+            false
         }
         Stmt::With(ast::StmtWith { body, .. }) => {
             if let Some(last_stmt) = body.last() {
-                implicit_return(checker, last_stmt);
+                if has_implicit_return(checker, last_stmt) {
+                    return true;
+                }
             }
+            false
         }
-        Stmt::Return(_) | Stmt::Raise(_) | Stmt::Try(_) => {}
+        Stmt::Return(_) | Stmt::Raise(_) | Stmt::Try(_) => false,
         Stmt::Expr(ast::StmtExpr { value, .. })
             if matches!(
                 value.as_ref(),
                 Expr::Call(ast::ExprCall { func, ..  })
                     if is_noreturn_func(func, checker.semantic())
-            ) => {}
-        _ => {
-            let mut diagnostic = Diagnostic::new(ImplicitReturn, stmt.range());
-            if let Some(indent) = indentation(checker.locator(), stmt) {
-                let mut content = String::new();
-                content.push_str(checker.stylist().line_ending().as_str());
-                content.push_str(indent);
-                content.push_str("return None");
-                diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
-                    content,
-                    end_of_last_statement(stmt, checker.locator()),
-                )));
-            }
-            checker.diagnostics.push(diagnostic);
+            ) =>
+        {
+            false
         }
+        _ => true,
+    }
+}
+
+fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
+    if has_implicit_return(checker, stmt) {
+        let mut diagnostic = Diagnostic::new(ImplicitReturn, stmt.range());
+        if let Some(indent) = indentation(checker.locator(), stmt) {
+            let mut content = String::new();
+            content.push_str(checker.stylist().line_ending().as_str());
+            content.push_str(indent);
+            content.push_str("return None");
+            diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
+                content,
+                end_of_last_statement(stmt, checker.locator()),
+            )));
+        }
+        checker.diagnostics.push(diagnostic);
     }
 }
 

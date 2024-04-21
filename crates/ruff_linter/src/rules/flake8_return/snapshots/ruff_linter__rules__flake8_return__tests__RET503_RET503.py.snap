@@ -22,25 +22,26 @@ RET503.py:21:5: RET503 [*] Missing explicit `return` at the end of function able
 24 25 | 
 25 26 | 
 
-RET503.py:28:9: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
+RET503.py:27:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
    |
-26 | def x(y):
-27 |     if not y:
-28 |         print()  # error
-   |         ^^^^^^^ RET503
-29 |     else:
-30 |         return 2
+26 |   def x(y):
+27 |       if not y:
+   |  _____^
+28 | |         print()  # error
+29 | |     else:
+30 | |         return 2
+   | |________________^ RET503
    |
    = help: Add explicit `return` statement
 
 ℹ Unsafe fix
-26 26 | def x(y):
-27 27 |     if not y:
 28 28 |         print()  # error
-   29 |+        return None
-29 30 |     else:
-30 31 |         return 2
+29 29 |     else:
+30 30 |         return 2
+   31 |+    return None
 31 32 | 
+32 33 | 
+33 34 | def x(y):
 
 RET503.py:37:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
    |
@@ -82,12 +83,16 @@ RET503.py:42:5: RET503 [*] Missing explicit `return` at the end of function able
 46 47 | 
 47 48 | 
 
-RET503.py:53:9: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
+RET503.py:49:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
    |
-51 |             return i
-52 |     else:
-53 |         print()  # error
-   |         ^^^^^^^ RET503
+48 |   def x(y):
+49 |       for i in range(10):
+   |  _____^
+50 | |         if i > 10:
+51 | |             return i
+52 | |     else:
+53 | |         print()  # error
+   | |_______________^ RET503
    |
    = help: Add explicit `return` statement
 
@@ -95,7 +100,7 @@ RET503.py:53:9: RET503 [*] Missing explicit `return` at the end of function able
 51 51 |             return i
 52 52 |     else:
 53 53 |         print()  # error
-   54 |+        return None
+   54 |+    return None
 54 55 | 
 55 56 | 
 56 57 | # A nonexistent function
@@ -269,12 +274,17 @@ RET503.py:275:5: RET503 [*] Missing explicit `return` at the end of function abl
 278 279 | 
 279 280 | def while_true():
 
-RET503.py:292:13: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
+RET503.py:288:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
     |
-290 |             return 1
-291 |         case 1:
-292 |             print()  # error
-    |             ^^^^^^^ RET503
+286 |   # match
+287 |   def x(y):
+288 |       match y:
+    |  _____^
+289 | |         case 0:
+290 | |             return 1
+291 | |         case 1:
+292 | |             print()  # error
+    | |___________________^ RET503
     |
     = help: Add explicit `return` statement
 
@@ -282,7 +292,7 @@ RET503.py:292:13: RET503 [*] Missing explicit `return` at the end of function ab
 290 290 |             return 1
 291 291 |         case 1:
 292 292 |             print()  # error
-    293 |+            return None
+    293 |+    return None
 293 294 | 
 294 295 | 
 295 296 | def foo(baz: str) -> str:
@@ -420,12 +430,21 @@ RET503.py:339:5: RET503 [*] Missing explicit `return` at the end of function abl
 341 342 | 
 342 343 | def foo(string: str) -> str:
 
-RET503.py:354:13: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
+RET503.py:346:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
     |
-352 |             return "third"
-353 |         case _:
-354 |             raises(string)
-    |             ^^^^^^^^^^^^^^ RET503
+344 |           raise RuntimeError("something went wrong")
+345 |   
+346 |       match string:
+    |  _____^
+347 | |         case "a":
+348 | |             return "first"
+349 | |         case "b":
+350 | |             return "second"
+351 | |         case "c":
+352 | |             return "third"
+353 | |         case _:
+354 | |             raises(string)
+    | |__________________________^ RET503
     |
     = help: Add explicit `return` statement
 
@@ -433,7 +452,7 @@ RET503.py:354:13: RET503 [*] Missing explicit `return` at the end of function ab
 352 352 |             return "third"
 353 353 |         case _:
 354 354 |             raises(string)
-    355 |+            return None
+    355 |+    return None
 355 356 | 
 356 357 | 
 357 358 | def foo() -> int:
@@ -452,5 +471,3 @@ RET503.py:370:5: RET503 [*] Missing explicit `return` at the end of function abl
 369 369 |         return 1
 370 370 |     bar()
     371 |+    return None
-
-
