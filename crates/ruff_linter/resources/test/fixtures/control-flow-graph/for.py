@@ -40,8 +40,6 @@ def func():
         if True:
             break
 
-# TODO(charlie): The `pass` here does not get properly redirected to the top of the
-# loop, unlike below.
 def func():
     for i in range(5):
         pass
@@ -62,10 +60,10 @@ def func():
         pass
 
 def func():
-        for i in range(3):
-            if i == 2:
-                assert i is not None
-                break
-        else:
-            raise Exception()
-        x = 0
+    for i in range(3):
+        if i == 2:
+            assert i is not None
+            break
+    else:
+        raise Exception()
+    x = 0
