@@ -90,6 +90,17 @@ predictions = predictions[
 predictions = predictions[
     len(past_covariates) // datamodule.hparams["downsample"]	:
 ]
+
+#: E203 single whitespace before : with line a comment
+predictions = predictions[
+    len(past_covariates) // datamodule.hparams["downsample"] :  # Just some comment
+]
+
+#: E203 multi whitespace before : with line a comment
+predictions = predictions[
+    len(past_covariates) // datamodule.hparams["downsample"]  :  # Just some comment
+]
+
 #:
 
 #: E201:1:6

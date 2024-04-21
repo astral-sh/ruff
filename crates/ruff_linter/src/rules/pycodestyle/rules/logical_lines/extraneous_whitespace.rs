@@ -230,7 +230,10 @@ pub(crate) fn extraneous_whitespace(line: &LogicalLine, context: &mut LogicalLin
                                         context.push_diagnostic(diagnostic);
                                     }
                                 } else if iter.peek().is_some_and(|token| {
-                                    matches!(token.kind(), TokenKind::NonLogicalNewline)
+                                    matches!(
+                                        token.kind(),
+                                        TokenKind::NonLogicalNewline | TokenKind::Comment
+                                    )
                                 }) {
                                     // Allow [
                                     //      long_expression_calculating_the_index() :
