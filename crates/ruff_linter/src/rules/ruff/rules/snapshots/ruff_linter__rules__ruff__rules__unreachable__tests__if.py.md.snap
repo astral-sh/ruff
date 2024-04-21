@@ -682,3 +682,39 @@ flowchart TD
   block1 --> return
   block0 --> return
 ```
+
+## Function 15
+### Source
+```python
+def func():
+    if x:
+        return
+    else:
+        assert x
+
+    print('pop')
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0["print('pop')\n"]
+  block1["return\n"]
+  block2[["Exception raised"]]
+  block3["assert x\n"]
+  block4["if x:
+        return
+    else:
+        assert x\n"]
+
+  start --> block4
+  block4 -- "x" --> block1
+  block4 -- "else" --> block3
+  block3 -- "x" --> block0
+  block3 -- "else" --> block2
+  block2 --> return
+  block1 --> return
+  block0 --> return
+```

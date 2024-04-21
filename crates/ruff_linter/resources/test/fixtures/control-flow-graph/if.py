@@ -120,3 +120,11 @@ def func(x):
         return 5
     elif x == 6:
         return 6
+
+def func():
+    if x:
+        return
+    else:
+        assert x
+
+    print('pop')
