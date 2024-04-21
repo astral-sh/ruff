@@ -152,7 +152,7 @@ def while_break():
         print("unreachable")
     return "reachable"
 
-# Test case found in the Bokeh repository that trigger a false positive.
+# Test case found in the Bokeh repository that triggered a false positive.
 def bokeh1(self, obj: BytesRep) -> bytes:
     data = obj["data"]
 
@@ -170,12 +170,7 @@ def bokeh1(self, obj: BytesRep) -> bytes:
 
     return buffer.data
 
-'''
-TODO: because `try` statements aren't handled this triggers a false positive as
-the last statement is reached, but the rules thinks it isn't (it doesn't
-see/process the break statement).
-
-# Test case found in the Bokeh repository that trigger a false positive.
+# Test case found in the Bokeh repository that triggered a false positive.
 def bokeh2(self, host: str = DEFAULT_HOST, port: int = DEFAULT_PORT) -> None:
     self.stop_serving = False
     while True:
@@ -189,4 +184,3 @@ def bokeh2(self, host: str = DEFAULT_HOST, port: int = DEFAULT_PORT) -> None:
             port += 1
 
     self.thread = threading.Thread(target=self._run_web_server)
-'''
