@@ -782,14 +782,9 @@ impl<'stmt> BasicBlocksBuilder<'stmt> {
                     ..
                 }) => loop_block(self, Condition::Iterator(condition), body, orelse, after),
                 Stmt::Try(_) => try_block(self, stmt, after),
-                Stmt::With(StmtWith { items, body, .. }) => {
-                    // TODO: handle `with` statements, see
-                    // <https://docs.python.org/3/reference/compound_stmts.html#the-with-statement>.
-                    // I recommend to `try` statements first as `with` can desugar
-                    // to a `try` statement.
-                    // For now we'll skip over it.
-                    let _ = (items, body); // Silence unused code warnings.
-                    self.unconditional_next_block(after)
+                Stmt::With(StmtWith { body, .. }) => {
+                    let with_block = self.append_blocks(body, after);
+                    self.unconditional_next_block(Some(with_block))
                 }
                 Stmt::Match(StmtMatch { subject, cases, .. }) => {
                     let next_after_block = self.maybe_next_block_index(after, || {
