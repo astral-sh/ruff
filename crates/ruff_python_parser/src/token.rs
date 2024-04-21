@@ -5,7 +5,7 @@
 //!
 //! [CPython source]: https://github.com/python/cpython/blob/dfc2e065a2e71011017077e549cd2f9bf4944c54/Include/internal/pycore_token.h;
 
-use ruff_python_ast::{AnyStringKind, BoolOp, Int, IpyEscapeKind, Operator, UnaryOp};
+use ruff_python_ast::{AnyStringKind, BoolOp, CmpOp, Int, IpyEscapeKind, Operator, UnaryOp};
 use std::fmt;
 
 use crate::Mode;
@@ -699,20 +699,31 @@ impl TokenKind {
         matches!(self, TokenKind::Match | TokenKind::Case)
     }
 
+    /// Returns `true` if the current token is a comparison operator. This function requires the
+    /// next token operators containing two tokens such as `not in` and `is not`.
     #[inline]
-    pub const fn is_compare_operator(&self) -> bool {
-        matches!(
-            self,
-            TokenKind::Not
-                | TokenKind::In
-                | TokenKind::Is
-                | TokenKind::EqEqual
-                | TokenKind::NotEqual
-                | TokenKind::Less
-                | TokenKind::LessEqual
-                | TokenKind::Greater
-                | TokenKind::GreaterEqual
-        )
+    pub const fn is_compare_operator(&self, next: TokenKind) -> bool {
+        self.as_compare_operator(next).is_some()
+    }
+
+    /// Returns the [`CmpOp`] that corresponds to this token kind, if it is a comparison operator,
+    /// otherwise return [None]. This function requires the next token operators containing two
+    /// tokens such as `not in` and `is not`.
+    #[inline]
+    pub const fn as_compare_operator(&self, next: TokenKind) -> Option<CmpOp> {
+        Some(match self {
+            TokenKind::In => CmpOp::In,
+            TokenKind::Not if matches!(next, TokenKind::In) => CmpOp::NotIn,
+            TokenKind::Is if matches!(next, TokenKind::Not) => CmpOp::IsNot,
+            TokenKind::Is => CmpOp::Is,
+            TokenKind::EqEqual => CmpOp::Eq,
+            TokenKind::NotEqual => CmpOp::NotEq,
+            TokenKind::Less => CmpOp::Lt,
+            TokenKind::LessEqual => CmpOp::LtE,
+            TokenKind::Greater => CmpOp::Gt,
+            TokenKind::GreaterEqual => CmpOp::GtE,
+            _ => return None,
+        })
     }
 
     /// Returns `true` if the current token is a boolean operator.

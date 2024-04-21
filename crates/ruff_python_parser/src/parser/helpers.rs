@@ -1,6 +1,4 @@
-use ruff_python_ast::{self as ast, CmpOp, Expr, ExprContext};
-
-use crate::TokenKind;
+use ruff_python_ast::{self as ast, Expr, ExprContext};
 
 /// Set the `ctx` for `Expr::Id`, `Expr::Attribute`, `Expr::Subscript`, `Expr::Starred`,
 /// `Expr::Tuple` and `Expr::List`. If `expr` is either `Expr::Tuple` or `Expr::List`,
@@ -25,21 +23,4 @@ pub(super) fn set_expr_ctx(expr: &mut Expr, new_ctx: ExprContext) {
         }
         _ => {}
     }
-}
-
-/// Converts a [`TokenKind`] array of size 2 to its correspondent [`CmpOp`].
-pub(super) fn token_kind_to_cmp_op(kind: [TokenKind; 2]) -> Result<CmpOp, ()> {
-    Ok(match kind {
-        [TokenKind::Is, TokenKind::Not] => CmpOp::IsNot,
-        [TokenKind::Is, _] => CmpOp::Is,
-        [TokenKind::Not, TokenKind::In] => CmpOp::NotIn,
-        [TokenKind::In, _] => CmpOp::In,
-        [TokenKind::EqEqual, _] => CmpOp::Eq,
-        [TokenKind::NotEqual, _] => CmpOp::NotEq,
-        [TokenKind::Less, _] => CmpOp::Lt,
-        [TokenKind::LessEqual, _] => CmpOp::LtE,
-        [TokenKind::Greater, _] => CmpOp::Gt,
-        [TokenKind::GreaterEqual, _] => CmpOp::GtE,
-        _ => return Err(()),
-    })
 }
