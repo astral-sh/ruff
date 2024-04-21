@@ -410,8 +410,8 @@ fn loop_block<'stmt>(
     }
 }
 
-fn post_process_loop<'stmt>(
-    blocks: &mut BasicBlocksBuilder<'stmt>,
+fn post_process_loop(
+    blocks: &mut BasicBlocksBuilder<'_>,
     start_index: BlockIndex,
     loop_start: BlockIndex,
     loop_exit: Option<BlockIndex>,
@@ -494,10 +494,10 @@ fn try_block<'stmt>(
     let else_block = blocks.append_blocks_if_not_empty(orelse, finally_block);
     let try_block = blocks.append_blocks_if_not_empty(body, else_block);
 
-    let finally_index = if !finalbody.is_empty() {
-        Some(finally_block)
-    } else {
+    let finally_index = if finalbody.is_empty() {
         None
+    } else {
+        Some(finally_block)
     };
 
     // If an exception is raised and not caught then terminate with exception
@@ -557,8 +557,8 @@ fn try_block<'stmt>(
     }
 }
 
-fn post_process_try<'stmt>(
-    blocks: &mut BasicBlocksBuilder<'stmt>,
+fn post_process_try(
+    blocks: &mut BasicBlocksBuilder<'_>,
     start_index: BlockIndex,
     except_index: Option<BlockIndex>,
     finally_index: Option<BlockIndex>,
