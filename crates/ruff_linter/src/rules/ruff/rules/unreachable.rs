@@ -843,7 +843,7 @@ impl<'stmt> BasicBlocksBuilder<'stmt> {
                     // assertion fails, it's possible it's continued in an `catch`
                     // or `finally` block, possibly outside of the function.
                     // Also see `Stmt::Raise` handling.
-                    let next = self.force_next_block_index();
+                    let next = self.maybe_next_block_index(after, || true);
                     let orelse = self.fake_exception_block_index();
                     NextBlock::If {
                         condition: Condition::Test(&stmt.test),
@@ -947,12 +947,6 @@ impl<'stmt> BasicBlocksBuilder<'stmt> {
         self.blocks
             .last_index()
             .map_or(NextBlock::Terminate, NextBlock::Always)
-    }
-
-    /// Select the next block index from `blocks`. If there is no next block it will
-    /// add a fake/empty block.
-    fn force_next_block_index(&mut self) -> BlockIndex {
-        self.maybe_next_block_index(None, || true)
     }
 
     /// Select the next block index from `blocks`. If there is no next block it will
