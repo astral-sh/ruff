@@ -705,7 +705,7 @@ mod tests {
                     select: None,
                     extend_select: None,
                     ignore: Some(vec![RuleSelector::from_str("RUF001").unwrap()]),
-                    exclude: Some(vec![PathBuf::from_str("third_party").unwrap()]),
+                    exclude: Some(vec!["third_party".into()]),
                     line_length: Some(LineLength::try_from(80).unwrap())
                 }
             }
