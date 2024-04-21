@@ -394,10 +394,21 @@ impl<'src> Parser<'src> {
         context: ExpressionContext,
     ) -> ParsedExpr {
         let start = self.node_start();
+        let token = self.current_token_kind();
 
-        let lhs = match self.current_token_kind() {
-            unary_tok @ (TokenKind::Plus | TokenKind::Minus | TokenKind::Tilde) => {
-                let unary_expr = self.parse_unary_expression(context);
+        if let Some(unary_op) = token.as_unary_opeartor() {
+            let expr = self.parse_unary_expression(unary_op, context);
+
+            if matches!(unary_op, UnaryOp::Not) {
+                if left_precedence > OperatorPrecedence::Not {
+                    self.add_error(
+                        ParseErrorType::OtherError(
+                            "Boolean 'not' expression cannot be used here".to_string(),
+                        ),
+                        &expr,
+                    );
+                }
+            } else {
                 if left_precedence > OperatorPrecedence::PosNegBitNot
                     // > The power operator `**` binds less tightly than an arithmetic
                     // > or bitwise unary operator on its right, that is, 2**-1 is 0.5.
@@ -407,36 +418,31 @@ impl<'src> Parser<'src> {
                 {
                     self.add_error(
                         ParseErrorType::OtherError(format!(
-                            "Unary {unary_tok} expression cannot be used here",
+                            "Unary '{unary_op}' expression cannot be used here",
                         )),
-                        &unary_expr,
+                        &expr,
                     );
                 }
-                Expr::UnaryOp(unary_expr).into()
             }
-            TokenKind::Not => {
-                let unary_expr = self.parse_unary_expression(context);
-                if left_precedence > OperatorPrecedence::Not {
-                    self.add_error(
-                        ParseErrorType::OtherError(
-                            "Boolean 'not' expression cannot be used here".to_string(),
-                        ),
-                        &unary_expr,
-                    );
-                }
-                Expr::UnaryOp(unary_expr).into()
-            }
+
+            return Expr::UnaryOp(expr).into();
+        }
+
+        match self.current_token_kind() {
             TokenKind::Star => {
                 let starred_expr = self.parse_starred_expression(context);
+
                 if left_precedence > OperatorPrecedence::Initial
                     || !context.is_starred_expression_allowed()
                 {
                     self.add_error(ParseErrorType::InvalidStarredExpressionUsage, &starred_expr);
                 }
-                Expr::Starred(starred_expr).into()
+
+                return Expr::Starred(starred_expr).into();
             }
             TokenKind::Await => {
                 let await_expr = self.parse_await_expression();
+
                 // `await` expressions cannot be nested
                 if left_precedence >= OperatorPrecedence::Await {
                     self.add_error(
@@ -446,26 +452,31 @@ impl<'src> Parser<'src> {
                         &await_expr,
                     );
                 }
-                Expr::Await(await_expr).into()
+
+                return Expr::Await(await_expr).into();
             }
             TokenKind::Lambda => {
-                // Lambda expression isn't allowed in this context but we'll still
-                // parse it and report an error for better recovery.
+                // Lambda expression isn't allowed in this context but we'll still parse it and
+                // report an error for better recovery.
                 let lambda_expr = self.parse_lambda_expr();
                 self.add_error(ParseErrorType::InvalidLambdaExpressionUsage, &lambda_expr);
-                Expr::Lambda(lambda_expr).into()
+                return Expr::Lambda(lambda_expr).into();
             }
             TokenKind::Yield => {
                 let expr = self.parse_yield_expression();
+
                 if left_precedence > OperatorPrecedence::Initial
                     || !context.is_yield_expression_allowed()
                 {
                     self.add_error(ParseErrorType::InvalidYieldExpressionUsage, &expr);
                 }
-                expr.into()
+
+                return expr.into();
             }
-            _ => self.parse_atom(),
-        };
+            _ => {}
+        }
+
+        let lhs = self.parse_atom();
 
         ParsedExpr {
             expr: self.parse_postfix_expression(lhs.expr, start),
@@ -984,20 +995,13 @@ impl<'src> Parser<'src> {
     /// See: <https://docs.python.org/3/reference/expressions.html#unary-arithmetic-and-bitwise-operations>
     pub(super) fn parse_unary_expression(
         &mut self,
+        op: UnaryOp,
         context: ExpressionContext,
     ) -> ast::ExprUnaryOp {
         let start = self.node_start();
+        self.bump(TokenKind::from(op));
 
-        let op = UnaryOp::try_from(self.current_token_kind())
-            .expect("current token should be a unary operator");
-        self.bump(self.current_token_kind());
-
-        let operand = if op.is_not() {
-            self.parse_binary_expression_or_higher(OperatorPrecedence::Not, context)
-        } else {
-            // plus, minus and tilde
-            self.parse_binary_expression_or_higher(OperatorPrecedence::PosNegBitNot, context)
-        };
+        let operand = self.parse_binary_expression_or_higher(OperatorPrecedence::from(op), context);
 
         ast::ExprUnaryOp {
             op,
@@ -2540,6 +2544,16 @@ impl From<BoolOp> for OperatorPrecedence {
         match op {
             BoolOp::And => OperatorPrecedence::And,
             BoolOp::Or => OperatorPrecedence::Or,
+        }
+    }
+}
+
+impl From<UnaryOp> for OperatorPrecedence {
+    #[inline]
+    fn from(op: UnaryOp) -> Self {
+        match op {
+            UnaryOp::Not => OperatorPrecedence::Not,
+            _ => OperatorPrecedence::PosNegBitNot,
         }
     }
 }

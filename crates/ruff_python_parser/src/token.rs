@@ -541,11 +541,6 @@ impl TokenKind {
     }
 
     #[inline]
-    pub const fn is_unary(&self) -> bool {
-        matches!(self, TokenKind::Plus | TokenKind::Minus)
-    }
-
-    #[inline]
     pub const fn is_keyword(&self) -> bool {
         matches!(
             self,
@@ -697,6 +692,52 @@ impl TokenKind {
     #[inline]
     pub const fn is_soft_keyword(&self) -> bool {
         matches!(self, TokenKind::Match | TokenKind::Case)
+    }
+
+    /// Returns `true` if the current token is a unary arithmetic operator.
+    ///
+    /// Use [`TokenKind::is_unary_opeartor`] to check for any unary operator.
+    #[inline]
+    pub const fn is_unary_arithmetic_operator(&self) -> bool {
+        matches!(self, TokenKind::Plus | TokenKind::Minus)
+    }
+
+    /// Returns the [`UnaryOp`] that corresponds to this token kind, if it is an arithmetic unary
+    /// operator, otherwise return [None].
+    ///
+    /// Use [`TokenKind::as_unary_opeartor`] to match against any unary operator.
+    #[inline]
+    pub const fn as_unary_arithmetic_opeartor(&self) -> Option<UnaryOp> {
+        Some(match self {
+            TokenKind::Plus => UnaryOp::UAdd,
+            TokenKind::Minus => UnaryOp::USub,
+            _ => return None,
+        })
+    }
+
+    /// Returns `true` if the current token is a unary operator.
+    ///
+    /// Use [`TokenKind::is_unary_arithmetic_operator`] to check for only an arithmetic unary
+    /// operator.
+    #[inline]
+    pub const fn is_unary_opeartor(&self) -> bool {
+        self.as_unary_opeartor().is_some()
+    }
+
+    /// Returns the [`UnaryOp`] that corresponds to this token kind, if it is a unary operator,
+    /// otherwise return [None].
+    ///
+    /// Use [`TokenKind::as_unary_arithmetic_opeartor`] to match against only an arithmetic unary
+    /// operator.
+    #[inline]
+    pub const fn as_unary_opeartor(&self) -> Option<UnaryOp> {
+        Some(match self {
+            TokenKind::Plus => UnaryOp::UAdd,
+            TokenKind::Minus => UnaryOp::USub,
+            TokenKind::Tilde => UnaryOp::Invert,
+            TokenKind::Not => UnaryOp::Not,
+            _ => return None,
+        })
     }
 
     /// Returns `true` if the current token is a comparison operator. This function requires the
@@ -911,34 +952,24 @@ impl TryFrom<TokenKind> for Operator {
     }
 }
 
-impl TryFrom<&Tok> for UnaryOp {
-    type Error = String;
-
-    fn try_from(value: &Tok) -> Result<Self, Self::Error> {
-        TokenKind::from_token(value).try_into()
-    }
-}
-
-impl TryFrom<TokenKind> for UnaryOp {
-    type Error = String;
-
-    fn try_from(value: TokenKind) -> Result<Self, Self::Error> {
-        Ok(match value {
-            TokenKind::Plus => UnaryOp::UAdd,
-            TokenKind::Minus => UnaryOp::USub,
-            TokenKind::Tilde => UnaryOp::Invert,
-            TokenKind::Not => UnaryOp::Not,
-            _ => return Err(format!("unexpected token: {value:?}")),
-        })
-    }
-}
-
 impl From<BoolOp> for TokenKind {
     #[inline]
     fn from(op: BoolOp) -> Self {
         match op {
             BoolOp::And => TokenKind::And,
             BoolOp::Or => TokenKind::Or,
+        }
+    }
+}
+
+impl From<UnaryOp> for TokenKind {
+    #[inline]
+    fn from(op: UnaryOp) -> Self {
+        match op {
+            UnaryOp::Invert => TokenKind::Tilde,
+            UnaryOp::Not => TokenKind::Not,
+            UnaryOp::UAdd => TokenKind::Plus,
+            UnaryOp::USub => TokenKind::Minus,
         }
     }
 }
