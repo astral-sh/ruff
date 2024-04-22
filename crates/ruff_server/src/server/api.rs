@@ -1,6 +1,7 @@
 use crate::{server::schedule::Task, session::Session};
 use lsp_server as server;
 
+mod diagnostics;
 mod notifications;
 mod requests;
 mod traits;
