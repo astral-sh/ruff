@@ -29,15 +29,15 @@ pub(crate) enum ScopeKind {
 }
 
 pub(crate) struct Scope {
-    pub name: Name,
-    pub kind: ScopeKind,
-    pub child_scopes: Vec<ScopeId>,
+    pub(crate) name: Name,
+    pub(crate) kind: ScopeKind,
+    pub(crate) child_scopes: Vec<ScopeId>,
     // symbol IDs, hashed by symbol name
     symbols_by_name: Map<SymbolId, ()>,
 }
 
 pub(crate) struct Symbol {
-    pub name: Name,
+    pub(crate) name: Name,
 }
 
 pub(crate) struct Symbols<'a> {

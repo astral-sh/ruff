@@ -6,6 +6,7 @@ use red_knot::module::{ModuleSearchPath, ModuleSearchPathKind};
 use red_knot::program::Program;
 use red_knot::{files, Workspace};
 
+#[allow(clippy::dbg_macro, clippy::print_stdout, clippy::unnecessary_wraps)]
 fn main() -> anyhow::Result<()> {
     let files = files::Files::default();
     let mut workspace = Workspace::new(PathBuf::from("/home/micha/astral/test/"));
@@ -128,8 +129,8 @@ fn main() -> anyhow::Result<()> {
 
     let source_jar: &SourceJar = program.jar();
 
-    dbg!(source_jar.parsed.statistics());
-    dbg!(source_jar.sources.statistics());
+    source_jar.parsed.statistics();
+    source_jar.sources.statistics();
 
     Ok(())
 }

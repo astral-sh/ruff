@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use std::path::Path;
 use std::sync::Arc;
 
@@ -38,6 +36,7 @@ impl Program {
     //        Ok(Symbols::from_ast(&self.parse(module_id)?.ast))
     //    }
 
+    #[allow(unused)]
     fn analyze_imports(&self, _name: ModuleName) -> Result<Vec<String>> {
         // TODO
         Ok(Vec::new())
