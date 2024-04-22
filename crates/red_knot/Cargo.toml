@@ -24,11 +24,11 @@ filetime = { workspace = true }
 hashbrown = { workspace = true }
 itertools = { workspace = true }
 log = { workspace = true }
-rustc-hash = { workspace = true }
 parking_lot = { workspace = true }
-salsa = { git = "https://github.com/salsa-rs/salsa.git", package = "salsa-2022", rev = "f5aec4abefb4c5e67cba6d8ea91c216bc2838f10" }
+rustc-hash = { workspace = true }
 smallvec = { workspace = true }
 smol_str = "0.2.1"
+tracing = { workspace = true }
 
 [dev-dependencies]
 textwrap = "0.16.1"
