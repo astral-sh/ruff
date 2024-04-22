@@ -371,9 +371,9 @@ dependencies = [
 
 [[package]]
 name = "codspeed"
-version = "2.4.1"
+version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "655a6d8e698ef8de25b6fb160dc904d98cf3642df48fae8bb05711db1893f47d"
+checksum = "735f16ee0fc63cb90596cd7b57ce481522adfe1714f95bc04a94d4f4b0a06a6d"
 dependencies = [
  "colored",
  "libc",
@@ -382,9 +382,9 @@ dependencies = [
 
 [[package]]
 name = "codspeed-criterion-compat"
-version = "2.4.1"
+version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cb377d73b85084b1ca5615e42fdbf3b52631d6d8feda4be6dfc2150646f53cea"
+checksum = "572ca9c8ad460591b40aad63c99d6746aa3c532f979175344eb015389499860c"
 dependencies = [
  "codspeed",
  "colored",
