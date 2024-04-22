@@ -1,5 +1,3 @@
-#![allow(unreachable_pub)]
-
 use std::fmt::Formatter;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicU32;
@@ -41,7 +39,6 @@ impl Module {
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct ModuleName(smol_str::SmolStr);
 
-#[allow(unused)]
 impl ModuleName {
     pub fn new(name: &str) -> Self {
         debug_assert!(!name.is_empty());
@@ -114,7 +111,6 @@ pub struct ModuleSearchPath {
     inner: Arc<ModuleSearchPathInner>,
 }
 
-#[allow(unused)]
 impl ModuleSearchPath {
     pub fn new(path: PathBuf, kind: ModuleSearchPathKind) -> Self {
         Self {
@@ -143,7 +139,6 @@ struct ModuleSearchPathInner {
     kind: ModuleSearchPathKind,
 }
 
-#[allow(unused)]
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub enum ModuleSearchPathKind {
     // Project dependency
@@ -375,7 +370,6 @@ pub struct ModuleResolver {
     next_module_id: AtomicU32,
 }
 
-#[allow(unused)]
 impl ModuleResolver {
     pub fn new(search_paths: Vec<ModuleSearchPath>) -> Self {
         Self {

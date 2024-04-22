@@ -1,4 +1,4 @@
-#![allow(unreachable_pub)]
+#![allow(clippy::pedantic)]
 
 use std::hash::BuildHasherDefault;
 use std::path::{Path, PathBuf};

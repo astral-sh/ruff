@@ -63,7 +63,7 @@ impl Parsed {
     }
 }
 
-pub fn parse<Db>(db: &Db, file_id: FileId) -> Parsed
+pub(crate) fn parse<Db>(db: &Db, file_id: FileId) -> Parsed
 where
     Db: SourceDb + HasJar<SourceJar>,
 {
