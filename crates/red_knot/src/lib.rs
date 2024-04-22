@@ -12,6 +12,7 @@ pub mod db;
 pub mod files;
 pub mod hir;
 mod module;
+mod parse;
 mod symbols;
 
 pub type FxDashMap<K, V> = dashmap::DashMap<K, V, BuildHasherDefault<FxHasher>>;
