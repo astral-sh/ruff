@@ -55,3 +55,31 @@ def func():
         return 1
     finally:
         return 2
+
+def func():
+    try:
+        raise Exception()
+    except:
+        print("reached")
+
+def func():
+    try:
+        assert False
+        print("unreachable")
+    except:
+        print("reached")
+
+def func():
+    try:
+        raise Exception()
+    finally:
+        print('reached')
+        return 2
+
+def func():
+    try:
+        assert False
+        print("unreachable")
+    finally:
+        print("reached")
+

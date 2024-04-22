@@ -48,7 +48,7 @@ pub(crate) fn in_function(name: &Identifier, body: &[Stmt]) -> Vec<Diagnostic> {
     // Create basic code blocks from the body.
     let basic_blocks = BasicBlocks::from(body);
 
-    // Basic on the code blocks we can (more) easily follow what statements are
+    // Using the code blocks we can (more) easily follow what statements are
     // and aren't reached, we'll mark them as such in `reached_map`.
     let mut reached_map = Bitmap::with_capacity(basic_blocks.len());
 
@@ -533,10 +533,16 @@ fn try_block<'stmt>(
         }
     }
 
+    let except_index = if handlers.is_empty() {
+        None
+    } else {
+        Some(next_branch)
+    };
+
     post_process_try(
         blocks,
         try_block,
-        Some(next_branch),
+        except_index,
         finally_index,
         Some(else_block),
     );
@@ -578,6 +584,10 @@ fn post_process_try(
                             if blocks.blocks[*next].is_exception() {
                                 blocks.blocks[idx].next = NextBlock::Always(except_index);
                             }
+                        } else if let Some(finally_index) = finally_index {
+                            if blocks.blocks[*next].is_exception() {
+                                blocks.blocks[idx].next = NextBlock::Always(finally_index);
+                            }
                         }
                         return;
                     }
@@ -595,11 +605,20 @@ fn post_process_try(
                         next_index = *next;
                         // re-route to except if not already re-routed
                         if let Some(except_index) = except_index {
-                            if blocks.blocks[*next].is_exception() {
+                            if blocks.blocks[*orelse].is_exception() {
                                 blocks.blocks[idx].next = NextBlock::If {
                                     condition: condition.clone(),
                                     next: *next,
                                     orelse: except_index,
+                                    exit: *exit,
+                                };
+                            }
+                        } else if let Some(finally_index) = finally_index {
+                            if blocks.blocks[*orelse].is_exception() {
+                                blocks.blocks[idx].next = NextBlock::If {
+                                    condition: condition.clone(),
+                                    next: *next,
+                                    orelse: finally_index,
                                     exit: *exit,
                                 };
                             }
@@ -698,12 +717,14 @@ fn is_wildcard(pattern: &MatchCase) -> bool {
 #[derive(Debug, Default)]
 struct BasicBlocksBuilder<'stmt> {
     blocks: IndexVec<BlockIndex, BasicBlock<'stmt>>,
+    exception_block_index: Option<BlockIndex>,
 }
 
 impl<'stmt> BasicBlocksBuilder<'stmt> {
     fn with_capacity(capacity: usize) -> Self {
         Self {
             blocks: IndexVec::with_capacity(capacity),
+            exception_block_index: None,
         }
     }
 
@@ -733,7 +754,7 @@ impl<'stmt> BasicBlocksBuilder<'stmt> {
                 | Stmt::IpyEscapeCommand(_)
                 | Stmt::Pass(_) => self.unconditional_next_block(after),
                 Stmt::Break(_) | Stmt::Continue(_) => {
-                    // NOTE: These are handled in post_processing.
+                    // NOTE: These are handled in post_process_loop.
                     self.unconditional_next_block(after)
                 }
                 // Statements that (can) divert the control flow.
@@ -830,19 +851,11 @@ impl<'stmt> BasicBlocksBuilder<'stmt> {
                     continue;
                 }
                 Stmt::Raise(_) => {
-                    // TODO: this needs special handling within `try` and `with`
-                    // statements. For now we just terminate the execution, it's
-                    // possible it's continued in an `catch` or `finally` block,
-                    // possibly outside of the function.
-                    // Also see `Stmt::Assert` handling.
-                    NextBlock::Terminate
+                    // NOTE: This may be modified in post_process_try.
+                    NextBlock::Always(self.fake_exception_block_index())
                 }
                 Stmt::Assert(stmt) => {
-                    // TODO: this needs special handling within `try` and `with`
-                    // statements. For now we just terminate the execution if the
-                    // assertion fails, it's possible it's continued in an `catch`
-                    // or `finally` block, possibly outside of the function.
-                    // Also see `Stmt::Raise` handling.
+                    // NOTE: This may be modified in post_process_try.
                     let next = self.maybe_next_block_index(after, || true);
                     let orelse = self.fake_exception_block_index();
                     NextBlock::If {
@@ -978,12 +991,13 @@ impl<'stmt> BasicBlocksBuilder<'stmt> {
 
     /// Returns a block index for a fake exception block in `blocks`.
     fn fake_exception_block_index(&mut self) -> BlockIndex {
-        for (i, block) in self.blocks.iter_enumerated() {
-            if block.is_exception() {
-                return i;
-            }
+        if let Some(index) = self.exception_block_index {
+            index
+        } else {
+            let index = self.blocks.push(BasicBlock::EXCEPTION);
+            self.exception_block_index = Some(index);
+            index
         }
-        self.blocks.push(BasicBlock::EXCEPTION)
     }
 
     /// Change the next basic block for the block, or chain of blocks, in index
