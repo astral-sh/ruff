@@ -71,7 +71,7 @@ where
     }
 
     fn clear(&mut self) {
-        self.map.clear()
+        self.map.clear();
     }
 
     fn statistics(&self) -> Option<Statistics> {
@@ -100,7 +100,7 @@ where
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let mut debug = f.debug_map();
 
-        for entry in self.map.iter() {
+        for entry in &self.map {
             debug.entry(&entry.value(), &entry.key());
         }
 

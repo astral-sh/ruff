@@ -1,31 +1,35 @@
 #![allow(dead_code)]
 
-use crate::cache::{Cache, MapCache};
-use crate::{Db, ModuleDb, SourceDb};
-use anyhow::Result;
 use std::path::Path;
 use std::sync::Arc;
 
+use anyhow::Result;
+
+use crate::cache::Cache;
+use crate::db::{Db, HasJar, ModuleDb, SourceDb, SourceJar, SourceStorage};
 use crate::files::{FileId, Files};
-use crate::module::{Module, ModuleId, ModuleName, ModuleResolver, ModuleSearchPath};
-use crate::parse::{parse, Parsed};
-use crate::source::Source;
+use crate::module::{
+    add_module, path_to_module, resolve_module, set_module_search_paths, Module, ModuleData,
+    ModuleName, ModuleResolver, ModuleSearchPath,
+};
+use crate::parse::{parse, Parsed, ParsedStorage};
+use crate::source::{source_text, Source};
 
 #[derive(Debug)]
 pub struct Program {
-    module_resolver: ModuleResolver,
     files: Files,
-    sources: MapCache<FileId, Source>,
-    parsed: MapCache<FileId, Parsed>,
+    source: SourceJar,
 }
 
 impl Program {
     pub fn new(module_search_paths: Vec<ModuleSearchPath>, files: Files) -> Self {
         Self {
-            module_resolver: ModuleResolver::new(module_search_paths, files.clone()),
+            source: SourceJar {
+                module_resolver: ModuleResolver::new(module_search_paths),
+                sources: SourceStorage::default(),
+                parsed: ParsedStorage::default(),
+            },
             files,
-            sources: Default::default(),
-            parsed: Default::default(),
         }
     }
 
@@ -44,9 +48,9 @@ impl Program {
             return;
         };
 
-        self.module_resolver.remove_module(path);
-        self.sources.remove(&file_id);
-        self.parsed.remove(&file_id);
+        self.source.module_resolver.remove_module(path);
+        self.source.sources.remove(&file_id);
+        self.source.parsed.remove(&file_id);
     }
 }
 
@@ -60,42 +64,43 @@ impl SourceDb for Program {
     }
 
     fn source(&self, file_id: FileId) -> Source {
-        self.sources.get(&file_id, |file_id| {
-            let path = self.file_path(*file_id);
-
-            let source_text = std::fs::read_to_string(&path).unwrap_or_else(|err| {
-                tracing::error!(
-                    "Failed to read file '{path:?}: {err}'. Falling back to empty text"
-                );
-                String::new()
-            });
-
-            Source::new(*file_id, source_text)
-        })
+        source_text(self, file_id)
     }
 
-    fn parse(&self, source: &Source) -> Parsed {
-        // TODO still performs two lookups instead of just one.
-        // Can be avoided by lifting the requirement to pass the source text to the caller.
-        // But could make for more awkward code.
-        self.parsed.get(&source.file(), |_| parse(&source))
+    fn parse(&self, file_id: FileId) -> Parsed {
+        parse(self, file_id)
     }
 }
 
 impl ModuleDb for Program {
-    fn resolve_module(&self, name: ModuleName) -> Option<ModuleId> {
-        // FIXME: The fact that `resolve_module` returns the id only is ab it annoying.
-        // What salsa does is that Module is only an id and the
-        // `path` or `name` methods call into the database
-        self.module_resolver.resolve(name)
+    fn resolve_module(&self, name: ModuleName) -> Option<Module> {
+        resolve_module(self, name)
     }
 
-    fn module(&self, module_id: ModuleId) -> Module {
-        self.module_resolver.module(module_id)
+    fn path_to_module(&mut self, path: &Path) -> Option<Module> {
+        path_to_module(self, path)
+    }
+
+    fn add_module(&mut self, path: &Path) -> Option<(Module, Vec<Arc<ModuleData>>)> {
+        add_module(self, path)
+    }
+
+    fn set_module_search_paths(&mut self, paths: Vec<ModuleSearchPath>) {
+        set_module_search_paths(self, paths);
     }
 }
 
 impl Db for Program {}
+
+impl HasJar<SourceJar> for Program {
+    fn jar(&self) -> &SourceJar {
+        &self.source
+    }
+
+    fn jar_mut(&mut self) -> &mut SourceJar {
+        &mut self.source
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -110,8 +115,8 @@ mod tests {
         let root = temp_dir.path().canonicalize()?;
         let mod1 = root.join("mod1.py");
         let mod2 = root.join("mod2.py");
-        std::fs::write(&mod1, "class C: pass")?;
-        std::fs::write(&mod2, "from mod1 import C")?;
+        std::fs::write(mod1, "class C: pass")?;
+        std::fs::write(mod2, "from mod1 import C")?;
 
         let program = Program::new(
             vec![ModuleSearchPath::new(
