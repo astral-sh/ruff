@@ -1,8 +1,10 @@
 use std::path::PathBuf;
 
+use red_knot::cache::Cache;
+use red_knot::db::{HasJar, SourceDb, SourceJar};
 use red_knot::module::{ModuleSearchPath, ModuleSearchPathKind};
 use red_knot::program::Program;
-use red_knot::{files, SourceDb, Workspace};
+use red_knot::{files, Workspace};
 
 fn main() -> anyhow::Result<()> {
     let files = files::Files::default();
@@ -41,7 +43,7 @@ fn main() -> anyhow::Result<()> {
 
     // TODO we could now consider spawning the analysis of the dependencies into their own threads.
     while let Some(file) = queue.pop() {
-        let source = program.source(file);
+        // let source = program.source(file);
         // let module_path = program.file_path(file_id);
 
         // // TODO this looks weird: dependencies.files. Let's figure out a better naming and structure.
@@ -57,7 +59,9 @@ fn main() -> anyhow::Result<()> {
         //     }
         // }
 
-        let parsed = program.parse(&source);
+        let _parsed = program.parse(file);
+        let _parsed = program.parse(file);
+        let parsed = program.parse(file);
 
         dbg!(&parsed);
 
@@ -121,6 +125,11 @@ fn main() -> anyhow::Result<()> {
     // is all about.
 
     // Oh dear, fitting this all into the fix loop will be fun.
+
+    let source_jar: &SourceJar = program.jar();
+
+    dbg!(source_jar.parsed.statistics());
+    dbg!(source_jar.sources.statistics());
 
     Ok(())
 }
