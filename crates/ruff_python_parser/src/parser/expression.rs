@@ -11,7 +11,6 @@ use ruff_python_ast::{
 };
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
-use crate::parser::helpers::token_kind_to_cmp_op;
 use crate::parser::progress::ParserProgress;
 use crate::parser::{helpers, FunctionKind, Parser};
 use crate::string::{parse_fstring_literal_element, parse_string_literal, StringType};
@@ -238,20 +237,20 @@ impl<'src> Parser<'src> {
         loop {
             progress.assert_progressing(self);
 
-            let token = self.current_token_kind();
+            let current_token = self.current_token_kind();
 
-            if matches!(token, TokenKind::In) && context.is_in_excluded() {
+            if matches!(current_token, TokenKind::In) && context.is_in_excluded() {
                 // Omit the `in` keyword when parsing the target expression in a comprehension or
                 // a `for` statement.
                 break;
             }
 
-            // We need to peek the next token because of `not in` operator.
-            let Some(new_precedence) = OperatorPrecedence::try_from_tokens(token, self.peek())
-            else {
-                // Not an operator token.
+            let Some(operator) = OperatorType::try_from_tokens(current_token, self.peek()) else {
+                // Not an operator.
                 break;
             };
+
+            let new_precedence = operator.precedence();
 
             let stop_at_current_operator = if new_precedence.is_right_associative() {
                 new_precedence < left_precedence
@@ -263,43 +262,26 @@ impl<'src> Parser<'src> {
                 break;
             }
 
-            // Operator token.
-            self.bump(token);
+            left.expr = match operator {
+                OperatorType::Boolean(bool_op) => {
+                    Expr::BoolOp(self.parse_boolean_expression(left.expr, start, bool_op, context))
+                }
+                OperatorType::Comparison(cmp_op) => Expr::Compare(
+                    self.parse_comparison_expression(left.expr, start, cmp_op, context),
+                ),
+                OperatorType::Binary(bin_op) => {
+                    self.bump(TokenKind::from(bin_op));
 
-            // We need to create a dedicated node for boolean operations and comparison operations
-            // even though they are infix operators.
-            if token.is_bool_operator() {
-                left = Expr::BoolOp(self.parse_bool_operation_expression(
-                    left.expr,
-                    start,
-                    token,
-                    new_precedence,
-                    context,
-                ))
-                .into();
-                continue;
-            }
+                    let right = self.parse_binary_expression_or_higher(new_precedence, context);
 
-            if token.is_compare_operator() {
-                left = Expr::Compare(self.parse_compare_expression(
-                    left.expr,
-                    start,
-                    token,
-                    new_precedence,
-                    context,
-                ))
-                .into();
-                continue;
-            }
-
-            let right = self.parse_binary_expression_or_higher(new_precedence, context);
-
-            left.expr = Expr::BinOp(ast::ExprBinOp {
-                left: Box::new(left.expr),
-                op: Operator::try_from(token).unwrap(),
-                right: Box::new(right.expr),
-                range: self.node_range(start),
-            });
+                    Expr::BinOp(ast::ExprBinOp {
+                        left: Box::new(left.expr),
+                        op: bin_op,
+                        right: Box::new(right.expr),
+                        range: self.node_range(start),
+                    })
+                }
+            };
         }
 
         left
@@ -946,22 +928,23 @@ impl<'src> Parser<'src> {
 
     /// Parses a boolean operation expression.
     ///
-    /// Note that the boolean `not` operator is parsed as a unary operator and
-    /// not as a boolean operation.
+    /// Note that the boolean `not` operator is parsed as a unary expression and
+    /// not as a boolean expression.
     ///
     /// # Panics
     ///
     /// If the parser isn't positioned at a `or` or `and` token.
     ///
     /// See: <https://docs.python.org/3/reference/expressions.html#boolean-operations>
-    fn parse_bool_operation_expression(
+    fn parse_boolean_expression(
         &mut self,
         lhs: Expr,
         start: TextSize,
-        operator_token: TokenKind,
-        operator_binding_power: OperatorPrecedence,
+        op: BoolOp,
         context: ExpressionContext,
     ) -> ast::ExprBoolOp {
+        self.bump(TokenKind::from(op));
+
         let mut values = vec![lhs];
         let mut progress = ParserProgress::default();
 
@@ -971,18 +954,39 @@ impl<'src> Parser<'src> {
             progress.assert_progressing(self);
 
             let parsed_expr =
-                self.parse_binary_expression_or_higher(operator_binding_power, context);
+                self.parse_binary_expression_or_higher(OperatorPrecedence::from(op), context);
             values.push(parsed_expr.expr);
 
-            if !self.eat(operator_token) {
+            if !self.eat(TokenKind::from(op)) {
                 break;
             }
         }
 
         ast::ExprBoolOp {
             values,
-            op: BoolOp::try_from(operator_token).unwrap(),
+            op,
             range: self.node_range(start),
+        }
+    }
+
+    /// Bump the appropriate token(s) for the given comparison operator.
+    fn bump_cmp_op(&mut self, op: CmpOp) {
+        let (first, second) = match op {
+            CmpOp::Eq => (TokenKind::EqEqual, None),
+            CmpOp::NotEq => (TokenKind::NotEqual, None),
+            CmpOp::Lt => (TokenKind::Less, None),
+            CmpOp::LtE => (TokenKind::LessEqual, None),
+            CmpOp::Gt => (TokenKind::Greater, None),
+            CmpOp::GtE => (TokenKind::GreaterEqual, None),
+            CmpOp::Is => (TokenKind::Is, None),
+            CmpOp::IsNot => (TokenKind::Is, Some(TokenKind::Not)),
+            CmpOp::In => (TokenKind::In, None),
+            CmpOp::NotIn => (TokenKind::Not, Some(TokenKind::In)),
+        };
+
+        self.bump(first);
+        if let Some(second) = second {
+            self.bump(second);
         }
     }
 
@@ -998,72 +1002,47 @@ impl<'src> Parser<'src> {
     /// If the parser isn't positioned at any of the comparison operators.
     ///
     /// See: <https://docs.python.org/3/reference/expressions.html#comparisons>
-    fn parse_compare_expression(
+    fn parse_comparison_expression(
         &mut self,
         lhs: Expr,
         start: TextSize,
-        operator: TokenKind,
-        operator_binding_power: OperatorPrecedence,
+        op: CmpOp,
         context: ExpressionContext,
     ) -> ast::ExprCompare {
-        let compare_operator = token_kind_to_cmp_op([operator, self.current_token_kind()]).unwrap();
-
-        // Bump the appropriate token when the compare operator is made up of
-        // two separate tokens.
-        match compare_operator {
-            CmpOp::IsNot => {
-                self.bump(TokenKind::Not);
-            }
-            CmpOp::NotIn => {
-                self.bump(TokenKind::In);
-            }
-            _ => {}
-        }
+        self.bump_cmp_op(op);
 
         let mut comparators = vec![];
-        let mut compare_operators = vec![compare_operator];
+        let mut operators = vec![op];
 
         let mut progress = ParserProgress::default();
 
         loop {
             progress.assert_progressing(self);
 
-            let parsed_expr =
-                self.parse_binary_expression_or_higher(operator_binding_power, context);
-            comparators.push(parsed_expr.expr);
+            comparators.push(
+                self.parse_binary_expression_or_higher(
+                    OperatorPrecedence::ComparisonsMembershipIdentity,
+                    context,
+                )
+                .expr,
+            );
 
-            let next_operator = self.current_token_kind();
-            if !next_operator.is_compare_operator()
-                || (matches!(next_operator, TokenKind::In) && context.is_in_excluded())
-            {
+            let next_token = self.current_token_kind();
+            if matches!(next_token, TokenKind::In) && context.is_in_excluded() {
                 break;
             }
-            self.bump(next_operator); // compare operator
 
-            if let Ok(compare_operator) =
-                token_kind_to_cmp_op([next_operator, self.current_token_kind()])
-            {
-                // Bump the appropriate token when the compare operator is made up of
-                // two separate tokens.
-                match compare_operator {
-                    CmpOp::IsNot => {
-                        self.bump(TokenKind::Not);
-                    }
-                    CmpOp::NotIn => {
-                        self.bump(TokenKind::In);
-                    }
-                    _ => {}
-                }
-
-                compare_operators.push(compare_operator);
-            } else {
+            let Some(next_op) = helpers::token_kind_to_cmp_op([next_token, self.peek()]) else {
                 break;
-            }
+            };
+
+            self.bump_cmp_op(next_op);
+            operators.push(next_op);
         }
 
         ast::ExprCompare {
             left: Box::new(lhs),
-            ops: compare_operators.into_boxed_slice(),
+            ops: operators.into_boxed_slice(),
             comparators: comparators.into_boxed_slice(),
             range: self.node_range(start),
         }
@@ -2374,42 +2353,70 @@ pub(super) enum OperatorPrecedence {
 }
 
 impl OperatorPrecedence {
-    /// Returns the precedence for the given operator token or [None] if the token isn't an
-    /// operator token.
-    fn try_from_tokens(token: TokenKind, next: TokenKind) -> Option<OperatorPrecedence> {
-        Some(match token {
-            TokenKind::Or => OperatorPrecedence::Or,
-            TokenKind::And => OperatorPrecedence::And,
-            TokenKind::Not if next == TokenKind::In => {
-                OperatorPrecedence::ComparisonsMembershipIdentity
-            }
-            TokenKind::Is
-            | TokenKind::In
-            | TokenKind::EqEqual
-            | TokenKind::NotEqual
-            | TokenKind::Less
-            | TokenKind::LessEqual
-            | TokenKind::Greater
-            | TokenKind::GreaterEqual => OperatorPrecedence::ComparisonsMembershipIdentity,
-            TokenKind::Vbar => OperatorPrecedence::BitOr,
-            TokenKind::CircumFlex => OperatorPrecedence::BitXor,
-            TokenKind::Amper => OperatorPrecedence::BitAnd,
-            TokenKind::LeftShift | TokenKind::RightShift => OperatorPrecedence::LeftRightShift,
-            TokenKind::Plus | TokenKind::Minus => OperatorPrecedence::AddSub,
-            TokenKind::Star
-            | TokenKind::Slash
-            | TokenKind::DoubleSlash
-            | TokenKind::Percent
-            | TokenKind::At => OperatorPrecedence::MulDivRemain,
-            TokenKind::DoubleStar => OperatorPrecedence::Exponent,
-            _ => return None,
-        })
-    }
-
     /// Returns `true` if the precedence is right-associative i.e., the operations are evaluated
     /// from right to left.
     fn is_right_associative(self) -> bool {
         matches!(self, OperatorPrecedence::Exponent)
+    }
+}
+
+#[derive(Debug)]
+enum OperatorType {
+    Boolean(BoolOp),
+    Comparison(CmpOp),
+    Binary(Operator),
+}
+
+impl OperatorType {
+    /// Attempts to convert the two tokens into the corresponding operator type. Returns [None]
+    /// if it's not an operator.
+    fn try_from_tokens(current: TokenKind, next: TokenKind) -> Option<OperatorType> {
+        if let Some(bool_op) = current.as_bool_operator() {
+            Some(OperatorType::Boolean(bool_op))
+        } else if let Some(bin_op) = current.as_binary_operator() {
+            Some(OperatorType::Binary(bin_op))
+        } else {
+            helpers::token_kind_to_cmp_op([current, next]).map(OperatorType::Comparison)
+        }
+    }
+
+    /// Returns the [`OperatorPrecedence`] for the given operator token or [None] if the token
+    /// isn't an operator token.
+    fn precedence(&self) -> OperatorPrecedence {
+        match self {
+            OperatorType::Boolean(bool_op) => OperatorPrecedence::from(*bool_op),
+            OperatorType::Comparison(_) => OperatorPrecedence::ComparisonsMembershipIdentity,
+            OperatorType::Binary(bin_op) => OperatorPrecedence::from(*bin_op),
+        }
+    }
+}
+
+impl From<BoolOp> for OperatorPrecedence {
+    #[inline]
+    fn from(op: BoolOp) -> Self {
+        match op {
+            BoolOp::And => OperatorPrecedence::And,
+            BoolOp::Or => OperatorPrecedence::Or,
+        }
+    }
+}
+
+impl From<Operator> for OperatorPrecedence {
+    #[inline]
+    fn from(op: Operator) -> Self {
+        match op {
+            Operator::Add | Operator::Sub => OperatorPrecedence::AddSub,
+            Operator::Mult
+            | Operator::Div
+            | Operator::FloorDiv
+            | Operator::Mod
+            | Operator::MatMult => OperatorPrecedence::MulDivRemain,
+            Operator::BitAnd => OperatorPrecedence::BitAnd,
+            Operator::BitOr => OperatorPrecedence::BitOr,
+            Operator::BitXor => OperatorPrecedence::BitXor,
+            Operator::LShift | Operator::RShift => OperatorPrecedence::LeftRightShift,
+            Operator::Pow => OperatorPrecedence::Exponent,
+        }
     }
 }
 

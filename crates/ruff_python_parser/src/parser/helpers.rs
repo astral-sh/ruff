@@ -28,8 +28,8 @@ pub(super) fn set_expr_ctx(expr: &mut Expr, new_ctx: ExprContext) {
 }
 
 /// Converts a [`TokenKind`] array of size 2 to its correspondent [`CmpOp`].
-pub(super) fn token_kind_to_cmp_op(kind: [TokenKind; 2]) -> Result<CmpOp, ()> {
-    Ok(match kind {
+pub(super) const fn token_kind_to_cmp_op(tokens: [TokenKind; 2]) -> Option<CmpOp> {
+    Some(match tokens {
         [TokenKind::Is, TokenKind::Not] => CmpOp::IsNot,
         [TokenKind::Is, _] => CmpOp::Is,
         [TokenKind::Not, TokenKind::In] => CmpOp::NotIn,
@@ -40,6 +40,6 @@ pub(super) fn token_kind_to_cmp_op(kind: [TokenKind; 2]) -> Result<CmpOp, ()> {
         [TokenKind::LessEqual, _] => CmpOp::LtE,
         [TokenKind::Greater, _] => CmpOp::Gt,
         [TokenKind::GreaterEqual, _] => CmpOp::GtE,
-        _ => return Err(()),
+        _ => return None,
     })
 }
