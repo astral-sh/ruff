@@ -14,6 +14,7 @@ use crate::noqa;
 use crate::noqa::{Directive, FileExemption, NoqaDirectives, NoqaMapping};
 use crate::registry::{AsRule, Rule, RuleSet};
 use crate::rule_redirects::get_redirect_target;
+use crate::rules::pygrep_hooks;
 use crate::rules::ruff::rules::{UnusedCodes, UnusedNOQA};
 use crate::settings::LinterSettings;
 
@@ -201,6 +202,10 @@ pub(crate) fn check_noqa(
                 }
             }
         }
+    }
+
+    if settings.rules.enabled(Rule::BlanketNOQA) {
+        pygrep_hooks::rules::blanket_noqa(diagnostics, &noqa_directives, locator);
     }
 
     ignored_diagnostics.sort_unstable();
