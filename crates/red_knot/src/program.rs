@@ -30,7 +30,7 @@ impl Program {
         }
     }
 
-    fn analyze_imports(&self, name: ModuleName) -> Vec<String> {
+    pub fn analyze_imports(&self, name: ModuleName) -> Vec<String> {
         if let Some(module) = self.resolve_module(name) {
             let parsed = self.parse(module.path(self).file());
             let symbols = Symbols::from_ast(parsed.ast());
