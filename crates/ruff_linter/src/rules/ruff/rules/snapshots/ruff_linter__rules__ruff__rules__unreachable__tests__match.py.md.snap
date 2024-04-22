@@ -327,23 +327,25 @@ flowchart TD
   start(("Start"))
   return(("End"))
   block0[["`*(empty)*`"]]
-  block1["raise ValueError(#quot;oops#quot;)\n"]
-  block2["match point:
+  block1[["Exception raised"]]
+  block2["raise ValueError(#quot;oops#quot;)\n"]
+  block3["match point:
         case (0, 0):
             print(#quot;Origin#quot;)
         case _:
             raise ValueError(#quot;oops#quot;)\n"]
-  block3["print(#quot;Origin#quot;)\n"]
-  block4["match point:
+  block4["print(#quot;Origin#quot;)\n"]
+  block5["match point:
         case (0, 0):
             print(#quot;Origin#quot;)
         case _:
             raise ValueError(#quot;oops#quot;)\n"]
 
-  start --> block4
-  block4 -- "case (0, 0)" --> block3
-  block4 -- "else" --> block2
-  block3 --> block0
+  start --> block5
+  block5 -- "case (0, 0)" --> block4
+  block5 -- "else" --> block3
+  block4 --> block0
+  block3 --> block2
   block2 --> block1
   block1 --> return
   block0 --> return
@@ -372,8 +374,9 @@ flowchart TD
   start(("Start"))
   return(("End"))
   block0[["`*(empty)*`"]]
-  block1["raise ValueError(#quot;Not a point#quot;)\n"]
-  block2["match point:
+  block1[["Exception raised"]]
+  block2["raise ValueError(#quot;Not a point#quot;)\n"]
+  block3["match point:
         case (0, 0):
             print(#quot;Origin#quot;)
         case (0, y):
@@ -384,8 +387,8 @@ flowchart TD
             print(f#quot;X={x}, Y={y}#quot;)
         case _:
             raise ValueError(#quot;Not a point#quot;)\n"]
-  block3["print(f#quot;X={x}, Y={y}#quot;)\n"]
-  block4["match point:
+  block4["print(f#quot;X={x}, Y={y}#quot;)\n"]
+  block5["match point:
         case (0, 0):
             print(#quot;Origin#quot;)
         case (0, y):
@@ -396,8 +399,8 @@ flowchart TD
             print(f#quot;X={x}, Y={y}#quot;)
         case _:
             raise ValueError(#quot;Not a point#quot;)\n"]
-  block5["print(f#quot;X={x}#quot;)\n"]
-  block6["match point:
+  block6["print(f#quot;X={x}#quot;)\n"]
+  block7["match point:
         case (0, 0):
             print(#quot;Origin#quot;)
         case (0, y):
@@ -408,8 +411,8 @@ flowchart TD
             print(f#quot;X={x}, Y={y}#quot;)
         case _:
             raise ValueError(#quot;Not a point#quot;)\n"]
-  block7["print(f#quot;Y={y}#quot;)\n"]
-  block8["match point:
+  block8["print(f#quot;Y={y}#quot;)\n"]
+  block9["match point:
         case (0, 0):
             print(#quot;Origin#quot;)
         case (0, y):
@@ -420,8 +423,8 @@ flowchart TD
             print(f#quot;X={x}, Y={y}#quot;)
         case _:
             raise ValueError(#quot;Not a point#quot;)\n"]
-  block9["print(#quot;Origin#quot;)\n"]
-  block10["match point:
+  block10["print(#quot;Origin#quot;)\n"]
+  block11["match point:
         case (0, 0):
             print(#quot;Origin#quot;)
         case (0, y):
@@ -433,19 +436,20 @@ flowchart TD
         case _:
             raise ValueError(#quot;Not a point#quot;)\n"]
 
-  start --> block10
-  block10 -- "case (0, 0)" --> block9
-  block10 -- "else" --> block8
-  block9 --> block0
-  block8 -- "case (0, y)" --> block7
-  block8 -- "else" --> block6
-  block7 --> block0
-  block6 -- "case (x, 0)" --> block5
-  block6 -- "else" --> block4
-  block5 --> block0
-  block4 -- "case (x, y)" --> block3
-  block4 -- "else" --> block2
-  block3 --> block0
+  start --> block11
+  block11 -- "case (0, 0)" --> block10
+  block11 -- "else" --> block9
+  block10 --> block0
+  block9 -- "case (0, y)" --> block8
+  block9 -- "else" --> block7
+  block8 --> block0
+  block7 -- "case (x, 0)" --> block6
+  block7 -- "else" --> block5
+  block6 --> block0
+  block5 -- "case (x, y)" --> block4
+  block5 -- "else" --> block3
+  block4 --> block0
+  block3 --> block2
   block2 --> block1
   block1 --> return
   block0 --> return
@@ -790,26 +794,26 @@ flowchart TD
   start(("Start"))
   return(("End"))
   block0[["`*(empty)*`"]]
-  block1["raise ValueError(#quot;oops#quot;)\n"]
-  block2["match point:
+  block1[["Exception raised"]]
+  block2["raise ValueError(#quot;oops#quot;)\n"]
+  block3["match point:
         case (0, 0):
             print(#quot;Origin#quot;)
         case foo:
             raise ValueError(#quot;oops#quot;)\n"]
-  block3["print(#quot;Origin#quot;)\n"]
-  block4["match point:
+  block4["print(#quot;Origin#quot;)\n"]
+  block5["match point:
         case (0, 0):
             print(#quot;Origin#quot;)
         case foo:
             raise ValueError(#quot;oops#quot;)\n"]
 
-  start --> block4
-  block4 -- "case (0, 0)" --> block3
-  block4 -- "else" --> block2
-  block3 --> block0
+  start --> block5
+  block5 -- "case (0, 0)" --> block4
+  block5 -- "else" --> block3
+  block4 --> block0
+  block3 --> block2
   block2 --> block1
   block1 --> return
   block0 --> return
 ```
-
-
