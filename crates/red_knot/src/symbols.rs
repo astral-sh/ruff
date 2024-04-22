@@ -41,8 +41,8 @@ pub(crate) struct Symbol {
 }
 
 pub(crate) struct Symbols<'a> {
-    table: SymbolTable,
-    defs: SymbolDefs<'a>,
+    pub table: SymbolTable,
+    pub defs: FxDashMap<SymbolId, Vec<&'a ast::Stmt>>,
 }
 
 /// Table of all symbols in all scopes for a module.
@@ -50,12 +50,6 @@ pub(crate) struct Symbols<'a> {
 pub(crate) struct SymbolTable {
     scopes_by_id: IndexVec<ScopeId, Scope>,
     symbols_by_id: IndexVec<SymbolId, Symbol>,
-}
-
-/// Maps Symbol Id to its definitions (as AST Stmt references)
-#[derive(Default)]
-pub(crate) struct SymbolDefs<'a> {
-    definitions: FxDashMap<SymbolId, Vec<&'a ast::Stmt>>,
 }
 
 pub(crate) struct SymbolIterator<'a, I> {
@@ -98,7 +92,7 @@ impl<'a> Symbols<'a> {
     pub(crate) fn from_ast(module: &'a ast::ModModule) -> Self {
         let symbols = Symbols {
             table: SymbolTable::new(),
-            defs: SymbolDefs::default(),
+            defs: FxDashMap::default(),
         };
         let root_scope_id = SymbolTable::root_scope_id();
         let mut builder = SymbolsBuilder {
@@ -133,15 +127,22 @@ impl SymbolTable {
         &self.scopes_by_id[SymbolTable::root_scope_id()]
     }
 
+    pub(crate) fn symbol_ids_for_scope(&self, scope_id: ScopeId) -> Copied<Keys<SymbolId, ()>> {
+        self.scopes_by_id[scope_id].symbols_by_name.keys().copied()
+    }
+
     pub(crate) fn symbols_for_scope(
         &self,
         scope_id: ScopeId,
     ) -> SymbolIterator<Copied<Keys<SymbolId, ()>>> {
-        let scope = &self.scopes_by_id[scope_id];
         SymbolIterator {
             table: self,
-            ids: scope.symbols_by_name.keys().copied(),
+            ids: self.symbol_ids_for_scope(scope_id),
         }
+    }
+
+    pub(crate) fn root_symbol_ids(&self) -> Copied<Keys<SymbolId, ()>> {
+        self.symbol_ids_for_scope(SymbolTable::root_scope_id())
     }
 
     pub(crate) fn root_symbols(&self) -> SymbolIterator<Copied<Keys<SymbolId, ()>>> {
@@ -225,12 +226,7 @@ impl<'a> SymbolsBuilder<'a> {
 
     fn add_symbol_with_def(&mut self, identifier: &str, node: &'a ast::Stmt) -> SymbolId {
         let symbol_id = self.add_symbol(identifier);
-        self.symbols
-            .defs
-            .definitions
-            .entry(symbol_id)
-            .or_default()
-            .push(node);
+        self.symbols.defs.entry(symbol_id).or_default().push(node);
         symbol_id
     }
 
