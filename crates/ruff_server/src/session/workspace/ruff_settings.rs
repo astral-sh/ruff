@@ -1,5 +1,9 @@
-use ruff_linter::display_settings;
+use ruff_linter::{
+    display_settings, fs::normalize_path_to, settings::types::FilePattern,
+    settings::types::PreviewMode,
+};
 use ruff_workspace::{
+    configuration::{Configuration, FormatConfiguration, LintConfiguration, RuleSelection},
     pyproject::settings_toml,
     resolver::{ConfigurationTransformer, Relativity},
 };
@@ -39,18 +43,6 @@ impl std::fmt::Display for RuffSettings {
 }
 
 impl RuffSettings {
-    pub(crate) fn resolve(
-        project_root: &Path,
-        configuration: ruff_workspace::configuration::Configuration,
-        editor_settings: &ResolvedEditorSettings,
-    ) -> crate::Result<Self> {
-        let settings = editor_settings.resolve(project_root, configuration)?;
-        Ok(Self {
-            linter: settings.linter,
-            formatter: settings.formatter,
-        })
-    }
-
     pub(crate) fn linter(&self) -> &ruff_linter::settings::LinterSettings {
         &self.linter
     }
@@ -71,18 +63,20 @@ impl RuffSettingsIndex {
             .map(DirEntry::into_path)
         {
             if let Some(pyproject) = settings_toml(&directory).ok().flatten() {
-                let Ok(configuration) = ruff_workspace::resolver::resolve_configuration(
+                let Ok(settings) = ruff_workspace::resolver::resolve_root_settings(
                     &pyproject,
                     Relativity::Parent,
-                    &LSPConfigTransformer,
+                    &EditorConfigurationTransformer(editor_settings, root),
                 ) else {
                     continue;
                 };
-                let Ok(settings) = RuffSettings::resolve(root, configuration, editor_settings)
-                else {
-                    continue;
-                };
-                index.insert(directory, Arc::new(settings));
+                index.insert(
+                    directory,
+                    Arc::new(RuffSettings {
+                        linter: settings.linter,
+                        formatter: settings.formatter,
+                    }),
+                );
             }
         }
 
@@ -108,13 +102,53 @@ impl RuffSettingsIndex {
     }
 }
 
-struct LSPConfigTransformer;
+struct EditorConfigurationTransformer<'a>(&'a ResolvedEditorSettings, &'a Path);
 
-impl ConfigurationTransformer for LSPConfigTransformer {
+impl<'a> ConfigurationTransformer for EditorConfigurationTransformer<'a> {
     fn transform(
         &self,
-        config: ruff_workspace::configuration::Configuration,
+        project_configuration: ruff_workspace::configuration::Configuration,
     ) -> ruff_workspace::configuration::Configuration {
-        config
+        let ResolvedEditorSettings {
+            format_preview,
+            lint_preview,
+            select,
+            extend_select,
+            ignore,
+            exclude,
+            line_length,
+        } = self.0.clone();
+
+        let project_root = self.1;
+
+        let editor_configuration = Configuration {
+            lint: LintConfiguration {
+                preview: lint_preview.map(PreviewMode::from),
+                rule_selections: vec![RuleSelection {
+                    select,
+                    extend_select: extend_select.unwrap_or_default(),
+                    ignore: ignore.unwrap_or_default(),
+                    ..Default::default()
+                }],
+                ..Default::default()
+            },
+            format: FormatConfiguration {
+                preview: format_preview.map(PreviewMode::from),
+                ..Default::default()
+            },
+            exclude: exclude.map(|exclude| {
+                exclude
+                    .into_iter()
+                    .map(|pattern| {
+                        let absolute = normalize_path_to(&pattern, project_root);
+                        FilePattern::User(pattern, absolute)
+                    })
+                    .collect()
+            }),
+            line_length,
+            ..Default::default()
+        };
+
+        editor_configuration.combine(project_configuration)
     }
 }

@@ -1,15 +1,7 @@
-use std::{ops::Deref, path::Path, str::FromStr};
+use std::{ops::Deref, str::FromStr};
 
 use lsp_types::Url;
-use ruff_linter::{
-    fs::normalize_path_to,
-    line_width::LineLength,
-    settings::types::{FilePattern, PreviewMode},
-    RuleSelector,
-};
-use ruff_workspace::configuration::{
-    Configuration, FormatConfiguration, LintConfiguration, RuleSelection,
-};
+use ruff_linter::{line_width::LineLength, RuleSelector};
 use rustc_hash::FxHashMap;
 use serde::Deserialize;
 
@@ -39,13 +31,13 @@ pub(crate) struct ResolvedClientSettings {
 #[derive(Clone, Debug, Default)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 pub(crate) struct ResolvedEditorSettings {
-    lint_preview: Option<bool>,
-    format_preview: Option<bool>,
-    select: Option<Vec<RuleSelector>>,
-    extend_select: Option<Vec<RuleSelector>>,
-    ignore: Option<Vec<RuleSelector>>,
-    exclude: Option<Vec<String>>,
-    line_length: Option<LineLength>,
+    pub(super) lint_preview: Option<bool>,
+    pub(super) format_preview: Option<bool>,
+    pub(super) select: Option<Vec<RuleSelector>>,
+    pub(super) extend_select: Option<Vec<RuleSelector>>,
+    pub(super) ignore: Option<Vec<RuleSelector>>,
+    pub(super) exclude: Option<Vec<String>>,
+    pub(super) line_length: Option<LineLength>,
 }
 
 /// This is a direct representation of the settings schema sent by the client.
@@ -307,56 +299,6 @@ impl ResolvedClientSettings {
 
     pub(crate) fn editor_settings(&self) -> &ResolvedEditorSettings {
         &self.editor_settings
-    }
-}
-
-impl ResolvedEditorSettings {
-    pub(crate) fn resolve(
-        &self,
-        project_root: &Path,
-        project_configuration: Configuration,
-    ) -> crate::Result<ruff_workspace::Settings> {
-        let Self {
-            format_preview,
-            lint_preview,
-            select,
-            extend_select,
-            ignore,
-            exclude,
-            line_length,
-        } = self.clone();
-
-        let editor_configuration = Configuration {
-            lint: LintConfiguration {
-                preview: lint_preview.map(PreviewMode::from),
-                rule_selections: vec![RuleSelection {
-                    select,
-                    extend_select: extend_select.unwrap_or_default(),
-                    ignore: ignore.unwrap_or_default(),
-                    ..Default::default()
-                }],
-                ..Default::default()
-            },
-            format: FormatConfiguration {
-                preview: format_preview.map(PreviewMode::from),
-                ..Default::default()
-            },
-            exclude: exclude.map(|exclude| {
-                exclude
-                    .into_iter()
-                    .map(|pattern| {
-                        let absolute = normalize_path_to(&pattern, project_root);
-                        FilePattern::User(pattern, absolute)
-                    })
-                    .collect()
-            }),
-            line_length,
-            ..Default::default()
-        };
-
-        let configuration = editor_configuration.combine(project_configuration);
-
-        configuration.into_settings(project_root)
     }
 }
 
