@@ -18,8 +18,6 @@ pub(crate) struct ResolvedClientSettings {
     fix_all: bool,
     organize_imports: bool,
     lint_enable: bool,
-    // TODO(jane): Remove once noqa auto-fix is implemented
-    #[allow(dead_code)]
     disable_rule_comment_enable: bool,
     fix_violation_enable: bool,
     editor_settings: ResolvedEditorSettings,
@@ -321,6 +319,10 @@ impl ResolvedClientSettings {
 
     pub(crate) fn lint(&self) -> bool {
         self.lint_enable
+    }
+
+    pub(crate) fn noqa_comments(&self) -> bool {
+        self.disable_rule_comment_enable
     }
 
     pub(crate) fn fix_violation(&self) -> bool {

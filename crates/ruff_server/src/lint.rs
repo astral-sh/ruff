@@ -26,6 +26,7 @@ pub(crate) struct AssociatedDiagnosticData {
     pub(crate) kind: DiagnosticKind,
     pub(crate) fix: Fix,
     pub(crate) code: String,
+    pub(crate) noqa_edit: Option<ruff_diagnostics::Edit>,
 }
 
 /// Describes a fix for `fixed_diagnostic` that applies `document_edits` to the source.
@@ -35,6 +36,7 @@ pub(crate) struct DiagnosticFix {
     pub(crate) title: String,
     pub(crate) code: String,
     pub(crate) edits: Vec<lsp_types::TextEdit>,
+    pub(crate) noqa_edit: Option<lsp_types::TextEdit>,
 }
 
 pub(crate) fn check(
@@ -126,6 +128,22 @@ pub(crate) fn fixes_for_diagnostics(
                         .to_range(document.contents(), document.index(), encoding),
                     new_text: edit.content().unwrap_or_default().to_string(),
                 });
+
+            let noqa_edit = (|| {
+                Some(lsp_types::TextEdit {
+                    range: associated_data.noqa_edit.as_ref()?.range().to_range(
+                        document.contents(),
+                        document.index(),
+                        encoding,
+                    ),
+                    new_text: associated_data
+                        .noqa_edit
+                        .as_ref()?
+                        .content()
+                        .unwrap_or_default()
+                        .to_string(),
+                })
+            })();
             Ok(Some(DiagnosticFix {
                 fixed_diagnostic,
                 code: associated_data.code,
@@ -134,6 +152,7 @@ pub(crate) fn fixes_for_diagnostics(
                     .suggestion
                     .unwrap_or(associated_data.kind.name),
                 edits: edits.collect(),
+                noqa_edit,
             }))
         })
         .filter_map(crate::Result::transpose)
@@ -146,7 +165,11 @@ fn to_lsp_diagnostic(
     encoding: PositionEncoding,
 ) -> lsp_types::Diagnostic {
     let Diagnostic {
-        kind, range, fix, ..
+        kind,
+        range,
+        fix,
+        noqa_edit,
+        ..
     } = diagnostic;
 
     let rule = kind.rule();
@@ -158,6 +181,7 @@ fn to_lsp_diagnostic(
                     kind: kind.clone(),
                     fix,
                     code: rule.noqa_code().to_string(),
+                    noqa_edit,
                 })
                 .ok()
             })

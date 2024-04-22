@@ -1,5 +1,5 @@
 use crate::edit::WorkspaceEditTracker;
-use crate::lint::fixes_for_diagnostics;
+use crate::lint::{fixes_for_diagnostics, DiagnosticFix};
 use crate::server::api::LSPResult;
 use crate::server::SupportedCodeAction;
 use crate::server::{client::Notifier, Result};
@@ -29,13 +29,24 @@ impl super::BackgroundDocumentRequestHandler for CodeActions {
 
         let supported_code_actions = supported_code_actions(params.context.only.clone());
 
+        let fixes = fixes_for_diagnostics(
+            snapshot.document(),
+            snapshot.encoding(),
+            params.context.diagnostics,
+        )
+        .with_failure_code(ErrorCode::InternalError)?;
+
         if snapshot.client_settings().fix_violation()
             && supported_code_actions.contains(&SupportedCodeAction::QuickFix)
         {
-            response.extend(
-                quick_fix(&snapshot, params.context.diagnostics.clone())
-                    .with_failure_code(ErrorCode::InternalError)?,
-            );
+            response
+                .extend(quick_fix(&snapshot, &fixes).with_failure_code(ErrorCode::InternalError)?);
+        }
+
+        if snapshot.client_settings().noqa_comments()
+            && supported_code_actions.contains(&SupportedCodeAction::QuickFix)
+        {
+            response.extend(noqa_comments(&snapshot, &fixes));
         }
 
         if snapshot.client_settings().fix_all()
@@ -56,25 +67,52 @@ impl super::BackgroundDocumentRequestHandler for CodeActions {
 
 fn quick_fix(
     snapshot: &DocumentSnapshot,
-    diagnostics: Vec<types::Diagnostic>,
+    fixes: &[DiagnosticFix],
 ) -> crate::Result<Vec<CodeActionOrCommand>> {
     let document = snapshot.document();
-
-    let fixes = fixes_for_diagnostics(document, snapshot.encoding(), diagnostics)?;
-
     fixes
-        .into_iter()
+        .iter()
         .map(|fix| {
             let mut tracker = WorkspaceEditTracker::new(snapshot.resolved_client_capabilities());
 
             tracker.set_edits_for_document(
                 snapshot.url().clone(),
                 document.version(),
-                fix.edits,
+                fix.edits.clone(),
             )?;
 
             Ok(types::CodeActionOrCommand::CodeAction(types::CodeAction {
                 title: format!("{DIAGNOSTIC_NAME} ({}): {}", fix.code, fix.title),
+                kind: Some(types::CodeActionKind::QUICKFIX),
+                edit: Some(tracker.into_workspace_edit()),
+                diagnostics: Some(vec![fix.fixed_diagnostic.clone()]),
+                data: Some(
+                    serde_json::to_value(snapshot.url()).expect("document url to serialize"),
+                ),
+                ..Default::default()
+            }))
+        })
+        .collect()
+}
+
+fn noqa_comments(snapshot: &DocumentSnapshot, fixes: &[DiagnosticFix]) -> Vec<CodeActionOrCommand> {
+    fixes
+        .iter()
+        .filter_map(|fix| {
+            let edit = fix.noqa_edit.as_ref()?.clone();
+
+            let mut tracker = WorkspaceEditTracker::new(snapshot.resolved_client_capabilities());
+
+            tracker
+                .set_edits_for_document(
+                    snapshot.url().clone(),
+                    snapshot.document().version(),
+                    vec![edit],
+                )
+                .ok()?;
+
+            Some(types::CodeActionOrCommand::CodeAction(types::CodeAction {
+                title: format!("{DIAGNOSTIC_NAME} ({}): Disable for this line", fix.code),
                 kind: Some(types::CodeActionKind::QUICKFIX),
                 edit: Some(tracker.into_workspace_edit()),
                 diagnostics: Some(vec![fix.fixed_diagnostic.clone()]),
