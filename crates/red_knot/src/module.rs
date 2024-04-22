@@ -202,7 +202,7 @@ impl ModuleResolver {
     }
 
     /// Resolves a module name to a module id.
-    fn resolve(&self, name: ModuleName) -> Option<ModuleId> {
+    pub fn resolve(&self, name: ModuleName) -> Option<ModuleId> {
         let entry = self.by_name.entry(name.clone());
 
         match entry {

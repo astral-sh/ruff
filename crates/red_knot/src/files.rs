@@ -27,6 +27,10 @@ impl Files {
         self.inner.write().intern(path)
     }
 
+    pub fn try_get(&self, path: &Path) -> Option<FileId> {
+        self.inner.read().try_get(path)
+    }
+
     // TODO Can we avoid using an `Arc` here? salsa can return references for some reason.
     pub fn path(&self, id: FileId) -> Arc<Path> {
         self.inner.read().path(id)
@@ -83,6 +87,20 @@ impl FilesInner {
                 id
             }
         }
+    }
+
+    pub(crate) fn try_get(&self, path: &Path) -> Option<FileId> {
+        let mut hasher = FxHasher::default();
+        path.hash(&mut hasher);
+        let hash = hasher.finish();
+
+        Some(
+            *self
+                .by_path
+                .raw_entry()
+                .from_hash(hash, |existing_file| &*self.by_id[*existing_file] == path)?
+                .0,
+        )
     }
 
     /// Returns the path for the file with the given id.

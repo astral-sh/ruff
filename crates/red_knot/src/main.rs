@@ -1,11 +1,8 @@
 use std::path::PathBuf;
 
-use rustc_hash::FxHashSet;
-
-use red_knot::db::{
-    ast_ids, check_physical_lines, check_syntax, definitions, dependencies, parse, Database, Db,
-};
-use red_knot::{files, Workspace};
+use red_knot::module::{ModuleSearchPath, ModuleSearchPathKind};
+use red_knot::program::Program;
+use red_knot::{files, SourceDb, Workspace};
 
 fn main() -> anyhow::Result<()> {
     let files = files::Files::default();
@@ -31,31 +28,38 @@ fn main() -> anyhow::Result<()> {
 
     println!("start analysis for {workspace:#?}");
 
-    let db = Database::new(files.clone());
+    let workspace_search_path = ModuleSearchPath::new(
+        workspace.root().to_path_buf(),
+        ModuleSearchPathKind::FirstParty,
+    );
+
+    let program = Program::new(vec![workspace_search_path], files);
+
     let mut queue: Vec<_> = workspace.open_files().collect();
-    let mut queued: FxHashSet<_> = queue.iter().copied().collect();
+    // let mut queued: FxHashSet<_> = queue.iter().copied().collect();
     // Should we use an accumulator for this?
-    let mut diagnostics = Vec::new();
 
     // TODO we could now consider spawning the analysis of the dependencies into their own threads.
     while let Some(file) = queue.pop() {
-        let content = db.source_text(file).unwrap();
-        let module_path = files.path(file_id);
+        let source = program.source(file);
+        // let module_path = program.file_path(file_id);
 
-        // TODO this looks weird: dependencies.files. Let's figure out a better naming and structure.
-        let dependencies = dependencies(&db, content);
+        // // TODO this looks weird: dependencies.files. Let's figure out a better naming and structure.
+        // let dependencies = dependencies(&db, content);
+        //
+        // // We know that we need to analyse all dependencies, but we don't need to check them.
+        // for dependency in &*dependencies {
+        //     let dependency_path = module_path.join(&dependency.path).canonicalize().unwrap();
+        //     let dependency_file_id = files.intern(&dependency_path);
+        //
+        //     if queued.insert(dependency_file_id) {
+        //         queue.push(dependency_file_id);
+        //     }
+        // }
 
-        // We know that we need to analyse all dependencies, but we don't need to check them.
-        for dependency in &*dependencies {
-            let dependency_path = module_path.join(&dependency.path).canonicalize().unwrap();
-            let dependency_file_id = files.intern(&dependency_path);
+        let parsed = program.parse(&source);
 
-            if queued.insert(dependency_file_id) {
-                queue.push(dependency_file_id);
-            }
-        }
-
-        let parsed = parse(&db, content);
+        dbg!(&parsed);
 
         // If this is an open file
         if workspace.is_file_open(file) {
@@ -69,30 +73,30 @@ fn main() -> anyhow::Result<()> {
 
             // I think we can run the syntax checks and the item tree construction in a single traversal?
             // Probably not, because we actually want to visit the nodes in a different order (breath first vs depth first, at least for some nodes).
-            diagnostics.extend(check_physical_lines(&db, content).diagnostics(&db));
-            diagnostics.extend(check_syntax(&db, parsed).diagnostics(&db));
+            // diagnostics.extend(check_physical_lines(&db, content).diagnostics(&db));
+            // diagnostics.extend(check_syntax(&db, parsed).diagnostics(&db));
         }
 
-        let ids = ast_ids(&db, content);
+        // let ids = ast_ids(&db, content);
 
-        dbg!(ids.root());
-
-        dbg!(ids.ast_id_for_node_key(ids.root()));
-
-        let ast = parsed.ast(&db);
-
-        if let Some(function) = ast.body.iter().find_map(|stmt| stmt.as_function_def_stmt()) {
-            let id = ids.ast_id(function);
-            dbg!(&id);
-
-            let key = ids.key(id);
-
-            dbg!(key.resolve(ast.into()));
-        }
-
-        let definitions = definitions(&db, content);
-
-        dbg!(&definitions);
+        // dbg!(ids.root());
+        //
+        // dbg!(ids.ast_id_for_node_key(ids.root()));
+        //
+        // let ast = parsed.ast(&db);
+        //
+        // if let Some(function) = ast.body.iter().find_map(|stmt| stmt.as_function_def_stmt()) {
+        //     let id = ids.ast_id(function);
+        //     dbg!(&id);
+        //
+        //     let key = ids.key(id);
+        //
+        //     dbg!(key.resolve(ast.into()));
+        // }
+        //
+        // let definitions = definitions(&db, content);
+        //
+        // dbg!(&definitions);
 
         // This is the HIR
         // I forgot how rust-analyzer reference from the HIR to the AST.
@@ -113,7 +117,6 @@ fn main() -> anyhow::Result<()> {
         // dbg!(parsed.module(&db));
     }
 
-    dbg!(&diagnostics);
     // TODO let's trigger a re-check down here. Not sure how to do this or how to model it but that's kind of what this
     // is all about.
 
