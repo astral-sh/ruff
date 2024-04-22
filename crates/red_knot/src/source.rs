@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use crate::files::FileId;
 
-pub fn source_text<Db>(db: &Db, file_id: FileId) -> Source
+pub(crate) fn source_text<Db>(db: &Db, file_id: FileId) -> Source
 where
     Db: SourceDb + HasJar<SourceJar>,
 {

@@ -118,7 +118,7 @@ impl AstIds {
     }
 
     /// Returns the [`TypedAstId`] for the node identified with the given [`TypedNodeKey`].
-    pub fn ast_id_for_key<N: HasAstId>(&self, node: TypedNodeKey<N>) -> TypedAstId<N> {
+    pub fn ast_id_for_key<N: HasAstId>(&self, node: &TypedNodeKey<N>) -> TypedAstId<N> {
         let ast_id = self.ast_id_for_node_key(node.inner);
 
         TypedAstId {
