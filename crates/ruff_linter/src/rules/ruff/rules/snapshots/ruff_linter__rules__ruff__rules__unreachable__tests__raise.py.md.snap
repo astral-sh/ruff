@@ -14,9 +14,11 @@ def func():
 flowchart TD
   start(("Start"))
   return(("End"))
-  block0["raise Exception\n"]
+  block0[["Exception raised"]]
+  block1["raise Exception\n"]
 
-  start --> block0
+  start --> block1
+  block1 --> block0
   block0 --> return
 ```
 
@@ -32,10 +34,10 @@ def func():
 flowchart TD
   start(("Start"))
   return(("End"))
-  block0["raise #quot;a glass!#quot;\n"]
+  block0[["Exception raised"]]
+  block1["raise #quot;a glass!#quot;\n"]
 
-  start --> block0
+  start --> block1
+  block1 --> block0
   block0 --> return
 ```
-
-

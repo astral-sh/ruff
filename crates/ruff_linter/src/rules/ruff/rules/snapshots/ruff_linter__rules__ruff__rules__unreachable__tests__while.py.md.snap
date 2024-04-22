@@ -692,19 +692,21 @@ flowchart TD
   block0["x = 3\n"]
   block1[["Loop continue"]]
   block2["x = 2\n"]
-  block3["x = 0\nx = 1\nraise Exception\n"]
-  block4["while True:
+  block3[["Exception raised"]]
+  block4["x = 0\nx = 1\nraise Exception\n"]
+  block5["while True:
         x = 0
         x = 1
         raise Exception
         x = 2\n"]
 
-  start --> block4
-  block4 -- "True" --> block3
-  block4 -- "else" --> block0
+  start --> block5
+  block5 -- "True" --> block4
+  block5 -- "else" --> block0
+  block4 --> block3
   block3 --> return
   block2 --> block1
-  block1 --> block4
+  block1 --> block5
   block0 --> return
 ```
 

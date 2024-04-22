@@ -375,10 +375,10 @@ flowchart TD
   start(("Start"))
   return(("End"))
   block0["x = 0\n"]
-  block1["raise Exception()\n"]
-  block2[["Loop continue"]]
-  block3["break\n"]
-  block4[["Exception raised"]]
+  block1[["Exception raised"]]
+  block2["raise Exception()\n"]
+  block3[["Loop continue"]]
+  block4["break\n"]
   block5["assert i is not None\n"]
   block6["if i == 2:
             assert i is not None
@@ -392,14 +392,14 @@ flowchart TD
 
   start --> block7
   block7 -- "range(3)" --> block6
-  block7 -- "else" --> block1
+  block7 -- "else" --> block2
   block6 -- "i == 2" --> block5
-  block6 -- "else" --> block2
-  block5 -- "i is not None" --> block3
-  block5 -- "else" --> block4
-  block4 --> return
-  block3 --> block0
-  block2 --> block7
+  block6 -- "else" --> block3
+  block5 -- "i is not None" --> block4
+  block5 -- "else" --> block1
+  block4 --> block0
+  block3 --> block7
+  block2 --> block1
   block1 --> return
   block0 --> return
 ```
