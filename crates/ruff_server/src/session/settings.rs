@@ -38,6 +38,7 @@ pub(crate) struct ResolvedEditorSettings {
     pub(super) ignore: Option<Vec<RuleSelector>>,
     pub(super) exclude: Option<Vec<String>>,
     pub(super) line_length: Option<LineLength>,
+    pub(super) prioritize_file_configuration: bool,
 }
 
 /// This is a direct representation of the settings schema sent by the client.
@@ -52,6 +53,7 @@ pub(crate) struct ClientSettings {
     code_action: Option<CodeActionOptions>,
     exclude: Option<Vec<String>>,
     line_length: Option<LineLength>,
+    prioritize_file_configuration: Option<bool>,
 }
 
 /// This is a direct representation of the workspace settings schema,
@@ -251,6 +253,11 @@ impl ResolvedClientSettings {
                     Some(settings.exclude.as_ref()?.clone())
                 }),
                 line_length: Self::resolve_optional(all_settings, |settings| settings.line_length),
+                prioritize_file_configuration: Self::resolve_or(
+                    all_settings,
+                    |settings| settings.prioritize_file_configuration,
+                    false,
+                ),
             },
         }
     }
@@ -383,6 +390,7 @@ mod tests {
                 ),
                 exclude: None,
                 line_length: None,
+                prioritize_file_configuration: None,
             },
             workspace_settings: [
                 WorkspaceSettings {
@@ -429,6 +437,7 @@ mod tests {
                         ),
                         exclude: None,
                         line_length: None,
+                        prioritize_file_configuration: None,
                     },
                     workspace: Url {
                         scheme: "file",
@@ -488,6 +497,7 @@ mod tests {
                         ),
                         exclude: None,
                         line_length: None,
+                        prioritize_file_configuration: None,
                     },
                     workspace: Url {
                         scheme: "file",
@@ -538,7 +548,8 @@ mod tests {
                     extend_select: None,
                     ignore: None,
                     exclude: None,
-                    line_length: None
+                    line_length: None,
+                    prioritize_file_configuration: false,
                 }
             }
         );
@@ -566,7 +577,8 @@ mod tests {
                     extend_select: None,
                     ignore: None,
                     exclude: None,
-                    line_length: None
+                    line_length: None,
+                    prioritize_file_configuration: false,
                 }
             }
         );
@@ -620,6 +632,7 @@ mod tests {
                             80,
                         ),
                     ),
+                    prioritize_file_configuration: None,
                 },
             ),
         }
@@ -648,7 +661,8 @@ mod tests {
                     extend_select: None,
                     ignore: Some(vec![RuleSelector::from_str("RUF001").unwrap()]),
                     exclude: Some(vec!["third_party".into()]),
-                    line_length: Some(LineLength::try_from(80).unwrap())
+                    line_length: Some(LineLength::try_from(80).unwrap()),
+                    prioritize_file_configuration: false,
                 }
             }
         );

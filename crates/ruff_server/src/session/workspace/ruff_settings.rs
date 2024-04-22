@@ -117,6 +117,7 @@ impl<'a> ConfigurationTransformer for EditorConfigurationTransformer<'a> {
             ignore,
             exclude,
             line_length,
+            prioritize_file_configuration: prioritize_workspace_settings,
         } = self.0.clone();
 
         let project_root = self.1;
@@ -149,6 +150,10 @@ impl<'a> ConfigurationTransformer for EditorConfigurationTransformer<'a> {
             ..Default::default()
         };
 
-        editor_configuration.combine(project_configuration)
+        if prioritize_workspace_settings {
+            project_configuration.combine(editor_configuration)
+        } else {
+            editor_configuration.combine(project_configuration)
+        }
     }
 }
