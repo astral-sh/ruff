@@ -1,79 +1,30 @@
 #![allow(dead_code)]
-use super::Name;
+use crate::{FxDashMap, Name};
 use hashbrown::hash_map::{Keys, RawEntryMut};
 use ruff_index::{newtype_index, IndexVec};
 use ruff_python_ast::visitor::preorder::PreorderVisitor;
 use ruff_python_ast::{self as ast};
-use ruff_python_parser::{Mode, ParseError};
-use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHasher;
 use std::hash::{Hash, Hasher};
 use std::iter::{Copied, DoubleEndedIterator, FusedIterator};
 
 type Map<K, V> = hashbrown::HashMap<K, V, ()>;
 
-struct SourceText {
-    text: String,
-}
-
-struct Parsed {
-    ast: ast::ModModule,
-    imports: Vec<String>,
-    errors: Vec<ParseError>,
-}
-
-impl Parsed {
-    fn new(ast: ast::ModModule, imports: Vec<String>, errors: Vec<ParseError>) -> Self {
-        Self {
-            ast,
-            imports,
-            errors,
-        }
-    }
-}
-
-fn parse(source: &SourceText) -> Parsed {
-    let result = ruff_python_parser::parse(&source.text, Mode::Module);
-
-    let (module, errors) = match result {
-        Ok(ast::Mod::Module(module)) => (module, vec![]),
-        Ok(ast::Mod::Expression(expression)) => (
-            ast::ModModule {
-                range: expression.range(),
-                body: vec![ast::Stmt::Expr(ast::StmtExpr {
-                    range: expression.range(),
-                    value: expression.body,
-                })],
-            },
-            vec![],
-        ),
-        Err(errors) => (
-            ast::ModModule {
-                range: TextRange::default(),
-                body: Vec::new(),
-            },
-            vec![errors],
-        ),
-    };
-
-    Parsed::new(module, Vec::new(), errors)
-}
+#[newtype_index]
+pub(crate) struct ScopeId;
 
 #[newtype_index]
-struct ScopeId;
-
-#[newtype_index]
-struct SymbolId;
+pub(crate) struct SymbolId;
 
 #[derive(Debug, PartialEq)]
-enum ScopeKind {
+pub(crate) enum ScopeKind {
     Module,
     Annotation,
     Class,
     Function,
 }
 
-struct Scope {
+pub(crate) struct Scope {
     pub name: Name,
     pub kind: ScopeKind,
     pub child_scopes: Vec<ScopeId>,
@@ -81,16 +32,29 @@ struct Scope {
     symbols_by_name: Map<SymbolId, ()>,
 }
 
-struct Symbol {
+pub(crate) struct Symbol {
     pub name: Name,
 }
 
-struct SymbolTable {
+pub(crate) struct Symbols<'a> {
+    table: SymbolTable,
+    defs: SymbolDefs<'a>,
+}
+
+/// Table of all symbols in all scopes for a module.
+/// Derived from module AST, but holds no references to it.
+pub(crate) struct SymbolTable {
     scopes_by_id: IndexVec<ScopeId, Scope>,
     symbols_by_id: IndexVec<SymbolId, Symbol>,
 }
 
-struct SymbolIterator<'a, I> {
+/// Maps Symbol Id to its definitions (as AST Stmt references)
+#[derive(Default)]
+pub(crate) struct SymbolDefs<'a> {
+    definitions: FxDashMap<SymbolId, Vec<&'a ast::Stmt>>,
+}
+
+pub(crate) struct SymbolIterator<'a, I> {
     table: &'a SymbolTable,
     ids: I,
 }
@@ -126,6 +90,22 @@ where
     }
 }
 
+impl<'a> Symbols<'a> {
+    pub(crate) fn from_ast(module: &'a ast::ModModule) -> Self {
+        let symbols = Symbols {
+            table: SymbolTable::new(),
+            defs: SymbolDefs::default(),
+        };
+        let root_scope_id = SymbolTable::root_scope_id();
+        let mut builder = SymbolsBuilder {
+            symbols,
+            scopes: vec![root_scope_id],
+        };
+        builder.visit_body(&module.body);
+        builder.symbols
+    }
+}
+
 impl SymbolTable {
     pub(crate) fn new() -> Self {
         let mut table = SymbolTable {
@@ -139,17 +119,6 @@ impl SymbolTable {
             symbols_by_name: Map::default(),
         });
         table
-    }
-
-    pub(crate) fn from_ast(module: &ast::ModModule) -> SymbolTable {
-        let table = SymbolTable::new();
-        let root_scope_id = SymbolTable::root_scope_id();
-        let mut builder = SymbolTableBuilder {
-            table,
-            scopes: vec![root_scope_id],
-        };
-        builder.visit_body(&module.body);
-        builder.table
     }
 
     pub(crate) fn root_scope_id() -> ScopeId {
@@ -238,18 +207,31 @@ impl SymbolTable {
     }
 }
 
-struct SymbolTableBuilder {
-    table: SymbolTable,
+struct SymbolsBuilder<'a> {
+    symbols: Symbols<'a>,
     scopes: Vec<ScopeId>,
 }
 
-impl SymbolTableBuilder {
+impl<'a> SymbolsBuilder<'a> {
     fn add_symbol(&mut self, identifier: &str) -> SymbolId {
-        self.table.add_symbol_to_scope(self.cur_scope(), identifier)
+        self.symbols
+            .table
+            .add_symbol_to_scope(self.cur_scope(), identifier)
+    }
+
+    fn add_symbol_with_def(&mut self, identifier: &str, node: &'a ast::Stmt) -> SymbolId {
+        let symbol_id = self.add_symbol(identifier);
+        self.symbols
+            .defs
+            .definitions
+            .entry(symbol_id)
+            .or_insert(Vec::new())
+            .push(node);
+        symbol_id
     }
 
     fn push_scope(&mut self, child_of: ScopeId, name: &str, kind: ScopeKind) -> ScopeId {
-        let scope_id = self.table.add_child_scope(child_of, name, kind);
+        let scope_id = self.symbols.table.add_child_scope(child_of, name, kind);
         self.scopes.push(scope_id);
         scope_id
     }
@@ -291,7 +273,7 @@ impl SymbolTableBuilder {
     }
 }
 
-impl<'a> PreorderVisitor<'a> for SymbolTableBuilder {
+impl<'a> PreorderVisitor<'a> for SymbolsBuilder<'a> {
     fn visit_expr(&mut self, expr: &'a ast::Expr) {
         if let ast::Expr::Name(ast::ExprName { id, .. }) = expr {
             self.add_symbol(id);
@@ -300,11 +282,12 @@ impl<'a> PreorderVisitor<'a> for SymbolTableBuilder {
     }
 
     fn visit_stmt(&mut self, stmt: &'a ast::Stmt) {
+        // TODO need to capture more definition statements here
         match stmt {
             ast::Stmt::ClassDef(ast::StmtClassDef {
                 name, type_params, ..
             }) => {
-                self.add_symbol(name);
+                self.add_symbol_with_def(name, stmt);
                 self.with_type_params(name, type_params, |builder| {
                     builder.push_scope(builder.cur_scope(), name, ScopeKind::Class);
                     ast::visitor::preorder::walk_stmt(builder, stmt);
@@ -314,7 +297,7 @@ impl<'a> PreorderVisitor<'a> for SymbolTableBuilder {
             ast::Stmt::FunctionDef(ast::StmtFunctionDef {
                 name, type_params, ..
             }) => {
-                self.add_symbol(name);
+                self.add_symbol_with_def(name, stmt);
                 self.with_type_params(name, type_params, |builder| {
                     builder.push_scope(builder.cur_scope(), name, ScopeKind::Function);
                     ast::visitor::preorder::walk_stmt(builder, stmt);
@@ -323,12 +306,12 @@ impl<'a> PreorderVisitor<'a> for SymbolTableBuilder {
             }
             ast::Stmt::Import(ast::StmtImport { names, .. }) => {
                 for alias in names {
-                    self.add_symbol(alias.name.id.split('.').next().unwrap());
+                    self.add_symbol_with_def(alias.name.id.split('.').next().unwrap(), stmt);
                 }
             }
             ast::Stmt::ImportFrom(ast::StmtImportFrom { names, .. }) => {
                 for alias in names {
-                    self.add_symbol(&alias.name.id);
+                    self.add_symbol_with_def(&alias.name.id, stmt);
                 }
             }
             _ => {
@@ -340,17 +323,17 @@ impl<'a> PreorderVisitor<'a> for SymbolTableBuilder {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::{SymbolId, SymbolIterator, SymbolTable, Symbols};
+    use crate::parse::{parse as parse_from_sourcetext, Parsed, SourceText};
+    use crate::symbols::ScopeKind;
     use itertools::Itertools;
     use textwrap::dedent;
 
     mod from_ast {
         use super::*;
 
-        fn build(code: &str) -> SymbolTable {
-            let source_text = SourceText { text: dedent(code) };
-            let parsed = parse(&source_text);
-            SymbolTable::from_ast(&parsed.ast)
+        fn parse(code: &str) -> Parsed {
+            parse_from_sourcetext(&SourceText { text: dedent(code) })
         }
 
         fn names<I>(it: SymbolIterator<I>) -> Vec<&str>
@@ -362,49 +345,56 @@ mod tests {
 
         #[test]
         fn empty() {
-            let table = build("");
+            let parsed = parse("");
+            let table = Symbols::from_ast(&parsed.ast).table;
             assert_eq!(names(table.root_symbols()).len(), 0);
         }
 
         #[test]
         fn simple() {
-            let table = build("x");
+            let parsed = parse("x");
+            let table = Symbols::from_ast(&parsed.ast).table;
             assert_eq!(names(table.root_symbols()), vec!["x"]);
         }
 
         #[test]
         fn annotation_only() {
-            let table = build("x: int");
+            let parsed = parse("x: int");
+            let table = Symbols::from_ast(&parsed.ast).table;
             assert_eq!(names(table.root_symbols()), vec!["int", "x"]);
         }
 
         #[test]
         fn import() {
-            let table = build("import foo");
+            let parsed = parse("import foo");
+            let table = Symbols::from_ast(&parsed.ast).table;
             assert_eq!(names(table.root_symbols()), vec!["foo"]);
         }
 
         #[test]
         fn import_sub() {
-            let table = build("import foo.bar");
+            let parsed = parse("import foo.bar");
+            let table = Symbols::from_ast(&parsed.ast).table;
             assert_eq!(names(table.root_symbols()), vec!["foo"]);
         }
 
         #[test]
         fn import_from() {
-            let table = build("from bar import foo");
+            let parsed = parse("from bar import foo");
+            let table = Symbols::from_ast(&parsed.ast).table;
             assert_eq!(names(table.root_symbols()), vec!["foo"]);
         }
 
         #[test]
         fn class_scope() {
-            let table = build(
+            let parsed = parse(
                 "
                 class C:
                     x = 1
                 y = 2
                 ",
             );
+            let table = Symbols::from_ast(&parsed.ast).table;
             assert_eq!(names(table.root_symbols()), vec!["C", "y"]);
             let scopes = table.root_child_scopes();
             assert_eq!(scopes.len(), 1);
@@ -416,13 +406,14 @@ mod tests {
 
         #[test]
         fn func_scope() {
-            let table = build(
+            let parsed = parse(
                 "
                 def func():
                     x = 1
                 y = 2
                 ",
             );
+            let table = Symbols::from_ast(&parsed.ast).table;
             assert_eq!(names(table.root_symbols()), vec!["func", "y"]);
             let scopes = table.root_child_scopes();
             assert_eq!(scopes.len(), 1);
@@ -434,7 +425,7 @@ mod tests {
 
         #[test]
         fn dupes() {
-            let table = build(
+            let parsed = parse(
                 "
                 def func():
                     x = 1
@@ -442,6 +433,7 @@ mod tests {
                     y = 2
                 ",
             );
+            let table = Symbols::from_ast(&parsed.ast).table;
             assert_eq!(names(table.root_symbols()), vec!["func"]);
             let scopes = table.root_child_scopes();
             assert_eq!(scopes.len(), 2);
@@ -457,12 +449,13 @@ mod tests {
 
         #[test]
         fn generic_func() {
-            let table = build(
+            let parsed = parse(
                 "
                 def func[T]():
                     x = 1
                 ",
             );
+            let table = Symbols::from_ast(&parsed.ast).table;
             assert_eq!(names(table.root_symbols()), vec!["func"]);
             let scopes = table.root_child_scopes();
             assert_eq!(scopes.len(), 1);
@@ -482,12 +475,13 @@ mod tests {
 
         #[test]
         fn generic_class() {
-            let table = build(
+            let parsed = parse(
                 "
                 class C[T]:
                     x = 1
                 ",
             );
+            let table = Symbols::from_ast(&parsed.ast).table;
             assert_eq!(names(table.root_symbols()), vec!["C"]);
             let scopes = table.root_child_scopes();
             assert_eq!(scopes.len(), 1);

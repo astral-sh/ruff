@@ -253,6 +253,10 @@ impl ModuleResolver {
         }
     }
 
+    pub fn path(&self, id: ModuleId) -> Arc<Path> {
+        self.files.path(self.module(id).path().file())
+    }
+
     /// Resolves the module id for the file with the given id.
     ///
     /// Returns `None` if the file is not a module in `sys.path`.
@@ -324,7 +328,7 @@ impl ModuleResolver {
     pub fn add_module(&mut self, path: &Path) -> Option<(ModuleId, Vec<ModuleId>)> {
         // No locking is required because we're holding a mutable reference to `self`.
 
-        // TOOD This needs tests
+        // TODO This needs tests
 
         let module_id = self.resolve_path(path)?;
 
