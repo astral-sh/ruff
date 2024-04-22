@@ -2,17 +2,14 @@
 
 use std::hash::BuildHasherDefault;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 
 use rustc_hash::{FxHashSet, FxHasher};
 
 use crate::files::FileId;
-use crate::module::{Module, ModuleId, ModuleName};
-use crate::parse::Parsed;
-use crate::source::Source;
 
 pub mod ast_ids;
-mod cache;
+pub mod cache;
+pub mod db;
 pub mod files;
 pub mod hir;
 pub mod module;
@@ -22,25 +19,8 @@ mod source;
 mod symbols;
 
 pub(crate) type FxDashMap<K, V> = dashmap::DashMap<K, V, BuildHasherDefault<FxHasher>>;
+#[allow(unused)]
 pub(crate) type FxDashSet<V> = dashmap::DashSet<V, BuildHasherDefault<FxHasher>>;
-
-pub trait SourceDb {
-    fn file_id(&self, path: &std::path::Path) -> FileId;
-
-    fn file_path(&self, file_id: FileId) -> Arc<std::path::Path>;
-
-    fn source(&self, file_id: FileId) -> Source;
-
-    fn parse(&self, source: &Source) -> Parsed;
-}
-
-pub trait ModuleDb {
-    fn resolve_module(&self, name: ModuleName) -> Option<ModuleId>;
-
-    fn module(&self, module_id: ModuleId) -> Module;
-}
-
-trait Db: ModuleDb + SourceDb {}
 
 #[derive(Debug)]
 pub struct Workspace {
