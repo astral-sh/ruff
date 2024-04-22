@@ -330,19 +330,16 @@ mod tests {
     use itertools::Itertools;
     use textwrap::dedent;
 
-    use crate::parse::{parse as parse_from_sourcetext, Parsed};
+    use crate::parse::Parsed;
     use crate::symbols::ScopeKind;
 
     use super::{SymbolId, SymbolIterator, SymbolTable, Symbols};
 
     mod from_ast {
-        use crate::files::FileId;
-        use crate::source::Source;
-
         use super::*;
 
         fn parse(code: &str) -> Parsed {
-            parse_from_sourcetext(&Source::new(FileId::from_u32(1), dedent(code)))
+            Parsed::from_text(&dedent(code))
         }
 
         fn names<I>(it: SymbolIterator<I>) -> Vec<&str>

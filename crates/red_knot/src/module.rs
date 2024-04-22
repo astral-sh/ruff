@@ -5,13 +5,35 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicU32;
 use std::sync::Arc;
 
-use crate::files::{FileId, Files};
-use crate::FxDashMap;
 use dashmap::mapref::entry::Entry;
+
+use crate::db::{HasJar, ModuleDb, SourceDb, SourceJar};
+use crate::files::FileId;
+use crate::FxDashMap;
 
 /// ID uniquely identifying a module.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
-pub struct ModuleId(u32);
+pub struct Module(u32);
+
+impl Module {
+    pub fn name<Db>(&self, db: &Db) -> ModuleName
+    where
+        Db: HasJar<SourceJar>,
+    {
+        let modules = &db.jar().module_resolver;
+
+        modules.modules.get(self).unwrap().name.clone()
+    }
+
+    pub fn path<Db>(&self, db: &Db) -> ModulePath
+    where
+        Db: HasJar<SourceJar>,
+    {
+        let modules = &db.jar().module_resolver;
+
+        modules.modules.get(self).unwrap().path.clone()
+    }
+}
 
 /// A module name, e.g. `foo.bar`.
 ///
@@ -134,37 +156,204 @@ pub enum ModuleSearchPathKind {
     StandardLibrary,
 }
 
-/// A module in a python program.
-///
-/// Cheap clone because it's an `Arc`.
-#[derive(Eq, PartialEq)]
-pub struct Module {
-    inner: Arc<ModuleData>,
-}
-
-impl Module {
-    pub fn name(&self) -> &ModuleName {
-        &self.inner.name
-    }
-
-    pub fn path(&self) -> &ModulePath {
-        &self.inner.path
-    }
-}
-
-impl std::fmt::Debug for Module {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Module")
-            .field("name", &self.name())
-            .field("path", &self.path())
-            .finish()
-    }
-}
-
 #[derive(Debug, Eq, PartialEq)]
-struct ModuleData {
+pub struct ModuleData {
     name: ModuleName,
     path: ModulePath,
+}
+
+//////////////////////////////////////////////////////
+// Queries
+//////////////////////////////////////////////////////
+
+/// Resolves a module name to a module id.
+pub fn resolve_module<Db>(db: &Db, name: ModuleName) -> Option<Module>
+where
+    Db: SourceDb + HasJar<SourceJar>,
+{
+    let jar = db.jar();
+    let modules = &jar.module_resolver;
+
+    let entry = modules.by_name.entry(name.clone());
+
+    match entry {
+        Entry::Occupied(entry) => Some(*entry.get()),
+        Entry::Vacant(entry) => {
+            let (root_path, absolute_path) = resolve_name(&name, &modules.search_paths)?;
+            let normalized = absolute_path.canonicalize().ok()?;
+
+            let file_id = db.file_id(&normalized);
+            let path = ModulePath::new(root_path.clone(), file_id);
+
+            let id = Module(
+                modules
+                    .next_module_id
+                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed),
+            );
+
+            modules
+                .modules
+                .insert(id, Arc::from(ModuleData { name, path }));
+
+            // A path can map to multiple modules because of symlinks:
+            // ```
+            // foo.py
+            // bar.py -> foo.py
+            // ```
+            // Here, both `foo` and `bar` resolve to the same module but through different paths.
+            // That's why we need to insert the absolute path and not the normalized path here.
+            modules.by_path.insert(absolute_path, id);
+
+            entry.insert_entry(id);
+
+            Some(id)
+        }
+    }
+}
+
+//////////////////////////////////////////////////////
+// Mutations
+//////////////////////////////////////////////////////
+
+pub fn set_module_search_paths<Db>(db: &mut Db, search_paths: Vec<ModuleSearchPath>)
+where
+    Db: HasJar<SourceJar>,
+{
+    let jar = db.jar_mut();
+
+    jar.module_resolver.search_paths = search_paths;
+}
+
+/// Resolves the module id for the file with the given id.
+///
+/// Returns `None` if the file is not a module in `sys.path`.
+pub fn file_to_module<Db>(db: &mut Db, file: FileId) -> Option<Module>
+where
+    Db: SourceDb + HasJar<SourceJar>,
+{
+    let path = db.file_path(file);
+    path_to_module(db, &path)
+}
+
+/// Resolves the module id for the given path.
+///
+/// Returns `None` if the path is not a module in `sys.path`.
+// WARNING!: It's important that this method takes `&mut self`. Without, the implementation is prone to race conditions.
+pub fn path_to_module<Db>(db: &mut Db, path: &Path) -> Option<Module>
+where
+    Db: SourceDb + HasJar<SourceJar>,
+{
+    let jar = db.jar_mut();
+    let modules = &mut jar.module_resolver;
+    debug_assert!(path.is_absolute());
+
+    if let Some(existing) = modules.by_path.get(path) {
+        return Some(*existing);
+    }
+
+    let root_path = modules
+        .search_paths
+        .iter()
+        .find(|root| path.starts_with(root.path()))?
+        .clone();
+
+    // SAFETY: `strip_prefix` is guaranteed to succeed because we search the root that is a prefix of the path.
+    let relative_path = path.strip_prefix(root_path.path()).unwrap();
+    let module_name = ModuleName::from_relative_path(relative_path)?;
+
+    // Resolve the module name to see if Python would resolve the name to the same path.
+    // If it doesn't, then that means that multiple modules have the same in different
+    // root paths, but that the module corresponding to the past path is in a lower priority path,
+    // in which case we ignore it.
+    let module_id = resolve_module(db, module_name)?;
+    // Note: Guaranteed to be race-free because we're holding a mutable reference of `self` here.
+    let module_path = module_id.path(db);
+
+    if module_path.root() == &root_path {
+        let normalized = path.canonicalize().ok()?;
+        let module_path = db.file_path(module_path.file());
+
+        if !module_path.starts_with(normalized) {
+            // This path is for a module with the same name but with a different precedence. For example:
+            // ```
+            // src/foo.py
+            // src/foo/__init__.py
+            // ```
+            // The module name of `src/foo.py` is `foo`, but the module loaded by Python is `src/foo/__init__.py`.
+            // That means we need to ignore `src/foo.py` even though it resolves to the same module name.
+            return None;
+        }
+
+        // Path has been inserted by `resolved`
+        Some(module_id)
+    } else {
+        // This path is for a module with the same name but in a module search path with a lower priority.
+        // Ignore it.
+        None
+    }
+}
+
+/// Adds a module to the resolver.
+///
+/// Returns `None` if the path doesn't resolve to a module.
+///
+/// Returns `Some` with the id of the module and the ids of the modules that need re-resolving
+/// because they were part of a namespace package and might now resolve differently.
+// FIXME: Returning module here is now pretty unsafe because it's no longer guaranteed to be in the cache.
+pub fn add_module<Db>(db: &mut Db, path: &Path) -> Option<(Module, Vec<Arc<ModuleData>>)>
+where
+    Db: SourceDb + HasJar<SourceJar> + ModuleDb,
+{
+    // No locking is required because we're holding a mutable reference to `modules`.
+
+    // TODO This needs tests
+
+    // Note: Intentionally by-pass caching here. Module should not be in the cache yet.
+    let module = path_to_module(db, path)?;
+
+    // The code below is to handle the addition of `__init__.py` files.
+    // When an `__init__.py` file is added, we need to remove all modules that are part of the same package.
+    // For example, an `__init__.py` is added to `foo`, we need to remove `foo.bar`, `foo.baz`, etc.
+    // because they were namespace packages before and could have been from different search paths.
+    let Some(filename) = path.file_name() else {
+        return Some((module, Vec::new()));
+    };
+
+    if !matches!(filename.to_str(), Some("__init__.py" | "__init__.pyi")) {
+        return Some((module, Vec::new()));
+    }
+
+    let Some(parent_name) = module.name(db).parent() else {
+        return Some((module, Vec::new()));
+    };
+
+    let mut to_remove = Vec::new();
+
+    let jar = db.jar_mut();
+    let modules = &mut jar.module_resolver;
+
+    modules.by_path.retain(|_, id| {
+        if modules
+            .modules
+            .get(id)
+            .unwrap()
+            .name
+            .starts_with(&parent_name)
+        {
+            to_remove.push(*id);
+            false
+        } else {
+            true
+        }
+    });
+
+    // TODO remove need for this vec
+    let mut removed = Vec::with_capacity(to_remove.len());
+    for id in &to_remove {
+        removed.push(modules.remove_module_by_id(*id));
+    }
+
+    Some((module, removed))
 }
 
 #[derive(Default)]
@@ -172,202 +361,30 @@ pub struct ModuleResolver {
     /// The search paths where modules are located (and searched). Corresponds to `sys.path` at runtime.
     search_paths: Vec<ModuleSearchPath>,
 
-    files: Files,
-
     // Locking: Locking is done by acquiring a (write) lock on `by_name`. This is because `by_name` is the primary
     // lookup method. Acquiring locks in any other ordering can result in deadlocks.
     /// Resolves a module name to it's module id.
-    by_name: FxDashMap<ModuleName, ModuleId>,
+    by_name: FxDashMap<ModuleName, Module>,
 
     /// All known modules, indexed by the module id.
-    modules: FxDashMap<ModuleId, Arc<ModuleData>>,
+    modules: FxDashMap<Module, Arc<ModuleData>>,
 
     /// Lookup from absolute path to module.
     /// The same module might be reachable from different paths when symlinks are involved.
-    by_path: FxDashMap<PathBuf, ModuleId>,
+    by_path: FxDashMap<PathBuf, Module>,
     next_module_id: AtomicU32,
 }
 
 #[allow(unused)]
 impl ModuleResolver {
-    pub fn new(search_paths: Vec<ModuleSearchPath>, files: Files) -> Self {
+    pub fn new(search_paths: Vec<ModuleSearchPath>) -> Self {
         Self {
             search_paths,
-            files,
             modules: FxDashMap::default(),
             by_name: FxDashMap::default(),
             by_path: FxDashMap::default(),
             next_module_id: AtomicU32::new(0),
         }
-    }
-
-    /// Resolves a module name to a module id.
-    pub fn resolve(&self, name: ModuleName) -> Option<ModuleId> {
-        let entry = self.by_name.entry(name.clone());
-
-        match entry {
-            Entry::Occupied(entry) => Some(*entry.get()),
-            Entry::Vacant(entry) => {
-                let (root_path, absolute_path) = resolve_name(&name, &self.search_paths)?;
-                let normalized = absolute_path.canonicalize().ok()?;
-
-                let file_id = self.files.intern(&normalized);
-                let path = ModulePath::new(root_path.clone(), file_id);
-
-                let id = ModuleId(
-                    self.next_module_id
-                        .fetch_add(1, std::sync::atomic::Ordering::Relaxed),
-                );
-
-                self.modules
-                    .insert(id, Arc::from(ModuleData { name, path }));
-
-                // A path can map to multiple modules because of symlinks:
-                // ```
-                // foo.py
-                // bar.py -> foo.py
-                // ```
-                // Here, both `foo` and `bar` resolve to the same module but through different paths.
-                // That's why we need to insert the absolute path and not the normalized path here.
-                self.by_path.insert(absolute_path, id);
-
-                entry.insert_entry(id);
-
-                Some(id)
-            }
-        }
-    }
-
-    /// Returns the id of a module with the given name if it exists, without resolving it.
-    pub fn id(&self, name: &ModuleName) -> Option<ModuleId> {
-        self.by_name.get(name).map(|lock| *lock)
-    }
-
-    /// Returns the module for a given id.
-    pub fn module(&self, id: ModuleId) -> Module {
-        let entry = self.modules.get(&id).unwrap();
-        let module = entry.value();
-
-        Module {
-            inner: module.clone(),
-        }
-    }
-
-    pub fn path(&self, id: ModuleId) -> Arc<Path> {
-        self.files.path(self.module(id).path().file())
-    }
-
-    /// Resolves the module id for the file with the given id.
-    ///
-    /// Returns `None` if the file is not a module in `sys.path`.
-    pub fn resolve_file(&mut self, file: FileId) -> Option<ModuleId> {
-        let path = self.files.path(file);
-        self.resolve_path(&path)
-    }
-
-    /// Resolves the module id for the given path.
-    ///
-    /// Returns `None` if the path is not a module in `sys.path`.
-    // WARNING!: It's important that this method takes `&mut self`. Without, the implementation is prone to race conditions.
-    pub fn resolve_path(&mut self, path: &Path) -> Option<ModuleId> {
-        debug_assert!(path.is_absolute());
-
-        if let Some(existing) = self.by_path.get(path) {
-            return Some(*existing);
-        }
-
-        let root_path = self
-            .search_paths
-            .iter()
-            .find(|root| path.starts_with(root.path()))?
-            .clone();
-
-        // SAFETY: `strip_prefix` is guaranteed to succeed because we search the root that is a prefix of the path.
-        let relative_path = path.strip_prefix(root_path.path()).unwrap();
-        let module_name = ModuleName::from_relative_path(relative_path)?;
-
-        // Resolve the module name to see if Python would resolve the name to the same path.
-        // If it doesn't, then that means that multiple modules have the same in different
-        // root paths, but that the module corresponding to the past path is in a lower priority path,
-        // in which case we ignore it.
-        let module_id = self.resolve(module_name)?;
-        // Note: Guaranteed to be race-free because we're holding a mutable reference of `self` here.
-        let module = self.module(module_id);
-
-        let module_path = module.path();
-        if module_path.root() == &root_path {
-            let normalized = path.canonicalize().ok()?;
-            let module_path = self.files.path(module_path.file());
-
-            if !module_path.starts_with(normalized) {
-                // This path is for a module with the same name but with a different precedence. For example:
-                // ```
-                // src/foo.py
-                // src/foo/__init__.py
-                // ```
-                // The module name of `src/foo.py` is `foo`, but the module loaded by Python is `src/foo/__init__.py`.
-                // That means we need to ignore `src/foo.py` even though it resolves to the same module name.
-                return None;
-            }
-
-            // Path has been inserted by `resolved`
-            Some(module_id)
-        } else {
-            // This path is for a module with the same name but in a module search path with a lower priority.
-            // Ignore it.
-            None
-        }
-    }
-
-    /// Adds a module to the resolver.
-    ///
-    /// Returns `None` if the path doesn't resolve to a module.
-    ///
-    /// Returns `Some` with the id of the module and the ids of the modules that need re-resolving
-    /// because they were part of a namespace package and might now resolve differently.
-    pub fn add_module(&mut self, path: &Path) -> Option<(ModuleId, Vec<ModuleId>)> {
-        // No locking is required because we're holding a mutable reference to `self`.
-
-        // TODO This needs tests
-
-        let module_id = self.resolve_path(path)?;
-
-        // The code below is to handle the addition of `__init__.py` files.
-        // When an `__init__.py` file is added, we need to remove all modules that are part of the same package.
-        // For example, an `__init__.py` is added to `foo`, we need to remove `foo.bar`, `foo.baz`, etc.
-        // because they were namespace packages before and could have been from different search paths.
-        let Some(filename) = path.file_name() else {
-            return Some((module_id, Vec::new()));
-        };
-
-        if !matches!(filename.to_str(), Some("__init__.py" | "__init__.pyi")) {
-            return Some((module_id, Vec::new()));
-        }
-
-        let module = self.module(module_id);
-
-        let Some(parent_name) = module.name().parent() else {
-            return Some((module_id, Vec::new()));
-        };
-
-        let mut to_remove = Vec::new();
-
-        self.by_path.retain(|path, id| {
-            let module = self.module(*id);
-
-            if module.name().starts_with(&parent_name) {
-                to_remove.push(*id);
-                false
-            } else {
-                true
-            }
-        });
-
-        for id in &to_remove {
-            self.remove_module_by_id(*id);
-        }
-
-        Some((module_id, to_remove))
     }
 
     pub fn remove_module(&mut self, path: &Path) {
@@ -379,13 +396,15 @@ impl ModuleResolver {
         self.remove_module_by_id(id);
     }
 
-    fn remove_module_by_id(&mut self, id: ModuleId) {
+    fn remove_module_by_id(&mut self, id: Module) -> Arc<ModuleData> {
         let (_, module) = self.modules.remove(&id).unwrap();
 
         self.by_name.remove(&module.name).unwrap();
 
         // It's possible that multiple paths map to the same id. Search all other paths referencing the same module id.
         self.by_path.retain(|_, current_id| *current_id != id);
+
+        module
     }
 }
 
@@ -557,13 +576,13 @@ impl PackageKind {
 
 #[cfg(test)]
 mod tests {
-    use crate::files::Files;
-    use crate::module::{ModuleName, ModuleResolver, ModuleSearchPath, ModuleSearchPathKind};
+    use crate::db::tests::TestDb;
+    use crate::db::{ModuleDb, SourceDb};
+    use crate::module::{ModuleName, ModuleSearchPath, ModuleSearchPathKind};
 
     struct TestCase {
         temp_dir: tempfile::TempDir,
-        resolver: ModuleResolver,
-        files: Files,
+        db: TestDb,
 
         src: ModuleSearchPath,
         site_packages: ModuleSearchPath,
@@ -585,14 +604,13 @@ mod tests {
         );
 
         let roots = vec![src.clone(), site_packages.clone()];
-        let files = Files::default();
 
-        let resolver = ModuleResolver::new(roots, files.clone());
+        let mut db = TestDb::default();
+        db.set_module_search_paths(roots);
 
         Ok(TestCase {
             temp_dir,
-            resolver,
-            files,
+            db,
             src,
             site_packages,
         })
@@ -601,9 +619,8 @@ mod tests {
     #[test]
     fn first_party_module() -> std::io::Result<()> {
         let TestCase {
-            mut resolver,
+            mut db,
             src,
-            files,
             temp_dir: _temp_dir,
             ..
         } = create_resolver()?;
@@ -611,18 +628,15 @@ mod tests {
         let foo_path = src.path().join("foo.py");
         std::fs::write(&foo_path, "print('Hello, world!')")?;
 
-        let foo_id = resolver.resolve(ModuleName::new("foo"));
+        let foo_module = db.resolve_module(ModuleName::new("foo")).unwrap();
 
-        assert!(foo_id.is_some());
-        assert_eq!(foo_id, resolver.resolve(ModuleName::new("foo")));
+        assert_eq!(Some(foo_module), db.resolve_module(ModuleName::new("foo")));
 
-        let foo_module = resolver.module(foo_id.unwrap());
+        assert_eq!(ModuleName::new("foo"), foo_module.name(&db));
+        assert_eq!(&src, foo_module.path(&db).root());
+        assert_eq!(&foo_path, &*db.file_path(foo_module.path(&db).file()));
 
-        assert_eq!(&ModuleName::new("foo"), foo_module.name());
-        assert_eq!(&src, foo_module.path().root());
-        assert_eq!(&foo_path, &*files.path(foo_module.path().file()));
-
-        assert_eq!(foo_id, resolver.resolve_path(&foo_path));
+        assert_eq!(Some(foo_module), db.path_to_module(&foo_path));
 
         Ok(())
     }
@@ -631,9 +645,8 @@ mod tests {
     fn resolve_package() -> std::io::Result<()> {
         let TestCase {
             src,
-            mut resolver,
+            mut db,
             temp_dir: _temp_dir,
-            files,
             ..
         } = create_resolver()?;
 
@@ -642,20 +655,16 @@ mod tests {
         std::fs::create_dir(&foo_dir)?;
         std::fs::write(&foo_path, "print('Hello, world!')")?;
 
-        let foo_id = resolver.resolve(ModuleName::new("foo"));
+        let foo_module = db.resolve_module(ModuleName::new("foo")).unwrap();
 
-        assert!(foo_id.is_some());
+        assert_eq!(ModuleName::new("foo"), foo_module.name(&db));
+        assert_eq!(&src, foo_module.path(&db).root());
+        assert_eq!(&foo_path, &*db.file_path(foo_module.path(&db).file()));
 
-        let foo_module = resolver.module(foo_id.unwrap());
-
-        assert_eq!(&ModuleName::new("foo"), foo_module.name());
-        assert_eq!(&src, foo_module.path().root());
-        assert_eq!(&foo_path, &*files.path(foo_module.path().file()));
-
-        assert_eq!(foo_id, resolver.resolve_path(&foo_path));
+        assert_eq!(Some(foo_module), db.path_to_module(&foo_path));
 
         // TODO: Should resolving by the directory name resolve a module or not?
-        assert_eq!(foo_id, resolver.resolve_path(&foo_dir));
+        assert_eq!(Some(foo_module), db.path_to_module(&foo_dir));
 
         Ok(())
     }
@@ -663,9 +672,8 @@ mod tests {
     #[test]
     fn package_priority_over_module() -> std::io::Result<()> {
         let TestCase {
-            mut resolver,
+            mut db,
             temp_dir: _temp_dir,
-            files,
             src,
             ..
         } = create_resolver()?;
@@ -678,17 +686,13 @@ mod tests {
         let foo_py = src.path().join("foo.py");
         std::fs::write(&foo_py, "print('Hello, world!')")?;
 
-        let foo_id = resolver.resolve(ModuleName::new("foo"));
+        let foo_module = db.resolve_module(ModuleName::new("foo")).unwrap();
 
-        assert!(foo_id.is_some());
+        assert_eq!(&src, foo_module.path(&db).root());
+        assert_eq!(&foo_init, &*db.file_path(foo_module.path(&db).file()));
 
-        let foo_module = resolver.module(foo_id.unwrap());
-
-        assert_eq!(&src, foo_module.path().root());
-        assert_eq!(&foo_init, &*files.path(foo_module.path().file()));
-
-        assert_eq!(foo_id, resolver.resolve_path(&foo_init));
-        assert_eq!(None, resolver.resolve_path(&foo_py));
+        assert_eq!(Some(foo_module), db.path_to_module(&foo_init));
+        assert_eq!(None, db.path_to_module(&foo_py));
 
         Ok(())
     }
@@ -696,9 +700,8 @@ mod tests {
     #[test]
     fn typing_stub_over_module() -> std::io::Result<()> {
         let TestCase {
-            mut resolver,
+            mut db,
             src,
-            files,
             temp_dir: _temp_dir,
             ..
         } = create_resolver()?;
@@ -708,17 +711,13 @@ mod tests {
         std::fs::write(&foo_stub, "x: int")?;
         std::fs::write(&foo_py, "print('Hello, world!')")?;
 
-        let foo_id = resolver.resolve(ModuleName::new("foo"));
+        let foo = db.resolve_module(ModuleName::new("foo")).unwrap();
 
-        assert!(foo_id.is_some());
+        assert_eq!(&src, foo.path(&db).root());
+        assert_eq!(&foo_stub, &*db.file_path(foo.path(&db).file()));
 
-        let foo_module = resolver.module(foo_id.unwrap());
-
-        assert_eq!(&src, foo_module.path().root());
-        assert_eq!(&foo_stub, &*files.path(foo_module.path().file()));
-
-        assert_eq!(foo_id, resolver.resolve_path(&foo_stub));
-        assert_eq!(None, resolver.resolve_path(&foo_py));
+        assert_eq!(Some(foo), db.path_to_module(&foo_stub));
+        assert_eq!(None, db.path_to_module(&foo_py));
 
         Ok(())
     }
@@ -726,8 +725,7 @@ mod tests {
     #[test]
     fn sub_packages() -> std::io::Result<()> {
         let TestCase {
-            mut resolver,
-            files,
+            mut db,
             src,
             temp_dir: _temp_dir,
             ..
@@ -742,16 +740,12 @@ mod tests {
         std::fs::write(bar.join("__init__.py"), "")?;
         std::fs::write(&baz, "print('Hello, world!')")?;
 
-        let baz_id = resolver.resolve(ModuleName::new("foo.bar.baz"));
+        let baz_module = db.resolve_module(ModuleName::new("foo.bar.baz")).unwrap();
 
-        assert!(baz_id.is_some());
+        assert_eq!(&src, baz_module.path(&db).root());
+        assert_eq!(&baz, &*db.file_path(baz_module.path(&db).file()));
 
-        let baz_module = resolver.module(baz_id.unwrap());
-
-        assert_eq!(&src, baz_module.path().root());
-        assert_eq!(&baz, &*files.path(baz_module.path().file()));
-
-        assert_eq!(baz_id, resolver.resolve_path(&baz));
+        assert_eq!(Some(baz_module), db.path_to_module(&baz));
 
         Ok(())
     }
@@ -759,11 +753,10 @@ mod tests {
     #[test]
     fn namespace_package() -> std::io::Result<()> {
         let TestCase {
-            mut resolver,
+            mut db,
             temp_dir: _,
             src,
             site_packages,
-            ..
         } = create_resolver()?;
 
         // From [PEP420](https://peps.python.org/pep-0420/#nested-namespace-packages).
@@ -793,14 +786,16 @@ mod tests {
         std::fs::create_dir_all(&child2)?;
         std::fs::write(&two, "print('Hello, world!')")?;
 
-        let one_id = resolver.resolve(ModuleName::new("parent.child.one"));
+        let one_module = db
+            .resolve_module(ModuleName::new("parent.child.one"))
+            .unwrap();
 
-        assert!(one_id.is_some());
-        assert_eq!(one_id, resolver.resolve_path(&one));
+        assert_eq!(Some(one_module), db.path_to_module(&one));
 
-        let two_id = resolver.resolve(ModuleName::new("parent.child.two"));
-        assert!(two_id.is_some());
-        assert_eq!(two_id, resolver.resolve_path(&two));
+        let two_module = db
+            .resolve_module(ModuleName::new("parent.child.two"))
+            .unwrap();
+        assert_eq!(Some(two_module), db.path_to_module(&two));
 
         Ok(())
     }
@@ -808,11 +803,10 @@ mod tests {
     #[test]
     fn regular_package_in_namespace_package() -> std::io::Result<()> {
         let TestCase {
-            mut resolver,
+            mut db,
             temp_dir: _,
             src,
             site_packages,
-            ..
         } = create_resolver()?;
 
         // Adopted test case from the [PEP420 examples](https://peps.python.org/pep-0420/#nested-namespace-packages).
@@ -843,22 +837,22 @@ mod tests {
         std::fs::create_dir_all(&child2)?;
         std::fs::write(two, "print('Hello, world!')")?;
 
-        let one_id = resolver.resolve(ModuleName::new("parent.child.one"));
+        let one_module = db
+            .resolve_module(ModuleName::new("parent.child.one"))
+            .unwrap();
 
-        assert!(one_id.is_some());
-        assert_eq!(one_id, resolver.resolve_path(&one));
+        assert_eq!(Some(one_module), db.path_to_module(&one));
 
-        assert_eq!(None, resolver.resolve(ModuleName::new("parent.child.two")));
+        assert_eq!(None, db.resolve_module(ModuleName::new("parent.child.two")));
         Ok(())
     }
 
     #[test]
     fn module_search_path_priority() -> std::io::Result<()> {
         let TestCase {
-            mut resolver,
+            mut db,
             src,
             site_packages,
-            files,
             temp_dir: _temp_dir,
         } = create_resolver()?;
 
@@ -868,17 +862,13 @@ mod tests {
         std::fs::write(&foo_src, "")?;
         std::fs::write(&foo_site_packages, "")?;
 
-        let foo_id = resolver.resolve(ModuleName::new("foo"));
+        let foo_module = db.resolve_module(ModuleName::new("foo")).unwrap();
 
-        assert!(foo_id.is_some());
+        assert_eq!(&src, foo_module.path(&db).root());
+        assert_eq!(&foo_src, &*db.file_path(foo_module.path(&db).file()));
 
-        let foo_module = resolver.module(foo_id.unwrap());
-
-        assert_eq!(&src, foo_module.path().root());
-        assert_eq!(&foo_src, &*files.path(foo_module.path().file()));
-
-        assert_eq!(foo_id, resolver.resolve_path(&foo_src));
-        assert_eq!(None, resolver.resolve_path(&foo_site_packages));
+        assert_eq!(Some(foo_module), db.path_to_module(&foo_src));
+        assert_eq!(None, db.path_to_module(&foo_site_packages));
 
         Ok(())
     }
@@ -887,8 +877,7 @@ mod tests {
     #[cfg(target_family = "unix")]
     fn symlink() -> std::io::Result<()> {
         let TestCase {
-            mut resolver,
-            files,
+            mut db,
             src,
             temp_dir: _temp_dir,
             ..
@@ -900,27 +889,22 @@ mod tests {
         std::fs::write(&foo, "")?;
         std::os::unix::fs::symlink(&foo, &bar)?;
 
-        let foo_id = resolver.resolve(ModuleName::new("foo"));
-        let bar_id = resolver.resolve(ModuleName::new("bar"));
+        let foo_module = db.resolve_module(ModuleName::new("foo")).unwrap();
+        let bar_module = db.resolve_module(ModuleName::new("bar")).unwrap();
 
-        assert!(foo_id.is_some());
-        assert!(bar_id.is_some());
-        assert_ne!(foo_id, bar_id);
+        assert_ne!(foo_module, bar_module);
 
-        let foo_module = resolver.module(foo_id.unwrap());
-
-        assert_eq!(&src, foo_module.path().root());
-        assert_eq!(&foo, &*files.path(foo_module.path().file()));
+        assert_eq!(&src, foo_module.path(&db).root());
+        assert_eq!(&foo, &*db.file_path(foo_module.path(&db).file()));
 
         // Bar has a different name but it should point to the same file.
-        let bar_module = resolver.module(bar_id.unwrap());
 
-        assert_eq!(&src, bar_module.path().root());
-        assert_eq!(foo_module.path().file(), bar_module.path().file());
-        assert_eq!(&foo, &*files.path(bar_module.path().file()));
+        assert_eq!(&src, bar_module.path(&db).root());
+        assert_eq!(foo_module.path(&db).file(), bar_module.path(&db).file());
+        assert_eq!(&foo, &*db.file_path(bar_module.path(&db).file()));
 
-        assert_eq!(foo_id, resolver.resolve_path(&foo));
-        assert_eq!(bar_id, resolver.resolve_path(&bar));
+        assert_eq!(Some(foo_module), db.path_to_module(&foo));
+        assert_eq!(Some(bar_module), db.path_to_module(&bar));
 
         Ok(())
     }
