@@ -1,12 +1,16 @@
 #![allow(dead_code)]
-use crate::{FxDashMap, Name};
-use hashbrown::hash_map::{Keys, RawEntryMut};
-use ruff_index::{newtype_index, IndexVec};
-use ruff_python_ast::visitor::preorder::PreorderVisitor;
-use ruff_python_ast::{self as ast};
-use rustc_hash::FxHasher;
+
 use std::hash::{Hash, Hasher};
 use std::iter::{Copied, DoubleEndedIterator, FusedIterator};
+
+use hashbrown::hash_map::{Keys, RawEntryMut};
+use rustc_hash::FxHasher;
+
+use ruff_index::{newtype_index, IndexVec};
+use ruff_python_ast as ast;
+use ruff_python_ast::visitor::preorder::PreorderVisitor;
+
+use crate::{FxDashMap, Name};
 
 type Map<K, V> = hashbrown::HashMap<K, V, ()>;
 
@@ -323,17 +327,22 @@ impl<'a> PreorderVisitor<'a> for SymbolsBuilder<'a> {
 
 #[cfg(test)]
 mod tests {
-    use super::{SymbolId, SymbolIterator, SymbolTable, Symbols};
-    use crate::parse::{parse as parse_from_sourcetext, Parsed, SourceText};
-    use crate::symbols::ScopeKind;
     use itertools::Itertools;
     use textwrap::dedent;
 
+    use crate::parse::{parse as parse_from_sourcetext, Parsed};
+    use crate::symbols::ScopeKind;
+
+    use super::{SymbolId, SymbolIterator, SymbolTable, Symbols};
+
     mod from_ast {
+        use crate::files::FileId;
+        use crate::source::Source;
+
         use super::*;
 
         fn parse(code: &str) -> Parsed {
-            parse_from_sourcetext(&SourceText { text: dedent(code) })
+            parse_from_sourcetext(&Source::new(FileId::from_u32(1), dedent(code)))
         }
 
         fn names<I>(it: SymbolIterator<I>) -> Vec<&str>
@@ -346,42 +355,42 @@ mod tests {
         #[test]
         fn empty() {
             let parsed = parse("");
-            let table = Symbols::from_ast(&parsed.ast).table;
+            let table = Symbols::from_ast(&parsed.ast()).table;
             assert_eq!(names(table.root_symbols()).len(), 0);
         }
 
         #[test]
         fn simple() {
             let parsed = parse("x");
-            let table = Symbols::from_ast(&parsed.ast).table;
+            let table = Symbols::from_ast(&parsed.ast()).table;
             assert_eq!(names(table.root_symbols()), vec!["x"]);
         }
 
         #[test]
         fn annotation_only() {
             let parsed = parse("x: int");
-            let table = Symbols::from_ast(&parsed.ast).table;
+            let table = Symbols::from_ast(&parsed.ast()).table;
             assert_eq!(names(table.root_symbols()), vec!["int", "x"]);
         }
 
         #[test]
         fn import() {
             let parsed = parse("import foo");
-            let table = Symbols::from_ast(&parsed.ast).table;
+            let table = Symbols::from_ast(&parsed.ast()).table;
             assert_eq!(names(table.root_symbols()), vec!["foo"]);
         }
 
         #[test]
         fn import_sub() {
             let parsed = parse("import foo.bar");
-            let table = Symbols::from_ast(&parsed.ast).table;
+            let table = Symbols::from_ast(&parsed.ast()).table;
             assert_eq!(names(table.root_symbols()), vec!["foo"]);
         }
 
         #[test]
         fn import_from() {
             let parsed = parse("from bar import foo");
-            let table = Symbols::from_ast(&parsed.ast).table;
+            let table = Symbols::from_ast(&parsed.ast()).table;
             assert_eq!(names(table.root_symbols()), vec!["foo"]);
         }
 
@@ -394,7 +403,7 @@ mod tests {
                 y = 2
                 ",
             );
-            let table = Symbols::from_ast(&parsed.ast).table;
+            let table = Symbols::from_ast(&parsed.ast()).table;
             assert_eq!(names(table.root_symbols()), vec!["C", "y"]);
             let scopes = table.root_child_scopes();
             assert_eq!(scopes.len(), 1);
@@ -413,7 +422,7 @@ mod tests {
                 y = 2
                 ",
             );
-            let table = Symbols::from_ast(&parsed.ast).table;
+            let table = Symbols::from_ast(&parsed.ast()).table;
             assert_eq!(names(table.root_symbols()), vec!["func", "y"]);
             let scopes = table.root_child_scopes();
             assert_eq!(scopes.len(), 1);
@@ -433,7 +442,7 @@ mod tests {
                     y = 2
                 ",
             );
-            let table = Symbols::from_ast(&parsed.ast).table;
+            let table = Symbols::from_ast(&parsed.ast()).table;
             assert_eq!(names(table.root_symbols()), vec!["func"]);
             let scopes = table.root_child_scopes();
             assert_eq!(scopes.len(), 2);
@@ -455,7 +464,7 @@ mod tests {
                     x = 1
                 ",
             );
-            let table = Symbols::from_ast(&parsed.ast).table;
+            let table = Symbols::from_ast(&parsed.ast()).table;
             assert_eq!(names(table.root_symbols()), vec!["func"]);
             let scopes = table.root_child_scopes();
             assert_eq!(scopes.len(), 1);
@@ -481,7 +490,7 @@ mod tests {
                     x = 1
                 ",
             );
-            let table = Symbols::from_ast(&parsed.ast).table;
+            let table = Symbols::from_ast(&parsed.ast()).table;
             assert_eq!(names(table.root_symbols()), vec!["C"]);
             let scopes = table.root_child_scopes();
             assert_eq!(scopes.len(), 1);
