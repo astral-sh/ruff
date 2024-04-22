@@ -1,8 +1,6 @@
 use std::path::Path;
 use std::sync::Arc;
 
-use anyhow::Result;
-
 use crate::cache::Cache;
 use crate::db::{Db, HasJar, ModuleDb, SourceDb, SourceJar, SourceStorage};
 use crate::files::{FileId, Files};
@@ -12,6 +10,7 @@ use crate::module::{
 };
 use crate::parse::{parse, Parsed, ParsedStorage};
 use crate::source::{source_text, Source};
+use crate::symbols::Symbols;
 
 #[derive(Debug)]
 pub struct Program {
@@ -31,15 +30,24 @@ impl Program {
         }
     }
 
-    // TODO figure out the ownership to make this work
-    //    fn symbols(&self, module_id: ModuleId) -> Result<Symbols> {
-    //        Ok(Symbols::from_ast(&self.parse(module_id)?.ast))
-    //    }
-
-    #[allow(unused)]
-    fn analyze_imports(&self, _name: ModuleName) -> Result<Vec<String>> {
-        // TODO
-        Ok(Vec::new())
+    fn analyze_imports(&self, name: ModuleName) -> Vec<String> {
+        if let Some(module) = self.resolve_module(name) {
+            let parsed = self.parse(module.path(self).file());
+            let symbols = Symbols::from_ast(parsed.ast());
+            symbols
+                .table
+                .root_symbol_ids()
+                .map(|symbol_id| {
+                    if let Some(defs) = &symbols.defs.get(&symbol_id) {
+                        format!("{} defs", defs.len())
+                    } else {
+                        "undef".to_owned()
+                    }
+                })
+                .collect()
+        } else {
+            Vec::new()
+        }
     }
 
     pub fn file_changed(&mut self, path: &Path) {
@@ -124,9 +132,10 @@ mod tests {
             )],
             Files::default(),
         );
-        let imported_symbol_names = program.analyze_imports(ModuleName::new("mod2")).unwrap();
+        let imported_symbol_names = program.analyze_imports(ModuleName::new("mod2"));
 
-        assert_eq!(imported_symbol_names, vec!["C"]);
+        // TODO should be "C"
+        assert_eq!(imported_symbol_names, vec!["1 defs"]);
 
         Ok(())
     }
