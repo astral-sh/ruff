@@ -74,9 +74,12 @@ class FuzzResult:
             print(colored("The following code triggers a bug:", "red"))
             print()
             print(self.maybe_bug)
-            print()
+            print(flush=True)
         else:
-            print(colored(f"Ran fuzzer successfully on seed {self.seed}", "green"))
+            print(
+                colored(f"Ran fuzzer successfully on seed {self.seed}", "green"),
+                flush=True,
+            )
 
 
 def fuzz_code(

@@ -23,6 +23,8 @@ jobs:
     name: "Determine changes"
     runs-on: ubuntu-latest
     outputs:
+      # Flag that is raised when any code that affects parser is changed
+      parser: ${{ steps.changed.outputs.parser_any_changed }}
       # Flag that is raised when any code that affects linter is changed
       linter: ${{ steps.changed.outputs.linter_any_changed }}
       # Flag that is raised when any code that affects formatter is changed
@@ -39,6 +41,17 @@ jobs:
         id: changed
         with:
           files_yaml: |
+            parser:
+              - Cargo.toml
+              - Cargo.lock
+              - crates/ruff_python_trivia/**
+              - crates/ruff_source_file/**
+              - crates/ruff_text_size/**
+              - crates/ruff_python_ast/**
+              - crates/ruff_python_parser/**
+              - scripts/fuzz-parser/**
+              - .github/workflows/ci.yaml
+
             linter:
               - Cargo.toml
               - Cargo.lock
@@ -199,6 +212,38 @@ jobs:
         with:
           tool: cargo-fuzz@0.11.2
       - run: cargo fuzz build -s none
+
+  fuzz-parser:
+    name: "Fuzz the parser"
+    runs-on: ubuntu-latest
+    needs:
+      - cargo-test-linux
+      - determine_changes
+    if: ${{ needs.determine_changes.outputs.parser == 'true' }}
+    timeout-minutes: 20
+    env:
+      FORCE_COLOR: 1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Install uv
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+      - name: Install Python requirements
+        run: uv pip install -r scripts/fuzz-parser/requirements.txt --system
+      - uses: actions/download-artifact@v4
+        name: Download Ruff binary to test
+        id: download-cached-binary
+        with:
+          name: ruff
+          path: ruff-to-test
+      - name: Fuzz
+        run: |
+          # Make executable, since artifact download doesn't preserve this
+          chmod +x ${{ steps.download-cached-binary.outputs.download-path }}/ruff
+
+          python scripts/fuzz-parser/fuzz.py 0-1_000 --test-executable ${{ steps.download-cached-binary.outputs.download-path }}/ruff
 
   scripts:
     name: "test scripts"
