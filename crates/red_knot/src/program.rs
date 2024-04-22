@@ -10,7 +10,6 @@ use crate::module::{
 };
 use crate::parse::{parse, Parsed, ParsedStorage};
 use crate::source::{source_text, Source};
-use crate::symbols::Symbols;
 
 #[derive(Debug)]
 pub struct Program {
@@ -27,26 +26,6 @@ impl Program {
                 parsed: ParsedStorage::default(),
             },
             files,
-        }
-    }
-
-    pub fn analyze_imports(&self, name: ModuleName) -> Vec<String> {
-        if let Some(module) = self.resolve_module(name) {
-            let parsed = self.parse(module.path(self).file());
-            let symbols = Symbols::from_ast(parsed.ast());
-            symbols
-                .table
-                .root_symbol_ids()
-                .map(|symbol_id| {
-                    if let Some(defs) = &symbols.defs.get(&symbol_id) {
-                        format!("{} defs", defs.len())
-                    } else {
-                        "undef".to_owned()
-                    }
-                })
-                .collect()
-        } else {
-            Vec::new()
         }
     }
 
@@ -106,37 +85,5 @@ impl HasJar<SourceJar> for Program {
 
     fn jar_mut(&mut self) -> &mut SourceJar {
         &mut self.source
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::files::Files;
-    use crate::module::{ModuleSearchPath, ModuleSearchPathKind};
-
-    use super::*;
-
-    #[test]
-    fn resolve_imports() -> std::io::Result<()> {
-        let temp_dir = tempfile::tempdir()?;
-        let root = temp_dir.path().canonicalize()?;
-        let mod1 = root.join("mod1.py");
-        let mod2 = root.join("mod2.py");
-        std::fs::write(mod1, "class C: pass")?;
-        std::fs::write(mod2, "from mod1 import C")?;
-
-        let program = Program::new(
-            vec![ModuleSearchPath::new(
-                root,
-                ModuleSearchPathKind::FirstParty,
-            )],
-            Files::default(),
-        );
-        let imported_symbol_names = program.analyze_imports(ModuleName::new("mod2"));
-
-        // TODO should be "C"
-        assert_eq!(imported_symbol_names, vec!["1 defs"]);
-
-        Ok(())
     }
 }
