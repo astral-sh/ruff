@@ -233,7 +233,7 @@ fn itemgetter_op_tuple(
     let [arg] = params.args.as_slice() else {
         return None;
     };
-    if expr.elts.is_empty() {
+    if expr.elts.is_empty() || expr.elts.len() == 1 {
         return None;
     }
     Some(Operator {
