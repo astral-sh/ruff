@@ -61,6 +61,7 @@ dashmap = { version = "5.5.3" }
 dirs = { version = "5.0.0" }
 drop_bomb = { version = "0.1.5" }
 env_logger = { version = "0.11.0" }
+etcetera = { version = "0.8.0" }
 fern = { version = "0.6.1" }
 filetime = { version = "0.2.23" }
 glob = { version = "0.3.1" }

@@ -3,11 +3,13 @@
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
+use etcetera::BaseStrategy;
 use log::debug;
 use pep440_rs::VersionSpecifiers;
 use serde::{Deserialize, Serialize};
 
 use ruff_linter::settings::types::PythonVersion;
+use ruff_linter::warn_user_once;
 
 use crate::options::Options;
 
@@ -99,28 +101,31 @@ pub fn find_settings_toml<P: AsRef<Path>>(path: P) -> Result<Option<PathBuf>> {
 /// Find the path to the user-specific `pyproject.toml` or `ruff.toml`, if it
 /// exists.
 pub fn find_user_settings_toml() -> Option<PathBuf> {
-    // Search for a user-specific `.ruff.toml`.
-    let mut path = dirs::config_dir()?;
-    path.push("ruff");
-    path.push(".ruff.toml");
-    if path.is_file() {
-        return Some(path);
+    let strategy = etcetera::base_strategy::choose_base_strategy().ok()?;
+    let config_dir = strategy.config_dir().join("ruff");
+
+    // Search for a user-specific `.ruff.toml`, then a `ruff.toml`, then a `pyproject.toml`.
+    for filename in [".ruff.toml", "ruff.toml", "pyproject.toml"] {
+        let path = config_dir.join(filename);
+        if path.is_file() {
+            return Some(path);
+        }
     }
 
-    // Search for a user-specific `ruff.toml`.
-    let mut path = dirs::config_dir()?;
-    path.push("ruff");
-    path.push("ruff.toml");
-    if path.is_file() {
-        return Some(path);
-    }
+    // On macOS, we used to support reading from `/Users/Alice/Library/Application Support`.
+    if cfg!(target_os = "macos") {
+        let deprecated_config_dir = dirs::config_dir()?.join("ruff");
 
-    // Search for a user-specific `pyproject.toml`.
-    let mut path = dirs::config_dir()?;
-    path.push("ruff");
-    path.push("pyproject.toml");
-    if path.is_file() {
-        return Some(path);
+        for file in [".ruff.toml", "ruff.toml", "pyproject.toml"] {
+            let path = deprecated_config_dir.join(file);
+            if path.is_file() {
+                warn_user_once!(
+                    "Reading configuration from `~/Library/Application Support` is deprecated. Please move your configuration to `{}/{file}`.",
+                    config_dir.display(),
+                );
+                return Some(path);
+            }
+        }
     }
 
     None
