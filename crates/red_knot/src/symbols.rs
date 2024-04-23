@@ -76,83 +76,6 @@ pub(crate) struct Symbols<'a> {
     pub(crate) defs: FxDashMap<SymbolId, Vec<&'a ast::Stmt>>,
 }
 
-/// Table of all symbols in all scopes for a module.
-/// Derived from module AST, but holds no references to it.
-#[derive(Debug)]
-pub(crate) struct SymbolTable {
-    scopes_by_id: IndexVec<ScopeId, Scope>,
-    symbols_by_id: IndexVec<SymbolId, Symbol>,
-}
-
-pub(crate) struct SymbolIterator<'a, I> {
-    table: &'a SymbolTable,
-    ids: I,
-}
-
-impl<'a, I> Iterator for SymbolIterator<'a, I>
-where
-    I: Iterator<Item = SymbolId>,
-{
-    type Item = &'a Symbol;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let id = self.ids.next()?;
-        Some(&self.table.symbols_by_id[id])
-    }
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        self.ids.size_hint()
-    }
-}
-
-impl<'a, I> FusedIterator for SymbolIterator<'a, I> where
-    I: Iterator<Item = SymbolId> + FusedIterator
-{
-}
-
-impl<'a, I> DoubleEndedIterator for SymbolIterator<'a, I>
-where
-    I: Iterator<Item = SymbolId> + DoubleEndedIterator,
-{
-    fn next_back(&mut self) -> Option<Self::Item> {
-        let id = self.ids.next_back()?;
-        Some(&self.table.symbols_by_id[id])
-    }
-}
-
-pub(crate) struct ScopeIterator<'a, I> {
-    table: &'a SymbolTable,
-    ids: I,
-}
-
-impl<'a, I> Iterator for ScopeIterator<'a, I>
-where
-    I: Iterator<Item = ScopeId>,
-{
-    type Item = &'a Scope;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let id = self.ids.next()?;
-        Some(&self.table.scopes_by_id[id])
-    }
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        self.ids.size_hint()
-    }
-}
-
-impl<'a, I> FusedIterator for ScopeIterator<'a, I> where I: Iterator<Item = ScopeId> + FusedIterator {}
-
-impl<'a, I> DoubleEndedIterator for ScopeIterator<'a, I>
-where
-    I: Iterator<Item = ScopeId> + DoubleEndedIterator,
-{
-    fn next_back(&mut self) -> Option<Self::Item> {
-        let id = self.ids.next_back()?;
-        Some(&self.table.scopes_by_id[id])
-    }
-}
-
 impl<'a> Symbols<'a> {
     pub(crate) fn from_ast(module: &'a ast::ModModule) -> Self {
         let symbols = Symbols {
@@ -167,6 +90,14 @@ impl<'a> Symbols<'a> {
         builder.visit_body(&module.body);
         builder.symbols
     }
+}
+
+/// Table of all symbols in all scopes for a module.
+/// Derived from module AST, but holds no references to it.
+#[derive(Debug)]
+pub(crate) struct SymbolTable {
+    scopes_by_id: IndexVec<ScopeId, Scope>,
+    symbols_by_id: IndexVec<SymbolId, Symbol>,
 }
 
 impl SymbolTable {
@@ -285,6 +216,75 @@ impl SymbolTable {
         let mut hasher = FxHasher::default();
         name.hash(&mut hasher);
         hasher.finish()
+    }
+}
+
+pub(crate) struct SymbolIterator<'a, I> {
+    table: &'a SymbolTable,
+    ids: I,
+}
+
+impl<'a, I> Iterator for SymbolIterator<'a, I>
+where
+    I: Iterator<Item = SymbolId>,
+{
+    type Item = &'a Symbol;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let id = self.ids.next()?;
+        Some(&self.table.symbols_by_id[id])
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.ids.size_hint()
+    }
+}
+
+impl<'a, I> FusedIterator for SymbolIterator<'a, I> where
+    I: Iterator<Item = SymbolId> + FusedIterator
+{
+}
+
+impl<'a, I> DoubleEndedIterator for SymbolIterator<'a, I>
+where
+    I: Iterator<Item = SymbolId> + DoubleEndedIterator,
+{
+    fn next_back(&mut self) -> Option<Self::Item> {
+        let id = self.ids.next_back()?;
+        Some(&self.table.symbols_by_id[id])
+    }
+}
+
+pub(crate) struct ScopeIterator<'a, I> {
+    table: &'a SymbolTable,
+    ids: I,
+}
+
+impl<'a, I> Iterator for ScopeIterator<'a, I>
+where
+    I: Iterator<Item = ScopeId>,
+{
+    type Item = &'a Scope;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let id = self.ids.next()?;
+        Some(&self.table.scopes_by_id[id])
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.ids.size_hint()
+    }
+}
+
+impl<'a, I> FusedIterator for ScopeIterator<'a, I> where I: Iterator<Item = ScopeId> + FusedIterator {}
+
+impl<'a, I> DoubleEndedIterator for ScopeIterator<'a, I>
+where
+    I: Iterator<Item = ScopeId> + DoubleEndedIterator,
+{
+    fn next_back(&mut self) -> Option<Self::Item> {
+        let id = self.ids.next_back()?;
+        Some(&self.table.scopes_by_id[id])
     }
 }
 
