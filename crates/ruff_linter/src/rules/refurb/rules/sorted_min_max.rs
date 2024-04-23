@@ -4,17 +4,19 @@ use ruff_diagnostics::Fix;
 use ruff_diagnostics::FixAvailability;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Expr};
-
-use crate::checkers::ast::Checker;
 use ruff_python_ast::Number;
+use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
+use crate::checkers::ast::Checker;
+
 /// ## What it does
-/// Checks for uses of `sorted()` to get the min and max values of a list.
+/// Checks for uses of `sorted()` to retrieve the minimum or maximum value in
+/// a sequence.
 ///
 /// ## Why is this bad?
-/// Using `sorted()` to get the min and max values of a list is inefficient.
+/// Using `sorted()` to compute the minimum or maximum value in a sequence is
+/// inefficient and less readable than using `min()` or `max()` directly.
 ///
 /// ## Example
 /// ```python
@@ -31,31 +33,47 @@ use ruff_text_size::Ranged;
 /// highest = max(nums)
 /// ```
 ///
-/// ## Note
+/// ## Fix safety
+/// In some cases, migrating to `min` or `max` can lead to a change in behavior,
+/// notably when breaking ties.
 ///
-/// If the original statement uses `reverse=True`, the `min` and `max` replacement will not
-/// be equivalent if the intended result is to get a non-stable min and max. Therefore, these
-/// replacements are marked unsafe.
+/// As an example, `sorted(data, key=itemgetter(0), reverse=True)[0]` will return
+/// the _last_ "minimum" element in the list, if there are multiple elements with
+/// the same key. However, `min(data, key=itemgetter(0))` will return the _first_
+/// "minimum" element in the list in the same scenario.
 ///
-/// In other words, `sorted(data, key=itemgetter(0), reverse=True)[0]` is not a stable min,
-/// but `min(data, key=itemgetter(0))` is a stable min.
+/// AS such, this rule's fix is marked as unsafe when the `reverse` keyword is used.
 ///
 /// ## References
 /// - [Python documentation: `min`](https://docs.python.org/3/library/functions.html#min)
 /// - [Python documentation: `max`](https://docs.python.org/3/library/functions.html#max)
 #[violation]
-pub struct SortedMinMax;
+pub struct SortedMinMax {
+    min_max: MinMax,
+}
 
 impl Violation for SortedMinMax {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Prefer `min` or `max` over `sorted()` to get the min and max values of a list")
+        let Self { min_max } = self;
+        match min_max {
+            MinMax::Min => {
+                format!("Prefer `min` over `sorted()` to compute the minimum value in a sequence")
+            }
+            MinMax::Max => {
+                format!("Prefer `max` over `sorted()` to compute the maximum value in a sequence")
+            }
+        }
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some(format!("Replace with `min` or `max`"))
+        let Self { min_max } = self;
+        match min_max {
+            MinMax::Min => Some("Replace with `min`".to_string()),
+            MinMax::Max => Some("Replace with `max`".to_string()),
+        }
     }
 }
 
@@ -72,6 +90,7 @@ pub(crate) fn sorted_min_max(checker: &mut Checker, subscript: &ast::ExprSubscri
         return;
     }
 
+    // Early return if the value is not a call expression.
     let Expr::Call(ast::ExprCall {
         func, arguments, ..
     }) = value.as_ref()
@@ -79,12 +98,7 @@ pub(crate) fn sorted_min_max(checker: &mut Checker, subscript: &ast::ExprSubscri
         return;
     };
 
-    // Check if the value is a call to `sorted()`.
-    if !matches!(func.as_ref(), Expr::Name(name) if name.id == "sorted" && checker.semantic().has_builtin_binding(name.id.as_str()))
-    {
-        return;
-    };
-
+    // Check if the index is either 0 or -1.
     let index = match slice.as_ref() {
         // [0]
         Expr::NumberLiteral(ast::ExprNumberLiteral {
@@ -110,28 +124,37 @@ pub(crate) fn sorted_min_max(checker: &mut Checker, subscript: &ast::ExprSubscri
         _ => return,
     };
 
+    // Check if the value is a call to `sorted()`.
+    if !checker.semantic().match_builtin_expr(func, "sorted") {
+        return;
+    }
+
+    // Check if the call to `sorted()` has a single argument.
+    let [list_expr] = arguments.args.as_ref() else {
+        return;
+    };
+
     let mut reverse_keyword = None;
     let mut key_keyword_expr = None;
 
     // Check if the call to `sorted()` has the `reverse` and `key` keywords.
     for keyword in arguments.keywords.iter() {
-        if reverse_keyword.is_none()
-            && keyword
-                .arg
-                .as_ref()
-                .map_or(false, |arg| arg.as_str() == "reverse")
-        {
-            reverse_keyword = Some(keyword);
-        } else if key_keyword_expr.is_none()
-            && keyword
-                .arg
-                .as_ref()
-                .map_or(false, |arg| arg.as_str() == "key")
-        {
-            key_keyword_expr = Some(&keyword.value);
-        } else {
-            // If unexpected keyword is found, return.
+        // If the call contains `**kwargs`, return.
+        let Some(arg) = keyword.arg.as_ref() else {
             return;
+        };
+
+        match arg.as_str() {
+            "reverse" => {
+                reverse_keyword = Some(keyword);
+            }
+            "key" => {
+                key_keyword_expr = Some(keyword);
+            }
+            _ => {
+                // If unexpected keyword is found, return.
+                return;
+            }
         }
     }
 
@@ -146,6 +169,7 @@ pub(crate) fn sorted_min_max(checker: &mut Checker, subscript: &ast::ExprSubscri
         false
     };
 
+    // Determine whether the operation is computing a minimum or maximum value.
     let min_max = match (index, is_reversed) {
         (Index::First, false) => MinMax::Min,
         (Index::First, true) => MinMax::Max,
@@ -153,40 +177,37 @@ pub(crate) fn sorted_min_max(checker: &mut Checker, subscript: &ast::ExprSubscri
         (Index::Last, true) => MinMax::Min,
     };
 
-    let Some(list_expr) = arguments.args.first() else {
-        return;
-    };
+    let mut diagnostic = Diagnostic::new(SortedMinMax { min_max }, subscript.range());
 
-    let mut diagnostic = Diagnostic::new(SortedMinMax, subscript.range());
-    diagnostic.set_fix({
-        let replacement = if let Some(key) = key_keyword_expr {
-            format!(
-                "{}({}, key={})",
-                min_max.as_str(),
-                checker.generator().expr(list_expr),
-                checker.generator().expr(key)
-            )
-        } else {
-            format!(
-                "{}({})",
-                min_max.as_str(),
-                checker.generator().expr(list_expr)
-            )
-        };
+    if checker.semantic().has_builtin_binding(min_max.as_str()) {
+        diagnostic.set_fix({
+            let replacement = if let Some(key) = key_keyword_expr {
+                format!(
+                    "{min_max}({}, {})",
+                    checker.locator().slice(list_expr),
+                    checker.locator().slice(key),
+                )
+            } else {
+                format!("{min_max}({})", checker.locator().slice(list_expr))
+            };
 
-        let replacement = Edit::replacement(replacement, subscript.start(), subscript.end());
-        if is_reversed {
-            Fix::unsafe_edit(replacement)
-        } else {
-            Fix::safe_edit(replacement)
-        }
-    });
+            let replacement = Edit::range_replacement(replacement, subscript.range());
+            if is_reversed {
+                Fix::unsafe_edit(replacement)
+            } else {
+                Fix::safe_edit(replacement)
+            }
+        });
+    }
+
     checker.diagnostics.push(diagnostic);
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 enum MinMax {
+    /// E.g., `min(nums)`
     Min,
+    /// E.g., `max(nums)`
     Max,
 }
 
@@ -199,10 +220,19 @@ impl MinMax {
     }
 }
 
+impl std::fmt::Display for MinMax {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Min => write!(f, "min"),
+            Self::Max => write!(f, "max"),
+        }
+    }
+}
+
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 enum Index {
-    // 0
+    /// E.g., `sorted(nums)[0]`
     First,
-    // -1
+    /// E.g., `sorted(nums)[-1]`
     Last,
 }
