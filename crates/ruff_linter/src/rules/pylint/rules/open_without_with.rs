@@ -1,6 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::{self as ast};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -15,13 +15,16 @@ use crate::rules::pylint::rules::is_open;
 /// Using a `with` statement ensures that the file is closed automatically when the block is exited, even if an exception is raised.
 ///
 /// ## Example
+///
 /// ```python
-/// f = open('file.txt', 'r')
+/// f = open("file.txt", "r")
 /// ```
+///
 /// Use instead:
+///
 /// ```python
-/// with open('file.txt', 'r') as f:
-///    ...
+/// with open("file.txt", "r") as f:
+///     ...
 /// ```
 #[violation]
 pub struct OpenWithoutWith;
@@ -36,7 +39,7 @@ impl Violation for OpenWithoutWith {
 /// PLR1732
 pub(crate) fn open_without_with(checker: &mut Checker, call: &ast::ExprCall) {
     let parent = checker.semantic().current_statement();
-    let Some(kind) = is_open(call.func.as_ref(), checker.semantic()) else {
+    if is_open(call.func.as_ref(), checker.semantic()).is_none() {
         return;
     };
     if let Some(with_stmt) = parent.as_with_stmt() {
