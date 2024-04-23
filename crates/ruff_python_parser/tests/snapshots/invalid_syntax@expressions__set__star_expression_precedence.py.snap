@@ -339,24 +339,29 @@ Module(
                         ExprSet {
                             range: 186..198,
                             elts: [
-                                Starred(
-                                    ExprStarred {
-                                        range: 187..189,
-                                        value: Name(
-                                            ExprName {
-                                                range: 188..189,
-                                                id: "x",
-                                                ctx: Load,
+                                Named(
+                                    ExprNamed {
+                                        range: 187..194,
+                                        target: Starred(
+                                            ExprStarred {
+                                                range: 187..189,
+                                                value: Name(
+                                                    ExprName {
+                                                        range: 188..189,
+                                                        id: "x",
+                                                        ctx: Store,
+                                                    },
+                                                ),
+                                                ctx: Store,
                                             },
                                         ),
-                                        ctx: Load,
-                                    },
-                                ),
-                                NumberLiteral(
-                                    ExprNumberLiteral {
-                                        range: 193..194,
-                                        value: Int(
-                                            2,
+                                        value: NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 193..194,
+                                                value: Int(
+                                                    2,
+                                                ),
+                                            },
                                         ),
                                     },
                                 ),
@@ -450,5 +455,5 @@ Module(
  8 | {*x if True else y, z}
  9 | {*lambda x: x, z}
 10 | {*x := 2, z}
-   |     ^^ Syntax Error: Expected ',', found ':='
+   |  ^^ Syntax Error: Assignment expression target must be an identifier
    |

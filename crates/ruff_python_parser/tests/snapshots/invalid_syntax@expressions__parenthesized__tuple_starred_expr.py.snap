@@ -491,34 +491,34 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 323..326,
-                    value: Starred(
-                        ExprStarred {
-                            range: 324..326,
-                            value: Name(
-                                ExprName {
-                                    range: 325..326,
-                                    id: "x",
-                                    ctx: Load,
-                                },
-                            ),
-                            ctx: Load,
-                        },
-                    ),
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    range: 330..343,
+                    range: 323..344,
                     value: Tuple(
                         ExprTuple {
-                            range: 330..343,
+                            range: 323..344,
                             elts: [
-                                NumberLiteral(
-                                    ExprNumberLiteral {
-                                        range: 330..331,
-                                        value: Int(
-                                            2,
+                                Named(
+                                    ExprNamed {
+                                        range: 324..331,
+                                        target: Starred(
+                                            ExprStarred {
+                                                range: 324..326,
+                                                value: Name(
+                                                    ExprName {
+                                                        range: 325..326,
+                                                        id: "x",
+                                                        ctx: Store,
+                                                    },
+                                                ),
+                                                ctx: Store,
+                                            },
+                                        ),
+                                        value: NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 330..331,
+                                                value: Int(
+                                                    2,
+                                                ),
+                                            },
                                         ),
                                     },
                                 ),
@@ -529,30 +529,35 @@ Module(
                                         ctx: Load,
                                     },
                                 ),
-                                Starred(
-                                    ExprStarred {
-                                        range: 336..338,
-                                        value: Name(
-                                            ExprName {
-                                                range: 337..338,
-                                                id: "x",
-                                                ctx: Load,
+                                Named(
+                                    ExprNamed {
+                                        range: 336..343,
+                                        target: Starred(
+                                            ExprStarred {
+                                                range: 336..338,
+                                                value: Name(
+                                                    ExprName {
+                                                        range: 337..338,
+                                                        id: "x",
+                                                        ctx: Store,
+                                                    },
+                                                ),
+                                                ctx: Store,
                                             },
                                         ),
-                                        ctx: Load,
-                                    },
-                                ),
-                                NumberLiteral(
-                                    ExprNumberLiteral {
-                                        range: 342..343,
-                                        value: Int(
-                                            2,
+                                        value: NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 342..343,
+                                                value: Int(
+                                                    2,
+                                                ),
+                                            },
                                         ),
                                     },
                                 ),
                             ],
                             ctx: Load,
-                            parenthesized: false,
+                            parenthesized: true,
                         },
                     ),
                 },
@@ -1231,7 +1236,7 @@ Module(
  8 | (*x if True else y, z, *x if True else y)
  9 | (*lambda x: x, z, *lambda x: x)
 10 | (*x := 2, z, *x := 2)
-   |  ^^ Syntax Error: Starred expression cannot be used here
+   |  ^^ Syntax Error: Assignment expression target must be an identifier
    |
 
 
@@ -1239,34 +1244,7 @@ Module(
  8 | (*x if True else y, z, *x if True else y)
  9 | (*lambda x: x, z, *lambda x: x)
 10 | (*x := 2, z, *x := 2)
-   |     ^^ Syntax Error: Expected ')', found ':='
-   |
-
-
-   |
- 8 | (*x if True else y, z, *x if True else y)
- 9 | (*lambda x: x, z, *lambda x: x)
-10 | (*x := 2, z, *x := 2)
-   |                 ^^ Syntax Error: Expected ',', found ':='
-   |
-
-
-   |
- 8 | (*x if True else y, z, *x if True else y)
- 9 | (*lambda x: x, z, *lambda x: x)
-10 | (*x := 2, z, *x := 2)
-   |                     ^ Syntax Error: Expected a statement
-   |
-
-
-   |
- 8 | (*x if True else y, z, *x if True else y)
- 9 | (*lambda x: x, z, *lambda x: x)
-10 | (*x := 2, z, *x := 2)
-   |                      ^ Syntax Error: Expected a statement
-11 | 
-12 | 
-13 | # Non-parenthesized
+   |              ^^ Syntax Error: Assignment expression target must be an identifier
    |
 
 

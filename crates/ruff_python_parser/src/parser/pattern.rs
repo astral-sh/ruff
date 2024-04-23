@@ -6,6 +6,8 @@ use crate::parser::{recovery, Parser, RecoveryContextKind, SequenceMatchPatternP
 use crate::token_set::TokenSet;
 use crate::{ParseErrorType, Tok, TokenKind};
 
+use super::expression::ExpressionContext;
+
 /// The set of tokens that can start a literal pattern.
 const LITERAL_PATTERN_START_SET: TokenSet = TokenSet::new([
     TokenKind::None,
@@ -483,7 +485,7 @@ impl<'src> Parser<'src> {
                     TokenKind::Int | TokenKind::Float | TokenKind::Complex
                 ) =>
             {
-                let unary_expr = self.parse_unary_expression();
+                let unary_expr = self.parse_unary_expression(ExpressionContext::default());
 
                 if unary_expr.op.is_u_add() {
                     self.add_error(

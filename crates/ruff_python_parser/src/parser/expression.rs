@@ -2,6 +2,7 @@ use std::cmp::Ordering;
 use std::hash::BuildHasherDefault;
 use std::ops::Deref;
 
+use bitflags::bitflags;
 use rustc_hash::FxHashSet;
 
 use ruff_python_ast::{
@@ -12,7 +13,7 @@ use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::parser::helpers::token_kind_to_cmp_op;
 use crate::parser::progress::ParserProgress;
-use crate::parser::{helpers, FunctionKind, Parser, ParserCtxFlags};
+use crate::parser::{helpers, FunctionKind, Parser};
 use crate::string::{parse_fstring_literal_element, parse_string_literal, StringType};
 use crate::token_set::TokenSet;
 use crate::{FStringErrorType, Mode, ParseErrorType, Tok, TokenKind};
@@ -118,106 +119,42 @@ impl<'src> Parser<'src> {
 
     /// Parses every Python expression.
     ///
-    /// Matches the `expressions` rule in the [Python grammar].
-    ///
-    /// The caller can specify whether starred expression is allowed or not. This
-    /// doesn't affect the parsing of a starred expression as it will be parsed
-    /// nevertheless. But, if it is not allowed, an error is reported.
-    ///
-    /// Use [`Parser::parse_star_expression_list`] if the starred expression is
-    /// required with a bitwise OR precedence.
+    /// Matches the `expressions` rule in the [Python grammar]. The [`ExpressionContext`] can be
+    /// used to match the `star_expressions` rule.
     ///
     /// [Python grammar]: https://docs.python.org/3/reference/grammar.html
-    pub(super) fn parse_expression_list(
-        &mut self,
-        allow_starred_expression: AllowStarredExpression,
-    ) -> ParsedExpr {
+    pub(super) fn parse_expression_list(&mut self, context: ExpressionContext) -> ParsedExpr {
         let start = self.node_start();
-        let parsed_expr = self.parse_conditional_expression_or_higher(allow_starred_expression);
+        let parsed_expr = self.parse_conditional_expression_or_higher_impl(context);
 
         if self.at(TokenKind::Comma) {
             Expr::Tuple(self.parse_tuple_expression(
                 parsed_expr.expr,
                 start,
                 Parenthesized::No,
-                |p| p.parse_conditional_expression_or_higher(allow_starred_expression),
+                |p| p.parse_conditional_expression_or_higher_impl(context),
             ))
             .into()
         } else {
             parsed_expr
-        }
-    }
-
-    /// Parses every Python expression.
-    ///
-    /// Matches the `star_expressions` rule in the [Python grammar].
-    ///
-    /// [Python grammar]: https://docs.python.org/3/reference/grammar.html
-    pub(super) fn parse_star_expression_list(&mut self) -> ParsedExpr {
-        let start = self.node_start();
-        let parsed_expr = self.parse_star_expression_or_higher(AllowNamedExpression::No);
-
-        if self.at(TokenKind::Comma) {
-            Expr::Tuple(self.parse_tuple_expression(
-                parsed_expr.expr,
-                start,
-                Parenthesized::No,
-                |parser| parser.parse_star_expression_or_higher(AllowNamedExpression::No),
-            ))
-            .into()
-        } else {
-            parsed_expr
-        }
-    }
-
-    /// Parses a star expression or any other expression.
-    ///
-    /// Matches either the `star_named_expression` or `star_expression` rule in
-    /// the [Python grammar] depending on whether named expressions are allowed
-    /// or not respectively.
-    ///
-    /// NOTE: If you have expressions separated by commas and want to parse them
-    /// individually instead of as a tuple, as done by [`Parser::parse_star_expression_list`],
-    /// use this function.
-    ///
-    /// [Python grammar]: https://docs.python.org/3/reference/grammar.html
-    pub(super) fn parse_star_expression_or_higher(
-        &mut self,
-        allow_named_expression: AllowNamedExpression,
-    ) -> ParsedExpr {
-        // This method parses starred expression with a different precedence,
-        // so don't allow starred expression in other branches.
-        if self.at(TokenKind::Star) {
-            Expr::Starred(self.parse_starred_expression(StarredExpressionPrecedence::BitOr)).into()
-        } else if allow_named_expression.is_yes() {
-            self.parse_named_expression_or_higher(AllowStarredExpression::No)
-        } else {
-            self.parse_conditional_expression_or_higher(AllowStarredExpression::No)
         }
     }
 
     /// Parses every Python expression except unparenthesized tuple.
     ///
-    /// Matches the `named_expression` rule in the [Python grammar].
+    /// Matches the `named_expression` rule in the [Python grammar]. The [`ExpressionContext`] can
+    /// be used to match the `star_named_expression` rule.
     ///
-    /// The caller can specify whether starred expression is allowed or not. This
-    /// doesn't affect the parsing of a starred expression as it will be parsed
-    /// nevertheless. But, if it is not allowed, an error is reported.
-    ///
-    /// Use [`Parser::parse_star_expression_or_higher`] with [`AllowNamedExpression::Yes`]
-    /// if the starred expression is required with a bitwise OR precedence.
-    ///
-    /// NOTE: If you have expressions separated by commas and want to parse them
-    /// individually instead of as a tuple, as done by [`Parser::parse_expression_list`]
-    /// use this function!
+    /// NOTE: If you have expressions separated by commas and want to parse them individually
+    /// instead of as a tuple, as done by [`Parser::parse_expression_list`], use this function.
     ///
     /// [Python grammar]: https://docs.python.org/3/reference/grammar.html
     pub(super) fn parse_named_expression_or_higher(
         &mut self,
-        allow_starred_expression: AllowStarredExpression,
+        context: ExpressionContext,
     ) -> ParsedExpr {
         let start = self.node_start();
-        let parsed_expr = self.parse_conditional_expression_or_higher(allow_starred_expression);
+        let parsed_expr = self.parse_conditional_expression_or_higher_impl(context);
 
         if self.at(TokenKind::ColonEqual) {
             Expr::Named(self.parse_named_expression(parsed_expr.expr, start)).into()
@@ -230,27 +167,27 @@ impl<'src> Parser<'src> {
     ///
     /// Matches the `expression` rule in the [Python grammar].
     ///
-    /// The caller can specify whether starred expression is allowed or not. This
-    /// doesn't affect the parsing of a starred expression as it will be parsed
-    /// nevertheless. But, if it is not allowed, an error is reported.
+    /// This uses the default [`ExpressionContext`]. Use
+    /// [`Parser::parse_conditional_expression_or_higher_impl`] if you prefer to pass in the
+    /// context.
     ///
-    /// Use [`Parser::parse_star_expression_or_higher`] with [`AllowNamedExpression::No`]
-    /// if the starred expression is required with a bitwise OR precedence.
-    ///
-    /// NOTE: If you have expressions separated by commas and want to parse them
-    /// individually instead of as a tuple, as done by [`Parser::parse_expression_list`]
-    /// use this function!
+    /// NOTE: If you have expressions separated by commas and want to parse them individually
+    /// instead of as a tuple, as done by [`Parser::parse_expression_list`] use this function.
     ///
     /// [Python grammar]: https://docs.python.org/3/reference/grammar.html
-    pub(super) fn parse_conditional_expression_or_higher(
+    pub(super) fn parse_conditional_expression_or_higher(&mut self) -> ParsedExpr {
+        self.parse_conditional_expression_or_higher_impl(ExpressionContext::default())
+    }
+
+    pub(super) fn parse_conditional_expression_or_higher_impl(
         &mut self,
-        allow_starred_expression: AllowStarredExpression,
+        context: ExpressionContext,
     ) -> ParsedExpr {
         if self.at(TokenKind::Lambda) {
             Expr::Lambda(self.parse_lambda_expr()).into()
         } else {
             let start = self.node_start();
-            let parsed_expr = self.parse_simple_expression(allow_starred_expression);
+            let parsed_expr = self.parse_simple_expression(context);
 
             if self.at(TokenKind::If) {
                 Expr::If(self.parse_if_expression(parsed_expr.expr, start)).into()
@@ -266,28 +203,14 @@ impl<'src> Parser<'src> {
     /// This is a combination of the `disjunction`, `starred_expression`, `yield_expr`
     /// and `lambdef` rules of the [Python grammar].
     ///
-    /// Note that this function parses yield and lambda expression but reports an error
-    /// as they're not allowed in this context. This is done for better error recovery.
-    /// Use [`Parser::parse_yield_expression_or_else`] to allow parsing yield expression.
-    /// Use [`Parser::parse_conditional_expression_or_higher`] or any methods which calls
-    /// into the specified method to allow parsing lambda expression.
-    ///
-    /// The caller can specify whether starred expression is allowed or not. This
-    /// doesn't affect the parsing of a starred expression as it will be parsed
-    /// nevertheless. But, if it is not allowed, an error is reported.
+    /// Note that this function parses lambda expression but reports an error as they're not
+    /// allowed in this context. This is done for better error recovery.
+    /// Use [`Parser::parse_conditional_expression_or_higher`] or any methods which calls into the
+    /// specified method to allow parsing lambda expression.
     ///
     /// [Python grammar]: https://docs.python.org/3/reference/grammar.html
-    fn parse_simple_expression(
-        &mut self,
-        allow_starred_expression: AllowStarredExpression,
-    ) -> ParsedExpr {
-        let parsed_expr = self.parse_expression_with_precedence(Precedence::Initial);
-
-        if allow_starred_expression.is_no() && parsed_expr.is_unparenthesized_starred_expr() {
-            self.add_error(ParseErrorType::InvalidStarredExpressionUsage, &parsed_expr);
-        }
-
-        parsed_expr
+    fn parse_simple_expression(&mut self, context: ExpressionContext) -> ParsedExpr {
+        self.parse_expression_with_precedence(Precedence::Initial, context)
     }
 
     /// Returns the binding power of the current token for a Pratt parser.
@@ -345,10 +268,14 @@ impl<'src> Parser<'src> {
     /// This method uses the [Pratt parsing algorithm].
     ///
     /// [Pratt parsing algorithm]: https://matklad.github.io/2020/04/13/simple-but-powerful-pratt-parsing.html
-    fn parse_expression_with_precedence(&mut self, previous_precedence: Precedence) -> ParsedExpr {
+    fn parse_expression_with_precedence(
+        &mut self,
+        previous_precedence: Precedence,
+        context: ExpressionContext,
+    ) -> ParsedExpr {
         let start = self.node_start();
-        let lhs = self.parse_lhs_expression(previous_precedence);
-        self.parse_expression_with_precedence_recursive(lhs, previous_precedence, start)
+        let lhs = self.parse_lhs_expression(previous_precedence, context);
+        self.parse_expression_with_precedence_recursive(lhs, previous_precedence, context, start)
     }
 
     /// Parses an expression with binding power of at least `previous_precedence` given the
@@ -357,6 +284,7 @@ impl<'src> Parser<'src> {
         &mut self,
         mut lhs: ParsedExpr,
         previous_precedence: Precedence,
+        context: ExpressionContext,
         start: TextSize,
     ) -> ParsedExpr {
         let mut progress = ParserProgress::default();
@@ -369,8 +297,7 @@ impl<'src> Parser<'src> {
                 break;
             }
 
-            // Don't parse a `CompareExpr` if we are parsing a `Comprehension` or `ForStmt`
-            if matches!(token, TokenKind::In) && self.has_ctx(ParserCtxFlags::FOR_TARGET) {
+            if matches!(token, TokenKind::In) && context.is_in_excluded() {
                 break;
             }
 
@@ -381,29 +308,33 @@ impl<'src> Parser<'src> {
 
             self.bump(token);
 
-            // We need to create a dedicated node for boolean operations and
-            // comparison operations even though they are infix operators.
+            // We need to create a dedicated node for boolean operations and comparison operations
+            // even though they are infix operators.
             if token.is_bool_operator() {
                 lhs = Expr::BoolOp(self.parse_bool_operation_expression(
                     lhs.expr,
                     start,
                     token,
                     operator_binding_power,
-                ))
-                .into();
-                continue;
-            } else if token.is_compare_operator() {
-                lhs = Expr::Compare(self.parse_compare_expression(
-                    lhs.expr,
-                    start,
-                    token,
-                    operator_binding_power,
+                    context,
                 ))
                 .into();
                 continue;
             }
 
-            let rhs = self.parse_expression_with_precedence(operator_binding_power);
+            if token.is_compare_operator() {
+                lhs = Expr::Compare(self.parse_compare_expression(
+                    lhs.expr,
+                    start,
+                    token,
+                    operator_binding_power,
+                    context,
+                ))
+                .into();
+                continue;
+            }
+
+            let rhs = self.parse_expression_with_precedence(operator_binding_power, context);
 
             lhs.expr = Expr::BinOp(ast::ExprBinOp {
                 left: Box::new(lhs.expr),
@@ -425,12 +356,16 @@ impl<'src> Parser<'src> {
     /// is valid in that context. For example, a unary operator is not valid
     /// in an `await` expression in which case the `previous_precedence` would
     /// be [`Precedence::Await`].
-    fn parse_lhs_expression(&mut self, previous_precedence: Precedence) -> ParsedExpr {
+    fn parse_lhs_expression(
+        &mut self,
+        previous_precedence: Precedence,
+        context: ExpressionContext,
+    ) -> ParsedExpr {
         let start = self.node_start();
 
         let lhs = match self.current_token_kind() {
             unary_tok @ (TokenKind::Plus | TokenKind::Minus | TokenKind::Tilde) => {
-                let unary_expr = self.parse_unary_expression();
+                let unary_expr = self.parse_unary_expression(context);
                 if previous_precedence > Precedence::PosNegBitNot
                     // > The power operator `**` binds less tightly than an arithmetic
                     // > or bitwise unary operator on its right, that is, 2**-1 is 0.5.
@@ -448,7 +383,7 @@ impl<'src> Parser<'src> {
                 Expr::UnaryOp(unary_expr).into()
             }
             TokenKind::Not => {
-                let unary_expr = self.parse_unary_expression();
+                let unary_expr = self.parse_unary_expression(context);
                 if previous_precedence > Precedence::Not {
                     self.add_error(
                         ParseErrorType::OtherError(
@@ -460,9 +395,10 @@ impl<'src> Parser<'src> {
                 Expr::UnaryOp(unary_expr).into()
             }
             TokenKind::Star => {
-                let starred_expr =
-                    self.parse_starred_expression(StarredExpressionPrecedence::Conditional);
-                if previous_precedence > Precedence::Initial {
+                let starred_expr = self.parse_starred_expression(context);
+                if previous_precedence > Precedence::Initial
+                    || !context.is_starred_expression_allowed()
+                {
                     self.add_error(ParseErrorType::InvalidStarredExpressionUsage, &starred_expr);
                 }
                 Expr::Starred(starred_expr).into()
@@ -488,10 +424,12 @@ impl<'src> Parser<'src> {
                 Expr::Lambda(lambda_expr).into()
             }
             TokenKind::Yield => {
-                // Yield expressions aren't allowed in this context but we'll still
-                // parse it and report an error for better recovery.
                 let expr = self.parse_yield_expression();
-                self.add_error(ParseErrorType::InvalidYieldExpressionUsage, &expr);
+                if previous_precedence > Precedence::Initial
+                    || !context.is_yield_expression_allowed()
+                {
+                    self.add_error(ParseErrorType::InvalidYieldExpressionUsage, &expr);
+                }
                 expr.into()
             }
             _ => self.parse_atom(),
@@ -511,7 +449,7 @@ impl<'src> Parser<'src> {
     ///
     /// [Python grammar]: https://docs.python.org/3/reference/grammar.html
     fn parse_expression_with_bitwise_or_precedence(&mut self) -> ParsedExpr {
-        let parsed_expr = self.parse_conditional_expression_or_higher(AllowStarredExpression::No);
+        let parsed_expr = self.parse_conditional_expression_or_higher();
 
         if parsed_expr.is_parenthesized {
             // Parentheses resets the precedence, so we don't need to validate it.
@@ -669,38 +607,11 @@ impl<'src> Parser<'src> {
                 Expr::IpyEscapeCommand(self.parse_ipython_escape_command_expression())
             }
             TokenKind::String | TokenKind::FStringStart => self.parse_strings(),
-            tok @ (TokenKind::Lpar | TokenKind::Lsqb | TokenKind::Lbrace) => {
-                // We need to unset the `FOR_TARGET` in the context when parsing an expression
-                // inside a parentheses, curly brace or brackets otherwise the `in` operator of a
-                // comparison expression will not be parsed in a `for` target.
-
-                // test_ok parenthesized_compare_expr_in_for
-                // for (x in y)[0] in iter: ...
-                // for (x in y).attr in iter: ...
-
-                // test_err parenthesized_compare_expr_in_for
-                // for (x in y)() in iter: ...
-                // for (x in y) in iter: ...
-                // for (x in y, z) in iter: ...
-                // for [x in y, z] in iter: ...
-                // for {x in y, z} in iter: ...
-                let current_context = self.ctx - ParserCtxFlags::FOR_TARGET;
-                let saved_context = self.set_ctx(current_context);
-
-                let expr = match tok {
-                    TokenKind::Lpar => {
-                        let parsed_expr = self.parse_parenthesized_expression();
-                        self.restore_ctx(current_context, saved_context);
-                        return parsed_expr;
-                    }
-                    TokenKind::Lsqb => self.parse_list_like_expression(),
-                    TokenKind::Lbrace => self.parse_set_or_dict_like_expression(),
-                    _ => unreachable!(),
-                };
-
-                self.restore_ctx(current_context, saved_context);
-                expr
+            TokenKind::Lpar => {
+                return self.parse_parenthesized_expression();
             }
+            TokenKind::Lsqb => self.parse_list_like_expression(),
+            TokenKind::Lbrace => self.parse_set_or_dict_like_expression(),
 
             kind => {
                 if kind.is_keyword() {
@@ -729,25 +640,14 @@ impl<'src> Parser<'src> {
     ///
     /// This method does nothing if the current token is not a candidate for a postfix expression.
     pub(super) fn parse_postfix_expression(&mut self, mut lhs: Expr, start: TextSize) -> Expr {
-        // test_ok for_in_target_postfix_expr
-        // for d[x in y] in target: ...
-
-        // test_err for_in_target_postfix_expr
-        // for d(x in y) in target: ...
-        let current_context = self.ctx - ParserCtxFlags::FOR_TARGET;
-        let saved_context = self.set_ctx(current_context);
-
-        lhs = loop {
+        loop {
             lhs = match self.current_token_kind() {
                 TokenKind::Lpar => Expr::Call(self.parse_call_expression(lhs, start)),
                 TokenKind::Lsqb => Expr::Subscript(self.parse_subscript_expression(lhs, start)),
                 TokenKind::Dot => Expr::Attribute(self.parse_attribute_expression(lhs, start)),
                 _ => break lhs,
             };
-        };
-
-        self.restore_ctx(current_context, saved_context);
-        lhs
+        }
     }
 
     /// Parse a call expression.
@@ -789,8 +689,7 @@ impl<'src> Parser<'src> {
         self.parse_comma_separated_list(RecoveryContextKind::Arguments, |parser| {
             let argument_start = parser.node_start();
             if parser.eat(TokenKind::DoubleStar) {
-                let value =
-                    parser.parse_conditional_expression_or_higher(AllowStarredExpression::No);
+                let value = parser.parse_conditional_expression_or_higher();
 
                 keywords.push(ast::Keyword {
                     arg: None,
@@ -801,8 +700,8 @@ impl<'src> Parser<'src> {
                 seen_keyword_unpacking = true;
             } else {
                 let start = parser.node_start();
-                let mut parsed_expr =
-                    parser.parse_named_expression_or_higher(AllowStarredExpression::Yes);
+                let mut parsed_expr = parser
+                    .parse_named_expression_or_higher(ExpressionContext::starred_conditional());
 
                 match parser.current_token_kind() {
                     TokenKind::Async | TokenKind::For => {
@@ -850,8 +749,7 @@ impl<'src> Parser<'src> {
                         }
                     };
 
-                    let value =
-                        parser.parse_conditional_expression_or_higher(AllowStarredExpression::No);
+                    let value = parser.parse_conditional_expression_or_higher();
 
                     keywords.push(ast::Keyword {
                         arg: Some(arg),
@@ -980,7 +878,8 @@ impl<'src> Parser<'src> {
         let start = self.node_start();
 
         let lower = if self.at_expr() {
-            let lower = self.parse_named_expression_or_higher(AllowStarredExpression::Yes);
+            let lower =
+                self.parse_named_expression_or_higher(ExpressionContext::starred_conditional());
             if self.at_ts(NEWLINE_EOF_SET.union([TokenKind::Rsqb, TokenKind::Comma].into())) {
                 return lower.expr;
             }
@@ -1008,20 +907,14 @@ impl<'src> Parser<'src> {
         let upper = if self.at_ts(UPPER_END_SET) {
             None
         } else {
-            Some(Box::new(
-                self.parse_conditional_expression_or_higher(AllowStarredExpression::No)
-                    .expr,
-            ))
+            Some(Box::new(self.parse_conditional_expression_or_higher().expr))
         };
 
         let step = if self.eat(TokenKind::Colon) {
             if self.at_ts(STEP_END_SET) {
                 None
             } else {
-                Some(Box::new(
-                    self.parse_conditional_expression_or_higher(AllowStarredExpression::No)
-                        .expr,
-                ))
+                Some(Box::new(self.parse_conditional_expression_or_higher().expr))
             }
         } else {
             None
@@ -1045,7 +938,10 @@ impl<'src> Parser<'src> {
     /// If the parser isn't positioned at any of the unary operators.
     ///
     /// See: <https://docs.python.org/3/reference/expressions.html#unary-arithmetic-and-bitwise-operations>
-    pub(super) fn parse_unary_expression(&mut self) -> ast::ExprUnaryOp {
+    pub(super) fn parse_unary_expression(
+        &mut self,
+        context: ExpressionContext,
+    ) -> ast::ExprUnaryOp {
         let start = self.node_start();
 
         let op = UnaryOp::try_from(self.current_token_kind())
@@ -1053,10 +949,10 @@ impl<'src> Parser<'src> {
         self.bump(self.current_token_kind());
 
         let operand = if op.is_not() {
-            self.parse_expression_with_precedence(Precedence::Not)
+            self.parse_expression_with_precedence(Precedence::Not, context)
         } else {
             // plus, minus and tilde
-            self.parse_expression_with_precedence(Precedence::PosNegBitNot)
+            self.parse_expression_with_precedence(Precedence::PosNegBitNot, context)
         };
 
         ast::ExprUnaryOp {
@@ -1106,6 +1002,7 @@ impl<'src> Parser<'src> {
         start: TextSize,
         operator_token: TokenKind,
         operator_binding_power: Precedence,
+        context: ExpressionContext,
     ) -> ast::ExprBoolOp {
         let mut values = vec![lhs];
         let mut progress = ParserProgress::default();
@@ -1115,7 +1012,8 @@ impl<'src> Parser<'src> {
         loop {
             progress.assert_progressing(self);
 
-            let parsed_expr = self.parse_expression_with_precedence(operator_binding_power);
+            let parsed_expr =
+                self.parse_expression_with_precedence(operator_binding_power, context);
             values.push(parsed_expr.expr);
 
             if !self.eat(operator_token) {
@@ -1148,6 +1046,7 @@ impl<'src> Parser<'src> {
         start: TextSize,
         operator: TokenKind,
         operator_binding_power: Precedence,
+        context: ExpressionContext,
     ) -> ast::ExprCompare {
         let compare_operator = token_kind_to_cmp_op([operator, self.current_token_kind()]).unwrap();
 
@@ -1171,11 +1070,14 @@ impl<'src> Parser<'src> {
         loop {
             progress.assert_progressing(self);
 
-            let parsed_expr = self.parse_expression_with_precedence(operator_binding_power);
+            let parsed_expr =
+                self.parse_expression_with_precedence(operator_binding_power, context);
             comparators.push(parsed_expr.expr);
 
             let next_operator = self.current_token_kind();
-            if !next_operator.is_compare_operator() {
+            if !next_operator.is_compare_operator()
+                || (matches!(next_operator, TokenKind::In) && context.is_in_excluded())
+            {
                 break;
             }
             self.bump(next_operator); // compare operator
@@ -1525,7 +1427,7 @@ impl<'src> Parser<'src> {
         // f"{*}"
         // f"{*x and y}"
         // f"{*yield x}"
-        let value = self.parse_yield_expression_or_else(Parser::parse_star_expression_list);
+        let value = self.parse_expression_list(ExpressionContext::yield_or_starred_bitwise_or());
 
         if !value.is_parenthesized && value.expr.is_lambda_expr() {
             // TODO(dhruvmanila): This requires making some changes in lambda expression
@@ -1655,7 +1557,8 @@ impl<'src> Parser<'src> {
         }
 
         // Parse the first element with a more general rule and limit it later.
-        let first_element = self.parse_star_expression_or_higher(AllowNamedExpression::Yes);
+        let first_element =
+            self.parse_named_expression_or_higher(ExpressionContext::starred_bitwise_or());
 
         match self.current_token_kind() {
             TokenKind::Async | TokenKind::For => {
@@ -1716,7 +1619,8 @@ impl<'src> Parser<'src> {
         // For dictionary expressions, the key uses the `expression` rule while for
         // set expressions, the element uses the `star_expression` rule. So, use the
         // one that is more general and limit it later.
-        let key_or_element = self.parse_star_expression_or_higher(AllowNamedExpression::Yes);
+        let key_or_element =
+            self.parse_named_expression_or_higher(ExpressionContext::starred_bitwise_or());
 
         match self.current_token_kind() {
             TokenKind::Async | TokenKind::For => {
@@ -1747,7 +1651,7 @@ impl<'src> Parser<'src> {
                 }
 
                 self.bump(TokenKind::Colon);
-                let value = self.parse_conditional_expression_or_higher(AllowStarredExpression::No);
+                let value = self.parse_conditional_expression_or_higher();
 
                 if matches!(self.current_token_kind(), TokenKind::Async | TokenKind::For) {
                     Expr::DictComp(self.parse_dictionary_comprehension_expression(
@@ -1798,19 +1702,16 @@ impl<'src> Parser<'src> {
 
         // Use the more general rule of the three to parse the first element
         // and limit it later.
-        let mut parsed_expr = self.parse_yield_expression_or_else(|p| {
-            p.parse_star_expression_or_higher(AllowNamedExpression::Yes)
-        });
+        let mut parsed_expr =
+            self.parse_named_expression_or_higher(ExpressionContext::yield_or_starred_bitwise_or());
 
         match self.current_token_kind() {
             TokenKind::Comma => {
                 // grammar: `tuple`
-                let tuple = self.parse_tuple_expression(
-                    parsed_expr.expr,
-                    start,
-                    Parenthesized::Yes,
-                    |parser| parser.parse_star_expression_or_higher(AllowNamedExpression::Yes),
-                );
+                let tuple =
+                    self.parse_tuple_expression(parsed_expr.expr, start, Parenthesized::Yes, |p| {
+                        p.parse_named_expression_or_higher(ExpressionContext::starred_bitwise_or())
+                    });
 
                 ParsedExpr {
                     expr: tuple.into(),
@@ -1898,7 +1799,7 @@ impl<'src> Parser<'src> {
         self.parse_comma_separated_list(RecoveryContextKind::ListElements, |parser| {
             elts.push(
                 parser
-                    .parse_star_expression_or_higher(AllowNamedExpression::Yes)
+                    .parse_named_expression_or_higher(ExpressionContext::starred_bitwise_or())
                     .expr,
             );
         });
@@ -1925,7 +1826,7 @@ impl<'src> Parser<'src> {
         self.parse_comma_separated_list(RecoveryContextKind::SetElements, |parser| {
             elts.push(
                 parser
-                    .parse_star_expression_or_higher(AllowNamedExpression::Yes)
+                    .parse_named_expression_or_higher(ExpressionContext::starred_bitwise_or())
                     .expr,
             );
         });
@@ -1962,18 +1863,10 @@ impl<'src> Parser<'src> {
                 // which requires limiting the expression.
                 values.push(parser.parse_expression_with_bitwise_or_precedence().expr);
             } else {
-                keys.push(Some(
-                    parser
-                        .parse_conditional_expression_or_higher(AllowStarredExpression::No)
-                        .expr,
-                ));
+                keys.push(Some(parser.parse_conditional_expression_or_higher().expr));
                 parser.expect(TokenKind::Colon);
 
-                values.push(
-                    parser
-                        .parse_conditional_expression_or_higher(AllowStarredExpression::No)
-                        .expr,
-                );
+                values.push(parser.parse_conditional_expression_or_higher().expr);
             }
         });
 
@@ -2027,15 +1920,14 @@ impl<'src> Parser<'src> {
             self.bump(TokenKind::For);
         };
 
-        let saved_context = self.set_ctx(ParserCtxFlags::FOR_TARGET);
-        let mut target = self.parse_expression_list(AllowStarredExpression::Yes);
-        self.restore_ctx(ParserCtxFlags::FOR_TARGET, saved_context);
+        let mut target =
+            self.parse_expression_list(ExpressionContext::starred_conditional().with_in_excluded());
 
         helpers::set_expr_ctx(&mut target.expr, ExprContext::Store);
         self.validate_assignment_target(&target.expr);
 
         self.expect(TokenKind::In);
-        let iter = self.parse_simple_expression(AllowStarredExpression::No);
+        let iter = self.parse_simple_expression(ExpressionContext::default());
 
         let mut ifs = vec![];
         let mut progress = ParserProgress::default();
@@ -2043,7 +1935,7 @@ impl<'src> Parser<'src> {
         while self.eat(TokenKind::If) {
             progress.assert_progressing(self);
 
-            let parsed_expr = self.parse_simple_expression(AllowStarredExpression::No);
+            let parsed_expr = self.parse_simple_expression(ExpressionContext::default());
 
             ifs.push(parsed_expr.expr);
         }
@@ -2177,18 +2069,15 @@ impl<'src> Parser<'src> {
     /// If the parser isn't positioned at a `*` token.
     ///
     /// [Python grammar]: https://docs.python.org/3/reference/grammar.html
-    fn parse_starred_expression(
-        &mut self,
-        precedence: StarredExpressionPrecedence,
-    ) -> ast::ExprStarred {
+    fn parse_starred_expression(&mut self, context: ExpressionContext) -> ast::ExprStarred {
         let start = self.node_start();
         self.bump(TokenKind::Star);
 
-        let parsed_expr = match precedence {
+        let parsed_expr = match context.starred_expression_precedence() {
             StarredExpressionPrecedence::Conditional => {
-                self.parse_conditional_expression_or_higher(AllowStarredExpression::No)
+                self.parse_conditional_expression_or_higher_impl(context)
             }
-            StarredExpressionPrecedence::BitOr => {
+            StarredExpressionPrecedence::BitwiseOr => {
                 self.parse_expression_with_bitwise_or_precedence()
             }
         };
@@ -2211,28 +2100,12 @@ impl<'src> Parser<'src> {
         let start = self.node_start();
         self.bump(TokenKind::Await);
 
-        let parsed_expr = self.parse_expression_with_precedence(Precedence::Await);
+        let parsed_expr =
+            self.parse_expression_with_precedence(Precedence::Await, ExpressionContext::default());
 
         ast::ExprAwait {
             value: Box::new(parsed_expr.expr),
             range: self.node_range(start),
-        }
-    }
-
-    /// Parses a yield expression if the parser is positioned at a `yield` token
-    /// or calls the given closure to parse an expression.
-    ///
-    /// This method is used where the grammar allows a `yield` expression or an
-    /// alternative expression. For example, the grammar for a parenthesized
-    /// expression is `(yield_expr | named_expression)`.
-    pub(super) fn parse_yield_expression_or_else<F>(&mut self, f: F) -> ParsedExpr
-    where
-        F: Fn(&mut Parser<'src>) -> ParsedExpr,
-    {
-        if self.at(TokenKind::Yield) {
-            self.parse_yield_expression().into()
-        } else {
-            f(self)
         }
     }
 
@@ -2251,9 +2124,12 @@ impl<'src> Parser<'src> {
             return self.parse_yield_from_expression(start);
         }
 
-        let value = self
-            .at_expr()
-            .then(|| Box::new(self.parse_star_expression_list().expr));
+        let value = self.at_expr().then(|| {
+            Box::new(
+                self.parse_expression_list(ExpressionContext::starred_bitwise_or())
+                    .expr,
+            )
+        });
 
         Expr::Yield(ast::ExprYield {
             value,
@@ -2283,7 +2159,9 @@ impl<'src> Parser<'src> {
         // If we didn't use the `parse_expression_list` method here, the parser
         // would have stopped at the comma. Then, the outer expression would
         // have been a tuple expression with two elements: `yield from x` and `y`.
-        let expr = self.parse_expression_list(AllowStarredExpression::No).expr;
+        let expr = self
+            .parse_expression_list(ExpressionContext::default())
+            .expr;
 
         match &expr {
             Expr::Tuple(tuple) if !tuple.parenthesized => {
@@ -2317,7 +2195,7 @@ impl<'src> Parser<'src> {
         }
         helpers::set_expr_ctx(&mut target, ExprContext::Store);
 
-        let value = self.parse_conditional_expression_or_higher(AllowStarredExpression::No);
+        let value = self.parse_conditional_expression_or_higher();
 
         ast::ExprNamed {
             target: Box::new(target),
@@ -2364,7 +2242,7 @@ impl<'src> Parser<'src> {
         // test_err lambda_body_with_yield_expr
         // lambda x: yield y
         // lambda x: yield from y
-        let body = self.parse_conditional_expression_or_higher(AllowStarredExpression::No);
+        let body = self.parse_conditional_expression_or_higher();
 
         ast::ExprLambda {
             body: Box::new(body.expr),
@@ -2383,11 +2261,11 @@ impl<'src> Parser<'src> {
     pub(super) fn parse_if_expression(&mut self, body: Expr, start: TextSize) -> ast::ExprIf {
         self.bump(TokenKind::If);
 
-        let test = self.parse_simple_expression(AllowStarredExpression::No);
+        let test = self.parse_simple_expression(ExpressionContext::default());
 
         self.expect(TokenKind::Else);
 
-        let orelse = self.parse_conditional_expression_or_higher(AllowStarredExpression::No);
+        let orelse = self.parse_conditional_expression_or_higher();
 
         ast::ExprIf {
             body: Box::new(body),
@@ -2589,32 +2467,116 @@ pub(super) enum GeneratorExpressionInParentheses {
     },
 }
 
+/// Represents the precedence used for parsing the value part of a starred expression.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum StarredExpressionPrecedence {
-    BitOr,
+pub(super) enum StarredExpressionPrecedence {
+    /// Matches `'*' bitwise_or` which is part of the `star_expression` rule in the
+    /// [Python grammar](https://docs.python.org/3/reference/grammar.html).
+    BitwiseOr,
+
+    /// Matches `'*' expression` which is part of the `starred_expression` rule in the
+    /// [Python grammar](https://docs.python.org/3/reference/grammar.html).
     Conditional,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum AllowNamedExpression {
-    Yes,
-    No,
-}
+/// Represents the expression parsing context.
+#[derive(Default, Debug, Copy, Clone, PartialEq, Eq)]
+pub(super) struct ExpressionContext(ExpressionContextFlags);
 
-impl AllowNamedExpression {
-    const fn is_yes(self) -> bool {
-        matches!(self, AllowNamedExpression::Yes)
+bitflags! {
+    #[derive(Default, Debug, Copy, Clone, PartialEq, Eq)]
+    struct ExpressionContextFlags: u8 {
+        /// This flag is set when the `in` keyword should be excluded from a comparison expression.
+        /// It is to avoid ambiguity in `for ... in ...` statements.
+        const EXCLUDE_IN = 1 << 0;
+
+        /// This flag is set when a starred expression should be allowed. This doesn't affect the
+        /// parsing of a starred expression as it will be parsed nevertheless. But, if it is not
+        /// allowed, an error is reported.
+        const ALLOW_STARRED_EXPRESSION = 1 << 1;
+
+        /// This flag is set when the value of a starred expression should be limited to bitwise OR
+        /// precedence. Matches the `* bitwise_or` grammar rule if set.
+        const STARRED_BITWISE_OR_PRECEDENCE = 1 << 2;
+
+        /// This flag is set when a yield expression should be allowed. This doesn't affect the
+        /// parsing of a yield expression as it will be parsed nevertheless. But, if it is not
+        /// allowed, an error is reported.
+        const ALLOW_YIELD_EXPRESSION = 1 << 3;
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum AllowStarredExpression {
-    Yes,
-    No,
-}
+impl ExpressionContext {
+    /// Create a new context allowing starred expression at conditional precedence.
+    pub(super) fn starred_conditional() -> Self {
+        ExpressionContext::default()
+            .with_starred_expression_allowed(StarredExpressionPrecedence::Conditional)
+    }
 
-impl AllowStarredExpression {
-    const fn is_no(self) -> bool {
-        matches!(self, AllowStarredExpression::No)
+    /// Create a new context allowing starred expression at bitwise OR precedence.
+    pub(super) fn starred_bitwise_or() -> Self {
+        ExpressionContext::default()
+            .with_starred_expression_allowed(StarredExpressionPrecedence::BitwiseOr)
+    }
+
+    /// Create a new context allowing starred expression at bitwise OR precedence or yield
+    /// expression.
+    pub(super) fn yield_or_starred_bitwise_or() -> Self {
+        ExpressionContext::starred_bitwise_or().with_yield_expression_allowed()
+    }
+
+    /// Returns a new [`ExpressionContext`] which allows starred expression with the given
+    /// precedence.
+    fn with_starred_expression_allowed(self, precedence: StarredExpressionPrecedence) -> Self {
+        let mut flags = self.0 | ExpressionContextFlags::ALLOW_STARRED_EXPRESSION;
+        match precedence {
+            StarredExpressionPrecedence::BitwiseOr => {
+                flags |= ExpressionContextFlags::STARRED_BITWISE_OR_PRECEDENCE;
+            }
+            StarredExpressionPrecedence::Conditional => {
+                flags -= ExpressionContextFlags::STARRED_BITWISE_OR_PRECEDENCE;
+            }
+        }
+        ExpressionContext(flags)
+    }
+
+    /// Returns a new [`ExpressionContext`] which allows yield expression.
+    fn with_yield_expression_allowed(self) -> Self {
+        ExpressionContext(self.0 | ExpressionContextFlags::ALLOW_YIELD_EXPRESSION)
+    }
+
+    /// Returns a new [`ExpressionContext`] which excludes `in` as part of a comparison expression.
+    pub(super) fn with_in_excluded(self) -> Self {
+        ExpressionContext(self.0 | ExpressionContextFlags::EXCLUDE_IN)
+    }
+
+    /// Returns `true` if the `in` keyword should be excluded from a comparison expression.
+    const fn is_in_excluded(self) -> bool {
+        self.0.contains(ExpressionContextFlags::EXCLUDE_IN)
+    }
+
+    /// Returns `true` if starred expressions are allowed.
+    const fn is_starred_expression_allowed(self) -> bool {
+        self.0
+            .contains(ExpressionContextFlags::ALLOW_STARRED_EXPRESSION)
+    }
+
+    /// Returns `true` if yield expressions are allowed.
+    const fn is_yield_expression_allowed(self) -> bool {
+        self.0
+            .contains(ExpressionContextFlags::ALLOW_YIELD_EXPRESSION)
+    }
+
+    /// Returns the [`StarredExpressionPrecedence`] for the context, regardless of whether starred
+    /// expressions are allowed or not.
+    const fn starred_expression_precedence(self) -> StarredExpressionPrecedence {
+        if self
+            .0
+            .contains(ExpressionContextFlags::STARRED_BITWISE_OR_PRECEDENCE)
+        {
+            StarredExpressionPrecedence::BitwiseOr
+        } else {
+            StarredExpressionPrecedence::Conditional
+        }
     }
 }
