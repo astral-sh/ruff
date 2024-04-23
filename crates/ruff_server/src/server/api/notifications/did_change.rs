@@ -1,3 +1,4 @@
+use crate::server::api::diagnostics::publish_diagnostics_for_document;
 use crate::server::api::LSPResult;
 use crate::server::client::{Notifier, Requester};
 use crate::server::Result;
@@ -15,7 +16,7 @@ impl super::SyncNotificationHandler for DidChange {
     #[tracing::instrument(skip_all, fields(file=%uri))]
     fn run(
         session: &mut Session,
-        _notifier: Notifier,
+        notifier: Notifier,
         _requester: &mut Requester,
         types::DidChangeTextDocumentParams {
             text_document:
@@ -39,6 +40,12 @@ impl super::SyncNotificationHandler for DidChange {
         document
             .make_mut()
             .apply_changes(content_changes, new_version, encoding);
+
+        // Publish diagnostics if the client doesnt support pull diagnostics
+        if !session.resolved_client_capabilities().pull_diagnostics {
+            let snapshot = session.take_snapshot(&uri).unwrap();
+            publish_diagnostics_for_document(&snapshot, &notifier)?;
+        }
 
         Ok(())
     }

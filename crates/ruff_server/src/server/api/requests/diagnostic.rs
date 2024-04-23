@@ -1,3 +1,4 @@
+use crate::server::api::diagnostics::generate_diagnostics;
 use crate::server::{client::Notifier, Result};
 use crate::session::DocumentSnapshot;
 use lsp_types::{self as types, request as req};
@@ -19,23 +20,13 @@ impl super::BackgroundDocumentRequestHandler for DocumentDiagnostic {
         _notifier: Notifier,
         _params: types::DocumentDiagnosticParams,
     ) -> Result<DocumentDiagnosticReportResult> {
-        let diagnostics = if snapshot.client_settings().lint() {
-            crate::lint::check(
-                snapshot.document(),
-                &snapshot.settings().linter,
-                snapshot.encoding(),
-            )
-        } else {
-            vec![]
-        };
-
         Ok(DocumentDiagnosticReportResult::Report(
             types::DocumentDiagnosticReport::Full(RelatedFullDocumentDiagnosticReport {
                 related_documents: None,
                 full_document_diagnostic_report: FullDocumentDiagnosticReport {
                     // TODO(jane): eventually this will be important for caching diagnostic information.
                     result_id: None,
-                    items: diagnostics,
+                    items: generate_diagnostics(&snapshot),
                 },
             }),
         ))
