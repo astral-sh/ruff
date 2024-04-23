@@ -31,6 +31,7 @@ Module(
                                             range: 7..8,
                                         },
                                         bound: None,
+                                        default_value: None,
                                     },
                                 ),
                             ],
@@ -67,6 +68,7 @@ Module(
                                             range: 25..27,
                                         },
                                         bound: None,
+                                        default_value: None,
                                     },
                                 ),
                                 TypeVar(
@@ -77,6 +79,7 @@ Module(
                                             range: 31..33,
                                         },
                                         bound: None,
+                                        default_value: None,
                                     },
                                 ),
                             ],
