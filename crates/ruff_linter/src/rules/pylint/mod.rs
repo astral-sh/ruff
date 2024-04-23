@@ -192,6 +192,7 @@ mod tests {
     #[test_case(Rule::UnnecessaryDunderCall, Path::new("unnecessary_dunder_call.py"))]
     #[test_case(Rule::NoStaticmethodDecorator, Path::new("no_method_decorator.py"))]
     #[test_case(Rule::PotentialIndexError, Path::new("potential_index_error.py"))]
+    #[test_case(Rule::OpenWithoutWith, Path::new("open_without_with.py"))]
     #[test_case(Rule::SuperWithoutBrackets, Path::new("super_without_brackets.py"))]
     #[test_case(Rule::SelfOrClsAssignment, Path::new("self_or_cls_assignment.py"))]
     #[test_case(Rule::TooManyNestedBlocks, Path::new("too_many_nested_blocks.py"))]

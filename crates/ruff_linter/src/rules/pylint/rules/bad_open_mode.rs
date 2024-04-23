@@ -76,7 +76,7 @@ pub(crate) fn bad_open_mode(checker: &mut Checker, call: &ast::ExprCall) {
 }
 
 #[derive(Debug, Copy, Clone)]
-enum Kind {
+pub enum Kind {
     /// A call to the builtin `open(...)`.
     Builtin,
     /// A call to `pathlib.Path(...).open(...)`.
@@ -84,7 +84,7 @@ enum Kind {
 }
 
 /// If a function is a call to `open`, returns the kind of `open` call.
-fn is_open(func: &Expr, semantic: &SemanticModel) -> Option<Kind> {
+pub(crate) fn is_open(func: &Expr, semantic: &SemanticModel) -> Option<Kind> {
     // Ex) `open(...)`
     if semantic.match_builtin_expr(func, "open") {
         return Some(Kind::Builtin);

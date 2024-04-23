@@ -1,0 +1,44 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+open_without_with.py:15:1: PLR1732 Consider using `with open(...) as ...:` instead of `open(...)`
+   |
+15 | open('path', "wb")  # [open-without-with]
+   | ^^^^^^^^^^^^^^^^^^ PLR1732
+16 | 
+17 | f1 = open('path', "wb")  # [open-without-with]
+   |
+
+open_without_with.py:17:6: PLR1732 Consider using `with open(...) as ...:` instead of `open(...)`
+   |
+15 | open('path', "wb")  # [open-without-with]
+16 | 
+17 | f1 = open('path', "wb")  # [open-without-with]
+   |      ^^^^^^^^^^^^^^^^^^ PLR1732
+18 | 
+19 | f = open('path', "wb")  # [open-without-with]
+   |
+
+open_without_with.py:19:5: PLR1732 Consider using `with open(...) as ...:` instead of `open(...)`
+   |
+17 | f1 = open('path', "wb")  # [open-without-with]
+18 | 
+19 | f = open('path', "wb")  # [open-without-with]
+   |     ^^^^^^^^^^^^^^^^^^ PLR1732
+20 | f.close()
+   |
+
+open_without_with.py:22:5: PLR1732 Consider using `with open(...) as ...:` instead of `open(...)`
+   |
+20 | f.close()
+21 | 
+22 | foo(open('path', "wb"))  # [open-without-with]
+   |     ^^^^^^^^^^^^^^^^^^ PLR1732
+   |
+
+open_without_with.py:25:10: PLR1732 Consider using `with open(...) as ...:` instead of `open(...)`
+   |
+25 | with foo(open('path', "wb")) as f:  # [open-without-with]
+   |          ^^^^^^^^^^^^^^^^^^ PLR1732
+26 |     pass
+   |

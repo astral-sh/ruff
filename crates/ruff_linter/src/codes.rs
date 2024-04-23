@@ -311,6 +311,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "W0133") => (RuleGroup::Preview, rules::pylint::rules::UselessExceptionStatement),
         (Pylint, "W0211") => (RuleGroup::Preview, rules::pylint::rules::BadStaticmethodArgument),
         (Pylint, "W0245") => (RuleGroup::Preview, rules::pylint::rules::SuperWithoutBrackets),
+        (Pylint, "R1732") => (RuleGroup::Preview, rules::pylint::rules::OpenWithoutWith),
         (Pylint, "W0406") => (RuleGroup::Stable, rules::pylint::rules::ImportSelf),
         (Pylint, "W0602") => (RuleGroup::Stable, rules::pylint::rules::GlobalVariableNotAssigned),
         (Pylint, "W0603") => (RuleGroup::Stable, rules::pylint::rules::GlobalStatement),
