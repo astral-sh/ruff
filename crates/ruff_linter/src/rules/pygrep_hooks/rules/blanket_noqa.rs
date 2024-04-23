@@ -2,7 +2,7 @@ use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_trivia::Cursor;
 use ruff_source_file::Locator;
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::{Ranged, TextLen, TextRange};
 
 use crate::noqa::{Directive, NoqaDirectives};
 
@@ -88,8 +88,13 @@ pub(crate) fn blanket_noqa(
 ) {
     for directive_line in noqa_directives.lines() {
         if let Directive::All(all) = &directive_line.directive {
-            let line = locator.slice(directive_line.range);
-            let offset = directive_line.range.start();
+            let line = if directive_line.end() > locator.contents().text_len() {
+                let range = TextRange::new(directive_line.start(), locator.contents().text_len());
+                locator.slice(range)
+            } else {
+                locator.slice(directive_line)
+            };
+            let offset = directive_line.start();
             let noqa_end = all.end() - offset;
 
             // Skip the `# noqa`, plus any trailing whitespace.
