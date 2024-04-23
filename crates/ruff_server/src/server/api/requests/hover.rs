@@ -63,8 +63,6 @@ pub(crate) fn hover(
         start = end + 1;
     }
 
-    tracing::warn!("codes: {}", codes);
-    tracing::warn!("word: {}", word);
     if !codes.contains(word) || word.is_empty() {
         return Ok(None); // Cursor was not over a code.
     }
