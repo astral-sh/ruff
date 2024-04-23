@@ -1,4 +1,4 @@
-use crate::server::{ client::Notifier, Result };
+use crate::server::{client::Notifier, Result};
 use crate::session::DocumentSnapshot;
 use lsp_types::{self as types, request as req};
 use regex::Regex;
@@ -42,14 +42,10 @@ pub(crate) fn hover(
 
     let line = &document.contents()[line_range];
 
-    if !line.contains("noqa") {
-        return None; // No noqa in line
-    }
-
     // Get the list of codes.
     let noqa_regex = Regex::new(r"(?i:# (?:(?:ruff|flake8): )?(?P<noqa>noqa))(?::\s?(?P<codes>([A-Z]+[0-9]+(?:[,\s]+)?)+))?").unwrap();
     let noqa_captures = noqa_regex.captures(line)?;
-    let codes_match = noqa_captures.name("code")?;
+    let codes_match = noqa_captures.name("codes")?;
     let codes_start = codes_match.start();
     let code_regex = Regex::new(r"[A-Z]+[0-9]+").unwrap();
     let cursor: usize = position
@@ -58,7 +54,7 @@ pub(crate) fn hover(
         .try_into()
         .expect("column number should fit within a usize");
     let word = code_regex.find_iter(codes_match.as_str()).find(|code| {
-        cursor > (code.start() + codes_start) && cursor <= (code.end() + codes_start)
+        cursor > (code.start() + codes_start) - 1 && cursor <= (code.end() + codes_start) - 1
     })?;
 
     // Get rule for the code under the cursor.
@@ -101,23 +97,17 @@ fn format_rule_text(rule: Rule) -> String {
         output.push('\n');
     }
 
-    //if rule.is_preview() || rule.is_nursery() {
-    //output.push_str(
-    //r"This rule is in preview and is not stable. The `--preview` flag is required for use.",
-    //);
-    //output.push('\n');
-    //output.push('\n');
-    //}
+    if rule.is_preview() || rule.is_nursery() {
+        output.push_str(r"This rule is in preview and is not stable.");
+        output.push('\n');
+        output.push('\n');
+    }
 
     if let Some(explanation) = rule.explanation() {
         output.push_str(explanation.trim());
     } else {
-        output.push_str("Something went wrong.");
-        //output.push_str("Message formats:");
-        //for format in rule.message_formats() {
-        //output.push('\n');
-        //output.push_str(&format!("* {format}"));
-        //}
+        tracing::warn!("Rule {} does not have an explanation", rule.noqa_code());
+        output.push_str("An issue occurred: an explanation for this rule was not found.");
     }
     output
 }
