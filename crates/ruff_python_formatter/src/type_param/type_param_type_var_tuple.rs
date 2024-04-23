@@ -8,7 +8,15 @@ pub struct FormatTypeParamTypeVarTuple;
 
 impl FormatNodeRule<TypeParamTypeVarTuple> for FormatTypeParamTypeVarTuple {
     fn fmt_fields(&self, item: &TypeParamTypeVarTuple, f: &mut PyFormatter) -> FormatResult<()> {
-        let TypeParamTypeVarTuple { range: _, name } = item;
-        write!(f, [token("*"), name.format()])
+        let TypeParamTypeVarTuple {
+            range: _,
+            name,
+            default_value,
+        } = item;
+        write!(f, [token("*"), name.format()])?;
+        if let Some(default_value) = default_value {
+            write!(f, [token("="), space(), default_value.format()])?;
+        }
+        Ok(())
     }
 }

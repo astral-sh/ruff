@@ -8,7 +8,15 @@ pub struct FormatTypeParamParamSpec;
 
 impl FormatNodeRule<TypeParamParamSpec> for FormatTypeParamParamSpec {
     fn fmt_fields(&self, item: &TypeParamParamSpec, f: &mut PyFormatter) -> FormatResult<()> {
-        let TypeParamParamSpec { range: _, name } = item;
-        write!(f, [token("**"), name.format()])
+        let TypeParamParamSpec {
+            range: _,
+            name,
+            default_value,
+        } = item;
+        write!(f, [token("**"), name.format()])?;
+        if let Some(default_value) = default_value {
+            write!(f, [token("="), space(), default_value.format()])?;
+        }
+        Ok(())
     }
 }

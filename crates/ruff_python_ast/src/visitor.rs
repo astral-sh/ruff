@@ -7,7 +7,8 @@ use crate::{
     self as ast, Alias, Arguments, BoolOp, BytesLiteral, CmpOp, Comprehension, Decorator,
     ElifElseClause, ExceptHandler, Expr, ExprContext, FString, FStringElement, FStringPart,
     Keyword, MatchCase, Operator, Parameter, Parameters, Pattern, PatternArguments, PatternKeyword,
-    Stmt, StringLiteral, TypeParam, TypeParamTypeVar, TypeParams, UnaryOp, WithItem,
+    Stmt, StringLiteral, TypeParam, TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple,
+    TypeParams, UnaryOp, WithItem,
 };
 
 /// A trait for AST visitors. Visits all nodes in the AST recursively in evaluation-order.
@@ -666,14 +667,35 @@ pub fn walk_type_param<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, type_param:
     match type_param {
         TypeParam::TypeVar(TypeParamTypeVar {
             bound,
+            default_value,
             name: _,
             range: _,
         }) => {
             if let Some(expr) = bound {
                 visitor.visit_expr(expr);
             }
+            if let Some(expr) = default_value {
+                visitor.visit_expr(expr);
+            }
         }
-        TypeParam::TypeVarTuple(_) | TypeParam::ParamSpec(_) => {}
+        TypeParam::TypeVarTuple(TypeParamTypeVarTuple {
+            default_value,
+            name: _,
+            range: _,
+        }) => {
+            if let Some(expr) = default_value {
+                visitor.visit_expr(expr);
+            }
+        }
+        TypeParam::ParamSpec(TypeParamParamSpec {
+            default_value,
+            name: _,
+            range: _,
+        }) => {
+            if let Some(expr) = default_value {
+                visitor.visit_expr(expr);
+            }
+        }
     }
 }
 

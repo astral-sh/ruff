@@ -1568,8 +1568,8 @@ impl<'a> Visitor<'a> for Checker<'a> {
         // Step 1: Binding
         match type_param {
             ast::TypeParam::TypeVar(ast::TypeParamTypeVar { name, range, .. })
-            | ast::TypeParam::TypeVarTuple(ast::TypeParamTypeVarTuple { name, range })
-            | ast::TypeParam::ParamSpec(ast::TypeParamParamSpec { name, range }) => {
+            | ast::TypeParam::TypeVarTuple(ast::TypeParamTypeVarTuple { name, range, .. })
+            | ast::TypeParam::ParamSpec(ast::TypeParamParamSpec { name, range, .. }) => {
                 self.add_binding(
                     name.as_str(),
                     *range,
@@ -1579,13 +1579,46 @@ impl<'a> Visitor<'a> for Checker<'a> {
             }
         }
         // Step 2: Traversal
-        if let ast::TypeParam::TypeVar(ast::TypeParamTypeVar {
-            bound: Some(bound), ..
-        }) = type_param
-        {
-            self.visit
-                .type_param_definitions
-                .push((bound, self.semantic.snapshot()));
+        match type_param {
+            ast::TypeParam::TypeVar(ast::TypeParamTypeVar {
+                bound,
+                default_value,
+                name: _,
+                range: _,
+            }) => {
+                if let Some(expr) = bound {
+                    self.visit
+                        .type_param_definitions
+                        .push((expr, self.semantic.snapshot()));
+                }
+                if let Some(expr) = default_value {
+                    self.visit
+                        .type_param_definitions
+                        .push((expr, self.semantic.snapshot()));
+                }
+            }
+            ast::TypeParam::TypeVarTuple(ast::TypeParamTypeVarTuple {
+                default_value,
+                name: _,
+                range: _,
+            }) => {
+                if let Some(expr) = default_value {
+                    self.visit
+                        .type_param_definitions
+                        .push((expr, self.semantic.snapshot()));
+                }
+            }
+            ast::TypeParam::ParamSpec(ast::TypeParamParamSpec {
+                default_value,
+                name: _,
+                range: _,
+            }) => {
+                if let Some(expr) = default_value {
+                    self.visit
+                        .type_param_definitions
+                        .push((expr, self.semantic.snapshot()));
+                }
+            }
         }
     }
 

@@ -4317,11 +4317,15 @@ impl AstNode for ast::TypeParamTypeVar {
     {
         let ast::TypeParamTypeVar {
             bound,
+            default_value,
             name: _,
             range: _,
         } = self;
 
         if let Some(expr) = bound {
+            visitor.visit_expr(expr);
+        }
+        if let Some(expr) = default_value {
             visitor.visit_expr(expr);
         }
     }
@@ -4355,11 +4359,18 @@ impl AstNode for ast::TypeParamTypeVarTuple {
     }
 
     #[inline]
-    fn visit_preorder<'a, V>(&'a self, _visitor: &mut V)
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
     where
         V: PreorderVisitor<'a> + ?Sized,
     {
-        let ast::TypeParamTypeVarTuple { range: _, name: _ } = self;
+        let ast::TypeParamTypeVarTuple {
+            range: _,
+            name: _,
+            default_value,
+        } = self;
+        if let Some(expr) = default_value {
+            visitor.visit_expr(expr);
+        }
     }
 }
 impl AstNode for ast::TypeParamParamSpec {
@@ -4391,11 +4402,18 @@ impl AstNode for ast::TypeParamParamSpec {
     }
 
     #[inline]
-    fn visit_preorder<'a, V>(&'a self, _visitor: &mut V)
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
     where
         V: PreorderVisitor<'a> + ?Sized,
     {
-        let ast::TypeParamParamSpec { range: _, name: _ } = self;
+        let ast::TypeParamParamSpec {
+            range: _,
+            name: _,
+            default_value,
+        } = self;
+        if let Some(expr) = default_value {
+            visitor.visit_expr(expr);
+        }
     }
 }
 impl AstNode for ast::FString {

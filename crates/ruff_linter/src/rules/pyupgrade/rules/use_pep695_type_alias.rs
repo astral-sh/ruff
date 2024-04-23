@@ -132,6 +132,8 @@ pub(crate) fn non_pep695_type_alias(checker: &mut Checker, stmt: &StmtAnnAssign)
                             }
                             None => None,
                         },
+                        // TODO(jelle): Should we handle defaults here? Maybe only if target_version = py313?
+                        default_value: None,
                     })
                 })
                 .collect(),

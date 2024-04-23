@@ -3168,6 +3168,7 @@ impl<'src> Parser<'src> {
             ast::TypeParam::TypeVarTuple(ast::TypeParamTypeVarTuple {
                 range: self.node_range(start),
                 name,
+                default_value: None, // TODO(jelle)
             })
         } else if self.eat(TokenKind::DoubleStar) {
             let name = self.parse_identifier();
@@ -3177,6 +3178,7 @@ impl<'src> Parser<'src> {
             ast::TypeParam::ParamSpec(ast::TypeParamParamSpec {
                 range: self.node_range(start),
                 name,
+                default_value: None, // TODO(jelle)
             })
         } else {
             let name = self.parse_identifier();
@@ -3207,6 +3209,7 @@ impl<'src> Parser<'src> {
                 range: self.node_range(start),
                 name,
                 bound,
+                default_value: None, // TODO(jelle)
             })
         }
     }
