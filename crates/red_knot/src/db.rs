@@ -1,14 +1,13 @@
-use std::ops::{Deref, DerefMut};
 use std::path::Path;
 use std::sync::Arc;
 
-use crate::cache::MapCache;
 use crate::files::FileId;
 use crate::module::{Module, ModuleData, ModuleName, ModuleResolver, ModuleSearchPath};
 use crate::parse::{Parsed, ParsedStorage};
-use crate::source::Source;
+use crate::source::{Source, SourceStorage};
 
 pub trait SourceDb {
+    // queries
     fn file_id(&self, path: &std::path::Path) -> FileId;
 
     fn file_path(&self, file_id: FileId) -> Arc<std::path::Path>;
@@ -18,9 +17,11 @@ pub trait SourceDb {
     fn parse(&self, file_id: FileId) -> Parsed;
 }
 
-pub trait ModuleDb {
+pub trait SemanticDb: SourceDb {
+    // queries
     fn resolve_module(&self, name: ModuleName) -> Option<Module>;
 
+    // mutations
     fn path_to_module(&mut self, path: &Path) -> Option<Module>;
 
     fn add_module(&mut self, path: &Path) -> Option<(Module, Vec<Arc<ModuleData>>)>;
@@ -28,77 +29,42 @@ pub trait ModuleDb {
     fn set_module_search_paths(&mut self, paths: Vec<ModuleSearchPath>);
 }
 
+pub trait Db: SemanticDb {}
+
 #[derive(Debug, Default)]
 pub struct SourceJar {
-    pub module_resolver: ModuleResolver,
     pub sources: SourceStorage,
     pub parsed: ParsedStorage,
 }
 
 #[derive(Debug, Default)]
-pub struct SourceStorage(pub(crate) MapCache<FileId, Source>);
-
-impl Deref for SourceStorage {
-    type Target = MapCache<FileId, Source>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
+pub struct SemanticJar {
+    pub module_resolver: ModuleResolver,
 }
 
-impl DerefMut for SourceStorage {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-
-impl HasIngredient<ModuleResolver> for SourceJar {
-    fn ingredient(&self) -> &ModuleResolver {
-        &self.module_resolver
-    }
-
-    fn ingredient_mut(&mut self) -> &mut ModuleResolver {
-        &mut self.module_resolver
-    }
-}
-
-impl HasIngredient<SourceStorage> for SourceJar {
-    fn ingredient(&self) -> &SourceStorage {
-        &self.sources
-    }
-
-    fn ingredient_mut(&mut self) -> &mut SourceStorage {
-        &mut self.sources
-    }
-}
-
-impl HasIngredient<ParsedStorage> for SourceJar {
-    fn ingredient(&self) -> &ParsedStorage {
-        &self.parsed
-    }
-
-    fn ingredient_mut(&mut self) -> &mut ParsedStorage {
-        &mut self.parsed
-    }
-}
-
-pub trait Db: ModuleDb + SourceDb {}
-
+/// Gives access to a specific jar in the database.
+///
+/// Nope, the terminology isn't borrowed from Java but from Salsa (https://salsa-rs.github.io/salsa/),
+/// which is an analogy to storing the salsa in different jars.
+///
+/// The basic idea is that each crate can define its own jar and the jars can be combined to a single
+/// database in the top level crate. Each crate also defines its own `Database` trait. The combination of
+/// `Database` trait and the jar allows to write queries in isolation without having to know how they get composed at the upper levels.
+///
+/// Salsa further defines a `HasIngredient` trait which slices the jar to a specific storage (e.g. a specific cache).
+/// We don't need this just jet because we write our queries by hand. We may want a similar trait if we decide
+/// to use a macro to generate the queries.
 pub trait HasJar<T> {
+    /// Gives a read-only reference to the jar.
     fn jar(&self) -> &T;
 
+    /// Gives a mutable reference to the jar.
     fn jar_mut(&mut self) -> &mut T;
-}
-
-pub trait HasIngredient<T> {
-    fn ingredient(&self) -> &T;
-
-    fn ingredient_mut(&mut self) -> &mut T;
 }
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use crate::db::{HasJar, ModuleDb, SourceDb, SourceJar};
+    use crate::db::{HasJar, SourceDb, SourceJar};
     use crate::files::{FileId, Files};
     use crate::module::{
         add_module, path_to_module, resolve_module, set_module_search_paths, Module, ModuleData,
@@ -109,12 +75,15 @@ pub(crate) mod tests {
     use std::path::Path;
     use std::sync::Arc;
 
+    use super::{SemanticDb, SemanticJar};
+
     // This can be a partial database used in a single crate for testing.
     // It would hold fewer data than the full database.
     #[derive(Debug, Default)]
     pub(crate) struct TestDb {
         files: Files,
         source: SourceJar,
+        semantic: SemanticJar,
     }
 
     impl HasJar<SourceJar> for TestDb {
@@ -124,6 +93,16 @@ pub(crate) mod tests {
 
         fn jar_mut(&mut self) -> &mut SourceJar {
             &mut self.source
+        }
+    }
+
+    impl HasJar<SemanticJar> for TestDb {
+        fn jar(&self) -> &SemanticJar {
+            &self.semantic
+        }
+
+        fn jar_mut(&mut self) -> &mut SemanticJar {
+            &mut self.semantic
         }
     }
 
@@ -145,7 +124,7 @@ pub(crate) mod tests {
         }
     }
 
-    impl ModuleDb for TestDb {
+    impl SemanticDb for TestDb {
         fn resolve_module(&self, name: ModuleName) -> Option<Module> {
             resolve_module(self, name)
         }

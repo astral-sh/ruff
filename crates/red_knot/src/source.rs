@@ -1,5 +1,6 @@
-use crate::cache::Cache;
+use crate::cache::KeyValueCache;
 use crate::db::{HasJar, SourceDb, SourceJar};
+use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 
 use crate::files::FileId;
@@ -10,7 +11,7 @@ where
 {
     let sources = &db.jar().sources;
 
-    sources.0.get(&file_id, |file_id| {
+    sources.get(&file_id, |file_id| {
         let path = db.file_path(*file_id);
 
         let source_text = std::fs::read_to_string(&path).unwrap_or_else(|err| {
@@ -35,5 +36,22 @@ impl Source {
     }
     pub fn text(&self) -> &str {
         &self.text
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct SourceStorage(pub(crate) KeyValueCache<FileId, Source>);
+
+impl Deref for SourceStorage {
+    type Target = KeyValueCache<FileId, Source>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for SourceStorage {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
     }
 }
