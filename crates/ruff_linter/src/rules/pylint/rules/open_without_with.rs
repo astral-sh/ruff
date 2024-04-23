@@ -7,17 +7,21 @@ use crate::checkers::ast::Checker;
 use crate::rules::pylint::rules::is_open;
 
 /// ## What it does
-/// Checks for hard-coded sequence accesses that are known to be out of bounds.
+/// Checks for usages of `open` without a `with` statement.
 ///
 /// ## Why is this bad?
-/// Attempting to access a sequence with an out-of-bounds index will cause an
-/// `IndexError` to be raised at runtime. When the sequence and index are
-/// defined statically (e.g., subscripts on `list` and `tuple` literals, with
-/// integer indexes), such errors can be detected ahead of time.
+/// When using `open` without a `with` statement, you must remember to close the file manually.
+/// This can lead to resource leaks if the file is not closed properly.
+/// Using a `with` statement ensures that the file is closed automatically when the block is exited, even if an exception is raised.
 ///
 /// ## Example
 /// ```python
-/// print([0, 1, 2][3])
+/// f = open('file.txt', 'r')
+/// ```
+/// Use instead:
+/// ```python
+/// with open('file.txt', 'r') as f:
+///    ...
 /// ```
 #[violation]
 pub struct OpenWithoutWith;
@@ -29,7 +33,7 @@ impl Violation for OpenWithoutWith {
     }
 }
 
-/// PLE0643
+/// PLR1732
 pub(crate) fn open_without_with(checker: &mut Checker, call: &ast::ExprCall) {
     let parent = checker.semantic().current_statement();
     let Some(kind) = is_open(call.func.as_ref(), checker.semantic()) else {
