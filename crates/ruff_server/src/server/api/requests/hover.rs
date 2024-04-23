@@ -54,7 +54,7 @@ pub(crate) fn hover(
         .try_into()
         .expect("column number should fit within a usize");
     let word = code_regex.find_iter(codes_match.as_str()).find(|code| {
-        cursor > (code.start() + codes_start) - 1 && cursor <= (code.end() + codes_start) - 1
+        cursor > (code.start() + codes_start) - 1 && cursor < (code.end() + codes_start)
     })?;
 
     // Get rule for the code under the cursor.
