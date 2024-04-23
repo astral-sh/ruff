@@ -153,9 +153,9 @@ impl<'a> Resolver<'a> {
 
         match self
             .router
-            .insert(format!("{}/{{*filepath}}", path), self.settings.len() - 1)
+            .insert(format!("{path}/{{*filepath}}"), self.settings.len() - 1)
         {
-            Ok(_) => {}
+            Ok(()) => {}
             Err(InsertError::Conflict { .. }) => {}
             Err(_) => unreachable!("file paths are escaped before being inserted in the router"),
         }
@@ -273,7 +273,7 @@ fn resolve_configuration(
         let options = pyproject::load_options(&path)?;
 
         let project_root = relativity.resolve(&path);
-        let configuration = Configuration::from_options(options, Some(&path), &project_root)?;
+        let configuration = Configuration::from_options(options, Some(&path), project_root)?;
 
         // If extending, continue to collect.
         next = configuration.extend.as_ref().map(|extend| {
@@ -308,7 +308,7 @@ fn resolve_scoped_settings<'a>(
 ) -> Result<(&'a Path, Settings)> {
     let configuration = resolve_configuration(pyproject, relativity, transformer)?;
     let project_root = relativity.resolve(pyproject);
-    let settings = configuration.into_settings(&project_root)?;
+    let settings = configuration.into_settings(project_root)?;
     Ok((project_root, settings))
 }
 
