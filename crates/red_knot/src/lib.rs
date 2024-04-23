@@ -15,7 +15,7 @@ pub mod hir;
 pub mod module;
 mod parse;
 pub mod program;
-mod source;
+pub mod source;
 mod symbols;
 mod types;
 

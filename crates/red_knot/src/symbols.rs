@@ -40,6 +40,7 @@ pub(crate) enum ScopeKind {
     Function,
 }
 
+#[derive(Debug)]
 pub(crate) struct Scope {
     name: Name,
     kind: ScopeKind,
@@ -58,6 +59,7 @@ impl Scope {
     }
 }
 
+#[derive(Debug)]
 pub(crate) struct Symbol {
     name: Name,
 }
@@ -68,6 +70,7 @@ impl Symbol {
     }
 }
 
+#[derive(Debug)]
 pub(crate) struct Symbols<'a> {
     pub(crate) table: SymbolTable,
     pub(crate) defs: FxDashMap<SymbolId, Vec<&'a ast::Stmt>>,
@@ -75,6 +78,7 @@ pub(crate) struct Symbols<'a> {
 
 /// Table of all symbols in all scopes for a module.
 /// Derived from module AST, but holds no references to it.
+#[derive(Debug)]
 pub(crate) struct SymbolTable {
     scopes_by_id: IndexVec<ScopeId, Scope>,
     symbols_by_id: IndexVec<SymbolId, Symbol>,
@@ -180,7 +184,7 @@ impl SymbolTable {
         table
     }
 
-    pub(crate) fn root_scope_id() -> ScopeId {
+    pub(crate) const fn root_scope_id() -> ScopeId {
         ScopeId::from_usize(0)
     }
 

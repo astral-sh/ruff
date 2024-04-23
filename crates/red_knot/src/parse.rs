@@ -5,7 +5,7 @@ use ruff_python_ast as ast;
 use ruff_python_parser::{Mode, ParseError};
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::cache::{Cache, MapCache};
+use crate::cache::KeyValueCache;
 use crate::db::{HasJar, SourceDb, SourceJar};
 use crate::files::FileId;
 
@@ -69,7 +69,7 @@ where
 {
     let parsed = db.jar();
 
-    parsed.parsed.0.get(&file_id, |file_id| {
+    parsed.parsed.get(&file_id, |file_id| {
         let source = db.source(*file_id);
 
         Parsed::from_text(source.text())
@@ -77,10 +77,10 @@ where
 }
 
 #[derive(Debug, Default)]
-pub struct ParsedStorage(MapCache<FileId, Parsed>);
+pub struct ParsedStorage(KeyValueCache<FileId, Parsed>);
 
 impl Deref for ParsedStorage {
-    type Target = MapCache<FileId, Parsed>;
+    type Target = KeyValueCache<FileId, Parsed>;
 
     fn deref(&self) -> &Self::Target {
         &self.0

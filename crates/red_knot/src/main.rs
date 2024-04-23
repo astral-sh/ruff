@@ -1,6 +1,5 @@
 use std::path::PathBuf;
 
-use red_knot::cache::Cache;
 use red_knot::db::{HasJar, SourceDb, SourceJar};
 use red_knot::module::{ModuleSearchPath, ModuleSearchPathKind};
 use red_knot::program::Program;
@@ -129,8 +128,8 @@ fn main() -> anyhow::Result<()> {
 
     let source_jar: &SourceJar = program.jar();
 
-    source_jar.parsed.statistics();
-    source_jar.sources.statistics();
+    dbg!(source_jar.parsed.statistics());
+    dbg!(source_jar.sources.statistics());
 
     Ok(())
 }
