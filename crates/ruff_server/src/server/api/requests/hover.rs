@@ -1,9 +1,10 @@
-use crate::server::{client::Notifier, Result};
+use crate::server::{ client::Notifier, Result };
 use crate::session::DocumentSnapshot;
 use lsp_types::{self as types, request as req};
 use regex::Regex;
 use ruff_diagnostics::FixAvailability;
 use ruff_linter::registry::{Linter, Rule, RuleNamespace};
+use ruff_source_file::OneIndexed;
 
 pub(crate) struct Hover;
 
@@ -20,54 +21,52 @@ impl super::BackgroundDocumentRequestHandler for Hover {
         _notifier: Notifier,
         params: types::HoverParams,
     ) -> Result<Option<types::Hover>> {
-        hover(&snapshot, &params.text_document_position_params)
+        Ok(hover(&snapshot, &params.text_document_position_params))
     }
 }
 
-#[allow(clippy::unnecessary_wraps)]
 pub(crate) fn hover(
     snapshot: &DocumentSnapshot,
     position: &types::TextDocumentPositionParams,
-) -> Result<Option<types::Hover>> {
-    let doc: &str = snapshot.document().contents();
-    let binding = String::from(doc);
-    let line = binding.lines().nth(position.position.line as usize);
-    let line = line.unwrap();
+) -> Option<types::Hover> {
+    let document = snapshot.document();
+    let line_number: usize = position
+        .position
+        .line
+        .try_into()
+        .expect("line number should fit within a usize");
+    let line_range = document.index().line_range(
+        OneIndexed::from_zero_indexed(line_number),
+        document.contents(),
+    );
+
+    let line = &document.contents()[line_range];
 
     if !line.contains("noqa") {
-        return Ok(None); // No noqa in line
+        return None; // No noqa in line
     }
 
     // Get the list of codes.
-    let re = Regex::new(r"(?i:# (?:(?:ruff|flake8): )?(?P<noqa>noqa))(?::\s?(?P<codes>([A-Z]+[0-9]+(?:[,\s]+)?)+))?").unwrap();
-    let caps = re.captures(line).unwrap();
-    let codes = caps.name("codes").unwrap().as_str();
-
-    // Get the word under the cursor.
-    let pos = position.position.character as usize;
-    let words: Vec<&str> = line.split(' ').collect();
-    let mut start = 0;
-    let mut word = "";
-    for &w in &words {
-        let end = start + w.len();
-        if pos >= start && pos < end {
-            let w = w.trim_end_matches(',');
-            word = w;
-            break;
-        }
-        start = end + 1;
-    }
-
-    if !codes.contains(word) || word.is_empty() {
-        return Ok(None); // Cursor was not over a code.
-    }
+    let noqa_regex = Regex::new(r"(?i:# (?:(?:ruff|flake8): )?(?P<noqa>noqa))(?::\s?(?P<codes>([A-Z]+[0-9]+(?:[,\s]+)?)+))?").unwrap();
+    let noqa_captures = noqa_regex.captures(line)?;
+    let codes_match = noqa_captures.name("code")?;
+    let codes_start = codes_match.start();
+    let code_regex = Regex::new(r"[A-Z]+[0-9]+").unwrap();
+    let cursor: usize = position
+        .position
+        .character
+        .try_into()
+        .expect("column number should fit within a usize");
+    let word = code_regex.find_iter(codes_match.as_str()).find(|code| {
+        cursor > (code.start() + codes_start) && cursor <= (code.end() + codes_start)
+    })?;
 
     // Get rule for the code under the cursor.
-    let rule = Rule::from_code(word);
+    let rule = Rule::from_code(word.as_str());
     let output = if let Ok(rule) = rule {
         format_rule_text(rule)
     } else {
-        format!("{word}: Rule not found")
+        format!("{}: Rule not found", word.as_str())
     };
 
     let hover = types::Hover {
@@ -78,7 +77,7 @@ pub(crate) fn hover(
         range: None,
     };
 
-    Ok(Some(hover))
+    Some(hover)
 }
 
 fn format_rule_text(rule: Rule) -> String {
