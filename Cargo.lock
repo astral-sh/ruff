@@ -2262,6 +2262,7 @@ dependencies = [
  "libc",
  "lsp-server",
  "lsp-types",
+ "regex",
  "ruff_diagnostics",
  "ruff_formatter",
  "ruff_linter",
