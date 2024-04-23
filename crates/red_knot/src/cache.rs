@@ -6,43 +6,28 @@ use dashmap::mapref::entry::Entry;
 
 use crate::FxDashMap;
 
-pub trait Cache<K, V> {
-    fn try_get(&self, key: &K) -> Option<V>;
-
-    fn get<F>(&self, key: &K, compute: F) -> V
-    where
-        F: FnOnce(&K) -> V;
-
-    fn set(&mut self, key: K, value: V);
-
-    fn remove(&mut self, key: &K) -> Option<V>;
-
-    fn clear(&mut self);
-
-    fn statistics(&self) -> Option<Statistics>;
-}
-
-pub struct MapCache<K, V> {
+/// Simple key value cache that locks on a per-key level.
+pub struct KeyValueCache<K, V> {
     map: FxDashMap<K, V>,
     statistics: CacheStatistics,
 }
 
-impl<K, V> Cache<K, V> for MapCache<K, V>
+impl<K, V> KeyValueCache<K, V>
 where
     K: Eq + Hash + Clone,
     V: Clone,
 {
-    fn try_get(&self, key: &K) -> Option<V> {
+    pub fn try_get(&self, key: &K) -> Option<V> {
         if let Some(existing) = self.map.get(key) {
             self.statistics.hit();
             Some(existing.clone())
         } else {
-            self.statistics.hit();
+            self.statistics.miss();
             None
         }
     }
 
-    fn get<F>(&self, key: &K, compute: F) -> V
+    pub fn get<F>(&self, key: &K, compute: F) -> V
     where
         F: FnOnce(&K) -> V,
     {
@@ -62,24 +47,25 @@ where
         }
     }
 
-    fn set(&mut self, key: K, value: V) {
+    pub fn set(&mut self, key: K, value: V) {
         self.map.insert(key, value);
     }
 
-    fn remove(&mut self, key: &K) -> Option<V> {
+    pub fn remove(&mut self, key: &K) -> Option<V> {
         self.map.remove(key).map(|(_, value)| value)
     }
 
-    fn clear(&mut self) {
+    pub fn clear(&mut self) {
         self.map.clear();
+        self.map.shrink_to_fit();
     }
 
-    fn statistics(&self) -> Option<Statistics> {
+    pub fn statistics(&self) -> Option<Statistics> {
         self.statistics.to_statistics()
     }
 }
 
-impl<K, V> Default for MapCache<K, V>
+impl<K, V> Default for KeyValueCache<K, V>
 where
     K: Eq + Hash,
     V: Clone,
@@ -92,7 +78,7 @@ where
     }
 }
 
-impl<K, V> std::fmt::Debug for MapCache<K, V>
+impl<K, V> std::fmt::Debug for KeyValueCache<K, V>
 where
     K: std::fmt::Debug + Eq + Hash,
     V: std::fmt::Debug,

@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use dashmap::mapref::entry::Entry;
 
-use crate::db::{HasJar, ModuleDb, SourceDb, SourceJar};
+use crate::db::{HasJar, SemanticDb, SemanticJar};
 use crate::files::FileId;
 use crate::FxDashMap;
 
@@ -16,7 +16,7 @@ pub struct Module(u32);
 impl Module {
     pub fn name<Db>(&self, db: &Db) -> ModuleName
     where
-        Db: HasJar<SourceJar>,
+        Db: HasJar<SemanticJar>,
     {
         let modules = &db.jar().module_resolver;
 
@@ -25,7 +25,7 @@ impl Module {
 
     pub fn path<Db>(&self, db: &Db) -> ModulePath
     where
-        Db: HasJar<SourceJar>,
+        Db: HasJar<SemanticJar>,
     {
         let modules = &db.jar().module_resolver;
 
@@ -161,10 +161,12 @@ pub struct ModuleData {
 // Queries
 //////////////////////////////////////////////////////
 
-/// Resolves a module name to a module id.
+/// Resolves a module name to a module id
+/// TODO: This would not work with Salsa because `ModuleName` isn't an ingredient and, therefore, cannot be used as part of a query.
+///  For this to work with salsa, it would be necessary to intern all `ModuleName`s.
 pub fn resolve_module<Db>(db: &Db, name: ModuleName) -> Option<Module>
 where
-    Db: SourceDb + HasJar<SourceJar>,
+    Db: SemanticDb + HasJar<SemanticJar>,
 {
     let jar = db.jar();
     let modules = &jar.module_resolver;
@@ -210,13 +212,14 @@ where
 // Mutations
 //////////////////////////////////////////////////////
 
+/// Changes the module search paths to `search_paths`.
 pub fn set_module_search_paths<Db>(db: &mut Db, search_paths: Vec<ModuleSearchPath>)
 where
-    Db: HasJar<SourceJar>,
+    Db: SemanticDb + HasJar<SemanticJar>,
 {
     let jar = db.jar_mut();
 
-    jar.module_resolver.search_paths = search_paths;
+    jar.module_resolver = ModuleResolver::new(search_paths);
 }
 
 /// Resolves the module id for the file with the given id.
@@ -224,7 +227,7 @@ where
 /// Returns `None` if the file is not a module in `sys.path`.
 pub fn file_to_module<Db>(db: &mut Db, file: FileId) -> Option<Module>
 where
-    Db: SourceDb + HasJar<SourceJar>,
+    Db: SemanticDb + HasJar<SemanticJar>,
 {
     let path = db.file_path(file);
     path_to_module(db, &path)
@@ -234,9 +237,10 @@ where
 ///
 /// Returns `None` if the path is not a module in `sys.path`.
 // WARNING!: It's important that this method takes `&mut self`. Without, the implementation is prone to race conditions.
+// Note: This won't work with salsa because `Path` is not an ingredient.
 pub fn path_to_module<Db>(db: &mut Db, path: &Path) -> Option<Module>
 where
-    Db: SourceDb + HasJar<SourceJar>,
+    Db: SemanticDb + HasJar<SemanticJar>,
 {
     let jar = db.jar_mut();
     let modules = &mut jar.module_resolver;
@@ -294,10 +298,10 @@ where
 ///
 /// Returns `Some` with the id of the module and the ids of the modules that need re-resolving
 /// because they were part of a namespace package and might now resolve differently.
-// FIXME: Returning module here is now pretty unsafe because it's no longer guaranteed to be in the cache.
+/// Note: This won't work with salsa because `Path` is not an ingredient.
 pub fn add_module<Db>(db: &mut Db, path: &Path) -> Option<(Module, Vec<Arc<ModuleData>>)>
 where
-    Db: SourceDb + HasJar<SourceJar> + ModuleDb,
+    Db: SemanticDb + HasJar<SemanticJar>,
 {
     // No locking is required because we're holding a mutable reference to `modules`.
 
@@ -571,7 +575,7 @@ impl PackageKind {
 #[cfg(test)]
 mod tests {
     use crate::db::tests::TestDb;
-    use crate::db::{ModuleDb, SourceDb};
+    use crate::db::{SemanticDb, SourceDb};
     use crate::module::{ModuleName, ModuleSearchPath, ModuleSearchPathKind};
 
     struct TestCase {
