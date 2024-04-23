@@ -273,9 +273,7 @@ jobs:
       - determine_changes
     # Only runs on pull requests, since that is the only we way we can find the base version for comparison.
     # Ecosystem check needs linter and/or formatter changes.
-    if: github.event_name == 'pull_request' && ${{
-      needs.determine_changes.outputs.code == 'true'
-      }}
+    if: ${{ github.event_name == 'pull_request' && needs.determine_changes.outputs.code == 'true' }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
@@ -554,7 +552,7 @@ jobs:
   benchmarks:
     runs-on: ubuntu-latest
     needs: determine_changes
-    if: ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
+    if: ${{ github.repository == 'astral-sh/ruff' && (needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main') }}
     timeout-minutes: 20
     steps:
       - name: "Checkout Branch"
