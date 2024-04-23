@@ -1795,9 +1795,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "dashmap",
- "filetime",
  "hashbrown 0.14.3",
- "itertools 0.12.1",
  "log",
  "parking_lot",
  "ruff_index",
