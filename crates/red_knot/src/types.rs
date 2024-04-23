@@ -6,7 +6,7 @@ use ruff_index::{newtype_index, IndexVec};
 pub(crate) struct TypeId;
 
 impl TypeId {
-    pub(crate) fn typ(self, env: &TypeEnvironment) -> &Type {
+    pub(crate) fn ty(self, env: &TypeEnvironment) -> &Type {
         env.type_for_id(self)
     }
 }
@@ -19,14 +19,14 @@ pub(crate) struct TypeEnvironment {
 
 impl TypeEnvironment {
     pub(crate) fn add_class(&mut self, name: &str) -> TypeId {
-        let class = Type::Class(TypeClass {
+        let class = Type::Class(ClassType {
             name: Name::new(name),
         });
         self.types_by_id.push(class)
     }
 
     pub(crate) fn add_function(&mut self, name: &str) -> TypeId {
-        let function = Type::Function(TypeFunction {
+        let function = Type::Function(FunctionType {
             name: Name::new(name),
         });
         self.types_by_id.push(function)
@@ -38,8 +38,8 @@ impl TypeEnvironment {
 }
 
 pub(crate) enum Type {
-    Class(TypeClass),
-    Function(TypeFunction),
+    Class(ClassType),
+    Function(FunctionType),
 }
 
 impl Type {
@@ -51,21 +51,21 @@ impl Type {
     }
 }
 
-pub(crate) struct TypeClass {
+pub(crate) struct ClassType {
     name: Name,
 }
 
-impl TypeClass {
+impl ClassType {
     pub(crate) fn name(&self) -> &str {
         self.name.as_str()
     }
 }
 
-pub(crate) struct TypeFunction {
+pub(crate) struct FunctionType {
     name: Name,
 }
 
-impl TypeFunction {
+impl FunctionType {
     pub(crate) fn name(&self) -> &str {
         self.name.as_str()
     }
@@ -79,13 +79,13 @@ mod tests {
     fn add_class() {
         let mut env = TypeEnvironment::default();
         let cid = env.add_class("C");
-        assert_eq!(cid.typ(&env).name(), "C");
+        assert_eq!(cid.ty(&env).name(), "C");
     }
 
     #[test]
     fn add_function() {
         let mut env = TypeEnvironment::default();
         let fid = env.add_function("func");
-        assert_eq!(fid.typ(&env).name(), "func");
+        assert_eq!(fid.ty(&env).name(), "func");
     }
 }
