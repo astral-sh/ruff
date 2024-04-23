@@ -17,6 +17,7 @@ mod parse;
 pub mod program;
 mod source;
 mod symbols;
+mod types;
 
 pub(crate) type FxDashMap<K, V> = dashmap::DashMap<K, V, BuildHasherDefault<FxHasher>>;
 #[allow(unused)]
