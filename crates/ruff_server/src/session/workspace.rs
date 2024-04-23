@@ -12,7 +12,10 @@ use crate::{edit::DocumentVersion, Document};
 
 use self::ruff_settings::RuffSettingsIndex;
 
-use super::{settings, ClientSettings};
+use super::{
+    settings::{self, ResolvedClientSettings, ResolvedEditorSettings},
+    ClientSettings,
+};
 
 mod ruff_settings;
 
@@ -23,7 +26,7 @@ pub(crate) struct Workspaces(BTreeMap<PathBuf, Workspace>);
 
 pub(crate) struct Workspace {
     open_documents: OpenDocuments,
-    settings: ClientSettings,
+    settings: ResolvedClientSettings,
 }
 
 pub(crate) struct OpenDocuments {
@@ -46,18 +49,28 @@ pub(crate) struct DocumentRef {
 }
 
 impl Workspaces {
-    pub(super) fn new(workspaces: Vec<(Url, ClientSettings)>) -> crate::Result<Self> {
+    pub(super) fn new(
+        workspaces: Vec<(Url, ClientSettings)>,
+        global_settings: &ClientSettings,
+    ) -> crate::Result<Self> {
         Ok(Self(
             workspaces
                 .into_iter()
-                .map(|(url, settings)| Workspace::new(&url, settings))
+                .map(|(url, workspace_settings)| {
+                    Workspace::new(&url, &workspace_settings, global_settings)
+                })
                 .collect::<crate::Result<_>>()?,
         ))
     }
 
-    pub(super) fn open_workspace_folder(&mut self, folder_url: &Url) -> crate::Result<()> {
+    pub(super) fn open_workspace_folder(
+        &mut self,
+        folder_url: &Url,
+        global_settings: &ClientSettings,
+    ) -> crate::Result<()> {
         // TODO(jane): find a way to allow for workspace settings to be updated dynamically
-        let (path, workspace) = Workspace::new(folder_url, ClientSettings::default())?;
+        let (path, workspace) =
+            Workspace::new(folder_url, &ClientSettings::default(), global_settings)?;
         self.0.insert(path, workspace);
         Ok(())
     }
@@ -117,12 +130,7 @@ impl Workspaces {
                 );
                 settings::ResolvedClientSettings::global(global_settings)
             },
-            |workspace| {
-                settings::ResolvedClientSettings::with_workspace(
-                    &workspace.settings,
-                    global_settings,
-                )
-            },
+            |workspace| workspace.settings.clone(),
         )
     }
 
@@ -152,13 +160,19 @@ impl Workspaces {
 }
 
 impl Workspace {
-    pub(crate) fn new(root: &Url, settings: ClientSettings) -> crate::Result<(PathBuf, Self)> {
+    pub(crate) fn new(
+        root: &Url,
+        workspace_settings: &ClientSettings,
+        global_settings: &ClientSettings,
+    ) -> crate::Result<(PathBuf, Self)> {
         let path = root
             .to_file_path()
             .map_err(|()| anyhow!("workspace URL was not a file path!"))?;
 
+        let settings = ResolvedClientSettings::with_workspace(workspace_settings, global_settings);
+
         let workspace = Self {
-            open_documents: OpenDocuments::new(&path),
+            open_documents: OpenDocuments::new(&path, settings.editor_settings()),
             settings,
         };
 
@@ -166,15 +180,16 @@ impl Workspace {
     }
 
     fn reload_settings(&mut self, root: &Path) {
-        self.open_documents.reload_settings(root);
+        self.open_documents
+            .reload_settings(root, self.settings.editor_settings());
     }
 }
 
 impl OpenDocuments {
-    fn new(path: &Path) -> Self {
+    fn new(path: &Path, editor_settings: &ResolvedEditorSettings) -> Self {
         Self {
             documents: FxHashMap::default(),
-            settings_index: RuffSettingsIndex::new(path),
+            settings_index: RuffSettingsIndex::new(path, editor_settings),
         }
     }
 
@@ -209,8 +224,8 @@ impl OpenDocuments {
         Ok(())
     }
 
-    fn reload_settings(&mut self, root: &Path) {
-        self.settings_index = RuffSettingsIndex::new(root);
+    fn reload_settings(&mut self, root: &Path, editor_settings: &ResolvedEditorSettings) {
+        self.settings_index = RuffSettingsIndex::new(root, editor_settings);
     }
 }
 
