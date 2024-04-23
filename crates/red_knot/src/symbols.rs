@@ -399,7 +399,6 @@ impl<'a> PreorderVisitor<'a> for SymbolsBuilder<'a> {
 
 #[cfg(test)]
 mod tests {
-    use itertools::Itertools;
     use textwrap::dedent;
 
     use crate::parse::Parsed;
@@ -418,7 +417,9 @@ mod tests {
         where
             I: Iterator<Item = SymbolId>,
         {
-            it.map(|sym| sym.name.0.as_str()).sorted().collect()
+            let mut symbols: Vec<_> = it.map(|sym| sym.name.0.as_str()).collect();
+            symbols.sort();
+            symbols
         }
 
         #[test]

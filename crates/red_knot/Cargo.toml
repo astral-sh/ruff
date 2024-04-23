@@ -20,9 +20,7 @@ ruff_index = { path = "../ruff_index" }
 
 anyhow = { workspace = true }
 dashmap = { workspace = true }
-filetime = { workspace = true }
 hashbrown = { workspace = true }
-itertools = { workspace = true }
 log = { workspace = true }
 parking_lot = { workspace = true }
 rustc-hash = { workspace = true }
