@@ -13,12 +13,7 @@ impl super::RequestHandler for Hover {
 
 impl super::BackgroundDocumentRequestHandler for Hover {
     fn document_url(params: &types::HoverParams) -> std::borrow::Cow<lsp_types::Url> {
-        let url = params
-            .text_document_position_params
-            .text_document
-            .uri
-            .clone();
-        std::borrow::Cow::Owned(url)
+        std::borrow::Cow::Borrowed(&params.text_document_position_params.text_document.uri)
     }
     fn run_with_snapshot(
         snapshot: DocumentSnapshot,
