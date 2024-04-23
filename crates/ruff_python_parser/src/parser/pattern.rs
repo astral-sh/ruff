@@ -478,30 +478,34 @@ impl<'src> Parser<'src> {
                     },
                 })
             }
-            // The `+` is only for better error recovery.
-            TokenKind::Minus | TokenKind::Plus
-                if matches!(
-                    self.peek(),
-                    TokenKind::Int | TokenKind::Float | TokenKind::Complex
-                ) =>
-            {
-                let unary_expr = self.parse_unary_expression(ExpressionContext::default());
+            kind => {
+                // The `+` is only for better error recovery.
+                if let Some(unary_arithmetic_op) = kind.as_unary_arithmetic_operator() {
+                    if matches!(
+                        self.peek(),
+                        TokenKind::Int | TokenKind::Float | TokenKind::Complex
+                    ) {
+                        let unary_expr = self.parse_unary_expression(
+                            unary_arithmetic_op,
+                            ExpressionContext::default(),
+                        );
 
-                if unary_expr.op.is_u_add() {
-                    self.add_error(
-                        ParseErrorType::OtherError(
-                            "Unary '+' is not allowed as a literal pattern".to_string(),
-                        ),
-                        &unary_expr,
-                    );
+                        if unary_expr.op.is_u_add() {
+                            self.add_error(
+                                ParseErrorType::OtherError(
+                                    "Unary '+' is not allowed as a literal pattern".to_string(),
+                                ),
+                                &unary_expr,
+                            );
+                        }
+
+                        return Pattern::MatchValue(ast::PatternMatchValue {
+                            value: Box::new(Expr::UnaryOp(unary_expr)),
+                            range: self.node_range(start),
+                        });
+                    }
                 }
 
-                Pattern::MatchValue(ast::PatternMatchValue {
-                    value: Box::new(Expr::UnaryOp(unary_expr)),
-                    range: self.node_range(start),
-                })
-            }
-            kind => {
                 // Upon encountering an unexpected token, return a `Pattern::MatchValue` containing
                 // an empty `Expr::Name`.
                 let invalid_node = if kind.is_keyword() {
