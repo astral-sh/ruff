@@ -44,7 +44,7 @@ pub struct SemanticJar {
 
 /// Gives access to a specific jar in the database.
 ///
-/// Nope, the terminology isn't borrowed from Java but from Salsa (https://salsa-rs.github.io/salsa/),
+/// Nope, the terminology isn't borrowed from Java but from Salsa <https://salsa-rs.github.io/salsa/>,
 /// which is an analogy to storing the salsa in different jars.
 ///
 /// The basic idea is that each crate can define its own jar and the jars can be combined to a single

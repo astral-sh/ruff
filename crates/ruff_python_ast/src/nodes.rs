@@ -4167,7 +4167,7 @@ mod tests {
         assert_eq!(std::mem::size_of::<ExprSetComp>(), 40);
         assert_eq!(std::mem::size_of::<ExprSlice>(), 32);
         assert_eq!(std::mem::size_of::<ExprStarred>(), 24);
-        assert_eq!(std::mem::size_of::<ExprStringLiteral>(), 48);
+        assert_eq!(std::mem::size_of::<ExprStringLiteral>(), 56);
         assert_eq!(std::mem::size_of::<ExprSubscript>(), 32);
         assert_eq!(std::mem::size_of::<ExprTuple>(), 40);
         assert_eq!(std::mem::size_of::<ExprUnaryOp>(), 24);
