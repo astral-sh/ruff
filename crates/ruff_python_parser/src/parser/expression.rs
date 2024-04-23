@@ -245,7 +245,8 @@ impl<'src> Parser<'src> {
                 break;
             }
 
-            let Some(operator) = OperatorType::try_from_tokens(current_token, self.peek()) else {
+            let Some(operator) = BinaryLikeOperator::try_from_tokens(current_token, self.peek())
+            else {
                 // Not an operator.
                 break;
             };
@@ -263,13 +264,13 @@ impl<'src> Parser<'src> {
             }
 
             left.expr = match operator {
-                OperatorType::Boolean(bool_op) => {
+                BinaryLikeOperator::Boolean(bool_op) => {
                     Expr::BoolOp(self.parse_boolean_expression(left.expr, start, bool_op, context))
                 }
-                OperatorType::Comparison(cmp_op) => Expr::Compare(
+                BinaryLikeOperator::Comparison(cmp_op) => Expr::Compare(
                     self.parse_comparison_expression(left.expr, start, cmp_op, context),
                 ),
-                OperatorType::Binary(bin_op) => {
+                BinaryLikeOperator::Binary(bin_op) => {
                     self.bump(TokenKind::from(bin_op));
 
                     let right = self.parse_binary_expression_or_higher(new_precedence, context);
@@ -2361,22 +2362,22 @@ impl OperatorPrecedence {
 }
 
 #[derive(Debug)]
-enum OperatorType {
+enum BinaryLikeOperator {
     Boolean(BoolOp),
     Comparison(CmpOp),
     Binary(Operator),
 }
 
-impl OperatorType {
-    /// Attempts to convert the two tokens into the corresponding operator type. Returns [None]
-    /// if it's not an operator.
-    fn try_from_tokens(current: TokenKind, next: TokenKind) -> Option<OperatorType> {
+impl BinaryLikeOperator {
+    /// Attempts to convert the two tokens into the corresponding binary-like operator. Returns
+    /// [None] if it's not a binary-like operator.
+    fn try_from_tokens(current: TokenKind, next: TokenKind) -> Option<BinaryLikeOperator> {
         if let Some(bool_op) = current.as_bool_operator() {
-            Some(OperatorType::Boolean(bool_op))
+            Some(BinaryLikeOperator::Boolean(bool_op))
         } else if let Some(bin_op) = current.as_binary_operator() {
-            Some(OperatorType::Binary(bin_op))
+            Some(BinaryLikeOperator::Binary(bin_op))
         } else {
-            helpers::token_kind_to_cmp_op([current, next]).map(OperatorType::Comparison)
+            helpers::token_kind_to_cmp_op([current, next]).map(BinaryLikeOperator::Comparison)
         }
     }
 
@@ -2384,9 +2385,9 @@ impl OperatorType {
     /// isn't an operator token.
     fn precedence(&self) -> OperatorPrecedence {
         match self {
-            OperatorType::Boolean(bool_op) => OperatorPrecedence::from(*bool_op),
-            OperatorType::Comparison(_) => OperatorPrecedence::ComparisonsMembershipIdentity,
-            OperatorType::Binary(bin_op) => OperatorPrecedence::from(*bin_op),
+            BinaryLikeOperator::Boolean(bool_op) => OperatorPrecedence::from(*bool_op),
+            BinaryLikeOperator::Comparison(_) => OperatorPrecedence::ComparisonsMembershipIdentity,
+            BinaryLikeOperator::Binary(bin_op) => OperatorPrecedence::from(*bin_op),
         }
     }
 }
