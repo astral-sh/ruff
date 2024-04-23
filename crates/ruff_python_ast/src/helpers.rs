@@ -264,11 +264,24 @@ pub fn any_over_expr(expr: &Expr, func: &dyn Fn(&Expr) -> bool) -> bool {
 
 pub fn any_over_type_param(type_param: &TypeParam, func: &dyn Fn(&Expr) -> bool) -> bool {
     match type_param {
-        TypeParam::TypeVar(ast::TypeParamTypeVar { bound, .. }) => bound
+        TypeParam::TypeVar(ast::TypeParamTypeVar {
+            bound,
+            default_value,
+            ..
+        }) => {
+            bound
+                .as_ref()
+                .is_some_and(|value| any_over_expr(value, func))
+                || default_value
+                    .as_ref()
+                    .is_some_and(|value| any_over_expr(value, func))
+        }
+        TypeParam::TypeVarTuple(ast::TypeParamTypeVarTuple { default_value, .. }) => default_value
             .as_ref()
             .is_some_and(|value| any_over_expr(value, func)),
-        TypeParam::TypeVarTuple(ast::TypeParamTypeVarTuple { .. }) => false,
-        TypeParam::ParamSpec(ast::TypeParamParamSpec { .. }) => false,
+        TypeParam::ParamSpec(ast::TypeParamParamSpec { default_value, .. }) => default_value
+            .as_ref()
+            .is_some_and(|value| any_over_expr(value, func)),
     }
 }
 
