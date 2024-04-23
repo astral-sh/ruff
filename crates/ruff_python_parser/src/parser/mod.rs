@@ -261,12 +261,59 @@ impl<'src> Parser<'src> {
     }
 
     fn node_range(&self, start: TextSize) -> TextRange {
-        // It's possible during error recovery that the parsing didn't consume any tokens. In that case,
-        // `last_token_end` still points to the end of the previous token but `start` is the start of the current token.
-        // Calling `TextRange::new(start, self.last_token_end)` would panic in that case because `start > end`.
-        // This path "detects" this case and creates an empty range instead.
-        if self.node_start() == start {
-            TextRange::empty(start)
+        // It's possible during error recovery that the parsing didn't consume any tokens. In that
+        // case, `last_token_end` still points to the end of the previous token but `start` is the
+        // start of the current token. Calling `TextRange::new(start, self.last_token_end)` would
+        // panic in that case because `start > end`. This path "detects" this case and creates an
+        // empty range instead.
+        //
+        // The reason it's `<=` instead of just `==` is because there could be whitespaces between
+        // the two tokens. For example:
+        //
+        // ```python
+        // #     last token end
+        // #     | current token (newline) start
+        // #     v v
+        // def foo \n
+        // #      ^
+        // #      assume there's trailing whitespace here
+        // ```
+        //
+        // Or, there could tokens that are considered "trivia" and thus aren't emitted by the token
+        // source. These are comments and non-logical newlines. For example:
+        //
+        // ```python
+        // #     last token end
+        // #     v
+        // def foo # comment\n
+        // #                ^ current token (newline) start
+        // ```
+        //
+        // In either of the above cases, there's a "gap" between the end of the last token and start
+        // of the current token.
+        if self.last_token_end <= start {
+            // We need to create an empty range at the last token end instead of the start because
+            // otherwise this node range will fall outside the range of it's parent node. Taking
+            // the above example:
+            //
+            // ```python
+            // if True:
+            // #   function start
+            // #   |     function end
+            // #   v     v
+            //     def foo # comment
+            // #                    ^ current token start
+            // ```
+            //
+            // Here, the current token start is the start of parameter range but the function ends
+            // at `foo`. Even if there's a function body, the range of parameters would still be
+            // before the comment.
+
+            // test_err node_range_with_gaps
+            // def foo # comment
+            // def bar(): ...
+            // def baz
+            TextRange::empty(self.last_token_end)
         } else {
             TextRange::new(start, self.last_token_end)
         }

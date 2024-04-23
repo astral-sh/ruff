@@ -1,56 +1,48 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-RUF029.py:34:11: RUF029 Function `fail_1a` is declared `async`, but doesn't `await` or use `async` features.
+RUF029.py:38:11: RUF029 Function `fail_1a` is declared `async`, but doesn't `await` or use `async` features.
    |
-34 | async def fail_1a():  # RUF029
+38 | async def fail_1a():  # RUF029
    |           ^^^^^^^ RUF029
-35 |     time.sleep(1)
+39 |     time.sleep(1)
    |
 
-RUF029.py:38:11: RUF029 Function `fail_1b` is declared `async`, but doesn't `await` or use `async` features.
+RUF029.py:42:11: RUF029 Function `fail_1b` is declared `async`, but doesn't `await` or use `async` features.
    |
-38 | async def fail_1b():  # RUF029: yield does not require async
+42 | async def fail_1b():  # RUF029: yield does not require async
    |           ^^^^^^^ RUF029
-39 |     yield "hello"
+43 |     yield "hello"
    |
 
-RUF029.py:42:11: RUF029 Function `fail_2` is declared `async`, but doesn't `await` or use `async` features.
+RUF029.py:46:11: RUF029 Function `fail_2` is declared `async`, but doesn't `await` or use `async` features.
    |
-42 | async def fail_2():  # RUF029
+46 | async def fail_2():  # RUF029
    |           ^^^^^^ RUF029
-43 |     with None as i:
-44 |         pass
+47 |     with None as i:
+48 |         pass
    |
 
-RUF029.py:47:11: RUF029 Function `fail_3` is declared `async`, but doesn't `await` or use `async` features.
+RUF029.py:51:11: RUF029 Function `fail_3` is declared `async`, but doesn't `await` or use `async` features.
    |
-47 | async def fail_3():  # RUF029
+51 | async def fail_3():  # RUF029
    |           ^^^^^^ RUF029
-48 |     for i in []:
-49 |         pass
+52 |     for i in []:
+53 |         pass
    |
 
-RUF029.py:54:11: RUF029 Function `fail_4a` is declared `async`, but doesn't `await` or use `async` features.
+RUF029.py:58:11: RUF029 Function `fail_4a` is declared `async`, but doesn't `await` or use `async` features.
    |
-54 | async def fail_4a():  # RUF029: the /outer/ function does not await
+58 | async def fail_4a():  # RUF029: the /outer/ function does not await
    |           ^^^^^^^ RUF029
-55 |     async def foo():
-56 |         await bla
+59 |     async def foo():
+60 |         await bla
    |
 
-RUF029.py:59:11: RUF029 Function `fail_4b` is declared `async`, but doesn't `await` or use `async` features.
+RUF029.py:63:11: RUF029 Function `fail_4b` is declared `async`, but doesn't `await` or use `async` features.
    |
-59 | async def fail_4b():  # RUF029: the /outer/ function does not await
+63 | async def fail_4b():  # RUF029: the /outer/ function does not await
    |           ^^^^^^^ RUF029
-60 |     class Foo:
-61 |         async def foo():
-   |
-
-RUF029.py:66:15: RUF029 Function `fail_4c` is declared `async`, but doesn't `await` or use `async` features.
-   |
-65 | def foo():
-66 |     async def fail_4c():  # RUF029: the /inner/ function does not await
-   |               ^^^^^^^ RUF029
-67 |         pass
+64 |     class Foo:
+65 |         async def foo(self):
    |

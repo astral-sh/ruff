@@ -11,17 +11,19 @@ line-length = 88
 line-length = 88
 
 [tool.ruff.lint]
-select = ["ALL"]
-ignore = [
-  "C901",  # McCabe complexity
-  "D",     # pydocstyle
-  "PL",    # pylint
-  "S",     # bandit
-  "G",     # flake8-logging
-  "T",     # flake8-print
-  "FBT",   # flake8-boolean-trap
-  "PERF",  # perflint
-  "ANN401",
+select = [
+  "E",   # pycodestyle (error)
+  "F",   # pyflakes
+  "B",   # bugbear
+  "B9",
+  "C4",  # flake8-comprehensions
+  "SIM", # flake8-simplify
+  "I",   # isort
+  "UP",  # pyupgrade
+  "PIE", # flake8-pie
+  "PGH", # pygrep-hooks
+  "PYI", # flake8-pyi
+  "RUF",
 ]
 
 [tool.ruff.lint.isort]

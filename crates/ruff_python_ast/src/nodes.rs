@@ -181,7 +181,7 @@ pub struct StmtFunctionDef {
     pub is_async: bool,
     pub decorator_list: Vec<Decorator>,
     pub name: Identifier,
-    pub type_params: Option<TypeParams>,
+    pub type_params: Option<Box<TypeParams>>,
     pub parameters: Box<Parameters>,
     pub returns: Option<Box<Expr>>,
     pub body: Vec<Stmt>,
@@ -4171,8 +4171,8 @@ mod tests {
     #[test]
     #[cfg(target_pointer_width = "64")]
     fn size() {
-        assert!(std::mem::size_of::<Stmt>() <= 144);
-        assert!(std::mem::size_of::<StmtFunctionDef>() <= 144);
+        assert!(std::mem::size_of::<Stmt>() <= 120);
+        assert!(std::mem::size_of::<StmtFunctionDef>() <= 120);
         assert!(std::mem::size_of::<StmtClassDef>() <= 104);
         assert!(std::mem::size_of::<StmtTry>() <= 112);
         assert!(std::mem::size_of::<Mod>() <= 32);

@@ -3,6 +3,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::visitor::preorder;
 use ruff_python_ast::{self as ast, AnyNodeRef, Expr, Stmt};
+use ruff_python_semantic::analyze::function_type::is_stub;
 
 use crate::checkers::ast::Checker;
 
@@ -83,6 +84,11 @@ impl<'a> preorder::PreorderVisitor<'a> for AsyncExprVisitor {
             _ => preorder::walk_stmt(self, stmt),
         }
     }
+    fn visit_comprehension(&mut self, comprehension: &'a ast::Comprehension) {
+        if comprehension.is_async {
+            self.found_await_or_async = true;
+        }
+    }
 }
 
 /// Very nearly `crate::node::StmtFunctionDef.visit_preorder`, except it is specialized and,
@@ -157,6 +163,11 @@ pub(crate) fn unused_async(
     }
 
     if checker.semantic().current_scope().kind.is_class() {
+        return;
+    }
+
+    // Ignore stubs (e.g., `...`).
+    if is_stub(function_def, checker.semantic()) {
         return;
     }
 
