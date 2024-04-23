@@ -76,7 +76,7 @@ pub(crate) fn bad_open_mode(checker: &mut Checker, call: &ast::ExprCall) {
 }
 
 #[derive(Debug, Copy, Clone)]
-pub enum Kind {
+pub(crate) enum Kind {
     /// A call to the builtin `open(...)`.
     Builtin,
     /// A call to `pathlib.Path(...).open(...)`.
