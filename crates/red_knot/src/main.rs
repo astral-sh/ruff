@@ -1,4 +1,10 @@
 use std::path::PathBuf;
+use tracing::level_filters::LevelFilter;
+use tracing::subscriber::Interest;
+use tracing::{Level, Metadata};
+use tracing_subscriber::layer::{Context, Filter, SubscriberExt};
+use tracing_subscriber::{Layer, Registry};
+use tracing_tree::time::Uptime;
 
 use red_knot::db::{HasJar, SourceDb, SourceJar};
 use red_knot::module::{ModuleSearchPath, ModuleSearchPathKind};
@@ -7,6 +13,8 @@ use red_knot::{files, Workspace};
 
 #[allow(clippy::dbg_macro, clippy::print_stdout, clippy::unnecessary_wraps)]
 fn main() -> anyhow::Result<()> {
+    setup_tracing();
+
     let files = files::Files::default();
     let mut workspace = Workspace::new(PathBuf::from("/home/micha/astral/test/"));
 
@@ -28,7 +36,7 @@ fn main() -> anyhow::Result<()> {
 
     // TODO: discover all python files and intern the file ids?
 
-    println!("start analysis for {workspace:#?}");
+    tracing::debug!("start analysis for workspace");
 
     let workspace_search_path = ModuleSearchPath::new(
         workspace.root().to_path_buf(),
@@ -132,4 +140,55 @@ fn main() -> anyhow::Result<()> {
     dbg!(source_jar.sources.statistics());
 
     Ok(())
+}
+
+fn setup_tracing() {
+    let subscriber = Registry::default().with(
+        tracing_tree::HierarchicalLayer::default()
+            .with_indent_lines(true)
+            .with_indent_amount(2)
+            .with_bracketed_fields(true)
+            .with_targets(true)
+            .with_writer(|| Box::new(std::io::stderr()))
+            .with_timer(Uptime::default())
+            .with_filter(LoggingFilter {
+                trace_level: Level::TRACE,
+            }),
+    );
+
+    tracing::subscriber::set_global_default(subscriber).unwrap();
+}
+
+struct LoggingFilter {
+    trace_level: Level,
+}
+
+impl LoggingFilter {
+    fn is_enabled(&self, meta: &Metadata<'_>) -> bool {
+        let filter = if meta.target().starts_with("red_knot") || meta.target().starts_with("ruff") {
+            self.trace_level
+        } else {
+            Level::INFO
+        };
+
+        meta.level() <= &filter
+    }
+}
+
+impl<S> Filter<S> for LoggingFilter {
+    fn enabled(&self, meta: &Metadata<'_>, _cx: &Context<'_, S>) -> bool {
+        self.is_enabled(meta)
+    }
+
+    fn callsite_enabled(&self, meta: &'static Metadata<'static>) -> Interest {
+        if self.is_enabled(meta) {
+            Interest::always()
+        } else {
+            Interest::never()
+        }
+    }
+
+    fn max_level_hint(&self) -> Option<LevelFilter> {
+        Some(LevelFilter::from_level(self.trace_level))
+    }
 }

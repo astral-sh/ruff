@@ -1830,6 +1830,8 @@ dependencies = [
  "tempfile",
  "textwrap",
  "tracing",
+ "tracing-subscriber",
+ "tracing-tree",
 ]
 
 [[package]]
