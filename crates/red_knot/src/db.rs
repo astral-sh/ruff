@@ -5,6 +5,7 @@ use crate::files::FileId;
 use crate::module::{Module, ModuleData, ModuleName, ModuleResolver, ModuleSearchPath};
 use crate::parse::{Parsed, ParsedStorage};
 use crate::source::{Source, SourceStorage};
+use crate::symbols::{SymbolTable, SymbolTablesStorage};
 
 pub trait SourceDb {
     // queries
@@ -20,6 +21,8 @@ pub trait SourceDb {
 pub trait SemanticDb: SourceDb {
     // queries
     fn resolve_module(&self, name: ModuleName) -> Option<Module>;
+
+    fn symbol_table(&self, file_id: FileId) -> Arc<SymbolTable>;
 
     // mutations
     fn path_to_module(&mut self, path: &Path) -> Option<Module>;
@@ -40,6 +43,7 @@ pub struct SourceJar {
 #[derive(Debug, Default)]
 pub struct SemanticJar {
     pub module_resolver: ModuleResolver,
+    pub symbol_tables: SymbolTablesStorage,
 }
 
 /// Gives access to a specific jar in the database.
@@ -72,6 +76,7 @@ pub(crate) mod tests {
     };
     use crate::parse::{parse, Parsed};
     use crate::source::{source_text, Source};
+    use crate::symbols::{symbol_table, SymbolTable};
     use std::path::Path;
     use std::sync::Arc;
 
@@ -127,6 +132,10 @@ pub(crate) mod tests {
     impl SemanticDb for TestDb {
         fn resolve_module(&self, name: ModuleName) -> Option<Module> {
             resolve_module(self, name)
+        }
+
+        fn symbol_table(&self, file_id: FileId) -> Arc<SymbolTable> {
+            symbol_table(self, file_id)
         }
 
         fn path_to_module(&mut self, path: &Path) -> Option<Module> {

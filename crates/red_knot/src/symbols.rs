@@ -2,6 +2,8 @@
 
 use std::hash::{Hash, Hasher};
 use std::iter::{Copied, DoubleEndedIterator, FusedIterator};
+use std::ops::{Deref, DerefMut};
+use std::sync::Arc;
 
 use hashbrown::hash_map::{Keys, RawEntryMut};
 use rustc_hash::{FxHashMap, FxHasher};
@@ -11,7 +13,24 @@ use ruff_python_ast as ast;
 use ruff_python_ast::visitor::preorder::PreorderVisitor;
 
 use crate::ast_ids::TypedNodeKey;
+use crate::cache::KeyValueCache;
+use crate::db::{HasJar, SemanticDb, SemanticJar};
+use crate::files::FileId;
 use crate::Name;
+
+#[allow(unreachable_pub)]
+#[tracing::instrument(level = "trace", skip(db))]
+pub fn symbol_table<Db>(db: &Db, file_id: FileId) -> Arc<SymbolTable>
+where
+    Db: SemanticDb + HasJar<SemanticJar>,
+{
+    let jar = db.jar();
+
+    jar.symbol_tables.get(&file_id, |_| {
+        let parsed = db.parse(file_id);
+        Arc::from(SymbolTable::from_ast(parsed.ast()))
+    })
+}
 
 type Map<K, V> = hashbrown::HashMap<K, V, ()>;
 
@@ -103,7 +122,7 @@ pub(crate) struct ImportFromDefinition {
 
 /// Table of all symbols in all scopes for a module.
 #[derive(Debug)]
-pub(crate) struct SymbolTable {
+pub struct SymbolTable {
     scopes_by_id: IndexVec<ScopeId, Scope>,
     symbols_by_id: IndexVec<SymbolId, Symbol>,
     defs: FxHashMap<SymbolId, Vec<Definition>>,
@@ -456,6 +475,23 @@ impl PreorderVisitor<'_> for SymbolTableBuilder {
                 ast::visitor::preorder::walk_stmt(self, stmt);
             }
         }
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct SymbolTablesStorage(KeyValueCache<FileId, Arc<SymbolTable>>);
+
+impl Deref for SymbolTablesStorage {
+    type Target = KeyValueCache<FileId, Arc<SymbolTable>>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for SymbolTablesStorage {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
     }
 }
 
