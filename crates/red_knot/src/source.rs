@@ -5,6 +5,7 @@ use std::sync::Arc;
 
 use crate::files::FileId;
 
+#[tracing::instrument(level = "trace", skip(db))]
 pub(crate) fn source_text<Db>(db: &Db, file_id: FileId) -> Source
 where
     Db: SourceDb + HasJar<SourceJar>,

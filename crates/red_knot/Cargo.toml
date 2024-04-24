@@ -27,6 +27,8 @@ rustc-hash = { workspace = true }
 smallvec = { workspace = true }
 smol_str = "0.2.1"
 tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+tracing-tree = { workspace = true }
 
 [dev-dependencies]
 textwrap = "0.16.1"
