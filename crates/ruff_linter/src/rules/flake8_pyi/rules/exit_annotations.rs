@@ -1,16 +1,16 @@
 use std::fmt::{Display, Formatter};
 
 use ruff_python_ast::{
-    Expr, ExprBinOp, ExprSubscript, ExprTuple, Identifier, Operator, ParameterWithDefault,
-    Parameters,
+    Expr, ExprBinOp, ExprSubscript, ExprTuple, Operator, ParameterWithDefault, Parameters, Stmt,
+    StmtClassDef, StmtFunctionDef,
 };
 use smallvec::SmallVec;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
-use ruff_python_semantic::SemanticModel;
-use ruff_text_size::Ranged;
+use ruff_python_semantic::{analyze::visibility::is_overload, SemanticModel};
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 
@@ -68,6 +68,10 @@ impl Violation for BadExitAnnotation {
             ErrorKind::FirstArgBadAnnotation => format!("The first argument in `{method_name}` should be annotated with `object` or `type[BaseException] | None`"),
             ErrorKind::SecondArgBadAnnotation => format!("The second argument in `{method_name}` should be annotated with `object` or `BaseException | None`"),
             ErrorKind::ThirdArgBadAnnotation => format!("The third argument in `{method_name}` should be annotated with `object` or `types.TracebackType | None`"),
+            ErrorKind::UnrecognizedExitOverload => format!(
+                "Annotations for a three-argument `{method_name}` overload (excluding `self`) \
+                should either be `None, None, None` or `type[BaseException], BaseException, types.TracebackType`"
+            )
         }
     }
 
@@ -80,18 +84,24 @@ impl Violation for BadExitAnnotation {
     }
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, is_macro::Is)]
 enum FuncKind {
     Sync,
     Async,
 }
 
+impl FuncKind {
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::Async => "__aexit__",
+            Self::Sync => "__exit__",
+        }
+    }
+}
+
 impl Display for FuncKind {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            FuncKind::Sync => write!(f, "__exit__"),
-            FuncKind::Async => write!(f, "__aexit__"),
-        }
+        f.write_str(self.as_str())
     }
 }
 
@@ -104,37 +114,59 @@ enum ErrorKind {
     ThirdArgBadAnnotation,
     ArgsAfterFirstFourMustHaveDefault,
     AllKwargsMustHaveDefault,
+    UnrecognizedExitOverload,
 }
 
 /// PYI036
-pub(crate) fn bad_exit_annotation(
-    checker: &mut Checker,
-    is_async: bool,
-    name: &Identifier,
-    parameters: &Parameters,
-) {
+pub(crate) fn bad_exit_annotation(checker: &mut Checker, function: &StmtFunctionDef) {
+    let StmtFunctionDef {
+        is_async,
+        decorator_list,
+        name,
+        parameters,
+        ..
+    } = function;
+
     let func_kind = match name.as_str() {
         "__exit__" if !is_async => FuncKind::Sync,
-        "__aexit__" if is_async => FuncKind::Async,
+        "__aexit__" if *is_async => FuncKind::Async,
         _ => return,
     };
 
-    let positional_args = parameters
-        .args
+    let semantic = checker.semantic();
+
+    let Some(Stmt::ClassDef(parent_class_def)) = semantic.current_statement_parent() else {
+        return;
+    };
+
+    let non_self_positional_args: SmallVec<[&ParameterWithDefault; 3]> = parameters
+        .posonlyargs
         .iter()
-        .chain(parameters.posonlyargs.iter())
-        .collect::<SmallVec<[&ParameterWithDefault; 4]>>();
+        .chain(parameters.args.iter())
+        .skip(1)
+        .collect();
+
+    if is_overload(decorator_list, semantic) {
+        check_positional_args_for_overloaded_method(
+            checker,
+            &non_self_positional_args,
+            func_kind,
+            parent_class_def,
+            parameters.range(),
+        );
+        return;
+    }
 
     // If there are less than three positional arguments, at least one of them must be a star-arg,
     // and it must be annotated with `object`.
-    if positional_args.len() < 4 {
+    if non_self_positional_args.len() < 3 {
         check_short_args_list(checker, parameters, func_kind);
     }
 
     // Every positional argument (beyond the first four) must have a default.
-    for parameter in positional_args
+    for parameter in non_self_positional_args
         .iter()
-        .skip(4)
+        .skip(3)
         .filter(|parameter| parameter.default.is_none())
     {
         checker.diagnostics.push(Diagnostic::new(
@@ -161,7 +193,7 @@ pub(crate) fn bad_exit_annotation(
         ));
     }
 
-    check_positional_args(checker, &positional_args, func_kind);
+    check_positional_args_for_non_overloaded_method(checker, &non_self_positional_args, func_kind);
 }
 
 /// Determine whether a "short" argument list (i.e., an argument list with less than four elements)
@@ -204,11 +236,11 @@ fn check_short_args_list(checker: &mut Checker, parameters: &Parameters, func_ki
     }
 }
 
-/// Determines whether the positional arguments of an `__exit__` or `__aexit__` method are
-/// annotated correctly.
-fn check_positional_args(
+/// Determines whether the positional arguments of an `__exit__` or `__aexit__` method
+/// (that is not decorated with `@typing.overload`) are annotated correctly.
+fn check_positional_args_for_non_overloaded_method(
     checker: &mut Checker,
-    positional_args: &[&ParameterWithDefault],
+    non_self_positional_args: &[&ParameterWithDefault],
     kind: FuncKind,
 ) {
     // For each argument, define the predicate against which to check the annotation.
@@ -222,7 +254,7 @@ fn check_positional_args(
         (ErrorKind::ThirdArgBadAnnotation, is_traceback_type),
     ];
 
-    for (arg, (error_info, predicate)) in positional_args.iter().skip(1).take(3).zip(validations) {
+    for (arg, (error_info, predicate)) in non_self_positional_args.iter().take(3).zip(validations) {
         let Some(annotation) = arg.parameter.annotation.as_ref() else {
             continue;
         };
@@ -249,6 +281,148 @@ fn check_positional_args(
     }
 }
 
+/// Determines whether the positional arguments of an `__exit__` or `__aexit__` method
+/// overload are annotated correctly.
+fn check_positional_args_for_overloaded_method(
+    checker: &mut Checker,
+    non_self_positional_args: &[&ParameterWithDefault],
+    kind: FuncKind,
+    parent_class_def: &StmtClassDef,
+    parameters_range: TextRange,
+) {
+    fn parameter_annotation_loosely_matches_predicate(
+        parameter: &ParameterWithDefault,
+        predicate: impl FnOnce(&Expr) -> bool,
+        semantic: &SemanticModel,
+    ) -> bool {
+        parameter
+            .parameter
+            .annotation
+            .as_ref()
+            .map_or(true, |annotation| {
+                predicate(annotation) || is_object_or_unused(annotation, semantic)
+            })
+    }
+
+    let semantic = checker.semantic();
+
+    // Collect all the overloads for this method into a SmallVec
+    let function_overloads: SmallVec<[&StmtFunctionDef; 2]> = parent_class_def
+        .body
+        .iter()
+        .filter_map(|stmt| {
+            let func_def = stmt.as_function_def_stmt()?;
+            if &func_def.name == kind.as_str() && is_overload(&func_def.decorator_list, semantic) {
+                Some(func_def)
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    // If the number of overloads for this method is not exactly 2, don't do any checking
+    if function_overloads.len() != 2 {
+        return;
+    }
+
+    for function_def in &function_overloads {
+        let StmtFunctionDef {
+            is_async,
+            parameters,
+            ..
+        } = function_def;
+
+        // If any overloads are an unexpected sync/async colour, don't do any checking
+        if *is_async != kind.is_async() {
+            return;
+        }
+
+        // If any overloads have any variadic arguments, don't do any checking
+        let Parameters {
+            range: _,
+            posonlyargs,
+            args,
+            vararg: None,
+            kwonlyargs,
+            kwarg: None,
+        } = &**parameters
+        else {
+            return;
+        };
+
+        // If any overloads have any keyword-only arguments, don't do any checking
+        if !kwonlyargs.is_empty() {
+            return;
+        }
+
+        // If the number of non-keyword-only arguments is not exactly equal to 4
+        // for any overloads, don't do any checking
+        if posonlyargs.len() + args.len() != 4 {
+            return;
+        }
+    }
+
+    debug_assert!(
+        function_overloads.contains(&semantic.current_statement().as_function_def_stmt().unwrap())
+    );
+
+    // We've now established that no overloads for this method have any variadic parameters,
+    // no overloads have any keyword-only parameters, all overloads are the expected
+    // sync/async colour, and all overloads have exactly 3 non-`self` non-keyword-only parameters.
+    // The method we're currently looking at is one of those overloads.
+    // It therefore follows that, in order for it to be correctly annotated, it must be
+    // one of the following two possible overloads:
+    //
+    // ```
+    // @overload
+    // def __(a)exit__(self, typ: None, exc: None, tb: None) -> None: ...
+    // @overload
+    // def __(a)exit__(self, typ: type[BaseException], exc: BaseException, tb: TracebackType) -> None: ...
+    // ```
+    //
+    // We'll allow small variations on either of these (if, e.g. a parameter is unannotated,
+    // annotated with `object` or `_typeshed.Unused`). *Basically*, though, the rule is:
+    // - If the function overload matches *either* of those, it's okay.
+    // - If not: emit a diagnostic.
+
+    // Start by checking the first possibility:
+    if non_self_positional_args.iter().all(|parameter| {
+        parameter_annotation_loosely_matches_predicate(
+            parameter,
+            Expr::is_none_literal_expr,
+            semantic,
+        )
+    }) {
+        return;
+    }
+
+    // Now check the second:
+    if parameter_annotation_loosely_matches_predicate(
+        non_self_positional_args[0],
+        |annotation| is_base_exception_type(annotation, semantic),
+        semantic,
+    ) && parameter_annotation_loosely_matches_predicate(
+        non_self_positional_args[1],
+        |annotation| semantic.match_builtin_expr(annotation, "BaseException"),
+        semantic,
+    ) && parameter_annotation_loosely_matches_predicate(
+        non_self_positional_args[2],
+        |annotation| is_traceback_type(annotation, semantic),
+        semantic,
+    ) {
+        return;
+    }
+
+    // Okay, neither of them match...
+    checker.diagnostics.push(Diagnostic::new(
+        BadExitAnnotation {
+            func_kind: kind,
+            error_kind: ErrorKind::UnrecognizedExitOverload,
+        },
+        parameters_range,
+    ));
+}
+
 /// Return the non-`None` annotation element of a PEP 604-style union or `Optional` annotation.
 fn non_none_annotation_element<'a>(
     annotation: &'a Expr,
@@ -256,12 +430,9 @@ fn non_none_annotation_element<'a>(
 ) -> Option<&'a Expr> {
     // E.g., `typing.Union` or `typing.Optional`
     if let Expr::Subscript(ExprSubscript { value, slice, .. }) = annotation {
-        let qualified_name = semantic.resolve_qualified_name(value);
+        let qualified_name = semantic.resolve_qualified_name(value)?;
 
-        if qualified_name
-            .as_ref()
-            .is_some_and(|value| semantic.match_typing_qualified_name(value, "Optional"))
-        {
+        if semantic.match_typing_qualified_name(&qualified_name, "Optional") {
             return if slice.is_none_literal_expr() {
                 None
             } else {
@@ -269,16 +440,11 @@ fn non_none_annotation_element<'a>(
             };
         }
 
-        if !qualified_name
-            .as_ref()
-            .is_some_and(|value| semantic.match_typing_qualified_name(value, "Union"))
-        {
+        if !semantic.match_typing_qualified_name(&qualified_name, "Union") {
             return None;
         }
 
-        let Expr::Tuple(ExprTuple { elts, .. }) = slice.as_ref() else {
-            return None;
-        };
+        let ExprTuple { elts, .. } = slice.as_tuple_expr()?;
 
         let [left, right] = elts.as_slice() else {
             return None;
@@ -318,7 +484,6 @@ fn non_none_annotation_element<'a>(
 fn is_object_or_unused(expr: &Expr, semantic: &SemanticModel) -> bool {
     semantic
         .resolve_qualified_name(expr)
-        .as_ref()
         .is_some_and(|qualified_name| {
             matches!(
                 qualified_name.segments(),
@@ -331,7 +496,6 @@ fn is_object_or_unused(expr: &Expr, semantic: &SemanticModel) -> bool {
 fn is_traceback_type(expr: &Expr, semantic: &SemanticModel) -> bool {
     semantic
         .resolve_qualified_name(expr)
-        .as_ref()
         .is_some_and(|qualified_name| {
             matches!(qualified_name.segments(), ["types", "TracebackType"])
         })
