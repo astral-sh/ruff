@@ -279,7 +279,10 @@ impl<N: AstNode> TypedNodeKey<N> {
             kind: node.as_any_node_ref().kind(),
             range: node.range(),
         };
-        Self::new(inner).unwrap()
+        Self {
+            inner,
+            _marker: PhantomData,
+        }
     }
 
     pub fn new(node_key: NodeKey) -> Option<Self> {

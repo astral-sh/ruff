@@ -4,14 +4,14 @@ use std::hash::{Hash, Hasher};
 use std::iter::{Copied, DoubleEndedIterator, FusedIterator};
 
 use hashbrown::hash_map::{Keys, RawEntryMut};
-use rustc_hash::FxHasher;
+use rustc_hash::{FxHashMap, FxHasher};
 
 use ruff_index::{newtype_index, IndexVec};
 use ruff_python_ast as ast;
 use ruff_python_ast::visitor::preorder::PreorderVisitor;
 
 use crate::ast_ids::TypedNodeKey;
-use crate::{FxDashMap, Name};
+use crate::Name;
 
 type Map<K, V> = hashbrown::HashMap<K, V, ()>;
 
@@ -104,14 +104,14 @@ pub(crate) struct ImportFromDefinition {
 #[derive(Debug)]
 pub(crate) struct Symbols {
     pub(crate) table: SymbolTable,
-    pub(crate) defs: FxDashMap<SymbolId, Vec<Definition>>,
+    pub(crate) defs: FxHashMap<SymbolId, Vec<Definition>>,
 }
 
 impl Symbols {
     pub(crate) fn from_ast(module: &ast::ModModule) -> Self {
         let symbols = Symbols {
             table: SymbolTable::new(),
-            defs: FxDashMap::default(),
+            defs: FxHashMap::default(),
         };
         let root_scope_id = SymbolTable::root_scope_id();
         let mut builder = SymbolsBuilder {
@@ -522,10 +522,7 @@ mod tests {
             let syms = Symbols::from_ast(parsed.ast());
             assert_eq!(names(syms.table.root_symbols()), vec!["foo"]);
             assert_eq!(
-                syms.defs
-                    .get(&syms.table.root_symbol_id_by_name("foo").unwrap())
-                    .unwrap()
-                    .len(),
+                syms.defs[&syms.table.root_symbol_id_by_name("foo").unwrap()].len(),
                 1
             );
         }
@@ -550,10 +547,7 @@ mod tests {
             let syms = Symbols::from_ast(parsed.ast());
             assert_eq!(names(syms.table.root_symbols()), vec!["foo"]);
             assert_eq!(
-                syms.defs
-                    .get(&syms.table.root_symbol_id_by_name("foo").unwrap())
-                    .unwrap()
-                    .len(),
+                syms.defs[&syms.table.root_symbol_id_by_name("foo").unwrap()].len(),
                 1
             );
         }
@@ -577,10 +571,7 @@ mod tests {
             assert_eq!(c_scope.name(), "C");
             assert_eq!(names(table.symbols_for_scope(scopes[0])), vec!["x"]);
             assert_eq!(
-                syms.defs
-                    .get(&syms.table.root_symbol_id_by_name("C").unwrap())
-                    .unwrap()
-                    .len(),
+                syms.defs[&syms.table.root_symbol_id_by_name("C").unwrap()].len(),
                 1
             );
         }
@@ -604,10 +595,7 @@ mod tests {
             assert_eq!(func_scope.name(), "func");
             assert_eq!(names(table.symbols_for_scope(scopes[0])), vec!["x"]);
             assert_eq!(
-                syms.defs
-                    .get(&syms.table.root_symbol_id_by_name("func").unwrap())
-                    .unwrap()
-                    .len(),
+                syms.defs[&syms.table.root_symbol_id_by_name("func").unwrap()].len(),
                 1
             );
         }
@@ -636,10 +624,7 @@ mod tests {
             assert_eq!(names(table.symbols_for_scope(scopes[0])), vec!["x"]);
             assert_eq!(names(table.symbols_for_scope(scopes[1])), vec!["y"]);
             assert_eq!(
-                syms.defs
-                    .get(&syms.table.root_symbol_id_by_name("func").unwrap())
-                    .unwrap()
-                    .len(),
+                syms.defs[&syms.table.root_symbol_id_by_name("func").unwrap()].len(),
                 2
             );
         }
