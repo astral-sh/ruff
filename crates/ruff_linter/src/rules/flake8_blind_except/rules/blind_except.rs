@@ -87,18 +87,25 @@ pub(crate) fn blind_except(
     if !matches!(builtin_exception_type, "BaseException" | "Exception") {
         return;
     }
-
     // If the exception is re-raised, don't flag an error.
     if body.iter().any(|stmt| {
-        if let Stmt::Raise(ast::StmtRaise { exc, .. }) = stmt {
-            if let Some(exc) = exc {
-                if let Expr::Name(ast::ExprName { id, .. }) = exc.as_ref() {
+        if let Stmt::Raise(ast::StmtRaise { exc, cause, .. }) = stmt {
+            if let Some(cause) = cause {
+                if let Expr::Name(ast::ExprName { id, .. }) = cause.as_ref() {
                     name.is_some_and(|name| id == name)
                 } else {
                     false
                 }
             } else {
-                true
+                if let Some(exc) = exc {
+                    if let Expr::Name(ast::ExprName { id, .. }) = exc.as_ref() {
+                        name.is_some_and(|name| id == name)
+                    } else {
+                        false
+                    }
+                } else {
+                    true
+                }
             }
         } else {
             false
