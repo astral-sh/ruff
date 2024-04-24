@@ -3205,11 +3205,36 @@ impl<'src> Parser<'src> {
                 None
             };
 
+            let default_value = if self.eat(TokenKind::Equal) {
+                if self.at_expr() {
+                    // test_err type_param_invalid_default_expr
+                    // type X[T = *int] = int
+                    // type X[T = yield x] = int
+                    // type X[T = (yield x)] = int
+                    // type X[T = yield from x] = int
+                    // type X[T = x := int] = int
+                    // type X[T: int = *int] = int
+                    Some(Box::new(self.parse_conditional_expression_or_higher().expr))
+                } else {
+                    // test_err type_param_missing_default
+                    // type X[T =] = int
+                    // type X[T: int =] = int
+                    // type X[T1 =, T2] = int
+                    self.add_error(
+                        ParseErrorType::ExpectedExpression,
+                        self.current_token_range(),
+                    );
+                    None
+                }
+            } else {
+                None
+            };
+
             ast::TypeParam::TypeVar(ast::TypeParamTypeVar {
                 range: self.node_range(start),
                 name,
                 bound,
-                default_value: None, // TODO(jelle)
+                default_value,
             })
         }
     }
