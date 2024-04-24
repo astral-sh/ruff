@@ -82,6 +82,14 @@ impl Scope {
     }
 }
 
+#[derive(Debug)]
+pub(crate) enum Disposition {
+    FreeVar,
+    CellVar,
+    ExplicitGlobal,
+    ImplicitGlobal,
+}
+
 bitflags! {
     #[derive(Debug)]
     pub(crate) struct SymbolFlags: u8 {
@@ -96,6 +104,7 @@ bitflags! {
 pub(crate) struct Symbol {
     name: Name,
     flags: SymbolFlags,
+    //disposition: Disposition, // TODO: might not be a field at all if we can determine from flags
 }
 
 impl Symbol {
@@ -112,6 +121,8 @@ impl Symbol {
     pub(crate) fn is_defined(&self) -> bool {
         self.flags.contains(SymbolFlags::IS_DEFINED)
     }
+
+    // TODO: 2nd pass analysis to categorize as: free-var, cell-var, explicit-global, implicit-global
 }
 
 // TODO storing TypedNodeKey for definitions means we have to search to find them again in the AST;
