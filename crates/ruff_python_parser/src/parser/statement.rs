@@ -3160,26 +3160,89 @@ impl<'src> Parser<'src> {
         // We should do the same but currently we can't without throwing away the parsed
         // expression because the AST can't contain it.
 
+        // test_ok type_param_type_var_tuple
+        // type X[*Ts] = int
+        // type X[*Ts = int] = int
+        // type X[*Ts = *int] = int
+        // type X[T, *Ts] = int
+        // type X[T, *Ts = int] = int
         if self.eat(TokenKind::Star) {
             let name = self.parse_identifier();
+
+            let default_value = if self.eat(TokenKind::Equal) {
+                if self.at_expr() {
+                    // test_err type_param_type_var_tuple_invalid_default_expr
+                    // type X[*Ts = *int] = int
+                    // type X[*Ts = yield x] = int
+                    // type X[*Ts = yield from x] = int
+                    // type X[*Ts = x := int] = int
+                    Some(Box::new(self.parse_conditional_expression_or_higher().expr))
+                } else {
+                    // test_err type_param_type_var_tuple_missing_default
+                    // type X[*Ts =] = int
+                    // type X[*Ts =, T2] = int
+                    self.add_error(
+                        ParseErrorType::ExpectedExpression,
+                        self.current_token_range(),
+                    );
+                    None
+                }
+            } else {
+                None
+            };
 
             // test_err type_param_type_var_tuple_bound
             // type X[*T: int] = int
             ast::TypeParam::TypeVarTuple(ast::TypeParamTypeVarTuple {
                 range: self.node_range(start),
                 name,
-                default_value: None, // TODO(jelle)
+                default_value,
             })
+
+        // test_ok type_param_param_spec
+        // type X[**P] = int
+        // type X[**P = int] = int
+        // type X[T, **P] = int
+        // type X[T, **P = int] = int
         } else if self.eat(TokenKind::DoubleStar) {
             let name = self.parse_identifier();
+
+            let default_value = if self.eat(TokenKind::Equal) {
+                if self.at_expr() {
+                    // test_err type_param_param_spec_invalid_default_expr
+                    // type X[**P = *int] = int
+                    // type X[**P = yield x] = int
+                    // type X[**P = yield from x] = int
+                    // type X[**P = x := int] = int
+                    // type X[**P = *int] = int
+                    Some(Box::new(self.parse_conditional_expression_or_higher().expr))
+                } else {
+                    // test_err type_param_param_spec_missing_default
+                    // type X[**P =] = int
+                    // type X[**P =, T2] = int
+                    self.add_error(
+                        ParseErrorType::ExpectedExpression,
+                        self.current_token_range(),
+                    );
+                    None
+                }
+            } else {
+                None
+            };
 
             // test_err type_param_param_spec_bound
             // type X[**T: int] = int
             ast::TypeParam::ParamSpec(ast::TypeParamParamSpec {
                 range: self.node_range(start),
                 name,
-                default_value: None, // TODO(jelle)
+                default_value,
             })
+            // test_ok type_param_type_var
+            // type X[T] = int
+            // type X[T = int] = int
+            // type X[T: int = int] = int
+            // type X[T: (int, int) = int] = int
+            // type X[T: int = int, U: (int, int) = int] = int
         } else {
             let name = self.parse_identifier();
 
@@ -3207,7 +3270,7 @@ impl<'src> Parser<'src> {
 
             let default_value = if self.eat(TokenKind::Equal) {
                 if self.at_expr() {
-                    // test_err type_param_invalid_default_expr
+                    // test_err type_param_type_var_invalid_default_expr
                     // type X[T = *int] = int
                     // type X[T = yield x] = int
                     // type X[T = (yield x)] = int
@@ -3216,7 +3279,7 @@ impl<'src> Parser<'src> {
                     // type X[T: int = *int] = int
                     Some(Box::new(self.parse_conditional_expression_or_higher().expr))
                 } else {
-                    // test_err type_param_missing_default
+                    // test_err type_param_type_var_missing_default
                     // type X[T =] = int
                     // type X[T: int =] = int
                     // type X[T1 =, T2] = int
