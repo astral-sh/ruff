@@ -10,6 +10,7 @@ use ruff_index::{newtype_index, IndexVec};
 use ruff_python_ast as ast;
 use ruff_python_ast::visitor::preorder::PreorderVisitor;
 
+use crate::ast_ids::TypedNodeKey;
 use crate::{FxDashMap, Name};
 
 type Map<K, V> = hashbrown::HashMap<K, V, ()>;
@@ -71,13 +72,40 @@ impl Symbol {
 }
 
 #[derive(Debug)]
-pub(crate) struct Symbols<'a> {
-    pub(crate) table: SymbolTable,
-    pub(crate) defs: FxDashMap<SymbolId, Vec<&'a ast::Stmt>>,
+pub(crate) enum Definition {
+    // For the import cases, we don't need reference to any arbitrary AST subtrees (annotations,
+    // RHS), and referencing just the import statement node is imprecise (a single import statement
+    // can assign many symbols, we'd have to re-search for the one we care about), so we just copy
+    // the small amount of information we need from the AST.
+    Import(ImportDefinition),
+    ImportFrom(ImportFromDefinition),
+    ClassDef(TypedNodeKey<ast::StmtClassDef>),
+    FunctionDef(TypedNodeKey<ast::StmtFunctionDef>),
+    Assignment(TypedNodeKey<ast::StmtAssign>),
+    AnnotatedAssignment(TypedNodeKey<ast::StmtAnnAssign>),
+    // TODO with statements, except handlers, function args...
 }
 
-impl<'a> Symbols<'a> {
-    pub(crate) fn from_ast(module: &'a ast::ModModule) -> Self {
+#[derive(Debug)]
+pub(crate) struct ImportDefinition {
+    module: String,
+}
+
+#[derive(Debug)]
+pub(crate) struct ImportFromDefinition {
+    module: Option<String>,
+    name: String,
+    level: Option<u32>,
+}
+
+#[derive(Debug)]
+pub(crate) struct Symbols {
+    pub(crate) table: SymbolTable,
+    pub(crate) defs: FxDashMap<SymbolId, Vec<Definition>>,
+}
+
+impl Symbols {
+    pub(crate) fn from_ast(module: &ast::ModModule) -> Self {
         let symbols = Symbols {
             table: SymbolTable::new(),
             defs: FxDashMap::default(),
@@ -164,7 +192,7 @@ impl SymbolTable {
         self.child_scopes_of(SymbolTable::root_scope_id())
     }
 
-    pub(crate) fn symbol_by_name(&self, scope_id: ScopeId, name: &str) -> Option<&Symbol> {
+    pub(crate) fn symbol_id_by_name(&self, scope_id: ScopeId, name: &str) -> Option<SymbolId> {
         let scope = &self.scopes_by_id[scope_id];
         let hash = SymbolTable::hash_name(name);
         let name = Name::new(name);
@@ -172,7 +200,19 @@ impl SymbolTable {
             .symbols_by_name
             .raw_entry()
             .from_hash(hash, |symid| self.symbols_by_id[*symid].name == name)
-            .map(|(k, ())| &self.symbols_by_id[*k])
+            .map(|(symbol_id, ())| *symbol_id)
+    }
+
+    pub(crate) fn symbol_by_name(&self, scope_id: ScopeId, name: &str) -> Option<&Symbol> {
+        Some(&self.symbols_by_id[self.symbol_id_by_name(scope_id, name)?])
+    }
+
+    pub(crate) fn root_symbol_id_by_name(&self, name: &str) -> Option<SymbolId> {
+        self.symbol_id_by_name(SymbolTable::root_scope_id(), name)
+    }
+
+    pub(crate) fn root_symbol_by_name(&self, name: &str) -> Option<&Symbol> {
+        self.symbol_by_name(SymbolTable::root_scope_id(), name)
     }
 
     pub(crate) fn add_symbol_to_scope(&mut self, scope_id: ScopeId, name: &str) -> SymbolId {
@@ -288,21 +328,25 @@ where
     }
 }
 
-struct SymbolsBuilder<'a> {
-    symbols: Symbols<'a>,
+struct SymbolsBuilder {
+    symbols: Symbols,
     scopes: Vec<ScopeId>,
 }
 
-impl<'a> SymbolsBuilder<'a> {
+impl SymbolsBuilder {
     fn add_symbol(&mut self, identifier: &str) -> SymbolId {
         self.symbols
             .table
             .add_symbol_to_scope(self.cur_scope(), identifier)
     }
 
-    fn add_symbol_with_def(&mut self, identifier: &str, node: &'a ast::Stmt) -> SymbolId {
+    fn add_symbol_with_def(&mut self, identifier: &str, definition: Definition) -> SymbolId {
         let symbol_id = self.add_symbol(identifier);
-        self.symbols.defs.entry(symbol_id).or_default().push(node);
+        self.symbols
+            .defs
+            .entry(symbol_id)
+            .or_default()
+            .push(definition);
         symbol_id
     }
 
@@ -349,45 +393,66 @@ impl<'a> SymbolsBuilder<'a> {
     }
 }
 
-impl<'a> PreorderVisitor<'a> for SymbolsBuilder<'a> {
-    fn visit_expr(&mut self, expr: &'a ast::Expr) {
+impl PreorderVisitor<'_> for SymbolsBuilder {
+    fn visit_expr(&mut self, expr: &ast::Expr) {
         if let ast::Expr::Name(ast::ExprName { id, .. }) = expr {
             self.add_symbol(id);
         }
         ast::visitor::preorder::walk_expr(self, expr);
     }
 
-    fn visit_stmt(&mut self, stmt: &'a ast::Stmt) {
+    fn visit_stmt(&mut self, stmt: &ast::Stmt) {
         // TODO need to capture more definition statements here
         match stmt {
-            ast::Stmt::ClassDef(ast::StmtClassDef {
-                name, type_params, ..
-            }) => {
-                self.add_symbol_with_def(name, stmt);
-                self.with_type_params(name, type_params, |builder| {
-                    builder.push_scope(builder.cur_scope(), name, ScopeKind::Class);
+            ast::Stmt::ClassDef(node) => {
+                let def = Definition::ClassDef(TypedNodeKey::from_node(node));
+                self.add_symbol_with_def(&node.name, def);
+                self.with_type_params(&node.name, &node.type_params, |builder| {
+                    builder.push_scope(builder.cur_scope(), &node.name, ScopeKind::Class);
                     ast::visitor::preorder::walk_stmt(builder, stmt);
                     builder.pop_scope();
                 });
             }
-            ast::Stmt::FunctionDef(ast::StmtFunctionDef {
-                name, type_params, ..
-            }) => {
-                self.add_symbol_with_def(name, stmt);
-                self.with_type_params(name, type_params, |builder| {
-                    builder.push_scope(builder.cur_scope(), name, ScopeKind::Function);
+            ast::Stmt::FunctionDef(node) => {
+                let def = Definition::FunctionDef(TypedNodeKey::from_node(node));
+                self.add_symbol_with_def(&node.name, def);
+                self.with_type_params(&node.name, &node.type_params, |builder| {
+                    builder.push_scope(builder.cur_scope(), &node.name, ScopeKind::Function);
                     ast::visitor::preorder::walk_stmt(builder, stmt);
                     builder.pop_scope();
                 });
             }
             ast::Stmt::Import(ast::StmtImport { names, .. }) => {
                 for alias in names {
-                    self.add_symbol_with_def(alias.name.id.split('.').next().unwrap(), stmt);
+                    let symbol_name = if let Some(asname) = &alias.asname {
+                        asname.id.as_str()
+                    } else {
+                        alias.name.id.split('.').next().unwrap()
+                    };
+                    let def = Definition::Import(ImportDefinition {
+                        module: alias.name.id.to_owned(),
+                    });
+                    self.add_symbol_with_def(symbol_name, def);
                 }
             }
-            ast::Stmt::ImportFrom(ast::StmtImportFrom { names, .. }) => {
+            ast::Stmt::ImportFrom(ast::StmtImportFrom {
+                module,
+                names,
+                level,
+                ..
+            }) => {
                 for alias in names {
-                    self.add_symbol_with_def(&alias.name.id, stmt);
+                    let symbol_name = if let Some(asname) = &alias.asname {
+                        asname.id.as_str()
+                    } else {
+                        alias.name.id.as_str()
+                    };
+                    let def = Definition::ImportFrom(ImportFromDefinition {
+                        module: module.as_ref().map(|m| m.id.clone()),
+                        name: alias.name.id.clone(),
+                        level: *level,
+                    });
+                    self.add_symbol_with_def(symbol_name, def);
                 }
             }
             _ => {
@@ -417,7 +482,7 @@ mod tests {
         where
             I: Iterator<Item = SymbolId>,
         {
-            let mut symbols: Vec<_> = it.map(|sym| sym.name.0.as_str()).collect();
+            let mut symbols: Vec<_> = it.map(|sym| sym.name.as_str()).collect();
             symbols.sort();
             symbols
         }
@@ -432,8 +497,12 @@ mod tests {
         #[test]
         fn simple() {
             let parsed = parse("x");
-            let table = Symbols::from_ast(parsed.ast()).table;
-            assert_eq!(names(table.root_symbols()), vec!["x"]);
+            let syms = Symbols::from_ast(parsed.ast());
+            assert_eq!(names(syms.table.root_symbols()), vec!["x"]);
+            assert!(syms
+                .defs
+                .get(&syms.table.root_symbol_id_by_name("x").unwrap())
+                .is_none());
         }
 
         #[test]
@@ -441,13 +510,21 @@ mod tests {
             let parsed = parse("x: int");
             let table = Symbols::from_ast(parsed.ast()).table;
             assert_eq!(names(table.root_symbols()), vec!["int", "x"]);
+            // TODO record definition
         }
 
         #[test]
         fn import() {
             let parsed = parse("import foo");
-            let table = Symbols::from_ast(parsed.ast()).table;
-            assert_eq!(names(table.root_symbols()), vec!["foo"]);
+            let syms = Symbols::from_ast(parsed.ast());
+            assert_eq!(names(syms.table.root_symbols()), vec!["foo"]);
+            assert_eq!(
+                syms.defs
+                    .get(&syms.table.root_symbol_id_by_name("foo").unwrap())
+                    .unwrap()
+                    .len(),
+                1
+            );
         }
 
         #[test]
@@ -458,10 +535,24 @@ mod tests {
         }
 
         #[test]
+        fn import_as() {
+            let parsed = parse("import foo.bar as baz");
+            let table = Symbols::from_ast(parsed.ast()).table;
+            assert_eq!(names(table.root_symbols()), vec!["baz"]);
+        }
+
+        #[test]
         fn import_from() {
             let parsed = parse("from bar import foo");
-            let table = Symbols::from_ast(parsed.ast()).table;
-            assert_eq!(names(table.root_symbols()), vec!["foo"]);
+            let syms = Symbols::from_ast(parsed.ast());
+            assert_eq!(names(syms.table.root_symbols()), vec!["foo"]);
+            assert_eq!(
+                syms.defs
+                    .get(&syms.table.root_symbol_id_by_name("foo").unwrap())
+                    .unwrap()
+                    .len(),
+                1
+            );
         }
 
         #[test]
@@ -473,14 +564,22 @@ mod tests {
                 y = 2
                 ",
             );
-            let table = Symbols::from_ast(parsed.ast()).table;
+            let syms = Symbols::from_ast(parsed.ast());
+            let table = &syms.table;
             assert_eq!(names(table.root_symbols()), vec!["C", "y"]);
             let scopes = table.root_child_scope_ids();
             assert_eq!(scopes.len(), 1);
-            let c_scope = scopes[0].scope(&table);
+            let c_scope = scopes[0].scope(table);
             assert_eq!(c_scope.kind(), ScopeKind::Class);
             assert_eq!(c_scope.name(), "C");
             assert_eq!(names(table.symbols_for_scope(scopes[0])), vec!["x"]);
+            assert_eq!(
+                syms.defs
+                    .get(&syms.table.root_symbol_id_by_name("C").unwrap())
+                    .unwrap()
+                    .len(),
+                1
+            );
         }
 
         #[test]
@@ -492,14 +591,22 @@ mod tests {
                 y = 2
                 ",
             );
-            let table = Symbols::from_ast(parsed.ast()).table;
+            let syms = Symbols::from_ast(parsed.ast());
+            let table = &syms.table;
             assert_eq!(names(table.root_symbols()), vec!["func", "y"]);
             let scopes = table.root_child_scope_ids();
             assert_eq!(scopes.len(), 1);
-            let func_scope = scopes[0].scope(&table);
+            let func_scope = scopes[0].scope(table);
             assert_eq!(func_scope.kind(), ScopeKind::Function);
             assert_eq!(func_scope.name(), "func");
             assert_eq!(names(table.symbols_for_scope(scopes[0])), vec!["x"]);
+            assert_eq!(
+                syms.defs
+                    .get(&syms.table.root_symbol_id_by_name("func").unwrap())
+                    .unwrap()
+                    .len(),
+                1
+            );
         }
 
         #[test]
@@ -512,18 +619,26 @@ mod tests {
                     y = 2
                 ",
             );
-            let table = Symbols::from_ast(parsed.ast()).table;
+            let syms = Symbols::from_ast(parsed.ast());
+            let table = &syms.table;
             assert_eq!(names(table.root_symbols()), vec!["func"]);
             let scopes = table.root_child_scope_ids();
             assert_eq!(scopes.len(), 2);
-            let func_scope_1 = scopes[0].scope(&table);
-            let func_scope_2 = scopes[1].scope(&table);
+            let func_scope_1 = scopes[0].scope(table);
+            let func_scope_2 = scopes[1].scope(table);
             assert_eq!(func_scope_1.kind(), ScopeKind::Function);
             assert_eq!(func_scope_1.name(), "func");
             assert_eq!(func_scope_2.kind(), ScopeKind::Function);
             assert_eq!(func_scope_2.name(), "func");
             assert_eq!(names(table.symbols_for_scope(scopes[0])), vec!["x"]);
             assert_eq!(names(table.symbols_for_scope(scopes[1])), vec!["y"]);
+            assert_eq!(
+                syms.defs
+                    .get(&syms.table.root_symbol_id_by_name("func").unwrap())
+                    .unwrap()
+                    .len(),
+                2
+            );
         }
 
         #[test]
