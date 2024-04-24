@@ -13,6 +13,9 @@ IntOrStr: TypeAlias = int | str
 IntOrFloat: Foo = int | float
 AliasNone: typing.TypeAlias = None
 
+class NotAnEnum:
+    FLAG_THIS = None
+
 # these are ok
 from enum import Enum
 
