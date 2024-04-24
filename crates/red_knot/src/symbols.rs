@@ -71,6 +71,9 @@ impl Symbol {
     }
 }
 
+// TODO storing TypedNodeKey for definitions means we have to search to find them again in the AST;
+// this is at best O(log n). If looking up definitions is a bottleneck we should look for
+// alternatives here.
 #[derive(Debug)]
 pub(crate) enum Definition {
     // For the import cases, we don't need reference to any arbitrary AST subtrees (annotations,

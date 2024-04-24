@@ -318,6 +318,7 @@ impl<'a> PreorderVisitor<'a> for FindNodeKeyVisitor<'a> {
     }
 
     fn visit_body(&mut self, body: &'a [Stmt]) {
+        // TODO it would be more efficient to use binary search instead of linear
         for stmt in body {
             if stmt.range().start() > self.key.range.end() {
                 break;
