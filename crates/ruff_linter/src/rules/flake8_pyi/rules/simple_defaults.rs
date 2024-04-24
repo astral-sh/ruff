@@ -1,13 +1,10 @@
-use rustc_hash::FxHashSet;
-
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{
     self as ast, Expr, Operator, ParameterWithDefault, Parameters, Stmt, UnaryOp,
 };
-use ruff_python_semantic::{BindingId, ScopeKind, SemanticModel};
+use ruff_python_semantic::{analyze::class::is_enumeration, ScopeKind, SemanticModel};
 use ruff_source_file::Locator;
 use ruff_text_size::Ranged;
 
@@ -473,53 +470,6 @@ fn is_final_assignment(annotation: &Expr, value: &Expr, semantic: &SemanticModel
     false
 }
 
-/// Returns `true` if the a class is an enum, based on its base classes.
-fn is_enum(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> bool {
-    fn inner(
-        class_def: &ast::StmtClassDef,
-        semantic: &SemanticModel,
-        seen: &mut FxHashSet<BindingId>,
-    ) -> bool {
-        class_def.bases().iter().any(|expr| {
-            // If the base class is `enum.Enum`, `enum.Flag`, etc., then this is an enum.
-            if semantic
-                .resolve_qualified_name(map_subscript(expr))
-                .is_some_and(|qualified_name| {
-                    matches!(
-                        qualified_name.segments(),
-                        [
-                            "enum",
-                            "Enum" | "Flag" | "IntEnum" | "IntFlag" | "StrEnum" | "ReprEnum"
-                        ]
-                    )
-                })
-            {
-                return true;
-            }
-
-            // If the base class extends `enum.Enum`, `enum.Flag`, etc., then this is an enum.
-            if let Some(id) = semantic.lookup_attribute(map_subscript(expr)) {
-                if seen.insert(id) {
-                    let binding = semantic.binding(id);
-                    if let Some(base_class) = binding
-                        .kind
-                        .as_class_definition()
-                        .map(|id| &semantic.scopes[*id])
-                        .and_then(|scope| scope.kind.as_class())
-                    {
-                        if inner(base_class, semantic, seen) {
-                            return true;
-                        }
-                    }
-                }
-            }
-            false
-        })
-    }
-
-    inner(class_def, semantic, &mut FxHashSet::default())
-}
-
 /// Returns `true` if an [`Expr`] is a value that should be annotated with `typing.TypeAlias`.
 ///
 /// This is relatively conservative, as it's hard to reliably detect whether a right-hand side is a
@@ -676,21 +626,22 @@ pub(crate) fn unannotated_assignment_in_stub(
     let Expr::Name(ast::ExprName { id, .. }) = target else {
         return;
     };
-    if is_special_assignment(target, checker.semantic()) {
+    let semantic = checker.semantic();
+    if is_special_assignment(target, semantic) {
         return;
     }
-    if is_type_var_like_call(value, checker.semantic()) {
+    if is_type_var_like_call(value, semantic) {
         return;
     }
     if is_valid_default_value_without_annotation(value) {
         return;
     }
-    if !is_valid_default_value_with_annotation(value, true, checker.locator(), checker.semantic()) {
+    if !is_valid_default_value_with_annotation(value, true, checker.locator(), semantic) {
         return;
     }
 
-    if let ScopeKind::Class(class_def) = checker.semantic().current_scope().kind {
-        if is_enum(class_def, checker.semantic()) {
+    if let ScopeKind::Class(class_def) = semantic.current_scope().kind {
+        if is_enumeration(class_def, semantic) {
             return;
         }
     }
