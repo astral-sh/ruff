@@ -3176,7 +3176,12 @@ impl<'src> Parser<'src> {
                     // type X[*Ts = yield x] = int
                     // type X[*Ts = yield from x] = int
                     // type X[*Ts = x := int] = int
-                    Some(Box::new(self.parse_conditional_expression_or_higher().expr))
+                    Some(Box::new(
+                        self.parse_conditional_expression_or_higher_impl(
+                            ExpressionContext::starred_bitwise_or(),
+                        )
+                        .expr,
+                    ))
                 } else {
                     // test_err type_param_type_var_tuple_missing_default
                     // type X[*Ts =] = int
