@@ -30,7 +30,7 @@ console_error_panic_hook = { version = "0.1.7" }
 console_log = { version = "1.0.0" }
 countme = { version = "3.0.1" }
 criterion = { version = "0.5.1", default-features = false }
-crossbeam = { version = "0.8.4" }
+crossbeam-channel = { version = "0.5.12" }
 dashmap = { version = "5.5.3" }
 dirs = { version = "5.0.0" }
 drop_bomb = { version = "0.1.5" }

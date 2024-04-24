@@ -1,136 +1,259 @@
-use std::path::PathBuf;
-use tracing::level_filters::LevelFilter;
+use rustc_hash::FxHashMap;
+use std::collections::hash_map::Entry;
+use std::num::NonZeroUsize;
+use std::path::Path;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex};
 use tracing::subscriber::Interest;
 use tracing::{Level, Metadata};
+use tracing_subscriber::filter::LevelFilter;
 use tracing_subscriber::layer::{Context, Filter, SubscriberExt};
 use tracing_subscriber::{Layer, Registry};
 use tracing_tree::time::Uptime;
 
-use red_knot::db::{HasJar, SemanticDb, SourceJar};
+// use red_knot::watch::FileWatcher;
+use red_knot::cancellation::CancellationSource;
+use red_knot::db::{HasJar, SourceDb, SourceJar};
+use red_knot::files::FileId;
 use red_knot::module::{ModuleSearchPath, ModuleSearchPathKind};
-use red_knot::program::Program;
+use red_knot::program::{FileChange, FileChangeKind, Program};
+use red_knot::watch::FileWatcher;
 use red_knot::{files, Workspace};
 
-#[allow(clippy::dbg_macro, clippy::print_stdout, clippy::unnecessary_wraps)]
+#[allow(
+    clippy::dbg_macro,
+    clippy::print_stdout,
+    clippy::unnecessary_wraps,
+    clippy::print_stderr
+)]
 fn main() -> anyhow::Result<()> {
     setup_tracing();
 
+    let arguments: Vec<_> = std::env::args().collect();
+
+    if arguments.len() < 2 {
+        eprintln!("Usage: red_knot <path>");
+        return Err(anyhow::anyhow!("Invalid arguments"));
+    }
+
+    let entry_point = Path::new(&arguments[1]);
+
+    if !entry_point.exists() {
+        eprintln!("The entry point does not exist.");
+        return Err(anyhow::anyhow!("Invalid arguments"));
+    }
+
+    if !entry_point.is_file() {
+        eprintln!("The entry point is not a file.");
+        return Err(anyhow::anyhow!("Invalid arguments"));
+    }
+
     let files = files::Files::default();
-    let mut workspace = Workspace::new(PathBuf::from("/home/micha/astral/test/"));
-
-    let file_id = files.intern(&workspace.root().join("test.py"));
-    workspace.open_file(file_id);
-
-    // For now, discover all python files in the root directory and mark them as open.
-
-    // for entry in fs::read_dir(workspace.root())?
-    //     .filter_map(|entry| entry.ok())
-    //     .filter(|entry| entry.path().extension().map_or(false, |ext| ext == "py"))
-    // {
-    //     let file_id = files.intern(&entry.path());
-    //     dbg!(file_id, &entry.path());
-    //
-
-    //     workspace.open_file(file_id);
-    // }
-
-    // TODO: discover all python files and intern the file ids?
-
-    tracing::debug!("start analysis for workspace");
+    let workspace_folder = entry_point.parent().unwrap();
+    let mut workspace = Workspace::new(workspace_folder.to_path_buf());
 
     let workspace_search_path = ModuleSearchPath::new(
         workspace.root().to_path_buf(),
         ModuleSearchPathKind::FirstParty,
     );
 
-    let program = Program::new(vec![workspace_search_path], files);
+    let entry_id = files.intern(entry_point);
 
-    let mut queue: Vec<_> = workspace.open_files().collect();
-    // let mut queued: FxHashSet<_> = queue.iter().copied().collect();
-    // Should we use an accumulator for this?
+    let mut program = Program::new(vec![workspace_search_path], files.clone());
 
-    // TODO we could now consider spawning the analysis of the dependencies into their own threads.
-    while let Some(file) = queue.pop() {
-        // let source = program.source(file);
-        // let module_path = program.file_path(file_id);
+    workspace.open_file(entry_id);
 
-        // // TODO this looks weird: dependencies.files. Let's figure out a better naming and structure.
-        // let dependencies = dependencies(&db, content);
-        //
-        // // We know that we need to analyse all dependencies, but we don't need to check them.
-        // for dependency in &*dependencies {
-        //     let dependency_path = module_path.join(&dependency.path).canonicalize().unwrap();
-        //     let dependency_file_id = files.intern(&dependency_path);
-        //
-        //     if queued.insert(dependency_file_id) {
-        //         queue.push(dependency_file_id);
-        //     }
-        // }
+    let (sender, receiver) = crossbeam_channel::bounded(
+        std::thread::available_parallelism()
+            .map(NonZeroUsize::get)
+            .unwrap_or(50)
+            .max(4), // TODO: Both these numbers are very arbitrary. Pick sensible defaults.
+    );
 
-        let symbols = program.symbol_table(file);
+    // Listen to Ctrl+C and abort the watch mode.
+    let abort_sender = Mutex::new(Some(sender.clone()));
+    ctrlc::set_handler(move || {
+        let mut lock = abort_sender.lock().unwrap();
 
-        dbg!(&symbols);
-
-        // If this is an open file
-        if workspace.is_file_open(file) {
-            // * run source text, logical line, and path based rules.
-            // * build the semantic model
-            // * run the semantic rules
-            // * run type checking
-            // Some of the steps could run together
-
-            // TODO check_tokens(&db, parsed.tokens(&db));
-
-            // I think we can run the syntax checks and the item tree construction in a single traversal?
-            // Probably not, because we actually want to visit the nodes in a different order (breath first vs depth first, at least for some nodes).
-            // diagnostics.extend(check_physical_lines(&db, content).diagnostics(&db));
-            // diagnostics.extend(check_syntax(&db, parsed).diagnostics(&db));
+        if let Some(sender) = lock.take() {
+            sender.send(Message::Exit).unwrap();
         }
+    })?;
 
-        // let ids = ast_ids(&db, content);
+    // Watch for file changes and re-trigger the analysis.
+    let file_changes_sender = sender.clone();
 
-        // dbg!(ids.root());
-        //
-        // dbg!(ids.ast_id_for_node_key(ids.root()));
-        //
-        // let ast = parsed.ast(&db);
-        //
-        // if let Some(function) = ast.body.iter().find_map(|stmt| stmt.as_function_def_stmt()) {
-        //     let id = ids.ast_id(function);
-        //     dbg!(&id);
-        //
-        //     let key = ids.key(id);
-        //
-        //     dbg!(key.resolve(ast.into()));
-        // }
-        //
-        // let definitions = definitions(&db, content);
-        //
-        // dbg!(&definitions);
+    let mut file_watcher = FileWatcher::new(
+        move |changes| {
+            file_changes_sender
+                .send(Message::FileChanges(changes))
+                .unwrap();
+        },
+        files.clone(),
+    );
 
-        // This is the HIR
-        // I forgot how rust-analyzer reference from the HIR to the AST.
-        // let item_tree = build_item_tree(&db, parsed.ast(&db)); // construct the item tree from the AST (the item tree is location agnostic)
-        // The bindings should only resolve internally. Imports should be resolved to full qualified paths
-        // but not resolved to bindings to ensure that result can be calculated on a per-file basis.
-        // let bindings = binder(&db, item_tree); // Run the item tree through the binder
+    file_watcher.watch_folder(workspace_folder)?;
 
-        // let types = type_inference(&db, bindings); // Run the type checker on the bindings
+    let files_to_check = vec![entry_id];
 
-        // We need to build the symbol table here. What rust-analyzer does is it first transforms
-        // the AST into a HIR that only contains the definitions. Each HIR node gets a unique where
-        // it first assigns IDs to the top-level elements before their children (to ensure that changes
-        // in the function body remain local). The idea of the HIR is to make the analysis location independent.
+    // Main loop that runs until the user exits the program
+    // Runs the analysis for each changed file. Cancels the analysis if a new change is detected.
+    loop {
+        let changes = {
+            tracing::trace!("Main Loop: Tick");
 
-        // Run the syntax only rules for the file and perform some binding?
+            // Token to cancel the analysis if a new change is detected.
+            let run_cancellation_token_source = CancellationSource::new();
+            let run_cancellation_token = run_cancellation_token_source.token();
 
-        // dbg!(parsed.module(&db));
+            // Tracks the number of pending analysis runs.
+            let pending_analysis = Arc::new(AtomicUsize::new(0));
+
+            // Take read-only references that are copy and Send.
+            let program = &program;
+            let workspace = &workspace;
+
+            let receiver = receiver.clone();
+            let started_analysis = pending_analysis.clone();
+
+            // Orchestration task. Ideally, we would run this on main but we should start it as soon as possible so that
+            // we avoid scheduling tasks when we already know that we're about to exit or cancel the analysis because of a file change.
+            // This uses `std::thread::spawn` because we don't want it to run inside of the thread pool
+            // or this code deadlocks when using a thread pool of the size 1.
+            let orchestration_handle = std::thread::spawn(move || {
+                fn consume_pending_messages(
+                    receiver: &crossbeam_channel::Receiver<Message>,
+                    mut aggregated_changes: AggregatedChanges,
+                ) -> NextTickCommand {
+                    loop {
+                        // Consume possibly incoming file change messages before running a new analysis, but don't wait for more than 100ms.
+                        crossbeam_channel::select! {
+                            recv(receiver) -> message => {
+                                match message {
+                                    Ok(Message::Exit) => {
+                                        return NextTickCommand::Exit;
+                                    }
+                                    Ok(Message::FileChanges(file_changes)) => {
+                                        aggregated_changes.extend(file_changes);
+                                    }
+
+                                    Ok(Message::AnalysisCancelled | Message::AnalysisCompleted(_)) => {
+                                        unreachable!(
+                                            "All analysis should have been completed at this time"
+                                        );
+                                    },
+
+                                    Err(_) => {
+                                        // There are no more senders, no point in waiting for more messages
+                                        break;
+                                    }
+                                }
+                            },
+                            default(std::time::Duration::from_millis(100)) => {
+                                break;
+                            }
+                        }
+                    }
+
+                    NextTickCommand::FileChanges(aggregated_changes)
+                }
+
+                let mut diagnostics = Vec::new();
+                let mut aggregated_changes = AggregatedChanges::default();
+
+                for message in &receiver {
+                    match message {
+                        Message::AnalysisCompleted(file_diagnostics) => {
+                            diagnostics.extend_from_slice(&file_diagnostics);
+
+                            if pending_analysis.fetch_sub(1, Ordering::SeqCst) == 1 {
+                                // Analysis completed, print the diagnostics.
+                                dbg!(&diagnostics);
+                            }
+                        }
+
+                        Message::AnalysisCancelled => {
+                            if pending_analysis.fetch_sub(1, Ordering::SeqCst) == 1 {
+                                return consume_pending_messages(&receiver, aggregated_changes);
+                            }
+                        }
+
+                        Message::Exit => {
+                            run_cancellation_token_source.cancel();
+
+                            // Don't consume any outstanding messages because we're exiting anyway.
+                            return NextTickCommand::Exit;
+                        }
+
+                        Message::FileChanges(changes) => {
+                            // Request cancellation, but wait until all analysis tasks have completed to
+                            // avoid stale messages in the next main loop.
+                            run_cancellation_token_source.cancel();
+
+                            aggregated_changes.extend(changes);
+
+                            if pending_analysis.load(Ordering::SeqCst) == 0 {
+                                return consume_pending_messages(&receiver, aggregated_changes);
+                            }
+                        }
+                    }
+                }
+
+                // This can be reached if there's no Ctrl+C and no file watcher handler.
+                // In that case, assume that we don't run in watch mode and exit.
+                NextTickCommand::Exit
+            });
+
+            // Star the analysis task on the thread pool and wait until they complete.
+            rayon::scope(|scope| {
+                for file in &files_to_check {
+                    let cancellation_token = run_cancellation_token.clone();
+                    if cancellation_token.is_cancelled() {
+                        break;
+                    }
+
+                    let sender = sender.clone();
+
+                    started_analysis.fetch_add(1, Ordering::SeqCst);
+
+                    // TODO: How do we allow the host to control the number of threads used?
+                    //  Or should we just assume that each host implements its own main loop,
+                    //  I don't think that's entirely unreasonable but we should avoid
+                    //  having different main loops per host AND command (e.g. format vs check vs lint)
+                    scope.spawn(move |_| {
+                        if cancellation_token.is_cancelled() {
+                            tracing::trace!("Exit analysis because cancellation was requested.");
+                            sender.send(Message::AnalysisCancelled).unwrap();
+                            return;
+                        }
+
+                        // TODO schedule the dependencies.
+                        let mut diagnostics = Vec::new();
+
+                        if workspace.is_file_open(*file) {
+                            diagnostics.extend_from_slice(&program.lint_syntax(*file));
+                        }
+
+                        sender
+                            .send(Message::AnalysisCompleted(diagnostics))
+                            .unwrap();
+                    });
+                }
+            });
+
+            // Wait for the orchestration task to complete. This either returns the file changes
+            // or instructs the main loop to exit.
+            match orchestration_handle.join().unwrap() {
+                NextTickCommand::FileChanges(changes) => changes,
+                NextTickCommand::Exit => {
+                    break;
+                }
+            }
+        };
+
+        // We have a mutable reference here and can perform all necessary invalidations.
+        program.apply_changes(changes.iter());
     }
-
-    // TODO let's trigger a re-check down here. Not sure how to do this or how to model it but that's kind of what this
-    // is all about.
-
-    // Oh dear, fitting this all into the fix loop will be fun.
 
     let source_jar: &SourceJar = program.jar();
 
@@ -138,6 +261,90 @@ fn main() -> anyhow::Result<()> {
     dbg!(source_jar.sources.statistics());
 
     Ok(())
+}
+
+enum Message {
+    AnalysisCompleted(Vec<String>),
+    AnalysisCancelled,
+    Exit,
+    FileChanges(Vec<FileChange>),
+}
+
+#[derive(Default, Debug)]
+struct AggregatedChanges {
+    changes: FxHashMap<FileId, FileChangeKind>,
+}
+
+impl AggregatedChanges {
+    fn add(&mut self, change: FileChange) {
+        match self.changes.entry(change.file_id()) {
+            Entry::Occupied(mut entry) => {
+                let merged = entry.get_mut();
+
+                match (merged, change.kind()) {
+                    (FileChangeKind::Created, FileChangeKind::Deleted) => {
+                        // Creation after deletion means that ruff newer saw the file.
+                        entry.remove();
+                    }
+                    (FileChangeKind::Created, FileChangeKind::Modified) => {
+                        // No-op, for ruff, modifying a file that it doesn't yet know that it exists is still considered a creation.
+                    }
+
+                    (FileChangeKind::Modified, FileChangeKind::Created) => {
+                        // Uhh, that should probably not happen. Continue considering it a modification.
+                    }
+
+                    (FileChangeKind::Modified, FileChangeKind::Deleted) => {
+                        *entry.get_mut() = FileChangeKind::Deleted;
+                    }
+
+                    (FileChangeKind::Deleted, FileChangeKind::Created) => {
+                        *entry.get_mut() = FileChangeKind::Modified;
+                    }
+
+                    (FileChangeKind::Deleted, FileChangeKind::Modified) => {
+                        // That's weird, but let's consider it a modification.
+                        *entry.get_mut() = FileChangeKind::Modified;
+                    }
+
+                    (FileChangeKind::Created, FileChangeKind::Created)
+                    | (FileChangeKind::Modified, FileChangeKind::Modified)
+                    | (FileChangeKind::Deleted, FileChangeKind::Deleted) => {
+                        // No-op transitions. Some of them should be impossible but we handle them anyway.
+                    }
+                }
+            }
+            Entry::Vacant(entry) => {
+                entry.insert(change.kind());
+            }
+        }
+    }
+
+    fn extend<I>(&mut self, changes: I)
+    where
+        I: IntoIterator<Item = FileChange>,
+        I::IntoIter: ExactSizeIterator,
+    {
+        let iter = changes.into_iter();
+        self.changes.reserve(iter.len());
+
+        for change in iter {
+            self.add(change);
+        }
+    }
+
+    fn iter(&self) -> impl Iterator<Item = FileChange> + '_ {
+        self.changes
+            .iter()
+            .map(|(id, kind)| FileChange::new(*id, *kind))
+    }
+}
+
+enum NextTickCommand {
+    /// Exit the main loop in the next tick
+    Exit,
+    /// Apply the given changes in the next main loop tick.
+    FileChanges(AggregatedChanges),
 }
 
 fn setup_tracing() {
