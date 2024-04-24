@@ -19,7 +19,7 @@ impl FormatNodeRule<TypeParamTypeVar> for FormatTypeParamTypeVar {
             write!(f, [token(":"), space(), bound.format()])?;
         }
         if let Some(default_value) = default_value {
-            write!(f, [token("="), space(), default_value.format()])?;
+            write!(f, [space(), token("="), space(), default_value.format()])?;
         }
         Ok(())
     }
