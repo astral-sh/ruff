@@ -129,6 +129,10 @@ x = f"{  # comment 12
     {'x': 1, 'y': 2} }"
 x = f"{    # comment 13
     {'x': 1, 'y': 2} = }"
+# But, if there's a format specifier or a conversion flag then we don't need to add
+# any whitespace at the end
+x = f"aaaaa { {'aaaaaa', 'bbbbbbb', 'ccccccccc'}!s} bbbbbb"
+x = f"aaaaa { {'aaaaaa', 'bbbbbbb', 'ccccccccc'}:.3f} bbbbbb"
 
 # But, in this case, we would split the expression itself because it exceeds the line
 # length limit so we need not add the extra space.
@@ -206,6 +210,29 @@ f"{ # comment 15
     # comment 18
 }"  # comment 19
 # comment 20
+
+# Single-quoted f-strings with a format specificer can be multiline
+f"aaaaaaaaaaaaaaaa bbbbbbbbbbbbbbbbbb ccccccccccc {
+    variable:.3f} ddddddddddddddd eeeeeeee"
+
+# But, if it's triple-quoted then we can't other the format specificer will have a
+# trailing newline
+f"""aaaaaaaaaaaaaaaa bbbbbbbbbbbbbbbbbb ccccccccccc {
+    variable:.3f} ddddddddddddddd eeeeeeee"""
+
+# But, we can break the ones which don't have a format specifier
+f"""fooooooooooooooooooo barrrrrrrrrrrrrrrrrrr {
+        xxxxxxxxxxxxxxx:.3f} aaaaaaaaaaaaaaaaa { xxxxxxxxxxxxxxxxxxxx } bbbbbbbbbbbb"""
+
+# Throw in a random comment in it but surpise, this is not a comment but just a text
+# which is part of the format specifier
+aaaaaaaaaaa = f"""asaaaaaaaaaaaaaaaa {
+        aaaaaaaaaaaa + bbbbbbbbbbbb + ccccccccccccccc + dddddddd:.3f
+     # comment
+} cccccccccc"""
+aaaaaaaaaaa = f"""asaaaaaaaaaaaaaaaa {
+        aaaaaaaaaaaa + bbbbbbbbbbbb + ccccccccccccccc + dddddddd:.3f
+     # comment} cccccccccc"""
 
 # Conversion flags
 #

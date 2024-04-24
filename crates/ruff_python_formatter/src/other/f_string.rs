@@ -135,7 +135,7 @@ impl FStringLayout {
         }
     }
 
-    pub(crate) const fn is_flat(self) -> bool {
-        matches!(self, Self::Flat)
+    pub(crate) const fn is_multiline(self) -> bool {
+        matches!(self, FStringLayout::Multiline)
     }
 }

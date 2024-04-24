@@ -1,5 +1,5 @@
 use crate::comments::Comments;
-use crate::other::f_string::FStringContext;
+use crate::other::f_string_element::FStringExpressionElementContext;
 use crate::PyFormatOptions;
 use ruff_formatter::{Buffer, FormatContext, GroupId, IndentWidth, SourceCode};
 use ruff_python_ast::str::Quote;
@@ -128,13 +128,13 @@ impl Debug for PyFormatContext<'_> {
     }
 }
 
-#[derive(Copy, Clone, Debug, Default)]
+#[derive(Clone, Copy, Debug, Default)]
 pub(crate) enum FStringState {
     /// The formatter is inside an f-string expression element i.e., between the
     /// curly brace in `f"foo {x}"`.
     ///
     /// The containing `FStringContext` is the surrounding f-string context.
-    InsideExpressionElement(FStringContext),
+    InsideExpressionElement(FStringExpressionElementContext),
     /// The formatter is outside an f-string.
     #[default]
     Outside,
