@@ -7,6 +7,10 @@ type X[T] = list[T] | set[T]
 type X[T, *Ts, **P] = (T, Ts, P)
 type X[T: int, *Ts, **P] = (T, Ts, P)
 type X[T: (int, str), *Ts, **P] = (T, Ts, P)
+type X[T = int] = T | str
+type X[T: int | str = int] = T | int | str
+type X[*Ts = *tuple[int, str]] = tuple[int, *Ts, str]
+type X[**P = [int, str]] = Callable[P, str]
 
 # Soft keyword as alias name
 type type = int

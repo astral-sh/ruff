@@ -756,20 +756,45 @@ impl<'a> Generator<'a> {
 
     pub(crate) fn unparse_type_param(&mut self, ast: &TypeParam) {
         match ast {
-            TypeParam::TypeVar(TypeParamTypeVar { name, bound, .. }) => {
+            TypeParam::TypeVar(TypeParamTypeVar {
+                name,
+                bound,
+                default_value,
+                ..
+            }) => {
                 self.p_id(name);
                 if let Some(expr) = bound {
                     self.p(": ");
                     self.unparse_expr(expr, precedence::MAX);
                 }
+                if let Some(expr) = default_value {
+                    self.p(" = ");
+                    self.unparse_expr(expr, precedence::MAX);
+                }
             }
-            TypeParam::TypeVarTuple(TypeParamTypeVarTuple { name, .. }) => {
+            TypeParam::TypeVarTuple(TypeParamTypeVarTuple {
+                name,
+                default_value,
+                ..
+            }) => {
                 self.p("*");
                 self.p_id(name);
+                if let Some(expr) = default_value {
+                    self.p(" = ");
+                    self.unparse_expr(expr, precedence::MAX);
+                }
             }
-            TypeParam::ParamSpec(TypeParamParamSpec { name, .. }) => {
+            TypeParam::ParamSpec(TypeParamParamSpec {
+                name,
+                default_value,
+                ..
+            }) => {
                 self.p("**");
                 self.p_id(name);
+                if let Some(expr) = default_value {
+                    self.p(" = ");
+                    self.unparse_expr(expr, precedence::MAX);
+                }
             }
         }
     }
@@ -1676,6 +1701,10 @@ class Foo:
         assert_round_trip!(r"type Foo[T] = list[T]");
         assert_round_trip!(r"type Foo[*Ts] = ...");
         assert_round_trip!(r"type Foo[**P] = ...");
+        assert_round_trip!(r"type Foo[T = int] = list[T]");
+        assert_round_trip!(r"type Foo[*Ts = int] = ...");
+        assert_round_trip!(r"type Foo[*Ts = *int] = ...");
+        assert_round_trip!(r"type Foo[**P = int] = ...");
         assert_round_trip!(r"type Foo[T, U, *Ts, **P] = ...");
         // https://github.com/astral-sh/ruff/issues/6498
         assert_round_trip!(r"f(a=1, *args, **kwargs)");
