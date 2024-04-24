@@ -664,6 +664,7 @@ impl Ranged for NoqaDirectiveLine<'_> {
 #[derive(Debug, Default)]
 pub(crate) struct NoqaDirectives<'a> {
     inner: Vec<NoqaDirectiveLine<'a>>,
+    last_directive_includes_eof: bool,
 }
 
 impl<'a> NoqaDirectives<'a> {
@@ -694,14 +695,17 @@ impl<'a> NoqaDirectives<'a> {
             }
         }
 
-        // Extend a mapping at the end of the file to also include the EOF token.
-        if let Some(last) = directives.last_mut() {
-            if last.range.end() == locator.contents().text_len() {
-                last.range = last.range.add_end(TextSize::from(1));
-            }
-        }
+        // Record whether last directive should include EOF token.
+        let last_directive_includes_eof = if let Some(last) = directives.last() {
+            last.range.end() == locator.contents().text_len()
+        } else {
+            false
+        };
 
-        Self { inner: directives }
+        Self {
+            inner: directives,
+            last_directive_includes_eof,
+        }
     }
 
     pub(crate) fn find_line_with_directive(&self, offset: TextSize) -> Option<&NoqaDirectiveLine> {
@@ -720,17 +724,26 @@ impl<'a> NoqaDirectives<'a> {
     }
 
     fn find_line_index(&self, offset: TextSize) -> Option<usize> {
-        self.inner
-            .binary_search_by(|directive| {
-                if directive.range.end() < offset {
-                    std::cmp::Ordering::Less
-                } else if directive.range.contains(offset) {
-                    std::cmp::Ordering::Equal
+        let index = self.inner.binary_search_by(|directive| {
+            if directive.range.end() < offset {
+                std::cmp::Ordering::Less
+            } else if directive.range.contains(offset) {
+                std::cmp::Ordering::Equal
+            } else {
+                std::cmp::Ordering::Greater
+            }
+        });
+
+        match index {
+            Ok(index) => Some(index),
+            Err(index) => {
+                if self.last_directive_includes_eof && index == self.inner.len() - 1 {
+                    Some(index)
                 } else {
-                    std::cmp::Ordering::Greater
+                    None
                 }
-            })
-            .ok()
+            }
+        }
     }
 
     pub(crate) fn lines(&self) -> &[NoqaDirectiveLine] {
