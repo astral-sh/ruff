@@ -6,7 +6,7 @@ use tracing_subscriber::layer::{Context, Filter, SubscriberExt};
 use tracing_subscriber::{Layer, Registry};
 use tracing_tree::time::Uptime;
 
-use red_knot::db::{HasJar, SourceDb, SourceJar};
+use red_knot::db::{HasJar, SemanticDb, SourceJar};
 use red_knot::module::{ModuleSearchPath, ModuleSearchPathKind};
 use red_knot::program::Program;
 use red_knot::{files, Workspace};
@@ -67,11 +67,9 @@ fn main() -> anyhow::Result<()> {
         //     }
         // }
 
-        let _parsed = program.parse(file);
-        let _parsed = program.parse(file);
-        let parsed = program.parse(file);
+        let symbols = program.symbol_table(file);
 
-        dbg!(&parsed);
+        dbg!(&symbols);
 
         // If this is an open file
         if workspace.is_file_open(file) {

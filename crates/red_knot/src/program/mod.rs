@@ -9,6 +9,7 @@ use crate::module::{
 };
 use crate::parse::{parse, Parsed, ParsedStorage};
 use crate::source::{source_text, Source, SourceStorage};
+use crate::symbols::{symbol_table, SymbolTable, SymbolTablesStorage};
 
 #[derive(Debug)]
 pub struct Program {
@@ -26,6 +27,7 @@ impl Program {
             },
             semantic: SemanticJar {
                 module_resolver: ModuleResolver::new(module_search_paths),
+                symbol_tables: SymbolTablesStorage::default(),
             },
             files,
         }
@@ -63,6 +65,10 @@ impl SourceDb for Program {
 impl SemanticDb for Program {
     fn resolve_module(&self, name: ModuleName) -> Option<Module> {
         resolve_module(self, name)
+    }
+
+    fn symbol_table(&self, file_id: FileId) -> Arc<SymbolTable> {
+        symbol_table(self, file_id)
     }
 
     // Mutations
