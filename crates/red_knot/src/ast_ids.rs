@@ -274,6 +274,17 @@ pub struct TypedNodeKey<N: AstNode> {
 }
 
 impl<N: AstNode> TypedNodeKey<N> {
+    pub fn from_node(node: &N) -> Self {
+        let inner = NodeKey {
+            kind: node.as_any_node_ref().kind(),
+            range: node.range(),
+        };
+        Self {
+            inner,
+            _marker: PhantomData,
+        }
+    }
+
     pub fn new(node_key: NodeKey) -> Option<Self> {
         N::can_cast(node_key.kind).then_some(TypedNodeKey {
             inner: node_key,
@@ -310,6 +321,7 @@ impl<'a> PreorderVisitor<'a> for FindNodeKeyVisitor<'a> {
     }
 
     fn visit_body(&mut self, body: &'a [Stmt]) {
+        // TODO it would be more efficient to use binary search instead of linear
         for stmt in body {
             if stmt.range().start() > self.key.range.end() {
                 break;
