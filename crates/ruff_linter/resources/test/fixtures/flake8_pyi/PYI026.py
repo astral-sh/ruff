@@ -15,5 +15,12 @@ IntOrFloat: Foo = int | float
 AliasNone: typing.TypeAlias = None
 
 # these are ok
+from enum import Enum
+
+class FooEnum(Enum): ...
+
+class BarEnum(FooEnum):
+    BAR = None
+
 VarAlias = str
 AliasFoo = Foo

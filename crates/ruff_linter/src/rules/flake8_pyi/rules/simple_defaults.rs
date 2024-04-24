@@ -476,9 +476,17 @@ fn is_final_assignment(annotation: &Expr, value: &Expr, semantic: &SemanticModel
 /// valid type alias. In particular, this function checks for uses of `typing.Any`, `None`,
 /// parameterized generics, and PEP 604-style unions.
 fn is_annotatable_type_alias(value: &Expr, semantic: &SemanticModel) -> bool {
-    matches!(value, Expr::Subscript(_) | Expr::NoneLiteral(_))
-        || is_valid_pep_604_union(value)
-        || semantic.match_typing_expr(value, "Any")
+    if value.is_none_literal_expr() {
+        if let ScopeKind::Class(class_def) = semantic.current_scope().kind {
+            !is_enumeration(class_def, semantic)
+        } else {
+            true
+        }
+    } else {
+        value.is_subscript_expr()
+            || is_valid_pep_604_union(value)
+            || semantic.match_typing_expr(value, "Any")
+    }
 }
 
 /// PYI011
