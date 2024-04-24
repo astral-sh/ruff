@@ -1359,6 +1359,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 if checker.enabled(Rule::ForLoopSetMutations) {
                     refurb::rules::for_loop_set_mutations(checker, for_stmt);
                 }
+                if checker.enabled(Rule::ForLoopWrites) {
+                    refurb::rules::for_loop_writes(checker, for_stmt);
+                }
             }
         }
         Stmt::Try(ast::StmtTry {
