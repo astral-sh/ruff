@@ -23,6 +23,7 @@ pub struct Files {
 }
 
 impl Files {
+    #[tracing::instrument(level = "trace", skip(path))]
     pub fn intern(&self, path: &Path) -> FileId {
         self.inner.write().intern(path)
     }
