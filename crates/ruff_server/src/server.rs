@@ -257,6 +257,7 @@ impl Server {
                     },
                 },
             )),
+            hover_provider: Some(types::HoverProviderCapability::Simple(true)),
             text_document_sync: Some(TextDocumentSyncCapability::Options(
                 TextDocumentSyncOptions {
                     open_close: Some(true),
