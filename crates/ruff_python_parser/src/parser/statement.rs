@@ -3173,6 +3173,7 @@ impl<'src> Parser<'src> {
                 if self.at_expr() {
                     // test_err type_param_type_var_tuple_invalid_default_expr
                     // type X[*Ts = *int] = int
+                    // type X[*Ts = *int or str] = int
                     // type X[*Ts = yield x] = int
                     // type X[*Ts = yield from x] = int
                     // type X[*Ts = x := int] = int
