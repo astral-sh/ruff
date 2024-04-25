@@ -11,7 +11,7 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::checkers::ast::Checker;
 use crate::fix;
 use crate::registry::Rule;
-use crate::rules::isort::{categorize as categorize_original, ImportSection, ImportType};
+use crate::rules::isort;
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 enum UnusedImportContext {
@@ -113,10 +113,18 @@ impl Violation for UnusedImport {
     }
 }
 
-/// Categorize the import as stdlib, first party, third party, or return `None` if this rule should
-/// not apply (e.g. `from __future__ …`).
-fn categorize(checker: &Checker, qualified_name: &str) -> Option<ImportType> {
-    match categorize_original(
+/// Categories of imports that we care about for this rule.
+pub enum ImportCat {
+    StdLib,
+    FirstParty,
+    ThirdParty,
+}
+
+/// Like [`isort::categorize`] but only returns categories relevant to this rule. Returns `None`
+/// when this rule does not apply (e.g. `from __future__ …`).
+fn categorize(checker: &Checker, qualified_name: &str) -> Option<ImportCat> {
+    use isort::{ImportSection, ImportType};
+    match isort::categorize(
         qualified_name,
         None,
         &checker.settings.src,
@@ -131,13 +139,13 @@ fn categorize(checker: &Checker, qualified_name: &str) -> Option<ImportType> {
         // this rule doesn't apply
         ImportSection::Known(ImportType::Future) => None,
         // stdlib
-        ImportSection::Known(ImportType::StandardLibrary) => Some(ImportType::StandardLibrary),
+        ImportSection::Known(ImportType::StandardLibrary) => Some(ImportCat::StdLib),
         // first party
-        ImportSection::Known(ImportType::FirstParty) => Some(ImportType::FirstParty),
-        ImportSection::Known(ImportType::LocalFolder) => Some(ImportType::FirstParty),
+        ImportSection::Known(ImportType::FirstParty) => Some(ImportCat::FirstParty),
+        ImportSection::Known(ImportType::LocalFolder) => Some(ImportCat::FirstParty),
         // third party
-        ImportSection::Known(ImportType::ThirdParty) => Some(ImportType::ThirdParty),
-        ImportSection::UserDefined(_) => Some(ImportType::ThirdParty),
+        ImportSection::Known(ImportType::ThirdParty) => Some(ImportCat::ThirdParty),
+        ImportSection::UserDefined(_) => Some(ImportCat::ThirdParty),
     }
 }
 
@@ -276,7 +284,7 @@ struct ImportBinding<'a> {
     /// The range of the import's parent statement.
     parent_range: Option<TextRange>,
     /// The origin of the import.
-    category: ImportType,
+    category: ImportCat,
 }
 
 impl Ranged for ImportBinding<'_> {
