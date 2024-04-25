@@ -32,3 +32,20 @@ pub(super) fn publish_diagnostics_for_document(
 
     Ok(())
 }
+
+pub(super) fn clear_diagnostics_for_document(
+    snapshot: &DocumentSnapshot,
+    notifier: &Notifier,
+) -> crate::server::Result<()> {
+    notifier
+        .notify::<lsp_types::notification::PublishDiagnostics>(
+            lsp_types::PublishDiagnosticsParams {
+                uri: snapshot.url().clone(),
+                diagnostics: vec![],
+                version: Some(snapshot.document().version()),
+            },
+        )
+        .with_failure_code(lsp_server::ErrorCode::InternalError)?;
+
+    Ok(())
+}
