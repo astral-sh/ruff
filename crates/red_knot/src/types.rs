@@ -444,8 +444,36 @@ mod tests {
                 FxIndexSet::from_iter(elems.iter().copied())
             );
         } else {
-            panic!("not a function");
+            panic!("not a union");
         }
         assert_eq!(format!("{}", union.display(&store)), "(C1 | C2)");
+    }
+
+    #[test]
+    fn add_intersection() {
+        let mut store = TypeStore::default();
+        let module = test_module(0);
+        let c1 = store.add_class(module, "C1");
+        let c2 = store.add_class(module, "C2");
+        let c3 = store.add_class(module, "C3");
+        let pos = vec![c1, c2];
+        let neg = vec![c3];
+        let intersection = store.add_intersection(module, &pos, &neg);
+        if let Type::Intersection(id) = intersection {
+            assert_eq!(
+                store.get_intersection(id).positive,
+                FxIndexSet::from_iter(pos.iter().copied())
+            );
+            assert_eq!(
+                store.get_intersection(id).negative,
+                FxIndexSet::from_iter(neg.iter().copied())
+            );
+        } else {
+            panic!("not an intersection");
+        }
+        assert_eq!(
+            format!("{}", intersection.display(&store)),
+            "(C1 & C2 & ~C3)"
+        );
     }
 }
