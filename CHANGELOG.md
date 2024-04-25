@@ -1482,9 +1482,9 @@ Read Ruff's new [versioning policy](https://docs.astral.sh/ruff/versioning/).
 - Unsafe fixes are no longer displayed or applied without opt-in ([#7769](https://github.com/astral-sh/ruff/pull/7769))
 - Drop formatting specific rules from the default set ([#7900](https://github.com/astral-sh/ruff/pull/7900))
 - The deprecated `format` setting has been removed ([#7984](https://github.com/astral-sh/ruff/pull/7984))
-- The `format` setting cannot be used to configure the output format, use `output-format` instead
-- The `RUFF_FORMAT` environment variable is ignored, use `RUFF_OUTPUT_FORMAT` instead
-- The `--format` option has been removed from `ruff check`, use `--output-format` instead
+    - The `format` setting cannot be used to configure the output format, use `output-format` instead
+    - The `RUFF_FORMAT` environment variable is ignored, use `RUFF_OUTPUT_FORMAT` instead
+    - The `--format` option has been removed from `ruff check`, use `--output-format` instead
 
 ### Rule changes
 
