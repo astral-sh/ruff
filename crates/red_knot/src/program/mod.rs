@@ -49,6 +49,8 @@ impl Program {
             self.source.sources.remove(&change.id);
             self.source.parsed.remove(&change.id);
             self.source.lint_syntax.remove(&change.id);
+            // TODO: remove all dependent modules as well
+            self.semantic.type_store.remove_module(&change.id);
         }
     }
 }

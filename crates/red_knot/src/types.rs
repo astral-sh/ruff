@@ -43,6 +43,10 @@ pub struct TypeStore {
 }
 
 impl TypeStore {
+    pub fn remove_module(&mut self, file_id: &FileId) {
+        self.modules.remove(file_id);
+    }
+
     fn add_or_get_module(&mut self, file_id: FileId) -> ModuleStoreRefMut {
         self.modules
             .entry(file_id)
