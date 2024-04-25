@@ -88,9 +88,8 @@ pub(crate) fn blanket_noqa(
 ) {
     for directive_line in noqa_directives.lines() {
         if let Directive::All(all) = &directive_line.directive {
-            let line = locator.slice(directive_line.range);
-            let offset = directive_line.range.start();
-            let noqa_end = all.end() - offset;
+            let line = locator.slice(directive_line);
+            let noqa_end = all.end() - directive_line.start();
 
             // Skip the `# noqa`, plus any trailing whitespace.
             let mut cursor = Cursor::new(&line[noqa_end.to_usize()..]);
