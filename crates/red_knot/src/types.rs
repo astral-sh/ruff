@@ -2,9 +2,9 @@
 use crate::ast_ids::NodeKey;
 use crate::module::Module;
 use crate::symbols::SymbolId;
-use crate::{FxDashMap, Name};
+use crate::{FxDashMap, FxIndexSet, Name};
 use ruff_index::{newtype_index, IndexVec};
-use rustc_hash::{FxHashMap, FxHashSet};
+use rustc_hash::FxHashMap;
 
 /// unique ID for a type
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
@@ -39,29 +39,13 @@ pub(crate) struct TypeStore {
 }
 
 impl TypeStore {
-    fn add_or_get_module(
-        &mut self,
-        module: Module,
-    ) -> dashmap::mapref::one::RefMut<
-        '_,
-        Module,
-        ModuleTypeStore,
-        std::hash::BuildHasherDefault<rustc_hash::FxHasher>,
-    > {
+    fn add_or_get_module(&mut self, module: Module) -> ModuleStoreRefMut {
         self.modules
             .entry(module)
             .or_insert_with(|| ModuleTypeStore::new(module))
     }
 
-    fn get_module(
-        &self,
-        module: Module,
-    ) -> dashmap::mapref::one::Ref<
-        '_,
-        Module,
-        ModuleTypeStore,
-        std::hash::BuildHasherDefault<rustc_hash::FxHasher>,
-    > {
+    fn get_module(&self, module: Module) -> ModuleStoreRef {
         self.modules.get(&module).expect("module should exist")
     }
 
@@ -80,6 +64,104 @@ impl TypeStore {
     fn add_intersection(&mut self, module: Module, positive: &[Type], negative: &[Type]) -> Type {
         self.add_or_get_module(module)
             .add_intersection(positive, negative)
+    }
+
+    fn get_function(&self, id: FunctionTypeId) -> FunctionTypeRef {
+        FunctionTypeRef {
+            module_store: self.get_module(id.module),
+            function_id: id.func_id,
+        }
+    }
+
+    fn get_class(&self, id: ClassTypeId) -> ClassTypeRef {
+        ClassTypeRef {
+            module_store: self.get_module(id.module),
+            class_id: id.class_id,
+        }
+    }
+
+    fn get_union(&self, id: UnionTypeId) -> UnionTypeRef {
+        UnionTypeRef {
+            module_store: self.get_module(id.module),
+            union_id: id.union_id,
+        }
+    }
+
+    fn get_intersection(&self, id: IntersectionTypeId) -> IntersectionTypeRef {
+        IntersectionTypeRef {
+            module_store: self.get_module(id.module),
+            intersection_id: id.intersection_id,
+        }
+    }
+}
+
+type ModuleStoreRef<'a> = dashmap::mapref::one::Ref<
+    'a,
+    Module,
+    ModuleTypeStore,
+    std::hash::BuildHasherDefault<rustc_hash::FxHasher>,
+>;
+
+type ModuleStoreRefMut<'a> = dashmap::mapref::one::RefMut<
+    'a,
+    Module,
+    ModuleTypeStore,
+    std::hash::BuildHasherDefault<rustc_hash::FxHasher>,
+>;
+
+#[derive(Debug)]
+pub(crate) struct FunctionTypeRef<'a> {
+    module_store: ModuleStoreRef<'a>,
+    function_id: ModuleFunctionTypeId,
+}
+
+impl<'a> std::ops::Deref for FunctionTypeRef<'a> {
+    type Target = FunctionType;
+
+    fn deref(&self) -> &Self::Target {
+        self.module_store.get_function(self.function_id)
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct ClassTypeRef<'a> {
+    module_store: ModuleStoreRef<'a>,
+    class_id: ModuleClassTypeId,
+}
+
+impl<'a> std::ops::Deref for ClassTypeRef<'a> {
+    type Target = ClassType;
+
+    fn deref(&self) -> &Self::Target {
+        self.module_store.get_class(self.class_id)
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct UnionTypeRef<'a> {
+    module_store: ModuleStoreRef<'a>,
+    union_id: ModuleUnionTypeId,
+}
+
+impl<'a> std::ops::Deref for UnionTypeRef<'a> {
+    type Target = UnionType;
+
+    fn deref(&self) -> &Self::Target {
+        self.module_store.get_union(self.union_id)
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct IntersectionTypeRef<'a> {
+    module_store: ModuleStoreRef<'a>,
+    intersection_id: ModuleIntersectionTypeId,
+}
+
+impl<'a> std::ops::Deref for IntersectionTypeRef<'a> {
+    type Target = IntersectionType;
+
+    fn deref(&self) -> &Self::Target {
+        self.module_store.get_intersection(self.intersection_id)
     }
 }
 
@@ -119,12 +201,6 @@ struct ModuleUnionTypeId;
 #[newtype_index]
 struct ModuleIntersectionTypeId;
 
-// Using Arc in these maps allows us to access details of a type without locking the entire
-// ModuleTypeStore to writes while we are doing it, but it also comes with the risk of high thread
-// contention on the atomic reference counts of high-traffic types, even just for reading type
-// details. This approach will only parallelize well if we are careful to limit our reads of type
-// details. We can do this by caching (by Type id) all type judgments we make that require looking
-// at type details, so we aren't having to peek into the details repeatedly.
 #[derive(Debug)]
 struct ModuleTypeStore {
     module: Module,
@@ -177,7 +253,7 @@ impl ModuleTypeStore {
 
     fn add_union(&mut self, elems: &[Type]) -> Type {
         let union_id = self.unions.push(UnionType {
-            elements: FxHashSet::from_iter(elems.iter().copied()),
+            elements: FxIndexSet::from_iter(elems.iter().copied()),
         });
         Type::Union(UnionTypeId {
             module: self.module,
@@ -187,8 +263,8 @@ impl ModuleTypeStore {
 
     fn add_intersection(&mut self, positive: &[Type], negative: &[Type]) -> Type {
         let intersection_id = self.intersections.push(IntersectionType {
-            positive: FxHashSet::from_iter(positive.iter().copied()),
-            negative: FxHashSet::from_iter(negative.iter().copied()),
+            positive: FxIndexSet::from_iter(positive.iter().copied()),
+            negative: FxIndexSet::from_iter(negative.iter().copied()),
         });
         Type::Intersection(IntersectionTypeId {
             module: self.module,
@@ -226,18 +302,8 @@ impl std::fmt::Display for DisplayType<'_> {
             Type::Never => f.write_str("Never"),
             Type::Unknown => f.write_str("Unknown"),
             Type::Unbound => f.write_str("Unbound"),
-            Type::Class(class_id) => f.write_str(
-                self.store
-                    .get_module(class_id.module)
-                    .get_class(class_id.class_id)
-                    .name(),
-            ),
-            Type::Function(func_id) => f.write_str(
-                self.store
-                    .get_module(func_id.module)
-                    .get_function(func_id.func_id)
-                    .name(),
-            ),
+            Type::Class(class_id) => f.write_str(self.store.get_class(*class_id).name()),
+            Type::Function(func_id) => f.write_str(self.store.get_function(*func_id).name()),
             Type::Union(union_id) => self
                 .store
                 .get_module(union_id.module)
@@ -277,7 +343,7 @@ impl FunctionType {
 #[derive(Debug)]
 pub(crate) struct UnionType {
     // the union type includes values in any of these types
-    elements: FxHashSet<Type>,
+    elements: FxIndexSet<Type>,
 }
 
 impl UnionType {
@@ -304,9 +370,9 @@ impl UnionType {
 #[derive(Debug)]
 pub(crate) struct IntersectionType {
     // the intersection type includes only values in all of these types
-    positive: FxHashSet<Type>,
+    positive: FxIndexSet<Type>,
     // negated elements of the intersection, e.g.
-    negative: FxHashSet<Type>,
+    negative: FxIndexSet<Type>,
 }
 
 impl IntersectionType {
@@ -335,13 +401,19 @@ impl IntersectionType {
 #[cfg(test)]
 mod tests {
     use crate::module::test_module;
-    use crate::types::TypeStore;
+    use crate::types::{Type, TypeStore};
+    use crate::FxIndexSet;
 
     #[test]
     fn add_class() {
         let mut store = TypeStore::default();
         let module = test_module(0);
         let class = store.add_class(module, "C");
+        if let Type::Class(id) = class {
+            assert_eq!(store.get_class(id).name(), "C");
+        } else {
+            panic!("not a class");
+        }
         assert_eq!(format!("{}", class.display(&store)), "C");
     }
 
@@ -350,6 +422,30 @@ mod tests {
         let mut store = TypeStore::default();
         let module = test_module(0);
         let func = store.add_function(module, "func");
+        if let Type::Function(id) = func {
+            assert_eq!(store.get_function(id).name(), "func");
+        } else {
+            panic!("not a function");
+        }
         assert_eq!(format!("{}", func.display(&store)), "func");
+    }
+
+    #[test]
+    fn add_union() {
+        let mut store = TypeStore::default();
+        let module = test_module(0);
+        let c1 = store.add_class(module, "C1");
+        let c2 = store.add_class(module, "C2");
+        let elems = vec![c1, c2];
+        let union = store.add_union(module, &elems);
+        if let Type::Union(id) = union {
+            assert_eq!(
+                store.get_union(id).elements,
+                FxIndexSet::from_iter(elems.iter().copied())
+            );
+        } else {
+            panic!("not a function");
+        }
+        assert_eq!(format!("{}", union.display(&store)), "(C1 | C2)");
     }
 }
