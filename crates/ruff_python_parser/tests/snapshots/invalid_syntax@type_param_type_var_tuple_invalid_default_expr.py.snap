@@ -30,7 +30,7 @@ Module(
                                             id: "Ts",
                                             range: 8..10,
                                         },
-                                        default_value: Some(
+                                        default: Some(
                                             Starred(
                                                 ExprStarred {
                                                     range: 13..17,
@@ -80,7 +80,7 @@ Module(
                                             id: "Ts",
                                             range: 33..35,
                                         },
-                                        default_value: Some(
+                                        default: Some(
                                             Starred(
                                                 ExprStarred {
                                                     range: 38..49,
@@ -145,7 +145,7 @@ Module(
                                             id: "Ts",
                                             range: 65..67,
                                         },
-                                        default_value: Some(
+                                        default: Some(
                                             Yield(
                                                 ExprYield {
                                                     range: 70..77,
@@ -196,7 +196,7 @@ Module(
                                             id: "Ts",
                                             range: 93..95,
                                         },
-                                        default_value: Some(
+                                        default: Some(
                                             YieldFrom(
                                                 ExprYieldFrom {
                                                     range: 98..110,
@@ -245,7 +245,7 @@ Module(
                                             id: "Ts",
                                             range: 126..128,
                                         },
-                                        default_value: Some(
+                                        default: Some(
                                             Name(
                                                 ExprName {
                                                     range: 131..132,
@@ -264,7 +264,7 @@ Module(
                                             range: 136..139,
                                         },
                                         bound: None,
-                                        default_value: None,
+                                        default: None,
                                     },
                                 ),
                             ],

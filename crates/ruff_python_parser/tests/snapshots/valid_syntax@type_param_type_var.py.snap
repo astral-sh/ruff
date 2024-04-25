@@ -31,7 +31,7 @@ Module(
                                             range: 7..8,
                                         },
                                         bound: None,
-                                        default_value: None,
+                                        default: None,
                                     },
                                 ),
                             ],
@@ -68,7 +68,7 @@ Module(
                                             range: 23..24,
                                         },
                                         bound: None,
-                                        default_value: Some(
+                                        default: Some(
                                             Name(
                                                 ExprName {
                                                     range: 27..30,
@@ -121,7 +121,7 @@ Module(
                                                 },
                                             ),
                                         ),
-                                        default_value: Some(
+                                        default: Some(
                                             Name(
                                                 ExprName {
                                                     range: 54..57,
@@ -190,7 +190,7 @@ Module(
                                                 },
                                             ),
                                         ),
-                                        default_value: Some(
+                                        default: Some(
                                             Name(
                                                 ExprName {
                                                     range: 88..91,
@@ -243,7 +243,7 @@ Module(
                                                 },
                                             ),
                                         ),
-                                        default_value: Some(
+                                        default: Some(
                                             Name(
                                                 ExprName {
                                                     range: 115..118,
@@ -286,7 +286,7 @@ Module(
                                                 },
                                             ),
                                         ),
-                                        default_value: Some(
+                                        default: Some(
                                             Name(
                                                 ExprName {
                                                     range: 136..139,

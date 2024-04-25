@@ -667,32 +667,32 @@ pub fn walk_type_param<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, type_param:
     match type_param {
         TypeParam::TypeVar(TypeParamTypeVar {
             bound,
-            default_value,
+            default,
             name: _,
             range: _,
         }) => {
             if let Some(expr) = bound {
                 visitor.visit_expr(expr);
             }
-            if let Some(expr) = default_value {
+            if let Some(expr) = default {
                 visitor.visit_expr(expr);
             }
         }
         TypeParam::TypeVarTuple(TypeParamTypeVarTuple {
-            default_value,
+            default,
             name: _,
             range: _,
         }) => {
-            if let Some(expr) = default_value {
+            if let Some(expr) = default {
                 visitor.visit_expr(expr);
             }
         }
         TypeParam::ParamSpec(TypeParamParamSpec {
-            default_value,
+            default,
             name: _,
             range: _,
         }) => {
-            if let Some(expr) = default_value {
+            if let Some(expr) = default {
                 visitor.visit_expr(expr);
             }
         }

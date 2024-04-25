@@ -29,7 +29,7 @@ Module(
                                             range: 10..12,
                                         },
                                         bound: None,
-                                        default_value: None,
+                                        default: None,
                                     },
                                 ),
                                 TypeVarTuple(
@@ -39,7 +39,7 @@ Module(
                                             id: "T2",
                                             range: 15..17,
                                         },
-                                        default_value: None,
+                                        default: None,
                                     },
                                 ),
                             ],

@@ -264,22 +264,18 @@ pub fn any_over_expr(expr: &Expr, func: &dyn Fn(&Expr) -> bool) -> bool {
 
 pub fn any_over_type_param(type_param: &TypeParam, func: &dyn Fn(&Expr) -> bool) -> bool {
     match type_param {
-        TypeParam::TypeVar(ast::TypeParamTypeVar {
-            bound,
-            default_value,
-            ..
-        }) => {
+        TypeParam::TypeVar(ast::TypeParamTypeVar { bound, default, .. }) => {
             bound
                 .as_ref()
                 .is_some_and(|value| any_over_expr(value, func))
-                || default_value
+                || default
                     .as_ref()
                     .is_some_and(|value| any_over_expr(value, func))
         }
-        TypeParam::TypeVarTuple(ast::TypeParamTypeVarTuple { default_value, .. }) => default_value
+        TypeParam::TypeVarTuple(ast::TypeParamTypeVarTuple { default, .. }) => default
             .as_ref()
             .is_some_and(|value| any_over_expr(value, func)),
-        TypeParam::ParamSpec(ast::TypeParamParamSpec { default_value, .. }) => default_value
+        TypeParam::ParamSpec(ast::TypeParamParamSpec { default, .. }) => default
             .as_ref()
             .is_some_and(|value| any_over_expr(value, func)),
     }
@@ -1632,13 +1628,13 @@ mod tests {
         let type_var_one = TypeParam::TypeVar(TypeParamTypeVar {
             range: TextRange::default(),
             bound: Some(Box::new(constant_one.clone())),
-            default_value: None,
+            default: None,
             name: Identifier::new("x", TextRange::default()),
         });
         let type_var_two = TypeParam::TypeVar(TypeParamTypeVar {
             range: TextRange::default(),
             bound: None,
-            default_value: Some(Box::new(constant_two.clone())),
+            default: Some(Box::new(constant_two.clone())),
             name: Identifier::new("x", TextRange::default()),
         });
         let type_alias = Stmt::TypeAlias(StmtTypeAlias {
@@ -1665,7 +1661,7 @@ mod tests {
         let type_var_no_bound = TypeParam::TypeVar(TypeParamTypeVar {
             range: TextRange::default(),
             bound: None,
-            default_value: None,
+            default: None,
             name: Identifier::new("x", TextRange::default()),
         });
         assert!(!any_over_type_param(&type_var_no_bound, &|_expr| true));
@@ -1678,7 +1674,7 @@ mod tests {
         let type_var_with_bound = TypeParam::TypeVar(TypeParamTypeVar {
             range: TextRange::default(),
             bound: Some(Box::new(constant.clone())),
-            default_value: None,
+            default: None,
             name: Identifier::new("x", TextRange::default()),
         });
         assert!(
@@ -1694,7 +1690,7 @@ mod tests {
 
         let type_var_with_default = TypeParam::TypeVar(TypeParamTypeVar {
             range: TextRange::default(),
-            default_value: Some(Box::new(constant.clone())),
+            default: Some(Box::new(constant.clone())),
             bound: None,
             name: Identifier::new("x", TextRange::default()),
         });
@@ -1715,7 +1711,7 @@ mod tests {
         let type_var_tuple = TypeParam::TypeVarTuple(TypeParamTypeVarTuple {
             range: TextRange::default(),
             name: Identifier::new("x", TextRange::default()),
-            default_value: None,
+            default: None,
         });
         assert!(
             !any_over_type_param(&type_var_tuple, &|_expr| true),
@@ -1729,7 +1725,7 @@ mod tests {
 
         let type_var_tuple_with_default = TypeParam::TypeVarTuple(TypeParamTypeVarTuple {
             range: TextRange::default(),
-            default_value: Some(Box::new(constant.clone())),
+            default: Some(Box::new(constant.clone())),
             name: Identifier::new("x", TextRange::default()),
         });
         assert!(
@@ -1749,7 +1745,7 @@ mod tests {
         let type_param_spec = TypeParam::ParamSpec(TypeParamParamSpec {
             range: TextRange::default(),
             name: Identifier::new("x", TextRange::default()),
-            default_value: None,
+            default: None,
         });
         assert!(
             !any_over_type_param(&type_param_spec, &|_expr| true),
@@ -1763,7 +1759,7 @@ mod tests {
 
         let param_spec_with_default = TypeParam::TypeVarTuple(TypeParamTypeVarTuple {
             range: TextRange::default(),
-            default_value: Some(Box::new(constant.clone())),
+            default: Some(Box::new(constant.clone())),
             name: Identifier::new("x", TextRange::default()),
         });
         assert!(

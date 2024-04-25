@@ -3169,7 +3169,7 @@ impl<'src> Parser<'src> {
         if self.eat(TokenKind::Star) {
             let name = self.parse_identifier();
 
-            let default_value = if self.eat(TokenKind::Equal) {
+            let default = if self.eat(TokenKind::Equal) {
                 if self.at_expr() {
                     // test_err type_param_type_var_tuple_invalid_default_expr
                     // type X[*Ts = *int] = int
@@ -3202,7 +3202,7 @@ impl<'src> Parser<'src> {
             ast::TypeParam::TypeVarTuple(ast::TypeParamTypeVarTuple {
                 range: self.node_range(start),
                 name,
-                default_value,
+                default,
             })
 
         // test_ok type_param_param_spec
@@ -3213,7 +3213,7 @@ impl<'src> Parser<'src> {
         } else if self.eat(TokenKind::DoubleStar) {
             let name = self.parse_identifier();
 
-            let default_value = if self.eat(TokenKind::Equal) {
+            let default = if self.eat(TokenKind::Equal) {
                 if self.at_expr() {
                     // test_err type_param_param_spec_invalid_default_expr
                     // type X[**P = *int] = int
@@ -3241,7 +3241,7 @@ impl<'src> Parser<'src> {
             ast::TypeParam::ParamSpec(ast::TypeParamParamSpec {
                 range: self.node_range(start),
                 name,
-                default_value,
+                default,
             })
             // test_ok type_param_type_var
             // type X[T] = int
@@ -3274,7 +3274,7 @@ impl<'src> Parser<'src> {
                 None
             };
 
-            let default_value = if self.eat(TokenKind::Equal) {
+            let default = if self.eat(TokenKind::Equal) {
                 if self.at_expr() {
                     // test_err type_param_type_var_invalid_default_expr
                     // type X[T = *int] = int
@@ -3303,7 +3303,7 @@ impl<'src> Parser<'src> {
                 range: self.node_range(start),
                 name,
                 bound,
-                default_value,
+                default,
             })
         }
     }

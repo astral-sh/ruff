@@ -1582,7 +1582,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
         match type_param {
             ast::TypeParam::TypeVar(ast::TypeParamTypeVar {
                 bound,
-                default_value,
+                default,
                 name: _,
                 range: _,
             }) => {
@@ -1591,29 +1591,29 @@ impl<'a> Visitor<'a> for Checker<'a> {
                         .type_param_definitions
                         .push((expr, self.semantic.snapshot()));
                 }
-                if let Some(expr) = default_value {
+                if let Some(expr) = default {
                     self.visit
                         .type_param_definitions
                         .push((expr, self.semantic.snapshot()));
                 }
             }
             ast::TypeParam::TypeVarTuple(ast::TypeParamTypeVarTuple {
-                default_value,
+                default,
                 name: _,
                 range: _,
             }) => {
-                if let Some(expr) = default_value {
+                if let Some(expr) = default {
                     self.visit
                         .type_param_definitions
                         .push((expr, self.semantic.snapshot()));
                 }
             }
             ast::TypeParam::ParamSpec(ast::TypeParamParamSpec {
-                default_value,
+                default,
                 name: _,
                 range: _,
             }) => {
-                if let Some(expr) = default_value {
+                if let Some(expr) = default {
                     self.visit
                         .type_param_definitions
                         .push((expr, self.semantic.snapshot()));

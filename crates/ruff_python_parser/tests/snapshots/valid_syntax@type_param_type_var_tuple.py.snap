@@ -30,7 +30,7 @@ Module(
                                             id: "Ts",
                                             range: 8..10,
                                         },
-                                        default_value: None,
+                                        default: None,
                                     },
                                 ),
                             ],
@@ -66,7 +66,7 @@ Module(
                                             id: "Ts",
                                             range: 26..28,
                                         },
-                                        default_value: Some(
+                                        default: Some(
                                             Name(
                                                 ExprName {
                                                     range: 31..34,
@@ -110,7 +110,7 @@ Module(
                                             id: "Ts",
                                             range: 50..52,
                                         },
-                                        default_value: Some(
+                                        default: Some(
                                             Starred(
                                                 ExprStarred {
                                                     range: 55..59,
@@ -161,7 +161,7 @@ Module(
                                             range: 74..75,
                                         },
                                         bound: None,
-                                        default_value: None,
+                                        default: None,
                                     },
                                 ),
                                 TypeVarTuple(
@@ -171,7 +171,7 @@ Module(
                                             id: "Ts",
                                             range: 78..80,
                                         },
-                                        default_value: None,
+                                        default: None,
                                     },
                                 ),
                             ],
@@ -208,7 +208,7 @@ Module(
                                             range: 95..96,
                                         },
                                         bound: None,
-                                        default_value: None,
+                                        default: None,
                                     },
                                 ),
                                 TypeVarTuple(
@@ -218,7 +218,7 @@ Module(
                                             id: "Ts",
                                             range: 99..101,
                                         },
-                                        default_value: Some(
+                                        default: Some(
                                             Name(
                                                 ExprName {
                                                     range: 104..107,

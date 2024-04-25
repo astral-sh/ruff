@@ -30,7 +30,7 @@ Module(
                                             id: "P",
                                             range: 9..10,
                                         },
-                                        default_value: Some(
+                                        default: Some(
                                             Starred(
                                                 ExprStarred {
                                                     range: 13..17,
@@ -80,7 +80,7 @@ Module(
                                             id: "P",
                                             range: 34..35,
                                         },
-                                        default_value: Some(
+                                        default: Some(
                                             Yield(
                                                 ExprYield {
                                                     range: 38..45,
@@ -131,7 +131,7 @@ Module(
                                             id: "P",
                                             range: 62..63,
                                         },
-                                        default_value: Some(
+                                        default: Some(
                                             YieldFrom(
                                                 ExprYieldFrom {
                                                     range: 66..78,
@@ -180,7 +180,7 @@ Module(
                                             id: "P",
                                             range: 95..96,
                                         },
-                                        default_value: Some(
+                                        default: Some(
                                             Name(
                                                 ExprName {
                                                     range: 99..100,
@@ -199,7 +199,7 @@ Module(
                                             range: 104..107,
                                         },
                                         bound: None,
-                                        default_value: None,
+                                        default: None,
                                     },
                                 ),
                             ],
@@ -235,7 +235,7 @@ Module(
                                             id: "P",
                                             range: 124..125,
                                         },
-                                        default_value: Some(
+                                        default: Some(
                                             Starred(
                                                 ExprStarred {
                                                     range: 128..132,

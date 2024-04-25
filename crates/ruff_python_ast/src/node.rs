@@ -4317,7 +4317,7 @@ impl AstNode for ast::TypeParamTypeVar {
     {
         let ast::TypeParamTypeVar {
             bound,
-            default_value,
+            default,
             name: _,
             range: _,
         } = self;
@@ -4325,7 +4325,7 @@ impl AstNode for ast::TypeParamTypeVar {
         if let Some(expr) = bound {
             visitor.visit_expr(expr);
         }
-        if let Some(expr) = default_value {
+        if let Some(expr) = default {
             visitor.visit_expr(expr);
         }
     }
@@ -4366,9 +4366,9 @@ impl AstNode for ast::TypeParamTypeVarTuple {
         let ast::TypeParamTypeVarTuple {
             range: _,
             name: _,
-            default_value,
+            default,
         } = self;
-        if let Some(expr) = default_value {
+        if let Some(expr) = default {
             visitor.visit_expr(expr);
         }
     }
@@ -4409,9 +4409,9 @@ impl AstNode for ast::TypeParamParamSpec {
         let ast::TypeParamParamSpec {
             range: _,
             name: _,
-            default_value,
+            default,
         } = self;
-        if let Some(expr) = default_value {
+        if let Some(expr) = default {
             visitor.visit_expr(expr);
         }
     }

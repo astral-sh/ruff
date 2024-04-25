@@ -759,7 +759,7 @@ impl<'a> Generator<'a> {
             TypeParam::TypeVar(TypeParamTypeVar {
                 name,
                 bound,
-                default_value,
+                default,
                 ..
             }) => {
                 self.p_id(name);
@@ -767,31 +767,23 @@ impl<'a> Generator<'a> {
                     self.p(": ");
                     self.unparse_expr(expr, precedence::MAX);
                 }
-                if let Some(expr) = default_value {
+                if let Some(expr) = default {
                     self.p(" = ");
                     self.unparse_expr(expr, precedence::MAX);
                 }
             }
-            TypeParam::TypeVarTuple(TypeParamTypeVarTuple {
-                name,
-                default_value,
-                ..
-            }) => {
+            TypeParam::TypeVarTuple(TypeParamTypeVarTuple { name, default, .. }) => {
                 self.p("*");
                 self.p_id(name);
-                if let Some(expr) = default_value {
+                if let Some(expr) = default {
                     self.p(" = ");
                     self.unparse_expr(expr, precedence::MAX);
                 }
             }
-            TypeParam::ParamSpec(TypeParamParamSpec {
-                name,
-                default_value,
-                ..
-            }) => {
+            TypeParam::ParamSpec(TypeParamParamSpec { name, default, .. }) => {
                 self.p("**");
                 self.p_id(name);
-                if let Some(expr) = default_value {
+                if let Some(expr) = default {
                     self.p(" = ");
                     self.unparse_expr(expr, precedence::MAX);
                 }

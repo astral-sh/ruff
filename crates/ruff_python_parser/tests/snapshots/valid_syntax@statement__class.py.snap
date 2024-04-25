@@ -409,7 +409,7 @@ Module(
                                             range: 342..343,
                                         },
                                         bound: None,
-                                        default_value: None,
+                                        default: None,
                                     },
                                 ),
                             ],
@@ -456,7 +456,7 @@ Module(
                                             range: 387..388,
                                         },
                                         bound: None,
-                                        default_value: Some(
+                                        default: Some(
                                             Name(
                                                 ExprName {
                                                     range: 391..394,
@@ -519,7 +519,7 @@ Module(
                                                 },
                                             ),
                                         ),
-                                        default_value: None,
+                                        default: None,
                                     },
                                 ),
                             ],
@@ -587,7 +587,7 @@ Module(
                                                 },
                                             ),
                                         ),
-                                        default_value: Some(
+                                        default: Some(
                                             Name(
                                                 ExprName {
                                                     range: 511..514,
@@ -666,7 +666,7 @@ Module(
                                                 },
                                             ),
                                         ),
-                                        default_value: None,
+                                        default: None,
                                     },
                                 ),
                             ],
@@ -713,7 +713,7 @@ Module(
                                             range: 617..618,
                                         },
                                         bound: None,
-                                        default_value: None,
+                                        default: None,
                                     },
                                 ),
                                 TypeVar(
@@ -724,7 +724,7 @@ Module(
                                             range: 620..621,
                                         },
                                         bound: None,
-                                        default_value: None,
+                                        default: None,
                                     },
                                 ),
                             ],
@@ -771,7 +771,7 @@ Module(
                                             range: 659..660,
                                         },
                                         bound: None,
-                                        default_value: None,
+                                        default: None,
                                     },
                                 ),
                                 TypeVar(
@@ -782,7 +782,7 @@ Module(
                                             range: 662..663,
                                         },
                                         bound: None,
-                                        default_value: None,
+                                        default: None,
                                     },
                                 ),
                             ],
@@ -828,7 +828,7 @@ Module(
                                             id: "Ts",
                                             range: 701..703,
                                         },
-                                        default_value: None,
+                                        default: None,
                                     },
                                 ),
                             ],
@@ -874,7 +874,7 @@ Module(
                                             id: "Ts",
                                             range: 753..755,
                                         },
-                                        default_value: Some(
+                                        default: Some(
                                             Subscript(
                                                 ExprSubscript {
                                                     range: 758..781,
@@ -970,7 +970,7 @@ Module(
                                             id: "Ts",
                                             range: 839..841,
                                         },
-                                        default_value: Some(
+                                        default: Some(
                                             Starred(
                                                 ExprStarred {
                                                     range: 844..860,
@@ -1059,7 +1059,7 @@ Module(
                                             id: "P",
                                             range: 895..896,
                                         },
-                                        default_value: None,
+                                        default: None,
                                     },
                                 ),
                             ],
@@ -1105,7 +1105,7 @@ Module(
                                             id: "P",
                                             range: 944..945,
                                         },
-                                        default_value: Some(
+                                        default: Some(
                                             List(
                                                 ExprList {
                                                     range: 948..958,
@@ -1175,7 +1175,7 @@ Module(
                                             range: 993..994,
                                         },
                                         bound: None,
-                                        default_value: None,
+                                        default: None,
                                     },
                                 ),
                                 TypeVar(
@@ -1194,7 +1194,7 @@ Module(
                                                 },
                                             ),
                                         ),
-                                        default_value: None,
+                                        default: None,
                                     },
                                 ),
                                 TypeVarTuple(
@@ -1204,7 +1204,7 @@ Module(
                                             id: "U",
                                             range: 1005..1006,
                                         },
-                                        default_value: None,
+                                        default: None,
                                     },
                                 ),
                                 ParamSpec(
@@ -1214,7 +1214,7 @@ Module(
                                             id: "P",
                                             range: 1010..1011,
                                         },
-                                        default_value: None,
+                                        default: None,
                                     },
                                 ),
                             ],
