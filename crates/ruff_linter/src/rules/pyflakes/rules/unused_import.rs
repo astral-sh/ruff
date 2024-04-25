@@ -11,6 +11,7 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::checkers::ast::Checker;
 use crate::fix;
 use crate::registry::Rule;
+use crate::rules::isort::{categorize as categorize_original, ImportSection, ImportType};
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 enum UnusedImportContext {
@@ -109,6 +110,34 @@ impl Violation for UnusedImport {
         } else {
             format!("Remove unused import: `{name}`")
         })
+    }
+}
+
+/// Categorize the import as stdlib, first party, third party, or return `None` if this rule should
+/// not apply (e.g. `from __future__ …`).
+fn categorize(checker: &Checker, qualified_name: &str) -> Option<ImportType> {
+    match categorize_original(
+        qualified_name,
+        None,
+        &checker.settings.src,
+        checker.package(),
+        checker.settings.isort.detect_same_package,
+        &checker.settings.isort.known_modules,
+        checker.settings.target_version,
+        checker.settings.isort.no_sections,
+        &checker.settings.isort.section_order,
+        &checker.settings.isort.default_section,
+    ) {
+        // this rule doesn't apply
+        ImportSection::Known(ImportType::Future) => None,
+        // stdlib
+        ImportSection::Known(ImportType::StandardLibrary) => Some(ImportType::StandardLibrary),
+        // first party
+        ImportSection::Known(ImportType::FirstParty) => Some(ImportType::FirstParty),
+        ImportSection::Known(ImportType::LocalFolder) => Some(ImportType::FirstParty),
+        // third party
+        ImportSection::Known(ImportType::ThirdParty) => Some(ImportType::ThirdParty),
+        ImportSection::UserDefined(_) => Some(ImportType::ThirdParty),
     }
 }
 
