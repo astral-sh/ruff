@@ -30,10 +30,12 @@ where
                 source: source.text(),
             };
             visitor.visit_body(&ast.body);
-            Diagnostics::from(visitor.diagnostics)
+            diagnostics = visitor.diagnostics
         } else {
-            Diagnostics::Empty
+            diagnostics.extend(parsed.errors().iter().map(|err| err.to_string()));
         }
+
+        Diagnostics::from(diagnostics)
     })
 }
 

@@ -1,9 +1,10 @@
-use rustc_hash::FxHashMap;
 use std::collections::hash_map::Entry;
 use std::num::NonZeroUsize;
 use std::path::Path;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
+
+use rustc_hash::FxHashMap;
 use tracing::subscriber::Interest;
 use tracing::{Level, Metadata};
 use tracing_subscriber::filter::LevelFilter;
@@ -11,7 +12,6 @@ use tracing_subscriber::layer::{Context, Filter, SubscriberExt};
 use tracing_subscriber::{Layer, Registry};
 use tracing_tree::time::Uptime;
 
-// use red_knot::watch::FileWatcher;
 use red_knot::cancellation::CancellationSource;
 use red_knot::db::{HasJar, SourceDb, SourceJar};
 use red_knot::files::FileId;
@@ -90,7 +90,7 @@ fn main() -> anyhow::Result<()> {
                 .unwrap();
         },
         files.clone(),
-    );
+    )?;
 
     file_watcher.watch_folder(workspace_folder)?;
 
@@ -283,7 +283,7 @@ impl AggregatedChanges {
 
                 match (merged, change.kind()) {
                     (FileChangeKind::Created, FileChangeKind::Deleted) => {
-                        // Creation after deletion means that ruff newer saw the file.
+                        // Deletion after creations means that ruff never saw the file.
                         entry.remove();
                     }
                     (FileChangeKind::Created, FileChangeKind::Modified) => {

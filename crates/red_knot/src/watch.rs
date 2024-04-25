@@ -1,3 +1,4 @@
+use anyhow::Context;
 use std::path::Path;
 
 use crate::files::Files;
@@ -24,14 +25,14 @@ where
 }
 
 impl FileWatcher {
-    pub fn new<E>(handler: E, files: Files) -> Self
+    pub fn new<E>(handler: E, files: Files) -> anyhow::Result<Self>
     where
         E: EventHandler,
     {
         Self::from_handler(Box::new(handler), files)
     }
 
-    fn from_handler(handler: Box<dyn EventHandler>, files: Files) -> Self {
+    fn from_handler(handler: Box<dyn EventHandler>, files: Files) -> anyhow::Result<Self> {
         let watcher = recommended_watcher(move |changes: notify::Result<Event>| {
             match changes {
                 Ok(event) => {
@@ -64,9 +65,9 @@ impl FileWatcher {
                 }
             }
         })
-        .unwrap();
+        .context("Failed to create file watcher.")?;
 
-        Self { watcher }
+        Ok(Self { watcher })
     }
 
     pub fn watch_folder(&mut self, path: &Path) -> anyhow::Result<()> {
