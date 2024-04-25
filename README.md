@@ -50,6 +50,7 @@ times faster than any individual tool.
 Ruff is extremely actively developed and used in major open-source projects like:
 
 - [Apache Airflow](https://github.com/apache/airflow)
+- [Apache Superset](https://github.com/apache/superset)
 - [FastAPI](https://github.com/tiangolo/fastapi)
 - [Hugging Face](https://github.com/huggingface/transformers)
 - [Pandas](https://github.com/pandas-dev/pandas)
