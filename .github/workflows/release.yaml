@@ -58,7 +58,7 @@ jobs:
           path: dist
 
   macos-x86_64:
-    runs-on: macos-latest
+    runs-on: macos-12
     steps:
       - uses: actions/checkout@v4
         with:
@@ -98,7 +98,7 @@ jobs:
             *.sha256
 
   macos-universal:
-    runs-on: macos-latest
+    runs-on: macos-12
     steps:
       - uses: actions/checkout@v4
         with:
