@@ -895,7 +895,7 @@ mod tests {
     fn symbol_from_id() {
         let mut table = SymbolTable::new();
         let root_scope_id = SymbolTable::root_scope_id();
-        let foo_symbol_id = table.add_symbol_to_scope(root_scope_id, "foo");
+        let foo_symbol_id = table.add_symbol_to_scope(root_scope_id, "foo", SymbolFlags::empty());
         let symbol = foo_symbol_id.symbol(&table);
         assert_eq!(symbol.name.as_str(), "foo");
     }
