@@ -1,8 +1,8 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast as ast;
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::name::QualifiedName;
-use ruff_python_ast::{self as ast, ParameterWithDefault};
 use ruff_python_semantic::{
     analyze::{function_type, visibility},
     Scope, ScopeId, ScopeKind,
@@ -102,9 +102,8 @@ pub(crate) fn no_self_use(
         .posonlyargs
         .iter()
         .chain(&parameters.args)
-        .chain(&parameters.kwonlyargs)
         .next()
-        .map(ParameterWithDefault::as_parameter)
+        .map(|param| &param.parameter)
     else {
         return;
     };

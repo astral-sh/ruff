@@ -6,7 +6,7 @@ use rustc_hash::FxHashSet;
 use ruff_python_ast::{
     self as ast, ExceptHandler, Expr, ExprContext, IpyEscapeKind, Operator, Stmt, WithItem,
 };
-use ruff_text_size::{Ranged, TextRange, TextSize};
+use ruff_text_size::{Ranged, TextSize};
 
 use crate::parser::expression::{GeneratorExpressionInParentheses, ParsedExpr, EXPR_SET};
 use crate::parser::progress::ParserProgress;
@@ -2861,7 +2861,7 @@ impl<'src> Parser<'src> {
         // the parser will drop the previous ones. Another thing is the vararg and kwarg
         // uses `Parameter` (not `ParameterWithDefault`) which means that the parser cannot
         // recover well from `*args=(1, 2)`.
-        let mut parameters = ast::Parameters::empty(TextRange::default());
+        let mut parameters = ast::Parameters::default();
 
         let mut seen_default_param = false; // `a=10`
         let mut seen_positional_only_separator = false; // `/`
