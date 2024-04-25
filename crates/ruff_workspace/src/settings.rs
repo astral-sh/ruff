@@ -135,8 +135,8 @@ pub(crate) static EXCLUDE: &[FilePattern] = &[
 ];
 
 pub(crate) static INCLUDE: &[FilePattern] = &[
-    FilePattern::Builtin("*.py"),
-    FilePattern::Builtin("*.pyi"),
+    FilePattern::Builtin("**/*.py"),
+    FilePattern::Builtin("**/*.pyi"),
     FilePattern::Builtin("**/pyproject.toml"),
 ];
 

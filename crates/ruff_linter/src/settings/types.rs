@@ -6,7 +6,7 @@ use std::str::FromStr;
 use std::string::ToString;
 
 use anyhow::{bail, Result};
-use globset::{Glob, GlobMatcher, GlobSet, GlobSetBuilder};
+use globset::{GlobBuilder, GlobMatcher, GlobSet, GlobSetBuilder};
 use pep440_rs::{Version as Pep440Version, VersionSpecifier, VersionSpecifiers};
 use rustc_hash::FxHashMap;
 use serde::{de, Deserialize, Deserializer, Serialize};
@@ -190,15 +190,19 @@ impl FilePattern {
     pub fn add_to(self, builder: &mut GlobSetBuilder) -> Result<()> {
         match self {
             FilePattern::Builtin(pattern) => {
-                builder.add(Glob::from_str(pattern)?);
+                builder.add(GlobBuilder::new(pattern).literal_separator(true).build()?);
             }
             FilePattern::User(pattern, absolute) => {
                 // Add the absolute path.
-                builder.add(Glob::new(&absolute.to_string_lossy())?);
+                builder.add(
+                    GlobBuilder::new(&absolute.to_string_lossy())
+                        .literal_separator(true)
+                        .build()?,
+                );
 
                 // Add basename path.
                 if !pattern.contains(std::path::MAIN_SEPARATOR) {
-                    builder.add(Glob::new(&pattern)?);
+                    builder.add(GlobBuilder::new(&pattern).literal_separator(true).build()?);
                 }
             }
         }
@@ -643,10 +647,16 @@ impl CompiledPerFileIgnoreList {
             .map(|per_file_ignore| {
                 // Construct absolute path matcher.
                 let absolute_matcher =
-                    Glob::new(&per_file_ignore.absolute.to_string_lossy())?.compile_matcher();
+                    GlobBuilder::new(&per_file_ignore.absolute.to_string_lossy())
+                        .literal_separator(true)
+                        .build()?
+                        .compile_matcher();
 
                 // Construct basename matcher.
-                let basename_matcher = Glob::new(&per_file_ignore.basename)?.compile_matcher();
+                let basename_matcher = GlobBuilder::new(&per_file_ignore.basename)
+                    .literal_separator(true)
+                    .build()?
+                    .compile_matcher();
 
                 Ok(CompiledPerFileIgnore {
                     absolute_matcher,

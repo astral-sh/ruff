@@ -58,8 +58,8 @@ file_resolver.extend_exclude = [
 ]
 file_resolver.force_exclude = false
 file_resolver.include = [
-	"*.py",
-	"*.pyi",
+	"**/*.py",
+	"**/*.pyi",
 	"**/pyproject.toml",
 ]
 file_resolver.extend_include = []

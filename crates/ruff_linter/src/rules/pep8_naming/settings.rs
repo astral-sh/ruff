@@ -4,7 +4,7 @@ use std::error::Error;
 use std::fmt;
 use std::fmt::Formatter;
 
-use globset::{Glob, GlobSet, GlobSetBuilder};
+use globset::{GlobBuilder, GlobSet, GlobSetBuilder};
 
 use ruff_cache::{CacheKey, CacheKeyHasher};
 use ruff_macros::CacheKey;
@@ -113,12 +113,22 @@ impl IgnoreNames {
         // defaults
         if let Some(names) = ignore_names {
             for name in names {
-                builder.add(Glob::new(&name).map_err(SettingsError::InvalidIgnoreName)?);
+                builder.add(
+                    GlobBuilder::new(&name)
+                        .literal_separator(true)
+                        .build()
+                        .map_err(SettingsError::InvalidIgnoreName)?,
+                );
                 literals.push(name);
             }
         } else {
             for name in DEFAULTS {
-                builder.add(Glob::new(name).unwrap());
+                builder.add(
+                    GlobBuilder::new(name)
+                        .literal_separator(true)
+                        .build()
+                        .unwrap(),
+                );
                 literals.push((*name).to_string());
             }
         }
@@ -126,7 +136,12 @@ impl IgnoreNames {
         // Add the ignored names from the `extend-ignore-names` option.
         if let Some(names) = extend_ignore_names {
             for name in names {
-                builder.add(Glob::new(&name).map_err(SettingsError::InvalidIgnoreName)?);
+                builder.add(
+                    GlobBuilder::new(&name)
+                        .literal_separator(true)
+                        .build()
+                        .map_err(SettingsError::InvalidIgnoreName)?,
+                );
                 literals.push(name);
             }
         }
@@ -166,7 +181,12 @@ impl IgnoreNames {
         let mut literals = Vec::new();
 
         for name in patterns {
-            builder.add(Glob::new(&name).map_err(SettingsError::InvalidIgnoreName)?);
+            builder.add(
+                GlobBuilder::new(&name)
+                    .literal_separator(true)
+                    .build()
+                    .map_err(SettingsError::InvalidIgnoreName)?,
+            );
             literals.push(name);
         }
 
