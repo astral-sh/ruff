@@ -14,7 +14,7 @@ use std::{
 };
 use walkdir::{DirEntry, WalkDir};
 
-use crate::session::settings::ResolvedEditorSettings;
+use crate::session::settings::{ConfigResolutionStrategy, ResolvedEditorSettings};
 
 #[derive(Default)]
 pub(crate) struct RuffSettings {
@@ -117,7 +117,7 @@ impl<'a> ConfigurationTransformer for EditorConfigurationTransformer<'a> {
             ignore,
             exclude,
             line_length,
-            prioritize_file_configuration: prioritize_workspace_settings,
+            resolution_strategy,
         } = self.0.clone();
 
         let project_root = self.1;
@@ -150,10 +150,13 @@ impl<'a> ConfigurationTransformer for EditorConfigurationTransformer<'a> {
             ..Default::default()
         };
 
-        if prioritize_workspace_settings {
-            project_configuration.combine(editor_configuration)
-        } else {
-            editor_configuration.combine(project_configuration)
+        match resolution_strategy {
+            ConfigResolutionStrategy::Default => {
+                editor_configuration.combine(project_configuration)
+            }
+            ConfigResolutionStrategy::PrioritizeWorkspace => {
+                project_configuration.combine(editor_configuration)
+            }
         }
     }
 }
