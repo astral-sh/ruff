@@ -83,7 +83,7 @@ impl Scope {
 }
 
 #[derive(Debug)]
-pub(crate) enum Disposition {
+pub(crate) enum Kind {
     FreeVar,
     CellVar,
     ExplicitGlobal,
@@ -104,7 +104,7 @@ bitflags! {
 pub(crate) struct Symbol {
     name: Name,
     flags: SymbolFlags,
-    //disposition: Disposition, // TODO: might not be a field at all if we can determine from flags
+    //kind: Kind, // TODO: might not be a field at all if we can determine from flags
 }
 
 impl Symbol {
