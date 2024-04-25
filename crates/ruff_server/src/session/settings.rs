@@ -1,4 +1,4 @@
-use std::{ops::Deref, str::FromStr};
+use std::{ffi::OsString, ops::Deref, path::PathBuf, str::FromStr};
 
 use lsp_types::Url;
 use ruff_linter::{line_width::LineLength, RuleSelector};
@@ -31,6 +31,7 @@ pub(crate) struct ResolvedClientSettings {
 #[derive(Clone, Debug)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 pub(crate) struct ResolvedEditorSettings {
+    pub(super) configuration: Option<PathBuf>,
     pub(super) lint_preview: Option<bool>,
     pub(super) format_preview: Option<bool>,
     pub(super) select: Option<Vec<RuleSelector>>,
@@ -62,6 +63,7 @@ pub(crate) enum ConfigurationPreference {
 #[cfg_attr(test, derive(PartialEq, Eq))]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ClientSettings {
+    configuration: Option<String>,
     fix_all: Option<bool>,
     organize_imports: Option<bool>,
     lint: Option<LintOptions>,
@@ -229,6 +231,12 @@ impl ResolvedClientSettings {
                 true,
             ),
             editor_settings: ResolvedEditorSettings {
+                configuration: Self::resolve_optional(all_settings, |settings| {
+                    settings
+                        .configuration
+                        .as_ref()
+                        .map(|config_path| OsString::from(config_path.clone()).into())
+                }),
                 lint_preview: Self::resolve_optional(all_settings, |settings| {
                     settings.lint.as_ref()?.preview
                 }),
@@ -357,6 +365,7 @@ mod tests {
         assert_debug_snapshot!(options, @r###"
         HasWorkspaces {
             global_settings: ClientSettings {
+                configuration: None,
                 fix_all: Some(
                     false,
                 ),
@@ -411,6 +420,7 @@ mod tests {
             workspace_settings: [
                 WorkspaceSettings {
                     settings: ClientSettings {
+                        configuration: None,
                         fix_all: Some(
                             true,
                         ),
@@ -469,6 +479,7 @@ mod tests {
                 },
                 WorkspaceSettings {
                     settings: ClientSettings {
+                        configuration: None,
                         fix_all: Some(
                             true,
                         ),
@@ -555,6 +566,7 @@ mod tests {
                 disable_rule_comment_enable: false,
                 fix_violation_enable: false,
                 editor_settings: ResolvedEditorSettings {
+                    configuration: None,
                     lint_preview: Some(true),
                     format_preview: None,
                     select: Some(vec![
@@ -584,6 +596,7 @@ mod tests {
                 disable_rule_comment_enable: true,
                 fix_violation_enable: false,
                 editor_settings: ResolvedEditorSettings {
+                    configuration: None,
                     lint_preview: Some(false),
                     format_preview: None,
                     select: Some(vec![
@@ -608,6 +621,7 @@ mod tests {
         GlobalOnly {
             settings: Some(
                 ClientSettings {
+                    configuration: None,
                     fix_all: Some(
                         false,
                     ),
@@ -671,6 +685,7 @@ mod tests {
                 disable_rule_comment_enable: false,
                 fix_violation_enable: true,
                 editor_settings: ResolvedEditorSettings {
+                    configuration: None,
                     lint_preview: None,
                     format_preview: None,
                     select: None,
