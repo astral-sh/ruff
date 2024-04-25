@@ -12,16 +12,19 @@ use crate::parse::{parse, Parsed, ParsedStorage};
 use crate::source::{source_text, Source, SourceStorage};
 use crate::symbols::{symbol_table, SymbolId, SymbolTable, SymbolTablesStorage};
 use crate::types::{infer_symbol_type, Type, TypeStore};
+use crate::Workspace;
 
 #[derive(Debug)]
 pub struct Program {
     files: Files,
     source: SourceJar,
     semantic: SemanticJar,
+
+    workspace: Workspace,
 }
 
 impl Program {
-    pub fn new(module_search_paths: Vec<ModuleSearchPath>, files: Files) -> Self {
+    pub fn new(workspace: Workspace, module_search_paths: Vec<ModuleSearchPath>) -> Self {
         Self {
             source: SourceJar {
                 sources: SourceStorage::default(),
@@ -33,7 +36,8 @@ impl Program {
                 symbol_tables: SymbolTablesStorage::default(),
                 type_store: TypeStore::default(),
             },
-            files,
+            files: Files::default(),
+            workspace,
         }
     }
 
@@ -52,6 +56,18 @@ impl Program {
             // TODO: remove all dependent modules as well
             self.semantic.type_store.remove_module(change.id);
         }
+    }
+
+    pub fn files(&self) -> &Files {
+        &self.files
+    }
+
+    pub fn workspace(&self) -> &Workspace {
+        &self.workspace
+    }
+
+    pub fn workspace_mut(&mut self) -> &mut Workspace {
+        &mut self.workspace
     }
 }
 
