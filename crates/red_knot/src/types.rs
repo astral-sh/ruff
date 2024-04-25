@@ -13,16 +13,18 @@ impl TypeId {
 }
 
 /// Arena holding all known types
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub(crate) struct TypeEnvironment {
     types_by_id: IndexVec<TypeId, Type>,
 }
 
 impl TypeEnvironment {
     pub(crate) fn add_class(&mut self, name: &str) -> TypeId {
-        let class = Type::Instance(ClassType {
-            name: Name::new(name),
-        });
+        let class = Type::Instance {
+            instance_of: ClassType {
+                name: Name::new(name),
+            },
+        };
         self.types_by_id.push(class)
     }
 
@@ -40,20 +42,22 @@ impl TypeEnvironment {
 
 #[derive(Debug)]
 pub(crate) enum Type {
-    // a specific function
+    /// a specific function
     Function(FunctionType),
-    // the set of Python objects with this class in their MRO
-    Instance(ClassType),
+    /// the set of Python objects with this class in their __class__'s method resolution order
+    Instance {
+        instance_of: ClassType,
+    },
     Union(UnionType),
     Intersection(IntersectionType),
-    // the dynamic or gradual type: a statically-unknown set of values
+    /// the dynamic or gradual type: a statically-unknown set of values
     Any,
-    // the empty set of values
+    /// the empty set of values
     Never,
-    // unknown type (no annotation)
-    // equivalent to Any, or to object in strict mode
+    /// unknown type (no annotation)
+    /// equivalent to Any, or to object in strict mode
     Unknown,
-    // name is not bound to any value
+    /// name is not bound to any value
     Unbound,
     // TODO protocols, callable types, overloads, generics, type vars
 }
@@ -61,8 +65,8 @@ pub(crate) enum Type {
 impl Type {
     pub(crate) fn name(&self) -> Option<&str> {
         match self {
-            Type::Instance(inner) => Some(inner.name()),
-            Type::Function(inner) => Some(inner.name()),
+            Type::Instance { instance_of: class } => Some(class.name()),
+            Type::Function(func) => Some(func.name()),
             Type::Union(_) => None,
             Type::Intersection(_) => None,
             Type::Any => Some("Any"),
@@ -72,14 +76,25 @@ impl Type {
         }
     }
 
-    fn display(&self, f: &mut std::fmt::Formatter, env: &TypeEnvironment) -> std::fmt::Result {
-        if let Some(name) = self.name() {
-            write!(f, "{}", name)
-        } else {
-            match self {
-                Type::Union(inner) => inner.display(f, env),
-                Type::Intersection(inner) => inner.display(f, env),
-                _ => Err(std::fmt::Error),
+    fn display<'a>(&'a self, env: &'a TypeEnvironment) -> DisplayType<'a> {
+        DisplayType { ty: self, env }
+    }
+}
+
+#[derive(Copy, Clone, Debug)]
+struct DisplayType<'a> {
+    ty: &'a Type,
+    env: &'a TypeEnvironment,
+}
+
+impl std::fmt::Display for DisplayType<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.ty {
+            Type::Union(inner) => inner.display(f, self.env),
+            Type::Intersection(inner) => inner.display(f, self.env),
+            _ => {
+                let name = self.ty.name().expect("type should have a name");
+                f.write_str(name)
             }
         }
     }
@@ -115,18 +130,17 @@ pub(crate) struct UnionType {
 
 impl UnionType {
     fn display(&self, f: &mut std::fmt::Formatter<'_>, env: &TypeEnvironment) -> std::fmt::Result {
-        write!(f, "(")?;
+        f.write_str("(")?;
         let mut first = true;
         for elem_id in self.elements.iter() {
             let ty = env.type_for_id(*elem_id);
-            if first {
-                first = false
-            } else {
-                write!(f, " | ")?;
+            if !first {
+                f.write_str(" | ")?;
             };
-            ty.display(f, env)?;
+            first = false;
+            write!(f, "{}", ty.display(env))?;
         }
-        write!(f, ")")
+        f.write_str(")")
     }
 }
 
@@ -146,7 +160,7 @@ pub(crate) struct IntersectionType {
 
 impl IntersectionType {
     fn display(&self, f: &mut std::fmt::Formatter<'_>, env: &TypeEnvironment) -> std::fmt::Result {
-        write!(f, "(")?;
+        f.write_str("(")?;
         let mut first = true;
         for (neg, elem_id) in self
             .positive
@@ -155,17 +169,16 @@ impl IntersectionType {
             .chain(self.negative.iter().map(|elem_id| (true, elem_id)))
         {
             let ty = env.type_for_id(*elem_id);
-            if first {
-                first = false
-            } else {
-                write!(f, " & ")?
+            if !first {
+                f.write_str(" & ")?;
             };
+            first = false;
             if neg {
-                write!(f, "~")?
+                f.write_str("~")?;
             };
-            ty.display(f, env)?;
+            write!(f, "{}", ty.display(env))?;
         }
-        write!(f, ")")
+        f.write_str(")")
     }
 }
 
