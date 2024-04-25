@@ -165,10 +165,15 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
             continue;
         };
 
+        let Some(category) = categorize(&checker, &import.qualified_name().to_string()) else {
+            continue;
+        };
+
         let import = ImportBinding {
             import,
             range: binding.range(),
             parent_range: binding.parent_range(checker.semantic()),
+            category,
         };
 
         if checker.rule_is_ignored(Rule::UnusedImport, import.start())
@@ -208,6 +213,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
             import,
             range,
             parent_range,
+            category,
         } in imports
         {
             let mut diagnostic = Diagnostic::new(
@@ -242,6 +248,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
         import,
         range,
         parent_range,
+        category,
     } in ignored.into_values().flatten()
     {
         let mut diagnostic = Diagnostic::new(
@@ -268,6 +275,8 @@ struct ImportBinding<'a> {
     range: TextRange,
     /// The range of the import's parent statement.
     parent_range: Option<TextRange>,
+    /// The origin of the import.
+    category: ImportType,
 }
 
 impl Ranged for ImportBinding<'_> {
