@@ -9,15 +9,18 @@ use crate::files::FileId;
 
 pub mod ast_ids;
 pub mod cache;
+pub mod cancellation;
 pub mod db;
 pub mod files;
 pub mod hir;
+pub mod lint;
 pub mod module;
 mod parse;
 pub mod program;
 pub mod source;
 mod symbols;
 mod types;
+pub mod watch;
 
 pub(crate) type FxDashMap<K, V> = dashmap::DashMap<K, V, BuildHasherDefault<FxHasher>>;
 #[allow(unused)]
