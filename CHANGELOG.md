@@ -1,5 +1,40 @@
 # Changelog
 
+## 0.4.2
+
+### Rule changes
+
+- \[`flake8-pyi`\] Allow for overloaded `__exit__` and `__aexit__` definitions (`PYI036`) ([#11057](https://github.com/astral-sh/ruff/pull/11057))
+- \[`pyupgrade`\] Catch usages of `"%s" % var` and provide an unsafe fix (`UP031`) ([#11019](https://github.com/astral-sh/ruff/pull/11019))
+- \[`refurb`\] Implement new rule that suggests min/max over `sorted()` (`FURB192`) ([#10868](https://github.com/astral-sh/ruff/pull/10868))
+
+### Server
+
+- Fix an issue with missing diagnostics for Neovim and Helix ([#11092](https://github.com/astral-sh/ruff/pull/11092))
+- Implement hover documentation for `noqa` codes ([#11096](https://github.com/astral-sh/ruff/pull/11096))
+- Introduce common Ruff configuration options with new server settings ([#11062](https://github.com/astral-sh/ruff/pull/11062))
+
+### Bug fixes
+
+- Use `macos-12` for building release wheels to enable macOS 11 compatibility ([#11146](https://github.com/astral-sh/ruff/pull/11146))
+- \[`flake8-blind-expect`\] Allow raise from in `BLE001` ([#11131](https://github.com/astral-sh/ruff/pull/11131))
+- \[`flake8-pyi`\] Allow simple assignments to `None` in enum class scopes (`PYI026`) ([#11128](https://github.com/astral-sh/ruff/pull/11128))
+- \[`flake8-simplify`\] Avoid raising `SIM911` for non-`zip` attribute calls ([#11126](https://github.com/astral-sh/ruff/pull/11126))
+- \[`refurb`\] Avoid `operator.itemgetter` suggestion for single-item tuple ([#11095](https://github.com/astral-sh/ruff/pull/11095))
+- \[`ruff`\] Respect per-file-ignores for `RUF100` with no other diagnostics ([#11058](https://github.com/astral-sh/ruff/pull/11058))
+- \[`ruff`\] Fix async comprehension false positive (`RUF029`) ([#11070](https://github.com/astral-sh/ruff/pull/11070))
+
+### Documentation
+
+- \[`flake8-bugbear`\] Document explicitly disabling strict zip (`B905`) ([#11040](https://github.com/astral-sh/ruff/pull/11040))
+- \[`flake8-type-checking`\] Mention `lint.typing-modules` in `TCH001`, `TCH002`, and `TCH003` ([#11144](https://github.com/astral-sh/ruff/pull/11144))
+- \[`isort`\] Improve documentation around custom `isort` sections ([#11050](https://github.com/astral-sh/ruff/pull/11050))
+- \[`pylint`\] Fix documentation oversight for `invalid-X-returns` ([#11094](https://github.com/astral-sh/ruff/pull/11094))
+
+### Performance
+
+- Use `matchit` to resolve per-file settings ([#11111](https://github.com/astral-sh/ruff/pull/11111))
+
 ## 0.4.1
 
 ### Preview features
