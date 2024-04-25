@@ -38,7 +38,7 @@ pub(crate) struct ResolvedEditorSettings {
     pub(super) ignore: Option<Vec<RuleSelector>>,
     pub(super) exclude: Option<Vec<String>>,
     pub(super) line_length: Option<LineLength>,
-    pub(super) resolution_strategy: ConfigResolutionStrategy,
+    pub(super) configuration_resolution_strategy: ConfigResolutionStrategy,
 }
 
 /// Determines how multiple conflicting configurations should be resolved - in this
@@ -68,7 +68,7 @@ pub(crate) struct ClientSettings {
     code_action: Option<CodeActionOptions>,
     exclude: Option<Vec<String>>,
     line_length: Option<LineLength>,
-    resolution_strategy: Option<ConfigResolutionStrategy>,
+    configuration_resolution_strategy: Option<ConfigResolutionStrategy>,
 }
 
 /// This is a direct representation of the workspace settings schema,
@@ -268,9 +268,9 @@ impl ResolvedClientSettings {
                     Some(settings.exclude.as_ref()?.clone())
                 }),
                 line_length: Self::resolve_optional(all_settings, |settings| settings.line_length),
-                resolution_strategy: Self::resolve_or(
+                configuration_resolution_strategy: Self::resolve_or(
                     all_settings,
-                    |settings| settings.resolution_strategy,
+                    |settings| settings.configuration_resolution_strategy,
                     ConfigResolutionStrategy::Default,
                 ),
             },
@@ -405,7 +405,7 @@ mod tests {
                 ),
                 exclude: None,
                 line_length: None,
-                resolution_strategy: None,
+                configuration_resolution_strategy: None,
             },
             workspace_settings: [
                 WorkspaceSettings {
@@ -452,7 +452,7 @@ mod tests {
                         ),
                         exclude: None,
                         line_length: None,
-                        resolution_strategy: None,
+                        configuration_resolution_strategy: None,
                     },
                     workspace: Url {
                         scheme: "file",
@@ -512,7 +512,7 @@ mod tests {
                         ),
                         exclude: None,
                         line_length: None,
-                        resolution_strategy: None,
+                        configuration_resolution_strategy: None,
                     },
                     workspace: Url {
                         scheme: "file",
@@ -564,7 +564,7 @@ mod tests {
                     ignore: None,
                     exclude: None,
                     line_length: None,
-                    resolution_strategy: ConfigResolutionStrategy::Default,
+                    configuration_resolution_strategy: ConfigResolutionStrategy::Default,
                 }
             }
         );
@@ -593,7 +593,7 @@ mod tests {
                     ignore: None,
                     exclude: None,
                     line_length: None,
-                    resolution_strategy: ConfigResolutionStrategy::Default,
+                    configuration_resolution_strategy: ConfigResolutionStrategy::Default,
                 }
             }
         );
@@ -647,7 +647,7 @@ mod tests {
                             80,
                         ),
                     ),
-                    resolution_strategy: None,
+                    configuration_resolution_strategy: None,
                 },
             ),
         }
@@ -677,7 +677,7 @@ mod tests {
                     ignore: Some(vec![RuleSelector::from_str("RUF001").unwrap()]),
                     exclude: Some(vec!["third_party".into()]),
                     line_length: Some(LineLength::try_from(80).unwrap()),
-                    resolution_strategy: ConfigResolutionStrategy::Default,
+                    configuration_resolution_strategy: ConfigResolutionStrategy::Default,
                 }
             }
         );

@@ -117,7 +117,7 @@ impl<'a> ConfigurationTransformer for EditorConfigurationTransformer<'a> {
             ignore,
             exclude,
             line_length,
-            resolution_strategy,
+            configuration_resolution_strategy,
         } = self.0.clone();
 
         let project_root = self.1;
@@ -150,7 +150,7 @@ impl<'a> ConfigurationTransformer for EditorConfigurationTransformer<'a> {
             ..Default::default()
         };
 
-        match resolution_strategy {
+        match configuration_resolution_strategy {
             ConfigResolutionStrategy::Default => {
                 editor_configuration.combine(project_configuration)
             }
