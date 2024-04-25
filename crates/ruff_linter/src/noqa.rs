@@ -652,6 +652,8 @@ pub(crate) struct NoqaDirectiveLine<'a> {
     pub(crate) directive: Directive<'a>,
     /// The codes that are ignored by the directive.
     pub(crate) matches: Vec<NoqaCode>,
+    // Whether the directive applies to range.end
+    pub(crate) includes_end: bool,
 }
 
 impl Ranged for NoqaDirectiveLine<'_> {
@@ -664,7 +666,6 @@ impl Ranged for NoqaDirectiveLine<'_> {
 #[derive(Debug, Default)]
 pub(crate) struct NoqaDirectives<'a> {
     inner: Vec<NoqaDirectiveLine<'a>>,
-    last_directive_includes_eof: bool,
 }
 
 impl<'a> NoqaDirectives<'a> {
@@ -685,27 +686,19 @@ impl<'a> NoqaDirectives<'a> {
                 }
                 Ok(Some(directive)) => {
                     // noqa comments are guaranteed to be single line.
+                    let range = locator.line_range(range.start());
                     directives.push(NoqaDirectiveLine {
-                        range: locator.line_range(range.start()),
+                        range,
                         directive,
                         matches: Vec::new(),
+                        includes_end: range.end() == locator.contents().text_len(),
                     });
                 }
                 Ok(None) => {}
             }
         }
 
-        // Record whether last directive should include EOF token.
-        let last_directive_includes_eof = if let Some(last) = directives.last() {
-            last.range.end() == locator.contents().text_len()
-        } else {
-            false
-        };
-
-        Self {
-            inner: directives,
-            last_directive_includes_eof,
-        }
+        Self { inner: directives }
     }
 
     pub(crate) fn find_line_with_directive(&self, offset: TextSize) -> Option<&NoqaDirectiveLine> {
@@ -724,26 +717,21 @@ impl<'a> NoqaDirectives<'a> {
     }
 
     fn find_line_index(&self, offset: TextSize) -> Option<usize> {
-        let index = self.inner.binary_search_by(|directive| {
-            if directive.range.end() < offset {
-                std::cmp::Ordering::Less
-            } else if directive.range.contains(offset) {
-                std::cmp::Ordering::Equal
-            } else {
-                std::cmp::Ordering::Greater
-            }
-        });
-
-        match index {
-            Ok(index) => Some(index),
-            Err(index) => {
-                if self.last_directive_includes_eof && index == self.inner.len() - 1 {
-                    Some(index)
-                } else {
-                    None
+        self.inner
+            .binary_search_by(|directive| {
+                if directive.range.end() < offset {
+                    std::cmp::Ordering::Less
+                } else if directive.range.start() > offset {
+                    std::cmp::Ordering::Greater
                 }
-            }
-        }
+                // At this point, end >= offset, start <= offset
+                else if !directive.includes_end && directive.range.end() == offset {
+                    std::cmp::Ordering::Less
+                } else {
+                    std::cmp::Ordering::Equal
+                }
+            })
+            .ok()
     }
 
     pub(crate) fn lines(&self) -> &[NoqaDirectiveLine] {
