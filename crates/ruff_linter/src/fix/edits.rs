@@ -1,6 +1,6 @@
 //! Interface for generating fix edits from higher-level actions (e.g., "remove an argument").
 
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 
 use ruff_diagnostics::Edit;
 use ruff_python_ast::parenthesize::parenthesized_range;
@@ -120,6 +120,30 @@ pub(crate) fn remove_unused_imports<'a>(
         None => Ok(delete_stmt(stmt, parent, locator, indexer)),
         Some(content) => Ok(Edit::range_replacement(content, stmt.range())),
     }
+}
+
+/// Edits to make the specified imports explicit, e.g. change `import x` to `import x as x`.
+pub(crate) fn make_imports_explicit<'a>(
+    member_names: impl Iterator<Item = &'a str>,
+    stmt: &Stmt,
+    locator: &Locator,
+) -> Vec<Edit> {
+    let aliases = match stmt {
+        Stmt::Import(ast::StmtImport { names, .. }) => names,
+        Stmt::ImportFrom(ast::StmtImportFrom { names, .. }) => names,
+        _ => {
+            return Vec::new();
+        }
+    };
+    // FIXME: what if the import is already `a as b` or `a as a`?
+    member_names
+        .filter_map(|name| {
+            aliases
+                .iter()
+                .find(|alias| name == alias.name.id)
+                .map(|alias| Edit::range_replacement(format!("{name} as {name}"), alias.range))
+        })
+        .collect()
 }
 
 #[derive(Debug, Copy, Clone)]
