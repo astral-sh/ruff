@@ -1398,9 +1398,6 @@ impl std::fmt::Display for LexicalError {
 /// Represents the different types of errors that can occur during lexing.
 #[derive(Debug, Clone, PartialEq)]
 pub enum LexicalErrorType {
-    /// A duplicate argument was found in a function definition.
-    DuplicateArgumentError(Box<str>),
-
     // TODO: Can probably be removed, the places it is used seem to be able
     // to use the `UnicodeError` variant instead.
     #[doc(hidden)]
@@ -1413,23 +1410,8 @@ pub enum LexicalErrorType {
     MissingUnicodeLbrace,
     /// Missing the `}` for unicode escape sequence.
     MissingUnicodeRbrace,
-    /// The nesting of brackets/braces/parentheses is not balanced.
-    NestingError,
     /// The indentation is not consistent.
     IndentationError,
-    /// Inconsistent use of tabs and spaces.
-    TabError,
-    /// Encountered a tab after a space.
-    TabsAfterSpaces,
-    /// A non-default argument follows a default argument.
-    DefaultArgumentError,
-
-    /// A positional argument follows a keyword argument.
-    PositionalArgumentError,
-    /// An iterable argument unpacking `*args` follows keyword argument unpacking `**kwargs`.
-    UnpackedArgumentError,
-    /// A keyword argument was repeated.
-    DuplicateKeywordArgumentError(Box<str>),
     /// An unrecognized token was encountered.
     UnrecognizedToken { tok: char },
     /// An f-string error containing the [`FStringErrorType`].
@@ -1440,8 +1422,6 @@ pub enum LexicalErrorType {
     LineContinuationError,
     /// An unexpected end of file was encountered.
     Eof,
-    /// Occurs when a syntactically invalid assignment was encountered.
-    AssignmentError,
     /// An unexpected error occurred.
     OtherError(Box<str>),
 }
@@ -1457,33 +1437,8 @@ impl std::fmt::Display for LexicalErrorType {
                 write!(f, "bytes can only contain ASCII literal characters")
             }
             LexicalErrorType::UnicodeError => write!(f, "Got unexpected unicode"),
-            LexicalErrorType::NestingError => write!(f, "Got unexpected nesting"),
             LexicalErrorType::IndentationError => {
                 write!(f, "unindent does not match any outer indentation level")
-            }
-            LexicalErrorType::TabError => {
-                write!(f, "inconsistent use of tabs and spaces in indentation")
-            }
-            LexicalErrorType::TabsAfterSpaces => {
-                write!(f, "Tabs not allowed as part of indentation after spaces")
-            }
-            LexicalErrorType::DefaultArgumentError => {
-                write!(f, "non-default argument follows default argument")
-            }
-            LexicalErrorType::DuplicateArgumentError(arg_name) => {
-                write!(f, "duplicate argument '{arg_name}' in function definition")
-            }
-            LexicalErrorType::DuplicateKeywordArgumentError(arg_name) => {
-                write!(f, "keyword argument repeated: {arg_name}")
-            }
-            LexicalErrorType::PositionalArgumentError => {
-                write!(f, "positional argument follows keyword argument")
-            }
-            LexicalErrorType::UnpackedArgumentError => {
-                write!(
-                    f,
-                    "iterable argument unpacking follows keyword argument unpacking"
-                )
             }
             LexicalErrorType::UnrecognizedToken { tok } => {
                 write!(f, "Got unexpected token {tok}")
@@ -1492,7 +1447,6 @@ impl std::fmt::Display for LexicalErrorType {
                 write!(f, "unexpected character after line continuation character")
             }
             LexicalErrorType::Eof => write!(f, "unexpected EOF while parsing"),
-            LexicalErrorType::AssignmentError => write!(f, "invalid assignment target"),
             LexicalErrorType::OtherError(msg) => write!(f, "{msg}"),
             LexicalErrorType::UnclosedStringError => {
                 write!(f, "missing closing quote in string literal")
