@@ -12,6 +12,7 @@ impl CancellationTokenSource {
         }
     }
 
+    #[tracing::instrument(level = "trace")]
     pub fn cancel(&self) {
         let (cancelled, condvar) = &*self.signal;
 

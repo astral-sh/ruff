@@ -164,7 +164,7 @@ pub struct ModuleData {
 /// Resolves a module name to a module id
 /// TODO: This would not work with Salsa because `ModuleName` isn't an ingredient and, therefore, cannot be used as part of a query.
 ///  For this to work with salsa, it would be necessary to intern all `ModuleName`s.
-#[tracing::instrument(level = "trace", skip(db))]
+#[tracing::instrument(level = "debug", skip(db))]
 pub fn resolve_module<Db>(db: &Db, name: ModuleName) -> Option<Module>
 where
     Db: SemanticDb + HasJar<SemanticJar>,

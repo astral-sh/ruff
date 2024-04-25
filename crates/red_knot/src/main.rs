@@ -18,6 +18,7 @@ use red_knot::cancellation::CancellationTokenSource;
 use red_knot::db::{HasJar, SourceDb, SourceJar};
 use red_knot::files::FileId;
 use red_knot::module::{ModuleSearchPath, ModuleSearchPathKind};
+use red_knot::program::check::{CheckError, RayonCheckScheduler};
 use red_knot::program::{FileChange, FileChangeKind, Program};
 use red_knot::watch::FileWatcher;
 use red_knot::Workspace;
@@ -134,8 +135,6 @@ impl MainLoop {
             .send(OrchestratorMessage::Run)
             .unwrap();
 
-        let files_to_check: Vec<_> = program.workspace().open_files().collect();
-
         for message in &self.main_loop_receiver {
             tracing::trace!("Main Loop: Tick");
 
@@ -143,56 +142,27 @@ impl MainLoop {
                 MainLoopMessage::CheckProgram => {
                     // Remove mutability from program.
                     let program = &*program;
-
-                    // Token to cancel the analysis if a new change is detected.
                     let run_cancellation_token_source = CancellationTokenSource::new();
                     let run_cancellation_token = run_cancellation_token_source.token();
+                    let sender = &self.orchestrator_sender;
 
-                    self.orchestrator_sender
+                    sender
                         .send(OrchestratorMessage::CheckProgramStarted {
-                            files: 1,
                             cancellation_token: run_cancellation_token_source,
                         })
                         .unwrap();
 
-                    // Star the analysis task on the thread pool and wait until they complete.
-                    rayon::scope(|scope| {
-                        for file in files_to_check.iter().copied() {
-                            if run_cancellation_token.is_cancelled() {
-                                self.orchestrator_sender
-                                    .send(OrchestratorMessage::CheckFileCancelled)
-                                    .unwrap();
-                            }
+                    rayon::in_place_scope(|scope| {
+                        let scheduler = RayonCheckScheduler { program, scope };
 
-                            let cancellation_token = run_cancellation_token.clone();
-                            let sender = self.orchestrator_sender.clone();
-
-                            // TODO: How do we allow the host to control the number of threads used?
-                            //  Or should we just assume that each host implements its own main loop,
-                            //  I don't think that's entirely unreasonable but we should avoid
-                            //  having different main loops per host AND command (e.g. format vs check vs lint)
-                            scope.spawn(move |_| {
-                                if cancellation_token.is_cancelled() {
-                                    tracing::trace!(
-                                        "Exit analysis because cancellation was requested."
-                                    );
-                                    sender
-                                        .send(OrchestratorMessage::CheckFileCancelled)
-                                        .unwrap();
-                                    return;
-                                }
-
-                                // TODO schedule the dependencies.
-                                let mut diagnostics = Vec::new();
-
-                                if program.workspace().is_file_open(file) {
-                                    diagnostics.extend_from_slice(&program.lint_syntax(file));
-                                }
-
-                                sender
-                                    .send(OrchestratorMessage::CheckFileCompleted(diagnostics))
-                                    .unwrap();
-                            });
+                        let result = program.check(&scheduler, run_cancellation_token);
+                        match result {
+                            Ok(result) => sender
+                                .send(OrchestratorMessage::CheckProgramCompleted(result))
+                                .unwrap(),
+                            Err(CheckError::Cancelled) => sender
+                                .send(OrchestratorMessage::CheckProgramCancelled)
+                                .unwrap(),
                         }
                     });
                 }
@@ -261,68 +231,45 @@ impl Orchestrator {
                     self.sender.send(MainLoopMessage::CheckProgram).unwrap();
                 }
 
-                OrchestratorMessage::CheckProgramStarted {
-                    files,
-                    cancellation_token,
-                } => {
+                OrchestratorMessage::CheckProgramStarted { cancellation_token } => {
                     debug_assert!(self.pending_analysis.is_none());
 
-                    self.pending_analysis = Some(PendingAnalysisState {
-                        count: files,
-                        cancellation_token,
-                        diagnostics: vec![],
-                    });
+                    self.pending_analysis = Some(PendingAnalysisState { cancellation_token });
                 }
 
-                OrchestratorMessage::CheckFileCompleted(diagnostics) => {
-                    let mut pending = self
-                        .pending_analysis
+                OrchestratorMessage::CheckProgramCompleted(diagnostics) => {
+                    self.pending_analysis
                         .take()
                         .expect("Expected a pending analysis.");
-                    pending.count = pending.count.checked_sub(1).unwrap();
-                    pending.diagnostics.extend(diagnostics);
 
-                    if pending.count == 0 {
-                        self.sender
-                            .send(MainLoopMessage::CheckCompleted(pending.diagnostics.clone()))
-                            .unwrap();
-                    } else {
-                        // More analysis are running, wait for them to complete
-                        self.pending_analysis = Some(pending);
-                    }
+                    self.sender
+                        .send(MainLoopMessage::CheckCompleted(diagnostics))
+                        .unwrap();
                 }
 
-                OrchestratorMessage::CheckFileCancelled => {
-                    let pending = self
-                        .pending_analysis
-                        .as_mut()
+                OrchestratorMessage::CheckProgramCancelled => {
+                    self.pending_analysis
+                        .take()
                         .expect("Expected a pending analysis.");
 
-                    pending.count = pending.count.checked_sub(1).unwrap();
-
-                    if pending.count == 0 {
-                        self.pending_analysis.take();
-
-                        self.debounce_changes();
-                    }
+                    self.debounce_changes();
                 }
 
                 OrchestratorMessage::FileChanges(changes) => {
                     // Request cancellation, but wait until all analysis tasks have completed to
                     // avoid stale messages in the next main loop.
-                    let remaining = if let Some(pending_state) = self.pending_analysis.as_ref() {
+                    let pending = if let Some(pending_state) = self.pending_analysis.as_ref() {
                         pending_state.cancellation_token.cancel();
-                        pending_state.count
+                        true
                     } else {
-                        0
+                        false
                     };
 
                     self.aggregated_changes.extend(changes);
 
                     // If there are no pending analysis tasks, apply the file changes. Otherwise
                     // keep running until all file checks have completed.
-                    if remaining == 0 {
-                        self.pending_analysis.take();
+                    if !pending {
                         self.debounce_changes();
                     }
                 }
@@ -348,8 +295,8 @@ impl Orchestrator {
                             self.aggregated_changes.extend(file_changes);
                         }
 
-                        Ok(OrchestratorMessage::CheckFileCancelled | OrchestratorMessage::CheckFileCompleted(_)) => unreachable!("There should be no pending check file operations."),
-                        Ok(OrchestratorMessage::Run | OrchestratorMessage::CheckProgramStarted {..}) => unreachable!("The orchestrator or analysis is already running."),
+                        Ok(OrchestratorMessage::CheckProgramStarted {..}| OrchestratorMessage::CheckProgramCompleted(_) | OrchestratorMessage::CheckProgramCancelled) => unreachable!("The program check should be complete at this point."),
+                        Ok(OrchestratorMessage::Run) => unreachable!("The orchestrator is already running."),
 
                         Err(_) => {
                             // There are no more senders, no point in waiting for more messages
@@ -375,9 +322,7 @@ impl Orchestrator {
 
 #[derive(Debug)]
 struct PendingAnalysisState {
-    count: usize,
     cancellation_token: CancellationTokenSource,
-    diagnostics: Vec<String>,
 }
 
 /// Message sent from the orchestrator to the main loop.
@@ -392,16 +337,15 @@ enum MainLoopMessage {
 #[derive(Debug)]
 enum OrchestratorMessage {
     Run,
+    Shutdown,
+
     CheckProgramStarted {
         cancellation_token: CancellationTokenSource,
-        files: usize,
     },
-
-    CheckFileCompleted(Vec<String>),
-    CheckFileCancelled,
+    CheckProgramCompleted(Vec<String>),
+    CheckProgramCancelled,
 
     FileChanges(Vec<FileChange>),
-    Shutdown,
 }
 
 #[derive(Default, Debug)]

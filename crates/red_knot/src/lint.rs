@@ -8,6 +8,7 @@ use crate::cache::KeyValueCache;
 use crate::db::{HasJar, SourceDb, SourceJar};
 use crate::files::FileId;
 
+#[tracing::instrument(level = "debug", skip(db))]
 pub(crate) fn lint_syntax<Db>(db: &Db, file_id: FileId) -> Diagnostics
 where
     Db: SourceDb + HasJar<SourceJar>,

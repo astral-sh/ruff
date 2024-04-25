@@ -19,7 +19,7 @@ use crate::files::FileId;
 use crate::Name;
 
 #[allow(unreachable_pub)]
-#[tracing::instrument(level = "trace", skip(db))]
+#[tracing::instrument(level = "debug", skip(db))]
 pub fn symbol_table<Db>(db: &Db, file_id: FileId) -> Arc<SymbolTable>
 where
     Db: SemanticDb + HasJar<SemanticJar>,

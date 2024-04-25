@@ -1,3 +1,5 @@
+pub mod check;
+
 use std::path::Path;
 use std::sync::Arc;
 
@@ -19,7 +21,6 @@ pub struct Program {
     files: Files,
     source: SourceJar,
     semantic: SemanticJar,
-
     workspace: Workspace,
 }
 

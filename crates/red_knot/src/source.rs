@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use crate::files::FileId;
 
-#[tracing::instrument(level = "trace", skip(db))]
+#[tracing::instrument(level = "debug", skip(db))]
 pub(crate) fn source_text<Db>(db: &Db, file_id: FileId) -> Source
 where
     Db: SourceDb + HasJar<SourceJar>,
@@ -15,8 +15,6 @@ where
     let sources = &db.jar().sources;
 
     sources.get(&file_id, |file_id| {
-        tracing::trace!("Reading source text for file_id={:?}.", file_id);
-
         let path = db.file_path(*file_id);
 
         let source_text = std::fs::read_to_string(&path).unwrap_or_else(|err| {
