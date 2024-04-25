@@ -1,5 +1,42 @@
 # Changelog
 
+## 0.4.2
+
+### Rule changes
+
+- [`flake8-pyi`] Allow for overloaded `__exit__` and `__aexit__` definitions (`PYI036`) ([#11057](https://github.com/astral-sh/ruff/pull/11057))
+- [`pyupgrade`] Catch usages of `"%s" % var` and provide an unsafe fix (`UP031`) ([#11019](https://github.com/astral-sh/ruff/pull/11019))
+- [`refurb`] Implement new rule that suggests min/max over `sorted()` (`FURB192`) ([#10868](https://github.com/astral-sh/ruff/pull/10868))
+
+### Server
+
+- Fix an issue with missing diagnostics for Neovim and Helix ([#11092](https://github.com/astral-sh/ruff/pull/11092))
+- Implement hover documentation for `noqa` codes ([#11096](https://github.com/astral-sh/ruff/pull/11096))
+- Introduce common Ruff configuration options with new server settings ([#11062](https://github.com/astral-sh/ruff/pull/11062))
+
+### Bug fixes
+
+- [`flake8-blind-expect`] Allow raise from in `BLE001` ([#11131](https://github.com/astral-sh/ruff/pull/11131))
+- [`flake8-pyi`] Allow simple assignments to `None` in enum class scopes (`PYI026`) ([#11128](https://github.com/astral-sh/ruff/pull/11128))
+- [`refurb`] Avoid `operator.itemgetter` suggestion for single-item tuple ([#11095](https://github.com/astral-sh/ruff/pull/11095))
+- [`ruff`] Respect per-file-ignores for `RUF100` with no other diagnostics ([#11058](https://github.com/astral-sh/ruff/pull/11058))
+- [`ruff`] Fix async comprehension false positive (`RUF029`) ([#11070](https://github.com/astral-sh/ruff/pull/11070))
+
+### Documentation
+
+- Add Apache Superset to list of major open source projects using Ruff ([#11136](https://github.com/astral-sh/ruff/pull/11136))
+- Fix license link in `README.md` ([#11124](https://github.com/astral-sh/ruff/pull/11124))
+- [`flake8-bugbear`] Document explicitly disabling strict zip (`B905`) ([#11040](https://github.com/astral-sh/ruff/pull/11040))
+- [`flake8-type-checking`] Mention `lint.typing-modules` in `TCH001`, `TCH002`, and `TCH003` ([#11144](https://github.com/astral-sh/ruff/pull/11144))
+- [`isort] Improve documentation around custom `isort` sections ([#11050](https://github.com/astral-sh/ruff/pull/11050))
+- [`pylint`] Fix documentation oversight for `invalid-X-returns` ([#11094](https://github.com/astral-sh/ruff/pull/11094))
+
+### Other changes
+
+- Use `macos-12` to build release wheels ([#11146](https://github.com/astral-sh/ruff/pull/11146))
+- Use `matchit` to resolve per-file settings ([#11111](https://github.com/astral-sh/ruff/pull/11111))
+- [`flake8-simplify`] Avoid raising `SIM911` for non-`zip` attribute calls ([#11126](https://github.com/astral-sh/ruff/pull/11126))
+
 ## 0.4.1
 
 ### Preview features
@@ -1447,9 +1484,9 @@ Read Ruff's new [versioning policy](https://docs.astral.sh/ruff/versioning/).
 - Unsafe fixes are no longer displayed or applied without opt-in ([#7769](https://github.com/astral-sh/ruff/pull/7769))
 - Drop formatting specific rules from the default set ([#7900](https://github.com/astral-sh/ruff/pull/7900))
 - The deprecated `format` setting has been removed ([#7984](https://github.com/astral-sh/ruff/pull/7984))
-    - The `format` setting cannot be used to configure the output format, use `output-format` instead
-    - The `RUFF_FORMAT` environment variable is ignored, use `RUFF_OUTPUT_FORMAT` instead
-    - The `--format` option has been removed from `ruff check`, use `--output-format` instead
+  - The `format` setting cannot be used to configure the output format, use `output-format` instead
+  - The `RUFF_FORMAT` environment variable is ignored, use `RUFF_OUTPUT_FORMAT` instead
+  - The `--format` option has been removed from `ruff check`, use `--output-format` instead
 
 ### Rule changes
 
