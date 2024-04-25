@@ -573,12 +573,6 @@ impl PackageKind {
     }
 }
 
-/// Give back an arbitrary `Module` id not backed by the db; for tests only
-#[cfg(test)]
-pub fn test_module(id: u32) -> Module {
-    Module(id)
-}
-
 #[cfg(test)]
 mod tests {
     use crate::db::tests::TestDb;

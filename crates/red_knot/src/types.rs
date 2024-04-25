@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 use crate::ast_ids::NodeKey;
-use crate::module::Module;
+use crate::files::FileId;
 use crate::symbols::SymbolId;
 use crate::{FxDashMap, FxIndexSet, Name};
 use ruff_index::{newtype_index, IndexVec};
@@ -38,62 +38,62 @@ impl Type {
 // switch to having all the arenas hold Arc, or we could see if we can split up ModuleTypeStore,
 // and/or give it inner mutability and finer-grained internal locking.
 #[derive(Debug, Default)]
-pub(crate) struct TypeStore {
-    modules: FxDashMap<Module, ModuleTypeStore>,
+pub struct TypeStore {
+    modules: FxDashMap<FileId, ModuleTypeStore>,
 }
 
 impl TypeStore {
-    fn add_or_get_module(&mut self, module: Module) -> ModuleStoreRefMut {
+    fn add_or_get_module(&mut self, file_id: FileId) -> ModuleStoreRefMut {
         self.modules
-            .entry(module)
-            .or_insert_with(|| ModuleTypeStore::new(module))
+            .entry(file_id)
+            .or_insert_with(|| ModuleTypeStore::new(file_id))
     }
 
-    fn get_module(&self, module: Module) -> ModuleStoreRef {
-        self.modules.get(&module).expect("module should exist")
+    fn get_module(&self, file_id: FileId) -> ModuleStoreRef {
+        self.modules.get(&file_id).expect("module should exist")
     }
 
-    fn add_function(&mut self, module: Module, name: &str) -> Type {
-        self.add_or_get_module(module).add_function(name)
+    fn add_function(&mut self, file_id: FileId, name: &str) -> Type {
+        self.add_or_get_module(file_id).add_function(name)
     }
 
-    fn add_class(&mut self, module: Module, name: &str) -> Type {
-        self.add_or_get_module(module).add_class(name)
+    fn add_class(&mut self, file_id: FileId, name: &str) -> Type {
+        self.add_or_get_module(file_id).add_class(name)
     }
 
-    fn add_union(&mut self, module: Module, elems: &[Type]) -> Type {
-        self.add_or_get_module(module).add_union(elems)
+    fn add_union(&mut self, file_id: FileId, elems: &[Type]) -> Type {
+        self.add_or_get_module(file_id).add_union(elems)
     }
 
-    fn add_intersection(&mut self, module: Module, positive: &[Type], negative: &[Type]) -> Type {
-        self.add_or_get_module(module)
+    fn add_intersection(&mut self, file_id: FileId, positive: &[Type], negative: &[Type]) -> Type {
+        self.add_or_get_module(file_id)
             .add_intersection(positive, negative)
     }
 
     fn get_function(&self, id: FunctionTypeId) -> FunctionTypeRef {
         FunctionTypeRef {
-            module_store: self.get_module(id.module),
+            module_store: self.get_module(id.file_id),
             function_id: id.func_id,
         }
     }
 
     fn get_class(&self, id: ClassTypeId) -> ClassTypeRef {
         ClassTypeRef {
-            module_store: self.get_module(id.module),
+            module_store: self.get_module(id.file_id),
             class_id: id.class_id,
         }
     }
 
     fn get_union(&self, id: UnionTypeId) -> UnionTypeRef {
         UnionTypeRef {
-            module_store: self.get_module(id.module),
+            module_store: self.get_module(id.file_id),
             union_id: id.union_id,
         }
     }
 
     fn get_intersection(&self, id: IntersectionTypeId) -> IntersectionTypeRef {
         IntersectionTypeRef {
-            module_store: self.get_module(id.module),
+            module_store: self.get_module(id.file_id),
             intersection_id: id.intersection_id,
         }
     }
@@ -101,14 +101,14 @@ impl TypeStore {
 
 type ModuleStoreRef<'a> = dashmap::mapref::one::Ref<
     'a,
-    Module,
+    FileId,
     ModuleTypeStore,
     std::hash::BuildHasherDefault<rustc_hash::FxHasher>,
 >;
 
 type ModuleStoreRefMut<'a> = dashmap::mapref::one::RefMut<
     'a,
-    Module,
+    FileId,
     ModuleTypeStore,
     std::hash::BuildHasherDefault<rustc_hash::FxHasher>,
 >;
@@ -171,25 +171,25 @@ impl<'a> std::ops::Deref for IntersectionTypeRef<'a> {
 
 #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
 pub(crate) struct FunctionTypeId {
-    module: Module,
+    file_id: FileId,
     func_id: ModuleFunctionTypeId,
 }
 
 #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
 pub(crate) struct ClassTypeId {
-    module: Module,
+    file_id: FileId,
     class_id: ModuleClassTypeId,
 }
 
 #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
 pub(crate) struct UnionTypeId {
-    module: Module,
+    file_id: FileId,
     union_id: ModuleUnionTypeId,
 }
 
 #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
 pub(crate) struct IntersectionTypeId {
-    module: Module,
+    file_id: FileId,
     intersection_id: ModuleIntersectionTypeId,
 }
 
@@ -207,7 +207,7 @@ struct ModuleIntersectionTypeId;
 
 #[derive(Debug)]
 struct ModuleTypeStore {
-    module: Module,
+    file_id: FileId,
     /// arena of all function types defined in this module
     functions: IndexVec<ModuleFunctionTypeId, FunctionType>,
     /// arena of all class types defined in this module
@@ -223,9 +223,9 @@ struct ModuleTypeStore {
 }
 
 impl ModuleTypeStore {
-    fn new(module: Module) -> Self {
+    fn new(file_id: FileId) -> Self {
         Self {
-            module,
+            file_id,
             functions: IndexVec::default(),
             classes: IndexVec::default(),
             unions: IndexVec::default(),
@@ -240,7 +240,7 @@ impl ModuleTypeStore {
             name: Name::new(name),
         });
         Type::Function(FunctionTypeId {
-            module: self.module,
+            file_id: self.file_id,
             func_id,
         })
     }
@@ -250,7 +250,7 @@ impl ModuleTypeStore {
             name: Name::new(name),
         });
         Type::Class(ClassTypeId {
-            module: self.module,
+            file_id: self.file_id,
             class_id,
         })
     }
@@ -260,7 +260,7 @@ impl ModuleTypeStore {
             elements: FxIndexSet::from_iter(elems.iter().copied()),
         });
         Type::Union(UnionTypeId {
-            module: self.module,
+            file_id: self.file_id,
             union_id,
         })
     }
@@ -271,7 +271,7 @@ impl ModuleTypeStore {
             negative: FxIndexSet::from_iter(negative.iter().copied()),
         });
         Type::Intersection(IntersectionTypeId {
-            module: self.module,
+            file_id: self.file_id,
             intersection_id,
         })
     }
@@ -310,12 +310,12 @@ impl std::fmt::Display for DisplayType<'_> {
             Type::Function(func_id) => f.write_str(self.store.get_function(*func_id).name()),
             Type::Union(union_id) => self
                 .store
-                .get_module(union_id.module)
+                .get_module(union_id.file_id)
                 .get_union(union_id.union_id)
                 .display(f, self.store),
             Type::Intersection(int_id) => self
                 .store
-                .get_module(int_id.module)
+                .get_module(int_id.file_id)
                 .get_intersection(int_id.intersection_id)
                 .display(f, self.store),
         }
@@ -404,15 +404,17 @@ impl IntersectionType {
 
 #[cfg(test)]
 mod tests {
-    use crate::module::test_module;
+    use crate::files::Files;
     use crate::types::{Type, TypeStore};
     use crate::FxIndexSet;
+    use std::path::Path;
 
     #[test]
     fn add_class() {
         let mut store = TypeStore::default();
-        let module = test_module(0);
-        let class = store.add_class(module, "C");
+        let files = Files::default();
+        let file_id = files.intern(Path::new("/foo"));
+        let class = store.add_class(file_id, "C");
         if let Type::Class(id) = class {
             assert_eq!(store.get_class(id).name(), "C");
         } else {
@@ -424,8 +426,9 @@ mod tests {
     #[test]
     fn add_function() {
         let mut store = TypeStore::default();
-        let module = test_module(0);
-        let func = store.add_function(module, "func");
+        let files = Files::default();
+        let file_id = files.intern(Path::new("/foo"));
+        let func = store.add_function(file_id, "func");
         if let Type::Function(id) = func {
             assert_eq!(store.get_function(id).name(), "func");
         } else {
@@ -437,11 +440,12 @@ mod tests {
     #[test]
     fn add_union() {
         let mut store = TypeStore::default();
-        let module = test_module(0);
-        let c1 = store.add_class(module, "C1");
-        let c2 = store.add_class(module, "C2");
+        let files = Files::default();
+        let file_id = files.intern(Path::new("/foo"));
+        let c1 = store.add_class(file_id, "C1");
+        let c2 = store.add_class(file_id, "C2");
         let elems = vec![c1, c2];
-        let union = store.add_union(module, &elems);
+        let union = store.add_union(file_id, &elems);
         if let Type::Union(id) = union {
             assert_eq!(
                 store.get_union(id).elements,
@@ -456,13 +460,14 @@ mod tests {
     #[test]
     fn add_intersection() {
         let mut store = TypeStore::default();
-        let module = test_module(0);
-        let c1 = store.add_class(module, "C1");
-        let c2 = store.add_class(module, "C2");
-        let c3 = store.add_class(module, "C3");
+        let files = Files::default();
+        let file_id = files.intern(Path::new("/foo"));
+        let c1 = store.add_class(file_id, "C1");
+        let c2 = store.add_class(file_id, "C2");
+        let c3 = store.add_class(file_id, "C3");
         let pos = vec![c1, c2];
         let neg = vec![c3];
-        let intersection = store.add_intersection(module, &pos, &neg);
+        let intersection = store.add_intersection(file_id, &pos, &neg);
         if let Type::Intersection(id) = intersection {
             assert_eq!(
                 store.get_intersection(id).positive,

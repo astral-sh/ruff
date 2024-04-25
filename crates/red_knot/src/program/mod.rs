@@ -11,6 +11,7 @@ use crate::module::{
 use crate::parse::{parse, Parsed, ParsedStorage};
 use crate::source::{source_text, Source, SourceStorage};
 use crate::symbols::{symbol_table, SymbolTable, SymbolTablesStorage};
+use crate::types::TypeStore;
 
 #[derive(Debug)]
 pub struct Program {
@@ -30,6 +31,7 @@ impl Program {
             semantic: SemanticJar {
                 module_resolver: ModuleResolver::new(module_search_paths),
                 symbol_tables: SymbolTablesStorage::default(),
+                type_store: TypeStore::default(),
             },
             files,
         }
