@@ -3,6 +3,7 @@ use std::sync::Arc;
 
 use crate::db::{Db, HasJar, SemanticDb, SemanticJar, SourceDb, SourceJar};
 use crate::files::{FileId, Files};
+use crate::lint::{lint_syntax, Diagnostics, LintSyntaxStorage};
 use crate::module::{
     add_module, path_to_module, resolve_module, set_module_search_paths, Module, ModuleData,
     ModuleName, ModuleResolver, ModuleSearchPath,
@@ -24,6 +25,7 @@ impl Program {
             source: SourceJar {
                 sources: SourceStorage::default(),
                 parsed: ParsedStorage::default(),
+                lint_syntax: LintSyntaxStorage::default(),
             },
             semantic: SemanticJar {
                 module_resolver: ModuleResolver::new(module_search_paths),
@@ -33,14 +35,19 @@ impl Program {
         }
     }
 
-    pub fn file_changed(&mut self, path: &Path) {
-        let Some(file_id) = self.files.try_get(path) else {
-            return;
-        };
-
-        self.semantic.module_resolver.remove_module(path);
-        self.source.sources.remove(&file_id);
-        self.source.parsed.remove(&file_id);
+    pub fn apply_changes<I>(&mut self, changes: I)
+    where
+        I: IntoIterator<Item = FileChange>,
+    {
+        for change in changes {
+            self.semantic
+                .module_resolver
+                .remove_module(&self.file_path(change.id));
+            self.semantic.symbol_tables.remove(&change.id);
+            self.source.sources.remove(&change.id);
+            self.source.parsed.remove(&change.id);
+            self.source.lint_syntax.remove(&change.id);
+        }
     }
 }
 
@@ -59,6 +66,10 @@ impl SourceDb for Program {
 
     fn parse(&self, file_id: FileId) -> Parsed {
         parse(self, file_id)
+    }
+
+    fn lint_syntax(&self, file_id: FileId) -> Diagnostics {
+        lint_syntax(self, file_id)
     }
 }
 
@@ -105,4 +116,31 @@ impl HasJar<SemanticJar> for Program {
     fn jar_mut(&mut self) -> &mut SemanticJar {
         &mut self.semantic
     }
+}
+
+#[derive(Copy, Clone, Debug)]
+pub struct FileChange {
+    id: FileId,
+    kind: FileChangeKind,
+}
+
+impl FileChange {
+    pub fn new(file_id: FileId, kind: FileChangeKind) -> Self {
+        Self { id: file_id, kind }
+    }
+
+    pub fn file_id(&self) -> FileId {
+        self.id
+    }
+
+    pub fn kind(&self) -> FileChangeKind {
+        self.kind
+    }
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum FileChangeKind {
+    Created,
+    Modified,
+    Deleted,
 }

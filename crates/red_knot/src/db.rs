@@ -2,6 +2,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 use crate::files::FileId;
+use crate::lint::{Diagnostics, LintSyntaxStorage};
 use crate::module::{Module, ModuleData, ModuleName, ModuleResolver, ModuleSearchPath};
 use crate::parse::{Parsed, ParsedStorage};
 use crate::source::{Source, SourceStorage};
@@ -16,6 +17,8 @@ pub trait SourceDb {
     fn source(&self, file_id: FileId) -> Source;
 
     fn parse(&self, file_id: FileId) -> Parsed;
+
+    fn lint_syntax(&self, file_id: FileId) -> Diagnostics;
 }
 
 pub trait SemanticDb: SourceDb {
@@ -38,6 +41,7 @@ pub trait Db: SemanticDb {}
 pub struct SourceJar {
     pub sources: SourceStorage,
     pub parsed: ParsedStorage,
+    pub lint_syntax: LintSyntaxStorage,
 }
 
 #[derive(Debug, Default)]
@@ -70,6 +74,7 @@ pub trait HasJar<T> {
 pub(crate) mod tests {
     use crate::db::{HasJar, SourceDb, SourceJar};
     use crate::files::{FileId, Files};
+    use crate::lint::{lint_syntax, Diagnostics};
     use crate::module::{
         add_module, path_to_module, resolve_module, set_module_search_paths, Module, ModuleData,
         ModuleName, ModuleSearchPath,
@@ -126,6 +131,10 @@ pub(crate) mod tests {
 
         fn parse(&self, file_id: FileId) -> Parsed {
             parse(self, file_id)
+        }
+
+        fn lint_syntax(&self, file_id: FileId) -> Diagnostics {
+            lint_syntax(self, file_id)
         }
     }
 
