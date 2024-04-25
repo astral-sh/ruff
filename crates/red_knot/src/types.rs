@@ -33,6 +33,10 @@ impl Type {
     }
 }
 
+// TODO: currently calling `get_function` et al and holding on to the `FunctionTypeRef` will lock a
+// shard of this dashmap, for as long as you hold the reference. This may be a problem. We could
+// switch to having all the arenas hold Arc, or we could see if we can split up ModuleTypeStore,
+// and/or give it inner mutability and finer-grained internal locking.
 #[derive(Debug, Default)]
 pub(crate) struct TypeStore {
     modules: FxDashMap<Module, ModuleTypeStore>,
