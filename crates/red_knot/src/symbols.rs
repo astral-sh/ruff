@@ -321,9 +321,9 @@ impl SymbolTable {
 
         match entry {
             RawEntryMut::Occupied(entry) => {
-                self.symbols_by_id.get_mut(*entry.key()).map(|symbol| {
+                if let Some(symbol) = self.symbols_by_id.get_mut(*entry.key()) {
                     symbol.flags.insert(flags);
-                });
+                };
                 *entry.key()
             }
             RawEntryMut::Vacant(entry) => {
