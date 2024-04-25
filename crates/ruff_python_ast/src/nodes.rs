@@ -3408,6 +3408,9 @@ impl Deref for TypeParams {
     }
 }
 
+/// A suite represents a [Vec] of [Stmt].
+///
+/// See: <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-suite>
 pub type Suite = Vec<Stmt>;
 
 /// The kind of escape command as defined in [IPython Syntax] in the IPython codebase.

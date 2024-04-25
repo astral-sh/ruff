@@ -3,7 +3,7 @@
 //! This module defines the tokens that the lexer recognizes. The tokens are
 //! loosely based on the token definitions found in the [CPython source].
 //!
-//! [CPython source]: https://github.com/python/cpython/blob/dfc2e065a2e71011017077e549cd2f9bf4944c54/Include/internal/pycore_token.h;
+//! [CPython source]: https://github.com/python/cpython/blob/dfc2e065a2e71011017077e549cd2f9bf4944c54/Grammar/Tokens
 
 use ruff_python_ast::{AnyStringKind, BoolOp, Int, IpyEscapeKind, Operator, UnaryOp};
 use std::fmt;
@@ -352,6 +352,10 @@ impl fmt::Display for Tok {
     }
 }
 
+/// A kind of token.
+///
+/// This is a lightweight representation of [Tok] which doesn't contain any information
+/// about the token itself.
 #[derive(Copy, Clone, PartialEq, Eq, Hash, Debug)]
 pub enum TokenKind {
     /// Token value for a name, commonly known as an identifier.

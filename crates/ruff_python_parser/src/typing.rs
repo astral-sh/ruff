@@ -1,9 +1,12 @@
-use crate::{parse_expression, parse_expression_starts_at};
+//! This module takes care of parsing a type annotation.
+
 use anyhow::Result;
+
 use ruff_python_ast::relocate::relocate_expr;
-use ruff_python_ast::str;
-use ruff_python_ast::Expr;
+use ruff_python_ast::{str, Expr};
 use ruff_text_size::{TextLen, TextRange};
+
+use crate::{parse_expression, parse_expression_starts_at};
 
 #[derive(is_macro::Is, Copy, Clone, Debug)]
 pub enum AnnotationKind {

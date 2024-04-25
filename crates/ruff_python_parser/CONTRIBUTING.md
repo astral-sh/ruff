@@ -52,3 +52,49 @@ Then, run the Parser test suite with the following command:
 ```sh
 cargo test --package ruff_python_parser
 ```
+
+### Python-based fuzzer
+
+The Ruff project includes a Python-based fuzzer that can be used to run the parser on
+randomly generated (but syntactically valid) Python source code files.
+
+To run the fuzzer, first install the required dependencies:
+
+```sh
+uv pip install -r scripts/fuzz-parser/requirements.txt
+```
+
+Then, run the fuzzer with the following command:
+
+```sh
+python scripts/fuzz-parser/fuzz.py
+```
+
+Refer to the [fuzz.py](https://github.com/astral-sh/ruff/blob/main/scripts/fuzz-parser/fuzz.py)
+script for more information or use the `--help` flag to see the available options.
+
+#### CI
+
+The fuzzer is run as part of the CI pipeline. The purpose of running the fuzzer in the CI is to
+catch any regresssions introduced by any new changes to the parser. This is why the fuzzer is run on
+the same set of seeds on every run.
+
+## Benchmarks
+
+The `ruff_benchmark` crate can benchmark both the lexer and the parser.
+
+To run the lexer benchmarks, use the following command:
+
+```sh
+cargo bench --package ruff_benchmark --bench lexer
+```
+
+And to run the parser benchmarks, use the following command:
+
+```sh
+cargo bench --package ruff_benchmark --bench parser
+```
+
+Refer to the [Benchmarking and
+Profiling](https://docs.astral.sh/ruff/contributing/#benchmark-driven-development) section in the
+contributing guide for more information.
