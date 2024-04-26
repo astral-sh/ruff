@@ -26,10 +26,13 @@ pub trait SemanticDb: SourceDb {
     // queries
     fn resolve_module(&self, name: ModuleName) -> Option<Module>;
 
+    fn file_to_module(&self, file_id: FileId) -> Option<Module>;
+
+    fn path_to_module(&self, path: &Path) -> Option<Module>;
+
     fn symbol_table(&self, file_id: FileId) -> Arc<SymbolTable>;
 
     // mutations
-    fn path_to_module(&mut self, path: &Path) -> Option<Module>;
 
     fn add_module(&mut self, path: &Path) -> Option<(Module, Vec<Arc<ModuleData>>)>;
 
@@ -80,8 +83,8 @@ pub(crate) mod tests {
     use crate::files::{FileId, Files};
     use crate::lint::{lint_syntax, Diagnostics};
     use crate::module::{
-        add_module, path_to_module, resolve_module, set_module_search_paths, Module, ModuleData,
-        ModuleName, ModuleSearchPath,
+        add_module, file_to_module, path_to_module, resolve_module, set_module_search_paths,
+        Module, ModuleData, ModuleName, ModuleSearchPath,
     };
     use crate::parse::{parse, Parsed};
     use crate::source::{source_text, Source};
@@ -148,12 +151,16 @@ pub(crate) mod tests {
             resolve_module(self, name)
         }
 
-        fn symbol_table(&self, file_id: FileId) -> Arc<SymbolTable> {
-            symbol_table(self, file_id)
+        fn file_to_module(&self, file_id: FileId) -> Option<Module> {
+            file_to_module(self, file_id)
         }
 
-        fn path_to_module(&mut self, path: &Path) -> Option<Module> {
+        fn path_to_module(&self, path: &Path) -> Option<Module> {
             path_to_module(self, path)
+        }
+
+        fn symbol_table(&self, file_id: FileId) -> Arc<SymbolTable> {
+            symbol_table(self, file_id)
         }
 
         fn add_module(&mut self, path: &Path) -> Option<(Module, Vec<Arc<ModuleData>>)> {

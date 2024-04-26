@@ -7,8 +7,8 @@ use crate::db::{Db, HasJar, SemanticDb, SemanticJar, SourceDb, SourceJar};
 use crate::files::{FileId, Files};
 use crate::lint::{lint_syntax, Diagnostics, LintSyntaxStorage};
 use crate::module::{
-    add_module, path_to_module, resolve_module, set_module_search_paths, Module, ModuleData,
-    ModuleName, ModuleResolver, ModuleSearchPath,
+    add_module, file_to_module, path_to_module, resolve_module, set_module_search_paths, Module,
+    ModuleData, ModuleName, ModuleResolver, ModuleSearchPath,
 };
 use crate::parse::{parse, Parsed, ParsedStorage};
 use crate::source::{source_text, Source, SourceStorage};
@@ -99,14 +99,19 @@ impl SemanticDb for Program {
         resolve_module(self, name)
     }
 
+    fn file_to_module(&self, file_id: FileId) -> Option<Module> {
+        file_to_module(self, file_id)
+    }
+
+    fn path_to_module(&self, path: &Path) -> Option<Module> {
+        path_to_module(self, path)
+    }
+
     fn symbol_table(&self, file_id: FileId) -> Arc<SymbolTable> {
         symbol_table(self, file_id)
     }
 
     // Mutations
-    fn path_to_module(&mut self, path: &Path) -> Option<Module> {
-        path_to_module(self, path)
-    }
 
     fn add_module(&mut self, path: &Path) -> Option<(Module, Vec<Arc<ModuleData>>)> {
         add_module(self, path)

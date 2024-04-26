@@ -4,6 +4,7 @@ use std::sync::atomic::AtomicU32;
 use std::sync::Arc;
 
 use dashmap::mapref::entry::Entry;
+use smol_str::SmolStr;
 
 use crate::db::{HasJar, SemanticDb, SemanticJar};
 use crate::files::FileId;
@@ -46,9 +47,25 @@ impl ModuleName {
         Self(smol_str::SmolStr::new(name))
     }
 
-    pub fn relative(_dots: u32, name: &str, _to: &Path) -> Self {
-        // FIXME: Take `to` and `dots` into account.
-        Self(smol_str::SmolStr::new(name))
+    pub fn relative(&self, level: u32, module: Option<&str>) -> Option<Self> {
+        let mut components = self.components().peekable();
+
+        // Skip over the relative parts.
+        for _ in 0..level {
+            components.next_back()?;
+        }
+
+        let mut name = String::new();
+
+        for part in components.chain(module) {
+            if !name.is_empty() {
+                name.push('.');
+            }
+
+            name.push_str(part);
+        }
+
+        Some(Self(SmolStr::new(name)))
     }
 
     pub fn from_relative_path(path: &Path) -> Option<Self> {
@@ -151,6 +168,12 @@ pub enum ModuleSearchPathKind {
     StandardLibrary,
 }
 
+impl ModuleSearchPathKind {
+    pub const fn is_first_party(self) -> bool {
+        matches!(self, Self::FirstParty)
+    }
+}
+
 #[derive(Debug, Eq, PartialEq)]
 pub struct ModuleData {
     name: ModuleName,
@@ -209,24 +232,11 @@ where
     }
 }
 
-//////////////////////////////////////////////////////
-// Mutations
-//////////////////////////////////////////////////////
-
-/// Changes the module search paths to `search_paths`.
-pub fn set_module_search_paths<Db>(db: &mut Db, search_paths: Vec<ModuleSearchPath>)
-where
-    Db: SemanticDb + HasJar<SemanticJar>,
-{
-    let jar = db.jar_mut();
-
-    jar.module_resolver = ModuleResolver::new(search_paths);
-}
-
 /// Resolves the module id for the file with the given id.
 ///
 /// Returns `None` if the file is not a module in `sys.path`.
-pub fn file_to_module<Db>(db: &mut Db, file: FileId) -> Option<Module>
+#[tracing::instrument(level = "debug", skip(db))]
+pub fn file_to_module<Db>(db: &Db, file: FileId) -> Option<Module>
 where
     Db: SemanticDb + HasJar<SemanticJar>,
 {
@@ -237,28 +247,24 @@ where
 /// Resolves the module id for the given path.
 ///
 /// Returns `None` if the path is not a module in `sys.path`.
-// WARNING!: It's important that this method takes `&mut self`. Without, the implementation is prone to race conditions.
-// Note: This won't work with salsa because `Path` is not an ingredient.
-pub fn path_to_module<Db>(db: &mut Db, path: &Path) -> Option<Module>
+#[tracing::instrument(level = "debug", skip(db))]
+pub fn path_to_module<Db>(db: &Db, path: &Path) -> Option<Module>
 where
     Db: SemanticDb + HasJar<SemanticJar>,
 {
-    let jar = db.jar_mut();
-    let modules = &mut jar.module_resolver;
+    let jar = db.jar();
+    let modules = &jar.module_resolver;
     debug_assert!(path.is_absolute());
 
     if let Some(existing) = modules.by_path.get(path) {
         return Some(*existing);
     }
 
-    let root_path = modules
-        .search_paths
-        .iter()
-        .find(|root| path.starts_with(root.path()))?
-        .clone();
+    let (root_path, relative_path) = modules.search_paths.iter().find_map(|root| {
+        let relative_path = path.strip_prefix(root.path()).ok()?;
+        Some((root.clone(), relative_path))
+    })?;
 
-    // SAFETY: `strip_prefix` is guaranteed to succeed because we search the root that is a prefix of the path.
-    let relative_path = path.strip_prefix(root_path.path()).unwrap();
     let module_name = ModuleName::from_relative_path(relative_path)?;
 
     // Resolve the module name to see if Python would resolve the name to the same path.
@@ -266,7 +272,6 @@ where
     // root paths, but that the module corresponding to the past path is in a lower priority path,
     // in which case we ignore it.
     let module_id = resolve_module(db, module_name)?;
-    // Note: Guaranteed to be race-free because we're holding a mutable reference of `self` here.
     let module_path = module_id.path(db);
 
     if module_path.root() == &root_path {
@@ -291,6 +296,20 @@ where
         // Ignore it.
         None
     }
+}
+
+//////////////////////////////////////////////////////
+// Mutations
+//////////////////////////////////////////////////////
+
+/// Changes the module search paths to `search_paths`.
+pub fn set_module_search_paths<Db>(db: &mut Db, search_paths: Vec<ModuleSearchPath>)
+where
+    Db: SemanticDb + HasJar<SemanticJar>,
+{
+    let jar = db.jar_mut();
+
+    jar.module_resolver = ModuleResolver::new(search_paths);
 }
 
 /// Adds a module to the resolver.
@@ -619,7 +638,7 @@ mod tests {
     #[test]
     fn first_party_module() -> std::io::Result<()> {
         let TestCase {
-            mut db,
+            db,
             src,
             temp_dir: _temp_dir,
             ..
@@ -645,7 +664,7 @@ mod tests {
     fn resolve_package() -> std::io::Result<()> {
         let TestCase {
             src,
-            mut db,
+            db,
             temp_dir: _temp_dir,
             ..
         } = create_resolver()?;
@@ -672,7 +691,7 @@ mod tests {
     #[test]
     fn package_priority_over_module() -> std::io::Result<()> {
         let TestCase {
-            mut db,
+            db,
             temp_dir: _temp_dir,
             src,
             ..
@@ -700,7 +719,7 @@ mod tests {
     #[test]
     fn typing_stub_over_module() -> std::io::Result<()> {
         let TestCase {
-            mut db,
+            db,
             src,
             temp_dir: _temp_dir,
             ..
@@ -725,7 +744,7 @@ mod tests {
     #[test]
     fn sub_packages() -> std::io::Result<()> {
         let TestCase {
-            mut db,
+            db,
             src,
             temp_dir: _temp_dir,
             ..
@@ -753,7 +772,7 @@ mod tests {
     #[test]
     fn namespace_package() -> std::io::Result<()> {
         let TestCase {
-            mut db,
+            db,
             temp_dir: _,
             src,
             site_packages,
@@ -803,7 +822,7 @@ mod tests {
     #[test]
     fn regular_package_in_namespace_package() -> std::io::Result<()> {
         let TestCase {
-            mut db,
+            db,
             temp_dir: _,
             src,
             site_packages,
@@ -850,7 +869,7 @@ mod tests {
     #[test]
     fn module_search_path_priority() -> std::io::Result<()> {
         let TestCase {
-            mut db,
+            db,
             src,
             site_packages,
             temp_dir: _temp_dir,
@@ -877,7 +896,7 @@ mod tests {
     #[cfg(target_family = "unix")]
     fn symlink() -> std::io::Result<()> {
         let TestCase {
-            mut db,
+            db,
             src,
             temp_dir: _temp_dir,
             ..

@@ -151,7 +151,7 @@ impl MainLoop {
                         .unwrap();
 
                     rayon::in_place_scope(|scope| {
-                        let scheduler = RayonCheckScheduler { program, scope };
+                        let scheduler = RayonCheckScheduler::new(program, scope);
 
                         let result = program.check(&scheduler, run_cancellation_token);
                         match result {
@@ -422,6 +422,7 @@ fn setup_tracing() {
             .with_indent_lines(true)
             .with_indent_amount(2)
             .with_bracketed_fields(true)
+            .with_thread_ids(true)
             .with_targets(true)
             .with_writer(|| Box::new(std::io::stderr()))
             .with_timer(Uptime::default())

@@ -35,7 +35,7 @@ where
         }) => {
             // TODO relative imports
             assert!(matches!(level, 0));
-            let module_name = ModuleName::new(module.as_ref().expect("TODO relative imports"));
+            let module_name = ModuleName::new(&module.as_ref().expect("TODO relative imports"));
             if let Some(module) = db.resolve_module(module_name) {
                 let remote_file_id = module.path(db).file();
                 let remote_symbols = db.symbol_table(remote_file_id);
