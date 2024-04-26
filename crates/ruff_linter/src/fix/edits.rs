@@ -1,6 +1,6 @@
 //! Interface for generating fix edits from higher-level actions (e.g., "remove an argument").
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result};
 
 use ruff_diagnostics::Edit;
 use ruff_python_ast::parenthesize::parenthesized_range;

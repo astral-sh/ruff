@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 use std::iter;
 
-use anyhow::{bail, Result};
+use anyhow::{anyhow, bail, Result};
 use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{Applicability, Diagnostic, Fix, FixAvailability, Violation};
@@ -216,7 +216,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
             if !in_except_handler && !checker.settings.preview.is_enabled() {
                 (
                     fix_by_removing_imports(checker, node_id, &to_remove, in_init).ok(),
-                    fix_by_reexporting(checker, node_id, &to_explicit, dunder_all),
+                    fix_by_reexporting(checker, node_id, &to_explicit, dunder_all).ok(),
                 )
             } else {
                 (None, None)
@@ -341,7 +341,10 @@ fn fix_by_reexporting(
     node_id: NodeId,
     imports: &[ImportBinding],
     dunder_all: Option<NodeId>,
-) -> Option<Fix> {
+) -> Result<Fix> {
+    if 0 == imports.len() {
+        bail!("Expected import bindings");
+    }
     let statement = checker.semantic().statement(node_id);
 
     let member_names = imports
@@ -351,17 +354,14 @@ fn fix_by_reexporting(
     let member_names = member_names.iter().map(AsRef::as_ref);
 
     let edits = match dunder_all {
-        Some(dunder_all) => todo!(),
+        Some(_dunder_all) => bail!("Not implemented: add to dunder_all"),
         None => fix::edits::make_redundant_alias(member_names, statement),
     };
 
     // Only emit a fix if there are edits
-    if 0 == edits.len() || 0 < imports.len() {
-        return None;
-    }
-    let mut edits_iter = edits.into_iter();
-    let first = edits_iter.next()?;
+    let mut tail = edits.into_iter();
+    let head = tail.next().ok_or(anyhow!("No edits to make"))?;
 
     let isolation = Checker::isolation(checker.semantic().parent_statement_id(node_id));
-    Some(Fix::safe_edits(first, edits_iter).isolate(isolation))
+    Ok(Fix::safe_edits(head, tail).isolate(isolation))
 }
