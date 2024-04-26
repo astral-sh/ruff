@@ -150,6 +150,16 @@ fn categorize(checker: &Checker, qualified_name: &str) -> Option<ImportCat> {
     }
 }
 
+/// For some unused binding in an import statement...
+///
+///  in_init ∧ 1stpty → safe,   move to __all__ or convert to explicit-import
+///  in_init ∧ stdlib → unsafe, remove
+///  in_init ∧ 3rdpty → unsafe, remove
+///
+/// ¬in_init ∧ 1stpty → safe,   remove
+/// ¬in_init ∧ stdlib → safe,   remove
+/// ¬in_init ∧ 3rdpty → safe,   remove
+///
 pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut Vec<Diagnostic>) {
     // Collect all unused imports by statement.
     let mut unused: FxHashMap<(NodeId, Exceptions), Vec<ImportBinding>> = FxHashMap::default();
@@ -205,7 +215,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
     let in_init = checker.path().ends_with("__init__.py");
     let fix_init = !checker.settings.ignore_init_module_imports;
 
-    // Generate a diagnostic for every import, but share a fix across all imports within the same
+    // Generate a diagnostic for every import, but share fixes across all imports within the same
     // statement (excluding those that are ignored).
     for ((node_id, exceptions), imports) in unused {
         let in_except_handler =
@@ -223,13 +233,26 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
                     // FIXME: make an "is first party" predicate
                 });
 
-        let fix = if (!in_init || fix_init) && !in_except_handler {
-            fix_imports(checker, node_id, &imports, in_init).ok()
-        } else {
-            None
-        };
+        // generate fixes that are shared across bindings in the statement
+        let (fix_remove, fix_explicit) =
+            if !in_except_handler && !checker.settings.preview.is_enabled() {
+                (
+                    fix_by_removing_imports_from_statement(checker, node_id, &to_remove, in_init),
+                    fix_by_making_explicit(
+                        checker,
+                        node_id,
+                        &to_explicit,
+                        None, // TODO this last argument is the node-id of __all__ export list
+                    ),
+                )
+            } else {
+                (None, None)
+            };
 
-        for binding in imports {
+        for (binding, fix) in iter::Iterator::chain(
+            iter::zip(to_remove, iter::repeat(fix_remove)),
+            iter::zip(to_explicit, iter::repeat(fix_explicit)),
+        ) {
             let mut diagnostic = Diagnostic::new(
                 UnusedImport {
                     name: binding.import.qualified_name().to_string(),
