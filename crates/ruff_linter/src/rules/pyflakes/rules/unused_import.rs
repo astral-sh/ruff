@@ -340,3 +340,46 @@ fn fix_by_removing_imports_from_statement(
         )),
     )
 }
+
+/// Generate a [`Fix`] to make bindings in a statement explicit, either by moving them to `__all__`
+/// or changing them from `import a` to `import a as a`.
+fn fix_by_making_explicit(
+    checker: &Checker,
+    node_id: NodeId,
+    imports: &[ImportBinding],
+    export_list: Option<NodeId>,
+) -> Option<Fix> {
+    let statement = checker.semantic().statement(node_id);
+    let parent = checker.semantic().parent_statement(node_id);
+
+    let member_names = imports
+        .iter()
+        .map(|binding| binding.import.member_name())
+        .collect::<Vec<_>>();
+
+    // if export_list:NodeId is given, generate edits to remove from the import AND edits to add to
+    // __all__ and combine them into a single fix
+    let edits = match export_list {
+        Some(export_list) => {
+            // TODO: generate explicits by writing an edit function using `export_list` argument
+            //fix::edits::make_exports_explicit(explicits, export_list)
+            todo!()
+        }
+        // TODO: double check that this doesn't emit an edit when the list is empty
+        None => fix::edits::make_imports_explicit(
+            member_names.iter().map(AsRef::as_ref),
+            statement,
+            checker.locator(),
+        ),
+    };
+
+    // Only emit a fix if there are edits
+    let [_head, _tail @ ..] = &edits[..] else {
+        return None;
+    };
+    let mut edits_iter = edits.into_iter();
+    let first = edits_iter.next()?;
+
+    let isolation = Checker::isolation(checker.semantic().parent_statement_id(node_id));
+    Some(Fix::safe_edits(first, edits_iter).isolate(isolation))
+}

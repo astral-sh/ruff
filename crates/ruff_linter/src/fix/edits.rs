@@ -122,11 +122,11 @@ pub(crate) fn remove_unused_imports<'a>(
     }
 }
 
+// TODO: unit tests
 /// Edits to make the specified imports explicit, e.g. change `import x` to `import x as x`.
-pub(crate) fn make_imports_explicit<'a>(
+pub(crate) fn make_redundant_alias<'a>(
     member_names: impl Iterator<Item = &'a str>,
     stmt: &Stmt,
-    locator: &Locator,
 ) -> Vec<Edit> {
     let aliases = match stmt {
         Stmt::Import(ast::StmtImport { names, .. }) => names,
@@ -135,7 +135,8 @@ pub(crate) fn make_imports_explicit<'a>(
             return Vec::new();
         }
     };
-    // FIXME: what if the import is already `a as b` or `a as a`?
+    // TODO: test for `a as a`
+    // TODO: test for `a as b`
     member_names
         .filter_map(|name| {
             aliases
