@@ -264,11 +264,20 @@ pub fn any_over_expr(expr: &Expr, func: &dyn Fn(&Expr) -> bool) -> bool {
 
 pub fn any_over_type_param(type_param: &TypeParam, func: &dyn Fn(&Expr) -> bool) -> bool {
     match type_param {
-        TypeParam::TypeVar(ast::TypeParamTypeVar { bound, .. }) => bound
+        TypeParam::TypeVar(ast::TypeParamTypeVar { bound, default, .. }) => {
+            bound
+                .as_ref()
+                .is_some_and(|value| any_over_expr(value, func))
+                || default
+                    .as_ref()
+                    .is_some_and(|value| any_over_expr(value, func))
+        }
+        TypeParam::TypeVarTuple(ast::TypeParamTypeVarTuple { default, .. }) => default
             .as_ref()
             .is_some_and(|value| any_over_expr(value, func)),
-        TypeParam::TypeVarTuple(ast::TypeParamTypeVarTuple { .. }) => false,
-        TypeParam::ParamSpec(ast::TypeParamParamSpec { .. }) => false,
+        TypeParam::ParamSpec(ast::TypeParamParamSpec { default, .. }) => default
+            .as_ref()
+            .is_some_and(|value| any_over_expr(value, func)),
     }
 }
 
@@ -1619,11 +1628,13 @@ mod tests {
         let type_var_one = TypeParam::TypeVar(TypeParamTypeVar {
             range: TextRange::default(),
             bound: Some(Box::new(constant_one.clone())),
+            default: None,
             name: Identifier::new("x", TextRange::default()),
         });
         let type_var_two = TypeParam::TypeVar(TypeParamTypeVar {
             range: TextRange::default(),
-            bound: Some(Box::new(constant_two.clone())),
+            bound: None,
+            default: Some(Box::new(constant_two.clone())),
             name: Identifier::new("x", TextRange::default()),
         });
         let type_alias = Stmt::TypeAlias(StmtTypeAlias {
@@ -1650,25 +1661,44 @@ mod tests {
         let type_var_no_bound = TypeParam::TypeVar(TypeParamTypeVar {
             range: TextRange::default(),
             bound: None,
+            default: None,
             name: Identifier::new("x", TextRange::default()),
         });
         assert!(!any_over_type_param(&type_var_no_bound, &|_expr| true));
 
-        let bound = Expr::NumberLiteral(ExprNumberLiteral {
+        let constant = Expr::NumberLiteral(ExprNumberLiteral {
             value: Number::Int(Int::ONE),
             range: TextRange::default(),
         });
 
         let type_var_with_bound = TypeParam::TypeVar(TypeParamTypeVar {
             range: TextRange::default(),
-            bound: Some(Box::new(bound.clone())),
+            bound: Some(Box::new(constant.clone())),
+            default: None,
             name: Identifier::new("x", TextRange::default()),
         });
         assert!(
             any_over_type_param(&type_var_with_bound, &|expr| {
                 assert_eq!(
-                    *expr, bound,
+                    *expr, constant,
                     "the received expression should be the unwrapped bound"
+                );
+                true
+            }),
+            "if true is returned from `func` it should be respected"
+        );
+
+        let type_var_with_default = TypeParam::TypeVar(TypeParamTypeVar {
+            range: TextRange::default(),
+            default: Some(Box::new(constant.clone())),
+            bound: None,
+            name: Identifier::new("x", TextRange::default()),
+        });
+        assert!(
+            any_over_type_param(&type_var_with_default, &|expr| {
+                assert_eq!(
+                    *expr, constant,
+                    "the received expression should be the unwrapped default"
                 );
                 true
             }),
@@ -1681,10 +1711,32 @@ mod tests {
         let type_var_tuple = TypeParam::TypeVarTuple(TypeParamTypeVarTuple {
             range: TextRange::default(),
             name: Identifier::new("x", TextRange::default()),
+            default: None,
         });
         assert!(
             !any_over_type_param(&type_var_tuple, &|_expr| true),
-            "type var tuples have no expressions to visit"
+            "this TypeVarTuple has no expressions to visit"
+        );
+
+        let constant = Expr::NumberLiteral(ExprNumberLiteral {
+            value: Number::Int(Int::ONE),
+            range: TextRange::default(),
+        });
+
+        let type_var_tuple_with_default = TypeParam::TypeVarTuple(TypeParamTypeVarTuple {
+            range: TextRange::default(),
+            default: Some(Box::new(constant.clone())),
+            name: Identifier::new("x", TextRange::default()),
+        });
+        assert!(
+            any_over_type_param(&type_var_tuple_with_default, &|expr| {
+                assert_eq!(
+                    *expr, constant,
+                    "the received expression should be the unwrapped default"
+                );
+                true
+            }),
+            "if true is returned from `func` it should be respected"
         );
     }
 
@@ -1693,10 +1745,32 @@ mod tests {
         let type_param_spec = TypeParam::ParamSpec(TypeParamParamSpec {
             range: TextRange::default(),
             name: Identifier::new("x", TextRange::default()),
+            default: None,
         });
         assert!(
             !any_over_type_param(&type_param_spec, &|_expr| true),
-            "param specs have no expressions to visit"
+            "this ParamSpec has no expressions to visit"
+        );
+
+        let constant = Expr::NumberLiteral(ExprNumberLiteral {
+            value: Number::Int(Int::ONE),
+            range: TextRange::default(),
+        });
+
+        let param_spec_with_default = TypeParam::TypeVarTuple(TypeParamTypeVarTuple {
+            range: TextRange::default(),
+            default: Some(Box::new(constant.clone())),
+            name: Identifier::new("x", TextRange::default()),
+        });
+        assert!(
+            any_over_type_param(&param_spec_with_default, &|expr| {
+                assert_eq!(
+                    *expr, constant,
+                    "the received expression should be the unwrapped default"
+                );
+                true
+            }),
+            "if true is returned from `func` it should be respected"
         );
     }
 }

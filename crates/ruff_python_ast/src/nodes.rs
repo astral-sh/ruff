@@ -3132,6 +3132,7 @@ pub struct TypeParamTypeVar {
     pub range: TextRange,
     pub name: Identifier,
     pub bound: Option<Box<Expr>>,
+    pub default: Option<Box<Expr>>,
 }
 
 impl From<TypeParamTypeVar> for TypeParam {
@@ -3145,6 +3146,7 @@ impl From<TypeParamTypeVar> for TypeParam {
 pub struct TypeParamParamSpec {
     pub range: TextRange,
     pub name: Identifier,
+    pub default: Option<Box<Expr>>,
 }
 
 impl From<TypeParamParamSpec> for TypeParam {
@@ -3158,6 +3160,7 @@ impl From<TypeParamParamSpec> for TypeParam {
 pub struct TypeParamTypeVarTuple {
     pub range: TextRange,
     pub name: Identifier,
+    pub default: Option<Box<Expr>>,
 }
 
 impl From<TypeParamTypeVarTuple> for TypeParam {

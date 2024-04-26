@@ -7,7 +7,7 @@ input_file: crates/ruff_python_parser/resources/valid/statement/type.py
 ```
 Module(
     ModModule {
-        range: 0..1661,
+        range: 0..1828,
         body: [
             TypeAlias(
                 StmtTypeAlias {
@@ -128,6 +128,7 @@ Module(
                                             range: 68..69,
                                         },
                                         bound: None,
+                                        default: None,
                                     },
                                 ),
                             ],
@@ -203,6 +204,7 @@ Module(
                                             range: 108..109,
                                         },
                                         bound: None,
+                                        default: None,
                                     },
                                 ),
                             ],
@@ -239,6 +241,7 @@ Module(
                                             range: 124..125,
                                         },
                                         bound: None,
+                                        default: None,
                                     },
                                 ),
                             ],
@@ -314,6 +317,7 @@ Module(
                                             range: 153..154,
                                         },
                                         bound: None,
+                                        default: None,
                                     },
                                 ),
                                 TypeVarTuple(
@@ -323,6 +327,7 @@ Module(
                                             id: "Ts",
                                             range: 157..159,
                                         },
+                                        default: None,
                                     },
                                 ),
                                 ParamSpec(
@@ -332,6 +337,7 @@ Module(
                                             id: "P",
                                             range: 163..164,
                                         },
+                                        default: None,
                                     },
                                 ),
                             ],
@@ -399,6 +405,7 @@ Module(
                                                 },
                                             ),
                                         ),
+                                        default: None,
                                     },
                                 ),
                                 TypeVarTuple(
@@ -408,6 +415,7 @@ Module(
                                             id: "Ts",
                                             range: 195..197,
                                         },
+                                        default: None,
                                     },
                                 ),
                                 ParamSpec(
@@ -417,6 +425,7 @@ Module(
                                             id: "P",
                                             range: 201..202,
                                         },
+                                        default: None,
                                     },
                                 ),
                             ],
@@ -500,6 +509,7 @@ Module(
                                                 },
                                             ),
                                         ),
+                                        default: None,
                                     },
                                 ),
                                 TypeVarTuple(
@@ -509,6 +519,7 @@ Module(
                                             id: "Ts",
                                             range: 240..242,
                                         },
+                                        default: None,
                                     },
                                 ),
                                 ParamSpec(
@@ -518,6 +529,7 @@ Module(
                                             id: "P",
                                             range: 246..247,
                                         },
+                                        default: None,
                                     },
                                 ),
                             ],
@@ -557,10 +569,369 @@ Module(
             ),
             TypeAlias(
                 StmtTypeAlias {
-                    range: 292..307,
+                    range: 262..287,
                     name: Name(
                         ExprName {
-                            range: 297..301,
+                            range: 267..268,
+                            id: "X",
+                            ctx: Store,
+                        },
+                    ),
+                    type_params: Some(
+                        TypeParams {
+                            range: 268..277,
+                            type_params: [
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        range: 269..276,
+                                        name: Identifier {
+                                            id: "T",
+                                            range: 269..270,
+                                        },
+                                        bound: None,
+                                        default: Some(
+                                            Name(
+                                                ExprName {
+                                                    range: 273..276,
+                                                    id: "int",
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                    value: BinOp(
+                        ExprBinOp {
+                            range: 280..287,
+                            left: Name(
+                                ExprName {
+                                    range: 280..281,
+                                    id: "T",
+                                    ctx: Load,
+                                },
+                            ),
+                            op: BitOr,
+                            right: Name(
+                                ExprName {
+                                    range: 284..287,
+                                    id: "str",
+                                    ctx: Load,
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            TypeAlias(
+                StmtTypeAlias {
+                    range: 288..330,
+                    name: Name(
+                        ExprName {
+                            range: 293..294,
+                            id: "X",
+                            ctx: Store,
+                        },
+                    ),
+                    type_params: Some(
+                        TypeParams {
+                            range: 294..314,
+                            type_params: [
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        range: 295..313,
+                                        name: Identifier {
+                                            id: "T",
+                                            range: 295..296,
+                                        },
+                                        bound: Some(
+                                            BinOp(
+                                                ExprBinOp {
+                                                    range: 298..307,
+                                                    left: Name(
+                                                        ExprName {
+                                                            range: 298..301,
+                                                            id: "int",
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                    op: BitOr,
+                                                    right: Name(
+                                                        ExprName {
+                                                            range: 304..307,
+                                                            id: "str",
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                },
+                                            ),
+                                        ),
+                                        default: Some(
+                                            Name(
+                                                ExprName {
+                                                    range: 310..313,
+                                                    id: "int",
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                    value: BinOp(
+                        ExprBinOp {
+                            range: 317..330,
+                            left: BinOp(
+                                ExprBinOp {
+                                    range: 317..324,
+                                    left: Name(
+                                        ExprName {
+                                            range: 317..318,
+                                            id: "T",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    op: BitOr,
+                                    right: Name(
+                                        ExprName {
+                                            range: 321..324,
+                                            id: "int",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                },
+                            ),
+                            op: BitOr,
+                            right: Name(
+                                ExprName {
+                                    range: 327..330,
+                                    id: "str",
+                                    ctx: Load,
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            TypeAlias(
+                StmtTypeAlias {
+                    range: 331..384,
+                    name: Name(
+                        ExprName {
+                            range: 336..337,
+                            id: "X",
+                            ctx: Store,
+                        },
+                    ),
+                    type_params: Some(
+                        TypeParams {
+                            range: 337..361,
+                            type_params: [
+                                TypeVarTuple(
+                                    TypeParamTypeVarTuple {
+                                        range: 338..360,
+                                        name: Identifier {
+                                            id: "Ts",
+                                            range: 339..341,
+                                        },
+                                        default: Some(
+                                            Starred(
+                                                ExprStarred {
+                                                    range: 344..360,
+                                                    value: Subscript(
+                                                        ExprSubscript {
+                                                            range: 345..360,
+                                                            value: Name(
+                                                                ExprName {
+                                                                    range: 345..350,
+                                                                    id: "tuple",
+                                                                    ctx: Load,
+                                                                },
+                                                            ),
+                                                            slice: Tuple(
+                                                                ExprTuple {
+                                                                    range: 351..359,
+                                                                    elts: [
+                                                                        Name(
+                                                                            ExprName {
+                                                                                range: 351..354,
+                                                                                id: "int",
+                                                                                ctx: Load,
+                                                                            },
+                                                                        ),
+                                                                        Name(
+                                                                            ExprName {
+                                                                                range: 356..359,
+                                                                                id: "str",
+                                                                                ctx: Load,
+                                                                            },
+                                                                        ),
+                                                                    ],
+                                                                    ctx: Load,
+                                                                    parenthesized: false,
+                                                                },
+                                                            ),
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                    value: Subscript(
+                        ExprSubscript {
+                            range: 364..384,
+                            value: Name(
+                                ExprName {
+                                    range: 364..369,
+                                    id: "tuple",
+                                    ctx: Load,
+                                },
+                            ),
+                            slice: Tuple(
+                                ExprTuple {
+                                    range: 370..383,
+                                    elts: [
+                                        Name(
+                                            ExprName {
+                                                range: 370..373,
+                                                id: "int",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        Starred(
+                                            ExprStarred {
+                                                range: 375..378,
+                                                value: Name(
+                                                    ExprName {
+                                                        range: 376..378,
+                                                        id: "Ts",
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        Name(
+                                            ExprName {
+                                                range: 380..383,
+                                                id: "str",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ],
+                                    ctx: Load,
+                                    parenthesized: false,
+                                },
+                            ),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            TypeAlias(
+                StmtTypeAlias {
+                    range: 385..428,
+                    name: Name(
+                        ExprName {
+                            range: 390..391,
+                            id: "X",
+                            ctx: Store,
+                        },
+                    ),
+                    type_params: Some(
+                        TypeParams {
+                            range: 391..409,
+                            type_params: [
+                                ParamSpec(
+                                    TypeParamParamSpec {
+                                        range: 392..408,
+                                        name: Identifier {
+                                            id: "P",
+                                            range: 394..395,
+                                        },
+                                        default: Some(
+                                            List(
+                                                ExprList {
+                                                    range: 398..408,
+                                                    elts: [
+                                                        Name(
+                                                            ExprName {
+                                                                range: 399..402,
+                                                                id: "int",
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                        Name(
+                                                            ExprName {
+                                                                range: 404..407,
+                                                                id: "str",
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                    ],
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                    value: Subscript(
+                        ExprSubscript {
+                            range: 412..428,
+                            value: Name(
+                                ExprName {
+                                    range: 412..420,
+                                    id: "Callable",
+                                    ctx: Load,
+                                },
+                            ),
+                            slice: Tuple(
+                                ExprTuple {
+                                    range: 421..427,
+                                    elts: [
+                                        Name(
+                                            ExprName {
+                                                range: 421..422,
+                                                id: "P",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        Name(
+                                            ExprName {
+                                                range: 424..427,
+                                                id: "str",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ],
+                                    ctx: Load,
+                                    parenthesized: false,
+                                },
+                            ),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            TypeAlias(
+                StmtTypeAlias {
+                    range: 459..474,
+                    name: Name(
+                        ExprName {
+                            range: 464..468,
                             id: "type",
                             ctx: Store,
                         },
@@ -568,7 +939,7 @@ Module(
                     type_params: None,
                     value: Name(
                         ExprName {
-                            range: 304..307,
+                            range: 471..474,
                             id: "int",
                             ctx: Load,
                         },
@@ -577,10 +948,10 @@ Module(
             ),
             TypeAlias(
                 StmtTypeAlias {
-                    range: 308..324,
+                    range: 475..491,
                     name: Name(
                         ExprName {
-                            range: 313..318,
+                            range: 480..485,
                             id: "match",
                             ctx: Store,
                         },
@@ -588,7 +959,7 @@ Module(
                     type_params: None,
                     value: Name(
                         ExprName {
-                            range: 321..324,
+                            range: 488..491,
                             id: "int",
                             ctx: Load,
                         },
@@ -597,10 +968,10 @@ Module(
             ),
             TypeAlias(
                 StmtTypeAlias {
-                    range: 325..340,
+                    range: 492..507,
                     name: Name(
                         ExprName {
-                            range: 330..334,
+                            range: 497..501,
                             id: "case",
                             ctx: Store,
                         },
@@ -608,7 +979,7 @@ Module(
                     type_params: None,
                     value: Name(
                         ExprName {
-                            range: 337..340,
+                            range: 504..507,
                             id: "int",
                             ctx: Load,
                         },
@@ -617,10 +988,10 @@ Module(
             ),
             TypeAlias(
                 StmtTypeAlias {
-                    range: 366..381,
+                    range: 533..548,
                     name: Name(
                         ExprName {
-                            range: 371..374,
+                            range: 538..541,
                             id: "foo",
                             ctx: Store,
                         },
@@ -628,7 +999,7 @@ Module(
                     type_params: None,
                     value: Name(
                         ExprName {
-                            range: 377..381,
+                            range: 544..548,
                             id: "type",
                             ctx: Load,
                         },
@@ -637,227 +1008,19 @@ Module(
             ),
             TypeAlias(
                 StmtTypeAlias {
-                    range: 382..398,
+                    range: 549..565,
                     name: Name(
                         ExprName {
-                            range: 387..390,
-                            id: "foo",
-                            ctx: Store,
-                        },
-                    ),
-                    type_params: None,
-                    value: Name(
-                        ExprName {
-                            range: 393..398,
-                            id: "match",
-                            ctx: Load,
-                        },
-                    ),
-                },
-            ),
-            TypeAlias(
-                StmtTypeAlias {
-                    range: 399..414,
-                    name: Name(
-                        ExprName {
-                            range: 404..407,
-                            id: "foo",
-                            ctx: Store,
-                        },
-                    ),
-                    type_params: None,
-                    value: Name(
-                        ExprName {
-                            range: 410..414,
-                            id: "case",
-                            ctx: Load,
-                        },
-                    ),
-                },
-            ),
-            TypeAlias(
-                StmtTypeAlias {
-                    range: 438..453,
-                    name: Name(
-                        ExprName {
-                            range: 446..447,
-                            id: "X",
-                            ctx: Store,
-                        },
-                    ),
-                    type_params: None,
-                    value: Name(
-                        ExprName {
-                            range: 450..453,
-                            id: "int",
-                            ctx: Load,
-                        },
-                    ),
-                },
-            ),
-            TypeAlias(
-                StmtTypeAlias {
-                    range: 454..469,
-                    name: Name(
-                        ExprName {
-                            range: 459..460,
-                            id: "X",
-                            ctx: Store,
-                        },
-                    ),
-                    type_params: None,
-                    value: Name(
-                        ExprName {
-                            range: 466..469,
-                            id: "int",
-                            ctx: Load,
-                        },
-                    ),
-                },
-            ),
-            TypeAlias(
-                StmtTypeAlias {
-                    range: 470..485,
-                    name: Name(
-                        ExprName {
-                            range: 475..476,
-                            id: "X",
-                            ctx: Store,
-                        },
-                    ),
-                    type_params: None,
-                    value: Name(
-                        ExprName {
-                            range: 482..485,
-                            id: "int",
-                            ctx: Load,
-                        },
-                    ),
-                },
-            ),
-            TypeAlias(
-                StmtTypeAlias {
-                    range: 486..506,
-                    name: Name(
-                        ExprName {
-                            range: 491..492,
-                            id: "X",
-                            ctx: Store,
-                        },
-                    ),
-                    type_params: None,
-                    value: Name(
-                        ExprName {
-                            range: 501..504,
-                            id: "int",
-                            ctx: Load,
-                        },
-                    ),
-                },
-            ),
-            TypeAlias(
-                StmtTypeAlias {
-                    range: 507..526,
-                    name: Name(
-                        ExprName {
-                            range: 518..519,
-                            id: "X",
-                            ctx: Store,
-                        },
-                    ),
-                    type_params: Some(
-                        TypeParams {
-                            range: 519..522,
-                            type_params: [
-                                TypeVar(
-                                    TypeParamTypeVar {
-                                        range: 520..521,
-                                        name: Identifier {
-                                            id: "T",
-                                            range: 520..521,
-                                        },
-                                        bound: None,
-                                    },
-                                ),
-                            ],
-                        },
-                    ),
-                    value: Name(
-                        ExprName {
-                            range: 525..526,
-                            id: "T",
-                            ctx: Load,
-                        },
-                    ),
-                },
-            ),
-            TypeAlias(
-                StmtTypeAlias {
-                    range: 527..547,
-                    name: Name(
-                        ExprName {
-                            range: 532..533,
-                            id: "X",
-                            ctx: Store,
-                        },
-                    ),
-                    type_params: Some(
-                        TypeParams {
-                            range: 540..543,
-                            type_params: [
-                                TypeVar(
-                                    TypeParamTypeVar {
-                                        range: 541..542,
-                                        name: Identifier {
-                                            id: "T",
-                                            range: 541..542,
-                                        },
-                                        bound: None,
-                                    },
-                                ),
-                            ],
-                        },
-                    ),
-                    value: Name(
-                        ExprName {
-                            range: 546..547,
-                            id: "T",
-                            ctx: Load,
-                        },
-                    ),
-                },
-            ),
-            TypeAlias(
-                StmtTypeAlias {
-                    range: 548..567,
-                    name: Name(
-                        ExprName {
-                            range: 553..554,
-                            id: "X",
-                            ctx: Store,
-                        },
-                    ),
-                    type_params: Some(
-                        TypeParams {
                             range: 554..557,
-                            type_params: [
-                                TypeVar(
-                                    TypeParamTypeVar {
-                                        range: 555..556,
-                                        name: Identifier {
-                                            id: "T",
-                                            range: 555..556,
-                                        },
-                                        bound: None,
-                                    },
-                                ),
-                            ],
+                            id: "foo",
+                            ctx: Store,
                         },
                     ),
+                    type_params: None,
                     value: Name(
                         ExprName {
-                            range: 566..567,
-                            id: "T",
+                            range: 560..565,
+                            id: "match",
                             ctx: Load,
                         },
                     ),
@@ -865,10 +1028,30 @@ Module(
             ),
             TypeAlias(
                 StmtTypeAlias {
-                    range: 589..601,
+                    range: 566..581,
                     name: Name(
                         ExprName {
-                            range: 594..595,
+                            range: 571..574,
+                            id: "foo",
+                            ctx: Store,
+                        },
+                    ),
+                    type_params: None,
+                    value: Name(
+                        ExprName {
+                            range: 577..581,
+                            id: "case",
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            TypeAlias(
+                StmtTypeAlias {
+                    range: 605..620,
+                    name: Name(
+                        ExprName {
+                            range: 613..614,
                             id: "X",
                             ctx: Store,
                         },
@@ -876,7 +1059,7 @@ Module(
                     type_params: None,
                     value: Name(
                         ExprName {
-                            range: 598..601,
+                            range: 617..620,
                             id: "int",
                             ctx: Load,
                         },
@@ -885,10 +1068,10 @@ Module(
             ),
             TypeAlias(
                 StmtTypeAlias {
-                    range: 603..615,
+                    range: 621..636,
                     name: Name(
                         ExprName {
-                            range: 608..609,
+                            range: 626..627,
                             id: "X",
                             ctx: Store,
                         },
@@ -896,7 +1079,198 @@ Module(
                     type_params: None,
                     value: Name(
                         ExprName {
-                            range: 612..615,
+                            range: 633..636,
+                            id: "int",
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            TypeAlias(
+                StmtTypeAlias {
+                    range: 637..652,
+                    name: Name(
+                        ExprName {
+                            range: 642..643,
+                            id: "X",
+                            ctx: Store,
+                        },
+                    ),
+                    type_params: None,
+                    value: Name(
+                        ExprName {
+                            range: 649..652,
+                            id: "int",
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            TypeAlias(
+                StmtTypeAlias {
+                    range: 653..673,
+                    name: Name(
+                        ExprName {
+                            range: 658..659,
+                            id: "X",
+                            ctx: Store,
+                        },
+                    ),
+                    type_params: None,
+                    value: Name(
+                        ExprName {
+                            range: 668..671,
+                            id: "int",
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            TypeAlias(
+                StmtTypeAlias {
+                    range: 674..693,
+                    name: Name(
+                        ExprName {
+                            range: 685..686,
+                            id: "X",
+                            ctx: Store,
+                        },
+                    ),
+                    type_params: Some(
+                        TypeParams {
+                            range: 686..689,
+                            type_params: [
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        range: 687..688,
+                                        name: Identifier {
+                                            id: "T",
+                                            range: 687..688,
+                                        },
+                                        bound: None,
+                                        default: None,
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                    value: Name(
+                        ExprName {
+                            range: 692..693,
+                            id: "T",
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            TypeAlias(
+                StmtTypeAlias {
+                    range: 694..714,
+                    name: Name(
+                        ExprName {
+                            range: 699..700,
+                            id: "X",
+                            ctx: Store,
+                        },
+                    ),
+                    type_params: Some(
+                        TypeParams {
+                            range: 707..710,
+                            type_params: [
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        range: 708..709,
+                                        name: Identifier {
+                                            id: "T",
+                                            range: 708..709,
+                                        },
+                                        bound: None,
+                                        default: None,
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                    value: Name(
+                        ExprName {
+                            range: 713..714,
+                            id: "T",
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            TypeAlias(
+                StmtTypeAlias {
+                    range: 715..734,
+                    name: Name(
+                        ExprName {
+                            range: 720..721,
+                            id: "X",
+                            ctx: Store,
+                        },
+                    ),
+                    type_params: Some(
+                        TypeParams {
+                            range: 721..724,
+                            type_params: [
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        range: 722..723,
+                                        name: Identifier {
+                                            id: "T",
+                                            range: 722..723,
+                                        },
+                                        bound: None,
+                                        default: None,
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                    value: Name(
+                        ExprName {
+                            range: 733..734,
+                            id: "T",
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            TypeAlias(
+                StmtTypeAlias {
+                    range: 756..768,
+                    name: Name(
+                        ExprName {
+                            range: 761..762,
+                            id: "X",
+                            ctx: Store,
+                        },
+                    ),
+                    type_params: None,
+                    value: Name(
+                        ExprName {
+                            range: 765..768,
+                            id: "int",
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            TypeAlias(
+                StmtTypeAlias {
+                    range: 770..782,
+                    name: Name(
+                        ExprName {
+                            range: 775..776,
+                            id: "X",
+                            ctx: Store,
+                        },
+                    ),
+                    type_params: None,
+                    value: Name(
+                        ExprName {
+                            range: 779..782,
                             id: "str",
                             ctx: Load,
                         },
@@ -905,10 +1279,10 @@ Module(
             ),
             TypeAlias(
                 StmtTypeAlias {
-                    range: 617..630,
+                    range: 784..797,
                     name: Name(
                         ExprName {
-                            range: 622..623,
+                            range: 789..790,
                             id: "X",
                             ctx: Store,
                         },
@@ -916,7 +1290,7 @@ Module(
                     type_params: None,
                     value: Name(
                         ExprName {
-                            range: 626..630,
+                            range: 793..797,
                             id: "type",
                             ctx: Load,
                         },
@@ -925,21 +1299,21 @@ Module(
             ),
             ClassDef(
                 StmtClassDef {
-                    range: 631..652,
+                    range: 798..819,
                     decorator_list: [],
                     name: Identifier {
                         id: "X",
-                        range: 637..638,
+                        range: 804..805,
                     },
                     type_params: None,
                     arguments: None,
                     body: [
                         TypeAlias(
                             StmtTypeAlias {
-                                range: 640..652,
+                                range: 807..819,
                                 name: Name(
                                     ExprName {
-                                        range: 645..646,
+                                        range: 812..813,
                                         id: "X",
                                         ctx: Store,
                                     },
@@ -947,7 +1321,7 @@ Module(
                                 type_params: None,
                                 value: Name(
                                     ExprName {
-                                        range: 649..652,
+                                        range: 816..819,
                                         id: "int",
                                         ctx: Load,
                                     },
@@ -959,10 +1333,10 @@ Module(
             ),
             TypeAlias(
                 StmtTypeAlias {
-                    range: 654..686,
+                    range: 821..853,
                     name: Name(
                         ExprName {
-                            range: 659..664,
+                            range: 826..831,
                             id: "Point",
                             ctx: Store,
                         },
@@ -970,28 +1344,28 @@ Module(
                     type_params: None,
                     value: Subscript(
                         ExprSubscript {
-                            range: 667..686,
+                            range: 834..853,
                             value: Name(
                                 ExprName {
-                                    range: 667..672,
+                                    range: 834..839,
                                     id: "tuple",
                                     ctx: Load,
                                 },
                             ),
                             slice: Tuple(
                                 ExprTuple {
-                                    range: 673..685,
+                                    range: 840..852,
                                     elts: [
                                         Name(
                                             ExprName {
-                                                range: 673..678,
+                                                range: 840..845,
                                                 id: "float",
                                                 ctx: Load,
                                             },
                                         ),
                                         Name(
                                             ExprName {
-                                                range: 680..685,
+                                                range: 847..852,
                                                 id: "float",
                                                 ctx: Load,
                                             },
@@ -1008,26 +1382,27 @@ Module(
             ),
             TypeAlias(
                 StmtTypeAlias {
-                    range: 687..714,
+                    range: 854..881,
                     name: Name(
                         ExprName {
-                            range: 692..697,
+                            range: 859..864,
                             id: "Point",
                             ctx: Store,
                         },
                     ),
                     type_params: Some(
                         TypeParams {
-                            range: 697..700,
+                            range: 864..867,
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
-                                        range: 698..699,
+                                        range: 865..866,
                                         name: Identifier {
                                             id: "T",
-                                            range: 698..699,
+                                            range: 865..866,
                                         },
                                         bound: None,
+                                        default: None,
                                     },
                                 ),
                             ],
@@ -1035,28 +1410,28 @@ Module(
                     ),
                     value: Subscript(
                         ExprSubscript {
-                            range: 703..714,
+                            range: 870..881,
                             value: Name(
                                 ExprName {
-                                    range: 703..708,
+                                    range: 870..875,
                                     id: "tuple",
                                     ctx: Load,
                                 },
                             ),
                             slice: Tuple(
                                 ExprTuple {
-                                    range: 709..713,
+                                    range: 876..880,
                                     elts: [
                                         Name(
                                             ExprName {
-                                                range: 709..710,
+                                                range: 876..877,
                                                 id: "T",
                                                 ctx: Load,
                                             },
                                         ),
                                         Name(
                                             ExprName {
-                                                range: 712..713,
+                                                range: 879..880,
                                                 id: "T",
                                                 ctx: Load,
                                             },
@@ -1073,25 +1448,26 @@ Module(
             ),
             TypeAlias(
                 StmtTypeAlias {
-                    range: 715..751,
+                    range: 882..918,
                     name: Name(
                         ExprName {
-                            range: 720..727,
+                            range: 887..894,
                             id: "IntFunc",
                             ctx: Store,
                         },
                     ),
                     type_params: Some(
                         TypeParams {
-                            range: 727..732,
+                            range: 894..899,
                             type_params: [
                                 ParamSpec(
                                     TypeParamParamSpec {
-                                        range: 728..731,
+                                        range: 895..898,
                                         name: Identifier {
                                             id: "P",
-                                            range: 730..731,
+                                            range: 897..898,
                                         },
+                                        default: None,
                                     },
                                 ),
                             ],
@@ -1099,28 +1475,28 @@ Module(
                     ),
                     value: Subscript(
                         ExprSubscript {
-                            range: 735..751,
+                            range: 902..918,
                             value: Name(
                                 ExprName {
-                                    range: 735..743,
+                                    range: 902..910,
                                     id: "Callable",
                                     ctx: Load,
                                 },
                             ),
                             slice: Tuple(
                                 ExprTuple {
-                                    range: 744..750,
+                                    range: 911..917,
                                     elts: [
                                         Name(
                                             ExprName {
-                                                range: 744..745,
+                                                range: 911..912,
                                                 id: "P",
                                                 ctx: Load,
                                             },
                                         ),
                                         Name(
                                             ExprName {
-                                                range: 747..750,
+                                                range: 914..917,
                                                 id: "int",
                                                 ctx: Load,
                                             },
@@ -1137,25 +1513,26 @@ Module(
             ),
             TypeAlias(
                 StmtTypeAlias {
-                    range: 765..805,
+                    range: 932..972,
                     name: Name(
                         ExprName {
-                            range: 770..782,
+                            range: 937..949,
                             id: "LabeledTuple",
                             ctx: Store,
                         },
                     ),
                     type_params: Some(
                         TypeParams {
-                            range: 782..787,
+                            range: 949..954,
                             type_params: [
                                 TypeVarTuple(
                                     TypeParamTypeVarTuple {
-                                        range: 783..786,
+                                        range: 950..953,
                                         name: Identifier {
                                             id: "Ts",
-                                            range: 784..786,
+                                            range: 951..953,
                                         },
+                                        default: None,
                                     },
                                 ),
                             ],
@@ -1163,31 +1540,31 @@ Module(
                     ),
                     value: Subscript(
                         ExprSubscript {
-                            range: 790..805,
+                            range: 957..972,
                             value: Name(
                                 ExprName {
-                                    range: 790..795,
+                                    range: 957..962,
                                     id: "tuple",
                                     ctx: Load,
                                 },
                             ),
                             slice: Tuple(
                                 ExprTuple {
-                                    range: 796..804,
+                                    range: 963..971,
                                     elts: [
                                         Name(
                                             ExprName {
-                                                range: 796..799,
+                                                range: 963..966,
                                                 id: "str",
                                                 ctx: Load,
                                             },
                                         ),
                                         Starred(
                                             ExprStarred {
-                                                range: 801..804,
+                                                range: 968..971,
                                                 value: Name(
                                                     ExprName {
-                                                        range: 802..804,
+                                                        range: 969..971,
                                                         id: "Ts",
                                                         ctx: Load,
                                                     },
@@ -1207,34 +1584,35 @@ Module(
             ),
             TypeAlias(
                 StmtTypeAlias {
-                    range: 822..870,
+                    range: 989..1037,
                     name: Name(
                         ExprName {
-                            range: 827..843,
+                            range: 994..1010,
                             id: "HashableSequence",
                             ctx: Store,
                         },
                     ),
                     type_params: Some(
                         TypeParams {
-                            range: 843..856,
+                            range: 1010..1023,
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
-                                        range: 844..855,
+                                        range: 1011..1022,
                                         name: Identifier {
                                             id: "T",
-                                            range: 844..845,
+                                            range: 1011..1012,
                                         },
                                         bound: Some(
                                             Name(
                                                 ExprName {
-                                                    range: 847..855,
+                                                    range: 1014..1022,
                                                     id: "Hashable",
                                                     ctx: Load,
                                                 },
                                             ),
                                         ),
+                                        default: None,
                                     },
                                 ),
                             ],
@@ -1242,17 +1620,17 @@ Module(
                     ),
                     value: Subscript(
                         ExprSubscript {
-                            range: 859..870,
+                            range: 1026..1037,
                             value: Name(
                                 ExprName {
-                                    range: 859..867,
+                                    range: 1026..1034,
                                     id: "Sequence",
                                     ctx: Load,
                                 },
                             ),
                             slice: Name(
                                 ExprName {
-                                    range: 868..869,
+                                    range: 1035..1036,
                                     id: "T",
                                     ctx: Load,
                                 },
@@ -1264,40 +1642,40 @@ Module(
             ),
             TypeAlias(
                 StmtTypeAlias {
-                    range: 893..943,
+                    range: 1060..1110,
                     name: Name(
                         ExprName {
-                            range: 898..914,
+                            range: 1065..1081,
                             id: "IntOrStrSequence",
                             ctx: Store,
                         },
                     ),
                     type_params: Some(
                         TypeParams {
-                            range: 914..929,
+                            range: 1081..1096,
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
-                                        range: 915..928,
+                                        range: 1082..1095,
                                         name: Identifier {
                                             id: "T",
-                                            range: 915..916,
+                                            range: 1082..1083,
                                         },
                                         bound: Some(
                                             Tuple(
                                                 ExprTuple {
-                                                    range: 918..928,
+                                                    range: 1085..1095,
                                                     elts: [
                                                         Name(
                                                             ExprName {
-                                                                range: 919..922,
+                                                                range: 1086..1089,
                                                                 id: "int",
                                                                 ctx: Load,
                                                             },
                                                         ),
                                                         Name(
                                                             ExprName {
-                                                                range: 924..927,
+                                                                range: 1091..1094,
                                                                 id: "str",
                                                                 ctx: Load,
                                                             },
@@ -1308,6 +1686,7 @@ Module(
                                                 },
                                             ),
                                         ),
+                                        default: None,
                                     },
                                 ),
                             ],
@@ -1315,17 +1694,17 @@ Module(
                     ),
                     value: Subscript(
                         ExprSubscript {
-                            range: 932..943,
+                            range: 1099..1110,
                             value: Name(
                                 ExprName {
-                                    range: 932..940,
+                                    range: 1099..1107,
                                     id: "Sequence",
                                     ctx: Load,
                                 },
                             ),
                             slice: Name(
                                 ExprName {
-                                    range: 941..942,
+                                    range: 1108..1109,
                                     id: "T",
                                     ctx: Load,
                                 },
@@ -1337,20 +1716,20 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 997..1011,
+                    range: 1164..1178,
                     value: Tuple(
                         ExprTuple {
-                            range: 997..1011,
+                            range: 1164..1178,
                             elts: [
                                 BinOp(
                                     ExprBinOp {
-                                        range: 997..1008,
+                                        range: 1164..1175,
                                         left: BinOp(
                                             ExprBinOp {
-                                                range: 997..1004,
+                                                range: 1164..1171,
                                                 left: Name(
                                                     ExprName {
-                                                        range: 997..1001,
+                                                        range: 1164..1168,
                                                         id: "type",
                                                         ctx: Load,
                                                     },
@@ -1358,7 +1737,7 @@ Module(
                                                 op: Mult,
                                                 right: Name(
                                                     ExprName {
-                                                        range: 1003..1004,
+                                                        range: 1170..1171,
                                                         id: "a",
                                                         ctx: Load,
                                                     },
@@ -1368,7 +1747,7 @@ Module(
                                         op: Add,
                                         right: Name(
                                             ExprName {
-                                                range: 1007..1008,
+                                                range: 1174..1175,
                                                 id: "b",
                                                 ctx: Load,
                                             },
@@ -1377,7 +1756,7 @@ Module(
                                 ),
                                 Name(
                                     ExprName {
-                                        range: 1010..1011,
+                                        range: 1177..1178,
                                         id: "c",
                                         ctx: Load,
                                     },
@@ -1391,17 +1770,17 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 1036..1052,
+                    range: 1203..1219,
                     value: Tuple(
                         ExprTuple {
-                            range: 1036..1052,
+                            range: 1203..1219,
                             elts: [
                                 BinOp(
                                     ExprBinOp {
-                                        range: 1036..1049,
+                                        range: 1203..1216,
                                         left: Name(
                                             ExprName {
-                                                range: 1036..1040,
+                                                range: 1203..1207,
                                                 id: "type",
                                                 ctx: Load,
                                             },
@@ -1409,10 +1788,10 @@ Module(
                                         op: Mult,
                                         right: BinOp(
                                             ExprBinOp {
-                                                range: 1043..1048,
+                                                range: 1210..1215,
                                                 left: Name(
                                                     ExprName {
-                                                        range: 1043..1044,
+                                                        range: 1210..1211,
                                                         id: "a",
                                                         ctx: Load,
                                                     },
@@ -1420,7 +1799,7 @@ Module(
                                                 op: Add,
                                                 right: Name(
                                                     ExprName {
-                                                        range: 1047..1048,
+                                                        range: 1214..1215,
                                                         id: "b",
                                                         ctx: Load,
                                                     },
@@ -1431,7 +1810,7 @@ Module(
                                 ),
                                 Name(
                                     ExprName {
-                                        range: 1051..1052,
+                                        range: 1218..1219,
                                         id: "c",
                                         ctx: Load,
                                     },
@@ -1445,29 +1824,29 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 1077..1093,
+                    range: 1244..1260,
                     value: Call(
                         ExprCall {
-                            range: 1077..1093,
+                            range: 1244..1260,
                             func: Name(
                                 ExprName {
-                                    range: 1077..1081,
+                                    range: 1244..1248,
                                     id: "type",
                                     ctx: Load,
                                 },
                             ),
                             arguments: Arguments {
-                                range: 1082..1093,
+                                range: 1249..1260,
                                 args: [
                                     Starred(
                                         ExprStarred {
-                                            range: 1083..1089,
+                                            range: 1250..1256,
                                             value: BinOp(
                                                 ExprBinOp {
-                                                    range: 1084..1089,
+                                                    range: 1251..1256,
                                                     left: Name(
                                                         ExprName {
-                                                            range: 1084..1085,
+                                                            range: 1251..1252,
                                                             id: "a",
                                                             ctx: Load,
                                                         },
@@ -1475,7 +1854,7 @@ Module(
                                                     op: Add,
                                                     right: Name(
                                                         ExprName {
-                                                            range: 1088..1089,
+                                                            range: 1255..1256,
                                                             id: "b",
                                                             ctx: Load,
                                                         },
@@ -1487,7 +1866,7 @@ Module(
                                     ),
                                     Name(
                                         ExprName {
-                                            range: 1091..1092,
+                                            range: 1258..1259,
                                             id: "c",
                                             ctx: Load,
                                         },
@@ -1501,16 +1880,16 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 1119..1134,
+                    range: 1286..1301,
                     value: BinOp(
                         ExprBinOp {
-                            range: 1119..1134,
+                            range: 1286..1301,
                             left: BinOp(
                                 ExprBinOp {
-                                    range: 1119..1130,
+                                    range: 1286..1297,
                                     left: Name(
                                         ExprName {
-                                            range: 1119..1123,
+                                            range: 1286..1290,
                                             id: "type",
                                             ctx: Load,
                                         },
@@ -1518,10 +1897,10 @@ Module(
                                     op: Sub,
                                     right: BinOp(
                                         ExprBinOp {
-                                            range: 1125..1130,
+                                            range: 1292..1297,
                                             left: Name(
                                                 ExprName {
-                                                    range: 1125..1126,
+                                                    range: 1292..1293,
                                                     id: "a",
                                                     ctx: Load,
                                                 },
@@ -1529,7 +1908,7 @@ Module(
                                             op: Mult,
                                             right: Name(
                                                 ExprName {
-                                                    range: 1129..1130,
+                                                    range: 1296..1297,
                                                     id: "b",
                                                     ctx: Load,
                                                 },
@@ -1541,7 +1920,7 @@ Module(
                             op: Add,
                             right: Name(
                                 ExprName {
-                                    range: 1133..1134,
+                                    range: 1300..1301,
                                     id: "c",
                                     ctx: Load,
                                 },
@@ -1552,16 +1931,16 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 1160..1177,
+                    range: 1327..1344,
                     value: BinOp(
                         ExprBinOp {
-                            range: 1160..1177,
+                            range: 1327..1344,
                             left: BinOp(
                                 ExprBinOp {
-                                    range: 1160..1173,
+                                    range: 1327..1340,
                                     left: Name(
                                         ExprName {
-                                            range: 1160..1164,
+                                            range: 1327..1331,
                                             id: "type",
                                             ctx: Load,
                                         },
@@ -1569,10 +1948,10 @@ Module(
                                     op: Sub,
                                     right: BinOp(
                                         ExprBinOp {
-                                            range: 1167..1172,
+                                            range: 1334..1339,
                                             left: Name(
                                                 ExprName {
-                                                    range: 1167..1168,
+                                                    range: 1334..1335,
                                                     id: "a",
                                                     ctx: Load,
                                                 },
@@ -1580,7 +1959,7 @@ Module(
                                             op: Mult,
                                             right: Name(
                                                 ExprName {
-                                                    range: 1171..1172,
+                                                    range: 1338..1339,
                                                     id: "b",
                                                     ctx: Load,
                                                 },
@@ -1592,7 +1971,7 @@ Module(
                             op: Add,
                             right: Name(
                                 ExprName {
-                                    range: 1176..1177,
+                                    range: 1343..1344,
                                     id: "c",
                                     ctx: Load,
                                 },
@@ -1603,33 +1982,33 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 1203..1220,
+                    range: 1370..1387,
                     value: BinOp(
                         ExprBinOp {
-                            range: 1203..1220,
+                            range: 1370..1387,
                             left: BinOp(
                                 ExprBinOp {
-                                    range: 1203..1216,
+                                    range: 1370..1383,
                                     left: Call(
                                         ExprCall {
-                                            range: 1203..1212,
+                                            range: 1370..1379,
                                             func: Name(
                                                 ExprName {
-                                                    range: 1203..1207,
+                                                    range: 1370..1374,
                                                     id: "type",
                                                     ctx: Load,
                                                 },
                                             ),
                                             arguments: Arguments {
-                                                range: 1208..1212,
+                                                range: 1375..1379,
                                                 args: [
                                                     UnaryOp(
                                                         ExprUnaryOp {
-                                                            range: 1209..1211,
+                                                            range: 1376..1378,
                                                             op: USub,
                                                             operand: Name(
                                                                 ExprName {
-                                                                    range: 1210..1211,
+                                                                    range: 1377..1378,
                                                                     id: "a",
                                                                     ctx: Load,
                                                                 },
@@ -1644,7 +2023,7 @@ Module(
                                     op: Mult,
                                     right: Name(
                                         ExprName {
-                                            range: 1215..1216,
+                                            range: 1382..1383,
                                             id: "b",
                                             ctx: Load,
                                         },
@@ -1654,7 +2033,7 @@ Module(
                             op: Add,
                             right: Name(
                                 ExprName {
-                                    range: 1219..1220,
+                                    range: 1386..1387,
                                     id: "c",
                                     ctx: Load,
                                 },
@@ -1665,22 +2044,22 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 1247..1256,
+                    range: 1414..1423,
                     value: Attribute(
                         ExprAttribute {
-                            range: 1247..1256,
+                            range: 1414..1423,
                             value: Call(
                                 ExprCall {
-                                    range: 1247..1254,
+                                    range: 1414..1421,
                                     func: Name(
                                         ExprName {
-                                            range: 1247..1251,
+                                            range: 1414..1418,
                                             id: "type",
                                             ctx: Load,
                                         },
                                     ),
                                     arguments: Arguments {
-                                        range: 1252..1254,
+                                        range: 1419..1421,
                                         args: [],
                                         keywords: [],
                                     },
@@ -1688,7 +2067,7 @@ Module(
                             ),
                             attr: Identifier {
                                 id: "a",
-                                range: 1255..1256,
+                                range: 1422..1423,
                             },
                             ctx: Load,
                         },
@@ -1697,26 +2076,26 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 1272..1283,
+                    range: 1439..1450,
                     value: Attribute(
                         ExprAttribute {
-                            range: 1272..1283,
+                            range: 1439..1450,
                             value: Call(
                                 ExprCall {
-                                    range: 1272..1281,
+                                    range: 1439..1448,
                                     func: Name(
                                         ExprName {
-                                            range: 1272..1276,
+                                            range: 1439..1443,
                                             id: "type",
                                             ctx: Load,
                                         },
                                     ),
                                     arguments: Arguments {
-                                        range: 1277..1281,
+                                        range: 1444..1448,
                                         args: [
                                             Tuple(
                                                 ExprTuple {
-                                                    range: 1278..1280,
+                                                    range: 1445..1447,
                                                     elts: [],
                                                     ctx: Load,
                                                     parenthesized: true,
@@ -1729,7 +2108,7 @@ Module(
                             ),
                             attr: Identifier {
                                 id: "a",
-                                range: 1282..1283,
+                                range: 1449..1450,
                             },
                             ctx: Load,
                         },
@@ -1738,26 +2117,26 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 1301..1313,
+                    range: 1468..1480,
                     value: Attribute(
                         ExprAttribute {
-                            range: 1301..1313,
+                            range: 1468..1480,
                             value: Call(
                                 ExprCall {
-                                    range: 1301..1311,
+                                    range: 1468..1478,
                                     func: Name(
                                         ExprName {
-                                            range: 1301..1305,
+                                            range: 1468..1472,
                                             id: "type",
                                             ctx: Load,
                                         },
                                     ),
                                     arguments: Arguments {
-                                        range: 1306..1311,
+                                        range: 1473..1478,
                                         args: [
                                             Tuple(
                                                 ExprTuple {
-                                                    range: 1307..1309,
+                                                    range: 1474..1476,
                                                     elts: [],
                                                     ctx: Load,
                                                     parenthesized: true,
@@ -1770,7 +2149,7 @@ Module(
                             ),
                             attr: Identifier {
                                 id: "a",
-                                range: 1312..1313,
+                                range: 1479..1480,
                             },
                             ctx: Load,
                         },
@@ -1779,23 +2158,23 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 1331..1341,
+                    range: 1498..1508,
                     value: Attribute(
                         ExprAttribute {
-                            range: 1331..1341,
+                            range: 1498..1508,
                             value: Subscript(
                                 ExprSubscript {
-                                    range: 1331..1339,
+                                    range: 1498..1506,
                                     value: Name(
                                         ExprName {
-                                            range: 1331..1335,
+                                            range: 1498..1502,
                                             id: "type",
                                             ctx: Load,
                                         },
                                     ),
                                     slice: Name(
                                         ExprName {
-                                            range: 1337..1338,
+                                            range: 1504..1505,
                                             id: "a",
                                             ctx: Load,
                                         },
@@ -1805,7 +2184,7 @@ Module(
                             ),
                             attr: Identifier {
                                 id: "b",
-                                range: 1340..1341,
+                                range: 1507..1508,
                             },
                             ctx: Load,
                         },
@@ -1814,27 +2193,27 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 1358..1369,
+                    range: 1525..1536,
                     value: Attribute(
                         ExprAttribute {
-                            range: 1358..1369,
+                            range: 1525..1536,
                             value: Subscript(
                                 ExprSubscript {
-                                    range: 1358..1367,
+                                    range: 1525..1534,
                                     value: Name(
                                         ExprName {
-                                            range: 1358..1362,
+                                            range: 1525..1529,
                                             id: "type",
                                             ctx: Load,
                                         },
                                     ),
                                     slice: Tuple(
                                         ExprTuple {
-                                            range: 1364..1366,
+                                            range: 1531..1533,
                                             elts: [
                                                 Name(
                                                     ExprName {
-                                                        range: 1364..1365,
+                                                        range: 1531..1532,
                                                         id: "a",
                                                         ctx: Load,
                                                     },
@@ -1849,7 +2228,7 @@ Module(
                             ),
                             attr: Identifier {
                                 id: "b",
-                                range: 1368..1369,
+                                range: 1535..1536,
                             },
                             ctx: Load,
                         },
@@ -1858,27 +2237,27 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 1408..1421,
+                    range: 1575..1588,
                     value: Attribute(
                         ExprAttribute {
-                            range: 1408..1421,
+                            range: 1575..1588,
                             value: Subscript(
                                 ExprSubscript {
-                                    range: 1408..1419,
+                                    range: 1575..1586,
                                     value: Name(
                                         ExprName {
-                                            range: 1408..1412,
+                                            range: 1575..1579,
                                             id: "type",
                                             ctx: Load,
                                         },
                                     ),
                                     slice: Tuple(
                                         ExprTuple {
-                                            range: 1414..1418,
+                                            range: 1581..1585,
                                             elts: [
                                                 Name(
                                                     ExprName {
-                                                        range: 1415..1416,
+                                                        range: 1582..1583,
                                                         id: "a",
                                                         ctx: Load,
                                                     },
@@ -1893,7 +2272,7 @@ Module(
                             ),
                             attr: Identifier {
                                 id: "b",
-                                range: 1420..1421,
+                                range: 1587..1588,
                             },
                             ctx: Load,
                         },
@@ -1902,22 +2281,22 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 1441..1457,
+                    range: 1608..1624,
                     value: Subscript(
                         ExprSubscript {
-                            range: 1441..1457,
+                            range: 1608..1624,
                             value: Call(
                                 ExprCall {
-                                    range: 1441..1447,
+                                    range: 1608..1614,
                                     func: Name(
                                         ExprName {
-                                            range: 1441..1445,
+                                            range: 1608..1612,
                                             id: "type",
                                             ctx: Load,
                                         },
                                     ),
                                     arguments: Arguments {
-                                        range: 1445..1447,
+                                        range: 1612..1614,
                                         args: [],
                                         keywords: [],
                                     },
@@ -1925,11 +2304,11 @@ Module(
                             ),
                             slice: Slice(
                                 ExprSlice {
-                                    range: 1448..1456,
+                                    range: 1615..1623,
                                     lower: Some(
                                         Name(
                                             ExprName {
-                                                range: 1448..1449,
+                                                range: 1615..1616,
                                                 id: "a",
                                                 ctx: Load,
                                             },
@@ -1938,7 +2317,7 @@ Module(
                                     upper: Some(
                                         Name(
                                             ExprName {
-                                                range: 1455..1456,
+                                                range: 1622..1623,
                                                 id: "b",
                                                 ctx: Load,
                                             },
@@ -1954,20 +2333,20 @@ Module(
             ),
             If(
                 StmtIf {
-                    range: 1476..1494,
+                    range: 1643..1661,
                     test: Named(
                         ExprNamed {
-                            range: 1479..1488,
+                            range: 1646..1655,
                             target: Name(
                                 ExprName {
-                                    range: 1479..1483,
+                                    range: 1646..1650,
                                     id: "type",
                                     ctx: Store,
                                 },
                             ),
                             value: NumberLiteral(
                                 ExprNumberLiteral {
-                                    range: 1487..1488,
+                                    range: 1654..1655,
                                     value: Int(
                                         1,
                                     ),
@@ -1978,7 +2357,7 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
-                                range: 1490..1494,
+                                range: 1657..1661,
                             },
                         ),
                     ],
@@ -1987,11 +2366,11 @@ Module(
             ),
             Assign(
                 StmtAssign {
-                    range: 1495..1530,
+                    range: 1662..1697,
                     targets: [
                         Name(
                             ExprName {
-                                range: 1495..1499,
+                                range: 1662..1666,
                                 id: "type",
                                 ctx: Store,
                             },
@@ -1999,19 +2378,19 @@ Module(
                     ],
                     value: Lambda(
                         ExprLambda {
-                            range: 1502..1530,
+                            range: 1669..1697,
                             parameters: Some(
                                 Parameters {
-                                    range: 1509..1514,
+                                    range: 1676..1681,
                                     posonlyargs: [],
                                     args: [
                                         ParameterWithDefault {
-                                            range: 1509..1514,
+                                            range: 1676..1681,
                                             parameter: Parameter {
-                                                range: 1509..1514,
+                                                range: 1676..1681,
                                                 name: Identifier {
                                                     id: "query",
-                                                    range: 1509..1514,
+                                                    range: 1676..1681,
                                                 },
                                                 annotation: None,
                                             },
@@ -2025,10 +2404,10 @@ Module(
                             ),
                             body: Compare(
                                 ExprCompare {
-                                    range: 1516..1530,
+                                    range: 1683..1697,
                                     left: Name(
                                         ExprName {
-                                            range: 1516..1521,
+                                            range: 1683..1688,
                                             id: "query",
                                             ctx: Load,
                                         },
@@ -2039,7 +2418,7 @@ Module(
                                     comparators: [
                                         Name(
                                             ExprName {
-                                                range: 1525..1530,
+                                                range: 1692..1697,
                                                 id: "event",
                                                 ctx: Load,
                                             },
@@ -2053,36 +2432,36 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 1531..1546,
+                    range: 1698..1713,
                     value: Call(
                         ExprCall {
-                            range: 1531..1546,
+                            range: 1698..1713,
                             func: Name(
                                 ExprName {
-                                    range: 1531..1536,
+                                    range: 1698..1703,
                                     id: "print",
                                     ctx: Load,
                                 },
                             ),
                             arguments: Arguments {
-                                range: 1536..1546,
+                                range: 1703..1713,
                                 args: [
                                     Call(
                                         ExprCall {
-                                            range: 1537..1545,
+                                            range: 1704..1712,
                                             func: Name(
                                                 ExprName {
-                                                    range: 1537..1541,
+                                                    range: 1704..1708,
                                                     id: "type",
                                                     ctx: Load,
                                                 },
                                             ),
                                             arguments: Arguments {
-                                                range: 1541..1545,
+                                                range: 1708..1712,
                                                 args: [
                                                     NumberLiteral(
                                                         ExprNumberLiteral {
-                                                            range: 1542..1544,
+                                                            range: 1709..1711,
                                                             value: Int(
                                                                 12,
                                                             ),
@@ -2102,23 +2481,23 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 1547..1557,
+                    range: 1714..1724,
                     value: Call(
                         ExprCall {
-                            range: 1547..1557,
+                            range: 1714..1724,
                             func: Name(
                                 ExprName {
-                                    range: 1547..1551,
+                                    range: 1714..1718,
                                     id: "type",
                                     ctx: Load,
                                 },
                             ),
                             arguments: Arguments {
-                                range: 1551..1557,
+                                range: 1718..1724,
                                 args: [
                                     Name(
                                         ExprName {
-                                            range: 1552..1556,
+                                            range: 1719..1723,
                                             id: "type",
                                             ctx: Load,
                                         },
@@ -2132,11 +2511,11 @@ Module(
             ),
             Assign(
                 StmtAssign {
-                    range: 1558..1576,
+                    range: 1725..1743,
                     targets: [
                         Name(
                             ExprName {
-                                range: 1558..1559,
+                                range: 1725..1726,
                                 id: "a",
                                 ctx: Store,
                             },
@@ -2144,10 +2523,10 @@ Module(
                     ],
                     value: Compare(
                         ExprCompare {
-                            range: 1565..1574,
+                            range: 1732..1741,
                             left: Name(
                                 ExprName {
-                                    range: 1565..1569,
+                                    range: 1732..1736,
                                     id: "type",
                                     ctx: Load,
                                 },
@@ -2158,7 +2537,7 @@ Module(
                             comparators: [
                                 Name(
                                     ExprName {
-                                        range: 1573..1574,
+                                        range: 1740..1741,
                                         id: "C",
                                         ctx: Load,
                                     },
@@ -2170,11 +2549,11 @@ Module(
             ),
             Assign(
                 StmtAssign {
-                    range: 1577..1593,
+                    range: 1744..1760,
                     targets: [
                         Name(
                             ExprName {
-                                range: 1577..1578,
+                                range: 1744..1745,
                                 id: "a",
                                 ctx: Store,
                             },
@@ -2182,20 +2561,20 @@ Module(
                     ],
                     value: Call(
                         ExprCall {
-                            range: 1584..1591,
+                            range: 1751..1758,
                             func: Name(
                                 ExprName {
-                                    range: 1584..1588,
+                                    range: 1751..1755,
                                     id: "type",
                                     ctx: Load,
                                 },
                             ),
                             arguments: Arguments {
-                                range: 1588..1591,
+                                range: 1755..1758,
                                 args: [
                                     Name(
                                         ExprName {
-                                            range: 1589..1590,
+                                            range: 1756..1757,
                                             id: "b",
                                             ctx: Load,
                                         },
@@ -2209,32 +2588,32 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 1594..1611,
+                    range: 1761..1778,
                     value: Call(
                         ExprCall {
-                            range: 1594..1611,
+                            range: 1761..1778,
                             func: Name(
                                 ExprName {
-                                    range: 1594..1598,
+                                    range: 1761..1765,
                                     id: "type",
                                     ctx: Load,
                                 },
                             ),
                             arguments: Arguments {
-                                range: 1599..1611,
+                                range: 1766..1778,
                                 args: [],
                                 keywords: [
                                     Keyword {
-                                        range: 1602..1609,
+                                        range: 1769..1776,
                                         arg: Some(
                                             Identifier {
                                                 id: "X",
-                                                range: 1602..1603,
+                                                range: 1769..1770,
                                             },
                                         ),
                                         value: Name(
                                             ExprName {
-                                                range: 1606..1609,
+                                                range: 1773..1776,
                                                 id: "int",
                                                 ctx: Load,
                                             },
@@ -2248,11 +2627,11 @@ Module(
             ),
             Assign(
                 StmtAssign {
-                    range: 1612..1620,
+                    range: 1779..1787,
                     targets: [
                         Name(
                             ExprName {
-                                range: 1612..1616,
+                                range: 1779..1783,
                                 id: "type",
                                 ctx: Store,
                             },
@@ -2260,7 +2639,7 @@ Module(
                     ],
                     value: NumberLiteral(
                         ExprNumberLiteral {
-                            range: 1619..1620,
+                            range: 1786..1787,
                             value: Int(
                                 1,
                             ),
@@ -2270,18 +2649,18 @@ Module(
             ),
             Assign(
                 StmtAssign {
-                    range: 1621..1633,
+                    range: 1788..1800,
                     targets: [
                         Name(
                             ExprName {
-                                range: 1621..1625,
+                                range: 1788..1792,
                                 id: "type",
                                 ctx: Store,
                             },
                         ),
                         Name(
                             ExprName {
-                                range: 1628..1629,
+                                range: 1795..1796,
                                 id: "x",
                                 ctx: Store,
                             },
@@ -2289,7 +2668,7 @@ Module(
                     ],
                     value: NumberLiteral(
                         ExprNumberLiteral {
-                            range: 1632..1633,
+                            range: 1799..1800,
                             value: Int(
                                 1,
                             ),
@@ -2299,18 +2678,18 @@ Module(
             ),
             Assign(
                 StmtAssign {
-                    range: 1634..1646,
+                    range: 1801..1813,
                     targets: [
                         Name(
                             ExprName {
-                                range: 1634..1635,
+                                range: 1801..1802,
                                 id: "x",
                                 ctx: Store,
                             },
                         ),
                         Name(
                             ExprName {
-                                range: 1638..1642,
+                                range: 1805..1809,
                                 id: "type",
                                 ctx: Store,
                             },
@@ -2318,7 +2697,7 @@ Module(
                     ],
                     value: NumberLiteral(
                         ExprNumberLiteral {
-                            range: 1645..1646,
+                            range: 1812..1813,
                             value: Int(
                                 1,
                             ),
@@ -2328,22 +2707,22 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 1647..1661,
+                    range: 1814..1828,
                     value: Lambda(
                         ExprLambda {
-                            range: 1647..1661,
+                            range: 1814..1828,
                             parameters: Some(
                                 Parameters {
-                                    range: 1654..1655,
+                                    range: 1821..1822,
                                     posonlyargs: [],
                                     args: [
                                         ParameterWithDefault {
-                                            range: 1654..1655,
+                                            range: 1821..1822,
                                             parameter: Parameter {
-                                                range: 1654..1655,
+                                                range: 1821..1822,
                                                 name: Identifier {
                                                     id: "x",
-                                                    range: 1654..1655,
+                                                    range: 1821..1822,
                                                 },
                                                 annotation: None,
                                             },
@@ -2357,7 +2736,7 @@ Module(
                             ),
                             body: Name(
                                 ExprName {
-                                    range: 1657..1661,
+                                    range: 1824..1828,
                                     id: "type",
                                     ctx: Load,
                                 },

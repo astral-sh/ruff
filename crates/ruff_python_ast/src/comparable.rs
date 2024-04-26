@@ -1173,21 +1173,29 @@ impl<'a> From<&'a ast::TypeParam> for ComparableTypeParam<'a> {
             ast::TypeParam::TypeVar(ast::TypeParamTypeVar {
                 name,
                 bound,
+                default,
                 range: _,
             }) => Self::TypeVar(TypeParamTypeVar {
                 name: name.as_str(),
                 bound: bound.as_ref().map(Into::into),
+                default: default.as_ref().map(Into::into),
             }),
-            ast::TypeParam::TypeVarTuple(ast::TypeParamTypeVarTuple { name, range: _ }) => {
-                Self::TypeVarTuple(TypeParamTypeVarTuple {
-                    name: name.as_str(),
-                })
-            }
-            ast::TypeParam::ParamSpec(ast::TypeParamParamSpec { name, range: _ }) => {
-                Self::ParamSpec(TypeParamParamSpec {
-                    name: name.as_str(),
-                })
-            }
+            ast::TypeParam::TypeVarTuple(ast::TypeParamTypeVarTuple {
+                name,
+                default,
+                range: _,
+            }) => Self::TypeVarTuple(TypeParamTypeVarTuple {
+                name: name.as_str(),
+                default: default.as_ref().map(Into::into),
+            }),
+            ast::TypeParam::ParamSpec(ast::TypeParamParamSpec {
+                name,
+                default,
+                range: _,
+            }) => Self::ParamSpec(TypeParamParamSpec {
+                name: name.as_str(),
+                default: default.as_ref().map(Into::into),
+            }),
         }
     }
 }
@@ -1196,16 +1204,19 @@ impl<'a> From<&'a ast::TypeParam> for ComparableTypeParam<'a> {
 pub struct TypeParamTypeVar<'a> {
     pub name: &'a str,
     pub bound: Option<Box<ComparableExpr<'a>>>,
+    pub default: Option<Box<ComparableExpr<'a>>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct TypeParamParamSpec<'a> {
     pub name: &'a str,
+    pub default: Option<Box<ComparableExpr<'a>>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct TypeParamTypeVarTuple<'a> {
     pub name: &'a str,
+    pub default: Option<Box<ComparableExpr<'a>>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]

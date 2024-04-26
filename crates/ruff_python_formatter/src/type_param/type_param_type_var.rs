@@ -12,10 +12,14 @@ impl FormatNodeRule<TypeParamTypeVar> for FormatTypeParamTypeVar {
             range: _,
             name,
             bound,
+            default,
         } = item;
         name.format().fmt(f)?;
         if let Some(bound) = bound {
             write!(f, [token(":"), space(), bound.format()])?;
+        }
+        if let Some(default) = default {
+            write!(f, [space(), token("="), space(), default.format()])?;
         }
         Ok(())
     }
