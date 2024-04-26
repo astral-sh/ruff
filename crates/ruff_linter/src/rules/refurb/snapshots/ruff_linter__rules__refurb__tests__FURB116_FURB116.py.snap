@@ -1,0 +1,144 @@
+---
+source: crates/ruff_linter/src/rules/refurb/mod.rs
+---
+FURB116.py:6:7: FURB116 [*] Replace `oct` call with `f"{num:o}"`
+  |
+4 |     return num
+5 | 
+6 | print(oct(num)[2:])  # FURB116
+  |       ^^^^^^^^^^^^ FURB116
+7 | print(hex(num)[2:])  # FURB116
+8 | print(bin(num)[2:])  # FURB116
+  |
+  = help: Replace with `f"{num:o}"`
+
+ℹ Safe fix
+3 3 | def return_num() -> int:
+4 4 |     return num
+5 5 | 
+6   |-print(oct(num)[2:])  # FURB116
+  6 |+print(f"{num:o}")  # FURB116
+7 7 | print(hex(num)[2:])  # FURB116
+8 8 | print(bin(num)[2:])  # FURB116
+9 9 | 
+
+FURB116.py:7:7: FURB116 [*] Replace `hex` call with `f"{num:x}"`
+  |
+6 | print(oct(num)[2:])  # FURB116
+7 | print(hex(num)[2:])  # FURB116
+  |       ^^^^^^^^^^^^ FURB116
+8 | print(bin(num)[2:])  # FURB116
+  |
+  = help: Replace with `f"{num:x}"`
+
+ℹ Safe fix
+4 4 |     return num
+5 5 | 
+6 6 | print(oct(num)[2:])  # FURB116
+7   |-print(hex(num)[2:])  # FURB116
+  7 |+print(f"{num:x}")  # FURB116
+8 8 | print(bin(num)[2:])  # FURB116
+9 9 | 
+10 10 | print(oct(1337)[2:])  # FURB116
+
+FURB116.py:8:7: FURB116 [*] Replace `bin` call with `f"{num:b}"`
+   |
+ 6 | print(oct(num)[2:])  # FURB116
+ 7 | print(hex(num)[2:])  # FURB116
+ 8 | print(bin(num)[2:])  # FURB116
+   |       ^^^^^^^^^^^^ FURB116
+ 9 | 
+10 | print(oct(1337)[2:])  # FURB116
+   |
+   = help: Replace with `f"{num:b}"`
+
+ℹ Safe fix
+5 5 | 
+6 6 | print(oct(num)[2:])  # FURB116
+7 7 | print(hex(num)[2:])  # FURB116
+8   |-print(bin(num)[2:])  # FURB116
+  8 |+print(f"{num:b}")  # FURB116
+9 9 | 
+10 10 | print(oct(1337)[2:])  # FURB116
+11 11 | print(hex(1337)[2:])  # FURB116
+
+FURB116.py:10:7: FURB116 [*] Replace `oct` call with `f"{1337:o}"`
+   |
+ 8 | print(bin(num)[2:])  # FURB116
+ 9 | 
+10 | print(oct(1337)[2:])  # FURB116
+   |       ^^^^^^^^^^^^^ FURB116
+11 | print(hex(1337)[2:])  # FURB116
+12 | print(bin(1337)[2:])  # FURB116
+   |
+   = help: Replace with `f"{1337:o}"`
+
+ℹ Safe fix
+7  7  | print(hex(num)[2:])  # FURB116
+8  8  | print(bin(num)[2:])  # FURB116
+9  9  | 
+10    |-print(oct(1337)[2:])  # FURB116
+   10 |+print(f"{1337:o}")  # FURB116
+11 11 | print(hex(1337)[2:])  # FURB116
+12 12 | print(bin(1337)[2:])  # FURB116
+13 13 | 
+
+FURB116.py:11:7: FURB116 [*] Replace `hex` call with `f"{1337:x}"`
+   |
+10 | print(oct(1337)[2:])  # FURB116
+11 | print(hex(1337)[2:])  # FURB116
+   |       ^^^^^^^^^^^^^ FURB116
+12 | print(bin(1337)[2:])  # FURB116
+   |
+   = help: Replace with `f"{1337:x}"`
+
+ℹ Safe fix
+8  8  | print(bin(num)[2:])  # FURB116
+9  9  | 
+10 10 | print(oct(1337)[2:])  # FURB116
+11    |-print(hex(1337)[2:])  # FURB116
+   11 |+print(f"{1337:x}")  # FURB116
+12 12 | print(bin(1337)[2:])  # FURB116
+13 13 | 
+14 14 | print(bin(return_num())[2:])  # FURB116 (no autofix)
+
+FURB116.py:12:7: FURB116 [*] Replace `bin` call with `f"{1337:b}"`
+   |
+10 | print(oct(1337)[2:])  # FURB116
+11 | print(hex(1337)[2:])  # FURB116
+12 | print(bin(1337)[2:])  # FURB116
+   |       ^^^^^^^^^^^^^ FURB116
+13 | 
+14 | print(bin(return_num())[2:])  # FURB116 (no autofix)
+   |
+   = help: Replace with `f"{1337:b}"`
+
+ℹ Safe fix
+9  9  | 
+10 10 | print(oct(1337)[2:])  # FURB116
+11 11 | print(hex(1337)[2:])  # FURB116
+12    |-print(bin(1337)[2:])  # FURB116
+   12 |+print(f"{1337:b}")  # FURB116
+13 13 | 
+14 14 | print(bin(return_num())[2:])  # FURB116 (no autofix)
+15 15 | print(bin(int(f"{num}"))[2:])  # FURB116 (no autofix)
+
+FURB116.py:14:7: FURB116 Replace `bin` call with f-string
+   |
+12 | print(bin(1337)[2:])  # FURB116
+13 | 
+14 | print(bin(return_num())[2:])  # FURB116 (no autofix)
+   |       ^^^^^^^^^^^^^^^^^^^^^ FURB116
+15 | print(bin(int(f"{num}"))[2:])  # FURB116 (no autofix)
+   |
+   = help: Replace with f-string
+
+FURB116.py:15:7: FURB116 Replace `bin` call with f-string
+   |
+14 | print(bin(return_num())[2:])  # FURB116 (no autofix)
+15 | print(bin(int(f"{num}"))[2:])  # FURB116 (no autofix)
+   |       ^^^^^^^^^^^^^^^^^^^^^^ FURB116
+16 | 
+17 | ## invalid
+   |
+   = help: Replace with f-string

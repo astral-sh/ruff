@@ -128,6 +128,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::SortedMinMax) {
                 refurb::rules::sorted_min_max(checker, subscript);
             }
+            if checker.enabled(Rule::FStringNumberFormat) {
+                refurb::rules::fstring_number_format(checker, subscript);
+            }
 
             pandas_vet::rules::subscript(checker, value, expr);
         }
