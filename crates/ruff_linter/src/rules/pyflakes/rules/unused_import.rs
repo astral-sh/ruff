@@ -191,7 +191,8 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
     }
 
     let in_init = checker.path().ends_with("__init__.py");
-    let fix_init = !checker.settings.ignore_init_module_imports;
+    // TODO: find the `__all__` node
+    let dunder_all = None;
 
     // Generate a diagnostic for every import, but share fixes across all imports within the same
     // statement (excluding those that are ignored).
@@ -214,13 +215,8 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
         let (fix_remove, fix_explicit) =
             if !in_except_handler && !checker.settings.preview.is_enabled() {
                 (
-                    fix_by_removing_imports_from_statement(checker, node_id, &to_remove, in_init),
-                    fix_by_making_explicit(
-                        checker,
-                        node_id,
-                        &to_explicit,
-                        None, // TODO this last argument is the node-id of __all__ export list
-                    ),
+                    fix_by_removing_imports(checker, node_id, &to_remove, in_init).ok(),
+                    fix_by_reexporting(checker, node_id, &to_explicit, dunder_all),
                 )
             } else {
                 (None, None)
@@ -297,7 +293,7 @@ impl Ranged for ImportBinding<'_> {
 }
 
 /// Generate a [`Fix`] to remove unused imports from a statement.
-fn fix_by_removing_imports_from_statement(
+fn fix_by_removing_imports(
     checker: &Checker,
     node_id: NodeId,
     imports: &[ImportBinding],
@@ -340,7 +336,7 @@ fn fix_by_removing_imports_from_statement(
 
 /// Generate a [`Fix`] to make bindings in a statement explicit, either by moving them to `__all__`
 /// or changing them from `import a` to `import a as a`.
-fn fix_by_making_explicit(
+fn fix_by_reexporting(
     checker: &Checker,
     node_id: NodeId,
     imports: &[ImportBinding],
