@@ -499,7 +499,7 @@ If you're using Ruff, consider adding the Ruff badge to your project's `README.m
 
 ## License
 
-This repository is licensed under the [MIT License](LICENSE)
+This repository is licensed under the [MIT License](https://github.com/astral-sh/ruff/blob/main/LICENSE)
 
 <div align="center">
   <a target="_blank" href="https://astral.sh" style="background:none">
