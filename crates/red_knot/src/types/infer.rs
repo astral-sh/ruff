@@ -4,7 +4,7 @@ use crate::module::ModuleName;
 use crate::symbols::{Definition, ImportFromDefinition, SymbolId};
 use crate::types::Type;
 use crate::FileId;
-use ruff_python_ast::{AstNode, StmtClassDef};
+use ruff_python_ast::AstNode;
 
 #[tracing::instrument(level = "trace", skip(db))]
 pub fn infer_symbol_type<Db>(db: &mut Db, file_id: FileId, symbol_id: SymbolId) -> Type
@@ -47,22 +47,20 @@ where
             }
         }
         Definition::ClassDef(node_key) => {
-            let node_key = node_key.erased();
-            if let Some(ty) = db.jar().type_store.get_cached_node_type(file_id, node_key) {
+            if let Some(ty) = db
+                .jar()
+                .type_store
+                .get_cached_node_type(file_id, node_key.erased())
+            {
                 ty
             } else {
                 let parsed = db.parse(file_id);
                 let ast = parsed.ast();
-                let node = StmtClassDef::cast_ref(
-                    node_key
-                        .resolve(ast.as_any_node_ref())
-                        .expect("node key should resolve"),
-                )
-                .expect("node key should cast");
+                let node = node_key.resolve_unwrap(ast.as_any_node_ref());
 
                 let store = &mut db.jar_mut().type_store;
                 let ty = Type::Class(store.add_class(file_id, &node.name.id));
-                store.cache_node_type(file_id, *node_key, ty);
+                store.cache_node_type(file_id, *node_key.erased(), ty);
                 ty
             }
         }

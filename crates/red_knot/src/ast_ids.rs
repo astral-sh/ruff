@@ -298,6 +298,10 @@ impl<N: AstNode> TypedNodeKey<N> {
         Some(N::cast_ref(node_ref).unwrap())
     }
 
+    pub fn resolve_unwrap<'a>(&self, root: AnyNodeRef<'a>) -> N::Ref<'a> {
+        self.resolve(root).expect("node should resolve")
+    }
+
     pub fn erased(&self) -> &NodeKey {
         &self.inner
     }
