@@ -44,7 +44,7 @@ impl ScopeId {
 }
 
 #[newtype_index]
-pub(crate) struct SymbolId;
+pub struct SymbolId;
 
 impl SymbolId {
     pub(crate) fn symbol(self, table: &SymbolTable) -> &Symbol {
@@ -110,14 +110,14 @@ pub(crate) enum Definition {
 
 #[derive(Debug)]
 pub(crate) struct ImportDefinition {
-    module: String,
+    pub(crate) module: String,
 }
 
 #[derive(Debug)]
 pub(crate) struct ImportFromDefinition {
-    module: Option<String>,
-    name: String,
-    level: Option<u32>,
+    pub(crate) module: Option<String>,
+    pub(crate) name: String,
+    pub(crate) level: Option<u32>,
 }
 
 /// Table of all symbols in all scopes for a module.
