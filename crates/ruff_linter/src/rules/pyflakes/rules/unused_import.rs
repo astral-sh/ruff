@@ -114,16 +114,7 @@ impl Violation for UnusedImport {
     }
 }
 
-/// Categories of imports that we care about for this rule.
-pub enum ImportCat {
-    StdLib,
-    FirstParty,
-    ThirdParty,
-}
-
-/// Like [`isort::categorize`] but only returns categories relevant to this rule. Returns `None`
-/// when this rule does not apply (e.g. `from __future__ …`).
-fn categorize(checker: &Checker, qualified_name: &str) -> Option<ImportCat> {
+fn is_first_party(checker: &Checker, qualified_name: &str) -> bool {
     use isort::{ImportSection, ImportType};
     match isort::categorize(
         qualified_name,
@@ -137,16 +128,8 @@ fn categorize(checker: &Checker, qualified_name: &str) -> Option<ImportCat> {
         &checker.settings.isort.section_order,
         &checker.settings.isort.default_section,
     ) {
-        // this rule doesn't apply
-        ImportSection::Known(ImportType::Future) => None,
-        // stdlib
-        ImportSection::Known(ImportType::StandardLibrary) => Some(ImportCat::StdLib),
-        // first party
-        ImportSection::Known(ImportType::FirstParty) => Some(ImportCat::FirstParty),
-        ImportSection::Known(ImportType::LocalFolder) => Some(ImportCat::FirstParty),
-        // third party
-        ImportSection::Known(ImportType::ThirdParty) => Some(ImportCat::ThirdParty),
-        ImportSection::UserDefined(_) => Some(ImportCat::ThirdParty),
+        ImportSection::Known(ImportType::FirstParty | ImportType::LocalFolder) => true,
+        _ => false,
     }
 }
 
@@ -184,15 +167,10 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
             continue;
         };
 
-        let Some(category) = categorize(&checker, &import.qualified_name().to_string()) else {
-            continue;
-        };
-
         let import = ImportBinding {
             import,
             range: binding.range(),
             parent_range: binding.parent_range(checker.semantic()),
-            category,
         };
 
         if checker.rule_is_ignored(Rule::UnusedImport, import.start())
@@ -228,9 +206,8 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
         let (to_explicit, to_remove): (Vec<_>, Vec<_>) =
             imports
                 .into_iter()
-                .partition(|ImportBinding { category, .. }| {
-                    in_init && *category == ImportCat::FirstParty
-                    // FIXME: make an "is first party" predicate
+                .partition(|ImportBinding { import, .. }| {
+                    in_init && is_first_party(checker, &import.qualified_name().to_string())
                 });
 
         // generate fixes that are shared across bindings in the statement
@@ -285,7 +262,6 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
         import,
         range,
         parent_range,
-        category,
     } in ignored.into_values().flatten()
     {
         let mut diagnostic = Diagnostic::new(
@@ -312,8 +288,6 @@ struct ImportBinding<'a> {
     range: TextRange,
     /// The range of the import's parent statement.
     parent_range: Option<TextRange>,
-    /// The origin of the import.
-    category: ImportCat,
 }
 
 impl Ranged for ImportBinding<'_> {
