@@ -174,7 +174,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 }
             }
             if checker.enabled(Rule::BadExitAnnotation) {
-                flake8_pyi::rules::bad_exit_annotation(checker, *is_async, name, parameters);
+                flake8_pyi::rules::bad_exit_annotation(checker, function_def);
             }
             if checker.enabled(Rule::RedundantNumericUnion) {
                 flake8_pyi::rules::redundant_numeric_union(checker, parameters);

@@ -84,6 +84,11 @@ impl<'a> preorder::PreorderVisitor<'a> for AsyncExprVisitor {
             _ => preorder::walk_stmt(self, stmt),
         }
     }
+    fn visit_comprehension(&mut self, comprehension: &'a ast::Comprehension) {
+        if comprehension.is_async {
+            self.found_await_or_async = true;
+        }
+    }
 }
 
 /// Very nearly `crate::node::StmtFunctionDef.visit_preorder`, except it is specialized and,

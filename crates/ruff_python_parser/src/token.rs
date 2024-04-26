@@ -536,17 +536,12 @@ pub enum TokenKind {
 
 impl TokenKind {
     #[inline]
-    pub const fn is_newline(&self) -> bool {
+    pub const fn is_newline(self) -> bool {
         matches!(self, TokenKind::Newline | TokenKind::NonLogicalNewline)
     }
 
     #[inline]
-    pub const fn is_unary(&self) -> bool {
-        matches!(self, TokenKind::Plus | TokenKind::Minus)
-    }
-
-    #[inline]
-    pub const fn is_keyword(&self) -> bool {
+    pub const fn is_keyword(self) -> bool {
         matches!(
             self,
             TokenKind::False
@@ -587,7 +582,7 @@ impl TokenKind {
     }
 
     #[inline]
-    pub const fn is_operator(&self) -> bool {
+    pub const fn is_operator(self) -> bool {
         matches!(
             self,
             TokenKind::Lpar
@@ -646,7 +641,7 @@ impl TokenKind {
     }
 
     #[inline]
-    pub const fn is_singleton(&self) -> bool {
+    pub const fn is_singleton(self) -> bool {
         matches!(self, TokenKind::False | TokenKind::True | TokenKind::None)
     }
 
@@ -663,7 +658,7 @@ impl TokenKind {
     }
 
     #[inline]
-    pub const fn is_arithmetic(&self) -> bool {
+    pub const fn is_arithmetic(self) -> bool {
         matches!(
             self,
             TokenKind::DoubleStar
@@ -677,7 +672,7 @@ impl TokenKind {
     }
 
     #[inline]
-    pub const fn is_bitwise_or_shift(&self) -> bool {
+    pub const fn is_bitwise_or_shift(self) -> bool {
         matches!(
             self,
             TokenKind::LeftShift
@@ -695,51 +690,100 @@ impl TokenKind {
     }
 
     #[inline]
-    pub const fn is_soft_keyword(&self) -> bool {
+    pub const fn is_soft_keyword(self) -> bool {
         matches!(self, TokenKind::Match | TokenKind::Case)
     }
 
+    /// Returns `true` if the current token is a unary arithmetic operator.
     #[inline]
-    pub const fn is_compare_operator(&self) -> bool {
-        matches!(
-            self,
-            TokenKind::Not
-                | TokenKind::In
-                | TokenKind::Is
-                | TokenKind::EqEqual
-                | TokenKind::NotEqual
-                | TokenKind::Less
-                | TokenKind::LessEqual
-                | TokenKind::Greater
-                | TokenKind::GreaterEqual
-        )
+    pub const fn is_unary_arithmetic_operator(self) -> bool {
+        matches!(self, TokenKind::Plus | TokenKind::Minus)
     }
 
+    /// Returns the [`UnaryOp`] that corresponds to this token kind, if it is an arithmetic unary
+    /// operator, otherwise return [None].
+    ///
+    /// Use [`TokenKind::as_unary_operator`] to match against any unary operator.
     #[inline]
-    pub const fn is_bool_operator(&self) -> bool {
-        matches!(self, TokenKind::And | TokenKind::Or)
+    pub(crate) const fn as_unary_arithmetic_operator(self) -> Option<UnaryOp> {
+        Some(match self {
+            TokenKind::Plus => UnaryOp::UAdd,
+            TokenKind::Minus => UnaryOp::USub,
+            _ => return None,
+        })
+    }
+
+    /// Returns the [`UnaryOp`] that corresponds to this token kind, if it is a unary operator,
+    /// otherwise return [None].
+    ///
+    /// Use [`TokenKind::as_unary_arithmetic_operator`] to match against only an arithmetic unary
+    /// operator.
+    #[inline]
+    pub(crate) const fn as_unary_operator(self) -> Option<UnaryOp> {
+        Some(match self {
+            TokenKind::Plus => UnaryOp::UAdd,
+            TokenKind::Minus => UnaryOp::USub,
+            TokenKind::Tilde => UnaryOp::Invert,
+            TokenKind::Not => UnaryOp::Not,
+            _ => return None,
+        })
+    }
+
+    /// Returns the [`BoolOp`] that corresponds to this token kind, if it is a boolean operator,
+    /// otherwise return [None].
+    #[inline]
+    pub(crate) const fn as_bool_operator(self) -> Option<BoolOp> {
+        Some(match self {
+            TokenKind::And => BoolOp::And,
+            TokenKind::Or => BoolOp::Or,
+            _ => return None,
+        })
+    }
+
+    /// Returns the binary [`Operator`] that corresponds to the current token, if it's a binary
+    /// operator, otherwise return [None].
+    ///
+    /// Use [`TokenKind::as_augmented_assign_operator`] to match against an augmented assignment
+    /// token.
+    pub(crate) const fn as_binary_operator(self) -> Option<Operator> {
+        Some(match self {
+            TokenKind::Plus => Operator::Add,
+            TokenKind::Minus => Operator::Sub,
+            TokenKind::Star => Operator::Mult,
+            TokenKind::At => Operator::MatMult,
+            TokenKind::DoubleStar => Operator::Pow,
+            TokenKind::Slash => Operator::Div,
+            TokenKind::DoubleSlash => Operator::FloorDiv,
+            TokenKind::Percent => Operator::Mod,
+            TokenKind::Amper => Operator::BitAnd,
+            TokenKind::Vbar => Operator::BitOr,
+            TokenKind::CircumFlex => Operator::BitXor,
+            TokenKind::LeftShift => Operator::LShift,
+            TokenKind::RightShift => Operator::RShift,
+            _ => return None,
+        })
     }
 
     /// Returns the [`Operator`] that corresponds to this token kind, if it is
     /// an augmented assignment operator, or [`None`] otherwise.
     #[inline]
-    pub const fn as_augmented_assign_operator(&self) -> Option<Operator> {
-        match self {
-            TokenKind::PlusEqual => Some(Operator::Add),
-            TokenKind::MinusEqual => Some(Operator::Sub),
-            TokenKind::StarEqual => Some(Operator::Mult),
-            TokenKind::AtEqual => Some(Operator::MatMult),
-            TokenKind::DoubleStarEqual => Some(Operator::Pow),
-            TokenKind::SlashEqual => Some(Operator::Div),
-            TokenKind::DoubleSlashEqual => Some(Operator::FloorDiv),
-            TokenKind::PercentEqual => Some(Operator::Mod),
-            TokenKind::AmperEqual => Some(Operator::BitAnd),
-            TokenKind::VbarEqual => Some(Operator::BitOr),
-            TokenKind::CircumflexEqual => Some(Operator::BitXor),
-            TokenKind::LeftShiftEqual => Some(Operator::LShift),
-            TokenKind::RightShiftEqual => Some(Operator::RShift),
-            _ => None,
-        }
+    pub(crate) const fn as_augmented_assign_operator(self) -> Option<Operator> {
+        Some(match self {
+            TokenKind::PlusEqual => Operator::Add,
+            TokenKind::MinusEqual => Operator::Sub,
+            TokenKind::StarEqual => Operator::Mult,
+            TokenKind::AtEqual => Operator::MatMult,
+            TokenKind::DoubleStarEqual => Operator::Pow,
+            TokenKind::SlashEqual => Operator::Div,
+            TokenKind::DoubleSlashEqual => Operator::FloorDiv,
+            TokenKind::PercentEqual => Operator::Mod,
+            TokenKind::AmperEqual => Operator::BitAnd,
+            TokenKind::VbarEqual => Operator::BitOr,
+            TokenKind::CircumflexEqual => Operator::BitXor,
+            TokenKind::LeftShiftEqual => Operator::LShift,
+            TokenKind::RightShiftEqual => Operator::RShift,
+            _ => return None,
+        })
     }
 
     pub const fn from_token(token: &Tok) -> Self {
@@ -865,60 +909,46 @@ impl From<Tok> for TokenKind {
     }
 }
 
-impl TryFrom<TokenKind> for Operator {
-    type Error = ();
-
-    fn try_from(value: TokenKind) -> Result<Self, Self::Error> {
-        Ok(match value {
-            TokenKind::At | TokenKind::AtEqual => Operator::MatMult,
-            TokenKind::Plus | TokenKind::PlusEqual => Operator::Add,
-            TokenKind::Star | TokenKind::StarEqual => Operator::Mult,
-            TokenKind::Vbar | TokenKind::VbarEqual => Operator::BitOr,
-            TokenKind::Minus | TokenKind::MinusEqual => Operator::Sub,
-            TokenKind::Slash | TokenKind::SlashEqual => Operator::Div,
-            TokenKind::Amper | TokenKind::AmperEqual => Operator::BitAnd,
-            TokenKind::Percent | TokenKind::PercentEqual => Operator::Mod,
-            TokenKind::DoubleStar | TokenKind::DoubleStarEqual => Operator::Pow,
-            TokenKind::LeftShift | TokenKind::LeftShiftEqual => Operator::LShift,
-            TokenKind::CircumFlex | TokenKind::CircumflexEqual => Operator::BitXor,
-            TokenKind::RightShift | TokenKind::RightShiftEqual => Operator::RShift,
-            TokenKind::DoubleSlash | TokenKind::DoubleSlashEqual => Operator::FloorDiv,
-            _ => return Err(()),
-        })
+impl From<BoolOp> for TokenKind {
+    #[inline]
+    fn from(op: BoolOp) -> Self {
+        match op {
+            BoolOp::And => TokenKind::And,
+            BoolOp::Or => TokenKind::Or,
+        }
     }
 }
 
-impl TryFrom<TokenKind> for BoolOp {
-    type Error = ();
-
-    fn try_from(value: TokenKind) -> Result<Self, Self::Error> {
-        Ok(match value {
-            TokenKind::And => BoolOp::And,
-            TokenKind::Or => BoolOp::Or,
-            _ => return Err(()),
-        })
+impl From<UnaryOp> for TokenKind {
+    #[inline]
+    fn from(op: UnaryOp) -> Self {
+        match op {
+            UnaryOp::Invert => TokenKind::Tilde,
+            UnaryOp::Not => TokenKind::Not,
+            UnaryOp::UAdd => TokenKind::Plus,
+            UnaryOp::USub => TokenKind::Minus,
+        }
     }
 }
 
-impl TryFrom<&Tok> for UnaryOp {
-    type Error = String;
-
-    fn try_from(value: &Tok) -> Result<Self, Self::Error> {
-        TokenKind::from_token(value).try_into()
-    }
-}
-
-impl TryFrom<TokenKind> for UnaryOp {
-    type Error = String;
-
-    fn try_from(value: TokenKind) -> Result<Self, Self::Error> {
-        Ok(match value {
-            TokenKind::Plus => UnaryOp::UAdd,
-            TokenKind::Minus => UnaryOp::USub,
-            TokenKind::Tilde => UnaryOp::Invert,
-            TokenKind::Not => UnaryOp::Not,
-            _ => return Err(format!("unexpected token: {value:?}")),
-        })
+impl From<Operator> for TokenKind {
+    #[inline]
+    fn from(op: Operator) -> Self {
+        match op {
+            Operator::Add => TokenKind::Plus,
+            Operator::Sub => TokenKind::Minus,
+            Operator::Mult => TokenKind::Star,
+            Operator::MatMult => TokenKind::At,
+            Operator::Div => TokenKind::Slash,
+            Operator::Mod => TokenKind::Percent,
+            Operator::Pow => TokenKind::DoubleStar,
+            Operator::LShift => TokenKind::LeftShift,
+            Operator::RShift => TokenKind::RightShift,
+            Operator::BitOr => TokenKind::Vbar,
+            Operator::BitXor => TokenKind::CircumFlex,
+            Operator::BitAnd => TokenKind::Amper,
+            Operator::FloorDiv => TokenKind::DoubleSlash,
+        }
     }
 }
 

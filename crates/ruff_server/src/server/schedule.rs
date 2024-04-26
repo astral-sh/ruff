@@ -1,6 +1,6 @@
 use std::num::NonZeroUsize;
 
-use crossbeam::channel::Sender;
+use crossbeam_channel::Sender;
 
 use crate::session::Session;
 

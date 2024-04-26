@@ -12,10 +12,10 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for `__hash__` implementations that return a type other than `integer`.
+/// Checks for `__hash__` implementations that return a value other than an integer.
 ///
 /// ## Why is this bad?
-/// The `__hash__` method should return an `integer`. Returning a different
+/// The `__hash__` method should return an integer. Returning a different
 /// type may cause unexpected behavior.
 ///
 /// Note: `bool` is a subclass of `int`, so it's technically valid for `__hash__` to

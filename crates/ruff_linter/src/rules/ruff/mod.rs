@@ -253,6 +253,24 @@ mod tests {
     }
 
     #[test]
+    fn ruff_per_file_ignores_empty() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("ruff/ruff_per_file_ignores.py"),
+            &settings::LinterSettings {
+                per_file_ignores: CompiledPerFileIgnoreList::resolve(vec![PerFileIgnore::new(
+                    "ruff_per_file_ignores.py".to_string(),
+                    &["RUF100".parse().unwrap()],
+                    None,
+                )])
+                .unwrap(),
+                ..settings::LinterSettings::for_rules(vec![Rule::UnusedNOQA])
+            },
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
     fn flake8_noqa() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/flake8_noqa.py"),

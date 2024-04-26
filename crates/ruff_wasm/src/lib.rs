@@ -18,7 +18,7 @@ use ruff_python_codegen::Stylist;
 use ruff_python_formatter::{format_module_ast, pretty_comments, PyFormatContext, QuoteStyle};
 use ruff_python_index::{CommentRangesBuilder, Indexer};
 use ruff_python_parser::lexer::LexResult;
-use ruff_python_parser::{parse_tokens, tokenize_all, AsMode, Mode};
+use ruff_python_parser::{parse_tokens, tokenize_all, AsMode, Mode, Program};
 use ruff_python_trivia::CommentRanges;
 use ruff_source_file::{Locator, SourceLocation};
 use ruff_text_size::Ranged;
@@ -250,9 +250,9 @@ impl Workspace {
 
     /// Parses the content and returns its AST
     pub fn parse(&self, contents: &str) -> Result<String, Error> {
-        let parsed = ruff_python_parser::parse(contents, Mode::Module).map_err(into_error)?;
+        let program = Program::parse_str(contents, Mode::Module);
 
-        Ok(format!("{parsed:#?}"))
+        Ok(format!("{:#?}", program.into_ast()))
     }
 
     pub fn tokens(&self, contents: &str) -> Result<String, Error> {

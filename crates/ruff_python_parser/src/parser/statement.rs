@@ -6,18 +6,17 @@ use rustc_hash::FxHashSet;
 use ruff_python_ast::{
     self as ast, ExceptHandler, Expr, ExprContext, IpyEscapeKind, Operator, Stmt, WithItem,
 };
-use ruff_text_size::{Ranged, TextRange, TextSize};
+use ruff_text_size::{Ranged, TextSize};
 
 use crate::parser::expression::{GeneratorExpressionInParentheses, ParsedExpr, EXPR_SET};
 use crate::parser::progress::ParserProgress;
 use crate::parser::{
-    helpers, FunctionKind, Parser, ParserCtxFlags, RecoveryContext, RecoveryContextKind,
-    WithItemKind,
+    helpers, FunctionKind, Parser, RecoveryContext, RecoveryContextKind, WithItemKind,
 };
 use crate::token_set::TokenSet;
 use crate::{Mode, ParseErrorType, Tok, TokenKind};
 
-use super::expression::{AllowNamedExpression, AllowStarredExpression, Precedence};
+use super::expression::{ExpressionContext, OperatorPrecedence};
 use super::Parenthesized;
 
 /// Tokens that represent compound statements.
@@ -262,7 +261,7 @@ impl<'src> Parser<'src> {
 
                 // simple_stmt: `... | yield_stmt | star_expressions | ...`
                 let parsed_expr =
-                    self.parse_yield_expression_or_else(Parser::parse_star_expression_list);
+                    self.parse_expression_list(ExpressionContext::yield_or_starred_bitwise_or());
 
                 if self.at(TokenKind::Equal) {
                     Stmt::Assign(self.parse_assign_statement(parsed_expr, start))
@@ -309,8 +308,9 @@ impl<'src> Parser<'src> {
             |parser| {
                 // Allow starred expression to raise a better error message for
                 // an invalid delete target later.
-                let mut target =
-                    parser.parse_conditional_expression_or_higher(AllowStarredExpression::Yes);
+                let mut target = parser.parse_conditional_expression_or_higher_impl(
+                    ExpressionContext::starred_conditional(),
+                );
                 helpers::set_expr_ctx(&mut target.expr, ExprContext::Del);
 
                 // test_err invalid_del_target
@@ -356,9 +356,12 @@ impl<'src> Parser<'src> {
         // return yield from x
         // return x := 1
         // return *x and y
-        let value = self
-            .at_expr()
-            .then(|| Box::new(self.parse_star_expression_list().expr));
+        let value = self.at_expr().then(|| {
+            Box::new(
+                self.parse_expression_list(ExpressionContext::starred_bitwise_or())
+                    .expr,
+            )
+        });
 
         ast::StmtReturn {
             range: self.node_range(start),
@@ -384,7 +387,7 @@ impl<'src> Parser<'src> {
             // raise *x
             // raise yield x
             // raise x := 1
-            let exc = self.parse_expression_list(AllowStarredExpression::No);
+            let exc = self.parse_expression_list(ExpressionContext::default());
 
             if let Some(ast::ExprTuple {
                 parenthesized: false,
@@ -406,7 +409,7 @@ impl<'src> Parser<'src> {
             // raise x from *y
             // raise x from yield y
             // raise x from y := 1
-            let cause = self.parse_expression_list(AllowStarredExpression::No);
+            let cause = self.parse_expression_list(ExpressionContext::default());
 
             if let Some(ast::ExprTuple {
                 parenthesized: false,
@@ -714,7 +717,7 @@ impl<'src> Parser<'src> {
         // assert assert x
         // assert yield x
         // assert x := 1
-        let test = self.parse_conditional_expression_or_higher(AllowStarredExpression::No);
+        let test = self.parse_conditional_expression_or_higher();
 
         let msg = if self.eat(TokenKind::Comma) {
             if self.at_expr() {
@@ -723,10 +726,7 @@ impl<'src> Parser<'src> {
                 // assert False, assert x
                 // assert False, yield x
                 // assert False, x := 1
-                Some(Box::new(
-                    self.parse_conditional_expression_or_higher(AllowStarredExpression::No)
-                        .expr,
-                ))
+                Some(Box::new(self.parse_conditional_expression_or_higher().expr))
             } else {
                 // test_err assert_empty_msg
                 // assert x,
@@ -854,7 +854,7 @@ impl<'src> Parser<'src> {
         // type x = yield y
         // type x = yield from y
         // type x = x := 1
-        let value = self.parse_conditional_expression_or_higher(AllowStarredExpression::No);
+        let value = self.parse_conditional_expression_or_higher();
 
         ast::StmtTypeAlias {
             name: Box::new(name),
@@ -1014,7 +1014,8 @@ impl<'src> Parser<'src> {
         // x = *lambda x: x
         // x = x := 1
 
-        let mut value = self.parse_yield_expression_or_else(Parser::parse_star_expression_list);
+        let mut value =
+            self.parse_expression_list(ExpressionContext::yield_or_starred_bitwise_or());
 
         if self.at(TokenKind::Equal) {
             // This path is only taken when there are more than one assignment targets.
@@ -1022,7 +1023,7 @@ impl<'src> Parser<'src> {
                 parser.bump(TokenKind::Equal);
 
                 let mut parsed_expr =
-                    parser.parse_yield_expression_or_else(Parser::parse_star_expression_list);
+                    parser.parse_expression_list(ExpressionContext::yield_or_starred_bitwise_or());
 
                 std::mem::swap(&mut value, &mut parsed_expr);
 
@@ -1092,7 +1093,7 @@ impl<'src> Parser<'src> {
         // test_err ann_assign_stmt_type_alias_annotation
         // a: type X = int
         // lambda: type X = int
-        let annotation = self.parse_conditional_expression_or_higher(AllowStarredExpression::No);
+        let annotation = self.parse_conditional_expression_or_higher();
 
         let value = if self.eat(TokenKind::Equal) {
             if self.at_expr() {
@@ -1101,7 +1102,7 @@ impl<'src> Parser<'src> {
                 // x: Any = x := 1
                 // x: list = [x, *a | b, *a or b]
                 Some(Box::new(
-                    self.parse_yield_expression_or_else(Parser::parse_star_expression_list)
+                    self.parse_expression_list(ExpressionContext::yield_or_starred_bitwise_or())
                         .expr,
                 ))
             } else {
@@ -1170,7 +1171,7 @@ impl<'src> Parser<'src> {
         // x += *yield from x
         // x += *lambda x: x
         // x += y := 1
-        let value = self.parse_yield_expression_or_else(Parser::parse_star_expression_list);
+        let value = self.parse_expression_list(ExpressionContext::yield_or_starred_bitwise_or());
 
         ast::StmtAugAssign {
             target: Box::new(target.expr),
@@ -1198,7 +1199,7 @@ impl<'src> Parser<'src> {
 
         // test_err if_stmt_missing_test
         // if : ...
-        let test = self.parse_named_expression_or_higher(AllowStarredExpression::No);
+        let test = self.parse_named_expression_or_higher(ExpressionContext::default());
 
         // test_err if_stmt_missing_colon
         // if x
@@ -1253,7 +1254,7 @@ impl<'src> Parser<'src> {
             // elif yield x:
             //     pass
             Some(
-                self.parse_named_expression_or_higher(AllowStarredExpression::No)
+                self.parse_named_expression_or_higher(ExpressionContext::default())
                     .expr,
             )
         } else {
@@ -1414,7 +1415,7 @@ impl<'src> Parser<'src> {
             //     pass
             // except* *x:
             //     pass
-            let parsed_expr = self.parse_expression_list(AllowStarredExpression::No);
+            let parsed_expr = self.parse_expression_list(ExpressionContext::default());
             if matches!(
                 parsed_expr.expr,
                 Expr::Tuple(ast::ExprTuple {
@@ -1522,22 +1523,31 @@ impl<'src> Parser<'src> {
     fn parse_for_statement(&mut self, start: TextSize) -> ast::StmtFor {
         self.bump(TokenKind::For);
 
-        // This is to avoid the ambiguity of the `in` token which is used in
-        // both the `for` statement and the comparison expression. For example:
-        //
-        // ```python
-        // for x in y:
-        // #   ^^^^^^
-        // #   This is not a comparison expression
-        //     pass
-        // ```
-        let saved_context = self.set_ctx(ParserCtxFlags::FOR_TARGET);
-
         // test_err for_stmt_missing_target
         // for in x: ...
-        let mut target = self.parse_expression_list(AllowStarredExpression::Yes);
 
-        self.restore_ctx(ParserCtxFlags::FOR_TARGET, saved_context);
+        // test_ok for_in_target_valid_expr
+        // for d[x in y] in target: ...
+        // for (x in y)[0] in iter: ...
+        // for (x in y).attr in iter: ...
+
+        // test_err for_stmt_invalid_target_in_keyword
+        // for d(x in y) in target: ...
+        // for (x in y)() in iter: ...
+        // for (x in y) in iter: ...
+        // for (x in y, z) in iter: ...
+        // for [x in y, z] in iter: ...
+        // for {x in y, z} in iter: ...
+
+        // test_err for_stmt_invalid_target_binary_expr
+        // for x not in y in z: ...
+        // for x == y in z: ...
+        // for x or y in z: ...
+        // for -x in y: ...
+        // for not x in y: ...
+        // for x | y in z: ...
+        let mut target =
+            self.parse_expression_list(ExpressionContext::starred_conditional().with_in_excluded());
 
         helpers::set_expr_ctx(&mut target.expr, ExprContext::Store);
 
@@ -1547,6 +1557,7 @@ impl<'src> Parser<'src> {
         // for *x and y in z: ...
         // for *x | y in z: ...
         // for await x in z: ...
+        // for yield x in y: ...
         // for [x, 1, y, *["a"]] in z: ...
         self.validate_assignment_target(&target.expr);
 
@@ -1563,7 +1574,7 @@ impl<'src> Parser<'src> {
         // for x in *a and b: ...
         // for x in yield a: ...
         // for target in x := 1: ...
-        let iter = self.parse_star_expression_list();
+        let iter = self.parse_expression_list(ExpressionContext::starred_bitwise_or());
 
         self.expect(TokenKind::Colon);
 
@@ -1607,7 +1618,7 @@ impl<'src> Parser<'src> {
         // while yield x: ...
         // while a, b: ...
         // while a := 1, b: ...
-        let test = self.parse_named_expression_or_higher(AllowStarredExpression::No);
+        let test = self.parse_named_expression_or_higher(ExpressionContext::default());
 
         // test_err while_stmt_missing_colon
         // while (
@@ -1689,7 +1700,7 @@ impl<'src> Parser<'src> {
                 // def foo() -> *int: ...
                 // def foo() -> (*int): ...
                 // def foo() -> yield x: ...
-                let returns = self.parse_expression_list(AllowStarredExpression::No);
+                let returns = self.parse_expression_list(ExpressionContext::default());
 
                 if matches!(
                     returns.expr,
@@ -2162,9 +2173,10 @@ impl<'src> Parser<'src> {
                 // with (a | b) << c | d: ...
                 // # Postfix should still be parsed first
                 // with (a)[0] + b * c: ...
-                self.parse_expression_with_precedence_recursive(
+                self.parse_binary_expression_or_higher_recursive(
                     lhs.into(),
-                    Precedence::Initial,
+                    OperatorPrecedence::Initial,
+                    ExpressionContext::default(),
                     start,
                 )
                 .expr
@@ -2215,9 +2227,8 @@ impl<'src> Parser<'src> {
             //
             // Thus, we can conclude that the grammar used should be:
             //      (yield_expr | star_named_expression)
-            let parsed_expr = self.parse_yield_expression_or_else(|p| {
-                p.parse_star_expression_or_higher(AllowNamedExpression::Yes)
-            });
+            let parsed_expr = self
+                .parse_named_expression_or_higher(ExpressionContext::yield_or_starred_bitwise_or());
 
             if matches!(self.current_token_kind(), TokenKind::Async | TokenKind::For) {
                 if parsed_expr.is_unparenthesized_starred_expr() {
@@ -2279,7 +2290,7 @@ impl<'src> Parser<'src> {
         } else {
             // If it's not in an ambiguous state, then the grammar of the with item
             // should be used which is `expression`.
-            self.parse_conditional_expression_or_higher(AllowStarredExpression::No)
+            self.parse_conditional_expression_or_higher()
         };
 
         let optional_vars = self
@@ -2305,7 +2316,8 @@ impl<'src> Parser<'src> {
     fn parse_with_item_optional_vars(&mut self) -> ParsedExpr {
         self.bump(TokenKind::As);
 
-        let mut target = self.parse_conditional_expression_or_higher(AllowStarredExpression::Yes);
+        let mut target = self
+            .parse_conditional_expression_or_higher_impl(ExpressionContext::starred_conditional());
 
         // This has the same semantics as an assignment target.
         self.validate_assignment_target(&target.expr);
@@ -2336,7 +2348,8 @@ impl<'src> Parser<'src> {
         //
         // First try with `star_named_expression`, then if there's no comma,
         // we'll restrict it to `named_expression`.
-        let subject = self.parse_star_expression_or_higher(AllowNamedExpression::Yes);
+        let subject =
+            self.parse_named_expression_or_higher(ExpressionContext::starred_bitwise_or());
 
         // test_ok match_stmt_subject_expr
         // match x := 1:
@@ -2360,7 +2373,7 @@ impl<'src> Parser<'src> {
         let subject = if self.at(TokenKind::Comma) {
             let tuple =
                 self.parse_tuple_expression(subject.expr, subject_start, Parenthesized::No, |p| {
-                    p.parse_star_expression_or_higher(AllowNamedExpression::Yes)
+                    p.parse_named_expression_or_higher(ExpressionContext::starred_bitwise_or())
                 });
 
             Expr::Tuple(tuple).into()
@@ -2470,7 +2483,7 @@ impl<'src> Parser<'src> {
                 // match x:
                 //     case y if yield x: ...
                 Some(Box::new(
-                    self.parse_named_expression_or_higher(AllowStarredExpression::No)
+                    self.parse_named_expression_or_higher(ExpressionContext::default())
                         .expr,
                 ))
             } else {
@@ -2588,7 +2601,7 @@ impl<'src> Parser<'src> {
             // @yield x
             // @yield from x
             // def foo(): ...
-            let parsed_expr = self.parse_named_expression_or_higher(AllowStarredExpression::No);
+            let parsed_expr = self.parse_named_expression_or_higher(ExpressionContext::default());
 
             decorators.push(ast::Decorator {
                 expression: parsed_expr.expr,
@@ -2744,7 +2757,9 @@ impl<'src> Parser<'src> {
                             // def foo(*args: *int or str): ...
                             // def foo(*args: *yield x): ...
                             // # def foo(*args: **int): ...
-                            self.parse_star_expression_or_higher(AllowNamedExpression::No)
+                            self.parse_conditional_expression_or_higher_impl(
+                                ExpressionContext::starred_bitwise_or(),
+                            )
                         }
                         AllowStarAnnotation::No => {
                             // test_ok param_with_annotation
@@ -2757,7 +2772,7 @@ impl<'src> Parser<'src> {
                             // def foo(arg: *int): ...
                             // def foo(arg: yield int): ...
                             // def foo(arg: x := int): ...
-                            self.parse_conditional_expression_or_higher(AllowStarredExpression::No)
+                            self.parse_conditional_expression_or_higher()
                         }
                     };
                     Some(Box::new(parsed_expr.expr))
@@ -2809,10 +2824,7 @@ impl<'src> Parser<'src> {
                 // def foo(x=*int): ...
                 // def foo(x=(*int)): ...
                 // def foo(x=yield y): ...
-                Some(Box::new(
-                    self.parse_conditional_expression_or_higher(AllowStarredExpression::No)
-                        .expr,
-                ))
+                Some(Box::new(self.parse_conditional_expression_or_higher().expr))
             } else {
                 // test_err param_missing_default
                 // def foo(x=): ...
@@ -2849,7 +2861,7 @@ impl<'src> Parser<'src> {
         // the parser will drop the previous ones. Another thing is the vararg and kwarg
         // uses `Parameter` (not `ParameterWithDefault`) which means that the parser cannot
         // recover well from `*args=(1, 2)`.
-        let mut parameters = ast::Parameters::empty(TextRange::default());
+        let mut parameters = ast::Parameters::default();
 
         let mut seen_default_param = false; // `a=10`
         let mut seen_positional_only_separator = false; // `/`
@@ -3176,10 +3188,7 @@ impl<'src> Parser<'src> {
                     // type X[T: yield x] = int
                     // type X[T: yield from x] = int
                     // type X[T: x := int] = int
-                    Some(Box::new(
-                        self.parse_conditional_expression_or_higher(AllowStarredExpression::No)
-                            .expr,
-                    ))
+                    Some(Box::new(self.parse_conditional_expression_or_higher().expr))
                 } else {
                     // test_err type_param_missing_bound
                     // type X[T: ] = int

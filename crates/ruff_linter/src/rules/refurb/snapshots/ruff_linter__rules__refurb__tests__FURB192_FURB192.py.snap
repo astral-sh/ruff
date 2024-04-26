@@ -1,0 +1,190 @@
+---
+source: crates/ruff_linter/src/rules/refurb/mod.rs
+---
+FURB192.py:3:1: FURB192 [*] Prefer `min` over `sorted()` to compute the minimum value in a sequence
+  |
+1 | # Errors
+2 | 
+3 | sorted(l)[0]
+  | ^^^^^^^^^^^^ FURB192
+4 | 
+5 | sorted(l)[-1]
+  |
+  = help: Replace with `min`
+
+ℹ Safe fix
+1 1 | # Errors
+2 2 | 
+3   |-sorted(l)[0]
+  3 |+min(l)
+4 4 | 
+5 5 | sorted(l)[-1]
+6 6 | 
+
+FURB192.py:5:1: FURB192 [*] Prefer `max` over `sorted()` to compute the maximum value in a sequence
+  |
+3 | sorted(l)[0]
+4 | 
+5 | sorted(l)[-1]
+  | ^^^^^^^^^^^^^ FURB192
+6 | 
+7 | sorted(l, reverse=False)[-1]
+  |
+  = help: Replace with `max`
+
+ℹ Safe fix
+2 2 | 
+3 3 | sorted(l)[0]
+4 4 | 
+5   |-sorted(l)[-1]
+  5 |+max(l)
+6 6 | 
+7 7 | sorted(l, reverse=False)[-1]
+8 8 | 
+
+FURB192.py:7:1: FURB192 [*] Prefer `max` over `sorted()` to compute the maximum value in a sequence
+  |
+5 | sorted(l)[-1]
+6 | 
+7 | sorted(l, reverse=False)[-1]
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB192
+8 | 
+9 | sorted(l, key=lambda x: x)[0]
+  |
+  = help: Replace with `max`
+
+ℹ Safe fix
+4 4 | 
+5 5 | sorted(l)[-1]
+6 6 | 
+7   |-sorted(l, reverse=False)[-1]
+  7 |+max(l)
+8 8 | 
+9 9 | sorted(l, key=lambda x: x)[0]
+10 10 | 
+
+FURB192.py:9:1: FURB192 [*] Prefer `min` over `sorted()` to compute the minimum value in a sequence
+   |
+ 7 | sorted(l, reverse=False)[-1]
+ 8 | 
+ 9 | sorted(l, key=lambda x: x)[0]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB192
+10 | 
+11 | sorted(l, key=key_fn)[0]
+   |
+   = help: Replace with `min`
+
+ℹ Safe fix
+6  6  | 
+7  7  | sorted(l, reverse=False)[-1]
+8  8  | 
+9     |-sorted(l, key=lambda x: x)[0]
+   9  |+min(l, key=lambda x: x)
+10 10 | 
+11 11 | sorted(l, key=key_fn)[0]
+12 12 | 
+
+FURB192.py:11:1: FURB192 [*] Prefer `min` over `sorted()` to compute the minimum value in a sequence
+   |
+ 9 | sorted(l, key=lambda x: x)[0]
+10 | 
+11 | sorted(l, key=key_fn)[0]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^ FURB192
+12 | 
+13 | sorted([1, 2, 3])[0]
+   |
+   = help: Replace with `min`
+
+ℹ Safe fix
+8  8  | 
+9  9  | sorted(l, key=lambda x: x)[0]
+10 10 | 
+11    |-sorted(l, key=key_fn)[0]
+   11 |+min(l, key=key_fn)
+12 12 | 
+13 13 | sorted([1, 2, 3])[0]
+14 14 | 
+
+FURB192.py:13:1: FURB192 [*] Prefer `min` over `sorted()` to compute the minimum value in a sequence
+   |
+11 | sorted(l, key=key_fn)[0]
+12 | 
+13 | sorted([1, 2, 3])[0]
+   | ^^^^^^^^^^^^^^^^^^^^ FURB192
+14 | 
+15 | # Unsafe
+   |
+   = help: Replace with `min`
+
+ℹ Safe fix
+10 10 | 
+11 11 | sorted(l, key=key_fn)[0]
+12 12 | 
+13    |-sorted([1, 2, 3])[0]
+   13 |+min([1, 2, 3])
+14 14 | 
+15 15 | # Unsafe
+16 16 | 
+
+FURB192.py:17:1: FURB192 [*] Prefer `min` over `sorted()` to compute the minimum value in a sequence
+   |
+15 | # Unsafe
+16 | 
+17 | sorted(l, key=key_fn, reverse=True)[-1]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB192
+18 | 
+19 | sorted(l, reverse=True)[0]
+   |
+   = help: Replace with `min`
+
+ℹ Unsafe fix
+14 14 | 
+15 15 | # Unsafe
+16 16 | 
+17    |-sorted(l, key=key_fn, reverse=True)[-1]
+   17 |+min(l, key=key_fn)
+18 18 | 
+19 19 | sorted(l, reverse=True)[0]
+20 20 | 
+
+FURB192.py:19:1: FURB192 [*] Prefer `max` over `sorted()` to compute the maximum value in a sequence
+   |
+17 | sorted(l, key=key_fn, reverse=True)[-1]
+18 | 
+19 | sorted(l, reverse=True)[0]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB192
+20 | 
+21 | sorted(l, reverse=True)[-1]
+   |
+   = help: Replace with `max`
+
+ℹ Unsafe fix
+16 16 | 
+17 17 | sorted(l, key=key_fn, reverse=True)[-1]
+18 18 | 
+19    |-sorted(l, reverse=True)[0]
+   19 |+max(l)
+20 20 | 
+21 21 | sorted(l, reverse=True)[-1]
+22 22 | 
+
+FURB192.py:21:1: FURB192 [*] Prefer `min` over `sorted()` to compute the minimum value in a sequence
+   |
+19 | sorted(l, reverse=True)[0]
+20 | 
+21 | sorted(l, reverse=True)[-1]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB192
+22 | 
+23 | # Non-errors
+   |
+   = help: Replace with `min`
+
+ℹ Unsafe fix
+18 18 | 
+19 19 | sorted(l, reverse=True)[0]
+20 20 | 
+21    |-sorted(l, reverse=True)[-1]
+   21 |+min(l)
+22 22 | 
+23 23 | # Non-errors
+24 24 |

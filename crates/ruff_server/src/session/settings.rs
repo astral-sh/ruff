@@ -1,4 +1,4 @@
-use std::{ffi::OsString, ops::Deref, path::PathBuf, str::FromStr};
+use std::{ops::Deref, str::FromStr};
 
 use lsp_types::Url;
 use ruff_linter::{line_width::LineLength, RuleSelector};
@@ -11,7 +11,7 @@ pub(crate) type WorkspaceSettingsMap = FxHashMap<Url, ClientSettings>;
 /// Resolved client settings for a specific document. These settings are meant to be
 /// used directly by the server, and are *not* a 1:1 representation with how the client
 /// sends them.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 #[allow(clippy::struct_excessive_bools)]
 pub(crate) struct ResolvedClientSettings {
@@ -22,25 +22,22 @@ pub(crate) struct ResolvedClientSettings {
     #[allow(dead_code)]
     disable_rule_comment_enable: bool,
     fix_violation_enable: bool,
-    // TODO(jane): Remove once editor settings resolution is implemented
-    #[allow(dead_code)]
     editor_settings: ResolvedEditorSettings,
 }
 
 /// Contains the resolved values of 'editor settings' - Ruff configuration for the linter/formatter that was passed in via
 /// LSP client settings. These fields are optional because we don't want to override file-based linter/formatting settings
 /// if these were un-set.
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
-#[allow(dead_code)] // TODO(jane): Remove once editor settings resolution is implemented
 pub(crate) struct ResolvedEditorSettings {
-    lint_preview: Option<bool>,
-    format_preview: Option<bool>,
-    select: Option<Vec<RuleSelector>>,
-    extend_select: Option<Vec<RuleSelector>>,
-    ignore: Option<Vec<RuleSelector>>,
-    exclude: Option<Vec<PathBuf>>,
-    line_length: Option<LineLength>,
+    pub(super) lint_preview: Option<bool>,
+    pub(super) format_preview: Option<bool>,
+    pub(super) select: Option<Vec<RuleSelector>>,
+    pub(super) extend_select: Option<Vec<RuleSelector>>,
+    pub(super) ignore: Option<Vec<RuleSelector>>,
+    pub(super) exclude: Option<Vec<String>>,
+    pub(super) line_length: Option<LineLength>,
 }
 
 /// This is a direct representation of the settings schema sent by the client.
@@ -251,14 +248,7 @@ impl ResolvedClientSettings {
                         .collect()
                 }),
                 exclude: Self::resolve_optional(all_settings, |settings| {
-                    Some(
-                        settings
-                            .exclude
-                            .as_ref()?
-                            .iter()
-                            .map(|path| PathBuf::from(OsString::from(path)))
-                            .collect(),
-                    )
+                    Some(settings.exclude.as_ref()?.clone())
                 }),
                 line_length: Self::resolve_optional(all_settings, |settings| settings.line_length),
             },
@@ -305,6 +295,10 @@ impl ResolvedClientSettings {
 
     pub(crate) fn fix_violation(&self) -> bool {
         self.fix_violation_enable
+    }
+
+    pub(crate) fn editor_settings(&self) -> &ResolvedEditorSettings {
+        &self.editor_settings
     }
 }
 
@@ -653,7 +647,7 @@ mod tests {
                     select: None,
                     extend_select: None,
                     ignore: Some(vec![RuleSelector::from_str("RUF001").unwrap()]),
-                    exclude: Some(vec![PathBuf::from_str("third_party").unwrap()]),
+                    exclude: Some(vec!["third_party".into()]),
                     line_length: Some(LineLength::try_from(80).unwrap())
                 }
             }

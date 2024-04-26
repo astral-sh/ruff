@@ -3183,7 +3183,7 @@ pub struct Decorator {
 ///
 /// NOTE: This type differs from the original Python AST. See: [arguments](https://docs.python.org/3/library/ast.html#ast.arguments).
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Default)]
 pub struct Parameters {
     pub range: TextRange,
     pub posonlyargs: Vec<ParameterWithDefault>,
@@ -3407,48 +3407,6 @@ impl Deref for TypeParams {
 }
 
 pub type Suite = Vec<Stmt>;
-
-impl Parameters {
-    pub fn empty(range: TextRange) -> Self {
-        Self {
-            range,
-            posonlyargs: Vec::new(),
-            args: Vec::new(),
-            vararg: None,
-            kwonlyargs: Vec::new(),
-            kwarg: None,
-        }
-    }
-}
-
-impl ParameterWithDefault {
-    pub fn as_parameter(&self) -> &Parameter {
-        &self.parameter
-    }
-}
-
-impl Parameters {
-    pub fn defaults(&self) -> impl std::iter::Iterator<Item = &Expr> {
-        self.posonlyargs
-            .iter()
-            .chain(self.args.iter())
-            .filter_map(|arg| arg.default.as_ref().map(std::convert::AsRef::as_ref))
-    }
-
-    #[allow(clippy::type_complexity)]
-    pub fn split_kwonlyargs(&self) -> (Vec<&Parameter>, Vec<(&Parameter, &Expr)>) {
-        let mut args = Vec::new();
-        let mut with_defaults = Vec::new();
-        for arg in &self.kwonlyargs {
-            if let Some(ref default) = arg.default {
-                with_defaults.push((arg.as_parameter(), &**default));
-            } else {
-                args.push(arg.as_parameter());
-            }
-        }
-        (args, with_defaults)
-    }
-}
 
 /// The kind of escape command as defined in [IPython Syntax] in the IPython codebase.
 ///

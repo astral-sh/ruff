@@ -69,3 +69,7 @@ async def fail_4b():  # RUF029: the /outer/ function does not await
 def foo():
     async def fail_4c():  # RUF029: the /inner/ function does not await
         pass
+
+
+async def test():
+    return [check async for check in async_func()]

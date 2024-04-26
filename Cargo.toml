@@ -24,13 +24,13 @@ chrono = { version = "0.4.35", default-features = false, features = ["clock"] }
 clap = { version = "4.5.3", features = ["derive"] }
 clap_complete_command = { version = "0.5.1" }
 clearscreen = { version = "3.0.0" }
-codspeed-criterion-compat = { version = "2.4.0", default-features = false }
+codspeed-criterion-compat = { version = "2.6.0", default-features = false }
 colored = { version = "2.1.0" }
 console_error_panic_hook = { version = "0.1.7" }
 console_log = { version = "1.0.0" }
 countme = { version = "3.0.1" }
 criterion = { version = "0.5.1", default-features = false }
-crossbeam = { version = "0.8.4" }
+crossbeam-channel = { version = "0.5.12" }
 dirs = { version = "5.0.0" }
 drop_bomb = { version = "0.1.5" }
 env_logger = { version = "0.11.0" }
@@ -58,6 +58,7 @@ libcst = { version = "1.1.0", default-features = false }
 log = { version = "0.4.17" }
 lsp-server = { version = "0.7.6" }
 lsp-types = { version = "0.95.0", features = ["proposed"] }
+matchit = { version = "0.8.1" }
 memchr = { version = "2.7.1" }
 mimalloc = { version = "0.1.39" }
 natord = { version = "1.0.9" }
@@ -65,12 +66,13 @@ notify = { version = "6.1.1" }
 num_cpus = { version = "1.16.0" }
 once_cell = { version = "1.19.0" }
 path-absolutize = { version = "3.1.1" }
+path-slash = { version = "0.2.1" }
 pathdiff = { version = "0.2.1" }
 pep440_rs = { version = "0.6.0", features = ["serde"] }
 pretty_assertions = "1.3.0"
 proc-macro2 = { version = "1.0.79" }
 pyproject-toml = { version = "0.9.0" }
-quick-junit = { version = "0.3.5" }
+quick-junit = { version = "0.4.0" }
 quote = { version = "1.0.23" }
 rand = { version = "0.8.5" }
 rayon = { version = "1.10.0" }

@@ -1,6 +1,7 @@
 use crate::{server::schedule::Task, session::Session};
 use lsp_server as server;
 
+mod diagnostics;
 mod notifications;
 mod requests;
 mod traits;
@@ -47,6 +48,9 @@ pub(super) fn request<'a>(req: server::Request) -> Task<'a> {
         }
         request::FormatRange::METHOD => {
             background_request_task::<request::FormatRange>(req, BackgroundSchedule::Fmt)
+        }
+        request::Hover::METHOD => {
+            background_request_task::<request::Hover>(req, BackgroundSchedule::Worker)
         }
         method => {
             tracing::warn!("Received request {method} which does not have a handler");

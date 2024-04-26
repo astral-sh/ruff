@@ -652,6 +652,8 @@ pub(crate) struct NoqaDirectiveLine<'a> {
     pub(crate) directive: Directive<'a>,
     /// The codes that are ignored by the directive.
     pub(crate) matches: Vec<NoqaCode>,
+    // Whether the directive applies to range.end
+    pub(crate) includes_end: bool,
 }
 
 impl Ranged for NoqaDirectiveLine<'_> {
@@ -684,20 +686,15 @@ impl<'a> NoqaDirectives<'a> {
                 }
                 Ok(Some(directive)) => {
                     // noqa comments are guaranteed to be single line.
+                    let range = locator.line_range(range.start());
                     directives.push(NoqaDirectiveLine {
-                        range: locator.line_range(range.start()),
+                        range,
                         directive,
                         matches: Vec::new(),
+                        includes_end: range.end() == locator.contents().text_len(),
                     });
                 }
                 Ok(None) => {}
-            }
-        }
-
-        // Extend a mapping at the end of the file to also include the EOF token.
-        if let Some(last) = directives.last_mut() {
-            if last.range.end() == locator.contents().text_len() {
-                last.range = last.range.add_end(TextSize::from(1));
             }
         }
 
@@ -724,10 +721,14 @@ impl<'a> NoqaDirectives<'a> {
             .binary_search_by(|directive| {
                 if directive.range.end() < offset {
                     std::cmp::Ordering::Less
-                } else if directive.range.contains(offset) {
-                    std::cmp::Ordering::Equal
-                } else {
+                } else if directive.range.start() > offset {
                     std::cmp::Ordering::Greater
+                }
+                // At this point, end >= offset, start <= offset
+                else if !directive.includes_end && directive.range.end() == offset {
+                    std::cmp::Ordering::Less
+                } else {
+                    std::cmp::Ordering::Equal
                 }
             })
             .ok()

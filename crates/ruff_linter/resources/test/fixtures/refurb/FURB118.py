@@ -10,7 +10,7 @@ op_mult = lambda x, y: x * y
 op_matmutl = lambda x, y: x @ y
 op_truediv = lambda x, y: x / y
 op_mod = lambda x, y: x % y
-op_pow = lambda x, y: x**y
+op_pow = lambda x, y: x ** y
 op_lshift = lambda x, y: x << y
 op_rshift = lambda x, y: x >> y
 op_bitor = lambda x, y: x | y
@@ -59,6 +59,7 @@ op_itemgetter = lambda x, y: (x[0], y[0])
 op_itemgetter = lambda x, y: (x[0], y[0])
 op_itemgetter = lambda x: ()
 op_itemgetter = lambda x: (*x[0], x[1])
+op_itemgetter = lambda x: (x[0],)
 
 
 def op_neg3(x, y):

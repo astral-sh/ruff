@@ -2,7 +2,7 @@ use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::{Arguments, Expr, Stmt, StmtClassDef};
-use ruff_python_semantic::{analyze, SemanticModel};
+use ruff_python_semantic::{analyze::class::is_enumeration, SemanticModel};
 
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_slots::rules::helpers::has_slots;
@@ -54,12 +54,14 @@ pub(crate) fn no_slots_in_str_subclass(checker: &mut Checker, stmt: &Stmt, class
         return;
     };
 
-    if !is_str_subclass(bases, checker.semantic()) {
+    let semantic = checker.semantic();
+
+    if !is_str_subclass(bases, semantic) {
         return;
     }
 
     // Ignore subclasses of `enum.Enum` et al.
-    if is_enum_subclass(class, checker.semantic()) {
+    if is_enumeration(class, semantic) {
         return;
     }
 
@@ -77,17 +79,4 @@ fn is_str_subclass(bases: &[Expr], semantic: &SemanticModel) -> bool {
     bases
         .iter()
         .any(|base| semantic.match_builtin_expr(base, "str"))
-}
-
-/// Returns `true` if the class is an enum subclass, at any depth.
-fn is_enum_subclass(class_def: &StmtClassDef, semantic: &SemanticModel) -> bool {
-    analyze::class::any_qualified_name(class_def, semantic, &|qualified_name| {
-        matches!(
-            qualified_name.segments(),
-            [
-                "enum",
-                "Enum" | "IntEnum" | "StrEnum" | "Flag" | "IntFlag" | "ReprEnum" | "EnumCheck"
-            ]
-        )
-    })
 }
