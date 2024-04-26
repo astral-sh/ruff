@@ -60,7 +60,7 @@ impl StringNormalizer {
             // The reason to preserve the quotes is based on the assumption that
             // the original f-string is valid in terms of quoting, and we don't
             // want to change that to make it invalid.
-            if (context.kind().is_triple_quoted() && !string.kind().is_triple_quoted())
+            if (context.f_string().kind().is_triple_quoted() && !string.kind().is_triple_quoted())
                 || self.target_version.supports_pep_701()
             {
                 self.quoting
