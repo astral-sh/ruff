@@ -582,6 +582,7 @@ fn is_stub_function(function_def: &ast::StmtFunctionDef, checker: &Checker) -> b
 }
 
 /// Generate flake8-annotation checks for a given `Definition`.
+/// ANN001, ANN401
 pub(crate) fn definition(
     checker: &Checker,
     definition: &Definition,
@@ -615,23 +616,14 @@ pub(crate) fn definition(
 
     let is_overridden = visibility::is_override(decorator_list, checker.semantic());
 
-    // ANN001, ANN401
+    // If this is a non-static method, skip `cls` or `self`.
     for ParameterWithDefault {
         parameter,
         default: _,
         range: _,
-    } in parameters
-        .posonlyargs
-        .iter()
-        .chain(&parameters.args)
-        .chain(&parameters.kwonlyargs)
-        .skip(
-            // If this is a non-static method, skip `cls` or `self`.
-            usize::from(
-                is_method && !visibility::is_staticmethod(decorator_list, checker.semantic()),
-            ),
-        )
-    {
+    } in parameters.iter_non_variadic_params().skip(usize::from(
+        is_method && !visibility::is_staticmethod(decorator_list, checker.semantic()),
+    )) {
         // ANN401 for dynamically typed parameters
         if let Some(annotation) = &parameter.annotation {
             has_any_typed_arg = true;

@@ -167,11 +167,7 @@ pub(crate) fn implicit_optional(checker: &mut Checker, parameters: &Parameters) 
         parameter,
         default,
         range: _,
-    } in parameters
-        .posonlyargs
-        .iter()
-        .chain(&parameters.args)
-        .chain(&parameters.kwonlyargs)
+    } in parameters.iter_non_variadic_params()
     {
         let Some(default) = default else { continue };
         if !default.is_none_literal_expr() {

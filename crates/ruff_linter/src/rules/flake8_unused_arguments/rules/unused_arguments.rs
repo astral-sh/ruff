@@ -1,5 +1,3 @@
-use std::iter;
-
 use regex::Regex;
 use ruff_python_ast as ast;
 use ruff_python_ast::{Parameter, Parameters};
@@ -224,19 +222,20 @@ fn function(
     diagnostics: &mut Vec<Diagnostic>,
 ) {
     let args = parameters
-        .posonlyargs
-        .iter()
-        .chain(&parameters.args)
-        .chain(&parameters.kwonlyargs)
+        .iter_non_variadic_params()
         .map(|parameter_with_default| &parameter_with_default.parameter)
         .chain(
-            iter::once::<Option<&Parameter>>(parameters.vararg.as_deref())
-                .flatten()
+            parameters
+                .vararg
+                .as_deref()
+                .into_iter()
                 .skip(usize::from(ignore_variadic_names)),
         )
         .chain(
-            iter::once::<Option<&Parameter>>(parameters.kwarg.as_deref())
-                .flatten()
+            parameters
+                .kwarg
+                .as_deref()
+                .into_iter()
                 .skip(usize::from(ignore_variadic_names)),
         );
     call(
@@ -260,20 +259,21 @@ fn method(
     diagnostics: &mut Vec<Diagnostic>,
 ) {
     let args = parameters
-        .posonlyargs
-        .iter()
-        .chain(&parameters.args)
-        .chain(&parameters.kwonlyargs)
+        .iter_non_variadic_params()
         .skip(1)
         .map(|parameter_with_default| &parameter_with_default.parameter)
         .chain(
-            iter::once::<Option<&Parameter>>(parameters.vararg.as_deref())
-                .flatten()
+            parameters
+                .vararg
+                .as_deref()
+                .into_iter()
                 .skip(usize::from(ignore_variadic_names)),
         )
         .chain(
-            iter::once::<Option<&Parameter>>(parameters.kwarg.as_deref())
-                .flatten()
+            parameters
+                .kwarg
+                .as_deref()
+                .into_iter()
                 .skip(usize::from(ignore_variadic_names)),
         );
     call(

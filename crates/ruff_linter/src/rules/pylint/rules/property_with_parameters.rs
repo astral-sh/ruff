@@ -49,7 +49,12 @@ pub(crate) fn property_with_parameters(
     checker: &mut Checker,
     stmt: &Stmt,
     decorator_list: &[Decorator],
-    parameters: &Parameters,
+    Parameters {
+        posonlyargs,
+        args,
+        kwonlyargs,
+        ..
+    }: &Parameters,
 ) {
     let semantic = checker.semantic();
     if !decorator_list
@@ -58,14 +63,7 @@ pub(crate) fn property_with_parameters(
     {
         return;
     }
-    if parameters
-        .posonlyargs
-        .iter()
-        .chain(&parameters.args)
-        .chain(&parameters.kwonlyargs)
-        .count()
-        > 1
-    {
+    if (posonlyargs.len() + args.len() + kwonlyargs.len()) > 1 {
         checker
             .diagnostics
             .push(Diagnostic::new(PropertyWithParameters, stmt.identifier()));

@@ -736,10 +736,7 @@ fn find_parameter<'a>(
     binding: &Binding,
 ) -> Option<&'a ParameterWithDefault> {
     parameters
-        .args
-        .iter()
-        .chain(parameters.posonlyargs.iter())
-        .chain(parameters.kwonlyargs.iter())
+        .iter_non_variadic_params()
         .find(|arg| arg.parameter.name.range() == binding.range())
 }
 

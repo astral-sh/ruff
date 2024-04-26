@@ -1755,23 +1755,19 @@ fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &
 
     // Look for arguments that weren't included in the docstring.
     let mut missing_arg_names: FxHashSet<String> = FxHashSet::default();
+
+    // If this is a non-static method, skip `cls` or `self`.
     for ParameterWithDefault {
         parameter,
         default: _,
         range: _,
     } in function
         .parameters
-        .posonlyargs
-        .iter()
-        .chain(&function.parameters.args)
-        .chain(&function.parameters.kwonlyargs)
-        .skip(
-            // If this is a non-static method, skip `cls` or `self`.
-            usize::from(
-                docstring.definition.is_method()
-                    && !is_staticmethod(&function.decorator_list, checker.semantic()),
-            ),
-        )
+        .iter_non_variadic_params()
+        .skip(usize::from(
+            docstring.definition.is_method()
+                && !is_staticmethod(&function.decorator_list, checker.semantic()),
+        ))
     {
         let arg_name = parameter.name.as_str();
         if !arg_name.starts_with('_') && !docstrings_args.contains(arg_name) {

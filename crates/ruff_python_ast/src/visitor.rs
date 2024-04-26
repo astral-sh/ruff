@@ -4,11 +4,11 @@ pub mod preorder;
 pub mod transformer;
 
 use crate::{
-    self as ast, Alias, Arguments, BoolOp, BytesLiteral, CmpOp, Comprehension, Decorator,
-    ElifElseClause, ExceptHandler, Expr, ExprContext, FString, FStringElement, FStringPart,
-    Keyword, MatchCase, Operator, Parameter, Parameters, Pattern, PatternArguments, PatternKeyword,
-    Stmt, StringLiteral, TypeParam, TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple,
-    TypeParams, UnaryOp, WithItem,
+    self as ast, Alias, AnyParameter, Arguments, BoolOp, BytesLiteral, CmpOp, Comprehension,
+    Decorator, ElifElseClause, ExceptHandler, Expr, ExprContext, FString, FStringElement,
+    FStringPart, Keyword, MatchCase, Operator, Parameter, Parameters, Pattern, PatternArguments,
+    PatternKeyword, Stmt, StringLiteral, TypeParam, TypeParamParamSpec, TypeParamTypeVar,
+    TypeParamTypeVarTuple, TypeParams, UnaryOp, WithItem,
 };
 
 /// A trait for AST visitors. Visits all nodes in the AST recursively in evaluation-order.
@@ -607,36 +607,15 @@ pub fn walk_arguments<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, arguments: &
 
 pub fn walk_parameters<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, parameters: &'a Parameters) {
     // Defaults are evaluated before annotations.
-    for arg in &parameters.posonlyargs {
-        if let Some(default) = &arg.default {
-            visitor.visit_expr(default);
-        }
-    }
-    for arg in &parameters.args {
-        if let Some(default) = &arg.default {
-            visitor.visit_expr(default);
-        }
-    }
-    for arg in &parameters.kwonlyargs {
-        if let Some(default) = &arg.default {
-            visitor.visit_expr(default);
-        }
+    for default in parameters
+        .iter_non_variadic_params()
+        .filter_map(|param| param.default.as_deref())
+    {
+        visitor.visit_expr(default);
     }
 
-    for arg in &parameters.posonlyargs {
-        visitor.visit_parameter(&arg.parameter);
-    }
-    for arg in &parameters.args {
-        visitor.visit_parameter(&arg.parameter);
-    }
-    if let Some(arg) = &parameters.vararg {
-        visitor.visit_parameter(arg);
-    }
-    for arg in &parameters.kwonlyargs {
-        visitor.visit_parameter(&arg.parameter);
-    }
-    if let Some(arg) = &parameters.kwarg {
-        visitor.visit_parameter(arg);
+    for parameter in parameters.iter_all_params().map(AnyParameter::as_parameter) {
+        visitor.visit_parameter(parameter);
     }
 }
 

@@ -348,39 +348,18 @@ pub fn any_over_stmt(stmt: &Stmt, func: &dyn Fn(&Expr) -> bool) -> bool {
             returns,
             ..
         }) => {
-            parameters
-                .posonlyargs
-                .iter()
-                .chain(parameters.args.iter().chain(parameters.kwonlyargs.iter()))
-                .any(|parameter| {
-                    parameter
-                        .default
-                        .as_ref()
-                        .is_some_and(|expr| any_over_expr(expr, func))
-                        || parameter
-                            .parameter
-                            .annotation
-                            .as_ref()
-                            .is_some_and(|expr| any_over_expr(expr, func))
-                })
-                || parameters.vararg.as_ref().is_some_and(|parameter| {
-                    parameter
-                        .annotation
-                        .as_ref()
-                        .is_some_and(|expr| any_over_expr(expr, func))
-                })
-                || parameters.kwarg.as_ref().is_some_and(|parameter| {
-                    parameter
-                        .annotation
-                        .as_ref()
-                        .is_some_and(|expr| any_over_expr(expr, func))
-                })
-                || type_params.as_ref().is_some_and(|type_params| {
-                    type_params
-                        .iter()
-                        .any(|type_param| any_over_type_param(type_param, func))
-                })
-                || body.iter().any(|stmt| any_over_stmt(stmt, func))
+            parameters.iter_all_params().any(|param| {
+                param
+                    .default()
+                    .is_some_and(|default| any_over_expr(default, func))
+                    || param
+                        .annotation()
+                        .is_some_and(|annotation| any_over_expr(annotation, func))
+            }) || type_params.as_ref().is_some_and(|type_params| {
+                type_params
+                    .iter()
+                    .any(|type_param| any_over_type_param(type_param, func))
+            }) || body.iter().any(|stmt| any_over_stmt(stmt, func))
                 || decorator_list
                     .iter()
                     .any(|decorator| any_over_expr(&decorator.expression, func))

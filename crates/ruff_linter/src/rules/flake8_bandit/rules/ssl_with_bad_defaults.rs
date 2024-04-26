@@ -49,44 +49,35 @@ impl Violation for SslWithBadDefaults {
 
 /// S503
 pub(crate) fn ssl_with_bad_defaults(checker: &mut Checker, function_def: &StmtFunctionDef) {
-    function_def
+    for default in function_def
         .parameters
-        .posonlyargs
-        .iter()
-        .chain(
-            function_def
-                .parameters
-                .args
-                .iter()
-                .chain(function_def.parameters.kwonlyargs.iter()),
-        )
-        .for_each(|param| {
-            if let Some(default) = &param.default {
-                match default.as_ref() {
-                    Expr::Name(ast::ExprName { id, range, .. }) => {
-                        if is_insecure_protocol(id.as_str()) {
-                            checker.diagnostics.push(Diagnostic::new(
-                                SslWithBadDefaults {
-                                    protocol: id.to_string(),
-                                },
-                                *range,
-                            ));
-                        }
-                    }
-                    Expr::Attribute(ast::ExprAttribute { attr, range, .. }) => {
-                        if is_insecure_protocol(attr.as_str()) {
-                            checker.diagnostics.push(Diagnostic::new(
-                                SslWithBadDefaults {
-                                    protocol: attr.to_string(),
-                                },
-                                *range,
-                            ));
-                        }
-                    }
-                    _ => {}
+        .iter_non_variadic_params()
+        .filter_map(|param| param.default.as_deref())
+    {
+        match default {
+            Expr::Name(ast::ExprName { id, range, .. }) => {
+                if is_insecure_protocol(id.as_str()) {
+                    checker.diagnostics.push(Diagnostic::new(
+                        SslWithBadDefaults {
+                            protocol: id.to_string(),
+                        },
+                        *range,
+                    ));
                 }
             }
-        });
+            Expr::Attribute(ast::ExprAttribute { attr, range, .. }) => {
+                if is_insecure_protocol(attr.as_str()) {
+                    checker.diagnostics.push(Diagnostic::new(
+                        SslWithBadDefaults {
+                            protocol: attr.to_string(),
+                        },
+                        *range,
+                    ));
+                }
+            }
+            _ => {}
+        }
+    }
 }
 
 /// Returns `true` if the given protocol name is insecure.

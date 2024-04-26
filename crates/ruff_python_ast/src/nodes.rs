@@ -3175,6 +3175,63 @@ pub struct Decorator {
     pub expression: Expr,
 }
 
+/// Enumeration of the two kinds of parameter
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub enum AnyParameter<'a> {
+    /// Variadic parameters cannot have default values,
+    /// e.g. both `*args` and `**kwargs` in the following function:
+    ///
+    /// ```python
+    /// def foo(*args, **kwargs): pass
+    /// ```
+    Variadic(&'a Parameter),
+
+    /// Non-variadic parameters can have default values,
+    /// though they won't necessarily always have them:
+    ///
+    /// ```python
+    /// def bar(a=1, /, b=2, *, c=3): pass
+    /// ```
+    NonVariadic(&'a ParameterWithDefault),
+}
+
+impl<'a> AnyParameter<'a> {
+    pub const fn as_parameter(self) -> &'a Parameter {
+        match self {
+            Self::NonVariadic(param) => &param.parameter,
+            Self::Variadic(param) => param,
+        }
+    }
+
+    pub const fn name(self) -> &'a Identifier {
+        &self.as_parameter().name
+    }
+
+    pub const fn is_variadic(self) -> bool {
+        matches!(self, Self::Variadic(_))
+    }
+
+    pub fn annotation(self) -> Option<&'a Expr> {
+        self.as_parameter().annotation.as_deref()
+    }
+
+    pub fn default(self) -> Option<&'a Expr> {
+        match self {
+            Self::NonVariadic(param) => param.default.as_deref(),
+            Self::Variadic(_) => None,
+        }
+    }
+}
+
+impl Ranged for AnyParameter<'_> {
+    fn range(&self) -> TextRange {
+        match self {
+            Self::NonVariadic(param) => param.range,
+            Self::Variadic(param) => param.range,
+        }
+    }
+}
+
 /// An alternative type of AST `arguments`. This is ruff_python_parser-friendly and human-friendly definition of function arguments.
 /// This form also has advantage to implement pre-order traverse.
 ///
@@ -3196,37 +3253,37 @@ pub struct Parameters {
 }
 
 impl Parameters {
-    /// Returns the [`ParameterWithDefault`] with the given name, or `None` if no such [`ParameterWithDefault`] exists.
-    pub fn find(&self, name: &str) -> Option<&ParameterWithDefault> {
+    /// Returns an iterator over all non-variadic parameters included in this [`Parameters`] node.
+    ///
+    /// The variadic parameters (`.vararg` and `.kwarg`) can never have default values;
+    /// non-variadic parameters sometimes will.
+    pub fn iter_non_variadic_params(&self) -> impl Iterator<Item = &ParameterWithDefault> {
         self.posonlyargs
             .iter()
             .chain(&self.args)
             .chain(&self.kwonlyargs)
+    }
+
+    /// Returns the [`ParameterWithDefault`] with the given name, or `None` if no such [`ParameterWithDefault`] exists.
+    pub fn find(&self, name: &str) -> Option<&ParameterWithDefault> {
+        self.iter_non_variadic_params()
             .find(|arg| arg.parameter.name.as_str() == name)
     }
 
-    /// Returns `true` if a parameter with the given name included in this [`Parameters`].
-    pub fn includes(&self, name: &str) -> bool {
-        if self
-            .posonlyargs
+    /// Returns an iterator over all parameters included in this [`Parameters`] node.
+    pub fn iter_all_params(&self) -> impl Iterator<Item = AnyParameter> {
+        self.posonlyargs
             .iter()
             .chain(&self.args)
-            .chain(&self.kwonlyargs)
-            .any(|arg| arg.parameter.name.as_str() == name)
-        {
-            return true;
-        }
-        if let Some(arg) = &self.vararg {
-            if arg.name.as_str() == name {
-                return true;
-            }
-        }
-        if let Some(arg) = &self.kwarg {
-            if arg.name.as_str() == name {
-                return true;
-            }
-        }
-        false
+            .map(AnyParameter::NonVariadic)
+            .chain(self.vararg.as_deref().map(AnyParameter::Variadic))
+            .chain(self.kwonlyargs.iter().map(AnyParameter::NonVariadic))
+            .chain(self.kwarg.as_deref().map(AnyParameter::Variadic))
+    }
+
+    /// Returns `true` if a parameter with the given name is included in this [`Parameters`].
+    pub fn includes(&self, name: &str) -> bool {
+        self.iter_all_params().any(|param| param.name() == name)
     }
 
     /// Returns `true` if the [`Parameters`] is empty.

@@ -3380,25 +3380,12 @@ impl<'src> Parser<'src> {
             BuildHasherDefault::default(),
         );
 
-        let posonlyargs = parameters.posonlyargs.iter();
-        let args = parameters.args.iter();
-        let kwonlyargs = parameters.kwonlyargs.iter();
-
-        let vararg = parameters.vararg.as_deref();
-        let kwarg = parameters.kwarg.as_deref();
-
-        for arg in posonlyargs
-            .chain(args)
-            .chain(kwonlyargs)
-            .map(|arg| &arg.parameter)
-            .chain(vararg)
-            .chain(kwarg)
-        {
-            let range = arg.name.range;
-            let arg_name = arg.name.as_str();
-            if !all_arg_names.insert(arg_name) {
+        for parameter in parameters.iter_all_params() {
+            let range = parameter.name().range();
+            let param_name = parameter.name().as_str();
+            if !all_arg_names.insert(param_name) {
                 self.add_error(
-                    ParseErrorType::DuplicateParameter(arg_name.to_string()),
+                    ParseErrorType::DuplicateParameter(param_name.to_string()),
                     range,
                 );
             }

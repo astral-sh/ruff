@@ -495,11 +495,7 @@ pub(crate) fn typed_argument_simple_defaults(checker: &mut Checker, parameters: 
         parameter,
         default,
         range: _,
-    } in parameters
-        .posonlyargs
-        .iter()
-        .chain(&parameters.args)
-        .chain(&parameters.kwonlyargs)
+    } in parameters.iter_non_variadic_params()
     {
         let Some(default) = default else {
             continue;
@@ -530,11 +526,7 @@ pub(crate) fn argument_simple_defaults(checker: &mut Checker, parameters: &Param
         parameter,
         default,
         range: _,
-    } in parameters
-        .posonlyargs
-        .iter()
-        .chain(&parameters.args)
-        .chain(&parameters.kwonlyargs)
+    } in parameters.iter_non_variadic_params()
     {
         let Some(default) = default else {
             continue;

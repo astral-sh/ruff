@@ -89,12 +89,7 @@ pub(crate) fn mutable_argument_default(checker: &mut Checker, function_def: &ast
         parameter,
         default,
         range: _,
-    } in function_def
-        .parameters
-        .posonlyargs
-        .iter()
-        .chain(&function_def.parameters.args)
-        .chain(&function_def.parameters.kwonlyargs)
+    } in function_def.parameters.iter_non_variadic_params()
     {
         let Some(default) = default else {
             continue;
