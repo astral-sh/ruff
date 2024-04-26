@@ -28,7 +28,7 @@ pub(crate) struct ResolvedClientSettings {
 /// Contains the resolved values of 'editor settings' - Ruff configuration for the linter/formatter that was passed in via
 /// LSP client settings. These fields are optional because we don't want to override file-based linter/formatting settings
 /// if these were un-set.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 pub(crate) struct ResolvedEditorSettings {
     pub(super) lint_preview: Option<bool>,
@@ -38,6 +38,23 @@ pub(crate) struct ResolvedEditorSettings {
     pub(super) ignore: Option<Vec<RuleSelector>>,
     pub(super) exclude: Option<Vec<String>>,
     pub(super) line_length: Option<LineLength>,
+    pub(super) configuration_preference: ConfigurationPreference,
+}
+
+/// Determines how multiple conflicting configurations should be resolved - in this
+/// case, the configuration from the client settings and configuration from local
+/// `.toml` files (aka 'workspace' configuration).
+#[derive(Clone, Copy, Debug, Deserialize, Default)]
+#[cfg_attr(test, derive(PartialEq, Eq))]
+#[serde(rename_all = "camelCase")]
+pub(crate) enum ConfigurationPreference {
+    /// Configuration set in the editor takes priority over workspace configuration set in `.toml` files.
+    #[default]
+    EditorFirst,
+    /// Configuration set in `.toml` files takes priority over configuration set in the editor.
+    FilesystemFirst,
+    /// `.toml` files are ignored completely, and only the editor configuration is used.
+    EditorOnly,
 }
 
 /// This is a direct representation of the settings schema sent by the client.
@@ -52,6 +69,7 @@ pub(crate) struct ClientSettings {
     code_action: Option<CodeActionOptions>,
     exclude: Option<Vec<String>>,
     line_length: Option<LineLength>,
+    configuration_preference: Option<ConfigurationPreference>,
 }
 
 /// This is a direct representation of the workspace settings schema,
@@ -251,6 +269,11 @@ impl ResolvedClientSettings {
                     Some(settings.exclude.as_ref()?.clone())
                 }),
                 line_length: Self::resolve_optional(all_settings, |settings| settings.line_length),
+                configuration_preference: Self::resolve_or(
+                    all_settings,
+                    |settings| settings.configuration_preference,
+                    ConfigurationPreference::EditorFirst,
+                ),
             },
         }
     }
@@ -383,6 +406,7 @@ mod tests {
                 ),
                 exclude: None,
                 line_length: None,
+                configuration_preference: None,
             },
             workspace_settings: [
                 WorkspaceSettings {
@@ -429,6 +453,7 @@ mod tests {
                         ),
                         exclude: None,
                         line_length: None,
+                        configuration_preference: None,
                     },
                     workspace: Url {
                         scheme: "file",
@@ -488,6 +513,7 @@ mod tests {
                         ),
                         exclude: None,
                         line_length: None,
+                        configuration_preference: None,
                     },
                     workspace: Url {
                         scheme: "file",
@@ -538,7 +564,8 @@ mod tests {
                     extend_select: None,
                     ignore: None,
                     exclude: None,
-                    line_length: None
+                    line_length: None,
+                    configuration_preference: ConfigurationPreference::default(),
                 }
             }
         );
@@ -566,7 +593,8 @@ mod tests {
                     extend_select: None,
                     ignore: None,
                     exclude: None,
-                    line_length: None
+                    line_length: None,
+                    configuration_preference: ConfigurationPreference::EditorFirst,
                 }
             }
         );
@@ -620,6 +648,7 @@ mod tests {
                             80,
                         ),
                     ),
+                    configuration_preference: None,
                 },
             ),
         }
@@ -648,7 +677,8 @@ mod tests {
                     extend_select: None,
                     ignore: Some(vec![RuleSelector::from_str("RUF001").unwrap()]),
                     exclude: Some(vec!["third_party".into()]),
-                    line_length: Some(LineLength::try_from(80).unwrap())
+                    line_length: Some(LineLength::try_from(80).unwrap()),
+                    configuration_preference: ConfigurationPreference::EditorFirst,
                 }
             }
         );
