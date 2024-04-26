@@ -25,6 +25,7 @@ ctrlc = "3.4.4"
 crossbeam-channel = { workspace = true }
 dashmap = { workspace = true }
 hashbrown = { workspace = true }
+indexmap = { workspace = true }
 log = { workspace = true }
 notify = { workspace = true }
 parking_lot = { workspace = true }

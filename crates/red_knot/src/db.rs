@@ -7,6 +7,7 @@ use crate::module::{Module, ModuleData, ModuleName, ModuleResolver, ModuleSearch
 use crate::parse::{Parsed, ParsedStorage};
 use crate::source::{Source, SourceStorage};
 use crate::symbols::{SymbolTable, SymbolTablesStorage};
+use crate::types::TypeStore;
 
 pub trait SourceDb {
     // queries
@@ -48,6 +49,7 @@ pub struct SourceJar {
 pub struct SemanticJar {
     pub module_resolver: ModuleResolver,
     pub symbol_tables: SymbolTablesStorage,
+    pub type_store: TypeStore,
 }
 
 /// Gives access to a specific jar in the database.
