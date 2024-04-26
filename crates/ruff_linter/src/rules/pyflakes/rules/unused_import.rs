@@ -334,42 +334,31 @@ fn fix_by_removing_imports(
     )
 }
 
-/// Generate a [`Fix`] to make bindings in a statement explicit, either by moving them to `__all__`
+/// Generate a [`Fix`] to make bindings in a statement explicit, either by adding them to `__all__`
 /// or changing them from `import a` to `import a as a`.
 fn fix_by_reexporting(
     checker: &Checker,
     node_id: NodeId,
     imports: &[ImportBinding],
-    export_list: Option<NodeId>,
+    dunder_all: Option<NodeId>,
 ) -> Option<Fix> {
     let statement = checker.semantic().statement(node_id);
-    let parent = checker.semantic().parent_statement(node_id);
 
     let member_names = imports
         .iter()
         .map(|binding| binding.import.member_name())
         .collect::<Vec<_>>();
+    let member_names = member_names.iter().map(AsRef::as_ref);
 
-    // if export_list:NodeId is given, generate edits to remove from the import AND edits to add to
-    // __all__ and combine them into a single fix
-    let edits = match export_list {
-        Some(export_list) => {
-            // TODO: generate explicits by writing an edit function using `export_list` argument
-            //fix::edits::make_exports_explicit(explicits, export_list)
-            todo!()
-        }
-        // TODO: double check that this doesn't emit an edit when the list is empty
-        None => fix::edits::make_imports_explicit(
-            member_names.iter().map(AsRef::as_ref),
-            statement,
-            checker.locator(),
-        ),
+    let edits = match dunder_all {
+        Some(dunder_all) => todo!(),
+        None => fix::edits::make_redundant_alias(member_names, statement),
     };
 
     // Only emit a fix if there are edits
-    let [_head, _tail @ ..] = &edits[..] else {
+    if 0 == edits.len() || 0 < imports.len() {
         return None;
-    };
+    }
     let mut edits_iter = edits.into_iter();
     let first = edits_iter.next()?;
 
