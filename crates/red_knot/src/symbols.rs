@@ -122,6 +122,20 @@ pub(crate) struct ImportFromDefinition {
     pub(crate) level: u32,
 }
 
+impl ImportFromDefinition {
+    pub(crate) fn module(&self) -> Option<&ModuleName> {
+        self.module.as_ref()
+    }
+
+    pub(crate) fn name(&self) -> &Name {
+        &self.name
+    }
+
+    pub(crate) fn level(&self) -> u32 {
+        self.level
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum Dependency {
     Module(ModuleName),
@@ -243,11 +257,17 @@ impl SymbolTable {
         self.symbol_by_name(SymbolTable::root_scope_id(), name)
     }
 
-    pub(crate) fn defs(&self, symbol_id: SymbolId) -> &[Definition] {
+    pub(crate) fn definitions(&self, symbol_id: SymbolId) -> &[Definition] {
         self.defs
             .get(&symbol_id)
             .map(std::vec::Vec::as_slice)
             .unwrap_or_default()
+    }
+
+    pub(crate) fn all_definitions(&self) -> impl Iterator<Item = (SymbolId, &Definition)> + '_ {
+        self.defs
+            .iter()
+            .flat_map(|(sym_id, defs)| defs.iter().map(move |def| (*sym_id, def)))
     }
 
     fn add_symbol_to_scope(&mut self, scope_id: ScopeId, name: &str) -> SymbolId {
@@ -574,7 +594,9 @@ mod tests {
             let table = SymbolTable::from_ast(parsed.ast());
             assert_eq!(names(table.root_symbols()), vec!["x"]);
             assert_eq!(
-                table.defs(table.root_symbol_id_by_name("x").unwrap()).len(),
+                table
+                    .definitions(table.root_symbol_id_by_name("x").unwrap())
+                    .len(),
                 0
             );
         }
@@ -594,7 +616,7 @@ mod tests {
             assert_eq!(names(table.root_symbols()), vec!["foo"]);
             assert_eq!(
                 table
-                    .defs(table.root_symbol_id_by_name("foo").unwrap())
+                    .definitions(table.root_symbol_id_by_name("foo").unwrap())
                     .len(),
                 1
             );
@@ -621,7 +643,7 @@ mod tests {
             assert_eq!(names(table.root_symbols()), vec!["foo"]);
             assert_eq!(
                 table
-                    .defs(table.root_symbol_id_by_name("foo").unwrap())
+                    .definitions(table.root_symbol_id_by_name("foo").unwrap())
                     .len(),
                 1
             );
@@ -645,7 +667,9 @@ mod tests {
             assert_eq!(c_scope.name(), "C");
             assert_eq!(names(table.symbols_for_scope(scopes[0])), vec!["x"]);
             assert_eq!(
-                table.defs(table.root_symbol_id_by_name("C").unwrap()).len(),
+                table
+                    .definitions(table.root_symbol_id_by_name("C").unwrap())
+                    .len(),
                 1
             );
         }
@@ -669,7 +693,7 @@ mod tests {
             assert_eq!(names(table.symbols_for_scope(scopes[0])), vec!["x"]);
             assert_eq!(
                 table
-                    .defs(table.root_symbol_id_by_name("func").unwrap())
+                    .definitions(table.root_symbol_id_by_name("func").unwrap())
                     .len(),
                 1
             );
@@ -699,7 +723,7 @@ mod tests {
             assert_eq!(names(table.symbols_for_scope(scopes[1])), vec!["y"]);
             assert_eq!(
                 table
-                    .defs(table.root_symbol_id_by_name("func").unwrap())
+                    .definitions(table.root_symbol_id_by_name("func").unwrap())
                     .len(),
                 2
             );

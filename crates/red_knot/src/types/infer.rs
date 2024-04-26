@@ -1,20 +1,22 @@
 #![allow(dead_code)]
+
+use ruff_python_ast::AstNode;
+
 use crate::db::{HasJar, SemanticDb, SemanticJar};
 use crate::module::ModuleName;
 use crate::symbols::{Definition, ImportFromDefinition, SymbolId};
 use crate::types::Type;
 use crate::FileId;
-use ruff_python_ast::AstNode;
 
 // TODO this should not take a &mut db, it should be a query, not a mutation. This means we'll need
 // to use interior mutability in TypeStore instead, and avoid races in populating the cache.
 #[tracing::instrument(level = "trace", skip(db))]
-pub fn infer_symbol_type<Db>(db: &mut Db, file_id: FileId, symbol_id: SymbolId) -> Type
+pub fn infer_symbol_type<Db>(db: &Db, file_id: FileId, symbol_id: SymbolId) -> Type
 where
     Db: SemanticDb + HasJar<SemanticJar>,
 {
     let symbols = db.symbol_table(file_id);
-    let defs = symbols.defs(symbol_id);
+    let defs = symbols.definitions(symbol_id);
 
     if let Some(ty) = db
         .jar()
@@ -48,28 +50,40 @@ where
                 Type::Unknown
             }
         }
-        Definition::ClassDef(node_key) => {
-            if let Some(ty) = db
-                .jar()
-                .type_store
-                .get_cached_node_type(file_id, node_key.erased())
-            {
-                ty
-            } else {
+        Definition::ClassDef(node_key) => db
+            .jar()
+            .type_store
+            .get_cached_node_type(file_id, node_key.erased())
+            .unwrap_or_else(|| {
                 let parsed = db.parse(file_id);
                 let ast = parsed.ast();
                 let node = node_key.resolve_unwrap(ast.as_any_node_ref());
 
-                let store = &mut db.jar_mut().type_store;
-                let ty = Type::Class(store.add_class(file_id, &node.name.id));
+                let store = &db.jar().type_store;
+                let ty: Type = store.add_class(file_id, &node.name.id).into();
                 store.cache_node_type(file_id, *node_key.erased(), ty);
                 ty
-            }
-        }
+            }),
+        Definition::FunctionDef(node_key) => db
+            .jar()
+            .type_store
+            .get_cached_node_type(file_id, node_key.erased())
+            .unwrap_or_else(|| {
+                let parsed = db.parse(file_id);
+                let ast = parsed.ast();
+                let node = node_key
+                    .resolve(ast.as_any_node_ref())
+                    .expect("node key should resolve");
+
+                let store = &db.jar().type_store;
+                let ty = store.add_function(file_id, &node.name.id).into();
+                store.cache_node_type(file_id, *node_key.erased(), ty);
+                ty
+            }),
         _ => todo!("other kinds of definitions"),
     };
 
-    db.jar_mut()
+    db.jar()
         .type_store
         .cache_symbol_type(file_id, symbol_id, ty);
     // TODO record dependencies
@@ -112,7 +126,7 @@ mod tests {
     fn follow_import_to_class() -> std::io::Result<()> {
         let TestCase {
             src,
-            mut db,
+            db,
             temp_dir: _temp_dir,
         } = create_test()?;
 

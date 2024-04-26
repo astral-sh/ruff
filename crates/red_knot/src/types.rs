@@ -37,6 +37,38 @@ impl Type {
     fn display<'a>(&'a self, store: &'a TypeStore) -> DisplayType<'a> {
         DisplayType { ty: self, store }
     }
+
+    pub const fn is_unbound(&self) -> bool {
+        matches!(self, Type::Unbound)
+    }
+
+    pub const fn is_unknown(&self) -> bool {
+        matches!(self, Type::Unknown)
+    }
+}
+
+impl From<FunctionTypeId> for Type {
+    fn from(id: FunctionTypeId) -> Self {
+        Type::Function(id)
+    }
+}
+
+impl From<ClassTypeId> for Type {
+    fn from(id: ClassTypeId) -> Self {
+        Type::Class(id)
+    }
+}
+
+impl From<UnionTypeId> for Type {
+    fn from(id: UnionTypeId) -> Self {
+        Type::Union(id)
+    }
+}
+
+impl From<IntersectionTypeId> for Type {
+    fn from(id: IntersectionTypeId) -> Self {
+        Type::Intersection(id)
+    }
 }
 
 // TODO: currently calling `get_function` et al and holding on to the `FunctionTypeRef` will lock a
@@ -53,13 +85,13 @@ impl TypeStore {
         self.modules.remove(&file_id);
     }
 
-    pub fn cache_symbol_type(&mut self, file_id: FileId, symbol_id: SymbolId, ty: Type) {
+    pub fn cache_symbol_type(&self, file_id: FileId, symbol_id: SymbolId, ty: Type) {
         self.add_or_get_module(file_id)
             .symbol_types
             .insert(symbol_id, ty);
     }
 
-    pub fn cache_node_type(&mut self, file_id: FileId, node_key: NodeKey, ty: Type) {
+    pub fn cache_node_type(&self, file_id: FileId, node_key: NodeKey, ty: Type) {
         self.add_or_get_module(file_id)
             .node_types
             .insert(node_key, ty);
@@ -79,7 +111,7 @@ impl TypeStore {
             .copied()
     }
 
-    fn add_or_get_module(&mut self, file_id: FileId) -> ModuleStoreRefMut {
+    fn add_or_get_module(&self, file_id: FileId) -> ModuleStoreRefMut {
         self.modules
             .entry(file_id)
             .or_insert_with(|| ModuleTypeStore::new(file_id))
@@ -93,11 +125,11 @@ impl TypeStore {
         self.modules.get(&file_id)
     }
 
-    fn add_function(&mut self, file_id: FileId, name: &str) -> FunctionTypeId {
+    fn add_function(&self, file_id: FileId, name: &str) -> FunctionTypeId {
         self.add_or_get_module(file_id).add_function(name)
     }
 
-    fn add_class(&mut self, file_id: FileId, name: &str) -> ClassTypeId {
+    fn add_class(&self, file_id: FileId, name: &str) -> ClassTypeId {
         self.add_or_get_module(file_id).add_class(name)
     }
 
@@ -462,7 +494,7 @@ mod tests {
 
     #[test]
     fn add_class() {
-        let mut store = TypeStore::default();
+        let store = TypeStore::default();
         let files = Files::default();
         let file_id = files.intern(Path::new("/foo"));
         let id = store.add_class(file_id, "C");
@@ -473,7 +505,7 @@ mod tests {
 
     #[test]
     fn add_function() {
-        let mut store = TypeStore::default();
+        let store = TypeStore::default();
         let files = Files::default();
         let file_id = files.intern(Path::new("/foo"));
         let id = store.add_function(file_id, "func");

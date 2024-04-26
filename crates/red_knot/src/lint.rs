@@ -1,12 +1,17 @@
+use std::cell::RefCell;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 
 use ruff_python_ast::visitor::Visitor;
-use ruff_python_ast::StringLiteral;
+use ruff_python_ast::{ModModule, StringLiteral};
 
 use crate::cache::KeyValueCache;
-use crate::db::{HasJar, SourceDb, SourceJar};
+use crate::db::{HasJar, SemanticDb, SemanticJar, SourceDb, SourceJar};
 use crate::files::FileId;
+use crate::parse::Parsed;
+use crate::source::Source;
+use crate::symbols::{Definition, SymbolId, SymbolTable};
+use crate::types::Type;
 
 #[tracing::instrument(level = "debug", skip(db))]
 pub(crate) fn lint_syntax<Db>(db: &Db, file_id: FileId) -> Diagnostics
@@ -40,7 +45,7 @@ where
     })
 }
 
-pub(crate) fn lint_lines(source: &str, diagnostics: &mut Vec<String>) {
+fn lint_lines(source: &str, diagnostics: &mut Vec<String>) {
     for (line_number, line) in source.lines().enumerate() {
         if line.len() < 88 {
             continue;
@@ -54,6 +59,108 @@ pub(crate) fn lint_lines(source: &str, diagnostics: &mut Vec<String>) {
                 char_count
             ));
         }
+    }
+}
+
+#[tracing::instrument(level = "debug", skip(db))]
+pub(crate) fn lint_semantic<Db>(db: &Db, file_id: FileId) -> Diagnostics
+where
+    Db: SemanticDb + HasJar<SemanticJar>,
+{
+    let storage = &db.jar().lint_semantic;
+
+    storage.get(&file_id, |file_id| {
+        let source = db.source(*file_id);
+        let parsed = db.parse(*file_id);
+        let symbols = db.symbol_table(*file_id);
+
+        let context = SemanticLintContext {
+            file_id: *file_id,
+            source,
+            parsed,
+            symbols,
+            db,
+            diagnostics: RefCell::new(Vec::new()),
+        };
+
+        lint_unresolved_imports(&context);
+
+        Diagnostics::from(context.diagnostics.take())
+    })
+}
+
+fn lint_unresolved_imports(context: &SemanticLintContext) {
+    for (symbol, definition) in context.symbols().all_definitions() {
+        match definition {
+            Definition::Import(import) => {
+                let ty = context.eval_symbol(symbol);
+
+                if ty.is_unknown() {
+                    context.push_diagnostic(format!("Unresolved module {}", import.module));
+                }
+            }
+            Definition::ImportFrom(import) => {
+                let ty = context.eval_symbol(symbol);
+
+                if ty.is_unknown() {
+                    let message = if let Some(module) = import.module() {
+                        format!(
+                            "Unresolved relative import '{}' from '{}{module}'",
+                            import.name(),
+                            ".".repeat(import.level() as usize)
+                        )
+                    } else {
+                        format!(
+                            "Unresolved import '{}' from {}",
+                            import.name(),
+                            ".".repeat(import.level() as usize)
+                        )
+                    };
+
+                    context.push_diagnostic(message);
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+pub struct SemanticLintContext<'a> {
+    file_id: FileId,
+    source: Source,
+    parsed: Parsed,
+    symbols: Arc<SymbolTable>,
+    db: &'a dyn SemanticDb,
+    diagnostics: RefCell<Vec<String>>,
+}
+
+impl<'a> SemanticLintContext<'a> {
+    pub fn source_text(&self) -> &str {
+        self.source.text()
+    }
+
+    pub fn file_id(&self) -> FileId {
+        self.file_id
+    }
+
+    pub fn ast(&self) -> &ModModule {
+        self.parsed.ast()
+    }
+
+    pub fn symbols(&self) -> &SymbolTable {
+        &self.symbols
+    }
+
+    pub fn eval_symbol(&self, symbol_id: SymbolId) -> Type {
+        self.db.infer_symbol_type(self.file_id, symbol_id)
+    }
+
+    pub fn push_diagnostic(&self, diagnostic: String) {
+        self.diagnostics.borrow_mut().push(diagnostic);
+    }
+
+    pub fn extend_diagnostics(&mut self, diagnostics: impl IntoIterator<Item = String>) {
+        self.diagnostics.get_mut().extend(diagnostics);
     }
 }
 
@@ -119,6 +226,23 @@ impl Deref for LintSyntaxStorage {
 }
 
 impl DerefMut for LintSyntaxStorage {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+#[derive(Default, Debug)]
+pub struct LintSemanticStorage(KeyValueCache<FileId, Diagnostics>);
+
+impl Deref for LintSemanticStorage {
+    type Target = KeyValueCache<FileId, Diagnostics>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for LintSemanticStorage {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }

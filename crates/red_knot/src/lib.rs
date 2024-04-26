@@ -1,3 +1,4 @@
+use std::fmt::Formatter;
 use std::hash::BuildHasherDefault;
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
@@ -98,5 +99,11 @@ where
 {
     fn from(value: T) -> Self {
         Self(value.into())
+    }
+}
+
+impl std::fmt::Display for Name {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
     }
 }

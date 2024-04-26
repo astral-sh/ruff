@@ -2,7 +2,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 use crate::files::FileId;
-use crate::lint::{Diagnostics, LintSyntaxStorage};
+use crate::lint::{Diagnostics, LintSemanticStorage, LintSyntaxStorage};
 use crate::module::{Module, ModuleData, ModuleName, ModuleResolver, ModuleSearchPath};
 use crate::parse::{Parsed, ParsedStorage};
 use crate::source::{Source, SourceStorage};
@@ -32,13 +32,15 @@ pub trait SemanticDb: SourceDb {
 
     fn symbol_table(&self, file_id: FileId) -> Arc<SymbolTable>;
 
+    fn infer_symbol_type(&self, file_id: FileId, symbol_id: SymbolId) -> Type;
+
+    fn lint_semantic(&self, file_id: FileId) -> Diagnostics;
+
     // mutations
 
     fn add_module(&mut self, path: &Path) -> Option<(Module, Vec<Arc<ModuleData>>)>;
 
     fn set_module_search_paths(&mut self, paths: Vec<ModuleSearchPath>);
-
-    fn infer_symbol_type(&mut self, file_id: FileId, symbol_id: SymbolId) -> Type;
 }
 
 pub trait Db: SemanticDb {}
@@ -55,6 +57,7 @@ pub struct SemanticJar {
     pub module_resolver: ModuleResolver,
     pub symbol_tables: SymbolTablesStorage,
     pub type_store: TypeStore,
+    pub lint_semantic: LintSemanticStorage,
 }
 
 /// Gives access to a specific jar in the database.
@@ -79,9 +82,12 @@ pub trait HasJar<T> {
 
 #[cfg(test)]
 pub(crate) mod tests {
+    use std::path::Path;
+    use std::sync::Arc;
+
     use crate::db::{HasJar, SourceDb, SourceJar};
     use crate::files::{FileId, Files};
-    use crate::lint::{lint_syntax, Diagnostics};
+    use crate::lint::{lint_semantic, lint_syntax, Diagnostics};
     use crate::module::{
         add_module, file_to_module, path_to_module, resolve_module, set_module_search_paths,
         Module, ModuleData, ModuleName, ModuleSearchPath,
@@ -90,8 +96,6 @@ pub(crate) mod tests {
     use crate::source::{source_text, Source};
     use crate::symbols::{symbol_table, SymbolId, SymbolTable};
     use crate::types::{infer_symbol_type, Type};
-    use std::path::Path;
-    use std::sync::Arc;
 
     use super::{SemanticDb, SemanticJar};
 
@@ -163,16 +167,20 @@ pub(crate) mod tests {
             symbol_table(self, file_id)
         }
 
+        fn infer_symbol_type(&self, file_id: FileId, symbol_id: SymbolId) -> Type {
+            infer_symbol_type(self, file_id, symbol_id)
+        }
+
+        fn lint_semantic(&self, file_id: FileId) -> Diagnostics {
+            lint_semantic(self, file_id)
+        }
+
         fn add_module(&mut self, path: &Path) -> Option<(Module, Vec<Arc<ModuleData>>)> {
             add_module(self, path)
         }
 
         fn set_module_search_paths(&mut self, paths: Vec<ModuleSearchPath>) {
             set_module_search_paths(self, paths);
-        }
-
-        fn infer_symbol_type(&mut self, file_id: FileId, symbol_id: SymbolId) -> Type {
-            infer_symbol_type(self, file_id, symbol_id)
         }
     }
 }
