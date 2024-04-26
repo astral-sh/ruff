@@ -6,8 +6,8 @@ use crate::lint::{Diagnostics, LintSyntaxStorage};
 use crate::module::{Module, ModuleData, ModuleName, ModuleResolver, ModuleSearchPath};
 use crate::parse::{Parsed, ParsedStorage};
 use crate::source::{Source, SourceStorage};
-use crate::symbols::{SymbolTable, SymbolTablesStorage};
-use crate::types::TypeStore;
+use crate::symbols::{SymbolId, SymbolTable, SymbolTablesStorage};
+use crate::types::{Type, TypeStore};
 
 pub trait SourceDb {
     // queries
@@ -34,6 +34,8 @@ pub trait SemanticDb: SourceDb {
     fn add_module(&mut self, path: &Path) -> Option<(Module, Vec<Arc<ModuleData>>)>;
 
     fn set_module_search_paths(&mut self, paths: Vec<ModuleSearchPath>);
+
+    fn eval_symbol(&mut self, file_id: FileId, symbol_id: SymbolId) -> Type;
 }
 
 pub trait Db: SemanticDb {}
@@ -83,7 +85,8 @@ pub(crate) mod tests {
     };
     use crate::parse::{parse, Parsed};
     use crate::source::{source_text, Source};
-    use crate::symbols::{symbol_table, SymbolTable};
+    use crate::symbols::{symbol_table, SymbolId, SymbolTable};
+    use crate::types::{eval_symbol, Type};
     use std::path::Path;
     use std::sync::Arc;
 
@@ -159,6 +162,10 @@ pub(crate) mod tests {
 
         fn set_module_search_paths(&mut self, paths: Vec<ModuleSearchPath>) {
             set_module_search_paths(self, paths);
+        }
+
+        fn eval_symbol(&mut self, file_id: FileId, symbol_id: SymbolId) -> Type {
+            eval_symbol(self, file_id, symbol_id)
         }
     }
 }

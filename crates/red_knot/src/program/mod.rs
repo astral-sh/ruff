@@ -10,8 +10,8 @@ use crate::module::{
 };
 use crate::parse::{parse, Parsed, ParsedStorage};
 use crate::source::{source_text, Source, SourceStorage};
-use crate::symbols::{symbol_table, SymbolTable, SymbolTablesStorage};
-use crate::types::TypeStore;
+use crate::symbols::{symbol_table, SymbolId, SymbolTable, SymbolTablesStorage};
+use crate::types::{eval_symbol, Type, TypeStore};
 
 #[derive(Debug)]
 pub struct Program {
@@ -97,6 +97,10 @@ impl SemanticDb for Program {
 
     fn set_module_search_paths(&mut self, paths: Vec<ModuleSearchPath>) {
         set_module_search_paths(self, paths);
+    }
+
+    fn eval_symbol(&mut self, file_id: FileId, symbol_id: SymbolId) -> Type {
+        eval_symbol(self, file_id, symbol_id)
     }
 }
 

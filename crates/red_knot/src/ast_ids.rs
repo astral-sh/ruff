@@ -297,6 +297,10 @@ impl<N: AstNode> TypedNodeKey<N> {
 
         Some(N::cast_ref(node_ref).unwrap())
     }
+
+    pub fn erased(&self) -> &NodeKey {
+        &self.inner
+    }
 }
 
 struct FindNodeKeyVisitor<'a> {

@@ -6,9 +6,13 @@ use crate::{FxDashMap, FxIndexSet, Name};
 use ruff_index::{newtype_index, IndexVec};
 use rustc_hash::FxHashMap;
 
+pub(crate) mod eval;
+
+pub(crate) use eval::eval_symbol;
+
 /// unique ID for a type
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-pub(crate) enum Type {
+pub enum Type {
     /// the dynamic or gradual type: a statically-unknown set of values
     Any,
     /// the empty set of values
@@ -47,6 +51,32 @@ impl TypeStore {
         self.modules.remove(file_id);
     }
 
+    pub fn cache_symbol_type(&mut self, file_id: FileId, symbol_id: SymbolId, ty: Type) {
+        self.add_or_get_module(file_id)
+            .symbol_types
+            .insert(symbol_id, ty);
+    }
+
+    pub fn cache_node_type(&mut self, file_id: FileId, node_key: NodeKey, ty: Type) {
+        self.add_or_get_module(file_id)
+            .node_types
+            .insert(node_key, ty);
+    }
+
+    pub fn get_cached_symbol_type(&self, file_id: FileId, symbol_id: SymbolId) -> Option<Type> {
+        self.try_get_module(file_id)?
+            .symbol_types
+            .get(&symbol_id)
+            .copied()
+    }
+
+    pub fn get_cached_node_type(&self, file_id: FileId, node_key: &NodeKey) -> Option<Type> {
+        self.try_get_module(file_id)?
+            .node_types
+            .get(node_key)
+            .copied()
+    }
+
     fn add_or_get_module(&mut self, file_id: FileId) -> ModuleStoreRefMut {
         self.modules
             .entry(file_id)
@@ -54,7 +84,11 @@ impl TypeStore {
     }
 
     fn get_module(&self, file_id: FileId) -> ModuleStoreRef {
-        self.modules.get(&file_id).expect("module should exist")
+        self.try_get_module(file_id).expect("module should exist")
+    }
+
+    fn try_get_module(&self, file_id: FileId) -> Option<ModuleStoreRef> {
+        self.modules.get(&file_id)
     }
 
     fn add_function(&mut self, file_id: FileId, name: &str) -> FunctionTypeId {
@@ -179,25 +213,25 @@ impl<'a> std::ops::Deref for IntersectionTypeRef<'a> {
 }
 
 #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
-pub(crate) struct FunctionTypeId {
+pub struct FunctionTypeId {
     file_id: FileId,
     func_id: ModuleFunctionTypeId,
 }
 
 #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
-pub(crate) struct ClassTypeId {
+pub struct ClassTypeId {
     file_id: FileId,
     class_id: ModuleClassTypeId,
 }
 
 #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
-pub(crate) struct UnionTypeId {
+pub struct UnionTypeId {
     file_id: FileId,
     union_id: ModuleUnionTypeId,
 }
 
 #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
-pub(crate) struct IntersectionTypeId {
+pub struct IntersectionTypeId {
     file_id: FileId,
     intersection_id: ModuleIntersectionTypeId,
 }
