@@ -49,11 +49,9 @@ pub(crate) struct ResolvedEditorSettings {
 #[serde(rename_all = "camelCase")]
 pub(crate) enum ConfigurationPreference {
     /// Configuration set in the editor takes priority over configuration set in `.toml` files.
-    /// If a custom configuration file is provided, local configuration will be ignored.
     #[default]
     EditorFirst,
     /// Configuration set in `.toml` files takes priority over configuration set in the editor.
-    /// If a custom configuration file is set, it will be ignored in favor of local project configuration.
     FilesystemFirst,
     /// `.toml` files are ignored completely, and only the editor configuration is used.
     EditorOnly,
