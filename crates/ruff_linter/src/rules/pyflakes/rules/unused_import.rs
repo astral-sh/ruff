@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 use std::iter;
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{Applicability, Diagnostic, Fix, FixAvailability, Violation};
@@ -300,12 +300,15 @@ impl Ranged for ImportBinding<'_> {
 }
 
 /// Generate a [`Fix`] to remove unused imports from a statement.
-fn fix_imports(
+fn fix_by_removing_imports_from_statement(
     checker: &Checker,
     node_id: NodeId,
     imports: &[ImportBinding],
     in_init: bool,
 ) -> Result<Fix> {
+    if 0 == imports.len() {
+        bail!("Expected import bindings");
+    }
     let statement = checker.semantic().statement(node_id);
     let parent = checker.semantic().parent_statement(node_id);
 
@@ -323,12 +326,14 @@ fn fix_imports(
         checker.stylist(),
         checker.indexer(),
     )?;
+
     // It's unsafe to remove things from `__init__.py` because it can break public interfaces
     let applicability = if in_init {
         Applicability::Unsafe
     } else {
         Applicability::Safe
     };
+
     Ok(
         Fix::applicable_edit(edit, applicability).isolate(Checker::isolation(
             checker.semantic().parent_statement_id(node_id),
