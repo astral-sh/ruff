@@ -57,19 +57,24 @@ impl TypeStore {
         self.modules.get(&file_id).expect("module should exist")
     }
 
-    fn add_function(&mut self, file_id: FileId, name: &str) -> Type {
+    fn add_function(&mut self, file_id: FileId, name: &str) -> FunctionTypeId {
         self.add_or_get_module(file_id).add_function(name)
     }
 
-    fn add_class(&mut self, file_id: FileId, name: &str) -> Type {
+    fn add_class(&mut self, file_id: FileId, name: &str) -> ClassTypeId {
         self.add_or_get_module(file_id).add_class(name)
     }
 
-    fn add_union(&mut self, file_id: FileId, elems: &[Type]) -> Type {
+    fn add_union(&mut self, file_id: FileId, elems: &[Type]) -> UnionTypeId {
         self.add_or_get_module(file_id).add_union(elems)
     }
 
-    fn add_intersection(&mut self, file_id: FileId, positive: &[Type], negative: &[Type]) -> Type {
+    fn add_intersection(
+        &mut self,
+        file_id: FileId,
+        positive: &[Type],
+        negative: &[Type],
+    ) -> IntersectionTypeId {
         self.add_or_get_module(file_id)
             .add_intersection(positive, negative)
     }
@@ -239,45 +244,45 @@ impl ModuleTypeStore {
         }
     }
 
-    fn add_function(&mut self, name: &str) -> Type {
+    fn add_function(&mut self, name: &str) -> FunctionTypeId {
         let func_id = self.functions.push(FunctionType {
             name: Name::new(name),
         });
-        Type::Function(FunctionTypeId {
+        FunctionTypeId {
             file_id: self.file_id,
             func_id,
-        })
+        }
     }
 
-    fn add_class(&mut self, name: &str) -> Type {
+    fn add_class(&mut self, name: &str) -> ClassTypeId {
         let class_id = self.classes.push(ClassType {
             name: Name::new(name),
         });
-        Type::Class(ClassTypeId {
+        ClassTypeId {
             file_id: self.file_id,
             class_id,
-        })
+        }
     }
 
-    fn add_union(&mut self, elems: &[Type]) -> Type {
+    fn add_union(&mut self, elems: &[Type]) -> UnionTypeId {
         let union_id = self.unions.push(UnionType {
             elements: FxIndexSet::from_iter(elems.iter().copied()),
         });
-        Type::Union(UnionTypeId {
+        UnionTypeId {
             file_id: self.file_id,
             union_id,
-        })
+        }
     }
 
-    fn add_intersection(&mut self, positive: &[Type], negative: &[Type]) -> Type {
+    fn add_intersection(&mut self, positive: &[Type], negative: &[Type]) -> IntersectionTypeId {
         let intersection_id = self.intersections.push(IntersectionType {
             positive: FxIndexSet::from_iter(positive.iter().copied()),
             negative: FxIndexSet::from_iter(negative.iter().copied()),
         });
-        Type::Intersection(IntersectionTypeId {
+        IntersectionTypeId {
             file_id: self.file_id,
             intersection_id,
-        })
+        }
     }
 
     fn get_function(&self, func_id: ModuleFunctionTypeId) -> &FunctionType {
@@ -418,12 +423,9 @@ mod tests {
         let mut store = TypeStore::default();
         let files = Files::default();
         let file_id = files.intern(Path::new("/foo"));
-        let class = store.add_class(file_id, "C");
-        if let Type::Class(id) = class {
-            assert_eq!(store.get_class(id).name(), "C");
-        } else {
-            panic!("not a class");
-        }
+        let id = store.add_class(file_id, "C");
+        assert_eq!(store.get_class(id).name(), "C");
+        let class = Type::Class(id);
         assert_eq!(format!("{}", class.display(&store)), "C");
     }
 
@@ -432,12 +434,9 @@ mod tests {
         let mut store = TypeStore::default();
         let files = Files::default();
         let file_id = files.intern(Path::new("/foo"));
-        let func = store.add_function(file_id, "func");
-        if let Type::Function(id) = func {
-            assert_eq!(store.get_function(id).name(), "func");
-        } else {
-            panic!("not a function");
-        }
+        let id = store.add_function(file_id, "func");
+        assert_eq!(store.get_function(id).name(), "func");
+        let func = Type::Function(id);
         assert_eq!(format!("{}", func.display(&store)), "func");
     }
 
@@ -448,16 +447,13 @@ mod tests {
         let file_id = files.intern(Path::new("/foo"));
         let c1 = store.add_class(file_id, "C1");
         let c2 = store.add_class(file_id, "C2");
-        let elems = vec![c1, c2];
-        let union = store.add_union(file_id, &elems);
-        if let Type::Union(id) = union {
-            assert_eq!(
-                store.get_union(id).elements,
-                FxIndexSet::from_iter(elems.iter().copied())
-            );
-        } else {
-            panic!("not a union");
-        }
+        let elems = vec![Type::Class(c1), Type::Class(c2)];
+        let id = store.add_union(file_id, &elems);
+        assert_eq!(
+            store.get_union(id).elements,
+            FxIndexSet::from_iter(elems.iter().copied())
+        );
+        let union = Type::Union(id);
         assert_eq!(format!("{}", union.display(&store)), "(C1 | C2)");
     }
 
@@ -469,21 +465,18 @@ mod tests {
         let c1 = store.add_class(file_id, "C1");
         let c2 = store.add_class(file_id, "C2");
         let c3 = store.add_class(file_id, "C3");
-        let pos = vec![c1, c2];
-        let neg = vec![c3];
-        let intersection = store.add_intersection(file_id, &pos, &neg);
-        if let Type::Intersection(id) = intersection {
-            assert_eq!(
-                store.get_intersection(id).positive,
-                FxIndexSet::from_iter(pos.iter().copied())
-            );
-            assert_eq!(
-                store.get_intersection(id).negative,
-                FxIndexSet::from_iter(neg.iter().copied())
-            );
-        } else {
-            panic!("not an intersection");
-        }
+        let pos = vec![Type::Class(c1), Type::Class(c2)];
+        let neg = vec![Type::Class(c3)];
+        let id = store.add_intersection(file_id, &pos, &neg);
+        assert_eq!(
+            store.get_intersection(id).positive,
+            FxIndexSet::from_iter(pos.iter().copied())
+        );
+        assert_eq!(
+            store.get_intersection(id).negative,
+            FxIndexSet::from_iter(neg.iter().copied())
+        );
+        let intersection = Type::Intersection(id);
         assert_eq!(
             format!("{}", intersection.display(&store)),
             "(C1 & C2 & ~C3)"
