@@ -110,6 +110,7 @@ impl<'a> ConfigurationTransformer for EditorConfigurationTransformer<'a> {
         filesystem_configuration: ruff_workspace::configuration::Configuration,
     ) -> ruff_workspace::configuration::Configuration {
         let ResolvedEditorSettings {
+            configuration,
             format_preview,
             lint_preview,
             select,
@@ -150,6 +151,19 @@ impl<'a> ConfigurationTransformer for EditorConfigurationTransformer<'a> {
             ..Default::default()
         };
 
+        // Merge in the editor-specified configuration file, if it exists
+        let editor_configuration = if let Some(config_file_path) = configuration {
+            match open_configuration_file(&config_file_path, project_root) {
+                Ok(config_from_file) => editor_configuration.combine(config_from_file),
+                Err(err) => {
+                    tracing::error!("Unable to find editor-specified configuration file {err}");
+                    editor_configuration
+                }
+            }
+        } else {
+            editor_configuration
+        };
+
         match configuration_preference {
             ConfigurationPreference::EditorFirst => {
                 editor_configuration.combine(filesystem_configuration)
@@ -160,4 +174,13 @@ impl<'a> ConfigurationTransformer for EditorConfigurationTransformer<'a> {
             ConfigurationPreference::EditorOnly => editor_configuration,
         }
     }
+}
+
+fn open_configuration_file(
+    config_path: &Path,
+    project_root: &Path,
+) -> crate::Result<Configuration> {
+    let options = ruff_workspace::pyproject::load_options(config_path)?;
+
+    Configuration::from_options(options, Some(config_path), project_root)
 }
