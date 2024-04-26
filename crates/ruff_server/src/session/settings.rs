@@ -45,14 +45,15 @@ pub(crate) struct ResolvedEditorSettings {
 /// Determines how multiple conflicting configurations should be resolved - in this
 /// case, the configuration from the client settings and configuration from local
 /// `.toml` files (aka 'workspace' configuration).
-#[derive(Clone, Copy, Debug, Deserialize, Default)]
-#[cfg_attr(test, derive(PartialEq, Eq))]
+#[derive(Clone, Copy, Debug, Deserialize, Default, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub(crate) enum ConfigurationPreference {
-    /// Configuration set in the editor takes priority over workspace configuration set in `.toml` files.
+    /// Configuration set in the editor takes priority over configuration set in `.toml` files.
+    /// If a custom configuration file is provided, local configuration will be ignored.
     #[default]
     EditorFirst,
     /// Configuration set in `.toml` files takes priority over configuration set in the editor.
+    /// If a custom configuration file is set, it will be ignored in favor of local project configuration.
     FilesystemFirst,
     /// `.toml` files are ignored completely, and only the editor configuration is used.
     EditorOnly,

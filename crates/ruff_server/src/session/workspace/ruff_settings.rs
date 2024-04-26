@@ -123,7 +123,7 @@ impl<'a> ConfigurationTransformer for EditorConfigurationTransformer<'a> {
 
         let project_root = self.1;
 
-        let mut editor_configuration = Configuration {
+        let editor_configuration = Configuration {
             lint: LintConfiguration {
                 preview: lint_preview.map(PreviewMode::from),
                 rule_selections: vec![RuleSelection {
@@ -153,8 +153,12 @@ impl<'a> ConfigurationTransformer for EditorConfigurationTransformer<'a> {
 
         if let Some(config_file_path) = configuration {
             match open_configuration_file(&config_file_path, project_root) {
+                // if a custom configuration file was given and the configuration preference is
+                // _not_ filesystem-first, return early with the combined editor configuration.
                 Ok(config_from_file) => {
-                    editor_configuration = editor_configuration.combine(config_from_file);
+                    if configuration_preference != ConfigurationPreference::FilesystemFirst {
+                        return editor_configuration.combine(config_from_file);
+                    }
                 }
                 Err(err) => tracing::error!("Unable to find custom configuration file {err}"),
             }
