@@ -6,9 +6,9 @@ use crate::{FxDashMap, FxIndexSet, Name};
 use ruff_index::{newtype_index, IndexVec};
 use rustc_hash::FxHashMap;
 
-pub(crate) mod eval;
+pub(crate) mod infer;
 
-pub(crate) use eval::eval_symbol;
+pub(crate) use infer::infer_symbol_type;
 
 /// unique ID for a type
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]

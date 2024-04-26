@@ -7,7 +7,7 @@ use crate::FileId;
 use ruff_python_ast::{AstNode, StmtClassDef};
 
 #[tracing::instrument(level = "trace", skip(db))]
-pub fn eval_symbol<Db>(db: &mut Db, file_id: FileId, symbol_id: SymbolId) -> Type
+pub fn infer_symbol_type<Db>(db: &mut Db, file_id: FileId, symbol_id: SymbolId) -> Type
 where
     Db: SemanticDb + HasJar<SemanticJar>,
 {
@@ -38,7 +38,7 @@ where
                 let remote_file_id = module.path(db).file();
                 let remote_symbols = db.symbol_table(remote_file_id);
                 if let Some(remote_symbol_id) = remote_symbols.root_symbol_id_by_name(name) {
-                    db.eval_symbol(remote_file_id, remote_symbol_id)
+                    db.infer_symbol_type(remote_file_id, remote_symbol_id)
                 } else {
                     Type::Unknown
                 }
@@ -61,7 +61,7 @@ where
                 .expect("node key should cast");
 
                 let store = &mut db.jar_mut().type_store;
-                let ty = store.add_class(file_id, &node.name.id);
+                let ty = Type::Class(store.add_class(file_id, &node.name.id));
                 store.cache_node_type(file_id, *node_key, ty);
                 ty
             }
@@ -130,7 +130,7 @@ mod tests {
             .root_symbol_id_by_name("D")
             .expect("D symbol should be found");
 
-        let ty = db.eval_symbol(a_file, d_sym);
+        let ty = db.infer_symbol_type(a_file, d_sym);
 
         let jar = HasJar::<SemanticJar>::jar(&db);
 

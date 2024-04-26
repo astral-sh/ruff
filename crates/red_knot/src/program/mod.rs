@@ -11,7 +11,7 @@ use crate::module::{
 use crate::parse::{parse, Parsed, ParsedStorage};
 use crate::source::{source_text, Source, SourceStorage};
 use crate::symbols::{symbol_table, SymbolId, SymbolTable, SymbolTablesStorage};
-use crate::types::{eval_symbol, Type, TypeStore};
+use crate::types::{infer_symbol_type, Type, TypeStore};
 
 #[derive(Debug)]
 pub struct Program {
@@ -99,8 +99,8 @@ impl SemanticDb for Program {
         set_module_search_paths(self, paths);
     }
 
-    fn eval_symbol(&mut self, file_id: FileId, symbol_id: SymbolId) -> Type {
-        eval_symbol(self, file_id, symbol_id)
+    fn infer_symbol_type(&mut self, file_id: FileId, symbol_id: SymbolId) -> Type {
+        infer_symbol_type(self, file_id, symbol_id)
     }
 }
 
