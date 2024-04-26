@@ -1809,6 +1809,7 @@ dependencies = [
  "ctrlc",
  "dashmap",
  "hashbrown 0.14.3",
+ "indexmap",
  "log",
  "notify",
  "parking_lot",
