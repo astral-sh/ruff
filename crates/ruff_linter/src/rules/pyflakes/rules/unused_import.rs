@@ -210,6 +210,8 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
         let in_except_handler =
             exceptions.intersects(Exceptions::MODULE_NOT_FOUND_ERROR | Exceptions::IMPORT_ERROR);
         let multiple = imports.len() > 1;
+        // FIXME: rename "imports" to "bindings"
+        // FIXME: rename "node_id" to "import_statement"
 
         let fix = if (!in_init || fix_init) && !in_except_handler {
             fix_imports(checker, node_id, &imports, in_init).ok()
@@ -217,16 +219,10 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
             None
         };
 
-        for ImportBinding {
-            import,
-            range,
-            parent_range,
-            category,
-        } in imports
-        {
+        for binding in imports {
             let mut diagnostic = Diagnostic::new(
                 UnusedImport {
-                    name: import.qualified_name().to_string(),
+                    name: binding.import.qualified_name().to_string(),
                     context: if in_except_handler {
                         Some(UnusedImportContext::ExceptHandler)
                     } else if in_init {
@@ -236,9 +232,9 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
                     },
                     multiple,
                 },
-                range,
+                binding.range,
             );
-            if let Some(range) = parent_range {
+            if let Some(range) = binding.parent_range {
                 diagnostic.set_parent(range.start());
             }
             if !in_except_handler {
