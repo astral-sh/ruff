@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::iter;
 
 use anyhow::Result;
 use rustc_hash::FxHashMap;
@@ -212,6 +213,15 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
         let multiple = imports.len() > 1;
         // FIXME: rename "imports" to "bindings"
         // FIXME: rename "node_id" to "import_statement"
+
+        // divide bindings in the import statement by how we want to fix them
+        let (to_explicit, to_remove): (Vec<_>, Vec<_>) =
+            imports
+                .into_iter()
+                .partition(|ImportBinding { category, .. }| {
+                    in_init && *category == ImportCat::FirstParty
+                    // FIXME: make an "is first party" predicate
+                });
 
         let fix = if (!in_init || fix_init) && !in_except_handler {
             fix_imports(checker, node_id, &imports, in_init).ok()
