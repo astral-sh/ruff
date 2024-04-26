@@ -3,7 +3,9 @@ use crate::db::SourceDb;
 use crate::files::FileId;
 use crate::lint::Diagnostics;
 use crate::program::Program;
+use rayon::max_num_threads;
 use rustc_hash::FxHashSet;
+use std::num::NonZeroUsize;
 
 impl Program {
     /// Checks all open files in the workspace and its dependencies.
@@ -61,6 +63,11 @@ pub trait CheckScheduler {
     ///
     /// The implementation should call [`CheckFileTask::run`] to execute the check.
     fn check_file(&self, file_task: CheckFileTask);
+
+    /// The maximum number of checks that can be run concurrently.
+    ///
+    /// Returns `None` if the checks run on the current thread (no concurrency).
+    fn max_concurrency(&self) -> Option<NonZeroUsize>;
 }
 
 /// Scheduler that runs checks on a rayon thread pool.
@@ -88,6 +95,10 @@ where
         self.scope
             .spawn(move |_| child_span.in_scope(|| check_file_task.run(program)));
     }
+
+    fn max_concurrency(&self) -> Option<NonZeroUsize> {
+        Some(NonZeroUsize::new(max_num_threads()).unwrap_or(NonZeroUsize::MIN))
+    }
 }
 
 /// Scheduler that runs all checks on the current thread.
@@ -107,6 +118,10 @@ impl<'a> SameThreadCheckScheduler<'a> {
 impl CheckScheduler for SameThreadCheckScheduler<'_> {
     fn check_file(&self, task: CheckFileTask) {
         task.run(self.program)
+    }
+
+    fn max_concurrency(&self) -> Option<NonZeroUsize> {
+        None
     }
 }
 
@@ -195,7 +210,13 @@ impl<'a> CheckFilesLoop<'a> {
     }
 
     fn run(mut self, files: impl Iterator<Item = FileId>) -> Result<Vec<String>, CheckError> {
-        let (sender, receiver) = crossbeam_channel::unbounded();
+        let (sender, receiver) = if let Some(max_concurrency) = self.scheduler.max_concurrency() {
+            crossbeam_channel::bounded(max_concurrency.get())
+        } else {
+            // The checks run on the current thread. That means it is necessary to store all messages
+            // or we risk deadlocking when the main loop never gets a chance to read the messages.
+            crossbeam_channel::unbounded()
+        };
 
         let context = CheckContext::new(self.cancellation_token.clone(), sender.clone());
 
