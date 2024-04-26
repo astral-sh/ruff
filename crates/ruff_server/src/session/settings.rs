@@ -38,22 +38,23 @@ pub(crate) struct ResolvedEditorSettings {
     pub(super) ignore: Option<Vec<RuleSelector>>,
     pub(super) exclude: Option<Vec<String>>,
     pub(super) line_length: Option<LineLength>,
-    pub(super) configuration_resolution_strategy: ConfigResolutionStrategy,
+    pub(super) configuration_preference: ConfigurationPreference,
 }
 
 /// Determines how multiple conflicting configurations should be resolved - in this
 /// case, the configuration from the client settings and configuration from local
 /// `.toml` files (aka 'workspace' configuration).
-#[derive(Clone, Copy, Debug, Deserialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Default)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 #[serde(rename_all = "camelCase")]
-pub(crate) enum ConfigResolutionStrategy {
-    /// The default strategy - configuration set in the editor takes priority over
-    /// workspace configuration set in `.toml` files.
-    Default,
-    /// An alternative strategy - configuration set in `.toml` files takes priority
-    /// over configuration set in the editor.
-    PrioritizeWorkspace,
+pub(crate) enum ConfigurationPreference {
+    /// Configuration set in the editor takes priority over workspace configuration set in `.toml` files.
+    #[default]
+    EditorFirst,
+    /// Configuration set in `.toml` files takes priority over configuration set in the editor.
+    FilesystemFirst,
+    /// `.toml` files are ignored completely, and only the editor configuration is used.
+    EditorOnly,
 }
 
 /// This is a direct representation of the settings schema sent by the client.
@@ -68,7 +69,7 @@ pub(crate) struct ClientSettings {
     code_action: Option<CodeActionOptions>,
     exclude: Option<Vec<String>>,
     line_length: Option<LineLength>,
-    configuration_resolution_strategy: Option<ConfigResolutionStrategy>,
+    configuration_preference: Option<ConfigurationPreference>,
 }
 
 /// This is a direct representation of the workspace settings schema,
@@ -268,10 +269,10 @@ impl ResolvedClientSettings {
                     Some(settings.exclude.as_ref()?.clone())
                 }),
                 line_length: Self::resolve_optional(all_settings, |settings| settings.line_length),
-                configuration_resolution_strategy: Self::resolve_or(
+                configuration_preference: Self::resolve_or(
                     all_settings,
-                    |settings| settings.configuration_resolution_strategy,
-                    ConfigResolutionStrategy::Default,
+                    |settings| settings.configuration_preference,
+                    ConfigurationPreference::EditorFirst,
                 ),
             },
         }
@@ -405,7 +406,7 @@ mod tests {
                 ),
                 exclude: None,
                 line_length: None,
-                configuration_resolution_strategy: None,
+                configuration_preference: None,
             },
             workspace_settings: [
                 WorkspaceSettings {
@@ -452,7 +453,7 @@ mod tests {
                         ),
                         exclude: None,
                         line_length: None,
-                        configuration_resolution_strategy: None,
+                        configuration_preference: None,
                     },
                     workspace: Url {
                         scheme: "file",
@@ -512,7 +513,7 @@ mod tests {
                         ),
                         exclude: None,
                         line_length: None,
-                        configuration_resolution_strategy: None,
+                        configuration_preference: None,
                     },
                     workspace: Url {
                         scheme: "file",
@@ -564,7 +565,7 @@ mod tests {
                     ignore: None,
                     exclude: None,
                     line_length: None,
-                    configuration_resolution_strategy: ConfigResolutionStrategy::Default,
+                    configuration_preference: ConfigurationPreference::default(),
                 }
             }
         );
@@ -593,7 +594,7 @@ mod tests {
                     ignore: None,
                     exclude: None,
                     line_length: None,
-                    configuration_resolution_strategy: ConfigResolutionStrategy::Default,
+                    configuration_preference: ConfigurationPreference::EditorFirst,
                 }
             }
         );
@@ -647,7 +648,7 @@ mod tests {
                             80,
                         ),
                     ),
-                    configuration_resolution_strategy: None,
+                    configuration_preference: None,
                 },
             ),
         }
@@ -677,7 +678,7 @@ mod tests {
                     ignore: Some(vec![RuleSelector::from_str("RUF001").unwrap()]),
                     exclude: Some(vec!["third_party".into()]),
                     line_length: Some(LineLength::try_from(80).unwrap()),
-                    configuration_resolution_strategy: ConfigResolutionStrategy::Default,
+                    configuration_preference: ConfigurationPreference::EditorFirst,
                 }
             }
         );

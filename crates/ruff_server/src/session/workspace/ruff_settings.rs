@@ -14,7 +14,7 @@ use std::{
 };
 use walkdir::{DirEntry, WalkDir};
 
-use crate::session::settings::{ConfigResolutionStrategy, ResolvedEditorSettings};
+use crate::session::settings::{ConfigurationPreference, ResolvedEditorSettings};
 
 #[derive(Default)]
 pub(crate) struct RuffSettings {
@@ -107,7 +107,7 @@ struct EditorConfigurationTransformer<'a>(&'a ResolvedEditorSettings, &'a Path);
 impl<'a> ConfigurationTransformer for EditorConfigurationTransformer<'a> {
     fn transform(
         &self,
-        project_configuration: ruff_workspace::configuration::Configuration,
+        filesystem_configuration: ruff_workspace::configuration::Configuration,
     ) -> ruff_workspace::configuration::Configuration {
         let ResolvedEditorSettings {
             format_preview,
@@ -117,7 +117,7 @@ impl<'a> ConfigurationTransformer for EditorConfigurationTransformer<'a> {
             ignore,
             exclude,
             line_length,
-            configuration_resolution_strategy,
+            configuration_preference,
         } = self.0.clone();
 
         let project_root = self.1;
@@ -150,13 +150,14 @@ impl<'a> ConfigurationTransformer for EditorConfigurationTransformer<'a> {
             ..Default::default()
         };
 
-        match configuration_resolution_strategy {
-            ConfigResolutionStrategy::Default => {
-                editor_configuration.combine(project_configuration)
+        match configuration_preference {
+            ConfigurationPreference::EditorFirst => {
+                editor_configuration.combine(filesystem_configuration)
             }
-            ConfigResolutionStrategy::PrioritizeWorkspace => {
-                project_configuration.combine(editor_configuration)
+            ConfigurationPreference::FilesystemFirst => {
+                filesystem_configuration.combine(editor_configuration)
             }
+            ConfigurationPreference::EditorOnly => editor_configuration,
         }
     }
 }
