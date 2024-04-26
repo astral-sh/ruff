@@ -215,7 +215,7 @@ f"{ # comment 15
 f"aaaaaaaaaaaaaaaa bbbbbbbbbbbbbbbbbb ccccccccccc {
     variable:.3f} ddddddddddddddd eeeeeeee"
 
-# But, if it's triple-quoted then we can't other the format specificer will have a
+# But, if it's triple-quoted then we can't or the format specificer will have a
 # trailing newline
 f"""aaaaaaaaaaaaaaaa bbbbbbbbbbbbbbbbbb ccccccccccc {
     variable:.3f} ddddddddddddddd eeeeeeee"""
