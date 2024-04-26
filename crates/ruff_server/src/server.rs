@@ -46,6 +46,7 @@ impl Server {
     pub fn new(worker_threads: NonZeroUsize) -> crate::Result<Self> {
         let (conn, threads) = lsp::Connection::stdio();
 
+        crate::log::init_logger(&conn.sender, crate::log::LogLevel::Info);
         crate::message::init_messenger(&conn.sender);
 
         let (id, params) = conn.initialize_start()?;
@@ -66,7 +67,7 @@ impl Server {
                 return (uri, ClientSettings::default());
             };
             let settings = workspace_settings.remove(&uri).unwrap_or_else(|| {
-                tracing::warn!("No workspace settings found for {uri}");
+                log_warn!("No workspace settings found for {uri}");
                 ClientSettings::default()
             });
             (uri, settings)
@@ -78,7 +79,7 @@ impl Server {
                 workspace_for_uri(folder.uri)
             }).collect())
             .or_else(|| {
-                tracing::debug!("No workspace(s) were provided during initialization. Using the current working directory as a default workspace...");
+                log_debug!("No workspace(s) were provided during initialization. Using the current working directory as a default workspace...");
                 let uri = types::Url::from_file_path(std::env::current_dir().ok()?).ok()?;
                 Some(vec![workspace_for_uri(uri)])
             })
@@ -193,17 +194,17 @@ impl Server {
             };
 
             let response_handler = |()| {
-                tracing::info!("Configuration file watcher successfully registered");
+                log_info!("Configuration file watcher successfully registered");
                 Task::nothing()
             };
 
             if let Err(err) = scheduler
                 .request::<lsp_types::request::RegisterCapability>(params, response_handler)
             {
-                tracing::error!("An error occurred when trying to register the configuration file watcher: {err}");
+                log_error!("An error occurred when trying to register the configuration file watcher: {err}");
             }
         } else {
-            tracing::warn!("LSP client does not support dynamic capability registration - automatic configuration reloading will not be available.");
+            log_warn!("LSP client does not support dynamic capability registration - automatic configuration reloading will not be available.");
         }
     }
 

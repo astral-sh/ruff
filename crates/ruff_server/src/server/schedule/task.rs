@@ -83,7 +83,7 @@ impl<'s> Task<'s> {
     {
         Self::local(move |_, _, _, responder| {
             if let Err(err) = responder.respond(id, result) {
-                tracing::error!("Unable to send immediate response: {err}");
+                log_error!("Unable to send immediate response: {err}");
             }
         })
     }

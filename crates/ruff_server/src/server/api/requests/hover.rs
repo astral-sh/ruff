@@ -106,7 +106,7 @@ fn format_rule_text(rule: Rule) -> String {
     if let Some(explanation) = rule.explanation() {
         output.push_str(explanation.trim());
     } else {
-        tracing::warn!("Rule {} does not have an explanation", rule.noqa_code());
+        log_warn!("Rule {} does not have an explanation", rule.noqa_code());
         output.push_str("An issue occurred: an explanation for this rule was not found.");
     }
     output

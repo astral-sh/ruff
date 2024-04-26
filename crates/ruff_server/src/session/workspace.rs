@@ -125,7 +125,7 @@ impl Workspaces {
     ) -> settings::ResolvedClientSettings {
         self.workspace_for_url(url).map_or_else(
             || {
-                tracing::warn!(
+                log_warn!(
                     "Workspace not found for {url}. Global settings will be used for this document"
                 );
                 settings::ResolvedClientSettings::global(global_settings)
@@ -211,7 +211,7 @@ impl OpenDocuments {
             .insert(url.clone(), DocumentController::new(contents, version))
             .is_some()
         {
-            tracing::warn!("Opening document `{url}` that is already open!");
+            log_warn!("Opening document `{url}` that is already open!");
         }
     }
 

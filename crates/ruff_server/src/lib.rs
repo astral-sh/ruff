@@ -4,12 +4,15 @@ pub use edit::{Document, PositionEncoding};
 use lsp_types::CodeActionKind;
 pub use server::Server;
 
+#[macro_use]
+mod log;
+#[macro_use]
+mod message;
+
 mod edit;
 mod fix;
 mod format;
 mod lint;
-#[macro_use]
-mod message;
 mod server;
 mod session;
 

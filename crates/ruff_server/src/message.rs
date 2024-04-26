@@ -32,7 +32,7 @@ pub(crate) fn init_messenger(client_sender: &ClientSender) {
         }
 
         let backtrace = std::backtrace::Backtrace::force_capture();
-        tracing::error!("{panic_info}\n{backtrace}");
+        log_error!("{panic_info}\n{backtrace}");
     }));
 }
 
