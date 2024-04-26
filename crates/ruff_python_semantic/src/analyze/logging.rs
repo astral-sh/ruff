@@ -25,6 +25,18 @@ pub fn is_logger_candidate(
         return false;
     };
 
+    // If the attribute is an inline instantiation, match against known constructors.
+    if let Expr::Call(ast::ExprCall { func, .. }) = &**value {
+        return semantic
+            .resolve_qualified_name(func)
+            .is_some_and(|qualified_name| {
+                matches!(
+                    qualified_name.segments(),
+                    ["logging", "getLogger" | "Logger"]
+                )
+            });
+    }
+
     // If the symbol was imported from another module, ensure that it's either a user-specified
     // logger object, the `logging` module itself, or `flask.current_app.logger`.
     if let Some(qualified_name) = semantic.resolve_qualified_name(value) {
