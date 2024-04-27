@@ -155,12 +155,12 @@ pub(crate) mod tests {
             file_to_module(self, file_id)
         }
 
-        fn infer_symbol_type(&self, file_id: FileId, symbol_id: SymbolId) -> Type {
-            infer_symbol_type(self, file_id, symbol_id)
-        }
-
         fn path_to_module(&self, path: &Path) -> Option<Module> {
             path_to_module(self, path)
+        }
+
+        fn infer_symbol_type(&self, file_id: FileId, symbol_id: SymbolId) -> Type {
+            infer_symbol_type(self, file_id, symbol_id)
         }
 
         fn symbol_table(&self, file_id: FileId) -> Arc<SymbolTable> {

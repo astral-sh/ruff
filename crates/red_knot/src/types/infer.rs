@@ -6,8 +6,6 @@ use crate::types::Type;
 use crate::FileId;
 use ruff_python_ast::AstNode;
 
-// TODO this should not take a &mut db, it should be a query, not a mutation. This means we'll need
-// to use interior mutability in TypeStore instead, and avoid races in populating the cache.
 #[tracing::instrument(level = "trace", skip(db))]
 pub fn infer_symbol_type<Db>(db: &Db, file_id: FileId, symbol_id: SymbolId) -> Type
 where
