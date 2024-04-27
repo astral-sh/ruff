@@ -7,15 +7,19 @@ use dashmap::mapref::entry::Entry;
 use crate::FxDashMap;
 
 /// Simple key value cache that locks on a per-key level.
-pub struct KeyValueCache<K, V> {
+pub struct KeyValueCache<K, V, S = DefaultStatisticsRecorder>
+where
+    S: StatisticsRecorder,
+{
     map: FxDashMap<K, V>,
-    statistics: CacheStatistics,
+    statistics: S,
 }
 
-impl<K, V> KeyValueCache<K, V>
+impl<K, V, S> KeyValueCache<K, V, S>
 where
     K: Eq + Hash + Clone,
     V: Clone,
+    S: StatisticsRecorder,
 {
     pub fn try_get(&self, key: &K) -> Option<V> {
         if let Some(existing) = self.map.get(key) {
@@ -65,23 +69,25 @@ where
     }
 }
 
-impl<K, V> Default for KeyValueCache<K, V>
+impl<K, V, S> Default for KeyValueCache<K, V, S>
 where
     K: Eq + Hash,
     V: Clone,
+    S: StatisticsRecorder,
 {
     fn default() -> Self {
         Self {
             map: FxDashMap::default(),
-            statistics: CacheStatistics::default(),
+            statistics: S::default(),
         }
     }
 }
 
-impl<K, V> std::fmt::Debug for KeyValueCache<K, V>
+impl<K, V, S> std::fmt::Debug for KeyValueCache<K, V, S>
 where
     K: std::fmt::Debug + Eq + Hash,
     V: std::fmt::Debug,
+    S: StatisticsRecorder,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let mut debug = f.debug_map();
@@ -112,10 +118,16 @@ impl Statistics {
 }
 
 #[cfg(debug_assertions)]
-pub type CacheStatistics = DebugStatistics;
+type DefaultStatisticsRecorder = DebugStatistics;
 
 #[cfg(not(debug_assertions))]
-pub type CacheStatistics = ReleaseStatistics;
+type DefaultStatisticsRecorder = ReleaseStatistics;
+
+pub trait StatisticsRecorder: Default {
+    fn hit(&self);
+    fn miss(&self);
+    fn to_statistics(&self) -> Option<Statistics>;
+}
 
 #[derive(Debug, Default)]
 pub struct DebugStatistics {
@@ -123,17 +135,17 @@ pub struct DebugStatistics {
     misses: AtomicUsize,
 }
 
-impl DebugStatistics {
+impl StatisticsRecorder for DebugStatistics {
     // TODO figure out appropriate Ordering
-    pub fn hit(&self) {
+    fn hit(&self) {
         self.hits.fetch_add(1, Ordering::SeqCst);
     }
 
-    pub fn miss(&self) {
+    fn miss(&self) {
         self.misses.fetch_add(1, Ordering::SeqCst);
     }
 
-    pub fn to_statistics(&self) -> Option<Statistics> {
+    fn to_statistics(&self) -> Option<Statistics> {
         let hits = self.hits.load(Ordering::SeqCst);
         let misses = self.misses.load(Ordering::SeqCst);
 
@@ -144,15 +156,15 @@ impl DebugStatistics {
 #[derive(Debug, Default)]
 pub struct ReleaseStatistics;
 
-impl ReleaseStatistics {
+impl StatisticsRecorder for ReleaseStatistics {
     #[inline]
-    pub const fn hit(&self) {}
+    fn hit(&self) {}
 
     #[inline]
-    pub const fn miss(&self) {}
+    fn miss(&self) {}
 
     #[inline]
-    pub const fn to_statistics(&self) -> Option<Statistics> {
+    fn to_statistics(&self) -> Option<Statistics> {
         None
     }
 }
