@@ -146,7 +146,13 @@ pub struct ReleaseStatistics;
 
 impl ReleaseStatistics {
     #[inline]
-    pub fn to_statistics(&self) -> Option<Statistics> {
+    pub const fn hit(&self) {}
+
+    #[inline]
+    pub const fn miss(&self) {}
+
+    #[inline]
+    pub const fn to_statistics(&self) -> Option<Statistics> {
         None
     }
 }
