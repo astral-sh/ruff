@@ -78,7 +78,7 @@ pub struct RayonCheckScheduler<'program, 'scope_ref, 'scope> {
 
 impl<'program, 'scope_ref, 'scope> RayonCheckScheduler<'program, 'scope_ref, 'scope> {
     pub fn new(program: &'program Program, scope: &'scope_ref rayon::Scope<'scope>) -> Self {
-        Self { scope, program }
+        Self { program, scope }
     }
 }
 
@@ -117,7 +117,7 @@ impl<'a> SameThreadCheckScheduler<'a> {
 
 impl CheckScheduler for SameThreadCheckScheduler<'_> {
     fn check_file(&self, task: CheckFileTask) {
-        task.run(self.program)
+        task.run(self.program);
     }
 
     fn max_concurrency(&self) -> Option<NonZeroUsize> {
@@ -166,8 +166,8 @@ impl CheckContext {
         sender: crossbeam_channel::Sender<CheckFileMessage>,
     ) -> Self {
         Self {
-            sender,
             cancellation_token,
+            sender,
         }
     }
 
@@ -224,13 +224,13 @@ impl<'a> CheckFilesLoop<'a> {
             self.queue_file(file, context.clone())?;
         }
 
-        self.run_impl(receiver, context)
+        self.run_impl(receiver, &context)
     }
 
     fn run_impl(
         mut self,
         receiver: crossbeam_channel::Receiver<CheckFileMessage>,
-        context: CheckContext,
+        context: &CheckContext,
     ) -> Result<Vec<String>, CheckError> {
         if self.cancellation_token.is_cancelled() {
             return Err(CheckError::Cancelled);

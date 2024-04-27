@@ -1,10 +1,8 @@
 #![allow(clippy::dbg_macro)]
 
 use std::collections::hash_map::Entry;
-use std::num::NonZeroUsize;
 use std::path::Path;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::Mutex;
 
 use rustc_hash::FxHashMap;
 use tracing::subscriber::Interest;
