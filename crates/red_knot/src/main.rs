@@ -113,7 +113,7 @@ impl MainLoop {
 
         (
             Self {
-                orchestrator_sender: orchestrator_sender.clone(),
+                orchestrator_sender,
                 main_loop_receiver,
             },
             MainLoopCancellationToken {
@@ -293,7 +293,7 @@ impl Orchestrator {
                             self.aggregated_changes.extend(file_changes);
                         }
 
-                        Ok(OrchestratorMessage::CheckProgramStarted {..}| OrchestratorMessage::CheckProgramCompleted(_) | OrchestratorMessage::CheckProgramCancelled) => unreachable!("The program check should be complete at this point."),
+                        Ok(OrchestratorMessage::CheckProgramStarted {..}| OrchestratorMessage::CheckProgramCompleted(_) | OrchestratorMessage::CheckProgramCancelled) => unreachable!("No program check should be running while debouncing changes."),
                         Ok(OrchestratorMessage::Run) => unreachable!("The orchestrator is already running."),
 
                         Err(_) => {

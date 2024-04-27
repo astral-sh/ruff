@@ -34,7 +34,7 @@ impl Program {
     }
 
     #[tracing::instrument(level = "debug", skip(self, context))]
-    fn check_file_with_context(
+    fn do_check_file(
         &self,
         file: FileId,
         context: &CheckContext,
@@ -102,9 +102,6 @@ where
 }
 
 /// Scheduler that runs all checks on the current thread.
-///
-/// Checks that are queued will run immediately on the current thread.
-/// That means that later scheduled checks block the completion of earlier scheduled checks.
 pub struct SameThreadCheckScheduler<'a> {
     program: &'a Program,
 }
@@ -139,7 +136,7 @@ pub struct CheckFileTask {
 impl CheckFileTask {
     /// Runs the check and communicates the result to the orchestrator.
     pub fn run(self, program: &Program) {
-        match program.check_file_with_context(self.file_id, &self.context) {
+        match program.do_check_file(self.file_id, &self.context) {
             Ok(diagnostics) => self
                 .context
                 .sender
