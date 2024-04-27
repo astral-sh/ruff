@@ -8,8 +8,14 @@ Ok(
             Codes {
                 range: 0..18,
                 codes: [
-                    "F401",
-                    "F841",
+                    Code {
+                        code: "F401",
+                        range: 8..12,
+                    },
+                    Code {
+                        code: "F841",
+                        range: 14..18,
+                    },
                 ],
             },
         ),

@@ -281,6 +281,8 @@ RUF100_0.py:107:12: RUF100 [*] Unused `noqa` directive (unknown: `E50`)
 107     |-    d = 1  #noqa: F841, E50
     107 |+    d = 1  # noqa: F841
 108 108 |     e = 1  #noqa: E50
+109 109 | 
+110 110 | 
 
 RUF100_0.py:108:5: F841 [*] Local variable `e` is assigned to but never used
     |
@@ -296,6 +298,9 @@ RUF100_0.py:108:5: F841 [*] Local variable `e` is assigned to but never used
 106 106 |     # Invalid - nonexistant error code with multibyte character
 107 107 |     d = 1  #noqa: F841, E50
 108     |-    e = 1  #noqa: E50
+109 108 | 
+110 109 | 
+111 110 | def f():
 
 RUF100_0.py:108:12: RUF100 [*] Unused `noqa` directive (unknown: `E50`)
     |
@@ -312,3 +317,22 @@ RUF100_0.py:108:12: RUF100 [*] Unused `noqa` directive (unknown: `E50`)
 107 107 |     d = 1  #noqa: F841, E50
 108     |-    e = 1  #noqa: E50
     108 |+    e = 1
+109 109 | 
+110 110 | 
+111 111 | def f():
+
+RUF100_0.py:113:20: RUF100 [*] Unused `noqa` directive (non-enabled: `PGH001`)
+    |
+111 | def f():
+112 |     # Disabled - check redirects are reported correctly
+113 |     eval(command)  # noqa: PGH001
+    |                    ^^^^^^^^^^^^^^ RUF100
+    |
+    = help: Remove unused `noqa` directive
+
+ℹ Safe fix
+110 110 | 
+111 111 | def f():
+112 112 |     # Disabled - check redirects are reported correctly
+113     |-    eval(command)  # noqa: PGH001
+    113 |+    eval(command)
