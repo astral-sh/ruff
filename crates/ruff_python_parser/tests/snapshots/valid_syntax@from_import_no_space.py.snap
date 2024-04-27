@@ -23,9 +23,7 @@ Module(
                             asname: None,
                         },
                     ],
-                    level: Some(
-                        1,
-                    ),
+                    level: 1,
                 },
             ),
             ImportFrom(
@@ -42,9 +40,7 @@ Module(
                             asname: None,
                         },
                     ],
-                    level: Some(
-                        3,
-                    ),
+                    level: 3,
                 },
             ),
         ],

@@ -571,7 +571,7 @@ impl<'a> Generator<'a> {
             }) => {
                 statement!({
                     self.p("from ");
-                    if let Some(level) = level {
+                    if *level > 0 {
                         for _ in 0..*level {
                             self.p(".");
                         }

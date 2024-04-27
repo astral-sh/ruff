@@ -28,9 +28,7 @@ Module(
                             asname: None,
                         },
                     ],
-                    level: Some(
-                        0,
-                    ),
+                    level: 0,
                 },
             ),
             ImportFrom(
@@ -47,9 +45,7 @@ Module(
                             asname: None,
                         },
                     ],
-                    level: Some(
-                        1,
-                    ),
+                    level: 1,
                 },
             ),
             ImportFrom(
@@ -89,9 +85,7 @@ Module(
                             ),
                         },
                     ],
-                    level: Some(
-                        0,
-                    ),
+                    level: 0,
                 },
             ),
             ImportFrom(
@@ -113,9 +107,7 @@ Module(
                             asname: None,
                         },
                     ],
-                    level: Some(
-                        1,
-                    ),
+                    level: 1,
                 },
             ),
             ImportFrom(
@@ -132,9 +124,7 @@ Module(
                             asname: None,
                         },
                     ],
-                    level: Some(
-                        3,
-                    ),
+                    level: 3,
                 },
             ),
             ImportFrom(
@@ -151,9 +141,7 @@ Module(
                             asname: None,
                         },
                     ],
-                    level: Some(
-                        26,
-                    ),
+                    level: 26,
                 },
             ),
             ImportFrom(
@@ -175,9 +163,7 @@ Module(
                             asname: None,
                         },
                     ],
-                    level: Some(
-                        26,
-                    ),
+                    level: 26,
                 },
             ),
             ImportFrom(
@@ -220,9 +206,7 @@ Module(
                             asname: None,
                         },
                     ],
-                    level: Some(
-                        0,
-                    ),
+                    level: 0,
                 },
             ),
             ImportFrom(
@@ -244,9 +228,7 @@ Module(
                             asname: None,
                         },
                     ],
-                    level: Some(
-                        0,
-                    ),
+                    level: 0,
                 },
             ),
         ],

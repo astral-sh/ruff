@@ -14,9 +14,7 @@ Module(
                     range: 0..4,
                     module: None,
                     names: [],
-                    level: Some(
-                        0,
-                    ),
+                    level: 0,
                 },
             ),
             ImportFrom(
@@ -33,9 +31,7 @@ Module(
                             asname: None,
                         },
                     ],
-                    level: Some(
-                        0,
-                    ),
+                    level: 0,
                 },
             ),
         ],

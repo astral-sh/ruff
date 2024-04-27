@@ -319,7 +319,7 @@ pub(crate) fn deprecated_mock_import(checker: &mut Checker, stmt: &Stmt) {
             level,
             ..
         }) => {
-            if level.is_some_and(|level| level > 0) {
+            if *level > 0 {
                 return;
             }
 

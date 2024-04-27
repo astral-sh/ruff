@@ -464,7 +464,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 let level = *level;
 
                 // Mark the top-level module as "seen" by the semantic model.
-                if level.map_or(true, |level| level == 0) {
+                if level == 0 {
                     if let Some(module) = module.and_then(|module| module.split('.').next()) {
                         self.semantic.add_module(module);
                     }

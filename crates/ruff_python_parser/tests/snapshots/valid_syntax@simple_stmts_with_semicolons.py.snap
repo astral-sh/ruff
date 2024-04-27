@@ -49,9 +49,7 @@ Module(
                             asname: None,
                         },
                     ],
-                    level: Some(
-                        0,
-                    ),
+                    level: 0,
                 },
             ),
             Expr(

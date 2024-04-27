@@ -14,7 +14,7 @@ pub(crate) enum TrailingComma {
 #[derive(Debug, Hash, Ord, PartialOrd, Eq, PartialEq, Clone)]
 pub(crate) struct ImportFromData<'a> {
     pub(crate) module: Option<&'a str>,
-    pub(crate) level: Option<u32>,
+    pub(crate) level: u32,
 }
 
 #[derive(Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
