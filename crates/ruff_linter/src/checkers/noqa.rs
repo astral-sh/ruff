@@ -10,7 +10,7 @@ use ruff_python_trivia::CommentRanges;
 use ruff_source_file::Locator;
 
 use crate::fix::edits::delete_comment;
-use crate::noqa::{Directive, FileExemption, NoqaDirectives, NoqaMapping};
+use crate::noqa::{Code, Directive, FileExemption, NoqaDirectives, NoqaMapping};
 use crate::registry::{AsRule, Rule, RuleSet};
 use crate::rule_redirects::get_redirect_target;
 use crate::rules::pygrep_hooks;
@@ -132,7 +132,7 @@ pub(crate) fn check_noqa(
                     let mut unmatched_codes = vec![];
                     let mut valid_codes = vec![];
                     let mut self_ignore = false;
-                    for original_code in directive.names() {
+                    for original_code in directive.iter().map(Code::as_str) {
                         let code = get_redirect_target(original_code).unwrap_or(original_code);
                         if Rule::UnusedNOQA.noqa_code() == code {
                             self_ignore = true;

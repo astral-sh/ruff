@@ -86,11 +86,14 @@ impl<'a> Directive<'a> {
                     let mut leading_space = 0;
                     while let Some(code) = Self::lex_code(&text[codes_end + leading_space..]) {
                         codes_end += leading_space;
-                        codes.push((
+                        codes.push(Code {
                             code,
-                            TextRange::at(TextSize::try_from(codes_end).unwrap(), code.text_len())
-                                .add(offset),
-                        ));
+                            range: TextRange::at(
+                                TextSize::try_from(codes_end).unwrap(),
+                                code.text_len(),
+                            )
+                            .add(offset),
+                        });
 
                         codes_end += code.len();
 
@@ -180,19 +183,42 @@ impl Ranged for All {
     }
 }
 
+/// An individual rule code in a `noqa` directive (e.g., `F401`).
+#[derive(Debug)]
+pub(crate) struct Code<'a> {
+    code: &'a str,
+    range: TextRange,
+}
+
+impl<'a> Code<'a> {
+    /// The code that is ignored by the `noqa` directive.
+    pub(crate) fn as_str(&self) -> &'a str {
+        self.code
+    }
+}
+
+impl Display for Code<'_> {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        fmt.write_str(self.code)
+    }
+}
+
+impl<'a> Ranged for Code<'a> {
+    /// The range of the rule code.
+    fn range(&self) -> TextRange {
+        self.range
+    }
+}
+
 #[derive(Debug)]
 pub(crate) struct Codes<'a> {
     range: TextRange,
-    codes: Vec<(&'a str, TextRange)>,
+    codes: Vec<Code<'a>>,
 }
 
 impl<'a> Codes<'a> {
-    /// The codes that are ignored by the `noqa` directive.
-    pub(crate) fn names(&self) -> impl Iterator<Item = &'a str> + '_ {
-        self.codes.iter().map(|(code, _)| *code)
-    }
-
-    pub(crate) fn iter(&self) -> std::slice::Iter<(&str, TextRange)> {
+    /// Returns an iterator over the [`Code`]s in the `noqa` directive.
+    pub(crate) fn iter(&self) -> std::slice::Iter<Code> {
         self.codes.iter()
     }
 
@@ -201,8 +227,8 @@ impl<'a> Codes<'a> {
     pub(crate) fn includes(&self, needle: Rule) -> bool {
         let needle = needle.noqa_code();
 
-        self.names()
-            .any(|code| needle == get_redirect_target(code).unwrap_or(code))
+        self.iter()
+            .any(|code| needle == get_redirect_target(code.as_str()).unwrap_or(code.as_str()))
     }
 }
 
@@ -621,7 +647,7 @@ fn add_noqa_inner(
                     rules
                         .iter()
                         .map(|rule| rule.noqa_code().to_string())
-                        .chain(codes.names().map(ToString::to_string))
+                        .chain(codes.iter().map(ToString::to_string))
                         .sorted_unstable(),
                 );
 
