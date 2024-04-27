@@ -7,19 +7,15 @@ use dashmap::mapref::entry::Entry;
 use crate::FxDashMap;
 
 /// Simple key value cache that locks on a per-key level.
-pub struct KeyValueCache<K, V, S = DefaultStatisticsRecorder>
-where
-    S: StatisticsRecorder,
-{
+pub struct KeyValueCache<K, V> {
     map: FxDashMap<K, V>,
-    statistics: S,
+    statistics: CacheStatistics,
 }
 
-impl<K, V, S> KeyValueCache<K, V, S>
+impl<K, V> KeyValueCache<K, V>
 where
     K: Eq + Hash + Clone,
     V: Clone,
-    S: StatisticsRecorder,
 {
     pub fn try_get(&self, key: &K) -> Option<V> {
         if let Some(existing) = self.map.get(key) {
@@ -69,25 +65,23 @@ where
     }
 }
 
-impl<K, V, S> Default for KeyValueCache<K, V, S>
+impl<K, V> Default for KeyValueCache<K, V>
 where
     K: Eq + Hash,
     V: Clone,
-    S: StatisticsRecorder,
 {
     fn default() -> Self {
         Self {
             map: FxDashMap::default(),
-            statistics: S::default(),
+            statistics: CacheStatistics::default(),
         }
     }
 }
 
-impl<K, V, S> std::fmt::Debug for KeyValueCache<K, V, S>
+impl<K, V> std::fmt::Debug for KeyValueCache<K, V>
 where
     K: std::fmt::Debug + Eq + Hash,
     V: std::fmt::Debug,
-    S: StatisticsRecorder,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let mut debug = f.debug_map();
@@ -118,12 +112,12 @@ impl Statistics {
 }
 
 #[cfg(debug_assertions)]
-type DefaultStatisticsRecorder = DebugStatistics;
+pub type CacheStatistics = DebugStatistics;
 
 #[cfg(not(debug_assertions))]
-type DefaultStatisticsRecorder = ReleaseStatistics;
+pub type CacheStatistics = ReleaseStatistics;
 
-pub trait StatisticsRecorder: Default {
+pub trait StatisticsRecorder {
     fn hit(&self);
     fn miss(&self);
     fn to_statistics(&self) -> Option<Statistics>;
