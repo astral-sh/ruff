@@ -271,9 +271,9 @@ where
 
     if module_path.root() == &root_path {
         let normalized = path.canonicalize().ok()?;
-        let module_path = db.file_path(module_path.file());
+        let interned_normalized = db.file_id(&normalized);
 
-        if !module_path.starts_with(normalized) {
+        if interned_normalized != module_path.file() {
             // This path is for a module with the same name but with a different precedence. For example:
             // ```
             // src/foo.py
@@ -662,8 +662,8 @@ mod tests {
 
         assert_eq!(Some(foo_module), db.path_to_module(&foo_path));
 
-        // TODO: Should resolving by the directory name resolve a module or not?
-        assert_eq!(Some(foo_module), db.path_to_module(&foo_dir));
+        // Resolving by directory doesn't resolve to the init file.
+        assert_eq!(None, db.path_to_module(&foo_dir));
 
         Ok(())
     }
