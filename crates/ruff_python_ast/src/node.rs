@@ -1,12 +1,13 @@
 use crate::visitor::preorder::PreorderVisitor;
 use crate::{
-    self as ast, Alias, ArgOrKeyword, Arguments, Comprehension, Decorator, ExceptHandler, Expr,
-    FStringElement, Keyword, MatchCase, Mod, Parameter, ParameterWithDefault, Parameters, Pattern,
-    PatternArguments, PatternKeyword, Stmt, StmtAnnAssign, StmtAssert, StmtAssign, StmtAugAssign,
-    StmtBreak, StmtClassDef, StmtContinue, StmtDelete, StmtExpr, StmtFor, StmtFunctionDef,
-    StmtGlobal, StmtIf, StmtImport, StmtImportFrom, StmtIpyEscapeCommand, StmtMatch, StmtNonlocal,
-    StmtPass, StmtRaise, StmtReturn, StmtTry, StmtTypeAlias, StmtWhile, StmtWith, TypeParam,
-    TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple, TypeParams, WithItem,
+    self as ast, Alias, AnyParameterRef, ArgOrKeyword, Arguments, Comprehension, Decorator,
+    ExceptHandler, Expr, FStringElement, Keyword, MatchCase, Mod, Parameter, ParameterWithDefault,
+    Parameters, Pattern, PatternArguments, PatternKeyword, Stmt, StmtAnnAssign, StmtAssert,
+    StmtAssign, StmtAugAssign, StmtBreak, StmtClassDef, StmtContinue, StmtDelete, StmtExpr,
+    StmtFor, StmtFunctionDef, StmtGlobal, StmtIf, StmtImport, StmtImportFrom, StmtIpyEscapeCommand,
+    StmtMatch, StmtNonlocal, StmtPass, StmtRaise, StmtReturn, StmtTry, StmtTypeAlias, StmtWhile,
+    StmtWith, TypeParam, TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple, TypeParams,
+    WithItem,
 };
 use ruff_text_size::{Ranged, TextRange};
 use std::ptr::NonNull;
@@ -4221,28 +4222,13 @@ impl AstNode for Parameters {
     where
         V: PreorderVisitor<'a> + ?Sized,
     {
-        let ast::Parameters {
-            range: _,
-            posonlyargs,
-            args,
-            vararg,
-            kwonlyargs,
-            kwarg,
-        } = self;
-        for arg in posonlyargs.iter().chain(args) {
-            visitor.visit_parameter_with_default(arg);
-        }
-
-        if let Some(arg) = vararg {
-            visitor.visit_parameter(arg);
-        }
-
-        for arg in kwonlyargs {
-            visitor.visit_parameter_with_default(arg);
-        }
-
-        if let Some(arg) = kwarg {
-            visitor.visit_parameter(arg);
+        for parameter in self.iter() {
+            match parameter {
+                AnyParameterRef::NonVariadic(parameter_with_default) => {
+                    visitor.visit_parameter_with_default(parameter_with_default);
+                }
+                AnyParameterRef::Variadic(parameter) => visitor.visit_parameter(parameter),
+            }
         }
     }
 }
