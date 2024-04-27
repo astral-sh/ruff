@@ -1,11 +1,10 @@
 #![allow(clippy::derive_partial_eq_without_eq)]
 
-use std::cell::OnceCell;
-
 use std::fmt;
 use std::fmt::Debug;
 use std::ops::Deref;
 use std::slice::{Iter, IterMut};
+use std::sync::OnceLock;
 
 use bitflags::bitflags;
 use itertools::Itertools;
@@ -1420,7 +1419,7 @@ impl StringLiteralValue {
         Self {
             inner: StringLiteralValueInner::Concatenated(ConcatenatedStringLiteral {
                 strings,
-                value: OnceCell::new(),
+                value: OnceLock::new(),
             }),
         }
     }
@@ -1782,7 +1781,7 @@ struct ConcatenatedStringLiteral {
     /// Each string literal that makes up the concatenated string.
     strings: Vec<StringLiteral>,
     /// The concatenated string value.
-    value: OnceCell<Box<str>>,
+    value: OnceLock<Box<str>>,
 }
 
 impl ConcatenatedStringLiteral {
@@ -4168,7 +4167,7 @@ mod tests {
         assert_eq!(std::mem::size_of::<ExprSetComp>(), 40);
         assert_eq!(std::mem::size_of::<ExprSlice>(), 32);
         assert_eq!(std::mem::size_of::<ExprStarred>(), 24);
-        assert_eq!(std::mem::size_of::<ExprStringLiteral>(), 48);
+        assert_eq!(std::mem::size_of::<ExprStringLiteral>(), 56);
         assert_eq!(std::mem::size_of::<ExprSubscript>(), 32);
         assert_eq!(std::mem::size_of::<ExprTuple>(), 40);
         assert_eq!(std::mem::size_of::<ExprUnaryOp>(), 24);
