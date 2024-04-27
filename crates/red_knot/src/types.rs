@@ -353,10 +353,9 @@ impl std::fmt::Display for DisplayType<'_> {
             Type::Unbound => f.write_str("Unbound"),
             // TODO functions and classes should display using a fully qualified name
             Type::Class(class_id) => {
-                // TODO: how do we want to display types that are not expressible in annotations?
-                f.write_str("Exact[type[")?;
+                f.write_str("Literal[")?;
                 f.write_str(self.store.get_class(*class_id).name())?;
-                f.write_str("]]")
+                f.write_str("]")
             }
             Type::Instance(class_id) => f.write_str(self.store.get_class(*class_id).name()),
             Type::Function(func_id) => f.write_str(self.store.get_function(*func_id).name()),
