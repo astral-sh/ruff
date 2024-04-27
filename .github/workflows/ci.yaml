@@ -194,6 +194,22 @@ jobs:
           cd crates/ruff_wasm
           wasm-pack test --node
 
+  cargo-build-release:
+    name: "cargo build (release)"
+    runs-on: macos-latest
+    needs: determine_changes
+    if: ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: "Install Rust toolchain"
+        run: rustup show
+      - name: "Install mold"
+        uses: rui314/setup-mold@v1
+      - uses: Swatinem/rust-cache@v2
+      - name: "Build"
+        run: cargo build --release --locked
+
   cargo-fuzz:
     name: "cargo fuzz"
     runs-on: ubuntu-latest
