@@ -10,6 +10,8 @@ use types::CodeActionOptions;
 use types::DiagnosticOptions;
 use types::DidChangeWatchedFilesRegistrationOptions;
 use types::FileSystemWatcher;
+use types::NotebookDocumentSyncOptions;
+use types::NotebookSelector;
 use types::OneOf;
 use types::TextDocumentSyncCapability;
 use types::TextDocumentSyncKind;
@@ -252,6 +254,14 @@ impl Server {
                 },
             )),
             hover_provider: Some(types::HoverProviderCapability::Simple(true)),
+            notebook_document_sync: Some(types::OneOf::Left(NotebookDocumentSyncOptions {
+                save: Some(false),
+                notebook_selector: [NotebookSelector::ByNotebook {
+                    notebook: types::Notebook::String("jupyter-notebook".to_string()),
+                    cells: None, // Is this correct? probably not.
+                }]
+                .to_vec(),
+            })),
             text_document_sync: Some(TextDocumentSyncCapability::Options(
                 TextDocumentSyncOptions {
                     open_close: Some(true),
