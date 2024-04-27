@@ -133,7 +133,7 @@ pub(crate) fn check_noqa(
                     let mut unknown_codes = vec![];
                     let mut unmatched_codes = vec![];
                     let mut valid_codes = vec![];
-                    let mut seen_codes = FxHashSet::new();
+                    let mut seen_codes = FxHashSet::default();
                     let mut self_ignore = false;
                     for original_code in directive.iter().map(Code::as_str) {
                         let code = get_redirect_target(original_code).unwrap_or(original_code);
