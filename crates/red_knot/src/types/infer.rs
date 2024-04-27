@@ -7,6 +7,7 @@ use crate::module::ModuleName;
 use crate::symbols::{Definition, ImportFromDefinition, SymbolId};
 use crate::types::Type;
 use crate::FileId;
+use ruff_python_ast as ast;
 
 // FIXME: Figure out proper dead-lock free synchronisation now that this takes `&db` instead of `&mut db`.
 #[tracing::instrument(level = "trace", skip(db))]
@@ -58,8 +59,23 @@ where
                 let ast = parsed.ast();
                 let node = node_key.resolve_unwrap(ast.as_any_node_ref());
 
+                let bases: Vec<_> = node
+                    .bases()
+                    .iter()
+                    .map(|base_expr| match base_expr {
+                        ast::Expr::Name(name) => {
+                            if let Some(base_symbol_id) = symbols.root_symbol_id_by_name(&name.id) {
+                                db.infer_symbol_type(file_id, base_symbol_id)
+                            } else {
+                                Type::Unknown
+                            }
+                        }
+                        _ => todo!("full expression type resolution"),
+                    })
+                    .collect();
+
                 let store = &db.jar().type_store;
-                let ty: Type = store.add_class(file_id, &node.name.id).into();
+                let ty = Type::Class(store.add_class(file_id, &node.name.id, bases.as_slice()));
                 store.cache_node_type(file_id, *node_key.erased(), ty);
                 ty
             }),
@@ -123,20 +139,17 @@ mod tests {
 
     #[test]
     fn follow_import_to_class() -> std::io::Result<()> {
-        let TestCase {
-            src,
-            db,
-            temp_dir: _temp_dir,
-        } = create_test()?;
+        let case = create_test()?;
+        let db = &case.db;
 
-        let a_path = src.path().join("a.py");
-        let b_path = src.path().join("b.py");
+        let a_path = case.src.path().join("a.py");
+        let b_path = case.src.path().join("b.py");
         std::fs::write(a_path, "from b import C as D")?;
         std::fs::write(b_path, "class C: pass")?;
         let a_file = db
             .resolve_module(ModuleName::new("a"))
             .expect("module should be found")
-            .path(&db)
+            .path(db)
             .file();
         let a_syms = db.symbol_table(a_file);
         let d_sym = a_syms
@@ -145,10 +158,45 @@ mod tests {
 
         let ty = db.infer_symbol_type(a_file, d_sym);
 
-        let jar = HasJar::<SemanticJar>::jar(&db);
-
+        let jar = HasJar::<SemanticJar>::jar(db);
         assert!(matches!(ty, Type::Class(_)));
         assert_eq!(format!("{}", ty.display(&jar.type_store)), "Literal[C]");
+        Ok(())
+    }
+
+    #[test]
+    fn resolve_base_class_by_name() -> std::io::Result<()> {
+        let case = create_test()?;
+        let db = &case.db;
+
+        let path = case.src.path().join("mod.py");
+        std::fs::write(path, "class Base: pass\nclass Sub(Base): pass")?;
+        let file = db
+            .resolve_module(ModuleName::new("mod"))
+            .expect("module should be found")
+            .path(db)
+            .file();
+        let syms = db.symbol_table(file);
+        let sym = syms
+            .root_symbol_id_by_name("Sub")
+            .expect("Sub symbol should be found");
+
+        let ty = db.infer_symbol_type(file, sym);
+
+        let Type::Class(class_id) = ty else {
+            panic!("Sub is not a Class")
+        };
+        let jar = HasJar::<SemanticJar>::jar(db);
+        let base_names: Vec<_> = jar
+            .type_store
+            .get_class(class_id)
+            .bases()
+            .iter()
+            .map(|base_ty| format!("{}", base_ty.display(&jar.type_store)))
+            .collect();
+
+        assert_eq!(base_names, vec!["Literal[Base]"]);
+
         Ok(())
     }
 }
