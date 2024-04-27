@@ -128,21 +128,21 @@ fn is_first_party(checker: &Checker, qualified_name: &str) -> bool {
         &checker.settings.isort.section_order,
         &checker.settings.isort.default_section,
     );
-    match category {
-        ImportSection::Known(ImportType::FirstParty | ImportType::LocalFolder) => true,
-        _ => false,
+    matches! {
+        category,
+        ImportSection::Known(ImportType::FirstParty | ImportType::LocalFolder)
     }
 }
 
 /// For some unused binding in an import statement...
 ///
-///  in_init ∧ 1stpty → safe,   move to __all__ or convert to explicit-import
-///  in_init ∧ stdlib → unsafe, remove
-///  in_init ∧ 3rdpty → unsafe, remove
+///  __init__.py ∧ 1stpty → safe,   move to __all__ or convert to explicit-import
+///  __init__.py ∧ stdlib → unsafe, remove
+///  __init__.py ∧ 3rdpty → unsafe, remove
 ///
-/// ¬in_init ∧ 1stpty → safe,   remove
-/// ¬in_init ∧ stdlib → safe,   remove
-/// ¬in_init ∧ 3rdpty → safe,   remove
+/// ¬__init__.py ∧ 1stpty → safe,   remove
+/// ¬__init__.py ∧ stdlib → safe,   remove
+/// ¬__init__.py ∧ 3rdpty → safe,   remove
 ///
 pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut Vec<Diagnostic>) {
     // Collect all unused imports by statement.
@@ -300,7 +300,7 @@ fn fix_by_removing_imports(
     imports: &[ImportBinding],
     in_init: bool,
 ) -> Result<Fix> {
-    if 0 == imports.len() {
+    if imports.is_empty() {
         bail!("Expected import bindings");
     }
     let statement = checker.semantic().statement(node_id);
@@ -343,7 +343,7 @@ fn fix_by_reexporting(
     imports: &[ImportBinding],
     dunder_all: Option<NodeId>,
 ) -> Result<Fix> {
-    if 0 == imports.len() {
+    if imports.is_empty() {
         bail!("Expected import bindings");
     }
     let statement = checker.semantic().statement(node_id);
