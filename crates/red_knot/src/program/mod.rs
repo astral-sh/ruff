@@ -111,6 +111,10 @@ impl SemanticDb for Program {
         symbol_table(self, file_id)
     }
 
+    fn infer_symbol_type(&self, file_id: FileId, symbol_id: SymbolId) -> Type {
+        infer_symbol_type(self, file_id, symbol_id)
+    }
+
     // Mutations
 
     fn add_module(&mut self, path: &Path) -> Option<(Module, Vec<Arc<ModuleData>>)> {
@@ -119,10 +123,6 @@ impl SemanticDb for Program {
 
     fn set_module_search_paths(&mut self, paths: Vec<ModuleSearchPath>) {
         set_module_search_paths(self, paths);
-    }
-
-    fn infer_symbol_type(&mut self, file_id: FileId, symbol_id: SymbolId) -> Type {
-        infer_symbol_type(self, file_id, symbol_id)
     }
 }
 

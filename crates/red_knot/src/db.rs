@@ -32,13 +32,13 @@ pub trait SemanticDb: SourceDb {
 
     fn symbol_table(&self, file_id: FileId) -> Arc<SymbolTable>;
 
+    fn infer_symbol_type(&self, file_id: FileId, symbol_id: SymbolId) -> Type;
+
     // mutations
 
     fn add_module(&mut self, path: &Path) -> Option<(Module, Vec<Arc<ModuleData>>)>;
 
     fn set_module_search_paths(&mut self, paths: Vec<ModuleSearchPath>);
-
-    fn infer_symbol_type(&mut self, file_id: FileId, symbol_id: SymbolId) -> Type;
 }
 
 pub trait Db: SemanticDb {}
@@ -155,6 +155,10 @@ pub(crate) mod tests {
             file_to_module(self, file_id)
         }
 
+        fn infer_symbol_type(&self, file_id: FileId, symbol_id: SymbolId) -> Type {
+            infer_symbol_type(self, file_id, symbol_id)
+        }
+
         fn path_to_module(&self, path: &Path) -> Option<Module> {
             path_to_module(self, path)
         }
@@ -169,10 +173,6 @@ pub(crate) mod tests {
 
         fn set_module_search_paths(&mut self, paths: Vec<ModuleSearchPath>) {
             set_module_search_paths(self, paths);
-        }
-
-        fn infer_symbol_type(&mut self, file_id: FileId, symbol_id: SymbolId) -> Type {
-            infer_symbol_type(self, file_id, symbol_id)
         }
     }
 }

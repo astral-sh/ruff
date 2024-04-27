@@ -9,7 +9,7 @@ use ruff_python_ast::AstNode;
 // TODO this should not take a &mut db, it should be a query, not a mutation. This means we'll need
 // to use interior mutability in TypeStore instead, and avoid races in populating the cache.
 #[tracing::instrument(level = "trace", skip(db))]
-pub fn infer_symbol_type<Db>(db: &mut Db, file_id: FileId, symbol_id: SymbolId) -> Type
+pub fn infer_symbol_type<Db>(db: &Db, file_id: FileId, symbol_id: SymbolId) -> Type
 where
     Db: SemanticDb + HasJar<SemanticJar>,
 {
@@ -36,15 +36,27 @@ where
             // TODO relative imports
             assert!(matches!(level, 0));
             let module_name = ModuleName::new(module.as_ref().expect("TODO relative imports"));
-            if let Some(module) = db.resolve_module(module_name) {
+            if let Some(module) = db.resolve_module(module_name.clone()) {
                 let remote_file_id = module.path(db).file();
                 let remote_symbols = db.symbol_table(remote_file_id);
                 if let Some(remote_symbol_id) = remote_symbols.root_symbol_id_by_name(name) {
+                    // TODO integrate this into module and symbol-resolution APIs (requiring a
+                    // "requester" argument) so that it doesn't have to be remembered
+                    db.jar().type_store.record_symbol_dependency(
+                        (file_id, symbol_id),
+                        (remote_file_id, remote_symbol_id),
+                    );
                     db.infer_symbol_type(remote_file_id, remote_symbol_id)
                 } else {
+                    db.jar()
+                        .type_store
+                        .record_module_dependency((file_id, symbol_id), module_name);
                     Type::Unknown
                 }
             } else {
+                db.jar()
+                    .type_store
+                    .record_module_dependency((file_id, symbol_id), module_name);
                 Type::Unknown
             }
         }
@@ -60,7 +72,7 @@ where
                 let ast = parsed.ast();
                 let node = node_key.resolve_unwrap(ast.as_any_node_ref());
 
-                let store = &mut db.jar_mut().type_store;
+                let store = &db.jar().type_store;
                 let ty = Type::Class(store.add_class(file_id, &node.name.id));
                 store.cache_node_type(file_id, *node_key.erased(), ty);
                 ty
@@ -69,10 +81,9 @@ where
         _ => todo!("other kinds of definitions"),
     };
 
-    db.jar_mut()
+    db.jar()
         .type_store
         .cache_symbol_type(file_id, symbol_id, ty);
-    // TODO record dependencies
     ty
 }
 
@@ -112,7 +123,7 @@ mod tests {
     fn follow_import_to_class() -> std::io::Result<()> {
         let TestCase {
             src,
-            mut db,
+            db,
             temp_dir: _temp_dir,
         } = create_test()?;
 
@@ -132,10 +143,24 @@ mod tests {
 
         let ty = db.infer_symbol_type(a_file, d_sym);
 
+        let b_file = db
+            .resolve_module(ModuleName::new("b"))
+            .expect("module should be found")
+            .path(&db)
+            .file();
+        let b_syms = db.symbol_table(b_file);
+        let c_sym = b_syms
+            .root_symbol_id_by_name("C")
+            .expect("C symbol should be found");
+
         let jar = HasJar::<SemanticJar>::jar(&db);
 
         assert!(matches!(ty, Type::Class(_)));
         assert_eq!(format!("{}", ty.display(&jar.type_store)), "Literal[C]");
+        assert_eq!(
+            jar.type_store.get_module(a_file).symbol_dependencies[&d_sym],
+            [(b_file, c_sym)].iter().copied().collect()
+        );
         Ok(())
     }
 }

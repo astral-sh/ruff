@@ -1,8 +1,9 @@
 #![allow(dead_code)]
 use crate::ast_ids::NodeKey;
 use crate::files::FileId;
+use crate::module::ModuleName;
 use crate::symbols::SymbolId;
-use crate::{FxDashMap, FxIndexSet, Name};
+use crate::{FxDashMap, FxHashSet, FxIndexSet, Name};
 use ruff_index::{newtype_index, IndexVec};
 use rustc_hash::FxHashMap;
 
@@ -49,17 +50,17 @@ pub struct TypeStore {
 }
 
 impl TypeStore {
-    pub fn remove_module(&mut self, file_id: FileId) {
+    pub fn remove_module(&self, file_id: FileId) {
         self.modules.remove(&file_id);
     }
 
-    pub fn cache_symbol_type(&mut self, file_id: FileId, symbol_id: SymbolId, ty: Type) {
+    pub fn cache_symbol_type(&self, file_id: FileId, symbol_id: SymbolId, ty: Type) {
         self.add_or_get_module(file_id)
             .symbol_types
             .insert(symbol_id, ty);
     }
 
-    pub fn cache_node_type(&mut self, file_id: FileId, node_key: NodeKey, ty: Type) {
+    pub fn cache_node_type(&self, file_id: FileId, node_key: NodeKey, ty: Type) {
         self.add_or_get_module(file_id)
             .node_types
             .insert(node_key, ty);
@@ -79,7 +80,7 @@ impl TypeStore {
             .copied()
     }
 
-    fn add_or_get_module(&mut self, file_id: FileId) -> ModuleStoreRefMut {
+    fn add_or_get_module(&self, file_id: FileId) -> ModuleStoreRefMut {
         self.modules
             .entry(file_id)
             .or_insert_with(|| ModuleTypeStore::new(file_id))
@@ -93,20 +94,20 @@ impl TypeStore {
         self.modules.get(&file_id)
     }
 
-    fn add_function(&mut self, file_id: FileId, name: &str) -> FunctionTypeId {
+    fn add_function(&self, file_id: FileId, name: &str) -> FunctionTypeId {
         self.add_or_get_module(file_id).add_function(name)
     }
 
-    fn add_class(&mut self, file_id: FileId, name: &str) -> ClassTypeId {
+    fn add_class(&self, file_id: FileId, name: &str) -> ClassTypeId {
         self.add_or_get_module(file_id).add_class(name)
     }
 
-    fn add_union(&mut self, file_id: FileId, elems: &[Type]) -> UnionTypeId {
+    fn add_union(&self, file_id: FileId, elems: &[Type]) -> UnionTypeId {
         self.add_or_get_module(file_id).add_union(elems)
     }
 
     fn add_intersection(
-        &mut self,
+        &self,
         file_id: FileId,
         positive: &[Type],
         negative: &[Type],
@@ -141,6 +142,24 @@ impl TypeStore {
             module_store: self.get_module(id.file_id),
             intersection_id: id.intersection_id,
         }
+    }
+
+    fn record_symbol_dependency(&self, from: (FileId, SymbolId), to: (FileId, SymbolId)) {
+        let (from_file_id, from_symbol_id) = from;
+        self.add_or_get_module(from_file_id)
+            .symbol_dependencies
+            .entry(from_symbol_id)
+            .or_default()
+            .insert(to);
+    }
+
+    fn record_module_dependency(&self, from: (FileId, SymbolId), to: ModuleName) {
+        let (from_file_id, from_symbol_id) = from;
+        self.add_or_get_module(from_file_id)
+            .module_dependencies
+            .entry(from_symbol_id)
+            .or_default()
+            .insert(to);
     }
 }
 
@@ -265,6 +284,12 @@ struct ModuleTypeStore {
     symbol_types: FxHashMap<SymbolId, Type>,
     /// cached types of AST nodes in this module
     node_types: FxHashMap<NodeKey, Type>,
+    // the inferred type for symbol K depends on the type of symbols in V
+    symbol_dependencies: FxHashMap<SymbolId, FxHashSet<(FileId, SymbolId)>>,
+    // the inferred type for symbol K depends on the modules in V; this type of dependency is
+    // recorded when e.g. the target symbol doesn't exist in the module, so we can't record a
+    // dependency on a symbol, but if the module changes it could still change our resolution)
+    module_dependencies: FxHashMap<SymbolId, FxHashSet<ModuleName>>,
 }
 
 impl ModuleTypeStore {
@@ -277,6 +302,8 @@ impl ModuleTypeStore {
             intersections: IndexVec::default(),
             symbol_types: FxHashMap::default(),
             node_types: FxHashMap::default(),
+            symbol_dependencies: FxHashMap::default(),
+            module_dependencies: FxHashMap::default(),
         }
     }
 
@@ -462,7 +489,7 @@ mod tests {
 
     #[test]
     fn add_class() {
-        let mut store = TypeStore::default();
+        let store = TypeStore::default();
         let files = Files::default();
         let file_id = files.intern(Path::new("/foo"));
         let id = store.add_class(file_id, "C");
@@ -473,7 +500,7 @@ mod tests {
 
     #[test]
     fn add_function() {
-        let mut store = TypeStore::default();
+        let store = TypeStore::default();
         let files = Files::default();
         let file_id = files.intern(Path::new("/foo"));
         let id = store.add_function(file_id, "func");
@@ -484,7 +511,7 @@ mod tests {
 
     #[test]
     fn add_union() {
-        let mut store = TypeStore::default();
+        let store = TypeStore::default();
         let files = Files::default();
         let file_id = files.intern(Path::new("/foo"));
         let c1 = store.add_class(file_id, "C1");
@@ -501,7 +528,7 @@ mod tests {
 
     #[test]
     fn add_intersection() {
-        let mut store = TypeStore::default();
+        let store = TypeStore::default();
         let files = Files::default();
         let file_id = files.intern(Path::new("/foo"));
         let c1 = store.add_class(file_id, "C1");
