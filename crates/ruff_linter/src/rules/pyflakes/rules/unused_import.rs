@@ -116,7 +116,7 @@ impl Violation for UnusedImport {
 
 fn is_first_party(checker: &Checker, qualified_name: &str) -> bool {
     use isort::{ImportSection, ImportType};
-    match isort::categorize(
+    let category = isort::categorize(
         qualified_name,
         None,
         &checker.settings.src,
@@ -127,7 +127,8 @@ fn is_first_party(checker: &Checker, qualified_name: &str) -> bool {
         checker.settings.isort.no_sections,
         &checker.settings.isort.section_order,
         &checker.settings.isort.default_section,
-    ) {
+    );
+    match category {
         ImportSection::Known(ImportType::FirstParty | ImportType::LocalFolder) => true,
         _ => false,
     }
