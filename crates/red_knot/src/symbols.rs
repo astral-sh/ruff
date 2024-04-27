@@ -16,7 +16,7 @@ use crate::ast_ids::TypedNodeKey;
 use crate::cache::KeyValueCache;
 use crate::db::{HasJar, SemanticDb, SemanticJar};
 use crate::files::FileId;
-use crate::module::ModuleName;
+use crate::module::{Module, ModuleName};
 use crate::Name;
 
 #[allow(unreachable_pub)]
@@ -128,11 +128,14 @@ pub(crate) enum Dependency {
 }
 
 impl Dependency {
-    pub(crate) fn module_name(&self, relative_to: Option<&ModuleName>) -> Option<ModuleName> {
+    pub(crate) fn module_name<Db>(&self, db: &Db, relative_to: Option<Module>) -> Option<ModuleName>
+    where
+        Db: SemanticDb + HasJar<SemanticJar>,
+    {
         match self {
             Dependency::Module(name) => Some(ModuleName::new(name.as_str())),
             Dependency::Relative { level, module } => {
-                relative_to?.relative(*level, module.as_ref().map(|name| name.as_str()))
+                relative_to?.relative_name(db, *level, module.as_deref())
             }
         }
     }

@@ -45,17 +45,19 @@ impl Program {
         let dependencies = symbol_table.dependencies();
 
         if !dependencies.is_empty() {
-            let module_name = self.file_to_module(file).map(|module| module.name(self));
+            let module = self.file_to_module(file);
 
             // TODO scheduling all dependencies here is wasteful if we don't infer any types on them
             //  but I think that's unlikely, so it is okay?
             //  Anyway, we need to figure out a way to retrieve the dependencies of a module
             //  from the persistent cache. So maybe it should be a separate query after all.
             for dependency in dependencies {
-                let dependency_name = dependency.module_name(module_name.as_ref());
+                let dependency_name = dependency.module_name(self, module);
 
                 if let Some(dependency_name) = dependency_name {
-                    // TODO The resolver doesn't support native dependencies yet.
+                    // TODO We may want to have a different check functions for non-first-party
+                    //   files because we only need to index them and not check them.
+                    //   Supporting non-first-party code also requires supporting typing stubs.
                     if let Some(dependency) = self.resolve_module(dependency_name) {
                         if dependency.path(self).root().kind().is_first_party() {
                             context.schedule_check_file(dependency.path(self).file());
