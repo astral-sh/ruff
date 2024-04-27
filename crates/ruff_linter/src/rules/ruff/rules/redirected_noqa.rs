@@ -5,11 +5,13 @@ use crate::noqa::{Directive, NoqaDirectives};
 use crate::rule_redirects::get_redirect_target;
 
 /// ## What it does
-/// Checks for `noqa` directives with code redirects.
+/// Checks for `noqa` directives that use redirected rule codes.
 ///
 /// ## Why is this bad?
-/// A code redirect implies that a rule has been deprecated in favor of another rule.
-/// To avoid confusion it is better to use the canonical rule code.
+/// When a rule code has been redirected, the implication is that the rule has
+/// been deprecated in favor of another rule or code. To keep the codebase
+/// consistent and up-to-date, prefer the canonical rule code over the deprecated
+/// code.
 ///
 /// ## Example
 /// ```python
@@ -34,8 +36,8 @@ impl AlwaysFixableViolation for RedirectedNOQA {
     }
 
     fn fix_title(&self) -> String {
-        let RedirectedNOQA { original, target } = self;
-        format!("Replace `{original}` with `{target}`")
+        let RedirectedNOQA { target, .. } = self;
+        format!("Replace with `{target}`")
     }
 }
 
@@ -46,19 +48,18 @@ pub(crate) fn redirected_noqa(diagnostics: &mut Vec<Diagnostic>, noqa_directives
             continue;
         };
 
-        for (original_code, code_range) in directive.iter() {
-            if let Some(redirected) = get_redirect_target(original_code) {
+        for (code, range) in directive.iter() {
+            if let Some(redirected) = get_redirect_target(code) {
                 let mut diagnostic = Diagnostic::new(
                     RedirectedNOQA {
-                        original: (*original_code).to_string(),
+                        original: (*code).to_string(),
                         target: redirected.to_string(),
                     },
-                    *code_range,
+                    *range,
                 );
-
                 diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                     redirected.to_string(),
-                    *code_range,
+                    *range,
                 )));
                 diagnostics.push(diagnostic);
             }
