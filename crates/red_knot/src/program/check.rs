@@ -3,6 +3,7 @@ use crate::db::{SemanticDb, SourceDb};
 use crate::files::FileId;
 use crate::lint::Diagnostics;
 use crate::program::Program;
+use crate::symbols::Dependency;
 use rayon::max_num_threads;
 use rustc_hash::FxHashSet;
 use std::num::NonZeroUsize;
@@ -52,7 +53,12 @@ impl Program {
             //  Anyway, we need to figure out a way to retrieve the dependencies of a module
             //  from the persistent cache. So maybe it should be a separate query after all.
             for dependency in dependencies {
-                let dependency_name = dependency.module_name(self, module);
+                let dependency_name = match dependency {
+                    Dependency::Module(name) => Some(name.clone()),
+                    Dependency::Relative { .. } => module
+                        .as_ref()
+                        .and_then(|module| module.resolve_dependency(self, dependency)),
+                };
 
                 if let Some(dependency_name) = dependency_name {
                     // TODO We may want to have a different check functions for non-first-party

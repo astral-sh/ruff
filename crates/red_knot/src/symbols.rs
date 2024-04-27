@@ -2,6 +2,7 @@
 
 use std::hash::{Hash, Hasher};
 use std::iter::{Copied, DoubleEndedIterator, FusedIterator};
+use std::num::NonZeroU32;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 
@@ -16,7 +17,7 @@ use crate::ast_ids::TypedNodeKey;
 use crate::cache::KeyValueCache;
 use crate::db::{HasJar, SemanticDb, SemanticJar};
 use crate::files::FileId;
-use crate::module::{Module, ModuleName};
+use crate::module::ModuleName;
 use crate::Name;
 
 #[allow(unreachable_pub)]
@@ -111,34 +112,23 @@ pub(crate) enum Definition {
 
 #[derive(Debug)]
 pub(crate) struct ImportDefinition {
-    pub(crate) module: Name,
+    pub(crate) module: ModuleName,
 }
 
 #[derive(Debug)]
 pub(crate) struct ImportFromDefinition {
-    pub(crate) module: Option<Name>,
+    pub(crate) module: Option<ModuleName>,
     pub(crate) name: Name,
     pub(crate) level: u32,
 }
 
 #[derive(Debug, Clone)]
-pub(crate) enum Dependency {
-    Module(Name),
-    Relative { level: u32, module: Option<Name> },
-}
-
-impl Dependency {
-    pub(crate) fn module_name<Db>(&self, db: &Db, relative_to: Option<Module>) -> Option<ModuleName>
-    where
-        Db: SemanticDb + HasJar<SemanticJar>,
-    {
-        match self {
-            Dependency::Module(name) => Some(ModuleName::new(name.as_str())),
-            Dependency::Relative { level, module } => {
-                relative_to?.relative_name(db, *level, module.as_deref())
-            }
-        }
-    }
+pub enum Dependency {
+    Module(ModuleName),
+    Relative {
+        level: NonZeroU32,
+        module: Option<ModuleName>,
+    },
 }
 
 /// Table of all symbols in all scopes for a module.
@@ -473,7 +463,7 @@ impl PreorderVisitor<'_> for SymbolTableBuilder {
                         alias.name.id.split('.').next().unwrap()
                     };
 
-                    let module = Name::new(&alias.name.id);
+                    let module = ModuleName::new(&alias.name.id);
 
                     let def = Definition::Import(ImportDefinition {
                         module: module.clone(),
@@ -488,7 +478,7 @@ impl PreorderVisitor<'_> for SymbolTableBuilder {
                 level,
                 ..
             }) => {
-                let module = module.as_ref().map(|m| Name::new(&m.id));
+                let module = module.as_ref().map(|m| ModuleName::new(&m.id));
 
                 for alias in names {
                     let symbol_name = if let Some(asname) = &alias.asname {
@@ -505,17 +495,17 @@ impl PreorderVisitor<'_> for SymbolTableBuilder {
                 }
 
                 let dependency = if let Some(module) = module {
-                    if *level == 0 {
-                        Dependency::Module(module)
-                    } else {
-                        Dependency::Relative {
-                            level: *level,
+                    match NonZeroU32::new(*level) {
+                        Some(level) => Dependency::Relative {
+                            level,
                             module: Some(module),
-                        }
+                        },
+                        None => Dependency::Module(module),
                     }
                 } else {
                     Dependency::Relative {
-                        level: *level,
+                        level: NonZeroU32::new(*level)
+                            .expect("Import without a module to have a level > 0"),
                         module,
                     }
                 };
