@@ -1,4 +1,5 @@
 use std::fmt::Formatter;
+use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicU32;
 use std::sync::Arc;
@@ -8,6 +9,7 @@ use smol_str::SmolStr;
 
 use crate::db::{HasJar, SemanticDb, SemanticJar};
 use crate::files::FileId;
+use crate::symbols::Dependency;
 use crate::FxDashMap;
 
 /// ID uniquely identifying a module.
@@ -42,27 +44,30 @@ impl Module {
         modules.modules.get(self).unwrap().kind
     }
 
-    pub fn relative_name<Db>(&self, db: &Db, level: u32, module: Option<&str>) -> Option<ModuleName>
+    pub fn resolve_dependency<Db>(&self, db: &Db, dependency: &Dependency) -> Option<ModuleName>
     where
         Db: HasJar<SemanticJar>,
     {
+        let (level, module) = match dependency {
+            Dependency::Module(module) => return Some(ModuleName::new(module)),
+            Dependency::Relative { level, module } => (*level, module.as_deref()),
+        };
+
         let name = self.name(db);
         let kind = self.kind(db);
 
         let mut components = name.components().peekable();
 
-        if level > 0 {
-            let start = match kind {
-                // `.` resolves to the enclosing package
-                ModuleKind::Module => 0,
-                // `.` resolves to the current package
-                ModuleKind::Package => 1,
-            };
+        let start = match kind {
+            // `.` resolves to the enclosing package
+            ModuleKind::Module => 0,
+            // `.` resolves to the current package
+            ModuleKind::Package => 1,
+        };
 
-            // Skip over the relative parts.
-            for _ in start..level {
-                components.next_back()?;
-            }
+        // Skip over the relative parts.
+        for _ in start..level.get() {
+            components.next_back()?;
         }
 
         let mut name = String::new();
@@ -138,6 +143,14 @@ impl ModuleName {
 
     pub fn as_str(&self) -> &str {
         &self.0
+    }
+}
+
+impl Deref for ModuleName {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        self.as_str()
     }
 }
 
@@ -638,6 +651,8 @@ mod tests {
     use crate::db::tests::TestDb;
     use crate::db::{SemanticDb, SourceDb};
     use crate::module::{ModuleKind, ModuleName, ModuleSearchPath, ModuleSearchPathKind};
+    use crate::symbols::Dependency;
+    use std::num::NonZeroU32;
 
     struct TestCase {
         temp_dir: tempfile::TempDir,
@@ -971,7 +986,7 @@ mod tests {
     }
 
     #[test]
-    fn relative_name() -> std::io::Result<()> {
+    fn resolve_dependency() -> std::io::Result<()> {
         let TestCase {
             src,
             db,
@@ -993,40 +1008,73 @@ mod tests {
         // `from . import bar` in `foo/__init__.py` resolves to `foo`
         assert_eq!(
             Some(ModuleName::new("foo")),
-            foo_module.relative_name(&db, 1, None)
+            foo_module.resolve_dependency(
+                &db,
+                &Dependency::Relative {
+                    level: NonZeroU32::new(1).unwrap(),
+                    module: None
+                }
+            )
         );
 
-        // `from baz import bar` in `foo/__init__.py` should resolve to `foo/baz.py`
+        // `from baz import bar` in `foo/__init__.py` should resolve to `baz.py`
         assert_eq!(
-            Some(ModuleName::new("foo.baz")),
-            foo_module.relative_name(&db, 0, Some("baz"))
+            Some(ModuleName::new("baz")),
+            foo_module.resolve_dependency(&db, &Dependency::Module(ModuleName::new("baz")))
         );
 
         // from .bar import test in `foo/__init__.py` should resolve to `foo/bar.py`
         assert_eq!(
             Some(ModuleName::new("foo.bar")),
-            foo_module.relative_name(&db, 1, Some("bar"))
+            foo_module.resolve_dependency(
+                &db,
+                &Dependency::Relative {
+                    level: NonZeroU32::new(1).unwrap(),
+                    module: Some(ModuleName::new("bar"))
+                }
+            )
         );
 
         // from .. import test in `foo/__init__.py` resolves to `` which is not a module
-        assert_eq!(None, foo_module.relative_name(&db, 2, None));
+        assert_eq!(
+            None,
+            foo_module.resolve_dependency(
+                &db,
+                &Dependency::Relative {
+                    level: NonZeroU32::new(2).unwrap(),
+                    module: None
+                }
+            )
+        );
 
         // `from . import test` in `foo/bar.py` resolves to `foo`
         assert_eq!(
             Some(ModuleName::new("foo")),
-            bar_module.relative_name(&db, 1, None)
+            bar_module.resolve_dependency(
+                &db,
+                &Dependency::Relative {
+                    level: NonZeroU32::new(1).unwrap(),
+                    module: None
+                }
+            )
         );
 
-        // `from baz import test` in `foo/bar.py` resolves to `foo.bar.baz`
+        // `from baz import test` in `foo/bar.py` resolves to `baz`
         assert_eq!(
-            Some(ModuleName::new("foo.bar.baz")),
-            bar_module.relative_name(&db, 0, Some("baz"))
+            Some(ModuleName::new("baz")),
+            bar_module.resolve_dependency(&db, &Dependency::Module(ModuleName::new("baz")))
         );
 
         // `from .baz import test` in `foo/bar.py` resolves to `foo.baz`.
         assert_eq!(
             Some(ModuleName::new("foo.baz")),
-            bar_module.relative_name(&db, 1, Some("baz"))
+            bar_module.resolve_dependency(
+                &db,
+                &Dependency::Relative {
+                    level: NonZeroU32::new(1).unwrap(),
+                    module: Some(ModuleName::new("baz"))
+                }
+            )
         );
 
         Ok(())
