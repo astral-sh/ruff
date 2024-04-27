@@ -135,7 +135,7 @@ mod tests {
         let jar = HasJar::<SemanticJar>::jar(&db);
 
         assert!(matches!(ty, Type::Class(_)));
-        assert_eq!(format!("{}", ty.display(&jar.type_store)), "C");
+        assert_eq!(format!("{}", ty.display(&jar.type_store)), "Exact[type[C]]");
         Ok(())
     }
 }

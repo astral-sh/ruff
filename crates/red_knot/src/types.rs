@@ -22,10 +22,12 @@ pub enum Type {
     Unknown,
     /// name is not bound to any value
     Unbound,
-    /// a specific function
+    /// a specific function object
     Function(FunctionTypeId),
-    /// the set of Python objects with a given class in their __class__'s method resolution order
+    /// a specific class object
     Class(ClassTypeId),
+    /// the set of Python objects with the given class in their __class__'s method resolution order
+    Instance(ClassTypeId),
     Union(UnionTypeId),
     Intersection(IntersectionTypeId),
     // TODO protocols, callable types, overloads, generics, type vars
@@ -349,7 +351,14 @@ impl std::fmt::Display for DisplayType<'_> {
             Type::Never => f.write_str("Never"),
             Type::Unknown => f.write_str("Unknown"),
             Type::Unbound => f.write_str("Unbound"),
-            Type::Class(class_id) => f.write_str(self.store.get_class(*class_id).name()),
+            // TODO functions and classes should display using a fully qualified name
+            Type::Class(class_id) => {
+                // TODO: how do we want to display types that are not expressible in annotations?
+                f.write_str("Exact[type[")?;
+                f.write_str(self.store.get_class(*class_id).name())?;
+                f.write_str("]]")
+            }
+            Type::Instance(class_id) => f.write_str(self.store.get_class(*class_id).name()),
             Type::Function(func_id) => f.write_str(self.store.get_function(*func_id).name()),
             Type::Union(union_id) => self
                 .store
@@ -459,8 +468,8 @@ mod tests {
         let file_id = files.intern(Path::new("/foo"));
         let id = store.add_class(file_id, "C");
         assert_eq!(store.get_class(id).name(), "C");
-        let class = Type::Class(id);
-        assert_eq!(format!("{}", class.display(&store)), "C");
+        let inst = Type::Instance(id);
+        assert_eq!(format!("{}", inst.display(&store)), "C");
     }
 
     #[test]
@@ -481,7 +490,7 @@ mod tests {
         let file_id = files.intern(Path::new("/foo"));
         let c1 = store.add_class(file_id, "C1");
         let c2 = store.add_class(file_id, "C2");
-        let elems = vec![Type::Class(c1), Type::Class(c2)];
+        let elems = vec![Type::Instance(c1), Type::Instance(c2)];
         let id = store.add_union(file_id, &elems);
         assert_eq!(
             store.get_union(id).elements,
@@ -499,8 +508,8 @@ mod tests {
         let c1 = store.add_class(file_id, "C1");
         let c2 = store.add_class(file_id, "C2");
         let c3 = store.add_class(file_id, "C3");
-        let pos = vec![Type::Class(c1), Type::Class(c2)];
-        let neg = vec![Type::Class(c3)];
+        let pos = vec![Type::Instance(c1), Type::Instance(c2)];
+        let neg = vec![Type::Instance(c3)];
         let id = store.add_intersection(file_id, &pos, &neg);
         assert_eq!(
             store.get_intersection(id).positive,
