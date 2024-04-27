@@ -154,7 +154,7 @@ pub(crate) fn check_noqa(
                                     disabled_codes.push(original_code);
                                 }
                             } else {
-                                unknown_codes.push(code);
+                                unknown_codes.push(original_code);
                             }
                         }
                     }

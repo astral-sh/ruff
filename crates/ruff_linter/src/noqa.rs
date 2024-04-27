@@ -608,7 +608,7 @@ fn add_noqa_inner(
                 // Add existing content.
                 output.push_str(
                     locator
-                        .slice(TextRange::new(offset, codes.range().start()))
+                        .slice(TextRange::new(offset, codes.start()))
                         .trim_end(),
                 );
 
