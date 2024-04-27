@@ -123,6 +123,8 @@ pub(crate) fn remove_unused_imports<'a>(
 }
 
 // TODO: unit tests
+// TODO: test for `a as a`
+// TODO: test for `a as b`
 /// Edits to make the specified imports explicit, e.g. change `import x` to `import x as x`.
 pub(crate) fn make_redundant_alias<'a>(
     member_names: impl Iterator<Item = &'a str>,
@@ -135,8 +137,6 @@ pub(crate) fn make_redundant_alias<'a>(
             return Vec::new();
         }
     };
-    // TODO: test for `a as a`
-    // TODO: test for `a as b`
     member_names
         .filter_map(|name| {
             aliases
