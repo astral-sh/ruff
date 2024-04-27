@@ -1,17 +1,18 @@
 use std::sync::{Arc, Condvar, Mutex};
 
 #[derive(Debug, Default)]
-pub struct CancellationSource {
+pub struct CancellationTokenSource {
     signal: Arc<(Mutex<bool>, Condvar)>,
 }
 
-impl CancellationSource {
+impl CancellationTokenSource {
     pub fn new() -> Self {
         Self {
             signal: Arc::new((Mutex::new(false), Condvar::default())),
         }
     }
 
+    #[tracing::instrument(level = "trace")]
     pub fn cancel(&self) {
         let (cancelled, condvar) = &*self.signal;
 

@@ -23,7 +23,7 @@ pub struct Files {
 }
 
 impl Files {
-    #[tracing::instrument(level = "trace", skip(path))]
+    #[tracing::instrument(level = "debug", skip(path))]
     pub fn intern(&self, path: &Path) -> FileId {
         self.inner.write().intern(path)
     }
@@ -32,7 +32,7 @@ impl Files {
         self.inner.read().try_get(path)
     }
 
-    // TODO Can we avoid using an `Arc` here? salsa can return references for some reason.
+    #[tracing::instrument(level = "debug")]
     pub fn path(&self, id: FileId) -> Arc<Path> {
         self.inner.read().path(id)
     }

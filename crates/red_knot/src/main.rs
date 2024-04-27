@@ -1,8 +1,8 @@
+#![allow(clippy::dbg_macro)]
+
 use std::collections::hash_map::Entry;
-use std::num::NonZeroUsize;
 use std::path::Path;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::Mutex;
 
 use rustc_hash::FxHashMap;
 use tracing::subscriber::Interest;
@@ -12,20 +12,16 @@ use tracing_subscriber::layer::{Context, Filter, SubscriberExt};
 use tracing_subscriber::{Layer, Registry};
 use tracing_tree::time::Uptime;
 
-use red_knot::cancellation::CancellationSource;
+use red_knot::cancellation::CancellationTokenSource;
 use red_knot::db::{HasJar, SourceDb, SourceJar};
 use red_knot::files::FileId;
 use red_knot::module::{ModuleSearchPath, ModuleSearchPathKind};
+use red_knot::program::check::{CheckError, RayonCheckScheduler};
 use red_knot::program::{FileChange, FileChangeKind, Program};
 use red_knot::watch::FileWatcher;
-use red_knot::{files, Workspace};
+use red_knot::Workspace;
 
-#[allow(
-    clippy::dbg_macro,
-    clippy::print_stdout,
-    clippy::unnecessary_wraps,
-    clippy::print_stderr
-)]
+#[allow(clippy::print_stdout, clippy::unnecessary_wraps, clippy::print_stderr)]
 fn main() -> anyhow::Result<()> {
     setup_tracing();
 
@@ -48,212 +44,43 @@ fn main() -> anyhow::Result<()> {
         return Err(anyhow::anyhow!("Invalid arguments"));
     }
 
-    let files = files::Files::default();
     let workspace_folder = entry_point.parent().unwrap();
-    let mut workspace = Workspace::new(workspace_folder.to_path_buf());
+    let workspace = Workspace::new(workspace_folder.to_path_buf());
 
     let workspace_search_path = ModuleSearchPath::new(
         workspace.root().to_path_buf(),
         ModuleSearchPathKind::FirstParty,
     );
+    let mut program = Program::new(workspace, vec![workspace_search_path]);
 
-    let entry_id = files.intern(entry_point);
+    let entry_id = program.file_id(entry_point);
+    program.workspace_mut().open_file(entry_id);
 
-    let mut program = Program::new(vec![workspace_search_path], files.clone());
-
-    workspace.open_file(entry_id);
-
-    let (sender, receiver) = crossbeam_channel::bounded(
-        std::thread::available_parallelism()
-            .map(NonZeroUsize::get)
-            .unwrap_or(50)
-            .max(4), // TODO: Both these numbers are very arbitrary. Pick sensible defaults.
-    );
+    let (main_loop, main_loop_cancellation_token) = MainLoop::new();
 
     // Listen to Ctrl+C and abort the watch mode.
-    let abort_sender = Mutex::new(Some(sender.clone()));
+    let main_loop_cancellation_token = Mutex::new(Some(main_loop_cancellation_token));
     ctrlc::set_handler(move || {
-        let mut lock = abort_sender.lock().unwrap();
+        let mut lock = main_loop_cancellation_token.lock().unwrap();
 
-        if let Some(sender) = lock.take() {
-            sender.send(Message::Exit).unwrap();
+        if let Some(token) = lock.take() {
+            token.stop();
         }
     })?;
 
-    // Watch for file changes and re-trigger the analysis.
-    let file_changes_sender = sender.clone();
+    let file_changes_notifier = main_loop.file_changes_notifier();
 
+    // Watch for file changes and re-trigger the analysis.
     let mut file_watcher = FileWatcher::new(
         move |changes| {
-            file_changes_sender
-                .send(Message::FileChanges(changes))
-                .unwrap();
+            file_changes_notifier.notify(changes);
         },
-        files.clone(),
+        program.files().clone(),
     )?;
 
     file_watcher.watch_folder(workspace_folder)?;
 
-    let files_to_check = vec![entry_id];
-
-    // Main loop that runs until the user exits the program
-    // Runs the analysis for each changed file. Cancels the analysis if a new change is detected.
-    loop {
-        let changes = {
-            tracing::trace!("Main Loop: Tick");
-
-            // Token to cancel the analysis if a new change is detected.
-            let run_cancellation_token_source = CancellationSource::new();
-            let run_cancellation_token = run_cancellation_token_source.token();
-
-            // Tracks the number of pending analysis runs.
-            let pending_analysis = Arc::new(AtomicUsize::new(0));
-
-            // Take read-only references that are copy and Send.
-            let program = &program;
-            let workspace = &workspace;
-
-            let receiver = receiver.clone();
-            let started_analysis = pending_analysis.clone();
-
-            // Orchestration task. Ideally, we would run this on main but we should start it as soon as possible so that
-            // we avoid scheduling tasks when we already know that we're about to exit or cancel the analysis because of a file change.
-            // This uses `std::thread::spawn` because we don't want it to run inside of the thread pool
-            // or this code deadlocks when using a thread pool of the size 1.
-            let orchestration_handle = std::thread::spawn(move || {
-                fn consume_pending_messages(
-                    receiver: &crossbeam_channel::Receiver<Message>,
-                    mut aggregated_changes: AggregatedChanges,
-                ) -> NextTickCommand {
-                    loop {
-                        // Consume possibly incoming file change messages before running a new analysis, but don't wait for more than 100ms.
-                        crossbeam_channel::select! {
-                            recv(receiver) -> message => {
-                                match message {
-                                    Ok(Message::Exit) => {
-                                        return NextTickCommand::Exit;
-                                    }
-                                    Ok(Message::FileChanges(file_changes)) => {
-                                        aggregated_changes.extend(file_changes);
-                                    }
-
-                                    Ok(Message::AnalysisCancelled | Message::AnalysisCompleted(_)) => {
-                                        unreachable!(
-                                            "All analysis should have been completed at this time"
-                                        );
-                                    },
-
-                                    Err(_) => {
-                                        // There are no more senders, no point in waiting for more messages
-                                        break;
-                                    }
-                                }
-                            },
-                            default(std::time::Duration::from_millis(100)) => {
-                                break;
-                            }
-                        }
-                    }
-
-                    NextTickCommand::FileChanges(aggregated_changes)
-                }
-
-                let mut diagnostics = Vec::new();
-                let mut aggregated_changes = AggregatedChanges::default();
-
-                for message in &receiver {
-                    match message {
-                        Message::AnalysisCompleted(file_diagnostics) => {
-                            diagnostics.extend_from_slice(&file_diagnostics);
-
-                            if pending_analysis.fetch_sub(1, Ordering::SeqCst) == 1 {
-                                // Analysis completed, print the diagnostics.
-                                dbg!(&diagnostics);
-                            }
-                        }
-
-                        Message::AnalysisCancelled => {
-                            if pending_analysis.fetch_sub(1, Ordering::SeqCst) == 1 {
-                                return consume_pending_messages(&receiver, aggregated_changes);
-                            }
-                        }
-
-                        Message::Exit => {
-                            run_cancellation_token_source.cancel();
-
-                            // Don't consume any outstanding messages because we're exiting anyway.
-                            return NextTickCommand::Exit;
-                        }
-
-                        Message::FileChanges(changes) => {
-                            // Request cancellation, but wait until all analysis tasks have completed to
-                            // avoid stale messages in the next main loop.
-                            run_cancellation_token_source.cancel();
-
-                            aggregated_changes.extend(changes);
-
-                            if pending_analysis.load(Ordering::SeqCst) == 0 {
-                                return consume_pending_messages(&receiver, aggregated_changes);
-                            }
-                        }
-                    }
-                }
-
-                // This can be reached if there's no Ctrl+C and no file watcher handler.
-                // In that case, assume that we don't run in watch mode and exit.
-                NextTickCommand::Exit
-            });
-
-            // Star the analysis task on the thread pool and wait until they complete.
-            rayon::scope(|scope| {
-                for file in &files_to_check {
-                    let cancellation_token = run_cancellation_token.clone();
-                    if cancellation_token.is_cancelled() {
-                        break;
-                    }
-
-                    let sender = sender.clone();
-
-                    started_analysis.fetch_add(1, Ordering::SeqCst);
-
-                    // TODO: How do we allow the host to control the number of threads used?
-                    //  Or should we just assume that each host implements its own main loop,
-                    //  I don't think that's entirely unreasonable but we should avoid
-                    //  having different main loops per host AND command (e.g. format vs check vs lint)
-                    scope.spawn(move |_| {
-                        if cancellation_token.is_cancelled() {
-                            tracing::trace!("Exit analysis because cancellation was requested.");
-                            sender.send(Message::AnalysisCancelled).unwrap();
-                            return;
-                        }
-
-                        // TODO schedule the dependencies.
-                        let mut diagnostics = Vec::new();
-
-                        if workspace.is_file_open(*file) {
-                            diagnostics.extend_from_slice(&program.lint_syntax(*file));
-                        }
-
-                        sender
-                            .send(Message::AnalysisCompleted(diagnostics))
-                            .unwrap();
-                    });
-                }
-            });
-
-            // Wait for the orchestration task to complete. This either returns the file changes
-            // or instructs the main loop to exit.
-            match orchestration_handle.join().unwrap() {
-                NextTickCommand::FileChanges(changes) => changes,
-                NextTickCommand::Exit => {
-                    break;
-                }
-            }
-        };
-
-        // We have a mutable reference here and can perform all necessary invalidations.
-        program.apply_changes(changes.iter());
-    }
+    main_loop.run(&mut program);
 
     let source_jar: &SourceJar = program.jar();
 
@@ -263,10 +90,259 @@ fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-enum Message {
-    AnalysisCompleted(Vec<String>),
-    AnalysisCancelled,
+struct MainLoop {
+    orchestrator_sender: crossbeam_channel::Sender<OrchestratorMessage>,
+    main_loop_receiver: crossbeam_channel::Receiver<MainLoopMessage>,
+}
+
+impl MainLoop {
+    fn new() -> (Self, MainLoopCancellationToken) {
+        let (orchestrator_sender, orchestrator_receiver) = crossbeam_channel::bounded(1);
+        let (main_loop_sender, main_loop_receiver) = crossbeam_channel::bounded(1);
+
+        let mut orchestrator = Orchestrator {
+            pending_analysis: None,
+            receiver: orchestrator_receiver,
+            sender: main_loop_sender.clone(),
+            aggregated_changes: AggregatedChanges::default(),
+        };
+
+        std::thread::spawn(move || {
+            orchestrator.run();
+        });
+
+        (
+            Self {
+                orchestrator_sender,
+                main_loop_receiver,
+            },
+            MainLoopCancellationToken {
+                sender: main_loop_sender,
+            },
+        )
+    }
+
+    fn file_changes_notifier(&self) -> FileChangesNotifier {
+        FileChangesNotifier {
+            sender: self.orchestrator_sender.clone(),
+        }
+    }
+
+    fn run(self, program: &mut Program) {
+        self.orchestrator_sender
+            .send(OrchestratorMessage::Run)
+            .unwrap();
+
+        for message in &self.main_loop_receiver {
+            tracing::trace!("Main Loop: Tick");
+
+            match message {
+                MainLoopMessage::CheckProgram => {
+                    // Remove mutability from program.
+                    let program = &*program;
+                    let run_cancellation_token_source = CancellationTokenSource::new();
+                    let run_cancellation_token = run_cancellation_token_source.token();
+                    let sender = &self.orchestrator_sender;
+
+                    sender
+                        .send(OrchestratorMessage::CheckProgramStarted {
+                            cancellation_token: run_cancellation_token_source,
+                        })
+                        .unwrap();
+
+                    rayon::in_place_scope(|scope| {
+                        let scheduler = RayonCheckScheduler { program, scope };
+
+                        let result = program.check(&scheduler, run_cancellation_token);
+                        match result {
+                            Ok(result) => sender
+                                .send(OrchestratorMessage::CheckProgramCompleted(result))
+                                .unwrap(),
+                            Err(CheckError::Cancelled) => sender
+                                .send(OrchestratorMessage::CheckProgramCancelled)
+                                .unwrap(),
+                        }
+                    });
+                }
+                MainLoopMessage::ApplyChanges(changes) => {
+                    program.apply_changes(changes.iter());
+                }
+                MainLoopMessage::CheckCompleted(diagnostics) => {
+                    dbg!(diagnostics);
+                }
+                MainLoopMessage::Exit => {
+                    return;
+                }
+            }
+        }
+    }
+}
+
+impl Drop for MainLoop {
+    fn drop(&mut self) {
+        self.orchestrator_sender
+            .send(OrchestratorMessage::Shutdown)
+            .unwrap();
+    }
+}
+
+#[derive(Debug, Clone)]
+struct FileChangesNotifier {
+    sender: crossbeam_channel::Sender<OrchestratorMessage>,
+}
+
+impl FileChangesNotifier {
+    fn notify(&self, changes: Vec<FileChange>) {
+        self.sender
+            .send(OrchestratorMessage::FileChanges(changes))
+            .unwrap();
+    }
+}
+
+#[derive(Debug)]
+struct MainLoopCancellationToken {
+    sender: crossbeam_channel::Sender<MainLoopMessage>,
+}
+
+impl MainLoopCancellationToken {
+    fn stop(self) {
+        self.sender.send(MainLoopMessage::Exit).unwrap();
+    }
+}
+
+struct Orchestrator {
+    aggregated_changes: AggregatedChanges,
+    pending_analysis: Option<PendingAnalysisState>,
+
+    /// Sends messages to the main loop.
+    sender: crossbeam_channel::Sender<MainLoopMessage>,
+    /// Receives messages from the main loop.
+    receiver: crossbeam_channel::Receiver<OrchestratorMessage>,
+}
+
+impl Orchestrator {
+    fn run(&mut self) {
+        while let Ok(message) = self.receiver.recv() {
+            match message {
+                OrchestratorMessage::Run => {
+                    self.pending_analysis = None;
+                    self.sender.send(MainLoopMessage::CheckProgram).unwrap();
+                }
+
+                OrchestratorMessage::CheckProgramStarted { cancellation_token } => {
+                    debug_assert!(self.pending_analysis.is_none());
+
+                    self.pending_analysis = Some(PendingAnalysisState { cancellation_token });
+                }
+
+                OrchestratorMessage::CheckProgramCompleted(diagnostics) => {
+                    self.pending_analysis
+                        .take()
+                        .expect("Expected a pending analysis.");
+
+                    self.sender
+                        .send(MainLoopMessage::CheckCompleted(diagnostics))
+                        .unwrap();
+                }
+
+                OrchestratorMessage::CheckProgramCancelled => {
+                    self.pending_analysis
+                        .take()
+                        .expect("Expected a pending analysis.");
+
+                    self.debounce_changes();
+                }
+
+                OrchestratorMessage::FileChanges(changes) => {
+                    // Request cancellation, but wait until all analysis tasks have completed to
+                    // avoid stale messages in the next main loop.
+                    let pending = if let Some(pending_state) = self.pending_analysis.as_ref() {
+                        pending_state.cancellation_token.cancel();
+                        true
+                    } else {
+                        false
+                    };
+
+                    self.aggregated_changes.extend(changes);
+
+                    // If there are no pending analysis tasks, apply the file changes. Otherwise
+                    // keep running until all file checks have completed.
+                    if !pending {
+                        self.debounce_changes();
+                    }
+                }
+                OrchestratorMessage::Shutdown => {
+                    return self.shutdown();
+                }
+            }
+        }
+    }
+
+    fn debounce_changes(&mut self) {
+        debug_assert!(self.pending_analysis.is_none());
+
+        loop {
+            // Consume possibly incoming file change messages before running a new analysis, but don't wait for more than 100ms.
+            crossbeam_channel::select! {
+                recv(self.receiver) -> message => {
+                    match message {
+                        Ok(OrchestratorMessage::Shutdown) => {
+                            return self.shutdown();
+                        }
+                        Ok(OrchestratorMessage::FileChanges(file_changes)) => {
+                            self.aggregated_changes.extend(file_changes);
+                        }
+
+                        Ok(OrchestratorMessage::CheckProgramStarted {..}| OrchestratorMessage::CheckProgramCompleted(_) | OrchestratorMessage::CheckProgramCancelled) => unreachable!("No program check should be running while debouncing changes."),
+                        Ok(OrchestratorMessage::Run) => unreachable!("The orchestrator is already running."),
+
+                        Err(_) => {
+                            // There are no more senders, no point in waiting for more messages
+                            return;
+                        }
+                    }
+                },
+                default(std::time::Duration::from_millis(100)) => {
+                    // No more file changes after 100 ms, send the changes and schedule a new analysis
+                    self.sender.send(MainLoopMessage::ApplyChanges(std::mem::take(&mut self.aggregated_changes))).unwrap();
+                    self.sender.send(MainLoopMessage::CheckProgram).unwrap();
+                    return;
+                }
+            }
+        }
+    }
+
+    #[allow(clippy::unused_self)]
+    fn shutdown(&self) {
+        tracing::trace!("Shutting down orchestrator.");
+    }
+}
+
+#[derive(Debug)]
+struct PendingAnalysisState {
+    cancellation_token: CancellationTokenSource,
+}
+
+/// Message sent from the orchestrator to the main loop.
+#[derive(Debug)]
+enum MainLoopMessage {
+    CheckProgram,
+    CheckCompleted(Vec<String>),
+    ApplyChanges(AggregatedChanges),
     Exit,
+}
+
+#[derive(Debug)]
+enum OrchestratorMessage {
+    Run,
+    Shutdown,
+
+    CheckProgramStarted {
+        cancellation_token: CancellationTokenSource,
+    },
+    CheckProgramCompleted(Vec<String>),
+    CheckProgramCancelled,
+
     FileChanges(Vec<FileChange>),
 }
 
@@ -338,13 +414,6 @@ impl AggregatedChanges {
             .iter()
             .map(|(id, kind)| FileChange::new(*id, *kind))
     }
-}
-
-enum NextTickCommand {
-    /// Exit the main loop in the next tick
-    Exit,
-    /// Apply the given changes in the next main loop tick.
-    FileChanges(AggregatedChanges),
 }
 
 fn setup_tracing() {

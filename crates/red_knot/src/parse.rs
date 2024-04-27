@@ -63,7 +63,7 @@ impl Parsed {
     }
 }
 
-#[tracing::instrument(level = "trace", skip(db))]
+#[tracing::instrument(level = "debug", skip(db))]
 pub(crate) fn parse<Db>(db: &Db, file_id: FileId) -> Parsed
 where
     Db: SourceDb + HasJar<SourceJar>,
