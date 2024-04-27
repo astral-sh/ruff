@@ -10,8 +10,9 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Why is this bad?
 /// In Python 2, the `print` statement can be used with the `>>` syntax to
-/// print to a file-like object. This `print >> sys.stderr` syntax is
-/// deprecated in Python 3.
+/// print to a file-like object. This `print >> sys.stderr` syntax no
+/// longer exists in Python 3, where `print` is only a function, not a
+/// statement.
 ///
 /// Instead, use the `file` keyword argument to the `print` function, the
 /// `sys.stderr.write` function, or the `logging` module.
