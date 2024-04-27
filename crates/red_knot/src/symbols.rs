@@ -117,7 +117,7 @@ pub(crate) struct ImportDefinition {
 pub(crate) struct ImportFromDefinition {
     pub(crate) module: Option<String>,
     pub(crate) name: String,
-    pub(crate) level: Option<u32>,
+    pub(crate) level: u32,
 }
 
 /// Table of all symbols in all scopes for a module.
