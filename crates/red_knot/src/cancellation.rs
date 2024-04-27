@@ -1,6 +1,6 @@
 use std::sync::{Arc, Condvar, Mutex};
 
-#[derive(Debug, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct CancellationTokenSource {
     signal: Arc<(Mutex<bool>, Condvar)>,
 }

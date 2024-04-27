@@ -3,7 +3,7 @@ pub mod check;
 use std::path::Path;
 use std::sync::Arc;
 
-use crate::db::{Db, HasJar, SemanticDb, SemanticJar, SourceDb, SourceJar};
+use crate::db::{Db, HasJar, QueryResult, SemanticDb, SemanticJar, SourceDb, SourceJar};
 use crate::files::{FileId, Files};
 use crate::lint::{
     lint_semantic, lint_syntax, Diagnostics, LintSemanticStorage, LintSyntaxStorage,
@@ -85,41 +85,41 @@ impl SourceDb for Program {
         self.files.path(file_id)
     }
 
-    fn source(&self, file_id: FileId) -> Source {
+    fn source(&self, file_id: FileId) -> QueryResult<Source> {
         source_text(self, file_id)
     }
 
-    fn parse(&self, file_id: FileId) -> Parsed {
+    fn parse(&self, file_id: FileId) -> QueryResult<Parsed> {
         parse(self, file_id)
     }
 
-    fn lint_syntax(&self, file_id: FileId) -> Diagnostics {
+    fn lint_syntax(&self, file_id: FileId) -> QueryResult<Diagnostics> {
         lint_syntax(self, file_id)
     }
 }
 
 impl SemanticDb for Program {
-    fn resolve_module(&self, name: ModuleName) -> Option<Module> {
+    fn resolve_module(&self, name: ModuleName) -> QueryResult<Option<Module>> {
         resolve_module(self, name)
     }
 
-    fn file_to_module(&self, file_id: FileId) -> Option<Module> {
+    fn file_to_module(&self, file_id: FileId) -> QueryResult<Option<Module>> {
         file_to_module(self, file_id)
     }
 
-    fn path_to_module(&self, path: &Path) -> Option<Module> {
+    fn path_to_module(&self, path: &Path) -> QueryResult<Option<Module>> {
         path_to_module(self, path)
     }
 
-    fn symbol_table(&self, file_id: FileId) -> Arc<SymbolTable> {
+    fn symbol_table(&self, file_id: FileId) -> QueryResult<Arc<SymbolTable>> {
         symbol_table(self, file_id)
     }
 
-    fn infer_symbol_type(&self, file_id: FileId, symbol_id: SymbolId) -> Type {
+    fn infer_symbol_type(&self, file_id: FileId, symbol_id: SymbolId) -> QueryResult<Type> {
         infer_symbol_type(self, file_id, symbol_id)
     }
 
-    fn lint_semantic(&self, file_id: FileId) -> Diagnostics {
+    fn lint_semantic(&self, file_id: FileId) -> QueryResult<Diagnostics> {
         lint_semantic(self, file_id)
     }
 
@@ -136,8 +136,8 @@ impl SemanticDb for Program {
 impl Db for Program {}
 
 impl HasJar<SourceJar> for Program {
-    fn jar(&self) -> &SourceJar {
-        &self.source
+    fn jar(&self) -> QueryResult<&SourceJar> {
+        Ok(&self.source)
     }
 
     fn jar_mut(&mut self) -> &mut SourceJar {
@@ -146,8 +146,8 @@ impl HasJar<SourceJar> for Program {
 }
 
 impl HasJar<SemanticJar> for Program {
-    fn jar(&self) -> &SemanticJar {
-        &self.semantic
+    fn jar(&self) -> QueryResult<&SemanticJar> {
+        Ok(&self.semantic)
     }
 
     fn jar_mut(&mut self) -> &mut SemanticJar {

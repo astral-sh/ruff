@@ -1,3 +1,7 @@
+mod jars;
+mod query;
+mod storage;
+
 use std::path::Path;
 use std::sync::Arc;
 
@@ -9,32 +13,35 @@ use crate::source::{Source, SourceStorage};
 use crate::symbols::{SymbolId, SymbolTable, SymbolTablesStorage};
 use crate::types::{Type, TypeStore};
 
+pub use jars::HasJar;
+pub use query::{QueryError, QueryResult};
+
 pub trait SourceDb {
     // queries
     fn file_id(&self, path: &std::path::Path) -> FileId;
 
     fn file_path(&self, file_id: FileId) -> Arc<std::path::Path>;
 
-    fn source(&self, file_id: FileId) -> Source;
+    fn source(&self, file_id: FileId) -> QueryResult<Source>;
 
-    fn parse(&self, file_id: FileId) -> Parsed;
+    fn parse(&self, file_id: FileId) -> QueryResult<Parsed>;
 
-    fn lint_syntax(&self, file_id: FileId) -> Diagnostics;
+    fn lint_syntax(&self, file_id: FileId) -> QueryResult<Diagnostics>;
 }
 
 pub trait SemanticDb: SourceDb {
     // queries
-    fn resolve_module(&self, name: ModuleName) -> Option<Module>;
+    fn resolve_module(&self, name: ModuleName) -> QueryResult<Option<Module>>;
 
-    fn file_to_module(&self, file_id: FileId) -> Option<Module>;
+    fn file_to_module(&self, file_id: FileId) -> QueryResult<Option<Module>>;
 
-    fn path_to_module(&self, path: &Path) -> Option<Module>;
+    fn path_to_module(&self, path: &Path) -> QueryResult<Option<Module>>;
 
-    fn symbol_table(&self, file_id: FileId) -> Arc<SymbolTable>;
+    fn symbol_table(&self, file_id: FileId) -> QueryResult<Arc<SymbolTable>>;
 
-    fn infer_symbol_type(&self, file_id: FileId, symbol_id: SymbolId) -> Type;
+    fn infer_symbol_type(&self, file_id: FileId, symbol_id: SymbolId) -> QueryResult<Type>;
 
-    fn lint_semantic(&self, file_id: FileId) -> Diagnostics;
+    fn lint_semantic(&self, file_id: FileId) -> QueryResult<Diagnostics>;
 
     // mutations
 
@@ -60,32 +67,12 @@ pub struct SemanticJar {
     pub lint_semantic: LintSemanticStorage,
 }
 
-/// Gives access to a specific jar in the database.
-///
-/// Nope, the terminology isn't borrowed from Java but from Salsa <https://salsa-rs.github.io/salsa/>,
-/// which is an analogy to storing the salsa in different jars.
-///
-/// The basic idea is that each crate can define its own jar and the jars can be combined to a single
-/// database in the top level crate. Each crate also defines its own `Database` trait. The combination of
-/// `Database` trait and the jar allows to write queries in isolation without having to know how they get composed at the upper levels.
-///
-/// Salsa further defines a `HasIngredient` trait which slices the jar to a specific storage (e.g. a specific cache).
-/// We don't need this just jet because we write our queries by hand. We may want a similar trait if we decide
-/// to use a macro to generate the queries.
-pub trait HasJar<T> {
-    /// Gives a read-only reference to the jar.
-    fn jar(&self) -> &T;
-
-    /// Gives a mutable reference to the jar.
-    fn jar_mut(&mut self) -> &mut T;
-}
-
 #[cfg(test)]
 pub(crate) mod tests {
     use std::path::Path;
     use std::sync::Arc;
 
-    use crate::db::{HasJar, SourceDb, SourceJar};
+    use crate::db::{HasJar, QueryResult, SourceDb, SourceJar};
     use crate::files::{FileId, Files};
     use crate::lint::{lint_semantic, lint_syntax, Diagnostics};
     use crate::module::{
@@ -109,8 +96,8 @@ pub(crate) mod tests {
     }
 
     impl HasJar<SourceJar> for TestDb {
-        fn jar(&self) -> &SourceJar {
-            &self.source
+        fn jar(&self) -> QueryResult<&SourceJar> {
+            Ok(&self.source)
         }
 
         fn jar_mut(&mut self) -> &mut SourceJar {
@@ -119,8 +106,8 @@ pub(crate) mod tests {
     }
 
     impl HasJar<SemanticJar> for TestDb {
-        fn jar(&self) -> &SemanticJar {
-            &self.semantic
+        fn jar(&self) -> QueryResult<&SemanticJar> {
+            Ok(&self.semantic)
         }
 
         fn jar_mut(&mut self) -> &mut SemanticJar {
@@ -137,41 +124,41 @@ pub(crate) mod tests {
             self.files.path(file_id)
         }
 
-        fn source(&self, file_id: FileId) -> Source {
+        fn source(&self, file_id: FileId) -> QueryResult<Source> {
             source_text(self, file_id)
         }
 
-        fn parse(&self, file_id: FileId) -> Parsed {
+        fn parse(&self, file_id: FileId) -> QueryResult<Parsed> {
             parse(self, file_id)
         }
 
-        fn lint_syntax(&self, file_id: FileId) -> Diagnostics {
+        fn lint_syntax(&self, file_id: FileId) -> QueryResult<Diagnostics> {
             lint_syntax(self, file_id)
         }
     }
 
     impl SemanticDb for TestDb {
-        fn resolve_module(&self, name: ModuleName) -> Option<Module> {
+        fn resolve_module(&self, name: ModuleName) -> QueryResult<Option<Module>> {
             resolve_module(self, name)
         }
 
-        fn file_to_module(&self, file_id: FileId) -> Option<Module> {
+        fn file_to_module(&self, file_id: FileId) -> QueryResult<Option<Module>> {
             file_to_module(self, file_id)
         }
 
-        fn path_to_module(&self, path: &Path) -> Option<Module> {
+        fn path_to_module(&self, path: &Path) -> QueryResult<Option<Module>> {
             path_to_module(self, path)
         }
 
-        fn symbol_table(&self, file_id: FileId) -> Arc<SymbolTable> {
+        fn symbol_table(&self, file_id: FileId) -> QueryResult<Arc<SymbolTable>> {
             symbol_table(self, file_id)
         }
 
-        fn infer_symbol_type(&self, file_id: FileId, symbol_id: SymbolId) -> Type {
+        fn infer_symbol_type(&self, file_id: FileId, symbol_id: SymbolId) -> QueryResult<Type> {
             infer_symbol_type(self, file_id, symbol_id)
         }
 
-        fn lint_semantic(&self, file_id: FileId) -> Diagnostics {
+        fn lint_semantic(&self, file_id: FileId) -> QueryResult<Diagnostics> {
             lint_semantic(self, file_id)
         }
 

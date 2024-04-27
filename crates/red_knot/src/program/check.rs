@@ -4,7 +4,7 @@ use rayon::max_num_threads;
 use rustc_hash::FxHashSet;
 
 use crate::cancellation::CancellationToken;
-use crate::db::{SemanticDb, SourceDb};
+use crate::db::{QueryError, QueryResult, SemanticDb, SourceDb};
 use crate::files::FileId;
 use crate::lint::Diagnostics;
 use crate::program::Program;
@@ -17,7 +17,7 @@ impl Program {
         &self,
         scheduler: &dyn CheckScheduler,
         cancellation_token: CancellationToken,
-    ) -> Result<Vec<String>, CheckError> {
+    ) -> QueryResult<Vec<String>> {
         let check_loop = CheckFilesLoop::new(scheduler, cancellation_token);
 
         check_loop.run(self.workspace().open_files.iter().copied())
@@ -30,25 +30,21 @@ impl Program {
         file: FileId,
         scheduler: &dyn CheckScheduler,
         cancellation_token: CancellationToken,
-    ) -> Result<Vec<String>, CheckError> {
+    ) -> QueryResult<Vec<String>> {
         let check_loop = CheckFilesLoop::new(scheduler, cancellation_token);
 
         check_loop.run([file].into_iter())
     }
 
     #[tracing::instrument(level = "debug", skip(self, context))]
-    fn do_check_file(
-        &self,
-        file: FileId,
-        context: &CheckContext,
-    ) -> Result<Diagnostics, CheckError> {
+    fn do_check_file(&self, file: FileId, context: &CheckContext) -> QueryResult<Diagnostics> {
         context.cancelled_ok()?;
 
-        let symbol_table = self.symbol_table(file);
+        let symbol_table = self.symbol_table(file)?;
         let dependencies = symbol_table.dependencies();
 
         if !dependencies.is_empty() {
-            let module = self.file_to_module(file);
+            let module = self.file_to_module(file)?;
 
             // TODO scheduling all dependencies here is wasteful if we don't infer any types on them
             //  but I think that's unlikely, so it is okay?
@@ -57,18 +53,19 @@ impl Program {
             for dependency in dependencies {
                 let dependency_name = match dependency {
                     Dependency::Module(name) => Some(name.clone()),
-                    Dependency::Relative { .. } => module
-                        .as_ref()
-                        .and_then(|module| module.resolve_dependency(self, dependency)),
+                    Dependency::Relative { .. } => match &module {
+                        Some(module) => module.resolve_dependency(self, dependency)?,
+                        None => None,
+                    },
                 };
 
                 if let Some(dependency_name) = dependency_name {
                     // TODO We may want to have a different check functions for non-first-party
                     //   files because we only need to index them and not check them.
                     //   Supporting non-first-party code also requires supporting typing stubs.
-                    if let Some(dependency) = self.resolve_module(dependency_name) {
-                        if dependency.path(self).root().kind().is_first_party() {
-                            context.schedule_check_file(dependency.path(self).file());
+                    if let Some(dependency) = self.resolve_module(dependency_name)? {
+                        if dependency.path(self)?.root().kind().is_first_party() {
+                            context.schedule_check_file(dependency.path(self)?.file());
                         }
                     }
                 }
@@ -78,8 +75,8 @@ impl Program {
         let mut diagnostics = Vec::new();
 
         if self.workspace().is_file_open(file) {
-            diagnostics.extend_from_slice(&self.lint_syntax(file));
-            diagnostics.extend_from_slice(&self.lint_semantic(file));
+            diagnostics.extend_from_slice(&self.lint_syntax(file)?);
+            diagnostics.extend_from_slice(&self.lint_semantic(file)?);
         }
 
         Ok(Diagnostics::from(diagnostics))
@@ -156,11 +153,6 @@ impl CheckScheduler for SameThreadCheckScheduler<'_> {
     }
 }
 
-#[derive(Debug, Clone)]
-pub enum CheckError {
-    Cancelled,
-}
-
 #[derive(Debug)]
 pub struct CheckFileTask {
     file_id: FileId,
@@ -176,7 +168,7 @@ impl CheckFileTask {
                 .sender
                 .send(CheckFileMessage::Completed(diagnostics))
                 .unwrap(),
-            Err(CheckError::Cancelled) => self
+            Err(QueryError::Cancelled) => self
                 .context
                 .sender
                 .send(CheckFileMessage::Cancelled)
@@ -188,13 +180,13 @@ impl CheckFileTask {
 #[derive(Clone, Debug)]
 struct CheckContext {
     cancellation_token: CancellationToken,
-    sender: crossbeam_channel::Sender<CheckFileMessage>,
+    sender: crossbeam::channel::Sender<CheckFileMessage>,
 }
 
 impl CheckContext {
     fn new(
         cancellation_token: CancellationToken,
-        sender: crossbeam_channel::Sender<CheckFileMessage>,
+        sender: crossbeam::channel::Sender<CheckFileMessage>,
     ) -> Self {
         Self {
             cancellation_token,
@@ -213,9 +205,9 @@ impl CheckContext {
         self.cancellation_token.is_cancelled()
     }
 
-    fn cancelled_ok(&self) -> Result<(), CheckError> {
+    fn cancelled_ok(&self) -> QueryResult<()> {
         if self.is_cancelled() {
-            Err(CheckError::Cancelled)
+            Err(QueryError::Cancelled)
         } else {
             Ok(())
         }
@@ -240,13 +232,13 @@ impl<'a> CheckFilesLoop<'a> {
         }
     }
 
-    fn run(mut self, files: impl Iterator<Item = FileId>) -> Result<Vec<String>, CheckError> {
+    fn run(mut self, files: impl Iterator<Item = FileId>) -> QueryResult<Vec<String>> {
         let (sender, receiver) = if let Some(max_concurrency) = self.scheduler.max_concurrency() {
-            crossbeam_channel::bounded(max_concurrency.get())
+            crossbeam::channel::bounded(max_concurrency.get())
         } else {
             // The checks run on the current thread. That means it is necessary to store all messages
             // or we risk deadlocking when the main loop never gets a chance to read the messages.
-            crossbeam_channel::unbounded()
+            crossbeam::channel::unbounded()
         };
 
         let context = CheckContext::new(self.cancellation_token.clone(), sender.clone());
@@ -260,11 +252,11 @@ impl<'a> CheckFilesLoop<'a> {
 
     fn run_impl(
         mut self,
-        receiver: crossbeam_channel::Receiver<CheckFileMessage>,
+        receiver: crossbeam::channel::Receiver<CheckFileMessage>,
         context: &CheckContext,
-    ) -> Result<Vec<String>, CheckError> {
+    ) -> QueryResult<Vec<String>> {
         if self.cancellation_token.is_cancelled() {
-            return Err(CheckError::Cancelled);
+            return Err(QueryError::Cancelled);
         }
 
         let mut result = Vec::default();
@@ -284,7 +276,7 @@ impl<'a> CheckFilesLoop<'a> {
                     self.queue_file(id, context.clone())?;
                 }
                 CheckFileMessage::Cancelled => {
-                    return Err(CheckError::Cancelled);
+                    return Err(QueryError::Cancelled);
                 }
             }
         }
@@ -292,9 +284,9 @@ impl<'a> CheckFilesLoop<'a> {
         Ok(result)
     }
 
-    fn queue_file(&mut self, file_id: FileId, context: CheckContext) -> Result<(), CheckError> {
+    fn queue_file(&mut self, file_id: FileId, context: CheckContext) -> QueryResult<()> {
         if context.is_cancelled() {
-            return Err(CheckError::Cancelled);
+            return Err(QueryError::Cancelled);
         }
 
         if self.queued_files.insert(file_id) {

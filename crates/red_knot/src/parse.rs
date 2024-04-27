@@ -6,7 +6,7 @@ use ruff_python_parser::{Mode, ParseError};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::cache::KeyValueCache;
-use crate::db::{HasJar, SourceDb, SourceJar};
+use crate::db::{HasJar, QueryResult, SourceDb, SourceJar};
 use crate::files::FileId;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -64,16 +64,16 @@ impl Parsed {
 }
 
 #[tracing::instrument(level = "debug", skip(db))]
-pub(crate) fn parse<Db>(db: &Db, file_id: FileId) -> Parsed
+pub(crate) fn parse<Db>(db: &Db, file_id: FileId) -> QueryResult<Parsed>
 where
     Db: SourceDb + HasJar<SourceJar>,
 {
-    let parsed = db.jar();
+    let parsed = db.jar()?;
 
     parsed.parsed.get(&file_id, |file_id| {
-        let source = db.source(*file_id);
+        let source = db.source(*file_id)?;
 
-        Parsed::from_text(source.text())
+        Ok(Parsed::from_text(source.text()))
     })
 }
 

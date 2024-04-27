@@ -4,6 +4,7 @@ use std::collections::hash_map::Entry;
 use std::path::Path;
 use std::sync::Mutex;
 
+use crossbeam::channel as crossbeam_channel;
 use rustc_hash::FxHashMap;
 use tracing::subscriber::Interest;
 use tracing::{Level, Metadata};
@@ -13,10 +14,10 @@ use tracing_subscriber::{Layer, Registry};
 use tracing_tree::time::Uptime;
 
 use red_knot::cancellation::CancellationTokenSource;
-use red_knot::db::{HasJar, SourceDb, SourceJar};
+use red_knot::db::{HasJar, QueryError, SourceDb, SourceJar};
 use red_knot::files::FileId;
 use red_knot::module::{ModuleSearchPath, ModuleSearchPathKind};
-use red_knot::program::check::{CheckError, RayonCheckScheduler};
+use red_knot::program::check::RayonCheckScheduler;
 use red_knot::program::{FileChange, FileChangeKind, Program};
 use red_knot::watch::FileWatcher;
 use red_knot::Workspace;
@@ -82,7 +83,7 @@ fn main() -> anyhow::Result<()> {
 
     main_loop.run(&mut program);
 
-    let source_jar: &SourceJar = program.jar();
+    let source_jar: &SourceJar = program.jar().unwrap();
 
     dbg!(source_jar.parsed.statistics());
     dbg!(source_jar.sources.statistics());
@@ -158,7 +159,7 @@ impl MainLoop {
                             Ok(result) => sender
                                 .send(OrchestratorMessage::CheckProgramCompleted(result))
                                 .unwrap(),
-                            Err(CheckError::Cancelled) => sender
+                            Err(QueryError::Cancelled) => sender
                                 .send(OrchestratorMessage::CheckProgramCancelled)
                                 .unwrap(),
                         }
