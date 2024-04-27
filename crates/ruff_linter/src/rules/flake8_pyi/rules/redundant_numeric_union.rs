@@ -1,6 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{AnyParameter, Expr, Parameters};
+use ruff_python_ast::{AnyParameterRef, Expr, Parameters};
 use ruff_python_semantic::analyze::typing::traverse_union;
 use ruff_text_size::Ranged;
 
@@ -61,10 +61,7 @@ impl Violation for RedundantNumericUnion {
 
 /// PYI041
 pub(crate) fn redundant_numeric_union(checker: &mut Checker, parameters: &Parameters) {
-    for annotation in parameters
-        .iter_all_params()
-        .filter_map(AnyParameter::annotation)
-    {
+    for annotation in parameters.iter().filter_map(AnyParameterRef::annotation) {
         check_annotation(checker, annotation);
     }
 }

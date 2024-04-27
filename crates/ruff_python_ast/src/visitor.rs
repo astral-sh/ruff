@@ -4,7 +4,7 @@ pub mod preorder;
 pub mod transformer;
 
 use crate::{
-    self as ast, Alias, AnyParameter, Arguments, BoolOp, BytesLiteral, CmpOp, Comprehension,
+    self as ast, Alias, AnyParameterRef, Arguments, BoolOp, BytesLiteral, CmpOp, Comprehension,
     Decorator, ElifElseClause, ExceptHandler, Expr, ExprContext, FString, FStringElement,
     FStringPart, Keyword, MatchCase, Operator, Parameter, Parameters, Pattern, PatternArguments,
     PatternKeyword, Stmt, StringLiteral, TypeParam, TypeParamParamSpec, TypeParamTypeVar,
@@ -614,7 +614,7 @@ pub fn walk_parameters<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, parameters:
         visitor.visit_expr(default);
     }
 
-    for parameter in parameters.iter_all_params().map(AnyParameter::as_parameter) {
+    for parameter in parameters.iter().map(AnyParameterRef::as_parameter) {
         visitor.visit_parameter(parameter);
     }
 }

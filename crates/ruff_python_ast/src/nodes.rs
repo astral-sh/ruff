@@ -3177,7 +3177,7 @@ pub struct Decorator {
 
 /// Enumeration of the two kinds of parameter
 #[derive(Debug, PartialEq, Clone, Copy)]
-pub enum AnyParameter<'a> {
+pub enum AnyParameterRef<'a> {
     /// Variadic parameters cannot have default values,
     /// e.g. both `*args` and `**kwargs` in the following function:
     ///
@@ -3195,7 +3195,7 @@ pub enum AnyParameter<'a> {
     NonVariadic(&'a ParameterWithDefault),
 }
 
-impl<'a> AnyParameter<'a> {
+impl<'a> AnyParameterRef<'a> {
     pub const fn as_parameter(self) -> &'a Parameter {
         match self {
             Self::NonVariadic(param) => &param.parameter,
@@ -3223,7 +3223,7 @@ impl<'a> AnyParameter<'a> {
     }
 }
 
-impl Ranged for AnyParameter<'_> {
+impl Ranged for AnyParameterRef<'_> {
     fn range(&self) -> TextRange {
         match self {
             Self::NonVariadic(param) => param.range,
@@ -3271,19 +3271,19 @@ impl Parameters {
     }
 
     /// Returns an iterator over all parameters included in this [`Parameters`] node.
-    pub fn iter_all_params(&self) -> impl Iterator<Item = AnyParameter> {
+    pub fn iter(&self) -> impl Iterator<Item = AnyParameterRef> {
         self.posonlyargs
             .iter()
             .chain(&self.args)
-            .map(AnyParameter::NonVariadic)
-            .chain(self.vararg.as_deref().map(AnyParameter::Variadic))
-            .chain(self.kwonlyargs.iter().map(AnyParameter::NonVariadic))
-            .chain(self.kwarg.as_deref().map(AnyParameter::Variadic))
+            .map(AnyParameterRef::NonVariadic)
+            .chain(self.vararg.as_deref().map(AnyParameterRef::Variadic))
+            .chain(self.kwonlyargs.iter().map(AnyParameterRef::NonVariadic))
+            .chain(self.kwarg.as_deref().map(AnyParameterRef::Variadic))
     }
 
     /// Returns `true` if a parameter with the given name is included in this [`Parameters`].
     pub fn includes(&self, name: &str) -> bool {
-        self.iter_all_params().any(|param| param.name() == name)
+        self.iter().any(|param| param.name() == name)
     }
 
     /// Returns `true` if the [`Parameters`] is empty.

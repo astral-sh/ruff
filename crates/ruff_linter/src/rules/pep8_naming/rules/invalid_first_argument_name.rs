@@ -257,7 +257,7 @@ fn rename_parameter(
 ) -> Result<Option<Fix>> {
     // Don't fix if another parameter has the valid name.
     if parameters
-        .iter_all_params()
+        .iter()
         .skip(1)
         .any(|parameter| parameter.name() == function_type.valid_first_argument_name())
     {

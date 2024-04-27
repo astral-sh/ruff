@@ -348,7 +348,7 @@ pub fn any_over_stmt(stmt: &Stmt, func: &dyn Fn(&Expr) -> bool) -> bool {
             returns,
             ..
         }) => {
-            parameters.iter_all_params().any(|param| {
+            parameters.iter().any(|param| {
                 param
                     .default()
                     .is_some_and(|default| any_over_expr(default, func))

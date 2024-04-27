@@ -31,7 +31,7 @@ use std::path::Path;
 use itertools::Itertools;
 use log::debug;
 use ruff_python_ast::{
-    self as ast, AnyParameter, Comprehension, ElifElseClause, ExceptHandler, Expr, ExprContext,
+    self as ast, AnyParameterRef, Comprehension, ElifElseClause, ExceptHandler, Expr, ExprContext,
     FStringElement, Keyword, MatchCase, Parameter, Parameters, Pattern, Stmt, Suite, UnaryOp,
 };
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -604,7 +604,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     self.visit_type_params(type_params);
                 }
 
-                for parameter in parameters.iter_all_params() {
+                for parameter in parameters.iter() {
                     if let Some(expr) = parameter.annotation() {
                         if singledispatch && !parameter.is_variadic() {
                             self.visit_runtime_required_annotation(expr);
@@ -1440,7 +1440,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
         // Step 1: Binding.
         // Bind, but intentionally avoid walking default expressions, as we handle them
         // upstream.
-        for parameter in parameters.iter_all_params().map(AnyParameter::as_parameter) {
+        for parameter in parameters.iter().map(AnyParameterRef::as_parameter) {
             self.visit_parameter(parameter);
         }
 

@@ -3380,7 +3380,7 @@ impl<'src> Parser<'src> {
             BuildHasherDefault::default(),
         );
 
-        for parameter in parameters.iter_all_params() {
+        for parameter in parameters.iter() {
             let range = parameter.name().range();
             let param_name = parameter.name().as_str();
             if !all_arg_names.insert(param_name) {

@@ -2,7 +2,7 @@ use std::fmt;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{AnyParameter, Parameters};
+use ruff_python_ast::{AnyParameterRef, Parameters};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -60,10 +60,7 @@ pub(crate) fn no_return_argument_annotation(checker: &mut Checker, parameters: &
     // Ex) def func(*, arg: NoReturn): ...
     // Ex) def func(*args: NoReturn): ...
     // Ex) def func(**kwargs: NoReturn): ...
-    for annotation in parameters
-        .iter_all_params()
-        .filter_map(AnyParameter::annotation)
-    {
+    for annotation in parameters.iter().filter_map(AnyParameterRef::annotation) {
         if checker.semantic().match_typing_expr(annotation, "NoReturn") {
             checker.diagnostics.push(Diagnostic::new(
                 NoReturnArgumentAnnotationInStub {
