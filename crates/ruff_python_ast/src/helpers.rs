@@ -732,9 +732,9 @@ where
 /// ```rust
 /// # use ruff_python_ast::helpers::format_import_from;
 ///
-/// assert_eq!(format_import_from(None, None), "".to_string());
-/// assert_eq!(format_import_from(Some(1), None), ".".to_string());
-/// assert_eq!(format_import_from(Some(1), Some("foo")), ".foo".to_string());
+/// assert_eq!(format_import_from(0, None), "".to_string());
+/// assert_eq!(format_import_from(1, None), ".".to_string());
+/// assert_eq!(format_import_from(1, Some("foo")), ".foo".to_string());
 /// ```
 pub fn format_import_from(level: u32, module: Option<&str>) -> String {
     let mut module_name = String::with_capacity(16);
@@ -756,9 +756,9 @@ pub fn format_import_from(level: u32, module: Option<&str>) -> String {
 /// ```rust
 /// # use ruff_python_ast::helpers::format_import_from_member;
 ///
-/// assert_eq!(format_import_from_member(None, None, "bar"), "bar".to_string());
-/// assert_eq!(format_import_from_member(Some(1), None, "bar"), ".bar".to_string());
-/// assert_eq!(format_import_from_member(Some(1), Some("foo"), "bar"), ".foo.bar".to_string());
+/// assert_eq!(format_import_from_member(0, None, "bar"), "bar".to_string());
+/// assert_eq!(format_import_from_member(1, None, "bar"), ".bar".to_string());
+/// assert_eq!(format_import_from_member(1, Some("foo"), "bar"), ".foo.bar".to_string());
 /// ```
 pub fn format_import_from_member(level: u32, module: Option<&str>, member: &str) -> String {
     let mut qualified_name = String::with_capacity(
@@ -798,9 +798,9 @@ pub fn to_module_path(package: &Path, path: &Path) -> Option<Vec<String>> {
 /// ```rust
 /// # use ruff_python_ast::helpers::collect_import_from_member;
 ///
-/// assert_eq!(collect_import_from_member(None, None, "bar").segments(), ["bar"]);
-/// assert_eq!(collect_import_from_member(Some(1), None, "bar").segments(), [".", "bar"]);
-/// assert_eq!(collect_import_from_member(Some(1), Some("foo"), "bar").segments(), [".", "foo", "bar"]);
+/// assert_eq!(collect_import_from_member(0, None, "bar").segments(), ["bar"]);
+/// assert_eq!(collect_import_from_member(1, None, "bar").segments(), [".", "bar"]);
+/// assert_eq!(collect_import_from_member(1, Some("foo"), "bar").segments(), [".", "foo", "bar"]);
 /// ```
 pub fn collect_import_from_member<'a>(
     level: u32,
