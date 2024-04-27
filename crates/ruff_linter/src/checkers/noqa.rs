@@ -1,14 +1,14 @@
 //! `NoQA` enforcement and validation.
 
-use std::collections::HashSet;
 use std::path::Path;
 
 use itertools::Itertools;
-use ruff_text_size::Ranged;
+use rustc_hash::FxHashSet;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_python_trivia::CommentRanges;
 use ruff_source_file::Locator;
+use ruff_text_size::Ranged;
 
 use crate::fix::edits::delete_comment;
 use crate::noqa::{Code, Directive, FileExemption, NoqaDirectives, NoqaMapping};
@@ -133,7 +133,7 @@ pub(crate) fn check_noqa(
                     let mut unknown_codes = vec![];
                     let mut unmatched_codes = vec![];
                     let mut valid_codes = vec![];
-                    let mut seen_codes = HashSet::new();
+                    let mut seen_codes = FxHashSet::new();
                     let mut self_ignore = false;
                     for original_code in directive.iter().map(Code::as_str) {
                         let code = get_redirect_target(original_code).unwrap_or(original_code);

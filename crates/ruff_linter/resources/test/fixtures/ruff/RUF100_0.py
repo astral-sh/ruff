@@ -26,10 +26,10 @@ def f() -> None:
 
     # fmt: off
     # Invalid - no space before #
-    d = 1# noqa: E501
+    d = 1  # noqa: E501
 
     # Invalid - many spaces before #
-    d = 1                       # noqa: E501
+    d = 1  # noqa: E501
     # fmt: on
 
 
@@ -104,8 +104,8 @@ def f():
 
 def f():
     # Invalid - nonexistant error code with multibyte character
-    d = 1  #noqa: F841, E50
-    e = 1  #noqa: E50
+    d = 1  # noqa: F841, E50
+    e = 1  # noqa: E50
 
 
 def f():
@@ -114,7 +114,7 @@ def f():
 
 
 # Check duplicate code detection
-def foo():
+def f():
     x = 2  # noqa: F841, F841, X200
 
     y = 2 == bar  # noqa: SIM300, F841, SIM300, SIM300

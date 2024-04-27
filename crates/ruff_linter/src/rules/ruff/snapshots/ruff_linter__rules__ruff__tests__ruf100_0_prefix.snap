@@ -100,12 +100,12 @@ RUF100_0.py:22:12: RUF100 [*] Unused `noqa` directive (unused: `F841`)
 24 24 |     # Invalid (but external)
 25 25 |     d = 1  # noqa: V500
 
-RUF100_0.py:29:10: RUF100 [*] Unused `noqa` directive (unused: `E501`)
+RUF100_0.py:29:12: RUF100 [*] Unused `noqa` directive (unused: `E501`)
    |
 27 |     # fmt: off
 28 |     # Invalid - no space before #
-29 |     d = 1# noqa: E501
-   |          ^^^^^^^^^^^^ RUF100
+29 |     d = 1  # noqa: E501
+   |            ^^^^^^^^^^^^ RUF100
 30 | 
 31 |     # Invalid - many spaces before #
    |
@@ -115,44 +115,44 @@ RUF100_0.py:29:10: RUF100 [*] Unused `noqa` directive (unused: `E501`)
 26 26 | 
 27 27 |     # fmt: off
 28 28 |     # Invalid - no space before #
-29    |-    d = 1# noqa: E501
+29    |-    d = 1  # noqa: E501
    29 |+    d = 1
 30 30 | 
 31 31 |     # Invalid - many spaces before #
-32 32 |     d = 1                       # noqa: E501
+32 32 |     d = 1  # noqa: E501
 
 RUF100_0.py:32:5: F841 [*] Local variable `d` is assigned to but never used
    |
 31 |     # Invalid - many spaces before #
-32 |     d = 1                       # noqa: E501
+32 |     d = 1  # noqa: E501
    |     ^ F841
 33 |     # fmt: on
    |
    = help: Remove assignment to unused variable `d`
 
 ℹ Unsafe fix
-29 29 |     d = 1# noqa: E501
+29 29 |     d = 1  # noqa: E501
 30 30 | 
 31 31 |     # Invalid - many spaces before #
-32    |-    d = 1                       # noqa: E501
+32    |-    d = 1  # noqa: E501
 33 32 |     # fmt: on
 34 33 | 
 35 34 | 
 
-RUF100_0.py:32:33: RUF100 [*] Unused `noqa` directive (unused: `E501`)
+RUF100_0.py:32:12: RUF100 [*] Unused `noqa` directive (unused: `E501`)
    |
 31 |     # Invalid - many spaces before #
-32 |     d = 1                       # noqa: E501
-   |                                 ^^^^^^^^^^^^ RUF100
+32 |     d = 1  # noqa: E501
+   |            ^^^^^^^^^^^^ RUF100
 33 |     # fmt: on
    |
    = help: Remove unused `noqa` directive
 
 ℹ Safe fix
-29 29 |     d = 1# noqa: E501
+29 29 |     d = 1  # noqa: E501
 30 30 | 
 31 31 |     # Invalid - many spaces before #
-32    |-    d = 1                       # noqa: E501
+32    |-    d = 1  # noqa: E501
    32 |+    d = 1
 33 33 |     # fmt: on
 34 34 | 
@@ -268,9 +268,9 @@ RUF100_0.py:107:12: RUF100 [*] Unused `noqa` directive (unknown: `E50`)
     |
 105 | def f():
 106 |     # Invalid - nonexistant error code with multibyte character
-107 |     d = 1  #noqa: F841, E50
-    |            ^^^^^^^^^^^^^^^^ RUF100
-108 |     e = 1  #noqa: E50
+107 |     d = 1  # noqa: F841, E50
+    |            ^^^^^^^^^^^^^^^^^ RUF100
+108 |     e = 1  # noqa: E50
     |
     = help: Remove unused `noqa` directive
 
@@ -278,17 +278,17 @@ RUF100_0.py:107:12: RUF100 [*] Unused `noqa` directive (unknown: `E50`)
 104 104 | 
 105 105 | def f():
 106 106 |     # Invalid - nonexistant error code with multibyte character
-107     |-    d = 1  #noqa: F841, E50
+107     |-    d = 1  # noqa: F841, E50
     107 |+    d = 1  # noqa: F841
-108 108 |     e = 1  #noqa: E50
+108 108 |     e = 1  # noqa: E50
 109 109 | 
 110 110 | 
 
 RUF100_0.py:108:5: F841 [*] Local variable `e` is assigned to but never used
     |
 106 |     # Invalid - nonexistant error code with multibyte character
-107 |     d = 1  #noqa: F841, E50
-108 |     e = 1  #noqa: E50
+107 |     d = 1  # noqa: F841, E50
+108 |     e = 1  # noqa: E50
     |     ^ F841
     |
     = help: Remove assignment to unused variable `e`
@@ -296,8 +296,8 @@ RUF100_0.py:108:5: F841 [*] Local variable `e` is assigned to but never used
 ℹ Unsafe fix
 105 105 | def f():
 106 106 |     # Invalid - nonexistant error code with multibyte character
-107 107 |     d = 1  #noqa: F841, E50
-108     |-    e = 1  #noqa: E50
+107 107 |     d = 1  # noqa: F841, E50
+108     |-    e = 1  # noqa: E50
 109 108 | 
 110 109 | 
 111 110 | def f():
@@ -305,17 +305,17 @@ RUF100_0.py:108:5: F841 [*] Local variable `e` is assigned to but never used
 RUF100_0.py:108:12: RUF100 [*] Unused `noqa` directive (unknown: `E50`)
     |
 106 |     # Invalid - nonexistant error code with multibyte character
-107 |     d = 1  #noqa: F841, E50
-108 |     e = 1  #noqa: E50
-    |            ^^^^^^^^^^ RUF100
+107 |     d = 1  # noqa: F841, E50
+108 |     e = 1  # noqa: E50
+    |            ^^^^^^^^^^^ RUF100
     |
     = help: Remove unused `noqa` directive
 
 ℹ Safe fix
 105 105 | def f():
 106 106 |     # Invalid - nonexistant error code with multibyte character
-107 107 |     d = 1  #noqa: F841, E50
-108     |-    e = 1  #noqa: E50
+107 107 |     d = 1  # noqa: F841, E50
+108     |-    e = 1  # noqa: E50
     108 |+    e = 1
 109 109 | 
 110 110 | 
@@ -324,7 +324,7 @@ RUF100_0.py:108:12: RUF100 [*] Unused `noqa` directive (unknown: `E50`)
 RUF100_0.py:118:12: RUF100 [*] Unused `noqa` directive (duplicated: `F841`; unknown: `X200`)
     |
 116 | # Check duplicate code detection
-117 | def foo():
+117 | def f():
 118 |     x = 2  # noqa: F841, F841, X200
     |            ^^^^^^^^^^^^^^^^^^^^^^^^ RUF100
 119 | 
@@ -335,7 +335,7 @@ RUF100_0.py:118:12: RUF100 [*] Unused `noqa` directive (duplicated: `F841`; unkn
 ℹ Safe fix
 115 115 | 
 116 116 | # Check duplicate code detection
-117 117 | def foo():
+117 117 | def f():
 118     |-    x = 2  # noqa: F841, F841, X200
     118 |+    x = 2  # noqa: F841
 119 119 | 
@@ -354,7 +354,7 @@ RUF100_0.py:120:19: RUF100 [*] Unused `noqa` directive (duplicated: `SIM300`, `S
     = help: Remove unused `noqa` directive
 
 ℹ Safe fix
-117 117 | def foo():
+117 117 | def f():
 118 118 |     x = 2  # noqa: F841, F841, X200
 119 119 | 
 120     |-    y = 2 == bar  # noqa: SIM300, F841, SIM300, SIM300
