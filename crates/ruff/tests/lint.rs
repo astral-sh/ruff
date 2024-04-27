@@ -1284,3 +1284,49 @@ fn negated_per_file_ignores_overlap() -> Result<()> {
     "###);
     Ok(())
 }
+
+#[test]
+fn unused_interaction() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+[lint]
+select = ["F"]
+"#,
+    )?;
+
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
+    }, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+            .args(STDIN_BASE_OPTIONS)
+            .arg("--config")
+            .arg(&ruff_toml)
+            .args(["--stdin-filename", "test.py"])
+            .arg("--fix")
+            .arg("-")
+            .pass_stdin(r#"
+import os  # F401
+
+def function():
+    import os  # F811
+    print(os.name)
+"#), @r###"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+
+        import os  # F401
+
+        def function():
+            print(os.name)
+
+        ----- stderr -----
+        Found 1 error (1 fixed, 0 remaining).
+        "###);
+    });
+
+    Ok(())
+}
