@@ -226,7 +226,6 @@ impl<'a> Codes<'a> {
     /// thereof).
     pub(crate) fn includes(&self, needle: Rule) -> bool {
         let needle = needle.noqa_code();
-
         self.iter()
             .any(|code| needle == get_redirect_target(code.as_str()).unwrap_or(code.as_str()))
     }
