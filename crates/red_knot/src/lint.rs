@@ -30,9 +30,9 @@ where
                 source: source.text(),
             };
             visitor.visit_body(&ast.body);
-            diagnostics = visitor.diagnostics
+            diagnostics = visitor.diagnostics;
         } else {
-            diagnostics.extend(parsed.errors().iter().map(|err| err.to_string()));
+            diagnostics.extend(parsed.errors().iter().map(std::string::ToString::to_string));
         }
 
         Diagnostics::from(diagnostics)

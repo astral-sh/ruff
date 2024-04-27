@@ -229,7 +229,7 @@ impl SymbolTable {
     pub(crate) fn defs(&self, symbol_id: SymbolId) -> &[Definition] {
         self.defs
             .get(&symbol_id)
-            .map(|defs| defs.as_slice())
+            .map(std::vec::Vec::as_slice)
             .unwrap_or_default()
     }
 
@@ -446,7 +446,7 @@ impl PreorderVisitor<'_> for SymbolTableBuilder {
                         alias.name.id.split('.').next().unwrap()
                     };
                     let def = Definition::Import(ImportDefinition {
-                        module: alias.name.id.to_owned(),
+                        module: alias.name.id.clone(),
                     });
                     self.add_symbol_with_def(symbol_name, def);
                 }
@@ -516,7 +516,7 @@ mod tests {
             I: Iterator<Item = SymbolId>,
         {
             let mut symbols: Vec<_> = it.map(|sym| sym.name.as_str()).collect();
-            symbols.sort();
+            symbols.sort_unstable();
             symbols
         }
 

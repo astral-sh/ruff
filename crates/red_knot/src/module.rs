@@ -407,6 +407,7 @@ impl ModuleResolver {
     }
 }
 
+#[allow(clippy::missing_fields_in_debug)]
 impl std::fmt::Debug for ModuleResolver {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ModuleResolver")

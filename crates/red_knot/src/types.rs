@@ -47,8 +47,8 @@ pub struct TypeStore {
 }
 
 impl TypeStore {
-    pub fn remove_module(&mut self, file_id: &FileId) {
-        self.modules.remove(file_id);
+    pub fn remove_module(&mut self, file_id: FileId) {
+        self.modules.remove(&file_id);
     }
 
     pub fn cache_symbol_type(&mut self, file_id: FileId, symbol_id: SymbolId, ty: Type) {
@@ -300,7 +300,7 @@ impl ModuleTypeStore {
 
     fn add_union(&mut self, elems: &[Type]) -> UnionTypeId {
         let union_id = self.unions.push(UnionType {
-            elements: FxIndexSet::from_iter(elems.iter().copied()),
+            elements: elems.iter().copied().collect(),
         });
         UnionTypeId {
             file_id: self.file_id,
@@ -310,8 +310,8 @@ impl ModuleTypeStore {
 
     fn add_intersection(&mut self, positive: &[Type], negative: &[Type]) -> IntersectionTypeId {
         let intersection_id = self.intersections.push(IntersectionType {
-            positive: FxIndexSet::from_iter(positive.iter().copied()),
-            negative: FxIndexSet::from_iter(negative.iter().copied()),
+            positive: positive.iter().copied().collect(),
+            negative: negative.iter().copied().collect(),
         });
         IntersectionTypeId {
             file_id: self.file_id,
@@ -397,7 +397,7 @@ impl UnionType {
     fn display(&self, f: &mut std::fmt::Formatter<'_>, store: &TypeStore) -> std::fmt::Result {
         f.write_str("(")?;
         let mut first = true;
-        for ty in self.elements.iter() {
+        for ty in &self.elements {
             if !first {
                 f.write_str(" | ")?;
             };
@@ -485,7 +485,7 @@ mod tests {
         let id = store.add_union(file_id, &elems);
         assert_eq!(
             store.get_union(id).elements,
-            FxIndexSet::from_iter(elems.iter().copied())
+            elems.into_iter().collect::<FxIndexSet<_>>()
         );
         let union = Type::Union(id);
         assert_eq!(format!("{}", union.display(&store)), "(C1 | C2)");
@@ -504,11 +504,11 @@ mod tests {
         let id = store.add_intersection(file_id, &pos, &neg);
         assert_eq!(
             store.get_intersection(id).positive,
-            FxIndexSet::from_iter(pos.iter().copied())
+            pos.into_iter().collect::<FxIndexSet<_>>()
         );
         assert_eq!(
             store.get_intersection(id).negative,
-            FxIndexSet::from_iter(neg.iter().copied())
+            neg.into_iter().collect::<FxIndexSet<_>>()
         );
         let intersection = Type::Intersection(id);
         assert_eq!(

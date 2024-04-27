@@ -60,8 +60,8 @@ impl FileWatcher {
                     }
                 }
                 // TODO proper error handling
-                Err(_err) => {
-                    panic!("Error");
+                Err(err) => {
+                    panic!("Error: {err}");
                 }
             }
         })

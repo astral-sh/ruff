@@ -101,6 +101,7 @@ pub struct Statistics {
 }
 
 impl Statistics {
+    #[allow(clippy::cast_precision_loss)]
     pub fn hit_rate(&self) -> Option<f64> {
         if self.hits + self.misses == 0 {
             return None;
@@ -144,7 +145,7 @@ impl DebugStatistics {
 pub struct ReleaseStatistics;
 
 impl ReleaseStatistics {
-    #[inline(always)]
+    #[inline]
     pub fn to_statistics(&self) -> Option<Statistics> {
         None
     }

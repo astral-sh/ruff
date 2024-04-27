@@ -18,8 +18,6 @@ use crate::files::FileId;
 use std::fmt::Formatter;
 use std::hash::{Hash, Hasher};
 
-pub mod definition;
-
 pub struct HirAstId<N: HasAstId> {
     file_id: FileId,
     node_id: TypedAstId<N>,
