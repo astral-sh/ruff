@@ -3371,14 +3371,8 @@ impl<'src> Parser<'src> {
     ///
     /// Report errors for all the duplicate names found.
     fn validate_parameters(&mut self, parameters: &ast::Parameters) {
-        let mut all_arg_names = FxHashSet::with_capacity_and_hasher(
-            parameters.posonlyargs.len()
-                + parameters.args.len()
-                + usize::from(parameters.vararg.is_some())
-                + parameters.kwonlyargs.len()
-                + usize::from(parameters.kwarg.is_some()),
-            BuildHasherDefault::default(),
-        );
+        let mut all_arg_names =
+            FxHashSet::with_capacity_and_hasher(parameters.len(), BuildHasherDefault::default());
 
         for parameter in parameters.iter() {
             let range = parameter.name().range();

@@ -3281,6 +3281,15 @@ impl Parameters {
             .chain(self.kwarg.as_deref().map(AnyParameterRef::Variadic))
     }
 
+    /// Returns the total number of parameters included in this [`Parameters`] node.
+    pub fn len(&self) -> usize {
+        self.posonlyargs.len()
+            + self.args.len()
+            + usize::from(self.vararg.is_some())
+            + self.kwonlyargs.len()
+            + usize::from(self.kwarg.is_some())
+    }
+
     /// Returns `true` if a parameter with the given name is included in this [`Parameters`].
     pub fn includes(&self, name: &str) -> bool {
         self.iter().any(|param| param.name() == name)
