@@ -39,7 +39,7 @@ fn extract_import_map(path: &Path, package: Option<&Path>, blocks: &[&Block]) ->
                 level,
                 range: _,
             }) => {
-                let level = level.unwrap_or_default() as usize;
+                let level = *level as usize;
                 let module = if let Some(module) = module {
                     let module: &String = module.as_ref();
                     if level == 0 {

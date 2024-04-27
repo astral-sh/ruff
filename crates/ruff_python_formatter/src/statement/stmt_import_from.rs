@@ -28,7 +28,7 @@ impl FormatNodeRule<StmtImportFrom> for FormatStmtImportFrom {
                 token("from"),
                 space(),
                 format_with(|f| {
-                    for _ in 0..level.unwrap_or(0) {
+                    for _ in 0..*level {
                         token(".").fmt(f)?;
                     }
                     Ok(())

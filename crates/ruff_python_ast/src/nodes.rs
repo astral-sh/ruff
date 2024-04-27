@@ -471,7 +471,7 @@ pub struct StmtImportFrom {
     pub range: TextRange,
     pub module: Option<Identifier>,
     pub names: Vec<Alias>,
-    pub level: Option<u32>,
+    pub level: u32,
 }
 
 impl From<StmtImportFrom> for Stmt {

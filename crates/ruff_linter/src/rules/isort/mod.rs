@@ -52,7 +52,7 @@ pub(crate) enum AnnotatedImport<'a> {
     ImportFrom {
         module: Option<&'a str>,
         names: Vec<AnnotatedAliasData<'a>>,
-        level: Option<u32>,
+        level: u32,
         atop: Vec<Comment<'a>>,
         inline: Vec<Comment<'a>>,
         trailing_comma: TrailingComma,

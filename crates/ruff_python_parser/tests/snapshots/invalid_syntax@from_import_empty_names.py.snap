@@ -19,9 +19,7 @@ Module(
                         },
                     ),
                     names: [],
-                    level: Some(
-                        0,
-                    ),
+                    level: 0,
                 },
             ),
             ImportFrom(
@@ -34,9 +32,7 @@ Module(
                         },
                     ),
                     names: [],
-                    level: Some(
-                        0,
-                    ),
+                    level: 0,
                 },
             ),
             ImportFrom(
@@ -49,9 +45,7 @@ Module(
                         },
                     ),
                     names: [],
-                    level: Some(
-                        0,
-                    ),
+                    level: 0,
                 },
             ),
         ],

@@ -573,7 +573,7 @@ impl<'src> Parser<'src> {
         ast::StmtImportFrom {
             module,
             names,
-            level: Some(leading_dots),
+            level: leading_dots,
             range: self.node_range(start),
         }
     }
