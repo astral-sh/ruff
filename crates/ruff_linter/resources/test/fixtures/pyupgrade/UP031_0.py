@@ -117,3 +117,10 @@ path = "%s-%s-%s.pem" % (
     cert.not_valid_after.date().isoformat().replace("-", ""), # expiration date
     hexlify(cert.fingerprint(hashes.SHA256())).decode("ascii")[0:8], # fingerprint prefix
 )
+
+# UP031 (no longer false negatives; now offer potentially unsafe fixes)
+'Hello %s' % bar
+
+'Hello %s' % bar.baz
+
+'Hello %s' % bar['bop']

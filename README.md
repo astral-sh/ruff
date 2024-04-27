@@ -4,7 +4,7 @@
 
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 [![image](https://img.shields.io/pypi/v/ruff.svg)](https://pypi.python.org/pypi/ruff)
-[![image](https://img.shields.io/pypi/l/ruff.svg)](https://pypi.python.org/pypi/ruff)
+[![image](https://img.shields.io/pypi/l/ruff.svg)](https://github.com/astral-sh/ruff/blob/main/LICENSE)
 [![image](https://img.shields.io/pypi/pyversions/ruff.svg)](https://pypi.python.org/pypi/ruff)
 [![Actions status](https://github.com/astral-sh/ruff/workflows/CI/badge.svg)](https://github.com/astral-sh/ruff/actions)
 [![Discord](https://img.shields.io/badge/Discord-%235865F2.svg?logo=discord&logoColor=white)](https://discord.com/invite/astral-sh)
@@ -50,6 +50,7 @@ times faster than any individual tool.
 Ruff is extremely actively developed and used in major open-source projects like:
 
 - [Apache Airflow](https://github.com/apache/airflow)
+- [Apache Superset](https://github.com/apache/superset)
 - [FastAPI](https://github.com/tiangolo/fastapi)
 - [Hugging Face](https://github.com/huggingface/transformers)
 - [Pandas](https://github.com/pandas-dev/pandas)
@@ -151,7 +152,7 @@ Ruff can also be used as a [pre-commit](https://pre-commit.com/) hook via [`ruff
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.3.5
+  rev: v0.4.2
   hooks:
     # Run the linter.
     - id: ruff
@@ -498,7 +499,7 @@ If you're using Ruff, consider adding the Ruff badge to your project's `README.m
 
 ## License
 
-MIT
+This repository is licensed under the [MIT License](https://github.com/astral-sh/ruff/blob/main/LICENSE)
 
 <div align="center">
   <a target="_blank" href="https://astral.sh" style="background:none">

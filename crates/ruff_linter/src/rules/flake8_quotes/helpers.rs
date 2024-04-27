@@ -1,3 +1,12 @@
+use ruff_python_ast::AnyStringKind;
+use ruff_text_size::TextLen;
+
+/// Returns the raw contents of the string given the string's contents and kind.
+/// This is a string without the prefix and quotes.
+pub(super) fn raw_contents(contents: &str, kind: AnyStringKind) -> &str {
+    &contents[kind.opener_len().to_usize()..(contents.text_len() - kind.closer_len()).to_usize()]
+}
+
 /// Return `true` if the haystack contains an escaped quote.
 pub(super) fn contains_escaped_quote(haystack: &str, quote: char) -> bool {
     for index in memchr::memchr_iter(quote as u8, haystack.as_bytes()) {

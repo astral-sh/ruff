@@ -78,7 +78,7 @@ pub(crate) fn manual_from_import(
                 asname: None,
                 range: TextRange::default(),
             }],
-            level: Some(0),
+            level: 0,
             range: TextRange::default(),
         };
         diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(

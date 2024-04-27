@@ -445,6 +445,39 @@ def test():
 # end
 
 
+# no error
+class Foo:
+    """Demo."""
+
+    @overload
+    def bar(self, x: int) -> int: ...
+    @overload
+    def bar(self, x: str) -> str: ...
+    def bar(self, x: int | str) -> int | str:
+        return x
+# end
+
+
+# no error
+@overload
+def foo(x: int) -> int: ...
+@overload
+def foo(x: str) -> str: ...
+def foo(x: int | str) -> int | str:
+    if not isinstance(x, (int, str)):
+        raise TypeError
+    return x
+# end
+
+
+# no error
+def foo(self, x: int) -> int: ...
+def bar(self, x: str) -> str: ...
+def baz(self, x: int | str) -> int | str:
+    return x
+# end
+
+
 # E301
 class Class(object):
 
@@ -486,6 +519,20 @@ class Class:
     @classmethod
     def cls_method(cls) -> None:
         pass
+# end
+
+
+# E301
+class Foo:
+    """Demo."""
+
+    @overload
+    def bar(self, x: int) -> int: ...
+    @overload
+    def bar(self, x: str) -> str:
+        ...
+    def bar(self, x: int | str) -> int | str:
+        return x
 # end
 
 
@@ -577,6 +624,23 @@ class Test:
 		
 	def method2():
 		return 22
+# end
+
+
+# E302
+class A:...
+class B: ...
+# end
+
+
+# E302
+@overload
+def fn(a: int) -> int: ...
+@overload
+def fn(a: str) -> str: ...
+
+def fn(a: int | str) -> int | str:
+    ...
 # end
 
 

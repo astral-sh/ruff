@@ -116,10 +116,7 @@ pub(crate) fn verbose_decimal_constructor(checker: &mut Checker, call: &ast::Exp
             func, arguments, ..
         }) => {
             // Must be a call to the `float` builtin.
-            let Some(func_name) = func.as_name_expr() else {
-                return;
-            };
-            if func_name.id != "float" {
+            if !checker.semantic().match_builtin_expr(func, "float") {
                 return;
             };
 
@@ -139,10 +136,6 @@ pub(crate) fn verbose_decimal_constructor(checker: &mut Checker, call: &ast::Exp
             ) {
                 return;
             }
-
-            if !checker.semantic().is_builtin("float") {
-                return;
-            };
 
             let replacement = checker.locator().slice(float).to_string();
             let mut diagnostic = Diagnostic::new(

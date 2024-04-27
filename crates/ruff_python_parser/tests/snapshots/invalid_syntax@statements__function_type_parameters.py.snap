@@ -1,0 +1,403 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/statements/function_type_parameters.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..986,
+        body: [
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 795..823,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: "keyword",
+                        range: 799..806,
+                    },
+                    type_params: Some(
+                        TypeParams {
+                            range: 806..816,
+                            type_params: [
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        range: 807..808,
+                                        name: Identifier {
+                                            id: "A",
+                                            range: 807..808,
+                                        },
+                                        bound: None,
+                                        default: None,
+                                    },
+                                ),
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        range: 810..815,
+                                        name: Identifier {
+                                            id: "await",
+                                            range: 810..815,
+                                        },
+                                        bound: None,
+                                        default: None,
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                    parameters: Parameters {
+                        range: 816..818,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 820..823,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 820..823,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 825..861,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: "not_a_type_param",
+                        range: 829..845,
+                    },
+                    type_params: Some(
+                        TypeParams {
+                            range: 845..854,
+                            type_params: [
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        range: 846..847,
+                                        name: Identifier {
+                                            id: "A",
+                                            range: 846..847,
+                                        },
+                                        bound: None,
+                                        default: None,
+                                    },
+                                ),
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        range: 852..853,
+                                        name: Identifier {
+                                            id: "B",
+                                            range: 852..853,
+                                        },
+                                        bound: None,
+                                        default: None,
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                    parameters: Parameters {
+                        range: 854..856,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 858..861,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 858..861,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 863..895,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: "multiple_commas",
+                        range: 867..882,
+                    },
+                    type_params: Some(
+                        TypeParams {
+                            range: 882..888,
+                            type_params: [
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        range: 883..884,
+                                        name: Identifier {
+                                            id: "A",
+                                            range: 883..884,
+                                        },
+                                        bound: None,
+                                        default: None,
+                                    },
+                                ),
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        range: 886..887,
+                                        name: Identifier {
+                                            id: "B",
+                                            range: 886..887,
+                                        },
+                                        bound: None,
+                                        default: None,
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                    parameters: Parameters {
+                        range: 888..890,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 892..895,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 892..895,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 897..937,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: "multiple_trailing_commas",
+                        range: 901..925,
+                    },
+                    type_params: Some(
+                        TypeParams {
+                            range: 925..930,
+                            type_params: [
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        range: 926..927,
+                                        name: Identifier {
+                                            id: "A",
+                                            range: 926..927,
+                                        },
+                                        bound: None,
+                                        default: None,
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                    parameters: Parameters {
+                        range: 930..932,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 934..937,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 934..937,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 939..978,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: "multiple_commas_and_recovery",
+                        range: 943..971,
+                    },
+                    type_params: Some(
+                        TypeParams {
+                            range: 971..975,
+                            type_params: [
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        range: 972..973,
+                                        name: Identifier {
+                                            id: "A",
+                                            range: 972..973,
+                                        },
+                                        bound: None,
+                                        default: None,
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                    parameters: Parameters {
+                        range: 975..975,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 975..978,
+                                value: NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 975..978,
+                                        value: Int(
+                                            100,
+                                        ),
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            AnnAssign(
+                StmtAnnAssign {
+                    range: 979..986,
+                    target: Tuple(
+                        ExprTuple {
+                            range: 979..981,
+                            elts: [],
+                            ctx: Store,
+                            parenthesized: true,
+                        },
+                    ),
+                    annotation: EllipsisLiteral(
+                        ExprEllipsisLiteral {
+                            range: 983..986,
+                        },
+                    ),
+                    value: None,
+                    simple: false,
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+   |
+ 9 | # on following lines.
+10 | 
+11 | def keyword[A, await](): ...
+   |                ^^^^^ Syntax Error: Expected an identifier, but found a keyword 'await' that cannot be used here
+12 | 
+13 | def not_a_type_param[A, |, B](): ...
+   |
+
+
+   |
+11 | def keyword[A, await](): ...
+12 | 
+13 | def not_a_type_param[A, |, B](): ...
+   |                         ^ Syntax Error: Expected a type parameter or the end of the type parameter list
+14 | 
+15 | def multiple_commas[A,,B](): ...
+   |
+
+
+   |
+11 | def keyword[A, await](): ...
+12 | 
+13 | def not_a_type_param[A, |, B](): ...
+   |                          ^ Syntax Error: Expected a type parameter or the end of the type parameter list
+14 | 
+15 | def multiple_commas[A,,B](): ...
+   |
+
+
+   |
+13 | def not_a_type_param[A, |, B](): ...
+14 | 
+15 | def multiple_commas[A,,B](): ...
+   |                       ^ Syntax Error: Expected a type parameter or the end of the type parameter list
+16 | 
+17 | def multiple_trailing_commas[A,,](): ...
+   |
+
+
+   |
+15 | def multiple_commas[A,,B](): ...
+16 | 
+17 | def multiple_trailing_commas[A,,](): ...
+   |                                ^ Syntax Error: Expected a type parameter or the end of the type parameter list
+18 | 
+19 | def multiple_commas_and_recovery[A,,100](): ...
+   |
+
+
+   |
+17 | def multiple_trailing_commas[A,,](): ...
+18 | 
+19 | def multiple_commas_and_recovery[A,,100](): ...
+   |                                    ^ Syntax Error: Expected a type parameter or the end of the type parameter list
+   |
+
+
+   |
+17 | def multiple_trailing_commas[A,,](): ...
+18 | 
+19 | def multiple_commas_and_recovery[A,,100](): ...
+   |                                     ^^^ Syntax Error: Expected a type parameter or the end of the type parameter list
+   |
+
+
+   |
+17 | def multiple_trailing_commas[A,,](): ...
+18 | 
+19 | def multiple_commas_and_recovery[A,,100](): ...
+   |                                        ^ Syntax Error: Expected newline, found ']'
+   |
+
+
+   |
+17 | def multiple_trailing_commas[A,,](): ...
+18 | 
+19 | def multiple_commas_and_recovery[A,,100](): ...
+   |                                         ^^ Syntax Error: Only single target (not tuple) can be annotated
+   |

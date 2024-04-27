@@ -11,9 +11,10 @@ use ruff_python_trivia::CommentRanges;
 use ruff_source_file::Locator;
 
 use crate::fix::edits::delete_comment;
-use crate::noqa::{Directive, FileExemption, NoqaDirectives, NoqaMapping};
+use crate::noqa::{Code, Directive, FileExemption, NoqaDirectives, NoqaMapping};
 use crate::registry::{AsRule, Rule, RuleSet};
 use crate::rule_redirects::get_redirect_target;
+use crate::rules::pygrep_hooks;
 use crate::rules::ruff;
 use crate::rules::ruff::rules::{UnusedCodes, UnusedNOQA};
 use crate::settings::LinterSettings;
@@ -112,6 +113,7 @@ pub(crate) fn check_noqa(
             FileExemption::All => true,
             FileExemption::Codes(codes) => codes.contains(&Rule::UnusedNOQA.noqa_code()),
         })
+        && !per_file_ignores.contains(Rule::UnusedNOQA)
     {
         for line in noqa_directives.lines() {
             match &line.directive {
@@ -131,9 +133,9 @@ pub(crate) fn check_noqa(
                     let mut unknown_codes = vec![];
                     let mut unmatched_codes = vec![];
                     let mut valid_codes = vec![];
-                    let mut self_ignore = per_file_ignores.contains(Rule::UnusedNOQA);
                     let mut seen_codes = HashSet::new();
-                    for original_code in directive.names() {
+                    let mut self_ignore = false;
+                    for original_code in directive.iter().map(Code::as_str) {
                         let code = get_redirect_target(original_code).unwrap_or(original_code);
                         if Rule::UnusedNOQA.noqa_code() == code {
                             self_ignore = true;
@@ -152,12 +154,12 @@ pub(crate) fn check_noqa(
                         } else {
                             if let Ok(rule) = Rule::from_code(code) {
                                 if settings.rules.enabled(rule) {
-                                    unmatched_codes.push(code);
+                                    unmatched_codes.push(original_code);
                                 } else {
-                                    disabled_codes.push(code);
+                                    disabled_codes.push(original_code);
                                 }
                             } else {
-                                unknown_codes.push(code);
+                                unknown_codes.push(original_code);
                             }
                         }
                     }
@@ -210,6 +212,10 @@ pub(crate) fn check_noqa(
                 }
             }
         }
+    }
+
+    if settings.rules.enabled(Rule::BlanketNOQA) {
+        pygrep_hooks::rules::blanket_noqa(diagnostics, &noqa_directives, locator);
     }
 
     if settings.rules.enabled(Rule::RedirectedNOQA) {

@@ -138,3 +138,8 @@ np.dtype(int) == float
 
 #: E721
 dtype == float
+
+import builtins
+
+if builtins.type(res) == memoryview:  # E721
+    pass

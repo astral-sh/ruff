@@ -170,17 +170,12 @@ fn match_iteration_target(expr: &Expr, semantic: &SemanticModel) -> Option<Itera
             arguments: Arguments { args, .. },
             ..
         }) => {
-            let ast::ExprName { id, .. } = func.as_name_expr()?;
-
-            if !matches!(id.as_str(), "tuple" | "list") {
-                return None;
-            }
-
             let [arg] = &**args else {
                 return None;
             };
 
-            if !semantic.is_builtin(id.as_str()) {
+            let builtin_function_name = semantic.resolve_builtin_symbol(func)?;
+            if !matches!(builtin_function_name, "tuple" | "list") {
                 return None;
             }
 
@@ -216,7 +211,9 @@ fn match_iteration_target(expr: &Expr, semantic: &SemanticModel) -> Option<Itera
                 },
                 Expr::Call(ast::ExprCall { func, .. }) => IterationTarget {
                     range: arg.range(),
-                    iterable: is_func_builtin_iterator(func, semantic),
+                    iterable: semantic
+                        .resolve_builtin_symbol(func)
+                        .is_some_and(is_iterator),
                 },
                 _ => IterationTarget {
                     range: arg.range(),
@@ -250,8 +247,10 @@ fn match_iteration_target(expr: &Expr, semantic: &SemanticModel) -> Option<Itera
                 return None;
             };
 
-            let iterable = if value.is_call_expr() {
-                is_func_builtin_iterator(&value.as_call_expr()?.func, semantic)
+            let iterable = if let ast::Expr::Call(ast::ExprCall { func, .. }) = &**value {
+                semantic
+                    .resolve_builtin_symbol(func)
+                    .is_some_and(is_iterator)
             } else {
                 false
             };
@@ -289,11 +288,4 @@ fn match_simple_comprehension(elt: &Expr, generators: &[Comprehension]) -> Optio
     }
 
     Some(generator.iter.range())
-}
-
-/// Returns `true` if the function is a builtin iterator.
-fn is_func_builtin_iterator(func: &Expr, semantic: &SemanticModel) -> bool {
-    func.as_name_expr().map_or(false, |func_name| {
-        is_iterator(func_name.id.as_str()) && semantic.is_builtin(func_name.id.as_str())
-    })
 }

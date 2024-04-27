@@ -241,8 +241,12 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "E0237") => (RuleGroup::Stable, rules::pylint::rules::NonSlotAssignment),
         (Pylint, "E0241") => (RuleGroup::Stable, rules::pylint::rules::DuplicateBases),
         (Pylint, "E0302") => (RuleGroup::Stable, rules::pylint::rules::UnexpectedSpecialMethodSignature),
+        (Pylint, "E0303") => (RuleGroup::Preview, rules::pylint::rules::InvalidLengthReturnType),
         (Pylint, "E0304") => (RuleGroup::Preview, rules::pylint::rules::InvalidBoolReturnType),
+        (Pylint, "E0305") => (RuleGroup::Preview, rules::pylint::rules::InvalidIndexReturnType),
         (Pylint, "E0307") => (RuleGroup::Stable, rules::pylint::rules::InvalidStrReturnType),
+        (Pylint, "E0308") => (RuleGroup::Preview, rules::pylint::rules::InvalidBytesReturnType),
+        (Pylint, "E0309") => (RuleGroup::Preview, rules::pylint::rules::InvalidHashReturnType),
         (Pylint, "E0604") => (RuleGroup::Stable, rules::pylint::rules::InvalidAllObject),
         (Pylint, "E0605") => (RuleGroup::Stable, rules::pylint::rules::InvalidAllFormat),
         (Pylint, "E0643") => (RuleGroup::Preview, rules::pylint::rules::PotentialIndexError),
@@ -293,11 +297,12 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "R2004") => (RuleGroup::Stable, rules::pylint::rules::MagicValueComparison),
         (Pylint, "R2044") => (RuleGroup::Preview, rules::pylint::rules::EmptyComment),
         (Pylint, "R5501") => (RuleGroup::Stable, rules::pylint::rules::CollapsibleElseIf),
+        (Pylint, "R6104") => (RuleGroup::Preview, rules::pylint::rules::NonAugmentedAssignment),
         (Pylint, "R6201") => (RuleGroup::Preview, rules::pylint::rules::LiteralMembership),
         #[allow(deprecated)]
         (Pylint, "R6301") => (RuleGroup::Nursery, rules::pylint::rules::NoSelfUse),
         (Pylint, "W0108") => (RuleGroup::Preview, rules::pylint::rules::UnnecessaryLambda),
-        (Pylint, "W0117") => (RuleGroup::Preview, rules::pylint::rules::NanComparison),
+        (Pylint, "W0177") => (RuleGroup::Preview, rules::pylint::rules::NanComparison),
         (Pylint, "W0120") => (RuleGroup::Stable, rules::pylint::rules::UselessElseOnLoop),
         (Pylint, "W0127") => (RuleGroup::Stable, rules::pylint::rules::SelfAssigningVariable),
         (Pylint, "W0128") => (RuleGroup::Preview, rules::pylint::rules::RedeclaredAssignedName),
@@ -310,6 +315,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "W0602") => (RuleGroup::Stable, rules::pylint::rules::GlobalVariableNotAssigned),
         (Pylint, "W0603") => (RuleGroup::Stable, rules::pylint::rules::GlobalStatement),
         (Pylint, "W0604") => (RuleGroup::Preview, rules::pylint::rules::GlobalAtModuleLevel),
+        (Pylint, "W0642") => (RuleGroup::Preview, rules::pylint::rules::SelfOrClsAssignment),
         (Pylint, "W0711") => (RuleGroup::Stable, rules::pylint::rules::BinaryOpException),
         (Pylint, "W1501") => (RuleGroup::Preview, rules::pylint::rules::BadOpenMode),
         (Pylint, "W1508") => (RuleGroup::Stable, rules::pylint::rules::InvalidEnvvarDefault),
@@ -378,6 +384,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Bugbear, "035") => (RuleGroup::Stable, rules::flake8_bugbear::rules::StaticKeyDictComprehension),
         (Flake8Bugbear, "904") => (RuleGroup::Stable, rules::flake8_bugbear::rules::RaiseWithoutFromInsideExcept),
         (Flake8Bugbear, "905") => (RuleGroup::Stable, rules::flake8_bugbear::rules::ZipWithoutExplicitStrict),
+        (Flake8Bugbear, "909") => (RuleGroup::Preview, rules::flake8_bugbear::rules::LoopIteratorMutation),
 
         // flake8-blind-except
         (Flake8BlindExcept, "001") => (RuleGroup::Stable, rules::flake8_blind_except::rules::BlindExcept),
@@ -960,6 +967,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "026") => (RuleGroup::Preview, rules::ruff::rules::DefaultFactoryKwarg),
         (Ruff, "027") => (RuleGroup::Preview, rules::ruff::rules::MissingFStringSyntax),
         (Ruff, "028") => (RuleGroup::Preview, rules::ruff::rules::InvalidFormatterSuppressionComment),
+        (Ruff, "029") => (RuleGroup::Preview, rules::ruff::rules::UnusedAsync),
         (Ruff, "100") => (RuleGroup::Stable, rules::ruff::rules::UnusedNOQA),
         (Ruff, "101") => (RuleGroup::Preview, rules::ruff::rules::RedirectedNOQA),
         (Ruff, "200") => (RuleGroup::Stable, rules::ruff::rules::InvalidPyprojectToml),
@@ -1038,10 +1046,12 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
 
         // refurb
         (Refurb, "101") => (RuleGroup::Preview, rules::refurb::rules::ReadWholeFile),
+        (Refurb, "103") => (RuleGroup::Preview, rules::refurb::rules::WriteWholeFile),
         (Refurb, "105") => (RuleGroup::Preview, rules::refurb::rules::PrintEmptyString),
         (Refurb, "110") => (RuleGroup::Preview, rules::refurb::rules::IfExpInsteadOfOrOperator),
         #[allow(deprecated)]
         (Refurb, "113") => (RuleGroup::Nursery, rules::refurb::rules::RepeatedAppend),
+        (Refurb, "116") => (RuleGroup::Preview, rules::refurb::rules::FStringNumberFormat),
         (Refurb, "118") => (RuleGroup::Preview, rules::refurb::rules::ReimplementedOperator),
         (Refurb, "129") => (RuleGroup::Preview, rules::refurb::rules::ReadlinesInFor),
         #[allow(deprecated)]
@@ -1067,6 +1077,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Refurb, "180") => (RuleGroup::Preview, rules::refurb::rules::MetaClassABCMeta),
         (Refurb, "181") => (RuleGroup::Preview, rules::refurb::rules::HashlibDigestHex),
         (Refurb, "187") => (RuleGroup::Preview, rules::refurb::rules::ListReverseCopy),
+        (Refurb, "192") => (RuleGroup::Preview, rules::refurb::rules::SortedMinMax),
 
         // flake8-logging
         (Flake8Logging, "001") => (RuleGroup::Stable, rules::flake8_logging::rules::DirectLoggerInstantiation),

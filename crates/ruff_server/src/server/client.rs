@@ -6,7 +6,7 @@ use serde_json::Value;
 
 use super::schedule::Task;
 
-pub(crate) type ClientSender = crossbeam::channel::Sender<lsp_server::Message>;
+pub(crate) type ClientSender = crossbeam_channel::Sender<lsp_server::Message>;
 
 type ResponseBuilder<'s> = Box<dyn FnOnce(lsp_server::Response) -> Task<'s>>;
 

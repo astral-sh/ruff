@@ -1,0 +1,27 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/global_stmt_empty.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..7,
+        body: [
+            Global(
+                StmtGlobal {
+                    range: 0..6,
+                    names: [],
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | global
+  |       ^ Syntax Error: Global statement must have at least one name
+  |

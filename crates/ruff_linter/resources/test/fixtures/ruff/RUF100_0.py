@@ -108,6 +108,11 @@ def f():
     e = 1  #noqa: E50
 
 
+def f():
+    # Disabled - check redirects are reported correctly
+    eval(command)  # noqa: PGH001
+
+
 # Check duplicate code detection
 def foo():
     x = 2  # noqa: F841, F841, X200

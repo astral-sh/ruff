@@ -905,7 +905,8 @@ pub struct LintCommonOptions {
 
     // Tables are required to go last.
     /// A list of mappings from file pattern to rule codes or prefixes to
-    /// exclude, when considering any matching files.
+    /// exclude, when considering any matching files. An initial '!' negates
+    /// the file pattern.
     #[option(
         default = "{}",
         value_type = "dict[str, list[RuleSelector]]",
@@ -914,6 +915,8 @@ pub struct LintCommonOptions {
             # Ignore `E402` (import violations) in all `__init__.py` files, and in `path/to/file.py`.
             "__init__.py" = ["E402"]
             "path/to/file.py" = ["E402"]
+            # Ignore `D` rules everywhere except for the `src/` directory.
+            "!src/**.py" = ["D"]
         "#
     )]
     pub per_file_ignores: Option<FxHashMap<String, Vec<RuleSelector>>>,
@@ -1304,7 +1307,7 @@ impl Flake8ImplicitStrConcatOptions {
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct Flake8ImportConventionsOptions {
     /// The conventional aliases for imports. These aliases can be extended by
-    /// the `extend_aliases` option.
+    /// the `extend-aliases` option.
     #[option(
         default = r#"{"altair": "alt", "matplotlib": "mpl", "matplotlib.pyplot": "plt", "numpy": "np", "pandas": "pd", "seaborn": "sns", "tensorflow": "tf", "tkinter":  "tk", "holoviews": "hv", "panel": "pn", "plotly.express": "px", "polars": "pl", "pyarrow": "pa"}"#,
         value_type = "dict[str, str]",
@@ -2254,7 +2257,31 @@ pub struct IsortOptions {
 
     // Tables are required to go last.
     /// A list of mappings from section names to modules.
-    /// By default custom sections are output last, but this can be overridden with `section-order`.
+    ///
+    /// By default, imports are categorized according to their type (e.g., `future`, `third-party`,
+    /// and so on). This setting allows you to group modules into custom sections, to augment or
+    /// override the built-in sections.
+    ///
+    /// For example, to group all testing utilities, you could create a `testing` section:
+    /// ```toml
+    /// testing = ["pytest", "hypothesis"]
+    /// ```
+    ///
+    /// Custom sections should typically be inserted into the `section-order` list to ensure that
+    /// they're displayed as a standalone group and in the intended order, as in:
+    /// ```toml
+    /// section-order = [
+    ///   "future",
+    ///   "standard-library",
+    ///   "third-party",
+    ///   "first-party",
+    ///   "local-folder",
+    ///   "testing"
+    /// ]
+    /// ```
+    ///
+    /// If a custom section is omitted from `section-order`, imports in that section will be
+    /// assigned to the `default-section` (which defaults to `third-party`).
     #[option(
         default = "{}",
         value_type = "dict[str, list[str]]",

@@ -54,13 +54,11 @@ pub(crate) fn import(import_from: &Stmt, name: &str, asname: Option<&str>) -> Op
 pub(crate) fn import_from(
     import_from: &Stmt,
     module: Option<&str>,
-    level: Option<u32>,
+    level: u32,
 ) -> Option<Diagnostic> {
     // If level is not zero or module is none, return
-    if let Some(level) = level {
-        if level != 0 {
-            return None;
-        }
+    if level != 0 {
+        return None;
     };
 
     if let Some(module) = module {

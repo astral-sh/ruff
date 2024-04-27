@@ -95,10 +95,22 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 }
             }
             if checker.enabled(Rule::InvalidBoolReturnType) {
-                pylint::rules::invalid_bool_return(checker, name, body);
+                pylint::rules::invalid_bool_return(checker, function_def);
+            }
+            if checker.enabled(Rule::InvalidLengthReturnType) {
+                pylint::rules::invalid_length_return(checker, function_def);
+            }
+            if checker.enabled(Rule::InvalidBytesReturnType) {
+                pylint::rules::invalid_bytes_return(checker, function_def);
+            }
+            if checker.enabled(Rule::InvalidIndexReturnType) {
+                pylint::rules::invalid_index_return(checker, function_def);
+            }
+            if checker.enabled(Rule::InvalidHashReturnType) {
+                pylint::rules::invalid_hash_return(checker, function_def);
             }
             if checker.enabled(Rule::InvalidStrReturnType) {
-                pylint::rules::invalid_str_return(checker, name, body);
+                pylint::rules::invalid_str_return(checker, function_def);
             }
             if checker.enabled(Rule::InvalidFunctionName) {
                 if let Some(diagnostic) = pep8_naming::rules::invalid_function_name(
@@ -146,7 +158,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     decorator_list,
                     returns.as_ref().map(AsRef::as_ref),
                     parameters,
-                    type_params.as_ref(),
+                    type_params.as_deref(),
                 );
             }
             if checker.source_type.is_stub() {
@@ -162,7 +174,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 }
             }
             if checker.enabled(Rule::BadExitAnnotation) {
-                flake8_pyi::rules::bad_exit_annotation(checker, *is_async, name, parameters);
+                flake8_pyi::rules::bad_exit_annotation(checker, function_def);
             }
             if checker.enabled(Rule::RedundantNumericUnion) {
                 flake8_pyi::rules::redundant_numeric_union(checker, parameters);
@@ -347,6 +359,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.enabled(Rule::SslWithBadDefaults) {
                 flake8_bandit::rules::ssl_with_bad_defaults(checker, function_def);
+            }
+            if checker.enabled(Rule::UnusedAsync) {
+                ruff::rules::unused_async(checker, function_def);
             }
         }
         Stmt::Return(_) => {
@@ -606,7 +621,8 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     pylint::rules::manual_from_import(checker, stmt, alias, names);
                 }
                 if checker.enabled(Rule::ImportSelf) {
-                    if let Some(diagnostic) = pylint::rules::import_self(alias, checker.module_path)
+                    if let Some(diagnostic) =
+                        pylint::rules::import_self(alias, checker.module.qualified_name())
                     {
                         checker.diagnostics.push(diagnostic);
                     }
@@ -770,9 +786,11 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 flake8_bandit::rules::suspicious_imports(checker, stmt);
             }
             if checker.enabled(Rule::BannedApi) {
-                if let Some(module) =
-                    helpers::resolve_imported_module_path(level, module, checker.module_path)
-                {
+                if let Some(module) = helpers::resolve_imported_module_path(
+                    level,
+                    module,
+                    checker.module.qualified_name(),
+                ) {
                     flake8_tidy_imports::rules::banned_api(
                         checker,
                         &flake8_tidy_imports::matchers::NameMatchPolicy::MatchNameOrParent(
@@ -799,9 +817,11 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 }
             }
             if checker.enabled(Rule::BannedModuleLevelImports) {
-                if let Some(module) =
-                    helpers::resolve_imported_module_path(level, module, checker.module_path)
-                {
+                if let Some(module) = helpers::resolve_imported_module_path(
+                    level,
+                    module,
+                    checker.module.qualified_name(),
+                ) {
                     flake8_tidy_imports::rules::banned_module_level_imports(
                         checker,
                         &flake8_tidy_imports::matchers::NameMatchPolicy::MatchNameOrParent(
@@ -888,7 +908,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                         stmt,
                         level,
                         module,
-                        checker.module_path,
+                        checker.module.qualified_name(),
                         checker.settings.flake8_tidy_imports.ban_relative_imports,
                     ) {
                         checker.diagnostics.push(diagnostic);
@@ -987,9 +1007,12 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 }
             }
             if checker.enabled(Rule::ImportSelf) {
-                if let Some(diagnostic) =
-                    pylint::rules::import_from_self(level, module, names, checker.module_path)
-                {
+                if let Some(diagnostic) = pylint::rules::import_from_self(
+                    level,
+                    module,
+                    names,
+                    checker.module.qualified_name(),
+                ) {
                     checker.diagnostics.push(diagnostic);
                 }
             }
@@ -1055,6 +1078,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
         }
         Stmt::AugAssign(aug_assign @ ast::StmtAugAssign { target, .. }) => {
+            if checker.enabled(Rule::SelfOrClsAssignment) {
+                pylint::rules::self_or_cls_assignment(checker, target);
+            }
             if checker.enabled(Rule::GlobalStatement) {
                 if let Expr::Name(ast::ExprName { id, .. }) = target.as_ref() {
                     pylint::rules::global_statement(checker, id);
@@ -1225,6 +1251,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::ReadWholeFile) {
                 refurb::rules::read_whole_file(checker, with_stmt);
             }
+            if checker.enabled(Rule::WriteWholeFile) {
+                refurb::rules::write_whole_file(checker, with_stmt);
+            }
             if checker.enabled(Rule::UselessWithLock) {
                 pylint::rules::useless_with_lock(checker, with_stmt);
             }
@@ -1265,6 +1294,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.any_enabled(&[
                 Rule::EnumerateForLoop,
                 Rule::IncorrectDictIterator,
+                Rule::LoopIteratorMutation,
                 Rule::UnnecessaryEnumerate,
                 Rule::UnusedLoopControlVariable,
                 Rule::YieldInForLoop,
@@ -1406,6 +1436,11 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
         }
         Stmt::Assign(assign @ ast::StmtAssign { targets, value, .. }) => {
+            if checker.enabled(Rule::SelfOrClsAssignment) {
+                for target in targets {
+                    pylint::rules::self_or_cls_assignment(checker, target);
+                }
+            }
             if checker.enabled(Rule::RedeclaredAssignedName) {
                 pylint::rules::redeclared_assigned_name(checker, targets);
             }
@@ -1475,6 +1510,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.settings.rules.enabled(Rule::TypeBivariance) {
                 pylint::rules::type_bivariance(checker, value);
             }
+            if checker.enabled(Rule::NonAugmentedAssignment) {
+                pylint::rules::non_augmented_assignment(checker, assign);
+            }
             if checker.settings.rules.enabled(Rule::UnsortedDunderAll) {
                 ruff::rules::sort_dunder_all_assign(checker, assign);
             }
@@ -1539,6 +1577,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                         stmt,
                     );
                 }
+            }
+            if checker.enabled(Rule::SelfOrClsAssignment) {
+                pylint::rules::self_or_cls_assignment(checker, target);
             }
             if checker.enabled(Rule::SelfAssigningVariable) {
                 pylint::rules::self_annotated_assignment(checker, assign_stmt);

@@ -34,7 +34,7 @@ use crate::checkers::ast::Checker;
 /// ```python
 /// from functools import partial
 ///
-/// adders = [partial(lambda x, i: x + i, i) for i in range(3)]
+/// adders = [partial(lambda x, i: x + i, i=i) for i in range(3)]
 /// values = [adder(1) for adder in adders]  # [1, 2, 3]
 /// ```
 ///
@@ -67,7 +67,7 @@ impl<'a> Visitor<'a> for LoadedNamesVisitor<'a> {
             Expr::Name(name) => match &name.ctx {
                 ExprContext::Load => self.loaded.push(name),
                 ExprContext::Store => self.stored.push(name),
-                ExprContext::Del => {}
+                _ => {}
             },
             _ => visitor::walk_expr(self, expr),
         }

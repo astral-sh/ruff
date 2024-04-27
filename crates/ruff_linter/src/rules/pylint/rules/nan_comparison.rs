@@ -47,7 +47,7 @@ impl Violation for NanComparison {
     }
 }
 
-/// PLW0117
+/// PLW0177
 pub(crate) fn nan_comparison(checker: &mut Checker, left: &Expr, comparators: &[Expr]) {
     for expr in std::iter::once(left).chain(comparators.iter()) {
         if let Some(qualified_name) = checker.semantic().resolve_qualified_name(expr) {
@@ -96,27 +96,20 @@ impl std::fmt::Display for Nan {
 
 /// Returns `true` if the expression is a call to `float("NaN")`.
 fn is_nan_float(expr: &Expr, semantic: &SemanticModel) -> bool {
-    let Expr::Call(call) = expr else {
+    let Expr::Call(ast::ExprCall {
+        func,
+        arguments: ast::Arguments { args, keywords, .. },
+        ..
+    }) = expr
+    else {
         return false;
     };
 
-    let Expr::Name(ast::ExprName { id, .. }) = call.func.as_ref() else {
-        return false;
-    };
-
-    if id.as_str() != "float" {
+    if !keywords.is_empty() {
         return false;
     }
 
-    if !call.arguments.keywords.is_empty() {
-        return false;
-    }
-
-    let [arg] = call.arguments.args.as_ref() else {
-        return false;
-    };
-
-    let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = arg else {
+    let [Expr::StringLiteral(ast::ExprStringLiteral { value, .. })] = &**args else {
         return false;
     };
 
@@ -127,9 +120,5 @@ fn is_nan_float(expr: &Expr, semantic: &SemanticModel) -> bool {
         return false;
     }
 
-    if !semantic.is_builtin("float") {
-        return false;
-    }
-
-    true
+    semantic.match_builtin_expr(func, "float")
 }

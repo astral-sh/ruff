@@ -105,21 +105,21 @@ fn fix_all(snapshot: &DocumentSnapshot) -> crate::Result<CodeActionOrCommand> {
                 document,
                 snapshot.resolved_client_capabilities(),
                 snapshot.url(),
-                &snapshot.configuration().linter,
+                snapshot.settings().linter(),
                 snapshot.encoding(),
                 document.version(),
             )?),
             None,
         )
     };
-    let action = types::CodeAction {
+
+    Ok(CodeActionOrCommand::CodeAction(types::CodeAction {
         title: format!("{DIAGNOSTIC_NAME}: Fix all auto-fixable problems"),
-        kind: Some(types::CodeActionKind::SOURCE_FIX_ALL),
+        kind: Some(crate::SOURCE_FIX_ALL_RUFF),
         edit,
         data,
         ..Default::default()
-    };
-    Ok(types::CodeActionOrCommand::CodeAction(action))
+    }))
 }
 
 fn organize_imports(snapshot: &DocumentSnapshot) -> crate::Result<CodeActionOrCommand> {
@@ -140,21 +140,21 @@ fn organize_imports(snapshot: &DocumentSnapshot) -> crate::Result<CodeActionOrCo
                 document,
                 snapshot.resolved_client_capabilities(),
                 snapshot.url(),
-                &snapshot.configuration().linter,
+                snapshot.settings().linter(),
                 snapshot.encoding(),
                 document.version(),
             )?),
             None,
         )
     };
-    let action = types::CodeAction {
+
+    Ok(CodeActionOrCommand::CodeAction(types::CodeAction {
         title: format!("{DIAGNOSTIC_NAME}: Organize imports"),
-        kind: Some(types::CodeActionKind::SOURCE_ORGANIZE_IMPORTS),
+        kind: Some(crate::SOURCE_ORGANIZE_IMPORTS_RUFF),
         edit,
         data,
         ..Default::default()
-    };
-    Ok(types::CodeActionOrCommand::CodeAction(action))
+    }))
 }
 
 /// If `action_filter` is `None`, this returns [`SupportedCodeActionKind::all()`]. Otherwise,
@@ -166,14 +166,8 @@ fn supported_code_actions(
         return SupportedCodeAction::all().collect();
     };
 
-    SupportedCodeAction::all()
-        .filter(move |action| {
-            action_filter.iter().any(|filter| {
-                action
-                    .kinds()
-                    .iter()
-                    .any(|kind| kind.as_str().starts_with(filter.as_str()))
-            })
-        })
+    action_filter
+        .into_iter()
+        .flat_map(SupportedCodeAction::from_kind)
         .collect()
 }

@@ -17,7 +17,8 @@ use crate::fix::edits::add_argument;
 /// iterable. This can lead to subtle bugs.
 ///
 /// Use the `strict` parameter to raise a `ValueError` if the iterables are of
-/// non-uniform length.
+/// non-uniform length. If the iterables are intentionally different lengths, the
+/// parameter should be explicitly set to `False`.
 ///
 /// ## Example
 /// ```python
@@ -52,18 +53,18 @@ impl AlwaysFixableViolation for ZipWithoutExplicitStrict {
 
 /// B905
 pub(crate) fn zip_without_explicit_strict(checker: &mut Checker, call: &ast::ExprCall) {
-    if let Expr::Name(ast::ExprName { id, .. }) = call.func.as_ref() {
-        if id == "zip"
-            && checker.semantic().is_builtin("zip")
-            && call.arguments.find_keyword("strict").is_none()
-            && !call
-                .arguments
-                .args
-                .iter()
-                .any(|arg| is_infinite_iterator(arg, checker.semantic()))
-        {
-            let mut diagnostic = Diagnostic::new(ZipWithoutExplicitStrict, call.range());
-            diagnostic.set_fix(Fix::applicable_edit(
+    let semantic = checker.semantic();
+
+    if semantic.match_builtin_expr(&call.func, "zip")
+        && call.arguments.find_keyword("strict").is_none()
+        && !call
+            .arguments
+            .args
+            .iter()
+            .any(|arg| is_infinite_iterator(arg, semantic))
+    {
+        checker.diagnostics.push(
+            Diagnostic::new(ZipWithoutExplicitStrict, call.range()).with_fix(Fix::applicable_edit(
                 add_argument(
                     "strict=False",
                     &call.arguments,
@@ -81,9 +82,8 @@ pub(crate) fn zip_without_explicit_strict(checker: &mut Checker, call: &ast::Exp
                 } else {
                     Applicability::Safe
                 },
-            ));
-            checker.diagnostics.push(diagnostic);
-        }
+            )),
+        );
     }
 }
 

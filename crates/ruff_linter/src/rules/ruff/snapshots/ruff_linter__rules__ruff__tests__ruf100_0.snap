@@ -320,7 +320,7 @@ RUF100_0.py:108:5: F841 [*] Local variable `e` is assigned to but never used
 108     |-    e = 1  #noqa: E50
 109 108 | 
 110 109 | 
-111 110 | # Check duplicate code detection
+111 110 | def f():
 
 RUF100_0.py:108:12: RUF100 [*] Unused `noqa` directive (unknown: `E50`)
     |
@@ -339,121 +339,121 @@ RUF100_0.py:108:12: RUF100 [*] Unused `noqa` directive (unknown: `E50`)
     108 |+    e = 1
 109 109 | 
 110 110 | 
-111 111 | # Check duplicate code detection
+111 111 | def f():
 
-RUF100_0.py:113:12: RUF100 [*] Unused `noqa` directive (duplicated: `F841`; unknown: `X200`)
+RUF100_0.py:118:12: RUF100 [*] Unused `noqa` directive (duplicated: `F841`; unknown: `X200`)
     |
-111 | # Check duplicate code detection
-112 | def foo():
-113 |     x = 2  # noqa: F841, F841, X200
+116 | # Check duplicate code detection
+117 | def foo():
+118 |     x = 2  # noqa: F841, F841, X200
     |            ^^^^^^^^^^^^^^^^^^^^^^^^ RUF100
-114 | 
-115 |     y = 2 == bar  # noqa: SIM300, F841, SIM300, SIM300
+119 | 
+120 |     y = 2 == bar  # noqa: SIM300, F841, SIM300, SIM300
     |
     = help: Remove unused `noqa` directive
 
 ℹ Safe fix
-110 110 | 
-111 111 | # Check duplicate code detection
-112 112 | def foo():
-113     |-    x = 2  # noqa: F841, F841, X200
-    113 |+    x = 2  # noqa: F841
-114 114 | 
-115 115 |     y = 2 == bar  # noqa: SIM300, F841, SIM300, SIM300
-116 116 | 
-
-RUF100_0.py:115:19: RUF100 [*] Unused `noqa` directive (duplicated: `SIM300`, `SIM300`)
-    |
-113 |     x = 2  # noqa: F841, F841, X200
-114 | 
-115 |     y = 2 == bar  # noqa: SIM300, F841, SIM300, SIM300
-    |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF100
-116 | 
-117 |     z = 2  # noqa: F841 F841  F841, F841, F841
-    |
-    = help: Remove unused `noqa` directive
-
-ℹ Safe fix
-112 112 | def foo():
-113 113 |     x = 2  # noqa: F841, F841, X200
-114 114 | 
-115     |-    y = 2 == bar  # noqa: SIM300, F841, SIM300, SIM300
-    115 |+    y = 2 == bar  # noqa: SIM300, F841
-116 116 | 
-117 117 |     z = 2  # noqa: F841 F841  F841, F841, F841
-118 118 | 
-
-RUF100_0.py:117:12: RUF100 [*] Unused `noqa` directive (duplicated: `F841`, `F841`, `F841`, `F841`)
-    |
-115 |     y = 2 == bar  # noqa: SIM300, F841, SIM300, SIM300
-116 | 
-117 |     z = 2  # noqa: F841 F841  F841, F841, F841
-    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF100
-118 | 
-119 |     return
-    |
-    = help: Remove unused `noqa` directive
-
-ℹ Safe fix
-114 114 | 
-115 115 |     y = 2 == bar  # noqa: SIM300, F841, SIM300, SIM300
-116 116 | 
-117     |-    z = 2  # noqa: F841 F841  F841, F841, F841
-    117 |+    z = 2  # noqa: F841
-118 118 | 
-119 119 |     return
-120 120 | 
-
-RUF100_0.py:124:20: RUF100 [*] Unused `noqa` directive (duplicated: `S307`, `S307`, `S307`)
-    |
-122 | # Allow code redirects
-123 | x = eval(command)  # noqa: PGH001, S307
-124 | x = eval(command)  # noqa: S307, PGH001, S307, S307, S307
-    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF100
-125 | x = eval(command)  # noqa: PGH001, S307, PGH001
-126 | x = eval(command)  # noqa: PGH001, S307, PGH001, S307
-    |
-    = help: Remove unused `noqa` directive
-
-ℹ Safe fix
+115 115 | 
+116 116 | # Check duplicate code detection
+117 117 | def foo():
+118     |-    x = 2  # noqa: F841, F841, X200
+    118 |+    x = 2  # noqa: F841
+119 119 | 
+120 120 |     y = 2 == bar  # noqa: SIM300, F841, SIM300, SIM300
 121 121 | 
-122 122 | # Allow code redirects
-123 123 | x = eval(command)  # noqa: PGH001, S307
-124     |-x = eval(command)  # noqa: S307, PGH001, S307, S307, S307
-    124 |+x = eval(command)  # noqa: S307, PGH001
-125 125 | x = eval(command)  # noqa: PGH001, S307, PGH001
-126 126 | x = eval(command)  # noqa: PGH001, S307, PGH001, S307
 
-RUF100_0.py:125:20: RUF100 [*] Unused `noqa` directive (duplicated: `PGH001`)
+RUF100_0.py:120:19: RUF100 [*] Unused `noqa` directive (duplicated: `SIM300`, `SIM300`)
     |
-123 | x = eval(command)  # noqa: PGH001, S307
-124 | x = eval(command)  # noqa: S307, PGH001, S307, S307, S307
-125 | x = eval(command)  # noqa: PGH001, S307, PGH001
-    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF100
-126 | x = eval(command)  # noqa: PGH001, S307, PGH001, S307
+118 |     x = 2  # noqa: F841, F841, X200
+119 | 
+120 |     y = 2 == bar  # noqa: SIM300, F841, SIM300, SIM300
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF100
+121 | 
+122 |     z = 2  # noqa: F841 F841  F841, F841, F841
     |
     = help: Remove unused `noqa` directive
 
 ℹ Safe fix
-122 122 | # Allow code redirects
-123 123 | x = eval(command)  # noqa: PGH001, S307
-124 124 | x = eval(command)  # noqa: S307, PGH001, S307, S307, S307
-125     |-x = eval(command)  # noqa: PGH001, S307, PGH001
-    125 |+x = eval(command)  # noqa: PGH001, S307
-126 126 | x = eval(command)  # noqa: PGH001, S307, PGH001, S307
+117 117 | def foo():
+118 118 |     x = 2  # noqa: F841, F841, X200
+119 119 | 
+120     |-    y = 2 == bar  # noqa: SIM300, F841, SIM300, SIM300
+    120 |+    y = 2 == bar  # noqa: SIM300, F841
+121 121 | 
+122 122 |     z = 2  # noqa: F841 F841  F841, F841, F841
+123 123 | 
 
-RUF100_0.py:126:20: RUF100 [*] Unused `noqa` directive (duplicated: `PGH001`, `S307`)
+RUF100_0.py:122:12: RUF100 [*] Unused `noqa` directive (duplicated: `F841`, `F841`, `F841`, `F841`)
     |
-124 | x = eval(command)  # noqa: S307, PGH001, S307, S307, S307
-125 | x = eval(command)  # noqa: PGH001, S307, PGH001
-126 | x = eval(command)  # noqa: PGH001, S307, PGH001, S307
+120 |     y = 2 == bar  # noqa: SIM300, F841, SIM300, SIM300
+121 | 
+122 |     z = 2  # noqa: F841 F841  F841, F841, F841
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF100
+123 | 
+124 |     return
+    |
+    = help: Remove unused `noqa` directive
+
+ℹ Safe fix
+119 119 | 
+120 120 |     y = 2 == bar  # noqa: SIM300, F841, SIM300, SIM300
+121 121 | 
+122     |-    z = 2  # noqa: F841 F841  F841, F841, F841
+    122 |+    z = 2  # noqa: F841
+123 123 | 
+124 124 |     return
+125 125 | 
+
+RUF100_0.py:129:20: RUF100 [*] Unused `noqa` directive (duplicated: `S307`, `S307`, `S307`)
+    |
+127 | # Allow code redirects
+128 | x = eval(command)  # noqa: PGH001, S307
+129 | x = eval(command)  # noqa: S307, PGH001, S307, S307, S307
+    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF100
+130 | x = eval(command)  # noqa: PGH001, S307, PGH001
+131 | x = eval(command)  # noqa: PGH001, S307, PGH001, S307
+    |
+    = help: Remove unused `noqa` directive
+
+ℹ Safe fix
+126 126 | 
+127 127 | # Allow code redirects
+128 128 | x = eval(command)  # noqa: PGH001, S307
+129     |-x = eval(command)  # noqa: S307, PGH001, S307, S307, S307
+    129 |+x = eval(command)  # noqa: S307, PGH001
+130 130 | x = eval(command)  # noqa: PGH001, S307, PGH001
+131 131 | x = eval(command)  # noqa: PGH001, S307, PGH001, S307
+
+RUF100_0.py:130:20: RUF100 [*] Unused `noqa` directive (duplicated: `PGH001`)
+    |
+128 | x = eval(command)  # noqa: PGH001, S307
+129 | x = eval(command)  # noqa: S307, PGH001, S307, S307, S307
+130 | x = eval(command)  # noqa: PGH001, S307, PGH001
+    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF100
+131 | x = eval(command)  # noqa: PGH001, S307, PGH001, S307
+    |
+    = help: Remove unused `noqa` directive
+
+ℹ Safe fix
+127 127 | # Allow code redirects
+128 128 | x = eval(command)  # noqa: PGH001, S307
+129 129 | x = eval(command)  # noqa: S307, PGH001, S307, S307, S307
+130     |-x = eval(command)  # noqa: PGH001, S307, PGH001
+    130 |+x = eval(command)  # noqa: PGH001, S307
+131 131 | x = eval(command)  # noqa: PGH001, S307, PGH001, S307
+
+RUF100_0.py:131:20: RUF100 [*] Unused `noqa` directive (duplicated: `PGH001`, `S307`)
+    |
+129 | x = eval(command)  # noqa: S307, PGH001, S307, S307, S307
+130 | x = eval(command)  # noqa: PGH001, S307, PGH001
+131 | x = eval(command)  # noqa: PGH001, S307, PGH001, S307
     |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF100
     |
     = help: Remove unused `noqa` directive
 
 ℹ Safe fix
-123 123 | x = eval(command)  # noqa: PGH001, S307
-124 124 | x = eval(command)  # noqa: S307, PGH001, S307, S307, S307
-125 125 | x = eval(command)  # noqa: PGH001, S307, PGH001
-126     |-x = eval(command)  # noqa: PGH001, S307, PGH001, S307
-    126 |+x = eval(command)  # noqa: PGH001, S307
+128 128 | x = eval(command)  # noqa: PGH001, S307
+129 129 | x = eval(command)  # noqa: S307, PGH001, S307, S307, S307
+130 130 | x = eval(command)  # noqa: PGH001, S307, PGH001
+131     |-x = eval(command)  # noqa: PGH001, S307, PGH001, S307
+    131 |+x = eval(command)  # noqa: PGH001, S307

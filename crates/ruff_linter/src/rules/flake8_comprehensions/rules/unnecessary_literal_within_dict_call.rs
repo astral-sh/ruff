@@ -75,7 +75,7 @@ pub(crate) fn unnecessary_literal_within_dict_call(checker: &mut Checker, call: 
     else {
         return;
     };
-    if !checker.semantic().is_builtin("dict") {
+    if !checker.semantic().has_builtin_binding("dict") {
         return;
     }
     let argument_kind = match argument {

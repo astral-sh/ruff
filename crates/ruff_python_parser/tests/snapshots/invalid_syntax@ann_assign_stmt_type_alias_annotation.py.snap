@@ -1,0 +1,108 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/ann_assign_stmt_type_alias_annotation.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..37,
+        body: [
+            AnnAssign(
+                StmtAnnAssign {
+                    range: 0..2,
+                    target: Name(
+                        ExprName {
+                            range: 0..1,
+                            id: "a",
+                            ctx: Store,
+                        },
+                    ),
+                    annotation: Name(
+                        ExprName {
+                            range: 2..2,
+                            id: "",
+                            ctx: Invalid,
+                        },
+                    ),
+                    value: None,
+                    simple: true,
+                },
+            ),
+            TypeAlias(
+                StmtTypeAlias {
+                    range: 3..15,
+                    name: Name(
+                        ExprName {
+                            range: 8..9,
+                            id: "X",
+                            ctx: Store,
+                        },
+                    ),
+                    type_params: None,
+                    value: Name(
+                        ExprName {
+                            range: 12..15,
+                            id: "int",
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 16..23,
+                    value: Lambda(
+                        ExprLambda {
+                            range: 16..23,
+                            parameters: None,
+                            body: Name(
+                                ExprName {
+                                    range: 23..23,
+                                    id: "",
+                                    ctx: Invalid,
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            TypeAlias(
+                StmtTypeAlias {
+                    range: 24..36,
+                    name: Name(
+                        ExprName {
+                            range: 29..30,
+                            id: "X",
+                            ctx: Store,
+                        },
+                    ),
+                    type_params: None,
+                    value: Name(
+                        ExprName {
+                            range: 33..36,
+                            id: "int",
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | a: type X = int
+  |    ^^^^ Syntax Error: Expected an expression
+2 | lambda: type X = int
+  |
+
+
+  |
+1 | a: type X = int
+2 | lambda: type X = int
+  |         ^^^^ Syntax Error: Expected an expression
+  |

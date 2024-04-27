@@ -264,11 +264,20 @@ pub fn any_over_expr(expr: &Expr, func: &dyn Fn(&Expr) -> bool) -> bool {
 
 pub fn any_over_type_param(type_param: &TypeParam, func: &dyn Fn(&Expr) -> bool) -> bool {
     match type_param {
-        TypeParam::TypeVar(ast::TypeParamTypeVar { bound, .. }) => bound
+        TypeParam::TypeVar(ast::TypeParamTypeVar { bound, default, .. }) => {
+            bound
+                .as_ref()
+                .is_some_and(|value| any_over_expr(value, func))
+                || default
+                    .as_ref()
+                    .is_some_and(|value| any_over_expr(value, func))
+        }
+        TypeParam::TypeVarTuple(ast::TypeParamTypeVarTuple { default, .. }) => default
             .as_ref()
             .is_some_and(|value| any_over_expr(value, func)),
-        TypeParam::TypeVarTuple(ast::TypeParamTypeVarTuple { .. }) => false,
-        TypeParam::ParamSpec(ast::TypeParamParamSpec { .. }) => false,
+        TypeParam::ParamSpec(ast::TypeParamParamSpec { default, .. }) => default
+            .as_ref()
+            .is_some_and(|value| any_over_expr(value, func)),
     }
 }
 
@@ -723,13 +732,13 @@ where
 /// ```rust
 /// # use ruff_python_ast::helpers::format_import_from;
 ///
-/// assert_eq!(format_import_from(None, None), "".to_string());
-/// assert_eq!(format_import_from(Some(1), None), ".".to_string());
-/// assert_eq!(format_import_from(Some(1), Some("foo")), ".foo".to_string());
+/// assert_eq!(format_import_from(0, None), "".to_string());
+/// assert_eq!(format_import_from(1, None), ".".to_string());
+/// assert_eq!(format_import_from(1, Some("foo")), ".foo".to_string());
 /// ```
-pub fn format_import_from(level: Option<u32>, module: Option<&str>) -> String {
+pub fn format_import_from(level: u32, module: Option<&str>) -> String {
     let mut module_name = String::with_capacity(16);
-    if let Some(level) = level {
+    if level > 0 {
         for _ in 0..level {
             module_name.push('.');
         }
@@ -747,18 +756,15 @@ pub fn format_import_from(level: Option<u32>, module: Option<&str>) -> String {
 /// ```rust
 /// # use ruff_python_ast::helpers::format_import_from_member;
 ///
-/// assert_eq!(format_import_from_member(None, None, "bar"), "bar".to_string());
-/// assert_eq!(format_import_from_member(Some(1), None, "bar"), ".bar".to_string());
-/// assert_eq!(format_import_from_member(Some(1), Some("foo"), "bar"), ".foo.bar".to_string());
+/// assert_eq!(format_import_from_member(0, None, "bar"), "bar".to_string());
+/// assert_eq!(format_import_from_member(1, None, "bar"), ".bar".to_string());
+/// assert_eq!(format_import_from_member(1, Some("foo"), "bar"), ".foo.bar".to_string());
 /// ```
-pub fn format_import_from_member(level: Option<u32>, module: Option<&str>, member: &str) -> String {
+pub fn format_import_from_member(level: u32, module: Option<&str>, member: &str) -> String {
     let mut qualified_name = String::with_capacity(
-        (level.unwrap_or(0) as usize)
-            + module.as_ref().map_or(0, |module| module.len())
-            + 1
-            + member.len(),
+        (level as usize) + module.as_ref().map_or(0, |module| module.len()) + 1 + member.len(),
     );
-    if let Some(level) = level {
+    if level > 0 {
         for _ in 0..level {
             qualified_name.push('.');
         }
@@ -792,17 +798,17 @@ pub fn to_module_path(package: &Path, path: &Path) -> Option<Vec<String>> {
 /// ```rust
 /// # use ruff_python_ast::helpers::collect_import_from_member;
 ///
-/// assert_eq!(collect_import_from_member(None, None, "bar").segments(), ["bar"]);
-/// assert_eq!(collect_import_from_member(Some(1), None, "bar").segments(), [".", "bar"]);
-/// assert_eq!(collect_import_from_member(Some(1), Some("foo"), "bar").segments(), [".", "foo", "bar"]);
+/// assert_eq!(collect_import_from_member(0, None, "bar").segments(), ["bar"]);
+/// assert_eq!(collect_import_from_member(1, None, "bar").segments(), [".", "bar"]);
+/// assert_eq!(collect_import_from_member(1, Some("foo"), "bar").segments(), [".", "foo", "bar"]);
 /// ```
 pub fn collect_import_from_member<'a>(
-    level: Option<u32>,
+    level: u32,
     module: Option<&'a str>,
     member: &'a str,
 ) -> QualifiedName<'a> {
     let mut qualified_name_builder = QualifiedNameBuilder::with_capacity(
-        level.unwrap_or_default() as usize
+        level as usize
             + module
                 .map(|module| module.split('.').count())
                 .unwrap_or_default()
@@ -810,11 +816,9 @@ pub fn collect_import_from_member<'a>(
     );
 
     // Include the dots as standalone segments.
-    if let Some(level) = level {
-        if level > 0 {
-            for _ in 0..level {
-                qualified_name_builder.push(".");
-            }
+    if level > 0 {
+        for _ in 0..level {
+            qualified_name_builder.push(".");
         }
     }
 
@@ -866,14 +870,10 @@ pub fn from_relative_import<'a>(
 /// Given an imported module (based on its relative import level and module name), return the
 /// fully-qualified module path.
 pub fn resolve_imported_module_path<'a>(
-    level: Option<u32>,
+    level: u32,
     module: Option<&'a str>,
     module_path: Option<&[String]>,
 ) -> Option<Cow<'a, str>> {
-    let Some(level) = level else {
-        return Some(Cow::Borrowed(module.unwrap_or("")));
-    };
-
     if level == 0 {
         return Some(Cow::Borrowed(module.unwrap_or("")));
     }
@@ -1563,14 +1563,14 @@ mod tests {
     fn resolve_import() {
         // Return the module directly.
         assert_eq!(
-            resolve_imported_module_path(None, Some("foo"), None),
+            resolve_imported_module_path(0, Some("foo"), None),
             Some(Cow::Borrowed("foo"))
         );
 
         // Construct the module path from the calling module's path.
         assert_eq!(
             resolve_imported_module_path(
-                Some(1),
+                1,
                 Some("foo"),
                 Some(&["bar".to_string(), "baz".to_string()])
             ),
@@ -1579,19 +1579,16 @@ mod tests {
 
         // We can't return the module if it's a relative import, and we don't know the calling
         // module's path.
-        assert_eq!(
-            resolve_imported_module_path(Some(1), Some("foo"), None),
-            None
-        );
+        assert_eq!(resolve_imported_module_path(1, Some("foo"), None), None);
 
         // We can't return the module if it's a relative import, and the path goes beyond the
         // calling module's path.
         assert_eq!(
-            resolve_imported_module_path(Some(1), Some("foo"), Some(&["bar".to_string()])),
+            resolve_imported_module_path(1, Some("foo"), Some(&["bar".to_string()])),
             None,
         );
         assert_eq!(
-            resolve_imported_module_path(Some(2), Some("foo"), Some(&["bar".to_string()])),
+            resolve_imported_module_path(2, Some("foo"), Some(&["bar".to_string()])),
             None
         );
     }
@@ -1600,7 +1597,7 @@ mod tests {
     fn any_over_stmt_type_alias() {
         let seen = RefCell::new(Vec::new());
         let name = Expr::Name(ExprName {
-            id: "x".to_string(),
+            id: "x".into(),
             range: TextRange::default(),
             ctx: ExprContext::Load,
         });
@@ -1619,11 +1616,13 @@ mod tests {
         let type_var_one = TypeParam::TypeVar(TypeParamTypeVar {
             range: TextRange::default(),
             bound: Some(Box::new(constant_one.clone())),
+            default: None,
             name: Identifier::new("x", TextRange::default()),
         });
         let type_var_two = TypeParam::TypeVar(TypeParamTypeVar {
             range: TextRange::default(),
-            bound: Some(Box::new(constant_two.clone())),
+            bound: None,
+            default: Some(Box::new(constant_two.clone())),
             name: Identifier::new("x", TextRange::default()),
         });
         let type_alias = Stmt::TypeAlias(StmtTypeAlias {
@@ -1650,25 +1649,44 @@ mod tests {
         let type_var_no_bound = TypeParam::TypeVar(TypeParamTypeVar {
             range: TextRange::default(),
             bound: None,
+            default: None,
             name: Identifier::new("x", TextRange::default()),
         });
         assert!(!any_over_type_param(&type_var_no_bound, &|_expr| true));
 
-        let bound = Expr::NumberLiteral(ExprNumberLiteral {
+        let constant = Expr::NumberLiteral(ExprNumberLiteral {
             value: Number::Int(Int::ONE),
             range: TextRange::default(),
         });
 
         let type_var_with_bound = TypeParam::TypeVar(TypeParamTypeVar {
             range: TextRange::default(),
-            bound: Some(Box::new(bound.clone())),
+            bound: Some(Box::new(constant.clone())),
+            default: None,
             name: Identifier::new("x", TextRange::default()),
         });
         assert!(
             any_over_type_param(&type_var_with_bound, &|expr| {
                 assert_eq!(
-                    *expr, bound,
+                    *expr, constant,
                     "the received expression should be the unwrapped bound"
+                );
+                true
+            }),
+            "if true is returned from `func` it should be respected"
+        );
+
+        let type_var_with_default = TypeParam::TypeVar(TypeParamTypeVar {
+            range: TextRange::default(),
+            default: Some(Box::new(constant.clone())),
+            bound: None,
+            name: Identifier::new("x", TextRange::default()),
+        });
+        assert!(
+            any_over_type_param(&type_var_with_default, &|expr| {
+                assert_eq!(
+                    *expr, constant,
+                    "the received expression should be the unwrapped default"
                 );
                 true
             }),
@@ -1681,10 +1699,32 @@ mod tests {
         let type_var_tuple = TypeParam::TypeVarTuple(TypeParamTypeVarTuple {
             range: TextRange::default(),
             name: Identifier::new("x", TextRange::default()),
+            default: None,
         });
         assert!(
             !any_over_type_param(&type_var_tuple, &|_expr| true),
-            "type var tuples have no expressions to visit"
+            "this TypeVarTuple has no expressions to visit"
+        );
+
+        let constant = Expr::NumberLiteral(ExprNumberLiteral {
+            value: Number::Int(Int::ONE),
+            range: TextRange::default(),
+        });
+
+        let type_var_tuple_with_default = TypeParam::TypeVarTuple(TypeParamTypeVarTuple {
+            range: TextRange::default(),
+            default: Some(Box::new(constant.clone())),
+            name: Identifier::new("x", TextRange::default()),
+        });
+        assert!(
+            any_over_type_param(&type_var_tuple_with_default, &|expr| {
+                assert_eq!(
+                    *expr, constant,
+                    "the received expression should be the unwrapped default"
+                );
+                true
+            }),
+            "if true is returned from `func` it should be respected"
         );
     }
 
@@ -1693,10 +1733,32 @@ mod tests {
         let type_param_spec = TypeParam::ParamSpec(TypeParamParamSpec {
             range: TextRange::default(),
             name: Identifier::new("x", TextRange::default()),
+            default: None,
         });
         assert!(
             !any_over_type_param(&type_param_spec, &|_expr| true),
-            "param specs have no expressions to visit"
+            "this ParamSpec has no expressions to visit"
+        );
+
+        let constant = Expr::NumberLiteral(ExprNumberLiteral {
+            value: Number::Int(Int::ONE),
+            range: TextRange::default(),
+        });
+
+        let param_spec_with_default = TypeParam::TypeVarTuple(TypeParamTypeVarTuple {
+            range: TextRange::default(),
+            default: Some(Box::new(constant.clone())),
+            name: Identifier::new("x", TextRange::default()),
+        });
+        assert!(
+            any_over_type_param(&param_spec_with_default, &|expr| {
+                assert_eq!(
+                    *expr, constant,
+                    "the received expression should be the unwrapped default"
+                );
+                true
+            }),
+            "if true is returned from `func` it should be respected"
         );
     }
 }

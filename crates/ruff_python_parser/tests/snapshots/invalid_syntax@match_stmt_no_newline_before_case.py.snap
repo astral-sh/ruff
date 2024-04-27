@@ -1,0 +1,71 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/match_stmt_no_newline_before_case.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..23,
+        body: [
+            Match(
+                StmtMatch {
+                    range: 0..10,
+                    subject: Name(
+                        ExprName {
+                            range: 6..9,
+                            id: "foo",
+                            ctx: Load,
+                        },
+                    ),
+                    cases: [],
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 11..15,
+                    value: Name(
+                        ExprName {
+                            range: 11..15,
+                            id: "case",
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            AnnAssign(
+                StmtAnnAssign {
+                    range: 16..22,
+                    target: Name(
+                        ExprName {
+                            range: 16..17,
+                            id: "_",
+                            ctx: Store,
+                        },
+                    ),
+                    annotation: EllipsisLiteral(
+                        ExprEllipsisLiteral {
+                            range: 19..22,
+                        },
+                    ),
+                    value: None,
+                    simple: true,
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | match foo: case _: ...
+  |            ^^^^ Syntax Error: Expected newline, found name
+  |
+
+
+  |
+1 | match foo: case _: ...
+  |                 ^ Syntax Error: Simple statements must be separated by newlines or semicolons
+  |

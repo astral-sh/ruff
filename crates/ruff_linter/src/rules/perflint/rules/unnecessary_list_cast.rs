@@ -69,11 +69,7 @@ pub(crate) fn unnecessary_list_cast(checker: &mut Checker, iter: &Expr, body: &[
         return;
     };
 
-    let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() else {
-        return;
-    };
-
-    if !(id == "list" && checker.semantic().is_builtin("list")) {
+    if !checker.semantic().match_builtin_expr(func, "list") {
         return;
     }
 

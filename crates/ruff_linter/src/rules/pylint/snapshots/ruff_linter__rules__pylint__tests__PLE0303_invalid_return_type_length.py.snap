@@ -1,0 +1,42 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+invalid_return_type_length.py:6:16: PLE0303 `__len__` does not return a non-negative integer
+  |
+4 | class Bool:
+5 |     def __len__(self):
+6 |         return True  # [invalid-length-return]
+  |                ^^^^ PLE0303
+  |
+
+invalid_return_type_length.py:11:16: PLE0303 `__len__` does not return a non-negative integer
+   |
+ 9 | class Float:
+10 |     def __len__(self):
+11 |         return 3.05  # [invalid-length-return]
+   |                ^^^^ PLE0303
+   |
+
+invalid_return_type_length.py:16:16: PLE0303 `__len__` does not return a non-negative integer
+   |
+14 | class Str:
+15 |     def __len__(self):
+16 |         return "ruff"  # [invalid-length-return]
+   |                ^^^^^^ PLE0303
+   |
+
+invalid_return_type_length.py:20:9: PLE0303 `__len__` does not return a non-negative integer
+   |
+19 | class LengthNoReturn:
+20 |     def __len__(self):
+   |         ^^^^^^^ PLE0303
+21 |         print("ruff")  # [invalid-length-return]
+   |
+
+invalid_return_type_length.py:26:16: PLE0303 `__len__` does not return a non-negative integer
+   |
+24 | class LengthNegative:
+25 |     def __len__(self):
+26 |         return -42  # [invalid-length-return]
+   |                ^^^ PLE0303
+   |

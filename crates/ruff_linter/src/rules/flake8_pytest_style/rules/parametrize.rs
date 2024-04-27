@@ -567,7 +567,7 @@ fn check_values(checker: &mut Checker, names: &Expr, values: &Expr) {
                     // Replace `]` with `)` or `,)`.
                     let values_end = Edit::replacement(
                         if needs_trailing_comma {
-                            "),".into()
+                            ",)".into()
                         } else {
                             ")".into()
                         },

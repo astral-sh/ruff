@@ -8,6 +8,8 @@ mod edit;
 mod fix;
 mod format;
 mod lint;
+#[macro_use]
+mod message;
 mod server;
 mod session;
 

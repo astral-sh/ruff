@@ -81,13 +81,6 @@ fn is_alias(expr: &Expr, semantic: &SemanticModel, target_version: PythonVersion
         })
 }
 
-/// Return `true` if an [`Expr`] is `TimeoutError`.
-fn is_timeout_error(expr: &Expr, semantic: &SemanticModel) -> bool {
-    semantic
-        .resolve_qualified_name(expr)
-        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["", "TimeoutError"]))
-}
-
 /// Create a [`Diagnostic`] for a single target, like an [`Expr::Name`].
 fn atom_diagnostic(checker: &mut Checker, target: &Expr) {
     let mut diagnostic = Diagnostic::new(
@@ -96,19 +89,25 @@ fn atom_diagnostic(checker: &mut Checker, target: &Expr) {
         },
         target.range(),
     );
-    if checker.semantic().is_builtin("TimeoutError") {
-        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-            "TimeoutError".to_string(),
-            target.range(),
-        )));
-    }
+    diagnostic.try_set_fix(|| {
+        let (import_edit, binding) = checker.importer().get_or_import_builtin_symbol(
+            "TimeoutError",
+            target.start(),
+            checker.semantic(),
+        )?;
+        Ok(Fix::safe_edits(
+            Edit::range_replacement(binding, target.range()),
+            import_edit,
+        ))
+    });
     checker.diagnostics.push(diagnostic);
 }
 
 /// Create a [`Diagnostic`] for a tuple of expressions.
 fn tuple_diagnostic(checker: &mut Checker, tuple: &ast::ExprTuple, aliases: &[&Expr]) {
     let mut diagnostic = Diagnostic::new(TimeoutErrorAlias { name: None }, tuple.range());
-    if checker.semantic().is_builtin("TimeoutError") {
+    let semantic = checker.semantic();
+    if semantic.has_builtin_binding("TimeoutError") {
         // Filter out any `TimeoutErrors` aliases.
         let mut remaining: Vec<Expr> = tuple
             .elts
@@ -126,7 +125,7 @@ fn tuple_diagnostic(checker: &mut Checker, tuple: &ast::ExprTuple, aliases: &[&E
         if tuple
             .elts
             .iter()
-            .all(|elt| !is_timeout_error(elt, checker.semantic()))
+            .all(|elt| !semantic.match_builtin_expr(elt, "TimeoutError"))
         {
             let node = ast::ExprName {
                 id: "TimeoutError".into(),

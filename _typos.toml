@@ -11,3 +11,9 @@ ned = "ned"
 pn = "pn"  # `import panel as pd` is a thing
 poit = "poit"
 BA = "BA" # acronym for "Bad Allowed", used in testing.
+
+[default]
+extend-ignore-re = [
+  # Line ignore with trailing "spellchecker:disable-line"
+  "(?Rm)^.*#\\s*spellchecker:disable-line$"
+]

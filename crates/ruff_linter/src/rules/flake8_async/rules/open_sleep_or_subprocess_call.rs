@@ -63,7 +63,7 @@ fn is_open_sleep_or_subprocess_call(func: &Expr, semantic: &SemanticModel) -> bo
         .is_some_and(|qualified_name| {
             matches!(
                 qualified_name.segments(),
-                ["", "open"]
+                ["" | "builtins", "open"]
                     | ["time", "sleep"]
                     | [
                         "subprocess",

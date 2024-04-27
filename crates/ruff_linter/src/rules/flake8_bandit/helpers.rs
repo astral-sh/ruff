@@ -24,23 +24,13 @@ pub(super) fn is_untyped_exception(type_: Option<&Expr>, semantic: &SemanticMode
         if let Expr::Tuple(ast::ExprTuple { elts, .. }) = &type_ {
             elts.iter().any(|type_| {
                 semantic
-                    .resolve_qualified_name(type_)
-                    .is_some_and(|qualified_name| {
-                        matches!(
-                            qualified_name.segments(),
-                            ["", "Exception" | "BaseException"]
-                        )
-                    })
+                    .resolve_builtin_symbol(type_)
+                    .is_some_and(|builtin| matches!(builtin, "Exception" | "BaseException"))
             })
         } else {
             semantic
-                .resolve_qualified_name(type_)
-                .is_some_and(|qualified_name| {
-                    matches!(
-                        qualified_name.segments(),
-                        ["", "Exception" | "BaseException"]
-                    )
-                })
+                .resolve_builtin_symbol(type_)
+                .is_some_and(|builtin| matches!(builtin, "Exception" | "BaseException"))
         }
     })
 }

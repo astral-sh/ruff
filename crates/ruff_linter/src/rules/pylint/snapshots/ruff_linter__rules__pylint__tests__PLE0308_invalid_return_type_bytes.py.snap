@@ -1,0 +1,34 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+invalid_return_type_bytes.py:6:16: PLE0308 `__bytes__` does not return `bytes`
+  |
+4 | class Float:
+5 |     def __bytes__(self):
+6 |         return 3.05  # [invalid-bytes-return]
+  |                ^^^^ PLE0308
+  |
+
+invalid_return_type_bytes.py:11:16: PLE0308 `__bytes__` does not return `bytes`
+   |
+ 9 | class Int:
+10 |     def __bytes__(self):
+11 |         return 0  # [invalid-bytes-return]
+   |                ^ PLE0308
+   |
+
+invalid_return_type_bytes.py:16:16: PLE0308 `__bytes__` does not return `bytes`
+   |
+14 | class Str:
+15 |     def __bytes__(self):
+16 |         return "some bytes"  # [invalid-bytes-return]
+   |                ^^^^^^^^^^^^ PLE0308
+   |
+
+invalid_return_type_bytes.py:20:9: PLE0308 `__bytes__` does not return `bytes`
+   |
+19 | class BytesNoReturn:
+20 |     def __bytes__(self):
+   |         ^^^^^^^^^ PLE0308
+21 |         print("ruff")  # [invalid-bytes-return]
+   |

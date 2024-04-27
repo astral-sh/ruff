@@ -229,6 +229,31 @@ impl<'a> Importer<'a> {
             .map_or_else(|| self.import_symbol(symbol, at, None, semantic), Ok)
     }
 
+    /// For a given builtin symbol, determine whether an [`Edit`] is necessary to make the symbol
+    /// available in the current scope. For example, if `zip` has been overridden in the relevant
+    /// scope, the `builtins` module will need to be imported in order for a `Fix` to reference
+    /// `zip`; but otherwise, that won't be necessary.
+    ///
+    /// Returns a two-item tuple. The first item is either `Some(Edit)` (indicating) that an
+    /// edit is necessary to make the symbol available, or `None`, indicating that the symbol has
+    /// not been overridden in the current scope. The second item in the tuple is the bound name
+    /// of the symbol.
+    ///
+    /// Attempts to reuse existing imports when possible.
+    pub(crate) fn get_or_import_builtin_symbol(
+        &self,
+        symbol: &str,
+        at: TextSize,
+        semantic: &SemanticModel,
+    ) -> Result<(Option<Edit>, String), ResolutionError> {
+        if semantic.has_builtin_binding(symbol) {
+            return Ok((None, symbol.to_string()));
+        }
+        let (import_edit, binding) =
+            self.get_or_import_symbol(&ImportRequest::import("builtins", symbol), at, semantic)?;
+        Ok((Some(import_edit), binding))
+    }
+
     /// Return the [`ImportedName`] to for existing symbol, if it's present in the given [`SemanticModel`].
     fn find_symbol(
         symbol: &ImportRequest,
@@ -380,7 +405,7 @@ impl<'a> Importer<'a> {
                 range: _,
             }) = stmt
             {
-                if level.map_or(true, |level| level == 0)
+                if *level == 0
                     && name.as_ref().is_some_and(|name| name == module)
                     && names.iter().all(|alias| alias.name.as_str() != "*")
                 {

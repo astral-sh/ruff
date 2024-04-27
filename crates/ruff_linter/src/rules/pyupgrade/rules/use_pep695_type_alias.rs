@@ -132,6 +132,9 @@ pub(crate) fn non_pep695_type_alias(checker: &mut Checker, stmt: &StmtAnnAssign)
                             }
                             None => None,
                         },
+                        // We don't handle defaults here yet. Should perhaps be a different rule since
+                        // defaults are only valid in 3.13+.
+                        default: None,
                     })
                 })
                 .collect(),

@@ -26,7 +26,7 @@ ruff_text_size = { path = "../ruff_text_size" }
 ruff_workspace = { path = "../ruff_workspace" }
 
 anyhow = { workspace = true }
-crossbeam = { workspace = true }
+crossbeam-channel = { workspace = true }
 jod-thread = { workspace = true }
 libc = { workspace = true }
 lsp-server = { workspace = true }
@@ -35,6 +35,8 @@ rustc-hash = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tracing = { workspace = true }
+walkdir = { workspace = true }
+regex = { workspace = true }
 
 [dev-dependencies]
 insta = { workspace = true }

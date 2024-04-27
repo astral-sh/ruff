@@ -344,7 +344,7 @@ impl Violation for SuspiciousMarkSafeUsage {
 }
 
 /// ## What it does
-/// Checks for uses of URL open functions that unexpected schemes.
+/// Checks for instances where URL open functions are used with unexpected schemes.
 ///
 /// ## Why is this bad?
 /// Some URL open functions allow the use of `file:` or custom schemes (for use
@@ -849,15 +849,45 @@ pub(crate) fn suspicious_function_call(checker: &mut Checker, call: &ExprCall) {
             ["" | "builtins", "eval"] => Some(SuspiciousEvalUsage.into()),
             // MarkSafe
             ["django", "utils", "safestring" | "html", "mark_safe"] => Some(SuspiciousMarkSafeUsage.into()),
-            // URLOpen (`urlopen`, `urlretrieve`, `Request`)
-            ["urllib", "request", "urlopen" | "urlretrieve" | "Request"] |
-            ["six", "moves", "urllib", "request", "urlopen" | "urlretrieve" | "Request"] => {
+            // URLOpen (`Request`)
+            ["urllib", "request","Request"] |
+            ["six", "moves", "urllib", "request","Request"] => {
                 // If the `url` argument is a string literal, allow `http` and `https` schemes.
                 if call.arguments.args.iter().all(|arg| !arg.is_starred_expr()) && call.arguments.keywords.iter().all(|keyword| keyword.arg.is_some()) {
                     if let Some(Expr::StringLiteral(ast::ExprStringLiteral { value, .. })) = &call.arguments.find_argument("url", 0) {
-                        let url = value.to_str().trim_start();
-                        if url.starts_with("http://") || url.starts_with("https://") {
-                            return None;
+                            let url = value.to_str().trim_start();
+                            if url.starts_with("http://") || url.starts_with("https://") {
+                                return None;
+                            }
+
+                    }
+                }
+                Some(SuspiciousURLOpenUsage.into())
+            }
+            // URLOpen (`urlopen`, `urlretrieve`)
+            ["urllib", "request", "urlopen" | "urlretrieve" ] |
+            ["six", "moves", "urllib", "request", "urlopen" | "urlretrieve" ] => {
+                if call.arguments.args.iter().all(|arg| !arg.is_starred_expr()) && call.arguments.keywords.iter().all(|keyword| keyword.arg.is_some()) {
+                    if let Some(arg) = &call.arguments.find_argument("url", 0) {
+                        // If the `url` argument is a string literal, allow `http` and `https` schemes.
+                        if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = arg {
+                            let url = value.to_str().trim_start();
+                            if url.starts_with("http://") || url.starts_with("https://") {
+                                return None;
+                            }
+                        }
+
+                        // If the `url` argument is a `urllib.request.Request` object, allow `http` and `https` schemes.
+                        if let Expr::Call(ExprCall { func, arguments, .. }) = arg {
+                            if checker.semantic().resolve_qualified_name(func.as_ref()).is_some_and(|name| name.segments() == ["urllib", "request", "Request"]) {
+                                if let Some( Expr::StringLiteral(ast::ExprStringLiteral { value, .. })) = arguments.find_argument("url", 0) {
+                                        let url = value.to_str().trim_start();
+                                        if url.starts_with("http://") || url.starts_with("https://") {
+                                            return None;
+                                        }
+
+                                }
+                            }
                         }
                     }
                 }

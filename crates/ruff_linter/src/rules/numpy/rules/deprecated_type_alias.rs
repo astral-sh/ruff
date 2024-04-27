@@ -90,12 +90,15 @@ pub(crate) fn deprecated_type_alias(checker: &mut Checker, expr: &Expr) {
             "long" => "int",
             _ => type_name,
         };
-        if checker.semantic().is_builtin(type_name) {
-            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                type_name.to_string(),
-                expr.range(),
-            )));
-        }
+        diagnostic.try_set_fix(|| {
+            let (import_edit, binding) = checker.importer().get_or_import_builtin_symbol(
+                type_name,
+                expr.start(),
+                checker.semantic(),
+            )?;
+            let binding_edit = Edit::range_replacement(binding, expr.range());
+            Ok(Fix::safe_edits(binding_edit, import_edit))
+        });
         checker.diagnostics.push(diagnostic);
     }
 }

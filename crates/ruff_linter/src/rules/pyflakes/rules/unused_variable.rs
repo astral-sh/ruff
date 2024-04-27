@@ -219,7 +219,7 @@ fn remove_unused_variable(binding: &Binding, checker: &Checker) -> Option<Fix> {
         {
             if target.is_name_expr() {
                 return if targets.len() > 1
-                    || contains_effect(value, |id| checker.semantic().is_builtin(id))
+                    || contains_effect(value, |id| checker.semantic().has_builtin_binding(id))
                 {
                     // If the expression is complex (`x = foo()`), remove the assignment,
                     // but preserve the right-hand side.
@@ -265,7 +265,7 @@ fn remove_unused_variable(binding: &Binding, checker: &Checker) -> Option<Fix> {
     }) = statement
     {
         if target.is_name_expr() {
-            return if contains_effect(value, |id| checker.semantic().is_builtin(id)) {
+            return if contains_effect(value, |id| checker.semantic().has_builtin_binding(id)) {
                 // If the expression is complex (`x = foo()`), remove the assignment,
                 // but preserve the right-hand side.
                 let start = statement.start();

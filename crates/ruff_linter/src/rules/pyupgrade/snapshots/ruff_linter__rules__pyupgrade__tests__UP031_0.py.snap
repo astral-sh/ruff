@@ -926,6 +926,8 @@ UP031_0.py:115:8: UP031 [*] Use format specifiers instead of percent format
 118 | |     hexlify(cert.fingerprint(hashes.SHA256())).decode("ascii")[0:8], # fingerprint prefix
 119 | | )
     | |_^ UP031
+120 |   
+121 |   # UP031 (no longer false negatives; now offer potentially unsafe fixes)
     |
     = help: Replace with format specifiers
 
@@ -939,4 +941,58 @@ UP031_0.py:115:8: UP031 [*] Use format specifiers instead of percent format
 117 117 |     cert.not_valid_after.date().isoformat().replace("-", ""), # expiration date
 118 118 |     hexlify(cert.fingerprint(hashes.SHA256())).decode("ascii")[0:8], # fingerprint prefix
 
+UP031_0.py:122:1: UP031 [*] Use format specifiers instead of percent format
+    |
+121 | # UP031 (no longer false negatives; now offer potentially unsafe fixes)
+122 | 'Hello %s' % bar
+    | ^^^^^^^^^^^^^^^^ UP031
+123 | 
+124 | 'Hello %s' % bar.baz
+    |
+    = help: Replace with format specifiers
 
+ℹ Unsafe fix
+119 119 | )
+120 120 | 
+121 121 | # UP031 (no longer false negatives; now offer potentially unsafe fixes)
+122     |-'Hello %s' % bar
+    122 |+'Hello {}'.format(bar)
+123 123 | 
+124 124 | 'Hello %s' % bar.baz
+125 125 | 
+
+UP031_0.py:124:1: UP031 [*] Use format specifiers instead of percent format
+    |
+122 | 'Hello %s' % bar
+123 | 
+124 | 'Hello %s' % bar.baz
+    | ^^^^^^^^^^^^^^^^^^^^ UP031
+125 | 
+126 | 'Hello %s' % bar['bop']
+    |
+    = help: Replace with format specifiers
+
+ℹ Unsafe fix
+121 121 | # UP031 (no longer false negatives; now offer potentially unsafe fixes)
+122 122 | 'Hello %s' % bar
+123 123 | 
+124     |-'Hello %s' % bar.baz
+    124 |+'Hello {}'.format(bar.baz)
+125 125 | 
+126 126 | 'Hello %s' % bar['bop']
+
+UP031_0.py:126:1: UP031 [*] Use format specifiers instead of percent format
+    |
+124 | 'Hello %s' % bar.baz
+125 | 
+126 | 'Hello %s' % bar['bop']
+    | ^^^^^^^^^^^^^^^^^^^^^^^ UP031
+    |
+    = help: Replace with format specifiers
+
+ℹ Unsafe fix
+123 123 | 
+124 124 | 'Hello %s' % bar.baz
+125 125 | 
+126     |-'Hello %s' % bar['bop']
+    126 |+'Hello {}'.format(bar['bop'])

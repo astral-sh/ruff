@@ -49,6 +49,14 @@ def yes_five(x: Dict[int, str]):
 
     x = 1
 
+
+from builtins import list as SneakyList
+
+
+sneaky = SneakyList()
+# FURB131
+del sneaky[:]
+
 # these should not
 
 del names["key"]

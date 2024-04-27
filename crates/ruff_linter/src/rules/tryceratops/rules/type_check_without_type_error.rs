@@ -74,26 +74,20 @@ fn has_control_flow(stmt: &Stmt) -> bool {
 }
 
 /// Returns `true` if an [`Expr`] is a call to check types.
-fn check_type_check_call(checker: &mut Checker, call: &Expr) -> bool {
-    checker
-        .semantic()
-        .resolve_qualified_name(call)
-        .is_some_and(|qualified_name| {
-            matches!(
-                qualified_name.segments(),
-                ["", "isinstance" | "issubclass" | "callable"]
-            )
-        })
+fn check_type_check_call(semantic: &SemanticModel, call: &Expr) -> bool {
+    semantic
+        .resolve_builtin_symbol(call)
+        .is_some_and(|builtin| matches!(builtin, "isinstance" | "issubclass" | "callable"))
 }
 
 /// Returns `true` if an [`Expr`] is a test to check types (e.g. via isinstance)
-fn check_type_check_test(checker: &mut Checker, test: &Expr) -> bool {
+fn check_type_check_test(semantic: &SemanticModel, test: &Expr) -> bool {
     match test {
         Expr::BoolOp(ast::ExprBoolOp { values, .. }) => values
             .iter()
-            .all(|expr| check_type_check_test(checker, expr)),
-        Expr::UnaryOp(ast::ExprUnaryOp { operand, .. }) => check_type_check_test(checker, operand),
-        Expr::Call(ast::ExprCall { func, .. }) => check_type_check_call(checker, func),
+            .all(|expr| check_type_check_test(semantic, expr)),
+        Expr::UnaryOp(ast::ExprUnaryOp { operand, .. }) => check_type_check_test(semantic, operand),
+        Expr::Call(ast::ExprCall { func, .. }) => check_type_check_call(semantic, func),
         _ => false,
     }
 }
@@ -161,14 +155,15 @@ pub(crate) fn type_check_without_type_error(
         elif_else_clauses,
         ..
     } = stmt_if;
+
     if let Some(Stmt::If(ast::StmtIf { test, .. })) = parent {
-        if !check_type_check_test(checker, test) {
+        if !check_type_check_test(checker.semantic(), test) {
             return;
         }
     }
 
     // Only consider the body when the `if` condition is all type-related
-    if !check_type_check_test(checker, test) {
+    if !check_type_check_test(checker.semantic(), test) {
         return;
     }
     check_body(checker, body);
@@ -176,7 +171,7 @@ pub(crate) fn type_check_without_type_error(
     for clause in elif_else_clauses {
         if let Some(test) = &clause.test {
             // If there are any `elif`, they must all also be type-related
-            if !check_type_check_test(checker, test) {
+            if !check_type_check_test(checker.semantic(), test) {
                 return;
             }
         }

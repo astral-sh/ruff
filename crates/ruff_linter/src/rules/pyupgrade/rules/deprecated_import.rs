@@ -643,10 +643,10 @@ pub(crate) fn deprecated_import(
     stmt: &Stmt,
     names: &[Alias],
     module: Option<&str>,
-    level: Option<u32>,
+    level: u32,
 ) {
     // Avoid relative and star imports.
-    if level.is_some_and(|level| level > 0) {
+    if level > 0 {
         return;
     }
     if names.first().is_some_and(|name| &name.name == "*") {

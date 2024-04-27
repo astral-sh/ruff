@@ -1,6 +1,7 @@
 #![allow(clippy::derive_partial_eq_without_eq)]
 
 use std::cell::OnceCell;
+
 use std::fmt;
 use std::fmt::Debug;
 use std::ops::Deref;
@@ -180,7 +181,7 @@ pub struct StmtFunctionDef {
     pub is_async: bool,
     pub decorator_list: Vec<Decorator>,
     pub name: Identifier,
-    pub type_params: Option<TypeParams>,
+    pub type_params: Option<Box<TypeParams>>,
     pub parameters: Box<Parameters>,
     pub returns: Option<Box<Expr>>,
     pub body: Vec<Stmt>,
@@ -470,7 +471,7 @@ pub struct StmtImportFrom {
     pub range: TextRange,
     pub module: Option<Identifier>,
     pub names: Vec<Alias>,
-    pub level: Option<u32>,
+    pub level: u32,
 }
 
 impl From<StmtImportFrom> for Stmt {
@@ -947,10 +948,17 @@ impl Ranged for FStringExpressionElement {
     }
 }
 
+/// An `FStringLiteralElement` with an empty `value` is an invalid f-string element.
 #[derive(Clone, Debug, PartialEq)]
 pub struct FStringLiteralElement {
     pub range: TextRange,
     pub value: Box<str>,
+}
+
+impl FStringLiteralElement {
+    pub fn is_valid(&self) -> bool {
+        !self.value.is_empty()
+    }
 }
 
 impl Ranged for FStringLiteralElement {
@@ -1571,6 +1579,9 @@ bitflags! {
         /// for why we track the casing of the `r` prefix,
         /// but not for any other prefix
         const R_PREFIX_UPPER = 1 << 4;
+
+        /// The string was deemed invalid by the parser.
+        const INVALID = 1 << 5;
     }
 }
 
@@ -1619,6 +1630,12 @@ impl StringLiteralFlags {
                     - StringLiteralFlagsInner::R_PREFIX_UPPER,
             ),
         }
+    }
+
+    #[must_use]
+    pub fn with_invalid(mut self) -> Self {
+        self.0 |= StringLiteralFlagsInner::INVALID;
+        self
     }
 
     pub const fn prefix(self) -> StringLiteralPrefix {
@@ -1736,6 +1753,15 @@ impl StringLiteral {
     /// Extracts a string slice containing the entire `String`.
     pub fn as_str(&self) -> &str {
         self
+    }
+
+    /// Creates an invalid string literal with the given range.
+    pub fn invalid(range: TextRange) -> Self {
+        Self {
+            range,
+            value: "".into(),
+            flags: StringLiteralFlags::default().with_invalid(),
+        }
     }
 }
 
@@ -1952,6 +1978,9 @@ bitflags! {
         /// See https://black.readthedocs.io/en/stable/the_black_code_style/current_style.html#r-strings-and-r-strings
         /// for why we track the casing of the `r` prefix, but not for any other prefix
         const R_PREFIX_UPPER = 1 << 3;
+
+        /// The bytestring was deemed invalid by the parser.
+        const INVALID = 1 << 4;
     }
 }
 
@@ -2025,6 +2054,12 @@ impl BytesLiteralFlags {
         self
     }
 
+    #[must_use]
+    pub fn with_invalid(mut self) -> Self {
+        self.0 |= BytesLiteralFlagsInner::INVALID;
+        self
+    }
+
     pub const fn prefix(self) -> ByteStringPrefix {
         if self.0.contains(BytesLiteralFlagsInner::R_PREFIX_LOWER) {
             debug_assert!(!self.0.contains(BytesLiteralFlagsInner::R_PREFIX_UPPER));
@@ -2093,6 +2128,15 @@ impl BytesLiteral {
     /// Extracts a byte slice containing the entire [`BytesLiteral`].
     pub fn as_slice(&self) -> &[u8] {
         self
+    }
+
+    /// Creates a new invalid bytes literal with the given range.
+    pub fn invalid(range: TextRange) -> Self {
+        Self {
+            range,
+            value: Box::new([]),
+            flags: BytesLiteralFlags::default().with_invalid(),
+        }
     }
 }
 
@@ -2726,6 +2770,7 @@ pub enum ExprContext {
     Load,
     Store,
     Del,
+    Invalid,
 }
 
 /// See also [boolop](https://docs.python.org/3/library/ast.html#ast.BoolOp)
@@ -3087,6 +3132,7 @@ pub struct TypeParamTypeVar {
     pub range: TextRange,
     pub name: Identifier,
     pub bound: Option<Box<Expr>>,
+    pub default: Option<Box<Expr>>,
 }
 
 impl From<TypeParamTypeVar> for TypeParam {
@@ -3100,6 +3146,7 @@ impl From<TypeParamTypeVar> for TypeParam {
 pub struct TypeParamParamSpec {
     pub range: TextRange,
     pub name: Identifier,
+    pub default: Option<Box<Expr>>,
 }
 
 impl From<TypeParamParamSpec> for TypeParam {
@@ -3113,6 +3160,7 @@ impl From<TypeParamParamSpec> for TypeParam {
 pub struct TypeParamTypeVarTuple {
     pub range: TextRange,
     pub name: Identifier,
+    pub default: Option<Box<Expr>>,
 }
 
 impl From<TypeParamTypeVarTuple> for TypeParam {
@@ -3138,7 +3186,7 @@ pub struct Decorator {
 ///
 /// NOTE: This type differs from the original Python AST. See: [arguments](https://docs.python.org/3/library/ast.html#ast.arguments).
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Default)]
 pub struct Parameters {
     pub range: TextRange,
     pub posonlyargs: Vec<ParameterWithDefault>,
@@ -3363,48 +3411,6 @@ impl Deref for TypeParams {
 
 pub type Suite = Vec<Stmt>;
 
-impl Parameters {
-    pub fn empty(range: TextRange) -> Self {
-        Self {
-            range,
-            posonlyargs: Vec::new(),
-            args: Vec::new(),
-            vararg: None,
-            kwonlyargs: Vec::new(),
-            kwarg: None,
-        }
-    }
-}
-
-impl ParameterWithDefault {
-    pub fn as_parameter(&self) -> &Parameter {
-        &self.parameter
-    }
-}
-
-impl Parameters {
-    pub fn defaults(&self) -> impl std::iter::Iterator<Item = &Expr> {
-        self.posonlyargs
-            .iter()
-            .chain(self.args.iter())
-            .filter_map(|arg| arg.default.as_ref().map(std::convert::AsRef::as_ref))
-    }
-
-    #[allow(clippy::type_complexity)]
-    pub fn split_kwonlyargs(&self) -> (Vec<&Parameter>, Vec<(&Parameter, &Expr)>) {
-        let mut args = Vec::new();
-        let mut with_defaults = Vec::new();
-        for arg in &self.kwonlyargs {
-            if let Some(ref default) = arg.default {
-                with_defaults.push((arg.as_parameter(), &**default));
-            } else {
-                args.push(arg.as_parameter());
-            }
-        }
-        (args, with_defaults)
-    }
-}
-
 /// The kind of escape command as defined in [IPython Syntax] in the IPython codebase.
 ///
 /// [IPython Syntax]: https://github.com/ipython/ipython/blob/635815e8f1ded5b764d66cacc80bbe25e9e2587f/IPython/core/inputtransformer2.py#L335-L343
@@ -3506,10 +3512,17 @@ impl IpyEscapeKind {
     }
 }
 
+/// An `Identifier` with an empty `id` is invalid.
+///
+/// For example, in the following code `id` will be empty.
+/// ```python
+/// def 1():
+///     ...
+/// ```
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Identifier {
-    id: String,
-    range: TextRange,
+    pub id: String,
+    pub range: TextRange,
 }
 
 impl Identifier {
@@ -3519,6 +3532,10 @@ impl Identifier {
             id: id.into(),
             range,
         }
+    }
+
+    pub fn is_valid(&self) -> bool {
+        !self.id.is_empty()
     }
 }
 
@@ -4115,8 +4132,8 @@ mod tests {
     #[test]
     #[cfg(target_pointer_width = "64")]
     fn size() {
-        assert!(std::mem::size_of::<Stmt>() <= 144);
-        assert!(std::mem::size_of::<StmtFunctionDef>() <= 144);
+        assert!(std::mem::size_of::<Stmt>() <= 120);
+        assert!(std::mem::size_of::<StmtFunctionDef>() <= 120);
         assert!(std::mem::size_of::<StmtClassDef>() <= 104);
         assert!(std::mem::size_of::<StmtTry>() <= 112);
         assert!(std::mem::size_of::<Mod>() <= 32);

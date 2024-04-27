@@ -28,7 +28,7 @@ use crate::Imported;
 /// A semantic model for a Python module, to enable querying the module's semantic information.
 pub struct SemanticModel<'a> {
     typing_modules: &'a [String],
-    module_path: Option<&'a [String]>,
+    module: Module<'a>,
 
     /// Stack of all AST nodes in the program.
     nodes: Nodes<'a>,
@@ -134,7 +134,7 @@ impl<'a> SemanticModel<'a> {
     pub fn new(typing_modules: &'a [String], path: &Path, module: Module<'a>) -> Self {
         Self {
             typing_modules,
-            module_path: module.path(),
+            module,
             nodes: Nodes::default(),
             node_id: None,
             branches: Branches::default(),
@@ -251,10 +251,62 @@ impl<'a> SemanticModel<'a> {
     }
 
     /// Return `true` if `member` is bound as a builtin.
-    pub fn is_builtin(&self, member: &str) -> bool {
+    ///
+    /// Note that a "builtin binding" does *not* include explicit lookups via the `builtins`
+    /// module, e.g. `import builtins; builtins.open`. It *only* includes the bindings
+    /// that are pre-populated in Python's global scope before any imports have taken place.
+    pub fn has_builtin_binding(&self, member: &str) -> bool {
         self.lookup_symbol(member)
             .map(|binding_id| &self.bindings[binding_id])
             .is_some_and(|binding| binding.kind.is_builtin())
+    }
+
+    /// If `expr` is a reference to a builtins symbol,
+    /// return the name of that symbol. Else, return `None`.
+    ///
+    /// This method returns `true` both for "builtin bindings"
+    /// (present even without any imports, e.g. `open()`), and for explicit lookups
+    /// via the `builtins` module (e.g. `import builtins; builtins.open()`).
+    pub fn resolve_builtin_symbol<'expr>(&'a self, expr: &'expr Expr) -> Option<&'a str>
+    where
+        'expr: 'a,
+    {
+        // Fast path: we only need to worry about name expressions
+        if !self.seen_module(Modules::BUILTINS) {
+            let name = &expr.as_name_expr()?.id;
+            return if self.has_builtin_binding(name) {
+                Some(name)
+            } else {
+                None
+            };
+        }
+
+        // Slow path: we have to consider names and attributes
+        let qualified_name = self.resolve_qualified_name(expr)?;
+        match qualified_name.segments() {
+            ["" | "builtins", name] => Some(*name),
+            _ => None,
+        }
+    }
+
+    /// Return `true` if `expr` is a reference to `builtins.$target`,
+    /// i.e. either `object` (where `object` is not overridden in the global scope),
+    /// or `builtins.object` (where `builtins` is imported as a module at the top level)
+    pub fn match_builtin_expr(&self, expr: &Expr, symbol: &str) -> bool {
+        debug_assert!(!symbol.contains('.'));
+        // fast path with more short-circuiting
+        if !self.seen_module(Modules::BUILTINS) {
+            let Expr::Name(ast::ExprName { id, .. }) = expr else {
+                return false;
+            };
+            return id == symbol && self.has_builtin_binding(symbol);
+        }
+
+        // slow path: we need to consider attribute accesses and aliased imports
+        let Some(qualified_name) = self.resolve_qualified_name(expr) else {
+            return false;
+        };
+        matches!(qualified_name.segments(), ["" | "builtins", name] if *name == symbol)
     }
 
     /// Return `true` if `member` is an "available" symbol, i.e., a symbol that has not been bound
@@ -739,7 +791,11 @@ impl<'a> SemanticModel<'a> {
                     .first()
                     .map_or(false, |segment| *segment == ".")
                 {
-                    from_relative_import(self.module_path?, qualified_name.segments(), tail)?
+                    from_relative_import(
+                        self.module.qualified_name()?,
+                        qualified_name.segments(),
+                        tail,
+                    )?
                 } else {
                     qualified_name
                         .segments()
@@ -765,14 +821,32 @@ impl<'a> SemanticModel<'a> {
                 }
             }
             BindingKind::ClassDefinition(_) | BindingKind::FunctionDefinition(_) => {
-                let value_name = UnqualifiedName::from_expr(value)?;
-                let resolved: QualifiedName = self
-                    .module_path?
-                    .iter()
-                    .map(String::as_str)
-                    .chain(value_name.segments().iter().copied())
-                    .collect();
-                Some(resolved)
+                // If we have a fully-qualified path for the module, use it.
+                if let Some(path) = self.module.qualified_name() {
+                    Some(
+                        path.iter()
+                            .map(String::as_str)
+                            .chain(
+                                UnqualifiedName::from_expr(value)?
+                                    .segments()
+                                    .iter()
+                                    .copied(),
+                            )
+                            .collect(),
+                    )
+                } else {
+                    // Otherwise, if we're in (e.g.) a script, use the module name.
+                    Some(
+                        std::iter::once(self.module.name()?)
+                            .chain(
+                                UnqualifiedName::from_expr(value)?
+                                    .segments()
+                                    .iter()
+                                    .copied(),
+                            )
+                            .collect(),
+                    )
+                }
             }
             _ => None,
         }
@@ -1138,6 +1212,7 @@ impl<'a> SemanticModel<'a> {
     pub fn add_module(&mut self, module: &str) {
         match module {
             "_typeshed" => self.seen.insert(Modules::TYPESHED),
+            "builtins" => self.seen.insert(Modules::BUILTINS),
             "collections" => self.seen.insert(Modules::COLLECTIONS),
             "dataclasses" => self.seen.insert(Modules::DATACLASSES),
             "datetime" => self.seen.insert(Modules::DATETIME),
@@ -1708,6 +1783,7 @@ bitflags! {
         const TYPING_EXTENSIONS = 1 << 15;
         const TYPESHED = 1 << 16;
         const DATACLASSES = 1 << 17;
+        const BUILTINS = 1 << 18;
     }
 }
 

@@ -186,7 +186,9 @@ pub(crate) fn missing_whitespace_around_operator(
             );
 
             NeedsSpace::from(!slash_in_func)
-        } else if kind.is_unary() || matches!(kind, TokenKind::Star | TokenKind::DoubleStar) {
+        } else if kind.is_unary_arithmetic_operator()
+            || matches!(kind, TokenKind::Star | TokenKind::DoubleStar)
+        {
             let is_binary = {
                 let prev_kind = prev_token.kind();
 
