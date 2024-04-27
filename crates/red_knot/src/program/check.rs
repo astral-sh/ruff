@@ -1,5 +1,5 @@
 use crate::cancellation::CancellationToken;
-use crate::db::SourceDb;
+use crate::db::{SemanticDb, SourceDb};
 use crate::files::FileId;
 use crate::lint::Diagnostics;
 use crate::program::Program;
@@ -41,7 +41,32 @@ impl Program {
     ) -> Result<Diagnostics, CheckError> {
         context.cancelled_ok()?;
 
-        // TODO schedule the dependencies.
+        let symbol_table = self.symbol_table(file);
+        let dependencies = symbol_table.dependencies();
+
+        if !dependencies.is_empty() {
+            let module = self.file_to_module(file);
+
+            // TODO scheduling all dependencies here is wasteful if we don't infer any types on them
+            //  but I think that's unlikely, so it is okay?
+            //  Anyway, we need to figure out a way to retrieve the dependencies of a module
+            //  from the persistent cache. So maybe it should be a separate query after all.
+            for dependency in dependencies {
+                let dependency_name = dependency.module_name(self, module);
+
+                if let Some(dependency_name) = dependency_name {
+                    // TODO We may want to have a different check functions for non-first-party
+                    //   files because we only need to index them and not check them.
+                    //   Supporting non-first-party code also requires supporting typing stubs.
+                    if let Some(dependency) = self.resolve_module(dependency_name) {
+                        if dependency.path(self).root().kind().is_first_party() {
+                            context.schedule_check_file(dependency.path(self).file());
+                        }
+                    }
+                }
+            }
+        }
+
         let mut diagnostics = Vec::new();
 
         if self.workspace().is_file_open(file) {
@@ -72,8 +97,8 @@ pub trait CheckScheduler {
 
 /// Scheduler that runs checks on a rayon thread pool.
 pub struct RayonCheckScheduler<'program, 'scope_ref, 'scope> {
-    pub program: &'program Program,
-    pub scope: &'scope_ref rayon::Scope<'scope>,
+    program: &'program Program,
+    scope: &'scope_ref rayon::Scope<'scope>,
 }
 
 impl<'program, 'scope_ref, 'scope> RayonCheckScheduler<'program, 'scope_ref, 'scope> {

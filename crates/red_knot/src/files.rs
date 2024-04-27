@@ -23,7 +23,7 @@ pub struct Files {
 }
 
 impl Files {
-    #[tracing::instrument(level = "debug", skip(path))]
+    #[tracing::instrument(level = "debug", skip(self))]
     pub fn intern(&self, path: &Path) -> FileId {
         self.inner.write().intern(path)
     }
@@ -32,7 +32,7 @@ impl Files {
         self.inner.read().try_get(path)
     }
 
-    #[tracing::instrument(level = "debug")]
+    #[tracing::instrument(level = "debug", skip(self))]
     pub fn path(&self, id: FileId) -> Arc<Path> {
         self.inner.read().path(id)
     }

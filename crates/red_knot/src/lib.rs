@@ -1,4 +1,5 @@
 use std::hash::BuildHasherDefault;
+use std::ops::Deref;
 use std::path::{Path, PathBuf};
 
 use rustc_hash::{FxHashSet, FxHasher};
@@ -79,5 +80,23 @@ impl Name {
 
     pub fn as_str(&self) -> &str {
         self.0.as_str()
+    }
+}
+
+impl Deref for Name {
+    type Target = str;
+
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        self.as_str()
+    }
+}
+
+impl<T> From<T> for Name
+where
+    T: Into<smol_str::SmolStr>,
+{
+    fn from(value: T) -> Self {
+        Self(value.into())
     }
 }
