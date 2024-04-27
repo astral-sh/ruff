@@ -90,6 +90,7 @@ where
 }
 
 fn lint_unresolved_imports(context: &SemanticLintContext) {
+    // TODO: Consider iterating over the dependencies (imports) only instead of all definitions.
     for (symbol, definition) in context.symbols().all_definitions() {
         match definition {
             Definition::Import(import) => {
@@ -103,17 +104,19 @@ fn lint_unresolved_imports(context: &SemanticLintContext) {
                 let ty = context.eval_symbol(symbol);
 
                 if ty.is_unknown() {
-                    let message = if let Some(module) = import.module() {
+                    let module_name = import.module().map(Deref::deref).unwrap_or_default();
+                    let message = if import.level() > 0 {
                         format!(
-                            "Unresolved relative import '{}' from '{}{module}'",
+                            "Unresolved relative import '{}' from {}{}",
                             import.name(),
-                            ".".repeat(import.level() as usize)
+                            ".".repeat(import.level() as usize),
+                            module_name
                         )
                     } else {
                         format!(
-                            "Unresolved import '{}' from {}",
+                            "Unresolved import '{}' from '{}'",
                             import.name(),
-                            ".".repeat(import.level() as usize)
+                            module_name
                         )
                     };
 
