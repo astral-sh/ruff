@@ -113,7 +113,7 @@ impl<'s> Requester<'s> {
             Box::new(move |response: lsp_server::Response| {
                 match (response.error, response.result) {
                     (Some(err), _) => {
-                        log_error!(
+                        tracing::error!(
                             "Got an error from the client (code {}): {}",
                             err.code,
                             err.message
@@ -123,7 +123,7 @@ impl<'s> Requester<'s> {
                     (None, Some(response)) => match serde_json::from_value(response) {
                         Ok(response) => response_handler(response),
                         Err(error) => {
-                            log_error!("Failed to deserialize response from server: {error}");
+                            tracing::error!("Failed to deserialize response from server: {error}");
                             Task::nothing()
                         }
                     },
@@ -136,7 +136,7 @@ impl<'s> Requester<'s> {
                             // hit it if the concrete type is `()`, so the `unwrap()` is safe here.
                             response_handler(serde_json::from_value(Value::Null).unwrap());
                         } else {
-                            log_error!(
+                            tracing::error!(
                                 "Server response was invalid: did not contain a result or error"
                             );
                         }
@@ -162,7 +162,7 @@ impl<'s> Requester<'s> {
         if let Some(handler) = self.response_handlers.remove(&response.id) {
             handler(response)
         } else {
-            log_error!(
+            tracing::error!(
                 "Received a response with ID {}, which was not expected",
                 response.id
             );

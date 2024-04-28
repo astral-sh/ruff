@@ -198,7 +198,7 @@ pub fn run(
         }
         Command::Check(args) => check(args, global_options),
         Command::Format(args) => format(args, global_options),
-        Command::Server(args) => server(args, global_options.log_level()),
+        Command::Server(args) => server(args),
     }
 }
 
@@ -212,14 +212,13 @@ fn format(args: FormatCommand, global_options: GlobalConfigArgs) -> Result<ExitS
     }
 }
 
-fn server(args: ServerCommand, log_level: LogLevel) -> Result<ExitStatus> {
+fn server(args: ServerCommand) -> Result<ExitStatus> {
     let ServerCommand { preview } = args;
     // by default, we set the number of worker threads to `num_cpus`, with a maximum of 4.
     let worker_threads = num_cpus::get().max(4);
     commands::server::run_server(
         preview,
         NonZeroUsize::try_from(worker_threads).expect("a non-zero worker thread count"),
-        log_level,
     )
 }
 

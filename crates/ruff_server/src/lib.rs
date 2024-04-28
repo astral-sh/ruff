@@ -5,8 +5,6 @@ use lsp_types::CodeActionKind;
 pub use server::Server;
 
 #[macro_use]
-mod log;
-#[macro_use]
 mod message;
 
 mod edit;
@@ -15,6 +13,7 @@ mod format;
 mod lint;
 mod server;
 mod session;
+mod trace;
 
 pub(crate) const SERVER_NAME: &str = "ruff";
 pub(crate) const DIAGNOSTIC_NAME: &str = "Ruff";

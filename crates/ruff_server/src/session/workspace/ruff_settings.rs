@@ -96,7 +96,7 @@ impl RuffSettingsIndex {
             return settings.clone();
         }
 
-        log_info!("No ruff settings file (pyproject.toml/ruff.toml/.ruff.toml) found for {} - falling back to default configuration", document_path.display());
+        tracing::info!("No ruff settings file (pyproject.toml/ruff.toml/.ruff.toml) found for {} - falling back to default configuration", document_path.display());
 
         self.fallback.clone()
     }

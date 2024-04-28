@@ -53,12 +53,12 @@ pub(super) fn request<'a>(req: server::Request) -> Task<'a> {
             background_request_task::<request::Hover>(req, BackgroundSchedule::Worker)
         }
         method => {
-            log_warn!("Received request {method} which does not have a handler");
+            tracing::warn!("Received request {method} which does not have a handler");
             return Task::nothing();
         }
     }
     .unwrap_or_else(|err| {
-        log_error!("Encountered error when routing request with ID {id}: {err}");
+        tracing::error!("Encountered error when routing request with ID {id}: {err}");
         show_err_msg!(
             "Ruff failed to handle a request from the editor. Check the logs for more details."
         );
@@ -85,12 +85,12 @@ pub(super) fn notification<'a>(notif: server::Notification) -> Task<'a> {
         notification::DidClose::METHOD => local_notification_task::<notification::DidClose>(notif),
         notification::DidOpen::METHOD => local_notification_task::<notification::DidOpen>(notif),
         method => {
-            log_warn!("Received notification {method} which does not have a handler.");
+            tracing::warn!("Received notification {method} which does not have a handler.");
             return Task::nothing();
         }
     }
     .unwrap_or_else(|err| {
-        log_error!("Encountered error when routing notification: {err}");
+        tracing::error!("Encountered error when routing notification: {err}");
         show_err_msg!("Ruff failed to handle a notification from the editor. Check the logs for more details.");
         Task::nothing()
     })
@@ -129,7 +129,7 @@ fn local_notification_task<'a, N: traits::SyncNotificationHandler>(
     let (id, params) = cast_notification::<N>(notif)?;
     Ok(Task::local(move |session, notifier, requester, _| {
         if let Err(err) = N::run(session, notifier, requester, params) {
-            log_error!("An error occurred while running {id}: {err}");
+            tracing::error!("An error occurred while running {id}: {err}");
             show_err_msg!("Ruff encountered a problem. Check the logs for more details.");
         }
     }))
@@ -148,7 +148,7 @@ fn background_notification_thread<'a, N: traits::BackgroundDocumentNotificationH
         };
         Box::new(move |notifier, _| {
             if let Err(err) = N::run_with_snapshot(snapshot, notifier, params) {
-                log_error!("An error occurred while running {id}: {err}");
+                tracing::error!("An error occurred while running {id}: {err}");
                 show_err_msg!("Ruff encountered a problem. Check the logs for more details.");
             }
         })
@@ -193,11 +193,11 @@ fn respond<Req>(
     Req: traits::RequestHandler,
 {
     if let Err(err) = &result {
-        log_error!("An error occurred with result ID {id}: {err}");
+        tracing::error!("An error occurred with result ID {id}: {err}");
         show_err_msg!("Ruff encountered a problem. Check the logs for more details.");
     }
     if let Err(err) = responder.respond(id, result) {
-        log_error!("Failed to send response: {err}");
+        tracing::error!("Failed to send response: {err}");
     }
 }
 

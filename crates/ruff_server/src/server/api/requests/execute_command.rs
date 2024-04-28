@@ -145,7 +145,7 @@ fn apply_edit(
                 let reason = response
                     .failure_reason
                     .unwrap_or_else(|| String::from("unspecified reason"));
-                log_error!("Failed to apply workspace edit: {reason}");
+                tracing::error!("Failed to apply workspace edit: {reason}");
                 show_err_msg!("Ruff was unable to apply edits: {reason}");
             }
             Task::nothing()
