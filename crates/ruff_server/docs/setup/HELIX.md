@@ -4,13 +4,14 @@ First, open the language configuration file for Helix. On Linux and macOS, this 
 and on Windows this will be in `%AppData%\helix\languages.toml`.
 
 Add the language server by adding:
+
 ```toml
 [language-server.ruff]
 command = "ruff"
 args = ["server", "--preview"]
 ```
 
-Then, you'll register the language server as the one to use with Python. 
+Then, you'll register the language server as the one to use with Python.
 If you don't already have a language server registered to use with Python, add this to `languages.toml`:
 
 ```toml
