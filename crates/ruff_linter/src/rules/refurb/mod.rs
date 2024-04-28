@@ -27,6 +27,7 @@ mod tests {
     #[test_case(Rule::SliceCopy, Path::new("FURB145.py"))]
     #[test_case(Rule::UnnecessaryEnumerate, Path::new("FURB148.py"))]
     #[test_case(Rule::MathConstant, Path::new("FURB152.py"))]
+    #[test_case(Rule::RepeatedGlobal, Path::new("FURB154.py"))]
     #[test_case(Rule::VerboseDecimalConstructor, Path::new("FURB157.py"))]
     #[test_case(Rule::UnnecessaryFromFloat, Path::new("FURB164.py"))]
     #[test_case(Rule::PrintEmptyString, Path::new("FURB105.py"))]
