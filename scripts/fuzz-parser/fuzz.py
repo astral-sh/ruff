@@ -28,6 +28,7 @@ from typing import NewType
 
 from pysource_codegen import generate as generate_random_code
 from pysource_minimize import minimize as minimize_repro
+from rich_argparse import RawDescriptionRichHelpFormatter
 from termcolor import colored
 
 MinimizedSourceCode = NewType("MinimizedSourceCode", str)
@@ -218,7 +219,7 @@ class ResolvedCliArgs:
 def parse_args() -> ResolvedCliArgs:
     """Parse command-line arguments"""
     parser = argparse.ArgumentParser(
-        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+        description=__doc__, formatter_class=RawDescriptionRichHelpFormatter
     )
     parser.add_argument(
         "seeds",
