@@ -12,11 +12,11 @@ mdurl==0.1.2
     # via markdown-it-py
 pygments==2.17.2
     # via rich
-pysource-codegen==0.5.1
-pysource-minimize==0.6.2
+pysource-codegen==0.5.2
+pysource-minimize==0.6.3
 rich==13.7.1
     # via pysource-minimize
-ruff==0.4.0
+ruff==0.4.2
 six==1.16.0
     # via
     #   asttokens

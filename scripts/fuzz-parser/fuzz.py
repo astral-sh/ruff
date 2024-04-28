@@ -11,8 +11,9 @@ Example invocations of the script:
   but only reporting bugs that are new on your branch:
   `python scripts/fuzz-parser/fuzz.py 0-10 --new-bugs-only`
 - Run the fuzzer concurrently on 10,000 different Python source-code files,
-  and only print a summary at the end:
-  `python scripts/fuzz-parser/fuzz.py 1-10000 --quiet
+  using a random selection of seeds, and only print a summary at the end
+  (the `shuf` command is Unix-specific):
+  `python scripts/fuzz-parser/fuzz.py $(shuf -i 0-1000000 -n 10000) --quiet
 """
 
 from __future__ import annotations
@@ -67,19 +68,20 @@ class FuzzResult:
     # required to trigger the bug. If not, it will be `None`.
     maybe_bug: MinimizedSourceCode | None
 
-    def print_description(self) -> None:
+    def print_description(self, index: int, num_seeds: int) -> None:
         """Describe the results of fuzzing the parser with this seed."""
+        progress = f"[{index}/{num_seeds}]"
+        msg = (
+            colored(f"Ran fuzzer on seed {self.seed}", "red")
+            if self.maybe_bug
+            else colored(f"Ran fuzzer successfully on seed {self.seed}", "green")
+        )
+        print(f"{msg:<55} {progress:>15}", flush=True)
         if self.maybe_bug:
-            print(colored(f"Ran fuzzer on seed {self.seed}", "red"))
             print(colored("The following code triggers a bug:", "red"))
             print()
             print(self.maybe_bug)
             print(flush=True)
-        else:
-            print(
-                colored(f"Ran fuzzer successfully on seed {self.seed}", "green"),
-                flush=True,
-            )
 
 
 def fuzz_code(
@@ -110,9 +112,10 @@ def fuzz_code(
 
 
 def run_fuzzer_concurrently(args: ResolvedCliArgs) -> list[FuzzResult]:
+    num_seeds = len(args.seeds)
     print(
         f"Concurrently running the fuzzer on "
-        f"{len(args.seeds)} randomly generated source-code files..."
+        f"{num_seeds} randomly generated source-code files..."
     )
     bugs: list[FuzzResult] = []
     with concurrent.futures.ProcessPoolExecutor() as executor:
@@ -127,10 +130,12 @@ def run_fuzzer_concurrently(args: ResolvedCliArgs) -> list[FuzzResult]:
             for seed in args.seeds
         ]
         try:
-            for future in concurrent.futures.as_completed(fuzz_result_futures):
+            for i, future in enumerate(
+                concurrent.futures.as_completed(fuzz_result_futures), start=1
+            ):
                 fuzz_result = future.result()
                 if not args.quiet:
-                    fuzz_result.print_description()
+                    fuzz_result.print_description(i, num_seeds)
                 if fuzz_result.maybe_bug:
                     bugs.append(fuzz_result)
         except KeyboardInterrupt:
@@ -142,12 +147,13 @@ def run_fuzzer_concurrently(args: ResolvedCliArgs) -> list[FuzzResult]:
 
 
 def run_fuzzer_sequentially(args: ResolvedCliArgs) -> list[FuzzResult]:
+    num_seeds = len(args.seeds)
     print(
         f"Sequentially running the fuzzer on "
-        f"{len(args.seeds)} randomly generated source-code files..."
+        f"{num_seeds} randomly generated source-code files..."
     )
     bugs: list[FuzzResult] = []
-    for seed in args.seeds:
+    for i, seed in enumerate(args.seeds, start=1):
         fuzz_result = fuzz_code(
             seed,
             test_executable=args.test_executable,
@@ -155,7 +161,7 @@ def run_fuzzer_sequentially(args: ResolvedCliArgs) -> list[FuzzResult]:
             only_new_bugs=args.only_new_bugs,
         )
         if not args.quiet:
-            fuzz_result.print_description()
+            fuzz_result.print_description(i, num_seeds)
         if fuzz_result.maybe_bug:
             bugs.append(fuzz_result)
     return bugs
@@ -293,7 +299,16 @@ def parse_args() -> ResolvedCliArgs:
         print(
             "Running `cargo build --release` since no test executable was specified..."
         )
-        subprocess.run(["cargo", "build", "--release"], check=True, capture_output=True)
+        try:
+            subprocess.run(
+                ["cargo", "build", "--release", "--color", "always"],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+        except subprocess.CalledProcessError as e:
+            print(e.stderr)
+            raise
         args.test_executable = os.path.join("target", "release", "ruff")
         assert os.path.exists(args.test_executable)
 
