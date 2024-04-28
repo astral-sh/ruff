@@ -49,7 +49,7 @@ impl Module {
         Db: HasJar<SemanticJar>,
     {
         let (level, module) = match dependency {
-            Dependency::Module(module) => return Some(ModuleName::new(module)),
+            Dependency::Module(module) => return Some(module.clone()),
             Dependency::Relative { level, module } => (*level, module.as_deref()),
         };
 
@@ -1012,7 +1012,7 @@ mod tests {
                 &db,
                 &Dependency::Relative {
                     level: NonZeroU32::new(1).unwrap(),
-                    module: None
+                    module: None,
                 }
             )
         );

@@ -5,7 +5,9 @@ use std::sync::Arc;
 
 use crate::db::{Db, HasJar, SemanticDb, SemanticJar, SourceDb, SourceJar};
 use crate::files::{FileId, Files};
-use crate::lint::{lint_syntax, Diagnostics, LintSyntaxStorage};
+use crate::lint::{
+    lint_semantic, lint_syntax, Diagnostics, LintSemanticStorage, LintSyntaxStorage,
+};
 use crate::module::{
     add_module, file_to_module, path_to_module, resolve_module, set_module_search_paths, Module,
     ModuleData, ModuleName, ModuleResolver, ModuleSearchPath,
@@ -36,6 +38,7 @@ impl Program {
                 module_resolver: ModuleResolver::new(module_search_paths),
                 symbol_tables: SymbolTablesStorage::default(),
                 type_store: TypeStore::default(),
+                lint_semantic: LintSemanticStorage::default(),
             },
             files: Files::default(),
             workspace,
@@ -56,6 +59,7 @@ impl Program {
             self.source.lint_syntax.remove(&change.id);
             // TODO: remove all dependent modules as well
             self.semantic.type_store.remove_module(change.id);
+            self.semantic.lint_semantic.remove(&change.id);
         }
     }
 
@@ -111,18 +115,21 @@ impl SemanticDb for Program {
         symbol_table(self, file_id)
     }
 
-    // Mutations
+    fn infer_symbol_type(&self, file_id: FileId, symbol_id: SymbolId) -> Type {
+        infer_symbol_type(self, file_id, symbol_id)
+    }
 
+    fn lint_semantic(&self, file_id: FileId) -> Diagnostics {
+        lint_semantic(self, file_id)
+    }
+
+    // Mutations
     fn add_module(&mut self, path: &Path) -> Option<(Module, Vec<Arc<ModuleData>>)> {
         add_module(self, path)
     }
 
     fn set_module_search_paths(&mut self, paths: Vec<ModuleSearchPath>) {
         set_module_search_paths(self, paths);
-    }
-
-    fn infer_symbol_type(&mut self, file_id: FileId, symbol_id: SymbolId) -> Type {
-        infer_symbol_type(self, file_id, symbol_id)
     }
 }
 

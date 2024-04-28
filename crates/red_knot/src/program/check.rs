@@ -1,12 +1,14 @@
+use std::num::NonZeroUsize;
+
+use rayon::max_num_threads;
+use rustc_hash::FxHashSet;
+
 use crate::cancellation::CancellationToken;
 use crate::db::{SemanticDb, SourceDb};
 use crate::files::FileId;
 use crate::lint::Diagnostics;
 use crate::program::Program;
 use crate::symbols::Dependency;
-use rayon::max_num_threads;
-use rustc_hash::FxHashSet;
-use std::num::NonZeroUsize;
 
 impl Program {
     /// Checks all open files in the workspace and its dependencies.
@@ -77,6 +79,7 @@ impl Program {
 
         if self.workspace().is_file_open(file) {
             diagnostics.extend_from_slice(&self.lint_syntax(file));
+            diagnostics.extend_from_slice(&self.lint_semantic(file));
         }
 
         Ok(Diagnostics::from(diagnostics))
