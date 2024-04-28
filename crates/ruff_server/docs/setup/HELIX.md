@@ -1,0 +1,29 @@
+## Helix Setup Guide for `ruff server`
+
+First, open the language configuration file for Helix. On Linux and macOS, this will be at `~/.config/helix/languages.toml`,
+and on Windows this will be in `%AppData%\helix\languages.toml`.
+
+Add the language server by adding:
+```toml
+[language-server.ruff]
+command = "ruff"
+args = ["server", "--preview"]
+```
+
+Then, you'll register the language server as the one to use with Python. 
+If you don't already have a language server registered to use with Python, add this to `languages.toml`:
+
+```toml
+[[language]]
+name = "python"
+language-servers = [ "ruff" ]
+```
+
+Otherwise, if you already have `language-servers` defined, you can simply add `"ruff"` to the list. For example,
+if you already have `pylsp` as a language server, you can modify the language entry as follows:
+
+```toml
+[[language]]
+name = "python"
+language-servers = [ "ruff", "pylsp" ]
+```
