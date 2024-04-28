@@ -10,7 +10,7 @@ use itertools::Itertools;
 use log::warn;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
-use ruff_diagnostics::Diagnostic;
+use ruff_diagnostics::{apply_isolated_edits, Diagnostic, Edit};
 use ruff_python_trivia::{indentation_at_offset, CommentRanges};
 use ruff_source_file::{LineEnding, Locator};
 
@@ -502,7 +502,7 @@ pub(crate) fn add_noqa(
     noqa_line_for: &NoqaMapping,
     line_ending: LineEnding,
 ) -> Result<usize> {
-    let (count, output) = add_noqa_inner(
+    let (count, edits) = generate_noqa_edits(
         path,
         diagnostics,
         locator,
@@ -511,11 +511,14 @@ pub(crate) fn add_noqa(
         noqa_line_for,
         line_ending,
     );
+
+    let output = apply_isolated_edits(locator.contents(), edits);
+
     fs::write(path, output)?;
     Ok(count)
 }
 
-fn add_noqa_inner(
+pub fn generate_noqa_edits(
     path: &Path,
     diagnostics: &[Diagnostic],
     locator: &Locator,
@@ -523,7 +526,7 @@ fn add_noqa_inner(
     external: &[String],
     noqa_line_for: &NoqaMapping,
     line_ending: LineEnding,
-) -> (usize, String) {
+) -> (usize, Vec<Edit>) {
     // Map of line start offset to set of (non-ignored) diagnostic codes that are triggered on that line.
     let mut matches_by_line: BTreeMap<TextSize, (RuleSet, Option<&Directive>)> =
         BTreeMap::default();
@@ -601,70 +604,74 @@ fn add_noqa_inner(
     }
 
     let mut count = 0;
-    let mut output = String::with_capacity(locator.len());
     let mut prev_end = TextSize::default();
+    let mut edits = Vec::with_capacity(matches_by_line.len());
 
     for (offset, (rules, directive)) in matches_by_line {
-        output.push_str(locator.slice(TextRange::new(prev_end, offset)));
-
         let line = locator.full_line(offset);
 
-        match directive {
-            None => {
-                // Add existing content.
-                output.push_str(line.trim_end());
-
-                // Add `noqa` directive.
-                output.push_str("  # noqa: ");
-
-                // Add codes.
-                push_codes(&mut output, rules.iter().map(|rule| rule.noqa_code()));
-                output.push_str(&line_ending);
-                count += 1;
-            }
-            Some(Directive::All(_)) => {
-                // Does not get inserted into the map.
-            }
-            Some(Directive::Codes(codes)) => {
-                // Reconstruct the line based on the preserved rule codes.
-                // This enables us to tally the number of edits.
-                let output_start = output.len();
-
-                // Add existing content.
-                output.push_str(
-                    locator
-                        .slice(TextRange::new(offset, codes.start()))
-                        .trim_end(),
-                );
-
-                // Add `noqa` directive.
-                output.push_str("  # noqa: ");
-
-                // Add codes.
-                push_codes(
-                    &mut output,
-                    rules
-                        .iter()
-                        .map(|rule| rule.noqa_code().to_string())
-                        .chain(codes.iter().map(ToString::to_string))
-                        .sorted_unstable(),
-                );
-
-                // Only count if the new line is an actual edit.
-                if &output[output_start..] != line.trim_end() {
-                    count += 1;
-                }
-
-                output.push_str(&line_ending);
-            }
+        if let Some(edit) = generate_edit(
+            directive,
+            &rules,
+            line,
+            locator.line_start(offset),
+            line_ending,
+            prev_end,
+        ) {
+            edits.push(edit);
+            count += 1;
         }
 
         prev_end = offset + line.text_len();
     }
 
-    output.push_str(locator.after(prev_end));
+    (count, edits)
+}
 
-    (count, output)
+fn generate_edit(
+    directive: Option<&Directive>,
+    rules: &RuleSet,
+    line: &str,
+    line_start: TextSize,
+    line_ending: LineEnding,
+    prev_end: TextSize,
+) -> Option<Edit> {
+    let mut edit_content = String::new();
+    let range;
+
+    // Add `noqa` directive.
+    edit_content.push_str("  # noqa: ");
+
+    // Add codes.
+    match directive {
+        None => {
+            let trimmed_line = line.trim_end();
+            range = TextRange::new(TextSize::of(trimmed_line), TextSize::of(line)) + prev_end;
+            push_codes(&mut edit_content, rules.iter().map(|rule| rule.noqa_code()));
+        }
+        Some(Directive::Codes(codes)) => {
+            // find trimmed line without the noqa
+            let trimmed_line =
+                line[TextRange::up_to(codes.start().checked_sub(line_start).unwrap())].trim();
+
+            range = TextRange::new(TextSize::of(trimmed_line), TextSize::of(line)) + prev_end;
+            // Add codes.
+            push_codes(
+                &mut edit_content,
+                rules
+                    .iter()
+                    .map(|rule| rule.noqa_code().to_string())
+                    .chain(codes.iter().map(ToString::to_string))
+                    .sorted_unstable(),
+            );
+        }
+        Some(Directive::All(_)) => return None,
+    };
+
+    // Add line ending.
+    edit_content.push_str(&line_ending);
+
+    Some(Edit::range_replacement(edit_content, range))
 }
 
 fn push_codes<I: Display>(str: &mut String, codes: impl Iterator<Item = I>) {
@@ -846,11 +853,11 @@ mod tests {
     use insta::assert_debug_snapshot;
     use ruff_text_size::{TextRange, TextSize};
 
-    use ruff_diagnostics::Diagnostic;
+    use ruff_diagnostics::{apply_isolated_edits, Diagnostic, Edit};
     use ruff_python_trivia::CommentRanges;
     use ruff_source_file::{LineEnding, Locator};
 
-    use crate::noqa::{add_noqa_inner, Directive, NoqaMapping, ParsedFileExemption};
+    use crate::noqa::{generate_noqa_edits, Directive, NoqaMapping, ParsedFileExemption};
     use crate::rules::pycodestyle::rules::AmbiguousVariableName;
     use crate::rules::pyflakes::rules::UnusedVariable;
 
@@ -1041,7 +1048,7 @@ mod tests {
 
         let contents = "x = 1";
         let noqa_line_for = NoqaMapping::default();
-        let (count, output) = add_noqa_inner(
+        let (count, edits) = generate_noqa_edits(
             path,
             &[],
             &Locator::new(contents),
@@ -1051,6 +1058,9 @@ mod tests {
             LineEnding::Lf,
         );
         assert_eq!(count, 0);
+        assert_eq!(edits.as_slice(), &[]);
+
+        let output = apply_isolated_edits(contents, edits);
         assert_eq!(output, format!("{contents}"));
 
         let diagnostics = [Diagnostic::new(
@@ -1062,7 +1072,7 @@ mod tests {
 
         let contents = "x = 1";
         let noqa_line_for = NoqaMapping::default();
-        let (count, output) = add_noqa_inner(
+        let (count, edits) = generate_noqa_edits(
             path,
             &diagnostics,
             &Locator::new(contents),
@@ -1072,6 +1082,12 @@ mod tests {
             LineEnding::Lf,
         );
         assert_eq!(count, 1);
+        assert_eq!(
+            edits.as_slice(),
+            &[Edit::insertion("  # noqa: F841\n".into(), TextSize::new(5))]
+        );
+
+        let output = apply_isolated_edits(contents, edits);
         assert_eq!(output, "x = 1  # noqa: F841\n");
 
         let diagnostics = [
@@ -1090,7 +1106,7 @@ mod tests {
         let noqa_line_for = NoqaMapping::default();
         let comment_ranges =
             CommentRanges::new(vec![TextRange::new(TextSize::from(7), TextSize::from(19))]);
-        let (count, output) = add_noqa_inner(
+        let (count, edits) = generate_noqa_edits(
             path,
             &diagnostics,
             &Locator::new(contents),
@@ -1100,6 +1116,15 @@ mod tests {
             LineEnding::Lf,
         );
         assert_eq!(count, 1);
+        assert_eq!(
+            edits.as_slice(),
+            &[Edit::range_replacement(
+                "  # noqa: E741, F841\n".into(),
+                TextRange::new(5u32.into(), 20u32.into())
+            )]
+        );
+
+        let output = apply_isolated_edits(contents, edits);
         assert_eq!(output, "x = 1  # noqa: E741, F841\n");
 
         let diagnostics = [
@@ -1118,7 +1143,7 @@ mod tests {
         let noqa_line_for = NoqaMapping::default();
         let comment_ranges =
             CommentRanges::new(vec![TextRange::new(TextSize::from(7), TextSize::from(13))]);
-        let (count, output) = add_noqa_inner(
+        let (count, edits) = generate_noqa_edits(
             path,
             &diagnostics,
             &Locator::new(contents),
@@ -1128,6 +1153,9 @@ mod tests {
             LineEnding::Lf,
         );
         assert_eq!(count, 0);
+        assert_eq!(edits.as_slice(), &[]);
+
+        let output = apply_isolated_edits(contents, edits);
         assert_eq!(output, "x = 1  # noqa");
     }
 }
