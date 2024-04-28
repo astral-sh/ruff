@@ -1,4 +1,4 @@
-use crate::db::QueryResult;
+use crate::db::query::QueryResult;
 
 /// Gives access to a specific jar in the database.
 ///
@@ -21,11 +21,16 @@ pub trait HasJar<T> {
 }
 
 pub trait HasJars {
-    type Jars;
+    type Jars: Default;
 
-    fn jars(&self) -> &QueryResult<Self::Jars>;
+    /// Gives access to the underlying jars but tests if the queries have been cancelled.
+    ///
+    /// Returns `Err(QueryError::Cancelled)` if the queries have been cancelled.
+    fn jars(&self) -> QueryResult<&Self::Jars>;
 
+    /// Gives access to the underlying jars without testing if the queries have been cancelled.
     fn jars_unwrap(&self) -> &Self::Jars;
 
+    /// Gives mutable access to the underlying jars.
     fn jars_mut(&mut self) -> &mut Self::Jars;
 }

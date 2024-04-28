@@ -1,12 +1,15 @@
 use std::cell::RefCell;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
+use std::time::Duration;
 
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{ModModule, StringLiteral};
 
 use crate::cache::KeyValueCache;
-use crate::db::{HasJar, QueryResult, SemanticDb, SemanticJar, SourceDb, SourceJar};
+use crate::db::{
+    HasJar, ParallelDatabase, QueryResult, SemanticDb, SemanticJar, SourceDb, SourceJar,
+};
 use crate::files::FileId;
 use crate::parse::Parsed;
 use crate::source::Source;
@@ -16,9 +19,15 @@ use crate::types::Type;
 #[tracing::instrument(level = "debug", skip(db))]
 pub(crate) fn lint_syntax<Db>(db: &Db, file_id: FileId) -> QueryResult<Diagnostics>
 where
-    Db: SourceDb + HasJar<SourceJar>,
+    Db: SourceDb + HasJar<SourceJar> + ParallelDatabase,
 {
     let storage = &db.jar()?.lint_syntax;
+
+    for i in 0..10 {
+        db.cancelled()?;
+        format!("Sleep {i}");
+        std::thread::sleep(Duration::from_secs(1));
+    }
 
     storage.get(&file_id, |file_id| {
         let mut diagnostics = Vec::new();

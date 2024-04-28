@@ -1,10 +1,9 @@
 use std::num::NonZeroUsize;
 
-use rayon::max_num_threads;
+use rayon::{current_num_threads, yield_local};
 use rustc_hash::FxHashSet;
 
-use crate::cancellation::CancellationToken;
-use crate::db::{QueryError, QueryResult, SemanticDb, SourceDb};
+use crate::db::{ParallelDatabase, QueryError, QueryResult, SemanticDb, SourceDb};
 use crate::files::FileId;
 use crate::lint::Diagnostics;
 use crate::program::Program;
@@ -13,32 +12,31 @@ use crate::symbols::Dependency;
 impl Program {
     /// Checks all open files in the workspace and its dependencies.
     #[tracing::instrument(level = "debug", skip_all)]
-    pub fn check(
-        &self,
-        scheduler: &dyn CheckScheduler,
-        cancellation_token: CancellationToken,
-    ) -> QueryResult<Vec<String>> {
-        let check_loop = CheckFilesLoop::new(scheduler, cancellation_token);
+    pub fn check(&self, scheduler: &dyn CheckScheduler) -> QueryResult<Vec<String>> {
+        self.cancelled()?;
+
+        let check_loop = CheckFilesLoop::new(scheduler);
 
         check_loop.run(self.workspace().open_files.iter().copied())
     }
 
     /// Checks a single file and its dependencies.
-    #[tracing::instrument(level = "debug", skip(self, scheduler, cancellation_token))]
+    #[tracing::instrument(level = "debug", skip(self, scheduler))]
     pub fn check_file(
         &self,
         file: FileId,
         scheduler: &dyn CheckScheduler,
-        cancellation_token: CancellationToken,
     ) -> QueryResult<Vec<String>> {
-        let check_loop = CheckFilesLoop::new(scheduler, cancellation_token);
+        self.cancelled()?;
+
+        let check_loop = CheckFilesLoop::new(scheduler);
 
         check_loop.run([file].into_iter())
     }
 
     #[tracing::instrument(level = "debug", skip(self, context))]
     fn do_check_file(&self, file: FileId, context: &CheckContext) -> QueryResult<Diagnostics> {
-        context.cancelled_ok()?;
+        self.cancelled()?;
 
         let symbol_table = self.symbol_table(file)?;
         let dependencies = symbol_table.dependencies();
@@ -125,10 +123,18 @@ where
 
         self.scope
             .spawn(move |_| child_span.in_scope(|| check_file_task.run(program)));
+
+        if current_num_threads() == 1 {
+            yield_local();
+        }
     }
 
     fn max_concurrency(&self) -> Option<NonZeroUsize> {
-        Some(NonZeroUsize::new(max_num_threads()).unwrap_or(NonZeroUsize::MIN))
+        if current_num_threads() == 1 {
+            return None;
+        }
+
+        Some(NonZeroUsize::new(current_num_threads()).unwrap_or(NonZeroUsize::MIN))
     }
 }
 
@@ -179,19 +185,12 @@ impl CheckFileTask {
 
 #[derive(Clone, Debug)]
 struct CheckContext {
-    cancellation_token: CancellationToken,
     sender: crossbeam::channel::Sender<CheckFileMessage>,
 }
 
 impl CheckContext {
-    fn new(
-        cancellation_token: CancellationToken,
-        sender: crossbeam::channel::Sender<CheckFileMessage>,
-    ) -> Self {
-        Self {
-            cancellation_token,
-            sender,
-        }
+    fn new(sender: crossbeam::channel::Sender<CheckFileMessage>) -> Self {
+        Self { sender }
     }
 
     /// Queues a new file for checking using the [`CheckScheduler`].
@@ -199,34 +198,18 @@ impl CheckContext {
     fn schedule_check_file(&self, file_id: FileId) {
         self.sender.send(CheckFileMessage::Queue(file_id)).unwrap();
     }
-
-    /// Returns `true` if the check has been cancelled.
-    fn is_cancelled(&self) -> bool {
-        self.cancellation_token.is_cancelled()
-    }
-
-    fn cancelled_ok(&self) -> QueryResult<()> {
-        if self.is_cancelled() {
-            Err(QueryError::Cancelled)
-        } else {
-            Ok(())
-        }
-    }
 }
 
 struct CheckFilesLoop<'a> {
     scheduler: &'a dyn CheckScheduler,
-    cancellation_token: CancellationToken,
     pending: usize,
     queued_files: FxHashSet<FileId>,
 }
 
 impl<'a> CheckFilesLoop<'a> {
-    fn new(scheduler: &'a dyn CheckScheduler, cancellation_token: CancellationToken) -> Self {
+    fn new(scheduler: &'a dyn CheckScheduler) -> Self {
         Self {
             scheduler,
-            cancellation_token,
-
             queued_files: FxHashSet::default(),
             pending: 0,
         }
@@ -241,10 +224,10 @@ impl<'a> CheckFilesLoop<'a> {
             crossbeam::channel::unbounded()
         };
 
-        let context = CheckContext::new(self.cancellation_token.clone(), sender.clone());
+        let context = CheckContext::new(sender.clone());
 
         for file in files {
-            self.queue_file(file, context.clone())?;
+            self.queue_file(file, context.clone());
         }
 
         self.run_impl(receiver, &context)
@@ -255,11 +238,8 @@ impl<'a> CheckFilesLoop<'a> {
         receiver: crossbeam::channel::Receiver<CheckFileMessage>,
         context: &CheckContext,
     ) -> QueryResult<Vec<String>> {
-        if self.cancellation_token.is_cancelled() {
-            return Err(QueryError::Cancelled);
-        }
-
         let mut result = Vec::default();
+        let mut cancelled = false;
 
         for message in receiver {
             match message {
@@ -273,30 +253,35 @@ impl<'a> CheckFilesLoop<'a> {
                     }
                 }
                 CheckFileMessage::Queue(id) => {
-                    self.queue_file(id, context.clone())?;
+                    if !cancelled {
+                        self.queue_file(id, context.clone());
+                    }
                 }
                 CheckFileMessage::Cancelled => {
-                    return Err(QueryError::Cancelled);
+                    self.pending -= 1;
+                    cancelled = true;
+
+                    if self.pending == 0 {
+                        break;
+                    }
                 }
             }
         }
 
-        Ok(result)
+        if cancelled {
+            Err(QueryError::Cancelled)
+        } else {
+            Ok(result)
+        }
     }
 
-    fn queue_file(&mut self, file_id: FileId, context: CheckContext) -> QueryResult<()> {
-        if context.is_cancelled() {
-            return Err(QueryError::Cancelled);
-        }
-
+    fn queue_file(&mut self, file_id: FileId, context: CheckContext) {
         if self.queued_files.insert(file_id) {
             self.pending += 1;
 
             self.scheduler
                 .check_file(CheckFileTask { file_id, context });
         }
-
-        Ok(())
     }
 }
 

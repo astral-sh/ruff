@@ -1,5 +1,6 @@
 mod jars;
 mod query;
+mod runtime;
 mod storage;
 
 use std::path::Path;
@@ -13,10 +14,68 @@ use crate::source::{Source, SourceStorage};
 use crate::symbols::{SymbolId, SymbolTable, SymbolTablesStorage};
 use crate::types::{Type, TypeStore};
 
-pub use jars::HasJar;
+pub use jars::{HasJar, HasJars};
 pub use query::{QueryError, QueryResult};
+pub use runtime::DbRuntime;
+pub use storage::JarsStorage;
 
-pub trait SourceDb {
+pub trait Database {
+    fn runtime(&self) -> &DbRuntime;
+
+    fn runtime_mut(&mut self) -> &mut DbRuntime;
+}
+
+pub trait ParallelDatabase: Database + Send {
+    /// Creates a snapshot of the database state that can be used to query the database in another thread.
+    ///
+    /// The snapshot is a read-only view of the database but query results are shared between threads.
+    /// All queries will be automatically cancelled when applying any mutations (calling [`HasJars::jars_mut`])
+    /// to the database (not the snapshot, because they're readonly).
+    fn snapshot(&self) -> Snapshot<Self>;
+
+    /// Returns `Ok` if the queries have not been cancelled and `Err(QueryError::Cancelled)` otherwise.
+    fn cancelled(&self) -> QueryResult<()> {
+        self.runtime().cancelled()
+    }
+
+    /// Returns `true` if the queries have been cancelled.
+    fn is_cancelled(&self) -> bool {
+        self.runtime().is_cancelled()
+    }
+}
+
+/// Readonly snapshot of a database.
+#[derive(Debug)]
+pub struct Snapshot<DB: ?Sized>
+where
+    DB: ParallelDatabase,
+{
+    db: DB,
+}
+
+impl<DB> Snapshot<DB>
+where
+    DB: ParallelDatabase,
+{
+    pub fn new(db: DB) -> Self {
+        Snapshot { db }
+    }
+}
+
+impl<DB> std::ops::Deref for Snapshot<DB>
+where
+    DB: ParallelDatabase,
+{
+    type Target = DB;
+
+    fn deref(&self) -> &DB {
+        &self.db
+    }
+}
+
+// Red knot specific databases code.
+
+pub trait SourceDb: Database {
     // queries
     fn file_id(&self, path: &std::path::Path) -> FileId;
 
@@ -72,7 +131,10 @@ pub(crate) mod tests {
     use std::path::Path;
     use std::sync::Arc;
 
-    use crate::db::{HasJar, QueryResult, SourceDb, SourceJar};
+    use crate::db::{
+        Database, DbRuntime, HasJar, HasJars, JarsStorage, ParallelDatabase, QueryResult, Snapshot,
+        SourceDb, SourceJar,
+    };
     use crate::files::{FileId, Files};
     use crate::lint::{lint_semantic, lint_syntax, Diagnostics};
     use crate::module::{
@@ -91,27 +153,26 @@ pub(crate) mod tests {
     #[derive(Debug, Default)]
     pub(crate) struct TestDb {
         files: Files,
-        source: SourceJar,
-        semantic: SemanticJar,
+        jars: JarsStorage<Self>,
     }
 
     impl HasJar<SourceJar> for TestDb {
         fn jar(&self) -> QueryResult<&SourceJar> {
-            Ok(&self.source)
+            Ok(&self.jars()?.0)
         }
 
         fn jar_mut(&mut self) -> &mut SourceJar {
-            &mut self.source
+            &mut self.jars_mut().0
         }
     }
 
     impl HasJar<SemanticJar> for TestDb {
         fn jar(&self) -> QueryResult<&SemanticJar> {
-            Ok(&self.semantic)
+            Ok(&self.jars()?.1)
         }
 
         fn jar_mut(&mut self) -> &mut SemanticJar {
-            &mut self.semantic
+            &mut self.jars_mut().1
         }
     }
 
@@ -168,6 +229,41 @@ pub(crate) mod tests {
 
         fn set_module_search_paths(&mut self, paths: Vec<ModuleSearchPath>) {
             set_module_search_paths(self, paths);
+        }
+    }
+
+    impl HasJars for TestDb {
+        type Jars = (SourceJar, SemanticJar);
+
+        fn jars(&self) -> QueryResult<&Self::Jars> {
+            self.jars.jars()
+        }
+
+        fn jars_unwrap(&self) -> &Self::Jars {
+            self.jars.jars_unwrap()
+        }
+
+        fn jars_mut(&mut self) -> &mut Self::Jars {
+            self.jars.jars_mut()
+        }
+    }
+
+    impl Database for TestDb {
+        fn runtime(&self) -> &DbRuntime {
+            self.jars.runtime()
+        }
+
+        fn runtime_mut(&mut self) -> &mut DbRuntime {
+            self.jars.runtime_mut()
+        }
+    }
+
+    impl ParallelDatabase for TestDb {
+        fn snapshot(&self) -> Snapshot<Self> {
+            Snapshot::new(Self {
+                files: self.files.clone(),
+                jars: self.jars.snapshot(),
+            })
         }
     }
 }
