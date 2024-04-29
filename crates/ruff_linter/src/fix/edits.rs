@@ -122,9 +122,6 @@ pub(crate) fn remove_unused_imports<'a>(
     }
 }
 
-// TODO: unit tests
-// TODO: test for `a as a`
-// TODO: test for `a as b`
 /// Edits to make the specified imports explicit, e.g. change `import x` to `import x as x`.
 pub(crate) fn make_redundant_alias<'a>(
     member_names: impl Iterator<Item = &'a str>,
@@ -141,7 +138,7 @@ pub(crate) fn make_redundant_alias<'a>(
         .filter_map(|name| {
             aliases
                 .iter()
-                .find(|alias| name == alias.name.id)
+                .find(|alias| name == alias.name.id && alias.asname.is_none())
                 .map(|alias| Edit::range_replacement(format!("{name} as {name}"), alias.range))
         })
         .collect()
@@ -482,11 +479,12 @@ fn all_lines_fit(
 mod tests {
     use anyhow::Result;
 
+    use ruff_diagnostics::Edit;
     use ruff_python_parser::parse_suite;
     use ruff_source_file::Locator;
-    use ruff_text_size::{Ranged, TextSize};
+    use ruff_text_size::{Ranged, TextRange, TextSize};
 
-    use crate::fix::edits::{next_stmt_break, trailing_semicolon};
+    use crate::fix::edits::{make_redundant_alias, next_stmt_break, trailing_semicolon};
 
     #[test]
     fn find_semicolon() -> Result<()> {
@@ -555,6 +553,37 @@ x = 1 \
         assert_eq!(
             next_stmt_break(TextSize::from(10), &locator),
             TextSize::from(12)
+        );
+    }
+
+    #[test]
+    fn redundant_alias() {
+        let contents = "import x, y as y, z as bees";
+        let program = parse_suite(contents).unwrap();
+        let stmt = program.first().unwrap();
+        assert_eq!(
+            make_redundant_alias(vec!["x"].into_iter(), stmt),
+            vec![Edit::range_replacement(
+                String::from("x as x"),
+                TextRange::new(TextSize::new(7), TextSize::new(8)),
+            )],
+            "make just one item redundant"
+        );
+        assert_eq!(
+            make_redundant_alias(vec!["x", "y"].into_iter(), stmt),
+            vec![Edit::range_replacement(
+                String::from("x as x"),
+                TextRange::new(TextSize::new(7), TextSize::new(8)),
+            )],
+            "the second item is already a redundant alias"
+        );
+        assert_eq!(
+            make_redundant_alias(vec!["x", "z"].into_iter(), stmt),
+            vec![Edit::range_replacement(
+                String::from("x as x"),
+                TextRange::new(TextSize::new(7), TextSize::new(8)),
+            )],
+            "the third item is already aliased to something else"
         );
     }
 }
