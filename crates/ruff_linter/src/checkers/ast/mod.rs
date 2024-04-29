@@ -31,8 +31,8 @@ use std::path::Path;
 use itertools::Itertools;
 use log::debug;
 use ruff_python_ast::{
-    self as ast, Comprehension, ElifElseClause, ExceptHandler, Expr, ExprContext, FStringElement,
-    Keyword, MatchCase, Parameter, ParameterWithDefault, Parameters, Pattern, Stmt, Suite, UnaryOp,
+    self as ast, AnyParameterRef, Comprehension, ElifElseClause, ExceptHandler, Expr, ExprContext,
+    FStringElement, Keyword, MatchCase, Parameter, Parameters, Pattern, Stmt, Suite, UnaryOp,
 };
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -604,15 +604,11 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     self.visit_type_params(type_params);
                 }
 
-                for parameter_with_default in parameters
-                    .posonlyargs
-                    .iter()
-                    .chain(&parameters.args)
-                    .chain(&parameters.kwonlyargs)
-                {
-                    if let Some(expr) = &parameter_with_default.parameter.annotation {
-                        if singledispatch {
+                for parameter in &**parameters {
+                    if let Some(expr) = parameter.annotation() {
+                        if singledispatch && !parameter.is_variadic() {
                             self.visit_runtime_required_annotation(expr);
+                            singledispatch = false;
                         } else {
                             match annotation {
                                 AnnotationContext::RuntimeRequired => {
@@ -625,41 +621,10 @@ impl<'a> Visitor<'a> for Checker<'a> {
                                     self.visit_annotation(expr);
                                 }
                             }
-                        };
+                        }
                     }
-                    if let Some(expr) = &parameter_with_default.default {
+                    if let Some(expr) = parameter.default() {
                         self.visit_expr(expr);
-                    }
-                    singledispatch = false;
-                }
-                if let Some(arg) = &parameters.vararg {
-                    if let Some(expr) = &arg.annotation {
-                        match annotation {
-                            AnnotationContext::RuntimeRequired => {
-                                self.visit_runtime_required_annotation(expr);
-                            }
-                            AnnotationContext::RuntimeEvaluated => {
-                                self.visit_runtime_evaluated_annotation(expr);
-                            }
-                            AnnotationContext::TypingOnly => {
-                                self.visit_annotation(expr);
-                            }
-                        }
-                    }
-                }
-                if let Some(arg) = &parameters.kwarg {
-                    if let Some(expr) = &arg.annotation {
-                        match annotation {
-                            AnnotationContext::RuntimeRequired => {
-                                self.visit_runtime_required_annotation(expr);
-                            }
-                            AnnotationContext::RuntimeEvaluated => {
-                                self.visit_runtime_evaluated_annotation(expr);
-                            }
-                            AnnotationContext::TypingOnly => {
-                                self.visit_annotation(expr);
-                            }
-                        }
                     }
                 }
                 for expr in returns {
@@ -1043,19 +1008,11 @@ impl<'a> Visitor<'a> for Checker<'a> {
             ) => {
                 // Visit the default arguments, but avoid the body, which will be deferred.
                 if let Some(parameters) = parameters {
-                    for ParameterWithDefault {
-                        default,
-                        parameter: _,
-                        range: _,
-                    } in parameters
-                        .posonlyargs
-                        .iter()
-                        .chain(&parameters.args)
-                        .chain(&parameters.kwonlyargs)
+                    for default in parameters
+                        .iter_non_variadic_params()
+                        .filter_map(|param| param.default.as_deref())
                     {
-                        if let Some(expr) = &default {
-                            self.visit_expr(expr);
-                        }
+                        self.visit_expr(default);
                     }
                 }
 
@@ -1483,20 +1440,8 @@ impl<'a> Visitor<'a> for Checker<'a> {
         // Step 1: Binding.
         // Bind, but intentionally avoid walking default expressions, as we handle them
         // upstream.
-        for parameter_with_default in &parameters.posonlyargs {
-            self.visit_parameter(&parameter_with_default.parameter);
-        }
-        for parameter_with_default in &parameters.args {
-            self.visit_parameter(&parameter_with_default.parameter);
-        }
-        if let Some(arg) = &parameters.vararg {
-            self.visit_parameter(arg);
-        }
-        for parameter_with_default in &parameters.kwonlyargs {
-            self.visit_parameter(&parameter_with_default.parameter);
-        }
-        if let Some(arg) = &parameters.kwarg {
-            self.visit_parameter(arg);
+        for parameter in parameters.iter().map(AnyParameterRef::as_parameter) {
+            self.visit_parameter(parameter);
         }
 
         // Step 4: Analysis

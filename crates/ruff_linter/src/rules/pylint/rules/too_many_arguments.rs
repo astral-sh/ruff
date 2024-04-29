@@ -61,10 +61,7 @@ impl Violation for TooManyArguments {
 pub(crate) fn too_many_arguments(checker: &mut Checker, function_def: &ast::StmtFunctionDef) {
     let num_arguments = function_def
         .parameters
-        .args
-        .iter()
-        .chain(&function_def.parameters.kwonlyargs)
-        .chain(&function_def.parameters.posonlyargs)
+        .iter_non_variadic_params()
         .filter(|arg| {
             !checker
                 .settings

@@ -139,11 +139,7 @@ pub(crate) fn function_call_in_argument_default(checker: &mut Checker, parameter
         default,
         parameter,
         range: _,
-    } in parameters
-        .posonlyargs
-        .iter()
-        .chain(&parameters.args)
-        .chain(&parameters.kwonlyargs)
+    } in parameters.iter_non_variadic_params()
     {
         if let Some(expr) = &default {
             if !parameter.annotation.as_ref().is_some_and(|expr| {

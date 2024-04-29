@@ -240,11 +240,7 @@ impl FormatNodeRule<Parameters> for FormatParameters {
             Ok(())
         });
 
-        let num_parameters = posonlyargs.len()
-            + args.len()
-            + usize::from(vararg.is_some())
-            + kwonlyargs.len()
-            + usize::from(kwarg.is_some());
+        let num_parameters = item.len();
 
         if self.parentheses == ParametersParentheses::Never {
             write!(f, [group(&format_inner), dangling_comments(dangling)])
