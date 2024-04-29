@@ -7,12 +7,12 @@ technique to parse expressions with different [precedence](https://docs.python.o
 
 Try out the parser in the [playground](https://play.ruff.rs/?secondary=AST).
 
-### Python version support
+## Python version support
 
 The parser supports the latest Python syntax, which is currently Python 3.12.
 It does not throw syntax errors if it encounters a syntax feature that is not
 supported by the [`target-version`](https://docs.astral.sh/ruff/settings/#target-version).
-This will be fixed in a future release (see https://github.com/astral-sh/ruff/issues/6591).
+This will be fixed in a future release (see <https://github.com/astral-sh/ruff/issues/6591>).
 
 ## Contributing
 

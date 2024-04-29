@@ -148,13 +148,13 @@ impl<'src> Parser<'src> {
     ///
     /// ## Recovery
     ///
-    /// After parsing a single expression, an error is reported and all of the remaining tokens are
+    /// After parsing a single expression, an error is reported and all remaining tokens are
     /// dropped by the parser.
     fn parse_single_expression(&mut self) -> ast::ModExpression {
         let start = self.node_start();
         let parsed_expr = self.parse_expression_list(ExpressionContext::default());
 
-        // All of the remaining newlines are actually going to be non-logical newlines.
+        // All remaining newlines are actually going to be non-logical newlines.
         self.eat(TokenKind::Newline);
 
         if !self.at(TokenKind::EndOfFile) {

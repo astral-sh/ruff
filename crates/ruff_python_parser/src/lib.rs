@@ -159,7 +159,7 @@ pub fn parse_program(source: &str) -> Result<ModModule, ParseError> {
     }
 }
 
-/// Parse a full Python program into a [Suite].
+/// Parse a full Python program into a [`Suite`].
 ///
 /// This function is similar to [`parse_program`] except that it returns the module body
 /// instead of the module itself.

@@ -354,7 +354,7 @@ impl fmt::Display for Tok {
 
 /// A kind of token.
 ///
-/// This is a lightweight representation of [Tok] which doesn't contain any information
+/// This is a lightweight representation of [`Tok`] which doesn't contain any information
 /// about the token itself.
 #[derive(Copy, Clone, PartialEq, Eq, Hash, Debug)]
 pub enum TokenKind {
