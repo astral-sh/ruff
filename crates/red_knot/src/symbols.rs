@@ -870,6 +870,12 @@ mod tests {
             assert_eq!(ann_scope.kind(), ScopeKind::Annotation);
             assert_eq!(ann_scope.name(), "C");
             assert_eq!(names(table.symbols_for_scope(ann_scope_id)), vec!["T"]);
+            assert!(
+                table
+                    .symbol_by_name(ann_scope_id, "T")
+                    .is_some_and(|s| s.is_defined() && !s.is_used()),
+                "type parameters are defined by the scope that introduces them"
+            );
             let scopes = table.child_scope_ids_of(ann_scope_id);
             assert_eq!(scopes.len(), 1);
             let func_scope_id = scopes[0];
