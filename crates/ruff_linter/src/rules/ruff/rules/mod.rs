@@ -21,7 +21,7 @@ pub(crate) use redirected_noqa::*;
 pub(crate) use sort_dunder_all::*;
 pub(crate) use sort_dunder_slots::*;
 pub(crate) use static_key_dict_comprehension::*;
-#[cfg(feature = "test-rules")]
+#[cfg(any(feature = "test-rules", test))]
 pub(crate) use test_rules::*;
 pub(crate) use unnecessary_dict_comprehension_for_iterable::*;
 pub(crate) use unnecessary_iterable_allocation_for_first_element::*;
@@ -56,7 +56,7 @@ mod sort_dunder_all;
 mod sort_dunder_slots;
 mod static_key_dict_comprehension;
 mod suppression_comment_visitor;
-#[cfg(feature = "test-rules")]
+#[cfg(any(feature = "test-rules", test))]
 pub(crate) mod test_rules;
 mod unnecessary_dict_comprehension_for_iterable;
 mod unnecessary_iterable_allocation_for_first_element;
