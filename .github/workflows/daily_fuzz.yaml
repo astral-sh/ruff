@@ -1,0 +1,72 @@
+name: Daily parser fuzz
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 0 * * *"
+  pull_request:
+    paths:
+      - ".github/workflows/daily_fuzz.yaml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+env:
+  CARGO_INCREMENTAL: 0
+  CARGO_NET_RETRY: 10
+  CARGO_TERM_COLOR: always
+  RUSTUP_MAX_RETRIES: 10
+  PACKAGE_NAME: ruff
+  FORCE_COLOR: 1
+
+jobs:
+  fuzz:
+    name: Fuzz
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Don't run the cron job on forks:
+    if: ${{ github.repository == 'astral-sh/ruff' || github.event_name != 'schedule' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install uv
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+      - name: Install Python requirements
+        run: uv pip install -r scripts/fuzz-parser/requirements.txt --system
+      - name: "Install Rust toolchain"
+        run: rustup show
+      - name: "Install mold"
+        uses: rui314/setup-mold@v1
+      - uses: Swatinem/rust-cache@v2
+      - name: Build ruff
+        # A debug build means the script runs slower once it gets started,
+        # but this is outweighed by the fact that a release build takes *much* longer to compile in CI
+        run: cargo build --locked
+      - name: Fuzz
+        run: python scripts/fuzz-parser/fuzz.py $(shuf -i 0-9999999999999999999 -n 1000) --test-executable target/debug/ruff
+
+  create-issue-on-failure:
+    name: Create an issue if the daily fuzz surfaced any bugs
+    runs-on: ubuntu-latest
+    needs: fuzz
+    if: ${{ github.repository == 'astral-sh/ruff' && always() && github.event_name == 'schedule' && needs.fuzz.result == 'failure' }}
+    permissions:
+      issues: write
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            await github.rest.issues.create({
+              owner: "astral-sh",
+              repo: "ruff",
+              title: `Daily parser fuzz failed on ${new Date().toDateString()}`,
+              body: "Runs listed here: https://github.com/astral-sh/ruff/actions/workflows/daily_fuzz.yml",
+              labels: ["bug", "parser", "fuzzer"],
+            })

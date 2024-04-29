@@ -77,7 +77,7 @@ class FuzzResult:
             if self.maybe_bug
             else colored(f"Ran fuzzer successfully on seed {self.seed}", "green")
         )
-        print(f"{msg:<55} {progress:>15}", flush=True)
+        print(f"{msg:<60} {progress:>15}", flush=True)
         if self.maybe_bug:
             print(colored("The following code triggers a bug:", "red"))
             print()
@@ -298,11 +298,12 @@ def parse_args() -> ResolvedCliArgs:
 
     if not args.test_executable:
         print(
-            "Running `cargo build --release` since no test executable was specified..."
+            "Running `cargo build --release` since no test executable was specified...",
+            flush=True,
         )
         try:
             subprocess.run(
-                ["cargo", "build", "--release", "--color", "always"],
+                ["cargo", "build", "--release", "--locked", "--color", "always"],
                 check=True,
                 capture_output=True,
                 text=True,
