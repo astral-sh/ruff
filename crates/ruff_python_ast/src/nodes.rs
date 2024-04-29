@@ -3278,11 +3278,27 @@ impl Parameters {
 
     /// Returns the total number of parameters included in this [`Parameters`] node.
     pub fn len(&self) -> usize {
-        self.posonlyargs.len()
-            + self.args.len()
-            + usize::from(self.vararg.is_some())
-            + self.kwonlyargs.len()
-            + usize::from(self.kwarg.is_some())
+        let Parameters {
+            range: _,
+            posonlyargs,
+            args,
+            vararg,
+            kwonlyargs,
+            kwarg,
+        } = self;
+        // Safety: a Python function can have an arbitrary number of parameters,
+        // so theoretically this could be a number that wouldn't fit into a usize,
+        // which would lead to a panic. A Python function with that many parameters
+        // is extremely unlikely outside of generated code, however, and it's even
+        // more unlikely that we'd find a function with that many parameters in a
+        // source-code file <=4GB large (Ruff's maximum).
+        posonlyargs
+            .len()
+            .checked_add(args.len())
+            .and_then(|length| length.checked_add(usize::from(vararg.is_some())))
+            .and_then(|length| length.checked_add(kwonlyargs.len()))
+            .and_then(|length| length.checked_add(usize::from(kwarg.is_some())))
+            .expect("Failed to fit the number of parameters into a usize")
     }
 
     /// Returns `true` if a parameter with the given name is included in this [`Parameters`].
@@ -3384,9 +3400,43 @@ impl<'a> Iterator for ParametersIterator<'a> {
 
         (lower, upper)
     }
+
+    fn last(mut self) -> Option<Self::Item> {
+        self.next_back()
+    }
+}
+
+impl<'a> DoubleEndedIterator for ParametersIterator<'a> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        let ParametersIterator {
+            posonlyargs,
+            args,
+            vararg,
+            kwonlyargs,
+            kwarg,
+        } = self;
+
+        if let Some(param) = kwarg.take() {
+            return Some(AnyParameterRef::Variadic(param));
+        }
+        if let Some(param) = kwonlyargs.next_back() {
+            return Some(AnyParameterRef::NonVariadic(param));
+        }
+        if let Some(param) = vararg.take() {
+            return Some(AnyParameterRef::Variadic(param));
+        }
+        if let Some(param) = args.next_back() {
+            return Some(AnyParameterRef::NonVariadic(param));
+        }
+        posonlyargs.next_back().map(AnyParameterRef::NonVariadic)
+    }
 }
 
 impl<'a> FusedIterator for ParametersIterator<'a> {}
+
+/// We rely on the same invariants outlined in the comment above `Parameters::len()`
+/// in order to implement `ExactSizeIterator` here
+impl<'a> ExactSizeIterator for ParametersIterator<'a> {}
 
 impl<'a> IntoIterator for &'a Parameters {
     type IntoIter = ParametersIterator<'a>;
