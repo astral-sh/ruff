@@ -4222,7 +4222,7 @@ impl AstNode for Parameters {
     where
         V: PreorderVisitor<'a> + ?Sized,
     {
-        for parameter in self.iter() {
+        for parameter in self {
             match parameter {
                 AnyParameterRef::NonVariadic(parameter_with_default) => {
                     visitor.visit_parameter_with_default(parameter_with_default);

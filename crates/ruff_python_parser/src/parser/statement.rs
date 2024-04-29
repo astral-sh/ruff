@@ -3374,7 +3374,7 @@ impl<'src> Parser<'src> {
         let mut all_arg_names =
             FxHashSet::with_capacity_and_hasher(parameters.len(), BuildHasherDefault::default());
 
-        for parameter in parameters.iter() {
+        for parameter in parameters {
             let range = parameter.name().range();
             let param_name = parameter.name().as_str();
             if !all_arg_names.insert(param_name) {

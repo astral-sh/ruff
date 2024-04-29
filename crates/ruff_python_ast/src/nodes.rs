@@ -2,6 +2,7 @@
 
 use std::fmt;
 use std::fmt::Debug;
+use std::iter::FusedIterator;
 use std::ops::Deref;
 use std::slice::{Iter, IterMut};
 use std::sync::OnceLock;
@@ -3271,14 +3272,8 @@ impl Parameters {
     }
 
     /// Returns an iterator over all parameters included in this [`Parameters`] node.
-    pub fn iter(&self) -> impl Iterator<Item = AnyParameterRef> {
-        self.posonlyargs
-            .iter()
-            .chain(&self.args)
-            .map(AnyParameterRef::NonVariadic)
-            .chain(self.vararg.as_deref().map(AnyParameterRef::Variadic))
-            .chain(self.kwonlyargs.iter().map(AnyParameterRef::NonVariadic))
-            .chain(self.kwarg.as_deref().map(AnyParameterRef::Variadic))
+    pub fn iter(&self) -> ParametersIterator {
+        ParametersIterator::new(self)
     }
 
     /// Returns the total number of parameters included in this [`Parameters`] node.
@@ -3302,6 +3297,102 @@ impl Parameters {
             && self.kwonlyargs.is_empty()
             && self.vararg.is_none()
             && self.kwarg.is_none()
+    }
+}
+
+pub struct ParametersIterator<'a> {
+    posonlyargs: Iter<'a, ParameterWithDefault>,
+    args: Iter<'a, ParameterWithDefault>,
+    vararg: Option<&'a Parameter>,
+    kwonlyargs: Iter<'a, ParameterWithDefault>,
+    kwarg: Option<&'a Parameter>,
+}
+
+impl<'a> ParametersIterator<'a> {
+    fn new(parameters: &'a Parameters) -> Self {
+        let Parameters {
+            range: _,
+            posonlyargs,
+            args,
+            vararg,
+            kwonlyargs,
+            kwarg,
+        } = parameters;
+        Self {
+            posonlyargs: posonlyargs.iter(),
+            args: args.iter(),
+            vararg: vararg.as_deref(),
+            kwonlyargs: kwonlyargs.iter(),
+            kwarg: kwarg.as_deref(),
+        }
+    }
+}
+
+impl<'a> Iterator for ParametersIterator<'a> {
+    type Item = AnyParameterRef<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let ParametersIterator {
+            posonlyargs,
+            args,
+            vararg,
+            kwonlyargs,
+            kwarg,
+        } = self;
+
+        if let Some(param) = posonlyargs.next() {
+            return Some(AnyParameterRef::NonVariadic(param));
+        }
+        if let Some(param) = args.next() {
+            return Some(AnyParameterRef::NonVariadic(param));
+        }
+        if let Some(param) = vararg.take() {
+            return Some(AnyParameterRef::Variadic(param));
+        }
+        if let Some(param) = kwonlyargs.next() {
+            return Some(AnyParameterRef::NonVariadic(param));
+        }
+        kwarg.take().map(AnyParameterRef::Variadic)
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let ParametersIterator {
+            posonlyargs,
+            args,
+            vararg,
+            kwonlyargs,
+            kwarg,
+        } = self;
+
+        let posonlyargs_len = posonlyargs.len();
+        let args_len = args.len();
+        let vararg_len = usize::from(vararg.is_some());
+        let kwonlyargs_len = kwonlyargs.len();
+        let kwarg_len = usize::from(kwarg.is_some());
+
+        let lower = posonlyargs_len
+            .saturating_add(args_len)
+            .saturating_add(vararg_len)
+            .saturating_add(kwonlyargs_len)
+            .saturating_add(kwarg_len);
+
+        let upper = posonlyargs_len
+            .checked_add(args_len)
+            .and_then(|length| length.checked_add(vararg_len))
+            .and_then(|length| length.checked_add(kwonlyargs_len))
+            .and_then(|length| length.checked_add(kwarg_len));
+
+        (lower, upper)
+    }
+}
+
+impl<'a> FusedIterator for ParametersIterator<'a> {}
+
+impl<'a> IntoIterator for &'a Parameters {
+    type IntoIter = ParametersIterator<'a>;
+    type Item = AnyParameterRef<'a>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
     }
 }
 
