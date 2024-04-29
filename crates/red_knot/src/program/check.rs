@@ -10,12 +10,15 @@ use crate::symbols::Dependency;
 impl Program {
     /// Checks all open files in the workspace and its dependencies.
     #[tracing::instrument(level = "debug", skip_all)]
-    pub fn check(&self, executor: impl CheckExecutor) -> QueryResult<Vec<String>> {
+    pub fn check(&self, mode: ExecutionMode) -> QueryResult<Vec<String>> {
         self.cancelled()?;
 
         let mut context = CheckContext::new(self);
 
-        executor.run(&mut context)?;
+        match mode {
+            ExecutionMode::SingleThreaded => SingleThreadedExecutor.run(&mut context)?,
+            ExecutionMode::ThreadPool => ThreadPoolExecutor.run(&mut context)?,
+        };
 
         Ok(context.finish())
     }
@@ -67,14 +70,14 @@ impl Program {
     }
 }
 
-#[derive(Copy, Clone, Debug)]
-pub enum CheckExecutionMode {
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum ExecutionMode {
     SingleThreaded,
     ThreadPool,
 }
 
 /// Context that stores state information about the entire check operation.
-pub struct CheckContext<'a> {
+struct CheckContext<'a> {
     /// IDs of the files that have been queued for checking.
     ///
     /// Used to avoid queuing the same file twice.
@@ -97,7 +100,7 @@ impl<'a> CheckContext<'a> {
     }
 
     /// Returns the tasks to check all open files in the workspace.
-    pub fn check_open_files(&mut self) -> Vec<CheckOpenFileTask> {
+    fn check_open_files(&mut self) -> Vec<CheckOpenFileTask> {
         self.scheduled_files
             .extend(self.program.workspace().open_files());
 
@@ -109,7 +112,7 @@ impl<'a> CheckContext<'a> {
     }
 
     /// Returns the task to check a dependency.
-    pub fn check_dependency(&mut self, file_id: FileId) -> Option<CheckDependencyTask> {
+    fn check_dependency(&mut self, file_id: FileId) -> Option<CheckDependencyTask> {
         if self.scheduled_files.insert(file_id) {
             Some(CheckDependencyTask { file_id })
         } else {
@@ -118,17 +121,17 @@ impl<'a> CheckContext<'a> {
     }
 
     /// Pushes the result for a single file check operation
-    pub fn push_diagnostics(&mut self, diagnostics: &Diagnostics) {
+    fn push_diagnostics(&mut self, diagnostics: &Diagnostics) {
         self.diagnostics.extend_from_slice(diagnostics);
     }
 
     /// Returns a reference to the program that is being checked.
-    pub fn program(&self) -> &'a Program {
+    fn program(&self) -> &'a Program {
         self.program
     }
 
     /// Creates a task context that is used to check a single file.
-    pub fn task_context<'b, S>(&self, dependency_scheduler: &'b S) -> CheckTaskContext<'a, 'b, S>
+    fn task_context<'b, S>(&self, dependency_scheduler: &'b S) -> CheckTaskContext<'a, 'b, S>
     where
         S: ScheduleDependency,
     {
@@ -144,7 +147,7 @@ impl<'a> CheckContext<'a> {
 }
 
 /// Trait that abstracts away how a dependency of a file gets scheduled for checking.
-pub trait ScheduleDependency {
+trait ScheduleDependency {
     /// Schedules the file with the given ID for checking.
     fn schedule(&self, file_id: FileId);
 }
@@ -163,7 +166,7 @@ where
 ///
 /// The task is generic over `S` because it is passed across thread boundaries and
 /// we don't want to add the requirement that [`ScheduleDependency`] must be [`Send`].
-pub struct CheckTaskContext<'a, 'scheduler, S>
+struct CheckTaskContext<'a, 'scheduler, S>
 where
     S: ScheduleDependency,
 {
@@ -197,14 +200,14 @@ impl<'a> CheckFileContext<'a> {
 }
 
 #[derive(Debug)]
-pub enum CheckFileTask {
+enum CheckFileTask {
     OpenFile(CheckOpenFileTask),
     Dependency(CheckDependencyTask),
 }
 
 impl CheckFileTask {
     /// Runs the task and returns the results for checking this file.
-    pub fn run<S>(&self, context: &CheckTaskContext<S>) -> QueryResult<Diagnostics>
+    fn run<S>(&self, context: &CheckTaskContext<S>) -> QueryResult<Diagnostics>
     where
         S: ScheduleDependency,
     {
@@ -214,7 +217,7 @@ impl CheckFileTask {
         }
     }
 
-    pub fn file_id(&self) -> FileId {
+    fn file_id(&self) -> FileId {
         match self {
             CheckFileTask::OpenFile(task) => task.file_id,
             CheckFileTask::Dependency(task) => task.file_id,
@@ -225,7 +228,7 @@ impl CheckFileTask {
 /// Task to check an open file.
 
 #[derive(Debug)]
-pub struct CheckOpenFileTask {
+struct CheckOpenFileTask {
     file_id: FileId,
 }
 
@@ -242,7 +245,7 @@ impl CheckOpenFileTask {
 
 /// Task to check a dependency file.
 #[derive(Debug)]
-pub struct CheckDependencyTask {
+struct CheckDependencyTask {
     file_id: FileId,
 }
 
@@ -258,7 +261,7 @@ impl CheckDependencyTask {
 }
 
 /// Executor that schedules the checking of individual program files.
-pub trait CheckExecutor {
+trait CheckExecutor {
     fn run(self, context: &mut CheckContext) -> QueryResult<()>;
 }
 
@@ -271,7 +274,7 @@ pub trait CheckExecutor {
 /// with checking the open files. Checking dependencies in a single threaded environment is more likely
 /// to hurt performance because we end up analyzing files in their entirety, even if we only need to type check parts of them.
 #[derive(Debug, Default)]
-pub struct SingleThreadedExecutor;
+struct SingleThreadedExecutor;
 
 impl CheckExecutor for SingleThreadedExecutor {
     fn run(self, context: &mut CheckContext) -> QueryResult<()> {
@@ -297,7 +300,7 @@ impl CheckExecutor for SingleThreadedExecutor {
 /// Other than [`SingleThreadedExecutor`], this executor schedules dependencies for checking. It
 /// even schedules dependencies for checking when the thread pool size is 1 for a better debugging experience.
 #[derive(Debug, Default)]
-pub struct ThreadPoolExecutor;
+struct ThreadPoolExecutor;
 
 impl CheckExecutor for ThreadPoolExecutor {
     fn run(self, context: &mut CheckContext) -> QueryResult<()> {
