@@ -77,7 +77,7 @@ class FuzzResult:
             if self.maybe_bug
             else colored(f"Ran fuzzer successfully on seed {self.seed}", "green")
         )
-        print(f"{msg:<55} {progress:>15}", flush=True)
+        print(f"{msg:<60} {progress:>15}", flush=True)
         if self.maybe_bug:
             print(colored("The following code triggers a bug:", "red"))
             print()
