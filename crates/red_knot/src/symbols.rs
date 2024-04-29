@@ -95,7 +95,7 @@ impl Symbol {
 // TODO storing TypedNodeKey for definitions means we have to search to find them again in the AST;
 // this is at best O(log n). If looking up definitions is a bottleneck we should look for
 // alternatives here.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub(crate) enum Definition {
     // For the import cases, we don't need reference to any arbitrary AST subtrees (annotations,
     // RHS), and referencing just the import statement node is imprecise (a single import statement
@@ -110,12 +110,12 @@ pub(crate) enum Definition {
     // TODO with statements, except handlers, function args...
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub(crate) struct ImportDefinition {
     pub(crate) module: ModuleName,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub(crate) struct ImportFromDefinition {
     pub(crate) module: Option<ModuleName>,
     pub(crate) name: Name,
@@ -160,6 +160,7 @@ impl SymbolTable {
         let mut builder = SymbolTableBuilder {
             table: SymbolTable::new(),
             scopes: vec![root_scope_id],
+            current_definition: None,
         };
         builder.visit_body(&module.body);
         builder.table
@@ -386,6 +387,8 @@ where
 struct SymbolTableBuilder {
     table: SymbolTable,
     scopes: Vec<ScopeId>,
+    /// the definition whose target(s) we are currently walking
+    current_definition: Option<Definition>,
 }
 
 impl SymbolTableBuilder {
@@ -448,8 +451,13 @@ impl SymbolTableBuilder {
 
 impl PreorderVisitor<'_> for SymbolTableBuilder {
     fn visit_expr(&mut self, expr: &ast::Expr) {
-        if let ast::Expr::Name(ast::ExprName { id, .. }) = expr {
+        if let ast::Expr::Name(ast::ExprName { id, ctx, .. }) = expr {
             self.add_symbol(id);
+            if matches!(ctx, ast::ExprContext::Store | ast::ExprContext::Del) {
+                if let Some(curdef) = self.current_definition.clone() {
+                    self.add_symbol_with_def(id, curdef);
+                }
+            }
         }
         ast::visitor::preorder::walk_expr(self, expr);
     }
@@ -531,6 +539,13 @@ impl PreorderVisitor<'_> for SymbolTableBuilder {
                 };
 
                 self.table.dependencies.push(dependency);
+            }
+            ast::Stmt::Assign(node) => {
+                debug_assert!(self.current_definition.is_none());
+                self.current_definition =
+                    Some(Definition::Assignment(TypedNodeKey::from_node(node)));
+                ast::visitor::preorder::walk_stmt(self, stmt);
+                self.current_definition = None;
             }
             _ => {
                 ast::visitor::preorder::walk_stmt(self, stmt);
@@ -644,6 +659,19 @@ mod tests {
             assert_eq!(
                 table
                     .definitions(table.root_symbol_id_by_name("foo").unwrap())
+                    .len(),
+                1
+            );
+        }
+
+        #[test]
+        fn assign() {
+            let parsed = parse("x = foo");
+            let table = SymbolTable::from_ast(parsed.ast());
+            assert_eq!(names(table.root_symbols()), vec!["foo", "x"]);
+            assert_eq!(
+                table
+                    .definitions(table.root_symbol_id_by_name("x").unwrap())
                     .len(),
                 1
             );
