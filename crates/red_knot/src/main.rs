@@ -16,7 +16,7 @@ use tracing_tree::time::Uptime;
 use red_knot::db::{HasJar, ParallelDatabase, QueryError, SemanticDb, SourceDb, SourceJar};
 use red_knot::files::FileId;
 use red_knot::module::{ModuleSearchPath, ModuleSearchPathKind};
-use red_knot::program::check::RayonCheckScheduler;
+use red_knot::program::check::ThreadPoolExecutor;
 use red_knot::program::{FileChange, FileChangeKind, Program};
 use red_knot::watch::FileWatcher;
 use red_knot::Workspace;
@@ -144,21 +144,19 @@ impl MainLoop {
                     // Spawn a new task that checks the program. This needs to be done in a separate thread
                     // to prevent blocking the main loop here.
                     rayon::spawn(move || {
-                        rayon::in_place_scope(|scope| {
-                            let scheduler = RayonCheckScheduler::new(&program, scope);
+                        let executor = ThreadPoolExecutor;
 
-                            match program.check(&scheduler) {
-                                Ok(result) => {
-                                    sender
-                                        .send(OrchestratorMessage::CheckProgramCompleted {
-                                            diagnostics: result,
-                                            revision,
-                                        })
-                                        .unwrap();
-                                }
-                                Err(QueryError::Cancelled) => {}
+                        match program.check(executor) {
+                            Ok(result) => {
+                                sender
+                                    .send(OrchestratorMessage::CheckProgramCompleted {
+                                        diagnostics: result,
+                                        revision,
+                                    })
+                                    .unwrap();
                             }
-                        });
+                            Err(QueryError::Cancelled) => {}
+                        }
                     });
                 }
                 MainLoopMessage::ApplyChanges(changes) => {
