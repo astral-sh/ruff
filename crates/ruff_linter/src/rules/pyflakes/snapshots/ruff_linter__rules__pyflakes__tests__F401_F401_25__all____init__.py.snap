@@ -1,0 +1,18 @@
+---
+source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+---
+__init__.py:23:8: F401 [*] `sys` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+   |
+23 | import sys # F401: remove unused
+   |        ^^^ F401
+   |
+   = help: Remove unused import: `sys`
+
+ℹ Unsafe fix
+20 20 | 
+21 21 | 
+22 22 | 
+23    |-import sys # F401: remove unused
+24 23 | 
+25 24 | 
+26 25 |
