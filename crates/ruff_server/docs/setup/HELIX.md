@@ -1,7 +1,7 @@
 ## Helix Setup Guide for `ruff server`
 
 First, open the language configuration file for Helix. On Linux and macOS, this will be at `~/.config/helix/languages.toml`,
-and on Windows this will be in `%AppData%\helix\languages.toml`.
+and on Windows this will be at `%AppData%\helix\languages.toml`.
 
 Add the language server by adding:
 
@@ -17,7 +17,7 @@ If you don't already have a language server registered to use with Python, add t
 ```toml
 [[language]]
 name = "python"
-language-servers = [ "ruff" ]
+language-servers = ["ruff"]
 ```
 
 Otherwise, if you already have `language-servers` defined, you can simply add `"ruff"` to the list. For example,
@@ -26,5 +26,28 @@ if you already have `pylsp` as a language server, you can modify the language en
 ```toml
 [[language]]
 name = "python"
-language-servers = [ "ruff", "pylsp" ]
+language-servers = ["ruff", "pylsp"]
+```
+
+If you want to, as an example, turn on auto-formatting, add `auto-format = true`:
+
+```toml
+[[language]]
+name = "python"
+language-servers = ["ruff", "pylsp"]
+auto-format = true
+```
+
+See the [Helix documentation](https://docs.helix-editor.com/languages.html) for more settings you can use here.
+
+You can pass settings into `ruff server` using `[language-server.ruff.config.settings]`. Here's an example settings configuration:
+
+```toml
+[language-server.ruff.config.settings]
+line-length = 80
+[language-server.ruff.config.settings.lint]
+select = ["E4", "E7"]
+preview = false
+[language-server.ruff.config.settings.format]
+preview = true
 ```
