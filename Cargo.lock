@@ -1300,7 +1300,7 @@ dependencies = [
 [[package]]
 name = "lsp-types"
 version = "0.95.1"
-source = "git+https://github.com/snowsignal/lsp-types.git?rev=3512a9f#3512a9f33eadc5402cfab1b8f7340824c8ca1439"
+source = "git+https://github.com/astral-sh/lsp-types.git?rev=3512a9f#3512a9f33eadc5402cfab1b8f7340824c8ca1439"
 dependencies = [
  "bitflags 1.3.2",
  "serde",
