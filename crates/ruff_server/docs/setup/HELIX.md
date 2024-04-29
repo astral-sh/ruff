@@ -32,7 +32,7 @@ language-servers = ["ruff", "pylsp"]
 Once you've set up the server, you should see diagnostics in your Python files. Code actions and other LSP features should also be available.
 
 ![image](assets/SuccessfulHelixSetup.png "A screenshot showing an open Python file in Helix with highlighted diagnostics and a code action dropdown menu open")
-*This screenshot is using `select=["ALL]"` for demonstration purposes* 
+*This screenshot is using `select=["ALL]"` for demonstration purposes.*
 
 If you want to, as an example, turn on auto-formatting, add `auto-format = true`:
 
@@ -45,7 +45,7 @@ auto-format = true
 
 See the [Helix documentation](https://docs.helix-editor.com/languages.html) for more settings you can use here.
 
-You can pass settings into `ruff server` using `[language-server.ruff.config.settings]`. Here's an example settings configuration:
+You can pass settings into `ruff server` using `[language-server.ruff.config.settings]`. For example:
 
 ```toml
 [language-server.ruff.config.settings]
