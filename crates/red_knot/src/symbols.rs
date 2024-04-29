@@ -91,7 +91,7 @@ pub(crate) enum Kind {
 }
 
 bitflags! {
-    #[derive(Debug)]
+    #[derive(Copy,Clone,Debug)]
     pub(crate) struct SymbolFlags: u8 {
         const IS_USED         = 1 << 0;
         const IS_DEFINED      = 1 << 1;
@@ -509,7 +509,7 @@ impl PreorderVisitor<'_> for SymbolTableBuilder {
                 ast::ExprContext::Invalid => SymbolFlags::empty(),
             };
             self.add_or_update_symbol(id, flags);
-            if matches!(ctx, ast::ExprContext::Store | ast::ExprContext::Del) {
+            if flags.contains(SymbolFlags::IS_DEFINED) {
                 if let Some(curdef) = self.current_definition.clone() {
                     self.add_or_update_symbol_with_def(id, curdef);
                 }
