@@ -502,7 +502,13 @@ impl SymbolTableBuilder {
 impl PreorderVisitor<'_> for SymbolTableBuilder {
     fn visit_expr(&mut self, expr: &ast::Expr) {
         if let ast::Expr::Name(ast::ExprName { id, ctx, .. }) = expr {
-            self.add_or_update_symbol(id, SymbolFlags::empty());
+            let flags = match ctx {
+                ast::ExprContext::Load => SymbolFlags::IS_USED,
+                ast::ExprContext::Store => SymbolFlags::IS_DEFINED,
+                ast::ExprContext::Del => SymbolFlags::IS_DEFINED,
+                ast::ExprContext::Invalid => SymbolFlags::empty(),
+            };
+            self.add_or_update_symbol(id, flags);
             if matches!(ctx, ast::ExprContext::Store | ast::ExprContext::Del) {
                 if let Some(curdef) = self.current_definition.clone() {
                     self.add_or_update_symbol_with_def(id, curdef);
