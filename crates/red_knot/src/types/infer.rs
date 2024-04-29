@@ -62,16 +62,7 @@ where
                 let bases: Vec<_> = node
                     .bases()
                     .iter()
-                    .map(|base_expr| match base_expr {
-                        ast::Expr::Name(name) => {
-                            if let Some(base_symbol_id) = symbols.root_symbol_id_by_name(&name.id) {
-                                db.infer_symbol_type(file_id, base_symbol_id)
-                            } else {
-                                Type::Unknown
-                            }
-                        }
-                        _ => todo!("full expression type resolution"),
-                    })
+                    .map(|base_expr| infer_expr_type(db, file_id, base_expr))
                     .collect();
 
                 let store = &db.jar().type_store;
@@ -95,6 +86,13 @@ where
                 store.cache_node_type(file_id, *node_key.erased(), ty);
                 ty
             }),
+        Definition::Assignment(node_key) => {
+            let parsed = db.parse(file_id);
+            let ast = parsed.ast();
+            let node = node_key.resolve_unwrap(ast.as_any_node_ref());
+            // TODO handle unpacking assignment correctly
+            infer_expr_type(db, file_id, &node.value)
+        }
         _ => todo!("other kinds of definitions"),
     };
 
@@ -103,6 +101,24 @@ where
         .cache_symbol_type(file_id, symbol_id, ty);
     // TODO record dependencies
     ty
+}
+
+fn infer_expr_type<Db>(db: &Db, file_id: FileId, expr: &ast::Expr) -> Type
+where
+    Db: SemanticDb + HasJar<SemanticJar>,
+{
+    // TODO cache the resolution of the type on the node
+    let symbols = db.symbol_table(file_id);
+    match expr {
+        ast::Expr::Name(name) => {
+            if let Some(symbol_id) = symbols.root_symbol_id_by_name(&name.id) {
+                db.infer_symbol_type(file_id, symbol_id)
+            } else {
+                Type::Unknown
+            }
+        }
+        _ => todo!("full expression type resolution"),
+    }
 }
 
 #[cfg(test)]
@@ -144,7 +160,7 @@ mod tests {
 
         let a_path = case.src.path().join("a.py");
         let b_path = case.src.path().join("b.py");
-        std::fs::write(a_path, "from b import C as D")?;
+        std::fs::write(a_path, "from b import C as D; E = D")?;
         std::fs::write(b_path, "class C: pass")?;
         let a_file = db
             .resolve_module(ModuleName::new("a"))
@@ -152,15 +168,16 @@ mod tests {
             .path(db)
             .file();
         let a_syms = db.symbol_table(a_file);
-        let d_sym = a_syms
-            .root_symbol_id_by_name("D")
-            .expect("D symbol should be found");
+        let e_sym = a_syms
+            .root_symbol_id_by_name("E")
+            .expect("E symbol should be found");
 
-        let ty = db.infer_symbol_type(a_file, d_sym);
+        let ty = db.infer_symbol_type(a_file, e_sym);
 
         let jar = HasJar::<SemanticJar>::jar(db);
         assert!(matches!(ty, Type::Class(_)));
         assert_eq!(format!("{}", ty.display(&jar.type_store)), "Literal[C]");
+
         Ok(())
     }
 
