@@ -307,7 +307,7 @@ impl SymbolTable {
             .flat_map(|(sym_id, defs)| defs.iter().map(move |def| (*sym_id, def)))
     }
 
-    fn add_symbol_to_scope(
+    fn add_or_update_symbol(
         &mut self,
         scope_id: ScopeId,
         name: &str,
@@ -438,13 +438,17 @@ struct SymbolTableBuilder {
 }
 
 impl SymbolTableBuilder {
-    fn add_symbol(&mut self, identifier: &str, flags: SymbolFlags) -> SymbolId {
+    fn add_or_update_symbol(&mut self, identifier: &str, flags: SymbolFlags) -> SymbolId {
         self.table
-            .add_symbol_to_scope(self.cur_scope(), identifier, flags)
+            .add_or_update_symbol(self.cur_scope(), identifier, flags)
     }
 
-    fn add_symbol_with_def(&mut self, identifier: &str, definition: Definition) -> SymbolId {
-        let symbol_id = self.add_symbol(identifier, SymbolFlags::IS_DEFINED);
+    fn add_or_update_symbol_with_def(
+        &mut self,
+        identifier: &str,
+        definition: Definition,
+    ) -> SymbolId {
+        let symbol_id = self.add_or_update_symbol(identifier, SymbolFlags::IS_DEFINED);
         self.table
             .defs
             .entry(symbol_id)
@@ -486,7 +490,7 @@ impl SymbolTableBuilder {
                     ast::TypeParam::ParamSpec(ast::TypeParamParamSpec { name, .. }) => name,
                     ast::TypeParam::TypeVarTuple(ast::TypeParamTypeVarTuple { name, .. }) => name,
                 };
-                self.add_symbol(name, SymbolFlags::IS_USED);
+                self.add_or_update_symbol(name, SymbolFlags::IS_USED);
             }
         }
         nested(self);
@@ -514,7 +518,7 @@ impl PreorderVisitor<'_> for SymbolTableBuilder {
         match stmt {
             ast::Stmt::ClassDef(node) => {
                 let def = Definition::ClassDef(TypedNodeKey::from_node(node));
-                self.add_symbol_with_def(&node.name, def);
+                self.add_or_update_symbol_with_def(&node.name, def);
                 self.with_type_params(&node.name, &node.type_params, |builder| {
                     builder.push_scope(builder.cur_scope(), &node.name, ScopeKind::Class);
                     ast::visitor::preorder::walk_stmt(builder, stmt);
@@ -523,7 +527,7 @@ impl PreorderVisitor<'_> for SymbolTableBuilder {
             }
             ast::Stmt::FunctionDef(node) => {
                 let def = Definition::FunctionDef(TypedNodeKey::from_node(node));
-                self.add_symbol_with_def(&node.name, def);
+                self.add_or_update_symbol_with_def(&node.name, def);
                 self.with_type_params(&node.name, &node.type_params, |builder| {
                     builder.push_scope(builder.cur_scope(), &node.name, ScopeKind::Function);
                     ast::visitor::preorder::walk_stmt(builder, stmt);
@@ -543,7 +547,7 @@ impl PreorderVisitor<'_> for SymbolTableBuilder {
                     let def = Definition::Import(ImportDefinition {
                         module: module.clone(),
                     });
-                    self.add_symbol_with_def(symbol_name, def);
+                    self.add_or_update_symbol_with_def(symbol_name, def);
                     self.table.dependencies.push(Dependency::Module(module));
                 }
             }
@@ -566,7 +570,7 @@ impl PreorderVisitor<'_> for SymbolTableBuilder {
                         name: Name::new(&alias.name.id),
                         level: *level,
                     });
-                    self.add_symbol_with_def(symbol_name, def);
+                    self.add_or_update_symbol_with_def(symbol_name, def);
                 }
 
                 let dependency = if let Some(module) = module {
@@ -861,8 +865,8 @@ mod tests {
     fn insert_same_name_symbol_twice() {
         let mut table = SymbolTable::new();
         let root_scope_id = SymbolTable::root_scope_id();
-        let symbol_id_1 = table.add_symbol_to_scope(root_scope_id, "foo", SymbolFlags::empty());
-        let symbol_id_2 = table.add_symbol_to_scope(root_scope_id, "foo", SymbolFlags::empty());
+        let symbol_id_1 = table.add_or_update_symbol(root_scope_id, "foo", SymbolFlags::empty());
+        let symbol_id_2 = table.add_or_update_symbol(root_scope_id, "foo", SymbolFlags::empty());
         assert_eq!(symbol_id_1, symbol_id_2);
     }
 
@@ -870,8 +874,8 @@ mod tests {
     fn insert_different_named_symbols() {
         let mut table = SymbolTable::new();
         let root_scope_id = SymbolTable::root_scope_id();
-        let symbol_id_1 = table.add_symbol_to_scope(root_scope_id, "foo", SymbolFlags::empty());
-        let symbol_id_2 = table.add_symbol_to_scope(root_scope_id, "bar", SymbolFlags::empty());
+        let symbol_id_1 = table.add_or_update_symbol(root_scope_id, "foo", SymbolFlags::empty());
+        let symbol_id_2 = table.add_or_update_symbol(root_scope_id, "bar", SymbolFlags::empty());
         assert_ne!(symbol_id_1, symbol_id_2);
     }
 
@@ -879,9 +883,9 @@ mod tests {
     fn add_child_scope_with_symbol() {
         let mut table = SymbolTable::new();
         let root_scope_id = SymbolTable::root_scope_id();
-        let foo_symbol_top = table.add_symbol_to_scope(root_scope_id, "foo", SymbolFlags::empty());
+        let foo_symbol_top = table.add_or_update_symbol(root_scope_id, "foo", SymbolFlags::empty());
         let c_scope = table.add_child_scope(root_scope_id, "C", ScopeKind::Class);
-        let foo_symbol_inner = table.add_symbol_to_scope(c_scope, "foo", SymbolFlags::empty());
+        let foo_symbol_inner = table.add_or_update_symbol(c_scope, "foo", SymbolFlags::empty());
         assert_ne!(foo_symbol_top, foo_symbol_inner);
     }
 
@@ -898,7 +902,7 @@ mod tests {
     fn symbol_from_id() {
         let mut table = SymbolTable::new();
         let root_scope_id = SymbolTable::root_scope_id();
-        let foo_symbol_id = table.add_symbol_to_scope(root_scope_id, "foo", SymbolFlags::empty());
+        let foo_symbol_id = table.add_or_update_symbol(root_scope_id, "foo", SymbolFlags::empty());
         let symbol = foo_symbol_id.symbol(&table);
         assert_eq!(symbol.name.as_str(), "foo");
     }
