@@ -298,11 +298,12 @@ def parse_args() -> ResolvedCliArgs:
 
     if not args.test_executable:
         print(
-            "Running `cargo build --release` since no test executable was specified..."
+            "Running `cargo build --release` since no test executable was specified...",
+            flush=True,
         )
         try:
             subprocess.run(
-                ["cargo", "build", "--release", "--color", "always"],
+                ["cargo", "build", "--release", "--locked", "--color", "always"],
                 check=True,
                 capture_output=True,
                 text=True,
