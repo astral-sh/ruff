@@ -1,7 +1,7 @@
 use crate::cancellation::CancellationTokenSource;
 use crate::db::{QueryError, QueryResult};
 
-/// Holds the data agnostic state of the database.
+/// Holds the jar agnostic state of the database.
 #[derive(Debug, Default)]
 pub struct DbRuntime {
     /// The cancellation token source used to signal other works that the queries should be aborted and

@@ -7,17 +7,22 @@ use crate::db::query::QueryResult;
 use crate::db::runtime::DbRuntime;
 use crate::db::{HasJars, ParallelDatabase};
 
+/// Stores the jars of a database and the state for each worker.
+///
+/// Today, all state is shared across all workers, but it may be desired to store data per worker in the future.
 pub struct JarsStorage<T>
 where
     T: HasJars + Sized,
 {
     // It's important that `jars_wait_group` is declared after `jars` to ensure that `jars` is dropped first.
     // See https://doc.rust-lang.org/reference/destructors.html
+    /// Stores the jars of the database.
     jars: Arc<T::Jars>,
 
     /// Used to count the references to `jars`. Allows implementing `jars_mut` without requiring to clone `jars`.
     jars_wait_group: WaitGroup,
 
+    /// The data agnostic state.
     runtime: DbRuntime,
 }
 
@@ -33,6 +38,9 @@ where
         }
     }
 
+    /// Creates a snapshot of the jars.
+    ///
+    /// Creating the snapshot is cheap because it doesn't clone the jars, it only increments a ref counter.
     #[must_use]
     pub fn snapshot(&self) -> JarsStorage<Db>
     where
@@ -50,10 +58,10 @@ where
         Ok(&self.jars)
     }
 
-    pub(crate) fn jars_unwrap(&self) -> &Db::Jars {
-        &self.jars
-    }
-
+    /// Returns a mutable reference to the jars without cloning their content.
+    ///
+    /// The method cancels any pending queries of other works and waits for them to complete so that
+    /// this instance is the only instance holding a reference to the jars.
     pub(crate) fn jars_mut(&mut self) -> &mut Db::Jars {
         // We have a mutable ref here, so no more workers can be spawned between calling this function and taking the mut ref below.
         self.cancel_other_workers();

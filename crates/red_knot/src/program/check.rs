@@ -3,7 +3,7 @@ use std::num::NonZeroUsize;
 use rayon::{current_num_threads, yield_local};
 use rustc_hash::FxHashSet;
 
-use crate::db::{ParallelDatabase, QueryError, QueryResult, SemanticDb, SourceDb};
+use crate::db::{Database, QueryError, QueryResult, SemanticDb, SourceDb};
 use crate::files::FileId;
 use crate::lint::Diagnostics;
 use crate::program::Program;

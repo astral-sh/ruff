@@ -283,8 +283,8 @@ impl Orchestrator {
                         }
                     }
                 },
-                default(std::time::Duration::from_millis(100)) => {
-                    // No more file changes after 100 ms, send the changes and schedule a new analysis
+                default(std::time::Duration::from_millis(10)) => {
+                    // No more file changes after 10 ms, send the changes and schedule a new analysis
                     self.sender.send(MainLoopMessage::ApplyChanges(aggregated_changes)).unwrap();
                     self.sender.send(MainLoopMessage::CheckProgram { revision: self.revision}).unwrap();
                     return;

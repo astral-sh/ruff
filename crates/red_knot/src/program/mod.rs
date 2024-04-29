@@ -154,10 +154,6 @@ impl HasJars for Program {
         self.jars.jars()
     }
 
-    fn jars_unwrap(&self) -> &Self::Jars {
-        self.jars.jars_unwrap()
-    }
-
     fn jars_mut(&mut self) -> &mut Self::Jars {
         self.jars.jars_mut()
     }

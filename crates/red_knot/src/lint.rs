@@ -23,10 +23,13 @@ where
 {
     let storage = &db.jar()?.lint_syntax;
 
-    for i in 0..10 {
-        db.cancelled()?;
-        format!("Sleep {i}");
-        std::thread::sleep(Duration::from_secs(1));
+    #[allow(clippy::print_stdout)]
+    if std::env::var("RED_KNOT_SLOW_LINT").is_ok() {
+        for i in 0..10 {
+            db.cancelled()?;
+            println!("RED_KNOT_SLOW_LINT is set, sleeping for {i}/10 seconds");
+            std::thread::sleep(Duration::from_secs(1));
+        }
     }
 
     storage.get(&file_id, |file_id| {

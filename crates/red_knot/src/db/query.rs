@@ -1,5 +1,6 @@
 use std::fmt::{Display, Formatter};
 
+/// Reason why a db query operation failed.
 #[derive(Debug, Clone, Copy)]
 pub enum QueryError {
     /// The query was cancelled because the DB was mutated or the query was cancelled by the host (e.g. on a file change or when pressing CTRL+C).

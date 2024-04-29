@@ -20,18 +20,11 @@ pub use runtime::DbRuntime;
 pub use storage::JarsStorage;
 
 pub trait Database {
+    /// Returns a reference to the runtime of the current worker.
     fn runtime(&self) -> &DbRuntime;
 
+    /// Returns a mutable reference to the runtime. Only one worker can hold a mutable reference to the runtime.
     fn runtime_mut(&mut self) -> &mut DbRuntime;
-}
-
-pub trait ParallelDatabase: Database + Send {
-    /// Creates a snapshot of the database state that can be used to query the database in another thread.
-    ///
-    /// The snapshot is a read-only view of the database but query results are shared between threads.
-    /// All queries will be automatically cancelled when applying any mutations (calling [`HasJars::jars_mut`])
-    /// to the database (not the snapshot, because they're readonly).
-    fn snapshot(&self) -> Snapshot<Self>;
 
     /// Returns `Ok` if the queries have not been cancelled and `Err(QueryError::Cancelled)` otherwise.
     fn cancelled(&self) -> QueryResult<()> {
@@ -44,7 +37,33 @@ pub trait ParallelDatabase: Database + Send {
     }
 }
 
+/// Database that supports running queries from multiple threads.
+pub trait ParallelDatabase: Database + Send {
+    /// Creates a snapshot of the database state that can be used to query the database in another thread.
+    ///
+    /// The snapshot is a read-only view of the database but query results are shared between threads.
+    /// All queries will be automatically cancelled when applying any mutations (calling [`HasJars::jars_mut`])
+    /// to the database (not the snapshot, because they're readonly).
+    ///
+    /// ## Creating a snapshot
+    ///
+    /// Creating a snapshot of the database's jars is cheap but creating a snapshot of
+    /// other state stored on the database might require deep-cloning data. That's why you should
+    /// avoid creating snapshots in a hot function (e.g. don't create a snapshot for each file, instead
+    /// create a snapshot when scheduling the check of an entire program).
+    ///
+    /// ## Salsa compatibility
+    /// Salsa prohibits creating a snapshot inside a query and so should we for better Salsa compatibility .
+    fn snapshot(&self) -> Snapshot<Self>;
+}
+
 /// Readonly snapshot of a database.
+///
+/// ## Dead locks
+/// A snapshot should always be dropped as soon as it is no longer necessary to run queries.
+/// Storing the snapshot without running a query or periodically checking if cancellation was requested
+/// can lead to deadlocks because mutating the [`Database`] requires cancels all pending queries
+/// and waiting for all [`Snapshot`]s to be dropped.
 #[derive(Debug)]
 pub struct Snapshot<DB: ?Sized>
 where
@@ -237,10 +256,6 @@ pub(crate) mod tests {
 
         fn jars(&self) -> QueryResult<&Self::Jars> {
             self.jars.jars()
-        }
-
-        fn jars_unwrap(&self) -> &Self::Jars {
-            self.jars.jars_unwrap()
         }
 
         fn jars_mut(&mut self) -> &mut Self::Jars {

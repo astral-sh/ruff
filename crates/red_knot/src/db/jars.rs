@@ -20,16 +20,17 @@ pub trait HasJar<T> {
     fn jar_mut(&mut self) -> &mut T;
 }
 
+/// Gives access to the jars in a database.
 pub trait HasJars {
+    /// A type storing the jars.
+    ///
+    /// Most commonly, this is a tuple where each jar is a tuple element.
     type Jars: Default;
 
     /// Gives access to the underlying jars but tests if the queries have been cancelled.
     ///
     /// Returns `Err(QueryError::Cancelled)` if the queries have been cancelled.
     fn jars(&self) -> QueryResult<&Self::Jars>;
-
-    /// Gives access to the underlying jars without testing if the queries have been cancelled.
-    fn jars_unwrap(&self) -> &Self::Jars;
 
     /// Gives mutable access to the underlying jars.
     fn jars_mut(&mut self) -> &mut Self::Jars;
