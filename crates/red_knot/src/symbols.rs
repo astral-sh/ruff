@@ -86,6 +86,7 @@ impl Scope {
 pub(crate) enum Kind {
     FreeVar,
     CellVar,
+    CellVarAssigned,
     ExplicitGlobal,
     ImplicitGlobal,
 }
