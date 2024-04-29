@@ -2,8 +2,8 @@ use std::path::Path;
 use std::sync::Arc;
 
 use crate::db::{
-    Database, Db, DbRuntime, HasJar, HasJars, JarsStorage, ParallelDatabase, QueryResult,
-    SemanticDb, SemanticJar, Snapshot, SourceDb, SourceJar,
+    Database, Db, DbRuntime, HasJar, HasJars, JarsStorage, LintDb, LintJar, ParallelDatabase,
+    QueryResult, SemanticDb, SemanticJar, Snapshot, SourceDb, SourceJar,
 };
 use crate::files::{FileId, Files};
 use crate::lint::{lint_semantic, lint_syntax, Diagnostics};
@@ -40,7 +40,7 @@ impl Program {
         I: IntoIterator<Item = FileChange>,
     {
         let files = self.files.clone();
-        let (source, semantic) = self.jars_mut();
+        let (source, semantic, lint) = self.jars_mut();
         for change in changes {
             let file_path = files.path(change.id);
 
@@ -48,10 +48,10 @@ impl Program {
             semantic.symbol_tables.remove(&change.id);
             source.sources.remove(&change.id);
             source.parsed.remove(&change.id);
-            source.lint_syntax.remove(&change.id);
             // TODO: remove all dependent modules as well
             semantic.type_store.remove_module(change.id);
-            semantic.lint_semantic.remove(&change.id);
+            lint.lint_syntax.remove(&change.id);
+            lint.lint_semantic.remove(&change.id);
         }
     }
 
@@ -84,10 +84,6 @@ impl SourceDb for Program {
     fn parse(&self, file_id: FileId) -> QueryResult<Parsed> {
         parse(self, file_id)
     }
-
-    fn lint_syntax(&self, file_id: FileId) -> QueryResult<Diagnostics> {
-        lint_syntax(self, file_id)
-    }
 }
 
 impl SemanticDb for Program {
@@ -111,10 +107,6 @@ impl SemanticDb for Program {
         infer_symbol_type(self, file_id, symbol_id)
     }
 
-    fn lint_semantic(&self, file_id: FileId) -> QueryResult<Diagnostics> {
-        lint_semantic(self, file_id)
-    }
-
     // Mutations
     fn add_module(&mut self, path: &Path) -> Option<(Module, Vec<Arc<ModuleData>>)> {
         add_module(self, path)
@@ -122,6 +114,16 @@ impl SemanticDb for Program {
 
     fn set_module_search_paths(&mut self, paths: Vec<ModuleSearchPath>) {
         set_module_search_paths(self, paths);
+    }
+}
+
+impl LintDb for Program {
+    fn lint_syntax(&self, file_id: FileId) -> QueryResult<Diagnostics> {
+        lint_syntax(self, file_id)
+    }
+
+    fn lint_semantic(&self, file_id: FileId) -> QueryResult<Diagnostics> {
+        lint_semantic(self, file_id)
     }
 }
 
@@ -148,7 +150,7 @@ impl ParallelDatabase for Program {
 }
 
 impl HasJars for Program {
-    type Jars = (SourceJar, SemanticJar);
+    type Jars = (SourceJar, SemanticJar, LintJar);
 
     fn jars(&self) -> QueryResult<&Self::Jars> {
         self.jars.jars()
@@ -176,6 +178,16 @@ impl HasJar<SemanticJar> for Program {
 
     fn jar_mut(&mut self) -> &mut SemanticJar {
         &mut self.jars_mut().1
+    }
+}
+
+impl HasJar<LintJar> for Program {
+    fn jar(&self) -> QueryResult<&LintJar> {
+        Ok(&self.jars()?.2)
+    }
+
+    fn jar_mut(&mut self) -> &mut LintJar {
+        &mut self.jars_mut().2
     }
 }
 

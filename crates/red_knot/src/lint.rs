@@ -7,9 +7,7 @@ use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{ModModule, StringLiteral};
 
 use crate::cache::KeyValueCache;
-use crate::db::{
-    HasJar, ParallelDatabase, QueryResult, SemanticDb, SemanticJar, SourceDb, SourceJar,
-};
+use crate::db::{HasJar, LintDb, LintJar, QueryResult, SemanticDb};
 use crate::files::FileId;
 use crate::parse::Parsed;
 use crate::source::Source;
@@ -19,7 +17,7 @@ use crate::types::Type;
 #[tracing::instrument(level = "debug", skip(db))]
 pub(crate) fn lint_syntax<Db>(db: &Db, file_id: FileId) -> QueryResult<Diagnostics>
 where
-    Db: SourceDb + HasJar<SourceJar> + ParallelDatabase,
+    Db: LintDb + HasJar<LintJar>,
 {
     let storage = &db.jar()?.lint_syntax;
 
@@ -77,7 +75,7 @@ fn lint_lines(source: &str, diagnostics: &mut Vec<String>) {
 #[tracing::instrument(level = "debug", skip(db))]
 pub(crate) fn lint_semantic<Db>(db: &Db, file_id: FileId) -> QueryResult<Diagnostics>
 where
-    Db: SemanticDb + HasJar<SemanticJar>,
+    Db: LintDb + HasJar<LintJar>,
 {
     let storage = &db.jar()?.lint_semantic;
 

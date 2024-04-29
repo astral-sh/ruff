@@ -1,10 +1,10 @@
-mod jars;
-mod query;
-mod runtime;
-mod storage;
-
 use std::path::Path;
 use std::sync::Arc;
+
+pub use jars::{HasJar, HasJars};
+pub use query::{QueryError, QueryResult};
+pub use runtime::DbRuntime;
+pub use storage::JarsStorage;
 
 use crate::files::FileId;
 use crate::lint::{Diagnostics, LintSemanticStorage, LintSyntaxStorage};
@@ -14,10 +14,10 @@ use crate::source::{Source, SourceStorage};
 use crate::symbols::{SymbolId, SymbolTable, SymbolTablesStorage};
 use crate::types::{Type, TypeStore};
 
-pub use jars::{HasJar, HasJars};
-pub use query::{QueryError, QueryResult};
-pub use runtime::DbRuntime;
-pub use storage::JarsStorage;
+mod jars;
+mod query;
+mod runtime;
+mod storage;
 
 pub trait Database {
     /// Returns a reference to the runtime of the current worker.
@@ -106,8 +106,6 @@ pub trait SourceDb: Database {
     fn source(&self, file_id: FileId) -> QueryResult<Source>;
 
     fn parse(&self, file_id: FileId) -> QueryResult<Parsed>;
-
-    fn lint_syntax(&self, file_id: FileId) -> QueryResult<Diagnostics>;
 }
 
 pub trait SemanticDb: SourceDb {
@@ -122,8 +120,6 @@ pub trait SemanticDb: SourceDb {
 
     fn infer_symbol_type(&self, file_id: FileId, symbol_id: SymbolId) -> QueryResult<Type>;
 
-    fn lint_semantic(&self, file_id: FileId) -> QueryResult<Diagnostics>;
-
     // mutations
 
     fn add_module(&mut self, path: &Path) -> Option<(Module, Vec<Arc<ModuleData>>)>;
@@ -131,13 +127,18 @@ pub trait SemanticDb: SourceDb {
     fn set_module_search_paths(&mut self, paths: Vec<ModuleSearchPath>);
 }
 
-pub trait Db: SemanticDb {}
+pub trait LintDb: SemanticDb {
+    fn lint_syntax(&self, file_id: FileId) -> QueryResult<Diagnostics>;
+
+    fn lint_semantic(&self, file_id: FileId) -> QueryResult<Diagnostics>;
+}
+
+pub trait Db: LintDb {}
 
 #[derive(Debug, Default)]
 pub struct SourceJar {
     pub sources: SourceStorage,
     pub parsed: ParsedStorage,
-    pub lint_syntax: LintSyntaxStorage,
 }
 
 #[derive(Debug, Default)]
@@ -145,6 +146,11 @@ pub struct SemanticJar {
     pub module_resolver: ModuleResolver,
     pub symbol_tables: SymbolTablesStorage,
     pub type_store: TypeStore,
+}
+
+#[derive(Debug, Default)]
+pub struct LintJar {
+    pub lint_syntax: LintSyntaxStorage,
     pub lint_semantic: LintSemanticStorage,
 }
 
@@ -154,8 +160,8 @@ pub(crate) mod tests {
     use std::sync::Arc;
 
     use crate::db::{
-        Database, DbRuntime, HasJar, HasJars, JarsStorage, ParallelDatabase, QueryResult, Snapshot,
-        SourceDb, SourceJar,
+        Database, DbRuntime, HasJar, HasJars, JarsStorage, LintDb, LintJar, QueryResult, SourceDb,
+        SourceJar,
     };
     use crate::files::{FileId, Files};
     use crate::lint::{lint_semantic, lint_syntax, Diagnostics};
@@ -198,6 +204,16 @@ pub(crate) mod tests {
         }
     }
 
+    impl HasJar<LintJar> for TestDb {
+        fn jar(&self) -> QueryResult<&LintJar> {
+            Ok(&self.jars()?.2)
+        }
+
+        fn jar_mut(&mut self) -> &mut LintJar {
+            &mut self.jars_mut().2
+        }
+    }
+
     impl SourceDb for TestDb {
         fn file_id(&self, path: &Path) -> FileId {
             self.files.intern(path)
@@ -213,10 +229,6 @@ pub(crate) mod tests {
 
         fn parse(&self, file_id: FileId) -> QueryResult<Parsed> {
             parse(self, file_id)
-        }
-
-        fn lint_syntax(&self, file_id: FileId) -> QueryResult<Diagnostics> {
-            lint_syntax(self, file_id)
         }
     }
 
@@ -241,10 +253,6 @@ pub(crate) mod tests {
             infer_symbol_type(self, file_id, symbol_id)
         }
 
-        fn lint_semantic(&self, file_id: FileId) -> QueryResult<Diagnostics> {
-            lint_semantic(self, file_id)
-        }
-
         fn add_module(&mut self, path: &Path) -> Option<(Module, Vec<Arc<ModuleData>>)> {
             add_module(self, path)
         }
@@ -254,8 +262,18 @@ pub(crate) mod tests {
         }
     }
 
+    impl LintDb for TestDb {
+        fn lint_syntax(&self, file_id: FileId) -> QueryResult<Diagnostics> {
+            lint_syntax(self, file_id)
+        }
+
+        fn lint_semantic(&self, file_id: FileId) -> QueryResult<Diagnostics> {
+            lint_semantic(self, file_id)
+        }
+    }
+
     impl HasJars for TestDb {
-        type Jars = (SourceJar, SemanticJar);
+        type Jars = (SourceJar, SemanticJar, LintJar);
 
         fn jars(&self) -> QueryResult<&Self::Jars> {
             self.jars.jars()
@@ -273,15 +291,6 @@ pub(crate) mod tests {
 
         fn runtime_mut(&mut self) -> &mut DbRuntime {
             self.jars.runtime_mut()
-        }
-    }
-
-    impl ParallelDatabase for TestDb {
-        fn snapshot(&self) -> Snapshot<Self> {
-            Snapshot::new(Self {
-                files: self.files.clone(),
-                jars: self.jars.snapshot(),
-            })
         }
     }
 }
