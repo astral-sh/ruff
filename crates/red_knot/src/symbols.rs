@@ -712,6 +712,13 @@ mod tests {
                     .len(),
                 1
             );
+            assert!(
+                table.root_symbol_id_by_name("foo").is_some_and(|sid| {
+                    let s = sid.symbol(&table);
+                    s.is_defined() || !s.is_used()
+                }),
+                "symbols that are defined get the defined flag"
+            );
         }
 
         #[test]
