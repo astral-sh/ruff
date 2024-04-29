@@ -81,8 +81,7 @@ libc = { version = "0.2.153" }
 libcst = { version = "1.1.0", default-features = false }
 log = { version = "0.4.17" }
 lsp-server = { version = "0.7.6" }
-# TODO: Change this before pushing upstream.
-lsp-types = { path="/home/nolan/lsp-types", features = ["proposed"] }
+lsp-types = { git="https://github.com/snowsignal/lsp-types.git", rev = "3512a9f", features = ["proposed"] }
 matchit = { version = "0.8.1" }
 memchr = { version = "2.7.1" }
 mimalloc = { version = "0.1.39" }
