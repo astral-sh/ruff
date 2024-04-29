@@ -75,7 +75,7 @@ where
                     .collect();
 
                 let store = &db.jar().type_store;
-                let ty = Type::Class(store.add_class(file_id, &node.name.id, bases.as_slice()));
+                let ty = Type::Class(store.add_class(file_id, &node.name.id, bases));
                 store.cache_node_type(file_id, *node_key.erased(), ty);
                 ty
             }),

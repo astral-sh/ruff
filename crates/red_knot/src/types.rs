@@ -123,7 +123,7 @@ impl TypeStore {
         self.add_or_get_module(file_id).add_function(name)
     }
 
-    fn add_class(&self, file_id: FileId, name: &str, bases: &[Type]) -> ClassTypeId {
+    fn add_class(&self, file_id: FileId, name: &str, bases: Vec<Type>) -> ClassTypeId {
         self.add_or_get_module(file_id).add_class(name, bases)
     }
 
@@ -316,11 +316,11 @@ impl ModuleTypeStore {
         }
     }
 
-    fn add_class(&mut self, name: &str, bases: &[Type]) -> ClassTypeId {
+    fn add_class(&mut self, name: &str, bases: Vec<Type>) -> ClassTypeId {
         let class_id = self.classes.push(ClassType {
             name: Name::new(name),
             // TODO: if no bases are given, that should imply [object]
-            bases: bases.to_owned(),
+            bases,
         });
         ClassTypeId {
             file_id: self.file_id,
@@ -498,7 +498,7 @@ mod tests {
         let store = TypeStore::default();
         let files = Files::default();
         let file_id = files.intern(Path::new("/foo"));
-        let id = store.add_class(file_id, "C", &[]);
+        let id = store.add_class(file_id, "C", Vec::new());
         assert_eq!(store.get_class(id).name(), "C");
         let inst = Type::Instance(id);
         assert_eq!(format!("{}", inst.display(&store)), "C");
@@ -520,8 +520,8 @@ mod tests {
         let mut store = TypeStore::default();
         let files = Files::default();
         let file_id = files.intern(Path::new("/foo"));
-        let c1 = store.add_class(file_id, "C1", &[]);
-        let c2 = store.add_class(file_id, "C2", &[]);
+        let c1 = store.add_class(file_id, "C1", Vec::new());
+        let c2 = store.add_class(file_id, "C2", Vec::new());
         let elems = vec![Type::Instance(c1), Type::Instance(c2)];
         let id = store.add_union(file_id, &elems);
         assert_eq!(
@@ -537,9 +537,9 @@ mod tests {
         let mut store = TypeStore::default();
         let files = Files::default();
         let file_id = files.intern(Path::new("/foo"));
-        let c1 = store.add_class(file_id, "C1", &[]);
-        let c2 = store.add_class(file_id, "C2", &[]);
-        let c3 = store.add_class(file_id, "C3", &[]);
+        let c1 = store.add_class(file_id, "C1", Vec::new());
+        let c2 = store.add_class(file_id, "C2", Vec::new());
+        let c3 = store.add_class(file_id, "C3", Vec::new());
         let pos = vec![Type::Instance(c1), Type::Instance(c2)];
         let neg = vec![Type::Instance(c3)];
         let id = store.add_intersection(file_id, &pos, &neg);
