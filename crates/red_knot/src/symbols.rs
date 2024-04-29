@@ -95,7 +95,9 @@ bitflags! {
     pub(crate) struct SymbolFlags: u8 {
         const IS_USED         = 1 << 0;
         const IS_DEFINED      = 1 << 1;
+        /// TODO: This flag is not yet set by anything
         const MARKED_GLOBAL   = 1 << 2;
+        /// TODO: This flag is not yet set by anything
         const MARKED_NONLOCAL = 1 << 3;
     }
 }
