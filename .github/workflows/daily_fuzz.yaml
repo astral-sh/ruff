@@ -55,7 +55,7 @@ jobs:
     name: Create an issue if the daily fuzz surfaced any bugs
     runs-on: ubuntu-latest
     needs: fuzz
-    if: ${{ github.repository == 'astral-sh/ruff' && always() && github.event_name == 'schedule' && needs.fuzz == 'failure' }}
+    if: ${{ github.repository == 'astral-sh/ruff' && always() && github.event_name == 'schedule' && needs.fuzz.result == 'failure' }}
     permissions:
       issues: write
     steps:
