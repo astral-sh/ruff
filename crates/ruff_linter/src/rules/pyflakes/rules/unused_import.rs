@@ -118,7 +118,7 @@ fn is_first_party(checker: &Checker, qualified_name: &str) -> bool {
     use isort::{ImportSection, ImportType};
     let category = isort::categorize(
         qualified_name,
-        None,
+        0,
         &checker.settings.src,
         checker.package(),
         checker.settings.isort.detect_same_package,
