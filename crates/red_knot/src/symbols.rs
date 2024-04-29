@@ -864,9 +864,11 @@ mod tests {
     fn insert_same_name_symbol_twice() {
         let mut table = SymbolTable::new();
         let root_scope_id = SymbolTable::root_scope_id();
-        let symbol_id_1 = table.add_or_update_symbol(root_scope_id, "foo", SymbolFlags::empty());
-        let symbol_id_2 = table.add_or_update_symbol(root_scope_id, "foo", SymbolFlags::empty());
+        let symbol_id_1 = table.add_or_update_symbol(root_scope_id, "foo", SymbolFlags::IS_DEFINED);
+        let symbol_id_2 = table.add_or_update_symbol(root_scope_id, "foo", SymbolFlags::IS_USED);
         assert_eq!(symbol_id_1, symbol_id_2);
+        assert!(symbol_id_1.symbol(&table).is_used(), "flags must merge");
+        assert!(symbol_id_1.symbol(&table).is_defined(), "flags must merge");
     }
 
     #[test]
