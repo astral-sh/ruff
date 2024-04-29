@@ -104,8 +104,7 @@ bitflags! {
 pub(crate) struct Symbol {
     name: Name,
     flags: SymbolFlags,
-    /// Not yet implemented
-    kind: Kind,
+    // kind: Kind,
 }
 
 impl Symbol {
