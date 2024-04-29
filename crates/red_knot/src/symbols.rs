@@ -104,7 +104,8 @@ bitflags! {
 pub(crate) struct Symbol {
     name: Name,
     flags: SymbolFlags,
-    //kind: Kind, // TODO: might not be a field at all if we can determine from flags
+    /// Not yet implemented
+    kind: Kind,
 }
 
 impl Symbol {
@@ -122,7 +123,9 @@ impl Symbol {
         self.flags.contains(SymbolFlags::IS_DEFINED)
     }
 
-    // TODO: 2nd pass analysis to categorize as: free-var, cell-var, explicit-global, implicit-global
+    // TODO: implement Symbol.kind 2-pass analysis to categorize as: free-var, cell-var,
+    // explicit-global, implicit-global and implement Symbol.kind by modifying the preorder
+    // traversal code
 }
 
 // TODO storing TypedNodeKey for definitions means we have to search to find them again in the AST;
