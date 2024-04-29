@@ -28,3 +28,13 @@ class MyClassBase(metaclass=ABCMeta):
     @abstractmethod
     def example(self, value):
         """Setter."""
+
+
+class VariadicParameters:
+    @property
+    def attribute_var_args(self, *args):  # [property-with-parameters]
+        return sum(args)
+
+    @property
+    def attribute_var_kwargs(self, **kwargs):  #[property-with-parameters]
+        return {key: value * 2 for key, value in kwargs.items()}
