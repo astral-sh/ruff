@@ -489,7 +489,7 @@ impl SymbolTableBuilder {
                     ast::TypeParam::ParamSpec(ast::TypeParamParamSpec { name, .. }) => name,
                     ast::TypeParam::TypeVarTuple(ast::TypeParamTypeVarTuple { name, .. }) => name,
                 };
-                self.add_or_update_symbol(name, SymbolFlags::IS_USED);
+                self.add_or_update_symbol(name, SymbolFlags::IS_DEFINED);
             }
         }
         nested(self);
