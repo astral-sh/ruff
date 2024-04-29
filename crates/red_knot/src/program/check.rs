@@ -213,6 +213,13 @@ impl CheckFileTask {
             Self::Dependency(task) => task.run(context),
         }
     }
+
+    pub fn file_id(&self) -> FileId {
+        match self {
+            CheckFileTask::OpenFile(task) => task.file_id,
+            CheckFileTask::Dependency(task) => task.file_id,
+        }
+    }
 }
 
 /// Task to check an open file.
@@ -296,6 +303,8 @@ impl CheckExecutor for ThreadPoolExecutor {
     fn run(self, context: &mut CheckContext) -> QueryResult<()> {
         let num_threads = current_num_threads();
         let single_threaded = num_threads == 1;
+        let span = tracing::trace_span!("ThreadPoolExecutor::run", num_threads);
+        let _ = span.enter();
 
         let mut queue: Vec<_> = context
             .check_open_files()
@@ -337,10 +346,19 @@ impl CheckExecutor for ThreadPoolExecutor {
 
                     let task_context = context.task_context(&schedule_dependency);
                     let sender = sender.clone();
+                    let task_span = tracing::trace_span!(
+                        parent: &span,
+                        "CheckFileTask::run",
+                        file_id = task.file_id().as_u32(),
+                    );
 
-                    scope.spawn(move |_| match task.run(&task_context) {
-                        Ok(result) => sender.send(ThreadPoolMessage::Completed(result)).unwrap(),
-                        Err(err) => sender.send(ThreadPoolMessage::Errored(err)).unwrap(),
+                    scope.spawn(move |_| {
+                        task_span.in_scope(|| match task.run(&task_context) {
+                            Ok(result) => {
+                                sender.send(ThreadPoolMessage::Completed(result)).unwrap();
+                            }
+                            Err(err) => sender.send(ThreadPoolMessage::Errored(err)).unwrap(),
+                        });
                     });
 
                     // If this is a single threaded rayon thread pool, yield the current thread
