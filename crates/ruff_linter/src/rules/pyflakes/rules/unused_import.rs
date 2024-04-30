@@ -244,7 +244,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
             });
 
         // generate fixes that are shared across bindings in the statement
-        let (fix_remove, fix_explicit) = if (!in_init || fix_init) && !in_except_handler {
+        let (fix_remove, fix_reexport) = if (!in_init || fix_init) && !in_except_handler {
             (
                 fix_by_removing_imports(checker, import_statement, &to_remove, in_init).ok(),
                 fix_by_reexporting(checker, import_statement, &to_explicit, dunder_all).ok(),
@@ -255,7 +255,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
 
         for ((binding, context), fix) in iter::Iterator::chain(
             iter::zip(to_remove, iter::repeat(fix_remove)),
-            iter::zip(to_explicit, iter::repeat(fix_explicit)),
+            iter::zip(to_reexport, iter::repeat(fix_reexport)),
         ) {
             let mut diagnostic = Diagnostic::new(
                 UnusedImport {
