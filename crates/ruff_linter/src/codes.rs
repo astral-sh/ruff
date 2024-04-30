@@ -971,32 +971,32 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "100") => (RuleGroup::Stable, rules::ruff::rules::UnusedNOQA),
         (Ruff, "101") => (RuleGroup::Preview, rules::ruff::rules::RedirectedNOQA),
         (Ruff, "200") => (RuleGroup::Stable, rules::ruff::rules::InvalidPyprojectToml),
-        #[cfg(feature = "test-rules")]
+        #[cfg(any(feature = "test-rules", test))]
         (Ruff, "900") => (RuleGroup::Stable, rules::ruff::rules::StableTestRule),
-        #[cfg(feature = "test-rules")]
+        #[cfg(any(feature = "test-rules", test))]
         (Ruff, "901") => (RuleGroup::Stable, rules::ruff::rules::StableTestRuleSafeFix),
-        #[cfg(feature = "test-rules")]
+        #[cfg(any(feature = "test-rules", test))]
         (Ruff, "902") => (RuleGroup::Stable, rules::ruff::rules::StableTestRuleUnsafeFix),
-        #[cfg(feature = "test-rules")]
+        #[cfg(any(feature = "test-rules", test))]
         (Ruff, "903") => (RuleGroup::Stable, rules::ruff::rules::StableTestRuleDisplayOnlyFix),
-        #[cfg(feature = "test-rules")]
+        #[cfg(any(feature = "test-rules", test))]
         (Ruff, "911") => (RuleGroup::Preview, rules::ruff::rules::PreviewTestRule),
-        #[cfg(feature = "test-rules")]
+        #[cfg(any(feature = "test-rules", test))]
         #[allow(deprecated)]
         (Ruff, "912") => (RuleGroup::Nursery, rules::ruff::rules::NurseryTestRule),
-        #[cfg(feature = "test-rules")]
+        #[cfg(any(feature = "test-rules", test))]
         (Ruff, "920") => (RuleGroup::Deprecated, rules::ruff::rules::DeprecatedTestRule),
-        #[cfg(feature = "test-rules")]
+        #[cfg(any(feature = "test-rules", test))]
         (Ruff, "921") => (RuleGroup::Deprecated, rules::ruff::rules::AnotherDeprecatedTestRule),
-        #[cfg(feature = "test-rules")]
+        #[cfg(any(feature = "test-rules", test))]
         (Ruff, "930") => (RuleGroup::Removed, rules::ruff::rules::RemovedTestRule),
-        #[cfg(feature = "test-rules")]
+        #[cfg(any(feature = "test-rules", test))]
         (Ruff, "931") => (RuleGroup::Removed, rules::ruff::rules::AnotherRemovedTestRule),
-        #[cfg(feature = "test-rules")]
+        #[cfg(any(feature = "test-rules", test))]
         (Ruff, "940") => (RuleGroup::Removed, rules::ruff::rules::RedirectedFromTestRule),
-        #[cfg(feature = "test-rules")]
+        #[cfg(any(feature = "test-rules", test))]
         (Ruff, "950") => (RuleGroup::Stable, rules::ruff::rules::RedirectedToTestRule),
-        #[cfg(feature = "test-rules")]
+        #[cfg(any(feature = "test-rules", test))]
         (Ruff, "960") => (RuleGroup::Removed, rules::ruff::rules::RedirectedFromPrefixTestRule),
 
 

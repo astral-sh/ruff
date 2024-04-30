@@ -33,7 +33,7 @@ use crate::message::Message;
 use crate::noqa::add_noqa;
 use crate::registry::{AsRule, Rule, RuleSet};
 use crate::rules::pycodestyle;
-#[cfg(feature = "test-rules")]
+#[cfg(any(feature = "test-rules", test))]
 use crate::rules::ruff::rules::test_rules::{self, TestRule, TEST_RULES};
 use crate::settings::types::UnsafeFixes;
 use crate::settings::{flags, LinterSettings};
@@ -218,7 +218,7 @@ pub fn check_path(
     }
 
     // Raise violations for internal test rules
-    #[cfg(feature = "test-rules")]
+    #[cfg(any(feature = "test-rules", test))]
     {
         for test_rule in TEST_RULES {
             if !settings.rules.enabled(*test_rule) {
