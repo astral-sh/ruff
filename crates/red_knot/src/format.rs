@@ -7,57 +7,49 @@ use ruff_text_size::TextRange;
 use crate::cache::KeyValueCache;
 use crate::db::{HasJar, QueryError, SourceDb};
 use crate::files::FileId;
+use crate::lint::Diagnostics;
 use crate::FxDashSet;
 
 pub(crate) trait FormatDb: SourceDb {
-    // TODO we may want to change the return type to something that avoids allocating a string if the code is already formatted.
-    fn format_file(&self, file_id: FileId) -> Result<String, FormatError>;
+    /// Formats a file and returns its formatted content or an indicator that it is unchanged.
+    fn format_file(&self, file_id: FileId) -> Result<FormattedFile, FormatError>;
 
+    /// Formats a range in a file.
     fn format_file_range(
         &self,
         file_id: FileId,
         range: TextRange,
     ) -> Result<PrintedRange, FormatError>;
 
-    fn check_file_formatted(&self, file_id: FileId) -> Result<bool, FormatError>;
+    fn check_file_formatted(&self, file_id: FileId) -> Result<Diagnostics, FormatError>;
 }
 
-pub(crate) fn format_file<Db>(db: &Db, file_id: FileId) -> Result<String, FormatError>
+#[tracing::instrument(level = "trace", skip(db))]
+pub(crate) fn format_file<Db>(db: &Db, file_id: FileId) -> Result<FormattedFile, FormatError>
 where
     Db: FormatDb + HasJar<FormatJar>,
 {
     let formatted = &db.jar()?.formatted;
-    let source = db.source(file_id)?;
 
     if formatted.contains(&file_id) {
-        return Ok(String::from(source.text()));
+        return Ok(FormattedFile::Unchanged);
     }
+
+    let source = db.source(file_id)?;
 
     // TODO use the `format_module` method here to re-use the AST.
     let printed =
         ruff_python_formatter::format_module_source(source.text(), PyFormatOptions::default())?;
 
-    // Formatting is fast and unlikely to run in parallel. Let threads race the formatting.
-    formatted.insert(file_id);
-
-    Ok(printed.into_code())
+    Ok(if printed.as_code() == source.text() {
+        formatted.insert(file_id);
+        FormattedFile::Unchanged
+    } else {
+        FormattedFile::Formatted(printed.into_code())
+    })
 }
 
-pub(crate) fn check_formatted<Db>(db: &Db, file_id: FileId) -> Result<bool, FormatError>
-where
-    Db: FormatDb + HasJar<FormatJar>,
-{
-    let formatted = &db.jar()?.formatted;
-
-    if formatted.contains(&file_id) {
-        return Ok(true);
-    }
-
-    let formatted_code = format_file(db, file_id)?;
-
-    Ok(formatted_code == db.source(file_id)?.text())
-}
-
+#[tracing::instrument(level = "trace", skip(db))]
 pub(crate) fn format_file_range<Db: FormatDb + HasJar<FormatJar>>(
     db: &Db,
     file_id: FileId,
@@ -77,6 +69,19 @@ pub(crate) fn format_file_range<Db: FormatDb + HasJar<FormatJar>>(
     Ok(result)
 }
 
+/// Checks if the file is correctly formatted. It creates a diagnostic for formatting issues.
+#[tracing::instrument(level = "trace", skip(db))]
+pub(crate) fn check_formatted<Db>(db: &Db, file_id: FileId) -> Result<Diagnostics, FormatError>
+where
+    Db: FormatDb + HasJar<FormatJar>,
+{
+    Ok(if db.format_file(file_id)?.is_unchanged() {
+        Diagnostics::Empty
+    } else {
+        Diagnostics::from(vec!["File is not formatted".to_string()])
+    })
+}
+
 #[derive(Debug)]
 pub(crate) enum FormatError {
     Format(FormatModuleError),
@@ -85,13 +90,25 @@ pub(crate) enum FormatError {
 
 impl From<FormatModuleError> for FormatError {
     fn from(value: FormatModuleError) -> Self {
-        Self::Format(value.into())
+        Self::Format(value)
     }
 }
 
 impl From<QueryError> for FormatError {
     fn from(value: QueryError) -> Self {
         Self::Query(value)
+    }
+}
+
+#[derive(Clone, Eq, PartialEq, Debug)]
+pub(crate) enum FormattedFile {
+    Formatted(String),
+    Unchanged,
+}
+
+impl FormattedFile {
+    pub(crate) const fn is_unchanged(&self) -> bool {
+        matches!(self, FormattedFile::Unchanged)
     }
 }
 
