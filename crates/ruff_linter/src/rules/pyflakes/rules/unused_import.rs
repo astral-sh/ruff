@@ -17,7 +17,7 @@ use crate::rules::isort;
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 enum UnusedImportContext {
     ExceptHandler,
-    Init,
+    Init { first_party: bool, dunder_all: bool },
 }
 
 /// ## What it does
@@ -95,7 +95,7 @@ impl Violation for UnusedImport {
                     "`{name}` imported but unused; consider using `importlib.util.find_spec` to test for availability"
                 )
             }
-            Some(UnusedImportContext::Init) => {
+            Some(UnusedImportContext::Init { .. }) => {
                 format!(
                     "`{name}` imported but unused; consider removing, adding to `__all__`, or using a redundant alias"
                 )
@@ -106,10 +106,21 @@ impl Violation for UnusedImport {
 
     fn fix_title(&self) -> Option<String> {
         let UnusedImport { name, multiple, .. } = self;
+        let resolution = match self.context {
+            Some(UnusedImportContext::Init {
+                first_party: true,
+                dunder_all: true,
+            }) => "Add unused import to __all__",
+            Some(UnusedImportContext::Init {
+                first_party: true,
+                dunder_all: false,
+            }) => "Use a redundant alias",
+            _ => "Remove unused import",
+        };
         Some(if *multiple {
-            "Remove unused import".to_string()
+            resolution.to_string()
         } else {
-            format!("Remove unused import: `{name}`")
+            format!("{resolution}: `{name}`")
         })
     }
 }
