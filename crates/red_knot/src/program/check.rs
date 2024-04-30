@@ -1,7 +1,7 @@
 use rayon::{current_num_threads, yield_local};
 use rustc_hash::FxHashSet;
 
-use crate::db::{Database, QueryError, QueryResult, SemanticDb, SourceDb};
+use crate::db::{Database, LintDb, QueryError, QueryResult, SemanticDb};
 use crate::files::FileId;
 use crate::lint::Diagnostics;
 use crate::program::Program;
