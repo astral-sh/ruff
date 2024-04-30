@@ -284,25 +284,19 @@ where
             // ```
             // Here, both `foo` and `bar` resolve to the same module but through different paths.
             // That's why we need to insert the absolute path and not the normalized path here.
-            modules.by_path.insert(absolute_path, id);
+            let absolute_id = if absolute_path == normalized {
+                file_id
+            } else {
+                db.file_id(&absolute_path)
+            };
+
+            modules.by_file.insert(absolute_id, id);
 
             entry.insert_entry(id);
 
             Ok(Some(id))
         }
     }
-}
-
-/// Resolves the module id for the file with the given id.
-///
-/// Returns `None` if the file is not a module in `sys.path`.
-#[tracing::instrument(level = "debug", skip(db))]
-pub fn file_to_module<Db>(db: &Db, file: FileId) -> QueryResult<Option<Module>>
-where
-    Db: SemanticDb + HasJar<SemanticJar>,
-{
-    let path = db.file_path(file);
-    path_to_module(db, &path)
 }
 
 /// Resolves the module id for the given path.
@@ -313,13 +307,28 @@ pub fn path_to_module<Db>(db: &Db, path: &Path) -> QueryResult<Option<Module>>
 where
     Db: SemanticDb + HasJar<SemanticJar>,
 {
+    let file = db.file_id(path);
+    file_to_module(db, file)
+}
+
+/// Resolves the module id for the file with the given id.
+///
+/// Returns `None` if the file is not a module in `sys.path`.
+#[tracing::instrument(level = "debug", skip(db))]
+pub fn file_to_module<Db>(db: &Db, file: FileId) -> QueryResult<Option<Module>>
+where
+    Db: SemanticDb + HasJar<SemanticJar>,
+{
     let jar = db.jar()?;
     let modules = &jar.module_resolver;
-    debug_assert!(path.is_absolute());
 
-    if let Some(existing) = modules.by_path.get(path) {
+    if let Some(existing) = modules.by_file.get(&file) {
         return Ok(Some(*existing));
     }
+
+    let path = db.file_path(file);
+
+    debug_assert!(path.is_absolute());
 
     let Some((root_path, relative_path)) = modules.search_paths.iter().find_map(|root| {
         let relative_path = path.strip_prefix(root.path()).ok()?;
@@ -420,7 +429,7 @@ where
     let jar = db.jar_mut();
     let modules = &mut jar.module_resolver;
 
-    modules.by_path.retain(|_, id| {
+    modules.by_file.retain(|_, id| {
         if modules
             .modules
             .get(id)
@@ -459,7 +468,7 @@ pub struct ModuleResolver {
 
     /// Lookup from absolute path to module.
     /// The same module might be reachable from different paths when symlinks are involved.
-    by_path: FxDashMap<PathBuf, Module>,
+    by_file: FxDashMap<FileId, Module>,
     next_module_id: AtomicU32,
 }
 
@@ -469,14 +478,14 @@ impl ModuleResolver {
             search_paths,
             modules: FxDashMap::default(),
             by_name: FxDashMap::default(),
-            by_path: FxDashMap::default(),
+            by_file: FxDashMap::default(),
             next_module_id: AtomicU32::new(0),
         }
     }
 
-    pub fn remove_module(&mut self, path: &Path) {
+    pub(crate) fn remove_module(&mut self, file_id: FileId) {
         // No locking is required because we're holding a mutable reference to `self`.
-        let Some((_, id)) = self.by_path.remove(path) else {
+        let Some((_, id)) = self.by_file.remove(&file_id) else {
             return;
         };
 
@@ -489,7 +498,7 @@ impl ModuleResolver {
         self.by_name.remove(&module.name).unwrap();
 
         // It's possible that multiple paths map to the same id. Search all other paths referencing the same module id.
-        self.by_path.retain(|_, current_id| *current_id != id);
+        self.by_file.retain(|_, current_id| *current_id != id);
 
         module
     }
