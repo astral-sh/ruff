@@ -212,7 +212,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
 
         // generate fixes that are shared across bindings in the statement
         let (fix_remove, fix_explicit) =
-            if !in_except_handler && !checker.settings.preview.is_enabled() {
+            if !in_except_handler && checker.settings.preview.is_enabled() {
                 (
                     fix_by_removing_imports(checker, import_statement, &to_remove, in_init).ok(),
                     fix_by_reexporting(checker, import_statement, &to_explicit, dunder_all).ok(),
