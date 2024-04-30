@@ -10,6 +10,7 @@ use crate::db::{
 use crate::files::{FileId, Files};
 use crate::format::{
     check_formatted, format_file, format_file_range, FormatDb, FormatError, FormatJar,
+    FormattedFile,
 };
 use crate::lint::{lint_semantic, lint_syntax, Diagnostics};
 use crate::module::{
@@ -132,7 +133,7 @@ impl LintDb for Program {
 }
 
 impl FormatDb for Program {
-    fn format_file(&self, file_id: FileId) -> Result<String, FormatError> {
+    fn format_file(&self, file_id: FileId) -> Result<FormattedFile, FormatError> {
         format_file(self, file_id)
     }
 
@@ -144,7 +145,7 @@ impl FormatDb for Program {
         format_file_range(self, file_id, range)
     }
 
-    fn check_file_formatted(&self, file_id: FileId) -> Result<bool, FormatError> {
+    fn check_file_formatted(&self, file_id: FileId) -> Result<Diagnostics, FormatError> {
         check_formatted(self, file_id)
     }
 }

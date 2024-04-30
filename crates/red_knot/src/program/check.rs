@@ -3,6 +3,7 @@ use rustc_hash::FxHashSet;
 
 use crate::db::{Database, LintDb, QueryError, QueryResult, SemanticDb};
 use crate::files::FileId;
+use crate::format::{FormatDb, FormatError};
 use crate::lint::Diagnostics;
 use crate::program::Program;
 use crate::symbols::Dependency;
@@ -64,6 +65,18 @@ impl Program {
         if self.workspace().is_file_open(file) {
             diagnostics.extend_from_slice(&self.lint_syntax(file)?);
             diagnostics.extend_from_slice(&self.lint_semantic(file)?);
+
+            match self.check_file_formatted(file) {
+                Ok(format_diagnostics) => {
+                    diagnostics.extend_from_slice(&format_diagnostics);
+                }
+                Err(FormatError::Query(err)) => {
+                    return Err(err);
+                }
+                Err(FormatError::Format(error)) => {
+                    diagnostics.push(format!("Error formatting file: {error}"));
+                }
+            }
         }
 
         Ok(Diagnostics::from(diagnostics))
