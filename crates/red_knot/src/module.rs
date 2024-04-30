@@ -7,7 +7,7 @@ use std::sync::Arc;
 use dashmap::mapref::entry::Entry;
 use smol_str::SmolStr;
 
-use crate::db::{HasJar, SemanticDb, SemanticJar};
+use crate::db::{HasJar, QueryResult, SemanticDb, SemanticJar};
 use crate::files::FileId;
 use crate::symbols::Dependency;
 use crate::FxDashMap;
@@ -17,44 +17,48 @@ use crate::FxDashMap;
 pub struct Module(u32);
 
 impl Module {
-    pub fn name<Db>(&self, db: &Db) -> ModuleName
+    pub fn name<Db>(&self, db: &Db) -> QueryResult<ModuleName>
     where
         Db: HasJar<SemanticJar>,
     {
-        let modules = &db.jar().module_resolver;
+        let modules = &db.jar()?.module_resolver;
 
-        modules.modules.get(self).unwrap().name.clone()
+        Ok(modules.modules.get(self).unwrap().name.clone())
     }
 
-    pub fn path<Db>(&self, db: &Db) -> ModulePath
+    pub fn path<Db>(&self, db: &Db) -> QueryResult<ModulePath>
     where
         Db: HasJar<SemanticJar>,
     {
-        let modules = &db.jar().module_resolver;
+        let modules = &db.jar()?.module_resolver;
 
-        modules.modules.get(self).unwrap().path.clone()
+        Ok(modules.modules.get(self).unwrap().path.clone())
     }
 
-    pub fn kind<Db>(&self, db: &Db) -> ModuleKind
+    pub fn kind<Db>(&self, db: &Db) -> QueryResult<ModuleKind>
     where
         Db: HasJar<SemanticJar>,
     {
-        let modules = &db.jar().module_resolver;
+        let modules = &db.jar()?.module_resolver;
 
-        modules.modules.get(self).unwrap().kind
+        Ok(modules.modules.get(self).unwrap().kind)
     }
 
-    pub fn resolve_dependency<Db>(&self, db: &Db, dependency: &Dependency) -> Option<ModuleName>
+    pub fn resolve_dependency<Db>(
+        &self,
+        db: &Db,
+        dependency: &Dependency,
+    ) -> QueryResult<Option<ModuleName>>
     where
         Db: HasJar<SemanticJar>,
     {
         let (level, module) = match dependency {
-            Dependency::Module(module) => return Some(module.clone()),
+            Dependency::Module(module) => return Ok(Some(module.clone())),
             Dependency::Relative { level, module } => (*level, module.as_deref()),
         };
 
-        let name = self.name(db);
-        let kind = self.kind(db);
+        let name = self.name(db)?;
+        let kind = self.kind(db)?;
 
         let mut components = name.components().peekable();
 
@@ -67,7 +71,9 @@ impl Module {
 
         // Skip over the relative parts.
         for _ in start..level.get() {
-            components.next_back()?;
+            if components.next_back().is_none() {
+                return Ok(None);
+            }
         }
 
         let mut name = String::new();
@@ -80,11 +86,11 @@ impl Module {
             name.push_str(part);
         }
 
-        if name.is_empty() {
+        Ok(if name.is_empty() {
             None
         } else {
             Some(ModuleName(SmolStr::new(name)))
-        }
+        })
     }
 }
 
@@ -238,20 +244,25 @@ pub struct ModuleData {
 /// TODO: This would not work with Salsa because `ModuleName` isn't an ingredient and, therefore, cannot be used as part of a query.
 ///  For this to work with salsa, it would be necessary to intern all `ModuleName`s.
 #[tracing::instrument(level = "debug", skip(db))]
-pub fn resolve_module<Db>(db: &Db, name: ModuleName) -> Option<Module>
+pub fn resolve_module<Db>(db: &Db, name: ModuleName) -> QueryResult<Option<Module>>
 where
     Db: SemanticDb + HasJar<SemanticJar>,
 {
     let jar = db.jar();
-    let modules = &jar.module_resolver;
+    let modules = &jar?.module_resolver;
 
     let entry = modules.by_name.entry(name.clone());
 
     match entry {
-        Entry::Occupied(entry) => Some(*entry.get()),
+        Entry::Occupied(entry) => Ok(Some(*entry.get())),
         Entry::Vacant(entry) => {
-            let (root_path, absolute_path, kind) = resolve_name(&name, &modules.search_paths)?;
-            let normalized = absolute_path.canonicalize().ok()?;
+            let Some((root_path, absolute_path, kind)) = resolve_name(&name, &modules.search_paths)
+            else {
+                return Ok(None);
+            };
+            let Ok(normalized) = absolute_path.canonicalize() else {
+                return Ok(None);
+            };
 
             let file_id = db.file_id(&normalized);
             let path = ModulePath::new(root_path.clone(), file_id);
@@ -277,7 +288,7 @@ where
 
             entry.insert_entry(id);
 
-            Some(id)
+            Ok(Some(id))
         }
     }
 }
@@ -286,7 +297,7 @@ where
 ///
 /// Returns `None` if the file is not a module in `sys.path`.
 #[tracing::instrument(level = "debug", skip(db))]
-pub fn file_to_module<Db>(db: &Db, file: FileId) -> Option<Module>
+pub fn file_to_module<Db>(db: &Db, file: FileId) -> QueryResult<Option<Module>>
 where
     Db: SemanticDb + HasJar<SemanticJar>,
 {
@@ -298,34 +309,42 @@ where
 ///
 /// Returns `None` if the path is not a module in `sys.path`.
 #[tracing::instrument(level = "debug", skip(db))]
-pub fn path_to_module<Db>(db: &Db, path: &Path) -> Option<Module>
+pub fn path_to_module<Db>(db: &Db, path: &Path) -> QueryResult<Option<Module>>
 where
     Db: SemanticDb + HasJar<SemanticJar>,
 {
-    let jar = db.jar();
+    let jar = db.jar()?;
     let modules = &jar.module_resolver;
     debug_assert!(path.is_absolute());
 
     if let Some(existing) = modules.by_path.get(path) {
-        return Some(*existing);
+        return Ok(Some(*existing));
     }
 
-    let (root_path, relative_path) = modules.search_paths.iter().find_map(|root| {
+    let Some((root_path, relative_path)) = modules.search_paths.iter().find_map(|root| {
         let relative_path = path.strip_prefix(root.path()).ok()?;
         Some((root.clone(), relative_path))
-    })?;
+    }) else {
+        return Ok(None);
+    };
 
-    let module_name = ModuleName::from_relative_path(relative_path)?;
+    let Some(module_name) = ModuleName::from_relative_path(relative_path) else {
+        return Ok(None);
+    };
 
     // Resolve the module name to see if Python would resolve the name to the same path.
     // If it doesn't, then that means that multiple modules have the same in different
     // root paths, but that the module corresponding to the past path is in a lower priority path,
     // in which case we ignore it.
-    let module_id = resolve_module(db, module_name)?;
-    let module_path = module_id.path(db);
+    let Some(module_id) = resolve_module(db, module_name)? else {
+        return Ok(None);
+    };
+    let module_path = module_id.path(db)?;
 
     if module_path.root() == &root_path {
-        let normalized = path.canonicalize().ok()?;
+        let Ok(normalized) = path.canonicalize() else {
+            return Ok(None);
+        };
         let interned_normalized = db.file_id(&normalized);
 
         if interned_normalized != module_path.file() {
@@ -336,15 +355,15 @@ where
             // ```
             // The module name of `src/foo.py` is `foo`, but the module loaded by Python is `src/foo/__init__.py`.
             // That means we need to ignore `src/foo.py` even though it resolves to the same module name.
-            return None;
+            return Ok(None);
         }
 
         // Path has been inserted by `resolved`
-        Some(module_id)
+        Ok(Some(module_id))
     } else {
         // This path is for a module with the same name but in a module search path with a lower priority.
         // Ignore it.
-        None
+        Ok(None)
     }
 }
 
@@ -378,7 +397,7 @@ where
     // TODO This needs tests
 
     // Note: Intentionally by-pass caching here. Module should not be in the cache yet.
-    let module = path_to_module(db, path)?;
+    let module = path_to_module(db, path).ok()??;
 
     // The code below is to handle the addition of `__init__.py` files.
     // When an `__init__.py` file is added, we need to remove all modules that are part of the same package.
@@ -392,7 +411,7 @@ where
         return Some((module, Vec::new()));
     }
 
-    let Some(parent_name) = module.name(db).parent() else {
+    let Some(parent_name) = module.name(db).ok()?.parent() else {
         return Some((module, Vec::new()));
     };
 
@@ -691,7 +710,7 @@ mod tests {
     }
 
     #[test]
-    fn first_party_module() -> std::io::Result<()> {
+    fn first_party_module() -> anyhow::Result<()> {
         let TestCase {
             db,
             src,
@@ -702,22 +721,22 @@ mod tests {
         let foo_path = src.path().join("foo.py");
         std::fs::write(&foo_path, "print('Hello, world!')")?;
 
-        let foo_module = db.resolve_module(ModuleName::new("foo")).unwrap();
+        let foo_module = db.resolve_module(ModuleName::new("foo"))?.unwrap();
 
-        assert_eq!(Some(foo_module), db.resolve_module(ModuleName::new("foo")));
+        assert_eq!(Some(foo_module), db.resolve_module(ModuleName::new("foo"))?);
 
-        assert_eq!(ModuleName::new("foo"), foo_module.name(&db));
-        assert_eq!(&src, foo_module.path(&db).root());
-        assert_eq!(ModuleKind::Module, foo_module.kind(&db));
-        assert_eq!(&foo_path, &*db.file_path(foo_module.path(&db).file()));
+        assert_eq!(ModuleName::new("foo"), foo_module.name(&db)?);
+        assert_eq!(&src, foo_module.path(&db)?.root());
+        assert_eq!(ModuleKind::Module, foo_module.kind(&db)?);
+        assert_eq!(&foo_path, &*db.file_path(foo_module.path(&db)?.file()));
 
-        assert_eq!(Some(foo_module), db.path_to_module(&foo_path));
+        assert_eq!(Some(foo_module), db.path_to_module(&foo_path)?);
 
         Ok(())
     }
 
     #[test]
-    fn resolve_package() -> std::io::Result<()> {
+    fn resolve_package() -> anyhow::Result<()> {
         let TestCase {
             src,
             db,
@@ -730,22 +749,22 @@ mod tests {
         std::fs::create_dir(&foo_dir)?;
         std::fs::write(&foo_path, "print('Hello, world!')")?;
 
-        let foo_module = db.resolve_module(ModuleName::new("foo")).unwrap();
+        let foo_module = db.resolve_module(ModuleName::new("foo"))?.unwrap();
 
-        assert_eq!(ModuleName::new("foo"), foo_module.name(&db));
-        assert_eq!(&src, foo_module.path(&db).root());
-        assert_eq!(&foo_path, &*db.file_path(foo_module.path(&db).file()));
+        assert_eq!(ModuleName::new("foo"), foo_module.name(&db)?);
+        assert_eq!(&src, foo_module.path(&db)?.root());
+        assert_eq!(&foo_path, &*db.file_path(foo_module.path(&db)?.file()));
 
-        assert_eq!(Some(foo_module), db.path_to_module(&foo_path));
+        assert_eq!(Some(foo_module), db.path_to_module(&foo_path)?);
 
         // Resolving by directory doesn't resolve to the init file.
-        assert_eq!(None, db.path_to_module(&foo_dir));
+        assert_eq!(None, db.path_to_module(&foo_dir)?);
 
         Ok(())
     }
 
     #[test]
-    fn package_priority_over_module() -> std::io::Result<()> {
+    fn package_priority_over_module() -> anyhow::Result<()> {
         let TestCase {
             db,
             temp_dir: _temp_dir,
@@ -761,20 +780,20 @@ mod tests {
         let foo_py = src.path().join("foo.py");
         std::fs::write(&foo_py, "print('Hello, world!')")?;
 
-        let foo_module = db.resolve_module(ModuleName::new("foo")).unwrap();
+        let foo_module = db.resolve_module(ModuleName::new("foo"))?.unwrap();
 
-        assert_eq!(&src, foo_module.path(&db).root());
-        assert_eq!(&foo_init, &*db.file_path(foo_module.path(&db).file()));
-        assert_eq!(ModuleKind::Package, foo_module.kind(&db));
+        assert_eq!(&src, foo_module.path(&db)?.root());
+        assert_eq!(&foo_init, &*db.file_path(foo_module.path(&db)?.file()));
+        assert_eq!(ModuleKind::Package, foo_module.kind(&db)?);
 
-        assert_eq!(Some(foo_module), db.path_to_module(&foo_init));
-        assert_eq!(None, db.path_to_module(&foo_py));
+        assert_eq!(Some(foo_module), db.path_to_module(&foo_init)?);
+        assert_eq!(None, db.path_to_module(&foo_py)?);
 
         Ok(())
     }
 
     #[test]
-    fn typing_stub_over_module() -> std::io::Result<()> {
+    fn typing_stub_over_module() -> anyhow::Result<()> {
         let TestCase {
             db,
             src,
@@ -787,19 +806,19 @@ mod tests {
         std::fs::write(&foo_stub, "x: int")?;
         std::fs::write(&foo_py, "print('Hello, world!')")?;
 
-        let foo = db.resolve_module(ModuleName::new("foo")).unwrap();
+        let foo = db.resolve_module(ModuleName::new("foo"))?.unwrap();
 
-        assert_eq!(&src, foo.path(&db).root());
-        assert_eq!(&foo_stub, &*db.file_path(foo.path(&db).file()));
+        assert_eq!(&src, foo.path(&db)?.root());
+        assert_eq!(&foo_stub, &*db.file_path(foo.path(&db)?.file()));
 
-        assert_eq!(Some(foo), db.path_to_module(&foo_stub));
-        assert_eq!(None, db.path_to_module(&foo_py));
+        assert_eq!(Some(foo), db.path_to_module(&foo_stub)?);
+        assert_eq!(None, db.path_to_module(&foo_py)?);
 
         Ok(())
     }
 
     #[test]
-    fn sub_packages() -> std::io::Result<()> {
+    fn sub_packages() -> anyhow::Result<()> {
         let TestCase {
             db,
             src,
@@ -816,18 +835,18 @@ mod tests {
         std::fs::write(bar.join("__init__.py"), "")?;
         std::fs::write(&baz, "print('Hello, world!')")?;
 
-        let baz_module = db.resolve_module(ModuleName::new("foo.bar.baz")).unwrap();
+        let baz_module = db.resolve_module(ModuleName::new("foo.bar.baz"))?.unwrap();
 
-        assert_eq!(&src, baz_module.path(&db).root());
-        assert_eq!(&baz, &*db.file_path(baz_module.path(&db).file()));
+        assert_eq!(&src, baz_module.path(&db)?.root());
+        assert_eq!(&baz, &*db.file_path(baz_module.path(&db)?.file()));
 
-        assert_eq!(Some(baz_module), db.path_to_module(&baz));
+        assert_eq!(Some(baz_module), db.path_to_module(&baz)?);
 
         Ok(())
     }
 
     #[test]
-    fn namespace_package() -> std::io::Result<()> {
+    fn namespace_package() -> anyhow::Result<()> {
         let TestCase {
             db,
             temp_dir: _,
@@ -863,21 +882,21 @@ mod tests {
         std::fs::write(&two, "print('Hello, world!')")?;
 
         let one_module = db
-            .resolve_module(ModuleName::new("parent.child.one"))
+            .resolve_module(ModuleName::new("parent.child.one"))?
             .unwrap();
 
-        assert_eq!(Some(one_module), db.path_to_module(&one));
+        assert_eq!(Some(one_module), db.path_to_module(&one)?);
 
         let two_module = db
-            .resolve_module(ModuleName::new("parent.child.two"))
+            .resolve_module(ModuleName::new("parent.child.two"))?
             .unwrap();
-        assert_eq!(Some(two_module), db.path_to_module(&two));
+        assert_eq!(Some(two_module), db.path_to_module(&two)?);
 
         Ok(())
     }
 
     #[test]
-    fn regular_package_in_namespace_package() -> std::io::Result<()> {
+    fn regular_package_in_namespace_package() -> anyhow::Result<()> {
         let TestCase {
             db,
             temp_dir: _,
@@ -914,17 +933,20 @@ mod tests {
         std::fs::write(two, "print('Hello, world!')")?;
 
         let one_module = db
-            .resolve_module(ModuleName::new("parent.child.one"))
+            .resolve_module(ModuleName::new("parent.child.one"))?
             .unwrap();
 
-        assert_eq!(Some(one_module), db.path_to_module(&one));
+        assert_eq!(Some(one_module), db.path_to_module(&one)?);
 
-        assert_eq!(None, db.resolve_module(ModuleName::new("parent.child.two")));
+        assert_eq!(
+            None,
+            db.resolve_module(ModuleName::new("parent.child.two"))?
+        );
         Ok(())
     }
 
     #[test]
-    fn module_search_path_priority() -> std::io::Result<()> {
+    fn module_search_path_priority() -> anyhow::Result<()> {
         let TestCase {
             db,
             src,
@@ -938,20 +960,20 @@ mod tests {
         std::fs::write(&foo_src, "")?;
         std::fs::write(&foo_site_packages, "")?;
 
-        let foo_module = db.resolve_module(ModuleName::new("foo")).unwrap();
+        let foo_module = db.resolve_module(ModuleName::new("foo"))?.unwrap();
 
-        assert_eq!(&src, foo_module.path(&db).root());
-        assert_eq!(&foo_src, &*db.file_path(foo_module.path(&db).file()));
+        assert_eq!(&src, foo_module.path(&db)?.root());
+        assert_eq!(&foo_src, &*db.file_path(foo_module.path(&db)?.file()));
 
-        assert_eq!(Some(foo_module), db.path_to_module(&foo_src));
-        assert_eq!(None, db.path_to_module(&foo_site_packages));
+        assert_eq!(Some(foo_module), db.path_to_module(&foo_src)?);
+        assert_eq!(None, db.path_to_module(&foo_site_packages)?);
 
         Ok(())
     }
 
     #[test]
     #[cfg(target_family = "unix")]
-    fn symlink() -> std::io::Result<()> {
+    fn symlink() -> anyhow::Result<()> {
         let TestCase {
             db,
             src,
@@ -965,28 +987,28 @@ mod tests {
         std::fs::write(&foo, "")?;
         std::os::unix::fs::symlink(&foo, &bar)?;
 
-        let foo_module = db.resolve_module(ModuleName::new("foo")).unwrap();
-        let bar_module = db.resolve_module(ModuleName::new("bar")).unwrap();
+        let foo_module = db.resolve_module(ModuleName::new("foo"))?.unwrap();
+        let bar_module = db.resolve_module(ModuleName::new("bar"))?.unwrap();
 
         assert_ne!(foo_module, bar_module);
 
-        assert_eq!(&src, foo_module.path(&db).root());
-        assert_eq!(&foo, &*db.file_path(foo_module.path(&db).file()));
+        assert_eq!(&src, foo_module.path(&db)?.root());
+        assert_eq!(&foo, &*db.file_path(foo_module.path(&db)?.file()));
 
         // Bar has a different name but it should point to the same file.
 
-        assert_eq!(&src, bar_module.path(&db).root());
-        assert_eq!(foo_module.path(&db).file(), bar_module.path(&db).file());
-        assert_eq!(&foo, &*db.file_path(bar_module.path(&db).file()));
+        assert_eq!(&src, bar_module.path(&db)?.root());
+        assert_eq!(foo_module.path(&db)?.file(), bar_module.path(&db)?.file());
+        assert_eq!(&foo, &*db.file_path(bar_module.path(&db)?.file()));
 
-        assert_eq!(Some(foo_module), db.path_to_module(&foo));
-        assert_eq!(Some(bar_module), db.path_to_module(&bar));
+        assert_eq!(Some(foo_module), db.path_to_module(&foo)?);
+        assert_eq!(Some(bar_module), db.path_to_module(&bar)?);
 
         Ok(())
     }
 
     #[test]
-    fn resolve_dependency() -> std::io::Result<()> {
+    fn resolve_dependency() -> anyhow::Result<()> {
         let TestCase {
             src,
             db,
@@ -1002,8 +1024,8 @@ mod tests {
         std::fs::write(foo_path, "from .bar import test")?;
         std::fs::write(bar_path, "test = 'Hello world'")?;
 
-        let foo_module = db.resolve_module(ModuleName::new("foo")).unwrap();
-        let bar_module = db.resolve_module(ModuleName::new("foo.bar")).unwrap();
+        let foo_module = db.resolve_module(ModuleName::new("foo"))?.unwrap();
+        let bar_module = db.resolve_module(ModuleName::new("foo.bar"))?.unwrap();
 
         // `from . import bar` in `foo/__init__.py` resolves to `foo`
         assert_eq!(
@@ -1014,13 +1036,13 @@ mod tests {
                     level: NonZeroU32::new(1).unwrap(),
                     module: None,
                 }
-            )
+            )?
         );
 
         // `from baz import bar` in `foo/__init__.py` should resolve to `baz.py`
         assert_eq!(
             Some(ModuleName::new("baz")),
-            foo_module.resolve_dependency(&db, &Dependency::Module(ModuleName::new("baz")))
+            foo_module.resolve_dependency(&db, &Dependency::Module(ModuleName::new("baz")))?
         );
 
         // from .bar import test in `foo/__init__.py` should resolve to `foo/bar.py`
@@ -1032,7 +1054,7 @@ mod tests {
                     level: NonZeroU32::new(1).unwrap(),
                     module: Some(ModuleName::new("bar"))
                 }
-            )
+            )?
         );
 
         // from .. import test in `foo/__init__.py` resolves to `` which is not a module
@@ -1044,7 +1066,7 @@ mod tests {
                     level: NonZeroU32::new(2).unwrap(),
                     module: None
                 }
-            )
+            )?
         );
 
         // `from . import test` in `foo/bar.py` resolves to `foo`
@@ -1056,13 +1078,13 @@ mod tests {
                     level: NonZeroU32::new(1).unwrap(),
                     module: None
                 }
-            )
+            )?
         );
 
         // `from baz import test` in `foo/bar.py` resolves to `baz`
         assert_eq!(
             Some(ModuleName::new("baz")),
-            bar_module.resolve_dependency(&db, &Dependency::Module(ModuleName::new("baz")))
+            bar_module.resolve_dependency(&db, &Dependency::Module(ModuleName::new("baz")))?
         );
 
         // `from .baz import test` in `foo/bar.py` resolves to `foo.baz`.
@@ -1074,7 +1096,7 @@ mod tests {
                     level: NonZeroU32::new(1).unwrap(),
                     module: Some(ModuleName::new("baz"))
                 }
-            )
+            )?
         );
 
         Ok(())

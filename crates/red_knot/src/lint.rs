@@ -1,12 +1,15 @@
 use std::cell::RefCell;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
+use std::time::Duration;
 
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{ModModule, StringLiteral};
 
 use crate::cache::KeyValueCache;
-use crate::db::{HasJar, SemanticDb, SemanticJar, SourceDb, SourceJar};
+use crate::db::{
+    HasJar, ParallelDatabase, QueryResult, SemanticDb, SemanticJar, SourceDb, SourceJar,
+};
 use crate::files::FileId;
 use crate::parse::Parsed;
 use crate::source::Source;
@@ -14,19 +17,28 @@ use crate::symbols::{Definition, SymbolId, SymbolTable};
 use crate::types::Type;
 
 #[tracing::instrument(level = "debug", skip(db))]
-pub(crate) fn lint_syntax<Db>(db: &Db, file_id: FileId) -> Diagnostics
+pub(crate) fn lint_syntax<Db>(db: &Db, file_id: FileId) -> QueryResult<Diagnostics>
 where
-    Db: SourceDb + HasJar<SourceJar>,
+    Db: SourceDb + HasJar<SourceJar> + ParallelDatabase,
 {
-    let storage = &db.jar().lint_syntax;
+    let storage = &db.jar()?.lint_syntax;
+
+    #[allow(clippy::print_stdout)]
+    if std::env::var("RED_KNOT_SLOW_LINT").is_ok() {
+        for i in 0..10 {
+            db.cancelled()?;
+            println!("RED_KNOT_SLOW_LINT is set, sleeping for {i}/10 seconds");
+            std::thread::sleep(Duration::from_secs(1));
+        }
+    }
 
     storage.get(&file_id, |file_id| {
         let mut diagnostics = Vec::new();
 
-        let source = db.source(*file_id);
+        let source = db.source(*file_id)?;
         lint_lines(source.text(), &mut diagnostics);
 
-        let parsed = db.parse(*file_id);
+        let parsed = db.parse(*file_id)?;
 
         if parsed.errors().is_empty() {
             let ast = parsed.ast();
@@ -41,7 +53,7 @@ where
             diagnostics.extend(parsed.errors().iter().map(std::string::ToString::to_string));
         }
 
-        Diagnostics::from(diagnostics)
+        Ok(Diagnostics::from(diagnostics))
     })
 }
 
@@ -63,16 +75,16 @@ fn lint_lines(source: &str, diagnostics: &mut Vec<String>) {
 }
 
 #[tracing::instrument(level = "debug", skip(db))]
-pub(crate) fn lint_semantic<Db>(db: &Db, file_id: FileId) -> Diagnostics
+pub(crate) fn lint_semantic<Db>(db: &Db, file_id: FileId) -> QueryResult<Diagnostics>
 where
     Db: SemanticDb + HasJar<SemanticJar>,
 {
-    let storage = &db.jar().lint_semantic;
+    let storage = &db.jar()?.lint_semantic;
 
     storage.get(&file_id, |file_id| {
-        let source = db.source(*file_id);
-        let parsed = db.parse(*file_id);
-        let symbols = db.symbol_table(*file_id);
+        let source = db.source(*file_id)?;
+        let parsed = db.parse(*file_id)?;
+        let symbols = db.symbol_table(*file_id)?;
 
         let context = SemanticLintContext {
             file_id: *file_id,
@@ -83,25 +95,25 @@ where
             diagnostics: RefCell::new(Vec::new()),
         };
 
-        lint_unresolved_imports(&context);
+        lint_unresolved_imports(&context)?;
 
-        Diagnostics::from(context.diagnostics.take())
+        Ok(Diagnostics::from(context.diagnostics.take()))
     })
 }
 
-fn lint_unresolved_imports(context: &SemanticLintContext) {
+fn lint_unresolved_imports(context: &SemanticLintContext) -> QueryResult<()> {
     // TODO: Consider iterating over the dependencies (imports) only instead of all definitions.
     for (symbol, definition) in context.symbols().all_definitions() {
         match definition {
             Definition::Import(import) => {
-                let ty = context.eval_symbol(symbol);
+                let ty = context.infer_symbol_type(symbol)?;
 
                 if ty.is_unknown() {
                     context.push_diagnostic(format!("Unresolved module {}", import.module));
                 }
             }
             Definition::ImportFrom(import) => {
-                let ty = context.eval_symbol(symbol);
+                let ty = context.infer_symbol_type(symbol)?;
 
                 if ty.is_unknown() {
                     let module_name = import.module().map(Deref::deref).unwrap_or_default();
@@ -126,6 +138,8 @@ fn lint_unresolved_imports(context: &SemanticLintContext) {
             _ => {}
         }
     }
+
+    Ok(())
 }
 
 pub struct SemanticLintContext<'a> {
@@ -154,7 +168,7 @@ impl<'a> SemanticLintContext<'a> {
         &self.symbols
     }
 
-    pub fn eval_symbol(&self, symbol_id: SymbolId) -> Type {
+    pub fn infer_symbol_type(&self, symbol_id: SymbolId) -> QueryResult<Type> {
         self.db.infer_symbol_type(self.file_id, symbol_id)
     }
 

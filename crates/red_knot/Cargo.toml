@@ -22,7 +22,7 @@ ruff_notebook = { path = "../ruff_notebook" }
 anyhow = { workspace = true }
 bitflags = { workspace = true }
 ctrlc = "3.4.4"
-crossbeam-channel = { workspace = true }
+crossbeam = { workspace = true }
 dashmap = { workspace = true }
 hashbrown = { workspace = true }
 indexmap = { workspace = true }

@@ -1,3 +1,8 @@
+mod jars;
+mod query;
+mod runtime;
+mod storage;
+
 use std::path::Path;
 use std::sync::Arc;
 
@@ -9,32 +14,115 @@ use crate::source::{Source, SourceStorage};
 use crate::symbols::{SymbolId, SymbolTable, SymbolTablesStorage};
 use crate::types::{Type, TypeStore};
 
-pub trait SourceDb {
+pub use jars::{HasJar, HasJars};
+pub use query::{QueryError, QueryResult};
+pub use runtime::DbRuntime;
+pub use storage::JarsStorage;
+
+pub trait Database {
+    /// Returns a reference to the runtime of the current worker.
+    fn runtime(&self) -> &DbRuntime;
+
+    /// Returns a mutable reference to the runtime. Only one worker can hold a mutable reference to the runtime.
+    fn runtime_mut(&mut self) -> &mut DbRuntime;
+
+    /// Returns `Ok` if the queries have not been cancelled and `Err(QueryError::Cancelled)` otherwise.
+    fn cancelled(&self) -> QueryResult<()> {
+        self.runtime().cancelled()
+    }
+
+    /// Returns `true` if the queries have been cancelled.
+    fn is_cancelled(&self) -> bool {
+        self.runtime().is_cancelled()
+    }
+}
+
+/// Database that supports running queries from multiple threads.
+pub trait ParallelDatabase: Database + Send {
+    /// Creates a snapshot of the database state that can be used to query the database in another thread.
+    ///
+    /// The snapshot is a read-only view of the database but query results are shared between threads.
+    /// All queries will be automatically cancelled when applying any mutations (calling [`HasJars::jars_mut`])
+    /// to the database (not the snapshot, because they're readonly).
+    ///
+    /// ## Creating a snapshot
+    ///
+    /// Creating a snapshot of the database's jars is cheap but creating a snapshot of
+    /// other state stored on the database might require deep-cloning data. That's why you should
+    /// avoid creating snapshots in a hot function (e.g. don't create a snapshot for each file, instead
+    /// create a snapshot when scheduling the check of an entire program).
+    ///
+    /// ## Salsa compatibility
+    /// Salsa prohibits creating a snapshot while running a local query (it's fine if other workers run a query) [[source](https://github.com/salsa-rs/salsa/issues/80)].
+    /// We should avoid creating snapshots while running a query because we might want to adopt Salsa in the future (if we can figure out persistent caching).
+    /// Unfortunately, the infrastructure doesn't provide an automated way of knowing when a query is run, that's
+    /// why we have to "enforce" this constraint manually.
+    fn snapshot(&self) -> Snapshot<Self>;
+}
+
+/// Readonly snapshot of a database.
+///
+/// ## Dead locks
+/// A snapshot should always be dropped as soon as it is no longer necessary to run queries.
+/// Storing the snapshot without running a query or periodically checking if cancellation was requested
+/// can lead to deadlocks because mutating the [`Database`] requires cancels all pending queries
+/// and waiting for all [`Snapshot`]s to be dropped.
+#[derive(Debug)]
+pub struct Snapshot<DB: ?Sized>
+where
+    DB: ParallelDatabase,
+{
+    db: DB,
+}
+
+impl<DB> Snapshot<DB>
+where
+    DB: ParallelDatabase,
+{
+    pub fn new(db: DB) -> Self {
+        Snapshot { db }
+    }
+}
+
+impl<DB> std::ops::Deref for Snapshot<DB>
+where
+    DB: ParallelDatabase,
+{
+    type Target = DB;
+
+    fn deref(&self) -> &DB {
+        &self.db
+    }
+}
+
+// Red knot specific databases code.
+
+pub trait SourceDb: Database {
     // queries
     fn file_id(&self, path: &std::path::Path) -> FileId;
 
     fn file_path(&self, file_id: FileId) -> Arc<std::path::Path>;
 
-    fn source(&self, file_id: FileId) -> Source;
+    fn source(&self, file_id: FileId) -> QueryResult<Source>;
 
-    fn parse(&self, file_id: FileId) -> Parsed;
+    fn parse(&self, file_id: FileId) -> QueryResult<Parsed>;
 
-    fn lint_syntax(&self, file_id: FileId) -> Diagnostics;
+    fn lint_syntax(&self, file_id: FileId) -> QueryResult<Diagnostics>;
 }
 
 pub trait SemanticDb: SourceDb {
     // queries
-    fn resolve_module(&self, name: ModuleName) -> Option<Module>;
+    fn resolve_module(&self, name: ModuleName) -> QueryResult<Option<Module>>;
 
-    fn file_to_module(&self, file_id: FileId) -> Option<Module>;
+    fn file_to_module(&self, file_id: FileId) -> QueryResult<Option<Module>>;
 
-    fn path_to_module(&self, path: &Path) -> Option<Module>;
+    fn path_to_module(&self, path: &Path) -> QueryResult<Option<Module>>;
 
-    fn symbol_table(&self, file_id: FileId) -> Arc<SymbolTable>;
+    fn symbol_table(&self, file_id: FileId) -> QueryResult<Arc<SymbolTable>>;
 
-    fn infer_symbol_type(&self, file_id: FileId, symbol_id: SymbolId) -> Type;
+    fn infer_symbol_type(&self, file_id: FileId, symbol_id: SymbolId) -> QueryResult<Type>;
 
-    fn lint_semantic(&self, file_id: FileId) -> Diagnostics;
+    fn lint_semantic(&self, file_id: FileId) -> QueryResult<Diagnostics>;
 
     // mutations
 
@@ -60,32 +148,15 @@ pub struct SemanticJar {
     pub lint_semantic: LintSemanticStorage,
 }
 
-/// Gives access to a specific jar in the database.
-///
-/// Nope, the terminology isn't borrowed from Java but from Salsa <https://salsa-rs.github.io/salsa/>,
-/// which is an analogy to storing the salsa in different jars.
-///
-/// The basic idea is that each crate can define its own jar and the jars can be combined to a single
-/// database in the top level crate. Each crate also defines its own `Database` trait. The combination of
-/// `Database` trait and the jar allows to write queries in isolation without having to know how they get composed at the upper levels.
-///
-/// Salsa further defines a `HasIngredient` trait which slices the jar to a specific storage (e.g. a specific cache).
-/// We don't need this just jet because we write our queries by hand. We may want a similar trait if we decide
-/// to use a macro to generate the queries.
-pub trait HasJar<T> {
-    /// Gives a read-only reference to the jar.
-    fn jar(&self) -> &T;
-
-    /// Gives a mutable reference to the jar.
-    fn jar_mut(&mut self) -> &mut T;
-}
-
 #[cfg(test)]
 pub(crate) mod tests {
     use std::path::Path;
     use std::sync::Arc;
 
-    use crate::db::{HasJar, SourceDb, SourceJar};
+    use crate::db::{
+        Database, DbRuntime, HasJar, HasJars, JarsStorage, ParallelDatabase, QueryResult, Snapshot,
+        SourceDb, SourceJar,
+    };
     use crate::files::{FileId, Files};
     use crate::lint::{lint_semantic, lint_syntax, Diagnostics};
     use crate::module::{
@@ -104,27 +175,26 @@ pub(crate) mod tests {
     #[derive(Debug, Default)]
     pub(crate) struct TestDb {
         files: Files,
-        source: SourceJar,
-        semantic: SemanticJar,
+        jars: JarsStorage<Self>,
     }
 
     impl HasJar<SourceJar> for TestDb {
-        fn jar(&self) -> &SourceJar {
-            &self.source
+        fn jar(&self) -> QueryResult<&SourceJar> {
+            Ok(&self.jars()?.0)
         }
 
         fn jar_mut(&mut self) -> &mut SourceJar {
-            &mut self.source
+            &mut self.jars_mut().0
         }
     }
 
     impl HasJar<SemanticJar> for TestDb {
-        fn jar(&self) -> &SemanticJar {
-            &self.semantic
+        fn jar(&self) -> QueryResult<&SemanticJar> {
+            Ok(&self.jars()?.1)
         }
 
         fn jar_mut(&mut self) -> &mut SemanticJar {
-            &mut self.semantic
+            &mut self.jars_mut().1
         }
     }
 
@@ -137,41 +207,41 @@ pub(crate) mod tests {
             self.files.path(file_id)
         }
 
-        fn source(&self, file_id: FileId) -> Source {
+        fn source(&self, file_id: FileId) -> QueryResult<Source> {
             source_text(self, file_id)
         }
 
-        fn parse(&self, file_id: FileId) -> Parsed {
+        fn parse(&self, file_id: FileId) -> QueryResult<Parsed> {
             parse(self, file_id)
         }
 
-        fn lint_syntax(&self, file_id: FileId) -> Diagnostics {
+        fn lint_syntax(&self, file_id: FileId) -> QueryResult<Diagnostics> {
             lint_syntax(self, file_id)
         }
     }
 
     impl SemanticDb for TestDb {
-        fn resolve_module(&self, name: ModuleName) -> Option<Module> {
+        fn resolve_module(&self, name: ModuleName) -> QueryResult<Option<Module>> {
             resolve_module(self, name)
         }
 
-        fn file_to_module(&self, file_id: FileId) -> Option<Module> {
+        fn file_to_module(&self, file_id: FileId) -> QueryResult<Option<Module>> {
             file_to_module(self, file_id)
         }
 
-        fn path_to_module(&self, path: &Path) -> Option<Module> {
+        fn path_to_module(&self, path: &Path) -> QueryResult<Option<Module>> {
             path_to_module(self, path)
         }
 
-        fn symbol_table(&self, file_id: FileId) -> Arc<SymbolTable> {
+        fn symbol_table(&self, file_id: FileId) -> QueryResult<Arc<SymbolTable>> {
             symbol_table(self, file_id)
         }
 
-        fn infer_symbol_type(&self, file_id: FileId, symbol_id: SymbolId) -> Type {
+        fn infer_symbol_type(&self, file_id: FileId, symbol_id: SymbolId) -> QueryResult<Type> {
             infer_symbol_type(self, file_id, symbol_id)
         }
 
-        fn lint_semantic(&self, file_id: FileId) -> Diagnostics {
+        fn lint_semantic(&self, file_id: FileId) -> QueryResult<Diagnostics> {
             lint_semantic(self, file_id)
         }
 
@@ -181,6 +251,37 @@ pub(crate) mod tests {
 
         fn set_module_search_paths(&mut self, paths: Vec<ModuleSearchPath>) {
             set_module_search_paths(self, paths);
+        }
+    }
+
+    impl HasJars for TestDb {
+        type Jars = (SourceJar, SemanticJar);
+
+        fn jars(&self) -> QueryResult<&Self::Jars> {
+            self.jars.jars()
+        }
+
+        fn jars_mut(&mut self) -> &mut Self::Jars {
+            self.jars.jars_mut()
+        }
+    }
+
+    impl Database for TestDb {
+        fn runtime(&self) -> &DbRuntime {
+            self.jars.runtime()
+        }
+
+        fn runtime_mut(&mut self) -> &mut DbRuntime {
+            self.jars.runtime_mut()
+        }
+    }
+
+    impl ParallelDatabase for TestDb {
+        fn snapshot(&self) -> Snapshot<Self> {
+            Snapshot::new(Self {
+                files: self.files.clone(),
+                jars: self.jars.snapshot(),
+            })
         }
     }
 }

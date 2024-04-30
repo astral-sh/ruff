@@ -4,6 +4,7 @@ use std::collections::hash_map::Entry;
 use std::path::Path;
 use std::sync::Mutex;
 
+use crossbeam::channel as crossbeam_channel;
 use rustc_hash::FxHashMap;
 use tracing::subscriber::Interest;
 use tracing::{Level, Metadata};
@@ -12,11 +13,10 @@ use tracing_subscriber::layer::{Context, Filter, SubscriberExt};
 use tracing_subscriber::{Layer, Registry};
 use tracing_tree::time::Uptime;
 
-use red_knot::cancellation::CancellationTokenSource;
-use red_knot::db::{HasJar, SourceDb, SourceJar};
+use red_knot::db::{HasJar, ParallelDatabase, QueryError, SemanticDb, SourceDb, SourceJar};
 use red_knot::files::FileId;
 use red_knot::module::{ModuleSearchPath, ModuleSearchPathKind};
-use red_knot::program::check::{CheckError, RayonCheckScheduler};
+use red_knot::program::check::RayonCheckScheduler;
 use red_knot::program::{FileChange, FileChangeKind, Program};
 use red_knot::watch::FileWatcher;
 use red_knot::Workspace;
@@ -51,7 +51,8 @@ fn main() -> anyhow::Result<()> {
         workspace.root().to_path_buf(),
         ModuleSearchPathKind::FirstParty,
     );
-    let mut program = Program::new(workspace, vec![workspace_search_path]);
+    let mut program = Program::new(workspace);
+    program.set_module_search_paths(vec![workspace_search_path]);
 
     let entry_id = program.file_id(entry_point);
     program.workspace_mut().open_file(entry_id);
@@ -82,7 +83,7 @@ fn main() -> anyhow::Result<()> {
 
     main_loop.run(&mut program);
 
-    let source_jar: &SourceJar = program.jar();
+    let source_jar: &SourceJar = program.jar().unwrap();
 
     dbg!(source_jar.parsed.statistics());
     dbg!(source_jar.sources.statistics());
@@ -101,10 +102,9 @@ impl MainLoop {
         let (main_loop_sender, main_loop_receiver) = crossbeam_channel::bounded(1);
 
         let mut orchestrator = Orchestrator {
-            pending_analysis: None,
             receiver: orchestrator_receiver,
             sender: main_loop_sender.clone(),
-            aggregated_changes: AggregatedChanges::default(),
+            revision: 0,
         };
 
         std::thread::spawn(move || {
@@ -137,34 +137,32 @@ impl MainLoop {
             tracing::trace!("Main Loop: Tick");
 
             match message {
-                MainLoopMessage::CheckProgram => {
-                    // Remove mutability from program.
-                    let program = &*program;
-                    let run_cancellation_token_source = CancellationTokenSource::new();
-                    let run_cancellation_token = run_cancellation_token_source.token();
-                    let sender = &self.orchestrator_sender;
+                MainLoopMessage::CheckProgram { revision } => {
+                    let program = program.snapshot();
+                    let sender = self.orchestrator_sender.clone();
 
-                    sender
-                        .send(OrchestratorMessage::CheckProgramStarted {
-                            cancellation_token: run_cancellation_token_source,
-                        })
-                        .unwrap();
+                    // Spawn a new task that checks the program. This needs to be done in a separate thread
+                    // to prevent blocking the main loop here.
+                    rayon::spawn(move || {
+                        rayon::in_place_scope(|scope| {
+                            let scheduler = RayonCheckScheduler::new(&program, scope);
 
-                    rayon::in_place_scope(|scope| {
-                        let scheduler = RayonCheckScheduler::new(program, scope);
-
-                        let result = program.check(&scheduler, run_cancellation_token);
-                        match result {
-                            Ok(result) => sender
-                                .send(OrchestratorMessage::CheckProgramCompleted(result))
-                                .unwrap(),
-                            Err(CheckError::Cancelled) => sender
-                                .send(OrchestratorMessage::CheckProgramCancelled)
-                                .unwrap(),
-                        }
+                            match program.check(&scheduler) {
+                                Ok(result) => {
+                                    sender
+                                        .send(OrchestratorMessage::CheckProgramCompleted {
+                                            diagnostics: result,
+                                            revision,
+                                        })
+                                        .unwrap();
+                                }
+                                Err(QueryError::Cancelled) => {}
+                            }
+                        });
                     });
                 }
                 MainLoopMessage::ApplyChanges(changes) => {
+                    // Automatically cancels any pending queries and waits for them to complete.
                     program.apply_changes(changes.iter());
                 }
                 MainLoopMessage::CheckCompleted(diagnostics) => {
@@ -211,13 +209,11 @@ impl MainLoopCancellationToken {
 }
 
 struct Orchestrator {
-    aggregated_changes: AggregatedChanges,
-    pending_analysis: Option<PendingAnalysisState>,
-
     /// Sends messages to the main loop.
     sender: crossbeam_channel::Sender<MainLoopMessage>,
     /// Receives messages from the main loop.
     receiver: crossbeam_channel::Receiver<OrchestratorMessage>,
+    revision: usize,
 }
 
 impl Orchestrator {
@@ -225,51 +221,33 @@ impl Orchestrator {
         while let Ok(message) = self.receiver.recv() {
             match message {
                 OrchestratorMessage::Run => {
-                    self.pending_analysis = None;
-                    self.sender.send(MainLoopMessage::CheckProgram).unwrap();
-                }
-
-                OrchestratorMessage::CheckProgramStarted { cancellation_token } => {
-                    debug_assert!(self.pending_analysis.is_none());
-
-                    self.pending_analysis = Some(PendingAnalysisState { cancellation_token });
-                }
-
-                OrchestratorMessage::CheckProgramCompleted(diagnostics) => {
-                    self.pending_analysis
-                        .take()
-                        .expect("Expected a pending analysis.");
-
                     self.sender
-                        .send(MainLoopMessage::CheckCompleted(diagnostics))
+                        .send(MainLoopMessage::CheckProgram {
+                            revision: self.revision,
+                        })
                         .unwrap();
                 }
 
-                OrchestratorMessage::CheckProgramCancelled => {
-                    self.pending_analysis
-                        .take()
-                        .expect("Expected a pending analysis.");
-
-                    self.debounce_changes();
+                OrchestratorMessage::CheckProgramCompleted {
+                    diagnostics,
+                    revision,
+                } => {
+                    // Only take the diagnostics if they are for the latest revision.
+                    if self.revision == revision {
+                        self.sender
+                            .send(MainLoopMessage::CheckCompleted(diagnostics))
+                            .unwrap();
+                    } else {
+                        tracing::debug!("Discarding diagnostics for outdated revision {revision} (current: {}).", self.revision);
+                    }
                 }
 
                 OrchestratorMessage::FileChanges(changes) => {
                     // Request cancellation, but wait until all analysis tasks have completed to
                     // avoid stale messages in the next main loop.
-                    let pending = if let Some(pending_state) = self.pending_analysis.as_ref() {
-                        pending_state.cancellation_token.cancel();
-                        true
-                    } else {
-                        false
-                    };
 
-                    self.aggregated_changes.extend(changes);
-
-                    // If there are no pending analysis tasks, apply the file changes. Otherwise
-                    // keep running until all file checks have completed.
-                    if !pending {
-                        self.debounce_changes();
-                    }
+                    self.revision += 1;
+                    self.debounce_changes(changes);
                 }
                 OrchestratorMessage::Shutdown => {
                     return self.shutdown();
@@ -278,8 +256,9 @@ impl Orchestrator {
         }
     }
 
-    fn debounce_changes(&mut self) {
-        debug_assert!(self.pending_analysis.is_none());
+    fn debounce_changes(&self, changes: Vec<FileChange>) {
+        let mut aggregated_changes = AggregatedChanges::default();
+        aggregated_changes.extend(changes);
 
         loop {
             // Consume possibly incoming file change messages before running a new analysis, but don't wait for more than 100ms.
@@ -290,10 +269,12 @@ impl Orchestrator {
                             return self.shutdown();
                         }
                         Ok(OrchestratorMessage::FileChanges(file_changes)) => {
-                            self.aggregated_changes.extend(file_changes);
+                            aggregated_changes.extend(file_changes);
                         }
 
-                        Ok(OrchestratorMessage::CheckProgramStarted {..}| OrchestratorMessage::CheckProgramCompleted(_) | OrchestratorMessage::CheckProgramCancelled) => unreachable!("No program check should be running while debouncing changes."),
+                        Ok(OrchestratorMessage::CheckProgramCompleted { .. })=> {
+                            // disregard any outdated completion message.
+                        }
                         Ok(OrchestratorMessage::Run) => unreachable!("The orchestrator is already running."),
 
                         Err(_) => {
@@ -302,10 +283,10 @@ impl Orchestrator {
                         }
                     }
                 },
-                default(std::time::Duration::from_millis(100)) => {
-                    // No more file changes after 100 ms, send the changes and schedule a new analysis
-                    self.sender.send(MainLoopMessage::ApplyChanges(std::mem::take(&mut self.aggregated_changes))).unwrap();
-                    self.sender.send(MainLoopMessage::CheckProgram).unwrap();
+                default(std::time::Duration::from_millis(10)) => {
+                    // No more file changes after 10 ms, send the changes and schedule a new analysis
+                    self.sender.send(MainLoopMessage::ApplyChanges(aggregated_changes)).unwrap();
+                    self.sender.send(MainLoopMessage::CheckProgram { revision: self.revision}).unwrap();
                     return;
                 }
             }
@@ -318,15 +299,10 @@ impl Orchestrator {
     }
 }
 
-#[derive(Debug)]
-struct PendingAnalysisState {
-    cancellation_token: CancellationTokenSource,
-}
-
 /// Message sent from the orchestrator to the main loop.
 #[derive(Debug)]
 enum MainLoopMessage {
-    CheckProgram,
+    CheckProgram { revision: usize },
     CheckCompleted(Vec<String>),
     ApplyChanges(AggregatedChanges),
     Exit,
@@ -337,11 +313,10 @@ enum OrchestratorMessage {
     Run,
     Shutdown,
 
-    CheckProgramStarted {
-        cancellation_token: CancellationTokenSource,
+    CheckProgramCompleted {
+        diagnostics: Vec<String>,
+        revision: usize,
     },
-    CheckProgramCompleted(Vec<String>),
-    CheckProgramCancelled,
 
     FileChanges(Vec<FileChange>),
 }

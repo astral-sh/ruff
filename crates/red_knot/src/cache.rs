@@ -2,6 +2,7 @@ use std::fmt::Formatter;
 use std::hash::Hash;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
+use crate::db::QueryResult;
 use dashmap::mapref::entry::Entry;
 
 use crate::FxDashMap;
@@ -27,11 +28,11 @@ where
         }
     }
 
-    pub fn get<F>(&self, key: &K, compute: F) -> V
+    pub fn get<F>(&self, key: &K, compute: F) -> QueryResult<V>
     where
-        F: FnOnce(&K) -> V,
+        F: FnOnce(&K) -> QueryResult<V>,
     {
-        match self.map.entry(key.clone()) {
+        Ok(match self.map.entry(key.clone()) {
             Entry::Occupied(cached) => {
                 self.statistics.hit();
 
@@ -40,11 +41,11 @@ where
             Entry::Vacant(vacant) => {
                 self.statistics.miss();
 
-                let value = compute(key);
+                let value = compute(key)?;
                 vacant.insert(value.clone());
                 value
             }
-        }
+        })
     }
 
     pub fn set(&mut self, key: K, value: V) {
