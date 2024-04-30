@@ -214,13 +214,34 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
             exceptions.intersects(Exceptions::MODULE_NOT_FOUND_ERROR | Exceptions::IMPORT_ERROR);
         let multiple = bindings.len() > 1;
 
-        // divide bindings in the import statement by how we want to fix them
-        let (to_explicit, to_remove): (Vec<_>, Vec<_>) =
-            bindings
-                .into_iter()
-                .partition(|ImportBinding { import, .. }| {
-                    in_init && is_first_party(checker, &import.qualified_name().to_string())
-                });
+        // pair each binding with context; divide them by how we want to fix them
+        let (to_reexport, to_remove): (Vec<_>, Vec<_>) = bindings
+            .into_iter()
+            .map(|binding| {
+                let context = if in_except_handler {
+                    Some(UnusedImportContext::ExceptHandler)
+                } else if in_init {
+                    Some(UnusedImportContext::Init {
+                        first_party: is_first_party(
+                            checker,
+                            &binding.import.qualified_name().to_string(),
+                        ),
+                        dunder_all: dunder_all.is_some(),
+                    })
+                } else {
+                    None
+                };
+                (binding, context)
+            })
+            .partition(|(_, context)| {
+                matches!(
+                    context,
+                    Some(UnusedImportContext::Init {
+                        first_party: true,
+                        ..
+                    })
+                )
+            });
 
         // generate fixes that are shared across bindings in the statement
         let (fix_remove, fix_explicit) = if (!in_init || fix_init) && !in_except_handler {
@@ -232,20 +253,14 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
             (None, None)
         };
 
-        for (binding, fix) in iter::Iterator::chain(
+        for ((binding, context), fix) in iter::Iterator::chain(
             iter::zip(to_remove, iter::repeat(fix_remove)),
             iter::zip(to_explicit, iter::repeat(fix_explicit)),
         ) {
             let mut diagnostic = Diagnostic::new(
                 UnusedImport {
                     name: binding.import.qualified_name().to_string(),
-                    context: if in_except_handler {
-                        Some(UnusedImportContext::ExceptHandler)
-                    } else if in_init {
-                        Some(UnusedImportContext::Init)
-                    } else {
-                        None
-                    },
+                    context,
                     multiple,
                 },
                 binding.range,
