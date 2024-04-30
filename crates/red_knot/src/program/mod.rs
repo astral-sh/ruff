@@ -39,12 +39,9 @@ impl Program {
     where
         I: IntoIterator<Item = FileChange>,
     {
-        let files = self.files.clone();
         let (source, semantic, lint) = self.jars_mut();
         for change in changes {
-            let file_path = files.path(change.id);
-
-            semantic.module_resolver.remove_module(&file_path);
+            semantic.module_resolver.remove_module(change.id);
             semantic.symbol_tables.remove(&change.id);
             source.sources.remove(&change.id);
             source.parsed.remove(&change.id);
