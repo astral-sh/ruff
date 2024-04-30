@@ -13,7 +13,9 @@ use tracing_subscriber::layer::{Context, Filter, SubscriberExt};
 use tracing_subscriber::{Layer, Registry};
 use tracing_tree::time::Uptime;
 
-use red_knot::db::{HasJar, ParallelDatabase, QueryError, SemanticDb, SourceDb, SourceJar};
+use red_knot::db::{
+    Database, HasJar, ParallelDatabase, QueryError, SemanticDb, SourceDb, SourceJar,
+};
 use red_knot::files::FileId;
 use red_knot::module::{ModuleSearchPath, ModuleSearchPathKind};
 use red_knot::program::check::ExecutionMode;
@@ -138,22 +140,28 @@ impl MainLoop {
 
             match message {
                 MainLoopMessage::CheckProgram { revision } => {
-                    let program = program.snapshot();
-                    let sender = self.orchestrator_sender.clone();
+                    {
+                        let program = program.snapshot();
+                        let sender = self.orchestrator_sender.clone();
 
-                    // Spawn a new task that checks the program. This needs to be done in a separate thread
-                    // to prevent blocking the main loop here.
-                    rayon::spawn(move || match program.check(ExecutionMode::ThreadPool) {
-                        Ok(result) => {
-                            sender
-                                .send(OrchestratorMessage::CheckProgramCompleted {
-                                    diagnostics: result,
-                                    revision,
-                                })
-                                .unwrap();
-                        }
-                        Err(QueryError::Cancelled) => {}
-                    });
+                        // Spawn a new task that checks the program. This needs to be done in a separate thread
+                        // to prevent blocking the main loop here.
+                        rayon::spawn(move || match program.check(ExecutionMode::ThreadPool) {
+                            Ok(result) => {
+                                sender
+                                    .send(OrchestratorMessage::CheckProgramCompleted {
+                                        diagnostics: result,
+                                        revision,
+                                    })
+                                    .unwrap();
+                            }
+                            Err(QueryError::Cancelled) => {}
+                        });
+                    }
+
+                    if !program.is_cancelled() {
+                        let _ = program.format();
+                    }
                 }
                 MainLoopMessage::ApplyChanges(changes) => {
                     // Automatically cancels any pending queries and waits for them to complete.
