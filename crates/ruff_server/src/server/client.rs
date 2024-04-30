@@ -4,9 +4,7 @@ use lsp_server::{Notification, RequestId};
 use rustc_hash::FxHashMap;
 use serde_json::Value;
 
-use super::schedule::Task;
-
-pub(crate) type ClientSender = crossbeam::channel::Sender<lsp_server::Message>;
+use super::{schedule::Task, ClientSender};
 
 type ResponseBuilder<'s> = Box<dyn FnOnce(lsp_server::Response) -> Task<'s>>;
 
@@ -29,12 +27,12 @@ pub(crate) struct Requester<'s> {
 }
 
 impl<'s> Client<'s> {
-    pub(super) fn new(sender: &ClientSender) -> Self {
+    pub(super) fn new(sender: ClientSender) -> Self {
         Self {
             notifier: Notifier(sender.clone()),
             responder: Responder(sender.clone()),
             requester: Requester {
-                sender: sender.clone(),
+                sender,
                 next_request_id: 1,
                 response_handlers: FxHashMap::default(),
             },
@@ -60,16 +58,15 @@ impl Notifier {
 
         let message = lsp_server::Message::Notification(Notification::new(method, params));
 
-        Ok(self.0.send(message)?)
+        self.0.send(message)
     }
 
     pub(crate) fn notify_method(&self, method: String) -> crate::Result<()> {
-        Ok(self
-            .0
+        self.0
             .send(lsp_server::Message::Notification(Notification::new(
                 method,
                 Value::Null,
-            )))?)
+            )))
     }
 }
 
@@ -82,7 +79,7 @@ impl Responder {
     where
         R: serde::Serialize,
     {
-        Ok(self.0.send(
+        self.0.send(
             match result {
                 Ok(res) => lsp_server::Response::new_ok(id, res),
                 Err(crate::server::api::Error { code, error }) => {
@@ -90,7 +87,7 @@ impl Responder {
                 }
             }
             .into(),
-        )?)
+        )
     }
 }
 

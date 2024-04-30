@@ -6,9 +6,9 @@ use crate::server::ClientSender;
 
 static MESSENGER: OnceLock<ClientSender> = OnceLock::new();
 
-pub(crate) fn init_messenger(client_sender: &ClientSender) {
+pub(crate) fn init_messenger(client_sender: ClientSender) {
     MESSENGER
-        .set(client_sender.clone())
+        .set(client_sender)
         .expect("messenger should only be initialized once");
 
     // unregister any previously registered panic hook
