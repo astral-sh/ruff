@@ -53,7 +53,10 @@ pub trait ParallelDatabase: Database + Send {
     /// create a snapshot when scheduling the check of an entire program).
     ///
     /// ## Salsa compatibility
-    /// Salsa prohibits creating a snapshot inside a query and so should we for better Salsa compatibility .
+    /// Salsa prohibits creating a snapshot while running a local query (it's fine if other workers run a query) [[source](https://github.com/salsa-rs/salsa/issues/80)].
+    /// We should avoid creating snapshots while running a query because we might want to adopt Salsa in the future (if we can figure out persistent caching).
+    /// Unfortunately, the infrastructure doesn't provide an automated way of knowing when a query is run, that's
+    /// why we have to "enforce" this constraint manually.
     fn snapshot(&self) -> Snapshot<Self>;
 }
 
