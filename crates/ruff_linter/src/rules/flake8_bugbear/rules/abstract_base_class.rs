@@ -157,7 +157,9 @@ pub(crate) fn abstract_base_class(
     let mut has_abstract_method = false;
     for stmt in body {
         // https://github.com/PyCQA/flake8-bugbear/issues/293
-        // Ignore abc's that declares a class attribute that must be set.
+        // If an ABC declares an attribute by providing a type annotation
+        // but does not actually assign a value for that attribute,
+        // assume it is intended to be an "abstract attribute"
         if matches!(
             stmt,
             Stmt::AnnAssign(ast::StmtAnnAssign { value: None, .. })

@@ -43,14 +43,14 @@ B024.py:92:7: B024 `notabc_Base_1` is an abstract base class, but it has no abst
 
 B024.py:132:7: B024 `abc_set_class_variable_2` is an abstract base class, but it has no abstract methods
     |
-132 | class abc_set_class_variable_2(ABC):  # safe
+132 | class abc_set_class_variable_2(ABC):  # error (not an abstract attribute)
     |       ^^^^^^^^^^^^^^^^^^^^^^^^ B024
 133 |     foo = 2
     |
 
 B024.py:136:7: B024 `abc_set_class_variable_3` is an abstract base class, but it has no abstract methods
     |
-136 | class abc_set_class_variable_3(ABC):  # safe
+136 | class abc_set_class_variable_3(ABC):  # error (not an abstract attribute)
     |       ^^^^^^^^^^^^^^^^^^^^^^^^ B024
 137 |     foo: int = 2
     |
