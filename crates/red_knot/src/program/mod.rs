@@ -1,5 +1,8 @@
-use std::path::Path;
+use std::collections::hash_map::Entry;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
+
+use rustc_hash::FxHashMap;
 
 use crate::db::{
     Database, Db, DbRuntime, HasJar, HasJars, JarsStorage, LintDb, LintJar, ParallelDatabase,
@@ -37,10 +40,17 @@ impl Program {
 
     pub fn apply_changes<I>(&mut self, changes: I)
     where
-        I: IntoIterator<Item = FileChange>,
+        I: IntoIterator<Item = FileWatcherChange>,
     {
+        let mut aggregated_changes = AggregatedChanges::default();
+
+        aggregated_changes.extend(changes.into_iter().map(|change| FileChange {
+            id: self.files.intern(&change.path),
+            kind: change.kind,
+        }));
+
         let (source, semantic, lint) = self.jars_mut();
-        for change in changes {
+        for change in aggregated_changes.iter() {
             semantic.module_resolver.remove_module(change.id);
             semantic.symbol_tables.remove(&change.id);
             source.sources.remove(&change.id);
@@ -140,7 +150,7 @@ impl ParallelDatabase for Program {
     fn snapshot(&self) -> Snapshot<Self> {
         Snapshot::new(Self {
             jars: self.jars.snapshot(),
-            files: self.files.clone(),
+            files: self.files.snapshot(),
             workspace: self.workspace.clone(),
         })
     }
@@ -188,22 +198,30 @@ impl HasJar<LintJar> for Program {
     }
 }
 
+#[derive(Clone, Debug)]
+pub struct FileWatcherChange {
+    path: PathBuf,
+    kind: FileChangeKind,
+}
+
+impl FileWatcherChange {
+    pub fn new(path: PathBuf, kind: FileChangeKind) -> Self {
+        Self { path, kind }
+    }
+}
+
 #[derive(Copy, Clone, Debug)]
-pub struct FileChange {
+struct FileChange {
     id: FileId,
     kind: FileChangeKind,
 }
 
 impl FileChange {
-    pub fn new(file_id: FileId, kind: FileChangeKind) -> Self {
-        Self { id: file_id, kind }
-    }
-
-    pub fn file_id(&self) -> FileId {
+    fn file_id(self) -> FileId {
         self.id
     }
 
-    pub fn kind(&self) -> FileChangeKind {
+    fn kind(self) -> FileChangeKind {
         self.kind
     }
 }
@@ -213,4 +231,75 @@ pub enum FileChangeKind {
     Created,
     Modified,
     Deleted,
+}
+
+#[derive(Default, Debug)]
+struct AggregatedChanges {
+    changes: FxHashMap<FileId, FileChangeKind>,
+}
+
+impl AggregatedChanges {
+    fn add(&mut self, change: FileChange) {
+        match self.changes.entry(change.file_id()) {
+            Entry::Occupied(mut entry) => {
+                let merged = entry.get_mut();
+
+                match (merged, change.kind()) {
+                    (FileChangeKind::Created, FileChangeKind::Deleted) => {
+                        // Deletion after creations means that ruff never saw the file.
+                        entry.remove();
+                    }
+                    (FileChangeKind::Created, FileChangeKind::Modified) => {
+                        // No-op, for ruff, modifying a file that it doesn't yet know that it exists is still considered a creation.
+                    }
+
+                    (FileChangeKind::Modified, FileChangeKind::Created) => {
+                        // Uhh, that should probably not happen. Continue considering it a modification.
+                    }
+
+                    (FileChangeKind::Modified, FileChangeKind::Deleted) => {
+                        *entry.get_mut() = FileChangeKind::Deleted;
+                    }
+
+                    (FileChangeKind::Deleted, FileChangeKind::Created) => {
+                        *entry.get_mut() = FileChangeKind::Modified;
+                    }
+
+                    (FileChangeKind::Deleted, FileChangeKind::Modified) => {
+                        // That's weird, but let's consider it a modification.
+                        *entry.get_mut() = FileChangeKind::Modified;
+                    }
+
+                    (FileChangeKind::Created, FileChangeKind::Created)
+                    | (FileChangeKind::Modified, FileChangeKind::Modified)
+                    | (FileChangeKind::Deleted, FileChangeKind::Deleted) => {
+                        // No-op transitions. Some of them should be impossible but we handle them anyway.
+                    }
+                }
+            }
+            Entry::Vacant(entry) => {
+                entry.insert(change.kind());
+            }
+        }
+    }
+
+    fn extend<I>(&mut self, changes: I)
+    where
+        I: IntoIterator<Item = FileChange>,
+    {
+        let iter = changes.into_iter();
+        let (lower, _) = iter.size_hint();
+        self.changes.reserve(lower);
+
+        for change in iter {
+            self.add(change);
+        }
+    }
+
+    fn iter(&self) -> impl Iterator<Item = FileChange> + '_ {
+        self.changes.iter().map(|(id, kind)| FileChange {
+            id: *id,
+            kind: *kind,
+        })
+    }
 }

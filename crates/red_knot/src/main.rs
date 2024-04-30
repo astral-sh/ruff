@@ -1,11 +1,9 @@
 #![allow(clippy::dbg_macro)]
 
-use std::collections::hash_map::Entry;
 use std::path::Path;
 use std::sync::Mutex;
 
 use crossbeam::channel as crossbeam_channel;
-use rustc_hash::FxHashMap;
 use tracing::subscriber::Interest;
 use tracing::{Level, Metadata};
 use tracing_subscriber::filter::LevelFilter;
@@ -14,10 +12,9 @@ use tracing_subscriber::{Layer, Registry};
 use tracing_tree::time::Uptime;
 
 use red_knot::db::{HasJar, ParallelDatabase, QueryError, SemanticDb, SourceDb, SourceJar};
-use red_knot::files::FileId;
 use red_knot::module::{ModuleSearchPath, ModuleSearchPathKind};
 use red_knot::program::check::ExecutionMode;
-use red_knot::program::{FileChange, FileChangeKind, Program};
+use red_knot::program::{FileWatcherChange, Program};
 use red_knot::watch::FileWatcher;
 use red_knot::Workspace;
 
@@ -72,12 +69,9 @@ fn main() -> anyhow::Result<()> {
     let file_changes_notifier = main_loop.file_changes_notifier();
 
     // Watch for file changes and re-trigger the analysis.
-    let mut file_watcher = FileWatcher::new(
-        move |changes| {
-            file_changes_notifier.notify(changes);
-        },
-        program.files().clone(),
-    )?;
+    let mut file_watcher = FileWatcher::new(move |changes| {
+        file_changes_notifier.notify(changes);
+    })?;
 
     file_watcher.watch_folder(workspace_folder)?;
 
@@ -157,7 +151,7 @@ impl MainLoop {
                 }
                 MainLoopMessage::ApplyChanges(changes) => {
                     // Automatically cancels any pending queries and waits for them to complete.
-                    program.apply_changes(changes.iter());
+                    program.apply_changes(changes);
                 }
                 MainLoopMessage::CheckCompleted(diagnostics) => {
                     dbg!(diagnostics);
@@ -184,7 +178,7 @@ struct FileChangesNotifier {
 }
 
 impl FileChangesNotifier {
-    fn notify(&self, changes: Vec<FileChange>) {
+    fn notify(&self, changes: Vec<FileWatcherChange>) {
         self.sender
             .send(OrchestratorMessage::FileChanges(changes))
             .unwrap();
@@ -250,10 +244,7 @@ impl Orchestrator {
         }
     }
 
-    fn debounce_changes(&self, changes: Vec<FileChange>) {
-        let mut aggregated_changes = AggregatedChanges::default();
-        aggregated_changes.extend(changes);
-
+    fn debounce_changes(&self, mut changes: Vec<FileWatcherChange>) {
         loop {
             // Consume possibly incoming file change messages before running a new analysis, but don't wait for more than 100ms.
             crossbeam_channel::select! {
@@ -263,7 +254,7 @@ impl Orchestrator {
                             return self.shutdown();
                         }
                         Ok(OrchestratorMessage::FileChanges(file_changes)) => {
-                            aggregated_changes.extend(file_changes);
+                            changes.extend(file_changes);
                         }
 
                         Ok(OrchestratorMessage::CheckProgramCompleted { .. })=> {
@@ -279,7 +270,7 @@ impl Orchestrator {
                 },
                 default(std::time::Duration::from_millis(10)) => {
                     // No more file changes after 10 ms, send the changes and schedule a new analysis
-                    self.sender.send(MainLoopMessage::ApplyChanges(aggregated_changes)).unwrap();
+                    self.sender.send(MainLoopMessage::ApplyChanges(changes)).unwrap();
                     self.sender.send(MainLoopMessage::CheckProgram { revision: self.revision}).unwrap();
                     return;
                 }
@@ -298,7 +289,7 @@ impl Orchestrator {
 enum MainLoopMessage {
     CheckProgram { revision: usize },
     CheckCompleted(Vec<String>),
-    ApplyChanges(AggregatedChanges),
+    ApplyChanges(Vec<FileWatcherChange>),
     Exit,
 }
 
@@ -312,77 +303,7 @@ enum OrchestratorMessage {
         revision: usize,
     },
 
-    FileChanges(Vec<FileChange>),
-}
-
-#[derive(Default, Debug)]
-struct AggregatedChanges {
-    changes: FxHashMap<FileId, FileChangeKind>,
-}
-
-impl AggregatedChanges {
-    fn add(&mut self, change: FileChange) {
-        match self.changes.entry(change.file_id()) {
-            Entry::Occupied(mut entry) => {
-                let merged = entry.get_mut();
-
-                match (merged, change.kind()) {
-                    (FileChangeKind::Created, FileChangeKind::Deleted) => {
-                        // Deletion after creations means that ruff never saw the file.
-                        entry.remove();
-                    }
-                    (FileChangeKind::Created, FileChangeKind::Modified) => {
-                        // No-op, for ruff, modifying a file that it doesn't yet know that it exists is still considered a creation.
-                    }
-
-                    (FileChangeKind::Modified, FileChangeKind::Created) => {
-                        // Uhh, that should probably not happen. Continue considering it a modification.
-                    }
-
-                    (FileChangeKind::Modified, FileChangeKind::Deleted) => {
-                        *entry.get_mut() = FileChangeKind::Deleted;
-                    }
-
-                    (FileChangeKind::Deleted, FileChangeKind::Created) => {
-                        *entry.get_mut() = FileChangeKind::Modified;
-                    }
-
-                    (FileChangeKind::Deleted, FileChangeKind::Modified) => {
-                        // That's weird, but let's consider it a modification.
-                        *entry.get_mut() = FileChangeKind::Modified;
-                    }
-
-                    (FileChangeKind::Created, FileChangeKind::Created)
-                    | (FileChangeKind::Modified, FileChangeKind::Modified)
-                    | (FileChangeKind::Deleted, FileChangeKind::Deleted) => {
-                        // No-op transitions. Some of them should be impossible but we handle them anyway.
-                    }
-                }
-            }
-            Entry::Vacant(entry) => {
-                entry.insert(change.kind());
-            }
-        }
-    }
-
-    fn extend<I>(&mut self, changes: I)
-    where
-        I: IntoIterator<Item = FileChange>,
-        I::IntoIter: ExactSizeIterator,
-    {
-        let iter = changes.into_iter();
-        self.changes.reserve(iter.len());
-
-        for change in iter {
-            self.add(change);
-        }
-    }
-
-    fn iter(&self) -> impl Iterator<Item = FileChange> + '_ {
-        self.changes
-            .iter()
-            .map(|(id, kind)| FileChange::new(*id, *kind))
-    }
+    FileChanges(Vec<FileWatcherChange>),
 }
 
 fn setup_tracing() {
