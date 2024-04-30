@@ -29,6 +29,9 @@ name = "python"
 language-servers = ["ruff", "pylsp"]
 ```
 
+> \[!NOTE\]
+> Multiple language servers for a single language are only supported in Helix version [`23.10`](https://github.com/helix-editor/helix/blob/master/CHANGELOG.md#2310-2023-10-24) and later.
+
 Once you've set up the server, you should see diagnostics in your Python files. Code actions and other LSP features should also be available.
 
 ![image](assets/SuccessfulHelixSetup.png "A screenshot showing an open Python file in Helix with highlighted diagnostics and a code action dropdown menu open")
