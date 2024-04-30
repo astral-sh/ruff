@@ -197,16 +197,14 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
 
     // Generate a diagnostic for every import, but share fixes across all imports within the same
     // statement (excluding those that are ignored).
-    for ((node_id, exceptions), imports) in unused {
+    for ((import_statement, exceptions), bindings) in unused {
         let in_except_handler =
             exceptions.intersects(Exceptions::MODULE_NOT_FOUND_ERROR | Exceptions::IMPORT_ERROR);
-        let multiple = imports.len() > 1;
-        // FIXME: rename "imports" to "bindings"
-        // FIXME: rename "node_id" to "import_statement"
+        let multiple = bindings.len() > 1;
 
         // divide bindings in the import statement by how we want to fix them
         let (to_explicit, to_remove): (Vec<_>, Vec<_>) =
-            imports
+            bindings
                 .into_iter()
                 .partition(|ImportBinding { import, .. }| {
                     in_init && is_first_party(checker, &import.qualified_name().to_string())
@@ -216,8 +214,8 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
         let (fix_remove, fix_explicit) =
             if !in_except_handler && !checker.settings.preview.is_enabled() {
                 (
-                    fix_by_removing_imports(checker, node_id, &to_remove, in_init).ok(),
-                    fix_by_reexporting(checker, node_id, &to_explicit, dunder_all).ok(),
+                    fix_by_removing_imports(checker, import_statement, &to_remove, in_init).ok(),
+                    fix_by_reexporting(checker, import_statement, &to_explicit, dunder_all).ok(),
                 )
             } else {
                 (None, None)
