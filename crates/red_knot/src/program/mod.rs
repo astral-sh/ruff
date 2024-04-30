@@ -1,3 +1,5 @@
+use ruff_formatter::PrintedRange;
+use ruff_text_size::TextRange;
 use std::path::Path;
 use std::sync::Arc;
 
@@ -6,6 +8,9 @@ use crate::db::{
     QueryResult, SemanticDb, SemanticJar, Snapshot, SourceDb, SourceJar,
 };
 use crate::files::{FileId, Files};
+use crate::format::{
+    check_formatted, format_file, format_file_range, FormatDb, FormatError, FormatJar,
+};
 use crate::lint::{lint_semantic, lint_syntax, Diagnostics};
 use crate::module::{
     add_module, file_to_module, path_to_module, resolve_module, set_module_search_paths, Module,
@@ -18,6 +23,7 @@ use crate::types::{infer_symbol_type, Type};
 use crate::Workspace;
 
 pub mod check;
+mod format;
 
 #[derive(Debug)]
 pub struct Program {
@@ -39,7 +45,7 @@ impl Program {
     where
         I: IntoIterator<Item = FileChange>,
     {
-        let (source, semantic, lint) = self.jars_mut();
+        let (source, semantic, lint, format) = self.jars_mut();
         for change in changes {
             semantic.module_resolver.remove_module(change.id);
             semantic.symbol_tables.remove(&change.id);
@@ -49,6 +55,7 @@ impl Program {
             semantic.type_store.remove_module(change.id);
             lint.lint_syntax.remove(&change.id);
             lint.lint_semantic.remove(&change.id);
+            format.formatted.remove(&change.id);
         }
     }
 
@@ -124,6 +131,24 @@ impl LintDb for Program {
     }
 }
 
+impl FormatDb for Program {
+    fn format_file(&self, file_id: FileId) -> Result<String, FormatError> {
+        format_file(self, file_id)
+    }
+
+    fn format_file_range(
+        &self,
+        file_id: FileId,
+        range: TextRange,
+    ) -> Result<PrintedRange, FormatError> {
+        format_file_range(self, file_id, range)
+    }
+
+    fn check_file_formatted(&self, file_id: FileId) -> Result<bool, FormatError> {
+        check_formatted(self, file_id)
+    }
+}
+
 impl Db for Program {}
 
 impl Database for Program {
@@ -147,7 +172,7 @@ impl ParallelDatabase for Program {
 }
 
 impl HasJars for Program {
-    type Jars = (SourceJar, SemanticJar, LintJar);
+    type Jars = (SourceJar, SemanticJar, LintJar, FormatJar);
 
     fn jars(&self) -> QueryResult<&Self::Jars> {
         self.jars.jars()
@@ -185,6 +210,16 @@ impl HasJar<LintJar> for Program {
 
     fn jar_mut(&mut self) -> &mut LintJar {
         &mut self.jars_mut().2
+    }
+}
+
+impl HasJar<FormatJar> for Program {
+    fn jar(&self) -> QueryResult<&FormatJar> {
+        Ok(&self.jars()?.3)
+    }
+
+    fn jar_mut(&mut self) -> &mut FormatJar {
+        &mut self.jars_mut().3
     }
 }
 

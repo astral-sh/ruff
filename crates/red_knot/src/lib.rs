@@ -12,6 +12,7 @@ pub mod cache;
 pub mod cancellation;
 pub mod db;
 pub mod files;
+mod format;
 pub mod hir;
 pub mod lint;
 pub mod module;
