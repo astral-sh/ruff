@@ -56,6 +56,7 @@ impl Violation for AbstractBaseClassWithoutAbstractMethod {
         format!("`{name}` is an abstract base class, but it has no abstract methods")
     }
 }
+
 /// ## What it does
 /// Checks for empty methods in abstract base classes without an abstract
 /// decorator.
@@ -156,8 +157,11 @@ pub(crate) fn abstract_base_class(
     let mut has_abstract_method = false;
     for stmt in body {
         // https://github.com/PyCQA/flake8-bugbear/issues/293
-        // Ignore abc's that declares a class attribute that must be set
-        if let Stmt::AnnAssign(_) | Stmt::Assign(_) = stmt {
+        // Ignore abc's that declares a class attribute that must be set.
+        if matches!(
+            stmt,
+            Stmt::AnnAssign(ast::StmtAnnAssign { value: None, .. })
+        ) {
             has_abstract_method = true;
             continue;
         }
