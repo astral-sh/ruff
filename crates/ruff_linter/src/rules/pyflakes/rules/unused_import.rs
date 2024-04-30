@@ -192,6 +192,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
     }
 
     let in_init = checker.path().ends_with("__init__.py");
+    let fix_init = checker.settings.preview.is_enabled();
     // TODO: find the `__all__` node
     let dunder_all = None;
 
@@ -211,15 +212,14 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
                 });
 
         // generate fixes that are shared across bindings in the statement
-        let (fix_remove, fix_explicit) =
-            if !in_except_handler && checker.settings.preview.is_enabled() {
-                (
-                    fix_by_removing_imports(checker, import_statement, &to_remove, in_init).ok(),
-                    fix_by_reexporting(checker, import_statement, &to_explicit, dunder_all).ok(),
-                )
-            } else {
-                (None, None)
-            };
+        let (fix_remove, fix_explicit) = if (!in_init || fix_init) && !in_except_handler {
+            (
+                fix_by_removing_imports(checker, import_statement, &to_remove, in_init).ok(),
+                fix_by_reexporting(checker, import_statement, &to_explicit, dunder_all).ok(),
+            )
+        } else {
+            (None, None)
+        };
 
         for (binding, fix) in iter::Iterator::chain(
             iter::zip(to_remove, iter::repeat(fix_remove)),

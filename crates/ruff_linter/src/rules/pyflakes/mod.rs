@@ -56,8 +56,6 @@ mod tests {
     #[test_case(Rule::UnusedImport, Path::new("F401_21.py"))]
     #[test_case(Rule::UnusedImport, Path::new("F401_22.py"))]
     #[test_case(Rule::UnusedImport, Path::new("F401_23.py"))]
-    #[test_case(Rule::UnusedImport, Path::new("F401_24/__init__.py"))]
-    #[test_case(Rule::UnusedImport, Path::new("F401_25__all/__init__.py"))]
     #[test_case(Rule::ImportShadowedByLoopVar, Path::new("F402.py"))]
     #[test_case(Rule::ImportShadowedByLoopVar, Path::new("F402.ipynb"))]
     #[test_case(Rule::UndefinedLocalWithImportStar, Path::new("F403.py"))]
@@ -207,6 +205,8 @@ mod tests {
     }
 
     #[test_case(Rule::UnusedVariable, Path::new("F841_4.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_24/__init__.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_25__all/__init__.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",
