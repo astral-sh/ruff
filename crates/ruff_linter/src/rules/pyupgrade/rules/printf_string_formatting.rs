@@ -40,10 +40,11 @@ use crate::rules::pyupgrade::helpers::curly_escape;
 /// ```
 ///
 /// ```python
-/// f"{'Hello'}, {'World'}" # "Hello, World"
+/// f"{'Hello'}, {'World'}"  # "Hello, World"
 /// ```
 ///
 /// ## Fix safety
+///
 /// In cases where the format string contains a single generic format specifier
 /// (e.g. `%s`), and the right-hand side is an ambiguous expression,
 /// we cannot offer a safe fix.
