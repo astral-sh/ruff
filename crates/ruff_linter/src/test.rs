@@ -10,6 +10,9 @@ use itertools::Itertools;
 use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{Applicability, Diagnostic, FixAvailability};
+use ruff_notebook::Notebook;
+#[cfg(not(fuzzing))]
+use ruff_notebook::NotebookError;
 use ruff_python_ast::PySourceType;
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
@@ -29,9 +32,6 @@ use crate::rules::pycodestyle::rules::syntax_error;
 use crate::settings::types::UnsafeFixes;
 use crate::settings::{flags, LinterSettings};
 use crate::source_kind::SourceKind;
-use ruff_notebook::Notebook;
-#[cfg(not(fuzzing))]
-use ruff_notebook::NotebookError;
 
 #[cfg(not(fuzzing))]
 pub(crate) fn test_resource_path(path: impl AsRef<Path>) -> std::path::PathBuf {
@@ -123,7 +123,7 @@ pub(crate) fn test_contents<'a>(
         &indexer,
     );
     let LinterResult {
-        data: (diagnostics, _imports),
+        data: diagnostics,
         error,
     } = check_path(
         path,
@@ -190,7 +190,7 @@ pub(crate) fn test_contents<'a>(
             );
 
             let LinterResult {
-                data: (fixed_diagnostics, _),
+                data: fixed_diagnostics,
                 error: fixed_error,
             } = check_path(
                 path,

@@ -17,7 +17,6 @@ use ruff_linter::registry::Rule;
 use ruff_linter::settings::types::UnsafeFixes;
 use ruff_linter::settings::{flags, LinterSettings};
 use ruff_linter::{fs, warn_user_once, IOError};
-use ruff_python_ast::imports::ImportMap;
 use ruff_source_file::SourceFileBuilder;
 use ruff_text_size::{TextRange, TextSize};
 use ruff_workspace::resolver::{
@@ -134,7 +133,6 @@ pub(crate) fn check(
                             dummy,
                             TextSize::default(),
                         )],
-                        ImportMap::default(),
                         FxHashMap::default(),
                     )
                 } else {

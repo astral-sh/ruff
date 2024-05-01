@@ -10,7 +10,6 @@ use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::Diagnostic;
 use ruff_notebook::Notebook;
-use ruff_python_ast::imports::ImportMap;
 use ruff_python_ast::{PySourceType, Suite};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
@@ -62,7 +61,7 @@ pub type FixTable = FxHashMap<Rule, usize>;
 
 pub struct FixerResult<'a> {
     /// The result returned by the linter, after applying any fixes.
-    pub result: LinterResult<(Vec<Message>, Option<ImportMap>)>,
+    pub result: LinterResult<Vec<Message>>,
     /// The resulting source code, after applying any fixes.
     pub transformed: Cow<'a, SourceKind>,
     /// The number of fixes applied for each [`Rule`].
@@ -84,10 +83,9 @@ pub fn check_path(
     source_kind: &SourceKind,
     source_type: PySourceType,
     tokens: TokenSource,
-) -> LinterResult<(Vec<Diagnostic>, Option<ImportMap>)> {
+) -> LinterResult<Vec<Diagnostic>> {
     // Aggregate all diagnostics.
     let mut diagnostics = vec![];
-    let mut imports = None;
     let mut error = None;
 
     // Collect doc lines. This requires a rare mix of tokens (for comments) and AST
@@ -169,19 +167,18 @@ pub fn check_path(
                     ));
                 }
                 if use_imports {
-                    let (import_diagnostics, module_imports) = check_imports(
+                    let import_diagnostics = check_imports(
                         &python_ast,
                         locator,
                         indexer,
                         &directives.isort,
                         settings,
                         stylist,
-                        path,
                         package,
                         source_type,
                         cell_offsets,
                     );
-                    imports = module_imports;
+
                     diagnostics.extend(import_diagnostics);
                 }
                 if use_doc_lines {
@@ -340,7 +337,7 @@ pub fn check_path(
         }
     }
 
-    LinterResult::new((diagnostics, imports), error)
+    LinterResult::new(diagnostics, error)
 }
 
 const MAX_ITERATIONS: usize = 100;
@@ -410,7 +407,7 @@ pub fn add_noqa_to_path(
     // TODO(dhruvmanila): Add support for Jupyter Notebooks
     add_noqa(
         path,
-        &diagnostics.0,
+        &diagnostics,
         &locator,
         indexer.comment_ranges(),
         &settings.external,
@@ -429,7 +426,7 @@ pub fn lint_only(
     source_kind: &SourceKind,
     source_type: PySourceType,
     data: ParseSource,
-) -> LinterResult<(Vec<Message>, Option<ImportMap>)> {
+) -> LinterResult<Vec<Message>> {
     // Tokenize once.
     let tokens = data.into_token_source(source_kind, source_type);
 
@@ -465,12 +462,7 @@ pub fn lint_only(
         tokens,
     );
 
-    result.map(|(diagnostics, imports)| {
-        (
-            diagnostics_to_messages(diagnostics, path, &locator, &directives),
-            imports,
-        )
-    })
+    result.map(|diagnostics| diagnostics_to_messages(diagnostics, path, &locator, &directives))
 }
 
 /// Convert from diagnostics to messages.
@@ -583,7 +575,7 @@ pub fn lint_fix<'a>(
             code: fixed_contents,
             fixes: applied,
             source_map,
-        }) = fix_file(&result.data.0, &locator, unsafe_fixes)
+        }) = fix_file(&result.data, &locator, unsafe_fixes)
         {
             if iterations < MAX_ITERATIONS {
                 // Count the number of fixed errors.
@@ -600,15 +592,12 @@ pub fn lint_fix<'a>(
                 continue;
             }
 
-            report_failed_to_converge_error(path, transformed.source_code(), &result.data.0);
+            report_failed_to_converge_error(path, transformed.source_code(), &result.data);
         }
 
         return Ok(FixerResult {
-            result: result.map(|(diagnostics, imports)| {
-                (
-                    diagnostics_to_messages(diagnostics, path, &locator, &directives),
-                    imports,
-                )
+            result: result.map(|diagnostics| {
+                diagnostics_to_messages(diagnostics, path, &locator, &directives)
             }),
             transformed,
             fixed,

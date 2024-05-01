@@ -611,7 +611,7 @@ mod tests {
             &indexer,
         );
         let LinterResult {
-            data: (mut diagnostics, ..),
+            data: mut diagnostics,
             ..
         } = check_path(
             Path::new("<filename>"),

@@ -179,8 +179,7 @@ impl Workspace {
 
         // Generate checks.
         let LinterResult {
-            data: (diagnostics, _imports),
-            ..
+            data: diagnostics, ..
         } = check_path(
             Path::new("<filename>"),
             None,
