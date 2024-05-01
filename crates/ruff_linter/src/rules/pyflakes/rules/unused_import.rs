@@ -6,6 +6,7 @@ use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{Applicability, Diagnostic, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::{Stmt, StmtImportFrom};
 use ruff_python_semantic::{AnyImport, Exceptions, Imported, NodeId, Scope};
 use ruff_text_size::{Ranged, TextRange};
 
@@ -125,10 +126,10 @@ impl Violation for UnusedImport {
     }
 }
 
-fn is_first_party(qualified_name: &str, checker: &Checker) -> bool {
+fn is_first_party(qualified_name: &str, level: u32, checker: &Checker) -> bool {
     let category = isort::categorize(
         qualified_name,
-        0,
+        level,
         &checker.settings.src,
         checker.package(),
         checker.settings.isort.detect_same_package,
@@ -212,6 +213,13 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
         let in_except_handler =
             exceptions.intersects(Exceptions::MODULE_NOT_FOUND_ERROR | Exceptions::IMPORT_ERROR);
         let multiple = bindings.len() > 1;
+        let level = match checker.semantic().statement(import_statement) {
+            Stmt::Import(_) => 0,
+            Stmt::ImportFrom(StmtImportFrom { level, .. }) => *level,
+            _ => {
+                continue;
+            }
+        };
 
         // pair each binding with context; divide them by how we want to fix them
         let (to_reexport, to_remove): (Vec<_>, Vec<_>) = bindings
@@ -223,6 +231,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
                     Some(UnusedImportContext::Init {
                         first_party: is_first_party(
                             &binding.import.qualified_name().to_string(),
+                            level,
                             checker,
                         ),
                         dunder_all: dunder_all.is_some(),
