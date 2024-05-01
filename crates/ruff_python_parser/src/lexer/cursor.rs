@@ -8,7 +8,7 @@ pub(super) struct Cursor<'src> {
     source: &'src str,
 
     /// The start position in the source text of the next character.
-    position: TextSize,
+    position: usize,
 
     /// Offset of the current token from the start of the source. The length of the current
     /// token can be computed by `self.position - self.current_start`.
@@ -24,7 +24,7 @@ impl<'src> Cursor<'src> {
 
         Self {
             source,
-            position: TextSize::new(0),
+            position: 0,
             current_start: TextSize::new(0),
             #[cfg(debug_assertions)]
             prev_char: EOF_CHAR,
@@ -53,7 +53,7 @@ impl<'src> Cursor<'src> {
 
     /// Returns the remaining text to lex.
     pub(super) fn rest(&self) -> &'src str {
-        self.source.get(self.position.to_usize()..).unwrap_or("")
+        self.source.get(self.position..).unwrap_or("")
     }
 
     // SAFETY: The `Cursor::new` call would panic if the string length is larger than a `u32`.
@@ -62,22 +62,26 @@ impl<'src> Cursor<'src> {
         TextSize::new(self.rest().len() as u32)
     }
 
+    // SAFETY: The `Cursor::new` call would panic if the string length is larger than a `u32`.
+    #[allow(clippy::cast_possible_truncation)]
     pub(super) fn token_len(&self) -> TextSize {
-        self.position - self.current_start
+        TextSize::new(self.position as u32) - self.current_start
     }
 
+    // SAFETY: The `Cursor::new` call would panic if the string length is larger than a `u32`.
+    #[allow(clippy::cast_possible_truncation)]
     pub(super) fn start_token(&mut self) {
-        self.current_start = self.position;
+        self.current_start = TextSize::new(self.position as u32);
     }
 
     pub(super) fn is_eof(&self) -> bool {
-        self.rest().is_empty()
+        self.position >= self.source.len()
     }
 
     /// Consumes the next character
     pub(super) fn bump(&mut self) -> Option<char> {
         let prev = self.rest().chars().next()?;
-        self.position += prev.text_len();
+        self.position += prev.text_len().to_usize();
 
         #[cfg(debug_assertions)]
         {
@@ -151,11 +155,11 @@ impl<'src> Cursor<'src> {
             self.prev_char = self.rest()[..count].chars().next_back().unwrap_or('\0');
         }
 
-        self.position += TextSize::try_from(count).unwrap();
+        self.position += count;
     }
 
     /// Skips to the end of the input stream.
     pub(super) fn skip_to_end(&mut self) {
-        self.position = self.source.text_len();
+        self.position = self.source.len();
     }
 }
