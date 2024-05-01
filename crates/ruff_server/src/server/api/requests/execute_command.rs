@@ -64,6 +64,7 @@ impl super::SyncRequestHandler for ExecuteCommand {
                 Command::FixAll => {
                     let edits = super::code_action_resolve::fix_all_edit(
                         snapshot.document(),
+                        snapshot.url(),
                         snapshot.settings().linter(),
                         snapshot.encoding(),
                     )
@@ -83,6 +84,7 @@ impl super::SyncRequestHandler for ExecuteCommand {
                 Command::OrganizeImports => {
                     let edits = super::code_action_resolve::organize_imports_edit(
                         snapshot.document(),
+                        snapshot.url(),
                         snapshot.settings().linter(),
                         snapshot.encoding(),
                     )

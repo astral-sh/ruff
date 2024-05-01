@@ -95,17 +95,18 @@ pub(super) fn resolve_edit_for_fix_all(
     tracker.set_edits_for_document(
         url.clone(),
         version,
-        fix_all_edit(document, linter_settings, encoding)?,
+        fix_all_edit(document, url, linter_settings, encoding)?,
     )?;
     Ok(tracker.into_workspace_edit())
 }
 
 pub(super) fn fix_all_edit(
     document: &crate::edit::Document,
+    document_url: &types::Url,
     linter_settings: &LinterSettings,
     encoding: PositionEncoding,
 ) -> crate::Result<Vec<types::TextEdit>> {
-    crate::fix::fix_all(document, linter_settings, encoding)
+    crate::fix::fix_all(document, document_url, linter_settings, encoding)
 }
 
 pub(super) fn resolve_edit_for_organize_imports(
@@ -120,13 +121,14 @@ pub(super) fn resolve_edit_for_organize_imports(
     tracker.set_edits_for_document(
         url.clone(),
         version,
-        organize_imports_edit(document, linter_settings, encoding)?,
+        organize_imports_edit(document, url, linter_settings, encoding)?,
     )?;
     Ok(tracker.into_workspace_edit())
 }
 
 pub(super) fn organize_imports_edit(
     document: &crate::edit::Document,
+    document_url: &types::Url,
     linter_settings: &LinterSettings,
     encoding: PositionEncoding,
 ) -> crate::Result<Vec<types::TextEdit>> {
@@ -138,5 +140,5 @@ pub(super) fn organize_imports_edit(
     .into_iter()
     .collect();
 
-    crate::fix::fix_all(document, &linter_settings, encoding)
+    crate::fix::fix_all(document, document_url, &linter_settings, encoding)
 }

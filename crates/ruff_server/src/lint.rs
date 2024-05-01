@@ -1,11 +1,10 @@
 //! Access to the Ruff linting API for the LSP
 
-use std::path::Path;
-
 use ruff_diagnostics::{Applicability, Diagnostic, DiagnosticKind, Fix};
 use ruff_linter::{
     directives::{extract_directives, Flags},
     linter::{check_path, LinterResult, TokenSource},
+    packaging::detect_package_root,
     registry::AsRule,
     settings::{flags, LinterSettings},
     source_kind::SourceKind,
@@ -40,11 +39,23 @@ pub(crate) struct DiagnosticFix {
 
 pub(crate) fn check(
     document: &crate::edit::Document,
+    document_url: &lsp_types::Url,
     linter_settings: &LinterSettings,
     encoding: PositionEncoding,
 ) -> Vec<lsp_types::Diagnostic> {
     let contents = document.contents();
     let index = document.index().clone();
+
+    let document_path = document_url
+        .to_file_path()
+        .expect("document URL should be a valid file path");
+
+    let package = detect_package_root(
+        document_path
+            .parent()
+            .expect("a path to a document should have a parent path"),
+        &linter_settings.namespace_packages,
+    );
 
     let source_type = PySourceType::default();
 
@@ -71,8 +82,8 @@ pub(crate) fn check(
         data: (diagnostics, _imports),
         ..
     } = check_path(
-        Path::new("<filename>"),
-        None,
+        &document_path,
+        package,
         &locator,
         &stylist,
         &indexer,

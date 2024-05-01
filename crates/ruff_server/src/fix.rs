@@ -1,11 +1,12 @@
 use ruff_linter::{
     linter::{FixerResult, LinterResult},
+    packaging::detect_package_root,
     settings::{flags, types::UnsafeFixes, LinterSettings},
     source_kind::SourceKind,
 };
 use ruff_python_ast::PySourceType;
 use ruff_source_file::LineIndex;
-use std::{borrow::Cow, path::Path};
+use std::borrow::Cow;
 
 use crate::{
     edit::{Replacement, ToRangeExt},
@@ -14,10 +15,22 @@ use crate::{
 
 pub(crate) fn fix_all(
     document: &crate::edit::Document,
+    document_url: &lsp_types::Url,
     linter_settings: &LinterSettings,
     encoding: PositionEncoding,
 ) -> crate::Result<Vec<lsp_types::TextEdit>> {
     let source = document.contents();
+
+    let document_path = document_url
+        .to_file_path()
+        .expect("document URL should be a valid file path");
+
+    let package = detect_package_root(
+        document_path
+            .parent()
+            .expect("a path to a document should have a parent path"),
+        &linter_settings.namespace_packages,
+    );
 
     let source_type = PySourceType::default();
 
@@ -35,8 +48,8 @@ pub(crate) fn fix_all(
         result: LinterResult { error, .. },
         ..
     } = ruff_linter::linter::lint_fix(
-        Path::new("<filename>"),
-        None,
+        &document_path,
+        package,
         flags::Noqa::Enabled,
         UnsafeFixes::Disabled,
         linter_settings,
