@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
 ---
-PYI059.pyi:8:7: PYI059 `Generic[]` should always be the last base class
+PYI059.pyi:8:7: PYI059 [*] `Generic[]` should always be the last base class
    |
  6 | V = TypeVar('V')
  7 | 
@@ -12,7 +12,17 @@ PYI059.pyi:8:7: PYI059 `Generic[]` should always be the last base class
    |
    = help: Move `Generic[]` to be the last base class
 
-PYI059.pyi:12:7: PYI059 `Generic[]` should always be the last base class
+ℹ Safe fix
+5 5 | K = TypeVar('K')
+6 6 | V = TypeVar('V')
+7 7 | 
+8   |-class LinkedList(Generic[T], Sized):  # PYI059
+  8 |+class LinkedList(Sized, Generic[T]):  # PYI059
+9 9 |     def __init__(self) -> None: ...
+10 10 |     def push(self, item: T) -> None: ...
+11 11 | 
+
+PYI059.pyi:12:7: PYI059 [*] `Generic[]` should always be the last base class
    |
 10 |     def push(self, item: T) -> None: ...
 11 | 
@@ -22,3 +32,15 @@ PYI059.pyi:12:7: PYI059 `Generic[]` should always be the last base class
 14 |     Iterable[Tuple[K, V]],
    |
    = help: Move `Generic[]` to be the last base class
+
+ℹ Safe fix
+10 10 |     def push(self, item: T) -> None: ...
+11 11 | 
+12 12 | class MyMapping(  # PYI059
+13    |-    t.Generic[K, V],
+14 13 |     Iterable[Tuple[K, V]],
+15    |-    Container[Tuple[K, V]],
+   14 |+    Container[Tuple[K, V]], t.Generic[K, V],
+16 15 | ):
+17 16 |     ...
+18 17 |
