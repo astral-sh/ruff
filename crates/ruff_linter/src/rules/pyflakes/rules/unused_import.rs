@@ -12,7 +12,7 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::checkers::ast::Checker;
 use crate::fix;
 use crate::registry::Rule;
-use crate::rules::isort;
+use crate::rules::{isort, isort::ImportSection, isort::ImportType};
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 enum UnusedImportContext {
@@ -125,8 +125,7 @@ impl Violation for UnusedImport {
     }
 }
 
-fn is_first_party(checker: &Checker, qualified_name: &str) -> bool {
-    use isort::{ImportSection, ImportType};
+fn is_first_party(qualified_name: &str, checker: &Checker) -> bool {
     let category = isort::categorize(
         qualified_name,
         0,
@@ -223,8 +222,8 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
                 } else if in_init {
                     Some(UnusedImportContext::Init {
                         first_party: is_first_party(
-                            checker,
                             &binding.import.qualified_name().to_string(),
+                            checker,
                         ),
                         dunder_all: dunder_all.is_some(),
                     })
