@@ -19,9 +19,10 @@ class MyMapping(  # PYI059
     ...
 
 
-class MyList(Sized, Generic[T]):
+# Negative cases
+class MyList(Sized, Generic[T]):  # Generic already in last place
     def __init__(self) -> None:
         self._items: List[T] = []
 
-class SomeGeneric(Generic[T]):
+class SomeGeneric(Generic[T]):  # Only one generic
     pass

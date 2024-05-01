@@ -14,3 +14,10 @@ class MyMapping(  # PYI059
     Container[Tuple[K, V]],
 ):
     ...
+
+# Negative cases
+class MyList(Sized, Generic[T]):  # Generic already in last place
+    def __init__(self) -> None: ...
+
+class SomeGeneric(Generic[T]):  # Only one generic
+    ...
