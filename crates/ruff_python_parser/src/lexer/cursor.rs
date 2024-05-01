@@ -1,21 +1,31 @@
 use ruff_text_size::{TextLen, TextSize};
-use std::str::Chars;
 
 pub(crate) const EOF_CHAR: char = '\0';
 
 #[derive(Clone, Debug)]
-pub(super) struct Cursor<'a> {
-    chars: Chars<'a>,
-    source_length: TextSize,
+pub(super) struct Cursor<'src> {
+    /// Source text.
+    source: &'src str,
+
+    /// The start position in the source text of the next character.
+    position: TextSize,
+
+    /// Offset of the current token from the start of the source. The length of the current
+    /// token can be computed by `self.position - self.current_start`.
+    current_start: TextSize,
+
     #[cfg(debug_assertions)]
     prev_char: char,
 }
 
-impl<'a> Cursor<'a> {
-    pub(crate) fn new(source: &'a str) -> Self {
+impl<'src> Cursor<'src> {
+    pub(crate) fn new(source: &'src str) -> Self {
+        assert!(TextSize::try_from(source.len()).is_ok());
+
         Self {
-            source_length: source.text_len(),
-            chars: source.chars(),
+            source,
+            position: TextSize::new(0),
+            current_start: TextSize::new(0),
             #[cfg(debug_assertions)]
             prev_char: EOF_CHAR,
         }
@@ -30,43 +40,44 @@ impl<'a> Cursor<'a> {
     /// Peeks the next character from the input stream without consuming it.
     /// Returns [`EOF_CHAR`] if the file is at the end of the file.
     pub(super) fn first(&self) -> char {
-        self.chars.clone().next().unwrap_or(EOF_CHAR)
+        self.rest().chars().next().unwrap_or(EOF_CHAR)
     }
 
     /// Peeks the second character from the input stream without consuming it.
     /// Returns [`EOF_CHAR`] if the position is past the end of the file.
     pub(super) fn second(&self) -> char {
-        let mut chars = self.chars.clone();
+        let mut chars = self.rest().chars();
         chars.next();
         chars.next().unwrap_or(EOF_CHAR)
     }
 
     /// Returns the remaining text to lex.
-    pub(super) fn rest(&self) -> &'a str {
-        self.chars.as_str()
+    pub(super) fn rest(&self) -> &'src str {
+        self.source.get(self.position.to_usize()..).unwrap_or("")
     }
 
-    // SAFETY: The `source.text_len` call in `new` would panic if the string length is larger than a `u32`.
+    // SAFETY: The `Cursor::new` call would panic if the string length is larger than a `u32`.
     #[allow(clippy::cast_possible_truncation)]
     pub(super) fn text_len(&self) -> TextSize {
-        TextSize::new(self.chars.as_str().len() as u32)
+        TextSize::new(self.rest().len() as u32)
     }
 
     pub(super) fn token_len(&self) -> TextSize {
-        self.source_length - self.text_len()
+        self.position - self.current_start
     }
 
     pub(super) fn start_token(&mut self) {
-        self.source_length = self.text_len();
+        self.current_start = self.position;
     }
 
     pub(super) fn is_eof(&self) -> bool {
-        self.chars.as_str().is_empty()
+        self.rest().is_empty()
     }
 
     /// Consumes the next character
     pub(super) fn bump(&mut self) -> Option<char> {
-        let prev = self.chars.next()?;
+        let prev = self.rest().chars().next()?;
+        self.position += prev.text_len();
 
         #[cfg(debug_assertions)]
         {
@@ -86,7 +97,7 @@ impl<'a> Cursor<'a> {
     }
 
     pub(super) fn eat_char2(&mut self, c1: char, c2: char) -> bool {
-        let mut chars = self.chars.clone();
+        let mut chars = self.rest().chars();
         if chars.next() == Some(c1) && chars.next() == Some(c2) {
             self.bump();
             self.bump();
@@ -97,7 +108,7 @@ impl<'a> Cursor<'a> {
     }
 
     pub(super) fn eat_char3(&mut self, c1: char, c2: char, c3: char) -> bool {
-        let mut chars = self.chars.clone();
+        let mut chars = self.rest().chars();
         if chars.next() == Some(c1) && chars.next() == Some(c2) && chars.next() == Some(c3) {
             self.bump();
             self.bump();
@@ -137,17 +148,14 @@ impl<'a> Cursor<'a> {
     pub(super) fn skip_bytes(&mut self, count: usize) {
         #[cfg(debug_assertions)]
         {
-            self.prev_char = self.chars.as_str()[..count]
-                .chars()
-                .next_back()
-                .unwrap_or('\0');
+            self.prev_char = self.rest()[..count].chars().next_back().unwrap_or('\0');
         }
 
-        self.chars = self.chars.as_str()[count..].chars();
+        self.position += TextSize::try_from(count).unwrap();
     }
 
     /// Skips to the end of the input stream.
     pub(super) fn skip_to_end(&mut self) {
-        self.chars = "".chars();
+        self.position = self.source.text_len();
     }
 }
