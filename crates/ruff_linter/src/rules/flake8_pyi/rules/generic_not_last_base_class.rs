@@ -150,5 +150,5 @@ fn generate_fix(bases: &Arguments, generic_base_index: usize, locator: &Locator)
         format!(", {}", locator.slice(generic_base.range())),
         last_base.end(),
     );
-    return Fix::safe_edits(insertion, [deletion]);
+    Fix::safe_edits(insertion, [deletion])
 }
