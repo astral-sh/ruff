@@ -4,7 +4,7 @@ use ruff_linter::{
 };
 use ruff_workspace::{
     configuration::{Configuration, FormatConfiguration, LintConfiguration, RuleSelection},
-    pyproject::settings_toml,
+    pyproject::{find_user_settings_toml, settings_toml},
     resolver::{ConfigurationTransformer, Relativity},
 };
 use std::{
@@ -80,9 +80,23 @@ impl RuffSettingsIndex {
             }
         }
 
+        let fallback = find_user_settings_toml()
+            .and_then(|user_settings| {
+                ruff_workspace::resolver::resolve_root_settings(
+                    &user_settings,
+                    Relativity::Cwd,
+                    &EditorConfigurationTransformer(editor_settings, root),
+                )
+                .ok()
+            })
+            .unwrap_or_default();
+
         Self {
             index,
-            fallback: Arc::default(),
+            fallback: Arc::new(RuffSettings {
+                formatter: fallback.formatter,
+                linter: fallback.linter,
+            }),
         }
     }
 
