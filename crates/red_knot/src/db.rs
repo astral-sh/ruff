@@ -57,6 +57,7 @@ pub trait ParallelDatabase: Database + Send {
     /// We should avoid creating snapshots while running a query because we might want to adopt Salsa in the future (if we can figure out persistent caching).
     /// Unfortunately, the infrastructure doesn't provide an automated way of knowing when a query is run, that's
     /// why we have to "enforce" this constraint manually.
+    #[must_use]
     fn snapshot(&self) -> Snapshot<Self>;
 }
 

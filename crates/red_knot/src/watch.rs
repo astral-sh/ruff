@@ -1,38 +1,38 @@
-use anyhow::Context;
 use std::path::Path;
 
-use crate::files::Files;
-use crate::program::{FileChange, FileChangeKind};
+use anyhow::Context;
 use notify::event::{CreateKind, RemoveKind};
 use notify::{recommended_watcher, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
+
+use crate::program::{FileChangeKind, FileWatcherChange};
 
 pub struct FileWatcher {
     watcher: RecommendedWatcher,
 }
 
 pub trait EventHandler: Send + 'static {
-    fn handle(&self, changes: Vec<FileChange>);
+    fn handle(&self, changes: Vec<FileWatcherChange>);
 }
 
 impl<F> EventHandler for F
 where
-    F: Fn(Vec<FileChange>) + Send + 'static,
+    F: Fn(Vec<FileWatcherChange>) + Send + 'static,
 {
-    fn handle(&self, changes: Vec<FileChange>) {
+    fn handle(&self, changes: Vec<FileWatcherChange>) {
         let f = self;
         f(changes);
     }
 }
 
 impl FileWatcher {
-    pub fn new<E>(handler: E, files: Files) -> anyhow::Result<Self>
+    pub fn new<E>(handler: E) -> anyhow::Result<Self>
     where
         E: EventHandler,
     {
-        Self::from_handler(Box::new(handler), files)
+        Self::from_handler(Box::new(handler))
     }
 
-    fn from_handler(handler: Box<dyn EventHandler>, files: Files) -> anyhow::Result<Self> {
+    fn from_handler(handler: Box<dyn EventHandler>) -> anyhow::Result<Self> {
         let watcher = recommended_watcher(move |changes: notify::Result<Event>| {
             match changes {
                 Ok(event) => {
@@ -50,8 +50,7 @@ impl FileWatcher {
 
                     for path in event.paths {
                         if path.is_file() {
-                            let id = files.intern(&path);
-                            changes.push(FileChange::new(id, change_kind));
+                            changes.push(FileWatcherChange::new(path, change_kind));
                         }
                     }
 

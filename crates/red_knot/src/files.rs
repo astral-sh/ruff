@@ -15,9 +15,9 @@ type Map<K, V> = hashbrown::HashMap<K, V, ()>;
 pub struct FileId;
 
 // TODO we'll need a higher level virtual file system abstraction that allows testing if a file exists
-// or retrieving its content (ideally lazily and in a way that the memory can be retained later)
-// I suspect that we'll end up with a FileSystem trait and our own Path abstraction.
-#[derive(Clone, Default)]
+//  or retrieving its content (ideally lazily and in a way that the memory can be retained later)
+//  I suspect that we'll end up with a FileSystem trait and our own Path abstraction.
+#[derive(Default)]
 pub struct Files {
     inner: Arc<RwLock<FilesInner>>,
 }
@@ -35,6 +35,16 @@ impl Files {
     #[tracing::instrument(level = "debug", skip(self))]
     pub fn path(&self, id: FileId) -> Arc<Path> {
         self.inner.read().path(id)
+    }
+
+    /// Snapshots files for a new database snapshot.
+    ///
+    /// This method should not be used outside a database snapshot.
+    #[must_use]
+    pub fn snapshot(&self) -> Files {
+        Files {
+            inner: self.inner.clone(),
+        }
     }
 }
 
@@ -63,7 +73,7 @@ struct FilesInner {
     by_path: Map<FileId, ()>,
     // TODO should we use a map here to reclaim the space for removed files?
     // TODO I think we should use our own path abstraction here to avoid having to normalize paths
-    // and dealing with non-utf paths everywhere.
+    //  and dealing with non-utf paths everywhere.
     by_id: IndexVec<FileId, Arc<Path>>,
 }
 
