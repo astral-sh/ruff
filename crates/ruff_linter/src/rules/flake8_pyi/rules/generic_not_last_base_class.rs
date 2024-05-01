@@ -52,7 +52,7 @@ use crate::checkers::ast::Checker;
 pub struct GenericNotLastBaseClass;
 
 impl Violation for GenericNotLastBaseClass {
-    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Always;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -76,18 +76,38 @@ pub(crate) fn generic_not_last_base_class(
 
     let semantic = checker.semantic();
 
-    for (base_index, base) in bases.args.iter().enumerate() {
+    let generic_base_indices: Vec<usize> = bases
+        .args
+        .iter()
+        .enumerate()
+        .filter_map(|(base_index, base)| {
+            if is_generic(base, semantic) {
+                return Some(base_index);
+            }
+            return None;
+        })
+        .collect();
+
+    if generic_base_indices.len() == 0 {
+        return;
+    }
+
+    if generic_base_indices.len() == 1 {
+        let base_index = generic_base_indices[0];
         if base_index == bases.args.len() - 1 {
-            // Don't raise issue if it is the last base.
+            // Don't raise issue for the last base.
             return;
         }
 
-        if is_generic(base, semantic) {
-            let mut diagnostic = Diagnostic::new(GenericNotLastBaseClass, class_def.identifier());
-            diagnostic.set_fix(generate_fix(bases, base_index, checker.locator()));
-            checker.diagnostics.push(diagnostic);
-            break;
-        }
+        let mut diagnostic = Diagnostic::new(GenericNotLastBaseClass, class_def.identifier());
+        diagnostic.set_fix(generate_fix(bases, base_index, checker.locator()));
+        checker.diagnostics.push(diagnostic);
+    } else {
+        // No fix if multiple generics are seen in the class bases.
+        checker.diagnostics.push(Diagnostic::new(
+            GenericNotLastBaseClass,
+            class_def.identifier(),
+        ));
     }
 }
 

@@ -20,6 +20,10 @@ class MyMapping(  # PYI059
     ...
 
 
+# in case of multiple Generic[] inheritance, don't fix it.
+class C(Generic[T], Generic[K, V]): ...  # PYI059
+
+
 # Negative cases
 class MyList(Sized, Generic[T]):  # Generic already in last place
     def __init__(self) -> None:

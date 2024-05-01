@@ -43,4 +43,12 @@ PYI059.py:15:7: PYI059 [*] `Generic[]` should always be the last base class
    17 |+    Container[Tuple[K, V]], t.Generic[K, V],
 19 18 | ):
 20 19 |     ...
-21 20 |
+21 20 | 
+
+PYI059.py:24:7: PYI059 `Generic[]` should always be the last base class
+   |
+23 | # in case of multiple Generic[] inheritance, don't fix it.
+24 | class C(Generic[T], Generic[K, V]): ...  # PYI059
+   |       ^ PYI059
+   |
+   = help: Move `Generic[]` to be the last base class
