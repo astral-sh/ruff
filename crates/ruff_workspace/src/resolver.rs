@@ -336,6 +336,7 @@ pub fn python_files_in_path<'a>(
     let mut resolver = Resolver::new(pyproject_config);
     let mut seen = FxHashSet::default();
 
+    // Insert the path to the root configuration to avoid parsing the configuration a second time.
     if let Some(config_path) = &pyproject_config.path {
         seen.insert(config_path.parent().unwrap());
     }
@@ -348,9 +349,11 @@ pub fn python_files_in_path<'a>(
                         let (root, settings) =
                             resolve_scoped_settings(&pyproject, Relativity::Parent, transformer)?;
                         resolver.add(root, settings);
+                        // We found the closest configuration.
                         break;
                     }
                 } else {
+                    // We already visited this ancestor, we can stop here.
                     break;
                 }
             }
