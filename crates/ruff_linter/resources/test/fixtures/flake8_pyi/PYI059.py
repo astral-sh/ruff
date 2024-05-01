@@ -1,4 +1,5 @@
 from typing import Container, Generic, Iterable, List, Sized, Tuple, TypeVar
+import typing as t
 
 T = TypeVar('T')
 K = TypeVar('K')
@@ -12,7 +13,7 @@ class LinkedList(Generic[T], Sized):  # PYI059
         self._items.append(item)
 
 class MyMapping(  # PYI059
-    Generic[K, V],
+    t.Generic[K, V],
     Iterable[Tuple[K, V]],
     Container[Tuple[K, V]],
 ):
