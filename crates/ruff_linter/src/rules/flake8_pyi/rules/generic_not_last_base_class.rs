@@ -84,11 +84,11 @@ pub(crate) fn generic_not_last_base_class(
             if is_generic(base, semantic) {
                 return Some(base_index);
             }
-            return None;
+            None
         })
         .collect();
 
-    if generic_base_indices.len() == 0 {
+    if generic_base_indices.is_empty() {
         return;
     }
 
