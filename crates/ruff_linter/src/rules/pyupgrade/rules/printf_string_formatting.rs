@@ -28,11 +28,13 @@ use crate::rules::pyupgrade::helpers::curly_escape;
 /// formatting.
 ///
 /// ## Example
+///
 /// ```python
 /// "%s, %s" % ("Hello", "World")  # "Hello, World"
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// "{}, {}".format("Hello", "World")  # "Hello, World"
 /// ```
@@ -47,6 +49,7 @@ use crate::rules::pyupgrade::helpers::curly_escape;
 /// we cannot offer a safe fix.
 ///
 /// For example, given:
+///
 /// ```python
 /// "%s" % val
 /// ```
