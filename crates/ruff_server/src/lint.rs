@@ -79,8 +79,7 @@ pub(crate) fn check(
 
     // Generate checks.
     let LinterResult {
-        data: (diagnostics, _imports),
-        ..
+        data: diagnostics, ..
     } = check_path(
         &document_path,
         package,

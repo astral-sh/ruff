@@ -1,8 +1,3 @@
-use ruff_text_size::TextRange;
-use rustc_hash::FxHashMap;
-#[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize};
-
 /// A representation of an individual name imported via any import statement.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AnyImport<'a> {
@@ -115,62 +110,5 @@ impl FutureImport for AnyImport<'_> {
             AnyImport::Import(import) => import.is_future_import(),
             AnyImport::ImportFrom(import_from) => import_from.is_future_import(),
         }
-    }
-}
-
-/// A representation of a module reference in an import statement.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct ModuleImport {
-    module: String,
-    range: TextRange,
-}
-
-impl ModuleImport {
-    pub fn new(module: String, range: TextRange) -> Self {
-        Self { module, range }
-    }
-}
-
-impl From<&ModuleImport> for TextRange {
-    fn from(import: &ModuleImport) -> TextRange {
-        import.range
-    }
-}
-
-/// A representation of the import dependencies between modules.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct ImportMap {
-    /// A map from dot-delimited module name to the list of imports in that module.
-    module_to_imports: FxHashMap<String, Vec<ModuleImport>>,
-}
-
-impl ImportMap {
-    pub fn new() -> Self {
-        Self {
-            module_to_imports: FxHashMap::default(),
-        }
-    }
-
-    pub fn insert(&mut self, module: String, imports_vec: Vec<ModuleImport>) {
-        self.module_to_imports.insert(module, imports_vec);
-    }
-
-    pub fn extend(&mut self, other: Self) {
-        self.module_to_imports.extend(other.module_to_imports);
-    }
-
-    pub fn iter(&self) -> std::collections::hash_map::Iter<String, Vec<ModuleImport>> {
-        self.module_to_imports.iter()
-    }
-}
-
-impl<'a> IntoIterator for &'a ImportMap {
-    type IntoIter = std::collections::hash_map::Iter<'a, String, Vec<ModuleImport>>;
-    type Item = (&'a String, &'a Vec<ModuleImport>);
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.iter()
     }
 }
