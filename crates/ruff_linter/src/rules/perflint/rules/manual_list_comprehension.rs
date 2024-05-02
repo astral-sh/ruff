@@ -44,22 +44,28 @@ use crate::checkers::ast::Checker;
 /// filtered.extend(x for x in original if x % 2)
 /// ```
 #[violation]
-pub struct ManualListComprehension;
+pub struct ManualListComprehension {
+    is_async: bool,
+}
 
 impl Violation for ManualListComprehension {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use a list comprehension to create a transformed list")
+        let ManualListComprehension { is_async } = self;
+        match is_async {
+            false => format!("Use a list comprehension to create a transformed list"),
+            true => format!("Use an async list comprehension to create a transformed list"),
+        }
     }
 }
 
 /// PERF401
-pub(crate) fn manual_list_comprehension(checker: &mut Checker, target: &Expr, body: &[Stmt]) {
-    let Expr::Name(ast::ExprName { id, .. }) = target else {
+pub(crate) fn manual_list_comprehension(checker: &mut Checker, for_stmt: &ast::StmtFor) {
+    let Expr::Name(ast::ExprName { id, .. }) = &*for_stmt.target else {
         return;
     };
 
-    let (stmt, if_test) = match body {
+    let (stmt, if_test) = match &*for_stmt.body {
         // ```python
         // for x in y:
         //     if z:
@@ -121,10 +127,13 @@ pub(crate) fn manual_list_comprehension(checker: &mut Checker, target: &Expr, bo
         return;
     }
 
-    // Ignore direct list copies (e.g., `for x in y: filtered.append(x)`).
-    if if_test.is_none() {
-        if arg.as_name_expr().is_some_and(|arg| arg.id == *id) {
-            return;
+    // Ignore direct list copies (e.g., `for x in y: filtered.append(x)`), unless it's async, which
+    // `manual-list-copy` doesn't cover.
+    if !for_stmt.is_async {
+        if if_test.is_none() {
+            if arg.as_name_expr().is_some_and(|arg| arg.id == *id) {
+                return;
+            }
         }
     }
 
@@ -179,7 +188,10 @@ pub(crate) fn manual_list_comprehension(checker: &mut Checker, target: &Expr, bo
         return;
     }
 
-    checker
-        .diagnostics
-        .push(Diagnostic::new(ManualListComprehension, *range));
+    checker.diagnostics.push(Diagnostic::new(
+        ManualListComprehension {
+            is_async: for_stmt.is_async,
+        },
+        *range,
+    ));
 }

@@ -1323,10 +1323,10 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 pylint::rules::dict_iter_missing_items(checker, target, iter);
             }
             if checker.enabled(Rule::ManualListComprehension) {
-                perflint::rules::manual_list_comprehension(checker, target, body);
+                perflint::rules::manual_list_comprehension(checker, for_stmt);
             }
             if checker.enabled(Rule::ManualListCopy) {
-                perflint::rules::manual_list_copy(checker, target, body);
+                perflint::rules::manual_list_copy(checker, for_stmt);
             }
             if checker.enabled(Rule::ManualDictComprehension) {
                 perflint::rules::manual_dict_comprehension(checker, target, body);
