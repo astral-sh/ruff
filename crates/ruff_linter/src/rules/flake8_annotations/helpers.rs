@@ -17,10 +17,13 @@ use crate::importer::{ImportRequest, Importer};
 use crate::settings::types::PythonVersion;
 
 /// Return the name of the function, if it's overloaded.
-pub(crate) fn overloaded_name(definition: &Definition, semantic: &SemanticModel) -> Option<String> {
+pub(crate) fn overloaded_name<'a>(
+    definition: &'a Definition,
+    semantic: &SemanticModel,
+) -> Option<&'a str> {
     let function = definition.as_function_def()?;
     if visibility::is_overload(&function.decorator_list, semantic) {
-        Some(function.name.to_string())
+        Some(function.name.as_str())
     } else {
         None
     }
