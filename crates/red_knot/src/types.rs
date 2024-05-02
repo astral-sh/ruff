@@ -119,8 +119,9 @@ impl TypeStore {
         self.modules.get(&file_id)
     }
 
-    fn add_function(&self, file_id: FileId, name: &str) -> FunctionTypeId {
-        self.add_or_get_module(file_id).add_function(name)
+    fn add_function(&self, file_id: FileId, name: &str, decorators: Vec<Type>) -> FunctionTypeId {
+        self.add_or_get_module(file_id)
+            .add_function(name, decorators)
     }
 
     fn add_class(&self, file_id: FileId, name: &str, bases: Vec<Type>) -> ClassTypeId {
@@ -306,9 +307,10 @@ impl ModuleTypeStore {
         }
     }
 
-    fn add_function(&mut self, name: &str) -> FunctionTypeId {
+    fn add_function(&mut self, name: &str, decorators: Vec<Type>) -> FunctionTypeId {
         let func_id = self.functions.push(FunctionType {
             name: Name::new(name),
+            decorators,
         });
         FunctionTypeId {
             file_id: self.file_id,
@@ -420,11 +422,16 @@ impl ClassType {
 #[derive(Debug)]
 pub(crate) struct FunctionType {
     name: Name,
+    decorators: Vec<Type>,
 }
 
 impl FunctionType {
     fn name(&self) -> &str {
         self.name.as_str()
+    }
+
+    fn decorators(&self) -> &[Type] {
+        self.decorators.as_slice()
     }
 }
 
@@ -509,8 +516,9 @@ mod tests {
         let store = TypeStore::default();
         let files = Files::default();
         let file_id = files.intern(Path::new("/foo"));
-        let id = store.add_function(file_id, "func");
+        let id = store.add_function(file_id, "func", vec![Type::Unknown]);
         assert_eq!(store.get_function(id).name(), "func");
+        assert_eq!(store.get_function(id).decorators(), vec![Type::Unknown]);
         let func = Type::Function(id);
         assert_eq!(format!("{}", func.display(&store)), "func");
     }
