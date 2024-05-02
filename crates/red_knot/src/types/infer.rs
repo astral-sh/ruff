@@ -80,14 +80,11 @@ where
                     .resolve(ast.as_any_node_ref())
                     .expect("node key should resolve");
 
-                let decorator_tys: Vec<_> = node
+                let decorator_tys = node
                     .decorator_list
                     .iter()
-                    .map(|decorator| {
-                        infer_expr_type(db, file_id, &decorator.expression)
-                            .expect("decorator expression type should be inferable")
-                    })
-                    .collect();
+                    .map(|decorator| infer_expr_type(db, file_id, &decorator.expression))
+                    .collect::<QueryResult<_>>()?;
 
                 let ty = type_store
                     .add_function(file_id, &node.name.id, decorator_tys)
