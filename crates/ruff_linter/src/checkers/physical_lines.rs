@@ -90,7 +90,6 @@ pub(crate) fn check_physical_lines(
 mod tests {
     use ruff_python_codegen::Stylist;
     use ruff_python_index::Indexer;
-    use ruff_python_parser::lexer::lex;
     use ruff_python_parser::Mode;
     use ruff_source_file::Locator;
 
@@ -105,7 +104,7 @@ mod tests {
     fn e501_non_ascii_char() {
         let line = "'\u{4e9c}' * 2"; // 7 in UTF-32, 9 in UTF-8.
         let locator = Locator::new(line);
-        let tokens: Vec<_> = lex(line, Mode::Module).collect();
+        let (tokens, _) = ruff_python_parser::tokenize(line, Mode::Module);
         let indexer = Indexer::from_tokens(&tokens, &locator);
         let stylist = Stylist::from_tokens(&tokens, &locator);
 

@@ -244,8 +244,7 @@ impl Indexer {
 
 #[cfg(test)]
 mod tests {
-    use ruff_python_parser::lexer::LexResult;
-    use ruff_python_parser::{lexer, Mode};
+    use ruff_python_parser::Mode;
     use ruff_source_file::Locator;
     use ruff_text_size::{TextRange, TextSize};
 
@@ -254,8 +253,8 @@ mod tests {
     #[test]
     fn continuation() {
         let contents = r"x = 1";
-        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
-        let indexer = Indexer::from_tokens(&lxr, &Locator::new(contents));
+        let (tokens, _) = ruff_python_parser::tokenize(contents, Mode::Module);
+        let indexer = Indexer::from_tokens(&tokens, &Locator::new(contents));
         assert_eq!(indexer.continuation_line_starts(), &[]);
 
         let contents = r"
@@ -267,8 +266,8 @@ y = 2
         "
         .trim();
 
-        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
-        let indexer = Indexer::from_tokens(&lxr, &Locator::new(contents));
+        let (tokens, _) = ruff_python_parser::tokenize(contents, Mode::Module);
+        let indexer = Indexer::from_tokens(&tokens, &Locator::new(contents));
         assert_eq!(indexer.continuation_line_starts(), &[]);
 
         let contents = r#"
@@ -287,8 +286,8 @@ if True:
 )
 "#
         .trim();
-        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
-        let indexer = Indexer::from_tokens(lxr.as_slice(), &Locator::new(contents));
+        let (tokens, _) = ruff_python_parser::tokenize(contents, Mode::Module);
+        let indexer = Indexer::from_tokens(&tokens, &Locator::new(contents));
         assert_eq!(
             indexer.continuation_line_starts(),
             [
@@ -319,8 +318,8 @@ x = 1; \
 import os
 "
         .trim();
-        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
-        let indexer = Indexer::from_tokens(lxr.as_slice(), &Locator::new(contents));
+        let (tokens, _) = ruff_python_parser::tokenize(contents, Mode::Module);
+        let indexer = Indexer::from_tokens(&tokens, &Locator::new(contents));
         assert_eq!(
             indexer.continuation_line_starts(),
             [
@@ -342,8 +341,8 @@ f'foo { 'str1' \
 }'
 "
         .trim();
-        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
-        let indexer = Indexer::from_tokens(lxr.as_slice(), &Locator::new(contents));
+        let (tokens, _) = ruff_python_parser::tokenize(contents, Mode::Module);
+        let indexer = Indexer::from_tokens(&tokens, &Locator::new(contents));
         assert_eq!(
             indexer.continuation_line_starts(),
             [
@@ -367,8 +366,8 @@ x = (
     + 2)
 "
         .trim();
-        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
-        let indexer = Indexer::from_tokens(lxr.as_slice(), &Locator::new(contents));
+        let (tokens, _) = ruff_python_parser::tokenize(contents, Mode::Module);
+        let indexer = Indexer::from_tokens(&tokens, &Locator::new(contents));
         assert_eq!(
             indexer.continuation_line_starts(),
             [
@@ -392,8 +391,8 @@ f"start {f"inner {f"another"}"} end"
 f"implicit " f"concatenation"
 "#
         .trim();
-        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
-        let indexer = Indexer::from_tokens(lxr.as_slice(), &Locator::new(contents));
+        let (tokens, _) = ruff_python_parser::tokenize(contents, Mode::Module);
+        let indexer = Indexer::from_tokens(&tokens, &Locator::new(contents));
         assert_eq!(
             indexer
                 .fstring_ranges()
@@ -428,8 +427,8 @@ f-string"""}
 """
 "#
         .trim();
-        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
-        let indexer = Indexer::from_tokens(lxr.as_slice(), &Locator::new(contents));
+        let (tokens, _) = ruff_python_parser::tokenize(contents, Mode::Module);
+        let indexer = Indexer::from_tokens(&tokens, &Locator::new(contents));
         assert_eq!(
             indexer
                 .fstring_ranges()
@@ -466,8 +465,8 @@ f-string"""}
 the end"""
 "#
         .trim();
-        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
-        let indexer = Indexer::from_tokens(lxr.as_slice(), &Locator::new(contents));
+        let (tokens, _) = ruff_python_parser::tokenize(contents, Mode::Module);
+        let indexer = Indexer::from_tokens(&tokens, &Locator::new(contents));
 
         // For reference, the ranges of the f-strings in the above code are as
         // follows where the ones inside parentheses are nested f-strings:

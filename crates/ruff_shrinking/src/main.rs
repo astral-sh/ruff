@@ -275,6 +275,7 @@ impl Strategy for StrategyRemoveToken {
         _ast: &'a Suite,
     ) -> Result<Box<dyn ExactSizeStringIter + 'a>> {
         let token_ranges: Vec<_> = ruff_python_parser::tokenize(input, Mode::Module)
+            .0
             .into_iter()
             // At this point we know we have valid python code
             .map(Result::unwrap)
@@ -319,7 +320,7 @@ fn minimization_step(
     pattern: &Regex,
     last_strategy_and_idx: Option<(&'static dyn Strategy, usize)>,
 ) -> Result<Option<(&'static dyn Strategy, usize, String)>> {
-    let tokens = ruff_python_parser::tokenize(input, Mode::Module);
+    let (tokens, _) = ruff_python_parser::tokenize(input, Mode::Module);
     let ast = ruff_python_parser::parse_program_tokens(tokens, input, false)
         .context("not valid python")?;
 

@@ -506,8 +506,8 @@ struct Line {
 
 #[cfg(test)]
 mod tests {
-    use ruff_python_parser::lexer::LexResult;
-    use ruff_python_parser::{lexer, Mode};
+
+    use ruff_python_parser::Mode;
 
     use ruff_source_file::Locator;
 
@@ -592,9 +592,9 @@ if False:
     }
 
     fn assert_logical_lines(contents: &str, expected: &[&str]) {
-        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
+        let (tokens, _) = ruff_python_parser::tokenize(contents, Mode::Module);
         let locator = Locator::new(contents);
-        let actual: Vec<String> = LogicalLines::from_tokens(&lxr, &locator)
+        let actual: Vec<String> = LogicalLines::from_tokens(&tokens, &locator)
             .into_iter()
             .map(|line| line.text_trimmed())
             .map(ToString::to_string)

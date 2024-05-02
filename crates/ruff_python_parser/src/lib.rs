@@ -117,7 +117,7 @@ pub use crate::parser::Program;
 pub use crate::token::{Tok, TokenKind};
 
 use ruff_python_ast::{Expr, Mod, ModModule, PySourceType, Suite};
-use ruff_text_size::TextSize;
+use ruff_text_size::{TextRange, TextSize};
 
 mod error;
 pub mod lexer;
@@ -340,9 +340,14 @@ pub fn parse_tokens(tokens: Vec<LexResult>, source: &str, mode: Mode) -> Result<
 }
 
 /// Collect tokens up to and including the first error.
-pub fn tokenize(contents: &str, mode: Mode) -> Vec<LexResult> {
-    let mut tokens: Vec<LexResult> = allocate_tokens_vec(contents);
+pub fn tokenize(contents: &str, mode: Mode) -> (Vec<LexResult>, Vec<(TokenKind, TextRange)>) {
+    let mut tokens = allocate_tokens_vec(contents);
+    let mut kinds = allocate_token_kinds_vec(contents);
+
     for tok in lexer::lex(contents, mode) {
+        if let Ok((token, range)) = tok.as_ref() {
+            kinds.push((TokenKind::from_token(token), *range));
+        }
         let is_err = tok.is_err();
         tokens.push(tok);
         if is_err {
@@ -350,7 +355,7 @@ pub fn tokenize(contents: &str, mode: Mode) -> Vec<LexResult> {
         }
     }
 
-    tokens
+    (tokens, kinds)
 }
 
 /// Tokenizes all tokens.
@@ -370,6 +375,10 @@ pub fn tokenize_all(contents: &str, mode: Mode) -> Vec<LexResult> {
 ///
 /// See [#9546](https://github.com/astral-sh/ruff/pull/9546) for a more detailed explanation.
 pub fn allocate_tokens_vec(contents: &str) -> Vec<LexResult> {
+    Vec::with_capacity(approximate_tokens_lower_bound(contents))
+}
+
+fn allocate_token_kinds_vec(contents: &str) -> Vec<(TokenKind, TextRange)> {
     Vec::with_capacity(approximate_tokens_lower_bound(contents))
 }
 

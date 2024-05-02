@@ -13,7 +13,6 @@ use ruff_linter::{
 use ruff_python_ast::PySourceType;
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
-use ruff_python_parser::lexer::LexResult;
 use ruff_python_parser::AsMode;
 use ruff_source_file::Locator;
 use ruff_text_size::Ranged;
@@ -52,7 +51,7 @@ pub(crate) fn check(
     let source_kind = SourceKind::Python(contents.to_string());
 
     // Tokenize once.
-    let tokens: Vec<LexResult> = ruff_python_parser::tokenize(contents, source_type.as_mode());
+    let (tokens, kinds) = ruff_python_parser::tokenize(contents, source_type.as_mode());
 
     // Map row and column locations to byte slices (lazily).
     let locator = Locator::with_index(contents, index);
@@ -81,7 +80,7 @@ pub(crate) fn check(
         flags::Noqa::Enabled,
         &source_kind,
         source_type,
-        TokenSource::Tokens(tokens),
+        TokenSource::Tokens(tokens, kinds),
     );
 
     diagnostics

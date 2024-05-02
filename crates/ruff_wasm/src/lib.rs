@@ -17,7 +17,6 @@ use ruff_python_ast::{Mod, PySourceType};
 use ruff_python_codegen::Stylist;
 use ruff_python_formatter::{format_module_ast, pretty_comments, PyFormatContext, QuoteStyle};
 use ruff_python_index::{CommentRangesBuilder, Indexer};
-use ruff_python_parser::lexer::LexResult;
 use ruff_python_parser::{parse_tokens, tokenize_all, AsMode, Mode, Program};
 use ruff_python_trivia::CommentRanges;
 use ruff_source_file::{Locator, SourceLocation};
@@ -162,7 +161,7 @@ impl Workspace {
         let source_kind = SourceKind::Python(contents.to_string());
 
         // Tokenize once.
-        let tokens: Vec<LexResult> = ruff_python_parser::tokenize(contents, source_type.as_mode());
+        let (tokens, kinds) = ruff_python_parser::tokenize(contents, source_type.as_mode());
 
         // Map row and column locations to byte slices (lazily).
         let locator = Locator::new(contents);
@@ -192,7 +191,7 @@ impl Workspace {
             flags::Noqa::Enabled,
             &source_kind,
             source_type,
-            TokenSource::Tokens(tokens),
+            TokenSource::Tokens(tokens, kinds),
         );
 
         let source_code = locator.to_source_code();
@@ -256,7 +255,7 @@ impl Workspace {
     }
 
     pub fn tokens(&self, contents: &str) -> Result<String, Error> {
-        let tokens: Vec<_> = ruff_python_parser::lexer::lex(contents, Mode::Module).collect();
+        let tokens = ruff_python_parser::tokenize_all(contents, Mode::Module);
 
         Ok(format!("{tokens:#?}"))
     }

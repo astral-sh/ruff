@@ -15,9 +15,9 @@ use ruff_python_ast::{PySourceType, Suite};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 use ruff_python_parser::lexer::LexResult;
-use ruff_python_parser::{AsMode, ParseError};
+use ruff_python_parser::{AsMode, ParseError, TokenKind};
 use ruff_source_file::{Locator, SourceFileBuilder};
-use ruff_text_size::Ranged;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::check_ast;
 use crate::checkers::filesystem::check_file_path;
@@ -356,7 +356,7 @@ pub fn add_noqa_to_path(
     let contents = source_kind.source_code();
 
     // Tokenize once.
-    let tokens: Vec<LexResult> = ruff_python_parser::tokenize(contents, source_type.as_mode());
+    let (tokens, kinds) = ruff_python_parser::tokenize(contents, source_type.as_mode());
 
     // Map row and column locations to byte slices (lazily).
     let locator = Locator::new(contents);
@@ -390,7 +390,7 @@ pub fn add_noqa_to_path(
         flags::Noqa::Disabled,
         source_kind,
         source_type,
-        TokenSource::Tokens(tokens),
+        TokenSource::Tokens(tokens, kinds),
     );
 
     // Log any parse errors.
@@ -526,7 +526,7 @@ pub fn lint_fix<'a>(
     // Continuously fix until the source code stabilizes.
     loop {
         // Tokenize once.
-        let tokens: Vec<LexResult> =
+        let (tokens, kinds) =
             ruff_python_parser::tokenize(transformed.source_code(), source_type.as_mode());
 
         // Map row and column locations to byte slices (lazily).
@@ -558,7 +558,7 @@ pub fn lint_fix<'a>(
             noqa,
             &transformed,
             source_type,
-            TokenSource::Tokens(tokens),
+            TokenSource::Tokens(tokens, kinds),
         );
 
         if iterations == 0 {
@@ -702,6 +702,7 @@ pub enum ParseSource<'a> {
     /// Use the precomputed tokens and AST.
     Precomputed {
         tokens: &'a [LexResult],
+        kinds: &'a [(TokenKind, TextRange)],
         ast: &'a Suite,
     },
 }
@@ -714,11 +715,14 @@ impl<'a> ParseSource<'a> {
         source_type: PySourceType,
     ) -> TokenSource<'a> {
         match self {
-            Self::None => TokenSource::Tokens(ruff_python_parser::tokenize(
-                source_kind.source_code(),
-                source_type.as_mode(),
-            )),
-            Self::Precomputed { tokens, ast } => TokenSource::Precomputed { tokens, ast },
+            Self::None => {
+                let (tokens, kinds) =
+                    ruff_python_parser::tokenize(source_kind.source_code(), source_type.as_mode());
+                TokenSource::Tokens(tokens, kinds)
+            }
+            Self::Precomputed { tokens, kinds, ast } => {
+                TokenSource::Precomputed { tokens, kinds, ast }
+            }
         }
     }
 }
@@ -726,10 +730,11 @@ impl<'a> ParseSource<'a> {
 #[derive(Debug, Clone)]
 pub enum TokenSource<'a> {
     /// Use the precomputed tokens to generate the AST.
-    Tokens(Vec<LexResult>),
+    Tokens(Vec<LexResult>, Vec<(TokenKind, TextRange)>),
     /// Use the precomputed tokens and AST.
     Precomputed {
         tokens: &'a [LexResult],
+        kinds: &'a [(TokenKind, TextRange)],
         ast: &'a Suite,
     },
 }
@@ -739,13 +744,21 @@ impl Deref for TokenSource<'_> {
 
     fn deref(&self) -> &Self::Target {
         match self {
-            Self::Tokens(tokens) => tokens,
+            Self::Tokens(tokens, _) => tokens,
             Self::Precomputed { tokens, .. } => tokens,
         }
     }
 }
 
 impl<'a> TokenSource<'a> {
+    #[allow(dead_code)]
+    pub(crate) fn kinds(&self) -> &[(TokenKind, TextRange)] {
+        match self {
+            Self::Tokens(_, kinds) => kinds,
+            Self::Precomputed { kinds, .. } => kinds,
+        }
+    }
+
     /// Convert to an [`AstSource`], parsing if necessary.
     fn into_ast_source(
         self,
@@ -753,11 +766,13 @@ impl<'a> TokenSource<'a> {
         source_type: PySourceType,
     ) -> Result<AstSource<'a>, ParseError> {
         match self {
-            Self::Tokens(tokens) => Ok(AstSource::Ast(ruff_python_parser::parse_program_tokens(
-                tokens,
-                source_kind.source_code(),
-                source_type.is_ipynb(),
-            )?)),
+            Self::Tokens(tokens, _) => {
+                Ok(AstSource::Ast(ruff_python_parser::parse_program_tokens(
+                    tokens,
+                    source_kind.source_code(),
+                    source_type.is_ipynb(),
+                )?))
+            }
             Self::Precomputed { ast, .. } => Ok(AstSource::Precomputed(ast)),
         }
     }

@@ -126,7 +126,6 @@ impl Deref for Indentation {
 
 #[cfg(test)]
 mod tests {
-    use ruff_python_parser::lexer::lex;
     use ruff_python_parser::Mode;
 
     use ruff_source_file::{find_newline, LineEnding};
@@ -138,7 +137,7 @@ mod tests {
     fn indentation() {
         let contents = r"x = 1";
         let locator = Locator::new(contents);
-        let tokens: Vec<_> = lex(contents, Mode::Module).collect();
+        let (tokens, _) = ruff_python_parser::tokenize(contents, Mode::Module);
         assert_eq!(
             Stylist::from_tokens(&tokens, &locator).indentation(),
             &Indentation::default()
@@ -149,7 +148,7 @@ if True:
   pass
 ";
         let locator = Locator::new(contents);
-        let tokens: Vec<_> = lex(contents, Mode::Module).collect();
+        let (tokens, _) = ruff_python_parser::tokenize(contents, Mode::Module);
         assert_eq!(
             Stylist::from_tokens(&tokens, &locator).indentation(),
             &Indentation("  ".to_string())
@@ -160,7 +159,7 @@ if True:
     pass
 ";
         let locator = Locator::new(contents);
-        let tokens: Vec<_> = lex(contents, Mode::Module).collect();
+        let (tokens, _) = ruff_python_parser::tokenize(contents, Mode::Module);
         assert_eq!(
             Stylist::from_tokens(&tokens, &locator).indentation(),
             &Indentation("    ".to_string())
@@ -171,7 +170,7 @@ if True:
 	pass
 ";
         let locator = Locator::new(contents);
-        let tokens: Vec<_> = lex(contents, Mode::Module).collect();
+        let (tokens, _) = ruff_python_parser::tokenize(contents, Mode::Module);
         assert_eq!(
             Stylist::from_tokens(&tokens, &locator).indentation(),
             &Indentation("\t".to_string())
@@ -186,7 +185,7 @@ x = (
 )
 ";
         let locator = Locator::new(contents);
-        let tokens: Vec<_> = lex(contents, Mode::Module).collect();
+        let (tokens, _) = ruff_python_parser::tokenize(contents, Mode::Module);
         assert_eq!(
             Stylist::from_tokens(&tokens, &locator).indentation(),
             &Indentation::default()
@@ -199,7 +198,7 @@ class FormFeedIndent:
         print(a)
 ";
         let locator = Locator::new(contents);
-        let tokens: Vec<_> = lex(contents, Mode::Module).collect();
+        let (tokens, _) = ruff_python_parser::tokenize(contents, Mode::Module);
         assert_eq!(
             Stylist::from_tokens(&tokens, &locator).indentation(),
             &Indentation(" ".to_string())
@@ -210,7 +209,7 @@ class FormFeedIndent:
     fn quote() {
         let contents = r"x = 1";
         let locator = Locator::new(contents);
-        let tokens: Vec<_> = lex(contents, Mode::Module).collect();
+        let (tokens, _) = ruff_python_parser::tokenize(contents, Mode::Module);
         assert_eq!(
             Stylist::from_tokens(&tokens, &locator).quote(),
             Quote::default()
@@ -218,7 +217,7 @@ class FormFeedIndent:
 
         let contents = r"x = '1'";
         let locator = Locator::new(contents);
-        let tokens: Vec<_> = lex(contents, Mode::Module).collect();
+        let (tokens, _) = ruff_python_parser::tokenize(contents, Mode::Module);
         assert_eq!(
             Stylist::from_tokens(&tokens, &locator).quote(),
             Quote::Single
@@ -226,7 +225,7 @@ class FormFeedIndent:
 
         let contents = r"x = f'1'";
         let locator = Locator::new(contents);
-        let tokens: Vec<_> = lex(contents, Mode::Module).collect();
+        let (tokens, _) = ruff_python_parser::tokenize(contents, Mode::Module);
         assert_eq!(
             Stylist::from_tokens(&tokens, &locator).quote(),
             Quote::Single
@@ -234,7 +233,7 @@ class FormFeedIndent:
 
         let contents = r#"x = "1""#;
         let locator = Locator::new(contents);
-        let tokens: Vec<_> = lex(contents, Mode::Module).collect();
+        let (tokens, _) = ruff_python_parser::tokenize(contents, Mode::Module);
         assert_eq!(
             Stylist::from_tokens(&tokens, &locator).quote(),
             Quote::Double
@@ -242,7 +241,7 @@ class FormFeedIndent:
 
         let contents = r#"x = f"1""#;
         let locator = Locator::new(contents);
-        let tokens: Vec<_> = lex(contents, Mode::Module).collect();
+        let (tokens, _) = ruff_python_parser::tokenize(contents, Mode::Module);
         assert_eq!(
             Stylist::from_tokens(&tokens, &locator).quote(),
             Quote::Double
@@ -250,7 +249,7 @@ class FormFeedIndent:
 
         let contents = r#"s = "It's done.""#;
         let locator = Locator::new(contents);
-        let tokens: Vec<_> = lex(contents, Mode::Module).collect();
+        let (tokens, _) = ruff_python_parser::tokenize(contents, Mode::Module);
         assert_eq!(
             Stylist::from_tokens(&tokens, &locator).quote(),
             Quote::Double
@@ -263,7 +262,7 @@ def f():
     pass
 "#;
         let locator = Locator::new(contents);
-        let tokens: Vec<_> = lex(contents, Mode::Module).collect();
+        let (tokens, _) = ruff_python_parser::tokenize(contents, Mode::Module);
         assert_eq!(
             Stylist::from_tokens(&tokens, &locator).quote(),
             Quote::default()
@@ -276,7 +275,7 @@ def f():
 a = 'v'
 "#;
         let locator = Locator::new(contents);
-        let tokens: Vec<_> = lex(contents, Mode::Module).collect();
+        let (tokens, _) = ruff_python_parser::tokenize(contents, Mode::Module);
         assert_eq!(
             Stylist::from_tokens(&tokens, &locator).quote(),
             Quote::Single
@@ -288,7 +287,7 @@ a = 'v'
 a = "v"
 "#;
         let locator = Locator::new(contents);
-        let tokens: Vec<_> = lex(contents, Mode::Module).collect();
+        let (tokens, _) = ruff_python_parser::tokenize(contents, Mode::Module);
         assert_eq!(
             Stylist::from_tokens(&tokens, &locator).quote(),
             Quote::Double
@@ -301,7 +300,7 @@ a = "v"
 a = f'v'
 "#;
         let locator = Locator::new(contents);
-        let tokens: Vec<_> = lex(contents, Mode::Module).collect();
+        let (tokens, _) = ruff_python_parser::tokenize(contents, Mode::Module);
         assert_eq!(
             Stylist::from_tokens(&tokens, &locator).quote(),
             Quote::Single
@@ -313,7 +312,7 @@ a = f'v'
 a = f"v"
 "#;
         let locator = Locator::new(contents);
-        let tokens: Vec<_> = lex(contents, Mode::Module).collect();
+        let (tokens, _) = ruff_python_parser::tokenize(contents, Mode::Module);
         assert_eq!(
             Stylist::from_tokens(&tokens, &locator).quote(),
             Quote::Double
@@ -323,7 +322,7 @@ a = f"v"
 f'''Module docstring.'''
 ";
         let locator = Locator::new(contents);
-        let tokens: Vec<_> = lex(contents, Mode::Module).collect();
+        let (tokens, _) = ruff_python_parser::tokenize(contents, Mode::Module);
         assert_eq!(
             Stylist::from_tokens(&tokens, &locator).quote(),
             Quote::Single

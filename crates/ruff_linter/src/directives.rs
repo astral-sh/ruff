@@ -394,8 +394,7 @@ impl TodoDirectiveKind {
 
 #[cfg(test)]
 mod tests {
-    use ruff_python_parser::lexer::LexResult;
-    use ruff_python_parser::{lexer, Mode};
+    use ruff_python_parser::Mode;
     use ruff_text_size::{TextLen, TextRange, TextSize};
 
     use ruff_python_index::Indexer;
@@ -407,11 +406,11 @@ mod tests {
     use crate::noqa::NoqaMapping;
 
     fn noqa_mappings(contents: &str) -> NoqaMapping {
-        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
+        let (tokens, _) = ruff_python_parser::tokenize(contents, Mode::Module);
         let locator = Locator::new(contents);
-        let indexer = Indexer::from_tokens(&lxr, &locator);
+        let indexer = Indexer::from_tokens(&tokens, &locator);
 
-        extract_noqa_line_for(&lxr, &locator, &indexer)
+        extract_noqa_line_for(&tokens, &locator, &indexer)
     }
 
     #[test]
@@ -586,9 +585,9 @@ assert foo, \
         let contents = "x = 1
 y = 2
 z = x + 1";
-        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
+        let (tokens, _) = ruff_python_parser::tokenize(contents, Mode::Module);
         let locator = Locator::new(contents);
-        let indexer = Indexer::from_tokens(&lxr, &locator);
+        let indexer = Indexer::from_tokens(&tokens, &locator);
         assert_eq!(
             extract_isort_directives(&locator, &indexer).exclusions,
             Vec::default()
@@ -599,9 +598,9 @@ x = 1
 y = 2
 # isort: on
 z = x + 1";
-        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
+        let (tokens, _) = ruff_python_parser::tokenize(contents, Mode::Module);
         let locator = Locator::new(contents);
-        let indexer = Indexer::from_tokens(&lxr, &locator);
+        let indexer = Indexer::from_tokens(&tokens, &locator);
         assert_eq!(
             extract_isort_directives(&locator, &indexer).exclusions,
             Vec::from_iter([TextRange::new(TextSize::from(0), TextSize::from(25))])
@@ -614,9 +613,9 @@ y = 2
 # isort: on
 z = x + 1
 # isort: on";
-        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
+        let (tokens, _) = ruff_python_parser::tokenize(contents, Mode::Module);
         let locator = Locator::new(contents);
-        let indexer = Indexer::from_tokens(&lxr, &locator);
+        let indexer = Indexer::from_tokens(&tokens, &locator);
         assert_eq!(
             extract_isort_directives(&locator, &indexer).exclusions,
             Vec::from_iter([TextRange::new(TextSize::from(0), TextSize::from(38))])
@@ -626,9 +625,9 @@ z = x + 1
 x = 1
 y = 2
 z = x + 1";
-        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
+        let (tokens, _) = ruff_python_parser::tokenize(contents, Mode::Module);
         let locator = Locator::new(contents);
-        let indexer = Indexer::from_tokens(&lxr, &locator);
+        let indexer = Indexer::from_tokens(&tokens, &locator);
         assert_eq!(
             extract_isort_directives(&locator, &indexer).exclusions,
             Vec::from_iter([TextRange::at(TextSize::from(0), contents.text_len())])
@@ -638,9 +637,9 @@ z = x + 1";
 x = 1
 y = 2
 z = x + 1";
-        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
+        let (tokens, _) = ruff_python_parser::tokenize(contents, Mode::Module);
         let locator = Locator::new(contents);
-        let indexer = Indexer::from_tokens(&lxr, &locator);
+        let indexer = Indexer::from_tokens(&tokens, &locator);
         assert_eq!(
             extract_isort_directives(&locator, &indexer).exclusions,
             Vec::default()
@@ -652,9 +651,9 @@ x = 1
 y = 2
 # isort: skip_file
 z = x + 1";
-        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
+        let (tokens, _) = ruff_python_parser::tokenize(contents, Mode::Module);
         let locator = Locator::new(contents);
-        let indexer = Indexer::from_tokens(&lxr, &locator);
+        let indexer = Indexer::from_tokens(&tokens, &locator);
         assert_eq!(
             extract_isort_directives(&locator, &indexer).exclusions,
             Vec::default()
@@ -666,9 +665,9 @@ z = x + 1";
         let contents = "x = 1
 y = 2
 z = x + 1";
-        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
+        let (tokens, _) = ruff_python_parser::tokenize(contents, Mode::Module);
         let locator = Locator::new(contents);
-        let indexer = Indexer::from_tokens(&lxr, &locator);
+        let indexer = Indexer::from_tokens(&tokens, &locator);
         assert_eq!(
             extract_isort_directives(&locator, &indexer).splits,
             Vec::new()
@@ -678,9 +677,9 @@ z = x + 1";
 y = 2
 # isort: split
 z = x + 1";
-        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
+        let (tokens, _) = ruff_python_parser::tokenize(contents, Mode::Module);
         let locator = Locator::new(contents);
-        let indexer = Indexer::from_tokens(&lxr, &locator);
+        let indexer = Indexer::from_tokens(&tokens, &locator);
         assert_eq!(
             extract_isort_directives(&locator, &indexer).splits,
             vec![TextSize::from(12)]
@@ -689,9 +688,9 @@ z = x + 1";
         let contents = "x = 1
 y = 2  # isort: split
 z = x + 1";
-        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
+        let (tokens, _) = ruff_python_parser::tokenize(contents, Mode::Module);
         let locator = Locator::new(contents);
-        let indexer = Indexer::from_tokens(&lxr, &locator);
+        let indexer = Indexer::from_tokens(&tokens, &locator);
         assert_eq!(
             extract_isort_directives(&locator, &indexer).splits,
             vec![TextSize::from(13)]

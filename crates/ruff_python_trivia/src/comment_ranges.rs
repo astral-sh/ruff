@@ -207,7 +207,6 @@ impl<'a> IntoIterator for &'a CommentRanges {
 #[cfg(test)]
 mod tests {
     use ruff_python_index::Indexer;
-    use ruff_python_parser::lexer::LexResult;
     use ruff_python_parser::{tokenize, Mode};
     use ruff_source_file::Locator;
     use ruff_text_size::TextSize;
@@ -216,7 +215,7 @@ mod tests {
     fn block_comments_two_line_block_at_start() {
         // arrange
         let source = "# line 1\n# line 2\n";
-        let tokens = tokenize(source, Mode::Module);
+        let (tokens, _) = tokenize(source, Mode::Module);
         let locator = Locator::new(source);
         let indexer = Indexer::from_tokens(&tokens, &locator);
 
@@ -231,7 +230,7 @@ mod tests {
     fn block_comments_indented_block() {
         // arrange
         let source = "    # line 1\n    # line 2\n";
-        let tokens = tokenize(source, Mode::Module);
+        let (tokens, _) = tokenize(source, Mode::Module);
         let locator = Locator::new(source);
         let indexer = Indexer::from_tokens(&tokens, &locator);
 
@@ -246,7 +245,7 @@ mod tests {
     fn block_comments_single_line_is_not_a_block() {
         // arrange
         let source = "\n";
-        let tokens: Vec<LexResult> = tokenize(source, Mode::Module);
+        let (tokens, _) = tokenize(source, Mode::Module);
         let locator = Locator::new(source);
         let indexer = Indexer::from_tokens(&tokens, &locator);
 
@@ -261,7 +260,7 @@ mod tests {
     fn block_comments_lines_with_code_not_a_block() {
         // arrange
         let source = "x = 1  # line 1\ny = 2  # line 2\n";
-        let tokens = tokenize(source, Mode::Module);
+        let (tokens, _) = tokenize(source, Mode::Module);
         let locator = Locator::new(source);
         let indexer = Indexer::from_tokens(&tokens, &locator);
 
@@ -276,7 +275,7 @@ mod tests {
     fn block_comments_sequential_lines_not_in_block() {
         // arrange
         let source = "    # line 1\n        # line 2\n";
-        let tokens = tokenize(source, Mode::Module);
+        let (tokens, _) = tokenize(source, Mode::Module);
         let locator = Locator::new(source);
         let indexer = Indexer::from_tokens(&tokens, &locator);
 
@@ -296,7 +295,7 @@ mod tests {
         # line 2
         """
         "#;
-        let tokens = tokenize(source, Mode::Module);
+        let (tokens, _) = tokenize(source, Mode::Module);
         let locator = Locator::new(source);
         let indexer = Indexer::from_tokens(&tokens, &locator);
 
@@ -333,7 +332,7 @@ y = 2  # do not form a block comment
 # therefore do not form a block comment
 """
         "#;
-        let tokens = tokenize(source, Mode::Module);
+        let (tokens, _) = tokenize(source, Mode::Module);
         let locator = Locator::new(source);
         let indexer = Indexer::from_tokens(&tokens, &locator);
 
