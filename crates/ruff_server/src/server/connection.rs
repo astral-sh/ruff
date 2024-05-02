@@ -28,7 +28,7 @@ impl ConnectionInitializer {
         }
     }
 
-    /// Starts the initialization process with the client by listening for an intialization request.
+    /// Starts the initialization process with the client by listening for an initialization request.
     /// Returns a request ID that should be passed into `initialize_finish` later,
     /// along with the initialization parameters that were provided.
     pub(super) fn initialize_start(
@@ -110,7 +110,9 @@ impl Connection {
     }
 
     /// Join the I/O threads that underpin this connection.
-    /// This will 
+    /// This is guaranteed to be nearly immediate since
+    /// we close the only active channels to these threads prior
+    /// to joining them.
     pub(super) fn close(self) -> crate::Result<()> {
         std::mem::drop(
             Arc::into_inner(self.sender)
