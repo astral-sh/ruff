@@ -6,7 +6,7 @@ use itertools::Itertools;
 use ruff_diagnostics::Edit;
 use ruff_python_codegen::Stylist;
 use ruff_python_semantic::{Binding, BindingKind, Scope, ScopeId, SemanticModel};
-use ruff_text_size::{Ranged, TextSize};
+use ruff_text_size::Ranged;
 
 pub(crate) struct Renamer;
 
@@ -215,7 +215,6 @@ impl Renamer {
                             let quote = stylist.quote();
                             format!("{quote}{target}{quote}")
                         } else {
-                            debug_assert_eq!(TextSize::of(name), reference.range().len());
                             target.to_string()
                         }
                     };
