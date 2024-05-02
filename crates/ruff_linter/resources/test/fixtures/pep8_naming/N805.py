@@ -8,7 +8,6 @@ class Class:
         pass
 
     if False:
-
         def extra_bad_method(this):
             pass
 
@@ -94,6 +93,7 @@ class ModelClass:
     def badstatic(foo):
         pass
 
+
 class SelfInArgsClass:
     def self_as_argument(this, self):
         pass
@@ -110,6 +110,7 @@ class SelfInArgsClass:
     def self_as_kwargs(this, **self):
         pass
 
+
 class RenamingInMethodBodyClass:
     def bad_method(this):
         this = this
@@ -117,3 +118,8 @@ class RenamingInMethodBodyClass:
 
     def bad_method(this):
         self = this
+
+
+class RenamingWithNFKC:
+    def formula(household):
+        hºusehold(1)
