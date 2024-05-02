@@ -41,7 +41,6 @@ is-macro = { workspace = true }
 itertools = { workspace = true }
 log = { workspace = true }
 notify = { workspace = true }
-num_cpus = { workspace = true }
 path-absolutize = { workspace = true, features = ["once_cell_cache"] }
 rayon = { workspace = true }
 regex = { workspace = true }
