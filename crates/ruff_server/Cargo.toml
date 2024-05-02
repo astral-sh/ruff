@@ -28,7 +28,6 @@ ruff_workspace = { path = "../ruff_workspace" }
 anyhow = { workspace = true }
 crossbeam = { workspace = true }
 jod-thread = { workspace = true }
-libc = { workspace = true }
 lsp-server = { workspace = true }
 lsp-types = { workspace = true }
 rustc-hash = { workspace = true }
@@ -40,6 +39,9 @@ regex = { workspace = true }
 
 [dev-dependencies]
 insta = { workspace = true }
+
+[target.'cfg(target_vendor = "apple")'.dependencies]
+libc = { workspace = true }
 
 [lints]
 workspace = true
