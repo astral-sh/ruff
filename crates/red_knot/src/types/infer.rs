@@ -85,7 +85,7 @@ where
                     .iter()
                     .map(|decorator| {
                         infer_expr_type(db, file_id, &decorator.expression)
-                            .expect("decorator expression type should be inferrable")
+                            .expect("decorator expression type should be inferable")
                     })
                     .collect();
 
