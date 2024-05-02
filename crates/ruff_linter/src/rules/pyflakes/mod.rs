@@ -205,6 +205,9 @@ mod tests {
     }
 
     #[test_case(Rule::UnusedVariable, Path::new("F841_4.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("__init__.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_24/__init__.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_25__all/__init__.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",
@@ -244,19 +247,6 @@ mod tests {
                 Rule::UndefinedExport,
                 Rule::UnusedImport,
             ]),
-        )?;
-        assert_messages!(diagnostics);
-        Ok(())
-    }
-
-    #[test]
-    fn init_unused_import_opt_in_to_fix() -> Result<()> {
-        let diagnostics = test_path(
-            Path::new("pyflakes/__init__.py"),
-            &LinterSettings {
-                ignore_init_module_imports: false,
-                ..LinterSettings::for_rules(vec![Rule::UnusedImport])
-            },
         )?;
         assert_messages!(diagnostics);
         Ok(())
