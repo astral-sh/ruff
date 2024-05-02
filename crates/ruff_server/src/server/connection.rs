@@ -110,7 +110,8 @@ impl Connection {
     }
 
     /// Join the I/O threads that underpin this connection.
-    pub(super) fn join_io_threads(self) -> crate::Result<()> {
+    /// This will 
+    pub(super) fn close(self) -> crate::Result<()> {
         std::mem::drop(
             Arc::into_inner(self.sender)
                 .expect("the client sender shouldn't have more than one strong reference"),

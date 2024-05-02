@@ -113,7 +113,7 @@ impl Server {
                 self.session,
                 self.worker_threads,
             )?;
-            self.connection.join_io_threads()?;
+            self.connection.close()?;
             // Note: when we start routing tracing through the LSP,
             // this should be replaced with a log directly to `stderr`.
             tracing::info!("Server has shut down successfully");
