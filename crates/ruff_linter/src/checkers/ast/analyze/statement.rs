@@ -877,7 +877,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                         if !matches!(checker.semantic.current_scope().kind, ScopeKind::Module) {
                             checker.diagnostics.push(Diagnostic::new(
                                 pyflakes::rules::UndefinedLocalWithNestedImportStarUsage {
-                                    name: helpers::format_import_from(level, module),
+                                    name: helpers::format_import_from(level, module).to_string(),
                                 },
                                 stmt.range(),
                             ));
@@ -886,7 +886,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     if checker.enabled(Rule::UndefinedLocalWithImportStar) {
                         checker.diagnostics.push(Diagnostic::new(
                             pyflakes::rules::UndefinedLocalWithImportStar {
-                                name: helpers::format_import_from(level, module),
+                                name: helpers::format_import_from(level, module).to_string(),
                             },
                             stmt.range(),
                         ));

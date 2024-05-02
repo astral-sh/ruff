@@ -715,17 +715,21 @@ where
 /// assert_eq!(format_import_from(1, None), ".".to_string());
 /// assert_eq!(format_import_from(1, Some("foo")), ".foo".to_string());
 /// ```
-pub fn format_import_from(level: u32, module: Option<&str>) -> String {
-    let mut module_name = String::with_capacity(16);
-    if level > 0 {
-        for _ in 0..level {
-            module_name.push('.');
+pub fn format_import_from(level: u32, module: Option<&str>) -> Cow<str> {
+    match (level, module) {
+        (0, Some(module)) => Cow::Borrowed(module),
+        (level, module) => {
+            let mut module_name =
+                String::with_capacity((level as usize) + module.map_or(0, str::len));
+            for _ in 0..level {
+                module_name.push('.');
+            }
+            if let Some(module) = module {
+                module_name.push_str(module);
+            }
+            Cow::Owned(module_name)
         }
     }
-    if let Some(module) = module {
-        module_name.push_str(module);
-    }
-    module_name
 }
 
 /// Format the member reference name for a relative import.
@@ -740,9 +744,8 @@ pub fn format_import_from(level: u32, module: Option<&str>) -> String {
 /// assert_eq!(format_import_from_member(1, Some("foo"), "bar"), ".foo.bar".to_string());
 /// ```
 pub fn format_import_from_member(level: u32, module: Option<&str>, member: &str) -> String {
-    let mut qualified_name = String::with_capacity(
-        (level as usize) + module.as_ref().map_or(0, |module| module.len()) + 1 + member.len(),
-    );
+    let mut qualified_name =
+        String::with_capacity((level as usize) + module.map_or(0, str::len) + 1 + member.len());
     if level > 0 {
         for _ in 0..level {
             qualified_name.push('.');

@@ -109,7 +109,7 @@ pub(crate) fn definitions(checker: &mut Checker) {
     };
 
     let definitions = std::mem::take(&mut checker.semantic.definitions);
-    let mut overloaded_name: Option<String> = None;
+    let mut overloaded_name: Option<&str> = None;
     for ContextualizedDefinition {
         definition,
         visibility,
@@ -127,7 +127,7 @@ pub(crate) fn definitions(checker: &mut Checker) {
             if !overloaded_name.is_some_and(|overloaded_name| {
                 flake8_annotations::helpers::is_overload_impl(
                     definition,
-                    &overloaded_name,
+                    overloaded_name,
                     &checker.semantic,
                 )
             }) {
