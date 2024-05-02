@@ -71,7 +71,7 @@ pub(crate) fn reimplemented_container_builtin(checker: &mut Checker, expr: &Expr
 
     let container = match &**body {
         Expr::List(ast::ExprList { elts, .. }) if elts.is_empty() => Container::List,
-        Expr::Dict(ast::ExprDict { values, .. }) if values.is_empty() => Container::Dict,
+        Expr::Dict(ast::ExprDict { items, .. }) if items.is_empty() => Container::Dict,
         _ => return,
     };
     let mut diagnostic = Diagnostic::new(ReimplementedContainerBuiltin { container }, expr.range());

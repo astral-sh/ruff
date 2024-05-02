@@ -298,17 +298,13 @@ fn is_valid_default_value_with_annotation(
                     .iter()
                     .all(|e| is_valid_default_value_with_annotation(e, false, locator, semantic));
         }
-        Expr::Dict(ast::ExprDict {
-            keys,
-            values,
-            range: _,
-        }) => {
+        Expr::Dict(ast::ExprDict { items, range: _ }) => {
             return allow_container
-                && keys.len() <= 10
-                && keys.iter().zip(values).all(|(k, v)| {
-                    k.as_ref().is_some_and(|k| {
-                        is_valid_default_value_with_annotation(k, false, locator, semantic)
-                    }) && is_valid_default_value_with_annotation(v, false, locator, semantic)
+                && items.len() <= 10
+                && items.iter().all(|ast::DictItem { key, value }| {
+                    key.as_ref().is_some_and(|key| {
+                        is_valid_default_value_with_annotation(key, false, locator, semantic)
+                    }) && is_valid_default_value_with_annotation(value, false, locator, semantic)
                 });
         }
         Expr::UnaryOp(ast::ExprUnaryOp {

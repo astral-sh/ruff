@@ -3,7 +3,7 @@
 use std::fmt;
 use std::fmt::Debug;
 use std::iter::FusedIterator;
-use std::ops::Deref;
+use std::ops::{Deref, Index};
 use std::slice::{Iter, IterMut};
 use std::sync::OnceLock;
 
@@ -767,12 +767,37 @@ impl From<ExprIf> for Expr {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct DictItem {
+    pub key: Option<Expr>,
+    pub value: Expr,
+}
+
+impl DictItem {
+    fn key(&self) -> Option<&Expr> {
+        self.key.as_ref()
+    }
+
+    fn value(&self) -> &Expr {
+        &self.value
+    }
+}
+
 /// See also [Dict](https://docs.python.org/3/library/ast.html#ast.Dict)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprDict {
     pub range: TextRange,
-    pub keys: Vec<Option<Expr>>,
-    pub values: Vec<Expr>,
+    pub items: Vec<DictItem>,
+}
+
+impl ExprDict {
+    pub fn keys(&self) -> DictKeysView {
+        DictKeysView { items: &self.items }
+    }
+
+    pub fn values(&self) -> DictValuesView {
+        DictValuesView { items: &self.items }
+    }
 }
 
 impl From<ExprDict> for Expr {
@@ -780,6 +805,168 @@ impl From<ExprDict> for Expr {
         Expr::Dict(payload)
     }
 }
+
+#[derive(Debug, Clone, Copy)]
+pub struct DictKeysView<'a> {
+    items: &'a [DictItem],
+}
+
+impl<'a> DictKeysView<'a> {
+    pub fn first(self) -> Option<Option<&'a Expr>> {
+        self.items.first().map(DictItem::key)
+    }
+
+    pub fn last(self) -> Option<Option<&'a Expr>> {
+        self.items.last().map(DictItem::key)
+    }
+
+    pub fn len(self) -> usize {
+        self.items.len()
+    }
+
+    pub fn is_empty(self) -> bool {
+        self.items.is_empty()
+    }
+
+    pub fn get(self, index: usize) -> Option<Option<&'a Expr>> {
+        self.items.get(index).map(DictItem::key)
+    }
+}
+
+impl<'a> IntoIterator for DictKeysView<'a> {
+    type IntoIter = DictKeyIterator<'a>;
+    type Item = Option<&'a Expr>;
+    fn into_iter(self) -> Self::IntoIter {
+        DictKeyIterator::new(self.items)
+    }
+}
+
+impl<'a> Index<usize> for DictKeysView<'a> {
+    type Output = Option<Expr>;
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.items[index].key
+    }
+}
+
+#[derive(Debug)]
+pub struct DictKeyIterator<'a> {
+    items: Iter<'a, DictItem>,
+}
+
+impl<'a> DictKeyIterator<'a> {
+    fn new(items: &'a [DictItem]) -> Self {
+        Self {
+            items: items.iter(),
+        }
+    }
+}
+
+impl<'a> Iterator for DictKeyIterator<'a> {
+    type Item = Option<&'a Expr>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.items.next().map(DictItem::key)
+    }
+
+    fn last(mut self) -> Option<Self::Item> {
+        self.items.next_back().map(DictItem::key)
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let len = self.items.len();
+        (len, Some(len))
+    }
+}
+
+impl<'a> DoubleEndedIterator for DictKeyIterator<'a> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        self.items.next_back().map(DictItem::key)
+    }
+}
+
+impl<'a> FusedIterator for DictKeyIterator<'a> {}
+impl<'a> ExactSizeIterator for DictKeyIterator<'a> {}
+
+#[derive(Debug, Clone, Copy)]
+pub struct DictValuesView<'a> {
+    items: &'a [DictItem],
+}
+
+impl<'a> DictValuesView<'a> {
+    pub fn first(self) -> Option<&'a Expr> {
+        self.items.first().map(DictItem::value)
+    }
+
+    pub fn last(self) -> Option<&'a Expr> {
+        self.items.last().map(DictItem::value)
+    }
+
+    pub fn len(self) -> usize {
+        self.items.len()
+    }
+
+    pub fn is_empty(self) -> bool {
+        self.items.is_empty()
+    }
+
+    pub fn get(self, index: usize) -> Option<&'a Expr> {
+        self.items.get(index).map(DictItem::value)
+    }
+}
+
+impl<'a> IntoIterator for DictValuesView<'a> {
+    type IntoIter = DictValueIterator<'a>;
+    type Item = &'a Expr;
+    fn into_iter(self) -> Self::IntoIter {
+        DictValueIterator::new(self.items)
+    }
+}
+
+impl<'a> Index<usize> for DictValuesView<'a> {
+    type Output = Expr;
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.items[index].value
+    }
+}
+
+#[derive(Debug)]
+pub struct DictValueIterator<'a> {
+    items: Iter<'a, DictItem>,
+}
+
+impl<'a> DictValueIterator<'a> {
+    fn new(items: &'a [DictItem]) -> Self {
+        Self {
+            items: items.iter(),
+        }
+    }
+}
+
+impl<'a> Iterator for DictValueIterator<'a> {
+    type Item = &'a Expr;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.items.next().map(DictItem::value)
+    }
+
+    fn last(mut self) -> Option<Self::Item> {
+        self.items.next_back().map(DictItem::value)
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let len = self.items.len();
+        (len, Some(len))
+    }
+}
+
+impl<'a> DoubleEndedIterator for DictValueIterator<'a> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        self.items.next_back().map(DictItem::value)
+    }
+}
+
+impl<'a> FusedIterator for DictValueIterator<'a> {}
+impl<'a> ExactSizeIterator for DictValueIterator<'a> {}
 
 /// See also [Set](https://docs.python.org/3/library/ast.html#ast.Set)
 #[derive(Clone, Debug, PartialEq)]
@@ -4358,7 +4545,7 @@ mod tests {
         assert_eq!(std::mem::size_of::<ExprBytesLiteral>(), 40);
         assert_eq!(std::mem::size_of::<ExprCall>(), 56);
         assert_eq!(std::mem::size_of::<ExprCompare>(), 48);
-        assert_eq!(std::mem::size_of::<ExprDict>(), 56);
+        assert_eq!(std::mem::size_of::<ExprDict>(), 32);
         assert_eq!(std::mem::size_of::<ExprDictComp>(), 48);
         assert_eq!(std::mem::size_of::<ExprEllipsisLiteral>(), 8);
         // 56 for Rustc < 1.76

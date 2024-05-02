@@ -229,7 +229,7 @@ fn slots_attributes(expr: &Expr) -> impl Iterator<Item = &str> {
 
     // Ex) `__slots__ = {"name": ...}`
     let keys_iter = match expr {
-        Expr::Dict(ast::ExprDict { keys, .. }) => Some(keys.iter().filter_map(|key| match key {
+        Expr::Dict(dict) => Some(dict.keys().into_iter().filter_map(|key| match key {
             Some(Expr::StringLiteral(ast::ExprStringLiteral { value, .. })) => Some(value.to_str()),
             _ => None,
         })),

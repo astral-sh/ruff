@@ -89,16 +89,14 @@ fn check_msg(checker: &mut Checker, msg: &Expr) {
 /// Check contents of the `extra` argument to logging calls.
 fn check_log_record_attr_clash(checker: &mut Checker, extra: &Keyword) {
     match &extra.value {
-        Expr::Dict(ast::ExprDict { keys, .. }) => {
-            for key in keys {
-                if let Some(key) = &key {
-                    if let Expr::StringLiteral(ast::ExprStringLiteral { value: attr, .. }) = key {
-                        if is_reserved_attr(attr.to_str()) {
-                            checker.diagnostics.push(Diagnostic::new(
-                                LoggingExtraAttrClash(attr.to_string()),
-                                key.range(),
-                            ));
-                        }
+        Expr::Dict(dict) => {
+            for key in dict.keys().into_iter().flatten() {
+                if let Expr::StringLiteral(ast::ExprStringLiteral { value: attr, .. }) = key {
+                    if is_reserved_attr(attr.to_str()) {
+                        checker.diagnostics.push(Diagnostic::new(
+                            LoggingExtraAttrClash(attr.to_string()),
+                            key.range(),
+                        ));
                     }
                 }
             }

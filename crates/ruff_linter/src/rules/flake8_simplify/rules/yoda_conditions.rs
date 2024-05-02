@@ -113,8 +113,8 @@ impl ConstantLikelihood {
                 .map(|expr| ConstantLikelihood::from_expression(expr, preview))
                 .min()
                 .unwrap_or(ConstantLikelihood::Definitely),
-            Expr::Dict(ast::ExprDict { values: vs, .. }) if preview.is_enabled() => {
-                if vs.is_empty() {
+            Expr::Dict(ast::ExprDict { items, .. }) if preview.is_enabled() => {
+                if items.is_empty() {
                     ConstantLikelihood::Definitely
                 } else {
                     ConstantLikelihood::Probably

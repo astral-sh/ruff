@@ -1,6 +1,5 @@
 use ruff_formatter::{format_args, write};
-use ruff_python_ast::AnyNodeRef;
-use ruff_python_ast::{Expr, ExprDict};
+use ruff_python_ast::{AnyNodeRef, DictItem, Expr, ExprDict};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::comments::{dangling_comments, leading_comments, SourceComment};
@@ -14,18 +13,12 @@ pub struct FormatExprDict;
 
 impl FormatNodeRule<ExprDict> for FormatExprDict {
     fn fmt_fields(&self, item: &ExprDict, f: &mut PyFormatter) -> FormatResult<()> {
-        let ExprDict {
-            range: _,
-            keys,
-            values,
-        } = item;
-
-        debug_assert_eq!(keys.len(), values.len());
+        let ExprDict { range: _, items } = item;
 
         let comments = f.context().comments().clone();
         let dangling = comments.dangling(item);
 
-        let (Some(key), Some(value)) = (keys.first(), values.first()) else {
+        let Some(DictItem { key, value }) = items.first() else {
             return empty_parenthesized("{", dangling, "}").fmt(f);
         };
 
@@ -46,7 +39,7 @@ impl FormatNodeRule<ExprDict> for FormatExprDict {
             let mut joiner = f.join_comma_separated(item.end());
 
             let mut key_value_comments = key_value_comments;
-            for (key, value) in keys.iter().zip(values) {
+            for DictItem { key, value } in items {
                 let mut key_value_pair = KeyValuePair::new(key, value);
 
                 let partition = key_value_comments

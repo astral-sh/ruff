@@ -174,13 +174,9 @@ impl<'a> StringLiteralDisplay<'a> {
                     display_kind,
                 }
             }
-            ast::Expr::Dict(ast::ExprDict {
-                keys,
-                values,
-                range,
-            }) => {
-                let mut narrowed_keys = Vec::with_capacity(values.len());
-                for key in keys {
+            ast::Expr::Dict(dict @ ast::ExprDict { items, range }) => {
+                let mut narrowed_keys = Vec::with_capacity(items.len());
+                for key in dict.keys() {
                     if let Some(key) = key {
                         // This is somewhat unfortunate,
                         // *but* using a dict for __slots__ is very rare
@@ -193,8 +189,10 @@ impl<'a> StringLiteralDisplay<'a> {
                 // `__slots__ = {"foo": "bar", **other_dict}`
                 // If `None` wasn't present in the keys,
                 // the length of the keys should always equal the length of the values
-                assert_eq!(narrowed_keys.len(), values.len());
-                let display_kind = DisplayKind::Dict { values };
+                assert_eq!(narrowed_keys.len(), items.len());
+                let display_kind = DisplayKind::Dict {
+                    values: dict.values(),
+                };
                 Self {
                     elts: Cow::Owned(narrowed_keys),
                     range: *range,
@@ -229,7 +227,7 @@ impl<'a> StringLiteralDisplay<'a> {
                 SORTING_STYLE,
             ),
             (DisplayKind::Dict { values }, false) => {
-                sort_single_line_elements_dict(&self.elts, items, values, locator)
+                sort_single_line_elements_dict(&self.elts, items, values.into_iter(), locator)
             }
         };
         Some(Fix::safe_edit(Edit::range_replacement(
@@ -245,7 +243,7 @@ impl<'a> StringLiteralDisplay<'a> {
 #[derive(Debug)]
 enum DisplayKind<'a> {
     Sequence(SequenceKind),
-    Dict { values: &'a [ast::Expr] },
+    Dict { values: ast::DictValuesView<'a> },
 }
 
 /// A newtype that zips together three iterables:
@@ -262,7 +260,11 @@ enum DisplayKind<'a> {
 struct DictElements<'a>(Vec<(&'a &'a str, &'a ast::Expr, &'a ast::Expr)>);
 
 impl<'a> DictElements<'a> {
-    fn new(elements: &'a [&str], key_elts: &'a [ast::Expr], value_elts: &'a [ast::Expr]) -> Self {
+    fn new(
+        elements: &'a [&str],
+        key_elts: &'a [ast::Expr],
+        value_elts: impl ExactSizeIterator<Item = &'a ast::Expr>,
+    ) -> Self {
         assert_eq!(key_elts.len(), elements.len());
         assert_eq!(elements.len(), value_elts.len());
         assert!(
@@ -294,10 +296,10 @@ impl<'a> DictElements<'a> {
 /// `sequence_sorting.rs` if any other modules need it,
 /// but stays here for now, since this is currently the
 /// only module that needs it
-fn sort_single_line_elements_dict(
-    key_elts: &[ast::Expr],
-    elements: &[&str],
-    value_elts: &[ast::Expr],
+fn sort_single_line_elements_dict<'a>(
+    key_elts: &'a [ast::Expr],
+    elements: &'a [&str],
+    value_elts: impl ExactSizeIterator<Item = &'a ast::Expr>,
     locator: &Locator,
 ) -> String {
     let element_trios = DictElements::new(elements, key_elts, value_elts);

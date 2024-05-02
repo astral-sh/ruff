@@ -2301,13 +2301,9 @@ impl AstNode for ast::ExprDict {
     where
         V: PreorderVisitor<'a> + ?Sized,
     {
-        let ast::ExprDict {
-            keys,
-            values,
-            range: _,
-        } = self;
+        let ast::ExprDict { items, range: _ } = self;
 
-        for (key, value) in keys.iter().zip(values) {
+        for ast::DictItem { key, value } in items {
             if let Some(key) = key {
                 visitor.visit_expr(key);
             }

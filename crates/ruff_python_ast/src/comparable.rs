@@ -689,8 +689,7 @@ pub struct ExprIf<'a> {
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ExprDict<'a> {
-    keys: Vec<Option<ComparableExpr<'a>>>,
-    values: Vec<ComparableExpr<'a>>,
+    items: Vec<(Option<ComparableExpr<'a>>, ComparableExpr<'a>)>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -933,16 +932,13 @@ impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
                 body: body.into(),
                 orelse: orelse.into(),
             }),
-            ast::Expr::Dict(ast::ExprDict {
-                keys,
-                values,
-                range: _,
-            }) => Self::Dict(ExprDict {
-                keys: keys
+            ast::Expr::Dict(ast::ExprDict { items, range: _ }) => Self::Dict(ExprDict {
+                items: items
                     .iter()
-                    .map(|expr| expr.as_ref().map(Into::into))
+                    .map(|ast::DictItem { key, value }| {
+                        (key.as_ref().map(Into::into), value.into())
+                    })
                     .collect(),
-                values: values.iter().map(Into::into).collect(),
             }),
             ast::Expr::Set(ast::ExprSet { elts, range: _ }) => Self::Set(ExprSet {
                 elts: elts.iter().map(Into::into).collect(),

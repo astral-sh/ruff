@@ -57,65 +57,67 @@ Module(
                                 value: Dict(
                                     ExprDict {
                                         range: 20..36,
-                                        keys: [
-                                            Some(
-                                                StringLiteral(
-                                                    ExprStringLiteral {
-                                                        range: 21..24,
-                                                        value: StringLiteralValue {
-                                                            inner: Single(
-                                                                StringLiteral {
-                                                                    range: 21..24,
-                                                                    value: "b",
-                                                                    flags: StringLiteralFlags {
-                                                                        quote_style: Single,
-                                                                        prefix: Empty,
-                                                                        triple_quoted: false,
+                                        items: [
+                                            DictItem {
+                                                key: Some(
+                                                    StringLiteral(
+                                                        ExprStringLiteral {
+                                                            range: 21..24,
+                                                            value: StringLiteralValue {
+                                                                inner: Single(
+                                                                    StringLiteral {
+                                                                        range: 21..24,
+                                                                        value: "b",
+                                                                        flags: StringLiteralFlags {
+                                                                            quote_style: Single,
+                                                                            prefix: Empty,
+                                                                            triple_quoted: false,
+                                                                        },
                                                                     },
-                                                                },
-                                                            ),
+                                                                ),
+                                                            },
                                                         },
+                                                    ),
+                                                ),
+                                                value: NumberLiteral(
+                                                    ExprNumberLiteral {
+                                                        range: 26..27,
+                                                        value: Int(
+                                                            1,
+                                                        ),
                                                     },
                                                 ),
-                                            ),
-                                            Some(
-                                                StringLiteral(
-                                                    ExprStringLiteral {
-                                                        range: 29..32,
-                                                        value: StringLiteralValue {
-                                                            inner: Single(
-                                                                StringLiteral {
-                                                                    range: 29..32,
-                                                                    value: "c",
-                                                                    flags: StringLiteralFlags {
-                                                                        quote_style: Single,
-                                                                        prefix: Empty,
-                                                                        triple_quoted: false,
+                                            },
+                                            DictItem {
+                                                key: Some(
+                                                    StringLiteral(
+                                                        ExprStringLiteral {
+                                                            range: 29..32,
+                                                            value: StringLiteralValue {
+                                                                inner: Single(
+                                                                    StringLiteral {
+                                                                        range: 29..32,
+                                                                        value: "c",
+                                                                        flags: StringLiteralFlags {
+                                                                            quote_style: Single,
+                                                                            prefix: Empty,
+                                                                            triple_quoted: false,
+                                                                        },
                                                                     },
-                                                                },
-                                                            ),
+                                                                ),
+                                                            },
                                                         },
+                                                    ),
+                                                ),
+                                                value: NumberLiteral(
+                                                    ExprNumberLiteral {
+                                                        range: 34..35,
+                                                        value: Int(
+                                                            2,
+                                                        ),
                                                     },
                                                 ),
-                                            ),
-                                        ],
-                                        values: [
-                                            NumberLiteral(
-                                                ExprNumberLiteral {
-                                                    range: 26..27,
-                                                    value: Int(
-                                                        1,
-                                                    ),
-                                                },
-                                            ),
-                                            NumberLiteral(
-                                                ExprNumberLiteral {
-                                                    range: 34..35,
-                                                    value: Int(
-                                                        2,
-                                                    ),
-                                                },
-                                            ),
+                                            },
                                         ],
                                     },
                                 ),
