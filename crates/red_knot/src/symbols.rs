@@ -68,7 +68,7 @@ pub(crate) struct Scope {
     name: Name,
     kind: ScopeKind,
     child_scopes: Vec<ScopeId>,
-    // symbol IDs, hashed by symbol name
+    /// symbol IDs, hashed by symbol name
     symbols_by_name: Map<SymbolId, ()>,
 }
 
@@ -107,6 +107,7 @@ bitflags! {
 pub(crate) struct Symbol {
     name: Name,
     flags: SymbolFlags,
+    scope_id: ScopeId,
     // kind: Kind,
 }
 
@@ -141,7 +142,7 @@ pub(crate) enum Definition {
     // the small amount of information we need from the AST.
     Import(ImportDefinition),
     ImportFrom(ImportFromDefinition),
-    ClassDef(TypedNodeKey<ast::StmtClassDef>),
+    ClassDef(ClassDefinition),
     FunctionDef(TypedNodeKey<ast::StmtFunctionDef>),
     Assignment(TypedNodeKey<ast::StmtAssign>),
     AnnotatedAssignment(TypedNodeKey<ast::StmtAnnAssign>),
@@ -172,6 +173,12 @@ impl ImportFromDefinition {
     pub(crate) fn level(&self) -> u32 {
         self.level
     }
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct ClassDefinition {
+    pub(crate) node_key: TypedNodeKey<ast::StmtClassDef>,
+    pub(crate) scope_id: ScopeId,
 }
 
 #[derive(Debug, Clone)]
@@ -332,7 +339,11 @@ impl SymbolTable {
                 *entry.key()
             }
             RawEntryMut::Vacant(entry) => {
-                let id = self.symbols_by_id.push(Symbol { name, flags });
+                let id = self.symbols_by_id.push(Symbol {
+                    name,
+                    flags,
+                    scope_id,
+                });
                 entry.insert_with_hasher(hash, id, (), |_| hash);
                 id
             }
@@ -482,8 +493,8 @@ impl SymbolTableBuilder {
         &mut self,
         name: &str,
         params: &Option<Box<ast::TypeParams>>,
-        nested: impl FnOnce(&mut Self),
-    ) {
+        nested: impl FnOnce(&mut Self) -> ScopeId,
+    ) -> ScopeId {
         if let Some(type_params) = params {
             self.push_scope(self.cur_scope(), name, ScopeKind::Annotation);
             for type_param in &type_params.type_params {
@@ -495,10 +506,11 @@ impl SymbolTableBuilder {
                 self.add_or_update_symbol(name, SymbolFlags::IS_DEFINED);
             }
         }
-        nested(self);
+        let scope_id = nested(self);
         if params.is_some() {
             self.pop_scope();
         }
+        scope_id
     }
 }
 
@@ -525,21 +537,28 @@ impl PreorderVisitor<'_> for SymbolTableBuilder {
         // TODO need to capture more definition statements here
         match stmt {
             ast::Stmt::ClassDef(node) => {
-                let def = Definition::ClassDef(TypedNodeKey::from_node(node));
-                self.add_or_update_symbol_with_def(&node.name, def);
-                self.with_type_params(&node.name, &node.type_params, |builder| {
-                    builder.push_scope(builder.cur_scope(), &node.name, ScopeKind::Class);
+                let scope_id = self.with_type_params(&node.name, &node.type_params, |builder| {
+                    let scope_id =
+                        builder.push_scope(builder.cur_scope(), &node.name, ScopeKind::Class);
                     ast::visitor::preorder::walk_stmt(builder, stmt);
                     builder.pop_scope();
+                    scope_id
                 });
+                let def = Definition::ClassDef(ClassDefinition {
+                    node_key: TypedNodeKey::from_node(node),
+                    scope_id,
+                });
+                self.add_or_update_symbol_with_def(&node.name, def);
             }
             ast::Stmt::FunctionDef(node) => {
                 let def = Definition::FunctionDef(TypedNodeKey::from_node(node));
                 self.add_or_update_symbol_with_def(&node.name, def);
                 self.with_type_params(&node.name, &node.type_params, |builder| {
-                    builder.push_scope(builder.cur_scope(), &node.name, ScopeKind::Function);
+                    let scope_id =
+                        builder.push_scope(builder.cur_scope(), &node.name, ScopeKind::Function);
                     ast::visitor::preorder::walk_stmt(builder, stmt);
                     builder.pop_scope();
+                    scope_id
                 });
             }
             ast::Stmt::Import(ast::StmtImport { names, .. }) => {
