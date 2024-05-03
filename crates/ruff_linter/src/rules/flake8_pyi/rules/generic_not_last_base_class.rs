@@ -1,5 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::{self as ast, Arguments, Expr, StmtClassDef};
 use ruff_python_semantic::SemanticModel;
@@ -66,15 +67,16 @@ impl Violation for GenericNotLastBaseClass {
 }
 
 /// PYI059
-pub(crate) fn generic_not_last_base_class(
-    checker: &mut Checker,
-    class_def: &StmtClassDef,
-) {
+pub(crate) fn generic_not_last_base_class(checker: &mut Checker, class_def: &StmtClassDef) {
+    let bases = class_def.arguments.as_deref();
     let Some(bases) = bases else {
         return;
     };
 
     let semantic = checker.semantic();
+    if !semantic.seen_typing() {
+        return;
+    }
 
     let generic_base_indices: Vec<usize> = bases
         .args
@@ -92,68 +94,31 @@ pub(crate) fn generic_not_last_base_class(
         return;
     }
 
-    let diagnostic = {
-	    if generic_base_indices.len() == 1 {
-	        let base_index = generic_base_indices[0];
-	        if base_index == bases.args.len() - 1 {
-	            // Don't raise issue for the last base.
-	            return;
-	        }
-	
-	        Diagnostic::new(GenericNotLastBaseClass, class_def.identifier())
-	            .with_fix(generate_fix(bases, base_index, checker.locator()))
-	    } else {
-	        // No fix if multiple generics are seen in the class bases.
-	        Diagnostic::new(
-	            GenericNotLastBaseClass,
-	            class_def.identifier(),
-	        )
-	    }
-	};
-	
-	checker.diagnostics.push(diagnostic);
+    let diagnostic =
+        {
+            if generic_base_indices.len() == 1 {
+                let base_index = generic_base_indices[0];
+                if base_index == bases.args.len() - 1 {
+                    // Don't raise issue for the last base.
+                    return;
+                }
+
+                Diagnostic::new(GenericNotLastBaseClass, class_def.identifier())
+                    .with_fix(generate_fix(bases, base_index, checker.locator()))
+            } else {
+                // No fix if multiple generics are seen in the class bases.
+                Diagnostic::new(GenericNotLastBaseClass, class_def.identifier())
+            }
+        };
+
+    checker.diagnostics.push(diagnostic);
 }
 
 /// Return `true` if the given expression resolves to `typing.Generic[...]`.
 fn is_generic(expr: &Expr, semantic: &SemanticModel) -> bool {
-    if !semantic.seen_typing() {
-        return false;
-    }
-
-    let Expr::Subscript(ast::ExprSubscript { value, .. }) = expr else {
-        return false;
-    };
-
-    semantic.match_typing_expr(value, "Generic")
+    semantic.match_typing_expr(map_subscript(expr), "Generic")
 }
 
-// let call_start = Edit::deletion(call.start(), argument.start());
-
-// // Delete from the start of the call to the start of the argument.
-
-// // Delete from the end of the argument to the end of the call.
-// let call_end = Edit::deletion(argument.end(), call.end());
-
-// // If this is a tuple, we also need to convert the inner argument to a list.
-// if argument.is_tuple_expr() {
-//     // Replace `(` with `[`.
-//     let argument_start = Edit::replacement(
-//         "[".to_string(),
-//         argument.start(),
-//         argument.start() + TextSize::from(1),
-//     );
-
-//     // Replace `)` with `]`.
-//     let argument_end = Edit::replacement(
-//         "]".to_string(),
-//         argument.end() - TextSize::from(1),
-//         argument.end(),
-//     );
-
-//     Fix::unsafe_edits(call_start, [argument_start, argument_end, call_end])
-// } else {
-//     Fix::unsafe_edits(call_start, [call_end])
-// }
 fn generate_fix(bases: &Arguments, generic_base_index: usize, locator: &Locator) -> Fix {
     let last_base = bases.args.last().expect("Last base should always exist");
     let generic_base = bases

@@ -16,6 +16,10 @@ class MyMapping(  # PYI059
 ):
     ...
 
+# Inheriting from just `Generic` is a TypeError, but it's probably fine
+# to flag this issue in this case as well, since after fixing the error
+# the Generic's position issue persists.
+class Foo(Generic, LinkedList): ...  # PYI059
 
 # in case of multiple Generic[] inheritance, don't fix it.
 class C(Generic[T], Generic[K, V]): ...  # PYI059
