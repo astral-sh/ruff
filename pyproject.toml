@@ -106,6 +106,5 @@ version_files = [
   "docs/integrations.md",
   "crates/ruff/Cargo.toml",
   "crates/ruff_linter/Cargo.toml",
-  "crates/ruff_shrinking/Cargo.toml",
   "scripts/benchmarks/pyproject.toml",
 ]
