@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 use crate::ast_ids::NodeKey;
+use crate::db::{HasJar, QueryResult, SemanticDb, SemanticJar};
 use crate::files::FileId;
 use crate::symbols::{ScopeId, SymbolId};
 use crate::{FxDashMap, FxIndexSet, Name};
@@ -259,6 +260,24 @@ pub struct ClassTypeId {
     class_id: ModuleClassTypeId,
 }
 
+impl ClassTypeId {
+    fn get_own_class_member<Db>(self, db: &Db, name: &Name) -> QueryResult<Option<Type>>
+    where
+        Db: SemanticDb + HasJar<SemanticJar>,
+    {
+        // TODO: this should distinguish instance-only members (e.g. `x: int`) and not return them
+        let ClassType { scope_id, .. } = *db.jar()?.type_store.get_class(self);
+        let table = db.symbol_table(self.file_id)?;
+        if let Some(symbol_id) = table.symbol_id_by_name(scope_id, name) {
+            Ok(Some(db.infer_symbol_type(self.file_id, symbol_id)?))
+        } else {
+            Ok(None)
+        }
+    }
+
+    // TODO: get_own_instance_member, get_class_member, get_instance_member
+}
+
 #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
 pub struct UnionTypeId {
     file_id: FileId,
@@ -326,7 +345,6 @@ impl ModuleTypeStore {
     fn add_class(&mut self, name: &str, scope_id: ScopeId, bases: Vec<Type>) -> ClassTypeId {
         let class_id = self.classes.push(ClassType {
             name: Name::new(name),
-            file_id: self.file_id,
             scope_id,
             // TODO: if no bases are given, that should imply [object]
             bases,
@@ -414,8 +432,6 @@ impl std::fmt::Display for DisplayType<'_> {
 pub(crate) struct ClassType {
     /// Name of the class at definition
     name: Name,
-    /// FileId in which the class was defined
-    pub(crate) file_id: FileId,
     /// ScopeId of the class body
     pub(crate) scope_id: ScopeId,
     /// Types of all class bases

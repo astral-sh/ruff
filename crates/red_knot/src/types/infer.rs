@@ -5,8 +5,8 @@ use ruff_python_ast::AstNode;
 use crate::db::{HasJar, QueryResult, SemanticDb, SemanticJar};
 use crate::module::ModuleName;
 use crate::symbols::{ClassDefinition, Definition, ImportFromDefinition, SymbolId};
-use crate::types::{ClassType, ClassTypeId, Type};
-use crate::{FileId, Name};
+use crate::types::Type;
+use crate::FileId;
 use ruff_python_ast as ast;
 
 // FIXME: Figure out proper dead-lock free synchronisation now that this takes `&db` instead of `&mut db`.
@@ -120,25 +120,8 @@ where
     }
 }
 
-fn get_class_member<Db>(db: &Db, class_id: ClassTypeId, name: &Name) -> QueryResult<Option<Type>>
-where
-    Db: SemanticDb + HasJar<SemanticJar>,
-{
-    let jar = db.jar()?;
-    let ClassType {
-        scope_id, file_id, ..
-    } = *jar.type_store.get_class(class_id);
-    let table = db.symbol_table(file_id)?;
-    if let Some(symbol_id) = table.symbol_id_by_name(scope_id, name) {
-        Ok(Some(infer_symbol_type(db, file_id, symbol_id)?))
-    } else {
-        Ok(None)
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use super::get_class_member;
     use crate::db::tests::TestDb;
     use crate::db::{HasJar, SemanticDb, SemanticJar};
     use crate::module::{ModuleName, ModuleSearchPath, ModuleSearchPathKind};
@@ -257,7 +240,9 @@ mod tests {
             panic!("C is not a Class");
         };
 
-        let member_ty = get_class_member(db, class_id, &Name::new("f")).expect("C.f to resolve");
+        let member_ty = class_id
+            .get_own_class_member(db, &Name::new("f"))
+            .expect("C.f to resolve");
 
         let Some(Type::Function(func_id)) = member_ty else {
             panic!("C.f is not a Function");
