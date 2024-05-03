@@ -470,8 +470,8 @@ impl SymbolTableBuilder {
         symbol_id
     }
 
-    fn push_scope(&mut self, child_of: ScopeId, name: &str, kind: ScopeKind) -> ScopeId {
-        let scope_id = self.table.add_child_scope(child_of, name, kind);
+    fn push_scope(&mut self, name: &str, kind: ScopeKind) -> ScopeId {
+        let scope_id = self.table.add_child_scope(self.cur_scope(), name, kind);
         self.scopes.push(scope_id);
         scope_id
     }
@@ -496,7 +496,7 @@ impl SymbolTableBuilder {
         nested: impl FnOnce(&mut Self) -> ScopeId,
     ) -> ScopeId {
         if let Some(type_params) = params {
-            self.push_scope(self.cur_scope(), name, ScopeKind::Annotation);
+            self.push_scope(name, ScopeKind::Annotation);
             for type_param in &type_params.type_params {
                 let name = match type_param {
                     ast::TypeParam::TypeVar(ast::TypeParamTypeVar { name, .. }) => name,
@@ -538,8 +538,7 @@ impl PreorderVisitor<'_> for SymbolTableBuilder {
         match stmt {
             ast::Stmt::ClassDef(node) => {
                 let scope_id = self.with_type_params(&node.name, &node.type_params, |builder| {
-                    let scope_id =
-                        builder.push_scope(builder.cur_scope(), &node.name, ScopeKind::Class);
+                    let scope_id = builder.push_scope(&node.name, ScopeKind::Class);
                     ast::visitor::preorder::walk_stmt(builder, stmt);
                     builder.pop_scope();
                     scope_id
@@ -554,8 +553,7 @@ impl PreorderVisitor<'_> for SymbolTableBuilder {
                 let def = Definition::FunctionDef(TypedNodeKey::from_node(node));
                 self.add_or_update_symbol_with_def(&node.name, def);
                 self.with_type_params(&node.name, &node.type_params, |builder| {
-                    let scope_id =
-                        builder.push_scope(builder.cur_scope(), &node.name, ScopeKind::Function);
+                    let scope_id = builder.push_scope(&node.name, ScopeKind::Function);
                     ast::visitor::preorder::walk_stmt(builder, stmt);
                     builder.pop_scope();
                     scope_id
