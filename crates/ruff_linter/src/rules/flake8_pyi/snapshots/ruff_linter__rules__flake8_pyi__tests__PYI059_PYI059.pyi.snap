@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
 ---
-PYI059.pyi:8:7: PYI059 [*] `Generic[]` should always be the last base class
+PYI059.pyi:8:17: PYI059 [*] `Generic[]` should always be the last base class
    |
  6 | V = TypeVar('V')
  7 | 
  8 | class LinkedList(Generic[T], Sized):  # PYI059
-   |       ^^^^^^^^^^ PYI059
+   |                 ^^^^^^^^^^^^^^^^^^^ PYI059
  9 |     def __init__(self) -> None: ...
 10 |     def push(self, item: T) -> None: ...
    |
@@ -22,14 +22,18 @@ PYI059.pyi:8:7: PYI059 [*] `Generic[]` should always be the last base class
 10 10 |     def push(self, item: T) -> None: ...
 11 11 | 
 
-PYI059.pyi:12:7: PYI059 [*] `Generic[]` should always be the last base class
+PYI059.pyi:12:16: PYI059 [*] `Generic[]` should always be the last base class
    |
-10 |     def push(self, item: T) -> None: ...
-11 | 
-12 | class MyMapping(  # PYI059
-   |       ^^^^^^^^^ PYI059
-13 |     t.Generic[K, V],
-14 |     Iterable[Tuple[K, V]],
+10 |       def push(self, item: T) -> None: ...
+11 |   
+12 |   class MyMapping(  # PYI059
+   |  ________________^
+13 | |     t.Generic[K, V],
+14 | |     Iterable[Tuple[K, V]],
+15 | |     Container[Tuple[K, V]],
+16 | | ):
+   | |_^ PYI059
+17 |       ...
    |
    = help: Move `Generic[]` to the end
 
@@ -45,12 +49,12 @@ PYI059.pyi:12:7: PYI059 [*] `Generic[]` should always be the last base class
 17 16 |     ...
 18 17 | 
 
-PYI059.pyi:22:7: PYI059 [*] `Generic[]` should always be the last base class
+PYI059.pyi:22:10: PYI059 [*] `Generic[]` should always be the last base class
    |
 20 | # to flag this issue in this case as well, since after fixing the error
 21 | # the Generic's position issue persists.
 22 | class Foo(Generic, LinkedList): ...  # PYI059
-   |       ^^^ PYI059
+   |          ^^^^^^^^^^^^^^^^^^^^^ PYI059
 23 | 
 24 | # in case of multiple Generic[] inheritance, don't fix it.
    |
@@ -66,10 +70,10 @@ PYI059.pyi:22:7: PYI059 [*] `Generic[]` should always be the last base class
 24 24 | # in case of multiple Generic[] inheritance, don't fix it.
 25 25 | class C(Generic[T], Generic[K, V]): ...  # PYI059
 
-PYI059.pyi:25:7: PYI059 `Generic[]` should always be the last base class
+PYI059.pyi:25:8: PYI059 `Generic[]` should always be the last base class
    |
 24 | # in case of multiple Generic[] inheritance, don't fix it.
 25 | class C(Generic[T], Generic[K, V]): ...  # PYI059
-   |       ^ PYI059
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI059
    |
    = help: Move `Generic[]` to the end
