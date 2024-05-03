@@ -128,15 +128,6 @@ impl FormatNodeRule<StmtWith> for FormatStmtWith {
             ]
         )
     }
-
-    fn fmt_dangling_comments(
-        &self,
-        _dangling_comments: &[SourceComment],
-        _f: &mut PyFormatter,
-    ) -> FormatResult<()> {
-        // Handled in `fmt_fields`
-        Ok(())
-    }
 }
 
 #[derive(Clone, Copy, Debug)]

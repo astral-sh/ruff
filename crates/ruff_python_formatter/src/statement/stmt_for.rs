@@ -2,7 +2,6 @@ use ruff_formatter::{format_args, write};
 use ruff_python_ast::{Expr, Stmt, StmtFor};
 use ruff_text_size::Ranged;
 
-use crate::comments::SourceComment;
 use crate::expression::expr_tuple::TupleParentheses;
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::Parenthesize;
@@ -91,15 +90,6 @@ impl FormatNodeRule<StmtFor> for FormatStmtFor {
             )?;
         }
 
-        Ok(())
-    }
-
-    fn fmt_dangling_comments(
-        &self,
-        _dangling_comments: &[SourceComment],
-        _f: &mut PyFormatter,
-    ) -> FormatResult<()> {
-        // Handled in `fmt_fields`
         Ok(())
     }
 }

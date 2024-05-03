@@ -60,7 +60,7 @@ pub(crate) fn redundant_backslash(
                     let start = locator.line_start(token.start());
                     start_index = continuation_lines
                         .binary_search(&start)
-                        .map_or_else(|err_index| err_index, |ok_index| ok_index);
+                        .unwrap_or_else(|err_index| err_index);
                 }
                 parens += 1;
             }
@@ -70,7 +70,7 @@ pub(crate) fn redundant_backslash(
                     let end = locator.line_start(token.start());
                     let end_index = continuation_lines
                         .binary_search(&end)
-                        .map_or_else(|err_index| err_index, |ok_index| ok_index);
+                        .unwrap_or_else(|err_index| err_index);
                     for continuation_line in &continuation_lines[start_index..end_index] {
                         let backslash_end = locator.line_end(*continuation_line);
                         let backslash_start = backslash_end - TextSize::new(1);

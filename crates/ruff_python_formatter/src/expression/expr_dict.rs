@@ -64,15 +64,6 @@ impl FormatNodeRule<ExprDict> for FormatExprDict {
             .with_dangling_comments(open_parenthesis_comments)
             .fmt(f)
     }
-
-    fn fmt_dangling_comments(
-        &self,
-        _dangling_comments: &[SourceComment],
-        _f: &mut PyFormatter,
-    ) -> FormatResult<()> {
-        // Handled by `fmt_fields`
-        Ok(())
-    }
 }
 
 impl NeedsParentheses for ExprDict {

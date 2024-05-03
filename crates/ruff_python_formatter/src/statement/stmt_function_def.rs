@@ -4,7 +4,6 @@ use ruff_python_ast::{NodeKind, StmtFunctionDef};
 use crate::comments::format::{
     empty_lines_after_leading_comments, empty_lines_before_trailing_comments,
 };
-use crate::comments::SourceComment;
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::{Parentheses, Parenthesize};
 use crate::prelude::*;
@@ -89,15 +88,6 @@ impl FormatNodeRule<StmtFunctionDef> for FormatStmtFunctionDef {
         // ```
         empty_lines_before_trailing_comments(f, comments.trailing(item), NodeKind::StmtFunctionDef)
             .fmt(f)
-    }
-
-    fn fmt_dangling_comments(
-        &self,
-        _dangling_comments: &[SourceComment],
-        _f: &mut PyFormatter,
-    ) -> FormatResult<()> {
-        // Handled in `fmt_fields`
-        Ok(())
     }
 }
 

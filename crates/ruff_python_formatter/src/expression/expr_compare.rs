@@ -2,7 +2,6 @@ use ruff_formatter::{FormatOwnedWithRule, FormatRefWithRule};
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::{CmpOp, ExprCompare};
 
-use crate::comments::SourceComment;
 use crate::expression::binary_like::BinaryLike;
 use crate::expression::has_parentheses;
 use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
@@ -16,16 +15,6 @@ impl FormatNodeRule<ExprCompare> for FormatExprCompare {
     #[inline]
     fn fmt_fields(&self, item: &ExprCompare, f: &mut PyFormatter) -> FormatResult<()> {
         BinaryLike::Compare(item).fmt(f)
-    }
-
-    fn fmt_dangling_comments(
-        &self,
-        dangling_comments: &[SourceComment],
-        _f: &mut PyFormatter,
-    ) -> FormatResult<()> {
-        // Node can not have dangling comments
-        debug_assert!(dangling_comments.is_empty());
-        Ok(())
     }
 }
 

@@ -218,7 +218,7 @@ fn contains_unescaped_newline(haystack: &str) -> bool {
     let mut rest = haystack;
 
     while let Some(index) = memchr::memchr(b'\\', rest.as_bytes()) {
-        rest = &rest[index + 1..].trim_whitespace_start();
+        rest = rest[index + 1..].trim_whitespace_start();
 
         if rest.starts_with('\n') {
             return true;

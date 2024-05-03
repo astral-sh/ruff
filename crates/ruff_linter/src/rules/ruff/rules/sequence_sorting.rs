@@ -48,7 +48,7 @@ impl SortingStyle {
 /// an "isort-style sort".
 ///
 /// An isort-style sort sorts items first according to their casing:
-/// `SCREAMING_SNAKE_CASE` names (conventionally used for global constants)
+/// SCREAMING_SNAKE_CASE names (conventionally used for global constants)
 /// come first, followed by CamelCase names (conventionally used for
 /// classes), followed by anything else. Within each category,
 /// a [natural sort](https://en.wikipedia.org/wiki/Natural_sort_order)

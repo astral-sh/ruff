@@ -12,8 +12,7 @@ use ruff_python_trivia::CommentRanges;
 use ruff_source_file::Locator;
 
 use crate::comments::{
-    dangling_comments, has_skip_comment, leading_comments, trailing_comments, Comments,
-    SourceComment,
+    has_skip_comment, leading_comments, trailing_comments, Comments, SourceComment,
 };
 pub use crate::context::PyFormatContext;
 pub use crate::options::{
@@ -75,6 +74,8 @@ where
 
             self.fmt_fields(node, f)?;
 
+            debug_assert!(node_comments.dangling.iter().all(SourceComment::is_formatted), "The node has dangling comments that need to be formatted manually. Add the special dangling comments handling to `fmt_fields`.");
+
             write!(
                 f,
                 [
@@ -87,26 +88,6 @@ where
 
     /// Formats the node's fields.
     fn fmt_fields(&self, item: &N, f: &mut PyFormatter) -> FormatResult<()>;
-
-    /// Formats the [dangling comments](comments#dangling-comments) of the node.
-    ///
-    /// You should override this method if the node handled by this rule can have dangling comments because the
-    /// default implementation formats the dangling comments at the end of the node, which isn't ideal but ensures that
-    /// no comments are dropped.
-    ///
-    /// A node can have dangling comments if all its children are tokens or if all node children are optional.
-    fn fmt_dangling_comments(
-        &self,
-        dangling_node_comments: &[SourceComment],
-        f: &mut PyFormatter,
-    ) -> FormatResult<()> {
-        debug_assert!(
-            dangling_node_comments.is_empty(),
-            "The node has dangling comments that need to be formatted manually. Add the special dangling comments handling to `fmt_fields` and override `fmt_dangling_comments` with an empty implementation that returns `Ok(())`."
-        );
-
-        dangling_comments(dangling_node_comments).fmt(f)
-    }
 
     fn is_suppressed(
         &self,

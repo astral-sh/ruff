@@ -93,15 +93,6 @@ impl FormatNodeRule<StmtTry> for FormatStmtTry {
 
         write!(f, [comments::dangling_comments(dangling_comments)])
     }
-
-    fn fmt_dangling_comments(
-        &self,
-        _dangling_comments: &[SourceComment],
-        _f: &mut PyFormatter,
-    ) -> FormatResult<()> {
-        // dangling comments are formatted as part of AnyStatementTry::fmt
-        Ok(())
-    }
 }
 
 fn format_case<'a>(

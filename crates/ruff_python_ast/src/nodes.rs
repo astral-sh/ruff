@@ -1006,7 +1006,7 @@ impl ConversionFlag {
 pub struct DebugText {
     /// The text between the `{` and the expression node.
     pub leading: String,
-    /// The text between the expression and the conversion, the format_spec, or the `}`, depending on what's present in the source
+    /// The text between the expression and the conversion, the `format_spec`, or the `}`, depending on what's present in the source
     pub trailing: String,
 }
 

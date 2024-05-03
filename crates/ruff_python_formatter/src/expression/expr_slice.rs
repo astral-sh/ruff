@@ -146,15 +146,6 @@ impl FormatNodeRule<ExprSlice> for FormatExprSlice {
         }
         Ok(())
     }
-
-    fn fmt_dangling_comments(
-        &self,
-        _dangling_node_comments: &[SourceComment],
-        _f: &mut PyFormatter,
-    ) -> FormatResult<()> {
-        // Handled as part of `fmt_fields`
-        Ok(())
-    }
 }
 
 /// We're in a slice, so we know there's a first colon, but with have to look into the source

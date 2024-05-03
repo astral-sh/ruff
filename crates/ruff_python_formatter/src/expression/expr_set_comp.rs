@@ -2,8 +2,6 @@ use ruff_formatter::{format_args, write, Buffer, FormatResult};
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::ExprSetComp;
 
-use crate::comments::SourceComment;
-
 use crate::expression::parentheses::{parenthesized, NeedsParentheses, OptionalParentheses};
 use crate::prelude::*;
 
@@ -40,15 +38,6 @@ impl FormatNodeRule<ExprSetComp> for FormatExprSetComp {
             )
             .with_dangling_comments(dangling)]
         )
-    }
-
-    fn fmt_dangling_comments(
-        &self,
-        _dangling_comments: &[SourceComment],
-        _f: &mut PyFormatter,
-    ) -> FormatResult<()> {
-        // Handled as part of `fmt_fields`
-        Ok(())
     }
 }
 

@@ -73,15 +73,6 @@ impl FormatNodeRule<StmtImportFrom> for FormatStmtImportFrom {
         }
     }
 
-    fn fmt_dangling_comments(
-        &self,
-        _dangling_comments: &[SourceComment],
-        _f: &mut PyFormatter,
-    ) -> FormatResult<()> {
-        // Handled in `fmt_fields`
-        Ok(())
-    }
-
     fn is_suppressed(
         &self,
         trailing_comments: &[SourceComment],

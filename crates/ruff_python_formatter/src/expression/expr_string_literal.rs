@@ -1,7 +1,6 @@
 use ruff_formatter::FormatRuleWithOptions;
 use ruff_python_ast::{AnyNodeRef, ExprStringLiteral};
 
-use crate::comments::SourceComment;
 use crate::expression::parentheses::{
     in_parentheses_only_group, NeedsParentheses, OptionalParentheses,
 };
@@ -60,14 +59,6 @@ impl FormatNodeRule<ExprStringLiteral> for FormatExprStringLiteral {
             }
             .fmt(f),
         }
-    }
-
-    fn fmt_dangling_comments(
-        &self,
-        _dangling_comments: &[SourceComment],
-        _f: &mut PyFormatter,
-    ) -> FormatResult<()> {
-        Ok(())
     }
 }
 

@@ -273,7 +273,7 @@ pub(crate) struct TodoComment<'a> {
     pub(crate) directive: TodoDirective<'a>,
     /// The comment's actual [`TextRange`].
     pub(crate) range: TextRange,
-    /// The comment range's position in [`Indexer`].comment_ranges()
+    /// The comment range's position in [`Indexer::comment_ranges`]
     pub(crate) range_index: usize,
 }
 
