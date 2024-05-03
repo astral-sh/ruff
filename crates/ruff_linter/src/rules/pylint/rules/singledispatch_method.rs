@@ -74,7 +74,7 @@ pub(crate) fn singledispatch_method(
         ..
     } = func;
 
-    let Some(parent) = &checker.semantic().first_non_type_parent_scope(scope) else {
+    let Some(parent) = checker.semantic().first_non_type_parent_scope(scope) else {
         return;
     };
 

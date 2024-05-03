@@ -73,3 +73,10 @@ def op_add4(x, y=1):
 def op_add5(x, y):
     print("op_add5")
     return x + y
+
+
+# OK
+class Class:
+    @staticmethod
+    def add(x, y):
+        return x + y

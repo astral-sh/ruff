@@ -49,7 +49,7 @@ pub(crate) fn no_self_use(
     scope: &Scope,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
-    let Some(parent) = &checker.semantic().first_non_type_parent_scope(scope) else {
+    let Some(parent) = checker.semantic().first_non_type_parent_scope(scope) else {
         return;
     };
 

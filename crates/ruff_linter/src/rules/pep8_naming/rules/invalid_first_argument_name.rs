@@ -190,7 +190,7 @@ pub(crate) fn invalid_first_argument_name(
         panic!("Expected ScopeKind::Function")
     };
 
-    let Some(parent) = &checker.semantic().first_non_type_parent_scope(scope) else {
+    let Some(parent) = checker.semantic().first_non_type_parent_scope(scope) else {
         return;
     };
 
