@@ -89,7 +89,15 @@ impl RuffSettingsIndex {
                 )
                 .ok()
             })
-            .unwrap_or_default();
+            .unwrap_or_else(|| {
+                let default_configuration = ruff_workspace::configuration::Configuration::default();
+                EditorConfigurationTransformer(editor_settings, root)
+                    .transform(default_configuration)
+                    .into_settings(root)
+                    .expect(
+                        "editor configuration should merge successfully with default configuration",
+                    )
+            });
 
         Self {
             index,
