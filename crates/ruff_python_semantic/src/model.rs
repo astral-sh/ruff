@@ -1575,6 +1575,31 @@ impl<'a> SemanticModel<'a> {
             .intersects(SemanticModelFlags::DEFERRED_TYPE_DEFINITION)
     }
 
+    pub const fn in_valid_context_for_deferred_type_definition(&self) -> bool {
+        if self.in_typing_literal() {
+            return false;
+        }
+        if !self.in_type_definition() {
+            return false;
+        }
+        // `in_deferred_type_definition()` will only be `true` if we're now visiting the deferred nodes
+        // after having already traversed the source tree once. If we're now visiting the deferred nodes,
+        // we can't defer again, or we'll infinitely recurse!
+        if self.in_deferred_type_definition() {
+            return false;
+        }
+        if self.in_type_checking_block() || self.flags.intersects(SemanticModelFlags::STUB_FILE) {
+            return true;
+        }
+        if !self
+            .flags
+            .intersects(SemanticModelFlags::FUTURE_ANNOTATIONS)
+        {
+            return false;
+        }
+        self.in_annotation()
+    }
+
     /// Return `true` if the model is in a forward type reference.
     ///
     /// Includes deferred string types, and future types in annotations.
@@ -1657,6 +1682,12 @@ impl<'a> SemanticModel<'a> {
     pub const fn future_annotations_or_stub(&self) -> bool {
         self.flags
             .intersects(SemanticModelFlags::FUTURE_ANNOTATIONS_OR_STUB)
+    }
+
+    /// Return `true` if we're in a block of code that is never executed at runtime:
+    /// either a stub file, or a `TYPE_CHECKING` block
+    pub const fn in_typing_only_block(&self) -> bool {
+        self.flags.intersects(SemanticModelFlags::TYPING_ONLY_BLOCK)
     }
 
     /// Return `true` if the model is in a stub file (i.e., a file with a `.pyi` extension).
@@ -2015,11 +2046,15 @@ bitflags! {
         /// The model is in a Python stub file (i.e., a `.pyi` file).
         const STUB_FILE = 1 << 16;
 
-        /// `__future__`-style type annotations are enabled in this model.
+        /// The model is in a context that's never evaluated at runtime:
+        /// either a stub file or a type-checking block
+        const TYPING_ONLY_BLOCK = Self::STUB_FILE.bits() | Self::TYPE_CHECKING_BLOCK.bits();
+
+        /// `__future__`-style type annotations are enabled.
         /// That could be because it's a stub file,
         /// or it could be because it's a non-stub file that has `from __future__ import annotations`
-        /// a the top of the module.
-        const FUTURE_ANNOTATIONS_OR_STUB = Self::FUTURE_ANNOTATIONS.bits() | Self::STUB_FILE.bits();
+        /// at the top of the module, or because we're in a `TYPE_CHECKING` block
+        const FUTURE_ANNOTATIONS_OR_STUB = Self::FUTURE_ANNOTATIONS.bits() | Self::TYPING_ONLY_BLOCK.bits();
 
         /// The model has traversed past the module docstring.
         ///

@@ -1,7 +1,7 @@
 """Tests for constructs allowed when `__future__` annotations are enabled but not otherwise"""
 from __future__ import annotations
 
-from typing import Optional, TypeAlias, Union
+from typing import Optional, TypeAlias, Union, TYPE_CHECKING
 
 __version__: str
 __author__: str
@@ -45,4 +45,8 @@ class D: ...
 # More circular references
 class Leaf: ...
 class Tree(list[Tree | Leaf]): ...  # Still invalid even when `__future__.annotations` are enabled
-class Tree2(list["Tree | Leaf"]): ...  # always okay
+class Tree2(list["Tree2 | Leaf"]): ...  # always okay
+
+if TYPE_CHECKING:
+    class Tree3(list[Tree3 | Leaf]): ...  # Always okay if it's in a `TYPE_CHECKING` block
+    Recursive: TypeAlias = Recursive | None  # Always okay if it's in a `TYPE_CHECKING` block

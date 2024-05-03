@@ -893,7 +893,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
 
     fn visit_expr(&mut self, expr: &'a Expr) {
         // Step 0: Pre-processing
-        if self.source_type.is_stub()
+        if self.semantic.in_typing_only_block()
             && self.semantic.in_class_base()
             && !self.semantic.in_deferred_class_base()
         {
@@ -903,15 +903,11 @@ impl<'a> Visitor<'a> for Checker<'a> {
             return;
         }
 
-        if !self.semantic.in_typing_literal()
-            // `in_deferred_type_definition()` will only be `true` if we're now visiting the deferred nodes
-            // after having already traversed the source tree once. If we're now visiting the deferred nodes,
-            // we can't defer again, or we'll infinitely recurse!
-            && !self.semantic.in_deferred_type_definition()
-            && self.semantic.in_type_definition()
-            && self.semantic.future_annotations_or_stub()
-            && (self.semantic.in_annotation() || self.source_type.is_stub())
-        {
+        let defer_probable_type_definition = self
+            .semantic
+            .in_valid_context_for_deferred_type_definition();
+
+        if defer_probable_type_definition {
             if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = expr {
                 self.visit.string_type_definitions.push((
                     expr.range(),
@@ -1953,9 +1949,10 @@ impl<'a> Checker<'a> {
 
     /// After initial traversal of the AST, visit all class bases that were deferred.
     ///
-    /// This method should only be relevant in stub files, where forward references are
-    /// legal in class bases. For other kinds of Python files, using a forward reference
-    /// in a class base is never legal, so `self.visit.class_bases` should always be empty.
+    /// This method should only be relevant in stub files or `TYPE_CHECKING` blocks,
+    /// where forward references are legal in class bases. In other contexts,
+    /// using a forward reference in a class base is never legal,
+    /// so `self.visit.class_bases` should always be empty.
     ///
     /// For example, in a stub file:
     /// ```python
@@ -1965,12 +1962,9 @@ impl<'a> Checker<'a> {
     fn visit_deferred_class_bases(&mut self) {
         let snapshot = self.semantic.snapshot();
         let deferred_bases = std::mem::take(&mut self.visit.class_bases);
-        debug_assert!(
-            self.source_type.is_stub() || deferred_bases.is_empty(),
-            "Class bases should never be deferred outside of stub files"
-        );
         for (expr, snapshot) in deferred_bases {
             self.semantic.restore(snapshot);
+            debug_assert!(self.semantic.in_typing_only_block());
             // Set this flag to avoid infinite recursion, or we'll just defer it again:
             self.semantic.flags |= SemanticModelFlags::DEFERRED_CLASS_BASE;
             self.visit_expr(expr);
@@ -1981,8 +1975,9 @@ impl<'a> Checker<'a> {
     /// After initial traversal of the AST, visit all "future type definitions".
     ///
     /// A "future type definition" is a type definition where [PEP 563] semantics
-    /// apply (i.e., an annotation in a module that has `from __future__ import annotations`
-    /// at the top of the file, or an annotation in a stub file). These type definitions
+    /// apply (i.e., a definition in a module that has `from __future__ import annotations`
+    /// at the top of the file, a definition in a `TYPE_CHECKING` block,
+    /// or an annotation in a stub file). These type definitions
     /// support forward references, so they are deferred on initial traversal
     /// of the source tree.
     ///
@@ -2004,13 +1999,9 @@ impl<'a> Checker<'a> {
             for (expr, snapshot) in type_definitions {
                 self.semantic.restore(snapshot);
 
-                // Type definitions should only be considered "`__future__` type definitions"
-                // if they are annotations in a module where `from __future__ import
-                // annotations` is active, or they are type definitions in a stub file.
-                debug_assert!(
-                    self.semantic.future_annotations_or_stub()
-                        && (self.source_type.is_stub() || self.semantic.in_annotation())
-                );
+                debug_assert!(self
+                    .semantic
+                    .in_valid_context_for_deferred_type_definition());
 
                 self.semantic.flags |= SemanticModelFlags::TYPE_DEFINITION
                     | SemanticModelFlags::FUTURE_TYPE_DEFINITION;
