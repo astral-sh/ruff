@@ -157,15 +157,6 @@ impl FormatNodeRule<StmtClassDef> for FormatStmtClassDef {
 
         Ok(())
     }
-
-    fn fmt_dangling_comments(
-        &self,
-        _dangling_comments: &[SourceComment],
-        _f: &mut PyFormatter,
-    ) -> FormatResult<()> {
-        // handled in fmt_fields
-        Ok(())
-    }
 }
 
 pub(super) struct FormatDecorators<'a> {

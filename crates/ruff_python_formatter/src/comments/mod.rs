@@ -195,9 +195,9 @@ type CommentsMap<'a> = MultiMap<NodeRefEqualityKey<'a>, SourceComment>;
 /// Cloning `comments` is cheap as it only involves bumping a reference counter.
 #[derive(Debug, Clone)]
 pub(crate) struct Comments<'a> {
-    /// The implementation uses an [Rc] so that [Comments] has a lifetime independent from the [crate::Formatter].
-    /// Independent lifetimes are necessary to support the use case where a (formattable object)[crate::Format]
-    /// iterates over all comments, and writes them into the [crate::Formatter] (mutably borrowing the [crate::Formatter] and in turn its context).
+    /// The implementation uses an [Rc] so that [Comments] has a lifetime independent from the [`crate::Formatter`].
+    /// Independent lifetimes are necessary to support the use case where a (formattable object)[`crate::Format`]
+    /// iterates over all comments, and writes them into the [`crate::Formatter`] (mutably borrowing the [`crate::Formatter`] and in turn its context).
     ///
     /// ```block
     /// for leading in f.context().comments().leading_comments(node) {

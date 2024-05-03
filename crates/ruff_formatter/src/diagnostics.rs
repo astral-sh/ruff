@@ -18,10 +18,10 @@ pub enum FormatError {
     InvalidDocument(InvalidDocumentError),
 
     /// Formatting failed because some content encountered a situation where a layout
-    /// choice by an enclosing [crate::Format] resulted in a poor layout for a child [crate::Format].
+    /// choice by an enclosing [`crate::Format`] resulted in a poor layout for a child [`crate::Format`].
     ///
-    /// It's up to an enclosing [crate::Format] to handle the error and pick another layout.
-    /// This error should not be raised if there's no outer [crate::Format] handling the poor layout error,
+    /// It's up to an enclosing [`crate::Format`] to handle the error and pick another layout.
+    /// This error should not be raised if there's no outer [`crate::Format`] handling the poor layout error,
     /// avoiding that formatting of the whole document fails.
     PoorLayout,
 }

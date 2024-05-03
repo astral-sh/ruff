@@ -56,7 +56,7 @@ impl CacheKey for LineLength {
 pub enum ParseLineWidthError {
     /// The string could not be parsed as a valid [u16]
     ParseError(ParseIntError),
-    /// The [u16] value of the string is not a valid [LineLength]
+    /// The [u16] value of the string is not a valid [`LineLength`]
     TryFromIntError(LineLengthFromIntError),
 }
 

@@ -2,7 +2,7 @@ use ruff_formatter::{format_args, write};
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::ExprNamed;
 
-use crate::comments::{dangling_comments, SourceComment};
+use crate::comments::dangling_comments;
 use crate::expression::parentheses::{
     in_parentheses_only_soft_line_break_or_space, NeedsParentheses, OptionalParentheses,
 };
@@ -41,15 +41,6 @@ impl FormatNodeRule<ExprNamed> for FormatExprNamed {
         }
 
         write!(f, [value.format()])
-    }
-
-    fn fmt_dangling_comments(
-        &self,
-        _dangling_comments: &[SourceComment],
-        _f: &mut PyFormatter,
-    ) -> FormatResult<()> {
-        // Handled by `fmt_fields`
-        Ok(())
     }
 }
 

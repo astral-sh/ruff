@@ -185,7 +185,7 @@ pub enum ScopeKind<'a> {
     Function(&'a ast::StmtFunctionDef),
     Generator,
     Module,
-    /// A Python 3.12+ ["annotation scope"](https://docs.python.org/3/reference/executionmodel.html#annotation-scopes)
+    /// A Python 3.12+ [annotation scope](https://docs.python.org/3/reference/executionmodel.html#annotation-scopes)
     Type,
     Lambda(&'a ast::ExprLambda),
 }

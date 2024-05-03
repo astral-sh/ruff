@@ -4,7 +4,6 @@ use ruff_python_ast::{Pattern, PatternArguments};
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
-use crate::comments::SourceComment;
 use crate::expression::parentheses::{empty_parenthesized, parenthesized, Parentheses};
 use crate::prelude::*;
 
@@ -71,14 +70,6 @@ impl FormatNodeRule<PatternArguments> for FormatPatternArguments {
             [parenthesized("(", &group(&all_arguments), ")")
                 .with_dangling_comments(dangling_comments)]
         )
-    }
-
-    fn fmt_dangling_comments(
-        &self,
-        _dangling_comments: &[SourceComment],
-        _f: &mut PyFormatter,
-    ) -> FormatResult<()> {
-        Ok(())
     }
 }
 

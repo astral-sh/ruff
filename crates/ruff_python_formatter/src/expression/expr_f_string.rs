@@ -2,7 +2,6 @@ use ruff_python_ast::{AnyNodeRef, ExprFString};
 use ruff_source_file::Locator;
 use ruff_text_size::Ranged;
 
-use crate::comments::SourceComment;
 use crate::expression::parentheses::{
     in_parentheses_only_group, NeedsParentheses, OptionalParentheses,
 };
@@ -28,15 +27,6 @@ impl FormatNodeRule<ExprFString> for FormatExprFString {
                     .fmt(f)
             }
         }
-    }
-
-    fn fmt_dangling_comments(
-        &self,
-        _dangling_node_comments: &[SourceComment],
-        _f: &mut PyFormatter,
-    ) -> FormatResult<()> {
-        // Handled as part of `fmt_fields`
-        Ok(())
     }
 }
 

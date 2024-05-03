@@ -3,5 +3,10 @@ doc-valid-idents = [
   "CodeQL",
   "IPython",
   "NumPy",
+  "LibCST",
+  "SCREAMING_SNAKE_CASE",
+  "SQLAlchemy",
+  "McCabe",
+  "FastAPI",
   "..",
 ]

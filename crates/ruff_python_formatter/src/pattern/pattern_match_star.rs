@@ -2,7 +2,7 @@ use ruff_formatter::write;
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::PatternMatchStar;
 
-use crate::comments::{dangling_comments, SourceComment};
+use crate::comments::dangling_comments;
 use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
 use crate::prelude::*;
 
@@ -22,15 +22,6 @@ impl FormatNodeRule<PatternMatchStar> for FormatPatternMatchStar {
             Some(name) => write!(f, [name.format()]),
             None => write!(f, [token("_")]),
         }
-    }
-
-    fn fmt_dangling_comments(
-        &self,
-        _dangling_comments: &[SourceComment],
-        _f: &mut PyFormatter,
-    ) -> FormatResult<()> {
-        // Handled by `fmt_fields`
-        Ok(())
     }
 }
 

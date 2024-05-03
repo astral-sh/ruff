@@ -2,7 +2,6 @@ use ruff_formatter::write;
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::ExprName;
 
-use crate::comments::SourceComment;
 use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
 use crate::prelude::*;
 
@@ -17,16 +16,6 @@ impl FormatNodeRule<ExprName> for FormatExprName {
             ctx: _,
         } = item;
         write!(f, [source_text_slice(*range)])
-    }
-
-    fn fmt_dangling_comments(
-        &self,
-        dangling_comments: &[SourceComment],
-        _f: &mut PyFormatter,
-    ) -> FormatResult<()> {
-        // Node cannot have dangling comments
-        debug_assert!(dangling_comments.is_empty());
-        Ok(())
     }
 }
 

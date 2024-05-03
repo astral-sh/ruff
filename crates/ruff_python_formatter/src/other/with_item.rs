@@ -1,7 +1,6 @@
 use ruff_formatter::{write, FormatRuleWithOptions};
 use ruff_python_ast::WithItem;
 
-use crate::comments::SourceComment;
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::{
     is_expression_parenthesized, parenthesized, Parentheses, Parenthesize,
@@ -173,14 +172,6 @@ impl FormatNodeRule<WithItem> for FormatWithItem {
             }
         }
 
-        Ok(())
-    }
-
-    fn fmt_dangling_comments(
-        &self,
-        _dangling_comments: &[SourceComment],
-        _f: &mut PyFormatter,
-    ) -> FormatResult<()> {
         Ok(())
     }
 }

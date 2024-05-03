@@ -3,7 +3,6 @@ use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::ExprList;
 use ruff_text_size::Ranged;
 
-use crate::comments::SourceComment;
 use crate::expression::parentheses::{
     empty_parenthesized, parenthesized, NeedsParentheses, OptionalParentheses,
 };
@@ -36,15 +35,6 @@ impl FormatNodeRule<ExprList> for FormatExprList {
         parenthesized("[", &items, "]")
             .with_dangling_comments(dangling)
             .fmt(f)
-    }
-
-    fn fmt_dangling_comments(
-        &self,
-        _dangling_comments: &[SourceComment],
-        _f: &mut PyFormatter,
-    ) -> FormatResult<()> {
-        // Handled as part of `fmt_fields`
-        Ok(())
     }
 }
 

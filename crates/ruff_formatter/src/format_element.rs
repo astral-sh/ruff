@@ -19,10 +19,10 @@ use ruff_text_size::TextSize;
 /// Use the helper functions like [`crate::builders::space`], [`crate::builders::soft_line_break`] etc. defined in this file to create elements.
 #[derive(Clone, Eq, PartialEq)]
 pub enum FormatElement {
-    /// A space token, see [crate::builders::space] for documentation.
+    /// A space token, see [`crate::builders::space`] for documentation.
     Space,
 
-    /// A new line, see [crate::builders::soft_line_break], [crate::builders::hard_line_break], and [crate::builders::soft_line_break_or_space] for documentation.
+    /// A new line, see [`crate::builders::soft_line_break`], [`crate::builders::hard_line_break`], and [`crate::builders::soft_line_break_or_space`] for documentation.
     Line(LineMode),
 
     /// Forces the parent group to print in expanded mode.
@@ -108,13 +108,13 @@ impl std::fmt::Debug for FormatElement {
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum LineMode {
-    /// See [crate::builders::soft_line_break_or_space] for documentation.
+    /// See [`crate::builders::soft_line_break_or_space`] for documentation.
     SoftOrSpace,
-    /// See [crate::builders::soft_line_break] for documentation.
+    /// See [`crate::builders::soft_line_break`] for documentation.
     Soft,
-    /// See [crate::builders::hard_line_break] for documentation.
+    /// See [`crate::builders::hard_line_break`] for documentation.
     Hard,
-    /// See [crate::builders::empty_line] for documentation.
+    /// See [`crate::builders::empty_line`] for documentation.
     Empty,
 }
 

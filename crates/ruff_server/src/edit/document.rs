@@ -56,7 +56,7 @@ impl Document {
         {
             tracing::debug!("Fast path - replacing entire document");
             self.modify(|contents, version| {
-                *contents = text.clone();
+                contents.clone_from(text);
                 *version = new_version;
             });
             return;

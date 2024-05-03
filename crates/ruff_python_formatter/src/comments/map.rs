@@ -246,7 +246,7 @@ impl<K: std::hash::Hash + Eq, V> MultiMap<K, V> {
     /// Returns `true` if `key` has any *leading*, *dangling*, or *trailing* parts.
     #[allow(unused)]
     pub(super) fn has(&self, key: &K) -> bool {
-        self.index.get(key).is_some()
+        self.index.contains_key(key)
     }
 
     /// Returns the *leading*, *dangling*, and *trailing* parts of `key`.
@@ -382,16 +382,16 @@ where
 
 #[derive(Clone, Debug)]
 struct InOrderEntry {
-    /// Index into the [MultiMap::parts] vector where the leading parts of this entry start
+    /// Index into the [`MultiMap::parts`] vector where the leading parts of this entry start
     leading_start: PartIndex,
 
-    /// Index into the [MultiMap::parts] vector where the dangling parts (and, thus, the leading parts end) start.
+    /// Index into the [`MultiMap::parts`] vector where the dangling parts (and, thus, the leading parts end) start.
     dangling_start: PartIndex,
 
-    /// Index into the [MultiMap::parts] vector where the trailing parts (and, thus, the dangling parts end) of this entry start
+    /// Index into the [`MultiMap::parts`] vector where the trailing parts (and, thus, the dangling parts end) of this entry start
     trailing_start: Option<PartIndex>,
 
-    /// Index into the [MultiMap::parts] vector where the trailing parts of this entry end
+    /// Index into the [`MultiMap::parts`] vector where the trailing parts of this entry end
     trailing_end: Option<PartIndex>,
 
     _count: Count<InOrderEntry>,
@@ -505,7 +505,7 @@ impl InOrderEntry {
 
 #[derive(Clone, Debug)]
 struct OutOfOrderEntry {
-    /// Index into the [MultiMap::out_of_order] vector at which offset the leaading vec is stored.
+    /// Index into the [`MultiMap::out_of_order`] vector at which offset the leaading vec is stored.
     leading_index: usize,
     _count: Count<OutOfOrderEntry>,
 }
