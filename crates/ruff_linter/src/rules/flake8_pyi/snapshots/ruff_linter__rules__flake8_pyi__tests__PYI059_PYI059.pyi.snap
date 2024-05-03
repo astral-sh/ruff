@@ -55,8 +55,6 @@ PYI059.pyi:22:10: PYI059 [*] `Generic[]` should always be the last base class
 21 | # the Generic's position issue persists.
 22 | class Foo(Generic, LinkedList): ...  # PYI059
    |          ^^^^^^^^^^^^^^^^^^^^^ PYI059
-23 | 
-24 | # in case of multiple Generic[] inheritance, don't fix it.
    |
    = help: Move `Generic[]` to the end
 
@@ -67,13 +65,49 @@ PYI059.pyi:22:10: PYI059 [*] `Generic[]` should always be the last base class
 22    |-class Foo(Generic, LinkedList): ...  # PYI059
    22 |+class Foo(LinkedList, Generic): ...  # PYI059
 23 23 | 
-24 24 | # in case of multiple Generic[] inheritance, don't fix it.
-25 25 | class C(Generic[T], Generic[K, V]): ...  # PYI059
+24 24 | 
+25 25 | class Foo(  # comment about the bracket
 
-PYI059.pyi:25:8: PYI059 `Generic[]` should always be the last base class
+PYI059.pyi:25:10: PYI059 [*] `Generic[]` should always be the last base class
    |
-24 | # in case of multiple Generic[] inheritance, don't fix it.
-25 | class C(Generic[T], Generic[K, V]): ...  # PYI059
+25 |   class Foo(  # comment about the bracket
+   |  __________^
+26 | |     # Part 1 of multiline comment 1
+27 | |     # Part 2 of multiline comment 1
+28 | |     Generic[T]  # comment about Generic[T]  # PYI059
+29 | |     # another comment?
+30 | |     ,  # comment about the comma?
+31 | |     # part 1 of multiline comment 2
+32 | |     # part 2 of multiline comment 2
+33 | |     int,  # comment about int
+34 | |     # yet another comment?
+35 | | ):  # and another one for good measure
+   | |_^ PYI059
+36 |       ...
+   |
+   = help: Move `Generic[]` to the end
+
+ℹ Safe fix
+25 25 | class Foo(  # comment about the bracket
+26 26 |     # Part 1 of multiline comment 1
+27 27 |     # Part 2 of multiline comment 1
+28    |-    Generic[T]  # comment about Generic[T]  # PYI059
+   28 |+      # comment about Generic[T]  # PYI059
+29 29 |     # another comment?
+30    |-    ,  # comment about the comma?
+   30 |+    # comment about the comma?
+31 31 |     # part 1 of multiline comment 2
+32 32 |     # part 2 of multiline comment 2
+33    |-    int,  # comment about int
+   33 |+    int, Generic[T],  # comment about int
+34 34 |     # yet another comment?
+35 35 | ):  # and another one for good measure
+36 36 |     ...
+
+PYI059.pyi:40:8: PYI059 `Generic[]` should always be the last base class
+   |
+39 | # in case of multiple Generic[] inheritance, don't fix it.
+40 | class C(Generic[T], Generic[K, V]): ...  # PYI059
    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI059
    |
    = help: Move `Generic[]` to the end

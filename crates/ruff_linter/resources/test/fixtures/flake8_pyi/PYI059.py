@@ -26,6 +26,21 @@ class MyMapping(  # PYI059
 class Foo(Generic, LinkedList):  # PYI059
     pass
 
+
+class Foo(  # comment about the bracket
+    # Part 1 of multiline comment 1
+    # Part 2 of multiline comment 1
+    Generic[T]  # comment about Generic[T]  # PYI059
+    # another comment?
+    ,  # comment about the comma?
+    # part 1 of multiline comment 2
+    # part 2 of multiline comment 2
+    int,  # comment about int
+    # yet another comment?
+):  # and another one for good measure
+    ...
+
+
 # in case of multiple Generic[] inheritance, don't fix it.
 class C(Generic[T], Generic[K, V]): ...  # PYI059
 

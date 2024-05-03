@@ -119,15 +119,28 @@ fn generate_fix(bases: &Arguments, generic_base_index: usize, locator: &Locator)
         .args
         .get(generic_base_index)
         .expect("Generic base should always exist");
-    let next_base = bases
-        .args
-        .get(generic_base_index + 1)
-        .expect("Generic base should never be the last base during auto-fix");
 
-    let deletion = Edit::deletion(generic_base.start(), next_base.start());
+    let comma_after_generic_base = generic_base.end().to_usize()
+        + locator
+            .after(generic_base.end())
+            .find(',')
+            .expect("Comma must always exist after generic base");
+
+    let last_whitespace = (comma_after_generic_base + 1)
+        + locator.contents()[comma_after_generic_base + 1..]
+            .bytes()
+            .position(|b| !b.is_ascii_whitespace())
+            .expect("Non whitespace character must always exist after Generic[]");
+
+    let comma_after_generic_base: u32 = comma_after_generic_base.try_into().unwrap();
+    let last_whitespace: u32 = last_whitespace.try_into().unwrap();
+
+    let base_deletion = Edit::deletion(generic_base.start(), generic_base.end());
+    let base_comma_deletion =
+        Edit::deletion(comma_after_generic_base.into(), last_whitespace.into());
     let insertion = Edit::insertion(
         format!(", {}", locator.slice(generic_base.range())),
         last_base.end(),
     );
-    Fix::safe_edits(insertion, [deletion])
+    Fix::safe_edits(insertion, [base_deletion, base_comma_deletion])
 }

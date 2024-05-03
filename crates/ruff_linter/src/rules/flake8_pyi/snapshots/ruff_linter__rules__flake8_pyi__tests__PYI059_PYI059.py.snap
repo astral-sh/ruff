@@ -67,12 +67,48 @@ PYI059.py:26:10: PYI059 [*] `Generic[]` should always be the last base class
    26 |+class Foo(LinkedList, Generic):  # PYI059
 27 27 |     pass
 28 28 | 
-29 29 | # in case of multiple Generic[] inheritance, don't fix it.
+29 29 | 
 
-PYI059.py:30:8: PYI059 `Generic[]` should always be the last base class
+PYI059.py:30:10: PYI059 [*] `Generic[]` should always be the last base class
    |
-29 | # in case of multiple Generic[] inheritance, don't fix it.
-30 | class C(Generic[T], Generic[K, V]): ...  # PYI059
+30 |   class Foo(  # comment about the bracket
+   |  __________^
+31 | |     # Part 1 of multiline comment 1
+32 | |     # Part 2 of multiline comment 1
+33 | |     Generic[T]  # comment about Generic[T]  # PYI059
+34 | |     # another comment?
+35 | |     ,  # comment about the comma?
+36 | |     # part 1 of multiline comment 2
+37 | |     # part 2 of multiline comment 2
+38 | |     int,  # comment about int
+39 | |     # yet another comment?
+40 | | ):  # and another one for good measure
+   | |_^ PYI059
+41 |       ...
+   |
+   = help: Move `Generic[]` to the end
+
+ℹ Safe fix
+30 30 | class Foo(  # comment about the bracket
+31 31 |     # Part 1 of multiline comment 1
+32 32 |     # Part 2 of multiline comment 1
+33    |-    Generic[T]  # comment about Generic[T]  # PYI059
+   33 |+      # comment about Generic[T]  # PYI059
+34 34 |     # another comment?
+35    |-    ,  # comment about the comma?
+   35 |+    # comment about the comma?
+36 36 |     # part 1 of multiline comment 2
+37 37 |     # part 2 of multiline comment 2
+38    |-    int,  # comment about int
+   38 |+    int, Generic[T],  # comment about int
+39 39 |     # yet another comment?
+40 40 | ):  # and another one for good measure
+41 41 |     ...
+
+PYI059.py:45:8: PYI059 `Generic[]` should always be the last base class
+   |
+44 | # in case of multiple Generic[] inheritance, don't fix it.
+45 | class C(Generic[T], Generic[K, V]): ...  # PYI059
    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI059
    |
    = help: Move `Generic[]` to the end
