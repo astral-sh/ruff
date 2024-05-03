@@ -1,7 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::map_subscript;
-use ruff_python_ast::{Arguments, StmtClassDef};
+use ruff_python_ast::{Expr, StmtClassDef};
 use ruff_source_file::Locator;
 use ruff_text_size::Ranged;
 
@@ -75,51 +75,42 @@ pub(crate) fn generic_not_last_base_class(checker: &mut Checker, class_def: &Stm
         return;
     }
 
-    let generic_base_indices: Vec<usize> = bases
+    let Some(last_base) = bases.args.last() else {
+        return;
+    };
+
+    let mut generic_base_iter = bases
         .args
         .iter()
-        .enumerate()
-        .filter_map(|(base_index, base)| {
-            if semantic.match_typing_expr(map_subscript(base), "Generic") {
-                return Some(base_index);
-            }
-            None
-        })
-        .collect();
+        .filter(|base| semantic.match_typing_expr(map_subscript(base), "Generic"));
 
-    if generic_base_indices.is_empty() {
+    let Some(generic_base) = generic_base_iter.next() else {
+        return;
+    };
+
+    // If Generic[] exists, but is the last base, don't raise issue.
+    if generic_base.range() == last_base.range() {
         return;
     }
 
+    let multiple_generic_bases = generic_base_iter.next().is_some();
     let diagnostic = {
-        if generic_base_indices.len() == 1 {
-            let base_index = generic_base_indices[0];
-            if base_index == bases.args.len() - 1 {
-                // Don't raise issue for the last base.
-                return;
-            }
-
-            Diagnostic::new(GenericNotLastBaseClass, bases.range()).with_fix(generate_fix(
-                bases,
-                base_index,
-                checker.locator(),
-            ))
-        } else {
+        if multiple_generic_bases {
             // No fix if multiple generics are seen in the class bases.
             Diagnostic::new(GenericNotLastBaseClass, bases.range())
+        } else {
+            Diagnostic::new(GenericNotLastBaseClass, bases.range()).with_fix(generate_fix(
+                generic_base,
+                last_base,
+                checker.locator(),
+            ))
         }
     };
 
     checker.diagnostics.push(diagnostic);
 }
 
-fn generate_fix(bases: &Arguments, generic_base_index: usize, locator: &Locator) -> Fix {
-    let last_base = bases.args.last().expect("Last base should always exist");
-    let generic_base = bases
-        .args
-        .get(generic_base_index)
-        .expect("Generic base should always exist");
-
+fn generate_fix(generic_base: &Expr, last_base: &Expr, locator: &Locator) -> Fix {
     let comma_after_generic_base = generic_base.end().to_usize()
         + locator
             .after(generic_base.end())
