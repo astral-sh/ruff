@@ -2,7 +2,7 @@ use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::identifier::Identifier;
-use ruff_python_ast::{self as ast, Arguments, Expr, StmtClassDef};
+use ruff_python_ast::{Arguments, Expr, StmtClassDef};
 use ruff_python_semantic::SemanticModel;
 use ruff_source_file::Locator;
 use ruff_text_size::Ranged;
