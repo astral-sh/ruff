@@ -5,9 +5,9 @@ use serde::{Deserialize, Serialize};
 
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
-use crate::{Edit, Fix};
+use crate::Fix;
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct DiagnosticKind {
     /// The identifier of the diagnostic, used to align the diagnostic with a rule.
@@ -18,13 +18,12 @@ pub struct DiagnosticKind {
     pub suggestion: Option<String>,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct Diagnostic {
     pub kind: DiagnosticKind,
     pub range: TextRange,
     pub fix: Option<Fix>,
     pub parent: Option<TextSize>,
-    pub noqa_edit: Option<Edit>,
 }
 
 impl Diagnostic {
@@ -34,7 +33,6 @@ impl Diagnostic {
             range,
             fix: None,
             parent: None,
-            noqa_edit: None,
         }
     }
 
@@ -50,20 +48,6 @@ impl Diagnostic {
     #[inline]
     pub fn set_fix(&mut self, fix: Fix) {
         self.fix = Some(fix);
-    }
-
-    /// Consumes `self` and returns a new `Diagnostic` with the given `noqa_edit`.
-    #[inline]
-    #[must_use]
-    pub fn with_noqa_edit(mut self, noqa_edit: Edit) -> Self {
-        self.set_noqa_edit(noqa_edit);
-        self
-    }
-
-    /// Set the [`Edit`] that can disable this diagnostic by creating a noqa comment
-    #[inline]
-    pub fn set_noqa_edit(&mut self, noqa_edit: Edit) {
-        self.noqa_edit = Some(noqa_edit);
     }
 
     /// Set the [`Fix`] used to fix the diagnostic, if the provided function returns `Ok`.

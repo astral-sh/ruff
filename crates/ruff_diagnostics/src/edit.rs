@@ -112,25 +112,6 @@ impl Ranged for Edit {
     }
 }
 
-pub fn apply_isolated_edits(contents: &str, edits: Vec<Edit>) -> String {
-    let mut output = String::with_capacity(contents.len());
-    let mut last_append = TextSize::default();
-
-    for edit in edits {
-        output.push_str(&contents[TextRange::new(last_append, edit.start())]);
-
-        if let Some(content) = edit.content() {
-            output.push_str(content);
-        }
-
-        last_append = edit.end();
-    }
-
-    output.push_str(&contents[TextRange::new(last_append, TextSize::of(contents))]);
-
-    output
-}
-
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 enum EditOperationKind {
     /// Edit that inserts new content into the source document.

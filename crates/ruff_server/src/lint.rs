@@ -1,8 +1,11 @@
 //! Access to the Ruff linting API for the LSP
 
-use ruff_diagnostics::{Applicability, Diagnostic, DiagnosticKind, Fix};
+use std::path::Path;
+
+use ruff_diagnostics::{Applicability, Diagnostic, DiagnosticKind, Edit, Fix};
 use ruff_linter::{
     directives::{extract_directives, Flags},
+    generate_noqa_edits,
     linter::{check_path, LinterResult, TokenSource},
     packaging::detect_package_root,
     registry::AsRule,
@@ -16,6 +19,7 @@ use ruff_python_parser::lexer::LexResult;
 use ruff_python_parser::AsMode;
 use ruff_source_file::Locator;
 use ruff_text_size::Ranged;
+use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 
 use crate::{edit::ToRangeExt, PositionEncoding, DIAGNOSTIC_NAME};
@@ -96,9 +100,22 @@ pub(crate) fn check(
         TokenSource::Tokens(tokens),
     );
 
+    let mut noqa_edits: FxHashMap<Diagnostic, Edit> = generate_noqa_edits(
+        &document_path,
+        diagnostics.as_slice(),
+        &locator,
+        indexer.comment_ranges(),
+        &linter_settings.external,
+        &directives.noqa_line_for,
+        stylist.line_ending(),
+    );
+
     diagnostics
         .into_iter()
-        .map(|diagnostic| to_lsp_diagnostic(diagnostic, document, encoding))
+        .map(|diagnostic| {
+            let noqa_edit = noqa_edits.remove(&diagnostic);
+            to_lsp_diagnostic(diagnostic, noqa_edit, document, encoding)
+        })
         .collect()
 }
 
@@ -161,15 +178,12 @@ pub(crate) fn fixes_for_diagnostics(
 
 fn to_lsp_diagnostic(
     diagnostic: Diagnostic,
+    noqa_edit: Option<Edit>,
     document: &crate::edit::Document,
     encoding: PositionEncoding,
 ) -> lsp_types::Diagnostic {
     let Diagnostic {
-        kind,
-        range,
-        fix,
-        noqa_edit,
-        ..
+        kind, range, fix, ..
     } = diagnostic;
 
     let rule = kind.rule();

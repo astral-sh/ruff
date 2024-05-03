@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::error::Error;
 use std::fmt::{Display, Write};
@@ -10,18 +11,36 @@ use itertools::Itertools;
 use log::warn;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
-use ruff_diagnostics::{apply_isolated_edits, Diagnostic, Edit};
+use ruff_diagnostics::{Diagnostic, Edit};
 use ruff_python_trivia::{indentation_at_offset, CommentRanges};
 use ruff_source_file::{LineEnding, Locator};
+use rustc_hash::FxHashMap;
 
 use crate::codes::NoqaCode;
 use crate::fs::relativize_path;
 use crate::registry::{AsRule, Rule, RuleSet};
 use crate::rule_redirects::get_redirect_target;
 
+pub fn generate_noqa_edits(
+    path: &Path,
+    diagnostics: &[Diagnostic],
+    locator: &Locator,
+    comment_ranges: &CommentRanges,
+    external: &[String],
+    noqa_line_for: &NoqaMapping,
+    line_ending: LineEnding,
+) -> FxHashMap<Diagnostic, Edit> {
+    let exemption =
+        FileExemption::try_extract(locator.contents(), comment_ranges, external, path, locator);
+    let directives = NoqaDirectives::from_commented_ranges(comment_ranges, path, locator);
+    let comments =
+        find_noqa_comments_by_line(diagnostics, locator, &exemption, &directives, noqa_line_for);
+    build_noqa_edits_by_diagnostic(comments, locator, line_ending)
+}
+
 /// A directive to ignore a set of rules for a given line of Python source code (e.g.,
 /// `# noqa: F401, F841`).
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) enum Directive<'a> {
     /// The `noqa` directive ignores all rules (e.g., `# noqa`).
     All(All),
@@ -87,7 +106,7 @@ impl<'a> Directive<'a> {
                     while let Some(code) = Self::lex_code(&text[codes_end + leading_space..]) {
                         codes_end += leading_space;
                         codes.push(Code {
-                            code,
+                            code: code.into(),
                             range: TextRange::at(
                                 TextSize::try_from(codes_end).unwrap(),
                                 code.text_len(),
@@ -171,7 +190,7 @@ impl<'a> Directive<'a> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct All {
     range: TextRange,
 }
@@ -184,22 +203,22 @@ impl Ranged for All {
 }
 
 /// An individual rule code in a `noqa` directive (e.g., `F401`).
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct Code<'a> {
-    code: &'a str,
+    code: Cow<'a, str>,
     range: TextRange,
 }
 
 impl<'a> Code<'a> {
     /// The code that is ignored by the `noqa` directive.
-    pub(crate) fn as_str(&self) -> &'a str {
-        self.code
+    pub(crate) fn as_str(&self) -> &str {
+        &self.code
     }
 }
 
 impl Display for Code<'_> {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        fmt.write_str(self.code)
+        fmt.write_str(&self.code)
     }
 }
 
@@ -210,7 +229,7 @@ impl<'a> Ranged for Code<'a> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct Codes<'a> {
     range: TextRange,
     codes: Vec<Code<'a>>,
@@ -502,7 +521,7 @@ pub(crate) fn add_noqa(
     noqa_line_for: &NoqaMapping,
     line_ending: LineEnding,
 ) -> Result<usize> {
-    let (count, edits) = generate_noqa_edits(
+    let (count, output) = add_noqa_inner(
         path,
         diagnostics,
         locator,
@@ -512,13 +531,11 @@ pub(crate) fn add_noqa(
         line_ending,
     );
 
-    let output = apply_isolated_edits(locator.contents(), edits);
-
     fs::write(path, output)?;
     Ok(count)
 }
 
-pub fn generate_noqa_edits(
+fn add_noqa_inner(
     path: &Path,
     diagnostics: &[Diagnostic],
     locator: &Locator,
@@ -526,16 +543,111 @@ pub fn generate_noqa_edits(
     external: &[String],
     noqa_line_for: &NoqaMapping,
     line_ending: LineEnding,
-) -> (usize, Vec<Edit>) {
-    // Map of line start offset to set of (non-ignored) diagnostic codes that are triggered on that line.
-    let mut matches_by_line: BTreeMap<TextSize, (RuleSet, Option<&Directive>)> =
-        BTreeMap::default();
+) -> (usize, String) {
+    let mut count = 0;
 
     // Whether the file is exempted from all checks.
     // Codes that are globally exempted (within the current file).
     let exemption =
         FileExemption::try_extract(locator.contents(), comment_ranges, external, path, locator);
     let directives = NoqaDirectives::from_commented_ranges(comment_ranges, path, locator);
+
+    let comments =
+        find_noqa_comments_by_line(diagnostics, locator, &exemption, &directives, noqa_line_for);
+
+    let edits = build_noqa_edits_by_line(comments, locator, line_ending);
+
+    let contents = locator.contents();
+
+    let mut output = String::with_capacity(contents.len());
+    let mut last_append = TextSize::default();
+
+    for (_, edit) in edits {
+        output.push_str(&contents[TextRange::new(last_append, edit.start())]);
+
+        if let Some(content) = edit.content() {
+            if content != &contents[edit.range()] {
+                count += 1;
+            }
+            output.push_str(content);
+        }
+
+        last_append = edit.end();
+    }
+
+    output.push_str(&contents[TextRange::new(last_append, TextSize::of(contents))]);
+
+    (count, output)
+}
+
+fn build_noqa_edits_by_diagnostic(
+    matches_by_line: BTreeMap<TextSize, Vec<NoqaComment>>,
+    locator: &Locator,
+    line_ending: LineEnding,
+) -> FxHashMap<Diagnostic, Edit> {
+    let mut edits = FxHashMap::default();
+    for (offset, matches) in matches_by_line {
+        let line = locator.full_line(offset);
+        for noqa_match in matches {
+            if let Some(edit) = generate_noqa_edit(
+                noqa_match.directive,
+                offset,
+                RuleSet::from_rule(noqa_match.diagnostic.kind.rule()),
+                line,
+                locator.line_start(offset),
+                line_ending,
+            ) {
+                edits.insert(noqa_match.diagnostic.clone(), edit);
+            }
+        }
+    }
+    edits
+}
+
+fn build_noqa_edits_by_line(
+    comments_by_line: BTreeMap<TextSize, Vec<NoqaComment>>,
+    locator: &Locator,
+    line_ending: LineEnding,
+) -> BTreeMap<TextSize, Edit> {
+    let mut edits = BTreeMap::default();
+    for (offset, matches) in comments_by_line {
+        if matches.is_empty() {
+            continue;
+        }
+        let line = locator.full_line(offset);
+        let directive = matches.first().unwrap().directive.clone();
+        let rules: Vec<_> = matches
+            .into_iter()
+            .map(|NoqaComment { diagnostic, .. }| diagnostic.kind.rule())
+            .collect();
+        if let Some(edit) = generate_noqa_edit(
+            directive,
+            offset,
+            RuleSet::from_rules(rules.as_slice()),
+            line,
+            locator.line_start(offset),
+            line_ending,
+        ) {
+            edits.insert(offset, edit);
+        }
+    }
+    edits
+}
+
+struct NoqaComment<'a> {
+    diagnostic: &'a Diagnostic,
+    directive: Option<Directive<'a>>,
+}
+
+fn find_noqa_comments_by_line<'a>(
+    diagnostics: &'a [Diagnostic],
+    locator: &'a Locator,
+    exemption: &Option<FileExemption>,
+    directives: &'a NoqaDirectives,
+    noqa_line_for: &NoqaMapping,
+) -> BTreeMap<TextSize, Vec<NoqaComment<'a>>> {
+    // Map of line start offset to set of (non-ignored) diagnostic codes that are triggered on that line.
+    let mut comments_by_line: BTreeMap<TextSize, Vec<NoqaComment>> = BTreeMap::default();
 
     // Mark any non-ignored diagnostics.
     for diagnostic in diagnostics {
@@ -579,16 +691,16 @@ pub fn generate_noqa_edits(
                 Directive::All(_) => {
                     continue;
                 }
-                Directive::Codes(codes) => {
+                directive @ Directive::Codes(codes) => {
                     let rule = diagnostic.kind.rule();
                     if !codes.includes(rule) {
-                        matches_by_line
+                        comments_by_line
                             .entry(directive_line.start())
-                            .or_insert_with(|| {
-                                (RuleSet::default(), Some(&directive_line.directive))
-                            })
-                            .0
-                            .insert(rule);
+                            .or_default()
+                            .push(NoqaComment {
+                                diagnostic,
+                                directive: Some(directive.clone()),
+                            });
                     }
                     continue;
                 }
@@ -596,45 +708,25 @@ pub fn generate_noqa_edits(
         }
 
         // There's no existing noqa directive that suppresses the diagnostic.
-        matches_by_line
+        comments_by_line
             .entry(locator.line_start(noqa_offset))
-            .or_insert_with(|| (RuleSet::default(), None))
-            .0
-            .insert(diagnostic.kind.rule());
+            .or_default()
+            .push(NoqaComment {
+                diagnostic,
+                directive: None,
+            });
     }
 
-    let mut count = 0;
-    let mut prev_end = TextSize::default();
-    let mut edits = Vec::with_capacity(matches_by_line.len());
-
-    for (offset, (rules, directive)) in matches_by_line {
-        let line = locator.full_line(offset);
-
-        if let Some(edit) = generate_edit(
-            directive,
-            &rules,
-            line,
-            locator.line_start(offset),
-            line_ending,
-            prev_end,
-        ) {
-            edits.push(edit);
-            count += 1;
-        }
-
-        prev_end = offset + line.text_len();
-    }
-
-    (count, edits)
+    comments_by_line
 }
 
-fn generate_edit(
-    directive: Option<&Directive>,
-    rules: &RuleSet,
+fn generate_noqa_edit(
+    directive: Option<Directive>,
+    offset: TextSize,
+    rules: RuleSet,
     line: &str,
     line_start: TextSize,
     line_ending: LineEnding,
-    prev_end: TextSize,
 ) -> Option<Edit> {
     let mut edit_content = String::new();
     let range;
@@ -646,20 +738,23 @@ fn generate_edit(
     match directive {
         None => {
             let trimmed_line = line.trim_end();
-            range = TextRange::new(TextSize::of(trimmed_line), TextSize::of(line)) + prev_end;
-            push_codes(&mut edit_content, rules.iter().map(|rule| rule.noqa_code()));
+            range = TextRange::new(TextSize::of(trimmed_line), TextSize::of(line)) + offset;
+            push_codes(
+                &mut edit_content,
+                rules.into_iter().map(|rule| rule.noqa_code().to_string()),
+            );
         }
         Some(Directive::Codes(codes)) => {
             // find trimmed line without the noqa
             let trimmed_line =
-                line[TextRange::up_to(codes.start().checked_sub(line_start).unwrap())].trim();
+                line[TextRange::up_to(codes.start().checked_sub(line_start).unwrap())].trim_end();
 
-            range = TextRange::new(TextSize::of(trimmed_line), TextSize::of(line)) + prev_end;
+            range = TextRange::new(TextSize::of(trimmed_line), TextSize::of(line)) + offset;
             // Add codes.
             push_codes(
                 &mut edit_content,
                 rules
-                    .iter()
+                    .into_iter()
                     .map(|rule| rule.noqa_code().to_string())
                     .chain(codes.iter().map(ToString::to_string))
                     .sorted_unstable(),
@@ -853,11 +948,11 @@ mod tests {
     use insta::assert_debug_snapshot;
     use ruff_text_size::{TextRange, TextSize};
 
-    use ruff_diagnostics::{apply_isolated_edits, Diagnostic, Edit};
+    use ruff_diagnostics::Diagnostic;
     use ruff_python_trivia::CommentRanges;
     use ruff_source_file::{LineEnding, Locator};
 
-    use crate::noqa::{generate_noqa_edits, Directive, NoqaMapping, ParsedFileExemption};
+    use crate::noqa::{add_noqa_inner, Directive, NoqaMapping, ParsedFileExemption};
     use crate::rules::pycodestyle::rules::AmbiguousVariableName;
     use crate::rules::pyflakes::rules::UnusedVariable;
 
@@ -1048,7 +1143,7 @@ mod tests {
 
         let contents = "x = 1";
         let noqa_line_for = NoqaMapping::default();
-        let (count, edits) = generate_noqa_edits(
+        let (count, output) = add_noqa_inner(
             path,
             &[],
             &Locator::new(contents),
@@ -1058,9 +1153,6 @@ mod tests {
             LineEnding::Lf,
         );
         assert_eq!(count, 0);
-        assert_eq!(edits.as_slice(), &[]);
-
-        let output = apply_isolated_edits(contents, edits);
         assert_eq!(output, format!("{contents}"));
 
         let diagnostics = [Diagnostic::new(
@@ -1071,8 +1163,8 @@ mod tests {
         )];
 
         let contents = "x = 1";
-        let noqa_line_for = NoqaMapping::default();
-        let (count, edits) = generate_noqa_edits(
+        let noqa_line_for: NoqaMapping = NoqaMapping::default();
+        let (count, output) = add_noqa_inner(
             path,
             &diagnostics,
             &Locator::new(contents),
@@ -1082,12 +1174,6 @@ mod tests {
             LineEnding::Lf,
         );
         assert_eq!(count, 1);
-        assert_eq!(
-            edits.as_slice(),
-            &[Edit::insertion("  # noqa: F841\n".into(), TextSize::new(5))]
-        );
-
-        let output = apply_isolated_edits(contents, edits);
         assert_eq!(output, "x = 1  # noqa: F841\n");
 
         let diagnostics = [
@@ -1106,7 +1192,7 @@ mod tests {
         let noqa_line_for = NoqaMapping::default();
         let comment_ranges =
             CommentRanges::new(vec![TextRange::new(TextSize::from(7), TextSize::from(19))]);
-        let (count, edits) = generate_noqa_edits(
+        let (count, output) = add_noqa_inner(
             path,
             &diagnostics,
             &Locator::new(contents),
@@ -1116,15 +1202,6 @@ mod tests {
             LineEnding::Lf,
         );
         assert_eq!(count, 1);
-        assert_eq!(
-            edits.as_slice(),
-            &[Edit::range_replacement(
-                "  # noqa: E741, F841\n".into(),
-                TextRange::new(5u32.into(), 20u32.into())
-            )]
-        );
-
-        let output = apply_isolated_edits(contents, edits);
         assert_eq!(output, "x = 1  # noqa: E741, F841\n");
 
         let diagnostics = [
@@ -1143,7 +1220,7 @@ mod tests {
         let noqa_line_for = NoqaMapping::default();
         let comment_ranges =
             CommentRanges::new(vec![TextRange::new(TextSize::from(7), TextSize::from(13))]);
-        let (count, edits) = generate_noqa_edits(
+        let (count, output) = add_noqa_inner(
             path,
             &diagnostics,
             &Locator::new(contents),
@@ -1153,9 +1230,6 @@ mod tests {
             LineEnding::Lf,
         );
         assert_eq!(count, 0);
-        assert_eq!(edits.as_slice(), &[]);
-
-        let output = apply_isolated_edits(contents, edits);
         assert_eq!(output, "x = 1  # noqa");
     }
 }
