@@ -33,6 +33,8 @@ mod tests {
     #[test_case(Rule::CustomTypeVarReturnType, Path::new("PYI019.pyi"))]
     #[test_case(Rule::DocstringInStub, Path::new("PYI021.py"))]
     #[test_case(Rule::DocstringInStub, Path::new("PYI021.pyi"))]
+    #[test_case(Rule::DuplicateLiteralMember, Path::new("PYI062.py"))]
+    #[test_case(Rule::DuplicateLiteralMember, Path::new("PYI062.pyi"))]
     #[test_case(Rule::DuplicateUnionMember, Path::new("PYI016.py"))]
     #[test_case(Rule::DuplicateUnionMember, Path::new("PYI016.pyi"))]
     #[test_case(Rule::EllipsisInNonEmptyClassBody, Path::new("PYI013.py"))]

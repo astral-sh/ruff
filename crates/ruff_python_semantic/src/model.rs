@@ -1350,6 +1350,15 @@ impl<'a> SemanticModel<'a> {
         false
     }
 
+    /// Return `true` if the model is in a nested literal expression (e.g., the inner `Literal` in
+    /// `Literal[Literal[int, str], float]`).
+    pub fn in_nested_literal(&self) -> bool {
+        // Ex) `Literal[Literal[int, str], float]`
+        self.current_expression_grandparent()
+            .and_then(Expr::as_subscript_expr)
+            .is_some_and(|parent| self.match_typing_expr(&parent.value, "Literal"))
+    }
+
     /// Returns `true` if `left` and `right` are in the same branches of an `if`, `match`, or
     /// `try` statement.
     ///
