@@ -338,7 +338,7 @@ pub struct CheckCommand {
     /// The name of the file when passing it through stdin.
     #[arg(long, help_heading = "Miscellaneous")]
     pub stdin_filename: Option<PathBuf>,
-    /// List of mappings from file extension to language (one of `"python"`, `"ipynb"`, `"pyi"`). For
+    /// List of mappings from file extension to language (one of `python`, `ipynb`, `pyi`). For
     /// example, to treat `.ipy` files as IPython notebooks, use `--extension ipy:ipynb`.
     #[arg(long, value_delimiter = ',')]
     pub extension: Option<Vec<ExtensionPair>>,
@@ -466,7 +466,7 @@ pub struct FormatCommand {
     /// The name of the file when passing it through stdin.
     #[arg(long, help_heading = "Miscellaneous")]
     pub stdin_filename: Option<PathBuf>,
-    /// List of mappings from file extension to language (one of [`"python"`, `"ipynb"`, `"pyi"`]). For
+    /// List of mappings from file extension to language (one of `python`, `ipynb`, `pyi`). For
     /// example, to treat `.ipy` files as IPython notebooks, use `--extension ipy:ipynb`.
     #[arg(long, value_delimiter = ',')]
     pub extension: Option<Vec<ExtensionPair>>,
