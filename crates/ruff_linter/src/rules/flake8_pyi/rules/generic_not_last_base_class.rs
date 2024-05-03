@@ -97,9 +97,7 @@ pub(crate) fn generic_not_last_base_class(checker: &mut Checker, class_def: &Stm
 
     // No fix if multiple generics are seen in the class bases.
     if generic_base_iter.next().is_none() {
-        diagnostic.set_fix(generate_fix(
-            generic_base, last_base, checker.locator(),
-        ));
+        diagnostic.set_fix(generate_fix(generic_base, last_base, checker.locator()));
     }
 
     checker.diagnostics.push(diagnostic);
