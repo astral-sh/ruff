@@ -1,4 +1,3 @@
-use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::error::Error;
 use std::fmt::{Display, Write};
@@ -106,7 +105,7 @@ impl<'a> Directive<'a> {
                     while let Some(code) = Self::lex_code(&text[codes_end + leading_space..]) {
                         codes_end += leading_space;
                         codes.push(Code {
-                            code: code.into(),
+                            code,
                             range: TextRange::at(
                                 TextSize::try_from(codes_end).unwrap(),
                                 code.text_len(),
@@ -205,20 +204,20 @@ impl Ranged for All {
 /// An individual rule code in a `noqa` directive (e.g., `F401`).
 #[derive(Debug, Clone)]
 pub(crate) struct Code<'a> {
-    code: Cow<'a, str>,
+    code: &'a str,
     range: TextRange,
 }
 
 impl<'a> Code<'a> {
     /// The code that is ignored by the `noqa` directive.
-    pub(crate) fn as_str(&self) -> &str {
-        &self.code
+    pub(crate) fn as_str(&self) -> &'a str {
+        self.code
     }
 }
 
 impl Display for Code<'_> {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        fmt.write_str(&self.code)
+        fmt.write_str(self.code)
     }
 }
 
