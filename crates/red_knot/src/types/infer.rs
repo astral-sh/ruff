@@ -4,7 +4,7 @@ use ruff_python_ast::AstNode;
 
 use crate::db::{HasJar, QueryResult, SemanticDb, SemanticJar};
 use crate::module::ModuleName;
-use crate::symbols::{Definition, ImportFromDefinition, SymbolId};
+use crate::symbols::{ClassDefinition, Definition, ImportFromDefinition, SymbolId};
 use crate::types::Type;
 use crate::FileId;
 use ruff_python_ast as ast;
@@ -51,7 +51,7 @@ where
                 Type::Unknown
             }
         }
-        Definition::ClassDef(node_key) => {
+        Definition::ClassDef(ClassDefinition { node_key, scope_id }) => {
             if let Some(ty) = type_store.get_cached_node_type(file_id, node_key.erased()) {
                 ty
             } else {
@@ -65,7 +65,8 @@ where
                     bases.push(infer_expr_type(db, file_id, base)?);
                 }
 
-                let ty = Type::Class(type_store.add_class(file_id, &node.name.id, bases));
+                let ty =
+                    Type::Class(type_store.add_class(file_id, &node.name.id, *scope_id, bases));
                 type_store.cache_node_type(file_id, *node_key.erased(), ty);
                 ty
             }
@@ -133,6 +134,7 @@ mod tests {
     use crate::db::{HasJar, SemanticDb, SemanticJar};
     use crate::module::{ModuleName, ModuleSearchPath, ModuleSearchPathKind};
     use crate::types::Type;
+    use crate::Name;
 
     // TODO with virtual filesystem we shouldn't have to write files to disk for these
     // tests
@@ -219,6 +221,44 @@ mod tests {
             .collect();
 
         assert_eq!(base_names, vec!["Literal[Base]"]);
+
+        Ok(())
+    }
+
+    #[test]
+    fn resolve_method() -> anyhow::Result<()> {
+        let case = create_test()?;
+        let db = &case.db;
+
+        let path = case.src.path().join("mod.py");
+        std::fs::write(path, "class C:\n  def f(self): pass")?;
+        let file = db
+            .resolve_module(ModuleName::new("mod"))?
+            .expect("module should be found")
+            .path(db)?
+            .file();
+        let syms = db.symbol_table(file)?;
+        let sym = syms
+            .root_symbol_id_by_name("C")
+            .expect("C symbol should be found");
+
+        let ty = db.infer_symbol_type(file, sym)?;
+
+        let Type::Class(class_id) = ty else {
+            panic!("C is not a Class");
+        };
+
+        let member_ty = class_id
+            .get_own_class_member(db, &Name::new("f"))
+            .expect("C.f to resolve");
+
+        let Some(Type::Function(func_id)) = member_ty else {
+            panic!("C.f is not a Function");
+        };
+
+        let jar = HasJar::<SemanticJar>::jar(db)?;
+        let function = jar.type_store.get_function(func_id);
+        assert_eq!(function.name(), "f");
 
         Ok(())
     }
