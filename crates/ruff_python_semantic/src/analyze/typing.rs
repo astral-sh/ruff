@@ -441,10 +441,9 @@ where
                     Expr::Tuple(ast::ExprTuple { elts, .. }) => {
                         // Traverse each element of the tuple within the literal recursively to handle cases
                         // such as `Literal[..., Literal[...]]
-                        elts.iter().for_each(|elt| {
+                        for elt in elts {
                             inner(func, semantic, elt, Some(expr));
-                        });
-                        return;
+                        }
                     }
                     other => {
                         inner(func, semantic, other, Some(expr));
