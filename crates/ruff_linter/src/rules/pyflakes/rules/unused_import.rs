@@ -418,12 +418,11 @@ fn fix_by_reexporting<'a, 'b>(
     if member_names.is_empty() {
         bail!("Expected import bindings");
     }
+    let member_names = member_names.iter().map(AsRef::as_ref);
 
     let edits = match dunder_all {
-        Some(dunder_all) => {
-            fix::edits::add_to_dunder_all(member_names.iter().map(AsRef::as_ref), dunder_all)
-        }
-        None => fix::edits::make_redundant_alias(member_names.iter().map(AsRef::as_ref), statement),
+        Some(dunder_all) => fix::edits::add_to_dunder_all(member_names, dunder_all),
+        None => fix::edits::make_redundant_alias(member_names, statement),
     };
 
     // Only emit a fix if there are edits
