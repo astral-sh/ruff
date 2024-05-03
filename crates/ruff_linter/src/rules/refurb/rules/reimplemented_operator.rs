@@ -28,7 +28,7 @@ use crate::importer::{ImportRequest, Importer};
 /// import functools
 ///
 /// nums = [1, 2, 3]
-/// sum = functools.reduce(lambda x, y: x + y, nums)
+/// total = functools.reduce(lambda x, y: x + y, nums)
 /// ```
 ///
 /// Use instead:
@@ -37,10 +37,8 @@ use crate::importer::{ImportRequest, Importer};
 /// import operator
 ///
 /// nums = [1, 2, 3]
-/// sum = functools.reduce(operator.add, nums)
+/// total = functools.reduce(operator.add, nums)
 /// ```
-///
-/// ## References
 #[violation]
 pub struct ReimplementedOperator {
     operator: Operator,
