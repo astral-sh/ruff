@@ -74,6 +74,7 @@ impl NeedsParentheses for ExprNamed {
             || parent.is_stmt_delete()
             || parent.is_stmt_for()
             || parent.is_stmt_function_def()
+            || parent.is_match_case()
         {
             OptionalParentheses::Always
         } else {

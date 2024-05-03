@@ -1235,4 +1235,41 @@ match x:
 ```
 
 
-
+## Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -82,7 +82,9 @@
+ 
+ 
+ match long_lines:
+-    case "this is a long line for if condition" if aaaaaaaaahhhhhhhh == 1 and bbbbbbaaaaaaaaaaa == 2:  # comment
++    case "this is a long line for if condition" if (
++        aaaaaaaaahhhhhhhh == 1 and bbbbbbaaaaaaaaaaa == 2
++    ):  # comment
+         pass
+ 
+     case "this is a long line for if condition with parentheses" if (
+@@ -90,7 +92,7 @@
+     ):  # comment
+         pass
+ 
+-    case "named expressions aren't special" if foo := 1:
++    case "named expressions aren't special" if (foo := 1):
+         pass
+ 
+     case "named expressions aren't that special" if (foo := 1):
+@@ -101,9 +103,9 @@
+     ):  # another comment
+         pass
+ 
+-    case {
+-        "long_long_long_key": str(long_long_long_key)
+-    } if value := "long long long long long long long long long long long value":
++    case {"long_long_long_key": str(long_long_long_key)} if (
++        value := "long long long long long long long long long long long value"
++    ):
+         pass
+ 
+ 
+```

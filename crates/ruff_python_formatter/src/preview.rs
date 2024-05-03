@@ -22,3 +22,8 @@ pub(crate) fn is_f_string_formatting_enabled(context: &PyFormatContext) -> bool 
 pub(crate) fn is_with_single_item_pre_39_enabled(context: &PyFormatContext) -> bool {
     context.is_preview()
 }
+
+/// Returns `true` if the [`parens_for_long_if_clauses_in_case_block`](https://github.com/psf/black/pull/4269) preview style is enabled.
+pub(crate) fn parens_for_long_if_clauses_in_case_block(context: &PyFormatContext) -> bool {
+    context.is_preview()
+}
