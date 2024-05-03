@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
 ---
-PT013.py:11:1: PT013 Found incorrect import of pytest, use simple `import pytest` instead
+PT013.py:11:1: PT013 Incorrect import of `pytest`; use `import pytest` instead
    |
  9 | # Error
 10 | 
@@ -11,7 +11,7 @@ PT013.py:11:1: PT013 Found incorrect import of pytest, use simple `import pytest
 13 | from pytest import fixture as other_name
    |
 
-PT013.py:12:1: PT013 Found incorrect import of pytest, use simple `import pytest` instead
+PT013.py:12:1: PT013 Incorrect import of `pytest`; use `import pytest` instead
    |
 11 | import pytest as other_name
 12 | from pytest import fixture
@@ -19,12 +19,10 @@ PT013.py:12:1: PT013 Found incorrect import of pytest, use simple `import pytest
 13 | from pytest import fixture as other_name
    |
 
-PT013.py:13:1: PT013 Found incorrect import of pytest, use simple `import pytest` instead
+PT013.py:13:1: PT013 Incorrect import of `pytest`; use `import pytest` instead
    |
 11 | import pytest as other_name
 12 | from pytest import fixture
 13 | from pytest import fixture as other_name
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT013
    |
-
-

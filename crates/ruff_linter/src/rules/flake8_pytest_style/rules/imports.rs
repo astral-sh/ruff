@@ -8,8 +8,8 @@ use ruff_text_size::Ranged;
 /// Checks for incorrect import of pytest.
 ///
 /// ## Why is this bad?
-/// `pytest` should be imported as `import pytest` and its members should be accessed in the form of
-/// `pytest.xxx.yyy` for consistency and to make it easier for linting tools to analyze the code.
+/// For consistency, `pytest` should be imported as `import pytest` and its members should be
+/// accessed in the form of `pytest.xxx.yyy` for consistency
 ///
 /// ## Example
 /// ```python
@@ -27,7 +27,7 @@ pub struct PytestIncorrectPytestImport;
 impl Violation for PytestIncorrectPytestImport {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Found incorrect import of pytest, use simple `import pytest` instead")
+        format!("Incorrect import of `pytest`; use `import pytest` instead")
     }
 }
 
