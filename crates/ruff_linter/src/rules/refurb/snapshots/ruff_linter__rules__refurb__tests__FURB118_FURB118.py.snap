@@ -793,13 +793,3 @@ FURB118.py:40:1: FURB118 Use `operator.add` instead of defining a function
    | |________________^ FURB118
    |
    = help: Replace with `operator.add`
-
-FURB118.py:45:5: FURB118 Use `operator.add` instead of defining a function
-   |
-44 |   class Adder:
-45 |       def add(x, y):
-   |  _____^
-46 | |         return x + y
-   | |____________________^ FURB118
-   |
-   = help: Replace with `operator.add`

@@ -322,7 +322,7 @@ pub(crate) fn unused_arguments(
         return;
     }
 
-    let Some(parent) = &checker.semantic().first_non_type_parent_scope(scope) else {
+    let Some(parent) = checker.semantic().first_non_type_parent_scope(scope) else {
         return;
     };
 

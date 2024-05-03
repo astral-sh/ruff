@@ -69,6 +69,13 @@ impl Violation for ReimplementedOperator {
 
 /// FURB118
 pub(crate) fn reimplemented_operator(checker: &mut Checker, target: &FunctionLike) {
+    // Ignore methods.
+    if target.kind() == FunctionLikeKind::Function {
+        if checker.semantic().current_scope().kind.is_class() {
+            return;
+        }
+    }
+
     let Some(params) = target.parameters() else {
         return;
     };
