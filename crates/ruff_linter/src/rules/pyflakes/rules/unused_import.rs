@@ -145,17 +145,24 @@ fn is_first_party(qualified_name: &str, level: u32, checker: &Checker) -> bool {
     }
 }
 
-fn dunder_all<'a>(binding: &Binding, semantic: &'a SemanticModel) -> Option<&'a ast::ExprList> {
-    let statement = binding.statement(semantic)?;
-    match statement {
-        Stmt::Assign(ast::StmtAssign { value, .. }) => {
-            let Expr::List(list) = &**value else {
-                return None;
-            };
-            Some(&list)
-        }
-        Stmt::AnnAssign(_) => todo!(),
-        Stmt::AugAssign(_) => todo!(),
+/// Find the `ExprList` for a top level `__all__`, if one exists.
+fn find_dunder_all_expr<'a>(semantic: &'a SemanticModel) -> Option<&'a ast::ExprList> {
+    let stmt = semantic
+        .global_scope()
+        .get_all("__all__")
+        .map(|binding_id| &semantic.bindings[binding_id])
+        .find_map(|binding| match binding.kind {
+            BindingKind::Export(_) => binding.statement(semantic),
+            _ => None,
+        })?;
+    let expr = match stmt {
+        Stmt::Assign(ast::StmtAssign { value, .. }) => Some(&**value),
+        Stmt::AnnAssign(ast::StmtAnnAssign { value, .. }) => value.as_deref(),
+        Stmt::AugAssign(ast::StmtAugAssign { value, .. }) => Some(&**value),
+        _ => None,
+    }?;
+    match expr {
+        ast::Expr::List(list) => Some(list),
         _ => None,
     }
 }
