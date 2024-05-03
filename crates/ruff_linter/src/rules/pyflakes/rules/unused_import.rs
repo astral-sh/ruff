@@ -6,8 +6,11 @@ use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{Applicability, Diagnostic, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast as ast;
 use ruff_python_ast::{Stmt, StmtImportFrom};
-use ruff_python_semantic::{AnyImport, Exceptions, Imported, NodeId, Scope};
+use ruff_python_semantic::{
+    AnyImport, BindingKind, Exceptions, Imported, NodeId, Scope, SemanticModel,
+};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -226,8 +229,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
 
     let in_init = checker.path().ends_with("__init__.py");
     let fix_init = checker.settings.preview.is_enabled();
-    // TODO: find the `__all__` node
-    let dunder_all = None;
+    let dunder_all_expr = find_dunder_all_expr(checker.semantic());
 
     // Generate a diagnostic for every import, but share fixes across all imports within the same
     // statement (excluding those that are ignored).
@@ -256,7 +258,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
                             level,
                             checker,
                         ),
-                        dunder_all: dunder_all.is_some(),
+                        dunder_all: dunder_all_expr.is_some(),
                     })
                 } else {
                     None
@@ -287,7 +289,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
                     checker,
                     import_statement,
                     to_reexport.iter().map(|(binding, _)| binding),
-                    dunder_all,
+                    dunder_all_expr,
                 )
                 .ok(),
             )
@@ -402,11 +404,11 @@ fn fix_by_removing_imports<'a>(
 
 /// Generate a [`Fix`] to make bindings in a statement explicit, either by adding them to `__all__`
 /// or changing them from `import a` to `import a as a`.
-fn fix_by_reexporting<'a>(
+fn fix_by_reexporting<'a, 'b>(
     checker: &Checker,
     node_id: NodeId,
     imports: impl Iterator<Item = &'a ImportBinding<'a>>,
-    dunder_all: Option<NodeId>,
+    dunder_all: Option<&ast::ExprList>,
 ) -> Result<Fix> {
     let statement = checker.semantic().statement(node_id);
 
@@ -418,7 +420,9 @@ fn fix_by_reexporting<'a>(
     }
 
     let edits = match dunder_all {
-        Some(_dunder_all) => bail!("Not implemented: add to dunder_all"),
+        Some(dunder_all) => {
+            fix::edits::add_to_dunder_all(member_names.iter().map(AsRef::as_ref), dunder_all)
+        }
         None => fix::edits::make_redundant_alias(member_names.iter().map(AsRef::as_ref), statement),
     };
 
