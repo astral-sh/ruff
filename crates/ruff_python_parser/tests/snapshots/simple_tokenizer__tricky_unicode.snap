@@ -1,0 +1,10 @@
+---
+source: crates/ruff_python_parser/tests/simple_tokenizer.rs
+expression: test_case.tokens()
+---
+[
+    SimpleToken {
+        kind: Name,
+        range: 0..6,
+    },
+]

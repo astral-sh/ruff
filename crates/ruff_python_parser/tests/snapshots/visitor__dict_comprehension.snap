@@ -1,0 +1,14 @@
+---
+source: crates/ruff_python_parser/tests/visitor.rs
+expression: trace
+---
+- StmtExpr
+  - ExprDictComp
+    - Comprehension
+      - ExprName
+      - ExprName
+    - ExprName
+    - ExprBinOp
+      - ExprName
+      - Pow
+      - ExprNumberLiteral

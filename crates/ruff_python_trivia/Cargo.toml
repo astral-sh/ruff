@@ -21,8 +21,6 @@ unicode-ident = { workspace = true }
 
 [dev-dependencies]
 insta = { workspace = true }
-ruff_python_parser = { path = "../ruff_python_parser" }
-ruff_python_index = { path = "../ruff_python_index" }
 
 [lints]
 workspace = true

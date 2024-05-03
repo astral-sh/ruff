@@ -1,0 +1,15 @@
+---
+source: crates/ruff_python_parser/tests/preorder.rs
+expression: trace
+---
+- ModModule
+  - StmtFunctionDef
+    - TypeParams
+      - TypeParamTypeVar
+        - ExprName
+      - TypeParamTypeVar
+      - TypeParamTypeVarTuple
+      - TypeParamParamSpec
+    - Parameters
+    - StmtExpr
+      - ExprEllipsisLiteral

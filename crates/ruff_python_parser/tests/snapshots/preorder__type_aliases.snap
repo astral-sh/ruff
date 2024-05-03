@@ -1,0 +1,16 @@
+---
+source: crates/ruff_python_parser/tests/preorder.rs
+expression: trace
+---
+- ModModule
+  - StmtTypeAlias
+    - ExprName
+    - TypeParams
+      - TypeParamTypeVar
+        - ExprName
+      - TypeParamTypeVar
+      - TypeParamTypeVarTuple
+      - TypeParamParamSpec
+    - ExprSubscript
+      - ExprName
+      - ExprName

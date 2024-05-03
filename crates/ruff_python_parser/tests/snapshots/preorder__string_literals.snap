@@ -1,0 +1,10 @@
+---
+source: crates/ruff_python_parser/tests/preorder.rs
+expression: trace
+---
+- ModModule
+  - StmtExpr
+    - ExprStringLiteral
+      - StringLiteral
+      - StringLiteral
+      - StringLiteral

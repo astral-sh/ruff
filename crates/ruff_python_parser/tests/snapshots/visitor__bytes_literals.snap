@@ -1,0 +1,9 @@
+---
+source: crates/ruff_python_parser/tests/visitor.rs
+expression: trace
+---
+- StmtExpr
+  - ExprBytesLiteral
+    - BytesLiteral
+    - BytesLiteral
+    - BytesLiteral

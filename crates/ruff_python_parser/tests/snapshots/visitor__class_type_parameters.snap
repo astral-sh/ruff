@@ -1,0 +1,12 @@
+---
+source: crates/ruff_python_parser/tests/visitor.rs
+expression: trace
+---
+- StmtClassDef
+  - TypeParamTypeVar
+    - ExprName
+  - TypeParamTypeVar
+  - TypeParamTypeVarTuple
+  - TypeParamParamSpec
+  - StmtExpr
+    - ExprEllipsisLiteral

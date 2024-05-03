@@ -1,0 +1,14 @@
+---
+source: crates/ruff_python_parser/tests/preorder.rs
+expression: trace
+---
+- ModModule
+  - StmtFunctionDef
+    - Decorator
+      - ExprName
+    - Parameters
+    - StmtPass
+  - StmtClassDef
+    - Decorator
+      - ExprName
+    - StmtPass

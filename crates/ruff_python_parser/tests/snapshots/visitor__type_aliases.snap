@@ -1,0 +1,14 @@
+---
+source: crates/ruff_python_parser/tests/visitor.rs
+expression: trace
+---
+- StmtTypeAlias
+  - ExprSubscript
+    - ExprName
+    - ExprName
+  - TypeParamTypeVar
+    - ExprName
+  - TypeParamTypeVar
+  - TypeParamTypeVarTuple
+  - TypeParamParamSpec
+  - ExprName
