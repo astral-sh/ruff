@@ -18,7 +18,7 @@ use crate::rules::{isort, isort::ImportSection, isort::ImportType};
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 enum UnusedImportContext {
     ExceptHandler,
-    Init { first_party: bool },
+    Init { first_party: bool, dunder_all: bool },
 }
 
 /// ## What it does
@@ -108,7 +108,14 @@ impl Violation for UnusedImport {
     fn fix_title(&self) -> Option<String> {
         let UnusedImport { name, multiple, .. } = self;
         let resolution = match self.context {
-            Some(UnusedImportContext::Init { first_party: true }) => "Use a redundant alias",
+            Some(UnusedImportContext::Init {
+                first_party: true,
+                dunder_all: true,
+            }) => "Add unused import to __all__",
+            Some(UnusedImportContext::Init {
+                first_party: true,
+                dunder_all: false,
+            }) => "Use a redundant alias",
             _ => "Remove unused import",
         };
         Some(if *multiple {
@@ -140,7 +147,7 @@ fn is_first_party(qualified_name: &str, level: u32, checker: &Checker) -> bool {
 
 /// For some unused binding in an import statement...
 ///
-///  __init__.py ∧ 1stpty → safe,   convert to redundant-alias
+///  __init__.py ∧ 1stpty → safe,   move to __all__ or convert to explicit-import
 ///  __init__.py ∧ stdlib → unsafe, remove
 ///  __init__.py ∧ 3rdpty → unsafe, remove
 ///
@@ -197,6 +204,8 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
 
     let in_init = checker.path().ends_with("__init__.py");
     let fix_init = checker.settings.preview.is_enabled();
+    // TODO: find the `__all__` node
+    let dunder_all = None;
 
     // Generate a diagnostic for every import, but share fixes across all imports within the same
     // statement (excluding those that are ignored).
@@ -225,6 +234,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
                             level,
                             checker,
                         ),
+                        dunder_all: dunder_all.is_some(),
                     })
                 } else {
                     None
@@ -234,7 +244,10 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
             .partition(|(_, context)| {
                 matches!(
                     context,
-                    Some(UnusedImportContext::Init { first_party: true })
+                    Some(UnusedImportContext::Init {
+                        first_party: true,
+                        ..
+                    })
                 )
             });
 
@@ -252,6 +265,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
                     checker,
                     import_statement,
                     to_reexport.iter().map(|(binding, _)| binding),
+                    dunder_all,
                 )
                 .ok(),
             )
@@ -364,12 +378,13 @@ fn fix_by_removing_imports<'a>(
     )
 }
 
-/// Generate a [`Fix`] to make bindings in a statement explicit, by changing from `import a` to
-/// `import a as a`.
+/// Generate a [`Fix`] to make bindings in a statement explicit, either by adding them to `__all__`
+/// or changing them from `import a` to `import a as a`.
 fn fix_by_reexporting<'a>(
     checker: &Checker,
     node_id: NodeId,
     imports: impl Iterator<Item = &'a ImportBinding<'a>>,
+    dunder_all: Option<NodeId>,
 ) -> Result<Fix> {
     let statement = checker.semantic().statement(node_id);
 
@@ -380,7 +395,10 @@ fn fix_by_reexporting<'a>(
         bail!("Expected import bindings");
     }
 
-    let edits = fix::edits::make_redundant_alias(member_names.iter().map(AsRef::as_ref), statement);
+    let edits = match dunder_all {
+        Some(_dunder_all) => bail!("Not implemented: add to dunder_all"),
+        None => fix::edits::make_redundant_alias(member_names.iter().map(AsRef::as_ref), statement),
+    };
 
     // Only emit a fix if there are edits
     let mut tail = edits.into_iter();
