@@ -9,14 +9,14 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for classes inheriting from `typing.Generic[]`, but `Generic[]` is
+/// Checks for classes inheriting from `typing.Generic[]` where `Generic[]` is
 /// not the last base class in the bases list.
 ///
 /// ## Why is this bad?
 /// `Generic[]` not being the final class in the bases tuple can cause
 /// unexpected behaviour at runtime (See [this CPython issue][1] for example).
-/// In a stub file, however, this rule is enforced purely for stylistic
-/// consistency.
+/// The rule is also applied to stub files, but, unlike at runtime,
+/// in stubs it is purely enforced for stylistic consistency.
 ///
 /// For example:
 /// ```python
@@ -32,6 +32,7 @@ use crate::checkers::ast::Checker;
 ///     ...
 /// ```
 ///
+/// Use instead:
 /// ```python
 /// class LinkedList(Sized, Generic[T]):
 ///     def push(self, item: T) -> None:
@@ -60,7 +61,7 @@ impl Violation for GenericNotLastBaseClass {
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some("Move `Generic[]` to be the last base class".to_string())
+        Some("Move `Generic[]` to the end".to_string())
     }
 }
 
@@ -68,7 +69,6 @@ impl Violation for GenericNotLastBaseClass {
 pub(crate) fn generic_not_last_base_class(
     checker: &mut Checker,
     class_def: &StmtClassDef,
-    bases: Option<&Arguments>,
 ) {
     let Some(bases) = bases else {
         return;
@@ -92,23 +92,26 @@ pub(crate) fn generic_not_last_base_class(
         return;
     }
 
-    if generic_base_indices.len() == 1 {
-        let base_index = generic_base_indices[0];
-        if base_index == bases.args.len() - 1 {
-            // Don't raise issue for the last base.
-            return;
-        }
-
-        let mut diagnostic = Diagnostic::new(GenericNotLastBaseClass, class_def.identifier());
-        diagnostic.set_fix(generate_fix(bases, base_index, checker.locator()));
-        checker.diagnostics.push(diagnostic);
-    } else {
-        // No fix if multiple generics are seen in the class bases.
-        checker.diagnostics.push(Diagnostic::new(
-            GenericNotLastBaseClass,
-            class_def.identifier(),
-        ));
-    }
+    let diagnostic = {
+	    if generic_base_indices.len() == 1 {
+	        let base_index = generic_base_indices[0];
+	        if base_index == bases.args.len() - 1 {
+	            // Don't raise issue for the last base.
+	            return;
+	        }
+	
+	        Diagnostic::new(GenericNotLastBaseClass, class_def.identifier())
+	            .with_fix(generate_fix(bases, base_index, checker.locator()))
+	    } else {
+	        // No fix if multiple generics are seen in the class bases.
+	        Diagnostic::new(
+	            GenericNotLastBaseClass,
+	            class_def.identifier(),
+	        )
+	    }
+	};
+	
+	checker.diagnostics.push(diagnostic);
 }
 
 /// Return `true` if the given expression resolves to `typing.Generic[...]`.
@@ -121,10 +124,7 @@ fn is_generic(expr: &Expr, semantic: &SemanticModel) -> bool {
         return false;
     };
 
-    let qualified_name = semantic.resolve_qualified_name(value);
-    qualified_name.as_ref().is_some_and(|qualified_name| {
-        semantic.match_typing_qualified_name(qualified_name, "Generic")
-    })
+    semantic.match_typing_expr(value, "Generic")
 }
 
 // let call_start = Edit::deletion(call.start(), argument.start());
