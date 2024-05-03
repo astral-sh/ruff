@@ -2,7 +2,6 @@
 
 use std::num::NonZeroUsize;
 
-use lsp::Connection;
 use lsp_server as lsp;
 use lsp_types as types;
 use types::ClientCapabilities;
@@ -18,6 +17,8 @@ use types::TextDocumentSyncOptions;
 use types::WorkDoneProgressOptions;
 use types::WorkspaceFoldersServerCapabilities;
 
+use self::connection::Connection;
+use self::connection::ConnectionInitializer;
 use self::schedule::event_loop_thread;
 use self::schedule::Scheduler;
 use self::schedule::Task;
@@ -28,33 +29,38 @@ use crate::PositionEncoding;
 
 mod api;
 mod client;
+mod connection;
 mod schedule;
 
-pub(crate) use client::ClientSender;
+pub(crate) use connection::ClientSender;
 
 pub(crate) type Result<T> = std::result::Result<T, api::Error>;
 
 pub struct Server {
-    conn: lsp::Connection,
+    connection: Connection,
     client_capabilities: ClientCapabilities,
-    threads: lsp::IoThreads,
     worker_threads: NonZeroUsize,
     session: Session,
 }
 
 impl Server {
     pub fn new(worker_threads: NonZeroUsize) -> crate::Result<Self> {
-        let (conn, threads) = lsp::Connection::stdio();
+        let connection = ConnectionInitializer::stdio();
 
-        crate::message::init_messenger(&conn.sender);
-
-        let (id, params) = conn.initialize_start()?;
-
-        let init_params: types::InitializeParams = serde_json::from_value(params)?;
+        let (id, init_params) = connection.initialize_start()?;
 
         let client_capabilities = init_params.capabilities;
         let position_encoding = Self::find_best_position_encoding(&client_capabilities);
         let server_capabilities = Self::server_capabilities(position_encoding);
+
+        let connection = connection.initialize_finish(
+            id,
+            &server_capabilities,
+            crate::SERVER_NAME,
+            crate::version(),
+        )?;
+
+        crate::message::init_messenger(connection.make_sender());
 
         let AllSettings {
             global_settings,
@@ -86,19 +92,8 @@ impl Server {
                 anyhow::anyhow!("Failed to get the current working directory while creating a default workspace.")
             })?;
 
-        let initialize_data = serde_json::json!({
-            "capabilities": server_capabilities,
-            "serverInfo": {
-                "name": crate::SERVER_NAME,
-                "version": crate::version()
-            }
-        });
-
-        conn.initialize_finish(id, initialize_data)?;
-
         Ok(Self {
-            conn,
-            threads,
+            connection,
             worker_threads,
             session: Session::new(
                 &client_capabilities,
@@ -111,17 +106,20 @@ impl Server {
     }
 
     pub fn run(self) -> crate::Result<()> {
-        let result = event_loop_thread(move || {
+        event_loop_thread(move || {
             Self::event_loop(
-                &self.conn,
+                &self.connection,
                 &self.client_capabilities,
                 self.session,
                 self.worker_threads,
-            )
+            )?;
+            self.connection.close()?;
+            // Note: when we start routing tracing through the LSP,
+            // this should be replaced with a log directly to `stderr`.
+            tracing::info!("Server has shut down successfully");
+            Ok(())
         })?
-        .join();
-        self.threads.join()?;
-        result
+        .join()
     }
 
     #[allow(clippy::needless_pass_by_value)] // this is because we aren't using `next_request_id` yet.
@@ -132,22 +130,21 @@ impl Server {
         worker_threads: NonZeroUsize,
     ) -> crate::Result<()> {
         let mut scheduler =
-            schedule::Scheduler::new(&mut session, worker_threads, &connection.sender);
+            schedule::Scheduler::new(&mut session, worker_threads, connection.make_sender());
 
         Self::try_register_capabilities(client_capabilities, &mut scheduler);
-        for msg in &connection.receiver {
+        for msg in connection.incoming() {
+            if connection.handle_shutdown(&msg)? {
+                break;
+            }
             let task = match msg {
-                lsp::Message::Request(req) => {
-                    if connection.handle_shutdown(&req)? {
-                        return Ok(());
-                    }
-                    api::request(req)
-                }
+                lsp::Message::Request(req) => api::request(req),
                 lsp::Message::Notification(notification) => api::notification(notification),
                 lsp::Message::Response(response) => scheduler.response(response),
             };
             scheduler.dispatch(task);
         }
+
         Ok(())
     }
 
