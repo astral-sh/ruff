@@ -1,4 +1,4 @@
-"""Tests for constructs allowed when `__future__` annotations are enabled but not otherwise"""
+"""Tests for forward references (some allowed, some still not) in the context of `from __future__ import annotations`"""
 from __future__ import annotations
 
 from typing import Optional, TypeAlias, Union, TYPE_CHECKING

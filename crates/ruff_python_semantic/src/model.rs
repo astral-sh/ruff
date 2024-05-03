@@ -1575,31 +1575,6 @@ impl<'a> SemanticModel<'a> {
             .intersects(SemanticModelFlags::DEFERRED_TYPE_DEFINITION)
     }
 
-    pub const fn in_valid_context_for_deferred_type_definition(&self) -> bool {
-        if self.in_typing_literal() {
-            return false;
-        }
-        if !self.in_type_definition() {
-            return false;
-        }
-        // `in_deferred_type_definition()` will only be `true` if we're now visiting the deferred nodes
-        // after having already traversed the source tree once. If we're now visiting the deferred nodes,
-        // we can't defer again, or we'll infinitely recurse!
-        if self.in_deferred_type_definition() {
-            return false;
-        }
-        if self.in_type_checking_block() || self.flags.intersects(SemanticModelFlags::STUB_FILE) {
-            return true;
-        }
-        if !self
-            .flags
-            .intersects(SemanticModelFlags::FUTURE_ANNOTATIONS)
-        {
-            return false;
-        }
-        self.in_annotation()
-    }
-
     /// Return `true` if the model is in a forward type reference.
     ///
     /// Includes deferred string types, and future types in annotations.
@@ -1678,15 +1653,29 @@ impl<'a> SemanticModel<'a> {
             .intersects(SemanticModelFlags::MODULE_DOCSTRING_BOUNDARY)
     }
 
-    /// Return `true` if `__future__`-style type annotations are enabled.
-    pub const fn future_annotations_or_stub(&self) -> bool {
+    /// Return `true` if we're in a file with `from __future__ import annotations`
+    /// at the top of the file.
+    ///
+    /// N.B. Checking this flag is *not* generally sufficient to determine whether
+    /// `__future__`-style forward references are enabled, since forward references
+    /// are allowed in two other contexts even without the
+    /// `from __future__ import annotations` import: stub files and `if TYPE_CHECKING`
+    /// blocks. To determine whether forward references are legal in a given context,
+    /// you'll need to do something like:
+    ///
+    /// ```ignore
+    /// if semantic.in_typing_only_context() || (
+    ///     semantic.future_annotations() && semantic.in_annotation()
+    /// ) {}
+    /// ```
+    pub const fn future_annotations(&self) -> bool {
         self.flags
-            .intersects(SemanticModelFlags::FUTURE_ANNOTATIONS_OR_STUB)
+            .intersects(SemanticModelFlags::FUTURE_ANNOTATIONS)
     }
 
     /// Return `true` if we're in a block of code that is never executed at runtime:
     /// either a stub file, or a `TYPE_CHECKING` block
-    pub const fn in_typing_only_block(&self) -> bool {
+    pub const fn in_typing_only_context(&self) -> bool {
         self.flags.intersects(SemanticModelFlags::TYPING_ONLY_BLOCK)
     }
 
@@ -2049,12 +2038,6 @@ bitflags! {
         /// The model is in a context that's never evaluated at runtime:
         /// either a stub file or a type-checking block
         const TYPING_ONLY_BLOCK = Self::STUB_FILE.bits() | Self::TYPE_CHECKING_BLOCK.bits();
-
-        /// `__future__`-style type annotations are enabled.
-        /// That could be because it's a stub file,
-        /// or it could be because it's a non-stub file that has `from __future__ import annotations`
-        /// at the top of the module, or because we're in a `TYPE_CHECKING` block
-        const FUTURE_ANNOTATIONS_OR_STUB = Self::FUTURE_ANNOTATIONS.bits() | Self::TYPING_ONLY_BLOCK.bits();
 
         /// The model has traversed past the module docstring.
         ///

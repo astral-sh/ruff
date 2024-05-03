@@ -893,7 +893,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
 
     fn visit_expr(&mut self, expr: &'a Expr) {
         // Step 0: Pre-processing
-        if self.semantic.in_typing_only_block()
+        if self.semantic.in_typing_only_context()
             && self.semantic.in_class_base()
             && !self.semantic.in_deferred_class_base()
         {
@@ -903,9 +903,14 @@ impl<'a> Visitor<'a> for Checker<'a> {
             return;
         }
 
-        let defer_probable_type_definition = self
-            .semantic
-            .in_valid_context_for_deferred_type_definition();
+        // `in_deferred_type_definition()` will only be `true` if we're now visiting the deferred nodes
+        // after having already traversed the source tree once. If we're now visiting the deferred nodes,
+        // we can't defer again, or we'll infinitely recurse!
+        let defer_probable_type_definition = self.semantic.in_type_definition()
+            && !self.semantic.in_deferred_type_definition()
+            && !self.semantic.in_typing_literal()
+            && (self.semantic.in_typing_only_context()
+                || (self.semantic.future_annotations() && self.semantic.in_annotation()));
 
         if defer_probable_type_definition {
             if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = expr {
@@ -1964,7 +1969,7 @@ impl<'a> Checker<'a> {
         let deferred_bases = std::mem::take(&mut self.visit.class_bases);
         for (expr, snapshot) in deferred_bases {
             self.semantic.restore(snapshot);
-            debug_assert!(self.semantic.in_typing_only_block());
+            debug_assert!(self.semantic.in_typing_only_context());
             // Set this flag to avoid infinite recursion, or we'll just defer it again:
             self.semantic.flags |= SemanticModelFlags::DEFERRED_CLASS_BASE;
             self.visit_expr(expr);
@@ -1998,11 +2003,6 @@ impl<'a> Checker<'a> {
             let type_definitions = std::mem::take(&mut self.visit.future_type_definitions);
             for (expr, snapshot) in type_definitions {
                 self.semantic.restore(snapshot);
-
-                debug_assert!(self
-                    .semantic
-                    .in_valid_context_for_deferred_type_definition());
-
                 self.semantic.flags |= SemanticModelFlags::TYPE_DEFINITION
                     | SemanticModelFlags::FUTURE_TYPE_DEFINITION;
                 self.visit_expr(expr);
@@ -2062,7 +2062,7 @@ impl<'a> Checker<'a> {
 
                     self.semantic.restore(snapshot);
 
-                    if self.semantic.in_annotation() && self.semantic.future_annotations_or_stub() {
+                    if self.semantic.in_annotation() && self.semantic.future_annotations() {
                         if self.enabled(Rule::QuotedAnnotation) {
                             pyupgrade::rules::quoted_annotation(self, value, range);
                         }
