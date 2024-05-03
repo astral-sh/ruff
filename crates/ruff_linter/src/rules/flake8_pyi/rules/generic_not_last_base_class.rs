@@ -93,19 +93,14 @@ pub(crate) fn generic_not_last_base_class(checker: &mut Checker, class_def: &Stm
         return;
     }
 
-    let multiple_generic_bases = generic_base_iter.next().is_some();
-    let diagnostic = {
-        if multiple_generic_bases {
-            // No fix if multiple generics are seen in the class bases.
-            Diagnostic::new(GenericNotLastBaseClass, bases.range())
-        } else {
-            Diagnostic::new(GenericNotLastBaseClass, bases.range()).with_fix(generate_fix(
-                generic_base,
-                last_base,
-                checker.locator(),
-            ))
-        }
-    };
+    let mut diagnostic = Diagnostic::new(GenericNotLastBaseClass, bases.range());
+
+    // No fix if multiple generics are seen in the class bases.
+    if generic_base_iter.next().is_none() {
+        diagnostic.set_fix(generate_fix(
+            generic_base, last_base, checker.locator(),
+        ));
+    }
 
     checker.diagnostics.push(diagnostic);
 }
