@@ -145,6 +145,21 @@ fn is_first_party(qualified_name: &str, level: u32, checker: &Checker) -> bool {
     }
 }
 
+fn dunder_all<'a>(binding: &Binding, semantic: &'a SemanticModel) -> Option<&'a ast::ExprList> {
+    let statement = binding.statement(semantic)?;
+    match statement {
+        Stmt::Assign(ast::StmtAssign { value, .. }) => {
+            let Expr::List(list) = &**value else {
+                return None;
+            };
+            Some(&list)
+        }
+        Stmt::AnnAssign(_) => todo!(),
+        Stmt::AugAssign(_) => todo!(),
+        _ => None,
+    }
+}
+
 /// For some unused binding in an import statement...
 ///
 ///  __init__.py ∧ 1stpty → safe,   move to __all__ or convert to explicit-import
