@@ -72,13 +72,17 @@ fn quick_fix(
     let document = snapshot.document();
     fixes
         .iter()
+        .filter(|fix| fix.edits.is_some())
         .map(|fix| {
             let mut tracker = WorkspaceEditTracker::new(snapshot.resolved_client_capabilities());
 
             tracker.set_edits_for_document(
                 snapshot.url().clone(),
                 document.version(),
-                fix.edits.clone(),
+                fix.edits
+                    .as_ref()
+                    .expect("should only be iterating over fixes with available edits")
+                    .clone(),
             )?;
 
             Ok(types::CodeActionOrCommand::CodeAction(types::CodeAction {
