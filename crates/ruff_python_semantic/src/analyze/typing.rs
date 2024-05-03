@@ -399,12 +399,17 @@ where
         // Ex) Union[x, y]
         if let Expr::Subscript(ast::ExprSubscript { value, slice, .. }) = expr {
             if semantic.match_typing_expr(value, "Union") {
-                if let Expr::Tuple(ast::ExprTuple { elts, .. }) = slice.as_ref() {
-                    // Traverse each element of the tuple within the union recursively to handle cases
-                    // such as `Union[..., Union[...]]
-                    elts.iter()
-                        .for_each(|elt| inner(func, semantic, elt, Some(expr)));
-                    return;
+                match slice.as_ref() {
+                    Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+                        // Traverse each element of the tuple within the union recursively to handle cases
+                        // such as `Union[..., Union[...]]
+                        elts.iter()
+                            .for_each(|elt| inner(func, semantic, elt, Some(expr)));
+                        return;
+                    }
+                    other => {
+                        inner(func, semantic, other, Some(expr));
+                    }
                 }
             }
         }
