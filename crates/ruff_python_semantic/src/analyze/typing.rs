@@ -437,19 +437,25 @@ where
         // Ex) Literal[x, y]
         if let Expr::Subscript(ast::ExprSubscript { value, slice, .. }) = expr {
             if semantic.match_typing_expr(value, "Literal") {
-                if let Expr::Tuple(ast::ExprTuple { elts, .. }) = slice.as_ref() {
-                    // Traverse each element of the tuple within the literal recursively to handle cases
-                    // such as `Literal[..., Literal[...]]
-                    elts.iter()
-                        .for_each(|elt| inner(func, semantic, elt, Some(expr)));
-                    return;
+                match slice.as_ref() {
+                    Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+                        // Traverse each element of the tuple within the literal recursively to handle cases
+                        // such as `Literal[..., Literal[...]]
+                        elts.iter().for_each(|elt| {
+                            inner(func, semantic, elt, Some(expr));
+                        });
+                        return;
+                    }
+                    other => {
+                        inner(func, semantic, other, Some(expr));
+                    }
                 }
             }
-        }
-
-        // Otherwise, call the function on expression, if it's not the top-level expression.
-        if let Some(parent) = parent {
-            func(expr, parent);
+        } else {
+            // Otherwise, call the function on expression, if it's not the top-level expression.
+            if let Some(parent) = parent {
+                func(expr, parent);
+            }
         }
     }
 
