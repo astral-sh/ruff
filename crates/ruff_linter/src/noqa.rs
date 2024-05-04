@@ -20,6 +20,11 @@ use crate::fs::relativize_path;
 use crate::registry::{AsRule, Rule, RuleSet};
 use crate::rule_redirects::get_redirect_target;
 
+/// Generates an array of edits that matches the length of `diagnostics`.
+/// Each potential edit in the array is paired, in order, with the associated diagnostic.
+/// Each edit will add a `noqa` comment to the appropriate line in the source to hide
+/// the diagnostic. These edits may conflict with each other and should not be applied
+/// simultaneously.
 pub fn generate_noqa_edits(
     path: &Path,
     diagnostics: &[Diagnostic],
