@@ -2373,6 +2373,7 @@ dependencies = [
  "rustc-hash",
  "serde",
  "serde_json",
+ "shellexpand",
  "tracing",
  "walkdir",
 ]
