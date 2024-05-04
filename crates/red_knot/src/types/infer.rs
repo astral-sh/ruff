@@ -5,33 +5,53 @@ use ruff_python_ast::AstNode;
 
 use crate::db::{QueryResult, SemanticDb, SemanticJar};
 
-use crate::module::{resolve_module, ModuleName};
+use crate::module::ModuleName;
 use crate::parse::parse;
-use crate::symbols::{symbol_table, ClassDefinition, Definition, ImportFromDefinition, SymbolId};
-use crate::types::Type;
+use crate::symbols::{
+    resolve_global_symbol, symbol_table, Definition, GlobalSymbolId, ImportFromDefinition,
+};
+use crate::types::{Type, TypeStore};
 use crate::FileId;
+
+#[tracing::instrument(level = "trace", skip(db))]
+pub fn type_store(db: &dyn SemanticDb) -> QueryResult<&TypeStore> {
+    let jar: &SemanticJar = db.jar()?;
+    Ok(&jar.type_store)
+}
 
 // FIXME: Figure out proper dead-lock free synchronisation now that this takes `&db` instead of `&mut db`.
 #[tracing::instrument(level = "trace", skip(db))]
-pub fn infer_symbol_type(
-    db: &dyn SemanticDb,
-    file_id: FileId,
-    symbol_id: SymbolId,
-) -> QueryResult<Type> {
-    let symbols = symbol_table(db, file_id)?;
-    let defs = symbols.definitions(symbol_id);
-
+pub fn infer_symbol_type(db: &dyn SemanticDb, symbol: GlobalSymbolId) -> QueryResult<Type> {
+    let symbols = symbol_table(db, symbol.file_id)?;
+    let defs = symbols.definitions(symbol.symbol_id);
     let jar: &SemanticJar = db.jar()?;
-    let type_store = &jar.type_store;
 
-    if let Some(ty) = type_store.get_cached_symbol_type(file_id, symbol_id) {
+    if let Some(ty) = jar.type_store.get_cached_symbol_type(symbol) {
         return Ok(ty);
     }
 
     // TODO handle multiple defs, conditional defs...
     assert_eq!(defs.len(), 1);
 
-    let ty = match &defs[0] {
+    let ty = infer_definition_type(db, symbol, defs[0].clone())?;
+
+    jar.type_store.cache_symbol_type(symbol, ty);
+
+    // TODO record dependencies
+    Ok(ty)
+}
+
+#[tracing::instrument(level = "trace", skip(db))]
+pub fn infer_definition_type(
+    db: &dyn SemanticDb,
+    symbol: GlobalSymbolId,
+    definition: Definition,
+) -> QueryResult<Type> {
+    let jar: &SemanticJar = db.jar()?;
+    let type_store = &jar.type_store;
+    let file_id = symbol.file_id;
+
+    match definition {
         Definition::ImportFrom(ImportFromDefinition {
             module,
             name,
@@ -40,24 +60,19 @@ pub fn infer_symbol_type(
             // TODO relative imports
             assert!(matches!(level, 0));
             let module_name = ModuleName::new(module.as_ref().expect("TODO relative imports"));
-            if let Some(module) = resolve_module(db, module_name)? {
-                let remote_file_id = module.path(db)?.file();
-                let remote_symbols = symbol_table(db, remote_file_id)?;
-                if let Some(remote_symbol_id) = remote_symbols.root_symbol_id_by_name(name) {
-                    infer_symbol_type(db, remote_file_id, remote_symbol_id)?
-                } else {
-                    Type::Unknown
-                }
+            if let Some(remote_symbol) = resolve_global_symbol(db, module_name, &name)? {
+                infer_symbol_type(db, remote_symbol)
             } else {
-                Type::Unknown
+                Ok(Type::Unknown)
             }
         }
-        Definition::ClassDef(ClassDefinition { node_key, scope_id }) => {
+        Definition::ClassDef(node_key) => {
             if let Some(ty) = type_store.get_cached_node_type(file_id, node_key.erased()) {
-                ty
+                Ok(ty)
             } else {
                 let parsed = parse(db.upcast(), file_id)?;
                 let ast = parsed.ast();
+                let table = symbol_table(db, file_id)?;
                 let node = node_key.resolve_unwrap(ast.as_any_node_ref());
 
                 let mut bases = Vec::with_capacity(node.bases().len());
@@ -65,19 +80,19 @@ pub fn infer_symbol_type(
                 for base in node.bases() {
                     bases.push(infer_expr_type(db, file_id, base)?);
                 }
-
-                let ty =
-                    Type::Class(type_store.add_class(file_id, &node.name.id, *scope_id, bases));
+                let scope_id = table.scope_id_for_node(node_key.erased());
+                let ty = Type::Class(type_store.add_class(file_id, &node.name.id, scope_id, bases));
                 type_store.cache_node_type(file_id, *node_key.erased(), ty);
-                ty
+                Ok(ty)
             }
         }
         Definition::FunctionDef(node_key) => {
             if let Some(ty) = type_store.get_cached_node_type(file_id, node_key.erased()) {
-                ty
+                Ok(ty)
             } else {
                 let parsed = parse(db.upcast(), file_id)?;
                 let ast = parsed.ast();
+                let table = symbol_table(db, file_id)?;
                 let node = node_key
                     .resolve(ast.as_any_node_ref())
                     .expect("node key should resolve");
@@ -87,12 +102,18 @@ pub fn infer_symbol_type(
                     .iter()
                     .map(|decorator| infer_expr_type(db, file_id, &decorator.expression))
                     .collect::<QueryResult<_>>()?;
-
+                let scope_id = table.scope_id_for_node(node_key.erased());
                 let ty = type_store
-                    .add_function(file_id, &node.name.id, decorator_tys)
+                    .add_function(
+                        file_id,
+                        &node.name.id,
+                        symbol.symbol_id,
+                        scope_id,
+                        decorator_tys,
+                    )
                     .into();
                 type_store.cache_node_type(file_id, *node_key.erased(), ty);
-                ty
+                Ok(ty)
             }
         }
         Definition::Assignment(node_key) => {
@@ -100,15 +121,10 @@ pub fn infer_symbol_type(
             let ast = parsed.ast();
             let node = node_key.resolve_unwrap(ast.as_any_node_ref());
             // TODO handle unpacking assignment correctly
-            infer_expr_type(db, file_id, &node.value)?
+            infer_expr_type(db, file_id, &node.value)
         }
         _ => todo!("other kinds of definitions"),
-    };
-
-    type_store.cache_symbol_type(file_id, symbol_id, ty);
-
-    // TODO record dependencies
-    Ok(ty)
+    }
 }
 
 fn infer_expr_type(db: &dyn SemanticDb, file_id: FileId, expr: &ast::Expr) -> QueryResult<Type> {
@@ -116,8 +132,9 @@ fn infer_expr_type(db: &dyn SemanticDb, file_id: FileId, expr: &ast::Expr) -> Qu
     let symbols = symbol_table(db, file_id)?;
     match expr {
         ast::Expr::Name(name) => {
+            // TODO look up in the correct scope, don't assume global
             if let Some(symbol_id) = symbols.root_symbol_id_by_name(&name.id) {
-                infer_symbol_type(db, file_id, symbol_id)
+                infer_symbol_type(db, GlobalSymbolId { file_id, symbol_id })
             } else {
                 Ok(Type::Unknown)
             }
@@ -133,7 +150,7 @@ mod tests {
     use crate::module::{
         resolve_module, set_module_search_paths, ModuleName, ModuleSearchPath, ModuleSearchPathKind,
     };
-    use crate::symbols::symbol_table;
+    use crate::symbols::{symbol_table, GlobalSymbolId};
     use crate::types::{infer_symbol_type, Type};
     use crate::Name;
 
@@ -180,7 +197,13 @@ mod tests {
             .root_symbol_id_by_name("E")
             .expect("E symbol should be found");
 
-        let ty = infer_symbol_type(db, a_file, e_sym)?;
+        let ty = infer_symbol_type(
+            db,
+            GlobalSymbolId {
+                file_id: a_file,
+                symbol_id: e_sym,
+            },
+        )?;
 
         let jar = HasJar::<SemanticJar>::jar(db)?;
         assert!(matches!(ty, Type::Class(_)));
@@ -205,7 +228,13 @@ mod tests {
             .root_symbol_id_by_name("Sub")
             .expect("Sub symbol should be found");
 
-        let ty = infer_symbol_type(db, file, sym)?;
+        let ty = infer_symbol_type(
+            db,
+            GlobalSymbolId {
+                file_id: file,
+                symbol_id: sym,
+            },
+        )?;
 
         let Type::Class(class_id) = ty else {
             panic!("Sub is not a Class")
@@ -240,7 +269,13 @@ mod tests {
             .root_symbol_id_by_name("C")
             .expect("C symbol should be found");
 
-        let ty = infer_symbol_type(db, file, sym)?;
+        let ty = infer_symbol_type(
+            db,
+            GlobalSymbolId {
+                file_id: file,
+                symbol_id: sym,
+            },
+        )?;
 
         let Type::Class(class_id) = ty else {
             panic!("C is not a Class");

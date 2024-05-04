@@ -9,10 +9,13 @@ use ruff_python_ast::{ModModule, StringLiteral};
 use crate::cache::KeyValueCache;
 use crate::db::{LintDb, LintJar, QueryResult};
 use crate::files::FileId;
+use crate::module::ModuleName;
 use crate::parse::{parse, Parsed};
 use crate::source::{source_text, Source};
-use crate::symbols::{symbol_table, Definition, SymbolId, SymbolTable};
-use crate::types::{infer_symbol_type, Type};
+use crate::symbols::{
+    resolve_global_symbol, symbol_table, Definition, GlobalSymbolId, SymbolId, SymbolTable,
+};
+use crate::types::{infer_definition_type, infer_symbol_type, Type};
 
 #[tracing::instrument(level = "debug", skip(db))]
 pub(crate) fn lint_syntax(db: &dyn LintDb, file_id: FileId) -> QueryResult<Diagnostics> {
@@ -90,6 +93,7 @@ pub(crate) fn lint_semantic(db: &dyn LintDb, file_id: FileId) -> QueryResult<Dia
         };
 
         lint_unresolved_imports(&context)?;
+        lint_bad_overrides(&context)?;
 
         Ok(Diagnostics::from(context.diagnostics.take()))
     })
@@ -136,6 +140,57 @@ fn lint_unresolved_imports(context: &SemanticLintContext) -> QueryResult<()> {
     Ok(())
 }
 
+fn lint_bad_overrides(context: &SemanticLintContext) -> QueryResult<()> {
+    // TODO we should have a special marker on the real typing module (from typeshed) so if you
+    // have your own "typing" module in your project, we don't consider it THE typing module (and
+    // same for other stdlib modules that our lint rules care about)
+    let Some(typing_override) =
+        resolve_global_symbol(context.db.upcast(), ModuleName::new("typing"), "override")?
+    else {
+        // TODO once we bundle typeshed, this should be unreachable!()
+        return Ok(());
+    };
+
+    // TODO we should maybe index definitions by type instead of iterating all, or else iterate all
+    // just once, match, and branch to all lint rules that care about a type of definition
+    for (symbol, definition) in context.symbols().all_definitions() {
+        if !matches!(definition, Definition::FunctionDef(_)) {
+            continue;
+        }
+        let ty = infer_definition_type(
+            context.db.upcast(),
+            GlobalSymbolId {
+                file_id: context.file_id,
+                symbol_id: symbol,
+            },
+            definition.clone(),
+        )?;
+        let Type::Function(func) = ty else {
+            unreachable!("type of a FunctionDef should always be a Function");
+        };
+        let Some(class) = func.get_containing_class(context.db.upcast())? else {
+            // not a method of a class
+            continue;
+        };
+        if func.has_decorator(context.db.upcast(), typing_override)? {
+            let method_name = func.name(context.db.upcast())?;
+            if class
+                .get_super_class_member(context.db.upcast(), &method_name)?
+                .is_none()
+            {
+                // TODO should have a qualname() method to support nested classes
+                context.push_diagnostic(
+                    format!(
+                        "Method {}.{} is decorated with `typing.override` but does not override any base class method",
+                        class.name(context.db.upcast())?,
+                        method_name,
+                    ));
+            }
+        }
+    }
+    Ok(())
+}
+
 pub struct SemanticLintContext<'a> {
     file_id: FileId,
     source: Source,
@@ -163,7 +218,13 @@ impl<'a> SemanticLintContext<'a> {
     }
 
     pub fn infer_symbol_type(&self, symbol_id: SymbolId) -> QueryResult<Type> {
-        infer_symbol_type(self.db.upcast(), self.file_id, symbol_id)
+        infer_symbol_type(
+            self.db.upcast(),
+            GlobalSymbolId {
+                file_id: self.file_id,
+                symbol_id,
+            },
+        )
     }
 
     pub fn push_diagnostic(&self, diagnostic: String) {
