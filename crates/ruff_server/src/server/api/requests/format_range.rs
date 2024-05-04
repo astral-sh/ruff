@@ -17,12 +17,15 @@ impl super::BackgroundDocumentRequestHandler for FormatRange {
         _notifier: Notifier,
         params: types::DocumentRangeFormattingParams,
     ) -> Result<super::FormatResponse> {
-        let document = snapshot.document();
+        let document = snapshot
+            .query()
+            .as_single_document()
+            .expect("hover should only be called on text documents or notebook cells");
         let text = document.contents();
         let index = document.index();
         let range = params.range.to_text_range(text, index, snapshot.encoding());
         let formatted_range =
-            crate::format::format_range(document, snapshot.settings().formatter(), range)
+            crate::format::format_range(document, snapshot.query().settings().formatter(), range)
                 .with_failure_code(lsp_server::ErrorCode::InternalError)?;
         Ok(Some(vec![types::TextEdit {
             range: formatted_range

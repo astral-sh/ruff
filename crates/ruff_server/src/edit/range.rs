@@ -1,5 +1,6 @@
 use super::PositionEncoding;
 use lsp_types as types;
+use ruff_notebook::NotebookIndex;
 use ruff_source_file::OneIndexed;
 use ruff_source_file::{LineIndex, SourceLocation};
 use ruff_text_size::{TextRange, TextSize};
@@ -11,6 +12,13 @@ pub(crate) trait RangeExt {
 
 pub(crate) trait ToRangeExt {
     fn to_range(&self, text: &str, index: &LineIndex, encoding: PositionEncoding) -> types::Range;
+    fn to_notebook_range(
+        &self,
+        text: &str,
+        source_index: &LineIndex,
+        notebook_index: &NotebookIndex,
+        encoding: PositionEncoding,
+    ) -> (usize, types::Range);
 }
 
 fn u32_index_to_usize(index: u32) -> usize {
@@ -83,9 +91,50 @@ impl RangeExt for lsp_types::Range {
 impl ToRangeExt for TextRange {
     fn to_range(&self, text: &str, index: &LineIndex, encoding: PositionEncoding) -> types::Range {
         types::Range {
-            start: offset_to_position(self.start(), text, index, encoding),
-            end: offset_to_position(self.end(), text, index, encoding),
+            start: source_location_to_position(&offset_to_source_location(
+                self.start(),
+                text,
+                index,
+                encoding,
+            )),
+            end: source_location_to_position(&offset_to_source_location(
+                self.end(),
+                text,
+                index,
+                encoding,
+            )),
         }
+    }
+
+    fn to_notebook_range(
+        &self,
+        text: &str,
+        source_index: &LineIndex,
+        notebook_index: &NotebookIndex,
+        encoding: PositionEncoding,
+    ) -> (usize, types::Range) {
+        let start = offset_to_source_location(self.start(), text, source_index, encoding);
+        let mut end = offset_to_source_location(self.end(), text, source_index, encoding);
+        let cell = notebook_index.cell(start.row);
+
+        // weird edge case here - if the end of the range is where the newline after the cell got added (making it 'out of bounds')
+        // we need to move it one character back (which should place it at the end of the last line).
+        if notebook_index.cell(end.row) != cell {
+            end = offset_to_source_location(
+                self.end().checked_sub(1.into()).unwrap_or_default(),
+                text,
+                source_index,
+                encoding,
+            );
+        }
+
+        let start = source_location_to_position(&notebook_index.translate_location(&start));
+        let end = source_location_to_position(&notebook_index.translate_location(&end));
+
+        (
+            cell.map(OneIndexed::to_zero_indexed).unwrap_or_default(),
+            types::Range { start, end },
+        )
     }
 }
 
@@ -111,13 +160,13 @@ fn utf8_column_offset(utf16_code_unit_offset: u32, line: &str) -> TextSize {
     utf8_code_unit_offset
 }
 
-fn offset_to_position(
+fn offset_to_source_location(
     offset: TextSize,
     text: &str,
     index: &LineIndex,
     encoding: PositionEncoding,
-) -> types::Position {
-    let location = match encoding {
+) -> SourceLocation {
+    match encoding {
         PositionEncoding::UTF8 => {
             let row = index.line_index(offset);
             let column = offset - index.line_start(row, text);
@@ -143,8 +192,10 @@ fn offset_to_position(
             }
         }
         PositionEncoding::UTF32 => index.source_location(offset, text),
-    };
+    }
+}
 
+fn source_location_to_position(location: &SourceLocation) -> types::Position {
     types::Position {
         line: u32::try_from(location.row.to_zero_indexed()).expect("row usize fits in u32"),
         character: u32::try_from(location.column.to_zero_indexed())

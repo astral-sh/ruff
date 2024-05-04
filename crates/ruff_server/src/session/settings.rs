@@ -7,7 +7,7 @@ use serde::Deserialize;
 use ruff_linter::{line_width::LineLength, RuleSelector};
 
 /// Maps a workspace URI to its associated client settings. Used during server initialization.
-pub(crate) type WorkspaceSettingsMap = FxHashMap<Url, ClientSettings>;
+pub(crate) type WorkspaceSettingsMap = FxHashMap<PathBuf, ClientSettings>;
 
 /// Resolved client settings for a specific document. These settings are meant to be
 /// used directly by the server, and are *not* a 1:1 representation with how the client
@@ -169,7 +169,12 @@ impl AllSettings {
             workspace_settings: workspace_settings.map(|workspace_settings| {
                 workspace_settings
                     .into_iter()
-                    .map(|settings| (settings.workspace, settings.settings))
+                    .map(|settings| {
+                        (
+                            settings.workspace.to_file_path().unwrap(),
+                            settings.settings,
+                        )
+                    })
                     .collect()
             }),
         }
@@ -552,12 +557,12 @@ mod tests {
             global_settings,
             workspace_settings,
         } = AllSettings::from_init_options(options);
-        let url = Url::parse("file:///Users/test/projects/pandas").expect("url should parse");
+        let path = PathBuf::from_str("/Users/test/projects/pandas").expect("path should be valid");
         let workspace_settings = workspace_settings.expect("workspace settings should exist");
         assert_eq!(
             ResolvedClientSettings::with_workspace(
                 workspace_settings
-                    .get(&url)
+                    .get(&path)
                     .expect("workspace setting should exist"),
                 &global_settings
             ),
@@ -583,11 +588,11 @@ mod tests {
                 }
             }
         );
-        let url = Url::parse("file:///Users/test/projects/scipy").expect("url should parse");
+        let path = PathBuf::from_str("/Users/test/projects/scipy").expect("path should be valid");
         assert_eq!(
             ResolvedClientSettings::with_workspace(
                 workspace_settings
-                    .get(&url)
+                    .get(&path)
                     .expect("workspace setting should exist"),
                 &global_settings
             ),

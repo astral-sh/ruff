@@ -29,12 +29,8 @@ impl super::BackgroundDocumentRequestHandler for CodeActions {
 
         let supported_code_actions = supported_code_actions(params.context.only.clone());
 
-        let fixes = fixes_for_diagnostics(
-            snapshot.document(),
-            snapshot.encoding(),
-            params.context.diagnostics,
-        )
-        .with_failure_code(ErrorCode::InternalError)?;
+        let fixes = fixes_for_diagnostics(params.context.diagnostics)
+            .with_failure_code(ErrorCode::InternalError)?;
 
         if snapshot.client_settings().fix_violation()
             && supported_code_actions.contains(&SupportedCodeAction::QuickFix)
@@ -69,7 +65,8 @@ fn quick_fix(
     snapshot: &DocumentSnapshot,
     fixes: &[DiagnosticFix],
 ) -> crate::Result<Vec<CodeActionOrCommand>> {
-    let document = snapshot.document();
+    let document = snapshot.query();
+
     fixes
         .iter()
         .filter(|fix| !fix.edits.is_empty())
@@ -77,7 +74,7 @@ fn quick_fix(
             let mut tracker = WorkspaceEditTracker::new(snapshot.resolved_client_capabilities());
 
             tracker.set_edits_for_document(
-                snapshot.url().clone(),
+                snapshot.query().make_key().into_url(),
                 document.version(),
                 fix.edits.clone(),
             )?;
@@ -88,7 +85,8 @@ fn quick_fix(
                 edit: Some(tracker.into_workspace_edit()),
                 diagnostics: Some(vec![fix.fixed_diagnostic.clone()]),
                 data: Some(
-                    serde_json::to_value(snapshot.url()).expect("document url to serialize"),
+                    serde_json::to_value(snapshot.query().make_key().into_url())
+                        .expect("document url should serialize"),
                 ),
                 ..Default::default()
             }))
@@ -106,8 +104,8 @@ fn noqa_comments(snapshot: &DocumentSnapshot, fixes: &[DiagnosticFix]) -> Vec<Co
 
             tracker
                 .set_edits_for_document(
-                    snapshot.url().clone(),
-                    snapshot.document().version(),
+                    snapshot.query().make_key().into_url(),
+                    snapshot.query().version(),
                     vec![edit],
                 )
                 .ok()?;
@@ -118,7 +116,8 @@ fn noqa_comments(snapshot: &DocumentSnapshot, fixes: &[DiagnosticFix]) -> Vec<Co
                 edit: Some(tracker.into_workspace_edit()),
                 diagnostics: Some(vec![fix.fixed_diagnostic.clone()]),
                 data: Some(
-                    serde_json::to_value(snapshot.url()).expect("document url to serialize"),
+                    serde_json::to_value(snapshot.query().make_key().into_url())
+                        .expect("document url should serialize"),
                 ),
                 ..Default::default()
             }))
@@ -127,7 +126,7 @@ fn noqa_comments(snapshot: &DocumentSnapshot, fixes: &[DiagnosticFix]) -> Vec<Co
 }
 
 fn fix_all(snapshot: &DocumentSnapshot) -> crate::Result<CodeActionOrCommand> {
-    let document = snapshot.document();
+    let document = snapshot.query();
 
     let (edit, data) = if snapshot
         .resolved_client_capabilities()
@@ -136,17 +135,18 @@ fn fix_all(snapshot: &DocumentSnapshot) -> crate::Result<CodeActionOrCommand> {
         // The editor will request the edit in a `CodeActionsResolve` request
         (
             None,
-            Some(serde_json::to_value(snapshot.url()).expect("document url to serialize")),
+            Some(
+                serde_json::to_value(snapshot.query().make_key().into_url())
+                    .expect("document url should serialize"),
+            ),
         )
     } else {
         (
             Some(resolve_edit_for_fix_all(
                 document,
                 snapshot.resolved_client_capabilities(),
-                snapshot.url(),
-                snapshot.settings().linter(),
+                snapshot.query().settings().linter(),
                 snapshot.encoding(),
-                document.version(),
             )?),
             None,
         )
@@ -162,7 +162,7 @@ fn fix_all(snapshot: &DocumentSnapshot) -> crate::Result<CodeActionOrCommand> {
 }
 
 fn organize_imports(snapshot: &DocumentSnapshot) -> crate::Result<CodeActionOrCommand> {
-    let document = snapshot.document();
+    let document = snapshot.query();
 
     let (edit, data) = if snapshot
         .resolved_client_capabilities()
@@ -171,17 +171,18 @@ fn organize_imports(snapshot: &DocumentSnapshot) -> crate::Result<CodeActionOrCo
         // The edit will be resolved later in the `CodeActionsResolve` request
         (
             None,
-            Some(serde_json::to_value(snapshot.url()).expect("document url to serialize")),
+            Some(
+                serde_json::to_value(snapshot.query().make_key().into_url())
+                    .expect("document url should serialize"),
+            ),
         )
     } else {
         (
             Some(resolve_edit_for_organize_imports(
                 document,
                 snapshot.resolved_client_capabilities(),
-                snapshot.url(),
-                snapshot.settings().linter(),
+                snapshot.query().settings().linter(),
                 snapshot.encoding(),
-                document.version(),
             )?),
             None,
         )

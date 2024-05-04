@@ -10,26 +10,28 @@ use ruff_linter::{
     settings::{flags, LinterSettings},
     source_kind::SourceKind,
 };
-use ruff_python_ast::PySourceType;
+use ruff_notebook::Notebook;
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 use ruff_python_parser::AsMode;
-use ruff_source_file::Locator;
+use ruff_source_file::{LineIndex, Locator};
 use ruff_text_size::Ranged;
+use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 
-use crate::{edit::ToRangeExt, PositionEncoding, DIAGNOSTIC_NAME};
+use crate::{edit::ToRangeExt, session::DocumentQuery, PositionEncoding, DIAGNOSTIC_NAME};
 
 /// This is serialized on the diagnostic `data` field.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub(crate) struct AssociatedDiagnosticData {
     pub(crate) kind: DiagnosticKind,
-    /// A possible fix for the associated diagnostic.
-    pub(crate) fix: Option<Fix>,
+    /// Edits to fix the diagnostic. If this is empty, a fix
+    /// does not exist.
+    pub(crate) edits: Vec<lsp_types::TextEdit>,
     /// The NOQA code for the diagnostic.
     pub(crate) code: String,
     /// Possible edit to add a `noqa` comment which will disable this diagnostic.
-    pub(crate) noqa_edit: Option<ruff_diagnostics::Edit>,
+    pub(crate) noqa_edit: Option<lsp_types::TextEdit>,
 }
 
 /// Describes a fix for `fixed_diagnostic` that may have quick fix
@@ -49,18 +51,16 @@ pub(crate) struct DiagnosticFix {
     pub(crate) noqa_edit: Option<lsp_types::TextEdit>,
 }
 
+/// A series of diagnostics across a single text document or an arbitrary number of notebook cells.
+pub(crate) type Diagnostics = FxHashMap<lsp_types::Url, Vec<lsp_types::Diagnostic>>;
+
 pub(crate) fn check(
-    document: &crate::edit::Document,
-    document_url: &lsp_types::Url,
+    query: &DocumentQuery,
     linter_settings: &LinterSettings,
     encoding: PositionEncoding,
-) -> Vec<lsp_types::Diagnostic> {
-    let contents = document.contents();
-    let index = document.index().clone();
-
-    let document_path = document_url
-        .to_file_path()
-        .expect("document URL should be a valid file path");
+) -> Diagnostics {
+    let document_path = query.file_path();
+    let source_kind = query.make_source_kind();
 
     let package = detect_package_root(
         document_path
@@ -69,16 +69,15 @@ pub(crate) fn check(
         &linter_settings.namespace_packages,
     );
 
-    let source_type = PySourceType::default();
-
-    // TODO(jane): Support Jupyter Notebooks
-    let source_kind = SourceKind::Python(contents.to_string());
+    let source_type = query.source_type();
 
     // Tokenize once.
-    let tokens = ruff_python_parser::tokenize(contents, source_type.as_mode());
+    let tokens = ruff_python_parser::tokenize(source_kind.source_code(), source_type.as_mode());
+
+    let index = LineIndex::from_source_text(source_kind.source_code());
 
     // Map row and column locations to byte slices (lazily).
-    let locator = Locator::with_index(contents, index);
+    let locator = Locator::with_index(source_kind.source_code(), index.clone());
 
     // Detect the current code style (lazily).
     let stylist = Stylist::from_tokens(&tokens, &locator);
@@ -90,10 +89,8 @@ pub(crate) fn check(
     let directives = extract_directives(&tokens, Flags::all(), &locator, &indexer);
 
     // Generate checks.
-    let LinterResult {
-        data: diagnostics, ..
-    } = check_path(
-        &document_path,
+    let LinterResult { data, .. } = check_path(
+        document_path,
         package,
         &locator,
         &stylist,
@@ -107,8 +104,8 @@ pub(crate) fn check(
     );
 
     let noqa_edits = generate_noqa_edits(
-        &document_path,
-        diagnostics.as_slice(),
+        document_path,
+        data.as_slice(),
         &locator,
         indexer.comment_ranges(),
         &linter_settings.external,
@@ -116,16 +113,42 @@ pub(crate) fn check(
         stylist.line_ending(),
     );
 
-    diagnostics
+    let mut diagnostics = Diagnostics::default();
+
+    // Populate all cell URLs with an empty diagnostic list.
+    // This ensures that cells without diagnostics still get updated.
+    if let Some(notebook) = query.as_notebook() {
+        for url in notebook.urls() {
+            diagnostics.entry(url.clone()).or_default();
+        }
+    }
+
+    for (index, diagnostic) in data
         .into_iter()
         .zip(noqa_edits)
-        .map(|(diagnostic, noqa_edit)| to_lsp_diagnostic(diagnostic, noqa_edit, document, encoding))
-        .collect()
+        .map(|(diagnostic, noqa_edit)| {
+            to_lsp_diagnostic(diagnostic, &noqa_edit, &source_kind, &index, encoding)
+        })
+    {
+        if let Some(notebook) = query.as_notebook() {
+            let Some(uri) = notebook.cell_uri_by_index(index) else {
+                tracing::warn!("Unable to find notebook cell at index {index}.");
+                continue;
+            };
+            diagnostics.entry(uri.clone()).or_default().push(diagnostic);
+        } else {
+            diagnostics
+                .entry(query.make_key().into_url())
+                .or_default()
+                .push(diagnostic);
+        }
+    }
+
+    diagnostics
 }
 
+/// Converts LSP diagnostics to a list of `DiagnosticFix`es by deserializing associated data on each diagnostic.
 pub(crate) fn fixes_for_diagnostics(
-    document: &crate::edit::Document,
-    encoding: PositionEncoding,
     diagnostics: Vec<lsp_types::Diagnostic>,
 ) -> crate::Result<Vec<DiagnosticFix>> {
     diagnostics
@@ -139,36 +162,6 @@ pub(crate) fn fixes_for_diagnostics(
                 serde_json::from_value(data).map_err(|err| {
                     anyhow::anyhow!("failed to deserialize diagnostic data: {err}")
                 })?;
-            let edits = associated_data
-                .fix
-                .map(|fix| {
-                    fix.edits()
-                        .iter()
-                        .map(|edit| lsp_types::TextEdit {
-                            range: edit.range().to_range(
-                                document.contents(),
-                                document.index(),
-                                encoding,
-                            ),
-                            new_text: edit.content().unwrap_or_default().to_string(),
-                        })
-                        .collect()
-                })
-                .unwrap_or_default();
-
-            let noqa_edit =
-                associated_data
-                    .noqa_edit
-                    .as_ref()
-                    .map(|noqa_edit| lsp_types::TextEdit {
-                        range: noqa_edit.range().to_range(
-                            document.contents(),
-                            document.index(),
-                            encoding,
-                        ),
-                        new_text: noqa_edit.content().unwrap_or_default().to_string(),
-                    });
-
             Ok(Some(DiagnosticFix {
                 fixed_diagnostic,
                 code: associated_data.code,
@@ -176,22 +169,28 @@ pub(crate) fn fixes_for_diagnostics(
                     .kind
                     .suggestion
                     .unwrap_or(associated_data.kind.name),
-                edits,
-                noqa_edit,
+                noqa_edit: associated_data.noqa_edit,
+                edits: associated_data.edits,
             }))
         })
         .filter_map(crate::Result::transpose)
         .collect()
 }
 
+/// Generates an LSP diagnostic with an associated cell index for the diagnostic to go in.
+/// If the source kind is a text document, the cell index will always be `0`.
 fn to_lsp_diagnostic(
     diagnostic: Diagnostic,
-    noqa_edit: Option<Edit>,
-    document: &crate::edit::Document,
+    noqa_edit: &Option<Edit>,
+    source_kind: &SourceKind,
+    index: &LineIndex,
     encoding: PositionEncoding,
-) -> lsp_types::Diagnostic {
+) -> (usize, lsp_types::Diagnostic) {
     let Diagnostic {
-        kind, range, fix, ..
+        kind,
+        range: diagnostic_range,
+        fix,
+        ..
     } = diagnostic;
 
     let rule = kind.rule();
@@ -200,11 +199,54 @@ fn to_lsp_diagnostic(
 
     let data = (fix.is_some() || noqa_edit.is_some())
         .then(|| {
-            serde_json::to_value(&AssociatedDiagnosticData {
+            let edits = fix
+                .as_ref()
+                .into_iter()
+                .flat_map(Fix::edits)
+                .map(|edit| lsp_types::TextEdit {
+                    range: if let Some(notebook_index) =
+                        source_kind.as_ipy_notebook().map(Notebook::index)
+                    {
+                        edit.range()
+                            .to_notebook_range(
+                                source_kind.source_code(),
+                                index,
+                                notebook_index,
+                                encoding,
+                            )
+                            .1
+                    } else {
+                        edit.range()
+                            .to_range(source_kind.source_code(), index, encoding)
+                    },
+                    new_text: edit.content().unwrap_or_default().to_string(),
+                })
+                .collect();
+            let noqa_edit = noqa_edit.as_ref().map(|noqa_edit| lsp_types::TextEdit {
+                range: if let Some(notebook_index) =
+                    source_kind.as_ipy_notebook().map(Notebook::index)
+                {
+                    noqa_edit
+                        .range()
+                        .to_notebook_range(
+                            source_kind.source_code(),
+                            index,
+                            notebook_index,
+                            encoding,
+                        )
+                        .1
+                } else {
+                    noqa_edit
+                        .range()
+                        .to_range(source_kind.source_code(), index, encoding)
+                },
+                new_text: noqa_edit.content().unwrap_or_default().to_string(),
+            });
+            serde_json::to_value(AssociatedDiagnosticData {
                 kind: kind.clone(),
-                fix,
-                code: rule.noqa_code().to_string(),
                 noqa_edit,
+                edits,
+                code: rule.noqa_code().to_string(),
             })
             .ok()
         })
@@ -212,21 +254,39 @@ fn to_lsp_diagnostic(
 
     let code = rule.noqa_code().to_string();
 
-    lsp_types::Diagnostic {
-        range: range.to_range(document.contents(), document.index(), encoding),
-        severity: Some(severity(&code)),
-        tags: tags(&code),
-        code: Some(lsp_types::NumberOrString::String(code)),
-        code_description: rule.url().and_then(|url| {
-            Some(lsp_types::CodeDescription {
-                href: lsp_types::Url::parse(&url).ok()?,
-            })
-        }),
-        source: Some(DIAGNOSTIC_NAME.into()),
-        message: kind.body,
-        related_information: None,
-        data,
+    let range: lsp_types::Range;
+    let cell: usize;
+
+    if let Some(notebook_index) = source_kind.as_ipy_notebook().map(Notebook::index) {
+        (cell, range) = diagnostic_range.to_notebook_range(
+            source_kind.source_code(),
+            index,
+            notebook_index,
+            encoding,
+        );
+    } else {
+        cell = usize::default();
+        range = diagnostic_range.to_range(source_kind.source_code(), index, encoding);
     }
+
+    (
+        cell,
+        lsp_types::Diagnostic {
+            range,
+            severity: Some(severity(&code)),
+            tags: tags(&code),
+            code: Some(lsp_types::NumberOrString::String(code)),
+            code_description: rule.url().and_then(|url| {
+                Some(lsp_types::CodeDescription {
+                    href: lsp_types::Url::parse(&url).ok()?,
+                })
+            }),
+            source: Some(DIAGNOSTIC_NAME.into()),
+            message: kind.body,
+            related_information: None,
+            data,
+        },
+    )
 }
 
 fn severity(code: &str) -> lsp_types::DiagnosticSeverity {

@@ -1,8 +1,11 @@
+use crate::edit::NotebookDocument;
 use crate::server::api::diagnostics::publish_diagnostics_for_document;
 use crate::server::api::LSPResult;
 use crate::server::client::{Notifier, Requester};
 use crate::server::Result;
 use crate::session::Session;
+use anyhow::anyhow;
+use lsp_server::ErrorCode;
 use lsp_types as types;
 use lsp_types::notification as notif;
 
@@ -13,7 +16,6 @@ impl super::NotificationHandler for DidOpenNotebook {
 }
 
 impl super::SyncNotificationHandler for DidOpenNotebook {
-    #[tracing::instrument(skip_all, fields(file=%url))]
     fn run(
         session: &mut Session,
         notifier: Notifier,
@@ -21,17 +23,42 @@ impl super::SyncNotificationHandler for DidOpenNotebook {
         types::DidOpenNotebookDocumentParams {
             notebook_document:
                 types::NotebookDocument {
-                    uri: url,
-                    notebook_type,
+                    uri,
                     version,
-                    metadata,
                     cells,
+                    metadata,
+                    notebook_type,
                 },
-            cell_text_documents: text_items,
+            cell_text_documents,
         }: types::DidOpenNotebookDocumentParams,
     ) -> Result<()> {
-        tracing::info!("DidOpenNotebook: {}", url);
-        show_err_msg!("DidOpenNotebook");
+        if notebook_type != "jupyter-notebook" {
+            return Err(anyhow!(
+                "Tried to open an unsupported notebook type: {notebook_type}"
+            ))
+            .with_failure_code(ErrorCode::InvalidParams);
+        }
+
+        let notebook = NotebookDocument::new(
+            version,
+            cells,
+            metadata.unwrap_or_default(),
+            cell_text_documents,
+        )
+        .with_failure_code(ErrorCode::InternalError)?;
+
+        let notebook_path = uri
+            .to_file_path()
+            .map_err(|()| anyhow!("expected notebook URI {uri} to be a valid file path"))
+            .with_failure_code(ErrorCode::InvalidParams)?;
+
+        session.open_notebook_document(notebook_path, notebook);
+
+        // publish diagnostics
+        let snapshot = session
+            .take_snapshot(&uri)
+            .expect("snapshot should be available");
+        publish_diagnostics_for_document(&snapshot, &notifier)?;
 
         Ok(())
     }

@@ -1,8 +1,10 @@
+use crate::edit::DocumentKey;
 use crate::server::api::diagnostics::publish_diagnostics_for_document;
 use crate::server::api::LSPResult;
 use crate::server::client::{Notifier, Requester};
 use crate::server::Result;
 use crate::session::Session;
+use lsp_server::ErrorCode;
 use lsp_types as types;
 use lsp_types::notification as notif;
 
@@ -13,22 +15,26 @@ impl super::NotificationHandler for DidChangeNotebook {
 }
 
 impl super::SyncNotificationHandler for DidChangeNotebook {
-    #[tracing::instrument(skip_all, fields(file=%uri))]
     fn run(
         session: &mut Session,
         notifier: Notifier,
         _requester: &mut Requester,
         types::DidChangeNotebookDocumentParams {
-            notebook_document:
-                types::VersionedNotebookDocumentIdentifier {
-                    uri,
-                    version: new_version,
-                },
-            change,
+            notebook_document: types::VersionedNotebookDocumentIdentifier { uri, version },
+            change: types::NotebookDocumentChangeEvent { cells, metadata },
         }: types::DidChangeNotebookDocumentParams,
     ) -> Result<()> {
-        tracing::info!("Notebook Changed: {}", uri);
-        show_err_msg!("Notebook Changed");
+        let key = DocumentKey::from_url(&uri);
+        session
+            .update_notebook_document(&key, cells, metadata, version)
+            .with_failure_code(ErrorCode::InternalError)?;
+
+        // publish new diagnostics
+        let snapshot = session
+            .take_snapshot(&uri)
+            .expect("snapshot should be available");
+        publish_diagnostics_for_document(&snapshot, &notifier)?;
+
         Ok(())
     }
 }

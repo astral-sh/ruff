@@ -3,10 +3,10 @@ use ruff_python_formatter::format_module_source;
 use ruff_text_size::TextRange;
 use ruff_workspace::FormatterSettings;
 
-use crate::edit::Document;
+use crate::edit::TextDocument;
 
 pub(crate) fn format(
-    document: &Document,
+    document: &TextDocument,
     formatter_settings: &FormatterSettings,
 ) -> crate::Result<String> {
     // TODO(jane): support Jupyter Notebook
@@ -17,7 +17,7 @@ pub(crate) fn format(
 }
 
 pub(crate) fn format_range(
-    document: &Document,
+    document: &TextDocument,
     formatter_settings: &FormatterSettings,
     range: TextRange,
 ) -> crate::Result<PrintedRange> {

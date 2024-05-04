@@ -21,6 +21,7 @@ ruff_python_codegen = { workspace = true }
 ruff_python_formatter = { workspace = true }
 ruff_python_index = { workspace = true }
 ruff_python_parser = { workspace = true }
+ruff_notebook = { path = "../ruff_notebook" }
 ruff_source_file = { workspace = true }
 ruff_text_size = { workspace = true }
 ruff_workspace = { workspace = true }

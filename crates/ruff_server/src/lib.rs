@@ -1,6 +1,6 @@
 //! ## The Ruff Language Server
 
-pub use edit::{Document, PositionEncoding};
+pub use edit::{PositionEncoding, TextDocument};
 use lsp_types::CodeActionKind;
 pub use server::Server;
 

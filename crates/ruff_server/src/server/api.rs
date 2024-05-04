@@ -90,6 +90,9 @@ pub(super) fn notification<'a>(notif: server::Notification) -> Task<'a> {
         notification::DidChangeNotebook::METHOD => {
             local_notification_task::<notification::DidChangeNotebook>(notif)
         }
+        notification::DidCloseNotebook::METHOD => {
+            local_notification_task::<notification::DidCloseNotebook>(notif)
+        }
         method => {
             tracing::warn!("Received notification {method} which does not have a handler.");
             return Task::nothing();

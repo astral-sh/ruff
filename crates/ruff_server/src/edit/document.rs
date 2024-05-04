@@ -7,10 +7,10 @@ use super::RangeExt;
 
 pub(crate) type DocumentVersion = i32;
 
-/// The state for an individual document in the server. Stays up-to-date
+/// The state of an individual document in the server. Stays up-to-date
 /// with changes made by the user, including unsaved changes.
 #[derive(Debug, Clone)]
-pub struct Document {
+pub struct TextDocument {
     /// The string contents of the document.
     contents: String,
     /// A computed line index for the document. This should always reflect
@@ -22,7 +22,7 @@ pub struct Document {
     version: DocumentVersion,
 }
 
-impl Document {
+impl TextDocument {
     pub fn new(contents: String, version: DocumentVersion) -> Self {
         let index = LineIndex::from_source_text(&contents);
         Self {
