@@ -165,7 +165,7 @@ impl<'a> ConfigurationTransformer for EditorConfigurationTransformer<'a> {
             ..Default::default()
         };
 
-        // Merge in the editor-specified configuration file, if it exists
+        // Merge in the editor-specified configuration file, if it exists.
         let editor_configuration = if let Some(config_file_path) = configuration {
             match open_configuration_file(&config_file_path, project_root) {
                 Ok(config_from_file) => editor_configuration.combine(config_from_file),
