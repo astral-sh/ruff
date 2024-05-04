@@ -35,7 +35,7 @@ pub enum IsolationLevel {
 }
 
 /// A collection of [`Edit`] elements to be applied to a source file.
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Fix {
     /// The [`Edit`] elements to be applied, sorted by [`Edit::start`] in ascending order.

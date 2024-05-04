@@ -13,7 +13,6 @@ use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use ruff_diagnostics::{Diagnostic, Edit};
 use ruff_python_trivia::{indentation_at_offset, CommentRanges};
 use ruff_source_file::{LineEnding, Locator};
-use rustc_hash::FxHashMap;
 
 use crate::codes::NoqaCode;
 use crate::fs::relativize_path;
@@ -33,13 +32,13 @@ pub fn generate_noqa_edits(
     external: &[String],
     noqa_line_for: &NoqaMapping,
     line_ending: LineEnding,
-) -> FxHashMap<Diagnostic, Edit> {
+) -> Vec<Option<Edit>> {
     let exemption =
         FileExemption::try_extract(locator.contents(), comment_ranges, external, path, locator);
     let directives = NoqaDirectives::from_commented_ranges(comment_ranges, path, locator);
     let comments =
         find_noqa_comments_by_line(diagnostics, locator, &exemption, &directives, noqa_line_for);
-    build_noqa_edits_by_diagnostic(comments, locator, line_ending)
+    build_noqa_edits_by_diagnostic(comments, diagnostics, locator, line_ending)
 }
 
 /// A directive to ignore a set of rules for a given line of Python source code (e.g.,
@@ -559,7 +558,18 @@ fn add_noqa_inner(
     let comments =
         find_noqa_comments_by_line(diagnostics, locator, &exemption, &directives, noqa_line_for);
 
-    let edits = build_noqa_edits_by_line(comments, locator, line_ending);
+    let edits = build_noqa_edits_by_line(
+        comments
+            .into_iter()
+            .flatten()
+            .sorted_by_key(|comment| comment.line)
+            .group_by(|comment| comment.line)
+            .into_iter()
+            .map(|(line, comments)| (line, comments.collect()))
+            .collect(),
+        locator,
+        line_ending,
+    );
 
     let contents = locator.contents();
 
@@ -585,24 +595,29 @@ fn add_noqa_inner(
 }
 
 fn build_noqa_edits_by_diagnostic(
-    matches_by_line: BTreeMap<TextSize, Vec<NoqaComment>>,
+    comments: Vec<Option<NoqaComment>>,
+    diagnostics: &[Diagnostic],
     locator: &Locator,
     line_ending: LineEnding,
-) -> FxHashMap<Diagnostic, Edit> {
-    let mut edits = FxHashMap::default();
-    for (offset, matches) in matches_by_line {
-        let line = locator.full_line(offset);
-        for noqa_match in matches {
-            if let Some(edit) = generate_noqa_edit(
-                noqa_match.directive,
-                offset,
-                RuleSet::from_rule(noqa_match.diagnostic.kind.rule()),
-                line,
-                locator.line_start(offset),
-                line_ending,
-            ) {
-                edits.insert(noqa_match.diagnostic.clone(), edit);
+) -> Vec<Option<Edit>> {
+    let mut edits = Vec::default();
+    for (i, comment) in comments.into_iter().enumerate() {
+        match comment {
+            Some(comment) => {
+                debug_assert_eq!(comment.diagnostic, &diagnostics[i]);
+                let line = locator.full_line(comment.line);
+                if let Some(edit) = generate_noqa_edit(
+                    comment.directive,
+                    comment.line,
+                    RuleSet::from_rule(comment.diagnostic.kind.rule()),
+                    line,
+                    locator.line_start(comment.line),
+                    line_ending,
+                ) {
+                    edits.push(Some(edit));
+                }
             }
+            None => edits.push(None),
         }
     }
     edits
@@ -639,6 +654,7 @@ fn build_noqa_edits_by_line(
 }
 
 struct NoqaComment<'a> {
+    line: TextSize,
     diagnostic: &'a Diagnostic,
     directive: Option<Directive<'a>>,
 }
@@ -649,20 +665,22 @@ fn find_noqa_comments_by_line<'a>(
     exemption: &Option<FileExemption>,
     directives: &'a NoqaDirectives,
     noqa_line_for: &NoqaMapping,
-) -> BTreeMap<TextSize, Vec<NoqaComment<'a>>> {
+) -> Vec<Option<NoqaComment<'a>>> {
     // Map of line start offset to set of (non-ignored) diagnostic codes that are triggered on that line.
-    let mut comments_by_line: BTreeMap<TextSize, Vec<NoqaComment>> = BTreeMap::default();
+    let mut comments_by_line: Vec<Option<NoqaComment<'a>>> = vec![];
 
     // Mark any non-ignored diagnostics.
     for diagnostic in diagnostics {
         match &exemption {
             Some(FileExemption::All) => {
                 // If the file is exempted, don't add any noqa directives.
+                comments_by_line.push(None);
                 continue;
             }
             Some(FileExemption::Codes(codes)) => {
                 // If the diagnostic is ignored by a global exemption, don't add a noqa directive.
                 if codes.contains(&diagnostic.kind.rule().noqa_code()) {
+                    comments_by_line.push(None);
                     continue;
                 }
             }
@@ -676,10 +694,12 @@ fn find_noqa_comments_by_line<'a>(
             {
                 match &directive_line.directive {
                     Directive::All(_) => {
+                        comments_by_line.push(None);
                         continue;
                     }
                     Directive::Codes(codes) => {
                         if codes.includes(diagnostic.kind.rule()) {
+                            comments_by_line.push(None);
                             continue;
                         }
                     }
@@ -693,18 +713,17 @@ fn find_noqa_comments_by_line<'a>(
         if let Some(directive_line) = directives.find_line_with_directive(noqa_offset) {
             match &directive_line.directive {
                 Directive::All(_) => {
+                    comments_by_line.push(None);
                     continue;
                 }
                 directive @ Directive::Codes(codes) => {
                     let rule = diagnostic.kind.rule();
                     if !codes.includes(rule) {
-                        comments_by_line
-                            .entry(directive_line.start())
-                            .or_default()
-                            .push(NoqaComment {
-                                diagnostic,
-                                directive: Some(directive.clone()),
-                            });
+                        comments_by_line.push(Some(NoqaComment {
+                            line: directive_line.start(),
+                            diagnostic,
+                            directive: Some(directive.clone()),
+                        }));
                     }
                     continue;
                 }
@@ -712,13 +731,11 @@ fn find_noqa_comments_by_line<'a>(
         }
 
         // There's no existing noqa directive that suppresses the diagnostic.
-        comments_by_line
-            .entry(locator.line_start(noqa_offset))
-            .or_default()
-            .push(NoqaComment {
-                diagnostic,
-                directive: None,
-            });
+        comments_by_line.push(Some(NoqaComment {
+            line: locator.line_start(noqa_offset),
+            diagnostic,
+            directive: None,
+        }));
     }
 
     comments_by_line

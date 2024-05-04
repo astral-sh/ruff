@@ -7,7 +7,7 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::Fix;
 
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct DiagnosticKind {
     /// The identifier of the diagnostic, used to align the diagnostic with a rule.
@@ -18,7 +18,7 @@ pub struct DiagnosticKind {
     pub suggestion: Option<String>,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Diagnostic {
     pub kind: DiagnosticKind,
     pub range: TextRange,
