@@ -1162,7 +1162,7 @@ mod tests {
         )];
 
         let contents = "x = 1";
-        let noqa_line_for: NoqaMapping = NoqaMapping::default();
+        let noqa_line_for = NoqaMapping::default();
         let (count, output) = add_noqa_inner(
             path,
             &diagnostics,
