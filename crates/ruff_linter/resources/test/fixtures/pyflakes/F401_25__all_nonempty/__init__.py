@@ -1,4 +1,4 @@
-"""__init__.py with __all__
+"""__init__.py with nonempty __all__
 
 Unused stdlib and third party imports are unsafe removals
 
