@@ -18,9 +18,9 @@ use crate::session::settings::{ConfigurationPreference, ResolvedEditorSettings};
 
 #[derive(Default)]
 pub(crate) struct RuffSettings {
-    // settings to pass into the ruff linter
+    /// Settings to pass into the Ruff linter.
     linter: ruff_linter::settings::LinterSettings,
-    // settings to pass into the ruff formatter
+    /// Settings to pass into the Ruff formatter.
     formatter: ruff_workspace::FormatterSettings,
 }
 
@@ -110,7 +110,10 @@ impl RuffSettingsIndex {
             return settings.clone();
         }
 
-        tracing::info!("No ruff settings file (pyproject.toml/ruff.toml/.ruff.toml) found for {} - falling back to default configuration", document_path.display());
+        tracing::info!(
+            "No Ruff settings file found for {}; falling back to default configuration",
+            document_path.display()
+        );
 
         self.fallback.clone()
     }
@@ -119,10 +122,7 @@ impl RuffSettingsIndex {
 struct EditorConfigurationTransformer<'a>(&'a ResolvedEditorSettings, &'a Path);
 
 impl<'a> ConfigurationTransformer for EditorConfigurationTransformer<'a> {
-    fn transform(
-        &self,
-        filesystem_configuration: ruff_workspace::configuration::Configuration,
-    ) -> ruff_workspace::configuration::Configuration {
+    fn transform(&self, filesystem_configuration: Configuration) -> Configuration {
         let ResolvedEditorSettings {
             configuration,
             format_preview,
@@ -144,13 +144,13 @@ impl<'a> ConfigurationTransformer for EditorConfigurationTransformer<'a> {
                     select,
                     extend_select: extend_select.unwrap_or_default(),
                     ignore: ignore.unwrap_or_default(),
-                    ..Default::default()
+                    ..RuleSelection::default()
                 }],
-                ..Default::default()
+                ..LintConfiguration::default()
             },
             format: FormatConfiguration {
                 preview: format_preview.map(PreviewMode::from),
-                ..Default::default()
+                ..FormatConfiguration::default()
             },
             exclude: exclude.map(|exclude| {
                 exclude
@@ -162,15 +162,15 @@ impl<'a> ConfigurationTransformer for EditorConfigurationTransformer<'a> {
                     .collect()
             }),
             line_length,
-            ..Default::default()
+            ..Configuration::default()
         };
 
-        // Merge in the editor-specified configuration file, if it exists
+        // Merge in the editor-specified configuration file, if it exists.
         let editor_configuration = if let Some(config_file_path) = configuration {
             match open_configuration_file(&config_file_path, project_root) {
                 Ok(config_from_file) => editor_configuration.combine(config_from_file),
                 Err(err) => {
-                    tracing::error!("Unable to find editor-specified configuration file {err}");
+                    tracing::error!("Unable to find editor-specified configuration file: {err}");
                     editor_configuration
                 }
             }
