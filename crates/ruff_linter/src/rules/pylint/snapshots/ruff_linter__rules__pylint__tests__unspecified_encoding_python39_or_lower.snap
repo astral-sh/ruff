@@ -473,5 +473,51 @@ unspecified_encoding.py:68:1: PLW1514 [*] `open` in text mode without explicit `
    70 |+    (("test.txt")), encoding=locale.getpreferredencoding(False),
 70 71 |     # comment
 71 72 | )
+72 73 | 
 
+unspecified_encoding.py:77:1: PLW1514 [*] `pathlib.Path.open` in text mode without explicit `encoding` argument
+   |
+76 | # Errors.
+77 | Path("foo.txt").open()
+   | ^^^^^^^^^^^^^^^^^^^^ PLW1514
+78 | Path("foo.txt").open("w")
+   |
+   = help: Add explicit `encoding` argument
 
+ℹ Unsafe fix
+72 72 | 
+73 73 | # Pathlib
+74 74 | from pathlib import Path
+   75 |+import locale
+75 76 | 
+76 77 | # Errors.
+77    |-Path("foo.txt").open()
+   78 |+Path("foo.txt").open(encoding=locale.getpreferredencoding(False))
+78 79 | Path("foo.txt").open("w")
+79 80 | 
+80 81 | # Non-errors.
+
+unspecified_encoding.py:78:1: PLW1514 [*] `pathlib.Path.open` in text mode without explicit `encoding` argument
+   |
+76 | # Errors.
+77 | Path("foo.txt").open()
+78 | Path("foo.txt").open("w")
+   | ^^^^^^^^^^^^^^^^^^^^ PLW1514
+79 | 
+80 | # Non-errors.
+   |
+   = help: Add explicit `encoding` argument
+
+ℹ Unsafe fix
+72 72 | 
+73 73 | # Pathlib
+74 74 | from pathlib import Path
+   75 |+import locale
+75 76 | 
+76 77 | # Errors.
+77 78 | Path("foo.txt").open()
+78    |-Path("foo.txt").open("w")
+   79 |+Path("foo.txt").open("w", encoding=locale.getpreferredencoding(False))
+79 80 | 
+80 81 | # Non-errors.
+81 82 | Path("foo.txt").open(encoding="utf-8")

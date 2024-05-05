@@ -77,13 +77,63 @@ pub(crate) fn unspecified_encoding(checker: &mut Checker, call: &ast::ExprCall) 
         .filter(|qualified_name| is_violation(call, qualified_name))
         .map(|qualified_name| (qualified_name.to_string(), Mode::from(&qualified_name)))
     else {
-        return;
+        return check_pathlib(checker, call);
     };
 
     let mut diagnostic = Diagnostic::new(
         UnspecifiedEncoding {
             function_name,
             mode,
+        },
+        call.func.range(),
+    );
+
+    if checker.settings.target_version >= PythonVersion::Py310 {
+        diagnostic.set_fix(generate_keyword_fix(checker, call));
+    } else {
+        diagnostic.try_set_fix(|| generate_import_fix(checker, call));
+    }
+
+    checker.diagnostics.push(diagnostic);
+}
+
+fn check_pathlib(checker: &mut Checker, call: &ast::ExprCall) {
+    let Expr::Attribute(ast::ExprAttribute { attr, value, .. }) = call.func.as_ref() else {
+        return;
+    };
+
+    if attr != "open" {
+        return;
+    }
+
+    let Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() else {
+        return;
+    };
+
+    if !checker
+        .semantic()
+        .resolve_qualified_name(func)
+        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["pathlib", "Path"]))
+    {
+        return;
+    }
+
+    if let Some(mode_arg) = call.arguments.find_argument("mode", 0) {
+        if is_binary_mode(mode_arg).unwrap_or(true) {
+            // binary mode or unknown mode is no violation
+            return;
+        }
+    }
+
+    if call.arguments.find_argument("encoding", 2).is_some() {
+        // encoding specified so no violation
+        return;
+    }
+
+    let mut diagnostic = Diagnostic::new(
+        UnspecifiedEncoding {
+            function_name: "pathlib.Path.open".to_string(),
+            mode: Mode::Supported,
         },
         call.func.range(),
     );

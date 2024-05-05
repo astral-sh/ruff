@@ -69,3 +69,18 @@ open(
     (("test.txt")),
     # comment
 )
+
+# Pathlib
+from pathlib import Path
+
+# Errors.
+Path("foo.txt").open()
+Path("foo.txt").open("w")
+
+# Non-errors.
+Path("foo.txt").open(encoding="utf-8")
+Path("foo.txt").open("wb")
+
+# Violation but not detectable
+x = Path("foo.txt")
+x.open()
