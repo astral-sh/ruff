@@ -2062,7 +2062,10 @@ impl<'a> Checker<'a> {
 
                     self.semantic.restore(snapshot);
 
-                    if self.semantic.in_annotation() && self.semantic.future_annotations() {
+                    if self.semantic.in_annotation()
+                        && (self.semantic.in_typing_only_context()
+                            || self.semantic.future_annotations())
+                    {
                         if self.enabled(Rule::QuotedAnnotation) {
                             pyupgrade::rules::quoted_annotation(self, value, range);
                         }
