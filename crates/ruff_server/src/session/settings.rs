@@ -274,9 +274,7 @@ impl ResolvedClientSettings {
                         .map(|rule| RuleSelector::from_str(rule).ok())
                         .collect()
                 }),
-                exclude: Self::resolve_optional(all_settings, |settings| {
-                    Some(settings.exclude.as_ref()?.clone())
-                }),
+                exclude: Self::resolve_optional(all_settings, |settings| settings.exclude.clone()),
                 line_length: Self::resolve_optional(all_settings, |settings| settings.line_length),
                 configuration_preference: Self::resolve_or(
                     all_settings,
