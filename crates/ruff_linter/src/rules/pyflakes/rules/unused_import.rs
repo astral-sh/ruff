@@ -205,6 +205,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
         };
 
         let import = ImportBinding {
+            name: binding.name(checker.locator()),
             import,
             range: binding.range(),
             parent_range: binding.parent_range(checker.semantic()),
@@ -342,6 +343,8 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
 /// An unused import with its surrounding context.
 #[derive(Debug)]
 struct ImportBinding<'a> {
+    /// Name of the binding, which for renamed imports will differ from the qualified name.
+    name: &'a str,
     /// The qualified name of the import (e.g., `typing.List` for `from typing import List`).
     import: AnyImport<'a, 'a>,
     /// The trimmed range of the import (e.g., `List` in `from typing import List`).
