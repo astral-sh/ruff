@@ -700,9 +700,19 @@ pub fn walk_pattern<V: Transformer + ?Sized>(visitor: &V, pattern: &mut Pattern)
                 visitor.visit_pattern(pattern);
             }
         }
-        Pattern::MatchMapping(ast::PatternMatchMapping { items, .. }) => {
-            for ast::MatchMappingItem { key, pattern } in items {
+        Pattern::MatchMapping(match_mapping_pattern) => {
+            for key in match_mapping_pattern
+                .items
+                .iter_mut()
+                .map(|item| &mut item.key)
+            {
                 visitor.visit_expr(key);
+            }
+            for pattern in match_mapping_pattern
+                .items
+                .iter_mut()
+                .map(|item| &mut item.pattern)
+            {
                 visitor.visit_pattern(pattern);
             }
         }
