@@ -174,8 +174,8 @@ impl<'a> StringLiteralDisplay<'a> {
                     display_kind,
                 }
             }
-            ast::Expr::Dict(dict) => {
-                let mut narrowed_keys = Vec::with_capacity(dict.items.len());
+            ast::Expr::Dict(dict @ ast::ExprDict { items, range }) => {
+                let mut narrowed_keys = Vec::with_capacity(items.len());
                 for key in dict.iter_keys() {
                     if let Some(key) = key {
                         // This is somewhat unfortunate,
@@ -189,11 +189,11 @@ impl<'a> StringLiteralDisplay<'a> {
                 // `__slots__ = {"foo": "bar", **other_dict}`
                 // If `None` wasn't present in the keys,
                 // the length of the keys should always equal the length of the values
-                assert_eq!(narrowed_keys.len(), dict.items.len());
+                assert_eq!(narrowed_keys.len(), items.len());
                 Self {
                     elts: Cow::Owned(narrowed_keys),
-                    range: dict.range(),
-                    display_kind: DisplayKind::Dict { node: dict },
+                    range: *range,
+                    display_kind: DisplayKind::Dict { items },
                 }
             }
             _ => return None,
@@ -223,8 +223,8 @@ impl<'a> StringLiteralDisplay<'a> {
                 locator,
                 SORTING_STYLE,
             ),
-            (DisplayKind::Dict { node }, false) => {
-                sort_single_line_elements_dict(&self.elts, elements, node, locator)
+            (DisplayKind::Dict { items }, false) => {
+                sort_single_line_elements_dict(&self.elts, elements, items, locator)
             }
         };
         Some(Fix::safe_edit(Edit::range_replacement(
@@ -240,7 +240,7 @@ impl<'a> StringLiteralDisplay<'a> {
 #[derive(Debug)]
 enum DisplayKind<'a> {
     Sequence(SequenceKind),
-    Dict { node: &'a ast::ExprDict },
+    Dict { items: &'a [ast::DictItem] },
 }
 
 /// A newtype that zips together three iterables:
@@ -257,18 +257,14 @@ enum DisplayKind<'a> {
 struct DictElements<'a>(Vec<(&'a &'a str, &'a ast::Expr, &'a ast::Expr)>);
 
 impl<'a> DictElements<'a> {
-    fn new(
-        elements: &'a [&str],
-        key_elts: &'a [ast::Expr],
-        value_elts: impl ExactSizeIterator<Item = &'a ast::Expr>,
-    ) -> Self {
+    fn new(elements: &'a [&str], key_elts: &'a [ast::Expr], items: &'a [ast::DictItem]) -> Self {
         assert_eq!(key_elts.len(), elements.len());
-        assert_eq!(elements.len(), value_elts.len());
+        assert_eq!(elements.len(), items.len());
         assert!(
             elements.len() >= 2,
             "A sequence with < 2 elements cannot be unsorted"
         );
-        Self(izip!(elements, key_elts, value_elts).collect())
+        Self(izip!(elements, key_elts, items.iter().map(|item| &item.value)).collect())
     }
 
     fn last_item_index(&self) -> usize {
@@ -296,10 +292,10 @@ impl<'a> DictElements<'a> {
 fn sort_single_line_elements_dict<'a>(
     key_elts: &'a [ast::Expr],
     elements: &'a [&str],
-    original_node: &'a ast::ExprDict,
+    original_items: &'a [ast::DictItem],
     locator: &Locator,
 ) -> String {
-    let element_trios = DictElements::new(elements, key_elts, original_node.iter_values());
+    let element_trios = DictElements::new(elements, key_elts, original_items);
     let last_item_index = element_trios.last_item_index();
     let mut result = String::from('{');
     // We grab the original source-code ranges using `locator.slice()`
