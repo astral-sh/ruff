@@ -323,21 +323,16 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
 
     // Separately, generate a diagnostic for every _ignored_ import, to ensure that the
     // suppression comments aren't marked as unused.
-    for ImportBinding {
-        import,
-        range,
-        parent_range,
-    } in ignored.into_values().flatten()
-    {
+    for binding in ignored.into_values().flatten() {
         let mut diagnostic = Diagnostic::new(
             UnusedImport {
-                name: import.qualified_name().to_string(),
+                name: binding.import.qualified_name().to_string(),
                 context: None,
                 multiple: false,
             },
-            range,
+            binding.range,
         );
-        if let Some(range) = parent_range {
+        if let Some(range) = binding.parent_range {
             diagnostic.set_parent(range.start());
         }
         diagnostics.push(diagnostic);
