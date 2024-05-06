@@ -4,3 +4,12 @@
 """;
 
 "another normal string"
+
+
+def compound_statement():
+    """
+    This is a docstring in a notebook
+    """;
+
+    b = "Another normal string"
+    pass

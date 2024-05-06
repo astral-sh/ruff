@@ -76,6 +76,7 @@ pub fn lines_after(offset: TextSize, code: &str) -> u32 {
                 cursor.eat_char('\n');
                 newlines += 1;
             }
+            ';' => continue,
             c if is_python_whitespace(c) => {
                 continue;
             }
@@ -1426,6 +1427,14 @@ mod tests {
         assert_eq!(
             lines_after(TextSize::new(6), "a = 20\n# some comment\nb = 10"),
             1
+        );
+    }
+
+    #[test]
+    fn lines_after_multiline_string_semi_delimiter() {
+        assert_eq!(
+            lines_after(TextSize::new(19), "a=\"\"\"hello world\"\"\";\n\n\nb = 10"),
+            3
         );
     }
 

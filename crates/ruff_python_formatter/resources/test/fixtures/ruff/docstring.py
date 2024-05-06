@@ -155,3 +155,12 @@ class TabbedIndent:
 def single_quoted():
     ' content\     '
     return
+
+
+def multiline_semi():
+    """
+    This is a multiline string ending with a semicolon
+    """;
+
+    a = "Another normal string"
+    pass

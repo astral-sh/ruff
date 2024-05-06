@@ -1,0 +1,24 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/module_trailing_semi.py
+---
+## Input
+```python
+"""
+    This is a multiline docstring
+    ending with a useless semicolon.
+""";
+
+
+"Another string. Keep the distance between 'a' and 'b'."
+```
+
+## Output
+```python
+"""
+This is a multiline docstring
+ending with a useless semicolon.
+"""
+
+"Another string. Keep the distance between 'a' and 'b'."
+```
