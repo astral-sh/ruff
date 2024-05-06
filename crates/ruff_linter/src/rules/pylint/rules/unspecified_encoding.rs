@@ -102,10 +102,6 @@ fn check_pathlib(checker: &mut Checker, call: &ast::ExprCall) {
         return;
     };
 
-    if attr != "open" {
-        return;
-    }
-
     let Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() else {
         return;
     };
@@ -118,22 +114,46 @@ fn check_pathlib(checker: &mut Checker, call: &ast::ExprCall) {
         return;
     }
 
-    if let Some(mode_arg) = call.arguments.find_argument("mode", 0) {
-        if is_binary_mode(mode_arg).unwrap_or(true) {
-            // binary mode or unknown mode is no violation
-            return;
+    match attr.as_str() {
+        "open" => {
+            if let Some(mode_arg) = call.arguments.find_argument("mode", 0) {
+                if is_binary_mode(mode_arg).unwrap_or(true) {
+                    // binary mode or unknown mode is no violation
+                    return;
+                }
+            }
+
+            if call.arguments.find_argument("encoding", 2).is_some() {
+                // encoding specified so no violation
+                return;
+            }
         }
+        "read_text" => {
+            if call.arguments.find_argument("encoding", 0).is_some() {
+                // encoding specified so no violation
+                return;
+            }
+        }
+        "write_text" => {
+            if call.arguments.find_argument("encoding", 1).is_some() {
+                // encoding specified so no violation
+                return;
+            }
+        }
+        _ => return,
     }
 
-    if call.arguments.find_argument("encoding", 2).is_some() {
-        // encoding specified so no violation
-        return;
-    }
+    let function_name = format!("pathlib.Path.{attr}");
+    let mode = if attr == "open" {
+        Mode::Supported
+    } else {
+        Mode::Unsupported
+    };
 
     let mut diagnostic = Diagnostic::new(
         UnspecifiedEncoding {
-            function_name: "pathlib.Path.open".to_string(),
-            mode: Mode::Supported,
+            function_name,
+            mode,
         },
         call.func.range(),
     );

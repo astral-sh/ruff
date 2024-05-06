@@ -70,16 +70,20 @@ open(
     # comment
 )
 
-# Pathlib
+# pathlib
 from pathlib import Path
 
 # Errors.
 Path("foo.txt").open()
 Path("foo.txt").open("w")
+text = Path("foo.txt").read_text()
+Path("foo.txt").write_text(text)
 
 # Non-errors.
 Path("foo.txt").open(encoding="utf-8")
 Path("foo.txt").open("wb")
+text = Path("foo.txt").read_text(encoding="utf-8")
+Path("foo.txt").write_text(text, encoding="utf-8")
 
 # Violation but not detectable
 x = Path("foo.txt")
