@@ -10,7 +10,7 @@ use crate::db::query::QueryResult;
 /// `Database` trait and the jar allows to write queries in isolation without having to know how they get composed at the upper levels.
 ///
 /// Salsa further defines a `HasIngredient` trait which slices the jar to a specific storage (e.g. a specific cache).
-/// We don't need this just jet because we write our queries by hand. We may want a similar trait if we decide
+/// We don't need this just yet because we write our queries by hand. We may want a similar trait if we decide
 /// to use a macro to generate the queries.
 pub trait HasJar<T> {
     /// Gives a read-only reference to the jar.
