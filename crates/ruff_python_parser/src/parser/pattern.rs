@@ -173,7 +173,8 @@ impl<'src> Parser<'src> {
         let start = self.node_start();
         self.bump(TokenKind::Lbrace);
 
-        let mut items = vec![];
+        let mut keys = vec![];
+        let mut patterns = vec![];
         let mut rest = None;
 
         self.parse_comma_separated_list(RecoveryContextKind::MatchPatternMapping, |parser| {
@@ -217,13 +218,11 @@ impl<'src> Parser<'src> {
                         recovery::pattern_to_expr(pattern)
                     }
                 };
+                keys.push(key);
 
                 parser.expect(TokenKind::Colon);
 
-                items.push(ast::MatchMappingItem {
-                    key,
-                    pattern: parser.parse_match_pattern(AllowStarPattern::No),
-                });
+                patterns.push(parser.parse_match_pattern(AllowStarPattern::No));
 
                 if rest.is_some() {
                     parser.add_error(
@@ -240,7 +239,8 @@ impl<'src> Parser<'src> {
 
         ast::PatternMatchMapping {
             range: self.node_range(start),
-            items,
+            keys,
+            patterns,
             rest,
         }
     }

@@ -3797,11 +3797,12 @@ impl AstNode for ast::PatternMatchMapping {
         V: PreorderVisitor<'a> + ?Sized,
     {
         let ast::PatternMatchMapping {
-            items,
+            keys,
+            patterns,
             range: _,
             rest: _,
         } = self;
-        for ast::MatchMappingItem { key, pattern } in items {
+        for (key, pattern) in keys.iter().zip(patterns) {
             visitor.visit_expr(key);
             visitor.visit_pattern(pattern);
         }

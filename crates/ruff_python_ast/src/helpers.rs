@@ -288,10 +288,11 @@ pub fn any_over_pattern(pattern: &Pattern, func: &dyn Fn(&Expr) -> bool) -> bool
         Pattern::MatchSequence(ast::PatternMatchSequence { patterns, range: _ }) => patterns
             .iter()
             .any(|pattern| any_over_pattern(pattern, func)),
-        Pattern::MatchMapping(ast::PatternMatchMapping { items, .. }) => {
-            items.iter().any(|ast::MatchMappingItem { key, pattern }| {
-                any_over_expr(key, func) || any_over_pattern(pattern, func)
-            })
+        Pattern::MatchMapping(ast::PatternMatchMapping { keys, patterns, .. }) => {
+            keys.iter().any(|key| any_over_expr(key, func))
+                || patterns
+                    .iter()
+                    .any(|pattern| any_over_pattern(pattern, func))
         }
         Pattern::MatchClass(ast::PatternMatchClass { cls, arguments, .. }) => {
             any_over_expr(cls, func)

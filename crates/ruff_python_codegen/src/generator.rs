@@ -679,13 +679,14 @@ impl<'a> Generator<'a> {
                 self.p("]");
             }
             Pattern::MatchMapping(ast::PatternMatchMapping {
-                items,
+                keys,
+                patterns,
                 rest,
                 range: _,
             }) => {
                 self.p("{");
                 let mut first = true;
-                for ast::MatchMappingItem { key, pattern } in items {
+                for (key, pattern) in keys.iter().zip(patterns) {
                     self.p_delim(&mut first, ", ");
                     self.unparse_expr(key, precedence::MAX);
                     self.p(": ");

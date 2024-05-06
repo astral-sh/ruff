@@ -274,61 +274,59 @@ Module(
                             pattern: MatchMapping(
                                 PatternMatchMapping {
                                     range: 233..254,
-                                    items: [
-                                        MatchMappingItem {
-                                            key: BooleanLiteral(
-                                                ExprBooleanLiteral {
-                                                    range: 234..238,
-                                                    value: true,
-                                                },
-                                            ),
-                                            pattern: MatchValue(
-                                                PatternMatchValue {
-                                                    range: 240..242,
-                                                    value: UnaryOp(
-                                                        ExprUnaryOp {
-                                                            range: 240..242,
-                                                            op: UAdd,
-                                                            operand: NumberLiteral(
-                                                                ExprNumberLiteral {
-                                                                    range: 241..242,
-                                                                    value: Int(
-                                                                        1,
-                                                                    ),
-                                                                },
-                                                            ),
-                                                        },
-                                                    ),
-                                                },
-                                            ),
-                                        },
-                                        MatchMappingItem {
-                                            key: BooleanLiteral(
-                                                ExprBooleanLiteral {
-                                                    range: 244..249,
-                                                    value: false,
-                                                },
-                                            ),
-                                            pattern: MatchValue(
-                                                PatternMatchValue {
-                                                    range: 251..253,
-                                                    value: UnaryOp(
-                                                        ExprUnaryOp {
-                                                            range: 251..253,
-                                                            op: USub,
-                                                            operand: NumberLiteral(
-                                                                ExprNumberLiteral {
-                                                                    range: 252..253,
-                                                                    value: Int(
-                                                                        2,
-                                                                    ),
-                                                                },
-                                                            ),
-                                                        },
-                                                    ),
-                                                },
-                                            ),
-                                        },
+                                    keys: [
+                                        BooleanLiteral(
+                                            ExprBooleanLiteral {
+                                                range: 234..238,
+                                                value: true,
+                                            },
+                                        ),
+                                        BooleanLiteral(
+                                            ExprBooleanLiteral {
+                                                range: 244..249,
+                                                value: false,
+                                            },
+                                        ),
+                                    ],
+                                    patterns: [
+                                        MatchValue(
+                                            PatternMatchValue {
+                                                range: 240..242,
+                                                value: UnaryOp(
+                                                    ExprUnaryOp {
+                                                        range: 240..242,
+                                                        op: UAdd,
+                                                        operand: NumberLiteral(
+                                                            ExprNumberLiteral {
+                                                                range: 241..242,
+                                                                value: Int(
+                                                                    1,
+                                                                ),
+                                                            },
+                                                        ),
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                        MatchValue(
+                                            PatternMatchValue {
+                                                range: 251..253,
+                                                value: UnaryOp(
+                                                    ExprUnaryOp {
+                                                        range: 251..253,
+                                                        op: USub,
+                                                        operand: NumberLiteral(
+                                                            ExprNumberLiteral {
+                                                                range: 252..253,
+                                                                value: Int(
+                                                                    2,
+                                                                ),
+                                                            },
+                                                        ),
+                                                    },
+                                                ),
+                                            },
+                                        ),
                                     ],
                                     rest: None,
                                 },
