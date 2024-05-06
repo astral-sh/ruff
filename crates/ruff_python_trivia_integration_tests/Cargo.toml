@@ -12,6 +12,7 @@ license.workspace = true
 [dependencies]
 
 [dev-dependencies]
+ruff_python_index = { path = "../ruff_python_index" }
 ruff_python_parser = { path = "../ruff_python_parser" }
 ruff_python_trivia = { path = "../ruff_python_trivia" }
 ruff_source_file = { path = "../ruff_source_file" }
