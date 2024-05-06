@@ -21,7 +21,7 @@ __init__.py:11:26: F401 [*] `.renamed` imported but unused; consider removing, a
 11 | from . import renamed as bees # F401: add to __all__
    |                          ^^^^ F401
    |
-   = help: Add unused import to __all__: `.renamed`
+   = help: Add unused import to __all__: `bees`
 
 ℹ Safe fix
 12 12 | 

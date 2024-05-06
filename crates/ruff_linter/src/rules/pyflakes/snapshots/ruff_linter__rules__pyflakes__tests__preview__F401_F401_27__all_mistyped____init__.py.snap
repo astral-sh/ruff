@@ -23,4 +23,4 @@ __init__.py:8:26: F401 `.renamed` imported but unused; consider removing, adding
 8 | from . import renamed as bees # F401: change to redundant alias b/c __all__ cannot be located
   |                          ^^^^ F401
   |
-  = help: Use a redundant alias: `.renamed`
+  = help: Use a redundant alias: `bees`
