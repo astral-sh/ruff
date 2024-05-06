@@ -1,7 +1,8 @@
 #![allow(dead_code)]
 use crate::ast_ids::NodeKey;
+use crate::db::{HasJar, QueryResult, SemanticDb, SemanticJar};
 use crate::files::FileId;
-use crate::symbols::SymbolId;
+use crate::symbols::{ScopeId, SymbolId};
 use crate::{FxDashMap, FxIndexSet, Name};
 use ruff_index::{newtype_index, IndexVec};
 use rustc_hash::FxHashMap;
@@ -124,8 +125,15 @@ impl TypeStore {
             .add_function(name, decorators)
     }
 
-    fn add_class(&self, file_id: FileId, name: &str, bases: Vec<Type>) -> ClassTypeId {
-        self.add_or_get_module(file_id).add_class(name, bases)
+    fn add_class(
+        &self,
+        file_id: FileId,
+        name: &str,
+        scope_id: ScopeId,
+        bases: Vec<Type>,
+    ) -> ClassTypeId {
+        self.add_or_get_module(file_id)
+            .add_class(name, scope_id, bases)
     }
 
     fn add_union(&mut self, file_id: FileId, elems: &[Type]) -> UnionTypeId {
@@ -253,6 +261,24 @@ pub struct ClassTypeId {
     class_id: ModuleClassTypeId,
 }
 
+impl ClassTypeId {
+    fn get_own_class_member<Db>(self, db: &Db, name: &Name) -> QueryResult<Option<Type>>
+    where
+        Db: SemanticDb + HasJar<SemanticJar>,
+    {
+        // TODO: this should distinguish instance-only members (e.g. `x: int`) and not return them
+        let ClassType { scope_id, .. } = *db.jar()?.type_store.get_class(self);
+        let table = db.symbol_table(self.file_id)?;
+        if let Some(symbol_id) = table.symbol_id_by_name(scope_id, name) {
+            Ok(Some(db.infer_symbol_type(self.file_id, symbol_id)?))
+        } else {
+            Ok(None)
+        }
+    }
+
+    // TODO: get_own_instance_member, get_class_member, get_instance_member
+}
+
 #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
 pub struct UnionTypeId {
     file_id: FileId,
@@ -318,9 +344,10 @@ impl ModuleTypeStore {
         }
     }
 
-    fn add_class(&mut self, name: &str, bases: Vec<Type>) -> ClassTypeId {
+    fn add_class(&mut self, name: &str, scope_id: ScopeId, bases: Vec<Type>) -> ClassTypeId {
         let class_id = self.classes.push(ClassType {
             name: Name::new(name),
+            scope_id,
             // TODO: if no bases are given, that should imply [object]
             bases,
         });
@@ -405,7 +432,11 @@ impl std::fmt::Display for DisplayType<'_> {
 
 #[derive(Debug)]
 pub(crate) struct ClassType {
+    /// Name of the class at definition
     name: Name,
+    /// `ScopeId` of the class body
+    pub(crate) scope_id: ScopeId,
+    /// Types of all class bases
     bases: Vec<Type>,
 }
 
@@ -496,6 +527,7 @@ impl IntersectionType {
 #[cfg(test)]
 mod tests {
     use crate::files::Files;
+    use crate::symbols::SymbolTable;
     use crate::types::{Type, TypeStore};
     use crate::FxIndexSet;
     use std::path::Path;
@@ -505,7 +537,7 @@ mod tests {
         let store = TypeStore::default();
         let files = Files::default();
         let file_id = files.intern(Path::new("/foo"));
-        let id = store.add_class(file_id, "C", Vec::new());
+        let id = store.add_class(file_id, "C", SymbolTable::root_scope_id(), Vec::new());
         assert_eq!(store.get_class(id).name(), "C");
         let inst = Type::Instance(id);
         assert_eq!(format!("{}", inst.display(&store)), "C");
@@ -528,8 +560,8 @@ mod tests {
         let mut store = TypeStore::default();
         let files = Files::default();
         let file_id = files.intern(Path::new("/foo"));
-        let c1 = store.add_class(file_id, "C1", Vec::new());
-        let c2 = store.add_class(file_id, "C2", Vec::new());
+        let c1 = store.add_class(file_id, "C1", SymbolTable::root_scope_id(), Vec::new());
+        let c2 = store.add_class(file_id, "C2", SymbolTable::root_scope_id(), Vec::new());
         let elems = vec![Type::Instance(c1), Type::Instance(c2)];
         let id = store.add_union(file_id, &elems);
         assert_eq!(
@@ -545,9 +577,9 @@ mod tests {
         let mut store = TypeStore::default();
         let files = Files::default();
         let file_id = files.intern(Path::new("/foo"));
-        let c1 = store.add_class(file_id, "C1", Vec::new());
-        let c2 = store.add_class(file_id, "C2", Vec::new());
-        let c3 = store.add_class(file_id, "C3", Vec::new());
+        let c1 = store.add_class(file_id, "C1", SymbolTable::root_scope_id(), Vec::new());
+        let c2 = store.add_class(file_id, "C2", SymbolTable::root_scope_id(), Vec::new());
+        let c3 = store.add_class(file_id, "C3", SymbolTable::root_scope_id(), Vec::new());
         let pos = vec![Type::Instance(c1), Type::Instance(c2)];
         let neg = vec![Type::Instance(c3)];
         let id = store.add_intersection(file_id, &pos, &neg);

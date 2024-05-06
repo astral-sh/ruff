@@ -1,5 +1,53 @@
 # Changelog
 
+## 0.4.3
+
+### Enhancements
+
+- Add support for PEP 696 syntax ([#11120](https://github.com/astral-sh/ruff/pull/11120))
+
+### Preview features
+
+- \[`refurb`\] Use function range for `reimplemented-operator` diagnostics ([#11271](https://github.com/astral-sh/ruff/pull/11271))
+- \[`refurb`\] Ignore methods in `reimplemented-operator` (`FURB118`) ([#11270](https://github.com/astral-sh/ruff/pull/11270))
+- \[`refurb`\] Implement `fstring-number-format` (`FURB116`) ([#10921](https://github.com/astral-sh/ruff/pull/10921))
+- \[`ruff`\] Implement `redirected-noqa` (`RUF101`) ([#11052](https://github.com/astral-sh/ruff/pull/11052))
+- \[`pyflakes`\] Distinguish between first-party and third-party imports for fix suggestions ([#11168](https://github.com/astral-sh/ruff/pull/11168))
+
+### Rule changes
+
+- \[`flake8-bugbear`\] Ignore non-abstract class attributes when enforcing `B024` ([#11210](https://github.com/astral-sh/ruff/pull/11210))
+- \[`flake8-logging`\] Include inline instantiations when detecting loggers ([#11154](https://github.com/astral-sh/ruff/pull/11154))
+- \[`pylint`\] Also emit `PLR0206` for properties with variadic parameters ([#11200](https://github.com/astral-sh/ruff/pull/11200))
+- \[`ruff`\] Detect duplicate codes as part of `unused-noqa` (`RUF100`) ([#10850](https://github.com/astral-sh/ruff/pull/10850))
+
+### Formatter
+
+- Avoid multiline expression if format specifier is present ([#11123](https://github.com/astral-sh/ruff/pull/11123))
+
+### LSP
+
+- Write `ruff server` setup guide for Helix ([#11183](https://github.com/astral-sh/ruff/pull/11183))
+- `ruff server` no longer hangs after shutdown ([#11222](https://github.com/astral-sh/ruff/pull/11222))
+- `ruff server` reads from a configuration TOML file in the user configuration directory if no local configuration exists ([#11225](https://github.com/astral-sh/ruff/pull/11225))
+- `ruff server` respects `per-file-ignores` configuration ([#11224](https://github.com/astral-sh/ruff/pull/11224))
+- `ruff server`: Support a custom TOML configuration file ([#11140](https://github.com/astral-sh/ruff/pull/11140))
+- `ruff server`: Support setting to prioritize project configuration over editor configuration ([#11086](https://github.com/astral-sh/ruff/pull/11086))
+
+### Bug fixes
+
+- Avoid debug assertion around NFKC renames ([#11249](https://github.com/astral-sh/ruff/pull/11249))
+- \[`pyflakes`\] Prioritize `redefined-while-unused` over `unused-import` ([#11173](https://github.com/astral-sh/ruff/pull/11173))
+- \[`ruff`\] Respect `async` expressions in comprehension bodies ([#11219](https://github.com/astral-sh/ruff/pull/11219))
+- \[`pygrep_hooks`\] Fix `blanket-noqa` panic when last line has noqa with no newline (`PGH004`) ([#11108](https://github.com/astral-sh/ruff/pull/11108))
+- \[`perflint`\] Ignore list-copy recommendations for async `for` loops ([#11250](https://github.com/astral-sh/ruff/pull/11250))
+- \[`pyflakes`\] Improve `invalid-print-syntax` documentation ([#11171](https://github.com/astral-sh/ruff/pull/11171))
+
+### Performance
+
+- Avoid allocations for isort module names ([#11251](https://github.com/astral-sh/ruff/pull/11251))
+- Build a separate ARM wheel for macOS ([#11149](https://github.com/astral-sh/ruff/pull/11149))
+
 ## 0.4.2
 
 ### Rule changes

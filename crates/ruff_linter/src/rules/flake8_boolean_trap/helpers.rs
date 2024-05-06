@@ -91,6 +91,12 @@ pub(super) fn allow_boolean_trap(call: &ast::ExprCall, checker: &Checker) -> boo
     // boolean trap is allowed. We want to avoid raising a violation for cases in which the argument
     // is positional-only and third-party, and this tends to be the case for setters.
     if call.arguments.args.len() == 1 {
+        // Ex) `foo.set(True)`
+        if func_name == "set" {
+            return true;
+        }
+
+        // Ex) `foo.set_visible(True)`
         if func_name
             .strip_prefix("set")
             .is_some_and(|suffix| suffix.starts_with(|c: char| c == '_' || c.is_ascii_uppercase()))

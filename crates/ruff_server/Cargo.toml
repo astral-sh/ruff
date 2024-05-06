@@ -30,12 +30,13 @@ crossbeam = { workspace = true }
 jod-thread = { workspace = true }
 lsp-server = { workspace = true }
 lsp-types = { workspace = true }
+regex = { workspace = true }
 rustc-hash = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+shellexpand = { workspace = true }
 tracing = { workspace = true }
 walkdir = { workspace = true }
-regex = { workspace = true }
 
 [dev-dependencies]
 insta = { workspace = true }

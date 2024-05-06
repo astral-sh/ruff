@@ -778,28 +778,18 @@ FURB118.py:33:17: FURB118 [*] Use `operator.itemgetter(slice(None))` instead of 
 35 36 | 
 36 37 | def op_not2(x):
 
-FURB118.py:36:1: FURB118 Use `operator.not_` instead of defining a function
+FURB118.py:36:5: FURB118 Use `operator.not_` instead of defining a function
    |
-36 | / def op_not2(x):
-37 | |     return not x
-   | |________________^ FURB118
+36 | def op_not2(x):
+   |     ^^^^^^^ FURB118
+37 |     return not x
    |
    = help: Replace with `operator.not_`
 
-FURB118.py:40:1: FURB118 Use `operator.add` instead of defining a function
+FURB118.py:40:5: FURB118 Use `operator.add` instead of defining a function
    |
-40 | / def op_add2(x, y):
-41 | |     return x + y
-   | |________________^ FURB118
-   |
-   = help: Replace with `operator.add`
-
-FURB118.py:45:5: FURB118 Use `operator.add` instead of defining a function
-   |
-44 |   class Adder:
-45 |       def add(x, y):
-   |  _____^
-46 | |         return x + y
-   | |____________________^ FURB118
+40 | def op_add2(x, y):
+   |     ^^^^^^^ FURB118
+41 |     return x + y
    |
    = help: Replace with `operator.add`

@@ -11,7 +11,6 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
-use crate::rules::flake8_unused_arguments::helpers;
 
 /// ## What it does
 /// Checks for the presence of unused arguments in function definitions.
@@ -322,18 +321,19 @@ pub(crate) fn unused_arguments(
         return;
     }
 
-    let Some(parent) = &checker.semantic().first_non_type_parent_scope(scope) else {
+    let Some(parent) = checker.semantic().first_non_type_parent_scope(scope) else {
         return;
     };
 
     match &scope.kind {
-        ScopeKind::Function(ast::StmtFunctionDef {
-            name,
-            parameters,
-            body,
-            decorator_list,
-            ..
-        }) => {
+        ScopeKind::Function(
+            function_def @ ast::StmtFunctionDef {
+                name,
+                parameters,
+                decorator_list,
+                ..
+            },
+        ) => {
             match function_type::classify(
                 name,
                 decorator_list,
@@ -362,7 +362,7 @@ pub(crate) fn unused_arguments(
                 }
                 function_type::FunctionType::Method => {
                     if checker.enabled(Argumentable::Method.rule_code())
-                        && !helpers::is_empty(body)
+                        && !function_type::is_stub(function_def, checker.semantic())
                         && (!visibility::is_magic(name)
                             || visibility::is_init(name)
                             || visibility::is_new(name)
@@ -387,7 +387,7 @@ pub(crate) fn unused_arguments(
                 }
                 function_type::FunctionType::ClassMethod => {
                     if checker.enabled(Argumentable::ClassMethod.rule_code())
-                        && !helpers::is_empty(body)
+                        && !function_type::is_stub(function_def, checker.semantic())
                         && (!visibility::is_magic(name)
                             || visibility::is_init(name)
                             || visibility::is_new(name)
@@ -412,7 +412,7 @@ pub(crate) fn unused_arguments(
                 }
                 function_type::FunctionType::StaticMethod => {
                     if checker.enabled(Argumentable::StaticMethod.rule_code())
-                        && !helpers::is_empty(body)
+                        && !function_type::is_stub(function_def, checker.semantic())
                         && (!visibility::is_magic(name)
                             || visibility::is_init(name)
                             || visibility::is_new(name)

@@ -1024,7 +1024,7 @@ pub struct Flake8BanditOptions {
     #[option(
         default = "[]",
         value_type = "list[str]",
-        example = "extend-hardcoded-tmp-directory = [\"/foo/bar\"]"
+        example = "hardcoded-tmp-directory-extend = [\"/foo/bar\"]"
     )]
     pub hardcoded_tmp_directory_extend: Option<Vec<String>>,
 

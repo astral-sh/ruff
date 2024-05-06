@@ -1,9 +1,10 @@
-use std::{ffi::OsString, ops::Deref, path::PathBuf, str::FromStr};
+use std::{ops::Deref, path::PathBuf, str::FromStr};
 
 use lsp_types::Url;
-use ruff_linter::{line_width::LineLength, RuleSelector};
 use rustc_hash::FxHashMap;
 use serde::Deserialize;
+
+use ruff_linter::{line_width::LineLength, RuleSelector};
 
 /// Maps a workspace URI to its associated client settings. Used during server initialization.
 pub(crate) type WorkspaceSettingsMap = FxHashMap<Url, ClientSettings>;
@@ -234,7 +235,8 @@ impl ResolvedClientSettings {
                     settings
                         .configuration
                         .as_ref()
-                        .map(|config_path| OsString::from(config_path.clone()).into())
+                        .and_then(|config_path| shellexpand::full(config_path).ok())
+                        .map(|config_path| PathBuf::from(config_path.as_ref()))
                 }),
                 lint_preview: Self::resolve_optional(all_settings, |settings| {
                     settings.lint.as_ref()?.preview
@@ -272,9 +274,7 @@ impl ResolvedClientSettings {
                         .map(|rule| RuleSelector::from_str(rule).ok())
                         .collect()
                 }),
-                exclude: Self::resolve_optional(all_settings, |settings| {
-                    Some(settings.exclude.as_ref()?.clone())
-                }),
+                exclude: Self::resolve_optional(all_settings, |settings| settings.exclude.clone()),
                 line_length: Self::resolve_optional(all_settings, |settings| settings.line_length),
                 configuration_preference: Self::resolve_or(
                     all_settings,
@@ -341,8 +341,9 @@ impl Default for InitializationOptions {
 #[cfg(test)]
 mod tests {
     use insta::assert_debug_snapshot;
-    use ruff_linter::registry::Linter;
     use serde::de::DeserializeOwned;
+
+    use ruff_linter::registry::Linter;
 
     use super::*;
 
