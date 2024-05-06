@@ -49,29 +49,6 @@ impl AlwaysFixableViolation for VerboseRaise {
     }
 }
 
-#[derive(Default)]
-struct RaiseStatementVisitor<'a> {
-    raises: Vec<&'a ast::StmtRaise>,
-}
-
-impl<'a> StatementVisitor<'a> for RaiseStatementVisitor<'a> {
-    fn visit_stmt(&mut self, stmt: &'a Stmt) {
-        match stmt {
-            Stmt::Raise(raise @ ast::StmtRaise { .. }) => {
-                self.raises.push(raise);
-            }
-            Stmt::Try(ast::StmtTry {
-                body, finalbody, ..
-            }) => {
-                for stmt in body.iter().chain(finalbody.iter()) {
-                    walk_stmt(self, stmt);
-                }
-            }
-            _ => walk_stmt(self, stmt),
-        }
-    }
-}
-
 /// TRY201
 pub(crate) fn verbose_raise(checker: &mut Checker, handlers: &[ExceptHandler]) {
     for handler in handlers {
@@ -105,6 +82,29 @@ pub(crate) fn verbose_raise(checker: &mut Checker, handlers: &[ExceptHandler]) {
                     }
                 }
             }
+        }
+    }
+}
+
+#[derive(Default)]
+struct RaiseStatementVisitor<'a> {
+    raises: Vec<&'a ast::StmtRaise>,
+}
+
+impl<'a> StatementVisitor<'a> for RaiseStatementVisitor<'a> {
+    fn visit_stmt(&mut self, stmt: &'a Stmt) {
+        match stmt {
+            Stmt::Raise(raise @ ast::StmtRaise { .. }) => {
+                self.raises.push(raise);
+            }
+            Stmt::Try(ast::StmtTry {
+                body, finalbody, ..
+            }) => {
+                for stmt in body.iter().chain(finalbody.iter()) {
+                    walk_stmt(self, stmt);
+                }
+            }
+            _ => walk_stmt(self, stmt),
         }
     }
 }
