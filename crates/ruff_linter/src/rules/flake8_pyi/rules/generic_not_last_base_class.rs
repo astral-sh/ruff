@@ -1,3 +1,5 @@
+use anyhow::Context;
+
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::map_subscript;
@@ -97,27 +99,27 @@ pub(crate) fn generic_not_last_base_class(checker: &mut Checker, class_def: &Stm
 
     // No fix if multiple generics are seen in the class bases.
     if generic_base_iter.next().is_none() {
-        diagnostic.set_fix(generate_fix(generic_base, last_base, checker.locator()));
+        diagnostic.try_set_fix(|| generate_fix(generic_base, last_base, checker.locator()));
     }
 
     checker.diagnostics.push(diagnostic);
 }
 
-fn generate_fix(generic_base: &Expr, last_base: &Expr, locator: &Locator) -> Fix {
+fn generate_fix(generic_base: &Expr, last_base: &Expr, locator: &Locator) -> anyhow::Result<Fix> {
     let comma_after_generic_base = generic_base.end().to_usize()
         + locator
             .after(generic_base.end())
             .find(',')
-            .expect("Comma must always exist after generic base");
+            .context("Comma must always exist after generic base")?;
 
     let last_whitespace = (comma_after_generic_base + 1)
         + locator.contents()[comma_after_generic_base + 1..]
             .bytes()
             .position(|b| !b.is_ascii_whitespace())
-            .expect("Non whitespace character must always exist after Generic[]");
+            .context("Non whitespace character must always exist after Generic[]")?;
 
-    let comma_after_generic_base: u32 = comma_after_generic_base.try_into().unwrap();
-    let last_whitespace: u32 = last_whitespace.try_into().unwrap();
+    let comma_after_generic_base: u32 = comma_after_generic_base.try_into()?;
+    let last_whitespace: u32 = last_whitespace.try_into()?;
 
     let base_deletion = Edit::deletion(generic_base.start(), generic_base.end());
     let base_comma_deletion =
@@ -126,5 +128,8 @@ fn generate_fix(generic_base: &Expr, last_base: &Expr, locator: &Locator) -> Fix
         format!(", {}", locator.slice(generic_base.range())),
         last_base.end(),
     );
-    Fix::safe_edits(insertion, [base_deletion, base_comma_deletion])
+    Ok(Fix::safe_edits(
+        insertion,
+        [base_deletion, base_comma_deletion],
+    ))
 }
