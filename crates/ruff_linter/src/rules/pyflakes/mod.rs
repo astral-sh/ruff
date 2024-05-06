@@ -208,6 +208,10 @@ mod tests {
     #[test_case(Rule::UnusedImport, Path::new("__init__.py"))]
     #[test_case(Rule::UnusedImport, Path::new("F401_24/__init__.py"))]
     #[test_case(Rule::UnusedImport, Path::new("F401_25__all_nonempty/__init__.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_26__all_empty/__init__.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_27__all_mistyped/__init__.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_28__all_multiple/__init__.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_29__all_pluseq/__init__.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",
