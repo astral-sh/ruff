@@ -203,7 +203,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 }
             }
             if checker.enabled(Rule::CachedInstanceMethod) {
-                flake8_bugbear::rules::cached_instance_method(checker, decorator_list);
+                flake8_bugbear::rules::cached_instance_method(checker, function_def);
             }
             if checker.enabled(Rule::MutableArgumentDefault) {
                 flake8_bugbear::rules::mutable_argument_default(checker, function_def);
