@@ -289,7 +289,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
                 fix_by_reexporting(
                     checker,
                     import_statement,
-                    to_reexport.iter().map(|(binding, _)| binding),
+                    &to_reexport.iter().map(|(b, _)| b).collect::<Vec<_>>(),
                     dunder_all_expr,
                 )
                 .ok(),
@@ -402,25 +402,28 @@ fn fix_by_removing_imports<'a>(
 
 /// Generate a [`Fix`] to make bindings in a statement explicit, either by adding them to `__all__`
 /// or changing them from `import a` to `import a as a`.
-fn fix_by_reexporting<'a, 'b>(
+fn fix_by_reexporting(
     checker: &Checker,
     node_id: NodeId,
-    imports: impl Iterator<Item = &'a ImportBinding<'a>>,
+    imports: &[&ImportBinding],
     dunder_all: Option<&ast::ExprList>,
 ) -> Result<Fix> {
     let statement = checker.semantic().statement(node_id);
-
-    let member_names = imports
-        .map(|binding| binding.import.member_name())
-        .collect::<Vec<_>>();
-    if member_names.is_empty() {
+    if imports.is_empty() {
         bail!("Expected import bindings");
     }
-    let member_names = member_names.iter().map(AsRef::as_ref);
 
     let edits = match dunder_all {
-        Some(dunder_all) => fix::edits::add_to_dunder_all(member_names, dunder_all),
-        None => fix::edits::make_redundant_alias(member_names, statement),
+        Some(dunder_all) => {
+            fix::edits::add_to_dunder_all(imports.iter().map(|b| b.name), dunder_all)
+        }
+        None => {
+            let member_names = imports
+                .iter()
+                .map(|b| b.import.member_name())
+                .collect::<Vec<_>>();
+            fix::edits::make_redundant_alias(member_names.iter().map(AsRef::as_ref), statement)
+        }
     };
 
     // Only emit a fix if there are edits
