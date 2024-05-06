@@ -16,3 +16,31 @@ __init__.py:19:8: F401 [*] `sys` imported but unused; consider removing, adding 
 20 19 | 
 21 20 | 
 22 21 | # first-party
+
+__init__.py:36:15: F401 [*] `.unused` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+   |
+36 | from . import unused # F401: add to __all__
+   |               ^^^^^^ F401
+   |
+   = help: Add unused import to __all__: `.unused`
+
+ℹ Safe fix
+39 39 | from . import renamed as bees # F401: add to __all__
+40 40 | 
+41 41 | 
+42    |-__all__ = ["argparse", "exported"]
+   42 |+__all__ = ["argparse", "exported", "unused"]
+
+__init__.py:39:26: F401 [*] `.renamed` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+   |
+39 | from . import renamed as bees # F401: add to __all__
+   |                          ^^^^ F401
+   |
+   = help: Add unused import to __all__: `.renamed`
+
+ℹ Safe fix
+39 39 | from . import renamed as bees # F401: add to __all__
+40 40 | 
+41 41 | 
+42    |-__all__ = ["argparse", "exported"]
+   42 |+__all__ = ["argparse", "exported", "bees"]
