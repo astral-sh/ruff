@@ -1,13 +1,11 @@
-use anyhow::Context;
-
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use ruff_diagnostics::{Diagnostic, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::map_subscript;
-use ruff_python_ast::{Expr, StmtClassDef};
-use ruff_source_file::Locator;
+use ruff_python_ast::{Arguments, Expr, StmtClassDef};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::fix::edits::{add_argument, remove_argument, Parentheses};
 
 /// ## What it does
 /// Checks for classes inheriting from `typing.Generic[]` where `Generic[]` is
@@ -99,37 +97,27 @@ pub(crate) fn generic_not_last_base_class(checker: &mut Checker, class_def: &Stm
 
     // No fix if multiple generics are seen in the class bases.
     if generic_base_iter.next().is_none() {
-        diagnostic.try_set_fix(|| generate_fix(generic_base, last_base, checker.locator()));
+        diagnostic.try_set_fix(|| generate_fix(generic_base, bases, checker));
     }
 
     checker.diagnostics.push(diagnostic);
 }
 
-fn generate_fix(generic_base: &Expr, last_base: &Expr, locator: &Locator) -> anyhow::Result<Fix> {
-    let comma_after_generic_base = generic_base.end().to_usize()
-        + locator
-            .after(generic_base.end())
-            .find(',')
-            .context("Comma must always exist after generic base")?;
+fn generate_fix(
+    generic_base: &Expr,
+    arguments: &Arguments,
+    checker: &Checker,
+) -> anyhow::Result<Fix> {
+    let locator = checker.locator();
+    let source = locator.contents();
 
-    let last_whitespace = (comma_after_generic_base + 1)
-        + locator.contents()[comma_after_generic_base + 1..]
-            .bytes()
-            .position(|b| !b.is_ascii_whitespace())
-            .context("Non whitespace character must always exist after Generic[]")?;
-
-    let comma_after_generic_base: u32 = comma_after_generic_base.try_into()?;
-    let last_whitespace: u32 = last_whitespace.try_into()?;
-
-    let base_deletion = Edit::deletion(generic_base.start(), generic_base.end());
-    let base_comma_deletion =
-        Edit::deletion(comma_after_generic_base.into(), last_whitespace.into());
-    let insertion = Edit::insertion(
-        format!(", {}", locator.slice(generic_base.range())),
-        last_base.end(),
+    let deletion = remove_argument(generic_base, arguments, Parentheses::Preserve, source)?;
+    let insertion = add_argument(
+        locator.slice(generic_base.range()),
+        arguments,
+        checker.indexer().comment_ranges(),
+        source,
     );
-    Ok(Fix::safe_edits(
-        insertion,
-        [base_deletion, base_comma_deletion],
-    ))
+
+    Ok(Fix::safe_edits(deletion, [insertion]))
 }

@@ -93,17 +93,16 @@ PYI059.py:30:10: PYI059 [*] `Generic[]` should always be the last base class
 31 31 |     # Part 1 of multiline comment 1
 32 32 |     # Part 2 of multiline comment 1
 33    |-    Generic[T]  # comment about Generic[T]  # PYI059
-   33 |+      # comment about Generic[T]  # PYI059
-34 34 |     # another comment?
+34    |-    # another comment?
 35    |-    ,  # comment about the comma?
-   35 |+    # comment about the comma?
-36 36 |     # part 1 of multiline comment 2
-37 37 |     # part 2 of multiline comment 2
+   33 |+    # comment about the comma?
+36 34 |     # part 1 of multiline comment 2
+37 35 |     # part 2 of multiline comment 2
 38    |-    int,  # comment about int
-   38 |+    int, Generic[T],  # comment about int
-39 39 |     # yet another comment?
-40 40 | ):  # and another one for good measure
-41 41 |     ...
+   36 |+    int, Generic[T],  # comment about int
+39 37 |     # yet another comment?
+40 38 | ):  # and another one for good measure
+41 39 |     ...
 
 PYI059.py:45:8: PYI059 `Generic[]` should always be the last base class
    |
