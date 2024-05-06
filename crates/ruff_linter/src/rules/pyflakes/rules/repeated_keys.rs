@@ -132,7 +132,7 @@ impl Violation for MultiValueRepeatedKeyVariable {
 pub(crate) fn repeated_keys(checker: &mut Checker, dict: &ast::ExprDict) {
     // Generate a map from key to (index, value).
     let mut seen: FxHashMap<ComparableExpr, FxHashSet<ComparableExpr>> =
-        FxHashMap::with_capacity_and_hasher(dict.keys().len(), BuildHasherDefault::default());
+        FxHashMap::with_capacity_and_hasher(dict.items.len(), BuildHasherDefault::default());
 
     // Detect duplicate keys.
     for (i, ast::DictItem { key, value }) in dict.items.iter().enumerate() {
@@ -167,20 +167,20 @@ pub(crate) fn repeated_keys(checker: &mut Checker, dict: &ast::ExprDict) {
                     if !seen_values.insert(comparable_value) {
                         diagnostic.set_fix(Fix::unsafe_edit(Edit::deletion(
                             parenthesized_range(
-                                (&dict.values()[i - 1]).into(),
+                                dict.value(i - 1).into(),
                                 dict.into(),
                                 checker.indexer().comment_ranges(),
                                 checker.locator().contents(),
                             )
-                            .unwrap_or(dict.values()[i - 1].range())
+                            .unwrap_or_else(|| dict.value(i - 1).range())
                             .end(),
                             parenthesized_range(
-                                (&dict.values()[i]).into(),
+                                dict.value(i).into(),
                                 dict.into(),
                                 checker.indexer().comment_ranges(),
                                 checker.locator().contents(),
                             )
-                            .unwrap_or(dict.values()[i].range())
+                            .unwrap_or_else(|| dict.value(i).range())
                             .end(),
                         )));
                     }
@@ -195,24 +195,24 @@ pub(crate) fn repeated_keys(checker: &mut Checker, dict: &ast::ExprDict) {
                         },
                         key.range(),
                     );
-                    let comparable_value: ComparableExpr = (&dict.items[i].value).into();
+                    let comparable_value: ComparableExpr = dict.value(i).into();
                     if !seen_values.insert(comparable_value) {
                         diagnostic.set_fix(Fix::unsafe_edit(Edit::deletion(
                             parenthesized_range(
-                                (&dict.values()[i - 1]).into(),
+                                dict.value(i - 1).into(),
                                 dict.into(),
                                 checker.indexer().comment_ranges(),
                                 checker.locator().contents(),
                             )
-                            .unwrap_or(dict.values()[i - 1].range())
+                            .unwrap_or_else(|| dict.value(i - 1).range())
                             .end(),
                             parenthesized_range(
-                                (&dict.values()[i]).into(),
+                                dict.value(i).into(),
                                 dict.into(),
                                 checker.indexer().comment_ranges(),
                                 checker.locator().contents(),
                             )
-                            .unwrap_or(dict.values()[i].range())
+                            .unwrap_or_else(|| dict.value(i).range())
                             .end(),
                         )));
                     }

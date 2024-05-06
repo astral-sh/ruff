@@ -3,7 +3,7 @@
 use std::fmt;
 use std::fmt::Debug;
 use std::iter::FusedIterator;
-use std::ops::{Deref, Index};
+use std::ops::Deref;
 use std::slice::{Iter, IterMut};
 use std::sync::OnceLock;
 
@@ -783,6 +783,15 @@ impl DictItem {
     }
 }
 
+impl Ranged for DictItem {
+    fn range(&self) -> TextRange {
+        TextRange::new(
+            self.key.as_ref().map_or(self.value.start(), Ranged::start),
+            self.value.end(),
+        )
+    }
+}
+
 /// See also [Dict](https://docs.python.org/3/library/ast.html#ast.Dict)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprDict {
@@ -791,60 +800,34 @@ pub struct ExprDict {
 }
 
 impl ExprDict {
-    pub fn keys(&self) -> DictKeysView {
-        DictKeysView { items: &self.items }
+    pub fn iter_keys(&self) -> DictKeyIterator {
+        DictKeyIterator::new(&self.items)
     }
 
-    pub fn values(&self) -> DictValuesView {
-        DictValuesView { items: &self.items }
+    pub fn iter_values(&self) -> DictValueIterator {
+        DictValueIterator::new(&self.items)
+    }
+
+    pub fn iter_items(&self) -> Iter<'_, DictItem> {
+        self.items.iter()
+    }
+
+    pub fn key(&self, n: usize) -> Option<&Expr> {
+        self.items[n].key()
+    }
+
+    pub fn value(&self, n: usize) -> &Expr {
+        self.items[n].value()
+    }
+
+    pub fn item(&self, n: usize) -> &DictItem {
+        &self.items[n]
     }
 }
 
 impl From<ExprDict> for Expr {
     fn from(payload: ExprDict) -> Self {
         Expr::Dict(payload)
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct DictKeysView<'a> {
-    items: &'a [DictItem],
-}
-
-impl<'a> DictKeysView<'a> {
-    pub fn first(self) -> Option<Option<&'a Expr>> {
-        self.items.first().map(DictItem::key)
-    }
-
-    pub fn last(self) -> Option<Option<&'a Expr>> {
-        self.items.last().map(DictItem::key)
-    }
-
-    pub fn len(self) -> usize {
-        self.items.len()
-    }
-
-    pub fn is_empty(self) -> bool {
-        self.items.is_empty()
-    }
-
-    pub fn get(self, index: usize) -> Option<Option<&'a Expr>> {
-        self.items.get(index).map(DictItem::key)
-    }
-}
-
-impl<'a> IntoIterator for DictKeysView<'a> {
-    type IntoIter = DictKeyIterator<'a>;
-    type Item = Option<&'a Expr>;
-    fn into_iter(self) -> Self::IntoIter {
-        DictKeyIterator::new(self.items)
-    }
-}
-
-impl<'a> Index<usize> for DictKeysView<'a> {
-    type Output = Option<Expr>;
-    fn index(&self, index: usize) -> &Self::Output {
-        &self.items[index].key
     }
 }
 
@@ -858,6 +841,10 @@ impl<'a> DictKeyIterator<'a> {
         Self {
             items: items.iter(),
         }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
     }
 }
 
@@ -887,48 +874,6 @@ impl<'a> DoubleEndedIterator for DictKeyIterator<'a> {
 impl<'a> FusedIterator for DictKeyIterator<'a> {}
 impl<'a> ExactSizeIterator for DictKeyIterator<'a> {}
 
-#[derive(Debug, Clone, Copy)]
-pub struct DictValuesView<'a> {
-    items: &'a [DictItem],
-}
-
-impl<'a> DictValuesView<'a> {
-    pub fn first(self) -> Option<&'a Expr> {
-        self.items.first().map(DictItem::value)
-    }
-
-    pub fn last(self) -> Option<&'a Expr> {
-        self.items.last().map(DictItem::value)
-    }
-
-    pub fn len(self) -> usize {
-        self.items.len()
-    }
-
-    pub fn is_empty(self) -> bool {
-        self.items.is_empty()
-    }
-
-    pub fn get(self, index: usize) -> Option<&'a Expr> {
-        self.items.get(index).map(DictItem::value)
-    }
-}
-
-impl<'a> IntoIterator for DictValuesView<'a> {
-    type IntoIter = DictValueIterator<'a>;
-    type Item = &'a Expr;
-    fn into_iter(self) -> Self::IntoIter {
-        DictValueIterator::new(self.items)
-    }
-}
-
-impl<'a> Index<usize> for DictValuesView<'a> {
-    type Output = Expr;
-    fn index(&self, index: usize) -> &Self::Output {
-        &self.items[index].value
-    }
-}
-
 #[derive(Debug)]
 pub struct DictValueIterator<'a> {
     items: Iter<'a, DictItem>,
@@ -939,6 +884,10 @@ impl<'a> DictValueIterator<'a> {
         Self {
             items: items.iter(),
         }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
     }
 }
 

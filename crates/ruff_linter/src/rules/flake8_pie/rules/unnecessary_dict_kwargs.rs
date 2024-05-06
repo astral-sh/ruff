@@ -84,18 +84,17 @@ pub(crate) fn unnecessary_dict_kwargs(checker: &mut Checker, call: &ast::ExprCal
 
         // Ensure that every keyword is a valid keyword argument (e.g., avoid errors for cases like
         // `foo(**{"bar-bar": 1})`).
-        let (keys, values) = (dict.keys(), dict.values());
-        let kwargs: Vec<&str> = keys
-            .into_iter()
+        let kwargs: Vec<&str> = dict
+            .iter_keys()
             .filter_map(|key| key.and_then(as_kwarg))
             .collect();
-        if kwargs.len() != keys.len() {
+        if kwargs.len() != dict.items.len() {
             continue;
         }
 
         let mut diagnostic = Diagnostic::new(UnnecessaryDictKwargs, keyword.range());
 
-        if values.is_empty() {
+        if dict.items.is_empty() {
             diagnostic.try_set_fix(|| {
                 remove_argument(
                     keyword,
@@ -120,7 +119,7 @@ pub(crate) fn unnecessary_dict_kwargs(checker: &mut Checker, call: &ast::ExprCal
                     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                         kwargs
                             .iter()
-                            .zip(values)
+                            .zip(dict.iter_values())
                             .map(|(kwarg, value)| {
                                 format!("{}={}", kwarg, checker.locator().slice(value.range()))
                             })
@@ -152,7 +151,7 @@ fn duplicates(call: &ast::ExprCall) -> FxHashSet<&str> {
                 duplicates.insert(name.as_str());
             }
         } else if let Expr::Dict(dict) = &keyword.value {
-            for key in dict.keys() {
+            for key in dict.iter_keys() {
                 if let Some(name) = key.and_then(as_kwarg) {
                     if !seen.insert(name) {
                         duplicates.insert(name);

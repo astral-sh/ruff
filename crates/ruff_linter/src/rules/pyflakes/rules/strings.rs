@@ -573,13 +573,12 @@ pub(crate) fn percent_format_extra_named_arguments(
         return;
     };
     // If any of the keys are spread, abort.
-    if dict.keys().into_iter().any(|key| key.is_none()) {
+    if dict.iter_keys().any(|key| key.is_none()) {
         return;
     }
 
     let missing: Vec<(usize, &str)> = dict
-        .keys()
-        .into_iter()
+        .iter_keys()
         .enumerate()
         .filter_map(|(index, key)| match key {
             Some(Expr::StringLiteral(ast::ExprStringLiteral { value, .. })) => {
@@ -633,12 +632,12 @@ pub(crate) fn percent_format_missing_arguments(
         return;
     };
 
-    if dict.keys().into_iter().any(|key| key.is_none()) {
+    if dict.iter_keys().any(|key| key.is_none()) {
         return; // contains **x splat
     }
 
     let mut keywords = FxHashSet::default();
-    for key in dict.keys().into_iter().flatten() {
+    for key in dict.iter_keys().flatten() {
         match key {
             Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
                 keywords.insert(value.to_str());

@@ -90,15 +90,16 @@ fn check_msg(checker: &mut Checker, msg: &Expr) {
 fn check_log_record_attr_clash(checker: &mut Checker, extra: &Keyword) {
     match &extra.value {
         Expr::Dict(dict) => {
-            for key in dict.keys().into_iter().flatten() {
-                if let Expr::StringLiteral(ast::ExprStringLiteral { value: attr, .. }) = key {
-                    if is_reserved_attr(attr.to_str()) {
-                        checker.diagnostics.push(Diagnostic::new(
-                            LoggingExtraAttrClash(attr.to_string()),
-                            key.range(),
-                        ));
-                    }
-                }
+            for invalid_key in dict
+                .iter_keys()
+                .flatten()
+                .filter_map(Expr::as_string_literal_expr)
+                .filter(|key| is_reserved_attr(key.value.to_str()))
+            {
+                checker.diagnostics.push(Diagnostic::new(
+                    LoggingExtraAttrClash(invalid_key.value.to_string()),
+                    invalid_key.range(),
+                ));
             }
         }
         Expr::Call(ast::ExprCall {

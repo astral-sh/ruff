@@ -174,9 +174,9 @@ impl<'a> StringLiteralDisplay<'a> {
                     display_kind,
                 }
             }
-            ast::Expr::Dict(dict @ ast::ExprDict { items, range }) => {
-                let mut narrowed_keys = Vec::with_capacity(items.len());
-                for key in dict.keys() {
+            ast::Expr::Dict(dict) => {
+                let mut narrowed_keys = Vec::with_capacity(dict.items.len());
+                for key in dict.iter_keys() {
                     if let Some(key) = key {
                         // This is somewhat unfortunate,
                         // *but* using a dict for __slots__ is very rare
@@ -189,14 +189,11 @@ impl<'a> StringLiteralDisplay<'a> {
                 // `__slots__ = {"foo": "bar", **other_dict}`
                 // If `None` wasn't present in the keys,
                 // the length of the keys should always equal the length of the values
-                assert_eq!(narrowed_keys.len(), items.len());
-                let display_kind = DisplayKind::Dict {
-                    values: dict.values(),
-                };
+                assert_eq!(narrowed_keys.len(), dict.items.len());
                 Self {
                     elts: Cow::Owned(narrowed_keys),
-                    range: *range,
-                    display_kind,
+                    range: dict.range(),
+                    display_kind: DisplayKind::Dict { node: dict },
                 }
             }
             _ => return None,
@@ -204,7 +201,7 @@ impl<'a> StringLiteralDisplay<'a> {
         Some(result)
     }
 
-    fn generate_fix(&self, items: &[&str], checker: &Checker) -> Option<Fix> {
+    fn generate_fix(&self, elements: &[&str], checker: &Checker) -> Option<Fix> {
         let locator = checker.locator();
         let is_multiline = locator.contains_line_break(self.range());
         let sorted_source_code = match (&self.display_kind, is_multiline) {
@@ -222,12 +219,12 @@ impl<'a> StringLiteralDisplay<'a> {
             (DisplayKind::Sequence(sequence_kind), false) => sort_single_line_elements_sequence(
                 *sequence_kind,
                 &self.elts,
-                items,
+                elements,
                 locator,
                 SORTING_STYLE,
             ),
-            (DisplayKind::Dict { values }, false) => {
-                sort_single_line_elements_dict(&self.elts, items, values.into_iter(), locator)
+            (DisplayKind::Dict { node }, false) => {
+                sort_single_line_elements_dict(&self.elts, elements, node, locator)
             }
         };
         Some(Fix::safe_edit(Edit::range_replacement(
@@ -243,7 +240,7 @@ impl<'a> StringLiteralDisplay<'a> {
 #[derive(Debug)]
 enum DisplayKind<'a> {
     Sequence(SequenceKind),
-    Dict { values: ast::DictValuesView<'a> },
+    Dict { node: &'a ast::ExprDict },
 }
 
 /// A newtype that zips together three iterables:
@@ -299,10 +296,10 @@ impl<'a> DictElements<'a> {
 fn sort_single_line_elements_dict<'a>(
     key_elts: &'a [ast::Expr],
     elements: &'a [&str],
-    value_elts: impl ExactSizeIterator<Item = &'a ast::Expr>,
+    original_node: &'a ast::ExprDict,
     locator: &Locator,
 ) -> String {
-    let element_trios = DictElements::new(elements, key_elts, value_elts);
+    let element_trios = DictElements::new(elements, key_elts, original_node.iter_values());
     let last_item_index = element_trios.last_item_index();
     let mut result = String::from('{');
     // We grab the original source-code ranges using `locator.slice()`

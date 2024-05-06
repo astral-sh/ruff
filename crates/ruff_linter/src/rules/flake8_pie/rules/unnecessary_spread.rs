@@ -75,7 +75,7 @@ fn unnecessary_spread_fix(
     let doublestar = SimpleTokenizer::starts_at(prev_end, locator.contents())
         .find(|tok| matches!(tok.kind(), SimpleTokenKind::DoubleStar))?;
 
-    if let Some(last) = dict.values().last() {
+    if let Some(last) = dict.iter_values().last() {
         // Ex) `**{a: 1, b: 2}`
         let mut edits = vec![];
         for tok in SimpleTokenizer::starts_at(last.end(), locator.contents()).skip_trivia() {

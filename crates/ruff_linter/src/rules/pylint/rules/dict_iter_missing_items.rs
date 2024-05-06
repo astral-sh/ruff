@@ -99,7 +99,7 @@ fn is_dict_key_tuple_with_two_elements(semantic: &SemanticModel, binding: &Bindi
         return false;
     };
 
-    dict_expr.keys().into_iter().all(|elt| {
+    dict_expr.iter_keys().all(|elt| {
         elt.is_some_and(|x| {
             if let Expr::Tuple(ExprTuple { elts, .. }) = x {
                 return elts.len() == 2;

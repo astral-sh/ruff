@@ -58,7 +58,7 @@ pub(crate) fn repeated_keyword_argument(checker: &mut Checker, call: &ExprCall) 
             }
         } else if let Expr::Dict(dict) = &keyword.value {
             // Ex) `func(**{"a": 1, "a": 2})`
-            for key in dict.keys().into_iter().flatten() {
+            for key in dict.iter_keys().flatten() {
                 if let Expr::StringLiteral(ExprStringLiteral { value, .. }) = key {
                     if !seen.insert(value.to_str()) {
                         checker.diagnostics.push(Diagnostic::new(
