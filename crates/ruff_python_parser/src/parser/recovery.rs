@@ -45,16 +45,10 @@ pub(super) fn pattern_to_expr(pattern: Pattern) -> Expr {
                 range,
             })
         }
-        Pattern::MatchMapping(ast::PatternMatchMapping {
-            range,
-            keys,
-            patterns,
-            rest,
-        }) => {
-            let mut items: Vec<ast::DictItem> = keys
+        Pattern::MatchMapping(ast::PatternMatchMapping { range, items, rest }) => {
+            let mut items: Vec<ast::DictItem> = items
                 .into_iter()
-                .zip(patterns)
-                .map(|(key, pattern)| ast::DictItem {
+                .map(|ast::MatchMappingItem { key, pattern }| ast::DictItem {
                     key: Some(key),
                     value: pattern_to_expr(pattern),
                 })

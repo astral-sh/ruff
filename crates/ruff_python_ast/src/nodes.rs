@@ -3163,13 +3163,60 @@ impl From<PatternMatchSequence> for Pattern {
     }
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct MatchMappingItem {
+    pub key: Expr,
+    pub pattern: Pattern,
+}
+
+impl MatchMappingItem {
+    fn key(&self) -> &Expr {
+        &self.key
+    }
+
+    fn pattern(&self) -> &Pattern {
+        &self.pattern
+    }
+}
+
+impl Ranged for MatchMappingItem {
+    fn range(&self) -> TextRange {
+        TextRange::new(self.key.start(), self.pattern.end())
+    }
+}
+
 /// See also [MatchMapping](https://docs.python.org/3/library/ast.html#ast.MatchMapping)
 #[derive(Clone, Debug, PartialEq)]
 pub struct PatternMatchMapping {
     pub range: TextRange,
-    pub keys: Vec<Expr>,
-    pub patterns: Vec<Pattern>,
+    pub items: Vec<MatchMappingItem>,
     pub rest: Option<Identifier>,
+}
+
+impl PatternMatchMapping {
+    pub fn iter_keys(&self) -> MatchMappingKeyIterator {
+        MatchMappingKeyIterator::new(&self.items)
+    }
+
+    pub fn iter_patterns(&self) -> MatchMappingPatternIterator {
+        MatchMappingPatternIterator::new(&self.items)
+    }
+
+    pub fn iter_items(&self) -> Iter<'_, MatchMappingItem> {
+        self.items.iter()
+    }
+
+    pub fn key(&self, n: usize) -> &Expr {
+        &self.items[n].key
+    }
+
+    pub fn pattern(&self, n: usize) -> &Pattern {
+        &self.items[n].pattern
+    }
+
+    pub fn item(&self, n: usize) -> &MatchMappingItem {
+        &self.items[n]
+    }
 }
 
 impl From<PatternMatchMapping> for Pattern {
@@ -3177,6 +3224,92 @@ impl From<PatternMatchMapping> for Pattern {
         Pattern::MatchMapping(payload)
     }
 }
+
+#[derive(Debug)]
+pub struct MatchMappingKeyIterator<'a> {
+    items: Iter<'a, MatchMappingItem>,
+}
+
+impl<'a> MatchMappingKeyIterator<'a> {
+    fn new(items: &'a [MatchMappingItem]) -> Self {
+        Self {
+            items: items.iter(),
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+}
+
+impl<'a> Iterator for MatchMappingKeyIterator<'a> {
+    type Item = &'a Expr;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.items.next().map(MatchMappingItem::key)
+    }
+
+    fn last(mut self) -> Option<Self::Item> {
+        self.items.next_back().map(MatchMappingItem::key)
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let len = self.items.len();
+        (len, Some(len))
+    }
+}
+
+impl<'a> DoubleEndedIterator for MatchMappingKeyIterator<'a> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        self.items.next_back().map(MatchMappingItem::key)
+    }
+}
+
+impl<'a> FusedIterator for MatchMappingKeyIterator<'a> {}
+impl<'a> ExactSizeIterator for MatchMappingKeyIterator<'a> {}
+
+#[derive(Debug)]
+pub struct MatchMappingPatternIterator<'a> {
+    items: Iter<'a, MatchMappingItem>,
+}
+
+impl<'a> MatchMappingPatternIterator<'a> {
+    fn new(items: &'a [MatchMappingItem]) -> Self {
+        Self {
+            items: items.iter(),
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+}
+
+impl<'a> Iterator for MatchMappingPatternIterator<'a> {
+    type Item = &'a Pattern;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.items.next().map(MatchMappingItem::pattern)
+    }
+
+    fn last(mut self) -> Option<Self::Item> {
+        self.items.next_back().map(MatchMappingItem::pattern)
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let len = self.items.len();
+        (len, Some(len))
+    }
+}
+
+impl<'a> DoubleEndedIterator for MatchMappingPatternIterator<'a> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        self.items.next_back().map(MatchMappingItem::pattern)
+    }
+}
+
+impl<'a> FusedIterator for MatchMappingPatternIterator<'a> {}
+impl<'a> ExactSizeIterator for MatchMappingPatternIterator<'a> {}
 
 /// See also [MatchClass](https://docs.python.org/3/library/ast.html#ast.MatchClass)
 #[derive(Clone, Debug, PartialEq)]
@@ -4482,8 +4615,8 @@ mod tests {
         assert!(std::mem::size_of::<StmtClassDef>() <= 104);
         assert!(std::mem::size_of::<StmtTry>() <= 112);
         assert!(std::mem::size_of::<Mod>() <= 32);
-        // 96 for Rustc < 1.76
-        assert!(matches!(std::mem::size_of::<Pattern>(), 88 | 96));
+        // 80 for Rustc < 1.76
+        assert!(matches!(std::mem::size_of::<Pattern>(), 72 | 80));
 
         assert_eq!(std::mem::size_of::<Expr>(), 64);
         assert_eq!(std::mem::size_of::<ExprAttribute>(), 56);

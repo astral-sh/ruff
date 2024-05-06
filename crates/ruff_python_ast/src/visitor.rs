@@ -693,11 +693,9 @@ pub fn walk_pattern<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, pattern: &'a P
                 visitor.visit_pattern(pattern);
             }
         }
-        Pattern::MatchMapping(ast::PatternMatchMapping { keys, patterns, .. }) => {
-            for expr in keys {
-                visitor.visit_expr(expr);
-            }
-            for pattern in patterns {
+        Pattern::MatchMapping(ast::PatternMatchMapping { items, .. }) => {
+            for ast::MatchMappingItem { key, pattern } in items {
+                visitor.visit_expr(key);
                 visitor.visit_pattern(pattern);
             }
         }

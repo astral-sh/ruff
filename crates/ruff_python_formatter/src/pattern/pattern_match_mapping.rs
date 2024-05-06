@@ -1,7 +1,7 @@
 use ruff_formatter::{format_args, write};
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::PatternMatchMapping;
-use ruff_python_ast::{Expr, Identifier, Pattern};
+use ruff_python_ast::{Expr, Identifier, MatchMappingItem, Pattern};
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange};
 
@@ -17,18 +17,15 @@ pub struct FormatPatternMatchMapping;
 impl FormatNodeRule<PatternMatchMapping> for FormatPatternMatchMapping {
     fn fmt_fields(&self, item: &PatternMatchMapping, f: &mut PyFormatter) -> FormatResult<()> {
         let PatternMatchMapping {
-            keys,
-            patterns,
+            items,
             rest,
             range: _,
         } = item;
 
-        debug_assert_eq!(keys.len(), patterns.len());
-
         let comments = f.context().comments().clone();
         let dangling = comments.dangling(item);
 
-        if keys.is_empty() && rest.is_none() {
+        if items.is_empty() && rest.is_none() {
             return empty_parenthesized("{", dangling, "}").fmt(f);
         }
 
@@ -68,7 +65,7 @@ impl FormatNodeRule<PatternMatchMapping> for FormatPatternMatchMapping {
         let format_pairs = format_with(|f| {
             let mut joiner = f.join_comma_separated(item.end());
 
-            for (key, pattern) in keys.iter().zip(patterns) {
+            for MatchMappingItem { key, pattern } in items {
                 let key_pattern_pair = KeyPatternPair { key, pattern };
                 joiner.entry(&key_pattern_pair, &key_pattern_pair);
             }
@@ -159,8 +156,7 @@ impl Format<PyFormatContext<'_>> for KeyPatternPair<'_> {
 /// if it exists.
 fn find_double_star(pattern: &PatternMatchMapping, source: &str) -> Option<(TextRange, TextRange)> {
     let PatternMatchMapping {
-        keys: _,
-        patterns,
+        items,
         rest,
         range: _,
     } = pattern;
@@ -168,8 +164,10 @@ fn find_double_star(pattern: &PatternMatchMapping, source: &str) -> Option<(Text
     // If there's no `rest` element, there's no `**`.
     let rest = rest.as_ref()?;
 
-    let mut tokenizer =
-        SimpleTokenizer::starts_at(patterns.last().map_or(pattern.start(), Ranged::end), source);
+    let mut tokenizer = SimpleTokenizer::starts_at(
+        items.last().map_or_else(|| pattern.start(), Ranged::end),
+        source,
+    );
     let double_star = tokenizer.find(|token| token.kind() == SimpleTokenKind::DoubleStar)?;
 
     Some((double_star.range(), rest.range()))
