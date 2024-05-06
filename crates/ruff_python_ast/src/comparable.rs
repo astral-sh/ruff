@@ -688,8 +688,23 @@ pub struct ExprIf<'a> {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
+pub struct ComparableDictItem<'a> {
+    key: Option<ComparableExpr<'a>>,
+    value: ComparableExpr<'a>,
+}
+
+impl<'a> From<&'a ast::DictItem> for ComparableDictItem<'a> {
+    fn from(ast::DictItem { key, value }: &'a ast::DictItem) -> Self {
+        Self {
+            key: key.as_ref().map(ComparableExpr::from),
+            value: value.into(),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ExprDict<'a> {
-    items: Vec<(Option<ComparableExpr<'a>>, ComparableExpr<'a>)>,
+    items: Vec<ComparableDictItem<'a>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -933,12 +948,7 @@ impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
                 orelse: orelse.into(),
             }),
             ast::Expr::Dict(ast::ExprDict { items, range: _ }) => Self::Dict(ExprDict {
-                items: items
-                    .iter()
-                    .map(|ast::DictItem { key, value }| {
-                        (key.as_ref().map(Into::into), value.into())
-                    })
-                    .collect(),
+                items: items.iter().map(ComparableDictItem::from).collect(),
             }),
             ast::Expr::Set(ast::ExprSet { elts, range: _ }) => Self::Set(ExprSet {
                 elts: elts.iter().map(Into::into).collect(),
