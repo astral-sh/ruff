@@ -1,0 +1,22 @@
+---
+source: crates/ruff_python_trivia_integration_tests/tests/simple_tokenizer.rs
+expression: test_case.tokens()
+---
+[
+    SimpleToken {
+        kind: Comma,
+        range: 0..1,
+    },
+    SimpleToken {
+        kind: Comma,
+        range: 1..2,
+    },
+    SimpleToken {
+        kind: Comma,
+        range: 2..3,
+    },
+    SimpleToken {
+        kind: Comma,
+        range: 3..4,
+    },
+]

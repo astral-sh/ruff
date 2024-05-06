@@ -1,0 +1,16 @@
+---
+source: crates/ruff_python_ast_integration_tests/tests/visitor.rs
+expression: trace
+---
+- StmtExpr
+  - ExprFString
+    - StringLiteral
+    - FString
+      - FStringLiteralElement
+      - FStringExpressionElement
+        - ExprName
+        - FStringLiteralElement
+        - FStringExpressionElement
+          - ExprName
+        - FStringLiteralElement
+      - FStringLiteralElement
