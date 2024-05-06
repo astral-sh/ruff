@@ -413,17 +413,14 @@ fn fix_by_reexporting(
         bail!("Expected import bindings");
     }
 
-    let edits = match dunder_all {
-        Some(dunder_all) => {
-            fix::edits::add_to_dunder_all(imports.iter().map(|b| b.name), dunder_all)
-        }
-        None => {
-            let member_names = imports
-                .iter()
-                .map(|b| b.import.member_name())
-                .collect::<Vec<_>>();
-            fix::edits::make_redundant_alias(member_names.iter().map(AsRef::as_ref), statement)
-        }
+    let edits = if let Some(dunder_all) = dunder_all {
+        fix::edits::add_to_dunder_all(imports.iter().map(|b| b.name), dunder_all)
+    } else {
+        let member_names = imports
+            .iter()
+            .map(|b| b.import.member_name())
+            .collect::<Vec<_>>();
+        fix::edits::make_redundant_alias(member_names.iter().map(AsRef::as_ref), statement)
     };
 
     // Only emit a fix if there are edits

@@ -152,8 +152,9 @@ pub(crate) fn add_to_dunder_all<'a>(
     let insertion_point = dunder_all
         .elts
         .last()
-        .map(|expr| expr.range().end())
-        .unwrap_or(dunder_all.range.end() - TextSize::from(1));
+        .map_or(dunder_all.range.end() - TextSize::from(1), |expr| {
+            expr.range().end()
+        });
     names
         .enumerate()
         .map(|(offset, name)| match dunder_all.elts.len() + offset {
