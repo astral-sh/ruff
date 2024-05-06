@@ -4,7 +4,7 @@ use anyhow::{Context, Result};
 
 use ruff_diagnostics::Edit;
 use ruff_python_ast::parenthesize::parenthesized_range;
-use ruff_python_ast::{self as ast, Arguments, ExceptHandler, Stmt};
+use ruff_python_ast::{self as ast, Arguments, ExceptHandler, ExprList, Stmt};
 use ruff_python_ast::{AnyNodeRef, ArgOrKeyword};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
@@ -140,6 +140,25 @@ pub(crate) fn make_redundant_alias<'a>(
                 .iter()
                 .find(|alias| alias.asname.is_none() && name == alias.name.id)
                 .map(|alias| Edit::range_replacement(format!("{name} as {name}"), alias.range))
+        })
+        .collect()
+}
+
+/// Fix to add the specified imports to the `__all__` export list.
+pub(crate) fn add_to_dunder_all<'a>(
+    names: impl Iterator<Item = &'a str>,
+    dunder_all: &ExprList,
+) -> Vec<Edit> {
+    let insertion_point = dunder_all
+        .elts
+        .last()
+        .map(|expr| expr.range().end())
+        .unwrap_or(dunder_all.range.end() - TextSize::from(1));
+    names
+        .enumerate()
+        .map(|(offset, name)| match dunder_all.elts.len() + offset {
+            0 => Edit::insertion(format!("{name:?}"), insertion_point),
+            _ => Edit::insertion(format!(", {name:?}"), insertion_point),
         })
         .collect()
 }
@@ -480,11 +499,14 @@ mod tests {
     use anyhow::Result;
 
     use ruff_diagnostics::Edit;
-    use ruff_python_parser::parse_suite;
+    use ruff_python_ast as ast;
+    use ruff_python_parser::{parse_expression, parse_suite};
     use ruff_source_file::Locator;
     use ruff_text_size::{Ranged, TextRange, TextSize};
 
-    use crate::fix::edits::{make_redundant_alias, next_stmt_break, trailing_semicolon};
+    use crate::fix::edits::{
+        add_to_dunder_all, make_redundant_alias, next_stmt_break, trailing_semicolon,
+    };
 
     #[test]
     fn find_semicolon() -> Result<()> {
@@ -584,6 +606,42 @@ x = 1 \
                 TextRange::new(TextSize::new(7), TextSize::new(8)),
             )],
             "the third item is already aliased to something else"
+        );
+    }
+
+    #[test]
+    fn add_to_empty_dunder_all() {
+        let Ok(ast::Expr::List(ref list)) = parse_expression("[]") else {
+            panic!("expected a list");
+        };
+        assert_eq!(
+            add_to_dunder_all(["x"].into_iter(), list),
+            vec![Edit::insertion(String::from("\"x\""), TextSize::new(1))],
+        );
+        assert_eq!(
+            add_to_dunder_all(["x", "y"].into_iter(), list),
+            vec![
+                Edit::insertion(String::from("\"x\""), TextSize::new(1)),
+                Edit::insertion(String::from(", \"y\""), TextSize::new(1))
+            ],
+        );
+    }
+
+    #[test]
+    fn add_to_nonempty_dunder_all() {
+        let Ok(ast::Expr::List(ref list)) = parse_expression("[\"a\", \"b\"]") else {
+            panic!("expected a list");
+        };
+        assert_eq!(
+            add_to_dunder_all(["x"].into_iter(), list),
+            vec![Edit::insertion(String::from(", \"x\""), TextSize::new(9))],
+        );
+        assert_eq!(
+            add_to_dunder_all(["x", "y"].into_iter(), list),
+            vec![
+                Edit::insertion(String::from(", \"x\""), TextSize::new(9)),
+                Edit::insertion(String::from(", \"y\""), TextSize::new(9))
+            ],
         );
     }
 }
