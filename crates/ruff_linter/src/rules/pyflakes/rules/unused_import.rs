@@ -82,7 +82,10 @@ enum UnusedImportContext {
 /// - [Typing documentation: interface conventions](https://typing.readthedocs.io/en/latest/source/libraries.html#library-interface-public-and-private-symbols)
 #[violation]
 pub struct UnusedImport {
+    /// Qualified name of the import
     name: String,
+    /// Name of the import binding
+    binding: String,
     context: Option<UnusedImportContext>,
     multiple: bool,
 }
@@ -109,7 +112,12 @@ impl Violation for UnusedImport {
     }
 
     fn fix_title(&self) -> Option<String> {
-        let UnusedImport { name, multiple, .. } = self;
+        let UnusedImport {
+            name,
+            binding,
+            multiple,
+            ..
+        } = self;
         let resolution = match self.context {
             Some(UnusedImportContext::Init {
                 first_party: true,
@@ -123,8 +131,10 @@ impl Violation for UnusedImport {
         };
         Some(if *multiple {
             resolution.to_string()
-        } else {
+        } else if name.ends_with(binding) {
             format!("{resolution}: `{name}`")
+        } else {
+            format!("{resolution}: `{binding}`")
         })
     }
 }
@@ -305,6 +315,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
             let mut diagnostic = Diagnostic::new(
                 UnusedImport {
                     name: binding.import.qualified_name().to_string(),
+                    binding: binding.name.to_string(),
                     context,
                     multiple,
                 },
@@ -328,6 +339,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
         let mut diagnostic = Diagnostic::new(
             UnusedImport {
                 name: binding.import.qualified_name().to_string(),
+                binding: binding.name.to_string(),
                 context: None,
                 multiple: false,
             },
