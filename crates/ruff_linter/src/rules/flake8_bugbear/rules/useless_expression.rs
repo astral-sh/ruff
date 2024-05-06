@@ -69,15 +69,11 @@ impl Violation for UselessExpression {
 /// B018
 pub(crate) fn useless_expression(checker: &mut Checker, value: &Expr) {
     // Ignore comparisons, as they're handled by `useless_comparison`.
-    if value.is_compare_expr() {
+    if matches!(value, Expr::Compare(_) | Expr::EllipsisLiteral(_)) {
         return;
     }
 
-    // Ignore strings, to avoid false positives with docstrings.
-    if matches!(
-        value,
-        Expr::FString(_) | Expr::StringLiteral(_) | Expr::EllipsisLiteral(_)
-    ) {
+    if checker.semantic().in_docstring() || checker.semantic().in_attribute_docstring() {
         return;
     }
 
