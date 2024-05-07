@@ -767,6 +767,29 @@ impl From<ExprIf> for Expr {
     }
 }
 
+/// Represents an item in a [dictionary literal display][1].
+///
+/// Consider the following Python dictionary literal:
+/// ```python
+/// {key1: value1, **other_dictionary}
+/// ```
+///
+/// In our AST, this would be represented using an `ExprDict` node containing
+/// two `DictItem` nodes inside it:
+/// ```ignore
+/// [
+///     DictItem {
+///         key: Some(Expr::Name(ExprName { id: "key1" })),
+///         value: Expr::Name(ExprName { id: "value1" }),
+///     },
+///     DictItem {
+///         key: None,
+///         value: Expr::Name(ExprName { id: "other_dictionary" }),
+///     }
+/// ]
+/// ```
+///
+/// [1]: https://docs.python.org/3/reference/expressions.html#displays-for-lists-sets-and-dictionaries
 #[derive(Debug, Clone, PartialEq)]
 pub struct DictItem {
     pub key: Option<Expr>,
@@ -800,28 +823,32 @@ pub struct ExprDict {
 }
 
 impl ExprDict {
+    /// Returns an `Iterator` over the AST nodes representing the
+    /// dictionary's keys.
     pub fn iter_keys(&self) -> DictKeyIterator {
         DictKeyIterator::new(&self.items)
     }
 
+    /// Returns an `Iterator` over the AST nodes representing the
+    /// dictionary's values.
     pub fn iter_values(&self) -> DictValueIterator {
         DictValueIterator::new(&self.items)
     }
 
-    pub fn iter_items(&self) -> Iter<'_, DictItem> {
-        self.items.iter()
-    }
-
+    /// Returns the AST node representing the *n*th key of this
+    /// dictionary.
+    ///
+    /// Panics: If the index `n` is out of bounds.
     pub fn key(&self, n: usize) -> Option<&Expr> {
         self.items[n].key()
     }
 
+    /// Returns the AST node representing the *n*th value of this
+    /// dictionary.
+    ///
+    /// Panics: If the index `n` is out of bounds.
     pub fn value(&self, n: usize) -> &Expr {
         self.items[n].value()
-    }
-
-    pub fn item(&self, n: usize) -> &DictItem {
-        &self.items[n]
     }
 }
 
