@@ -1633,6 +1633,13 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 if checker.enabled(Rule::TSuffixedTypeAlias) {
                     flake8_pyi::rules::t_suffixed_type_alias(checker, target);
                 }
+            } else if checker
+                .semantic
+                .match_typing_expr(helpers::map_subscript(annotation), "Final")
+            {
+                if checker.enabled(Rule::RedundantFinalLiteral) {
+                    flake8_pyi::rules::redundant_final_literal(checker, assign_stmt);
+                }
             }
         }
         Stmt::TypeAlias(ast::StmtTypeAlias { name, .. }) => {

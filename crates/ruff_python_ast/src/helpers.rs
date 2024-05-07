@@ -659,15 +659,14 @@ pub fn map_callable(decorator: &Expr) -> &Expr {
     }
 }
 
-/// Given an [`Expr`] that can be callable or not (like a decorator, which could
-/// be used with or without explicit call syntax), return the underlying
-/// callable.
+/// Given an [`Expr`] that can be a [`ExprSubscript`][ast::ExprSubscript] or not
+/// (like an annotation that may be generic or not), return the underlying expr.
 pub fn map_subscript(expr: &Expr) -> &Expr {
     if let Expr::Subscript(ast::ExprSubscript { value, .. }) = expr {
-        // Ex) `Iterable[T]`
+        // Ex) `Iterable[T]`  => return `Iterable`
         value
     } else {
-        // Ex) `Iterable`
+        // Ex) `Iterable`  => return `Iterable`
         expr
     }
 }
