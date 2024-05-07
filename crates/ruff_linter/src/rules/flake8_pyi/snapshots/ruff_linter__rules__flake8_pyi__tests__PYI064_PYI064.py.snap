@@ -81,7 +81,7 @@ PYI064.py:10:1: PYI064 [*] `Final[Literal[123]]` can be replaced with a bare `Fi
 8  8  | 
 9  9  | # This should be fixable, and marked as safe
 10    |-w1: Final[Literal[123]]  # PYI064
-   10 |+w1: Final  # PYI064
+   10 |+w1: Final = 123  # PYI064
 11 11 | 
 12 12 | # This should be fixable, but marked as unsafe
 13 13 | w2: Final[Literal[123]] = "random value"  # PYI064
@@ -101,7 +101,7 @@ PYI064.py:13:1: PYI064 [*] `Final[Literal[123]]` can be replaced with a bare `Fi
 11 11 | 
 12 12 | # This should be fixable, but marked as unsafe
 13    |-w2: Final[Literal[123]] = "random value"  # PYI064
-   13 |+w2: Final = "random value"  # PYI064
+   13 |+w2: Final = 123  # PYI064
 14 14 | 
 15 15 | n1: Final[Literal[True, False]] = True # No issue here
 16 16 | n2: Literal[True] = True  # No issue here

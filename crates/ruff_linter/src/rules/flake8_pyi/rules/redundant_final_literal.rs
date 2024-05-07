@@ -85,11 +85,17 @@ pub(crate) fn redundant_final_literal(checker: &mut Checker, ann_assign: &ast::S
             },
             ann_assign.range(),
         )
-        .with_fix(generate_fix(annotation, assign_value.as_deref(), literal)),
+        .with_fix(generate_fix(
+            checker,
+            annotation,
+            assign_value.as_deref(),
+            literal,
+        )),
     );
 }
 
 fn generate_fix(
+    checker: &Checker,
     annotation: &ast::Expr,
     assign_value: Option<&ast::Expr>,
     literal: &ast::Expr,
@@ -98,13 +104,22 @@ fn generate_fix(
     let insertion = Edit::insertion(format!("Final"), annotation.start());
 
     let Some(assign_value) = assign_value else {
-        // TODO: modify the assign side
-        return Fix::safe_edits(deletion, [insertion]);
+        // If no assignment exists, add our own, same as the literal value.
+        let literal_source = checker.locator().slice(literal.range());
+        let assignment = Edit::insertion(format!(" = {literal_source}"), annotation.end());
+        return Fix::safe_edits(deletion, [insertion, assignment]);
     };
 
     if ComparableExpr::from(assign_value) != ComparableExpr::from(literal) {
-        // TODO: modify the assign side
-        return Fix::unsafe_edits(deletion, [insertion]);
+        // In this case, assume that the value in the literal annotation
+        // is the correct one.
+        let literal_source = checker.locator().slice(literal.range());
+        let assign_replacement = Edit::replacement(
+            literal_source.to_string(),
+            assign_value.start(),
+            assign_value.end(),
+        );
+        return Fix::unsafe_edits(deletion, [insertion, assign_replacement]);
     }
 
     Fix::safe_edits(deletion, [insertion])
