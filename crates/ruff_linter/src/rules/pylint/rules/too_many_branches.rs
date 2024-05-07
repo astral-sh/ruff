@@ -107,6 +107,7 @@ fn num_branches(stmts: &[Stmt]) -> usize {
                     .map(|case| num_branches(&case.body))
                     .sum::<usize>()
             }
+            Stmt::With(ast::StmtWith { body, .. }) => num_branches(body),
             Stmt::For(ast::StmtFor { body, orelse, .. })
             | Stmt::While(ast::StmtWhile { body, orelse, .. }) => {
                 1 + num_branches(body)

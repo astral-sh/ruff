@@ -2,6 +2,8 @@
 Test for too many branches.
 Taken from the pylint source 2023-02-03
 """
+from contextlib import suppress
+
 # pylint: disable=using-constant-test
 def wrong(): # [too-many-branches]
     """ Has too many branches. """
@@ -70,3 +72,33 @@ def good():
         pass
     elif 7:
         pass
+
+def with_statement_wrong():
+    """statements inside the with statement should get counted"""
+    with suppress(Exception):
+        if 1:
+            pass
+        elif 1:
+            pass
+        elif 1:
+            pass
+        elif 1:
+            pass
+        elif 1:
+            pass
+        elif 1:
+            pass
+        try:
+            pass
+        finally:
+            pass
+        if 2:
+            pass
+        while True:
+            pass
+        if 1:
+            pass
+        elif 2:
+            pass
+        elif 3:
+            pass
