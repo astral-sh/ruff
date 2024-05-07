@@ -41,6 +41,8 @@ mod tests {
     #[test_case(Rule::FutureAnnotationsInStub, Path::new("PYI044.pyi"))]
     #[test_case(Rule::GeneratorReturnFromIterMethod, Path::new("PYI058.py"))]
     #[test_case(Rule::GeneratorReturnFromIterMethod, Path::new("PYI058.pyi"))]
+    #[test_case(Rule::GenericNotLastBaseClass, Path::new("PYI059.py"))]
+    #[test_case(Rule::GenericNotLastBaseClass, Path::new("PYI059.pyi"))]
     #[test_case(Rule::IterMethodReturnIterable, Path::new("PYI045.py"))]
     #[test_case(Rule::IterMethodReturnIterable, Path::new("PYI045.pyi"))]
     #[test_case(Rule::NoReturnArgumentAnnotationInStub, Path::new("PYI050.py"))]
