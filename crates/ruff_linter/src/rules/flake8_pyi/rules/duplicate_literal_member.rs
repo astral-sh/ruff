@@ -12,19 +12,19 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for duplicate literal members.
+/// Checks for duplicate members in a `typing.Literal[]` slice.
 ///
 /// ## Why is this bad?
 /// Duplicate literal members are redundant and should be removed.
 ///
 /// ## Example
 /// ```python
-/// foo: Literal[True, False, True]
+/// foo: Literal["a", "b", "a"]
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// foo: Literal[True, False]
+/// foo: Literal["a", "b"]
 /// ```
 ///
 /// ## References
@@ -52,13 +52,12 @@ pub(crate) fn duplicate_literal_member<'a>(checker: &mut Checker, expr: &'a Expr
     let mut check_for_duplicate_members = |expr: &'a Expr, _: &'a Expr| {
         // If we've already seen this literal member, raise a violation.
         if !seen_nodes.insert(expr.into()) {
-            let diagnostic = Diagnostic::new(
+            diagnostics.push(Diagnostic::new(
                 DuplicateLiteralMember {
                     duplicate_name: checker.generator().expr(expr),
                 },
                 expr.range(),
-            );
-            diagnostics.push(diagnostic);
+            ));
         }
     };
 

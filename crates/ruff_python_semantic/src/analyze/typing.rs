@@ -437,7 +437,7 @@ where
         // Ex) Literal[x, y]
         if let Expr::Subscript(ast::ExprSubscript { value, slice, .. }) = expr {
             if semantic.match_typing_expr(value, "Literal") {
-                match slice.as_ref() {
+                match &**slice {
                     Expr::Tuple(ast::ExprTuple { elts, .. }) => {
                         // Traverse each element of the tuple within the literal recursively to handle cases
                         // such as `Literal[..., Literal[...]]
