@@ -112,7 +112,7 @@ fn generate_fix(
         // If no assignment exists, add our own, same as the literal value.
         let literal_source = checker.locator().slice(literal.range());
         let assignment = Edit::insertion(format!(" = {literal_source}"), annotation.end());
-        insertions.push(assignment)
+        insertions.push(assignment);
     };
 
     Fix::safe_edits(deletion, insertions)
