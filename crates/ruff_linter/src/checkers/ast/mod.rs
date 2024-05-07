@@ -1172,8 +1172,8 @@ impl<'a> Visitor<'a> for Checker<'a> {
                             let Keyword { arg, value, .. } = keyword;
                             match (arg.as_ref(), value) {
                                 // Ex) NamedTuple("a", **{"a": int})
-                                (None, Expr::Dict(ast::ExprDict { keys, values, .. })) => {
-                                    for (key, value) in keys.iter().zip(values) {
+                                (None, Expr::Dict(ast::ExprDict { items, .. })) => {
+                                    for ast::DictItem { key, value } in items {
                                         if let Some(key) = key.as_ref() {
                                             self.visit_non_type_definition(key);
                                             self.visit_type_definition(value);
@@ -1200,16 +1200,11 @@ impl<'a> Visitor<'a> for Checker<'a> {
                             self.visit_non_type_definition(arg);
                         }
                         for arg in args {
-                            if let Expr::Dict(ast::ExprDict {
-                                keys,
-                                values,
-                                range: _,
-                            }) = arg
-                            {
-                                for key in keys.iter().flatten() {
-                                    self.visit_non_type_definition(key);
-                                }
-                                for value in values {
+                            if let Expr::Dict(ast::ExprDict { items, range: _ }) = arg {
+                                for ast::DictItem { key, value } in items {
+                                    if let Some(key) = key {
+                                        self.visit_non_type_definition(key);
+                                    }
                                     self.visit_type_definition(value);
                                 }
                             } else {

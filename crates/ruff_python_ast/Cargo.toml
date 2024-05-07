@@ -27,7 +27,6 @@ serde = { workspace = true, optional = true }
 
 [dev-dependencies]
 insta = { workspace = true }
-ruff_python_parser = { path = "../ruff_python_parser" }
 
 [features]
 serde = ["dep:serde", "ruff_text_size/serde"]

@@ -263,25 +263,25 @@ Module(
                                             left: Dict(
                                                 ExprDict {
                                                     range: 201..210,
-                                                    keys: [
-                                                        Some(
-                                                            BooleanLiteral(
-                                                                ExprBooleanLiteral {
-                                                                    range: 202..206,
-                                                                    value: true,
+                                                    items: [
+                                                        DictItem {
+                                                            key: Some(
+                                                                BooleanLiteral(
+                                                                    ExprBooleanLiteral {
+                                                                        range: 202..206,
+                                                                        value: true,
+                                                                    },
+                                                                ),
+                                                            ),
+                                                            value: NumberLiteral(
+                                                                ExprNumberLiteral {
+                                                                    range: 208..209,
+                                                                    value: Int(
+                                                                        1,
+                                                                    ),
                                                                 },
                                                             ),
-                                                        ),
-                                                    ],
-                                                    values: [
-                                                        NumberLiteral(
-                                                            ExprNumberLiteral {
-                                                                range: 208..209,
-                                                                value: Int(
-                                                                    1,
-                                                                ),
-                                                            },
-                                                        ),
+                                                        },
                                                     ],
                                                 },
                                             ),
@@ -711,25 +711,25 @@ Module(
                                             right: Dict(
                                                 ExprDict {
                                                     range: 534..543,
-                                                    keys: [
-                                                        Some(
-                                                            BooleanLiteral(
-                                                                ExprBooleanLiteral {
-                                                                    range: 535..539,
-                                                                    value: true,
+                                                    items: [
+                                                        DictItem {
+                                                            key: Some(
+                                                                BooleanLiteral(
+                                                                    ExprBooleanLiteral {
+                                                                        range: 535..539,
+                                                                        value: true,
+                                                                    },
+                                                                ),
+                                                            ),
+                                                            value: NumberLiteral(
+                                                                ExprNumberLiteral {
+                                                                    range: 541..542,
+                                                                    value: Int(
+                                                                        1,
+                                                                    ),
                                                                 },
                                                             ),
-                                                        ),
-                                                    ],
-                                                    values: [
-                                                        NumberLiteral(
-                                                            ExprNumberLiteral {
-                                                                range: 541..542,
-                                                                value: Int(
-                                                                    1,
-                                                                ),
-                                                            },
-                                                        ),
+                                                        },
                                                     ],
                                                 },
                                             ),

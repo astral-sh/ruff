@@ -110,27 +110,27 @@ Module(
                     value: Dict(
                         ExprDict {
                             range: 271..277,
-                            keys: [
-                                Some(
-                                    NumberLiteral(
+                            items: [
+                                DictItem {
+                                    key: Some(
+                                        NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 272..273,
+                                                value: Int(
+                                                    1,
+                                                ),
+                                            },
+                                        ),
+                                    ),
+                                    value: NumberLiteral(
                                         ExprNumberLiteral {
-                                            range: 272..273,
+                                            range: 275..276,
                                             value: Int(
-                                                1,
+                                                2,
                                             ),
                                         },
                                     ),
-                                ),
-                            ],
-                            values: [
-                                NumberLiteral(
-                                    ExprNumberLiteral {
-                                        range: 275..276,
-                                        value: Int(
-                                            2,
-                                        ),
-                                    },
-                                ),
+                                },
                             ],
                         },
                     ),

@@ -767,12 +767,89 @@ impl From<ExprIf> for Expr {
     }
 }
 
+/// Represents an item in a [dictionary literal display][1].
+///
+/// Consider the following Python dictionary literal:
+/// ```python
+/// {key1: value1, **other_dictionary}
+/// ```
+///
+/// In our AST, this would be represented using an `ExprDict` node containing
+/// two `DictItem` nodes inside it:
+/// ```ignore
+/// [
+///     DictItem {
+///         key: Some(Expr::Name(ExprName { id: "key1" })),
+///         value: Expr::Name(ExprName { id: "value1" }),
+///     },
+///     DictItem {
+///         key: None,
+///         value: Expr::Name(ExprName { id: "other_dictionary" }),
+///     }
+/// ]
+/// ```
+///
+/// [1]: https://docs.python.org/3/reference/expressions.html#displays-for-lists-sets-and-dictionaries
+#[derive(Debug, Clone, PartialEq)]
+pub struct DictItem {
+    pub key: Option<Expr>,
+    pub value: Expr,
+}
+
+impl DictItem {
+    fn key(&self) -> Option<&Expr> {
+        self.key.as_ref()
+    }
+
+    fn value(&self) -> &Expr {
+        &self.value
+    }
+}
+
+impl Ranged for DictItem {
+    fn range(&self) -> TextRange {
+        TextRange::new(
+            self.key.as_ref().map_or(self.value.start(), Ranged::start),
+            self.value.end(),
+        )
+    }
+}
+
 /// See also [Dict](https://docs.python.org/3/library/ast.html#ast.Dict)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprDict {
     pub range: TextRange,
-    pub keys: Vec<Option<Expr>>,
-    pub values: Vec<Expr>,
+    pub items: Vec<DictItem>,
+}
+
+impl ExprDict {
+    /// Returns an `Iterator` over the AST nodes representing the
+    /// dictionary's keys.
+    pub fn iter_keys(&self) -> DictKeyIterator {
+        DictKeyIterator::new(&self.items)
+    }
+
+    /// Returns an `Iterator` over the AST nodes representing the
+    /// dictionary's values.
+    pub fn iter_values(&self) -> DictValueIterator {
+        DictValueIterator::new(&self.items)
+    }
+
+    /// Returns the AST node representing the *n*th key of this
+    /// dictionary.
+    ///
+    /// Panics: If the index `n` is out of bounds.
+    pub fn key(&self, n: usize) -> Option<&Expr> {
+        self.items[n].key()
+    }
+
+    /// Returns the AST node representing the *n*th value of this
+    /// dictionary.
+    ///
+    /// Panics: If the index `n` is out of bounds.
+    pub fn value(&self, n: usize) -> &Expr {
+        self.items[n].value()
+    }
 }
 
 impl From<ExprDict> for Expr {
@@ -780,6 +857,90 @@ impl From<ExprDict> for Expr {
         Expr::Dict(payload)
     }
 }
+
+#[derive(Debug, Clone)]
+pub struct DictKeyIterator<'a> {
+    items: Iter<'a, DictItem>,
+}
+
+impl<'a> DictKeyIterator<'a> {
+    fn new(items: &'a [DictItem]) -> Self {
+        Self {
+            items: items.iter(),
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+}
+
+impl<'a> Iterator for DictKeyIterator<'a> {
+    type Item = Option<&'a Expr>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.items.next().map(DictItem::key)
+    }
+
+    fn last(mut self) -> Option<Self::Item> {
+        self.next_back()
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.items.size_hint()
+    }
+}
+
+impl<'a> DoubleEndedIterator for DictKeyIterator<'a> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        self.items.next_back().map(DictItem::key)
+    }
+}
+
+impl<'a> FusedIterator for DictKeyIterator<'a> {}
+impl<'a> ExactSizeIterator for DictKeyIterator<'a> {}
+
+#[derive(Debug, Clone)]
+pub struct DictValueIterator<'a> {
+    items: Iter<'a, DictItem>,
+}
+
+impl<'a> DictValueIterator<'a> {
+    fn new(items: &'a [DictItem]) -> Self {
+        Self {
+            items: items.iter(),
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+}
+
+impl<'a> Iterator for DictValueIterator<'a> {
+    type Item = &'a Expr;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.items.next().map(DictItem::value)
+    }
+
+    fn last(mut self) -> Option<Self::Item> {
+        self.next_back()
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.items.size_hint()
+    }
+}
+
+impl<'a> DoubleEndedIterator for DictValueIterator<'a> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        self.items.next_back().map(DictItem::value)
+    }
+}
+
+impl<'a> FusedIterator for DictValueIterator<'a> {}
+impl<'a> ExactSizeIterator for DictValueIterator<'a> {}
 
 /// See also [Set](https://docs.python.org/3/library/ast.html#ast.Set)
 #[derive(Clone, Debug, PartialEq)]
@@ -4358,7 +4519,7 @@ mod tests {
         assert_eq!(std::mem::size_of::<ExprBytesLiteral>(), 40);
         assert_eq!(std::mem::size_of::<ExprCall>(), 56);
         assert_eq!(std::mem::size_of::<ExprCompare>(), 48);
-        assert_eq!(std::mem::size_of::<ExprDict>(), 56);
+        assert_eq!(std::mem::size_of::<ExprDict>(), 32);
         assert_eq!(std::mem::size_of::<ExprDictComp>(), 48);
         assert_eq!(std::mem::size_of::<ExprEllipsisLiteral>(), 8);
         // 56 for Rustc < 1.76

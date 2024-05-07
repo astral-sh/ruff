@@ -2267,6 +2267,12 @@ pub struct IsortOptions {
     /// testing = ["pytest", "hypothesis"]
     /// ```
     ///
+    /// The values in the list are treated as glob patterns. For example, to match all packages in
+    /// the LangChain ecosystem (`langchain-core`, `langchain-openai`, etc.):
+    /// ```toml
+    /// langchain = ["langchain-*"]
+    /// ```
+    ///
     /// Custom sections should typically be inserted into the `section-order` list to ensure that
     /// they're displayed as a standalone group and in the intended order, as in:
     /// ```toml

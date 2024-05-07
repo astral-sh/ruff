@@ -47,7 +47,7 @@ jobs:
         run: mkdocs build --strict -f mkdocs.public.yml
       - name: "Deploy to Cloudflare Pages"
         if: ${{ env.CF_API_TOKEN_EXISTS == 'true' }}
-        uses: cloudflare/wrangler-action@v3.4.1
+        uses: cloudflare/wrangler-action@v3.5.0
         with:
           apiToken: ${{ secrets.CF_API_TOKEN }}
           accountId: ${{ secrets.CF_ACCOUNT_ID }}

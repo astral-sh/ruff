@@ -170,16 +170,12 @@ fn is_valid_tuple(formats: &[CFormatStrOrBytes<String>], elts: &[Expr]) -> bool 
 }
 
 /// Return `true` if the dictionary values align with the format types.
-fn is_valid_dict(
-    formats: &[CFormatStrOrBytes<String>],
-    keys: &[Option<Expr>],
-    values: &[Expr],
-) -> bool {
+fn is_valid_dict(formats: &[CFormatStrOrBytes<String>], items: &[ast::DictItem]) -> bool {
     let formats = collect_specs(formats);
 
     // If there are more formats that values, the statement is invalid. Avoid
     // checking the values.
-    if formats.len() > values.len() {
+    if formats.len() > items.len() {
         return true;
     }
 
@@ -192,7 +188,7 @@ fn is_valid_dict(
                 .map(|mapping_key| (mapping_key.as_str(), format))
         })
         .collect();
-    for (key, value) in keys.iter().zip(values) {
+    for ast::DictItem { key, value } in items {
         let Some(key) = key else {
             return true;
         };
@@ -252,11 +248,7 @@ pub(crate) fn bad_string_format_type(checker: &mut Checker, expr: &Expr, right: 
     // Parse the parameters.
     let is_valid = match right {
         Expr::Tuple(ast::ExprTuple { elts, .. }) => is_valid_tuple(&format_strings, elts),
-        Expr::Dict(ast::ExprDict {
-            keys,
-            values,
-            range: _,
-        }) => is_valid_dict(&format_strings, keys, values),
+        Expr::Dict(ast::ExprDict { items, range: _ }) => is_valid_dict(&format_strings, items),
         _ => is_valid_constant(&format_strings, right),
     };
     if !is_valid {

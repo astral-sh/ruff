@@ -1544,8 +1544,7 @@ impl<'src> Parser<'src> {
         // Return an empty `DictExpr` when finding a `}` right after the `{`
         if self.eat(TokenKind::Rbrace) {
             return Expr::Dict(ast::ExprDict {
-                keys: vec![],
-                values: vec![],
+                items: vec![],
                 range: self.node_range(start),
             });
         }
@@ -1794,21 +1793,24 @@ impl<'src> Parser<'src> {
             self.expect(TokenKind::Comma);
         }
 
-        let mut keys = vec![key];
-        let mut values = vec![value];
+        let mut items = vec![ast::DictItem { key, value }];
 
         self.parse_comma_separated_list(RecoveryContextKind::DictElements, |parser| {
             if parser.eat(TokenKind::DoubleStar) {
-                keys.push(None);
-
                 // Handle dictionary unpacking. Here, the grammar is `'**' bitwise_or`
                 // which requires limiting the expression.
-                values.push(parser.parse_expression_with_bitwise_or_precedence().expr);
+                items.push(ast::DictItem {
+                    key: None,
+                    value: parser.parse_expression_with_bitwise_or_precedence().expr,
+                });
             } else {
-                keys.push(Some(parser.parse_conditional_expression_or_higher().expr));
+                let key = parser.parse_conditional_expression_or_higher().expr;
                 parser.expect(TokenKind::Colon);
 
-                values.push(parser.parse_conditional_expression_or_higher().expr);
+                items.push(ast::DictItem {
+                    key: Some(key),
+                    value: parser.parse_conditional_expression_or_higher().expr,
+                });
             }
         });
 
@@ -1816,8 +1818,7 @@ impl<'src> Parser<'src> {
 
         ast::ExprDict {
             range: self.node_range(start),
-            keys,
-            values,
+            items,
         }
     }
 

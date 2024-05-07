@@ -28,8 +28,7 @@ Module(
                                     cls: Dict(
                                         ExprDict {
                                             range: 108..109,
-                                            keys: [],
-                                            values: [],
+                                            items: [],
                                         },
                                     ),
                                     arguments: PatternArguments {

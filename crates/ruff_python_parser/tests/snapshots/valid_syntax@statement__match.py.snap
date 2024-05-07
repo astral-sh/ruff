@@ -3814,37 +3814,37 @@ Module(
                     subject: Dict(
                         ExprDict {
                             range: 2959..2970,
-                            keys: [
-                                Some(
-                                    StringLiteral(
-                                        ExprStringLiteral {
-                                            range: 2960..2966,
-                                            value: StringLiteralValue {
-                                                inner: Single(
-                                                    StringLiteral {
-                                                        range: 2960..2966,
-                                                        value: "test",
-                                                        flags: StringLiteralFlags {
-                                                            quote_style: Double,
-                                                            prefix: Empty,
-                                                            triple_quoted: false,
+                            items: [
+                                DictItem {
+                                    key: Some(
+                                        StringLiteral(
+                                            ExprStringLiteral {
+                                                range: 2960..2966,
+                                                value: StringLiteralValue {
+                                                    inner: Single(
+                                                        StringLiteral {
+                                                            range: 2960..2966,
+                                                            value: "test",
+                                                            flags: StringLiteralFlags {
+                                                                quote_style: Double,
+                                                                prefix: Empty,
+                                                                triple_quoted: false,
+                                                            },
                                                         },
-                                                    },
-                                                ),
+                                                    ),
+                                                },
                                             },
+                                        ),
+                                    ),
+                                    value: NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 2968..2969,
+                                            value: Int(
+                                                1,
+                                            ),
                                         },
                                     ),
-                                ),
-                            ],
-                            values: [
-                                NumberLiteral(
-                                    ExprNumberLiteral {
-                                        range: 2968..2969,
-                                        value: Int(
-                                            1,
-                                        ),
-                                    },
-                                ),
+                                },
                             ],
                         },
                     ),
@@ -3907,16 +3907,36 @@ Module(
                     subject: Dict(
                         ExprDict {
                             range: 3032..3049,
-                            keys: [
-                                Some(
-                                    StringLiteral(
+                            items: [
+                                DictItem {
+                                    key: Some(
+                                        StringLiteral(
+                                            ExprStringLiteral {
+                                                range: 3033..3040,
+                                                value: StringLiteralValue {
+                                                    inner: Single(
+                                                        StringLiteral {
+                                                            range: 3033..3040,
+                                                            value: "label",
+                                                            flags: StringLiteralFlags {
+                                                                quote_style: Double,
+                                                                prefix: Empty,
+                                                                triple_quoted: false,
+                                                            },
+                                                        },
+                                                    ),
+                                                },
+                                            },
+                                        ),
+                                    ),
+                                    value: StringLiteral(
                                         ExprStringLiteral {
-                                            range: 3033..3040,
+                                            range: 3042..3048,
                                             value: StringLiteralValue {
                                                 inner: Single(
                                                     StringLiteral {
-                                                        range: 3033..3040,
-                                                        value: "label",
+                                                        range: 3042..3048,
+                                                        value: "test",
                                                         flags: StringLiteralFlags {
                                                             quote_style: Double,
                                                             prefix: Empty,
@@ -3927,27 +3947,7 @@ Module(
                                             },
                                         },
                                     ),
-                                ),
-                            ],
-                            values: [
-                                StringLiteral(
-                                    ExprStringLiteral {
-                                        range: 3042..3048,
-                                        value: StringLiteralValue {
-                                            inner: Single(
-                                                StringLiteral {
-                                                    range: 3042..3048,
-                                                    value: "test",
-                                                    flags: StringLiteralFlags {
-                                                        quote_style: Double,
-                                                        prefix: Empty,
-                                                        triple_quoted: false,
-                                                    },
-                                                },
-                                            ),
-                                        },
-                                    },
-                                ),
+                                },
                             ],
                         },
                     ),

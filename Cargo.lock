@@ -1208,9 +1208,9 @@ dependencies = [
 
 [[package]]
 name = "libc"
-version = "0.2.153"
+version = "0.2.154"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9c198f91728a82281a64e1f4f9eeb25d82cb32a5de251c6bd1b5154d63a8e7bd"
+checksum = "ae743338b92ff9146ce83992f766a31066a91a8c84a45e0e9f21e7cf6de6d346"
 
 [[package]]
 name = "libcst"
@@ -2204,12 +2204,22 @@ dependencies = [
  "is-macro",
  "itertools 0.12.1",
  "once_cell",
- "ruff_python_parser",
  "ruff_python_trivia",
  "ruff_source_file",
  "ruff_text_size",
  "rustc-hash",
  "serde",
+]
+
+[[package]]
+name = "ruff_python_ast_integration_tests"
+version = "0.0.0"
+dependencies = [
+ "insta",
+ "ruff_python_ast",
+ "ruff_python_parser",
+ "ruff_python_trivia",
+ "ruff_text_size",
 ]
 
 [[package]]
@@ -2340,11 +2350,21 @@ version = "0.0.0"
 dependencies = [
  "insta",
  "itertools 0.12.1",
- "ruff_python_index",
- "ruff_python_parser",
  "ruff_source_file",
  "ruff_text_size",
  "unicode-ident",
+]
+
+[[package]]
+name = "ruff_python_trivia_integration_tests"
+version = "0.0.0"
+dependencies = [
+ "insta",
+ "ruff_python_index",
+ "ruff_python_parser",
+ "ruff_python_trivia",
+ "ruff_source_file",
+ "ruff_text_size",
 ]
 
 [[package]]
@@ -2582,9 +2602,9 @@ checksum = "1c107b6f4780854c8b126e228ea8869f4d7b71260f962fefb57b996b8959ba6b"
 
 [[package]]
 name = "serde"
-version = "1.0.199"
+version = "1.0.200"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0c9f6e76df036c77cd94996771fb40db98187f096dd0b9af39c6c6e452ba966a"
+checksum = "ddc6f9cc94d67c0e21aaf7eda3a010fd3af78ebf6e096aa6e2e13c79749cce4f"
 dependencies = [
  "serde_derive",
 ]
@@ -2602,9 +2622,9 @@ dependencies = [
 
 [[package]]
 name = "serde_derive"
-version = "1.0.199"
+version = "1.0.200"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "11bd257a6541e141e42ca6d24ae26f7714887b47e89aa739099104c7e4d3b7fc"
+checksum = "856f046b9400cee3c8c94ed572ecdb752444c24528c035cd35882aad6f492bcb"
 dependencies = [
  "proc-macro2",
  "quote",

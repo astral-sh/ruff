@@ -1,6 +1,5 @@
 use ruff_formatter::{format_args, write};
-use ruff_python_ast::AnyNodeRef;
-use ruff_python_ast::{Expr, ExprDict};
+use ruff_python_ast::{AnyNodeRef, DictItem, Expr, ExprDict};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::comments::{dangling_comments, leading_comments, SourceComment};
@@ -14,18 +13,12 @@ pub struct FormatExprDict;
 
 impl FormatNodeRule<ExprDict> for FormatExprDict {
     fn fmt_fields(&self, item: &ExprDict, f: &mut PyFormatter) -> FormatResult<()> {
-        let ExprDict {
-            range: _,
-            keys,
-            values,
-        } = item;
-
-        debug_assert_eq!(keys.len(), values.len());
+        let ExprDict { range: _, items } = item;
 
         let comments = f.context().comments().clone();
         let dangling = comments.dangling(item);
 
-        let (Some(key), Some(value)) = (keys.first(), values.first()) else {
+        let Some(first_dict_item) = items.first() else {
             return empty_parenthesized("{", dangling, "}").fmt(f);
         };
 
@@ -37,17 +30,17 @@ impl FormatNodeRule<ExprDict> for FormatExprDict {
         //     y
         // }
         // ```
-        let (open_parenthesis_comments, key_value_comments) = dangling.split_at(
-            dangling
-                .partition_point(|comment| comment.end() < KeyValuePair::new(key, value).start()),
-        );
+        let (open_parenthesis_comments, key_value_comments) =
+            dangling.split_at(dangling.partition_point(|comment| {
+                comment.end() < KeyValuePair::new(first_dict_item).start()
+            }));
 
         let format_pairs = format_with(|f| {
             let mut joiner = f.join_comma_separated(item.end());
 
             let mut key_value_comments = key_value_comments;
-            for (key, value) in keys.iter().zip(values) {
-                let mut key_value_pair = KeyValuePair::new(key, value);
+            for dict_item in items {
+                let mut key_value_pair = KeyValuePair::new(dict_item);
 
                 let partition = key_value_comments
                     .partition_point(|comment| comment.start() < key_value_pair.end());
@@ -84,10 +77,10 @@ struct KeyValuePair<'a> {
 }
 
 impl<'a> KeyValuePair<'a> {
-    fn new(key: &'a Option<Expr>, value: &'a Expr) -> Self {
+    fn new(item: &'a DictItem) -> Self {
         Self {
-            key,
-            value,
+            key: &item.key,
+            value: &item.value,
             comments: &[],
         }
     }

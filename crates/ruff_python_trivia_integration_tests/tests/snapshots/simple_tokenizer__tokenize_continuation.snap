@@ -1,0 +1,30 @@
+---
+source: crates/ruff_python_trivia_integration_tests/tests/simple_tokenizer.rs
+expression: test_case.tokens()
+---
+[
+    SimpleToken {
+        kind: LParen,
+        range: 0..1,
+    },
+    SimpleToken {
+        kind: Whitespace,
+        range: 1..2,
+    },
+    SimpleToken {
+        kind: Continuation,
+        range: 2..3,
+    },
+    SimpleToken {
+        kind: Newline,
+        range: 3..4,
+    },
+    SimpleToken {
+        kind: Whitespace,
+        range: 4..5,
+    },
+    SimpleToken {
+        kind: RParen,
+        range: 5..6,
+    },
+]
