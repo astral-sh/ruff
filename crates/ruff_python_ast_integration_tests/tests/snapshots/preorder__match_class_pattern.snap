@@ -1,0 +1,32 @@
+---
+source: crates/ruff_python_ast_integration_tests/tests/preorder.rs
+expression: trace
+---
+- ModModule
+  - StmtMatch
+    - ExprName
+    - MatchCase
+      - PatternMatchClass
+        - ExprName
+        - PatternArguments
+          - PatternMatchValue
+            - ExprNumberLiteral
+          - PatternMatchValue
+            - ExprNumberLiteral
+      - StmtExpr
+        - ExprEllipsisLiteral
+    - MatchCase
+      - PatternMatchClass
+        - ExprName
+        - PatternArguments
+          - PatternKeyword
+            - PatternMatchValue
+              - ExprNumberLiteral
+          - PatternKeyword
+            - PatternMatchValue
+              - ExprNumberLiteral
+          - PatternKeyword
+            - PatternMatchValue
+              - ExprNumberLiteral
+      - StmtExpr
+        - ExprEllipsisLiteral

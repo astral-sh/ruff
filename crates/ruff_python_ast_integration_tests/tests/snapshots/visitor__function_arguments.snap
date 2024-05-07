@@ -1,0 +1,18 @@
+---
+source: crates/ruff_python_ast_integration_tests/tests/visitor.rs
+expression: trace
+---
+- StmtFunctionDef
+  - Parameters
+    - ExprNumberLiteral
+    - ExprNumberLiteral
+    - ExprNumberLiteral
+    - Parameter
+    - Parameter
+    - Parameter
+    - Parameter
+    - Parameter
+    - Parameter
+    - Parameter
+    - Parameter
+  - StmtPass

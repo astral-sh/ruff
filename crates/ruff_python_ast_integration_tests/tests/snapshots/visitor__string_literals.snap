@@ -1,0 +1,9 @@
+---
+source: crates/ruff_python_ast_integration_tests/tests/visitor.rs
+expression: trace
+---
+- StmtExpr
+  - ExprStringLiteral
+    - StringLiteral
+    - StringLiteral
+    - StringLiteral

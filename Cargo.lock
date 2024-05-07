@@ -2204,12 +2204,22 @@ dependencies = [
  "is-macro",
  "itertools 0.12.1",
  "once_cell",
- "ruff_python_parser",
  "ruff_python_trivia",
  "ruff_source_file",
  "ruff_text_size",
  "rustc-hash",
  "serde",
+]
+
+[[package]]
+name = "ruff_python_ast_integration_tests"
+version = "0.0.0"
+dependencies = [
+ "insta",
+ "ruff_python_ast",
+ "ruff_python_parser",
+ "ruff_python_trivia",
+ "ruff_text_size",
 ]
 
 [[package]]
@@ -2340,11 +2350,21 @@ version = "0.0.0"
 dependencies = [
  "insta",
  "itertools 0.12.1",
- "ruff_python_index",
- "ruff_python_parser",
  "ruff_source_file",
  "ruff_text_size",
  "unicode-ident",
+]
+
+[[package]]
+name = "ruff_python_trivia_integration_tests"
+version = "0.0.0"
+dependencies = [
+ "insta",
+ "ruff_python_index",
+ "ruff_python_parser",
+ "ruff_python_trivia",
+ "ruff_source_file",
+ "ruff_text_size",
 ]
 
 [[package]]
