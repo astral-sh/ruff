@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 use std::error::Error;
-use std::fmt::{Display, Write};
+use std::fmt::Display;
 use std::fs;
 use std::ops::Add;
 use std::path::Path;
@@ -36,14 +36,13 @@ pub fn generate_noqa_edits(
     let exemption =
         FileExemption::try_extract(locator.contents(), comment_ranges, external, path, locator);
     let directives = NoqaDirectives::from_commented_ranges(comment_ranges, path, locator);
-    let comments =
-        find_noqa_comments_by_line(diagnostics, locator, &exemption, &directives, noqa_line_for);
+    let comments = find_noqa_comments(diagnostics, locator, &exemption, &directives, noqa_line_for);
     build_noqa_edits_by_diagnostic(comments, diagnostics, locator, line_ending)
 }
 
 /// A directive to ignore a set of rules for a given line of Python source code (e.g.,
 /// `# noqa: F401, F841`).
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub(crate) enum Directive<'a> {
     /// The `noqa` directive ignores all rules (e.g., `# noqa`).
     All(All),
@@ -232,7 +231,7 @@ impl<'a> Ranged for Code<'a> {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub(crate) struct Codes<'a> {
     range: TextRange,
     codes: Vec<Code<'a>>,
@@ -555,21 +554,9 @@ fn add_noqa_inner(
         FileExemption::try_extract(locator.contents(), comment_ranges, external, path, locator);
     let directives = NoqaDirectives::from_commented_ranges(comment_ranges, path, locator);
 
-    let comments =
-        find_noqa_comments_by_line(diagnostics, locator, &exemption, &directives, noqa_line_for);
+    let comments = find_noqa_comments(diagnostics, locator, &exemption, &directives, noqa_line_for);
 
-    let edits = build_noqa_edits_by_line(
-        comments
-            .into_iter()
-            .flatten()
-            .sorted_by_key(|comment| comment.line)
-            .group_by(|comment| comment.line)
-            .into_iter()
-            .map(|(line, comments)| (line, comments.collect()))
-            .collect(),
-        locator,
-        line_ending,
-    );
+    let edits = build_noqa_edits_by_line(comments, locator, line_ending);
 
     let contents = locator.contents();
 
@@ -579,12 +566,9 @@ fn add_noqa_inner(
     for (_, edit) in edits {
         output.push_str(&contents[TextRange::new(last_append, edit.start())]);
 
-        if let Some(content) = edit.content() {
-            if content != &contents[edit.range()] {
-                count += 1;
-            }
-            output.push_str(content);
-        }
+        edit.write(&mut output);
+
+        count += 1;
 
         last_append = edit.end();
     }
@@ -605,16 +589,14 @@ fn build_noqa_edits_by_diagnostic(
         match comment {
             Some(comment) => {
                 debug_assert_eq!(comment.diagnostic, &diagnostics[i]);
-                let line = locator.full_line(comment.line);
-                if let Some(edit) = generate_noqa_edit(
+                if let Some(noqa_edit) = generate_noqa_edit(
                     comment.directive,
                     comment.line,
                     RuleSet::from_rule(comment.diagnostic.kind.rule()),
-                    line,
-                    locator.line_start(comment.line),
+                    locator,
                     line_ending,
                 ) {
-                    edits.push(Some(edit));
+                    edits.push(Some(noqa_edit.into_edit()));
                 }
             }
             None => edits.push(None),
@@ -623,28 +605,32 @@ fn build_noqa_edits_by_diagnostic(
     edits
 }
 
-fn build_noqa_edits_by_line(
-    comments_by_line: BTreeMap<TextSize, Vec<NoqaComment>>,
+fn build_noqa_edits_by_line<'a>(
+    comments: Vec<Option<NoqaComment<'a>>>,
     locator: &Locator,
     line_ending: LineEnding,
-) -> BTreeMap<TextSize, Edit> {
+) -> BTreeMap<TextSize, NoqaEdit<'a>> {
+    let mut comments_by_line = BTreeMap::default();
+    for comment in comments.into_iter().flatten() {
+        comments_by_line
+            .entry(comment.line)
+            .or_insert_with(Vec::default)
+            .push(comment);
+    }
     let mut edits = BTreeMap::default();
     for (offset, matches) in comments_by_line {
-        if matches.is_empty() {
+        let Some(first_match) = matches.first() else {
             continue;
-        }
-        let line = locator.full_line(offset);
-        let directive = matches.first().unwrap().directive.clone();
-        let rules: Vec<_> = matches
-            .into_iter()
-            .map(|NoqaComment { diagnostic, .. }| diagnostic.kind.rule())
-            .collect();
+        };
+        let directive = first_match.directive;
         if let Some(edit) = generate_noqa_edit(
             directive,
             offset,
-            RuleSet::from_rules(rules.as_slice()),
-            line,
-            locator.line_start(offset),
+            matches
+                .into_iter()
+                .map(|NoqaComment { diagnostic, .. }| diagnostic.kind.rule())
+                .collect(),
+            locator,
             line_ending,
         ) {
             edits.insert(offset, edit);
@@ -656,17 +642,17 @@ fn build_noqa_edits_by_line(
 struct NoqaComment<'a> {
     line: TextSize,
     diagnostic: &'a Diagnostic,
-    directive: Option<Directive<'a>>,
+    directive: Option<&'a Directive<'a>>,
 }
 
-fn find_noqa_comments_by_line<'a>(
+fn find_noqa_comments<'a>(
     diagnostics: &'a [Diagnostic],
     locator: &'a Locator,
     exemption: &Option<FileExemption>,
     directives: &'a NoqaDirectives,
     noqa_line_for: &NoqaMapping,
 ) -> Vec<Option<NoqaComment<'a>>> {
-    // Map of line start offset to set of (non-ignored) diagnostic codes that are triggered on that line.
+    // List of noqa comments, ordered to match up with `diagnostics`
     let mut comments_by_line: Vec<Option<NoqaComment<'a>>> = vec![];
 
     // Mark any non-ignored diagnostics.
@@ -722,7 +708,7 @@ fn find_noqa_comments_by_line<'a>(
                         comments_by_line.push(Some(NoqaComment {
                             line: directive_line.start(),
                             diagnostic,
-                            directive: Some(directive.clone()),
+                            directive: Some(directive),
                         }));
                     }
                     continue;
@@ -741,62 +727,96 @@ fn find_noqa_comments_by_line<'a>(
     comments_by_line
 }
 
-fn generate_noqa_edit(
-    directive: Option<Directive>,
+struct NoqaEdit<'a> {
+    edit_range: TextRange,
+    rules: RuleSet,
+    codes: Option<&'a Codes<'a>>,
+    line_ending: LineEnding,
+}
+
+impl<'a> NoqaEdit<'a> {
+    fn into_edit(self) -> Edit {
+        let mut edit_content = String::new();
+        self.write(&mut edit_content);
+
+        Edit::range_replacement(edit_content, self.edit_range)
+    }
+
+    fn write(&self, writer: &mut impl std::fmt::Write) {
+        write!(writer, "  # noqa: ").unwrap();
+        match self.codes {
+            Some(codes) => {
+                push_codes(
+                    writer,
+                    self.rules
+                        .iter()
+                        .map(|rule| rule.noqa_code().to_string())
+                        .chain(codes.iter().map(ToString::to_string))
+                        .sorted_unstable(),
+                );
+            }
+            None => {
+                push_codes(
+                    writer,
+                    self.rules.iter().map(|rule| rule.noqa_code().to_string()),
+                );
+            }
+        }
+        write!(writer, "{}", self.line_ending.as_str()).unwrap();
+    }
+}
+
+impl<'a> Ranged for NoqaEdit<'a> {
+    fn range(&self) -> TextRange {
+        self.edit_range
+    }
+}
+
+fn generate_noqa_edit<'a>(
+    directive: Option<&'a Directive>,
     offset: TextSize,
     rules: RuleSet,
-    line: &str,
-    line_start: TextSize,
+    locator: &Locator,
     line_ending: LineEnding,
-) -> Option<Edit> {
-    let mut edit_content = String::new();
-    let range;
+) -> Option<NoqaEdit<'a>> {
+    let line_range = locator.full_line_range(offset);
 
-    // Add `noqa` directive.
-    edit_content.push_str("  # noqa: ");
+    let edit_range;
+    let codes;
 
     // Add codes.
     match directive {
         None => {
-            let trimmed_line = line.trim_end();
-            range = TextRange::new(TextSize::of(trimmed_line), TextSize::of(line)) + offset;
-            push_codes(
-                &mut edit_content,
-                rules.into_iter().map(|rule| rule.noqa_code().to_string()),
-            );
+            let trimmed_line = locator.slice(line_range).trim_end();
+            edit_range = TextRange::new(TextSize::of(trimmed_line), line_range.len()) + offset;
+            codes = None;
         }
-        Some(Directive::Codes(codes)) => {
+        Some(Directive::Codes(existing_codes)) => {
             // find trimmed line without the noqa
-            let trimmed_line =
-                line[TextRange::up_to(codes.start().checked_sub(line_start).unwrap())].trim_end();
-
-            range = TextRange::new(TextSize::of(trimmed_line), TextSize::of(line)) + offset;
-            // Add codes.
-            push_codes(
-                &mut edit_content,
-                rules
-                    .into_iter()
-                    .map(|rule| rule.noqa_code().to_string())
-                    .chain(codes.iter().map(ToString::to_string))
-                    .sorted_unstable(),
-            );
+            let trimmed_line = locator
+                .slice(TextRange::new(line_range.start(), existing_codes.start()))
+                .trim_end();
+            edit_range = TextRange::new(TextSize::of(trimmed_line), line_range.len()) + offset;
+            codes = Some(existing_codes);
         }
         Some(Directive::All(_)) => return None,
     };
 
-    // Add line ending.
-    edit_content.push_str(&line_ending);
-
-    Some(Edit::range_replacement(edit_content, range))
+    Some(NoqaEdit {
+        edit_range,
+        rules,
+        codes,
+        line_ending,
+    })
 }
 
-fn push_codes<I: Display>(str: &mut String, codes: impl Iterator<Item = I>) {
+fn push_codes<I: Display>(writer: &mut dyn std::fmt::Write, codes: impl Iterator<Item = I>) {
     let mut first = true;
     for code in codes {
         if !first {
-            str.push_str(", ");
+            write!(writer, ", ").unwrap();
         }
-        write!(str, "{code}").unwrap();
+        write!(writer, "{code}").unwrap();
         first = false;
     }
 }
