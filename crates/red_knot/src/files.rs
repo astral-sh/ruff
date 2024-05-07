@@ -81,9 +81,7 @@ impl FilesInner {
     /// Inserts the path and returns a new id for it or returns the id if it is an existing path.
     // TODO should this accept Path or PathBuf?
     pub(crate) fn intern(&mut self, path: &Path) -> FileId {
-        let mut hasher = FxHasher::default();
-        path.hash(&mut hasher);
-        let hash = hasher.finish();
+        let hash = FilesInner::hash_path(path);
 
         let entry = self
             .by_path
@@ -94,10 +92,18 @@ impl FilesInner {
             RawEntryMut::Occupied(entry) => *entry.key(),
             RawEntryMut::Vacant(entry) => {
                 let id = self.by_id.push(Arc::from(path));
-                entry.insert_with_hasher(hash, id, (), |_| hash);
+                entry.insert_with_hasher(hash, id, (), |file| {
+                    FilesInner::hash_path(&self.by_id[*file])
+                });
                 id
             }
         }
+    }
+
+    fn hash_path(path: &Path) -> u64 {
+        let mut hasher = FxHasher::default();
+        path.hash(&mut hasher);
+        hasher.finish()
     }
 
     pub(crate) fn try_get(&self, path: &Path) -> Option<FileId> {
@@ -154,5 +160,21 @@ mod tests {
         let id1 = files.intern(&path1);
         let id2 = files.intern(&path2);
         assert_ne!(id1, id2);
+    }
+
+    #[test]
+    fn four_files() {
+        let files = Files::default();
+        let foo_path = PathBuf::from("foo");
+        let foo_id = files.intern(&foo_path);
+        let bar_path = PathBuf::from("bar");
+        files.intern(&bar_path);
+        let baz_path = PathBuf::from("baz");
+        files.intern(&baz_path);
+        let qux_path = PathBuf::from("qux");
+        files.intern(&qux_path);
+
+        let foo_id_2 = files.try_get(&foo_path).expect("foo_path to be found");
+        assert_eq!(foo_id_2, foo_id);
     }
 }
