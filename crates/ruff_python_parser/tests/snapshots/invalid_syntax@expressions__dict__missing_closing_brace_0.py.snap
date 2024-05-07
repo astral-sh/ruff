@@ -15,51 +15,53 @@ Module(
                     value: Dict(
                         ExprDict {
                             range: 0..24,
-                            keys: [
-                                Some(
-                                    Name(
+                            items: [
+                                DictItem {
+                                    key: Some(
+                                        Name(
+                                            ExprName {
+                                                range: 1..2,
+                                                id: "x",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ),
+                                    value: Name(
                                         ExprName {
-                                            range: 1..2,
-                                            id: "x",
+                                            range: 5..8,
+                                            id: "def",
                                             ctx: Load,
                                         },
                                     ),
-                                ),
-                                Some(
-                                    Call(
-                                        ExprCall {
-                                            range: 9..14,
-                                            func: Name(
-                                                ExprName {
-                                                    range: 9..12,
-                                                    id: "foo",
-                                                    ctx: Load,
+                                },
+                                DictItem {
+                                    key: Some(
+                                        Call(
+                                            ExprCall {
+                                                range: 9..14,
+                                                func: Name(
+                                                    ExprName {
+                                                        range: 9..12,
+                                                        id: "foo",
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                arguments: Arguments {
+                                                    range: 12..14,
+                                                    args: [],
+                                                    keywords: [],
                                                 },
-                                            ),
-                                            arguments: Arguments {
-                                                range: 12..14,
-                                                args: [],
-                                                keywords: [],
                                             },
+                                        ),
+                                    ),
+                                    value: Name(
+                                        ExprName {
+                                            range: 20..24,
+                                            id: "pass",
+                                            ctx: Load,
                                         },
                                     ),
-                                ),
-                            ],
-                            values: [
-                                Name(
-                                    ExprName {
-                                        range: 5..8,
-                                        id: "def",
-                                        ctx: Load,
-                                    },
-                                ),
-                                Name(
-                                    ExprName {
-                                        range: 20..24,
-                                        id: "pass",
-                                        ctx: Load,
-                                    },
-                                ),
+                                },
                             ],
                         },
                     ),

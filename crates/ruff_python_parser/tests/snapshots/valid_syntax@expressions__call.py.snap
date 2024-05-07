@@ -360,45 +360,47 @@ Module(
                             func: Dict(
                                 ExprDict {
                                     range: 219..231,
-                                    keys: [
-                                        Some(
-                                            NumberLiteral(
+                                    items: [
+                                        DictItem {
+                                            key: Some(
+                                                NumberLiteral(
+                                                    ExprNumberLiteral {
+                                                        range: 220..221,
+                                                        value: Int(
+                                                            1,
+                                                        ),
+                                                    },
+                                                ),
+                                            ),
+                                            value: NumberLiteral(
                                                 ExprNumberLiteral {
-                                                    range: 220..221,
+                                                    range: 223..224,
                                                     value: Int(
-                                                        1,
+                                                        2,
                                                     ),
                                                 },
                                             ),
-                                        ),
-                                        Some(
-                                            NumberLiteral(
+                                        },
+                                        DictItem {
+                                            key: Some(
+                                                NumberLiteral(
+                                                    ExprNumberLiteral {
+                                                        range: 226..227,
+                                                        value: Int(
+                                                            3,
+                                                        ),
+                                                    },
+                                                ),
+                                            ),
+                                            value: NumberLiteral(
                                                 ExprNumberLiteral {
-                                                    range: 226..227,
+                                                    range: 229..230,
                                                     value: Int(
-                                                        3,
+                                                        4,
                                                     ),
                                                 },
                                             ),
-                                        ),
-                                    ],
-                                    values: [
-                                        NumberLiteral(
-                                            ExprNumberLiteral {
-                                                range: 223..224,
-                                                value: Int(
-                                                    2,
-                                                ),
-                                            },
-                                        ),
-                                        NumberLiteral(
-                                            ExprNumberLiteral {
-                                                range: 229..230,
-                                                value: Int(
-                                                    4,
-                                                ),
-                                            },
-                                        ),
+                                        },
                                     ],
                                 },
                             ),

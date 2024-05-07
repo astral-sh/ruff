@@ -15,26 +15,26 @@ Module(
                     value: Dict(
                         ExprDict {
                             range: 0..6,
-                            keys: [
-                                Some(
-                                    Name(
-                                        ExprName {
-                                            range: 1..2,
-                                            id: "x",
-                                            ctx: Load,
+                            items: [
+                                DictItem {
+                                    key: Some(
+                                        Name(
+                                            ExprName {
+                                                range: 1..2,
+                                                id: "x",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ),
+                                    value: NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 4..5,
+                                            value: Int(
+                                                1,
+                                            ),
                                         },
                                     ),
-                                ),
-                            ],
-                            values: [
-                                NumberLiteral(
-                                    ExprNumberLiteral {
-                                        range: 4..5,
-                                        value: Int(
-                                            1,
-                                        ),
-                                    },
-                                ),
+                                },
                             ],
                         },
                     ),

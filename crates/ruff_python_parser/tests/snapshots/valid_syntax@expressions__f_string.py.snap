@@ -823,104 +823,104 @@ Module(
                     value: Dict(
                         ExprDict {
                             range: 219..253,
-                            keys: [
-                                Some(
-                                    FString(
-                                        ExprFString {
-                                            range: 220..248,
-                                            value: FStringValue {
-                                                inner: Concatenated(
-                                                    [
-                                                        Literal(
-                                                            StringLiteral {
-                                                                range: 220..226,
-                                                                value: "foo ",
-                                                                flags: StringLiteralFlags {
-                                                                    quote_style: Double,
-                                                                    prefix: Empty,
-                                                                    triple_quoted: false,
+                            items: [
+                                DictItem {
+                                    key: Some(
+                                        FString(
+                                            ExprFString {
+                                                range: 220..248,
+                                                value: FStringValue {
+                                                    inner: Concatenated(
+                                                        [
+                                                            Literal(
+                                                                StringLiteral {
+                                                                    range: 220..226,
+                                                                    value: "foo ",
+                                                                    flags: StringLiteralFlags {
+                                                                        quote_style: Double,
+                                                                        prefix: Empty,
+                                                                        triple_quoted: false,
+                                                                    },
                                                                 },
-                                                            },
-                                                        ),
-                                                        FString(
-                                                            FString {
-                                                                range: 227..242,
-                                                                elements: [
-                                                                    Literal(
-                                                                        FStringLiteralElement {
-                                                                            range: 229..233,
-                                                                            value: "bar ",
-                                                                        },
-                                                                    ),
-                                                                    Expression(
-                                                                        FStringExpressionElement {
-                                                                            range: 233..240,
-                                                                            expression: BinOp(
-                                                                                ExprBinOp {
-                                                                                    range: 234..239,
-                                                                                    left: Name(
-                                                                                        ExprName {
-                                                                                            range: 234..235,
-                                                                                            id: "x",
-                                                                                            ctx: Load,
-                                                                                        },
-                                                                                    ),
-                                                                                    op: Add,
-                                                                                    right: Name(
-                                                                                        ExprName {
-                                                                                            range: 238..239,
-                                                                                            id: "y",
-                                                                                            ctx: Load,
-                                                                                        },
-                                                                                    ),
-                                                                                },
-                                                                            ),
-                                                                            debug_text: None,
-                                                                            conversion: None,
-                                                                            format_spec: None,
-                                                                        },
-                                                                    ),
-                                                                    Literal(
-                                                                        FStringLiteralElement {
-                                                                            range: 240..241,
-                                                                            value: " ",
-                                                                        },
-                                                                    ),
-                                                                ],
-                                                                flags: FStringFlags {
-                                                                    quote_style: Double,
-                                                                    prefix: Regular,
-                                                                    triple_quoted: false,
+                                                            ),
+                                                            FString(
+                                                                FString {
+                                                                    range: 227..242,
+                                                                    elements: [
+                                                                        Literal(
+                                                                            FStringLiteralElement {
+                                                                                range: 229..233,
+                                                                                value: "bar ",
+                                                                            },
+                                                                        ),
+                                                                        Expression(
+                                                                            FStringExpressionElement {
+                                                                                range: 233..240,
+                                                                                expression: BinOp(
+                                                                                    ExprBinOp {
+                                                                                        range: 234..239,
+                                                                                        left: Name(
+                                                                                            ExprName {
+                                                                                                range: 234..235,
+                                                                                                id: "x",
+                                                                                                ctx: Load,
+                                                                                            },
+                                                                                        ),
+                                                                                        op: Add,
+                                                                                        right: Name(
+                                                                                            ExprName {
+                                                                                                range: 238..239,
+                                                                                                id: "y",
+                                                                                                ctx: Load,
+                                                                                            },
+                                                                                        ),
+                                                                                    },
+                                                                                ),
+                                                                                debug_text: None,
+                                                                                conversion: None,
+                                                                                format_spec: None,
+                                                                            },
+                                                                        ),
+                                                                        Literal(
+                                                                            FStringLiteralElement {
+                                                                                range: 240..241,
+                                                                                value: " ",
+                                                                            },
+                                                                        ),
+                                                                    ],
+                                                                    flags: FStringFlags {
+                                                                        quote_style: Double,
+                                                                        prefix: Regular,
+                                                                        triple_quoted: false,
+                                                                    },
                                                                 },
-                                                            },
-                                                        ),
-                                                        Literal(
-                                                            StringLiteral {
-                                                                range: 243..248,
-                                                                value: "baz",
-                                                                flags: StringLiteralFlags {
-                                                                    quote_style: Double,
-                                                                    prefix: Empty,
-                                                                    triple_quoted: false,
+                                                            ),
+                                                            Literal(
+                                                                StringLiteral {
+                                                                    range: 243..248,
+                                                                    value: "baz",
+                                                                    flags: StringLiteralFlags {
+                                                                        quote_style: Double,
+                                                                        prefix: Empty,
+                                                                        triple_quoted: false,
+                                                                    },
                                                                 },
-                                                            },
-                                                        ),
-                                                    ],
-                                                ),
+                                                            ),
+                                                        ],
+                                                    ),
+                                                },
                                             },
+                                        ),
+                                    ),
+                                    value: NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 250..252,
+                                            value: Int(
+                                                10,
+                                            ),
                                         },
                                     ),
-                                ),
-                            ],
-                            values: [
-                                NumberLiteral(
-                                    ExprNumberLiteral {
-                                        range: 250..252,
-                                        value: Int(
-                                            10,
-                                        ),
-                                    },
-                                ),
+                                },
                             ],
                         },
                     ),

@@ -236,37 +236,37 @@ Module(
                     target: Dict(
                         ExprDict {
                             range: 186..194,
-                            keys: [
-                                Some(
-                                    StringLiteral(
-                                        ExprStringLiteral {
-                                            range: 187..190,
-                                            value: StringLiteralValue {
-                                                inner: Single(
-                                                    StringLiteral {
-                                                        range: 187..190,
-                                                        value: "a",
-                                                        flags: StringLiteralFlags {
-                                                            quote_style: Double,
-                                                            prefix: Empty,
-                                                            triple_quoted: false,
+                            items: [
+                                DictItem {
+                                    key: Some(
+                                        StringLiteral(
+                                            ExprStringLiteral {
+                                                range: 187..190,
+                                                value: StringLiteralValue {
+                                                    inner: Single(
+                                                        StringLiteral {
+                                                            range: 187..190,
+                                                            value: "a",
+                                                            flags: StringLiteralFlags {
+                                                                quote_style: Double,
+                                                                prefix: Empty,
+                                                                triple_quoted: false,
+                                                            },
                                                         },
-                                                    },
-                                                ),
+                                                    ),
+                                                },
                                             },
+                                        ),
+                                    ),
+                                    value: NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 192..193,
+                                            value: Int(
+                                                5,
+                                            ),
                                         },
                                     ),
-                                ),
-                            ],
-                            values: [
-                                NumberLiteral(
-                                    ExprNumberLiteral {
-                                        range: 192..193,
-                                        value: Int(
-                                            5,
-                                        ),
-                                    },
-                                ),
+                                },
                             ],
                         },
                     ),

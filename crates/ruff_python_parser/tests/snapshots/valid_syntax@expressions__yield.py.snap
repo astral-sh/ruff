@@ -216,26 +216,26 @@ Module(
                                 Dict(
                                     ExprDict {
                                         range: 85..91,
-                                        keys: [
-                                            Some(
-                                                Name(
-                                                    ExprName {
-                                                        range: 86..87,
-                                                        id: "x",
-                                                        ctx: Load,
+                                        items: [
+                                            DictItem {
+                                                key: Some(
+                                                    Name(
+                                                        ExprName {
+                                                            range: 86..87,
+                                                            id: "x",
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                ),
+                                                value: NumberLiteral(
+                                                    ExprNumberLiteral {
+                                                        range: 89..90,
+                                                        value: Int(
+                                                            5,
+                                                        ),
                                                     },
                                                 ),
-                                            ),
-                                        ],
-                                        values: [
-                                            NumberLiteral(
-                                                ExprNumberLiteral {
-                                                    range: 89..90,
-                                                    value: Int(
-                                                        5,
-                                                    ),
-                                                },
-                                            ),
+                                            },
                                         ],
                                     },
                                 ),

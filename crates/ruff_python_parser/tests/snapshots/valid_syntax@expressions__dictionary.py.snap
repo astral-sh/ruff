@@ -15,8 +15,7 @@ Module(
                     value: Dict(
                         ExprDict {
                             range: 9..11,
-                            keys: [],
-                            values: [],
+                            items: [],
                         },
                     ),
                 },
@@ -27,27 +26,27 @@ Module(
                     value: Dict(
                         ExprDict {
                             range: 12..18,
-                            keys: [
-                                Some(
-                                    NumberLiteral(
+                            items: [
+                                DictItem {
+                                    key: Some(
+                                        NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 13..14,
+                                                value: Int(
+                                                    1,
+                                                ),
+                                            },
+                                        ),
+                                    ),
+                                    value: NumberLiteral(
                                         ExprNumberLiteral {
-                                            range: 13..14,
+                                            range: 16..17,
                                             value: Int(
-                                                1,
+                                                2,
                                             ),
                                         },
                                     ),
-                                ),
-                            ],
-                            values: [
-                                NumberLiteral(
-                                    ExprNumberLiteral {
-                                        range: 16..17,
-                                        value: Int(
-                                            2,
-                                        ),
-                                    },
-                                ),
+                                },
                             ],
                         },
                     ),
@@ -59,71 +58,75 @@ Module(
                     value: Dict(
                         ExprDict {
                             range: 19..43,
-                            keys: [
-                                Some(
-                                    NumberLiteral(
+                            items: [
+                                DictItem {
+                                    key: Some(
+                                        NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 20..21,
+                                                value: Int(
+                                                    1,
+                                                ),
+                                            },
+                                        ),
+                                    ),
+                                    value: NumberLiteral(
                                         ExprNumberLiteral {
-                                            range: 20..21,
+                                            range: 23..24,
+                                            value: Int(
+                                                2,
+                                            ),
+                                        },
+                                    ),
+                                },
+                                DictItem {
+                                    key: Some(
+                                        Name(
+                                            ExprName {
+                                                range: 26..27,
+                                                id: "a",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ),
+                                    value: NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 29..30,
                                             value: Int(
                                                 1,
                                             ),
                                         },
                                     ),
-                                ),
-                                Some(
-                                    Name(
-                                        ExprName {
-                                            range: 26..27,
-                                            id: "a",
-                                            ctx: Load,
-                                        },
-                                    ),
-                                ),
-                                Some(
-                                    Name(
-                                        ExprName {
-                                            range: 32..33,
-                                            id: "b",
-                                            ctx: Load,
-                                        },
-                                    ),
-                                ),
-                            ],
-                            values: [
-                                NumberLiteral(
-                                    ExprNumberLiteral {
-                                        range: 23..24,
-                                        value: Int(
-                                            2,
+                                },
+                                DictItem {
+                                    key: Some(
+                                        Name(
+                                            ExprName {
+                                                range: 32..33,
+                                                id: "b",
+                                                ctx: Load,
+                                            },
                                         ),
-                                    },
-                                ),
-                                NumberLiteral(
-                                    ExprNumberLiteral {
-                                        range: 29..30,
-                                        value: Int(
-                                            1,
-                                        ),
-                                    },
-                                ),
-                                StringLiteral(
-                                    ExprStringLiteral {
-                                        range: 35..42,
-                                        value: StringLiteralValue {
-                                            inner: Single(
-                                                StringLiteral {
-                                                    range: 35..42,
-                                                    value: "hello",
-                                                    flags: StringLiteralFlags {
-                                                        quote_style: Single,
-                                                        prefix: Empty,
-                                                        triple_quoted: false,
+                                    ),
+                                    value: StringLiteral(
+                                        ExprStringLiteral {
+                                            range: 35..42,
+                                            value: StringLiteralValue {
+                                                inner: Single(
+                                                    StringLiteral {
+                                                        range: 35..42,
+                                                        value: "hello",
+                                                        flags: StringLiteralFlags {
+                                                            quote_style: Single,
+                                                            prefix: Empty,
+                                                            triple_quoted: false,
+                                                        },
                                                     },
-                                                },
-                                            ),
+                                                ),
+                                            },
                                         },
-                                    },
-                                ),
+                                    ),
+                                },
                             ],
                         },
                     ),
@@ -135,8 +138,7 @@ Module(
                     value: Dict(
                         ExprDict {
                             range: 66..69,
-                            keys: [],
-                            values: [],
+                            items: [],
                         },
                     ),
                 },
@@ -147,45 +149,47 @@ Module(
                     value: Dict(
                         ExprDict {
                             range: 70..100,
-                            keys: [
-                                Some(
-                                    NumberLiteral(
+                            items: [
+                                DictItem {
+                                    key: Some(
+                                        NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 76..77,
+                                                value: Int(
+                                                    1,
+                                                ),
+                                            },
+                                        ),
+                                    ),
+                                    value: NumberLiteral(
                                         ExprNumberLiteral {
-                                            range: 76..77,
+                                            range: 83..84,
                                             value: Int(
-                                                1,
+                                                2,
                                             ),
                                         },
                                     ),
-                                ),
-                                Some(
-                                    NumberLiteral(
+                                },
+                                DictItem {
+                                    key: Some(
+                                        NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 90..91,
+                                                value: Int(
+                                                    3,
+                                                ),
+                                            },
+                                        ),
+                                    ),
+                                    value: NumberLiteral(
                                         ExprNumberLiteral {
-                                            range: 90..91,
+                                            range: 97..98,
                                             value: Int(
-                                                3,
+                                                4,
                                             ),
                                         },
                                     ),
-                                ),
-                            ],
-                            values: [
-                                NumberLiteral(
-                                    ExprNumberLiteral {
-                                        range: 83..84,
-                                        value: Int(
-                                            2,
-                                        ),
-                                    },
-                                ),
-                                NumberLiteral(
-                                    ExprNumberLiteral {
-                                        range: 97..98,
-                                        value: Int(
-                                            4,
-                                        ),
-                                    },
-                                ),
+                                },
                             ],
                         },
                     ),
@@ -197,84 +201,84 @@ Module(
                     value: Dict(
                         ExprDict {
                             range: 111..132,
-                            keys: [
-                                Some(
-                                    Dict(
-                                        ExprDict {
-                                            range: 112..118,
-                                            keys: [
-                                                Some(
-                                                    NumberLiteral(
-                                                        ExprNumberLiteral {
-                                                            range: 113..114,
-                                                            value: Int(
-                                                                1,
-                                                            ),
-                                                        },
-                                                    ),
-                                                ),
-                                            ],
-                                            values: [
-                                                NumberLiteral(
-                                                    ExprNumberLiteral {
-                                                        range: 116..117,
-                                                        value: Int(
-                                                            2,
-                                                        ),
-                                                    },
-                                                ),
-                                            ],
-                                        },
-                                    ),
-                                ),
-                            ],
-                            values: [
-                                Dict(
-                                    ExprDict {
-                                        range: 120..131,
-                                        keys: [
-                                            Some(
-                                                NumberLiteral(
-                                                    ExprNumberLiteral {
-                                                        range: 121..122,
-                                                        value: Int(
-                                                            3,
-                                                        ),
-                                                    },
-                                                ),
-                                            ),
-                                        ],
-                                        values: [
-                                            Dict(
-                                                ExprDict {
-                                                    range: 124..130,
-                                                    keys: [
-                                                        Some(
+                            items: [
+                                DictItem {
+                                    key: Some(
+                                        Dict(
+                                            ExprDict {
+                                                range: 112..118,
+                                                items: [
+                                                    DictItem {
+                                                        key: Some(
                                                             NumberLiteral(
                                                                 ExprNumberLiteral {
-                                                                    range: 125..126,
+                                                                    range: 113..114,
                                                                     value: Int(
-                                                                        4,
+                                                                        1,
                                                                     ),
                                                                 },
                                                             ),
                                                         ),
-                                                    ],
-                                                    values: [
-                                                        NumberLiteral(
+                                                        value: NumberLiteral(
                                                             ExprNumberLiteral {
-                                                                range: 128..129,
+                                                                range: 116..117,
                                                                 value: Int(
-                                                                    5,
+                                                                    2,
                                                                 ),
                                                             },
                                                         ),
-                                                    ],
+                                                    },
+                                                ],
+                                            },
+                                        ),
+                                    ),
+                                    value: Dict(
+                                        ExprDict {
+                                            range: 120..131,
+                                            items: [
+                                                DictItem {
+                                                    key: Some(
+                                                        NumberLiteral(
+                                                            ExprNumberLiteral {
+                                                                range: 121..122,
+                                                                value: Int(
+                                                                    3,
+                                                                ),
+                                                            },
+                                                        ),
+                                                    ),
+                                                    value: Dict(
+                                                        ExprDict {
+                                                            range: 124..130,
+                                                            items: [
+                                                                DictItem {
+                                                                    key: Some(
+                                                                        NumberLiteral(
+                                                                            ExprNumberLiteral {
+                                                                                range: 125..126,
+                                                                                value: Int(
+                                                                                    4,
+                                                                                ),
+                                                                            },
+                                                                        ),
+                                                                    ),
+                                                                    value: NumberLiteral(
+                                                                        ExprNumberLiteral {
+                                                                            range: 128..129,
+                                                                            value: Int(
+                                                                                5,
+                                                                            ),
+                                                                        },
+                                                                    ),
+                                                                },
+                                                            ],
+                                                        },
+                                                    ),
                                                 },
-                                            ),
-                                        ],
-                                    },
-                                ),
+                                            ],
+                                        },
+                                    ),
+                                },
                             ],
                         },
                     ),
@@ -286,54 +290,54 @@ Module(
                     value: Dict(
                         ExprDict {
                             range: 155..171,
-                            keys: [
-                                Some(
-                                    Lambda(
-                                        ExprLambda {
-                                            range: 156..167,
-                                            parameters: Some(
-                                                Parameters {
-                                                    range: 163..164,
-                                                    posonlyargs: [],
-                                                    args: [
-                                                        ParameterWithDefault {
-                                                            range: 163..164,
-                                                            parameter: Parameter {
+                            items: [
+                                DictItem {
+                                    key: Some(
+                                        Lambda(
+                                            ExprLambda {
+                                                range: 156..167,
+                                                parameters: Some(
+                                                    Parameters {
+                                                        range: 163..164,
+                                                        posonlyargs: [],
+                                                        args: [
+                                                            ParameterWithDefault {
                                                                 range: 163..164,
-                                                                name: Identifier {
-                                                                    id: "x",
+                                                                parameter: Parameter {
                                                                     range: 163..164,
+                                                                    name: Identifier {
+                                                                        id: "x",
+                                                                        range: 163..164,
+                                                                    },
+                                                                    annotation: None,
                                                                 },
-                                                                annotation: None,
+                                                                default: None,
                                                             },
-                                                            default: None,
-                                                        },
-                                                    ],
-                                                    vararg: None,
-                                                    kwonlyargs: [],
-                                                    kwarg: None,
-                                                },
-                                            ),
-                                            body: Name(
-                                                ExprName {
-                                                    range: 166..167,
-                                                    id: "x",
-                                                    ctx: Load,
-                                                },
+                                                        ],
+                                                        vararg: None,
+                                                        kwonlyargs: [],
+                                                        kwarg: None,
+                                                    },
+                                                ),
+                                                body: Name(
+                                                    ExprName {
+                                                        range: 166..167,
+                                                        id: "x",
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                    ),
+                                    value: NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 169..170,
+                                            value: Int(
+                                                1,
                                             ),
                                         },
                                     ),
-                                ),
-                            ],
-                            values: [
-                                NumberLiteral(
-                                    ExprNumberLiteral {
-                                        range: 169..170,
-                                        value: Int(
-                                            1,
-                                        ),
-                                    },
-                                ),
+                                },
                             ],
                         },
                     ),
@@ -345,89 +349,91 @@ Module(
                     value: Dict(
                         ExprDict {
                             range: 172..202,
-                            keys: [
-                                Some(
-                                    StringLiteral(
-                                        ExprStringLiteral {
-                                            range: 173..176,
-                                            value: StringLiteralValue {
-                                                inner: Single(
-                                                    StringLiteral {
-                                                        range: 173..176,
-                                                        value: "A",
-                                                        flags: StringLiteralFlags {
-                                                            quote_style: Single,
-                                                            prefix: Empty,
-                                                            triple_quoted: false,
-                                                        },
-                                                    },
-                                                ),
-                                            },
-                                        },
-                                    ),
-                                ),
-                                Some(
-                                    StringLiteral(
-                                        ExprStringLiteral {
-                                            range: 194..197,
-                                            value: StringLiteralValue {
-                                                inner: Single(
-                                                    StringLiteral {
-                                                        range: 194..197,
-                                                        value: "B",
-                                                        flags: StringLiteralFlags {
-                                                            quote_style: Single,
-                                                            prefix: Empty,
-                                                            triple_quoted: false,
-                                                        },
-                                                    },
-                                                ),
-                                            },
-                                        },
-                                    ),
-                                ),
-                            ],
-                            values: [
-                                Lambda(
-                                    ExprLambda {
-                                        range: 178..192,
-                                        parameters: Some(
-                                            Parameters {
-                                                range: 185..186,
-                                                posonlyargs: [],
-                                                args: [
-                                                    ParameterWithDefault {
-                                                        range: 185..186,
-                                                        parameter: Parameter {
-                                                            range: 185..186,
-                                                            name: Identifier {
-                                                                id: "p",
-                                                                range: 185..186,
+                            items: [
+                                DictItem {
+                                    key: Some(
+                                        StringLiteral(
+                                            ExprStringLiteral {
+                                                range: 173..176,
+                                                value: StringLiteralValue {
+                                                    inner: Single(
+                                                        StringLiteral {
+                                                            range: 173..176,
+                                                            value: "A",
+                                                            flags: StringLiteralFlags {
+                                                                quote_style: Single,
+                                                                prefix: Empty,
+                                                                triple_quoted: false,
                                                             },
-                                                            annotation: None,
                                                         },
-                                                        default: None,
-                                                    },
-                                                ],
-                                                vararg: None,
-                                                kwonlyargs: [],
-                                                kwarg: None,
+                                                    ),
+                                                },
                                             },
                                         ),
-                                        body: NoneLiteral(
-                                            ExprNoneLiteral {
-                                                range: 188..192,
+                                    ),
+                                    value: Lambda(
+                                        ExprLambda {
+                                            range: 178..192,
+                                            parameters: Some(
+                                                Parameters {
+                                                    range: 185..186,
+                                                    posonlyargs: [],
+                                                    args: [
+                                                        ParameterWithDefault {
+                                                            range: 185..186,
+                                                            parameter: Parameter {
+                                                                range: 185..186,
+                                                                name: Identifier {
+                                                                    id: "p",
+                                                                    range: 185..186,
+                                                                },
+                                                                annotation: None,
+                                                            },
+                                                            default: None,
+                                                        },
+                                                    ],
+                                                    vararg: None,
+                                                    kwonlyargs: [],
+                                                    kwarg: None,
+                                                },
+                                            ),
+                                            body: NoneLiteral(
+                                                ExprNoneLiteral {
+                                                    range: 188..192,
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                },
+                                DictItem {
+                                    key: Some(
+                                        StringLiteral(
+                                            ExprStringLiteral {
+                                                range: 194..197,
+                                                value: StringLiteralValue {
+                                                    inner: Single(
+                                                        StringLiteral {
+                                                            range: 194..197,
+                                                            value: "B",
+                                                            flags: StringLiteralFlags {
+                                                                quote_style: Single,
+                                                                prefix: Empty,
+                                                                triple_quoted: false,
+                                                            },
+                                                        },
+                                                    ),
+                                                },
                                             },
                                         ),
-                                    },
-                                ),
-                                Name(
-                                    ExprName {
-                                        range: 199..200,
-                                        id: "C",
-                                        ctx: Load,
-                                    },
-                                ),
+                                    ),
+                                    value: Name(
+                                        ExprName {
+                                            range: 199..200,
+                                            id: "C",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                },
                             ],
                         },
                     ),
@@ -439,38 +445,38 @@ Module(
                     value: Dict(
                         ExprDict {
                             range: 224..237,
-                            keys: [
-                                Some(
-                                    Named(
-                                        ExprNamed {
-                                            range: 226..232,
-                                            target: Name(
-                                                ExprName {
-                                                    range: 226..227,
-                                                    id: "x",
-                                                    ctx: Store,
-                                                },
-                                            ),
-                                            value: NumberLiteral(
-                                                ExprNumberLiteral {
-                                                    range: 231..232,
-                                                    value: Int(
-                                                        1,
-                                                    ),
-                                                },
-                                            ),
+                            items: [
+                                DictItem {
+                                    key: Some(
+                                        Named(
+                                            ExprNamed {
+                                                range: 226..232,
+                                                target: Name(
+                                                    ExprName {
+                                                        range: 226..227,
+                                                        id: "x",
+                                                        ctx: Store,
+                                                    },
+                                                ),
+                                                value: NumberLiteral(
+                                                    ExprNumberLiteral {
+                                                        range: 231..232,
+                                                        value: Int(
+                                                            1,
+                                                        ),
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                    ),
+                                    value: Name(
+                                        ExprName {
+                                            range: 235..236,
+                                            id: "y",
+                                            ctx: Load,
                                         },
                                     ),
-                                ),
-                            ],
-                            values: [
-                                Name(
-                                    ExprName {
-                                        range: 235..236,
-                                        id: "y",
-                                        ctx: Load,
-                                    },
-                                ),
+                                },
                             ],
                         },
                     ),
@@ -482,51 +488,51 @@ Module(
                     value: Dict(
                         ExprDict {
                             range: 238..258,
-                            keys: [
-                                Some(
-                                    Named(
+                            items: [
+                                DictItem {
+                                    key: Some(
+                                        Named(
+                                            ExprNamed {
+                                                range: 240..246,
+                                                target: Name(
+                                                    ExprName {
+                                                        range: 240..241,
+                                                        id: "x",
+                                                        ctx: Store,
+                                                    },
+                                                ),
+                                                value: NumberLiteral(
+                                                    ExprNumberLiteral {
+                                                        range: 245..246,
+                                                        value: Int(
+                                                            1,
+                                                        ),
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                    ),
+                                    value: Named(
                                         ExprNamed {
-                                            range: 240..246,
+                                            range: 250..256,
                                             target: Name(
                                                 ExprName {
-                                                    range: 240..241,
-                                                    id: "x",
+                                                    range: 250..251,
+                                                    id: "y",
                                                     ctx: Store,
                                                 },
                                             ),
                                             value: NumberLiteral(
                                                 ExprNumberLiteral {
-                                                    range: 245..246,
+                                                    range: 255..256,
                                                     value: Int(
-                                                        1,
+                                                        2,
                                                     ),
                                                 },
                                             ),
                                         },
                                     ),
-                                ),
-                            ],
-                            values: [
-                                Named(
-                                    ExprNamed {
-                                        range: 250..256,
-                                        target: Name(
-                                            ExprName {
-                                                range: 250..251,
-                                                id: "y",
-                                                ctx: Store,
-                                            },
-                                        ),
-                                        value: NumberLiteral(
-                                            ExprNumberLiteral {
-                                                range: 255..256,
-                                                value: Int(
-                                                    2,
-                                                ),
-                                            },
-                                        ),
-                                    },
-                                ),
+                                },
                             ],
                         },
                     ),
@@ -538,17 +544,17 @@ Module(
                     value: Dict(
                         ExprDict {
                             range: 284..289,
-                            keys: [
-                                None,
-                            ],
-                            values: [
-                                Name(
-                                    ExprName {
-                                        range: 287..288,
-                                        id: "d",
-                                        ctx: Load,
-                                    },
-                                ),
+                            items: [
+                                DictItem {
+                                    key: None,
+                                    value: Name(
+                                        ExprName {
+                                            range: 287..288,
+                                            id: "d",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                },
                             ],
                         },
                     ),
@@ -560,33 +566,35 @@ Module(
                     value: Dict(
                         ExprDict {
                             range: 290..301,
-                            keys: [
-                                Some(
-                                    Name(
+                            items: [
+                                DictItem {
+                                    key: Some(
+                                        Name(
+                                            ExprName {
+                                                range: 291..292,
+                                                id: "a",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ),
+                                    value: Name(
                                         ExprName {
-                                            range: 291..292,
-                                            id: "a",
+                                            range: 294..295,
+                                            id: "b",
                                             ctx: Load,
                                         },
                                     ),
-                                ),
-                                None,
-                            ],
-                            values: [
-                                Name(
-                                    ExprName {
-                                        range: 294..295,
-                                        id: "b",
-                                        ctx: Load,
-                                    },
-                                ),
-                                Name(
-                                    ExprName {
-                                        range: 299..300,
-                                        id: "d",
-                                        ctx: Load,
-                                    },
-                                ),
+                                },
+                                DictItem {
+                                    key: None,
+                                    value: Name(
+                                        ExprName {
+                                            range: 299..300,
+                                            id: "d",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                },
                             ],
                         },
                     ),
@@ -598,25 +606,27 @@ Module(
                     value: Dict(
                         ExprDict {
                             range: 302..312,
-                            keys: [
-                                None,
-                                None,
-                            ],
-                            values: [
-                                Name(
-                                    ExprName {
-                                        range: 305..306,
-                                        id: "a",
-                                        ctx: Load,
-                                    },
-                                ),
-                                Name(
-                                    ExprName {
-                                        range: 310..311,
-                                        id: "b",
-                                        ctx: Load,
-                                    },
-                                ),
+                            items: [
+                                DictItem {
+                                    key: None,
+                                    value: Name(
+                                        ExprName {
+                                            range: 305..306,
+                                            id: "a",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                },
+                                DictItem {
+                                    key: None,
+                                    value: Name(
+                                        ExprName {
+                                            range: 310..311,
+                                            id: "b",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                },
                             ],
                         },
                     ),
@@ -628,16 +638,36 @@ Module(
                     value: Dict(
                         ExprDict {
                             range: 313..338,
-                            keys: [
-                                Some(
-                                    StringLiteral(
+                            items: [
+                                DictItem {
+                                    key: Some(
+                                        StringLiteral(
+                                            ExprStringLiteral {
+                                                range: 314..317,
+                                                value: StringLiteralValue {
+                                                    inner: Single(
+                                                        StringLiteral {
+                                                            range: 314..317,
+                                                            value: "a",
+                                                            flags: StringLiteralFlags {
+                                                                quote_style: Double,
+                                                                prefix: Empty,
+                                                                triple_quoted: false,
+                                                            },
+                                                        },
+                                                    ),
+                                                },
+                                            },
+                                        ),
+                                    ),
+                                    value: StringLiteral(
                                         ExprStringLiteral {
-                                            range: 314..317,
+                                            range: 319..322,
                                             value: StringLiteralValue {
                                                 inner: Single(
                                                     StringLiteral {
-                                                        range: 314..317,
-                                                        value: "a",
+                                                        range: 319..322,
+                                                        value: "b",
                                                         flags: StringLiteralFlags {
                                                             quote_style: Double,
                                                             prefix: Empty,
@@ -648,17 +678,46 @@ Module(
                                             },
                                         },
                                     ),
-                                ),
-                                None,
-                                Some(
-                                    StringLiteral(
+                                },
+                                DictItem {
+                                    key: None,
+                                    value: Name(
+                                        ExprName {
+                                            range: 326..327,
+                                            id: "c",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                },
+                                DictItem {
+                                    key: Some(
+                                        StringLiteral(
+                                            ExprStringLiteral {
+                                                range: 329..332,
+                                                value: StringLiteralValue {
+                                                    inner: Single(
+                                                        StringLiteral {
+                                                            range: 329..332,
+                                                            value: "d",
+                                                            flags: StringLiteralFlags {
+                                                                quote_style: Double,
+                                                                prefix: Empty,
+                                                                triple_quoted: false,
+                                                            },
+                                                        },
+                                                    ),
+                                                },
+                                            },
+                                        ),
+                                    ),
+                                    value: StringLiteral(
                                         ExprStringLiteral {
-                                            range: 329..332,
+                                            range: 334..337,
                                             value: StringLiteralValue {
                                                 inner: Single(
                                                     StringLiteral {
-                                                        range: 329..332,
-                                                        value: "d",
+                                                        range: 334..337,
+                                                        value: "e",
                                                         flags: StringLiteralFlags {
                                                             quote_style: Double,
                                                             prefix: Empty,
@@ -669,52 +728,7 @@ Module(
                                             },
                                         },
                                     ),
-                                ),
-                            ],
-                            values: [
-                                StringLiteral(
-                                    ExprStringLiteral {
-                                        range: 319..322,
-                                        value: StringLiteralValue {
-                                            inner: Single(
-                                                StringLiteral {
-                                                    range: 319..322,
-                                                    value: "b",
-                                                    flags: StringLiteralFlags {
-                                                        quote_style: Double,
-                                                        prefix: Empty,
-                                                        triple_quoted: false,
-                                                    },
-                                                },
-                                            ),
-                                        },
-                                    },
-                                ),
-                                Name(
-                                    ExprName {
-                                        range: 326..327,
-                                        id: "c",
-                                        ctx: Load,
-                                    },
-                                ),
-                                StringLiteral(
-                                    ExprStringLiteral {
-                                        range: 334..337,
-                                        value: StringLiteralValue {
-                                            inner: Single(
-                                                StringLiteral {
-                                                    range: 334..337,
-                                                    value: "e",
-                                                    flags: StringLiteralFlags {
-                                                        quote_style: Double,
-                                                        prefix: Empty,
-                                                        triple_quoted: false,
-                                                    },
-                                                },
-                                            ),
-                                        },
-                                    },
-                                ),
+                                },
                             ],
                         },
                     ),
@@ -726,75 +740,77 @@ Module(
                     value: Dict(
                         ExprDict {
                             range: 339..367,
-                            keys: [
-                                Some(
-                                    NumberLiteral(
+                            items: [
+                                DictItem {
+                                    key: Some(
+                                        NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 340..341,
+                                                value: Int(
+                                                    1,
+                                                ),
+                                            },
+                                        ),
+                                    ),
+                                    value: NumberLiteral(
                                         ExprNumberLiteral {
-                                            range: 340..341,
+                                            range: 343..344,
                                             value: Int(
-                                                1,
+                                                2,
                                             ),
                                         },
                                     ),
-                                ),
-                                None,
-                            ],
-                            values: [
-                                NumberLiteral(
-                                    ExprNumberLiteral {
-                                        range: 343..344,
-                                        value: Int(
-                                            2,
-                                        ),
-                                    },
-                                ),
-                                Dict(
-                                    ExprDict {
-                                        range: 348..366,
-                                        keys: [
-                                            Some(
-                                                StringLiteral(
-                                                    ExprStringLiteral {
-                                                        range: 349..357,
-                                                        value: StringLiteralValue {
-                                                            inner: Single(
-                                                                StringLiteral {
-                                                                    range: 349..357,
-                                                                    value: "nested",
-                                                                    flags: StringLiteralFlags {
-                                                                        quote_style: Single,
-                                                                        prefix: Empty,
-                                                                        triple_quoted: false,
-                                                                    },
-                                                                },
-                                                            ),
-                                                        },
-                                                    },
-                                                ),
-                                            ),
-                                        ],
-                                        values: [
-                                            StringLiteral(
-                                                ExprStringLiteral {
-                                                    range: 359..365,
-                                                    value: StringLiteralValue {
-                                                        inner: Single(
-                                                            StringLiteral {
-                                                                range: 359..365,
-                                                                value: "dict",
-                                                                flags: StringLiteralFlags {
-                                                                    quote_style: Single,
-                                                                    prefix: Empty,
-                                                                    triple_quoted: false,
+                                },
+                                DictItem {
+                                    key: None,
+                                    value: Dict(
+                                        ExprDict {
+                                            range: 348..366,
+                                            items: [
+                                                DictItem {
+                                                    key: Some(
+                                                        StringLiteral(
+                                                            ExprStringLiteral {
+                                                                range: 349..357,
+                                                                value: StringLiteralValue {
+                                                                    inner: Single(
+                                                                        StringLiteral {
+                                                                            range: 349..357,
+                                                                            value: "nested",
+                                                                            flags: StringLiteralFlags {
+                                                                                quote_style: Single,
+                                                                                prefix: Empty,
+                                                                                triple_quoted: false,
+                                                                            },
+                                                                        },
+                                                                    ),
                                                                 },
                                                             },
                                                         ),
-                                                    },
+                                                    ),
+                                                    value: StringLiteral(
+                                                        ExprStringLiteral {
+                                                            range: 359..365,
+                                                            value: StringLiteralValue {
+                                                                inner: Single(
+                                                                    StringLiteral {
+                                                                        range: 359..365,
+                                                                        value: "dict",
+                                                                        flags: StringLiteralFlags {
+                                                                            quote_style: Single,
+                                                                            prefix: Empty,
+                                                                            triple_quoted: false,
+                                                                        },
+                                                                    },
+                                                                ),
+                                                            },
+                                                        },
+                                                    ),
                                                 },
-                                            ),
-                                        ],
-                                    },
-                                ),
+                                            ],
+                                        },
+                                    ),
+                                },
                             ],
                         },
                     ),
@@ -806,71 +822,73 @@ Module(
                     value: Dict(
                         ExprDict {
                             range: 368..393,
-                            keys: [
-                                Some(
-                                    BinOp(
+                            items: [
+                                DictItem {
+                                    key: Some(
+                                        BinOp(
+                                            ExprBinOp {
+                                                range: 369..374,
+                                                left: Name(
+                                                    ExprName {
+                                                        range: 369..370,
+                                                        id: "x",
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                op: Mult,
+                                                right: NumberLiteral(
+                                                    ExprNumberLiteral {
+                                                        range: 373..374,
+                                                        value: Int(
+                                                            1,
+                                                        ),
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                    ),
+                                    value: BinOp(
                                         ExprBinOp {
-                                            range: 369..374,
+                                            range: 376..382,
                                             left: Name(
                                                 ExprName {
-                                                    range: 369..370,
-                                                    id: "x",
+                                                    range: 376..377,
+                                                    id: "y",
                                                     ctx: Load,
                                                 },
                                             ),
-                                            op: Mult,
+                                            op: Pow,
                                             right: NumberLiteral(
                                                 ExprNumberLiteral {
-                                                    range: 373..374,
+                                                    range: 381..382,
                                                     value: Int(
-                                                        1,
+                                                        2,
                                                     ),
                                                 },
                                             ),
                                         },
                                     ),
-                                ),
-                                None,
-                            ],
-                            values: [
-                                BinOp(
-                                    ExprBinOp {
-                                        range: 376..382,
-                                        left: Name(
-                                            ExprName {
-                                                range: 376..377,
-                                                id: "y",
-                                                ctx: Load,
+                                },
+                                DictItem {
+                                    key: None,
+                                    value: Call(
+                                        ExprCall {
+                                            range: 386..392,
+                                            func: Name(
+                                                ExprName {
+                                                    range: 386..390,
+                                                    id: "call",
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            arguments: Arguments {
+                                                range: 390..392,
+                                                args: [],
+                                                keywords: [],
                                             },
-                                        ),
-                                        op: Pow,
-                                        right: NumberLiteral(
-                                            ExprNumberLiteral {
-                                                range: 381..382,
-                                                value: Int(
-                                                    2,
-                                                ),
-                                            },
-                                        ),
-                                    },
-                                ),
-                                Call(
-                                    ExprCall {
-                                        range: 386..392,
-                                        func: Name(
-                                            ExprName {
-                                                range: 386..390,
-                                                id: "call",
-                                                ctx: Load,
-                                            },
-                                        ),
-                                        arguments: Arguments {
-                                            range: 390..392,
-                                            args: [],
-                                            keywords: [],
                                         },
-                                    },
-                                ),
+                                    ),
+                                },
                             ],
                         },
                     ),
@@ -882,23 +900,23 @@ Module(
                     value: Dict(
                         ExprDict {
                             range: 460..471,
-                            keys: [
-                                None,
-                            ],
-                            values: [
-                                UnaryOp(
-                                    ExprUnaryOp {
-                                        range: 464..469,
-                                        op: Not,
-                                        operand: Name(
-                                            ExprName {
-                                                range: 468..469,
-                                                id: "x",
-                                                ctx: Load,
-                                            },
-                                        ),
-                                    },
-                                ),
+                            items: [
+                                DictItem {
+                                    key: None,
+                                    value: UnaryOp(
+                                        ExprUnaryOp {
+                                            range: 464..469,
+                                            op: Not,
+                                            operand: Name(
+                                                ExprName {
+                                                    range: 468..469,
+                                                    id: "x",
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                },
                             ],
                         },
                     ),
@@ -910,44 +928,44 @@ Module(
                     value: Dict(
                         ExprDict {
                             range: 494..515,
-                            keys: [
-                                Some(
-                                    NumberLiteral(
-                                        ExprNumberLiteral {
-                                            range: 495..496,
-                                            value: Int(
-                                                1,
+                            items: [
+                                DictItem {
+                                    key: Some(
+                                        NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 495..496,
+                                                value: Int(
+                                                    1,
+                                                ),
+                                            },
+                                        ),
+                                    ),
+                                    value: If(
+                                        ExprIf {
+                                            range: 498..514,
+                                            test: BooleanLiteral(
+                                                ExprBooleanLiteral {
+                                                    range: 503..507,
+                                                    value: true,
+                                                },
+                                            ),
+                                            body: Name(
+                                                ExprName {
+                                                    range: 498..499,
+                                                    id: "x",
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            orelse: Name(
+                                                ExprName {
+                                                    range: 513..514,
+                                                    id: "y",
+                                                    ctx: Load,
+                                                },
                                             ),
                                         },
                                     ),
-                                ),
-                            ],
-                            values: [
-                                If(
-                                    ExprIf {
-                                        range: 498..514,
-                                        test: BooleanLiteral(
-                                            ExprBooleanLiteral {
-                                                range: 503..507,
-                                                value: true,
-                                            },
-                                        ),
-                                        body: Name(
-                                            ExprName {
-                                                range: 498..499,
-                                                id: "x",
-                                                ctx: Load,
-                                            },
-                                        ),
-                                        orelse: Name(
-                                            ExprName {
-                                                range: 513..514,
-                                                id: "y",
-                                                ctx: Load,
-                                            },
-                                        ),
-                                    },
-                                ),
+                                },
                             ],
                         },
                     ),
@@ -1079,78 +1097,80 @@ Module(
                     value: Dict(
                         ExprDict {
                             range: 576..600,
-                            keys: [
-                                Some(
-                                    Set(
-                                        ExprSet {
-                                            range: 577..583,
-                                            elts: [
-                                                NumberLiteral(
-                                                    ExprNumberLiteral {
-                                                        range: 578..579,
-                                                        value: Int(
-                                                            1,
+                            items: [
+                                DictItem {
+                                    key: Some(
+                                        Set(
+                                            ExprSet {
+                                                range: 577..583,
+                                                elts: [
+                                                    NumberLiteral(
+                                                        ExprNumberLiteral {
+                                                            range: 578..579,
+                                                            value: Int(
+                                                                1,
+                                                            ),
+                                                        },
+                                                    ),
+                                                    NumberLiteral(
+                                                        ExprNumberLiteral {
+                                                            range: 581..582,
+                                                            value: Int(
+                                                                2,
+                                                            ),
+                                                        },
+                                                    ),
+                                                ],
+                                            },
+                                        ),
+                                    ),
+                                    value: NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 585..586,
+                                            value: Int(
+                                                3,
+                                            ),
+                                        },
+                                    ),
+                                },
+                                DictItem {
+                                    key: Some(
+                                        Name(
+                                            ExprName {
+                                                range: 588..589,
+                                                id: "x",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ),
+                                    value: Dict(
+                                        ExprDict {
+                                            range: 591..598,
+                                            items: [
+                                                DictItem {
+                                                    key: Some(
+                                                        NumberLiteral(
+                                                            ExprNumberLiteral {
+                                                                range: 592..593,
+                                                                value: Int(
+                                                                    1,
+                                                                ),
+                                                            },
                                                         ),
-                                                    },
-                                                ),
-                                                NumberLiteral(
-                                                    ExprNumberLiteral {
-                                                        range: 581..582,
-                                                        value: Int(
-                                                            2,
-                                                        ),
-                                                    },
-                                                ),
+                                                    ),
+                                                    value: NumberLiteral(
+                                                        ExprNumberLiteral {
+                                                            range: 595..596,
+                                                            value: Int(
+                                                                2,
+                                                            ),
+                                                        },
+                                                    ),
+                                                },
                                             ],
                                         },
                                     ),
-                                ),
-                                Some(
-                                    Name(
-                                        ExprName {
-                                            range: 588..589,
-                                            id: "x",
-                                            ctx: Load,
-                                        },
-                                    ),
-                                ),
-                            ],
-                            values: [
-                                NumberLiteral(
-                                    ExprNumberLiteral {
-                                        range: 585..586,
-                                        value: Int(
-                                            3,
-                                        ),
-                                    },
-                                ),
-                                Dict(
-                                    ExprDict {
-                                        range: 591..598,
-                                        keys: [
-                                            Some(
-                                                NumberLiteral(
-                                                    ExprNumberLiteral {
-                                                        range: 592..593,
-                                                        value: Int(
-                                                            1,
-                                                        ),
-                                                    },
-                                                ),
-                                            ),
-                                        ],
-                                        values: [
-                                            NumberLiteral(
-                                                ExprNumberLiteral {
-                                                    range: 595..596,
-                                                    value: Int(
-                                                        2,
-                                                    ),
-                                                },
-                                            ),
-                                        ],
-                                    },
-                                ),
+                                },
                             ],
                         },
                     ),
@@ -1162,41 +1182,43 @@ Module(
                     value: Dict(
                         ExprDict {
                             range: 601..621,
-                            keys: [
-                                Some(
-                                    Name(
+                            items: [
+                                DictItem {
+                                    key: Some(
+                                        Name(
+                                            ExprName {
+                                                range: 603..604,
+                                                id: "x",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ),
+                                    value: Name(
                                         ExprName {
-                                            range: 603..604,
-                                            id: "x",
+                                            range: 608..609,
+                                            id: "y",
                                             ctx: Load,
                                         },
                                     ),
-                                ),
-                                Some(
-                                    Name(
+                                },
+                                DictItem {
+                                    key: Some(
+                                        Name(
+                                            ExprName {
+                                                range: 613..614,
+                                                id: "z",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ),
+                                    value: Name(
                                         ExprName {
-                                            range: 613..614,
-                                            id: "z",
+                                            range: 618..619,
+                                            id: "a",
                                             ctx: Load,
                                         },
                                     ),
-                                ),
-                            ],
-                            values: [
-                                Name(
-                                    ExprName {
-                                        range: 608..609,
-                                        id: "y",
-                                        ctx: Load,
-                                    },
-                                ),
-                                Name(
-                                    ExprName {
-                                        range: 618..619,
-                                        id: "a",
-                                        ctx: Load,
-                                    },
-                                ),
+                                },
                             ],
                         },
                     ),
