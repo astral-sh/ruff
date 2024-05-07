@@ -30,7 +30,7 @@ pub struct RedundantFinalLiteral {
 }
 
 impl Violation for RedundantFinalLiteral {
-    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Always;
 
     #[derive_message_formats]
     fn message(&self) -> String {
