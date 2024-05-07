@@ -158,8 +158,8 @@ fn is_first_party(qualified_name: &str, level: u32, checker: &Checker) -> bool {
     }
 }
 
-/// Find the `ExprList` for a top level `__all__`, if one exists.
-fn find_dunder_all_expr<'a>(semantic: &'a SemanticModel) -> Option<&'a ast::ExprList> {
+/// Find the `Expr` value for a top level `__all__`, if one exists.
+fn find_dunder_all_expr<'a>(semantic: &'a SemanticModel) -> Option<&'a ast::Expr> {
     let stmt = semantic
         .global_scope()
         .get_all("__all__")
@@ -175,7 +175,8 @@ fn find_dunder_all_expr<'a>(semantic: &'a SemanticModel) -> Option<&'a ast::Expr
         _ => None,
     }?;
     match expr {
-        ast::Expr::List(list) => Some(list),
+        ast::Expr::List(_) => Some(expr),
+        ast::Expr::Tuple(_) => Some(expr),
         _ => None,
     }
 }
@@ -418,7 +419,7 @@ fn fix_by_reexporting(
     checker: &Checker,
     node_id: NodeId,
     imports: &[&ImportBinding],
-    dunder_all: Option<&ast::ExprList>,
+    dunder_all: Option<&ast::Expr>,
 ) -> Result<Fix> {
     let statement = checker.semantic().statement(node_id);
     if imports.is_empty() {

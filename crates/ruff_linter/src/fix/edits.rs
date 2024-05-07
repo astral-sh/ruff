@@ -4,7 +4,7 @@ use anyhow::{Context, Result};
 
 use ruff_diagnostics::Edit;
 use ruff_python_ast::parenthesize::parenthesized_range;
-use ruff_python_ast::{self as ast, Arguments, ExceptHandler, ExprList, Stmt};
+use ruff_python_ast::{self as ast, Arguments, ExceptHandler, Expr, Stmt};
 use ruff_python_ast::{AnyNodeRef, ArgOrKeyword};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
@@ -147,19 +147,25 @@ pub(crate) fn make_redundant_alias<'a>(
 /// Fix to add the specified imports to the `__all__` export list.
 pub(crate) fn add_to_dunder_all<'a>(
     names: impl Iterator<Item = &'a str>,
-    dunder_all: &ExprList,
+    expr: &Expr,
     stylist: &Stylist,
 ) -> Vec<Edit> {
+    let (insertion_point, export_prefix_length) = match expr {
+        ast::Expr::List(ast::ExprList { elts, range, .. })
+        | ast::Expr::Tuple(ast::ExprTuple { elts, range, .. }) => (
+            elts.last()
+                .map(|elt| elt.range().end())
+                .unwrap_or(range.end() - "]".text_len()),
+            elts.len(),
+        ),
+        _ => {
+            return vec![];
+        }
+    };
     let quote = stylist.quote();
-    let insertion_point = dunder_all
-        .elts
-        .last()
-        .map_or(dunder_all.range.end() - "]".text_len(), |expr| {
-            expr.range().end()
-        });
     names
         .enumerate()
-        .map(|(offset, name)| match dunder_all.elts.len() + offset {
+        .map(|(offset, name)| match export_prefix_length + offset {
             0 => Edit::insertion(format!("{quote}{name}{quote}"), insertion_point),
             _ => Edit::insertion(format!(", {quote}{name}{quote}"), insertion_point),
         })
@@ -500,9 +506,9 @@ fn all_lines_fit(
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
+    use test_case::test_case;
 
     use ruff_diagnostics::Edit;
-    use ruff_python_ast as ast;
     use ruff_python_codegen::Stylist;
     use ruff_python_parser::{lexer, parse_expression, parse_suite, Mode};
     use ruff_source_file::Locator;
@@ -613,51 +619,49 @@ x = 1 \
         );
     }
 
-    #[test]
-    fn add_to_empty_dunder_all() {
-        let raw = "[]";
+    #[test_case("[]" ; "empty list")]
+    #[test_case("()" ; "empty tuple")]
+    fn add_to_empty_dunder_all(raw: &str) -> Result<()> {
         let locator = Locator::new(raw);
         let stylist = Stylist::from_tokens(
             &lexer::lex(raw, Mode::Expression).collect::<Vec<_>>(),
             &locator,
         );
-        let Ok(ast::Expr::List(ref list)) = parse_expression(raw) else {
-            panic!("expected a list");
-        };
+        let expr = parse_expression(raw)?;
         assert_eq!(
-            add_to_dunder_all(["x"].into_iter(), list, &stylist),
+            add_to_dunder_all(["x"].into_iter(), &expr, &stylist),
             vec![Edit::insertion(String::from("\"x\""), TextSize::new(1))],
         );
         assert_eq!(
-            add_to_dunder_all(["x", "y"].into_iter(), list, &stylist),
+            add_to_dunder_all(["x", "y"].into_iter(), &expr, &stylist),
             vec![
                 Edit::insertion(String::from("\"x\""), TextSize::new(1)),
                 Edit::insertion(String::from(", \"y\""), TextSize::new(1))
             ],
         );
+        Ok(())
     }
 
-    #[test]
-    fn add_to_nonempty_dunder_all() {
-        let raw = "[\"a\", \"b\"]";
+    #[test_case(r#"["a", "b"]"# ; "nonempty list")]
+    #[test_case(r#"("a", "b")"# ; "nonempty tuple")]
+    fn add_to_nonempty_dunder_all(raw: &str) -> Result<()> {
         let locator = Locator::new(raw);
         let stylist = Stylist::from_tokens(
             &lexer::lex(raw, Mode::Expression).collect::<Vec<_>>(),
             &locator,
         );
-        let Ok(ast::Expr::List(ref list)) = parse_expression(raw) else {
-            panic!("expected a list");
-        };
+        let expr = parse_expression(raw)?;
         assert_eq!(
-            add_to_dunder_all(["x"].into_iter(), list, &stylist),
+            add_to_dunder_all(["x"].into_iter(), &expr, &stylist),
             vec![Edit::insertion(String::from(", \"x\""), TextSize::new(9))],
         );
         assert_eq!(
-            add_to_dunder_all(["x", "y"].into_iter(), list, &stylist),
+            add_to_dunder_all(["x", "y"].into_iter(), &expr, &stylist),
             vec![
                 Edit::insertion(String::from(", \"x\""), TextSize::new(9)),
                 Edit::insertion(String::from(", \"y\""), TextSize::new(9))
             ],
         );
+        Ok(())
     }
 }
