@@ -7,7 +7,7 @@ z: Final[Literal["this is a really long literal, that won't be rendered in the i
 # This should be fixable, and marked as safe
 w1: Final[Literal[123]]  # PYI064
 
-# This should be fixable, but marked as unsafe
+# This should not be fixable
 w2: Final[Literal[123]] = "random value"  # PYI064
 
 n1: Final[Literal[True, False]] # No issue here

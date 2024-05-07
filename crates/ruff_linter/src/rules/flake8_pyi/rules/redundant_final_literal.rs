@@ -30,7 +30,7 @@ pub struct RedundantFinalLiteral {
 }
 
 impl Violation for RedundantFinalLiteral {
-    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Always;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -78,49 +78,42 @@ pub(crate) fn redundant_final_literal(checker: &mut Checker, ann_assign: &ast::S
         return;
     }
 
-    checker.diagnostics.push(
-        Diagnostic::new(
-            RedundantFinalLiteral {
-                literal: SourceCodeSnippet::from_str(checker.locator().slice(literal.range())),
-            },
-            ann_assign.range(),
-        )
-        .with_fix(generate_fix(
+    let mut diagnostic = Diagnostic::new(
+        RedundantFinalLiteral {
+            literal: SourceCodeSnippet::from_str(checker.locator().slice(literal.range())),
+        },
+        ann_assign.range(),
+    );
+    // The literal value and the assignment value being different doesn't
+    // make sense, so we don't do an autofix if that happens.
+    if !assign_value.as_ref().is_some_and(|assign_value| {
+        ComparableExpr::from(assign_value) != ComparableExpr::from(literal)
+    }) {
+        diagnostic.set_fix(generate_fix(
             checker,
             annotation,
-            assign_value.as_deref(),
             literal,
-        )),
-    );
+            assign_value.is_none(),
+        ));
+    }
+    checker.diagnostics.push(diagnostic);
 }
 
 fn generate_fix(
     checker: &Checker,
     annotation: &ast::Expr,
-    assign_value: Option<&ast::Expr>,
     literal: &ast::Expr,
+    add_assignment: bool,
 ) -> Fix {
     let deletion = Edit::range_deletion(annotation.range());
-    let insertion = Edit::insertion(format!("Final"), annotation.start());
+    let mut insertions = vec![Edit::insertion(format!("Final"), annotation.start())];
 
-    let Some(assign_value) = assign_value else {
+    if add_assignment {
         // If no assignment exists, add our own, same as the literal value.
         let literal_source = checker.locator().slice(literal.range());
         let assignment = Edit::insertion(format!(" = {literal_source}"), annotation.end());
-        return Fix::safe_edits(deletion, [insertion, assignment]);
+        insertions.push(assignment)
     };
 
-    if ComparableExpr::from(assign_value) != ComparableExpr::from(literal) {
-        // In this case, assume that the value in the literal annotation
-        // is the correct one.
-        let literal_source = checker.locator().slice(literal.range());
-        let assign_replacement = Edit::replacement(
-            literal_source.to_string(),
-            assign_value.start(),
-            assign_value.end(),
-        );
-        return Fix::unsafe_edits(deletion, [insertion, assign_replacement]);
-    }
-
-    Fix::safe_edits(deletion, [insertion])
+    Fix::safe_edits(deletion, insertions)
 }
