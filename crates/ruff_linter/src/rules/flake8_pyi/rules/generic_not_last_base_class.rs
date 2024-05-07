@@ -1,7 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::map_subscript;
-use ruff_python_ast::{Arguments, Expr, StmtClassDef};
+use ruff_python_ast::{self as ast, helpers::map_subscript};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -9,11 +8,11 @@ use crate::fix::edits::{add_argument, remove_argument, Parentheses};
 
 /// ## What it does
 /// Checks for classes inheriting from `typing.Generic[]` where `Generic[]` is
-/// not the last base class in the bases list.
+/// not the last base class in the bases tuple.
 ///
 /// ## Why is this bad?
-/// `Generic[]` not being the final class in the bases tuple can cause
-/// unexpected behaviour at runtime (See [this CPython issue][1] for example).
+/// If `Generic[]` is not the final class in the bases tuple, unexpected
+/// behaviour can occur at runtime (See [this CPython issue][1] for an example).
 /// The rule is also applied to stub files, but, unlike at runtime,
 /// in stubs it is purely enforced for stylistic consistency.
 ///
@@ -65,7 +64,7 @@ impl Violation for GenericNotLastBaseClass {
 }
 
 /// PYI059
-pub(crate) fn generic_not_last_base_class(checker: &mut Checker, class_def: &StmtClassDef) {
+pub(crate) fn generic_not_last_base_class(checker: &mut Checker, class_def: &ast::StmtClassDef) {
     let Some(bases) = class_def.arguments.as_deref() else {
         return;
     };
@@ -88,14 +87,14 @@ pub(crate) fn generic_not_last_base_class(checker: &mut Checker, class_def: &Stm
         return;
     };
 
-    // If Generic[] exists, but is the last base, don't raise issue.
+    // If `Generic[]` exists, but is the last base, don't emit a diagnostic.
     if generic_base.range() == last_base.range() {
         return;
     }
 
     let mut diagnostic = Diagnostic::new(GenericNotLastBaseClass, bases.range());
 
-    // No fix if multiple generics are seen in the class bases.
+    // No fix if multiple `Generic[]`s are seen in the class bases.
     if generic_base_iter.next().is_none() {
         diagnostic.try_set_fix(|| generate_fix(generic_base, bases, checker));
     }
@@ -104,8 +103,8 @@ pub(crate) fn generic_not_last_base_class(checker: &mut Checker, class_def: &Stm
 }
 
 fn generate_fix(
-    generic_base: &Expr,
-    arguments: &Arguments,
+    generic_base: &ast::Expr,
+    arguments: &ast::Arguments,
     checker: &Checker,
 ) -> anyhow::Result<Fix> {
     let locator = checker.locator();
@@ -113,7 +112,7 @@ fn generate_fix(
 
     let deletion = remove_argument(generic_base, arguments, Parentheses::Preserve, source)?;
     let insertion = add_argument(
-        locator.slice(generic_base.range()),
+        locator.slice(generic_base),
         arguments,
         checker.indexer().comment_ranges(),
         source,
