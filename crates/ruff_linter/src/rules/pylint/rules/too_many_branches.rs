@@ -266,4 +266,20 @@ finally:
         test_helper(source, 5)?;
         Ok(())
     }
+
+    #[test]
+    fn with_statement() -> Result<()> {
+        let source: &str = r"
+with suppress(Exception):
+    if x == 0:  # 2
+        return
+    else:
+        return
+";
+
+        // The `with` statement is not considered a branch but
+        // the statements inside the `with` should be counted
+        test_helper(source, 2)?;
+        Ok(())
+    }
 }
