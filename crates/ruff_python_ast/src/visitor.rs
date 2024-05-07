@@ -389,16 +389,12 @@ pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a Expr) {
             visitor.visit_expr(body);
             visitor.visit_expr(orelse);
         }
-        Expr::Dict(ast::ExprDict {
-            keys,
-            values,
-            range: _,
-        }) => {
-            for expr in keys.iter().flatten() {
-                visitor.visit_expr(expr);
-            }
-            for expr in values {
-                visitor.visit_expr(expr);
+        Expr::Dict(ast::ExprDict { items, range: _ }) => {
+            for ast::DictItem { key, value } in items {
+                if let Some(key) = key {
+                    visitor.visit_expr(key);
+                }
+                visitor.visit_expr(value);
             }
         }
         Expr::Set(ast::ExprSet { elts, range: _ }) => {

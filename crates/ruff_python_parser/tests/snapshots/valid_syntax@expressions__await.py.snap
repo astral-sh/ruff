@@ -192,26 +192,26 @@ Module(
                             value: Dict(
                                 ExprDict {
                                     range: 76..82,
-                                    keys: [
-                                        Some(
-                                            Name(
-                                                ExprName {
-                                                    range: 77..78,
-                                                    id: "i",
-                                                    ctx: Load,
+                                    items: [
+                                        DictItem {
+                                            key: Some(
+                                                Name(
+                                                    ExprName {
+                                                        range: 77..78,
+                                                        id: "i",
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                            ),
+                                            value: NumberLiteral(
+                                                ExprNumberLiteral {
+                                                    range: 80..81,
+                                                    value: Int(
+                                                        5,
+                                                    ),
                                                 },
                                             ),
-                                        ),
-                                    ],
-                                    values: [
-                                        NumberLiteral(
-                                            ExprNumberLiteral {
-                                                range: 80..81,
-                                                value: Int(
-                                                    5,
-                                                ),
-                                            },
-                                        ),
+                                        },
                                     ],
                                 },
                             ),

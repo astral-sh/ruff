@@ -15,34 +15,36 @@ Module(
                     value: Dict(
                         ExprDict {
                             range: 125..135,
-                            keys: [
-                                None,
-                                Some(
-                                    NumberLiteral(
-                                        ExprNumberLiteral {
-                                            range: 133..134,
-                                            value: Int(
-                                                1,
-                                            ),
+                            items: [
+                                DictItem {
+                                    key: None,
+                                    value: Name(
+                                        ExprName {
+                                            range: 128..129,
+                                            id: "x",
+                                            ctx: Load,
                                         },
                                     ),
-                                ),
-                            ],
-                            values: [
-                                Name(
-                                    ExprName {
-                                        range: 128..129,
-                                        id: "x",
-                                        ctx: Load,
-                                    },
-                                ),
-                                Name(
-                                    ExprName {
-                                        range: 134..134,
-                                        id: "",
-                                        ctx: Invalid,
-                                    },
-                                ),
+                                },
+                                DictItem {
+                                    key: Some(
+                                        NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 133..134,
+                                                value: Int(
+                                                    1,
+                                                ),
+                                            },
+                                        ),
+                                    ),
+                                    value: Name(
+                                        ExprName {
+                                            range: 134..134,
+                                            id: "",
+                                            ctx: Invalid,
+                                        },
+                                    ),
+                                },
                             ],
                         },
                     ),
@@ -54,52 +56,54 @@ Module(
                     value: Dict(
                         ExprDict {
                             range: 136..162,
-                            keys: [
-                                Some(
-                                    Name(
-                                        ExprName {
-                                            range: 137..138,
-                                            id: "a",
-                                            ctx: Load,
+                            items: [
+                                DictItem {
+                                    key: Some(
+                                        Name(
+                                            ExprName {
+                                                range: 137..138,
+                                                id: "a",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ),
+                                    value: NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 140..141,
+                                            value: Int(
+                                                1,
+                                            ),
                                         },
                                     ),
-                                ),
-                                None,
-                            ],
-                            values: [
-                                NumberLiteral(
-                                    ExprNumberLiteral {
-                                        range: 140..141,
-                                        value: Int(
-                                            1,
-                                        ),
-                                    },
-                                ),
-                                If(
-                                    ExprIf {
-                                        range: 145..161,
-                                        test: BooleanLiteral(
-                                            ExprBooleanLiteral {
-                                                range: 150..154,
-                                                value: true,
-                                            },
-                                        ),
-                                        body: Name(
-                                            ExprName {
-                                                range: 145..146,
-                                                id: "x",
-                                                ctx: Load,
-                                            },
-                                        ),
-                                        orelse: Name(
-                                            ExprName {
-                                                range: 160..161,
-                                                id: "y",
-                                                ctx: Load,
-                                            },
-                                        ),
-                                    },
-                                ),
+                                },
+                                DictItem {
+                                    key: None,
+                                    value: If(
+                                        ExprIf {
+                                            range: 145..161,
+                                            test: BooleanLiteral(
+                                                ExprBooleanLiteral {
+                                                    range: 150..154,
+                                                    value: true,
+                                                },
+                                            ),
+                                            body: Name(
+                                                ExprName {
+                                                    range: 145..146,
+                                                    id: "x",
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            orelse: Name(
+                                                ExprName {
+                                                    range: 160..161,
+                                                    id: "y",
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                },
                             ],
                         },
                     ),
@@ -111,62 +115,64 @@ Module(
                     value: Dict(
                         ExprDict {
                             range: 163..184,
-                            keys: [
-                                None,
-                                Some(
-                                    Name(
-                                        ExprName {
-                                            range: 179..180,
-                                            id: "b",
-                                            ctx: Load,
+                            items: [
+                                DictItem {
+                                    key: None,
+                                    value: Lambda(
+                                        ExprLambda {
+                                            range: 166..177,
+                                            parameters: Some(
+                                                Parameters {
+                                                    range: 173..174,
+                                                    posonlyargs: [],
+                                                    args: [
+                                                        ParameterWithDefault {
+                                                            range: 173..174,
+                                                            parameter: Parameter {
+                                                                range: 173..174,
+                                                                name: Identifier {
+                                                                    id: "x",
+                                                                    range: 173..174,
+                                                                },
+                                                                annotation: None,
+                                                            },
+                                                            default: None,
+                                                        },
+                                                    ],
+                                                    vararg: None,
+                                                    kwonlyargs: [],
+                                                    kwarg: None,
+                                                },
+                                            ),
+                                            body: Name(
+                                                ExprName {
+                                                    range: 176..177,
+                                                    id: "x",
+                                                    ctx: Load,
+                                                },
+                                            ),
                                         },
                                     ),
-                                ),
-                            ],
-                            values: [
-                                Lambda(
-                                    ExprLambda {
-                                        range: 166..177,
-                                        parameters: Some(
-                                            Parameters {
-                                                range: 173..174,
-                                                posonlyargs: [],
-                                                args: [
-                                                    ParameterWithDefault {
-                                                        range: 173..174,
-                                                        parameter: Parameter {
-                                                            range: 173..174,
-                                                            name: Identifier {
-                                                                id: "x",
-                                                                range: 173..174,
-                                                            },
-                                                            annotation: None,
-                                                        },
-                                                        default: None,
-                                                    },
-                                                ],
-                                                vararg: None,
-                                                kwonlyargs: [],
-                                                kwarg: None,
-                                            },
-                                        ),
-                                        body: Name(
+                                },
+                                DictItem {
+                                    key: Some(
+                                        Name(
                                             ExprName {
-                                                range: 176..177,
-                                                id: "x",
+                                                range: 179..180,
+                                                id: "b",
                                                 ctx: Load,
                                             },
                                         ),
-                                    },
-                                ),
-                                NumberLiteral(
-                                    ExprNumberLiteral {
-                                        range: 182..183,
-                                        value: Int(
-                                            2,
-                                        ),
-                                    },
-                                ),
+                                    ),
+                                    value: NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 182..183,
+                                            value: Int(
+                                                2,
+                                            ),
+                                        },
+                                    ),
+                                },
                             ],
                         },
                     ),
@@ -178,49 +184,51 @@ Module(
                     value: Dict(
                         ExprDict {
                             range: 185..201,
-                            keys: [
-                                Some(
-                                    Name(
-                                        ExprName {
-                                            range: 186..187,
-                                            id: "a",
-                                            ctx: Load,
+                            items: [
+                                DictItem {
+                                    key: Some(
+                                        Name(
+                                            ExprName {
+                                                range: 186..187,
+                                                id: "a",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ),
+                                    value: NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 189..190,
+                                            value: Int(
+                                                1,
+                                            ),
                                         },
                                     ),
-                                ),
-                                None,
-                            ],
-                            values: [
-                                NumberLiteral(
-                                    ExprNumberLiteral {
-                                        range: 189..190,
-                                        value: Int(
-                                            1,
-                                        ),
-                                    },
-                                ),
-                                BoolOp(
-                                    ExprBoolOp {
-                                        range: 194..200,
-                                        op: Or,
-                                        values: [
-                                            Name(
-                                                ExprName {
-                                                    range: 194..195,
-                                                    id: "x",
-                                                    ctx: Load,
-                                                },
-                                            ),
-                                            Name(
-                                                ExprName {
-                                                    range: 199..200,
-                                                    id: "y",
-                                                    ctx: Load,
-                                                },
-                                            ),
-                                        ],
-                                    },
-                                ),
+                                },
+                                DictItem {
+                                    key: None,
+                                    value: BoolOp(
+                                        ExprBoolOp {
+                                            range: 194..200,
+                                            op: Or,
+                                            values: [
+                                                Name(
+                                                    ExprName {
+                                                        range: 194..195,
+                                                        id: "x",
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                Name(
+                                                    ExprName {
+                                                        range: 199..200,
+                                                        id: "y",
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                            ],
+                                        },
+                                    ),
+                                },
                             ],
                         },
                     ),
@@ -232,49 +240,51 @@ Module(
                     value: Dict(
                         ExprDict {
                             range: 202..219,
-                            keys: [
-                                None,
-                                Some(
-                                    Name(
-                                        ExprName {
-                                            range: 214..215,
-                                            id: "b",
-                                            ctx: Load,
+                            items: [
+                                DictItem {
+                                    key: None,
+                                    value: BoolOp(
+                                        ExprBoolOp {
+                                            range: 205..212,
+                                            op: And,
+                                            values: [
+                                                Name(
+                                                    ExprName {
+                                                        range: 205..206,
+                                                        id: "x",
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                Name(
+                                                    ExprName {
+                                                        range: 211..212,
+                                                        id: "y",
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                            ],
                                         },
                                     ),
-                                ),
-                            ],
-                            values: [
-                                BoolOp(
-                                    ExprBoolOp {
-                                        range: 205..212,
-                                        op: And,
-                                        values: [
-                                            Name(
-                                                ExprName {
-                                                    range: 205..206,
-                                                    id: "x",
-                                                    ctx: Load,
-                                                },
-                                            ),
-                                            Name(
-                                                ExprName {
-                                                    range: 211..212,
-                                                    id: "y",
-                                                    ctx: Load,
-                                                },
-                                            ),
-                                        ],
-                                    },
-                                ),
-                                NumberLiteral(
-                                    ExprNumberLiteral {
-                                        range: 217..218,
-                                        value: Int(
-                                            2,
+                                },
+                                DictItem {
+                                    key: Some(
+                                        Name(
+                                            ExprName {
+                                                range: 214..215,
+                                                id: "b",
+                                                ctx: Load,
+                                            },
                                         ),
-                                    },
-                                ),
+                                    ),
+                                    value: NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 217..218,
+                                            value: Int(
+                                                2,
+                                            ),
+                                        },
+                                    ),
+                                },
                             ],
                         },
                     ),
@@ -286,57 +296,61 @@ Module(
                     value: Dict(
                         ExprDict {
                             range: 220..241,
-                            keys: [
-                                Some(
-                                    Name(
-                                        ExprName {
-                                            range: 221..222,
-                                            id: "a",
-                                            ctx: Load,
-                                        },
-                                    ),
-                                ),
-                                None,
-                                Some(
-                                    Name(
-                                        ExprName {
-                                            range: 236..237,
-                                            id: "b",
-                                            ctx: Load,
-                                        },
-                                    ),
-                                ),
-                            ],
-                            values: [
-                                NumberLiteral(
-                                    ExprNumberLiteral {
-                                        range: 224..225,
-                                        value: Int(
-                                            1,
-                                        ),
-                                    },
-                                ),
-                                UnaryOp(
-                                    ExprUnaryOp {
-                                        range: 229..234,
-                                        op: Not,
-                                        operand: Name(
+                            items: [
+                                DictItem {
+                                    key: Some(
+                                        Name(
                                             ExprName {
-                                                range: 233..234,
-                                                id: "x",
+                                                range: 221..222,
+                                                id: "a",
                                                 ctx: Load,
                                             },
                                         ),
-                                    },
-                                ),
-                                NumberLiteral(
-                                    ExprNumberLiteral {
-                                        range: 239..240,
-                                        value: Int(
-                                            2,
+                                    ),
+                                    value: NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 224..225,
+                                            value: Int(
+                                                1,
+                                            ),
+                                        },
+                                    ),
+                                },
+                                DictItem {
+                                    key: None,
+                                    value: UnaryOp(
+                                        ExprUnaryOp {
+                                            range: 229..234,
+                                            op: Not,
+                                            operand: Name(
+                                                ExprName {
+                                                    range: 233..234,
+                                                    id: "x",
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                },
+                                DictItem {
+                                    key: Some(
+                                        Name(
+                                            ExprName {
+                                                range: 236..237,
+                                                id: "b",
+                                                ctx: Load,
+                                            },
                                         ),
-                                    },
-                                ),
+                                    ),
+                                    value: NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 239..240,
+                                            value: Int(
+                                                2,
+                                            ),
+                                        },
+                                    ),
+                                },
                             ],
                         },
                     ),
@@ -348,34 +362,34 @@ Module(
                     value: Dict(
                         ExprDict {
                             range: 242..252,
-                            keys: [
-                                None,
-                            ],
-                            values: [
-                                Compare(
-                                    ExprCompare {
-                                        range: 245..251,
-                                        left: Name(
-                                            ExprName {
-                                                range: 245..246,
-                                                id: "x",
-                                                ctx: Load,
-                                            },
-                                        ),
-                                        ops: [
-                                            In,
-                                        ],
-                                        comparators: [
-                                            Name(
+                            items: [
+                                DictItem {
+                                    key: None,
+                                    value: Compare(
+                                        ExprCompare {
+                                            range: 245..251,
+                                            left: Name(
                                                 ExprName {
-                                                    range: 250..251,
-                                                    id: "y",
+                                                    range: 245..246,
+                                                    id: "x",
                                                     ctx: Load,
                                                 },
                                             ),
-                                        ],
-                                    },
-                                ),
+                                            ops: [
+                                                In,
+                                            ],
+                                            comparators: [
+                                                Name(
+                                                    ExprName {
+                                                        range: 250..251,
+                                                        id: "y",
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                            ],
+                                        },
+                                    ),
+                                },
                             ],
                         },
                     ),
@@ -387,34 +401,34 @@ Module(
                     value: Dict(
                         ExprDict {
                             range: 253..267,
-                            keys: [
-                                None,
-                            ],
-                            values: [
-                                Compare(
-                                    ExprCompare {
-                                        range: 256..266,
-                                        left: Name(
-                                            ExprName {
-                                                range: 256..257,
-                                                id: "x",
-                                                ctx: Load,
-                                            },
-                                        ),
-                                        ops: [
-                                            NotIn,
-                                        ],
-                                        comparators: [
-                                            Name(
+                            items: [
+                                DictItem {
+                                    key: None,
+                                    value: Compare(
+                                        ExprCompare {
+                                            range: 256..266,
+                                            left: Name(
                                                 ExprName {
-                                                    range: 265..266,
-                                                    id: "y",
+                                                    range: 256..257,
+                                                    id: "x",
                                                     ctx: Load,
                                                 },
                                             ),
-                                        ],
-                                    },
-                                ),
+                                            ops: [
+                                                NotIn,
+                                            ],
+                                            comparators: [
+                                                Name(
+                                                    ExprName {
+                                                        range: 265..266,
+                                                        id: "y",
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                            ],
+                                        },
+                                    ),
+                                },
                             ],
                         },
                     ),
@@ -426,34 +440,34 @@ Module(
                     value: Dict(
                         ExprDict {
                             range: 268..277,
-                            keys: [
-                                None,
-                            ],
-                            values: [
-                                Compare(
-                                    ExprCompare {
-                                        range: 271..276,
-                                        left: Name(
-                                            ExprName {
-                                                range: 271..272,
-                                                id: "x",
-                                                ctx: Load,
-                                            },
-                                        ),
-                                        ops: [
-                                            Lt,
-                                        ],
-                                        comparators: [
-                                            Name(
+                            items: [
+                                DictItem {
+                                    key: None,
+                                    value: Compare(
+                                        ExprCompare {
+                                            range: 271..276,
+                                            left: Name(
                                                 ExprName {
-                                                    range: 275..276,
-                                                    id: "y",
+                                                    range: 271..272,
+                                                    id: "x",
                                                     ctx: Load,
                                                 },
                                             ),
-                                        ],
-                                    },
-                                ),
+                                            ops: [
+                                                Lt,
+                                            ],
+                                            comparators: [
+                                                Name(
+                                                    ExprName {
+                                                        range: 275..276,
+                                                        id: "y",
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                            ],
+                                        },
+                                    ),
+                                },
                             ],
                         },
                     ),

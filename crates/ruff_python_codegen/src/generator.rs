@@ -919,22 +919,18 @@ impl<'a> Generator<'a> {
                     self.unparse_expr(orelse, precedence::IF_EXP);
                 });
             }
-            Expr::Dict(ast::ExprDict {
-                keys,
-                values,
-                range: _,
-            }) => {
+            Expr::Dict(ast::ExprDict { items, range: _ }) => {
                 self.p("{");
                 let mut first = true;
-                for (k, v) in keys.iter().zip(values) {
+                for ast::DictItem { key, value } in items {
                     self.p_delim(&mut first, ", ");
-                    if let Some(k) = k {
-                        self.unparse_expr(k, precedence::COMMA);
+                    if let Some(key) = key {
+                        self.unparse_expr(key, precedence::COMMA);
                         self.p(": ");
-                        self.unparse_expr(v, precedence::COMMA);
+                        self.unparse_expr(value, precedence::COMMA);
                     } else {
                         self.p("**");
-                        self.unparse_expr(v, precedence::MAX);
+                        self.unparse_expr(value, precedence::MAX);
                     }
                 }
                 self.p("}");

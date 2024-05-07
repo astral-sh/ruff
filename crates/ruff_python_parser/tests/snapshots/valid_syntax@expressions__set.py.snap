@@ -15,8 +15,7 @@ Module(
                     value: Dict(
                         ExprDict {
                             range: 14..16,
-                            keys: [],
-                            values: [],
+                            items: [],
                         },
                     ),
                 },
@@ -139,8 +138,7 @@ Module(
                     value: Dict(
                         ExprDict {
                             range: 74..77,
-                            keys: [],
-                            values: [],
+                            items: [],
                         },
                     ),
                 },
@@ -579,33 +577,35 @@ Module(
                                 Dict(
                                     ExprDict {
                                         range: 300..311,
-                                        keys: [
-                                            Some(
-                                                Name(
+                                        items: [
+                                            DictItem {
+                                                key: Some(
+                                                    Name(
+                                                        ExprName {
+                                                            range: 301..302,
+                                                            id: "a",
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                ),
+                                                value: Name(
                                                     ExprName {
-                                                        range: 301..302,
-                                                        id: "a",
+                                                        range: 304..305,
+                                                        id: "b",
                                                         ctx: Load,
                                                     },
                                                 ),
-                                            ),
-                                            None,
-                                        ],
-                                        values: [
-                                            Name(
-                                                ExprName {
-                                                    range: 304..305,
-                                                    id: "b",
-                                                    ctx: Load,
-                                                },
-                                            ),
-                                            Name(
-                                                ExprName {
-                                                    range: 309..310,
-                                                    id: "d",
-                                                    ctx: Load,
-                                                },
-                                            ),
+                                            },
+                                            DictItem {
+                                                key: None,
+                                                value: Name(
+                                                    ExprName {
+                                                        range: 309..310,
+                                                        id: "d",
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                            },
                                         ],
                                     },
                                 ),
