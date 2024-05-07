@@ -1200,14 +1200,6 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 ruff::rules::never_union(checker, expr);
             }
 
-            // Avoid duplicate checks if the parent is a literal, since this rule already
-            // traverses nested literals.
-            if checker.enabled(Rule::DuplicateLiteralMember) {
-                if !checker.semantic.in_nested_literal() {
-                    flake8_pyi::rules::duplicate_literal_member(checker, expr);
-                }
-            }
-
             // Avoid duplicate checks if the parent is a union, since these rules already
             // traverse nested unions.
             if !checker.semantic.in_nested_union() {
