@@ -1,6 +1,6 @@
 //! Key observations
 //!
-//! The HIR avoids allocations to large extends by:
+//! The HIR (High-Level Intermediate Representation) avoids allocations to large extends by:
 //! * Using an arena per node type
 //! * using ids and id ranges to reference items.
 //!
