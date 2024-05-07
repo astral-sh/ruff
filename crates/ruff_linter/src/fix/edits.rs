@@ -148,18 +148,20 @@ pub(crate) fn make_redundant_alias<'a>(
 pub(crate) fn add_to_dunder_all<'a>(
     names: impl Iterator<Item = &'a str>,
     dunder_all: &ExprList,
+    stylist: &Stylist,
 ) -> Vec<Edit> {
+    let quote = stylist.quote();
     let insertion_point = dunder_all
         .elts
         .last()
-        .map_or(dunder_all.range.end() - TextSize::from(1), |expr| {
+        .map_or(dunder_all.range.end() - "]".text_len(), |expr| {
             expr.range().end()
         });
     names
         .enumerate()
         .map(|(offset, name)| match dunder_all.elts.len() + offset {
-            0 => Edit::insertion(format!("{name:?}"), insertion_point),
-            _ => Edit::insertion(format!(", {name:?}"), insertion_point),
+            0 => Edit::insertion(format!("{quote}{name}{quote}"), insertion_point),
+            _ => Edit::insertion(format!(", {quote}{name}{quote}"), insertion_point),
         })
         .collect()
 }
@@ -501,7 +503,8 @@ mod tests {
 
     use ruff_diagnostics::Edit;
     use ruff_python_ast as ast;
-    use ruff_python_parser::{parse_expression, parse_suite};
+    use ruff_python_codegen::Stylist;
+    use ruff_python_parser::{lexer, parse_expression, parse_suite, Mode};
     use ruff_source_file::Locator;
     use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -612,15 +615,21 @@ x = 1 \
 
     #[test]
     fn add_to_empty_dunder_all() {
-        let Ok(ast::Expr::List(ref list)) = parse_expression("[]") else {
+        let raw = "[]";
+        let locator = Locator::new(raw);
+        let stylist = Stylist::from_tokens(
+            &lexer::lex(raw, Mode::Expression).collect::<Vec<_>>(),
+            &locator,
+        );
+        let Ok(ast::Expr::List(ref list)) = parse_expression(raw) else {
             panic!("expected a list");
         };
         assert_eq!(
-            add_to_dunder_all(["x"].into_iter(), list),
+            add_to_dunder_all(["x"].into_iter(), list, &stylist),
             vec![Edit::insertion(String::from("\"x\""), TextSize::new(1))],
         );
         assert_eq!(
-            add_to_dunder_all(["x", "y"].into_iter(), list),
+            add_to_dunder_all(["x", "y"].into_iter(), list, &stylist),
             vec![
                 Edit::insertion(String::from("\"x\""), TextSize::new(1)),
                 Edit::insertion(String::from(", \"y\""), TextSize::new(1))
@@ -630,15 +639,21 @@ x = 1 \
 
     #[test]
     fn add_to_nonempty_dunder_all() {
-        let Ok(ast::Expr::List(ref list)) = parse_expression("[\"a\", \"b\"]") else {
+        let raw = "[\"a\", \"b\"]";
+        let locator = Locator::new(raw);
+        let stylist = Stylist::from_tokens(
+            &lexer::lex(raw, Mode::Expression).collect::<Vec<_>>(),
+            &locator,
+        );
+        let Ok(ast::Expr::List(ref list)) = parse_expression(raw) else {
             panic!("expected a list");
         };
         assert_eq!(
-            add_to_dunder_all(["x"].into_iter(), list),
+            add_to_dunder_all(["x"].into_iter(), list, &stylist),
             vec![Edit::insertion(String::from(", \"x\""), TextSize::new(9))],
         );
         assert_eq!(
-            add_to_dunder_all(["x", "y"].into_iter(), list),
+            add_to_dunder_all(["x", "y"].into_iter(), list, &stylist),
             vec![
                 Edit::insertion(String::from(", \"x\""), TextSize::new(9)),
                 Edit::insertion(String::from(", \"y\""), TextSize::new(9))

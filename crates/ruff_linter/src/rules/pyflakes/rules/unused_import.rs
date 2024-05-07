@@ -426,7 +426,11 @@ fn fix_by_reexporting(
     }
 
     let edits = if let Some(dunder_all) = dunder_all {
-        fix::edits::add_to_dunder_all(imports.iter().map(|b| b.name), dunder_all)
+        fix::edits::add_to_dunder_all(
+            imports.iter().map(|b| b.name),
+            dunder_all,
+            checker.stylist(),
+        )
     } else {
         let member_names = imports
             .iter()
