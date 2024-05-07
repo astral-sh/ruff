@@ -433,11 +433,7 @@ fn fix_by_reexporting(
             checker.stylist(),
         )
     } else {
-        let member_names = imports
-            .iter()
-            .map(|b| b.import.member_name())
-            .collect::<Vec<_>>();
-        fix::edits::make_redundant_alias(member_names.iter().map(AsRef::as_ref), statement)
+        fix::edits::make_redundant_alias(imports.iter().map(|b| b.import.member_name()), statement)
     };
 
     // Only emit a fix if there are edits

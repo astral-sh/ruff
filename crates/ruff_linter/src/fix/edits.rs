@@ -1,5 +1,7 @@
 //! Interface for generating fix edits from higher-level actions (e.g., "remove an argument").
 
+use std::borrow::Cow;
+
 use anyhow::{Context, Result};
 
 use ruff_diagnostics::Edit;
@@ -124,7 +126,7 @@ pub(crate) fn remove_unused_imports<'a>(
 
 /// Edits to make the specified imports explicit, e.g. change `import x` to `import x as x`.
 pub(crate) fn make_redundant_alias<'a>(
-    member_names: impl Iterator<Item = &'a str>,
+    member_names: impl Iterator<Item = Cow<'a, str>>,
     stmt: &Stmt,
 ) -> Vec<Edit> {
     let aliases = match stmt {
@@ -593,7 +595,7 @@ x = 1 \
         let program = parse_suite(contents).unwrap();
         let stmt = program.first().unwrap();
         assert_eq!(
-            make_redundant_alias(["x"].into_iter(), stmt),
+            make_redundant_alias(["x"].into_iter().map(|s| s.into()), stmt),
             vec![Edit::range_replacement(
                 String::from("x as x"),
                 TextRange::new(TextSize::new(7), TextSize::new(8)),
@@ -601,7 +603,7 @@ x = 1 \
             "make just one item redundant"
         );
         assert_eq!(
-            make_redundant_alias(vec!["x", "y"].into_iter(), stmt),
+            make_redundant_alias(vec!["x", "y"].into_iter().map(|s| s.into()), stmt),
             vec![Edit::range_replacement(
                 String::from("x as x"),
                 TextRange::new(TextSize::new(7), TextSize::new(8)),
@@ -609,7 +611,7 @@ x = 1 \
             "the second item is already a redundant alias"
         );
         assert_eq!(
-            make_redundant_alias(vec!["x", "z"].into_iter(), stmt),
+            make_redundant_alias(vec!["x", "z"].into_iter().map(|s| s.into()), stmt),
             vec![Edit::range_replacement(
                 String::from("x as x"),
                 TextRange::new(TextSize::new(7), TextSize::new(8)),
