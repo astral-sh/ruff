@@ -73,8 +73,17 @@ pub(crate) fn redundant_final_literal(checker: &mut Checker, ann_assign: &ast::S
         return;
     };
 
-    // If the Literal contains multiple elements, don't raise issue
-    if let ast::Expr::Tuple(_) = &**literal {
+    // Discards tuples like `Literal[1, 2, 3]`
+    // and complex literals like `Literal[{1, 2}]`
+    if !matches!(
+        &**literal,
+        ast::Expr::StringLiteral(_)
+            | ast::Expr::BytesLiteral(_)
+            | ast::Expr::NumberLiteral(_)
+            | ast::Expr::BooleanLiteral(_)
+            | ast::Expr::NoneLiteral(_)
+            | ast::Expr::EllipsisLiteral(_)
+    ) {
         return;
     }
 
