@@ -1,6 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, comparable::ComparableExpr};
+use ruff_python_ast::{self as ast, comparable::ComparableExpr, helpers::map_subscript};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -56,6 +56,10 @@ impl Violation for RedundantFinalLiteral {
 
 /// PYI064
 pub(crate) fn redundant_final_literal(checker: &mut Checker, ann_assign: &ast::StmtAnnAssign) {
+    if !checker.semantic().seen_typing() {
+        return;
+    }
+
     let ast::StmtAnnAssign {
         value: assign_value,
         annotation,
@@ -69,6 +73,14 @@ pub(crate) fn redundant_final_literal(checker: &mut Checker, ann_assign: &ast::S
     else {
         return;
     };
+
+    // Ensure it is `Final[Literal[...]]`
+    if !checker
+        .semantic()
+        .match_typing_expr(map_subscript(literal_slice), "Literal")
+    {
+        return;
+    }
     let ast::Expr::Subscript(ast::ExprSubscript { slice: literal, .. }) = &**literal_slice else {
         return;
     };

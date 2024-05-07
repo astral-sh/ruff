@@ -17,3 +17,5 @@ n2: Literal[True] = True  # No issue here
 
 PlatformName = Literal["linux", "macos", "windows"]
 PLATFORMS: Final[set[PlatformName]] = {"linux", "macos", "windows"}  # No issue here
+
+foo: Final[{1, 2, 3}] = {1, 2, 3}  # No issue here
