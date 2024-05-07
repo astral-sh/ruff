@@ -154,8 +154,7 @@ pub(crate) fn add_to_dunder_all<'a>(
         ast::Expr::List(ast::ExprList { elts, range, .. })
         | ast::Expr::Tuple(ast::ExprTuple { elts, range, .. }) => (
             elts.last()
-                .map(|elt| elt.range().end())
-                .unwrap_or(range.end() - "]".text_len()),
+                .map_or(range.end() - "]".text_len(), |elt| elt.range().end()),
             elts.len(),
         ),
         _ => {
