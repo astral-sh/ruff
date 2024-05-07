@@ -1,4 +1,6 @@
 from typing import Literal
+import typing as t
+import typing_extensions
 
 x: Literal[True, False, True, False]  # PY062 twice here
 
@@ -10,8 +12,8 @@ Literal[1, Literal[1]]  # once
 Literal[1, 2, Literal[1, 2]]  # twice
 Literal[1, Literal[1], Literal[1]]  # twice
 Literal[1, Literal[2], Literal[2]]  # once
-Literal[1, Literal[2, Literal[1]]]  # once
-Literal[1, 1, 1]  # twice
+t.Literal[1, t.Literal[2, t.Literal[1]]]  # once
+typing_extensions.Literal[1, 1, 1]  # twice
 
 # Ensure issue is only raised once, even on nested literals
 MyType = Literal["foo", Literal[True, False, True], "bar"]  # PYI062
