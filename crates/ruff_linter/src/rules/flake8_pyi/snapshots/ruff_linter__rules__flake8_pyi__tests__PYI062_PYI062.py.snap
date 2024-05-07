@@ -1,0 +1,138 @@
+---
+source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
+---
+PYI062.py:5:25: PYI062 Duplicate literal member `True`
+  |
+3 | import typing_extensions
+4 | 
+5 | x: Literal[True, False, True, False]  # PYI062 twice here
+  |                         ^^^^ PYI062
+6 | 
+7 | y: Literal[1, print("hello"), 3, Literal[4, 1]]  # PYI062 on the last 1
+  |
+
+PYI062.py:5:31: PYI062 Duplicate literal member `False`
+  |
+3 | import typing_extensions
+4 | 
+5 | x: Literal[True, False, True, False]  # PYI062 twice here
+  |                               ^^^^^ PYI062
+6 | 
+7 | y: Literal[1, print("hello"), 3, Literal[4, 1]]  # PYI062 on the last 1
+  |
+
+PYI062.py:7:45: PYI062 Duplicate literal member `1`
+  |
+5 | x: Literal[True, False, True, False]  # PYI062 twice here
+6 | 
+7 | y: Literal[1, print("hello"), 3, Literal[4, 1]]  # PYI062 on the last 1
+  |                                             ^ PYI062
+8 | 
+9 | z: Literal[{1, 3, 5}, "foobar", {1,3,5}]  # PYI062 on the set literal
+  |
+
+PYI062.py:9:33: PYI062 Duplicate literal member `{1, 3, 5}`
+   |
+ 7 | y: Literal[1, print("hello"), 3, Literal[4, 1]]  # PYI062 on the last 1
+ 8 | 
+ 9 | z: Literal[{1, 3, 5}, "foobar", {1,3,5}]  # PYI062 on the set literal
+   |                                 ^^^^^^^ PYI062
+10 | 
+11 | Literal[1, Literal[1]]  # once
+   |
+
+PYI062.py:11:20: PYI062 Duplicate literal member `1`
+   |
+ 9 | z: Literal[{1, 3, 5}, "foobar", {1,3,5}]  # PYI062 on the set literal
+10 | 
+11 | Literal[1, Literal[1]]  # once
+   |                    ^ PYI062
+12 | Literal[1, 2, Literal[1, 2]]  # twice
+13 | Literal[1, Literal[1], Literal[1]]  # twice
+   |
+
+PYI062.py:12:23: PYI062 Duplicate literal member `1`
+   |
+11 | Literal[1, Literal[1]]  # once
+12 | Literal[1, 2, Literal[1, 2]]  # twice
+   |                       ^ PYI062
+13 | Literal[1, Literal[1], Literal[1]]  # twice
+14 | Literal[1, Literal[2], Literal[2]]  # once
+   |
+
+PYI062.py:12:26: PYI062 Duplicate literal member `2`
+   |
+11 | Literal[1, Literal[1]]  # once
+12 | Literal[1, 2, Literal[1, 2]]  # twice
+   |                          ^ PYI062
+13 | Literal[1, Literal[1], Literal[1]]  # twice
+14 | Literal[1, Literal[2], Literal[2]]  # once
+   |
+
+PYI062.py:13:20: PYI062 Duplicate literal member `1`
+   |
+11 | Literal[1, Literal[1]]  # once
+12 | Literal[1, 2, Literal[1, 2]]  # twice
+13 | Literal[1, Literal[1], Literal[1]]  # twice
+   |                    ^ PYI062
+14 | Literal[1, Literal[2], Literal[2]]  # once
+15 | t.Literal[1, t.Literal[2, t.Literal[1]]]  # once
+   |
+
+PYI062.py:13:32: PYI062 Duplicate literal member `1`
+   |
+11 | Literal[1, Literal[1]]  # once
+12 | Literal[1, 2, Literal[1, 2]]  # twice
+13 | Literal[1, Literal[1], Literal[1]]  # twice
+   |                                ^ PYI062
+14 | Literal[1, Literal[2], Literal[2]]  # once
+15 | t.Literal[1, t.Literal[2, t.Literal[1]]]  # once
+   |
+
+PYI062.py:14:32: PYI062 Duplicate literal member `2`
+   |
+12 | Literal[1, 2, Literal[1, 2]]  # twice
+13 | Literal[1, Literal[1], Literal[1]]  # twice
+14 | Literal[1, Literal[2], Literal[2]]  # once
+   |                                ^ PYI062
+15 | t.Literal[1, t.Literal[2, t.Literal[1]]]  # once
+16 | typing_extensions.Literal[1, 1, 1]  # twice
+   |
+
+PYI062.py:15:37: PYI062 Duplicate literal member `1`
+   |
+13 | Literal[1, Literal[1], Literal[1]]  # twice
+14 | Literal[1, Literal[2], Literal[2]]  # once
+15 | t.Literal[1, t.Literal[2, t.Literal[1]]]  # once
+   |                                     ^ PYI062
+16 | typing_extensions.Literal[1, 1, 1]  # twice
+   |
+
+PYI062.py:16:30: PYI062 Duplicate literal member `1`
+   |
+14 | Literal[1, Literal[2], Literal[2]]  # once
+15 | t.Literal[1, t.Literal[2, t.Literal[1]]]  # once
+16 | typing_extensions.Literal[1, 1, 1]  # twice
+   |                              ^ PYI062
+17 | 
+18 | # Ensure issue is only raised once, even on nested literals
+   |
+
+PYI062.py:16:33: PYI062 Duplicate literal member `1`
+   |
+14 | Literal[1, Literal[2], Literal[2]]  # once
+15 | t.Literal[1, t.Literal[2, t.Literal[1]]]  # once
+16 | typing_extensions.Literal[1, 1, 1]  # twice
+   |                                 ^ PYI062
+17 | 
+18 | # Ensure issue is only raised once, even on nested literals
+   |
+
+PYI062.py:19:46: PYI062 Duplicate literal member `True`
+   |
+18 | # Ensure issue is only raised once, even on nested literals
+19 | MyType = Literal["foo", Literal[True, False, True], "bar"]  # PYI062
+   |                                              ^^^^ PYI062
+20 | 
+21 | n: Literal["No", "duplicates", "here", 1, "1"]
+   |
