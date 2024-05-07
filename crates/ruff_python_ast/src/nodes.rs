@@ -831,7 +831,7 @@ impl From<ExprDict> for Expr {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct DictKeyIterator<'a> {
     items: Iter<'a, DictItem>,
 }
@@ -856,12 +856,11 @@ impl<'a> Iterator for DictKeyIterator<'a> {
     }
 
     fn last(mut self) -> Option<Self::Item> {
-        self.items.next_back().map(DictItem::key)
+        self.next_back()
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        let len = self.items.len();
-        (len, Some(len))
+        self.items.size_hint()
     }
 }
 
@@ -874,7 +873,7 @@ impl<'a> DoubleEndedIterator for DictKeyIterator<'a> {
 impl<'a> FusedIterator for DictKeyIterator<'a> {}
 impl<'a> ExactSizeIterator for DictKeyIterator<'a> {}
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct DictValueIterator<'a> {
     items: Iter<'a, DictItem>,
 }
@@ -899,12 +898,11 @@ impl<'a> Iterator for DictValueIterator<'a> {
     }
 
     fn last(mut self) -> Option<Self::Item> {
-        self.items.next_back().map(DictItem::value)
+        self.next_back()
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        let len = self.items.len();
-        (len, Some(len))
+        self.items.size_hint()
     }
 }
 
