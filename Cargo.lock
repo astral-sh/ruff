@@ -2213,7 +2213,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_python_ast_integration_tests"
-version = "0.1.0"
+version = "0.0.0"
 dependencies = [
  "insta",
  "ruff_python_ast",
