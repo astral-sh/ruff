@@ -284,11 +284,13 @@ impl SymbolTable {
         let scope = &self.scopes_by_id[scope_id];
         let hash = SymbolTable::hash_name(name);
         let name = Name::new(name);
-        scope
-            .symbols_by_name
-            .raw_entry()
-            .from_hash(hash, |symid| self.symbols_by_id[*symid].name == name)
-            .map(|(symbol_id, ())| *symbol_id)
+        Some(
+            *scope
+                .symbols_by_name
+                .raw_entry()
+                .from_hash(hash, |symid| self.symbols_by_id[*symid].name == name)?
+                .0,
+        )
     }
 
     pub(crate) fn symbol_by_name(&self, scope_id: ScopeId, name: &str) -> Option<&Symbol> {
@@ -344,7 +346,9 @@ impl SymbolTable {
                     flags,
                     scope_id,
                 });
-                entry.insert_with_hasher(hash, id, (), |_| hash);
+                entry.insert_with_hasher(hash, id, (), |symid| {
+                    SymbolTable::hash_name(&self.symbols_by_id[*symid].name)
+                });
                 id
             }
         }
@@ -952,5 +956,21 @@ mod tests {
         let foo_symbol_id = table.add_or_update_symbol(root_scope_id, "foo", SymbolFlags::empty());
         let symbol = foo_symbol_id.symbol(&table);
         assert_eq!(symbol.name.as_str(), "foo");
+    }
+
+    #[test]
+    fn bigger_symbol_table() {
+        let mut table = SymbolTable::new();
+        let root_scope_id = SymbolTable::root_scope_id();
+        let foo_symbol_id = table.add_or_update_symbol(root_scope_id, "foo", SymbolFlags::empty());
+        table.add_or_update_symbol(root_scope_id, "bar", SymbolFlags::empty());
+        table.add_or_update_symbol(root_scope_id, "baz", SymbolFlags::empty());
+        table.add_or_update_symbol(root_scope_id, "qux", SymbolFlags::empty());
+
+        let foo_symbol_id_2 = table
+            .root_symbol_id_by_name("foo")
+            .expect("foo symbol to be found");
+
+        assert_eq!(foo_symbol_id_2, foo_symbol_id);
     }
 }
