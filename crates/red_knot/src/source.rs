@@ -1,18 +1,17 @@
-use crate::cache::KeyValueCache;
-use crate::db::{HasJar, QueryResult, SourceDb, SourceJar};
-use ruff_notebook::Notebook;
-use ruff_python_ast::PySourceType;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 
+use ruff_notebook::Notebook;
+use ruff_python_ast::PySourceType;
+
+use crate::cache::KeyValueCache;
+use crate::db::{QueryResult, SourceDb};
 use crate::files::FileId;
 
 #[tracing::instrument(level = "debug", skip(db))]
-pub(crate) fn source_text<Db>(db: &Db, file_id: FileId) -> QueryResult<Source>
-where
-    Db: SourceDb + HasJar<SourceJar>,
-{
-    let sources = &db.jar()?.sources;
+pub(crate) fn source_text(db: &dyn SourceDb, file_id: FileId) -> QueryResult<Source> {
+    let jar = db.jar()?;
+    let sources = &jar.sources;
 
     sources.get(&file_id, |file_id| {
         let path = db.file_path(*file_id);

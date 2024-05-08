@@ -1,15 +1,17 @@
 #![allow(dead_code)]
-use crate::ast_ids::NodeKey;
-use crate::db::{HasJar, QueryResult, SemanticDb, SemanticJar};
-use crate::files::FileId;
-use crate::symbols::{ScopeId, SymbolId};
-use crate::{FxDashMap, FxIndexSet, Name};
-use ruff_index::{newtype_index, IndexVec};
+
 use rustc_hash::FxHashMap;
 
-pub(crate) mod infer;
-
 pub(crate) use infer::infer_symbol_type;
+use ruff_index::{newtype_index, IndexVec};
+
+use crate::ast_ids::NodeKey;
+use crate::db::{QueryResult, SemanticDb, SemanticJar};
+use crate::files::FileId;
+use crate::symbols::{symbol_table, ScopeId, SymbolId};
+use crate::{FxDashMap, FxIndexSet, Name};
+
+pub(crate) mod infer;
 
 /// unique ID for a type
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
@@ -262,15 +264,14 @@ pub struct ClassTypeId {
 }
 
 impl ClassTypeId {
-    fn get_own_class_member<Db>(self, db: &Db, name: &Name) -> QueryResult<Option<Type>>
-    where
-        Db: SemanticDb + HasJar<SemanticJar>,
-    {
+    fn get_own_class_member(self, db: &dyn SemanticDb, name: &Name) -> QueryResult<Option<Type>> {
+        let jar: &SemanticJar = db.jar()?;
+
         // TODO: this should distinguish instance-only members (e.g. `x: int`) and not return them
-        let ClassType { scope_id, .. } = *db.jar()?.type_store.get_class(self);
-        let table = db.symbol_table(self.file_id)?;
+        let ClassType { scope_id, .. } = *jar.type_store.get_class(self);
+        let table = symbol_table(db, self.file_id)?;
         if let Some(symbol_id) = table.symbol_id_by_name(scope_id, name) {
-            Ok(Some(db.infer_symbol_type(self.file_id, symbol_id)?))
+            Ok(Some(infer_symbol_type(db, self.file_id, symbol_id)?))
         } else {
             Ok(None)
         }
@@ -526,11 +527,12 @@ impl IntersectionType {
 
 #[cfg(test)]
 mod tests {
+    use std::path::Path;
+
     use crate::files::Files;
     use crate::symbols::SymbolTable;
     use crate::types::{Type, TypeStore};
     use crate::FxIndexSet;
-    use std::path::Path;
 
     #[test]
     fn add_class() {
