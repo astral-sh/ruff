@@ -6,8 +6,9 @@ use ruff_python_parser::{Mode, ParseError};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::cache::KeyValueCache;
-use crate::db::{HasJar, QueryResult, SourceDb, SourceJar};
+use crate::db::{QueryResult, SourceDb};
 use crate::files::FileId;
+use crate::source::source_text;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Parsed {
@@ -64,14 +65,11 @@ impl Parsed {
 }
 
 #[tracing::instrument(level = "debug", skip(db))]
-pub(crate) fn parse<Db>(db: &Db, file_id: FileId) -> QueryResult<Parsed>
-where
-    Db: SourceDb + HasJar<SourceJar>,
-{
-    let parsed = db.jar()?;
+pub(crate) fn parse(db: &dyn SourceDb, file_id: FileId) -> QueryResult<Parsed> {
+    let jar = db.jar()?;
 
-    parsed.parsed.get(&file_id, |file_id| {
-        let source = db.source(*file_id)?;
+    jar.parsed.get(&file_id, |file_id| {
+        let source = source_text(db, *file_id)?;
 
         Ok(Parsed::from_text(source.text()))
     })

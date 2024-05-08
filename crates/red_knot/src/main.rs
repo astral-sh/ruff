@@ -11,8 +11,8 @@ use tracing_subscriber::layer::{Context, Filter, SubscriberExt};
 use tracing_subscriber::{Layer, Registry};
 use tracing_tree::time::Uptime;
 
-use red_knot::db::{HasJar, ParallelDatabase, QueryError, SemanticDb, SourceDb, SourceJar};
-use red_knot::module::{ModuleSearchPath, ModuleSearchPathKind};
+use red_knot::db::{HasJar, ParallelDatabase, QueryError, SourceDb, SourceJar};
+use red_knot::module::{set_module_search_paths, ModuleSearchPath, ModuleSearchPathKind};
 use red_knot::program::check::ExecutionMode;
 use red_knot::program::{FileWatcherChange, Program};
 use red_knot::watch::FileWatcher;
@@ -49,7 +49,7 @@ fn main() -> anyhow::Result<()> {
         ModuleSearchPathKind::FirstParty,
     );
     let mut program = Program::new(workspace);
-    program.set_module_search_paths(vec![workspace_search_path]);
+    set_module_search_paths(&mut program, vec![workspace_search_path]);
 
     let entry_id = program.file_id(entry_point);
     program.workspace_mut().open_file(entry_id);

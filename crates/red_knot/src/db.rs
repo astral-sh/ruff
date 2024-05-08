@@ -1,4 +1,3 @@
-use std::path::Path;
 use std::sync::Arc;
 
 pub use jars::{HasJar, HasJars};
@@ -7,12 +6,12 @@ pub use runtime::DbRuntime;
 pub use storage::JarsStorage;
 
 use crate::files::FileId;
-use crate::lint::{Diagnostics, LintSemanticStorage, LintSyntaxStorage};
-use crate::module::{Module, ModuleData, ModuleName, ModuleResolver, ModuleSearchPath};
-use crate::parse::{Parsed, ParsedStorage};
-use crate::source::{Source, SourceStorage};
-use crate::symbols::{SymbolId, SymbolTable, SymbolTablesStorage};
-use crate::types::{Type, TypeStore};
+use crate::lint::{LintSemanticStorage, LintSyntaxStorage};
+use crate::module::ModuleResolver;
+use crate::parse::ParsedStorage;
+use crate::source::SourceStorage;
+use crate::symbols::SymbolTablesStorage;
+use crate::types::TypeStore;
 
 mod jars;
 mod query;
@@ -61,6 +60,8 @@ pub trait ParallelDatabase: Database + Send {
     fn snapshot(&self) -> Snapshot<Self>;
 }
 
+pub trait DbWithJar<Jar>: Database + HasJar<Jar> {}
+
 /// Readonly snapshot of a database.
 ///
 /// ## Dead locks
@@ -96,45 +97,24 @@ where
     }
 }
 
+pub trait Upcast<T: ?Sized> {
+    fn upcast(&self) -> &T;
+}
+
 // Red knot specific databases code.
 
-pub trait SourceDb: Database {
+pub trait SourceDb: DbWithJar<SourceJar> {
     // queries
     fn file_id(&self, path: &std::path::Path) -> FileId;
 
     fn file_path(&self, file_id: FileId) -> Arc<std::path::Path>;
-
-    fn source(&self, file_id: FileId) -> QueryResult<Source>;
-
-    fn parse(&self, file_id: FileId) -> QueryResult<Parsed>;
 }
 
-pub trait SemanticDb: SourceDb {
-    // queries
-    fn resolve_module(&self, name: ModuleName) -> QueryResult<Option<Module>>;
+pub trait SemanticDb: SourceDb + DbWithJar<SemanticJar> + Upcast<dyn SourceDb> {}
 
-    fn file_to_module(&self, file_id: FileId) -> QueryResult<Option<Module>>;
+pub trait LintDb: SemanticDb + DbWithJar<LintJar> + Upcast<dyn SemanticDb> {}
 
-    fn path_to_module(&self, path: &Path) -> QueryResult<Option<Module>>;
-
-    fn symbol_table(&self, file_id: FileId) -> QueryResult<Arc<SymbolTable>>;
-
-    fn infer_symbol_type(&self, file_id: FileId, symbol_id: SymbolId) -> QueryResult<Type>;
-
-    // mutations
-
-    fn add_module(&mut self, path: &Path) -> Option<(Module, Vec<Arc<ModuleData>>)>;
-
-    fn set_module_search_paths(&mut self, paths: Vec<ModuleSearchPath>);
-}
-
-pub trait LintDb: SemanticDb {
-    fn lint_syntax(&self, file_id: FileId) -> QueryResult<Diagnostics>;
-
-    fn lint_semantic(&self, file_id: FileId) -> QueryResult<Diagnostics>;
-}
-
-pub trait Db: LintDb {}
+pub trait Db: LintDb + Upcast<dyn LintDb> {}
 
 #[derive(Debug, Default)]
 pub struct SourceJar {
@@ -161,19 +141,10 @@ pub(crate) mod tests {
     use std::sync::Arc;
 
     use crate::db::{
-        Database, DbRuntime, HasJar, HasJars, JarsStorage, LintDb, LintJar, QueryResult, SourceDb,
-        SourceJar,
+        Database, DbRuntime, DbWithJar, HasJar, HasJars, JarsStorage, LintDb, LintJar, QueryResult,
+        SourceDb, SourceJar, Upcast,
     };
     use crate::files::{FileId, Files};
-    use crate::lint::{lint_semantic, lint_syntax, Diagnostics};
-    use crate::module::{
-        add_module, file_to_module, path_to_module, resolve_module, set_module_search_paths,
-        Module, ModuleData, ModuleName, ModuleSearchPath,
-    };
-    use crate::parse::{parse, Parsed};
-    use crate::source::{source_text, Source};
-    use crate::symbols::{symbol_table, SymbolId, SymbolTable};
-    use crate::types::{infer_symbol_type, Type};
 
     use super::{SemanticDb, SemanticJar};
 
@@ -223,55 +194,35 @@ pub(crate) mod tests {
         fn file_path(&self, file_id: FileId) -> Arc<Path> {
             self.files.path(file_id)
         }
+    }
 
-        fn source(&self, file_id: FileId) -> QueryResult<Source> {
-            source_text(self, file_id)
-        }
+    impl DbWithJar<SourceJar> for TestDb {}
 
-        fn parse(&self, file_id: FileId) -> QueryResult<Parsed> {
-            parse(self, file_id)
+    impl Upcast<dyn SourceDb> for TestDb {
+        fn upcast(&self) -> &(dyn SourceDb + 'static) {
+            self
         }
     }
 
-    impl SemanticDb for TestDb {
-        fn resolve_module(&self, name: ModuleName) -> QueryResult<Option<Module>> {
-            resolve_module(self, name)
-        }
+    impl SemanticDb for TestDb {}
 
-        fn file_to_module(&self, file_id: FileId) -> QueryResult<Option<Module>> {
-            file_to_module(self, file_id)
-        }
+    impl DbWithJar<SemanticJar> for TestDb {}
 
-        fn path_to_module(&self, path: &Path) -> QueryResult<Option<Module>> {
-            path_to_module(self, path)
-        }
-
-        fn symbol_table(&self, file_id: FileId) -> QueryResult<Arc<SymbolTable>> {
-            symbol_table(self, file_id)
-        }
-
-        fn infer_symbol_type(&self, file_id: FileId, symbol_id: SymbolId) -> QueryResult<Type> {
-            infer_symbol_type(self, file_id, symbol_id)
-        }
-
-        fn add_module(&mut self, path: &Path) -> Option<(Module, Vec<Arc<ModuleData>>)> {
-            add_module(self, path)
-        }
-
-        fn set_module_search_paths(&mut self, paths: Vec<ModuleSearchPath>) {
-            set_module_search_paths(self, paths);
+    impl Upcast<dyn SemanticDb> for TestDb {
+        fn upcast(&self) -> &(dyn SemanticDb + 'static) {
+            self
         }
     }
 
-    impl LintDb for TestDb {
-        fn lint_syntax(&self, file_id: FileId) -> QueryResult<Diagnostics> {
-            lint_syntax(self, file_id)
-        }
+    impl LintDb for TestDb {}
 
-        fn lint_semantic(&self, file_id: FileId) -> QueryResult<Diagnostics> {
-            lint_semantic(self, file_id)
+    impl Upcast<dyn LintDb> for TestDb {
+        fn upcast(&self) -> &(dyn LintDb + 'static) {
+            self
         }
     }
+
+    impl DbWithJar<LintJar> for TestDb {}
 
     impl HasJars for TestDb {
         type Jars = (SourceJar, SemanticJar, LintJar);

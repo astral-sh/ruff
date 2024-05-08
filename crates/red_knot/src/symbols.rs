@@ -16,21 +16,19 @@ use ruff_python_ast::visitor::preorder::PreorderVisitor;
 
 use crate::ast_ids::TypedNodeKey;
 use crate::cache::KeyValueCache;
-use crate::db::{HasJar, QueryResult, SemanticDb, SemanticJar};
+use crate::db::{QueryResult, SemanticDb, SemanticJar};
 use crate::files::FileId;
 use crate::module::ModuleName;
+use crate::parse::parse;
 use crate::Name;
 
 #[allow(unreachable_pub)]
 #[tracing::instrument(level = "debug", skip(db))]
-pub fn symbol_table<Db>(db: &Db, file_id: FileId) -> QueryResult<Arc<SymbolTable>>
-where
-    Db: SemanticDb + HasJar<SemanticJar>,
-{
-    let jar = db.jar()?;
+pub fn symbol_table(db: &dyn SemanticDb, file_id: FileId) -> QueryResult<Arc<SymbolTable>> {
+    let jar: &SemanticJar = db.jar()?;
 
     jar.symbol_tables.get(&file_id, |_| {
-        let parsed = db.parse(file_id)?;
+        let parsed = parse(db.upcast(), file_id)?;
         Ok(Arc::from(SymbolTable::from_ast(parsed.ast())))
     })
 }

@@ -7,19 +7,17 @@ use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{ModModule, StringLiteral};
 
 use crate::cache::KeyValueCache;
-use crate::db::{HasJar, LintDb, LintJar, QueryResult, SemanticDb};
+use crate::db::{LintDb, LintJar, QueryResult};
 use crate::files::FileId;
-use crate::parse::Parsed;
-use crate::source::Source;
-use crate::symbols::{Definition, SymbolId, SymbolTable};
-use crate::types::Type;
+use crate::parse::{parse, Parsed};
+use crate::source::{source_text, Source};
+use crate::symbols::{symbol_table, Definition, SymbolId, SymbolTable};
+use crate::types::{infer_symbol_type, Type};
 
 #[tracing::instrument(level = "debug", skip(db))]
-pub(crate) fn lint_syntax<Db>(db: &Db, file_id: FileId) -> QueryResult<Diagnostics>
-where
-    Db: LintDb + HasJar<LintJar>,
-{
-    let storage = &db.jar()?.lint_syntax;
+pub(crate) fn lint_syntax(db: &dyn LintDb, file_id: FileId) -> QueryResult<Diagnostics> {
+    let lint_jar: &LintJar = db.jar()?;
+    let storage = &lint_jar.lint_syntax;
 
     #[allow(clippy::print_stdout)]
     if std::env::var("RED_KNOT_SLOW_LINT").is_ok() {
@@ -33,10 +31,10 @@ where
     storage.get(&file_id, |file_id| {
         let mut diagnostics = Vec::new();
 
-        let source = db.source(*file_id)?;
+        let source = source_text(db.upcast(), *file_id)?;
         lint_lines(source.text(), &mut diagnostics);
 
-        let parsed = db.parse(*file_id)?;
+        let parsed = parse(db.upcast(), *file_id)?;
 
         if parsed.errors().is_empty() {
             let ast = parsed.ast();
@@ -73,16 +71,14 @@ fn lint_lines(source: &str, diagnostics: &mut Vec<String>) {
 }
 
 #[tracing::instrument(level = "debug", skip(db))]
-pub(crate) fn lint_semantic<Db>(db: &Db, file_id: FileId) -> QueryResult<Diagnostics>
-where
-    Db: LintDb + HasJar<LintJar>,
-{
-    let storage = &db.jar()?.lint_semantic;
+pub(crate) fn lint_semantic(db: &dyn LintDb, file_id: FileId) -> QueryResult<Diagnostics> {
+    let lint_jar: &LintJar = db.jar()?;
+    let storage = &lint_jar.lint_semantic;
 
     storage.get(&file_id, |file_id| {
-        let source = db.source(*file_id)?;
-        let parsed = db.parse(*file_id)?;
-        let symbols = db.symbol_table(*file_id)?;
+        let source = source_text(db.upcast(), *file_id)?;
+        let parsed = parse(db.upcast(), *file_id)?;
+        let symbols = symbol_table(db.upcast(), *file_id)?;
 
         let context = SemanticLintContext {
             file_id: *file_id,
@@ -145,7 +141,7 @@ pub struct SemanticLintContext<'a> {
     source: Source,
     parsed: Parsed,
     symbols: Arc<SymbolTable>,
-    db: &'a dyn SemanticDb,
+    db: &'a dyn LintDb,
     diagnostics: RefCell<Vec<String>>,
 }
 
@@ -167,7 +163,7 @@ impl<'a> SemanticLintContext<'a> {
     }
 
     pub fn infer_symbol_type(&self, symbol_id: SymbolId) -> QueryResult<Type> {
-        self.db.infer_symbol_type(self.file_id, symbol_id)
+        infer_symbol_type(self.db.upcast(), self.file_id, symbol_id)
     }
 
     pub fn push_diagnostic(&self, diagnostic: String) {
