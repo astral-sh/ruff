@@ -65,36 +65,36 @@ pub(crate) fn unnecessary_dict_kwargs(checker: &mut Checker, call: &ast::ExprCal
             continue;
         }
 
-        let Expr::Dict(ast::ExprDict { keys, values, .. }) = &keyword.value else {
+        let Expr::Dict(dict) = &keyword.value else {
             continue;
         };
 
         // Ex) `foo(**{**bar})`
-        if matches!(keys.as_slice(), [None]) {
-            let mut diagnostic = Diagnostic::new(UnnecessaryDictKwargs, keyword.range());
-
-            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                format!("**{}", checker.locator().slice(values[0].range())),
+        if let [ast::DictItem { key: None, value }] = dict.items.as_slice() {
+            let diagnostic = Diagnostic::new(UnnecessaryDictKwargs, keyword.range());
+            let edit = Edit::range_replacement(
+                format!("**{}", checker.locator().slice(value)),
                 keyword.range(),
-            )));
-
-            checker.diagnostics.push(diagnostic);
+            );
+            checker
+                .diagnostics
+                .push(diagnostic.with_fix(Fix::safe_edit(edit)));
             continue;
         }
 
         // Ensure that every keyword is a valid keyword argument (e.g., avoid errors for cases like
         // `foo(**{"bar-bar": 1})`).
-        let kwargs = keys
-            .iter()
-            .filter_map(|key| key.as_ref().and_then(as_kwarg))
-            .collect::<Vec<_>>();
-        if kwargs.len() != keys.len() {
+        let kwargs: Vec<&str> = dict
+            .iter_keys()
+            .filter_map(|key| key.and_then(as_kwarg))
+            .collect();
+        if kwargs.len() != dict.items.len() {
             continue;
         }
 
         let mut diagnostic = Diagnostic::new(UnnecessaryDictKwargs, keyword.range());
 
-        if values.is_empty() {
+        if dict.items.is_empty() {
             diagnostic.try_set_fix(|| {
                 remove_argument(
                     keyword,
@@ -119,7 +119,7 @@ pub(crate) fn unnecessary_dict_kwargs(checker: &mut Checker, call: &ast::ExprCal
                     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                         kwargs
                             .iter()
-                            .zip(values.iter())
+                            .zip(dict.iter_values())
                             .map(|(kwarg, value)| {
                                 format!("{}={}", kwarg, checker.locator().slice(value.range()))
                             })
@@ -150,9 +150,9 @@ fn duplicates(call: &ast::ExprCall) -> FxHashSet<&str> {
             if !seen.insert(name.as_str()) {
                 duplicates.insert(name.as_str());
             }
-        } else if let Expr::Dict(ast::ExprDict { keys, .. }) = &keyword.value {
-            for key in keys {
-                if let Some(name) = key.as_ref().and_then(as_kwarg) {
+        } else if let Expr::Dict(dict) = &keyword.value {
+            for key in dict.iter_keys() {
+                if let Some(name) = key.and_then(as_kwarg) {
                     if !seen.insert(name) {
                         duplicates.insert(name);
                     }

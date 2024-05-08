@@ -51,24 +51,23 @@ pub(super) fn pattern_to_expr(pattern: Pattern) -> Expr {
             patterns,
             rest,
         }) => {
-            let mut keys = keys.into_iter().map(Option::Some).collect::<Vec<_>>();
-            let mut values = patterns
+            let mut items: Vec<ast::DictItem> = keys
                 .into_iter()
-                .map(pattern_to_expr)
-                .collect::<Vec<_>>();
+                .zip(patterns)
+                .map(|(key, pattern)| ast::DictItem {
+                    key: Some(key),
+                    value: pattern_to_expr(pattern),
+                })
+                .collect();
             if let Some(rest) = rest {
-                keys.push(None);
-                values.push(Expr::Name(ast::ExprName {
+                let value = Expr::Name(ast::ExprName {
                     range: rest.range,
                     id: rest.id,
                     ctx: ExprContext::Store,
-                }));
+                });
+                items.push(ast::DictItem { key: None, value });
             }
-            Expr::Dict(ast::ExprDict {
-                range,
-                keys,
-                values,
-            })
+            Expr::Dict(ast::ExprDict { range, items })
         }
         Pattern::MatchClass(ast::PatternMatchClass {
             range,

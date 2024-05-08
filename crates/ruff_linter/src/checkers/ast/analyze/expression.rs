@@ -97,6 +97,13 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 }
             }
 
+            // Ex) Literal[...]
+            if checker.enabled(Rule::DuplicateLiteralMember) {
+                if !checker.semantic.in_nested_literal() {
+                    flake8_pyi::rules::duplicate_literal_member(checker, expr);
+                }
+            }
+
             if checker.enabled(Rule::NeverUnion) {
                 ruff::rules::never_union(checker, expr);
             }

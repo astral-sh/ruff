@@ -15,82 +15,88 @@ Module(
                     value: Dict(
                         ExprDict {
                             range: 122..147,
-                            keys: [
-                                None,
-                                Some(
-                                    Name(
+                            items: [
+                                DictItem {
+                                    key: None,
+                                    value: Name(
                                         ExprName {
-                                            range: 128..129,
-                                            id: "y",
-                                            ctx: Load,
-                                        },
-                                    ),
-                                ),
-                                Some(
-                                    Name(
-                                        ExprName {
-                                            range: 134..135,
+                                            range: 125..126,
                                             id: "x",
                                             ctx: Load,
                                         },
                                     ),
-                                ),
-                                Some(
-                                    Compare(
-                                        ExprCompare {
-                                            range: 137..146,
-                                            left: Name(
-                                                ExprName {
-                                                    range: 137..138,
-                                                    id: "y",
-                                                    ctx: Load,
-                                                },
-                                            ),
-                                            ops: [
-                                                In,
-                                            ],
-                                            comparators: [
-                                                Name(
+                                },
+                                DictItem {
+                                    key: Some(
+                                        Name(
+                                            ExprName {
+                                                range: 128..129,
+                                                id: "y",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ),
+                                    value: Name(
+                                        ExprName {
+                                            range: 130..133,
+                                            id: "for",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                },
+                                DictItem {
+                                    key: Some(
+                                        Name(
+                                            ExprName {
+                                                range: 134..135,
+                                                id: "x",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ),
+                                    value: Name(
+                                        ExprName {
+                                            range: 135..135,
+                                            id: "",
+                                            ctx: Invalid,
+                                        },
+                                    ),
+                                },
+                                DictItem {
+                                    key: Some(
+                                        Compare(
+                                            ExprCompare {
+                                                range: 137..146,
+                                                left: Name(
                                                     ExprName {
-                                                        range: 142..146,
-                                                        id: "data",
+                                                        range: 137..138,
+                                                        id: "y",
                                                         ctx: Load,
                                                     },
                                                 ),
-                                            ],
+                                                ops: [
+                                                    In,
+                                                ],
+                                                comparators: [
+                                                    Name(
+                                                        ExprName {
+                                                            range: 142..146,
+                                                            id: "data",
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                ],
+                                            },
+                                        ),
+                                    ),
+                                    value: Name(
+                                        ExprName {
+                                            range: 146..146,
+                                            id: "",
+                                            ctx: Invalid,
                                         },
                                     ),
-                                ),
-                            ],
-                            values: [
-                                Name(
-                                    ExprName {
-                                        range: 125..126,
-                                        id: "x",
-                                        ctx: Load,
-                                    },
-                                ),
-                                Name(
-                                    ExprName {
-                                        range: 130..133,
-                                        id: "for",
-                                        ctx: Load,
-                                    },
-                                ),
-                                Name(
-                                    ExprName {
-                                        range: 135..135,
-                                        id: "",
-                                        ctx: Invalid,
-                                    },
-                                ),
-                                Name(
-                                    ExprName {
-                                        range: 146..146,
-                                        id: "",
-                                        ctx: Invalid,
-                                    },
-                                ),
+                                },
                             ],
                         },
                     ),

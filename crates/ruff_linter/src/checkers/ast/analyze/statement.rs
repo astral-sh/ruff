@@ -478,6 +478,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::EllipsisInNonEmptyClassBody) {
                 flake8_pyi::rules::ellipsis_in_non_empty_class_body(checker, body);
             }
+            if checker.enabled(Rule::GenericNotLastBaseClass) {
+                flake8_pyi::rules::generic_not_last_base_class(checker, class_def);
+            }
             if checker.enabled(Rule::PytestIncorrectMarkParenthesesStyle) {
                 flake8_pytest_style::rules::marks(checker, decorator_list);
             }

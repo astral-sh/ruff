@@ -425,7 +425,7 @@ Ruff is used by a number of major open-source projects and companies, including:
 - Microsoft ([Semantic Kernel](https://github.com/microsoft/semantic-kernel),
     [ONNX Runtime](https://github.com/microsoft/onnxruntime),
     [LightGBM](https://github.com/microsoft/LightGBM))
-- Modern Treasury ([Python SDK](https://github.com/Modern-Treasury/modern-treasury-python-sdk))
+- Modern Treasury ([Python SDK](https://github.com/Modern-Treasury/modern-treasury-python))
 - Mozilla ([Firefox](https://github.com/mozilla/gecko-dev))
 - [Mypy](https://github.com/python/mypy)
 - Netflix ([Dispatch](https://github.com/Netflix/dispatch))
