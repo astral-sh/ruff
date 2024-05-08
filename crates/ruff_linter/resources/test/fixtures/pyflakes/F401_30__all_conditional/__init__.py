@@ -1,4 +1,6 @@
 """__init__.py with __all__ populated by conditional plus-eq
+
+multiple __all__ so cannot offer a fix to add to them; offer fixes for redundant-aliases
 """
 
 import sys

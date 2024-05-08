@@ -158,9 +158,9 @@ fn is_first_party(qualified_name: &str, level: u32, checker: &Checker) -> bool {
     }
 }
 
-/// Find the `Expr` value for a top level `__all__`, if one exists.
+/// Find the `Expr` value for a unique top level `__all__` binding.
 fn find_dunder_all_expr<'a>(semantic: &'a SemanticModel) -> Option<&'a ast::Expr> {
-    let stmt = semantic
+    let stmts: Vec<_> = semantic
         .global_scope()
         .get_all("__all__")
         .map(|binding_id| semantic.binding(binding_id))
@@ -168,8 +168,10 @@ fn find_dunder_all_expr<'a>(semantic: &'a SemanticModel) -> Option<&'a ast::Expr
             BindingKind::Export(_) => binding.statement(semantic),
             _ => None,
         })
-        // `.get_all(…)` returns bindings in reverse-execution-order; we want the first __all__
-        .last()?;
+        .collect();
+    let [stmt] = stmts.as_slice() else {
+        return None; // only fix when there is /exactly one/ binding
+    };
     let expr = match stmt {
         Stmt::Assign(ast::StmtAssign { value, .. }) => Some(&**value),
         Stmt::AnnAssign(ast::StmtAnnAssign { value, .. }) => value.as_deref(),
