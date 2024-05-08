@@ -1,3 +1,5 @@
+//! Utilities for semantic analysis of `__all__` definitions
+
 use bitflags::bitflags;
 
 use ruff_python_ast::{self as ast, helpers::map_subscript, Expr, Stmt};
@@ -68,34 +70,79 @@ impl Ranged for DunderAllDefinition<'_> {
     }
 }
 
-/// Extract the names bound to a given __all__ assignment.
-///
-/// Accepts a closure that determines whether a given name (e.g., `"list"`) is a Python builtin.
-pub fn extract_all_names<'a>(
-    stmt: &'a Stmt,
-    semantic: &SemanticModel,
-) -> (Vec<DunderAllName<'a>>, DunderAllFlags) {
-    fn add_to_names<'a>(
-        elts: &'a [Expr],
-        names: &mut Vec<DunderAllName<'a>>,
-        flags: &mut DunderAllFlags,
-    ) {
-        for elt in elts {
-            if let Expr::StringLiteral(ast::ExprStringLiteral { value, range }) = elt {
-                names.push(DunderAllName {
-                    name: value.to_str(),
-                    range: *range,
-                });
-            } else {
-                *flags |= DunderAllFlags::INVALID_OBJECT;
+impl<'a> SemanticModel<'a> {
+    /// Extract the names bound to a given __all__ assignment.
+    pub fn extract_dunder_all_names<'expr>(
+        &self,
+        stmt: &'expr Stmt,
+    ) -> (Vec<DunderAllName<'expr>>, DunderAllFlags) {
+        fn add_to_names<'expr>(
+            elts: &'expr [Expr],
+            names: &mut Vec<DunderAllName<'expr>>,
+            flags: &mut DunderAllFlags,
+        ) {
+            for elt in elts {
+                if let Expr::StringLiteral(ast::ExprStringLiteral { value, range }) = elt {
+                    names.push(DunderAllName {
+                        name: value.to_str(),
+                        range: *range,
+                    });
+                } else {
+                    *flags |= DunderAllFlags::INVALID_OBJECT;
+                }
             }
         }
+
+        let mut names: Vec<DunderAllName> = vec![];
+        let mut flags = DunderAllFlags::empty();
+
+        if let Some(value) = match stmt {
+            Stmt::Assign(ast::StmtAssign { value, .. }) => Some(value),
+            Stmt::AnnAssign(ast::StmtAnnAssign { value, .. }) => value.as_ref(),
+            Stmt::AugAssign(ast::StmtAugAssign { value, .. }) => Some(value),
+            _ => None,
+        } {
+            if let Expr::BinOp(ast::ExprBinOp { left, right, .. }) = value.as_ref() {
+                let mut current_left = left;
+                let mut current_right = right;
+                loop {
+                    // Process the right side, which should be a "real" value.
+                    let (elts, new_flags) = self.extract_dunder_all_elts(current_right);
+                    flags |= new_flags;
+                    if let Some(elts) = elts {
+                        add_to_names(elts, &mut names, &mut flags);
+                    }
+
+                    // Process the left side, which can be a "real" value or the "rest" of the
+                    // binary operation.
+                    if let Expr::BinOp(ast::ExprBinOp { left, right, .. }) = current_left.as_ref() {
+                        current_left = left;
+                        current_right = right;
+                    } else {
+                        let (elts, new_flags) = self.extract_dunder_all_elts(current_left);
+                        flags |= new_flags;
+                        if let Some(elts) = elts {
+                            add_to_names(elts, &mut names, &mut flags);
+                        }
+                        break;
+                    }
+                }
+            } else {
+                let (elts, new_flags) = self.extract_dunder_all_elts(value);
+                flags |= new_flags;
+                if let Some(elts) = elts {
+                    add_to_names(elts, &mut names, &mut flags);
+                }
+            }
+        }
+
+        (names, flags)
     }
 
-    fn extract_elts<'a>(
-        expr: &'a Expr,
-        semantic: &SemanticModel,
-    ) -> (Option<&'a [Expr]>, DunderAllFlags) {
+    fn extract_dunder_all_elts<'expr>(
+        &self,
+        expr: &'expr Expr,
+    ) -> (Option<&'expr [Expr]>, DunderAllFlags) {
         match expr {
             Expr::List(ast::ExprList { elts, .. }) => {
                 return (Some(elts), DunderAllFlags::empty());
@@ -124,7 +171,7 @@ pub fn extract_all_names<'a>(
             }) => {
                 // Allow `tuple()`, `list()`, and their generic forms, like `list[int]()`.
                 if arguments.keywords.is_empty() && arguments.args.len() <= 1 {
-                    if semantic
+                    if self
                         .resolve_builtin_symbol(map_subscript(func))
                         .is_some_and(|symbol| matches!(symbol, "tuple" | "list"))
                     {
@@ -149,55 +196,10 @@ pub fn extract_all_names<'a>(
             }
             Expr::Named(ast::ExprNamed { value, .. }) => {
                 // Allow, e.g., `__all__ += (value := ["A", "B"])`.
-                return extract_elts(value, semantic);
+                return self.extract_dunder_all_elts(value);
             }
             _ => {}
         }
         (None, DunderAllFlags::INVALID_FORMAT)
     }
-
-    let mut names: Vec<DunderAllName> = vec![];
-    let mut flags = DunderAllFlags::empty();
-
-    if let Some(value) = match stmt {
-        Stmt::Assign(ast::StmtAssign { value, .. }) => Some(value),
-        Stmt::AnnAssign(ast::StmtAnnAssign { value, .. }) => value.as_ref(),
-        Stmt::AugAssign(ast::StmtAugAssign { value, .. }) => Some(value),
-        _ => None,
-    } {
-        if let Expr::BinOp(ast::ExprBinOp { left, right, .. }) = value.as_ref() {
-            let mut current_left = left;
-            let mut current_right = right;
-            loop {
-                // Process the right side, which should be a "real" value.
-                let (elts, new_flags) = extract_elts(current_right, semantic);
-                flags |= new_flags;
-                if let Some(elts) = elts {
-                    add_to_names(elts, &mut names, &mut flags);
-                }
-
-                // Process the left side, which can be a "real" value or the "rest" of the
-                // binary operation.
-                if let Expr::BinOp(ast::ExprBinOp { left, right, .. }) = current_left.as_ref() {
-                    current_left = left;
-                    current_right = right;
-                } else {
-                    let (elts, new_flags) = extract_elts(current_left, semantic);
-                    flags |= new_flags;
-                    if let Some(elts) = elts {
-                        add_to_names(elts, &mut names, &mut flags);
-                    }
-                    break;
-                }
-            }
-        } else {
-            let (elts, new_flags) = extract_elts(value, semantic);
-            flags |= new_flags;
-            if let Some(elts) = elts {
-                add_to_names(elts, &mut names, &mut flags);
-            }
-        }
-    }
-
-    (names, flags)
 }

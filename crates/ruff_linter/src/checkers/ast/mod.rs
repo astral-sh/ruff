@@ -49,7 +49,7 @@ use ruff_python_ast::{helpers, str, visitor, PySourceType};
 use ruff_python_codegen::{Generator, Stylist};
 use ruff_python_index::Indexer;
 use ruff_python_parser::typing::{parse_type_annotation, AnnotationKind};
-use ruff_python_semantic::all::{extract_all_names, DunderAllDefinition, DunderAllFlags};
+use ruff_python_semantic::all::{DunderAllDefinition, DunderAllFlags};
 use ruff_python_semantic::analyze::{imports, typing};
 use ruff_python_semantic::{
     BindingFlags, BindingId, BindingKind, Exceptions, Export, FromImport, Globals, Import, Module,
@@ -1882,7 +1882,7 @@ impl<'a> Checker<'a> {
                 _ => false,
             }
         {
-            let (all_names, all_flags) = extract_all_names(parent, &self.semantic);
+            let (all_names, all_flags) = self.semantic.extract_dunder_all_names(parent);
 
             if all_flags.intersects(DunderAllFlags::INVALID_OBJECT) {
                 flags |= BindingFlags::INVALID_ALL_OBJECT;
