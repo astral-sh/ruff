@@ -617,7 +617,7 @@ x = 1 \
         let program = parse_suite(contents).unwrap();
         let stmt = program.first().unwrap();
         assert_eq!(
-            make_redundant_alias(["x"].into_iter().map(|s| s.into()), stmt),
+            make_redundant_alias(["x"].into_iter().map(std::convert::Into::into), stmt),
             vec![Edit::range_replacement(
                 String::from("x as x"),
                 TextRange::new(TextSize::new(7), TextSize::new(8)),
@@ -625,7 +625,10 @@ x = 1 \
             "make just one item redundant"
         );
         assert_eq!(
-            make_redundant_alias(vec!["x", "y"].into_iter().map(|s| s.into()), stmt),
+            make_redundant_alias(
+                vec!["x", "y"].into_iter().map(std::convert::Into::into),
+                stmt
+            ),
             vec![Edit::range_replacement(
                 String::from("x as x"),
                 TextRange::new(TextSize::new(7), TextSize::new(8)),
@@ -633,7 +636,10 @@ x = 1 \
             "the second item is already a redundant alias"
         );
         assert_eq!(
-            make_redundant_alias(vec!["x", "z"].into_iter().map(|s| s.into()), stmt),
+            make_redundant_alias(
+                vec!["x", "z"].into_iter().map(std::convert::Into::into),
+                stmt
+            ),
             vec![Edit::range_replacement(
                 String::from("x as x"),
                 TextRange::new(TextSize::new(7), TextSize::new(8)),
@@ -667,7 +673,7 @@ x = 1 \
                 &locator,
             );
             // SUT
-            add_to_dunder_all(names.iter().map(|s| *s), &expr, &stylist)
+            add_to_dunder_all(names.iter().copied(), &expr, &stylist)
         };
         let diag = {
             use crate::rules::pycodestyle::rules::MissingNewlineAtEndOfFile;
