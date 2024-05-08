@@ -1,3 +1,5 @@
+pub mod all;
+
 use std::path::Path;
 
 use bitflags::bitflags;

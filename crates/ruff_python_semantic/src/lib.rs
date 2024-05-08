@@ -1,4 +1,3 @@
-pub mod all;
 pub mod analyze;
 mod binding;
 mod branches;
