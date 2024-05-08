@@ -164,10 +164,12 @@ fn find_dunder_all_expr<'a>(semantic: &'a SemanticModel) -> Option<&'a ast::Expr
         .global_scope()
         .get_all("__all__")
         .map(|binding_id| semantic.binding(binding_id))
-        .find_map(|binding| match binding.kind {
+        .filter_map(|binding| match binding.kind {
             BindingKind::Export(_) => binding.statement(semantic),
             _ => None,
-        })?;
+        })
+        // `.get_all(…)` returns bindings in reverse-execution-order; we want the first __all__
+        .last()?;
     let expr = match stmt {
         Stmt::Assign(ast::StmtAssign { value, .. }) => Some(&**value),
         Stmt::AnnAssign(ast::StmtAnnAssign { value, .. }) => value.as_deref(),
