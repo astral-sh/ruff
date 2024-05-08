@@ -3,8 +3,8 @@ use std::ops::{Deref, DerefMut};
 
 use bitflags::bitflags;
 
+use crate::all::DunderAllName;
 use ruff_index::{newtype_index, IndexSlice, IndexVec};
-use ruff_python_ast::all::DunderAllName;
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::Stmt;
 use ruff_source_file::Locator;

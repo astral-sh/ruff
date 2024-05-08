@@ -1,8 +1,7 @@
 use bitflags::bitflags;
-use ruff_text_size::{Ranged, TextRange};
 
-use crate::helpers::map_subscript;
-use crate::{self as ast, Expr, Stmt};
+use ruff_python_ast::{self as ast, helpers::map_subscript, Expr, Stmt};
+use ruff_text_size::{Ranged, TextRange};
 
 bitflags! {
     #[derive(Default, Debug, Copy, Clone, PartialEq, Eq)]
