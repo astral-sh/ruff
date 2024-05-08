@@ -352,7 +352,7 @@ struct LogicalLineInfo {
     kind: LogicalLineKind,
     first_token_range: TextRange,
 
-    // The token's kind right before the newline ending the logical line.
+    // The kind of the last non-trivia token before the newline ending the logical line.
     last_token: TokenKind,
 
     // The end of the logical line including the newline.
@@ -549,7 +549,9 @@ impl<'a> Iterator for LinePreprocessor<'a> {
                 _ => {}
             }
 
-            last_token = token_kind;
+            if !token_kind.is_trivia() {
+                last_token = token_kind;
+            }
         }
 
         None
