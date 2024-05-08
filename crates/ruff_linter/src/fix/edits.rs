@@ -153,24 +153,45 @@ pub(crate) fn add_to_dunder_all<'a>(
     stylist: &Stylist,
 ) -> Vec<Edit> {
     let (insertion_point, export_prefix_length) = match expr {
-        ast::Expr::List(ast::ExprList { elts, range, .. })
-        | ast::Expr::Tuple(ast::ExprTuple { elts, range, .. }) => (
+        ast::Expr::List(ast::ExprList { elts, range, .. }) => (
             elts.last()
                 .map_or(range.end() - "]".text_len(), |elt| elt.range().end()),
             elts.len(),
         ),
+        ast::Expr::Tuple(tup) if tup.parenthesized => (
+            tup.elts
+                .last()
+                .map_or(tup.range.end() - ")".text_len(), |elt| elt.range().end()),
+            tup.elts.len(),
+        ),
+        ast::Expr::Tuple(tup) if !tup.parenthesized => (
+            tup.elts
+                .last()
+                .expect("unparenthesized empty tuple is not possible")
+                .range()
+                .end(),
+            tup.elts.len(),
+        ),
         _ => {
+            // we don't know how to insert into this expression
             return vec![];
         }
     };
     let quote = stylist.quote();
-    names
+    let mut edits: Vec<_> = names
         .enumerate()
         .map(|(offset, name)| match export_prefix_length + offset {
             0 => Edit::insertion(format!("{quote}{name}{quote}"), insertion_point),
             _ => Edit::insertion(format!(", {quote}{name}{quote}"), insertion_point),
         })
-        .collect()
+        .collect();
+    match expr {
+        ast::Expr::Tuple(tup) if tup.parenthesized && 1 == export_prefix_length + edits.len() => {
+            edits.push(Edit::insertion(",".to_string(), insertion_point));
+        }
+        _ => {}
+    };
+    edits
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -506,15 +527,16 @@ fn all_lines_fit(
 
 #[cfg(test)]
 mod tests {
-    use anyhow::Result;
+    use anyhow::{anyhow, Result};
     use test_case::test_case;
 
-    use ruff_diagnostics::Edit;
+    use ruff_diagnostics::{Diagnostic, Edit, Fix};
     use ruff_python_codegen::Stylist;
     use ruff_python_parser::{lexer, parse_expression, parse_suite, Mode};
     use ruff_source_file::Locator;
     use ruff_text_size::{Ranged, TextRange, TextSize};
 
+    use crate::fix::apply_fixes;
     use crate::fix::edits::{
         add_to_dunder_all, make_redundant_alias, next_stmt_break, trailing_semicolon,
     };
@@ -620,49 +642,46 @@ x = 1 \
         );
     }
 
-    #[test_case("[]" ; "empty list")]
-    #[test_case("()" ; "empty tuple")]
-    fn add_to_empty_dunder_all(raw: &str) -> Result<()> {
+    #[test_case("()",             &["x", "y"], r#"("x", "y")"#             ; "2 into empty tuple")]
+    #[test_case("()",             &["x"],      r#"("x",)"#                 ; "1 into empty tuple adding a trailing comma")]
+    #[test_case("[]",             &["x", "y"], r#"["x", "y"]"#             ; "2 into empty list")]
+    #[test_case("[]",             &["x"],      r#"["x"]"#                  ; "1 into empty list")]
+    #[test_case(r#""a", "b""#,    &["x", "y"], r#""a", "b", "x", "y""#     ; "2 into unparenthesized tuple")]
+    #[test_case(r#""a", "b""#,    &["x"],      r#""a", "b", "x""#          ; "1 into unparenthesized tuple")]
+    #[test_case(r#""a", "b","#,   &["x", "y"], r#""a", "b", "x", "y","#    ; "2 into unparenthesized tuple w/trailing comma")]
+    #[test_case(r#""a", "b","#,   &["x"],      r#""a", "b", "x","#         ; "1 into unparenthesized tuple w/trailing comma")]
+    #[test_case(r#"("a", "b")"#,  &["x", "y"], r#"("a", "b", "x", "y")"#   ; "2 into nonempty tuple")]
+    #[test_case(r#"("a", "b")"#,  &["x"],      r#"("a", "b", "x")"#        ; "1 into nonempty tuple")]
+    #[test_case(r#"("a", "b",)"#, &["x", "y"], r#"("a", "b", "x", "y",)"#  ; "2 into nonempty tuple w/trailing comma")]
+    #[test_case(r#"("a", "b",)"#, &["x"],      r#"("a", "b", "x",)"#       ; "1 into nonempty tuple w/trailing comma")]
+    #[test_case(r#"["a", "b",]"#, &["x", "y"], r#"["a", "b", "x", "y",]"#  ; "2 into nonempty list w/trailing comma")]
+    #[test_case(r#"["a", "b",]"#, &["x"],      r#"["a", "b", "x",]"#       ; "1 into nonempty list w/trailing comma")]
+    #[test_case(r#"["a", "b"]"#,  &["x", "y"], r#"["a", "b", "x", "y"]"#   ; "2 into nonempty list")]
+    #[test_case(r#"["a", "b"]"#,  &["x"],      r#"["a", "b", "x"]"#        ; "1 into nonempty list")]
+    fn add_to_dunder_all_test(raw: &str, names: &[&str], expect: &str) -> Result<()> {
         let locator = Locator::new(raw);
-        let stylist = Stylist::from_tokens(
-            &lexer::lex(raw, Mode::Expression).collect::<Vec<_>>(),
-            &locator,
-        );
-        let expr = parse_expression(raw)?;
-        assert_eq!(
-            add_to_dunder_all(["x"].into_iter(), &expr, &stylist),
-            vec![Edit::insertion(String::from("\"x\""), TextSize::new(1))],
-        );
-        assert_eq!(
-            add_to_dunder_all(["x", "y"].into_iter(), &expr, &stylist),
-            vec![
-                Edit::insertion(String::from("\"x\""), TextSize::new(1)),
-                Edit::insertion(String::from(", \"y\""), TextSize::new(1))
-            ],
-        );
-        Ok(())
-    }
-
-    #[test_case(r#"["a", "b"]"# ; "nonempty list")]
-    #[test_case(r#"("a", "b")"# ; "nonempty tuple")]
-    fn add_to_nonempty_dunder_all(raw: &str) -> Result<()> {
-        let locator = Locator::new(raw);
-        let stylist = Stylist::from_tokens(
-            &lexer::lex(raw, Mode::Expression).collect::<Vec<_>>(),
-            &locator,
-        );
-        let expr = parse_expression(raw)?;
-        assert_eq!(
-            add_to_dunder_all(["x"].into_iter(), &expr, &stylist),
-            vec![Edit::insertion(String::from(", \"x\""), TextSize::new(9))],
-        );
-        assert_eq!(
-            add_to_dunder_all(["x", "y"].into_iter(), &expr, &stylist),
-            vec![
-                Edit::insertion(String::from(", \"x\""), TextSize::new(9)),
-                Edit::insertion(String::from(", \"y\""), TextSize::new(9))
-            ],
-        );
+        let edits = {
+            let expr = parse_expression(raw)?;
+            let stylist = Stylist::from_tokens(
+                &lexer::lex(raw, Mode::Expression).collect::<Vec<_>>(),
+                &locator,
+            );
+            // SUT
+            add_to_dunder_all(names.iter().map(|s| *s), &expr, &stylist)
+        };
+        let diag = {
+            use crate::rules::pycodestyle::rules::MissingNewlineAtEndOfFile;
+            let mut iter = edits.into_iter();
+            Diagnostic::new(
+                MissingNewlineAtEndOfFile, // The choice of rule here is arbitrary.
+                TextRange::default(),
+            )
+            .with_fix(Fix::safe_edits(
+                iter.next().ok_or(anyhow!("expected edits nonempty"))?,
+                iter,
+            ))
+        };
+        assert_eq!(apply_fixes([diag].iter(), &locator).code, expect);
         Ok(())
     }
 }
