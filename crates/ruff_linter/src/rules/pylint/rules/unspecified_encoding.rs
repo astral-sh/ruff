@@ -1,4 +1,5 @@
 use anyhow::Result;
+use std::fmt::{Display, Formatter};
 
 use ast::StringLiteralFlags;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
@@ -121,17 +122,19 @@ impl<'a> Segments<'a> {
         }
         None
     }
+}
 
-    fn to_string(&self) -> String {
+impl Display for Segments<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Segments::Regular(segments) => {
-                if segments[0] == "" {
-                    segments[1..].join(".")
+                if segments[0].is_empty() {
+                    f.write_str(&segments[1..].join("."))
                 } else {
-                    segments.join(".")
+                    f.write_str(&segments.join("."))
                 }
             }
-            Segments::Pathlib(attr) => format!("pathlib.Path.{attr}"),
+            Segments::Pathlib(attr) => f.write_str(&format!("pathlib.Path.{attr}")),
         }
     }
 }
