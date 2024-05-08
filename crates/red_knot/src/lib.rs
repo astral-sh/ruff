@@ -18,6 +18,7 @@ pub mod module;
 mod parse;
 pub mod program;
 mod semantic;
+mod salsa_db;
 pub mod source;
 pub mod watch;
 
