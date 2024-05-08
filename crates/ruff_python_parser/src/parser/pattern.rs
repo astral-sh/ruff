@@ -1,10 +1,11 @@
 use ruff_python_ast::{self as ast, Expr, ExprContext, Number, Operator, Pattern, Singleton};
 use ruff_text_size::{Ranged, TextSize};
 
+use crate::lexer::TokenValue;
 use crate::parser::progress::ParserProgress;
 use crate::parser::{recovery, Parser, RecoveryContextKind, SequenceMatchPatternParentheses};
 use crate::token_set::TokenSet;
-use crate::{ParseErrorType, Tok, TokenKind};
+use crate::{ParseErrorType, TokenKind};
 
 use super::expression::ExpressionContext;
 
@@ -397,7 +398,7 @@ impl<'src> Parser<'src> {
                 })
             }
             TokenKind::Complex => {
-                let (Tok::Complex { real, imag }, _) = self.bump(TokenKind::Complex) else {
+                let TokenValue::Complex { real, imag } = self.take_value(TokenKind::Complex) else {
                     unreachable!()
                 };
                 let range = self.node_range(start);
@@ -411,7 +412,7 @@ impl<'src> Parser<'src> {
                 })
             }
             TokenKind::Int => {
-                let (Tok::Int { value }, _) = self.bump(TokenKind::Int) else {
+                let TokenValue::Int(value) = self.take_value(TokenKind::Int) else {
                     unreachable!()
                 };
                 let range = self.node_range(start);
@@ -425,7 +426,7 @@ impl<'src> Parser<'src> {
                 })
             }
             TokenKind::Float => {
-                let (Tok::Float { value }, _) = self.bump(TokenKind::Float) else {
+                let TokenValue::Float(value) = self.take_value(TokenKind::Float) else {
                     unreachable!()
                 };
                 let range = self.node_range(start);
@@ -439,7 +440,7 @@ impl<'src> Parser<'src> {
                 })
             }
             TokenKind::Name if self.peek() == TokenKind::Dot => {
-                let (Tok::Name { name }, _) = self.bump(TokenKind::Name) else {
+                let TokenValue::Name(name) = self.take_value(TokenKind::Name) else {
                     unreachable!()
                 };
                 let id = Expr::Name(ast::ExprName {
@@ -456,7 +457,7 @@ impl<'src> Parser<'src> {
                 })
             }
             TokenKind::Name => {
-                let (Tok::Name { name }, _) = self.bump(TokenKind::Name) else {
+                let TokenValue::Name(name) = self.take_value(TokenKind::Name) else {
                     unreachable!()
                 };
                 let range = self.node_range(start);

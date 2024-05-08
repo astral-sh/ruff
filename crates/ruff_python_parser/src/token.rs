@@ -545,6 +545,11 @@ pub enum TokenKind {
 
 impl TokenKind {
     #[inline]
+    pub const fn is_eof(self) -> bool {
+        matches!(self, TokenKind::EndOfFile)
+    }
+
+    #[inline]
     pub const fn is_newline(self) -> bool {
         matches!(self, TokenKind::Newline | TokenKind::NonLogicalNewline)
     }
@@ -700,7 +705,7 @@ impl TokenKind {
 
     #[inline]
     pub const fn is_soft_keyword(self) -> bool {
-        matches!(self, TokenKind::Match | TokenKind::Case)
+        matches!(self, TokenKind::Match | TokenKind::Case | TokenKind::Type)
     }
 
     /// Returns `true` if the current token is a unary arithmetic operator.

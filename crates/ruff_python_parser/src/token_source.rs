@@ -1,115 +1,72 @@
-use std::iter::FusedIterator;
+use ruff_text_size::TextRange;
 
-use ruff_text_size::{TextRange, TextSize};
+use crate::lexer::{Lexer, LexicalError, Token, TokenValue};
+use crate::{Mode, TokenKind};
 
-use crate::lexer::{LexResult, LexicalError, Spanned};
-use crate::{Tok, TokenKind};
-
-#[derive(Clone, Debug)]
-pub(crate) struct TokenSource {
-    tokens: std::vec::IntoIter<LexResult>,
-    errors: Vec<LexicalError>,
+#[derive(Debug)]
+pub(crate) struct TokenSource<'src> {
+    lexer: Lexer<'src>,
+    tokens: Vec<Token>,
 }
 
-impl TokenSource {
-    pub(crate) fn new(tokens: Vec<LexResult>) -> Self {
+impl<'src> TokenSource<'src> {
+    pub(crate) fn new(lexer: Lexer<'src>) -> Self {
         Self {
-            tokens: tokens.into_iter(),
-            errors: Vec::new(),
+            lexer,
+            tokens: vec![],
         }
     }
 
-    /// Returns the position of the current token.
-    ///
-    /// This is the position before any whitespace or comments.
-    pub(crate) fn position(&self) -> Option<TextSize> {
-        let first = self.tokens.as_slice().first()?;
-
-        let range = match first {
-            Ok((_, range)) => *range,
-            Err(error) => error.location(),
-        };
-
-        Some(range.start())
+    pub(crate) fn from_source(source: &'src str, mode: Mode) -> Self {
+        Self::new(Lexer::new(source, mode))
     }
 
-    /// Returns the end of the last token
-    pub(crate) fn end(&self) -> Option<TextSize> {
-        let last = self.tokens.as_slice().last()?;
+    /// Returns the kind of the current token.
+    pub(crate) fn current_kind(&self) -> TokenKind {
+        self.lexer.current_kind()
+    }
 
-        let range = match last {
-            Ok((_, range)) => *range,
-            Err(error) => error.location(),
-        };
+    /// Returns the range of the current token.
+    pub(crate) fn current_range(&self) -> TextRange {
+        self.lexer.current_range()
+    }
 
-        Some(range.end())
+    pub(crate) fn take_value(&mut self) -> TokenValue {
+        self.lexer.take_value()
     }
 
     /// Returns the next token kind and its range without consuming it.
-    pub(crate) fn peek(&self) -> Option<(TokenKind, TextRange)> {
-        let mut iter = self.tokens.as_slice().iter();
-
-        loop {
-            let next = iter.next()?;
-
-            if next.as_ref().is_ok_and(is_trivia) {
+    pub(crate) fn peek(&mut self) -> TokenKind {
+        let checkpoint = self.lexer.checkpoint();
+        let next = loop {
+            let next = self.lexer.next_token();
+            if next.is_trivia() {
                 continue;
             }
+            break next.kind();
+        };
+        self.lexer.rewind(checkpoint);
+        next
+    }
 
-            break Some(match next {
-                Ok((token, range)) => (TokenKind::from_token(token), *range),
-                Err(error) => (TokenKind::Unknown, error.location()),
-            });
+    pub(crate) fn next_token(&mut self) {
+        loop {
+            let next = self.lexer.next_token();
+            self.tokens.push(next);
+            if next.is_trivia() {
+                continue;
+            }
+            break;
         }
     }
 
-    pub(crate) fn finish(self) -> Vec<LexicalError> {
+    pub(crate) fn finish(mut self) -> (Vec<Token>, Vec<LexicalError>) {
         assert_eq!(
-            self.tokens.as_slice(),
-            &[],
-            "TokenSource was not fully consumed."
+            self.peek(),
+            TokenKind::EndOfFile,
+            "TokenSource was not fully consumed"
         );
 
-        self.errors
+        (self.tokens, self.lexer.finish())
     }
-}
-
-impl FromIterator<LexResult> for TokenSource {
-    #[inline]
-    fn from_iter<T: IntoIterator<Item = LexResult>>(iter: T) -> Self {
-        Self::new(Vec::from_iter(iter))
-    }
-}
-
-impl Iterator for TokenSource {
-    type Item = Spanned;
-
-    #[inline]
-    fn next(&mut self) -> Option<Self::Item> {
-        loop {
-            let next = self.tokens.next()?;
-
-            match next {
-                Ok(token) => {
-                    if is_trivia(&token) {
-                        continue;
-                    }
-
-                    break Some(token);
-                }
-
-                Err(error) => {
-                    let location = error.location();
-                    self.errors.push(error);
-                    break Some((Tok::Unknown, location));
-                }
-            }
-        }
-    }
-}
-
-impl FusedIterator for TokenSource {}
-
-const fn is_trivia(result: &Spanned) -> bool {
-    matches!(result, (Tok::Comment(_) | Tok::NonLogicalNewline, _))
 }

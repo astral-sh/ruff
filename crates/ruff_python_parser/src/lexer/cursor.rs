@@ -3,16 +3,22 @@ use std::str::Chars;
 
 pub(crate) const EOF_CHAR: char = '\0';
 
+/// A cursor represents a pointer in the source code
 #[derive(Clone, Debug)]
-pub(super) struct Cursor<'a> {
-    chars: Chars<'a>,
+pub(super) struct Cursor<'src> {
+    /// An iterator over the [`char`]'s of the source code.
+    chars: Chars<'src>,
+
+    /// Length of the source code.
     source_length: TextSize,
+
+    /// Stores the previous character for debug assertions.
     #[cfg(debug_assertions)]
     prev_char: char,
 }
 
-impl<'a> Cursor<'a> {
-    pub(crate) fn new(source: &'a str) -> Self {
+impl<'src> Cursor<'src> {
+    pub(crate) fn new(source: &'src str) -> Self {
         Self {
             source_length: source.text_len(),
             chars: source.chars(),
@@ -21,14 +27,14 @@ impl<'a> Cursor<'a> {
         }
     }
 
-    /// Returns the previous token. Useful for debug assertions.
+    /// Returns the previous character. Useful for debug assertions.
     #[cfg(debug_assertions)]
     pub(super) const fn previous(&self) -> char {
         self.prev_char
     }
 
     /// Peeks the next character from the input stream without consuming it.
-    /// Returns [`EOF_CHAR`] if the file is at the end of the file.
+    /// Returns [`EOF_CHAR`] if the position is past the end of the file.
     pub(super) fn first(&self) -> char {
         self.chars.clone().next().unwrap_or(EOF_CHAR)
     }
@@ -42,7 +48,7 @@ impl<'a> Cursor<'a> {
     }
 
     /// Returns the remaining text to lex.
-    pub(super) fn rest(&self) -> &'a str {
+    pub(super) fn rest(&self) -> &'src str {
         self.chars.as_str()
     }
 
