@@ -107,6 +107,8 @@ fn num_branches(stmts: &[Stmt]) -> usize {
                     .map(|case| num_branches(&case.body))
                     .sum::<usize>()
             }
+            Stmt::With(ast::StmtWith { body, .. }) => num_branches(body), // The `with` statement
+            // is not considered a branch but the statements inside the `with` should be counted
             Stmt::For(ast::StmtFor { body, orelse, .. })
             | Stmt::While(ast::StmtWhile { body, orelse, .. }) => {
                 1 + num_branches(body)
@@ -263,6 +265,20 @@ finally:
 ";
 
         test_helper(source, 5)?;
+        Ok(())
+    }
+
+    #[test]
+    fn with_statement() -> Result<()> {
+        let source: &str = r"
+with suppress(Exception):
+    if x == 0:  # 2
+        return
+    else:
+        return
+";
+
+        test_helper(source, 2)?;
         Ok(())
     }
 }
