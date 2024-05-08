@@ -5,8 +5,9 @@ use std::fmt::Debug;
 use std::ops::Deref;
 use std::path::Path;
 
+use crate::all::DunderAllName;
 use ruff_index::{newtype_index, IndexSlice, IndexVec};
-use ruff_python_ast::{self as ast, all::DunderAllName, Stmt};
+use ruff_python_ast::{self as ast, Stmt};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::analyze::visibility::{
