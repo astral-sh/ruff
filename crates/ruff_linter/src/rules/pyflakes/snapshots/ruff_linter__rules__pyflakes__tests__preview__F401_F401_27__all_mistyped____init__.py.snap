@@ -6,7 +6,7 @@ __init__.py:5:15: F401 [*] `.unused` imported but unused; consider removing, add
 5 | from . import unused # F401: change to redundant alias b/c __all__ cannot be located
   |               ^^^^^^ F401
   |
-  = help: Use a redundant alias: `.unused`
+  = help: Use an explicit re-export: `.unused`
 
 ℹ Safe fix
 2 2 | """
@@ -23,4 +23,4 @@ __init__.py:8:26: F401 `.renamed` imported but unused; consider removing, adding
 8 | from . import renamed as bees # F401: change to redundant alias b/c __all__ cannot be located
   |                          ^^^^ F401
   |
-  = help: Use a redundant alias: `bees`
+  = help: Use an explicit re-export: `bees`

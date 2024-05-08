@@ -22,7 +22,7 @@ __init__.py:33:15: F401 [*] `.unused` imported but unused; consider removing, ad
 33 | from . import unused  # F401: change to redundant alias
    |               ^^^^^^ F401
    |
-   = help: Use a redundant alias: `.unused`
+   = help: Use an explicit re-export: `.unused`
 
 ℹ Safe fix
 30 30 | from . import aliased as aliased  # Ok: is redundant alias
@@ -39,4 +39,4 @@ __init__.py:36:26: F401 `.renamed` imported but unused; consider removing, addin
 36 | from . import renamed as bees  # F401: no fix
    |                          ^^^^ F401
    |
-   = help: Use a redundant alias: `bees`
+   = help: Use an explicit re-export: `bees`

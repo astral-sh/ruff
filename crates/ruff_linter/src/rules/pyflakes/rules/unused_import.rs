@@ -126,7 +126,7 @@ impl Violation for UnusedImport {
             Some(UnusedImportContext::Init {
                 first_party: true,
                 dunder_all: false,
-            }) => "Use a redundant alias",
+            }) => "Use an explicit re-export",
             _ => "Remove unused import",
         };
         Some(if *multiple {
