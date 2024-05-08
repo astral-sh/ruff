@@ -17,6 +17,7 @@ pub mod lint;
 pub mod module;
 mod parse;
 pub mod program;
+mod salsa_db;
 pub mod source;
 mod symbols;
 mod types;
