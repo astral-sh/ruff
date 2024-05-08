@@ -3,6 +3,8 @@ use bitflags::bitflags;
 use ruff_python_ast::{self as ast, helpers::map_subscript, Expr, Stmt};
 use ruff_text_size::{Ranged, TextRange};
 
+use crate::SemanticModel;
+
 bitflags! {
     #[derive(Default, Debug, Copy, Clone, PartialEq, Eq)]
     pub struct DunderAllFlags: u8 {
@@ -69,10 +71,10 @@ impl Ranged for DunderAllDefinition<'_> {
 /// Extract the names bound to a given __all__ assignment.
 ///
 /// Accepts a closure that determines whether a given name (e.g., `"list"`) is a Python builtin.
-pub fn extract_all_names<F>(stmt: &Stmt, is_builtin: F) -> (Vec<DunderAllName>, DunderAllFlags)
-where
-    F: Fn(&str) -> bool,
-{
+pub fn extract_all_names<'a>(
+    stmt: &'a Stmt,
+    semantic: &SemanticModel,
+) -> (Vec<DunderAllName<'a>>, DunderAllFlags) {
     fn add_to_names<'a>(
         elts: &'a [Expr],
         names: &mut Vec<DunderAllName<'a>>,
@@ -90,10 +92,10 @@ where
         }
     }
 
-    fn extract_elts<F>(expr: &Expr, is_builtin: F) -> (Option<&[Expr]>, DunderAllFlags)
-    where
-        F: Fn(&str) -> bool,
-    {
+    fn extract_elts<'a>(
+        expr: &'a Expr,
+        semantic: &SemanticModel,
+    ) -> (Option<&'a [Expr]>, DunderAllFlags) {
         match expr {
             Expr::List(ast::ExprList { elts, .. }) => {
                 return (Some(elts), DunderAllFlags::empty());
@@ -122,24 +124,24 @@ where
             }) => {
                 // Allow `tuple()`, `list()`, and their generic forms, like `list[int]()`.
                 if arguments.keywords.is_empty() && arguments.args.len() <= 1 {
-                    if let Expr::Name(ast::ExprName { id, .. }) = map_subscript(func) {
-                        let id = id.as_str();
-                        if matches!(id, "tuple" | "list") && is_builtin(id) {
-                            let [arg] = arguments.args.as_ref() else {
+                    if semantic
+                        .resolve_builtin_symbol(map_subscript(func))
+                        .is_some_and(|symbol| matches!(symbol, "tuple" | "list"))
+                    {
+                        let [arg] = arguments.args.as_ref() else {
+                            return (None, DunderAllFlags::empty());
+                        };
+                        match arg {
+                            Expr::List(ast::ExprList { elts, .. })
+                            | Expr::Set(ast::ExprSet { elts, .. })
+                            | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+                                return (Some(elts), DunderAllFlags::empty());
+                            }
+                            _ => {
+                                // We can't analyze other expressions, but they must be
+                                // valid, since the `list` or `tuple` call will ultimately
+                                // evaluate to a list or tuple.
                                 return (None, DunderAllFlags::empty());
-                            };
-                            match arg {
-                                Expr::List(ast::ExprList { elts, .. })
-                                | Expr::Set(ast::ExprSet { elts, .. })
-                                | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
-                                    return (Some(elts), DunderAllFlags::empty());
-                                }
-                                _ => {
-                                    // We can't analyze other expressions, but they must be
-                                    // valid, since the `list` or `tuple` call will ultimately
-                                    // evaluate to a list or tuple.
-                                    return (None, DunderAllFlags::empty());
-                                }
                             }
                         }
                     }
@@ -147,7 +149,7 @@ where
             }
             Expr::Named(ast::ExprNamed { value, .. }) => {
                 // Allow, e.g., `__all__ += (value := ["A", "B"])`.
-                return extract_elts(value, is_builtin);
+                return extract_elts(value, semantic);
             }
             _ => {}
         }
@@ -168,7 +170,7 @@ where
             let mut current_right = right;
             loop {
                 // Process the right side, which should be a "real" value.
-                let (elts, new_flags) = extract_elts(current_right, |expr| is_builtin(expr));
+                let (elts, new_flags) = extract_elts(current_right, semantic);
                 flags |= new_flags;
                 if let Some(elts) = elts {
                     add_to_names(elts, &mut names, &mut flags);
@@ -180,7 +182,7 @@ where
                     current_left = left;
                     current_right = right;
                 } else {
-                    let (elts, new_flags) = extract_elts(current_left, |expr| is_builtin(expr));
+                    let (elts, new_flags) = extract_elts(current_left, semantic);
                     flags |= new_flags;
                     if let Some(elts) = elts {
                         add_to_names(elts, &mut names, &mut flags);
@@ -189,7 +191,7 @@ where
                 }
             }
         } else {
-            let (elts, new_flags) = extract_elts(value, |expr| is_builtin(expr));
+            let (elts, new_flags) = extract_elts(value, semantic);
             flags |= new_flags;
             if let Some(elts) = elts {
                 add_to_names(elts, &mut names, &mut flags);

@@ -1882,8 +1882,7 @@ impl<'a> Checker<'a> {
                 _ => false,
             }
         {
-            let (all_names, all_flags) =
-                extract_all_names(parent, |name| self.semantic.has_builtin_binding(name));
+            let (all_names, all_flags) = extract_all_names(parent, &self.semantic);
 
             if all_flags.intersects(DunderAllFlags::INVALID_OBJECT) {
                 flags |= BindingFlags::INVALID_ALL_OBJECT;
