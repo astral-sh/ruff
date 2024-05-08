@@ -163,7 +163,7 @@ fn find_dunder_all_expr<'a>(semantic: &'a SemanticModel) -> Option<&'a ast::Expr
     let stmt = semantic
         .global_scope()
         .get_all("__all__")
-        .map(|binding_id| &semantic.bindings[binding_id])
+        .map(|binding_id| semantic.binding(binding_id))
         .find_map(|binding| match binding.kind {
             BindingKind::Export(_) => binding.statement(semantic),
             _ => None,
