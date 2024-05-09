@@ -1738,7 +1738,7 @@ impl<'a> LexedText<'a> {
 
 #[cfg(test)]
 mod tests {
-    use insta::assert_debug_snapshot;
+    use std::fmt::Write;
 
     use super::*;
 
@@ -1746,98 +1746,105 @@ mod tests {
     const MAC_EOL: &str = "\r";
     const UNIX_EOL: &str = "\n";
 
-    struct LexIter<'src> {
-        inner: Lexer<'src>,
-    }
-
-    impl<'src> LexIter<'src> {
-        fn new(source: &'src str, mode: Mode) -> Self {
-            LexIter {
-                inner: Lexer::new(source, mode),
+    fn lex(source: &str, mode: Mode) -> (Vec<Token>, Vec<LexicalError>) {
+        let mut lexer = Lexer::new(source, mode);
+        let mut tokens = Vec::new();
+        loop {
+            let next = lexer.next_token();
+            if next.kind().is_eof() {
+                break;
             }
+            tokens.push(next);
         }
+        (tokens, lexer.finish())
     }
 
-    impl Iterator for LexIter<'_> {
-        type Item = Result<Token, LexicalError>;
+    fn lex_valid(source: &str, mode: Mode) {
+        let (tokens, errors) = lex(source, mode);
 
-        fn next(&mut self) -> Option<Self::Item> {
-            let next = self.inner.next_token();
-            if next.as_ref().is_ok_and(|token| token.kind().is_eof()) {
-                None
-            } else {
-                Some(next)
+        if !errors.is_empty() {
+            let mut message = "Unexpected lexical errors for a valid program:\n".to_string();
+            for error in errors {
+                writeln!(&mut message, "{:?}", error).unwrap();
             }
+            writeln!(&mut message, "Source:\n{}", source).unwrap();
+            panic!("{message}");
         }
+
+        insta::assert_debug_snapshot!(tokens);
     }
 
-    fn lex_result(source: &str, mode: Mode) -> Vec<Result<Token, LexicalError>> {
-        LexIter::new(source, mode).collect()
+    fn lex_invalid(source: &str, mode: Mode) {
+        let (tokens, errors) = lex(source, mode);
+
+        assert!(
+            !errors.is_empty(),
+            "Expected lexer to generate at least one error for the following source:\n{}",
+            source
+        );
+
+        let mut output = String::new();
+
+        writeln!(&mut output, "## Tokens").unwrap();
+        writeln!(&mut output, "```\n{:#?}\n```", tokens).unwrap();
+        writeln!(&mut output, "## Errors").unwrap();
+        writeln!(&mut output, "```\n{:#?}\n```", errors).unwrap();
+
+        insta::assert_snapshot!(output);
     }
 
-    fn lex_tokens(source: &str, mode: Mode) -> Vec<Token> {
-        let lexer = LexIter::new(source, mode);
-        lexer.map(std::result::Result::unwrap).collect()
+    fn lex_source(source: &str) {
+        lex_valid(source, Mode::Module);
     }
 
-    fn lex_source(source: &str) -> Vec<Token> {
-        lex_tokens(source, Mode::Module)
+    fn lex_jupyter_source(source: &str) {
+        lex_valid(source, Mode::Ipython);
     }
 
-    fn lex_jupyter_source(source: &str) -> Vec<Token> {
-        lex_tokens(source, Mode::Ipython)
-    }
-
-    fn ipython_escape_command_line_continuation_eol(eol: &str) -> Vec<Token> {
+    fn ipython_escape_command_line_continuation_eol(eol: &str) {
         let source = format!("%matplotlib \\{eol}  --inline");
-        lex_jupyter_source(&source)
+        lex_jupyter_source(&source);
     }
 
     #[test]
     fn test_ipython_escape_command_line_continuation_unix_eol() {
-        assert_debug_snapshot!(ipython_escape_command_line_continuation_eol(UNIX_EOL));
+        ipython_escape_command_line_continuation_eol(UNIX_EOL);
     }
 
     #[test]
     fn test_ipython_escape_command_line_continuation_mac_eol() {
-        assert_debug_snapshot!(ipython_escape_command_line_continuation_eol(MAC_EOL));
+        ipython_escape_command_line_continuation_eol(MAC_EOL);
     }
 
     #[test]
     fn test_ipython_escape_command_line_continuation_windows_eol() {
-        assert_debug_snapshot!(ipython_escape_command_line_continuation_eol(WINDOWS_EOL));
+        ipython_escape_command_line_continuation_eol(WINDOWS_EOL);
     }
 
-    fn ipython_escape_command_line_continuation_with_eol_and_eof(eol: &str) -> Vec<Token> {
+    fn ipython_escape_command_line_continuation_with_eol_and_eof(eol: &str) {
         let source = format!("%matplotlib \\{eol}");
-        lex_jupyter_source(&source)
+        lex_jupyter_source(&source);
     }
 
     #[test]
     fn test_ipython_escape_command_line_continuation_with_unix_eol_and_eof() {
-        assert_debug_snapshot!(ipython_escape_command_line_continuation_with_eol_and_eof(
-            UNIX_EOL
-        ));
+        ipython_escape_command_line_continuation_with_eol_and_eof(UNIX_EOL);
     }
 
     #[test]
     fn test_ipython_escape_command_line_continuation_with_mac_eol_and_eof() {
-        assert_debug_snapshot!(ipython_escape_command_line_continuation_with_eol_and_eof(
-            MAC_EOL
-        ));
+        ipython_escape_command_line_continuation_with_eol_and_eof(MAC_EOL);
     }
 
     #[test]
     fn test_ipython_escape_command_line_continuation_with_windows_eol_and_eof() {
-        assert_debug_snapshot!(ipython_escape_command_line_continuation_with_eol_and_eof(
-            WINDOWS_EOL
-        ));
+        ipython_escape_command_line_continuation_with_eol_and_eof(WINDOWS_EOL);
     }
 
     #[test]
     fn test_empty_ipython_escape_command() {
         let source = "%\n%%\n!\n!!\n?\n??\n/\n,\n;";
-        assert_debug_snapshot!(lex_jupyter_source(source));
+        lex_jupyter_source(source);
     }
 
     #[test]
@@ -1858,7 +1865,7 @@ mod tests {
 !ls
 "
         .trim();
-        assert_debug_snapshot!(lex_jupyter_source(source));
+        lex_jupyter_source(source);
     }
 
     #[test]
@@ -1883,7 +1890,7 @@ mod tests {
 %%foo???
 !pwd?"
             .trim();
-        assert_debug_snapshot!(lex_jupyter_source(source));
+        lex_jupyter_source(source);
     }
 
     #[test]
@@ -1893,7 +1900,7 @@ if True:
     %matplotlib \
         --inline"
             .trim();
-        assert_debug_snapshot!(lex_jupyter_source(source));
+        lex_jupyter_source(source);
     }
 
     #[test]
@@ -1905,7 +1912,7 @@ bar = %timeit a % 3
 baz = %matplotlib \
         inline"
             .trim();
-        assert_debug_snapshot!(lex_jupyter_source(source));
+        lex_jupyter_source(source);
     }
 
     fn assert_no_ipython_escape_command(tokens: &[Token]) {
@@ -1929,7 +1936,8 @@ foo = ,func
 def f(arg=%timeit a = b):
     pass"
             .trim();
-        let tokens = lex_jupyter_source(source);
+        let (tokens, errors) = lex(source, Mode::Ipython);
+        assert!(errors.is_empty());
         assert_no_ipython_escape_command(&tokens);
     }
 
@@ -1937,137 +1945,133 @@ def f(arg=%timeit a = b):
     fn test_numbers() {
         let source =
             "0x2f 0o12 0b1101 0 123 123_45_67_890 0.2 1e+2 2.1e3 2j 2.2j 000 0x995DC9BBDF1939FA 0x995DC9BBDF1939FA995DC9BBDF1939FA";
-        assert_debug_snapshot!(lex_source(source));
+        lex_source(source);
     }
 
     #[test]
     fn test_invalid_leading_zero_small() {
         let source = "025";
-
-        let tokens = lex_result(source, Mode::Module);
-        assert_debug_snapshot!(tokens);
+        lex_invalid(source, Mode::Module);
     }
 
     #[test]
     fn test_invalid_leading_zero_big() {
         let source =
             "0252222222222222522222222222225222222222222252222222222222522222222222225222222222222";
-
-        let tokens = lex_result(source, Mode::Module);
-        assert_debug_snapshot!(tokens);
+        lex_invalid(source, Mode::Module);
     }
 
     #[test]
     fn test_line_comment_long() {
         let source = "99232  # foo".to_string();
-        assert_debug_snapshot!(lex_source(&source));
+        lex_source(&source);
     }
 
     #[test]
     fn test_line_comment_whitespace() {
         let source = "99232  #  ".to_string();
-        assert_debug_snapshot!(lex_source(&source));
+        lex_source(&source);
     }
 
     #[test]
     fn test_line_comment_single_whitespace() {
         let source = "99232  # ".to_string();
-        assert_debug_snapshot!(lex_source(&source));
+        lex_source(&source);
     }
 
     #[test]
     fn test_line_comment_empty() {
         let source = "99232  #".to_string();
-        assert_debug_snapshot!(lex_source(&source));
+        lex_source(&source);
     }
 
-    fn comment_until_eol(eol: &str) -> Vec<Token> {
+    fn comment_until_eol(eol: &str) {
         let source = format!("123  # Foo{eol}456");
-        lex_source(&source)
+        lex_source(&source);
     }
 
     #[test]
     fn test_comment_until_unix_eol() {
-        assert_debug_snapshot!(comment_until_eol(UNIX_EOL));
+        comment_until_eol(UNIX_EOL);
     }
 
     #[test]
     fn test_comment_until_mac_eol() {
-        assert_debug_snapshot!(comment_until_eol(MAC_EOL));
+        comment_until_eol(MAC_EOL);
     }
 
     #[test]
     fn test_comment_until_windows_eol() {
-        assert_debug_snapshot!(comment_until_eol(WINDOWS_EOL));
+        comment_until_eol(WINDOWS_EOL);
     }
 
     #[test]
     fn test_assignment() {
         let source = r"a_variable = 99 + 2-0";
-        assert_debug_snapshot!(lex_source(source));
+        lex_source(source);
     }
 
-    fn indentation_with_eol(eol: &str) -> Vec<Token> {
+    fn indentation_with_eol(eol: &str) {
         let source = format!("def foo():{eol}    return 99{eol}{eol}");
-        lex_source(&source)
+        lex_source(&source);
     }
 
     #[test]
     fn test_indentation_with_unix_eol() {
-        assert_debug_snapshot!(indentation_with_eol(UNIX_EOL));
+        indentation_with_eol(UNIX_EOL);
     }
 
     #[test]
     fn test_indentation_with_mac_eol() {
-        assert_debug_snapshot!(indentation_with_eol(MAC_EOL));
+        indentation_with_eol(MAC_EOL);
     }
 
     #[test]
     fn test_indentation_with_windows_eol() {
-        assert_debug_snapshot!(indentation_with_eol(WINDOWS_EOL));
+        indentation_with_eol(WINDOWS_EOL);
     }
 
-    fn double_dedent_with_eol(eol: &str) -> Vec<Token> {
+    fn double_dedent_with_eol(eol: &str) {
         let source = format!("def foo():{eol} if x:{eol}{eol}  return 99{eol}{eol}");
-        lex_source(&source)
+        lex_source(&source);
     }
 
     #[test]
     fn test_double_dedent_with_unix_eol() {
-        assert_debug_snapshot!(double_dedent_with_eol(UNIX_EOL));
+        double_dedent_with_eol(UNIX_EOL);
     }
 
     #[test]
     fn test_double_dedent_with_mac_eol() {
-        assert_debug_snapshot!(double_dedent_with_eol(MAC_EOL));
+        double_dedent_with_eol(MAC_EOL);
     }
 
     #[test]
     fn test_double_dedent_with_windows_eol() {
-        assert_debug_snapshot!(double_dedent_with_eol(WINDOWS_EOL));
+        double_dedent_with_eol(WINDOWS_EOL);
     }
 
-    fn double_dedent_with_tabs_eol(eol: &str) -> Vec<Token> {
+    fn double_dedent_with_tabs_eol(eol: &str) {
         let source = format!("def foo():{eol}\tif x:{eol}{eol}\t\t return 99{eol}{eol}");
-        lex_source(&source)
+        lex_source(&source);
     }
 
     #[test]
     fn test_double_dedent_with_tabs_unix_eol() {
-        assert_debug_snapshot!(double_dedent_with_tabs_eol(UNIX_EOL));
+        double_dedent_with_tabs_eol(UNIX_EOL);
     }
 
     #[test]
     fn test_double_dedent_with_tabs_mac_eol() {
-        assert_debug_snapshot!(double_dedent_with_tabs_eol(MAC_EOL));
+        double_dedent_with_tabs_eol(MAC_EOL);
     }
 
     #[test]
     fn test_double_dedent_with_tabs_windows_eol() {
-        assert_debug_snapshot!(double_dedent_with_tabs_eol(WINDOWS_EOL));
+        double_dedent_with_tabs_eol(WINDOWS_EOL);
     }
 
-    fn newline_in_brackets_eol(eol: &str) -> Vec<Token> {
+    fn newline_in_brackets_eol(eol: &str) {
         let source = r"x = [
 
     1,2
@@ -2079,22 +2083,22 @@ def f(arg=%timeit a = b):
 7}]
 "
         .replace('\n', eol);
-        lex_source(&source)
+        lex_source(&source);
     }
 
     #[test]
     fn test_newline_in_brackets_unix_eol() {
-        assert_debug_snapshot!(newline_in_brackets_eol(UNIX_EOL));
+        newline_in_brackets_eol(UNIX_EOL);
     }
 
     #[test]
     fn test_newline_in_brackets_mac_eol() {
-        assert_debug_snapshot!(newline_in_brackets_eol(MAC_EOL));
+        newline_in_brackets_eol(MAC_EOL);
     }
 
     #[test]
     fn test_newline_in_brackets_windows_eol() {
-        assert_debug_snapshot!(newline_in_brackets_eol(WINDOWS_EOL));
+        newline_in_brackets_eol(WINDOWS_EOL);
     }
 
     #[test]
@@ -2106,58 +2110,57 @@ def f(arg=%timeit a = b):
     'c' \
     'd'
 )";
-        assert_debug_snapshot!(lex_source(source));
+        lex_source(source);
     }
 
     #[test]
     fn test_logical_newline_line_comment() {
         let source = "#Hello\n#World\n";
-        assert_debug_snapshot!(lex_source(source));
+        lex_source(source);
     }
 
     #[test]
     fn test_operators() {
         let source = "//////=/ /";
-        assert_debug_snapshot!(lex_source(source));
+        lex_source(source);
     }
 
     #[test]
     fn test_string() {
         let source = r#""double" 'single' 'can\'t' "\\\"" '\t\r\n' '\g' r'raw\'' '\420' '\200\0a'"#;
-        assert_debug_snapshot!(lex_source(source));
+        lex_source(source);
     }
 
-    fn string_continuation_with_eol(eol: &str) -> Vec<Token> {
+    fn string_continuation_with_eol(eol: &str) {
         let source = format!("\"abc\\{eol}def\"");
-        lex_source(&source)
+        lex_source(&source);
     }
 
     #[test]
     fn test_string_continuation_with_unix_eol() {
-        assert_debug_snapshot!(string_continuation_with_eol(UNIX_EOL));
+        string_continuation_with_eol(UNIX_EOL);
     }
 
     #[test]
     fn test_string_continuation_with_mac_eol() {
-        assert_debug_snapshot!(string_continuation_with_eol(MAC_EOL));
+        string_continuation_with_eol(MAC_EOL);
     }
 
     #[test]
     fn test_string_continuation_with_windows_eol() {
-        assert_debug_snapshot!(string_continuation_with_eol(WINDOWS_EOL));
+        string_continuation_with_eol(WINDOWS_EOL);
     }
 
     #[test]
     fn test_escape_unicode_name() {
         let source = r#""\N{EN SPACE}""#;
-        assert_debug_snapshot!(lex_source(source));
+        lex_source(source);
     }
 
     fn get_tokens_only(source: &str) -> Vec<TokenKind> {
-        lex_source(source)
-            .into_iter()
-            .map(|token| token.kind())
-            .collect()
+        let (tokens, errors) = lex(source, Mode::Module);
+        assert!(errors.is_empty());
+        tokens.into_iter().map(|token| token.kind()).collect()
     }
 
     #[test]
@@ -2167,24 +2170,24 @@ def f(arg=%timeit a = b):
         assert_eq!(get_tokens_only(source1), get_tokens_only(source2));
     }
 
-    fn triple_quoted_eol(eol: &str) -> Vec<Token> {
+    fn triple_quoted_eol(eol: &str) {
         let source = format!("\"\"\"{eol} test string{eol} \"\"\"");
-        lex_source(&source)
+        lex_source(&source);
     }
 
     #[test]
     fn test_triple_quoted_unix_eol() {
-        assert_debug_snapshot!(triple_quoted_eol(UNIX_EOL));
+        triple_quoted_eol(UNIX_EOL);
     }
 
     #[test]
     fn test_triple_quoted_mac_eol() {
-        assert_debug_snapshot!(triple_quoted_eol(MAC_EOL));
+        triple_quoted_eol(MAC_EOL);
     }
 
     #[test]
     fn test_triple_quoted_windows_eol() {
-        assert_debug_snapshot!(triple_quoted_eol(WINDOWS_EOL));
+        triple_quoted_eol(WINDOWS_EOL);
     }
 
     // This test case is to just make sure that the lexer doesn't go into
@@ -2192,124 +2195,112 @@ def f(arg=%timeit a = b):
     #[test]
     fn test_infinite_loop() {
         let source = "[1";
-        let _ = lex_result(source, Mode::Module);
+        lex_invalid(source, Mode::Module);
     }
 
     /// Emoji identifiers are a non-standard python feature and are not supported by our lexer.
     #[test]
     fn test_emoji_identifier() {
         let source = "🐦";
-
-        let lexed = lex_result(source, Mode::Module);
-
-        match lexed.as_slice() {
-            [Err(error)] => {
-                assert_eq!(
-                    error.error(),
-                    &LexicalErrorType::UnrecognizedToken { tok: '🐦' }
-                );
-            }
-            result => panic!("Expected an error token but found {result:?}"),
-        }
+        lex_invalid(source, Mode::Module);
     }
 
     #[test]
     fn tet_too_low_dedent() {
-        let tokens = lex_result(
+        lex_invalid(
             "if True:
     pass
   pass",
             Mode::Module,
         );
-        assert_debug_snapshot!(tokens);
     }
 
     #[test]
     fn test_empty_fstrings() {
         let source = r#"f"" "" F"" f'' '' f"""""" f''''''"#;
-        assert_debug_snapshot!(lex_source(source));
+        lex_source(source);
     }
 
     #[test]
     fn test_fstring_prefix() {
         let source = r#"f"" F"" rf"" rF"" Rf"" RF"" fr"" Fr"" fR"" FR"""#;
-        assert_debug_snapshot!(lex_source(source));
+        lex_source(source);
     }
 
     #[test]
     fn test_fstring() {
         let source = r#"f"normal {foo} {{another}} {bar} {{{three}}}""#;
-        assert_debug_snapshot!(lex_source(source));
+        lex_source(source);
     }
 
     #[test]
     fn test_fstring_parentheses() {
         let source = r#"f"{}" f"{{}}" f" {}" f"{{{}}}" f"{{{{}}}}" f" {} {{}} {{{}}} {{{{}}}}  ""#;
-        assert_debug_snapshot!(lex_source(source));
+        lex_source(source);
     }
 
-    fn fstring_single_quote_escape_eol(eol: &str) -> Vec<Token> {
+    fn fstring_single_quote_escape_eol(eol: &str) {
         let source = format!(r"f'text \{eol} more text'");
-        lex_source(&source)
+        lex_source(&source);
     }
 
     #[test]
     fn test_fstring_single_quote_escape_unix_eol() {
-        assert_debug_snapshot!(fstring_single_quote_escape_eol(UNIX_EOL));
+        fstring_single_quote_escape_eol(UNIX_EOL);
     }
 
     #[test]
     fn test_fstring_single_quote_escape_mac_eol() {
-        assert_debug_snapshot!(fstring_single_quote_escape_eol(MAC_EOL));
+        fstring_single_quote_escape_eol(MAC_EOL);
     }
 
     #[test]
     fn test_fstring_single_quote_escape_windows_eol() {
-        assert_debug_snapshot!(fstring_single_quote_escape_eol(WINDOWS_EOL));
+        fstring_single_quote_escape_eol(WINDOWS_EOL);
     }
 
     #[test]
     fn test_fstring_escape() {
         let source = r#"f"\{x:\"\{x}} \"\"\
  end""#;
-        assert_debug_snapshot!(lex_source(source));
+        lex_source(source);
     }
 
     #[test]
     fn test_fstring_escape_braces() {
         let source = r"f'\{foo}' f'\\{foo}' f'\{{foo}}' f'\\{{foo}}'";
-        assert_debug_snapshot!(lex_source(source));
+        lex_source(source);
     }
 
     #[test]
     fn test_fstring_escape_raw() {
         let source = r#"rf"\{x:\"\{x}} \"\"\
  end""#;
-        assert_debug_snapshot!(lex_source(source));
+        lex_source(source);
     }
 
     #[test]
     fn test_fstring_named_unicode() {
         let source = r#"f"\N{BULLET} normal \Nope \N""#;
-        assert_debug_snapshot!(lex_source(source));
+        lex_source(source);
     }
 
     #[test]
     fn test_fstring_named_unicode_raw() {
         let source = r#"rf"\N{BULLET} normal""#;
-        assert_debug_snapshot!(lex_source(source));
+        lex_source(source);
     }
 
     #[test]
     fn test_fstring_with_named_expression() {
         let source = r#"f"{x:=10} {(x:=10)} {x,{y:=10}} {[x:=10]}""#;
-        assert_debug_snapshot!(lex_source(source));
+        lex_source(source);
     }
 
     #[test]
     fn test_fstring_with_format_spec() {
         let source = r#"f"{foo:} {x=!s:.3f} {x:.{y}f} {'':*^{1:{1}}} {x:{{1}.pop()}}""#;
-        assert_debug_snapshot!(lex_source(source));
+        lex_source(source);
     }
 
     #[test]
@@ -2332,19 +2323,19 @@ f'__{
         b
 }__'
 ";
-        assert_debug_snapshot!(lex_source(source));
+        lex_source(source);
     }
 
     #[test]
     fn test_fstring_conversion() {
         let source = r#"f"{x!s} {x=!r} {x:.3f!r} {{x!r}}""#;
-        assert_debug_snapshot!(lex_source(source));
+        lex_source(source);
     }
 
     #[test]
     fn test_fstring_nested() {
         let source = r#"f"foo {f"bar {x + f"{wow}"}"} baz" f'foo {f'bar'} some {f"another"}'"#;
-        assert_debug_snapshot!(lex_source(source));
+        lex_source(source);
     }
 
     #[test]
@@ -2354,7 +2345,7 @@ f'__{
         *
             y
 } second""#;
-        assert_debug_snapshot!(lex_source(source));
+        lex_source(source);
     }
 
     #[test]
@@ -2367,7 +2358,7 @@ hello
 hello
 ''' f"some {f"""multiline
 allowed {x}"""} string""#;
-        assert_debug_snapshot!(lex_source(source));
+        lex_source(source);
     }
 
     #[test]
@@ -2377,13 +2368,13 @@ allowed {x}"""} string""#;
     x
 } # not a comment
 """"#;
-        assert_debug_snapshot!(lex_source(source));
+        lex_source(source);
     }
 
     #[test]
     fn test_fstring_with_ipy_escape_command() {
         let source = r#"f"foo {!pwd} bar""#;
-        assert_debug_snapshot!(lex_source(source));
+        lex_source(source);
     }
 
     #[test]
@@ -2393,13 +2384,13 @@ f"{lambda x:{x}}"
 f"{(lambda x:{x})}"
 "#
         .trim();
-        assert_debug_snapshot!(lex_source(source));
+        lex_source(source);
     }
 
     #[test]
     fn test_fstring_with_nul_char() {
         let source = r"f'\0'";
-        assert_debug_snapshot!(lex_source(source));
+        lex_source(source);
     }
 
     #[test]
@@ -2407,21 +2398,17 @@ f"{(lambda x:{x})}"
         let source = r"match foo:
     case bar:
         pass";
-        assert_debug_snapshot!(lex_jupyter_source(source));
-    }
-
-    fn lex_error(source: &str) -> LexicalError {
-        match lex_result(source, Mode::Module)
-            .into_iter()
-            .find_map(Result::err)
-        {
-            Some(err) => err,
-            _ => panic!("Expected at least one error"),
-        }
+        lex_jupyter_source(source);
     }
 
     fn lex_fstring_error(source: &str) -> FStringErrorType {
-        match lex_error(source).into_error() {
+        let (_, errors) = lex(source, Mode::Module);
+        match errors
+            .into_iter()
+            .next()
+            .expect("lexer should give at least one error")
+            .into_error()
+        {
             LexicalErrorType::FStringError(error) => error,
             err => panic!("Expected FStringError: {err:?}"),
         }
