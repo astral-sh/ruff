@@ -1,17 +1,15 @@
 #![allow(dead_code)]
-
-use rustc_hash::FxHashMap;
-
-pub(crate) use infer::infer_symbol_type;
-use ruff_index::{newtype_index, IndexVec};
-
 use crate::ast_ids::NodeKey;
 use crate::db::{QueryResult, SemanticDb, SemanticJar};
 use crate::files::FileId;
-use crate::symbols::{symbol_table, ScopeId, SymbolId};
+use crate::symbols::{symbol_table, GlobalSymbolId, ScopeId, ScopeKind, SymbolId};
 use crate::{FxDashMap, FxIndexSet, Name};
+use ruff_index::{newtype_index, IndexVec};
+use rustc_hash::FxHashMap;
 
 pub(crate) mod infer;
+
+pub(crate) use infer::{infer_definition_type, infer_symbol_type};
 
 /// unique ID for a type
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
@@ -82,10 +80,10 @@ impl TypeStore {
         self.modules.remove(&file_id);
     }
 
-    pub fn cache_symbol_type(&self, file_id: FileId, symbol_id: SymbolId, ty: Type) {
-        self.add_or_get_module(file_id)
+    pub fn cache_symbol_type(&self, symbol: GlobalSymbolId, ty: Type) {
+        self.add_or_get_module(symbol.file_id)
             .symbol_types
-            .insert(symbol_id, ty);
+            .insert(symbol.symbol_id, ty);
     }
 
     pub fn cache_node_type(&self, file_id: FileId, node_key: NodeKey, ty: Type) {
@@ -94,10 +92,10 @@ impl TypeStore {
             .insert(node_key, ty);
     }
 
-    pub fn get_cached_symbol_type(&self, file_id: FileId, symbol_id: SymbolId) -> Option<Type> {
-        self.try_get_module(file_id)?
+    pub fn get_cached_symbol_type(&self, symbol: GlobalSymbolId) -> Option<Type> {
+        self.try_get_module(symbol.file_id)?
             .symbol_types
-            .get(&symbol_id)
+            .get(&symbol.symbol_id)
             .copied()
     }
 
@@ -122,9 +120,16 @@ impl TypeStore {
         self.modules.get(&file_id)
     }
 
-    fn add_function(&self, file_id: FileId, name: &str, decorators: Vec<Type>) -> FunctionTypeId {
+    fn add_function(
+        &self,
+        file_id: FileId,
+        name: &str,
+        symbol_id: SymbolId,
+        scope_id: ScopeId,
+        decorators: Vec<Type>,
+    ) -> FunctionTypeId {
         self.add_or_get_module(file_id)
-            .add_function(name, decorators)
+            .add_function(name, symbol_id, scope_id, decorators)
     }
 
     fn add_class(
@@ -257,6 +262,80 @@ pub struct FunctionTypeId {
     func_id: ModuleFunctionTypeId,
 }
 
+impl FunctionTypeId {
+    fn function(self, db: &dyn SemanticDb) -> QueryResult<FunctionTypeRef> {
+        let jar: &SemanticJar = db.jar()?;
+        Ok(jar.type_store.get_function(self))
+    }
+
+    pub(crate) fn name(self, db: &dyn SemanticDb) -> QueryResult<Name> {
+        Ok(self.function(db)?.name().into())
+    }
+
+    pub(crate) fn global_symbol(self, db: &dyn SemanticDb) -> QueryResult<GlobalSymbolId> {
+        Ok(GlobalSymbolId {
+            file_id: self.file(),
+            symbol_id: self.symbol(db)?,
+        })
+    }
+
+    pub(crate) fn file(self) -> FileId {
+        self.file_id
+    }
+
+    pub(crate) fn symbol(self, db: &dyn SemanticDb) -> QueryResult<SymbolId> {
+        let FunctionType { symbol_id, .. } = *self.function(db)?;
+        Ok(symbol_id)
+    }
+
+    pub(crate) fn get_containing_class(
+        self,
+        db: &dyn SemanticDb,
+    ) -> QueryResult<Option<ClassTypeId>> {
+        let table = symbol_table(db, self.file_id)?;
+        let FunctionType { symbol_id, .. } = *self.function(db)?;
+        let scope_id = symbol_id.symbol(&table).scope_id();
+        let scope = scope_id.scope(&table);
+        if !matches!(scope.kind(), ScopeKind::Class) {
+            return Ok(None);
+        };
+        let Some(def) = scope.definition() else {
+            return Ok(None);
+        };
+        let Some(symbol_id) = scope.defining_symbol() else {
+            return Ok(None);
+        };
+        let Type::Class(class) = infer_definition_type(
+            db,
+            GlobalSymbolId {
+                file_id: self.file_id,
+                symbol_id,
+            },
+            def,
+        )?
+        else {
+            return Ok(None);
+        };
+        Ok(Some(class))
+    }
+
+    pub(crate) fn has_decorator(
+        self,
+        db: &dyn SemanticDb,
+        decorator_symbol: GlobalSymbolId,
+    ) -> QueryResult<bool> {
+        for deco_ty in self.function(db)?.decorators() {
+            let Type::Function(deco_func) = deco_ty else {
+                continue;
+            };
+            if deco_func.global_symbol(db)? == decorator_symbol {
+                return Ok(true);
+            }
+        }
+        Ok(false)
+    }
+}
+
 #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
 pub struct ClassTypeId {
     file_id: FileId,
@@ -264,14 +343,47 @@ pub struct ClassTypeId {
 }
 
 impl ClassTypeId {
-    fn get_own_class_member(self, db: &dyn SemanticDb, name: &Name) -> QueryResult<Option<Type>> {
+    fn class(self, db: &dyn SemanticDb) -> QueryResult<ClassTypeRef> {
         let jar: &SemanticJar = db.jar()?;
+        Ok(jar.type_store.get_class(self))
+    }
 
+    pub(crate) fn name(self, db: &dyn SemanticDb) -> QueryResult<Name> {
+        Ok(self.class(db)?.name().into())
+    }
+
+    pub(crate) fn get_super_class_member(
+        self,
+        db: &dyn SemanticDb,
+        name: &Name,
+    ) -> QueryResult<Option<Type>> {
+        // TODO we should linearize the MRO instead of doing this recursively
+        let class = self.class(db)?;
+        for base in class.bases() {
+            if let Type::Class(base) = base {
+                if let Some(own_member) = base.get_own_class_member(db, name)? {
+                    return Ok(Some(own_member));
+                }
+                if let Some(base_member) = base.get_super_class_member(db, name)? {
+                    return Ok(Some(base_member));
+                }
+            }
+        }
+        Ok(None)
+    }
+
+    fn get_own_class_member(self, db: &dyn SemanticDb, name: &Name) -> QueryResult<Option<Type>> {
         // TODO: this should distinguish instance-only members (e.g. `x: int`) and not return them
-        let ClassType { scope_id, .. } = *jar.type_store.get_class(self);
+        let ClassType { scope_id, .. } = *self.class(db)?;
         let table = symbol_table(db, self.file_id)?;
         if let Some(symbol_id) = table.symbol_id_by_name(scope_id, name) {
-            Ok(Some(infer_symbol_type(db, self.file_id, symbol_id)?))
+            Ok(Some(infer_symbol_type(
+                db,
+                GlobalSymbolId {
+                    file_id: self.file_id,
+                    symbol_id,
+                },
+            )?))
         } else {
             Ok(None)
         }
@@ -334,9 +446,17 @@ impl ModuleTypeStore {
         }
     }
 
-    fn add_function(&mut self, name: &str, decorators: Vec<Type>) -> FunctionTypeId {
+    fn add_function(
+        &mut self,
+        name: &str,
+        symbol_id: SymbolId,
+        scope_id: ScopeId,
+        decorators: Vec<Type>,
+    ) -> FunctionTypeId {
         let func_id = self.functions.push(FunctionType {
             name: Name::new(name),
+            symbol_id,
+            scope_id,
             decorators,
         });
         FunctionTypeId {
@@ -436,7 +556,7 @@ pub(crate) struct ClassType {
     /// Name of the class at definition
     name: Name,
     /// `ScopeId` of the class body
-    pub(crate) scope_id: ScopeId,
+    scope_id: ScopeId,
     /// Types of all class bases
     bases: Vec<Type>,
 }
@@ -453,7 +573,13 @@ impl ClassType {
 
 #[derive(Debug)]
 pub(crate) struct FunctionType {
+    /// name of the function at definition
     name: Name,
+    /// symbol which this function is a definition of
+    symbol_id: SymbolId,
+    /// scope of this function's body
+    scope_id: ScopeId,
+    /// types of all decorators on this function
     decorators: Vec<Type>,
 }
 
@@ -462,7 +588,11 @@ impl FunctionType {
         self.name.as_str()
     }
 
-    fn decorators(&self) -> &[Type] {
+    fn scope_id(&self) -> ScopeId {
+        self.scope_id
+    }
+
+    pub(crate) fn decorators(&self) -> &[Type] {
         self.decorators.as_slice()
     }
 }
@@ -493,12 +623,12 @@ impl UnionType {
 // directly in intersections rather than as a separate type. This sacrifices some efficiency in the
 // case where a Not appears outside an intersection (unclear when that could even happen, but we'd
 // have to represent it as a single-element intersection if it did) in exchange for better
-// efficiency in the not-within-intersection case.
+// efficiency in the within-intersection case.
 #[derive(Debug)]
 pub(crate) struct IntersectionType {
     // the intersection type includes only values in all of these types
     positive: FxIndexSet<Type>,
-    // negated elements of the intersection, e.g.
+    // the intersection type does not include any value in any of these types
     negative: FxIndexSet<Type>,
 }
 
@@ -530,7 +660,7 @@ mod tests {
     use std::path::Path;
 
     use crate::files::Files;
-    use crate::symbols::SymbolTable;
+    use crate::symbols::{SymbolFlags, SymbolTable};
     use crate::types::{Type, TypeStore};
     use crate::FxIndexSet;
 
@@ -550,7 +680,20 @@ mod tests {
         let store = TypeStore::default();
         let files = Files::default();
         let file_id = files.intern(Path::new("/foo"));
-        let id = store.add_function(file_id, "func", vec![Type::Unknown]);
+        let mut table = SymbolTable::new();
+        let func_symbol = table.add_or_update_symbol(
+            SymbolTable::root_scope_id(),
+            "func",
+            SymbolFlags::IS_DEFINED,
+        );
+
+        let id = store.add_function(
+            file_id,
+            "func",
+            func_symbol,
+            SymbolTable::root_scope_id(),
+            vec![Type::Unknown],
+        );
         assert_eq!(store.get_function(id).name(), "func");
         assert_eq!(store.get_function(id).decorators(), vec![Type::Unknown]);
         let func = Type::Function(id);
