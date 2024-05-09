@@ -57,7 +57,7 @@ pub(crate) fn missing_or_outdented_indentation(
     let mut indentation = indent_level;
     // Start by increasing indent on any continuation line
     let mut desired_indentation = indentation + tab_size;
-    let mut indent_increased = true;
+    let mut indentation_changed = true;
     let mut indentation_stack: std::vec::Vec<usize> = Vec::new();
 
     let mut iter = line.tokens().iter().peekable();
@@ -65,8 +65,9 @@ pub(crate) fn missing_or_outdented_indentation(
         // If continuation line
         if token.start() >= line_end {
             // Reset and calculate current indentation
-            indent_increased = false;
-            indentation = expand_indent(locator.line(token.start()), indent_width);
+            indentation_changed = false;
+            let range = TextRange::new(locator.line_start(token.start()), token.start());
+            indentation = expand_indent(locator.slice(range), indent_width);
 
             // Calculate correct indentation
             let correct_indentation = if first_token_is_closing_bracket(token, iter.peek().copied())
@@ -87,10 +88,7 @@ pub(crate) fn missing_or_outdented_indentation(
             };
 
             if indentation < correct_indentation {
-                let diagnostic = Diagnostic::new(
-                    MissingOrOutdentedIndentation,
-                    TextRange::new(locator.line_start(token.start()), token.start()),
-                );
+                let diagnostic = Diagnostic::new(MissingOrOutdentedIndentation, range);
                 context.push_diagnostic(diagnostic);
             }
 
@@ -102,9 +100,9 @@ pub(crate) fn missing_or_outdented_indentation(
                 // Store indent to return to once bracket closes
                 indentation_stack.push(desired_indentation);
                 // Only increase the indent once per continuation line
-                if !indent_increased {
+                if !indentation_changed {
                     desired_indentation += tab_size;
-                    indent_increased = true;
+                    indentation_changed = true;
                 }
             }
             TokenKind::Rpar | TokenKind::Rsqb | TokenKind::Rbrace => {
@@ -112,6 +110,7 @@ pub(crate) fn missing_or_outdented_indentation(
                 desired_indentation = indentation_stack
                     .pop()
                     .expect("Closing brackets should always be preceded by opening brackets");
+                indentation_changed = true;
             }
             _ => {}
         }

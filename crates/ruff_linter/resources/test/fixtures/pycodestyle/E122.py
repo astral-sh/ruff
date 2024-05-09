@@ -141,3 +141,22 @@ def f():
         )
     )
         + 2)
+
+# OK
+def target(
+    self,
+) -> Union[
+    Guild,
+    Member,
+    User,
+]:
+    ...
+
+# OK
+x = [
+    [
+        1
+    ], [
+        1
+    ]
+]
