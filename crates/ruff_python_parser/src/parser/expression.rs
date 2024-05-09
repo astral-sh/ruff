@@ -460,7 +460,7 @@ impl<'src> Parser<'src> {
         let range = self.current_token_range();
 
         if self.at(TokenKind::Name) {
-            let TokenValue::Name(name) = self.take_value(TokenKind::Name) else {
+            let TokenValue::Name(name) = self.bump_value(TokenKind::Name) else {
                 unreachable!();
             };
             return ast::Identifier {
@@ -499,7 +499,7 @@ impl<'src> Parser<'src> {
 
         let lhs = match self.current_token_kind() {
             TokenKind::Float => {
-                let TokenValue::Float(value) = self.take_value(TokenKind::Float) else {
+                let TokenValue::Float(value) = self.bump_value(TokenKind::Float) else {
                     unreachable!()
                 };
 
@@ -509,7 +509,7 @@ impl<'src> Parser<'src> {
                 })
             }
             TokenKind::Complex => {
-                let TokenValue::Complex { real, imag } = self.take_value(TokenKind::Complex) else {
+                let TokenValue::Complex { real, imag } = self.bump_value(TokenKind::Complex) else {
                     unreachable!()
                 };
                 Expr::NumberLiteral(ast::ExprNumberLiteral {
@@ -518,7 +518,7 @@ impl<'src> Parser<'src> {
                 })
             }
             TokenKind::Int => {
-                let TokenValue::Int(value) = self.take_value(TokenKind::Int) else {
+                let TokenValue::Int(value) = self.bump_value(TokenKind::Int) else {
                     unreachable!()
                 };
                 Expr::NumberLiteral(ast::ExprNumberLiteral {
@@ -1230,7 +1230,7 @@ impl<'src> Parser<'src> {
     /// See: <https://docs.python.org/3.13/reference/lexical_analysis.html#string-and-bytes-literals>
     fn parse_string_or_byte_literal(&mut self) -> StringType {
         let range = self.current_token_range();
-        let TokenValue::String { value, flags } = self.take_value(TokenKind::String) else {
+        let TokenValue::String { value, flags } = self.bump_value(TokenKind::String) else {
             unreachable!()
         };
 
@@ -1277,7 +1277,7 @@ impl<'src> Parser<'src> {
     fn parse_fstring(&mut self) -> ast::FString {
         let start = self.node_start();
 
-        let TokenValue::FStringStart(kind) = self.take_value(TokenKind::FStringStart) else {
+        let TokenValue::FStringStart(kind) = self.bump_value(TokenKind::FStringStart) else {
             unreachable!()
         };
         let elements = self.parse_fstring_elements();
@@ -1307,7 +1307,7 @@ impl<'src> Parser<'src> {
                 TokenKind::FStringMiddle => {
                     let range = parser.current_token_range();
                     let TokenValue::FStringMiddle { value, flags, .. } =
-                        parser.take_value(TokenKind::FStringMiddle)
+                        parser.bump_value(TokenKind::FStringMiddle)
                     else {
                         unreachable!()
                     };
@@ -1398,7 +1398,7 @@ impl<'src> Parser<'src> {
         let conversion = if self.eat(TokenKind::Exclamation) {
             let conversion_flag_range = self.current_token_range();
             if self.at(TokenKind::Name) {
-                let TokenValue::Name(name) = self.take_value(TokenKind::Name) else {
+                let TokenValue::Name(name) = self.bump_value(TokenKind::Name) else {
                     unreachable!();
                 };
                 match &*name {
@@ -2234,7 +2234,7 @@ impl<'src> Parser<'src> {
         let start = self.node_start();
 
         let TokenValue::IpyEscapeCommand { value, kind } =
-            self.take_value(TokenKind::IpyEscapeCommand)
+            self.bump_value(TokenKind::IpyEscapeCommand)
         else {
             unreachable!()
         };

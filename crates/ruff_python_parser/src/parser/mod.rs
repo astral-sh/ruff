@@ -370,7 +370,7 @@ impl<'src> Parser<'src> {
         }
     }
 
-    fn take_value(&mut self, kind: TokenKind) -> TokenValue {
+    fn bump_value(&mut self, kind: TokenKind) -> TokenValue {
         let value = self.tokens.take_value();
         self.bump(kind);
         value
@@ -403,8 +403,14 @@ impl<'src> Parser<'src> {
             return true;
         }
 
-        let (found, range) = (self.current_token_kind(), self.current_token_range());
-        self.add_error(ParseErrorType::ExpectedToken { found, expected }, range);
+        self.add_error(
+            ParseErrorType::ExpectedToken {
+                found: self.current_token_kind(),
+                expected,
+            },
+            self.current_token_range(),
+        );
+
         false
     }
 

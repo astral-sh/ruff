@@ -398,7 +398,7 @@ impl<'src> Parser<'src> {
                 })
             }
             TokenKind::Complex => {
-                let TokenValue::Complex { real, imag } = self.take_value(TokenKind::Complex) else {
+                let TokenValue::Complex { real, imag } = self.bump_value(TokenKind::Complex) else {
                     unreachable!()
                 };
                 let range = self.node_range(start);
@@ -412,7 +412,7 @@ impl<'src> Parser<'src> {
                 })
             }
             TokenKind::Int => {
-                let TokenValue::Int(value) = self.take_value(TokenKind::Int) else {
+                let TokenValue::Int(value) = self.bump_value(TokenKind::Int) else {
                     unreachable!()
                 };
                 let range = self.node_range(start);
@@ -426,7 +426,7 @@ impl<'src> Parser<'src> {
                 })
             }
             TokenKind::Float => {
-                let TokenValue::Float(value) = self.take_value(TokenKind::Float) else {
+                let TokenValue::Float(value) = self.bump_value(TokenKind::Float) else {
                     unreachable!()
                 };
                 let range = self.node_range(start);
@@ -440,7 +440,7 @@ impl<'src> Parser<'src> {
                 })
             }
             TokenKind::Name if self.peek() == TokenKind::Dot => {
-                let TokenValue::Name(name) = self.take_value(TokenKind::Name) else {
+                let TokenValue::Name(name) = self.bump_value(TokenKind::Name) else {
                     unreachable!()
                 };
                 let id = Expr::Name(ast::ExprName {
@@ -457,7 +457,7 @@ impl<'src> Parser<'src> {
                 })
             }
             TokenKind::Name => {
-                let TokenValue::Name(name) = self.take_value(TokenKind::Name) else {
+                let TokenValue::Name(name) = self.bump_value(TokenKind::Name) else {
                     unreachable!()
                 };
                 let range = self.node_range(start);

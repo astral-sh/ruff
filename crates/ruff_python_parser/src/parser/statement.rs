@@ -874,7 +874,7 @@ impl<'src> Parser<'src> {
         let start = self.node_start();
 
         let TokenValue::IpyEscapeCommand { value, kind } =
-            self.take_value(TokenKind::IpyEscapeCommand)
+            self.bump_value(TokenKind::IpyEscapeCommand)
         else {
             unreachable!()
         };
