@@ -162,7 +162,22 @@ x = [
 ]
 
 # OK
-EXPLAIN_QUERY = """
-EXPLAIN header=1, indexes=1
-%(query)s
+QUERY_EXECUTION_COUNT_SQL = f"""
+SELECT day_start, sum(total) AS total FROM (
+    SELECT
+        0 AS total,
+        toStartOfDay(now() - toIntervalDay(number)) AS day_start
+    FROM numbers(dateDiff('day', toStartOfDay(now()  - INTERVAL %(days)s day), now()))
+    UNION ALL
+    SELECT
+        count(*) AS total,
+        toStartOfDay(query_start_time) AS day_start
+    FROM
+        {QUERY_LOG_SYSTEM_TABLE}
+    WHERE
+        query_start_time > now() - INTERVAL %(days)s day AND type = 2 AND is_initial_query %(conditions)s
+    GROUP BY day_start
+)
+GROUP BY day_start
+ORDER BY day_start asc
 """

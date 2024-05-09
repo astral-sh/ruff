@@ -60,8 +60,7 @@ pub(crate) fn missing_or_outdented_indentation(
     let mut indentation_changed = true;
     let mut indentation_stack: std::vec::Vec<usize> = Vec::new();
 
-    let mut iter = line.tokens().iter().peekable();
-    while let Some(token) = iter.next() {
+    for token in line.tokens() {
         // If continuation line
         if token.start() >= line_end {
             // Reset and calculate current indentation
@@ -70,9 +69,8 @@ pub(crate) fn missing_or_outdented_indentation(
             indentation = expand_indent(locator.slice(range), indent_width);
 
             // Calculate correct indentation
-            let correct_indentation = if first_token_is_closing_bracket(token, iter.peek().copied())
-            {
-                // If first non-indent token is a closing bracket
+            let correct_indentation = if token_is_closing(token) {
+                // If first token is a closing bracket or fstring-end
                 // then the correct indentation is the one on top of the stack
                 // unless we are back at the starting indentation in which case
                 // the initial indentation is correct.
@@ -117,19 +115,9 @@ pub(crate) fn missing_or_outdented_indentation(
     }
 }
 
-fn first_token_is_closing_bracket(
-    first_token: &LogicalLineToken,
-    second_token: Option<&LogicalLineToken>,
-) -> bool {
-    match first_token.kind {
-        TokenKind::Rpar | TokenKind::Rsqb | TokenKind::Rbrace => true,
-        TokenKind::Indent => {
-            second_token.is_some()
-                && matches!(
-                    second_token.unwrap().kind,
-                    TokenKind::Rpar | TokenKind::Rsqb | TokenKind::Rbrace
-                )
-        }
-        _ => false,
-    }
+fn token_is_closing(token: &LogicalLineToken) -> bool {
+    matches!(
+        token.kind,
+        TokenKind::Rpar | TokenKind::Rsqb | TokenKind::Rbrace | TokenKind::FStringEnd
+    )
 }
