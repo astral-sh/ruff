@@ -12,8 +12,8 @@ from pathlib import Path
 from subprocess import check_call, check_output
 from tempfile import TemporaryDirectory
 
-schemastore_fork = "git@github.com:astral-sh/schemastore.git"
-schemastore_upstream = "git@github.com:SchemaStore/schemastore.git"
+schemastore_fork = "https://github.com/astral-sh/schemastore.git"
+schemastore_upstream = "https://github.com/SchemaStore/schemastore.git"
 ruff_repo = "https://github.com/astral-sh/ruff"
 root = Path(
     check_output(["git", "rev-parse", "--show-toplevel"], text=True).strip(),
@@ -23,7 +23,7 @@ ruff_json = Path("schemas/json/ruff.json")
 
 def update_schemastore(schemastore: Path) -> None:
     if not schemastore.is_dir():
-        check_call(["git", "clone", schemastore_fork, schemastore])
+        check_call(["git", "clone", schemastore_fork, schemastore, "--depth=1"])
         check_call(
             [
                 "git",
