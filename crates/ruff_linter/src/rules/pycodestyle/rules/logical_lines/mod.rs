@@ -1,5 +1,6 @@
 pub(crate) use extraneous_whitespace::*;
 pub(crate) use indentation::*;
+pub(crate) use missing_or_outdented_indentation::*;
 pub(crate) use missing_whitespace::*;
 pub(crate) use missing_whitespace_after_keyword::*;
 pub(crate) use missing_whitespace_around_operator::*;
@@ -23,6 +24,7 @@ use ruff_source_file::Locator;
 
 mod extraneous_whitespace;
 mod indentation;
+mod missing_or_outdented_indentation;
 mod missing_whitespace;
 mod missing_whitespace_after_keyword;
 mod missing_whitespace_around_operator;

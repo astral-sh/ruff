@@ -1,4 +1,5 @@
 use crate::line_width::IndentWidth;
+use crate::registry::Rule;
 use ruff_diagnostics::Diagnostic;
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
@@ -9,10 +10,11 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::registry::AsRule;
 use crate::rules::pycodestyle::rules::logical_lines::{
-    extraneous_whitespace, indentation, missing_whitespace, missing_whitespace_after_keyword,
-    missing_whitespace_around_operator, redundant_backslash, space_after_comma,
-    space_around_operator, whitespace_around_keywords, whitespace_around_named_parameter_equals,
-    whitespace_before_comment, whitespace_before_parameters, LogicalLines, TokenFlags,
+    extraneous_whitespace, indentation, missing_or_outdented_indentation, missing_whitespace,
+    missing_whitespace_after_keyword, missing_whitespace_around_operator, redundant_backslash,
+    space_after_comma, space_around_operator, whitespace_around_keywords,
+    whitespace_around_named_parameter_equals, whitespace_before_comment,
+    whitespace_before_parameters, LogicalLines, TokenFlags,
 };
 use crate::settings::LinterSettings;
 
@@ -104,6 +106,16 @@ pub(crate) fn check_logical_lines(
             if settings.rules.enabled(kind.rule()) {
                 context.push_diagnostic(Diagnostic::new(kind, range));
             }
+        }
+
+        if settings.rules.enabled(Rule::MissingOrOutdentedIndentation) {
+            missing_or_outdented_indentation(
+                &line,
+                indent_level,
+                settings.tab_size,
+                locator,
+                &mut context,
+            );
         }
 
         if !line.is_comment_only() {

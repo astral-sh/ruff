@@ -42,6 +42,7 @@ KNOWN_FORMATTING_VIOLATIONS = [
     "indent-with-spaces",
     "indentation-with-invalid-multiple",
     "line-too-long",
+    "missing-or-outdented-indentation",
     "missing-trailing-comma",
     "missing-whitespace",
     "missing-whitespace-after-keyword",
