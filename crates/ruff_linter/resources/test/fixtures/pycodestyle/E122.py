@@ -160,3 +160,9 @@ x = [
         1
     ]
 ]
+
+# OK
+EXPLAIN_QUERY = """
+EXPLAIN header=1, indexes=1
+%(query)s
+"""

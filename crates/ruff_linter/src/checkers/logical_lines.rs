@@ -114,7 +114,11 @@ pub(crate) fn check_logical_lines(
         }
 
         if settings.rules.enabled(Rule::MissingOrOutdentedIndentation) {
-            if line.flags().contains(TokenFlags::BRACKET) || line.contains_backslash(indexer) {
+            if line
+                .flags()
+                .contains(TokenFlags::BRACKET | TokenFlags::NEWLINE)
+                || line.contains_backslash(indexer)
+            {
                 missing_or_outdented_indentation(
                     &line,
                     indent_level,
