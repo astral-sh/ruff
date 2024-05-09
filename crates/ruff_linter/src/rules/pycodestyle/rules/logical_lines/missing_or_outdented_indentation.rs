@@ -10,10 +10,10 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::rules::pycodestyle::helpers::expand_indent;
 
 /// ## What it does
-/// Checks for continuation lines not indented as far as they should be or indented too far.
+/// Checks for continuation lines without enough indentation.
 ///
 /// ## Why is this bad?
-/// This makes distinguishing continuation line harder.
+/// This makes distinguishing continuation lines more difficult.
 ///
 /// ## Example
 /// ```python
