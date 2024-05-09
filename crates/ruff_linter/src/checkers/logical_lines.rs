@@ -77,7 +77,12 @@ pub(crate) fn check_logical_lines(
 
         if line.flags().contains(TokenFlags::BRACKET) {
             whitespace_before_parameters(&line, &mut context);
-            redundant_backslash(&line, locator, indexer, &mut context);
+        }
+
+        if settings.rules.enabled(Rule::RedundantBackslash) {
+            if line.flags().contains(TokenFlags::BRACKET) && line.contains_backslash(indexer) {
+                redundant_backslash(&line, locator, indexer, &mut context);
+            }
         }
 
         // Extract the indentation level.
@@ -109,13 +114,15 @@ pub(crate) fn check_logical_lines(
         }
 
         if settings.rules.enabled(Rule::MissingOrOutdentedIndentation) {
-            missing_or_outdented_indentation(
-                &line,
-                indent_level,
-                settings.tab_size,
-                locator,
-                &mut context,
-            );
+            if line.flags().contains(TokenFlags::BRACKET) || line.contains_backslash(indexer) {
+                missing_or_outdented_indentation(
+                    &line,
+                    indent_level,
+                    settings.tab_size,
+                    locator,
+                    &mut context,
+                );
+            }
         }
 
         if !line.is_comment_only() {

@@ -15,12 +15,12 @@ use std::fmt::{Debug, Formatter};
 use std::iter::FusedIterator;
 
 use bitflags::bitflags;
+use ruff_python_index::Indexer;
 use ruff_python_parser::lexer::LexResult;
-use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
-
 use ruff_python_parser::TokenKind;
 use ruff_python_trivia::is_python_whitespace;
 use ruff_source_file::Locator;
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 mod extraneous_whitespace;
 mod indentation;
@@ -48,7 +48,6 @@ bitflags! {
         const KEYWORD = 0b0000_1000;
         /// Whether the logical line contains a comment.
         const COMMENT = 0b0001_0000;
-
         /// Whether the logical line contains any non trivia token (no comment, newline, or in/dedent)
         const NON_TRIVIA = 0b0010_0000;
     }
@@ -110,7 +109,7 @@ impl<'a> IntoIterator for &'a LogicalLines<'a> {
     }
 }
 
-/// A logical line spawns multiple lines in the source document if the line
+/// A logical line spans multiple lines in the source document if the line
 /// ends with a parenthesized expression (`(..)`, `[..]`, `{..}`) that contains
 /// line breaks.
 ///
@@ -247,6 +246,23 @@ impl<'a> LogicalLine<'a> {
     /// Returns the line's flags
     pub(crate) const fn flags(&self) -> TokenFlags {
         self.line.flags
+    }
+
+    // Checks if the line contains explicit line joins, i.e. backslashes
+    pub(crate) fn contains_backslash(&self, indexer: &Indexer) -> bool {
+        let Some(first_token) = self.tokens().first() else {
+            return false;
+        };
+        let last_token = self.tokens().last().unwrap();
+        let continuation_lines = indexer.continuation_line_starts();
+        let start_index = continuation_lines
+            .binary_search(&first_token.start())
+            .unwrap_or_else(|err_index| err_index);
+        let end_index = continuation_lines
+            .binary_search(&last_token.start())
+            .unwrap_or_else(|err_index| err_index);
+
+        end_index > start_index
     }
 }
 
@@ -465,7 +481,7 @@ impl LogicalLinesBuilder {
         self.tokens.push(LogicalLineToken { kind, range });
     }
 
-    // SAFETY: `LogicalLines::from_tokens` asserts that the file has less than `u32::MAX` tokens and each tokens is at least one character long
+    // SAFETY: `LogicalLines::from_tokens` asserts that the file has less than `u32::MAX` tokens and each token is at least one character long
     #[allow(clippy::cast_possible_truncation)]
     fn finish_line(&mut self) {
         let end = self.tokens.len() as u32;
