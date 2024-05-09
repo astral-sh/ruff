@@ -72,10 +72,9 @@ impl AlwaysFixableViolation for UnspecifiedEncoding {
 
 /// PLW1514
 pub(crate) fn unspecified_encoding(checker: &mut Checker, call: &ast::ExprCall) {
-    let Some((function_name, mode)) =
-        QualifiedNameWrapper::try_from_call_expression(call, checker.semantic())
-            .filter(|segments| is_violation(call, segments))
-            .map(|segments| (segments.to_string(), segments.mode_argument()))
+    let Some((function_name, mode)) = Callee::try_from_call_expression(call, checker.semantic())
+        .filter(|segments| is_violation(call, segments))
+        .map(|segments| (segments.to_string(), segments.mode_argument()))
     else {
         return;
     };
@@ -97,25 +96,22 @@ pub(crate) fn unspecified_encoding(checker: &mut Checker, call: &ast::ExprCall) 
     checker.diagnostics.push(diagnostic);
 }
 
-/// Wrapper around [`QualifiedName`] to consider attribute value on `pathlib.Path(...)` calls.
-enum QualifiedNameWrapper<'a> {
-    /// Regular fully-qualified symbol name.
-    Regular(QualifiedName<'a>),
+/// Represents the path of the function or method being called.
+enum Callee<'a> {
+    /// Fully-qualified symbol name of the callee.
+    Qualified(QualifiedName<'a>),
     /// Attribute value for the `pathlib.Path(...)` call e.g., `open` in
     /// `pathlib.Path(...).open(...)`.
     Pathlib(&'a str),
 }
 
-impl<'a> QualifiedNameWrapper<'a> {
+impl<'a> Callee<'a> {
     fn try_from_call_expression(
         call: &'a ast::ExprCall,
         semantic: &'a SemanticModel,
     ) -> Option<Self> {
-        if let Some(qualified_name) = semantic.resolve_qualified_name(&call.func) {
-            return Some(QualifiedNameWrapper::Regular(qualified_name));
-        }
-        // Check for pathlib.Path(...).open(...) or equivalent
-        else if let Expr::Attribute(ast::ExprAttribute { attr, value, .. }) = call.func.as_ref() {
+        if let Expr::Attribute(ast::ExprAttribute { attr, value, .. }) = call.func.as_ref() {
+            // Check for `pathlib.Path(...).open(...)` or equivalent
             if let Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() {
                 if semantic
                     .resolve_qualified_name(func)
@@ -123,16 +119,21 @@ impl<'a> QualifiedNameWrapper<'a> {
                         matches!(qualified_name.segments(), ["pathlib", "Path"])
                     })
                 {
-                    return Some(QualifiedNameWrapper::Pathlib(attr));
+                    return Some(Callee::Pathlib(attr));
                 }
             }
         }
+
+        if let Some(qualified_name) = semantic.resolve_qualified_name(&call.func) {
+            return Some(Callee::Qualified(qualified_name));
+        }
+
         None
     }
 
     fn mode_argument(&self) -> ModeArgument {
         match self {
-            QualifiedNameWrapper::Regular(qualified_name) => match qualified_name.segments() {
+            Callee::Qualified(qualified_name) => match qualified_name.segments() {
                 ["" | "codecs" | "_io", "open"] => ModeArgument::Supported,
                 ["tempfile", "TemporaryFile" | "NamedTemporaryFile" | "SpooledTemporaryFile"] => {
                     ModeArgument::Supported
@@ -140,7 +141,7 @@ impl<'a> QualifiedNameWrapper<'a> {
                 ["io" | "_io", "TextIOWrapper"] => ModeArgument::Unsupported,
                 _ => ModeArgument::Unsupported,
             },
-            QualifiedNameWrapper::Pathlib(attr) => match *attr {
+            Callee::Pathlib(attr) => match *attr {
                 "open" => ModeArgument::Supported,
                 _ => ModeArgument::Unsupported,
             },
@@ -148,15 +149,11 @@ impl<'a> QualifiedNameWrapper<'a> {
     }
 }
 
-impl Display for QualifiedNameWrapper<'_> {
+impl Display for Callee<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            QualifiedNameWrapper::Regular(qualified_name) => {
-                f.write_str(&qualified_name.to_string())
-            }
-            QualifiedNameWrapper::Pathlib(attr) => {
-                f.write_str(&format!("pathlib.Path(...).{attr}"))
-            }
+            Callee::Qualified(qualified_name) => f.write_str(&qualified_name.to_string()),
+            Callee::Pathlib(attr) => f.write_str(&format!("pathlib.Path(...).{attr}")),
         }
     }
 }
@@ -210,7 +207,7 @@ fn is_binary_mode(expr: &Expr) -> Option<bool> {
 }
 
 /// Returns `true` if the given call lacks an explicit `encoding`.
-fn is_violation(call: &ast::ExprCall, qualified_name: &QualifiedNameWrapper) -> bool {
+fn is_violation(call: &ast::ExprCall, qualified_name: &Callee) -> bool {
     // If we have something like `*args`, which might contain the encoding argument, abort.
     if call.arguments.args.iter().any(Expr::is_starred_expr) {
         return false;
@@ -225,7 +222,7 @@ fn is_violation(call: &ast::ExprCall, qualified_name: &QualifiedNameWrapper) -> 
         return false;
     }
     match qualified_name {
-        QualifiedNameWrapper::Regular(qualified_name) => match qualified_name.segments() {
+        Callee::Qualified(qualified_name) => match qualified_name.segments() {
             ["" | "codecs" | "_io", "open"] => {
                 if let Some(mode_arg) = call.arguments.find_argument("mode", 1) {
                     if is_binary_mode(mode_arg).unwrap_or(true) {
@@ -257,7 +254,7 @@ fn is_violation(call: &ast::ExprCall, qualified_name: &QualifiedNameWrapper) -> 
             }
             _ => false,
         },
-        QualifiedNameWrapper::Pathlib(attr) => match *attr {
+        Callee::Pathlib(attr) => match *attr {
             "open" => {
                 if let Some(mode_arg) = call.arguments.find_argument("mode", 0) {
                     if is_binary_mode(mode_arg).unwrap_or(true) {
