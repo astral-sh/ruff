@@ -51,7 +51,7 @@ bitflags! {
         /// Whether the logical line contains any non trivia token (no comment, newline, or in/dedent)
         const NON_TRIVIA = 0b0010_0000;
         /// Whether the logical line contains any newline.
-        const NEWLINE = 0b0100_0000;
+        const NON_LOGICAL_NEWLINE = 0b0100_0000;
     }
 }
 
@@ -140,7 +140,7 @@ impl<'a> LogicalLine<'a> {
     pub(crate) fn is_comment_only(&self) -> bool {
         !self
             .flags()
-            .intersects(!(TokenFlags::COMMENT | TokenFlags::NEWLINE))
+            .intersects(!(TokenFlags::COMMENT | TokenFlags::NON_LOGICAL_NEWLINE))
     }
 
     /// Returns logical line's text including comments, indents, dedent and trailing new lines.
@@ -482,8 +482,8 @@ impl LogicalLinesBuilder {
             line.flags.insert(TokenFlags::NON_TRIVIA);
         }
 
-        if matches!(kind, TokenKind::Newline | TokenKind::NonLogicalNewline) {
-            line.flags.insert(TokenFlags::NEWLINE);
+        if matches!(kind, TokenKind::NonLogicalNewline) {
+            line.flags.insert(TokenFlags::NON_LOGICAL_NEWLINE);
         }
 
         self.tokens.push(LogicalLineToken { kind, range });
