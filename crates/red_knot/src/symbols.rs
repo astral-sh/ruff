@@ -52,7 +52,7 @@ pub fn resolve_global_symbol(
     }))
 }
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct GlobalSymbolId {
     pub(crate) file_id: FileId,
     pub(crate) symbol_id: SymbolId,
