@@ -82,8 +82,14 @@ Path("foo.txt").write_text(text)
 # Non-errors.
 Path("foo.txt").open(encoding="utf-8")
 Path("foo.txt").open("wb")
+Path("foo.txt").open(*args)
+Path("foo.txt").open(**kwargs)
 text = Path("foo.txt").read_text(encoding="utf-8")
+text = Path("foo.txt").read_text(*args)
+text = Path("foo.txt").read_text(**kwargs)
 Path("foo.txt").write_text(text, encoding="utf-8")
+Path("foo.txt").write_text(text, *args)
+Path("foo.txt").write_text(text, **kwargs)
 
 # Violation but not detectable
 x = Path("foo.txt")

@@ -210,7 +210,7 @@ fn is_binary_mode(expr: &Expr) -> Option<bool> {
 }
 
 /// Returns `true` if the given call lacks an explicit `encoding`.
-fn is_violation(call: &ast::ExprCall, segments: &QualifiedNameWrapper) -> bool {
+fn is_violation(call: &ast::ExprCall, qualified_name: &QualifiedNameWrapper) -> bool {
     // If we have something like `*args`, which might contain the encoding argument, abort.
     if call.arguments.args.iter().any(Expr::is_starred_expr) {
         return false;
@@ -224,7 +224,7 @@ fn is_violation(call: &ast::ExprCall, segments: &QualifiedNameWrapper) -> bool {
     {
         return false;
     }
-    match segments {
+    match qualified_name {
         QualifiedNameWrapper::Regular(qualified_name) => match qualified_name.segments() {
             ["" | "codecs" | "_io", "open"] => {
                 if let Some(mode_arg) = call.arguments.find_argument("mode", 1) {
