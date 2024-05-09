@@ -181,3 +181,19 @@ SELECT day_start, sum(total) AS total FROM (
 GROUP BY day_start
 ORDER BY day_start asc
 """
+
+# OK
+NODE_STORAGE_SQL = f"""
+SELECT
+    hostName() node,
+    sum(total_space) space_used,
+    sum(free_space) free_space,
+    (space_used + free_space) total_space_available,
+    formatReadableSize(total_space_available) readable_total_space_available,
+    formatReadableSize(space_used) readable_space_used,
+    formatReadableSize(free_space) readable_free_space
+FROM {DISKS_SYSTEM_TABLE}
+WHERE type = 'local'
+GROUP BY node
+ORDER BY node
+"""

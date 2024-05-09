@@ -59,6 +59,7 @@ pub(crate) fn missing_or_outdented_indentation(
     let mut desired_indentation = indentation + tab_size;
     let mut indentation_changed = true;
     let mut indentation_stack: std::vec::Vec<usize> = Vec::new();
+    let mut fstrings = 0u32;
 
     for token in line.tokens() {
         // If continuation line
@@ -85,7 +86,7 @@ pub(crate) fn missing_or_outdented_indentation(
                 desired_indentation
             };
 
-            if indentation < correct_indentation {
+            if fstrings == 0 && indentation < correct_indentation {
                 let diagnostic = Diagnostic::new(MissingOrOutdentedIndentation, range);
                 context.push_diagnostic(diagnostic);
             }
@@ -94,7 +95,9 @@ pub(crate) fn missing_or_outdented_indentation(
         }
 
         match token.kind() {
-            TokenKind::Lpar | TokenKind::Lsqb | TokenKind::Lbrace => {
+            TokenKind::FStringStart => fstrings += 1,
+            TokenKind::FStringEnd => fstrings = fstrings.saturating_sub(1),
+            TokenKind::Lpar | TokenKind::Lsqb | TokenKind::Lbrace if fstrings == 0 => {
                 // Store indent to return to once bracket closes
                 indentation_stack.push(desired_indentation);
                 // Only increase the indent once per continuation line
@@ -103,7 +106,7 @@ pub(crate) fn missing_or_outdented_indentation(
                     indentation_changed = true;
                 }
             }
-            TokenKind::Rpar | TokenKind::Rsqb | TokenKind::Rbrace => {
+            TokenKind::Rpar | TokenKind::Rsqb | TokenKind::Rbrace if fstrings == 0 => {
                 // Return to previous indent
                 desired_indentation = indentation_stack
                     .pop()
@@ -118,6 +121,6 @@ pub(crate) fn missing_or_outdented_indentation(
 fn token_is_closing(token: &LogicalLineToken) -> bool {
     matches!(
         token.kind,
-        TokenKind::Rpar | TokenKind::Rsqb | TokenKind::Rbrace | TokenKind::FStringEnd
+        TokenKind::Rpar | TokenKind::Rsqb | TokenKind::Rbrace
     )
 }
