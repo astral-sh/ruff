@@ -10,14 +10,8 @@ use crate::parse::parse;
 use crate::symbols::{
     resolve_global_symbol, symbol_table, Definition, GlobalSymbolId, ImportFromDefinition,
 };
-use crate::types::{Type, TypeStore};
+use crate::types::Type;
 use crate::FileId;
-
-#[tracing::instrument(level = "trace", skip(db))]
-pub fn type_store(db: &dyn SemanticDb) -> QueryResult<&TypeStore> {
-    let jar: &SemanticJar = db.jar()?;
-    Ok(&jar.type_store)
-}
 
 // FIXME: Figure out proper dead-lock free synchronisation now that this takes `&db` instead of `&mut db`.
 #[tracing::instrument(level = "trace", skip(db))]

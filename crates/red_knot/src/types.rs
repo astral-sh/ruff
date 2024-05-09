@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 use crate::ast_ids::NodeKey;
-use crate::db::{QueryResult, SemanticDb};
+use crate::db::{QueryResult, SemanticDb, SemanticJar};
 use crate::files::FileId;
 use crate::symbols::{symbol_table, GlobalSymbolId, ScopeId, ScopeKind, SymbolId};
 use crate::{FxDashMap, FxIndexSet, Name};
@@ -9,7 +9,7 @@ use rustc_hash::FxHashMap;
 
 pub(crate) mod infer;
 
-pub(crate) use infer::{infer_definition_type, infer_symbol_type, type_store};
+pub(crate) use infer::{infer_definition_type, infer_symbol_type};
 
 /// unique ID for a type
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
@@ -263,8 +263,9 @@ pub struct FunctionTypeId {
 }
 
 impl FunctionTypeId {
-    pub(crate) fn function(self, db: &dyn SemanticDb) -> QueryResult<FunctionTypeRef> {
-        Ok(type_store(db)?.get_function(self))
+    fn function(self, db: &dyn SemanticDb) -> QueryResult<FunctionTypeRef> {
+        let jar: &SemanticJar = db.jar()?;
+        Ok(jar.type_store.get_function(self))
     }
 
     pub(crate) fn name(self, db: &dyn SemanticDb) -> QueryResult<Name> {
@@ -283,7 +284,7 @@ impl FunctionTypeId {
     }
 
     pub(crate) fn symbol(self, db: &dyn SemanticDb) -> QueryResult<SymbolId> {
-        let FunctionType { symbol_id, .. } = *type_store(db)?.get_function(self);
+        let FunctionType { symbol_id, .. } = *self.function(db)?;
         Ok(symbol_id)
     }
 
@@ -292,7 +293,7 @@ impl FunctionTypeId {
         db: &dyn SemanticDb,
     ) -> QueryResult<Option<ClassTypeId>> {
         let table = symbol_table(db, self.file_id)?;
-        let FunctionType { symbol_id, .. } = *type_store(db)?.get_function(self);
+        let FunctionType { symbol_id, .. } = *self.function(db)?;
         let scope_id = symbol_id.symbol(&table).scope_id();
         let scope = scope_id.scope(&table);
         if !matches!(scope.kind(), ScopeKind::Class) {
@@ -342,9 +343,13 @@ pub struct ClassTypeId {
 }
 
 impl ClassTypeId {
+    fn class(self, db: &dyn SemanticDb) -> QueryResult<ClassTypeRef> {
+        let jar: &SemanticJar = db.jar()?;
+        Ok(jar.type_store.get_class(self))
+    }
+
     pub(crate) fn name(self, db: &dyn SemanticDb) -> QueryResult<Name> {
-        let class = type_store(db)?.get_class(self);
-        Ok(class.name().into())
+        Ok(self.class(db)?.name().into())
     }
 
     pub(crate) fn get_super_class_member(
@@ -353,7 +358,7 @@ impl ClassTypeId {
         name: &Name,
     ) -> QueryResult<Option<Type>> {
         // TODO we should linearize the MRO instead of doing this recursively
-        let class = type_store(db)?.get_class(self);
+        let class = self.class(db)?;
         for base in class.bases() {
             if let Type::Class(base) = base {
                 if let Some(own_member) = base.get_own_class_member(db, name)? {
@@ -369,7 +374,7 @@ impl ClassTypeId {
 
     fn get_own_class_member(self, db: &dyn SemanticDb, name: &Name) -> QueryResult<Option<Type>> {
         // TODO: this should distinguish instance-only members (e.g. `x: int`) and not return them
-        let ClassType { scope_id, .. } = *type_store(db)?.get_class(self);
+        let ClassType { scope_id, .. } = *self.class(db)?;
         let table = symbol_table(db, self.file_id)?;
         if let Some(symbol_id) = table.symbol_id_by_name(scope_id, name) {
             Ok(Some(infer_symbol_type(
