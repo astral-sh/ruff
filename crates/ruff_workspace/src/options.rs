@@ -1,3 +1,5 @@
+//! Find configurations provided by tools like flake8, pydocsyle and isort.
+
 use std::collections::BTreeSet;
 use std::hash::BuildHasherDefault;
 
