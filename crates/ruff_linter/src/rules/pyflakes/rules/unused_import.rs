@@ -129,7 +129,11 @@ impl Violation for UnusedImport {
             Some(UnusedImportContext::Init {
                 first_party: true,
                 dunder_all_count: 0,
-            }) => "Use an explicit re-export",
+            }) => {
+                return Some(format!(
+                    "Use an explicit re-export: `{binding} as {binding}`"
+                ));
+            }
             _ => "Remove unused import",
         };
         Some(if *multiple {
