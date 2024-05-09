@@ -21,7 +21,10 @@ use crate::rules::{isort, isort::ImportSection, isort::ImportType};
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 enum UnusedImportContext {
     ExceptHandler,
-    Init { first_party: bool, dunder_all: bool },
+    Init {
+        first_party: bool,
+        dunder_all_count: usize,
+    },
 }
 
 /// ## What it does
@@ -121,11 +124,11 @@ impl Violation for UnusedImport {
         let resolution = match self.context {
             Some(UnusedImportContext::Init {
                 first_party: true,
-                dunder_all: true,
+                dunder_all_count: 1,
             }) => "Add unused import to __all__",
             Some(UnusedImportContext::Init {
                 first_party: true,
-                dunder_all: false,
+                dunder_all_count: 0,
             }) => "Use an explicit re-export",
             _ => "Remove unused import",
         };
@@ -158,36 +161,37 @@ fn is_first_party(qualified_name: &str, level: u32, checker: &Checker) -> bool {
     }
 }
 
-/// Find the `Expr` value for a unique top level `__all__` binding.
-fn find_dunder_all_expr<'a>(semantic: &'a SemanticModel) -> Option<&'a ast::Expr> {
-    let stmts: Vec<_> = semantic
+/// Find the `Expr` for top level `__all__` bindings.
+fn find_dunder_all_exprs<'a>(semantic: &'a SemanticModel) -> Vec<&'a ast::Expr> {
+    semantic
         .global_scope()
         .get_all("__all__")
-        .map(|binding_id| semantic.binding(binding_id))
-        .filter_map(|binding| match binding.kind {
-            BindingKind::Export(_) => binding.statement(semantic),
-            _ => None,
+        .filter_map(|binding_id| {
+            let binding = semantic.binding(binding_id);
+            let stmt = match binding.kind {
+                BindingKind::Export(_) => binding.statement(semantic),
+                _ => None,
+            }?;
+            let expr = match stmt {
+                Stmt::Assign(ast::StmtAssign { value, .. }) => Some(&**value),
+                Stmt::AnnAssign(ast::StmtAnnAssign { value, .. }) => value.as_deref(),
+                Stmt::AugAssign(ast::StmtAugAssign { value, .. }) => Some(&**value),
+                _ => None,
+            }?;
+            match expr {
+                ast::Expr::List(_) => Some(expr),
+                ast::Expr::Tuple(_) => Some(expr),
+                _ => None,
+            }
         })
-        .collect();
-    let [stmt] = stmts.as_slice() else {
-        return None; // only fix when there is /exactly one/ binding
-    };
-    let expr = match stmt {
-        Stmt::Assign(ast::StmtAssign { value, .. }) => Some(&**value),
-        Stmt::AnnAssign(ast::StmtAnnAssign { value, .. }) => value.as_deref(),
-        Stmt::AugAssign(ast::StmtAugAssign { value, .. }) => Some(&**value),
-        _ => None,
-    }?;
-    match expr {
-        ast::Expr::List(_) => Some(expr),
-        ast::Expr::Tuple(_) => Some(expr),
-        _ => None,
-    }
+        .collect()
 }
 
 /// For some unused binding in an import statement...
 ///
-///  __init__.py ∧ 1stpty → safe,   move to __all__ or convert to explicit-import
+///  __init__.py ∧ 1stpty → safe,   if one __all__, add to __all__
+///                         safe,   if no __all__, convert to redundant-alias
+///                         n/a,    if multiple __all__, offer no fix
 ///  __init__.py ∧ stdlib → unsafe, remove
 ///  __init__.py ∧ 3rdpty → unsafe, remove
 ///
@@ -245,7 +249,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
 
     let in_init = checker.path().ends_with("__init__.py");
     let fix_init = checker.settings.preview.is_enabled();
-    let dunder_all_expr = find_dunder_all_expr(checker.semantic());
+    let dunder_all_exprs = find_dunder_all_exprs(checker.semantic());
 
     // Generate a diagnostic for every import, but share fixes across all imports within the same
     // statement (excluding those that are ignored).
@@ -274,7 +278,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
                             level,
                             checker,
                         ),
-                        dunder_all: dunder_all_expr.is_some(),
+                        dunder_all_count: dunder_all_exprs.len(),
                     })
                 } else {
                     None
@@ -305,7 +309,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
                     checker,
                     import_statement,
                     &to_reexport.iter().map(|(b, _)| b).collect::<Vec<_>>(),
-                    dunder_all_expr,
+                    &dunder_all_exprs,
                 )
                 .ok(),
             )
@@ -423,21 +427,24 @@ fn fix_by_reexporting(
     checker: &Checker,
     node_id: NodeId,
     imports: &[&ImportBinding],
-    dunder_all: Option<&ast::Expr>,
+    dunder_all_exprs: &[&ast::Expr],
 ) -> Result<Fix> {
     let statement = checker.semantic().statement(node_id);
     if imports.is_empty() {
         bail!("Expected import bindings");
     }
 
-    let edits = if let Some(dunder_all) = dunder_all {
-        fix::edits::add_to_dunder_all(
+    let edits = match dunder_all_exprs {
+        [] => fix::edits::make_redundant_alias(
+            imports.iter().map(|b| b.import.member_name()),
+            statement,
+        ),
+        [dunder_all] => fix::edits::add_to_dunder_all(
             imports.iter().map(|b| b.name),
             dunder_all,
             checker.stylist(),
-        )
-    } else {
-        fix::edits::make_redundant_alias(imports.iter().map(|b| b.import.member_name()), statement)
+        ),
+        _ => bail!("Cannot offer a fix when there are multiple __all__"),
     };
 
     // Only emit a fix if there are edits
