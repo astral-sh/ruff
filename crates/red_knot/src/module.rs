@@ -231,11 +231,6 @@ pub struct ModuleData {
 // Queries
 //////////////////////////////////////////////////////
 
-#[tracing::instrument(level = "debug", skip(db))]
-pub fn module_to_file(db: &dyn SemanticDb, module: Module) -> QueryResult<FileId> {
-    Ok(module.path(db)?.file())
-}
-
 /// Resolves a module name to a module id
 /// TODO: This would not work with Salsa because `ModuleName` isn't an ingredient and, therefore, cannot be used as part of a query.
 ///  For this to work with salsa, it would be necessary to intern all `ModuleName`s.
