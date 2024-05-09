@@ -1,11 +1,11 @@
-use anyhow::Result;
 use std::fmt::{Display, Formatter};
 
-use ast::StringLiteralFlags;
+use anyhow::Result;
+
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast as ast;
-use ruff_python_ast::Expr;
+use ruff_python_ast::name::QualifiedName;
+use ruff_python_ast::{self as ast, Expr, StringLiteralFlags};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -44,7 +44,7 @@ use crate::settings::types::PythonVersion;
 #[violation]
 pub struct UnspecifiedEncoding {
     function_name: String,
-    mode: Mode,
+    mode: ModeArgument,
 }
 
 impl AlwaysFixableViolation for UnspecifiedEncoding {
@@ -56,10 +56,10 @@ impl AlwaysFixableViolation for UnspecifiedEncoding {
         } = self;
 
         match mode {
-            Mode::Supported => {
+            ModeArgument::Supported => {
                 format!("`{function_name}` in text mode without explicit `encoding` argument")
             }
-            Mode::Unsupported => {
+            ModeArgument::Unsupported => {
                 format!("`{function_name}` without explicit `encoding` argument")
             }
         }
@@ -72,9 +72,10 @@ impl AlwaysFixableViolation for UnspecifiedEncoding {
 
 /// PLW1514
 pub(crate) fn unspecified_encoding(checker: &mut Checker, call: &ast::ExprCall) {
-    let Some((function_name, mode)) = Segments::try_from_call(call, checker.semantic())
-        .filter(|segments| is_violation(call, segments))
-        .map(|segments| (segments.to_string(), Mode::from(&segments)))
+    let Some((function_name, mode)) =
+        QualifiedNameWrapper::try_from_call_expression(call, checker.semantic())
+            .filter(|segments| is_violation(call, segments))
+            .map(|segments| (segments.to_string(), segments.mode_argument()))
     else {
         return;
     };
@@ -96,16 +97,22 @@ pub(crate) fn unspecified_encoding(checker: &mut Checker, call: &ast::ExprCall) 
     checker.diagnostics.push(diagnostic);
 }
 
-enum Segments<'a> {
-    Regular(Vec<&'a str>),
+/// Wrapper around [`QualifiedName`] to consider attribute value on `pathlib.Path(...)` calls.
+enum QualifiedNameWrapper<'a> {
+    /// Regular fully-qualified symbol name.
+    Regular(QualifiedName<'a>),
+    /// Attribute value for the `pathlib.Path(...)` call e.g., `open` in
+    /// `pathlib.Path(...).open(...)`.
     Pathlib(&'a str),
 }
 
-impl<'a> Segments<'a> {
-    fn try_from_call(call: &'a ast::ExprCall, semantic: &'a SemanticModel) -> Option<Self> {
+impl<'a> QualifiedNameWrapper<'a> {
+    fn try_from_call_expression(
+        call: &'a ast::ExprCall,
+        semantic: &'a SemanticModel,
+    ) -> Option<Self> {
         if let Some(qualified_name) = semantic.resolve_qualified_name(&call.func) {
-            let segments = qualified_name.segments().to_vec();
-            return Some(Segments::Regular(segments));
+            return Some(QualifiedNameWrapper::Regular(qualified_name));
         }
         // Check for pathlib.Path(...).open(...) or equivalent
         else if let Expr::Attribute(ast::ExprAttribute { attr, value, .. }) = call.func.as_ref() {
@@ -116,25 +123,40 @@ impl<'a> Segments<'a> {
                         matches!(qualified_name.segments(), ["pathlib", "Path"])
                     })
                 {
-                    return Some(Segments::Pathlib(attr));
+                    return Some(QualifiedNameWrapper::Pathlib(attr));
                 }
             }
         }
         None
     }
+
+    fn mode_argument(&self) -> ModeArgument {
+        match self {
+            QualifiedNameWrapper::Regular(qualified_name) => match qualified_name.segments() {
+                ["" | "codecs" | "_io", "open"] => ModeArgument::Supported,
+                ["tempfile", "TemporaryFile" | "NamedTemporaryFile" | "SpooledTemporaryFile"] => {
+                    ModeArgument::Supported
+                }
+                ["io" | "_io", "TextIOWrapper"] => ModeArgument::Unsupported,
+                _ => ModeArgument::Unsupported,
+            },
+            QualifiedNameWrapper::Pathlib(attr) => match *attr {
+                "open" => ModeArgument::Supported,
+                _ => ModeArgument::Unsupported,
+            },
+        }
+    }
 }
 
-impl Display for Segments<'_> {
+impl Display for QualifiedNameWrapper<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Segments::Regular(segments) => {
-                if segments[0].is_empty() {
-                    f.write_str(&segments[1..].join("."))
-                } else {
-                    f.write_str(&segments.join("."))
-                }
+            QualifiedNameWrapper::Regular(qualified_name) => {
+                f.write_str(&qualified_name.to_string())
             }
-            Segments::Pathlib(attr) => f.write_str(&format!("pathlib.Path.{attr}")),
+            QualifiedNameWrapper::Pathlib(attr) => {
+                f.write_str(&format!("pathlib.Path(...).{attr}"))
+            }
         }
     }
 }
@@ -188,7 +210,7 @@ fn is_binary_mode(expr: &Expr) -> Option<bool> {
 }
 
 /// Returns `true` if the given call lacks an explicit `encoding`.
-fn is_violation(call: &ast::ExprCall, segments: &Segments) -> bool {
+fn is_violation(call: &ast::ExprCall, segments: &QualifiedNameWrapper) -> bool {
     // If we have something like `*args`, which might contain the encoding argument, abort.
     if call.arguments.args.iter().any(Expr::is_starred_expr) {
         return false;
@@ -203,7 +225,7 @@ fn is_violation(call: &ast::ExprCall, segments: &Segments) -> bool {
         return false;
     }
     match segments {
-        Segments::Regular(segments) => match segments.as_slice() {
+        QualifiedNameWrapper::Regular(qualified_name) => match qualified_name.segments() {
             ["" | "codecs" | "_io", "open"] => {
                 if let Some(mode_arg) = call.arguments.find_argument("mode", 1) {
                     if is_binary_mode(mode_arg).unwrap_or(true) {
@@ -214,8 +236,9 @@ fn is_violation(call: &ast::ExprCall, segments: &Segments) -> bool {
                 // else mode not specified, defaults to text mode
                 call.arguments.find_argument("encoding", 3).is_none()
             }
-            ["tempfile", "TemporaryFile" | "NamedTemporaryFile" | "SpooledTemporaryFile"] => {
-                let mode_pos = usize::from(segments[1] == "SpooledTemporaryFile");
+            ["tempfile", tempfile_class @ ("TemporaryFile" | "NamedTemporaryFile" | "SpooledTemporaryFile")] =>
+            {
+                let mode_pos = usize::from(*tempfile_class == "SpooledTemporaryFile");
                 if let Some(mode_arg) = call.arguments.find_argument("mode", mode_pos) {
                     if is_binary_mode(mode_arg).unwrap_or(true) {
                         // binary mode or unknown mode is no violation
@@ -234,7 +257,7 @@ fn is_violation(call: &ast::ExprCall, segments: &Segments) -> bool {
             }
             _ => false,
         },
-        Segments::Pathlib(attr) => match *attr {
+        QualifiedNameWrapper::Pathlib(attr) => match *attr {
             "open" => {
                 if let Some(mode_arg) = call.arguments.find_argument("mode", 0) {
                     if is_binary_mode(mode_arg).unwrap_or(true) {
@@ -253,28 +276,9 @@ fn is_violation(call: &ast::ExprCall, segments: &Segments) -> bool {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Mode {
+enum ModeArgument {
     /// The call supports a `mode` argument.
     Supported,
     /// The call does not support a `mode` argument.
     Unsupported,
-}
-
-impl From<&Segments<'_>> for Mode {
-    fn from(segments: &Segments) -> Self {
-        match segments {
-            Segments::Regular(segments) => match segments.as_slice() {
-                ["" | "codecs" | "_io", "open"] => Mode::Supported,
-                ["tempfile", "TemporaryFile" | "NamedTemporaryFile" | "SpooledTemporaryFile"] => {
-                    Mode::Supported
-                }
-                ["io" | "_io", "TextIOWrapper"] => Mode::Unsupported,
-                _ => Mode::Unsupported,
-            },
-            Segments::Pathlib(attr) => match *attr {
-                "open" => Mode::Supported,
-                _ => Mode::Unsupported,
-            },
-        }
-    }
 }

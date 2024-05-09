@@ -475,7 +475,7 @@ unspecified_encoding.py:68:1: PLW1514 [*] `open` in text mode without explicit `
 71 72 | )
 72 73 | 
 
-unspecified_encoding.py:77:1: PLW1514 [*] `pathlib.Path.open` in text mode without explicit `encoding` argument
+unspecified_encoding.py:77:1: PLW1514 [*] `pathlib.Path(...).open` in text mode without explicit `encoding` argument
    |
 76 | # Errors.
 77 | Path("foo.txt").open()
@@ -498,7 +498,7 @@ unspecified_encoding.py:77:1: PLW1514 [*] `pathlib.Path.open` in text mode witho
 79 80 | text = Path("foo.txt").read_text()
 80 81 | Path("foo.txt").write_text(text)
 
-unspecified_encoding.py:78:1: PLW1514 [*] `pathlib.Path.open` in text mode without explicit `encoding` argument
+unspecified_encoding.py:78:1: PLW1514 [*] `pathlib.Path(...).open` in text mode without explicit `encoding` argument
    |
 76 | # Errors.
 77 | Path("foo.txt").open()
@@ -523,7 +523,7 @@ unspecified_encoding.py:78:1: PLW1514 [*] `pathlib.Path.open` in text mode witho
 80 81 | Path("foo.txt").write_text(text)
 81 82 | 
 
-unspecified_encoding.py:79:8: PLW1514 [*] `pathlib.Path.read_text` without explicit `encoding` argument
+unspecified_encoding.py:79:8: PLW1514 [*] `pathlib.Path(...).read_text` without explicit `encoding` argument
    |
 77 | Path("foo.txt").open()
 78 | Path("foo.txt").open("w")
@@ -548,7 +548,7 @@ unspecified_encoding.py:79:8: PLW1514 [*] `pathlib.Path.read_text` without expli
 81 82 | 
 82 83 | # Non-errors.
 
-unspecified_encoding.py:80:1: PLW1514 [*] `pathlib.Path.write_text` without explicit `encoding` argument
+unspecified_encoding.py:80:1: PLW1514 [*] `pathlib.Path(...).write_text` without explicit `encoding` argument
    |
 78 | Path("foo.txt").open("w")
 79 | text = Path("foo.txt").read_text()
