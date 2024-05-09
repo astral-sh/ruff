@@ -124,6 +124,7 @@ pub(crate) fn check_logical_lines(
                     indent_level,
                     settings.tab_size,
                     locator,
+                    indexer,
                     &mut context,
                 );
             }

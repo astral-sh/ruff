@@ -3,9 +3,10 @@ use crate::checkers::logical_lines::LogicalLinesContext;
 use crate::line_width::IndentWidth;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_index::Indexer;
 use ruff_python_parser::TokenKind;
 use ruff_source_file::Locator;
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::rules::pycodestyle::helpers::expand_indent;
 
@@ -44,6 +45,7 @@ pub(crate) fn missing_or_outdented_indentation(
     indent_level: usize,
     indent_width: IndentWidth,
     locator: &Locator,
+    indexer: &Indexer,
     context: &mut LogicalLinesContext,
 ) {
     if line.tokens().len() <= 1 {
@@ -51,7 +53,7 @@ pub(crate) fn missing_or_outdented_indentation(
     }
 
     let first_token = line.first_token().unwrap();
-    let mut line_end = locator.full_line_end(first_token.start());
+    let mut next_continuation = continuation_line_end(locator, indexer, first_token);
 
     let tab_size = indent_width.as_usize();
     let mut indentation = indent_level;
@@ -60,10 +62,12 @@ pub(crate) fn missing_or_outdented_indentation(
     let mut indentation_changed = true;
     let mut indentation_stack: std::vec::Vec<usize> = Vec::new();
     let mut fstrings = 0u32;
+    let mut newline = false;
 
     for token in line.tokens() {
         // If continuation line
-        if token.start() >= line_end {
+        if newline || (next_continuation.is_some() && token.start() >= next_continuation.unwrap()) {
+            newline = false;
             // Reset and calculate current indentation
             indentation_changed = false;
             let range = TextRange::new(locator.line_start(token.start()), token.start());
@@ -91,7 +95,9 @@ pub(crate) fn missing_or_outdented_indentation(
                 context.push_diagnostic(diagnostic);
             }
 
-            line_end = locator.full_line_end(token.start());
+            if next_continuation.is_some() && token.start() >= next_continuation.unwrap() {
+                next_continuation = continuation_line_end(locator, indexer, token);
+            }
         }
 
         match token.kind() {
@@ -113,6 +119,7 @@ pub(crate) fn missing_or_outdented_indentation(
                     .expect("Closing brackets should always be preceded by opening brackets");
                 indentation_changed = true;
             }
+            TokenKind::Newline | TokenKind::NonLogicalNewline => newline = true,
             _ => {}
         }
     }
@@ -123,4 +130,17 @@ fn token_is_closing(token: &LogicalLineToken) -> bool {
         token.kind,
         TokenKind::Rpar | TokenKind::Rsqb | TokenKind::Rbrace
     )
+}
+
+fn continuation_line_end(
+    locator: &Locator,
+    indexer: &Indexer,
+    token: &LogicalLineToken,
+) -> Option<TextSize> {
+    let continuation_lines = indexer.continuation_line_starts();
+    let continuation_line_index = continuation_lines
+        .binary_search(&token.start())
+        .unwrap_or_else(|err_index| err_index);
+    let continuation_line_start = continuation_lines.get(continuation_line_index)?;
+    Some(locator.full_line_end(*continuation_line_start))
 }

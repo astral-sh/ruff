@@ -165,11 +165,6 @@ x = [
 QUERY_EXECUTION_COUNT_SQL = f"""
 SELECT day_start, sum(total) AS total FROM (
     SELECT
-        0 AS total,
-        toStartOfDay(now() - toIntervalDay(number)) AS day_start
-    FROM numbers(dateDiff('day', toStartOfDay(now()  - INTERVAL %(days)s day), now()))
-    UNION ALL
-    SELECT
         count(*) AS total,
         toStartOfDay(query_start_time) AS day_start
     FROM
@@ -178,8 +173,6 @@ SELECT day_start, sum(total) AS total FROM (
         query_start_time > now() - INTERVAL %(days)s day AND type = 2 AND is_initial_query %(conditions)s
     GROUP BY day_start
 )
-GROUP BY day_start
-ORDER BY day_start asc
 """
 
 # OK
@@ -187,13 +180,11 @@ NODE_STORAGE_SQL = f"""
 SELECT
     hostName() node,
     sum(total_space) space_used,
-    sum(free_space) free_space,
-    (space_used + free_space) total_space_available,
-    formatReadableSize(total_space_available) readable_total_space_available,
-    formatReadableSize(space_used) readable_space_used,
-    formatReadableSize(free_space) readable_free_space
 FROM {DISKS_SYSTEM_TABLE}
 WHERE type = 'local'
-GROUP BY node
-ORDER BY node
 """
+
+# # Ok
+# [21,
+#  21,
+#  21]
