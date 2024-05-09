@@ -172,15 +172,10 @@ fn find_dunder_all_exprs<'a>(semantic: &'a SemanticModel) -> Vec<&'a ast::Expr> 
                 BindingKind::Export(_) => binding.statement(semantic),
                 _ => None,
             }?;
-            let expr = match stmt {
+            match stmt {
                 Stmt::Assign(ast::StmtAssign { value, .. }) => Some(&**value),
                 Stmt::AnnAssign(ast::StmtAnnAssign { value, .. }) => value.as_deref(),
                 Stmt::AugAssign(ast::StmtAugAssign { value, .. }) => Some(&**value),
-                _ => None,
-            }?;
-            match expr {
-                ast::Expr::List(_) => Some(expr),
-                ast::Expr::Tuple(_) => Some(expr),
                 _ => None,
             }
         })
