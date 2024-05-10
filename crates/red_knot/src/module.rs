@@ -660,13 +660,13 @@ where
 }
 
 #[derive(Debug)]
-struct ResolvedPackage {
-    path: PathBuf,
-    kind: PackageKind,
+pub struct ResolvedPackage {
+    pub path: PathBuf,
+    pub kind: PackageKind,
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
-enum PackageKind {
+pub enum PackageKind {
     /// A root package or module. E.g. `foo` in `foo.bar.baz` or just `foo`.
     Root,
 
@@ -682,7 +682,7 @@ enum PackageKind {
 }
 
 impl PackageKind {
-    const fn is_regular_package(self) -> bool {
+    pub const fn is_regular_package(self) -> bool {
         matches!(self, PackageKind::Regular)
     }
 }

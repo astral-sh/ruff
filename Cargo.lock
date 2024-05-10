@@ -463,6 +463,11 @@ name = "countme"
 version = "3.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7704b5fdd17b18ae31c4c1da5a2e0305a2bf17b5249300a9ee9ed7b72114c636"
+dependencies = [
+ "dashmap",
+ "once_cell",
+ "rustc-hash",
+]
 
 [[package]]
 name = "crc32fast"
@@ -1810,9 +1815,11 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "bitflags 2.5.0",
+ "countme",
  "crossbeam",
  "ctrlc",
  "dashmap",
+ "filetime",
  "hashbrown 0.14.5",
  "indexmap",
  "notify",
@@ -1828,6 +1835,7 @@ dependencies = [
  "smol_str",
  "tempfile",
  "tracing",
+ "tracing-log",
  "tracing-subscriber",
  "tracing-tree",
 ]
@@ -2538,7 +2546,7 @@ checksum = "e86697c916019a8588c99b5fac3cead74ec0b4b819707a682fd4d23fa0ce1ba1"
 [[package]]
 name = "salsa-2022"
 version = "0.1.0"
-source = "git+https://github.com/salsa-rs/salsa.git?rev=f5aec4abefb4c5e67cba6d8ea91c216bc2838f10#f5aec4abefb4c5e67cba6d8ea91c216bc2838f10"
+source = "git+https://github.com/salsa-rs/salsa.git?rev=05b4e3ebdcdc47730cdd359e7e97fb2470527279#05b4e3ebdcdc47730cdd359e7e97fb2470527279"
 dependencies = [
  "arc-swap",
  "crossbeam",
@@ -2556,7 +2564,7 @@ dependencies = [
 [[package]]
 name = "salsa-2022-macros"
 version = "0.1.0"
-source = "git+https://github.com/salsa-rs/salsa.git?rev=f5aec4abefb4c5e67cba6d8ea91c216bc2838f10#f5aec4abefb4c5e67cba6d8ea91c216bc2838f10"
+source = "git+https://github.com/salsa-rs/salsa.git?rev=05b4e3ebdcdc47730cdd359e7e97fb2470527279#05b4e3ebdcdc47730cdd359e7e97fb2470527279"
 dependencies = [
  "eyre",
  "heck 0.4.1",
