@@ -1777,7 +1777,7 @@ def f(arg=%timeit a = b):
     #[test]
     fn test_numbers() {
         let source =
-            "0x2f 0o12 0b1101 0 123 123_45_67_890 0.2 1e+2 2.1e3 2j 2.2j 000 0x995DC9BBDF1939FA";
+            "0x2f 0o12 0b1101 0 123 123_45_67_890 0.2 1e+2 2.1e3 2j 2.2j 000 0x995DC9BBDF1939FA 0x995DC9BBDF1939FA995DC9BBDF1939FA";
         assert_debug_snapshot!(lex_source(source));
     }
 
