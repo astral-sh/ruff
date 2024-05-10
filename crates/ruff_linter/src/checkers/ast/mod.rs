@@ -168,7 +168,7 @@ impl ExpectedDocstringKind {
     const fn as_flag(self) -> SemanticModelFlags {
         match self {
             ExpectedDocstringKind::Attribute => SemanticModelFlags::ATTRIBUTE_DOCSTRING,
-            _ => SemanticModelFlags::DOCSTRING,
+            _ => SemanticModelFlags::PEP_257_DOCSTRING,
         }
     }
 }

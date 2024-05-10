@@ -1643,9 +1643,11 @@ impl<'a> SemanticModel<'a> {
             .intersects(SemanticModelFlags::TYPE_CHECKING_BLOCK)
     }
 
-    /// Return `true` if the model is in a docstring.
-    pub const fn in_docstring(&self) -> bool {
-        self.flags.intersects(SemanticModelFlags::DOCSTRING)
+    /// Return `true` if the model is in a docstring as described in [PEP 257].
+    ///
+    /// [PEP 257]: https://peps.python.org/pep-0257/#what-is-a-docstring
+    pub const fn in_pep_257_docstring(&self) -> bool {
+        self.flags.intersects(SemanticModelFlags::PEP_257_DOCSTRING)
     }
 
     /// Return `true` if the model is in an attribute docstring.
@@ -2088,7 +2090,7 @@ bitflags! {
         /// ```
         const COMPREHENSION_ASSIGNMENT = 1 << 20;
 
-        /// The model is in a module / class / function docstring.
+        /// The model is in a docstring as described in [PEP 257].
         ///
         /// For example, the model could be visiting either the module, class,
         /// or function docstring in:
@@ -2105,7 +2107,9 @@ bitflags! {
         ///     """Function docstring."""
         ///     pass
         /// ```
-        const DOCSTRING = 1 << 21;
+        ///
+        /// [PEP 257]: https://peps.python.org/pep-0257/#what-is-a-docstring
+        const PEP_257_DOCSTRING = 1 << 21;
 
         /// The model is visiting the r.h.s. of a module-level `__all__` definition.
         ///
@@ -2159,6 +2163,12 @@ bitflags! {
         ///     b = 1
         ///     """This is an attribute docstring for `Foo.b` class variable"""
         /// ```
+        ///
+        /// Unlike other kinds of docstrings as described in [PEP 257], attribute docstrings are
+        /// discarded at runtime. However, they are used by some documentation renderers and
+        /// static-analysis tools.
+        ///
+        /// [PEP 257]: https://peps.python.org/pep-0257/#what-is-a-docstring
         const ATTRIBUTE_DOCSTRING = 1 << 26;
 
         /// The context is in any type annotation.
