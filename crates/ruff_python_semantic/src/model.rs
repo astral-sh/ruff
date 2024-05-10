@@ -1643,9 +1643,17 @@ impl<'a> SemanticModel<'a> {
             .intersects(SemanticModelFlags::TYPE_CHECKING_BLOCK)
     }
 
-    /// Return `true` if the model is in a docstring.
-    pub const fn in_docstring(&self) -> bool {
-        self.flags.intersects(SemanticModelFlags::DOCSTRING)
+    /// Return `true` if the model is in a docstring as described in [PEP 257].
+    ///
+    /// [PEP 257]: https://peps.python.org/pep-0257/#what-is-a-docstring
+    pub const fn in_pep_257_docstring(&self) -> bool {
+        self.flags.intersects(SemanticModelFlags::PEP_257_DOCSTRING)
+    }
+
+    /// Return `true` if the model is in an attribute docstring.
+    pub const fn in_attribute_docstring(&self) -> bool {
+        self.flags
+            .intersects(SemanticModelFlags::ATTRIBUTE_DOCSTRING)
     }
 
     /// Return `true` if the model has traversed past the "top-of-file" import boundary.
@@ -2082,7 +2090,7 @@ bitflags! {
         /// ```
         const COMPREHENSION_ASSIGNMENT = 1 << 20;
 
-        /// The model is in a module / class / function docstring.
+        /// The model is in a docstring as described in [PEP 257].
         ///
         /// For example, the model could be visiting either the module, class,
         /// or function docstring in:
@@ -2099,7 +2107,9 @@ bitflags! {
         ///     """Function docstring."""
         ///     pass
         /// ```
-        const DOCSTRING = 1 << 21;
+        ///
+        /// [PEP 257]: https://peps.python.org/pep-0257/#what-is-a-docstring
+        const PEP_257_DOCSTRING = 1 << 21;
 
         /// The model is visiting the r.h.s. of a module-level `__all__` definition.
         ///
@@ -2135,6 +2145,31 @@ bitflags! {
         /// The model is visiting a class base that was initially deferred
         /// while traversing the AST. (This only happens in stub files.)
         const DEFERRED_CLASS_BASE = 1 << 25;
+
+        /// The model is in an attribute docstring.
+        ///
+        /// An attribute docstring is a string literal immediately following an assignment or an
+        /// annotated assignment statement. The context in which this is valid are:
+        /// 1. At the top level of a module
+        /// 2. At the top level of a class definition i.e., a class attribute
+        ///
+        /// For example:
+        /// ```python
+        /// a = 1
+        /// """This is an attribute docstring for `a` variable"""
+        ///
+        ///
+        /// class Foo:
+        ///     b = 1
+        ///     """This is an attribute docstring for `Foo.b` class variable"""
+        /// ```
+        ///
+        /// Unlike other kinds of docstrings as described in [PEP 257], attribute docstrings are
+        /// discarded at runtime. However, they are used by some documentation renderers and
+        /// static-analysis tools.
+        ///
+        /// [PEP 257]: https://peps.python.org/pep-0257/#what-is-a-docstring
+        const ATTRIBUTE_DOCSTRING = 1 << 26;
 
         /// The context is in any type annotation.
         const ANNOTATION = Self::TYPING_ONLY_ANNOTATION.bits() | Self::RUNTIME_EVALUATED_ANNOTATION.bits() | Self::RUNTIME_REQUIRED_ANNOTATION.bits();

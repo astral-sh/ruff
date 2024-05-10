@@ -460,7 +460,7 @@ pub(crate) fn check_string_quotes(checker: &mut Checker, string_like: StringLike
         StringLike::FString(node) => node.value.iter().map(Ranged::range).collect(),
     };
 
-    if checker.semantic().in_docstring() {
+    if checker.semantic().in_pep_257_docstring() {
         if checker.enabled(Rule::BadQuotesDocstring) {
             for range in ranges {
                 docstring(checker, range);
