@@ -1278,21 +1278,20 @@ mod tests {
     fn multiline_comment() {
         let path = Path::new("/tmp/foo.txt");
         let source = r#"
-        print(
-            """First line
-            second line
-            third line
-              %s"""
-            % name
-        )
-        "#;
+print(
+    """First line
+    second line
+    third line
+      %s"""
+    % name
+)
+"#;
+        let noqa_line_for = [TextRange::new(8.into(), 68.into())].into_iter().collect();
         let diagnostics = [Diagnostic::new(
             PrintfStringFormatting,
             TextRange::new(12.into(), 79.into()),
         )];
         let comment_ranges = CommentRanges::default();
-        let mut noqa_line_for = NoqaMapping::default();
-        noqa_line_for.push_mapping(TextRange::new(12.into(), 79.into()));
         let edits = generate_noqa_edits(
             path,
             &diagnostics,
@@ -1306,8 +1305,8 @@ mod tests {
             edits,
             vec![Some(Edit::replacement(
                 "  # noqa: UP031\n".to_string(),
-                88.into(),
-                89.into()
+                68.into(),
+                69.into()
             ))]
         );
     }
