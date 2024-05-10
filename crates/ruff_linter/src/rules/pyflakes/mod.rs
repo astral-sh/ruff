@@ -11,7 +11,6 @@ mod tests {
 
     use anyhow::Result;
     use regex::Regex;
-    use ruff_python_parser::lexer::LexResult;
 
     use test_case::test_case;
 
@@ -591,7 +590,7 @@ mod tests {
         let source_type = PySourceType::default();
         let source_kind = SourceKind::Python(contents.to_string());
         let settings = LinterSettings::for_rules(Linter::Pyflakes.rules());
-        let tokens: Vec<LexResult> = ruff_python_parser::tokenize(&contents, source_type.as_mode());
+        let tokens = ruff_python_parser::tokenize(&contents, source_type.as_mode());
         let locator = Locator::new(&contents);
         let stylist = Stylist::from_tokens(&tokens, &locator);
         let indexer = Indexer::from_tokens(&tokens, &locator);

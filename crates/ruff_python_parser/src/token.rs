@@ -228,6 +228,11 @@ pub enum Tok {
 }
 
 impl Tok {
+    #[inline]
+    pub fn kind(&self) -> TokenKind {
+        TokenKind::from_token(self)
+    }
+
     pub fn start_marker(mode: Mode) -> Self {
         match mode {
             Mode::Module | Mode::Ipython => Tok::StartModule,
