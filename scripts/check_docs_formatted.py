@@ -39,6 +39,7 @@ KNOWN_FORMATTING_VIOLATIONS = [
     "blank-lines-before-nested-definition",
     "blank-lines-top-level",
     "explicit-string-concatenation",
+    "f-string-missing-placeholders",
     "indent-with-spaces",
     "indentation-with-invalid-multiple",
     "line-too-long",
