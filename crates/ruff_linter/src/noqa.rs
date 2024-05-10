@@ -37,7 +37,7 @@ pub fn generate_noqa_edits(
         FileExemption::try_extract(locator.contents(), comment_ranges, external, path, locator);
     let directives = NoqaDirectives::from_commented_ranges(comment_ranges, path, locator);
     let comments = find_noqa_comments(diagnostics, locator, &exemption, &directives, noqa_line_for);
-    build_noqa_edits_by_diagnostic(comments, diagnostics, locator, line_ending)
+    build_noqa_edits_by_diagnostic(comments, locator, line_ending)
 }
 
 /// A directive to ignore a set of rules for a given line of Python source code (e.g.,
@@ -192,7 +192,7 @@ impl<'a> Directive<'a> {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub(crate) struct All {
     range: TextRange,
 }
@@ -205,7 +205,7 @@ impl Ranged for All {
 }
 
 /// An individual rule code in a `noqa` directive (e.g., `F401`).
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub(crate) struct Code<'a> {
     code: &'a str,
     range: TextRange,
@@ -580,15 +580,13 @@ fn add_noqa_inner(
 
 fn build_noqa_edits_by_diagnostic(
     comments: Vec<Option<NoqaComment>>,
-    diagnostics: &[Diagnostic],
     locator: &Locator,
     line_ending: LineEnding,
 ) -> Vec<Option<Edit>> {
     let mut edits = Vec::default();
-    for (i, comment) in comments.into_iter().enumerate() {
+    for comment in comments {
         match comment {
             Some(comment) => {
-                debug_assert_eq!(comment.diagnostic, &diagnostics[i]);
                 if let Some(noqa_edit) = generate_noqa_edit(
                     comment.directive,
                     comment.line,
@@ -989,13 +987,15 @@ mod tests {
     use insta::assert_debug_snapshot;
     use ruff_text_size::{TextRange, TextSize};
 
-    use ruff_diagnostics::Diagnostic;
+    use ruff_diagnostics::{Diagnostic, Edit};
     use ruff_python_trivia::CommentRanges;
     use ruff_source_file::{LineEnding, Locator};
 
+    use crate::generate_noqa_edits;
     use crate::noqa::{add_noqa_inner, Directive, NoqaMapping, ParsedFileExemption};
     use crate::rules::pycodestyle::rules::AmbiguousVariableName;
     use crate::rules::pyflakes::rules::UnusedVariable;
+    use crate::rules::pyupgrade::rules::PrintfStringFormatting;
 
     #[test]
     fn noqa_all() {
@@ -1272,5 +1272,43 @@ mod tests {
         );
         assert_eq!(count, 0);
         assert_eq!(output, "x = 1  # noqa");
+    }
+
+    #[test]
+    fn multiline_comment() {
+        let path = Path::new("/tmp/foo.txt");
+        let source = r#"
+        print(
+            """First line
+            second line
+            third line
+              %s"""
+            % name
+        )
+        "#;
+        let diagnostics = [Diagnostic::new(
+            PrintfStringFormatting,
+            TextRange::new(12.into(), 79.into()),
+        )];
+        let comment_ranges = CommentRanges::default();
+        let mut noqa_line_for = NoqaMapping::default();
+        noqa_line_for.push_mapping(TextRange::new(12.into(), 79.into()));
+        let edits = generate_noqa_edits(
+            path,
+            &diagnostics,
+            &Locator::new(source),
+            &comment_ranges,
+            &[],
+            &noqa_line_for,
+            LineEnding::Lf,
+        );
+        assert_eq!(
+            edits,
+            vec![Some(Edit::replacement(
+                "  # noqa: UP031\n".to_string(),
+                88.into(),
+                89.into()
+            ))]
+        );
     }
 }
