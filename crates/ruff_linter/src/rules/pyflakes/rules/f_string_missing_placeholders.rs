@@ -29,6 +29,28 @@ use crate::checkers::ast::Checker;
 /// "Hello, world!"
 /// ```
 ///
+/// **Note regarding implicit string concatenation:** In order to maintain
+/// compatibility with the original PyFlakes rule, this rule is only flagged
+/// when _none_ of the f-strings in an implicit string concatenation have
+/// placeholders. For example:
+///
+/// ```python
+/// # Will not be flagged
+/// (
+///     f"Hello,"
+///     f" {name}!"
+/// )
+///
+/// # Will be flagged
+/// (
+///     f"Hello,"
+///     f" World!"
+/// )
+/// ```
+///
+/// See [Issue #10885](https://github.com/astral-sh/ruff/issues/10885) for
+/// more information.
+///
 /// ## References
 /// - [PEP 498](https://www.python.org/dev/peps/pep-0498/)
 #[violation]
