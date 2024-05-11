@@ -5,6 +5,7 @@ use rustc_hash::FxHashSet;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_text_size::Ranged;
@@ -121,7 +122,19 @@ pub(crate) fn unnecessary_dict_kwargs(checker: &mut Checker, call: &ast::ExprCal
                             .iter()
                             .zip(dict.iter_values())
                             .map(|(kwarg, value)| {
-                                format!("{}={}", kwarg, checker.locator().slice(value.range()))
+                                format!(
+                                    "{}={}",
+                                    kwarg,
+                                    checker.locator().slice(
+                                        parenthesized_range(
+                                            value.into(),
+                                            dict.into(),
+                                            checker.indexer().comment_ranges(),
+                                            checker.locator().contents(),
+                                        )
+                                        .unwrap_or(value.range())
+                                    )
+                                )
                             })
                             .join(", "),
                         keyword.range(),
