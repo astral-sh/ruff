@@ -17,7 +17,6 @@ use ruff_python_parser::lexer::LexResult;
 use ruff_python_parser::AsMode;
 use ruff_source_file::Locator;
 use ruff_text_size::Ranged;
-use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 
 use crate::{edit::ToRangeExt, PositionEncoding, DIAGNOSTIC_NAME};
@@ -38,7 +37,7 @@ pub(crate) struct DiagnosticFix {
     pub(crate) fixed_diagnostic: lsp_types::Diagnostic,
     pub(crate) title: String,
     pub(crate) code: String,
-    pub(crate) edits: Option<Vec<lsp_types::TextEdit>>,
+    pub(crate) edits: Vec<lsp_types::TextEdit>,
     pub(crate) noqa_edit: Option<lsp_types::TextEdit>,
 }
 
@@ -99,7 +98,7 @@ pub(crate) fn check(
         TokenSource::Tokens(tokens),
     );
 
-    let mut noqa_edits: FxHashMap<Diagnostic, Edit> = generate_noqa_edits(
+    let noqa_edits = generate_noqa_edits(
         &document_path,
         diagnostics.as_slice(),
         &locator,
@@ -111,10 +110,8 @@ pub(crate) fn check(
 
     diagnostics
         .into_iter()
-        .map(|diagnostic| {
-            let noqa_edit = noqa_edits.remove(&diagnostic);
-            to_lsp_diagnostic(diagnostic, noqa_edit, document, encoding)
-        })
+        .zip(noqa_edits)
+        .map(|(diagnostic, noqa_edit)| to_lsp_diagnostic(diagnostic, noqa_edit, document, encoding))
         .collect()
 }
 
@@ -134,19 +131,22 @@ pub(crate) fn fixes_for_diagnostics(
                 serde_json::from_value(data).map_err(|err| {
                     anyhow::anyhow!("failed to deserialize diagnostic data: {err}")
                 })?;
-            let edits = associated_data.fix.map(|fix| {
-                fix.edits()
-                    .iter()
-                    .map(|edit| lsp_types::TextEdit {
-                        range: edit.range().to_range(
-                            document.contents(),
-                            document.index(),
-                            encoding,
-                        ),
-                        new_text: edit.content().unwrap_or_default().to_string(),
-                    })
-                    .collect()
-            });
+            let edits = associated_data
+                .fix
+                .map(|fix| {
+                    fix.edits()
+                        .iter()
+                        .map(|edit| lsp_types::TextEdit {
+                            range: edit.range().to_range(
+                                document.contents(),
+                                document.index(),
+                                encoding,
+                            ),
+                            new_text: edit.content().unwrap_or_default().to_string(),
+                        })
+                        .collect()
+                })
+                .unwrap_or_default();
 
             let noqa_edit =
                 associated_data

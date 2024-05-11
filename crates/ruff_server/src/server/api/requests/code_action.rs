@@ -72,17 +72,14 @@ fn quick_fix(
     let document = snapshot.document();
     fixes
         .iter()
-        .filter(|fix| fix.edits.is_some())
+        .filter(|fix| !fix.edits.is_empty())
         .map(|fix| {
             let mut tracker = WorkspaceEditTracker::new(snapshot.resolved_client_capabilities());
 
             tracker.set_edits_for_document(
                 snapshot.url().clone(),
                 document.version(),
-                fix.edits
-                    .as_ref()
-                    .expect("should only be iterating over fixes with available edits")
-                    .clone(),
+                fix.edits.clone(),
             )?;
 
             Ok(types::CodeActionOrCommand::CodeAction(types::CodeAction {
@@ -103,7 +100,7 @@ fn noqa_comments(snapshot: &DocumentSnapshot, fixes: &[DiagnosticFix]) -> Vec<Co
     fixes
         .iter()
         .filter_map(|fix| {
-            let edit = fix.noqa_edit.as_ref()?.clone();
+            let edit = fix.noqa_edit.clone()?;
 
             let mut tracker = WorkspaceEditTracker::new(snapshot.resolved_client_capabilities());
 
