@@ -88,7 +88,7 @@ pub(crate) fn check(
     let indexer = Indexer::from_tokens(&tokens, &locator);
 
     // Extract the `# noqa` and `# isort: skip` directives from the source.
-    let directives = extract_directives(&tokens, Flags::empty(), &locator, &indexer);
+    let directives = extract_directives(&tokens, Flags::all(), &locator, &indexer);
 
     // Generate checks.
     let LinterResult {
