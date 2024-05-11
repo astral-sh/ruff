@@ -25,8 +25,11 @@ use crate::{edit::ToRangeExt, PositionEncoding, DIAGNOSTIC_NAME};
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub(crate) struct AssociatedDiagnosticData {
     pub(crate) kind: DiagnosticKind,
+    /// A possible fix for the associated diagnostic.
     pub(crate) fix: Option<Fix>,
+    /// The NOQA code for the diagnostic.
     pub(crate) code: String,
+    /// Possible edit to add a `noqa` comment which will disable this diagnostic.
     pub(crate) noqa_edit: Option<ruff_diagnostics::Edit>,
 }
 
@@ -34,10 +37,16 @@ pub(crate) struct AssociatedDiagnosticData {
 /// edits available, `noqa` comment edits, or both.
 #[derive(Clone, Debug)]
 pub(crate) struct DiagnosticFix {
+    /// The original diagnostic to be fixed
     pub(crate) fixed_diagnostic: lsp_types::Diagnostic,
+    /// The message describing what the fix does.
     pub(crate) title: String,
+    /// The NOQA code for the diagnostic.
     pub(crate) code: String,
+    /// Edits to fix the diagnostic. If this is empty, a fix
+    /// does not exist.
     pub(crate) edits: Vec<lsp_types::TextEdit>,
+    /// Possible edit to add a `noqa` comment which will disable this diagnostic.
     pub(crate) noqa_edit: Option<lsp_types::TextEdit>,
 }
 
