@@ -452,6 +452,17 @@ pub enum StringLikePart<'a> {
     FString(&'a ast::FString),
 }
 
+impl StringLikePart<'_> {
+    /// Returns `true` if this part is a raw string i.e., the literal is prefixed with `r`.
+    pub fn is_raw(&self) -> bool {
+        match self {
+            StringLikePart::String(string) => string.flags.prefix().is_raw(),
+            StringLikePart::Bytes(bytes) => bytes.flags.prefix().is_raw(),
+            StringLikePart::FString(f_string) => f_string.flags.prefix().is_raw(),
+        }
+    }
+}
+
 impl<'a> From<&'a ast::StringLiteral> for StringLikePart<'a> {
     fn from(value: &'a ast::StringLiteral) -> Self {
         StringLikePart::String(value)

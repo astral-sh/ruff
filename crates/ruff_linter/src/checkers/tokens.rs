@@ -75,18 +75,6 @@ pub(crate) fn check_tokens(
         pyupgrade::rules::unnecessary_coding_comment(&mut diagnostics, locator, indexer);
     }
 
-    if settings.rules.enabled(Rule::InvalidEscapeSequence) {
-        for (tok, range) in tokens.iter().flatten() {
-            pycodestyle::rules::invalid_escape_sequence(
-                &mut diagnostics,
-                locator,
-                indexer,
-                tok,
-                *range,
-            );
-        }
-    }
-
     if settings.rules.enabled(Rule::TabIndentation) {
         pycodestyle::rules::tab_indentation(&mut diagnostics, locator, indexer);
     }
