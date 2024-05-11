@@ -53,39 +53,30 @@ pub(crate) fn unnecessary_escaped_quote(checker: &mut Checker, string_like: Stri
 
     let locator = checker.locator();
 
-    match string_like {
-        StringLike::String(expr) => {
-            for string in &expr.value {
+    for part in string_like.parts() {
+        match part {
+            ast::StringLikePart::String(string_literal) => {
                 if let Some(diagnostic) = check_string_or_bytes(
                     locator,
-                    string.range(),
-                    AnyStringKind::from(string.flags),
+                    string_literal.range(),
+                    AnyStringKind::from(string_literal.flags),
                 ) {
                     checker.diagnostics.push(diagnostic);
                 }
             }
-        }
-        StringLike::Bytes(expr) => {
-            for bytes in &expr.value {
-                if let Some(diagnostic) =
-                    check_string_or_bytes(locator, bytes.range(), AnyStringKind::from(bytes.flags))
-                {
+            ast::StringLikePart::Bytes(bytes_literal) => {
+                if let Some(diagnostic) = check_string_or_bytes(
+                    locator,
+                    bytes_literal.range(),
+                    AnyStringKind::from(bytes_literal.flags),
+                ) {
                     checker.diagnostics.push(diagnostic);
                 }
             }
-        }
-        StringLike::FString(expr) => {
-            for part in &expr.value {
-                if let Some(diagnostic) = match part {
-                    ast::FStringPart::Literal(string) => check_string_or_bytes(
-                        locator,
-                        string.range(),
-                        AnyStringKind::from(string.flags),
-                    ),
-                    ast::FStringPart::FString(f_string) => check_f_string(locator, f_string),
-                } {
+            ast::StringLikePart::FString(f_string) => {
+                if let Some(diagnostic) = check_f_string(locator, f_string) {
                     checker.diagnostics.push(diagnostic);
-                };
+                }
             }
         }
     }

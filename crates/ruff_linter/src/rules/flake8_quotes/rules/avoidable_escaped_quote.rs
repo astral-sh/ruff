@@ -64,28 +64,15 @@ pub(crate) fn avoidable_escaped_quote(checker: &mut Checker, string_like: String
 
     let mut rule_checker = AvoidableEscapedQuoteChecker::new(checker.locator(), checker.settings);
 
-    match string_like {
-        StringLike::String(expr) => {
-            for string_literal in &expr.value {
+    for part in string_like.parts() {
+        match part {
+            ast::StringLikePart::String(string_literal) => {
                 rule_checker.visit_string_literal(string_literal);
             }
-        }
-        StringLike::Bytes(expr) => {
-            for bytes_literal in &expr.value {
+            ast::StringLikePart::Bytes(bytes_literal) => {
                 rule_checker.visit_bytes_literal(bytes_literal);
             }
-        }
-        StringLike::FString(expr) => {
-            for part in &expr.value {
-                match part {
-                    ast::FStringPart::Literal(string_literal) => {
-                        rule_checker.visit_string_literal(string_literal);
-                    }
-                    ast::FStringPart::FString(f_string) => {
-                        rule_checker.visit_f_string(f_string);
-                    }
-                }
-            }
+            ast::StringLikePart::FString(f_string) => rule_checker.visit_f_string(f_string),
         }
     }
 
