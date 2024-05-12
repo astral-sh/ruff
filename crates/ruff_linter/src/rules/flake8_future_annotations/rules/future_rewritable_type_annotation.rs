@@ -72,7 +72,7 @@ impl Violation for FutureRewritableTypeAnnotation {
     #[derive_message_formats]
     fn message(&self) -> String {
         let FutureRewritableTypeAnnotation { name } = self;
-        format!("Missing `from __future__ import annotations`, but uses `{name}`")
+        format!("Add `from __future__ import annotations` to rewrite `{name}` more succinctly")
     }
 }
 
