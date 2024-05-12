@@ -65,69 +65,87 @@ UP007B.py:15:9: UP007B Use `X | Y` for type annotations
    |
    = help: Convert to `X | Y`
 
-UP007B.py:18:10: UP007B Use `X | Y` for type annotations
+UP007B.py:18:15: UP007B [*] Use `X | Y` for type annotations
    |
-18 | def f(x: Optional[int : float]) -> None:
-   |          ^^^^^^^^^^^^^^^^^^^^^ UP007B
+18 | def f(x: list[Optional[int]]) -> None:
+   |               ^^^^^^^^^^^^^ UP007B
 19 |     ...
    |
    = help: Convert to `X | Y`
 
+ℹ Safe fix
+15 15 |     x = Optional[str]
+16 16 | 
+17 17 | 
+18    |-def f(x: list[Optional[int]]) -> None:
+   18 |+def f(x: list[int | None]) -> None:
+19 19 |     ...
+20 20 | 
+21 21 | 
+
 UP007B.py:22:10: UP007B Use `X | Y` for type annotations
    |
-22 | def f(x: Optional[str, int : float]) -> None:
-   |          ^^^^^^^^^^^^^^^^^^^^^^^^^^ UP007B
+22 | def f(x: Optional[int : float]) -> None:
+   |          ^^^^^^^^^^^^^^^^^^^^^ UP007B
 23 |     ...
    |
    = help: Convert to `X | Y`
 
 UP007B.py:26:10: UP007B Use `X | Y` for type annotations
    |
-26 | def f(x: Optional[int, float]) -> None:
-   |          ^^^^^^^^^^^^^^^^^^^^ UP007B
+26 | def f(x: Optional[str, int : float]) -> None:
+   |          ^^^^^^^^^^^^^^^^^^^^^^^^^^ UP007B
 27 |     ...
    |
    = help: Convert to `X | Y`
 
-UP007B.py:32:28: UP007B [*] Use `X | Y` for type annotations
+UP007B.py:30:10: UP007B Use `X | Y` for type annotations
    |
-30 |   # Regression test for: https://github.com/astral-sh/ruff/issues/7131
-31 |   class ServiceRefOrValue:
-32 |       service_specification: Optional[
+30 | def f(x: Optional[int, float]) -> None:
+   |          ^^^^^^^^^^^^^^^^^^^^ UP007B
+31 |     ...
+   |
+   = help: Convert to `X | Y`
+
+UP007B.py:36:28: UP007B [*] Use `X | Y` for type annotations
+   |
+34 |   # Regression test for: https://github.com/astral-sh/ruff/issues/7131
+35 |   class ServiceRefOrValue:
+36 |       service_specification: Optional[
    |  ____________________________^
-33 | |         list[ServiceSpecificationRef]
-34 | |         | list[ServiceSpecification]
-35 | |     ] = None
+37 | |         list[ServiceSpecificationRef]
+38 | |         | list[ServiceSpecification]
+39 | |     ] = None
    | |_____^ UP007B
    |
    = help: Convert to `X | Y`
 
 ℹ Safe fix
-29 29 | 
-30 30 | # Regression test for: https://github.com/astral-sh/ruff/issues/7131
-31 31 | class ServiceRefOrValue:
-32    |-    service_specification: Optional[
-33    |-        list[ServiceSpecificationRef]
-34    |-        | list[ServiceSpecification]
-35    |-    ] = None
-   32 |+    service_specification: list[ServiceSpecificationRef] | list[ServiceSpecification] | None = None
-36 33 | 
-37 34 | 
-38 35 | # Regression test for: https://github.com/astral-sh/ruff/issues/7201
+33 33 | 
+34 34 | # Regression test for: https://github.com/astral-sh/ruff/issues/7131
+35 35 | class ServiceRefOrValue:
+36    |-    service_specification: Optional[
+37    |-        list[ServiceSpecificationRef]
+38    |-        | list[ServiceSpecification]
+39    |-    ] = None
+   36 |+    service_specification: list[ServiceSpecificationRef] | list[ServiceSpecification] | None = None
+40 37 | 
+41 38 | 
+42 39 | # Regression test for: https://github.com/astral-sh/ruff/issues/7201
 
-UP007B.py:40:28: UP007B [*] Use `X | Y` for type annotations
+UP007B.py:44:28: UP007B [*] Use `X | Y` for type annotations
    |
-38 | # Regression test for: https://github.com/astral-sh/ruff/issues/7201
-39 | class ServiceRefOrValue:
-40 |     service_specification: Optional[str]is not True = None
+42 | # Regression test for: https://github.com/astral-sh/ruff/issues/7201
+43 | class ServiceRefOrValue:
+44 |     service_specification: Optional[str]is not True = None
    |                            ^^^^^^^^^^^^^ UP007B
    |
    = help: Convert to `X | Y`
 
 ℹ Safe fix
-37 37 | 
-38 38 | # Regression test for: https://github.com/astral-sh/ruff/issues/7201
-39 39 | class ServiceRefOrValue:
-40    |-    service_specification: Optional[str]is not True = None
-   40 |+    service_specification: str | None is not True = None
-41 41 |
+41 41 | 
+42 42 | # Regression test for: https://github.com/astral-sh/ruff/issues/7201
+43 43 | class ServiceRefOrValue:
+44    |-    service_specification: Optional[str]is not True = None
+   44 |+    service_specification: str | None is not True = None
+45 45 |

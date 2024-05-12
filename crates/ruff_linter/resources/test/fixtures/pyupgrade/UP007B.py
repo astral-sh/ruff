@@ -15,6 +15,10 @@ def f() -> None:
     x = Optional[str]
 
 
+def f(x: list[Optional[int]]) -> None:
+    ...
+
+
 def f(x: Optional[int : float]) -> None:
     ...
 
