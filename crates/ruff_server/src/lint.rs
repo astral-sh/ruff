@@ -1,8 +1,9 @@
 //! Access to the Ruff linting API for the LSP
 
-use ruff_diagnostics::{Applicability, Diagnostic, DiagnosticKind, Fix};
+use ruff_diagnostics::{Applicability, Diagnostic, DiagnosticKind, Edit, Fix};
 use ruff_linter::{
     directives::{extract_directives, Flags},
+    generate_noqa_edits,
     linter::{check_path, LinterResult, TokenSource},
     packaging::detect_package_root,
     registry::AsRule,
@@ -24,17 +25,29 @@ use crate::{edit::ToRangeExt, PositionEncoding, DIAGNOSTIC_NAME};
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub(crate) struct AssociatedDiagnosticData {
     pub(crate) kind: DiagnosticKind,
-    pub(crate) fix: Fix,
+    /// A possible fix for the associated diagnostic.
+    pub(crate) fix: Option<Fix>,
+    /// The NOQA code for the diagnostic.
     pub(crate) code: String,
+    /// Possible edit to add a `noqa` comment which will disable this diagnostic.
+    pub(crate) noqa_edit: Option<ruff_diagnostics::Edit>,
 }
 
-/// Describes a fix for `fixed_diagnostic` that applies `document_edits` to the source.
+/// Describes a fix for `fixed_diagnostic` that may have quick fix
+/// edits available, `noqa` comment edits, or both.
 #[derive(Clone, Debug)]
 pub(crate) struct DiagnosticFix {
+    /// The original diagnostic to be fixed
     pub(crate) fixed_diagnostic: lsp_types::Diagnostic,
+    /// The message describing what the fix does.
     pub(crate) title: String,
+    /// The NOQA code for the diagnostic.
     pub(crate) code: String,
+    /// Edits to fix the diagnostic. If this is empty, a fix
+    /// does not exist.
     pub(crate) edits: Vec<lsp_types::TextEdit>,
+    /// Possible edit to add a `noqa` comment which will disable this diagnostic.
+    pub(crate) noqa_edit: Option<lsp_types::TextEdit>,
 }
 
 pub(crate) fn check(
@@ -75,7 +88,7 @@ pub(crate) fn check(
     let indexer = Indexer::from_tokens(&tokens, &locator);
 
     // Extract the `# noqa` and `# isort: skip` directives from the source.
-    let directives = extract_directives(&tokens, Flags::empty(), &locator, &indexer);
+    let directives = extract_directives(&tokens, Flags::all(), &locator, &indexer);
 
     // Generate checks.
     let LinterResult {
@@ -94,9 +107,20 @@ pub(crate) fn check(
         TokenSource::Tokens(tokens),
     );
 
+    let noqa_edits = generate_noqa_edits(
+        &document_path,
+        diagnostics.as_slice(),
+        &locator,
+        indexer.comment_ranges(),
+        &linter_settings.external,
+        &directives.noqa_line_for,
+        stylist.line_ending(),
+    );
+
     diagnostics
         .into_iter()
-        .map(|diagnostic| to_lsp_diagnostic(diagnostic, document, encoding))
+        .zip(noqa_edits)
+        .map(|(diagnostic, noqa_edit)| to_lsp_diagnostic(diagnostic, noqa_edit, document, encoding))
         .collect()
 }
 
@@ -118,14 +142,34 @@ pub(crate) fn fixes_for_diagnostics(
                 })?;
             let edits = associated_data
                 .fix
-                .edits()
-                .iter()
-                .map(|edit| lsp_types::TextEdit {
-                    range: edit
-                        .range()
-                        .to_range(document.contents(), document.index(), encoding),
-                    new_text: edit.content().unwrap_or_default().to_string(),
-                });
+                .map(|fix| {
+                    fix.edits()
+                        .iter()
+                        .map(|edit| lsp_types::TextEdit {
+                            range: edit.range().to_range(
+                                document.contents(),
+                                document.index(),
+                                encoding,
+                            ),
+                            new_text: edit.content().unwrap_or_default().to_string(),
+                        })
+                        .collect()
+                })
+                .unwrap_or_default();
+
+            let noqa_edit =
+                associated_data
+                    .noqa_edit
+                    .as_ref()
+                    .map(|noqa_edit| lsp_types::TextEdit {
+                        range: noqa_edit.range().to_range(
+                            document.contents(),
+                            document.index(),
+                            encoding,
+                        ),
+                        new_text: noqa_edit.content().unwrap_or_default().to_string(),
+                    });
+
             Ok(Some(DiagnosticFix {
                 fixed_diagnostic,
                 code: associated_data.code,
@@ -133,7 +177,8 @@ pub(crate) fn fixes_for_diagnostics(
                     .kind
                     .suggestion
                     .unwrap_or(associated_data.kind.name),
-                edits: edits.collect(),
+                edits,
+                noqa_edit,
             }))
         })
         .filter_map(crate::Result::transpose)
@@ -142,6 +187,7 @@ pub(crate) fn fixes_for_diagnostics(
 
 fn to_lsp_diagnostic(
     diagnostic: Diagnostic,
+    noqa_edit: Option<Edit>,
     document: &crate::edit::Document,
     encoding: PositionEncoding,
 ) -> lsp_types::Diagnostic {
@@ -151,18 +197,19 @@ fn to_lsp_diagnostic(
 
     let rule = kind.rule();
 
-    let data = fix.and_then(|fix| {
-        fix.applies(Applicability::Unsafe)
-            .then(|| {
-                serde_json::to_value(&AssociatedDiagnosticData {
-                    kind: kind.clone(),
-                    fix,
-                    code: rule.noqa_code().to_string(),
-                })
-                .ok()
+    let fix = fix.and_then(|fix| fix.applies(Applicability::Unsafe).then_some(fix));
+
+    let data = (fix.is_some() || noqa_edit.is_some())
+        .then(|| {
+            serde_json::to_value(&AssociatedDiagnosticData {
+                kind: kind.clone(),
+                fix,
+                code: rule.noqa_code().to_string(),
+                noqa_edit,
             })
-            .flatten()
-    });
+            .ok()
+        })
+        .flatten();
 
     let code = rule.noqa_code().to_string();
 
