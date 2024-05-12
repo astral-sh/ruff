@@ -319,7 +319,10 @@ mod tests {
     fn redirects() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/redirects.py"),
-            &settings::LinterSettings::for_rules(vec![Rule::NonPEP604Annotation]),
+            &settings::LinterSettings::for_rules(vec![
+                Rule::NonPEP604AnnotationOptional,
+                Rule::NonPEP604AnnotationUnion,
+            ]),
         )?;
         assert_messages!(diagnostics);
         Ok(())

@@ -39,7 +39,8 @@ mod tests {
     #[test_case(Rule::NonPEP585Annotation, Path::new("UP006_1.py"))]
     #[test_case(Rule::NonPEP585Annotation, Path::new("UP006_2.py"))]
     #[test_case(Rule::NonPEP585Annotation, Path::new("UP006_3.py"))]
-    #[test_case(Rule::NonPEP604Annotation, Path::new("UP007.py"))]
+    #[test_case(Rule::NonPEP604AnnotationUnion, Path::new("UP007.py"))]
+    #[test_case(Rule::NonPEP604AnnotationOptional, Path::new("UP007B.py"))]
     #[test_case(Rule::NonPEP604Isinstance, Path::new("UP038.py"))]
     #[test_case(Rule::OSErrorAlias, Path::new("UP024_0.py"))]
     #[test_case(Rule::OSErrorAlias, Path::new("UP024_1.py"))]
@@ -187,7 +188,10 @@ mod tests {
             Path::new("pyupgrade/future_annotations.py"),
             &settings::LinterSettings {
                 target_version: PythonVersion::Py37,
-                ..settings::LinterSettings::for_rule(Rule::NonPEP604Annotation)
+                ..settings::LinterSettings::for_rules(vec![
+                    Rule::NonPEP604AnnotationUnion,
+                    Rule::NonPEP604AnnotationOptional,
+                ])
             },
         )?;
         assert_messages!(diagnostics);
@@ -200,7 +204,10 @@ mod tests {
             Path::new("pyupgrade/future_annotations.py"),
             &settings::LinterSettings {
                 target_version: PythonVersion::Py310,
-                ..settings::LinterSettings::for_rule(Rule::NonPEP604Annotation)
+                ..settings::LinterSettings::for_rules(vec![
+                    Rule::NonPEP604AnnotationUnion,
+                    Rule::NonPEP604AnnotationOptional,
+                ])
             },
         )?;
         assert_messages!(diagnostics);
