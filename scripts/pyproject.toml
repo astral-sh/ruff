@@ -1,7 +1,7 @@
 [project]
 name = "scripts"
 version = "0.0.1"
-dependencies = ["sphinx"]
+dependencies = ["stdlibs"]
 requires-python = ">=3.8"
 
 [tool.black]
