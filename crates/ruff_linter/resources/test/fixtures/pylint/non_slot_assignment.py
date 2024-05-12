@@ -66,3 +66,19 @@ class StudentF(object):
 
     def setup(self):
         pass
+
+
+# https://github.com/astral-sh/ruff/issues/11358
+class Foo:
+    __slots__ = ("bar",)
+
+    def __init__(self):
+        self.qux = 2
+
+    @property
+    def qux(self):
+        return self.bar * 2
+
+    @qux.setter
+    def qux(self, value):
+        self.bar = value / 2
