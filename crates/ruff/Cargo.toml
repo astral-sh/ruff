@@ -68,6 +68,10 @@ insta-cmd = { workspace = true }
 tempfile = { workspace = true }
 test-case = { workspace = true }
 
+[package.metadata.cargo-shear]
+# Used via macro expansion.
+ignored = ["chrono"]
+
 [target.'cfg(target_os = "windows")'.dependencies]
 mimalloc = { workspace = true }
 

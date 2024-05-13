@@ -19,8 +19,5 @@ ruff_source_file = { path = "../ruff_source_file" }
 itertools = { workspace = true }
 unicode-ident = { workspace = true }
 
-[dev-dependencies]
-insta = { workspace = true }
-
 [lints]
 workspace = true

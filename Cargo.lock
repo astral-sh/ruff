@@ -1821,7 +1821,6 @@ dependencies = [
  "dashmap",
  "hashbrown 0.14.5",
  "indexmap",
- "log",
  "notify",
  "parking_lot",
  "rayon",
@@ -1829,10 +1828,8 @@ dependencies = [
  "ruff_notebook",
  "ruff_python_ast",
  "ruff_python_parser",
- "ruff_python_trivia",
  "ruff_text_size",
  "rustc-hash",
- "smallvec",
  "smol_str",
  "tempfile",
  "textwrap",
@@ -2200,7 +2197,6 @@ version = "0.0.0"
 dependencies = [
  "aho-corasick",
  "bitflags 2.5.0",
- "insta",
  "is-macro",
  "itertools 0.12.1",
  "once_cell",
@@ -2348,7 +2344,6 @@ dependencies = [
 name = "ruff_python_trivia"
 version = "0.0.0"
 dependencies = [
- "insta",
  "itertools 0.12.1",
  "ruff_source_file",
  "ruff_text_size",
