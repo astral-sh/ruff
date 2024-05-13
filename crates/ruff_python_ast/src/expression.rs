@@ -2,8 +2,7 @@ use std::iter::FusedIterator;
 
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::AnyNodeRef;
-use crate::{self as ast, Expr};
+use crate::{self as ast, AnyNodeRef, AnyStringFlags, Expr};
 
 /// Unowned pendant to [`ast::Expr`] that stores a reference instead of a owned value.
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -453,12 +452,12 @@ pub enum StringLikePart<'a> {
 }
 
 impl StringLikePart<'_> {
-    /// Returns `true` if this part is a raw string i.e., the literal is prefixed with `r`.
-    pub fn is_raw(&self) -> bool {
+    /// Returns the [`AnyStringFlags`] for the current string-like part.
+    pub fn flags(&self) -> AnyStringFlags {
         match self {
-            StringLikePart::String(string) => string.flags.prefix().is_raw(),
-            StringLikePart::Bytes(bytes) => bytes.flags.prefix().is_raw(),
-            StringLikePart::FString(f_string) => f_string.flags.prefix().is_raw(),
+            StringLikePart::String(string) => AnyStringFlags::from(string.flags),
+            StringLikePart::Bytes(bytes) => AnyStringFlags::from(bytes.flags),
+            StringLikePart::FString(f_string) => AnyStringFlags::from(f_string.flags),
         }
     }
 }

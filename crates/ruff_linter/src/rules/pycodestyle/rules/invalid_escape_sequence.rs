@@ -63,7 +63,7 @@ pub(crate) fn invalid_escape_sequence(checker: &mut Checker, string_like: String
     let locator = checker.locator();
 
     for part in string_like.parts() {
-        if part.is_raw() {
+        if part.flags().is_raw_string() {
             continue;
         }
         match part {
