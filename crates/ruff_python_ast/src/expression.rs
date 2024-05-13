@@ -2,8 +2,7 @@ use std::iter::FusedIterator;
 
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::AnyNodeRef;
-use crate::{self as ast, Expr};
+use crate::{self as ast, AnyNodeRef, AnyStringFlags, Expr};
 
 /// Unowned pendant to [`ast::Expr`] that stores a reference instead of a owned value.
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -450,6 +449,17 @@ pub enum StringLikePart<'a> {
     String(&'a ast::StringLiteral),
     Bytes(&'a ast::BytesLiteral),
     FString(&'a ast::FString),
+}
+
+impl StringLikePart<'_> {
+    /// Returns the [`AnyStringFlags`] for the current string-like part.
+    pub fn flags(&self) -> AnyStringFlags {
+        match self {
+            StringLikePart::String(string) => AnyStringFlags::from(string.flags),
+            StringLikePart::Bytes(bytes) => AnyStringFlags::from(bytes.flags),
+            StringLikePart::FString(f_string) => AnyStringFlags::from(f_string.flags),
+        }
+    }
 }
 
 impl<'a> From<&'a ast::StringLiteral> for StringLikePart<'a> {

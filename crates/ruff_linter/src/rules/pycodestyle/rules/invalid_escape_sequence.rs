@@ -2,11 +2,11 @@ use memchr::memchr_iter;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_index::Indexer;
-use ruff_python_parser::Tok;
+use ruff_python_ast::{AnyStringFlags, FStringElement, StringLike, StringLikePart};
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
+use crate::checkers::ast::Checker;
 use crate::fix::edits::pad_start;
 
 /// ## What it does
@@ -59,38 +59,83 @@ impl AlwaysFixableViolation for InvalidEscapeSequence {
 }
 
 /// W605
-pub(crate) fn invalid_escape_sequence(
+pub(crate) fn invalid_escape_sequence(checker: &mut Checker, string_like: StringLike) {
+    let locator = checker.locator();
+
+    for part in string_like.parts() {
+        if part.flags().is_raw_string() {
+            continue;
+        }
+        match part {
+            StringLikePart::String(string_literal) => {
+                check(
+                    &mut checker.diagnostics,
+                    locator,
+                    string_literal.start(),
+                    string_literal.range(),
+                    AnyStringFlags::from(string_literal.flags),
+                );
+            }
+            StringLikePart::Bytes(bytes_literal) => {
+                check(
+                    &mut checker.diagnostics,
+                    locator,
+                    bytes_literal.start(),
+                    bytes_literal.range(),
+                    AnyStringFlags::from(bytes_literal.flags),
+                );
+            }
+            StringLikePart::FString(f_string) => {
+                let flags = AnyStringFlags::from(f_string.flags);
+                for element in f_string.elements.iter() {
+                    match element {
+                        FStringElement::Literal(literal) => {
+                            check(
+                                &mut checker.diagnostics,
+                                locator,
+                                f_string.start(),
+                                literal.range(),
+                                flags,
+                            );
+                        }
+                        FStringElement::Expression(expression) => {
+                            let Some(format_spec) = expression.format_spec.as_ref() else {
+                                continue;
+                            };
+                            for literal in format_spec.elements.literals() {
+                                check(
+                                    &mut checker.diagnostics,
+                                    locator,
+                                    f_string.start(),
+                                    literal.range(),
+                                    flags,
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn check(
     diagnostics: &mut Vec<Diagnostic>,
     locator: &Locator,
-    indexer: &Indexer,
-    token: &Tok,
-    token_range: TextRange,
+    // Start position of the expression that contains the source range. This is used to generate
+    // the fix when the source range is part of the expression like in f-string which contains
+    // other f-string literal elements.
+    expr_start: TextSize,
+    // Range in the source code to perform the check on.
+    source_range: TextRange,
+    flags: AnyStringFlags,
 ) {
-    let (token_source_code, string_start_location, flags) = match token {
-        Tok::FStringMiddle { flags, .. } => {
-            if flags.is_raw_string() {
-                return;
-            }
-            let Some(f_string_range) = indexer.fstring_ranges().innermost(token_range.start())
-            else {
-                return;
-            };
-            (locator.slice(token_range), f_string_range.start(), flags)
-        }
-        Tok::String { flags, .. } => {
-            if flags.is_raw_string() {
-                return;
-            }
-            (locator.slice(token_range), token_range.start(), flags)
-        }
-        _ => return,
-    };
-
+    let source = locator.slice(source_range);
     let mut contains_valid_escape_sequence = false;
     let mut invalid_escape_chars = Vec::new();
 
     let mut prev = None;
-    let bytes = token_source_code.as_bytes();
+    let bytes = source.as_bytes();
     for i in memchr_iter(b'\\', bytes) {
         // If the previous character was also a backslash, skip.
         if prev.is_some_and(|prev| prev == i - 1) {
@@ -100,9 +145,9 @@ pub(crate) fn invalid_escape_sequence(
 
         prev = Some(i);
 
-        let next_char = match token_source_code[i + 1..].chars().next() {
+        let next_char = match source[i + 1..].chars().next() {
             Some(next_char) => next_char,
-            None if token.is_f_string_middle() => {
+            None if flags.is_f_string() => {
                 // If we're at the end of a f-string middle token, the next character
                 // is actually emitted as a different token. For example,
                 //
@@ -124,7 +169,7 @@ pub(crate) fn invalid_escape_sequence(
                 // f-string. This means that if there's a `FStringMiddle` token and we
                 // encounter a `\` character, then the next character is always going to
                 // be part of the f-string.
-                if let Some(next_char) = locator.after(token_range.end()).chars().next() {
+                if let Some(next_char) = locator.after(source_range.end()).chars().next() {
                     next_char
                 } else {
                     continue;
@@ -172,7 +217,7 @@ pub(crate) fn invalid_escape_sequence(
             continue;
         }
 
-        let location = token_range.start() + TextSize::try_from(i).unwrap();
+        let location = source_range.start() + TextSize::try_from(i).unwrap();
         let range = TextRange::at(location, next_char.text_len() + TextSize::from(1));
         invalid_escape_chars.push(InvalidEscapeChar {
             ch: next_char,
@@ -180,7 +225,6 @@ pub(crate) fn invalid_escape_sequence(
         });
     }
 
-    let mut invalid_escape_sequence = Vec::new();
     if contains_valid_escape_sequence {
         // Escape with backslash.
         for invalid_escape_char in &invalid_escape_chars {
@@ -195,7 +239,7 @@ pub(crate) fn invalid_escape_sequence(
                 r"\".to_string(),
                 invalid_escape_char.start() + TextSize::from(1),
             )));
-            invalid_escape_sequence.push(diagnostic);
+            diagnostics.push(diagnostic);
         }
     } else {
         // Turn into raw string.
@@ -212,8 +256,8 @@ pub(crate) fn invalid_escape_sequence(
                 // Replace the Unicode prefix with `r`.
                 diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
                     "r".to_string(),
-                    string_start_location,
-                    string_start_location + TextSize::from(1),
+                    expr_start,
+                    expr_start + TextSize::from(1),
                 )));
             } else {
                 // Insert the `r` prefix.
@@ -222,17 +266,15 @@ pub(crate) fn invalid_escape_sequence(
                     // `assert`, etc.) and the string. For example, `return"foo"` is valid, but
                     // `returnr"foo"` is not.
                     Fix::safe_edit(Edit::insertion(
-                        pad_start("r".to_string(), string_start_location, locator),
-                        string_start_location,
+                        pad_start("r".to_string(), expr_start, locator),
+                        expr_start,
                     )),
                 );
             }
 
-            invalid_escape_sequence.push(diagnostic);
+            diagnostics.push(diagnostic);
         }
     }
-
-    diagnostics.extend(invalid_escape_sequence);
 }
 
 #[derive(Debug, PartialEq, Eq)]
