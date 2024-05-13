@@ -6,7 +6,7 @@ expression: string_continuation_with_eol(UNIX_EOL)
     (
         String {
             value: "abc\\\ndef",
-            flags: StringKind {
+            flags: AnyStringFlags {
                 prefix: Regular(
                     Empty,
                 ),

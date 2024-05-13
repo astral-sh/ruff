@@ -2650,7 +2650,7 @@ impl AnyStringFlags {
 
 impl fmt::Debug for AnyStringFlags {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("StringKind")
+        f.debug_struct("AnyStringFlags")
             .field("prefix", &self.prefix())
             .field("triple_quoted", &self.is_triple_quoted())
             .field("quote_style", &self.quote_style())

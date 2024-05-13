@@ -6,7 +6,7 @@ expression: string_continuation_with_eol(WINDOWS_EOL)
     (
         String {
             value: "abc\\\r\ndef",
-            flags: StringKind {
+            flags: AnyStringFlags {
                 prefix: Regular(
                     Empty,
                 ),
