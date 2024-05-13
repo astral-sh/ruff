@@ -12,7 +12,7 @@ import json
 from pathlib import Path
 from subprocess import check_call, check_output
 from tempfile import TemporaryDirectory
-from typing import NamedTuple
+from typing import NamedTuple, assert_never
 
 ruff_repo = "https://github.com/astral-sh/ruff"
 root = Path(
@@ -43,7 +43,7 @@ class GitProtocol(str, enum.Enum):
                     upstream="https://github.com/SchemaStore/schemastore.git",
                 )
             case _:
-                assert False, "Should be unreachable"
+                assert_never(self)
 
 
 def update_schemastore(
