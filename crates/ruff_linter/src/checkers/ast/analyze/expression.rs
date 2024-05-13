@@ -1065,13 +1065,17 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 pyflakes::rules::invalid_print_syntax(checker, left);
             }
         }
-        Expr::BinOp(ast::ExprBinOp {
-            left,
-            op: Operator::Mod,
-            right,
-            range: _,
-        }) => {
-            if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = left.as_ref() {
+        Expr::BinOp(
+            bin_op @ ast::ExprBinOp {
+                left,
+                op: Operator::Mod,
+                right,
+                range: _,
+            },
+        ) => {
+            if let Expr::StringLiteral(format_string @ ast::ExprStringLiteral { value, .. }) =
+                left.as_ref()
+            {
                 if checker.any_enabled(&[
                     Rule::PercentFormatInvalidFormat,
                     Rule::PercentFormatExpectedMapping,
@@ -1151,10 +1155,14 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                     pyupgrade::rules::printf_string_formatting(checker, expr, right);
                 }
                 if checker.enabled(Rule::BadStringFormatCharacter) {
-                    pylint::rules::bad_string_format_character::percent(checker, expr);
+                    pylint::rules::bad_string_format_character::percent(
+                        checker,
+                        expr,
+                        format_string,
+                    );
                 }
                 if checker.enabled(Rule::BadStringFormatType) {
-                    pylint::rules::bad_string_format_type(checker, expr, right);
+                    pylint::rules::bad_string_format_type(checker, bin_op, format_string);
                 }
                 if checker.enabled(Rule::HardcodedSQLExpression) {
                     flake8_bandit::rules::hardcoded_sql_expression(checker, expr);
