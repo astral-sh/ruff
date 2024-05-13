@@ -6,7 +6,7 @@ expression: triple_quoted_eol(MAC_EOL)
     (
         String {
             value: "\r test string\r ",
-            kind: StringKind {
+            flags: AnyStringFlags {
                 prefix: Regular(
                     Empty,
                 ),

@@ -5,7 +5,7 @@ expression: lex_source(source)
 [
     (
         FStringStart(
-            StringKind {
+            AnyStringFlags {
                 prefix: Format(
                     Regular,
                 ),
@@ -21,7 +21,7 @@ expression: lex_source(source)
     ),
     (
         FStringStart(
-            StringKind {
+            AnyStringFlags {
                 prefix: Format(
                     Regular,
                 ),
@@ -37,7 +37,7 @@ expression: lex_source(source)
     ),
     (
         FStringStart(
-            StringKind {
+            AnyStringFlags {
                 prefix: Format(
                     Raw {
                         uppercase_r: false,
@@ -55,7 +55,7 @@ expression: lex_source(source)
     ),
     (
         FStringStart(
-            StringKind {
+            AnyStringFlags {
                 prefix: Format(
                     Raw {
                         uppercase_r: false,
@@ -73,7 +73,7 @@ expression: lex_source(source)
     ),
     (
         FStringStart(
-            StringKind {
+            AnyStringFlags {
                 prefix: Format(
                     Raw {
                         uppercase_r: true,
@@ -91,7 +91,7 @@ expression: lex_source(source)
     ),
     (
         FStringStart(
-            StringKind {
+            AnyStringFlags {
                 prefix: Format(
                     Raw {
                         uppercase_r: true,
@@ -109,7 +109,7 @@ expression: lex_source(source)
     ),
     (
         FStringStart(
-            StringKind {
+            AnyStringFlags {
                 prefix: Format(
                     Raw {
                         uppercase_r: false,
@@ -127,7 +127,7 @@ expression: lex_source(source)
     ),
     (
         FStringStart(
-            StringKind {
+            AnyStringFlags {
                 prefix: Format(
                     Raw {
                         uppercase_r: false,
@@ -145,7 +145,7 @@ expression: lex_source(source)
     ),
     (
         FStringStart(
-            StringKind {
+            AnyStringFlags {
                 prefix: Format(
                     Raw {
                         uppercase_r: true,
@@ -163,7 +163,7 @@ expression: lex_source(source)
     ),
     (
         FStringStart(
-            StringKind {
+            AnyStringFlags {
                 prefix: Format(
                     Raw {
                         uppercase_r: true,

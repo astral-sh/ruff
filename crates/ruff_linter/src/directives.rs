@@ -131,7 +131,7 @@ fn extract_noqa_line_for(lxr: &[LexResult], locator: &Locator, indexer: &Indexer
 
             // For multi-line strings, we expect `noqa` directives on the last line of the
             // string.
-            Tok::String { kind, .. } if kind.is_triple_quoted() => {
+            Tok::String { flags, .. } if flags.is_triple_quoted() => {
                 if locator.contains_line_break(*range) {
                     string_mappings.push(TextRange::new(
                         locator.line_start(range.start()),

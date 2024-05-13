@@ -5,7 +5,7 @@ expression: fstring_single_quote_escape_eol(WINDOWS_EOL)
 [
     (
         FStringStart(
-            StringKind {
+            AnyStringFlags {
                 prefix: Format(
                     Regular,
                 ),
@@ -18,7 +18,7 @@ expression: fstring_single_quote_escape_eol(WINDOWS_EOL)
     (
         FStringMiddle {
             value: "text \\\r\n more text",
-            kind: StringKind {
+            flags: AnyStringFlags {
                 prefix: Format(
                     Regular,
                 ),

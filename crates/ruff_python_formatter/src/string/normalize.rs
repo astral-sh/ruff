@@ -2,7 +2,7 @@ use std::borrow::Cow;
 use std::iter::FusedIterator;
 
 use ruff_formatter::FormatContext;
-use ruff_python_ast::{str::Quote, AnyStringKind};
+use ruff_python_ast::{str::Quote, AnyStringFlags};
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -60,7 +60,7 @@ impl StringNormalizer {
             // The reason to preserve the quotes is based on the assumption that
             // the original f-string is valid in terms of quoting, and we don't
             // want to change that to make it invalid.
-            if (context.f_string().kind().is_triple_quoted() && !string.kind().is_triple_quoted())
+            if (context.f_string().flags().is_triple_quoted() && !string.flags().is_triple_quoted())
                 || self.target_version.supports_pep_701()
             {
                 self.quoting
@@ -78,14 +78,14 @@ impl StringNormalizer {
         let first_quote_or_normalized_char_offset = raw_content
             .bytes()
             .position(|b| matches!(b, b'\\' | b'"' | b'\'' | b'\r' | b'{'));
-        let string_kind = string.kind();
+        let string_flags = string.flags();
 
         let new_kind = match self.quoting(string) {
-            Quoting::Preserve => string_kind,
+            Quoting::Preserve => string_flags,
             Quoting::CanChange => {
                 // Per PEP 8, always prefer double quotes for triple-quoted strings.
                 // Except when using quote-style-preserve.
-                let preferred_style = if string_kind.is_triple_quoted() {
+                let preferred_style = if string_flags.is_triple_quoted() {
                     // ... unless we're formatting a code snippet inside a docstring,
                     // then we specifically want to invert our quote style to avoid
                     // writing out invalid Python.
@@ -146,30 +146,30 @@ impl StringNormalizer {
                     if let Some(first_quote_or_normalized_char_offset) =
                         first_quote_or_normalized_char_offset
                     {
-                        if string_kind.is_raw_string() {
+                        if string_flags.is_raw_string() {
                             choose_quotes_for_raw_string(
                                 &raw_content[first_quote_or_normalized_char_offset..],
-                                string_kind,
+                                string_flags,
                                 preferred_quote,
                             )
                         } else {
                             choose_quotes_impl(
                                 &raw_content[first_quote_or_normalized_char_offset..],
-                                string_kind,
+                                string_flags,
                                 preferred_quote,
                             )
                         }
                     } else {
-                        string_kind.with_quote_style(preferred_quote)
+                        string_flags.with_quote_style(preferred_quote)
                     }
                 } else {
-                    string_kind
+                    string_flags
                 }
             }
         };
 
         QuoteSelection {
-            kind: new_kind,
+            flags: new_kind,
             first_quote_or_normalized_char_offset,
         }
     }
@@ -189,7 +189,7 @@ impl StringNormalizer {
             normalize_string(
                 raw_content,
                 first_quote_or_escape_offset,
-                quote_selection.kind,
+                quote_selection.flags,
                 // TODO: Remove the `b'{'` in `choose_quotes` when promoting the
                 // `format_fstring` preview style
                 self.format_fstring,
@@ -199,7 +199,7 @@ impl StringNormalizer {
         };
 
         NormalizedString {
-            kind: quote_selection.kind,
+            flags: quote_selection.flags,
             content_range: string.content_range(),
             text: normalized,
         }
@@ -208,22 +208,22 @@ impl StringNormalizer {
 
 #[derive(Debug)]
 pub(crate) struct QuoteSelection {
-    kind: AnyStringKind,
+    flags: AnyStringFlags,
 
     /// Offset to the first quote character or character that needs special handling in [`normalize_string`].
     first_quote_or_normalized_char_offset: Option<usize>,
 }
 
 impl QuoteSelection {
-    pub(crate) fn kind(&self) -> AnyStringKind {
-        self.kind
+    pub(crate) fn flags(&self) -> AnyStringFlags {
+        self.flags
     }
 }
 
 #[derive(Debug)]
 pub(crate) struct NormalizedString<'a> {
     /// Holds data about the quotes and prefix of the string
-    kind: AnyStringKind,
+    flags: AnyStringFlags,
 
     /// The range of the string's content in the source (minus prefix and quotes).
     content_range: TextRange,
@@ -237,8 +237,8 @@ impl<'a> NormalizedString<'a> {
         &self.text
     }
 
-    pub(crate) fn kind(&self) -> AnyStringKind {
-        self.kind
+    pub(crate) fn flags(&self) -> AnyStringFlags {
+        self.flags
     }
 }
 
@@ -250,8 +250,8 @@ impl Ranged for NormalizedString<'_> {
 
 impl Format<PyFormatContext<'_>> for NormalizedString<'_> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
-        let quotes = StringQuotes::from(self.kind);
-        ruff_formatter::write!(f, [self.kind.prefix(), quotes])?;
+        let quotes = StringQuotes::from(self.flags);
+        ruff_formatter::write!(f, [self.flags.prefix(), quotes])?;
         match &self.text {
             Cow::Borrowed(_) => {
                 source_text_slice(self.range()).fmt(f)?;
@@ -271,9 +271,9 @@ impl Format<PyFormatContext<'_>> for NormalizedString<'_> {
 /// style is double quotes.
 fn choose_quotes_for_raw_string(
     input: &str,
-    kind: AnyStringKind,
+    flags: AnyStringFlags,
     preferred_quote: Quote,
-) -> AnyStringKind {
+) -> AnyStringFlags {
     let preferred_quote_char = preferred_quote.as_char();
     let mut chars = input.chars().peekable();
     let contains_unescaped_configured_quotes = loop {
@@ -284,7 +284,7 @@ fn choose_quotes_for_raw_string(
             }
             // `"` or `'`
             Some(c) if c == preferred_quote_char => {
-                if !kind.is_triple_quoted() {
+                if !flags.is_triple_quoted() {
                     break true;
                 }
 
@@ -310,9 +310,9 @@ fn choose_quotes_for_raw_string(
         }
     };
     if contains_unescaped_configured_quotes {
-        kind
+        flags
     } else {
-        kind.with_quote_style(preferred_quote)
+        flags.with_quote_style(preferred_quote)
     }
 }
 
@@ -324,8 +324,12 @@ fn choose_quotes_for_raw_string(
 /// For triple quoted strings, the preferred quote style is always used, unless the string contains
 /// a triplet of the quote character (e.g., if double quotes are preferred, double quotes will be
 /// used unless the string contains `"""`).
-fn choose_quotes_impl(input: &str, kind: AnyStringKind, preferred_quote: Quote) -> AnyStringKind {
-    let quote = if kind.is_triple_quoted() {
+fn choose_quotes_impl(
+    input: &str,
+    flags: AnyStringFlags,
+    preferred_quote: Quote,
+) -> AnyStringFlags {
+    let quote = if flags.is_triple_quoted() {
         // True if the string contains a triple quote sequence of the configured quote style.
         let mut uses_triple_quotes = false;
         let mut chars = input.chars().peekable();
@@ -379,7 +383,7 @@ fn choose_quotes_impl(input: &str, kind: AnyStringKind, preferred_quote: Quote) 
         if uses_triple_quotes {
             // String contains a triple quote sequence of the configured quote style.
             // Keep the existing quote style.
-            kind.quote_style()
+            flags.quote_style()
         } else {
             preferred_quote
         }
@@ -419,7 +423,7 @@ fn choose_quotes_impl(input: &str, kind: AnyStringKind, preferred_quote: Quote) 
         }
     };
 
-    kind.with_quote_style(quote)
+    flags.with_quote_style(quote)
 }
 
 /// Adds the necessary quote escapes and removes unnecessary escape sequences when quoting `input`
@@ -429,7 +433,7 @@ fn choose_quotes_impl(input: &str, kind: AnyStringKind, preferred_quote: Quote) 
 pub(crate) fn normalize_string(
     input: &str,
     start_offset: usize,
-    kind: AnyStringKind,
+    flags: AnyStringFlags,
     format_fstring: bool,
 ) -> Cow<str> {
     // The normalized string if `input` is not yet normalized.
@@ -439,14 +443,14 @@ pub(crate) fn normalize_string(
     // If `last_index` is `0` at the end, then the input is already normalized and can be returned as is.
     let mut last_index = 0;
 
-    let quote = kind.quote_style();
+    let quote = flags.quote_style();
     let preferred_quote = quote.as_char();
     let opposite_quote = quote.opposite().as_char();
 
     let mut chars = CharIndicesWithOffset::new(input, start_offset).peekable();
 
-    let is_raw = kind.is_raw_string();
-    let is_fstring = !format_fstring && kind.is_f_string();
+    let is_raw = flags.is_raw_string();
+    let is_fstring = !format_fstring && flags.is_f_string();
     let mut formatted_value_nesting = 0u32;
 
     while let Some((index, c)) = chars.next() {
@@ -484,7 +488,7 @@ pub(crate) fn normalize_string(
                     } else {
                         // Length of the `\` plus the length of the escape sequence character (`u` | `U` | `x`)
                         let escape_start_len = '\\'.len_utf8() + next.len_utf8();
-                        if let Some(normalised) = UnicodeEscape::new(next, !kind.is_byte_string())
+                        if let Some(normalised) = UnicodeEscape::new(next, !flags.is_byte_string())
                             .and_then(|escape| escape.normalize(&input[index + escape_start_len..]))
                         {
                             let escape_start_offset = index + escape_start_len;
@@ -503,7 +507,7 @@ pub(crate) fn normalize_string(
                         }
                     }
 
-                    if !kind.is_triple_quoted() {
+                    if !flags.is_triple_quoted() {
                         #[allow(clippy::if_same_then_else)]
                         if next == opposite_quote && formatted_value_nesting == 0 {
                             // Remove the escape by ending before the backslash and starting again with the quote
@@ -516,7 +520,7 @@ pub(crate) fn normalize_string(
                         }
                     }
                 }
-            } else if !kind.is_triple_quoted()
+            } else if !flags.is_triple_quoted()
                 && c == preferred_quote
                 && formatted_value_nesting == 0
             {
@@ -689,7 +693,7 @@ impl UnicodeEscape {
 mod tests {
     use std::borrow::Cow;
 
-    use ruff_python_ast::{str::Quote, AnyStringKind, AnyStringPrefix, ByteStringPrefix};
+    use ruff_python_ast::{str::Quote, AnyStringFlags, AnyStringPrefix, ByteStringPrefix};
 
     use super::{normalize_string, UnicodeEscape};
 
@@ -710,7 +714,7 @@ mod tests {
         let normalized = normalize_string(
             input,
             0,
-            AnyStringKind::new(
+            AnyStringFlags::new(
                 AnyStringPrefix::Bytes(ByteStringPrefix::Regular),
                 Quote::Double,
                 false,

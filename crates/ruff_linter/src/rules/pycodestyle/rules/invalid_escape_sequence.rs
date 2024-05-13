@@ -66,22 +66,22 @@ pub(crate) fn invalid_escape_sequence(
     token: &Tok,
     token_range: TextRange,
 ) {
-    let (token_source_code, string_start_location, kind) = match token {
-        Tok::FStringMiddle { kind, .. } => {
-            if kind.is_raw_string() {
+    let (token_source_code, string_start_location, flags) = match token {
+        Tok::FStringMiddle { flags, .. } => {
+            if flags.is_raw_string() {
                 return;
             }
             let Some(f_string_range) = indexer.fstring_ranges().innermost(token_range.start())
             else {
                 return;
             };
-            (locator.slice(token_range), f_string_range.start(), kind)
+            (locator.slice(token_range), f_string_range.start(), flags)
         }
-        Tok::String { kind, .. } => {
-            if kind.is_raw_string() {
+        Tok::String { flags, .. } => {
+            if flags.is_raw_string() {
                 return;
             }
-            (locator.slice(token_range), token_range.start(), kind)
+            (locator.slice(token_range), token_range.start(), flags)
         }
         _ => return,
     };
@@ -208,7 +208,7 @@ pub(crate) fn invalid_escape_sequence(
                 invalid_escape_char.range(),
             );
 
-            if kind.is_u_string() {
+            if flags.is_u_string() {
                 // Replace the Unicode prefix with `r`.
                 diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
                     "r".to_string(),
