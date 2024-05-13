@@ -136,10 +136,8 @@ impl Violation for UnusedImport {
 
             _ => Some(if *multiple {
                 "Remove unused import".to_string()
-            } else if name.ends_with(binding) {
-                format!("Remove unused import: `{name}`")
             } else {
-                format!("Remove unused import: `{binding}`")
+                format!("Remove unused import: `{name}`")
             }),
         }
     }

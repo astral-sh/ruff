@@ -27,7 +27,7 @@ F401_5.py:3:22: F401 [*] `d.e.f` imported but unused
 4 | import h.i
 5 | import j.k as l
   |
-  = help: Remove unused import: `g`
+  = help: Remove unused import: `d.e.f`
 
 ℹ Safe fix
 1 1 | """Test: removal of multi-segment and aliases imports."""
@@ -60,7 +60,7 @@ F401_5.py:5:15: F401 [*] `j.k` imported but unused
 5 | import j.k as l
   |               ^ F401
   |
-  = help: Remove unused import: `l`
+  = help: Remove unused import: `j.k`
 
 ℹ Safe fix
 2 2 | from a.b import c
