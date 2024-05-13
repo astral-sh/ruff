@@ -266,6 +266,11 @@ The remaining configuration options can be provided through a catch-all `--confi
 ruff check --config "lint.per-file-ignores = {'some_file.py' = ['F841']}"
 ```
 
+To opt in to the latest lint rules, formatter style changes, interface updates, and more, enable
+[preview mode](https://docs.astral.sh/ruff/rules/) by setting `preview = true` in your configuration
+file or passing `--preview` on the command line. Preview mode enables a collection of unstable
+features that may change prior to stabilization.
+
 See `ruff help` for more on Ruff's top-level commands, or `ruff help check` and `ruff help format`
 for more on the linting and formatting commands, respectively.
 
