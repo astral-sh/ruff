@@ -395,22 +395,16 @@ jobs:
           name: ecosystem-result
           path: ecosystem-result
 
-  cargo-udeps:
-    name: "cargo udeps"
+  cargo-shear:
+    name: "cargo shear"
     runs-on: ubuntu-latest
     needs: determine_changes
     if: ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
-    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-      - name: "Install nightly Rust toolchain"
-        # Only pinned to make caching work, update freely
-        run: rustup toolchain install nightly-2023-10-15
-      - uses: Swatinem/rust-cache@v2
-      - name: "Install cargo-udeps"
-        uses: taiki-e/install-action@cargo-udeps
-      - name: "Run cargo-udeps"
-        run: cargo +nightly-2023-10-15 udeps
+      - uses: cargo-bins/cargo-binstall@main
+      - run: cargo binstall --no-confirm cargo-shear
+      - run: cargo shear
 
   python-package:
     name: "python package"
