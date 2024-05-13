@@ -206,7 +206,7 @@ pub(crate) fn ambiguous_unicode_character_string(checker: &mut Checker, string_l
             }
             ast::StringLikePart::Bytes(_) => {}
             ast::StringLikePart::FString(f_string) => {
-                for literal in f_string.literals() {
+                for literal in f_string.elements.literals() {
                     let text = checker.locator().slice(literal);
                     ambiguous_unicode_character(
                         &mut checker.diagnostics,

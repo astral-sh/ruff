@@ -57,7 +57,7 @@ pub(crate) fn hardcoded_bind_all_interfaces(checker: &mut Checker, string: Strin
                         }
                     }
                     ast::FStringPart::FString(f_string) => {
-                        for literal in f_string.literals() {
+                        for literal in f_string.elements.literals() {
                             if &**literal == "0.0.0.0" {
                                 checker.diagnostics.push(Diagnostic::new(
                                     HardcodedBindAllInterfaces,

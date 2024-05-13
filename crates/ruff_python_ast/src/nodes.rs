@@ -3,7 +3,7 @@
 use std::fmt;
 use std::fmt::Debug;
 use std::iter::FusedIterator;
-use std::ops::Deref;
+use std::ops::{Deref, DerefMut};
 use std::slice::{Iter, IterMut};
 use std::sync::OnceLock;
 
@@ -1084,7 +1084,7 @@ impl From<ExprCall> for Expr {
 #[derive(Clone, Debug, PartialEq)]
 pub struct FStringFormatSpec {
     pub range: TextRange,
-    pub elements: Vec<FStringElement>,
+    pub elements: FStringElements,
 }
 
 impl Ranged for FStringFormatSpec {
@@ -1484,24 +1484,8 @@ impl fmt::Debug for FStringFlags {
 #[derive(Clone, Debug, PartialEq)]
 pub struct FString {
     pub range: TextRange,
-    pub elements: Vec<FStringElement>,
+    pub elements: FStringElements,
     pub flags: FStringFlags,
-}
-
-impl FString {
-    /// Returns an iterator over all the [`FStringLiteralElement`] nodes contained in this f-string.
-    pub fn literals(&self) -> impl Iterator<Item = &FStringLiteralElement> {
-        self.elements
-            .iter()
-            .filter_map(|element| element.as_literal())
-    }
-
-    /// Returns an iterator over all the [`FStringExpressionElement`] nodes contained in this f-string.
-    pub fn expressions(&self) -> impl Iterator<Item = &FStringExpressionElement> {
-        self.elements
-            .iter()
-            .filter_map(|element| element.as_expression())
-    }
 }
 
 impl Ranged for FString {
@@ -1517,6 +1501,48 @@ impl From<FString> for Expr {
             value: FStringValue::single(payload),
         }
         .into()
+    }
+}
+
+/// A newtype wrapper around a list of [`FStringElement`].
+#[derive(Clone, Default, PartialEq)]
+pub struct FStringElements(Vec<FStringElement>);
+
+impl FStringElements {
+    /// Returns an iterator over all the [`FStringLiteralElement`] nodes contained in this f-string.
+    pub fn literals(&self) -> impl Iterator<Item = &FStringLiteralElement> {
+        self.iter().filter_map(|element| element.as_literal())
+    }
+
+    /// Returns an iterator over all the [`FStringExpressionElement`] nodes contained in this f-string.
+    pub fn expressions(&self) -> impl Iterator<Item = &FStringExpressionElement> {
+        self.iter().filter_map(|element| element.as_expression())
+    }
+}
+
+impl From<Vec<FStringElement>> for FStringElements {
+    fn from(elements: Vec<FStringElement>) -> Self {
+        FStringElements(elements)
+    }
+}
+
+impl Deref for FStringElements {
+    type Target = Vec<FStringElement>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for FStringElements {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl fmt::Debug for FStringElements {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Debug::fmt(&self.0, f)
     }
 }
 

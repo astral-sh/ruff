@@ -192,6 +192,7 @@ impl Visitor<'_> for AvoidableEscapedQuoteChecker<'_> {
         // f"'normal' {f'\'nested\' {x} "double quotes"'} normal"
         // ```
         if !f_string
+            .elements
             .literals()
             .any(|literal| contains_quote(literal, opposite_quote_char))
         {
@@ -269,7 +270,7 @@ fn check_f_string(
     let opposite_quote_char = quotes_settings.inline_quotes.opposite().as_char();
 
     let mut edits = vec![];
-    for literal in f_string.literals() {
+    for literal in f_string.elements.literals() {
         let content = locator.slice(literal);
         if !contains_escaped_quote(content, quote_char) {
             continue;

@@ -6,8 +6,8 @@ use bitflags::bitflags;
 use rustc_hash::FxHashSet;
 
 use ruff_python_ast::{
-    self as ast, BoolOp, CmpOp, ConversionFlag, Expr, ExprContext, FStringElement, IpyEscapeKind,
-    Number, Operator, UnaryOp,
+    self as ast, BoolOp, CmpOp, ConversionFlag, Expr, ExprContext, FStringElement, FStringElements,
+    IpyEscapeKind, Number, Operator, UnaryOp,
 };
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
@@ -1297,8 +1297,8 @@ impl<'src> Parser<'src> {
     /// # Panics
     ///
     /// If the parser isn't positioned at a `{` or `FStringMiddle` token.
-    fn parse_fstring_elements(&mut self) -> Vec<FStringElement> {
-        let mut elements = vec![];
+    fn parse_fstring_elements(&mut self) -> FStringElements {
+        let mut elements = FStringElements::default();
 
         self.parse_list(RecoveryContextKind::FStringElements, |parser| {
             let element = match parser.current_token_kind() {
