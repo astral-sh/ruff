@@ -6,7 +6,7 @@ expression: lex_source(source)
     (
         String {
             value: "\\N{EN SPACE}",
-            kind: StringKind {
+            flags: StringKind {
                 prefix: Regular(
                     Empty,
                 ),

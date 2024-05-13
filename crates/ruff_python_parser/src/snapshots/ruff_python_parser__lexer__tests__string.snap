@@ -6,7 +6,7 @@ expression: lex_source(source)
     (
         String {
             value: "double",
-            kind: StringKind {
+            flags: StringKind {
                 prefix: Regular(
                     Empty,
                 ),
@@ -19,7 +19,7 @@ expression: lex_source(source)
     (
         String {
             value: "single",
-            kind: StringKind {
+            flags: StringKind {
                 prefix: Regular(
                     Empty,
                 ),
@@ -32,7 +32,7 @@ expression: lex_source(source)
     (
         String {
             value: "can\\'t",
-            kind: StringKind {
+            flags: StringKind {
                 prefix: Regular(
                     Empty,
                 ),
@@ -45,7 +45,7 @@ expression: lex_source(source)
     (
         String {
             value: "\\\\\\\"",
-            kind: StringKind {
+            flags: StringKind {
                 prefix: Regular(
                     Empty,
                 ),
@@ -58,7 +58,7 @@ expression: lex_source(source)
     (
         String {
             value: "\\t\\r\\n",
-            kind: StringKind {
+            flags: StringKind {
                 prefix: Regular(
                     Empty,
                 ),
@@ -71,7 +71,7 @@ expression: lex_source(source)
     (
         String {
             value: "\\g",
-            kind: StringKind {
+            flags: StringKind {
                 prefix: Regular(
                     Empty,
                 ),
@@ -84,7 +84,7 @@ expression: lex_source(source)
     (
         String {
             value: "raw\\'",
-            kind: StringKind {
+            flags: StringKind {
                 prefix: Regular(
                     Raw {
                         uppercase: false,
@@ -99,7 +99,7 @@ expression: lex_source(source)
     (
         String {
             value: "\\420",
-            kind: StringKind {
+            flags: StringKind {
                 prefix: Regular(
                     Empty,
                 ),
@@ -112,7 +112,7 @@ expression: lex_source(source)
     (
         String {
             value: "\\200\\0a",
-            kind: StringKind {
+            flags: StringKind {
                 prefix: Regular(
                     Empty,
                 ),

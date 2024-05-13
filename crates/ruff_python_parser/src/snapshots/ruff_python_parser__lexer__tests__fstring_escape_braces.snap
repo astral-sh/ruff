@@ -18,7 +18,7 @@ expression: lex_source(source)
     (
         FStringMiddle {
             value: "\\",
-            kind: StringKind {
+            flags: StringKind {
                 prefix: Format(
                     Regular,
                 ),
@@ -61,7 +61,7 @@ expression: lex_source(source)
     (
         FStringMiddle {
             value: "\\\\",
-            kind: StringKind {
+            flags: StringKind {
                 prefix: Format(
                     Regular,
                 ),
@@ -104,7 +104,7 @@ expression: lex_source(source)
     (
         FStringMiddle {
             value: "\\{foo}",
-            kind: StringKind {
+            flags: StringKind {
                 prefix: Format(
                     Regular,
                 ),
@@ -133,7 +133,7 @@ expression: lex_source(source)
     (
         FStringMiddle {
             value: "\\\\{foo}",
-            kind: StringKind {
+            flags: StringKind {
                 prefix: Format(
                     Regular,
                 ),

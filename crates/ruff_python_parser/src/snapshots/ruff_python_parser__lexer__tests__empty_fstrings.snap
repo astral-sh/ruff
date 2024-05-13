@@ -22,7 +22,7 @@ expression: lex_source(source)
     (
         String {
             value: "",
-            kind: StringKind {
+            flags: StringKind {
                 prefix: Regular(
                     Empty,
                 ),
@@ -67,7 +67,7 @@ expression: lex_source(source)
     (
         String {
             value: "",
-            kind: StringKind {
+            flags: StringKind {
                 prefix: Regular(
                     Empty,
                 ),

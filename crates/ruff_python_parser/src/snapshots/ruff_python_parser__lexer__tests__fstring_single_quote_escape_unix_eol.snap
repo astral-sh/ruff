@@ -18,7 +18,7 @@ expression: fstring_single_quote_escape_eol(UNIX_EOL)
     (
         FStringMiddle {
             value: "text \\\n more text",
-            kind: StringKind {
+            flags: StringKind {
                 prefix: Format(
                     Regular,
                 ),

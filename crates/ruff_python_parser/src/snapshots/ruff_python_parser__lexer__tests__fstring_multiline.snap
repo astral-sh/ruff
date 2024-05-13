@@ -18,7 +18,7 @@ expression: lex_source(source)
     (
         FStringMiddle {
             value: "\nhello\n    world\n",
-            kind: StringKind {
+            flags: StringKind {
                 prefix: Format(
                     Regular,
                 ),
@@ -47,7 +47,7 @@ expression: lex_source(source)
     (
         FStringMiddle {
             value: "\n    world\nhello\n",
-            kind: StringKind {
+            flags: StringKind {
                 prefix: Format(
                     Regular,
                 ),
@@ -76,7 +76,7 @@ expression: lex_source(source)
     (
         FStringMiddle {
             value: "some ",
-            kind: StringKind {
+            flags: StringKind {
                 prefix: Format(
                     Regular,
                 ),
@@ -105,7 +105,7 @@ expression: lex_source(source)
     (
         FStringMiddle {
             value: "multiline\nallowed ",
-            kind: StringKind {
+            flags: StringKind {
                 prefix: Format(
                     Regular,
                 ),
@@ -140,7 +140,7 @@ expression: lex_source(source)
     (
         FStringMiddle {
             value: " string",
-            kind: StringKind {
+            flags: StringKind {
                 prefix: Format(
                     Regular,
                 ),

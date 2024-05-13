@@ -18,7 +18,7 @@ expression: lex_source(source)
     (
         FStringMiddle {
             value: "\\0",
-            kind: StringKind {
+            flags: StringKind {
                 prefix: Format(
                     Regular,
                 ),

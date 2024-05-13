@@ -18,7 +18,7 @@ expression: lex_source(source)
     (
         FStringMiddle {
             value: "foo ",
-            kind: StringKind {
+            flags: StringKind {
                 prefix: Format(
                     Regular,
                 ),
@@ -47,7 +47,7 @@ expression: lex_source(source)
     (
         FStringMiddle {
             value: "bar ",
-            kind: StringKind {
+            flags: StringKind {
                 prefix: Format(
                     Regular,
                 ),
@@ -116,7 +116,7 @@ expression: lex_source(source)
     (
         FStringMiddle {
             value: " baz",
-            kind: StringKind {
+            flags: StringKind {
                 prefix: Format(
                     Regular,
                 ),
@@ -145,7 +145,7 @@ expression: lex_source(source)
     (
         FStringMiddle {
             value: "foo ",
-            kind: StringKind {
+            flags: StringKind {
                 prefix: Format(
                     Regular,
                 ),
@@ -174,7 +174,7 @@ expression: lex_source(source)
     (
         FStringMiddle {
             value: "bar",
-            kind: StringKind {
+            flags: StringKind {
                 prefix: Format(
                     Regular,
                 ),
@@ -195,7 +195,7 @@ expression: lex_source(source)
     (
         FStringMiddle {
             value: " some ",
-            kind: StringKind {
+            flags: StringKind {
                 prefix: Format(
                     Regular,
                 ),
@@ -224,7 +224,7 @@ expression: lex_source(source)
     (
         FStringMiddle {
             value: "another",
-            kind: StringKind {
+            flags: StringKind {
                 prefix: Format(
                     Regular,
                 ),

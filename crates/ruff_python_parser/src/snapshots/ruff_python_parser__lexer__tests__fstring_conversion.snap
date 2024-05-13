@@ -42,7 +42,7 @@ expression: lex_source(source)
     (
         FStringMiddle {
             value: " ",
-            kind: StringKind {
+            flags: StringKind {
                 prefix: Format(
                     Regular,
                 ),
@@ -83,7 +83,7 @@ expression: lex_source(source)
     (
         FStringMiddle {
             value: " ",
-            kind: StringKind {
+            flags: StringKind {
                 prefix: Format(
                     Regular,
                 ),
@@ -110,7 +110,7 @@ expression: lex_source(source)
     (
         FStringMiddle {
             value: ".3f!r",
-            kind: StringKind {
+            flags: StringKind {
                 prefix: Format(
                     Regular,
                 ),
@@ -127,7 +127,7 @@ expression: lex_source(source)
     (
         FStringMiddle {
             value: " {x!r}",
-            kind: StringKind {
+            flags: StringKind {
                 prefix: Format(
                     Regular,
                 ),

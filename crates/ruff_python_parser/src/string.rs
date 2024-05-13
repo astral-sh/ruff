@@ -44,7 +44,7 @@ struct StringParser {
     source: Box<str>,
     /// Current position of the parser in the source.
     cursor: usize,
-    /// The flags corresponding to the string.
+    /// Flags that can be used to query information about the string.
     flags: AnyStringFlags,
     /// The location of the first character in the source from the start of the file.
     offset: TextSize,
