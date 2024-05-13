@@ -26,7 +26,7 @@ class SchemastoreRepos(NamedTuple):
     upstream: str
 
 
-class GitProtocol(str, enum.Enum):
+class GitProtocol(enum.Enum):
     SSH = "ssh"
     HTTPS = "https"
 
