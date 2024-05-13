@@ -121,30 +121,27 @@ impl Violation for UnusedImport {
             multiple,
             ..
         } = self;
-        let resolution = match self.context {
+        match self.context {
             Some(UnusedImportContext::Init {
                 first_party: true,
                 dunder_all_count: 1,
-            }) => {
-                return Some(format!("Add unused import `{binding}` to __all__"));
-            }
+            }) => Some(format!("Add unused import `{binding}` to __all__")),
+
             Some(UnusedImportContext::Init {
                 first_party: true,
                 dunder_all_count: 0,
-            }) => {
-                return Some(format!(
-                    "Use an explicit re-export: `{binding} as {binding}`"
-                ));
-            }
-            _ => "Remove unused import",
-        };
-        Some(if *multiple {
-            resolution.to_string()
-        } else if name.ends_with(binding) {
-            format!("{resolution}: `{name}`")
-        } else {
-            format!("{resolution}: `{binding}`")
-        })
+            }) => Some(format!(
+                "Use an explicit re-export: `{binding} as {binding}`"
+            )),
+
+            _ => Some(if *multiple {
+                "Remove unused import".to_string()
+            } else if name.ends_with(binding) {
+                format!("Remove unused import: `{name}`")
+            } else {
+                format!("Remove unused import: `{binding}`")
+            }),
+        }
     }
 }
 
