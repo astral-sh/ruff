@@ -35,7 +35,7 @@ use unicode_ident::{is_xid_continue, is_xid_start};
 use unicode_normalization::UnicodeNormalization;
 
 use ruff_python_ast::{
-    str::Quote, AnyStringKind, AnyStringPrefix, FStringPrefix, Int, IpyEscapeKind,
+    str::Quote, AnyStringFlags, AnyStringPrefix, FStringPrefix, Int, IpyEscapeKind,
 };
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
@@ -561,7 +561,7 @@ impl<'source> Lexer<'source> {
         #[cfg(debug_assertions)]
         debug_assert_eq!(self.cursor.previous(), quote);
 
-        let mut kind = AnyStringKind::default()
+        let mut flags = AnyStringFlags::default()
             .with_prefix(AnyStringPrefix::Format(prefix))
             .with_quote_style(if quote == '"' {
                 Quote::Double
@@ -570,11 +570,11 @@ impl<'source> Lexer<'source> {
             });
 
         if self.cursor.eat_char2(quote, quote) {
-            kind = kind.with_triple_quotes();
+            flags = flags.with_triple_quotes();
         }
 
-        self.fstrings.push(FStringContext::new(kind, self.nesting));
-        Tok::FStringStart(kind)
+        self.fstrings.push(FStringContext::new(flags, self.nesting));
+        Tok::FStringStart(flags)
     }
 
     /// Lex a f-string middle or end token.
@@ -707,7 +707,7 @@ impl<'source> Lexer<'source> {
         };
         Ok(Some(Tok::FStringMiddle {
             value: value.into_boxed_str(),
-            kind: fstring.kind(),
+            flags: fstring.flags(),
         }))
     }
 
@@ -716,7 +716,7 @@ impl<'source> Lexer<'source> {
         #[cfg(debug_assertions)]
         debug_assert_eq!(self.cursor.previous(), quote);
 
-        let mut kind = AnyStringKind::default()
+        let mut flags = AnyStringFlags::default()
             .with_prefix(prefix)
             .with_quote_style(if quote == '"' {
                 Quote::Double
@@ -727,13 +727,13 @@ impl<'source> Lexer<'source> {
         // If the next two characters are also the quote character, then we have a triple-quoted
         // string; consume those two characters and ensure that we require a triple-quote to close
         if self.cursor.eat_char2(quote, quote) {
-            kind = kind.with_triple_quotes();
+            flags = flags.with_triple_quotes();
         }
 
         let value_start = self.offset();
 
         let quote_byte = u8::try_from(quote).expect("char that fits in u8");
-        let value_end = if kind.is_triple_quoted() {
+        let value_end = if flags.is_triple_quoted() {
             // For triple-quoted strings, scan until we find the closing quote (ignoring escaped
             // quotes) or the end of the file.
             loop {
@@ -821,7 +821,7 @@ impl<'source> Lexer<'source> {
             value: self.source[TextRange::new(value_start, value_end)]
                 .to_string()
                 .into_boxed_str(),
-            kind,
+            flags,
         })
     }
 

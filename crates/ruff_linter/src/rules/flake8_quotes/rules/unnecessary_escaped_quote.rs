@@ -1,6 +1,6 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, AnyStringKind, StringLike};
+use ruff_python_ast::{self as ast, AnyStringFlags, StringLike};
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -59,7 +59,7 @@ pub(crate) fn unnecessary_escaped_quote(checker: &mut Checker, string_like: Stri
                 if let Some(diagnostic) = check_string_or_bytes(
                     locator,
                     string.range(),
-                    AnyStringKind::from(string.flags),
+                    AnyStringFlags::from(string.flags),
                 ) {
                     checker.diagnostics.push(diagnostic);
                 }
@@ -68,7 +68,7 @@ pub(crate) fn unnecessary_escaped_quote(checker: &mut Checker, string_like: Stri
         StringLike::Bytes(expr) => {
             for bytes in &expr.value {
                 if let Some(diagnostic) =
-                    check_string_or_bytes(locator, bytes.range(), AnyStringKind::from(bytes.flags))
+                    check_string_or_bytes(locator, bytes.range(), AnyStringFlags::from(bytes.flags))
                 {
                     checker.diagnostics.push(diagnostic);
                 }
@@ -80,7 +80,7 @@ pub(crate) fn unnecessary_escaped_quote(checker: &mut Checker, string_like: Stri
                     ast::FStringPart::Literal(string) => check_string_or_bytes(
                         locator,
                         string.range(),
-                        AnyStringKind::from(string.flags),
+                        AnyStringFlags::from(string.flags),
                     ),
                     ast::FStringPart::FString(f_string) => check_f_string(locator, f_string),
                 } {
@@ -99,16 +99,16 @@ pub(crate) fn unnecessary_escaped_quote(checker: &mut Checker, string_like: Stri
 fn check_string_or_bytes(
     locator: &Locator,
     range: TextRange,
-    kind: AnyStringKind,
+    flags: AnyStringFlags,
 ) -> Option<Diagnostic> {
-    assert!(!kind.is_f_string());
+    assert!(!flags.is_f_string());
 
-    if kind.is_triple_quoted() || kind.is_raw_string() {
+    if flags.is_triple_quoted() || flags.is_raw_string() {
         return None;
     }
 
-    let contents = raw_contents(locator.slice(range), kind);
-    let quote = kind.quote_style();
+    let contents = raw_contents(locator.slice(range), flags);
+    let quote = flags.quote_style();
     let opposite_quote_char = quote.opposite().as_char();
 
     if !contains_escaped_quote(contents, opposite_quote_char) {
@@ -117,7 +117,7 @@ fn check_string_or_bytes(
 
     let mut diagnostic = Diagnostic::new(UnnecessaryEscapedQuote, range);
     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-        kind.format_string_contents(&unescape_string(contents, opposite_quote_char)),
+        flags.format_string_contents(&unescape_string(contents, opposite_quote_char)),
         range,
     )));
     Some(diagnostic)

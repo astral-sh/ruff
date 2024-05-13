@@ -2,7 +2,7 @@ pub(crate) use any::AnyString;
 pub(crate) use normalize::{normalize_string, NormalizedString, StringNormalizer};
 use ruff_formatter::format_args;
 use ruff_python_ast::str::Quote;
-use ruff_python_ast::{self as ast, AnyStringKind, AnyStringPrefix};
+use ruff_python_ast::{self as ast, AnyStringFlags, AnyStringPrefix};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::comments::{leading_comments, trailing_comments};
@@ -87,8 +87,8 @@ impl Format<PyFormatContext<'_>> for StringQuotes {
     }
 }
 
-impl From<AnyStringKind> for StringQuotes {
-    fn from(value: AnyStringKind) -> Self {
+impl From<AnyStringFlags> for StringQuotes {
+    fn from(value: AnyStringFlags) -> Self {
         Self {
             triple: value.is_triple_quoted(),
             quote_char: value.quote_style(),
@@ -119,7 +119,7 @@ impl From<Quote> for QuoteStyle {
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct StringPart {
-    kind: AnyStringKind,
+    flags: AnyStringFlags,
     range: TextRange,
 }
 
@@ -131,13 +131,13 @@ impl Ranged for StringPart {
 
 impl StringPart {
     /// Use the `kind()` method to retrieve information about the
-    fn kind(self) -> AnyStringKind {
-        self.kind
+    fn flags(self) -> AnyStringFlags {
+        self.flags
     }
 
     /// Returns the range of the string's content in the source (minus prefix and quotes).
     fn content_range(self) -> TextRange {
-        let kind = self.kind();
+        let kind = self.flags();
         TextRange::new(
             self.start() + kind.opener_len(),
             self.end() - kind.closer_len(),
@@ -149,7 +149,7 @@ impl From<&ast::StringLiteral> for StringPart {
     fn from(value: &ast::StringLiteral) -> Self {
         Self {
             range: value.range,
-            kind: value.flags.into(),
+            flags: value.flags.into(),
         }
     }
 }
@@ -158,7 +158,7 @@ impl From<&ast::BytesLiteral> for StringPart {
     fn from(value: &ast::BytesLiteral) -> Self {
         Self {
             range: value.range,
-            kind: value.flags.into(),
+            flags: value.flags.into(),
         }
     }
 }
@@ -167,7 +167,7 @@ impl From<&ast::FString> for StringPart {
     fn from(value: &ast::FString) -> Self {
         Self {
             range: value.range,
-            kind: value.flags.into(),
+            flags: value.flags.into(),
         }
     }
 }

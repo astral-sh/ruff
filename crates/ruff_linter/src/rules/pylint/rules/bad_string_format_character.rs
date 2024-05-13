@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{AnyStringKind, Expr};
+use ruff_python_ast::{AnyStringFlags, Expr};
 use ruff_python_literal::{
     cformat::{CFormatErrorType, CFormatString},
     format::FormatPart,
@@ -92,12 +92,12 @@ pub(crate) fn call(checker: &mut Checker, string: &str, range: TextRange) {
 /// Ex) `"%z" % "1"`
 pub(crate) fn percent(checker: &mut Checker, expr: &Expr) {
     // Grab each string segment (in case there's an implicit concatenation).
-    let mut strings: Vec<(TextRange, AnyStringKind)> = vec![];
+    let mut strings: Vec<(TextRange, AnyStringFlags)> = vec![];
     for (tok, range) in
         lexer::lex_starts_at(checker.locator().slice(expr), Mode::Module, expr.start()).flatten()
     {
         match tok {
-            Tok::String { kind, .. } => strings.push((range, kind)),
+            Tok::String { flags, .. } => strings.push((range, flags)),
             // Break as soon as we find the modulo symbol.
             Tok::Percent => break,
             _ => {}
@@ -109,10 +109,10 @@ pub(crate) fn percent(checker: &mut Checker, expr: &Expr) {
         return;
     }
 
-    for (range, kind) in &strings {
+    for (range, flags) in &strings {
         let string = checker.locator().slice(*range);
         let string = &string
-            [usize::from(kind.opener_len())..(string.len() - usize::from(kind.closer_len()))];
+            [usize::from(flags.opener_len())..(string.len() - usize::from(flags.closer_len()))];
 
         // Parse the format string (e.g. `"%s"`) into a list of `PercentFormat`.
         if let Err(format_error) = CFormatString::from_str(string) {

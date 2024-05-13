@@ -5,7 +5,7 @@
 //!
 //! [CPython source]: https://github.com/python/cpython/blob/dfc2e065a2e71011017077e549cd2f9bf4944c54/Grammar/Tokens
 
-use ruff_python_ast::{AnyStringKind, BoolOp, Int, IpyEscapeKind, Operator, UnaryOp};
+use ruff_python_ast::{AnyStringFlags, BoolOp, Int, IpyEscapeKind, Operator, UnaryOp};
 use std::fmt;
 
 use crate::Mode;
@@ -44,11 +44,11 @@ pub enum Tok {
         value: Box<str>,
         /// Flags that can be queried to determine the quote style
         /// and prefixes of the string
-        kind: AnyStringKind,
+        flags: AnyStringFlags,
     },
     /// Token value for the start of an f-string. This includes the `f`/`F`/`fr` prefix
     /// and the opening quote(s).
-    FStringStart(AnyStringKind),
+    FStringStart(AnyStringFlags),
     /// Token value that includes the portion of text inside the f-string that's not
     /// part of the expression part and isn't an opening or closing brace.
     FStringMiddle {
@@ -56,7 +56,7 @@ pub enum Tok {
         value: Box<str>,
         /// Flags that can be queried to determine the quote style
         /// and prefixes of the string
-        kind: AnyStringKind,
+        flags: AnyStringFlags,
     },
     /// Token value for the end of an f-string. This includes the closing quote.
     FStringEnd,
@@ -245,8 +245,8 @@ impl fmt::Display for Tok {
             Int { value } => write!(f, "{value}"),
             Float { value } => write!(f, "{value}"),
             Complex { real, imag } => write!(f, "{real}j{imag}"),
-            String { value, kind } => {
-                write!(f, "{}", kind.format_string_contents(value))
+            String { value, flags } => {
+                write!(f, "{}", flags.format_string_contents(value))
             }
             FStringStart(_) => f.write_str("FStringStart"),
             FStringMiddle { value, .. } => f.write_str(value),

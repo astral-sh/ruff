@@ -2321,7 +2321,7 @@ bitflags! {
     /// prefix flags is by calling the `as_flags()` method on the
     /// `StringPrefix` enum.
     #[derive(Default, Debug, Copy, Clone, PartialEq, Eq, Hash)]
-    struct AnyStringFlags: u8 {
+    struct AnyStringFlagsInner: u8 {
         /// The string uses double quotes (`"`).
         /// If this flag is not set, the string uses single quotes (`'`).
         const DOUBLE = 1 << 0;
@@ -2425,71 +2425,71 @@ impl TryFrom<[char; 2]> for AnyStringPrefix {
 }
 
 impl AnyStringPrefix {
-    const fn as_flags(self) -> AnyStringFlags {
+    const fn as_flags(self) -> AnyStringFlagsInner {
         match self {
             // regular strings
-            Self::Regular(StringLiteralPrefix::Empty) => AnyStringFlags::empty(),
-            Self::Regular(StringLiteralPrefix::Unicode) => AnyStringFlags::U_PREFIX,
+            Self::Regular(StringLiteralPrefix::Empty) => AnyStringFlagsInner::empty(),
+            Self::Regular(StringLiteralPrefix::Unicode) => AnyStringFlagsInner::U_PREFIX,
             Self::Regular(StringLiteralPrefix::Raw { uppercase: false }) => {
-                AnyStringFlags::R_PREFIX_LOWER
+                AnyStringFlagsInner::R_PREFIX_LOWER
             }
             Self::Regular(StringLiteralPrefix::Raw { uppercase: true }) => {
-                AnyStringFlags::R_PREFIX_UPPER
+                AnyStringFlagsInner::R_PREFIX_UPPER
             }
 
             // bytestrings
-            Self::Bytes(ByteStringPrefix::Regular) => AnyStringFlags::B_PREFIX,
+            Self::Bytes(ByteStringPrefix::Regular) => AnyStringFlagsInner::B_PREFIX,
             Self::Bytes(ByteStringPrefix::Raw { uppercase_r: false }) => {
-                AnyStringFlags::B_PREFIX.union(AnyStringFlags::R_PREFIX_LOWER)
+                AnyStringFlagsInner::B_PREFIX.union(AnyStringFlagsInner::R_PREFIX_LOWER)
             }
             Self::Bytes(ByteStringPrefix::Raw { uppercase_r: true }) => {
-                AnyStringFlags::B_PREFIX.union(AnyStringFlags::R_PREFIX_UPPER)
+                AnyStringFlagsInner::B_PREFIX.union(AnyStringFlagsInner::R_PREFIX_UPPER)
             }
 
             // f-strings
-            Self::Format(FStringPrefix::Regular) => AnyStringFlags::F_PREFIX,
+            Self::Format(FStringPrefix::Regular) => AnyStringFlagsInner::F_PREFIX,
             Self::Format(FStringPrefix::Raw { uppercase_r: false }) => {
-                AnyStringFlags::F_PREFIX.union(AnyStringFlags::R_PREFIX_LOWER)
+                AnyStringFlagsInner::F_PREFIX.union(AnyStringFlagsInner::R_PREFIX_LOWER)
             }
             Self::Format(FStringPrefix::Raw { uppercase_r: true }) => {
-                AnyStringFlags::F_PREFIX.union(AnyStringFlags::R_PREFIX_UPPER)
+                AnyStringFlagsInner::F_PREFIX.union(AnyStringFlagsInner::R_PREFIX_UPPER)
             }
         }
     }
 
-    const fn from_kind(kind: AnyStringKind) -> Self {
-        let AnyStringKind(flags) = kind;
+    const fn from_kind(kind: AnyStringFlags) -> Self {
+        let AnyStringFlags(flags) = kind;
 
         // f-strings
-        if flags.contains(AnyStringFlags::F_PREFIX) {
-            if flags.contains(AnyStringFlags::R_PREFIX_LOWER) {
+        if flags.contains(AnyStringFlagsInner::F_PREFIX) {
+            if flags.contains(AnyStringFlagsInner::R_PREFIX_LOWER) {
                 return Self::Format(FStringPrefix::Raw { uppercase_r: false });
             }
-            if flags.contains(AnyStringFlags::R_PREFIX_UPPER) {
+            if flags.contains(AnyStringFlagsInner::R_PREFIX_UPPER) {
                 return Self::Format(FStringPrefix::Raw { uppercase_r: true });
             }
             return Self::Format(FStringPrefix::Regular);
         }
 
         // bytestrings
-        if flags.contains(AnyStringFlags::B_PREFIX) {
-            if flags.contains(AnyStringFlags::R_PREFIX_LOWER) {
+        if flags.contains(AnyStringFlagsInner::B_PREFIX) {
+            if flags.contains(AnyStringFlagsInner::R_PREFIX_LOWER) {
                 return Self::Bytes(ByteStringPrefix::Raw { uppercase_r: false });
             }
-            if flags.contains(AnyStringFlags::R_PREFIX_UPPER) {
+            if flags.contains(AnyStringFlagsInner::R_PREFIX_UPPER) {
                 return Self::Bytes(ByteStringPrefix::Raw { uppercase_r: true });
             }
             return Self::Bytes(ByteStringPrefix::Regular);
         }
 
         // all other strings
-        if flags.contains(AnyStringFlags::R_PREFIX_LOWER) {
+        if flags.contains(AnyStringFlagsInner::R_PREFIX_LOWER) {
             return Self::Regular(StringLiteralPrefix::Raw { uppercase: false });
         }
-        if flags.contains(AnyStringFlags::R_PREFIX_UPPER) {
+        if flags.contains(AnyStringFlagsInner::R_PREFIX_UPPER) {
             return Self::Regular(StringLiteralPrefix::Raw { uppercase: true });
         }
-        if flags.contains(AnyStringFlags::U_PREFIX) {
+        if flags.contains(AnyStringFlagsInner::U_PREFIX) {
             return Self::Regular(StringLiteralPrefix::Unicode);
         }
         Self::Regular(StringLiteralPrefix::Empty)
@@ -2517,9 +2517,9 @@ impl Default for AnyStringPrefix {
 }
 
 #[derive(Default, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct AnyStringKind(AnyStringFlags);
+pub struct AnyStringFlags(AnyStringFlagsInner);
 
-impl AnyStringKind {
+impl AnyStringFlags {
     #[must_use]
     pub fn with_prefix(mut self, prefix: AnyStringPrefix) -> Self {
         self.0 |= prefix.as_flags();
@@ -2541,28 +2541,29 @@ impl AnyStringKind {
 
     /// Does the string have a `u` or `U` prefix?
     pub const fn is_u_string(self) -> bool {
-        self.0.contains(AnyStringFlags::U_PREFIX)
+        self.0.contains(AnyStringFlagsInner::U_PREFIX)
     }
 
     /// Does the string have an `r` or `R` prefix?
     pub const fn is_raw_string(self) -> bool {
-        self.0
-            .intersects(AnyStringFlags::R_PREFIX_LOWER.union(AnyStringFlags::R_PREFIX_UPPER))
+        self.0.intersects(
+            AnyStringFlagsInner::R_PREFIX_LOWER.union(AnyStringFlagsInner::R_PREFIX_UPPER),
+        )
     }
 
     /// Does the string have an `f` or `F` prefix?
     pub const fn is_f_string(self) -> bool {
-        self.0.contains(AnyStringFlags::F_PREFIX)
+        self.0.contains(AnyStringFlagsInner::F_PREFIX)
     }
 
     /// Does the string have a `b` or `B` prefix?
     pub const fn is_byte_string(self) -> bool {
-        self.0.contains(AnyStringFlags::B_PREFIX)
+        self.0.contains(AnyStringFlagsInner::B_PREFIX)
     }
 
     /// Does the string use single or double quotes in its opener and closer?
     pub const fn quote_style(self) -> Quote {
-        if self.0.contains(AnyStringFlags::DOUBLE) {
+        if self.0.contains(AnyStringFlagsInner::DOUBLE) {
             Quote::Double
         } else {
             Quote::Single
@@ -2572,7 +2573,7 @@ impl AnyStringKind {
     /// Is the string triple-quoted, i.e.,
     /// does it begin and end with three consecutive quote characters?
     pub const fn is_triple_quoted(self) -> bool {
-        self.0.contains(AnyStringFlags::TRIPLE_QUOTED)
+        self.0.contains(AnyStringFlagsInner::TRIPLE_QUOTED)
     }
 
     /// A `str` representation of the quotes used to start and close.
@@ -2634,20 +2635,20 @@ impl AnyStringKind {
     #[must_use]
     pub fn with_quote_style(mut self, quotes: Quote) -> Self {
         match quotes {
-            Quote::Double => self.0 |= AnyStringFlags::DOUBLE,
-            Quote::Single => self.0 -= AnyStringFlags::DOUBLE,
+            Quote::Double => self.0 |= AnyStringFlagsInner::DOUBLE,
+            Quote::Single => self.0 -= AnyStringFlagsInner::DOUBLE,
         };
         self
     }
 
     #[must_use]
     pub fn with_triple_quotes(mut self) -> Self {
-        self.0 |= AnyStringFlags::TRIPLE_QUOTED;
+        self.0 |= AnyStringFlagsInner::TRIPLE_QUOTED;
         self
     }
 }
 
-impl fmt::Debug for AnyStringKind {
+impl fmt::Debug for AnyStringFlags {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("StringKind")
             .field("prefix", &self.prefix())
@@ -2657,8 +2658,8 @@ impl fmt::Debug for AnyStringKind {
     }
 }
 
-impl From<AnyStringKind> for StringLiteralFlags {
-    fn from(value: AnyStringKind) -> StringLiteralFlags {
+impl From<AnyStringFlags> for StringLiteralFlags {
+    fn from(value: AnyStringFlags) -> StringLiteralFlags {
         let AnyStringPrefix::Regular(prefix) = value.prefix() else {
             unreachable!(
                 "Should never attempt to convert {} into a regular string",
@@ -2676,7 +2677,7 @@ impl From<AnyStringKind> for StringLiteralFlags {
     }
 }
 
-impl From<StringLiteralFlags> for AnyStringKind {
+impl From<StringLiteralFlags> for AnyStringFlags {
     fn from(value: StringLiteralFlags) -> Self {
         Self::new(
             AnyStringPrefix::Regular(value.prefix()),
@@ -2686,8 +2687,8 @@ impl From<StringLiteralFlags> for AnyStringKind {
     }
 }
 
-impl From<AnyStringKind> for BytesLiteralFlags {
-    fn from(value: AnyStringKind) -> BytesLiteralFlags {
+impl From<AnyStringFlags> for BytesLiteralFlags {
+    fn from(value: AnyStringFlags) -> BytesLiteralFlags {
         let AnyStringPrefix::Bytes(bytestring_prefix) = value.prefix() else {
             unreachable!(
                 "Should never attempt to convert {} into a bytestring",
@@ -2705,7 +2706,7 @@ impl From<AnyStringKind> for BytesLiteralFlags {
     }
 }
 
-impl From<BytesLiteralFlags> for AnyStringKind {
+impl From<BytesLiteralFlags> for AnyStringFlags {
     fn from(value: BytesLiteralFlags) -> Self {
         Self::new(
             AnyStringPrefix::Bytes(value.prefix()),
@@ -2715,8 +2716,8 @@ impl From<BytesLiteralFlags> for AnyStringKind {
     }
 }
 
-impl From<AnyStringKind> for FStringFlags {
-    fn from(value: AnyStringKind) -> FStringFlags {
+impl From<AnyStringFlags> for FStringFlags {
+    fn from(value: AnyStringFlags) -> FStringFlags {
         let AnyStringPrefix::Format(fstring_prefix) = value.prefix() else {
             unreachable!(
                 "Should never attempt to convert {} into an f-string",
@@ -2734,7 +2735,7 @@ impl From<AnyStringKind> for FStringFlags {
     }
 }
 
-impl From<FStringFlags> for AnyStringKind {
+impl From<FStringFlags> for AnyStringFlags {
     fn from(value: FStringFlags) -> Self {
         Self::new(
             AnyStringPrefix::Format(value.prefix()),
