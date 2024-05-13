@@ -2814,7 +2814,7 @@ impl AstNode for ast::FStringFormatSpec {
     where
         V: PreorderVisitor<'a> + ?Sized,
     {
-        for element in self.elements.iter() {
+        for element in &self.elements {
             visitor.visit_f_string_element(element);
         }
     }
@@ -2864,7 +2864,7 @@ impl AstNode for ast::FStringExpressionElement {
         visitor.visit_expr(expression);
 
         if let Some(format_spec) = format_spec {
-            for spec_part in format_spec.elements.iter() {
+            for spec_part in &format_spec.elements {
                 visitor.visit_f_string_element(spec_part);
             }
         }
@@ -4800,7 +4800,7 @@ impl AstNode for ast::FString {
             flags: _,
         } = self;
 
-        for fstring_element in elements.iter() {
+        for fstring_element in elements {
             visitor.visit_f_string_element(fstring_element);
         }
     }

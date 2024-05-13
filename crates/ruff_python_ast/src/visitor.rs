@@ -739,7 +739,7 @@ pub fn walk_pattern_keyword<'a, V: Visitor<'a> + ?Sized>(
 }
 
 pub fn walk_f_string<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, f_string: &'a FString) {
-    for f_string_element in f_string.elements.iter() {
+    for f_string_element in &f_string.elements {
         visitor.visit_f_string_element(f_string_element);
     }
 }
@@ -756,7 +756,7 @@ pub fn walk_f_string_element<'a, V: Visitor<'a> + ?Sized>(
     {
         visitor.visit_expr(expression);
         if let Some(format_spec) = format_spec {
-            for spec_element in format_spec.elements.iter() {
+            for spec_element in &format_spec.elements {
                 visitor.visit_f_string_element(spec_element);
             }
         }
