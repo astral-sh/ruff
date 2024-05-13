@@ -443,7 +443,7 @@ fn fix_by_reexporting(
             dunder_all,
             checker.stylist(),
         ),
-        _ => bail!("Cannot offer a fix when there are multiple __all__"),
+        _ => bail!("Cannot offer a fix when there are multiple __all__ definitions"),
     };
 
     // Only emit a fix if there are edits
