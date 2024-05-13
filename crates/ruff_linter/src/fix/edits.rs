@@ -185,12 +185,11 @@ pub(crate) fn add_to_dunder_all<'a>(
             _ => Edit::insertion(format!(", {quote}{name}{quote}"), insertion_point),
         })
         .collect();
-    match expr {
-        ast::Expr::Tuple(tup) if tup.parenthesized && 1 == export_prefix_length + edits.len() => {
+    if let ast::Expr::Tuple(tup) = expr {
+        if tup.parenthesized && export_prefix_length + edits.len() == 1 {
             edits.push(Edit::insertion(",".to_string(), insertion_point));
         }
-        _ => {}
-    };
+    }
     edits
 }
 
