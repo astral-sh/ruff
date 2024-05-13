@@ -87,7 +87,7 @@ pub(crate) fn invalid_escape_sequence(checker: &mut Checker, string_like: String
             }
             StringLikePart::FString(f_string) => {
                 let flags = AnyStringFlags::from(f_string.flags);
-                for element in f_string.elements.iter() {
+                for element in &f_string.elements {
                     match element {
                         FStringElement::Literal(literal) => {
                             check(

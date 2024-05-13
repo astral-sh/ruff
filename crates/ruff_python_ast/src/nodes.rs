@@ -1526,6 +1526,24 @@ impl From<Vec<FStringElement>> for FStringElements {
     }
 }
 
+impl<'a> IntoIterator for &'a FStringElements {
+    type IntoIter = Iter<'a, FStringElement>;
+    type Item = &'a FStringElement;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a mut FStringElements {
+    type IntoIter = IterMut<'a, FStringElement>;
+    type Item = &'a mut FStringElement;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter_mut()
+    }
+}
+
 impl Deref for FStringElements {
     type Target = Vec<FStringElement>;
 
