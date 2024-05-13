@@ -125,7 +125,9 @@ impl Violation for UnusedImport {
             Some(UnusedImportContext::Init {
                 first_party: true,
                 dunder_all_count: 1,
-            }) => "Add unused import to __all__",
+            }) => {
+                return Some(format!("Add unused import `{binding}` to __all__"));
+            }
             Some(UnusedImportContext::Init {
                 first_party: true,
                 dunder_all_count: 0,

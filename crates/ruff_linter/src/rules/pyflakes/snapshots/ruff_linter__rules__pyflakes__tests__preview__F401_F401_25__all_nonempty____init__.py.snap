@@ -22,7 +22,7 @@ __init__.py:36:15: F401 [*] `.unused` imported but unused; consider removing, ad
 36 | from . import unused # F401: add to __all__
    |               ^^^^^^ F401
    |
-   = help: Add unused import to __all__: `.unused`
+   = help: Add unused import `unused` to __all__
 
 ℹ Safe fix
 39 39 | from . import renamed as bees # F401: add to __all__
@@ -36,7 +36,7 @@ __init__.py:39:26: F401 [*] `.renamed` imported but unused; consider removing, a
 39 | from . import renamed as bees # F401: add to __all__
    |                          ^^^^ F401
    |
-   = help: Add unused import to __all__: `bees`
+   = help: Add unused import `bees` to __all__
 
 ℹ Safe fix
 39 39 | from . import renamed as bees # F401: add to __all__
