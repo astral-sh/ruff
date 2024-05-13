@@ -27,18 +27,10 @@ pub fn is_known_standard_library(minor_version: u8, module: &str) -> bool {
     modules_by_version = {}
 
     for major_version, minor_version in VERSIONS:
-        modules = {
-            "_ast",
-            "posixpath",
-            "ntpath",
-            "sre_constants",
-            "sre_parse",
-            "sre_compile",
-            "sre",
-        }
+        modules = set()
 
         for module in stdlib_module_names(f"{major_version}.{minor_version}"):
-            if module not in ["__future__", "__main__"]:
+            if module != "__future__":
                 modules.add(module)
 
         modules_by_version[minor_version] = modules
