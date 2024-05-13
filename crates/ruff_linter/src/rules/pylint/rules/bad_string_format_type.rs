@@ -2,8 +2,7 @@ use std::str::FromStr;
 
 use ruff_python_ast::{self as ast, AnyStringFlags, Expr};
 use ruff_python_literal::cformat::{CFormatPart, CFormatSpec, CFormatStrOrBytes, CFormatString};
-use ruff_python_parser::{lexer, AsMode, Tok};
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::Ranged;
 use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{Diagnostic, Violation};
@@ -211,30 +210,16 @@ fn is_valid_dict(formats: &[CFormatStrOrBytes<String>], items: &[ast::DictItem])
 }
 
 /// PLE1307
-pub(crate) fn bad_string_format_type(checker: &mut Checker, expr: &Expr, right: &Expr) {
-    // Grab each string segment (in case there's an implicit concatenation).
-    let content = checker.locator().slice(expr);
-    let mut strings: Vec<(TextRange, AnyStringFlags)> = vec![];
-    for (tok, range) in
-        lexer::lex_starts_at(content, checker.source_type.as_mode(), expr.start()).flatten()
-    {
-        match tok {
-            Tok::String { flags, .. } => strings.push((range, flags)),
-            // Break as soon as we find the modulo symbol.
-            Tok::Percent => break,
-            _ => {}
-        }
-    }
-
-    // If there are no string segments, abort.
-    if strings.is_empty() {
-        return;
-    }
-
+pub(crate) fn bad_string_format_type(
+    checker: &mut Checker,
+    bin_op: &ast::ExprBinOp,
+    format_string: &ast::ExprStringLiteral,
+) {
     // Parse each string segment.
     let mut format_strings = vec![];
-    for (range, flags) in &strings {
-        let string = checker.locator().slice(*range);
+    for string_literal in &format_string.value {
+        let string = checker.locator().slice(string_literal);
+        let flags = AnyStringFlags::from(string_literal.flags);
         let quote_len = usize::from(flags.quote_len());
         let string =
             &string[(usize::from(flags.prefix_len()) + quote_len)..(string.len() - quote_len)];
@@ -246,14 +231,14 @@ pub(crate) fn bad_string_format_type(checker: &mut Checker, expr: &Expr, right: 
     }
 
     // Parse the parameters.
-    let is_valid = match right {
+    let is_valid = match &*bin_op.right {
         Expr::Tuple(ast::ExprTuple { elts, .. }) => is_valid_tuple(&format_strings, elts),
         Expr::Dict(ast::ExprDict { items, range: _ }) => is_valid_dict(&format_strings, items),
-        _ => is_valid_constant(&format_strings, right),
+        _ => is_valid_constant(&format_strings, &bin_op.right),
     };
     if !is_valid {
         checker
             .diagnostics
-            .push(Diagnostic::new(BadStringFormatType, expr.range()));
+            .push(Diagnostic::new(BadStringFormatType, bin_op.range()));
     }
 }
