@@ -1087,6 +1087,24 @@ pub struct FStringFormatSpec {
     pub elements: Vec<FStringElement>,
 }
 
+impl FStringFormatSpec {
+    /// Returns an iterator over all the [`FStringLiteralElement`] nodes contained in this format
+    /// spec of the f-string.
+    pub fn literals(&self) -> impl Iterator<Item = &FStringLiteralElement> {
+        self.elements
+            .iter()
+            .filter_map(|element| element.as_literal())
+    }
+
+    /// Returns an iterator over all the [`FStringExpressionElement`] nodes contained in this
+    /// format spec of the f-string.
+    pub fn expressions(&self) -> impl Iterator<Item = &FStringExpressionElement> {
+        self.elements
+            .iter()
+            .filter_map(|element| element.as_expression())
+    }
+}
+
 impl Ranged for FStringFormatSpec {
     fn range(&self) -> TextRange {
         self.range
