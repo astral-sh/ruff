@@ -12,11 +12,11 @@ license.workspace = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-ruff_python_parser = { path = "../ruff_python_parser" }
-ruff_python_ast = { path = "../ruff_python_ast" }
-ruff_text_size = { path = "../ruff_text_size" }
-ruff_index = { path = "../ruff_index" }
-ruff_notebook = { path = "../ruff_notebook" }
+ruff_python_parser = { workspace = true }
+ruff_python_ast = { workspace = true }
+ruff_text_size = { workspace = true }
+ruff_index = { workspace = true }
+ruff_notebook = { workspace = true }
 
 anyhow = { workspace = true }
 bitflags = { workspace = true }

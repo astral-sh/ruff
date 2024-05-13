@@ -12,11 +12,11 @@ license.workspace = true
 [dependencies]
 
 [dev-dependencies]
-ruff_python_index = { path = "../ruff_python_index" }
-ruff_python_parser = { path = "../ruff_python_parser" }
-ruff_python_trivia = { path = "../ruff_python_trivia" }
-ruff_source_file = { path = "../ruff_source_file" }
-ruff_text_size = { path = "../ruff_text_size" }
+ruff_python_index = { workspace = true }
+ruff_python_parser = { workspace = true }
+ruff_python_trivia = { workspace = true }
+ruff_source_file = { workspace = true }
+ruff_text_size = { workspace = true }
 
 insta = { workspace = true }
 

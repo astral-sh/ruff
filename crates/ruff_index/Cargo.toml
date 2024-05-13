@@ -14,7 +14,7 @@ license = { workspace = true }
 doctest = false
 
 [dependencies]
-ruff_macros = { path = "../ruff_macros" }
+ruff_macros = { workspace = true }
 
 [dev-dependencies]
 static_assertions = { workspace = true }
