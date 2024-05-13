@@ -616,7 +616,7 @@ x = 1 \
         let program = parse_suite(contents).unwrap();
         let stmt = program.first().unwrap();
         assert_eq!(
-            make_redundant_alias(["x"].into_iter().map(std::convert::Into::into), stmt),
+            make_redundant_alias(["x"].into_iter().map(Cow::from), stmt),
             vec![Edit::range_replacement(
                 String::from("x as x"),
                 TextRange::new(TextSize::new(7), TextSize::new(8)),
