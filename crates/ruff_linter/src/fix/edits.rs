@@ -527,6 +527,7 @@ fn all_lines_fit(
 #[cfg(test)]
 mod tests {
     use anyhow::{anyhow, Result};
+    use std::borrow::Cow;
     use test_case::test_case;
 
     use ruff_diagnostics::{Diagnostic, Edit, Fix};
@@ -624,10 +625,7 @@ x = 1 \
             "make just one item redundant"
         );
         assert_eq!(
-            make_redundant_alias(
-                vec!["x", "y"].into_iter().map(std::convert::Into::into),
-                stmt
-            ),
+            make_redundant_alias(vec!["x", "y"].into_iter().map(Cow::from), stmt),
             vec![Edit::range_replacement(
                 String::from("x as x"),
                 TextRange::new(TextSize::new(7), TextSize::new(8)),
@@ -635,10 +633,7 @@ x = 1 \
             "the second item is already a redundant alias"
         );
         assert_eq!(
-            make_redundant_alias(
-                vec!["x", "z"].into_iter().map(std::convert::Into::into),
-                stmt
-            ),
+            make_redundant_alias(vec!["x", "z"].into_iter().map(Cow::from), stmt),
             vec![Edit::range_replacement(
                 String::from("x as x"),
                 TextRange::new(TextSize::new(7), TextSize::new(8)),
