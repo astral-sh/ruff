@@ -21,3 +21,14 @@ def func():
     i = 0
     i += 2
     return i
+
+def func():
+    with x:
+        i = 0
+    i = 1
+
+def func():
+    with x:
+        i = 0
+        return 1
+    i = 1
