@@ -25,9 +25,6 @@ once_cell = { workspace = true }
 rustc-hash = { workspace = true }
 serde = { workspace = true, optional = true }
 
-[dev-dependencies]
-insta = { workspace = true }
-
 [features]
 serde = ["dep:serde", "ruff_text_size/serde"]
 

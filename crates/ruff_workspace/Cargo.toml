@@ -47,6 +47,10 @@ toml = { workspace = true }
 ruff_linter = { path = "../ruff_linter", features = ["clap", "test-rules"] }
 tempfile = { workspace = true }
 
+[package.metadata.cargo-shear]
+# Used via macro expansion.
+ignored = ["colored"]
+
 [features]
 default = []
 schemars = ["dep:schemars", "ruff_formatter/schemars", "ruff_python_formatter/schemars"]

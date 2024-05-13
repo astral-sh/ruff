@@ -11,7 +11,7 @@ repository = { workspace = true }
 license = { workspace = true }
 
 [lib]
-doctest= false
+doctest = false
 
 [dependencies]
 ruff_cache = { path = "../ruff_cache" }
@@ -48,6 +48,10 @@ regex = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 similar = { workspace = true }
+
+[package.metadata.cargo-shear]
+# Used via `CacheKey` macro expansion.
+ignored = ["ruff_cache"]
 
 [[test]]
 name = "ruff_python_formatter_fixtures"

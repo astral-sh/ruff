@@ -25,6 +25,10 @@ unicode-width = { workspace = true }
 
 [dev-dependencies]
 
+[package.metadata.cargo-shear]
+# Used via `CacheKey` macro expansion.
+ignored = ["ruff_cache"]
+
 [features]
 serde = ["dep:serde", "ruff_text_size/serde"]
 schemars = ["dep:schemars", "ruff_text_size/schemars"]
