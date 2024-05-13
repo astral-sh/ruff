@@ -2326,7 +2326,7 @@ impl Ranged for ParsedExpr {
 /// See: <https://docs.python.org/3/reference/expressions.html#operator-precedence>
 #[derive(Debug, Ord, Eq, PartialEq, PartialOrd, Copy, Clone)]
 pub(super) enum OperatorPrecedence {
-    /// The initital precedence when parsing an expression.
+    /// The initial precedence when parsing an expression.
     Initial,
     /// Precedence of boolean `or` operator.
     Or,

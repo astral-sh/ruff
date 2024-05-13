@@ -224,7 +224,7 @@ f"""aaaaaaaaaaaaaaaa bbbbbbbbbbbbbbbbbb ccccccccccc {
 f"""fooooooooooooooooooo barrrrrrrrrrrrrrrrrrr {
         xxxxxxxxxxxxxxx:.3f} aaaaaaaaaaaaaaaaa { xxxxxxxxxxxxxxxxxxxx } bbbbbbbbbbbb"""
 
-# Throw in a random comment in it but surpise, this is not a comment but just a text
+# Throw in a random comment in it but surprise, this is not a comment but just a text
 # which is part of the format specifier
 aaaaaaaaaaa = f"""asaaaaaaaaaaaaaaaa {
         aaaaaaaaaaaa + bbbbbbbbbbbb + ccccccccccccccc + dddddddd:.3f
