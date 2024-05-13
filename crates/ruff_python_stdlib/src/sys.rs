@@ -245,7 +245,6 @@ pub fn is_known_standard_library(minor_version: u8, module: &str) -> bool {
                 | "socketserver"
                 | "spwd"
                 | "sqlite3"
-                | "sre"
                 | "sre_compile"
                 | "sre_constants"
                 | "sre_parse"
