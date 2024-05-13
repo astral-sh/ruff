@@ -124,7 +124,7 @@ fn check_f_string(locator: &Locator, f_string: &ast::FString) -> Option<Diagnost
     let opposite_quote_char = flags.quote_style().opposite().as_char();
 
     let mut edits = vec![];
-    for literal in f_string.literals() {
+    for literal in f_string.elements.literals() {
         let content = locator.slice(literal);
         if !contains_escaped_quote(content, opposite_quote_char) {
             continue;

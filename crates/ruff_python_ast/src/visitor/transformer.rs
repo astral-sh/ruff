@@ -746,7 +746,7 @@ pub fn walk_pattern_keyword<V: Transformer + ?Sized>(
 }
 
 pub fn walk_f_string<V: Transformer + ?Sized>(visitor: &V, f_string: &mut FString) {
-    for element in &mut f_string.elements {
+    for element in f_string.elements.iter_mut() {
         visitor.visit_f_string_element(element);
     }
 }
@@ -763,7 +763,7 @@ pub fn walk_f_string_element<V: Transformer + ?Sized>(
     {
         visitor.visit_expr(expression);
         if let Some(format_spec) = format_spec {
-            for spec_element in &mut format_spec.elements {
+            for spec_element in format_spec.elements.iter_mut() {
                 visitor.visit_f_string_element(spec_element);
             }
         }
