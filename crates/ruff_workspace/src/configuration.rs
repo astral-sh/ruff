@@ -181,6 +181,7 @@ impl Configuration {
                 PythonVersion::Py310 => ruff_python_formatter::PythonVersion::Py310,
                 PythonVersion::Py311 => ruff_python_formatter::PythonVersion::Py311,
                 PythonVersion::Py312 => ruff_python_formatter::PythonVersion::Py312,
+                PythonVersion::Py313 => ruff_python_formatter::PythonVersion::Py313,
             },
             line_width: self
                 .line_length
