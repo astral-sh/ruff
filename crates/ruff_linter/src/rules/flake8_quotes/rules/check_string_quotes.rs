@@ -454,11 +454,7 @@ pub(crate) fn check_string_quotes(checker: &mut Checker, string_like: StringLike
         return;
     }
 
-    let ranges: Vec<TextRange> = match string_like {
-        StringLike::String(node) => node.value.iter().map(Ranged::range).collect(),
-        StringLike::Bytes(node) => node.value.iter().map(Ranged::range).collect(),
-        StringLike::FString(node) => node.value.iter().map(Ranged::range).collect(),
-    };
+    let ranges: Vec<_> = string_like.parts().map(|part| part.range()).collect();
 
     if checker.semantic().in_pep_257_docstring() {
         if checker.enabled(Rule::BadQuotesDocstring) {

@@ -192,48 +192,32 @@ pub(crate) fn ambiguous_unicode_character_string(checker: &mut Checker, string_l
         Context::String
     };
 
-    match string_like {
-        StringLike::String(node) => {
-            for literal in &node.value {
-                let text = checker.locator().slice(literal);
+    for part in string_like.parts() {
+        match part {
+            ast::StringLikePart::String(string_literal) => {
+                let text = checker.locator().slice(string_literal);
                 ambiguous_unicode_character(
                     &mut checker.diagnostics,
                     text,
-                    literal.range(),
+                    string_literal.range(),
                     context,
                     checker.settings,
                 );
             }
-        }
-        StringLike::FString(node) => {
-            for part in &node.value {
-                match part {
-                    ast::FStringPart::Literal(literal) => {
-                        let text = checker.locator().slice(literal);
-                        ambiguous_unicode_character(
-                            &mut checker.diagnostics,
-                            text,
-                            literal.range(),
-                            context,
-                            checker.settings,
-                        );
-                    }
-                    ast::FStringPart::FString(f_string) => {
-                        for literal in f_string.literals() {
-                            let text = checker.locator().slice(literal);
-                            ambiguous_unicode_character(
-                                &mut checker.diagnostics,
-                                text,
-                                literal.range(),
-                                context,
-                                checker.settings,
-                            );
-                        }
-                    }
+            ast::StringLikePart::Bytes(_) => {}
+            ast::StringLikePart::FString(f_string) => {
+                for literal in f_string.literals() {
+                    let text = checker.locator().slice(literal);
+                    ambiguous_unicode_character(
+                        &mut checker.diagnostics,
+                        text,
+                        literal.range(),
+                        context,
+                        checker.settings,
+                    );
                 }
             }
         }
-        StringLike::Bytes(_) => (),
     }
 }
 
