@@ -6,7 +6,7 @@ use anyhow::{Context, Result};
 
 use ruff_diagnostics::Edit;
 use ruff_python_ast::parenthesize::parenthesized_range;
-use ruff_python_ast::{self as ast, Arguments, ExceptHandler, Expr, Stmt};
+use ruff_python_ast::{self as ast, Arguments, ExceptHandler, Expr, ExprList, Stmt};
 use ruff_python_ast::{AnyNodeRef, ArgOrKeyword};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
@@ -153,18 +153,18 @@ pub(crate) fn add_to_dunder_all<'a>(
     stylist: &Stylist,
 ) -> Vec<Edit> {
     let (insertion_point, export_prefix_length) = match expr {
-        ast::Expr::List(ast::ExprList { elts, range, .. }) => (
+        Expr::List(ExprList { elts, range, .. }) => (
             elts.last()
-                .map_or(range.end() - "]".text_len(), |elt| elt.range().end()),
+                .map_or(range.end() - "]".text_len(), |elt| elt.end()),
             elts.len(),
         ),
-        ast::Expr::Tuple(tup) if tup.parenthesized => (
+        Expr::Tuple(tup) if tup.parenthesized => (
             tup.elts
                 .last()
-                .map_or(tup.range.end() - ")".text_len(), |elt| elt.range().end()),
+                .map_or(tup.end() - ")".text_len(), |elt| elt.end()),
             tup.elts.len(),
         ),
-        ast::Expr::Tuple(tup) if !tup.parenthesized => (
+        Expr::Tuple(tup) if !tup.parenthesized => (
             tup.elts
                 .last()
                 .expect("unparenthesized empty tuple is not possible")
@@ -185,7 +185,7 @@ pub(crate) fn add_to_dunder_all<'a>(
             _ => Edit::insertion(format!(", {quote}{name}{quote}"), insertion_point),
         })
         .collect();
-    if let ast::Expr::Tuple(tup) = expr {
+    if let Expr::Tuple(tup) = expr {
         if tup.parenthesized && export_prefix_length + edits.len() == 1 {
             edits.push(Edit::insertion(",".to_string(), insertion_point));
         }
