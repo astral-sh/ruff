@@ -17,6 +17,59 @@ use ruff_python_ast::identifier::Identifier;
 /// and maintain than functions or methods with fewer branches.
 ///
 /// ## Example
+/// Instead of:
+/// ```python
+/// def capital(country):
+///     if country == "Australia":
+///         return "Canberra"
+///     elif country == "Brazil":
+///         return "Brasilia"
+///     elif country == "Canada":
+///         return "Ottawa"
+///     elif country == "England":
+///         return "London"
+///     elif country == "France":
+///         return "Paris"
+///     elif country == "Germany":
+///         return "Berlin"
+///     elif country == "Poland":
+///         return "Warsaw"
+///     elif country == "Romania":
+///         return "Bucharest"
+///     elif country == "Spain":
+///         return "Madrid"
+///     elif country == "Thailand":
+///         return "Bangkok"
+///     elif country == "Turkey":
+///         return "Ankara"
+///     elif country == "United States":
+///         return "Washington"
+///     else:
+///         return "Unknown"  # 13th branch
+/// ```
+///
+/// Use:
+/// ```python
+/// def capital(country):
+///     capitals = {
+///         "Australia": "Canberra",
+///         "Brazil": "Brasilia",
+///         "Canada": "Ottawa",
+///         "England": "London",
+///         "France": "Paris",
+///         "Germany": "Berlin",
+///         "Poland": "Warsaw",
+///         "Romania": "Bucharest",
+///         "Spain": "Madrid",
+///         "Thailand": "Bangkok",
+///         "Turkey": "Ankara",
+///         "United States": "Washington",
+///     }
+///     city = capitals.get(country, "Unknown")
+///     return city
+/// ```
+///
+/// Instead of:
 /// ```python
 /// def grades_to_average_number(grades):
 ///     numbers = []
@@ -56,7 +109,7 @@ use ruff_python_ast::identifier::Identifier;
 ///         return 0
 /// ```
 ///
-/// Use instead:
+/// Use:
 /// ```python
 /// def grades_to_average_number(grades):
 ///     grade_values = {"F": 0.0, "E": 0.0, "D": 1.0, "C": 2.0, "B": 3.0, "A": 4.0}
