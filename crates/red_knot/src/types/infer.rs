@@ -123,7 +123,7 @@ pub fn infer_definition_type(
             // TODO handle unpacking assignment correctly
             infer_expr_type(db, file_id, &node.value)
         }
-        _ => todo!("other kinds of definitions"),
+        x => todo!("other kinds of definitions: {x:?}"),
     }
 }
 
