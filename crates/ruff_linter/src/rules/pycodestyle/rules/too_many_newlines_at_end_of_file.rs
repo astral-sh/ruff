@@ -1,7 +1,6 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_parser::lexer::LexResult;
-use ruff_python_parser::Tok;
+use ruff_python_parser::{TokenKind, TokenKindIter};
 use ruff_text_size::{TextRange, TextSize};
 
 /// ## What it does
@@ -57,23 +56,23 @@ impl AlwaysFixableViolation for TooManyNewlinesAtEndOfFile {
 /// W391
 pub(crate) fn too_many_newlines_at_end_of_file(
     diagnostics: &mut Vec<Diagnostic>,
-    lxr: &[LexResult],
+    tokens: TokenKindIter,
 ) {
     let mut num_trailing_newlines = 0u32;
     let mut start: Option<TextSize> = None;
     let mut end: Option<TextSize> = None;
 
     // Count the number of trailing newlines.
-    for (tok, range) in lxr.iter().rev().flatten() {
-        match tok {
-            Tok::NonLogicalNewline | Tok::Newline => {
+    for (token, range) in tokens.rev() {
+        match token {
+            TokenKind::NonLogicalNewline | TokenKind::Newline => {
                 if num_trailing_newlines == 0 {
                     end = Some(range.end());
                 }
                 start = Some(range.end());
                 num_trailing_newlines += 1;
             }
-            Tok::Dedent => continue,
+            TokenKind::Dedent => continue,
             _ => {
                 break;
             }

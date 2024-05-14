@@ -1,7 +1,6 @@
 use ruff_notebook::CellOffsets;
 use ruff_python_ast::PySourceType;
-use ruff_python_parser::lexer::LexResult;
-use ruff_python_parser::Tok;
+use ruff_python_parser::{TokenKind, TokenKindIter};
 use ruff_text_size::{TextRange, TextSize};
 
 use ruff_diagnostics::{AlwaysFixableViolation, Violation};
@@ -100,7 +99,7 @@ impl AlwaysFixableViolation for UselessSemicolon {
 /// E701, E702, E703
 pub(crate) fn compound_statements(
     diagnostics: &mut Vec<Diagnostic>,
-    lxr: &[LexResult],
+    mut tokens: TokenKindIter,
     locator: &Locator,
     indexer: &Indexer,
     source_type: PySourceType,
@@ -134,39 +133,36 @@ pub(crate) fn compound_statements(
     // Track indentation.
     let mut indent = 0u32;
 
-    // Keep the token iterator to perform lookaheads.
-    let mut tokens = lxr.iter().flatten();
-
-    while let Some(&(ref tok, range)) = tokens.next() {
-        match tok {
-            Tok::Lpar => {
+    while let Some((token, range)) = tokens.next() {
+        match token {
+            TokenKind::Lpar => {
                 par_count = par_count.saturating_add(1);
             }
-            Tok::Rpar => {
+            TokenKind::Rpar => {
                 par_count = par_count.saturating_sub(1);
             }
-            Tok::Lsqb => {
+            TokenKind::Lsqb => {
                 sqb_count = sqb_count.saturating_add(1);
             }
-            Tok::Rsqb => {
+            TokenKind::Rsqb => {
                 sqb_count = sqb_count.saturating_sub(1);
             }
-            Tok::Lbrace => {
+            TokenKind::Lbrace => {
                 brace_count = brace_count.saturating_add(1);
             }
-            Tok::Rbrace => {
+            TokenKind::Rbrace => {
                 brace_count = brace_count.saturating_sub(1);
             }
-            Tok::Ellipsis => {
+            TokenKind::Ellipsis => {
                 if allow_ellipsis {
                     allow_ellipsis = false;
                     continue;
                 }
             }
-            Tok::Indent => {
+            TokenKind::Indent => {
                 indent = indent.saturating_add(1);
             }
-            Tok::Dedent => {
+            TokenKind::Dedent => {
                 indent = indent.saturating_sub(1);
             }
             _ => {}
@@ -176,8 +172,8 @@ pub(crate) fn compound_statements(
             continue;
         }
 
-        match tok {
-            Tok::Newline => {
+        match token {
+            TokenKind::Newline => {
                 if let Some((start, end)) = semi {
                     if !(source_type.is_ipynb()
                         && indent == 0
@@ -215,7 +211,7 @@ pub(crate) fn compound_statements(
                 while_ = None;
                 with = None;
             }
-            Tok::Colon => {
+            TokenKind::Colon => {
                 if case.is_some()
                     || class.is_some()
                     || elif.is_some()
@@ -235,11 +231,14 @@ pub(crate) fn compound_statements(
                     allow_ellipsis = true;
                 }
             }
-            Tok::Semi => {
+            TokenKind::Semi => {
                 semi = Some((range.start(), range.end()));
                 allow_ellipsis = false;
             }
-            Tok::Comment(..) | Tok::Indent | Tok::Dedent | Tok::NonLogicalNewline => {}
+            TokenKind::Comment
+            | TokenKind::Indent
+            | TokenKind::Dedent
+            | TokenKind::NonLogicalNewline => {}
             _ => {
                 if let Some((start, end)) = semi {
                     diagnostics.push(Diagnostic::new(
@@ -277,8 +276,8 @@ pub(crate) fn compound_statements(
             }
         }
 
-        match tok {
-            Tok::Lambda => {
+        match token {
+            TokenKind::Lambda => {
                 // Reset.
                 colon = None;
                 case = None;
@@ -294,40 +293,40 @@ pub(crate) fn compound_statements(
                 while_ = None;
                 with = None;
             }
-            Tok::Case => {
+            TokenKind::Case => {
                 case = Some((range.start(), range.end()));
             }
-            Tok::If => {
+            TokenKind::If => {
                 if_ = Some((range.start(), range.end()));
             }
-            Tok::While => {
+            TokenKind::While => {
                 while_ = Some((range.start(), range.end()));
             }
-            Tok::For => {
+            TokenKind::For => {
                 for_ = Some((range.start(), range.end()));
             }
-            Tok::Try => {
+            TokenKind::Try => {
                 try_ = Some((range.start(), range.end()));
             }
-            Tok::Except => {
+            TokenKind::Except => {
                 except = Some((range.start(), range.end()));
             }
-            Tok::Finally => {
+            TokenKind::Finally => {
                 finally = Some((range.start(), range.end()));
             }
-            Tok::Elif => {
+            TokenKind::Elif => {
                 elif = Some((range.start(), range.end()));
             }
-            Tok::Else => {
+            TokenKind::Else => {
                 else_ = Some((range.start(), range.end()));
             }
-            Tok::Class => {
+            TokenKind::Class => {
                 class = Some((range.start(), range.end()));
             }
-            Tok::With => {
+            TokenKind::With => {
                 with = Some((range.start(), range.end()));
             }
-            Tok::Match => {
+            TokenKind::Match => {
                 match_ = Some((range.start(), range.end()));
             }
             _ => {}
@@ -337,17 +336,17 @@ pub(crate) fn compound_statements(
 
 /// Returns `true` if there are any non-trivia tokens from the given token
 /// iterator till the given end offset.
-fn has_non_trivia_tokens_till<'a>(
-    tokens: impl Iterator<Item = &'a (Tok, TextRange)>,
-    cell_end: TextSize,
-) -> bool {
-    for &(ref tok, tok_range) in tokens {
+fn has_non_trivia_tokens_till(tokens: TokenKindIter, cell_end: TextSize) -> bool {
+    for (token, tok_range) in tokens {
         if tok_range.start() >= cell_end {
             return false;
         }
         if !matches!(
-            tok,
-            Tok::Newline | Tok::Comment(_) | Tok::EndOfFile | Tok::NonLogicalNewline
+            token,
+            TokenKind::Newline
+                | TokenKind::Comment
+                | TokenKind::EndOfFile
+                | TokenKind::NonLogicalNewline
         ) {
             return true;
         }
