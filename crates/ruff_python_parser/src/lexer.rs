@@ -35,7 +35,9 @@ use unicode_ident::{is_xid_continue, is_xid_start};
 use unicode_normalization::UnicodeNormalization;
 
 use ruff_python_ast::{
-    str::Quote, AnyStringFlags, AnyStringPrefix, FStringPrefix, Int, IpyEscapeKind,
+    str::Quote,
+    str_prefix::{AnyStringPrefix, FStringPrefix},
+    AnyStringFlags, Int, IpyEscapeKind,
 };
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
