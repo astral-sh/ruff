@@ -124,11 +124,14 @@ impl<'src> Lexer<'src> {
         self.current.range()
     }
 
+    /// Helper function to push the given error and return the [`TokenKind::Unknown`] token.
     fn push_error(&mut self, error: LexicalError) -> TokenKind {
         self.errors.push(error);
         TokenKind::Unknown
     }
 
+    /// Helper function to push the given error and return the [`Token`] with [`TokenKind::Unknown`]
+    /// kind and the error location.
     fn push_error_with_range(&mut self, error: LexicalError) -> Token {
         let range = error.location();
         self.errors.push(error);
@@ -1305,6 +1308,11 @@ impl<'src> Lexer<'src> {
         self.token_range().start()
     }
 
+    /// Takes the token value corresponding to the current token out of the lexer, replacing it
+    /// with the default value.
+    ///
+    /// All the subsequent call to this method without moving the lexer would always return the
+    /// default value which is [`TokenValue::None`].
     pub(crate) fn take_value(&mut self) -> TokenValue {
         std::mem::take(&mut self.value)
     }
@@ -1358,6 +1366,7 @@ impl Token {
         Self { kind, range }
     }
 
+    #[inline]
     pub const fn kind(&self) -> TokenKind {
         self.kind
     }

@@ -1,15 +1,17 @@
-use ruff_text_size::{TextLen, TextSize};
 use std::str::Chars;
+
+use ruff_text_size::{TextLen, TextSize};
 
 pub(crate) const EOF_CHAR: char = '\0';
 
-/// A cursor represents a pointer in the source code
+/// A cursor represents a pointer in the source code.
 #[derive(Clone, Debug)]
 pub(super) struct Cursor<'src> {
     /// An iterator over the [`char`]'s of the source code.
     chars: Chars<'src>,
 
-    /// Length of the source code.
+    /// Length of the source code. This is used as a marker to indicate the start of the current
+    /// token which is being lexed.
     source_length: TextSize,
 
     /// Stores the previous character for debug assertions.
@@ -48,29 +50,44 @@ impl<'src> Cursor<'src> {
     }
 
     /// Returns the remaining text to lex.
+    ///
+    /// Use [`Cursor::text_len`] to get the length of the remaining text.
     pub(super) fn rest(&self) -> &'src str {
         self.chars.as_str()
     }
 
+    /// Returns the length of the remaining text.
+    ///
+    /// Use [`Cursor::rest`] to get the remaining text.
     // SAFETY: The `source.text_len` call in `new` would panic if the string length is larger than a `u32`.
     #[allow(clippy::cast_possible_truncation)]
     pub(super) fn text_len(&self) -> TextSize {
         TextSize::new(self.chars.as_str().len() as u32)
     }
 
+    /// Returns the length of the current token length.
+    ///
+    /// This is to be used after setting the start position of the token using
+    /// [`Cursor::start_token`].
     pub(super) fn token_len(&self) -> TextSize {
         self.source_length - self.text_len()
     }
 
+    /// Mark the current position of the cursor as the start of the token which is going to be
+    /// lexed.
+    ///
+    /// Use [`Cursor::token_len`] to get the length of the lexed token.
     pub(super) fn start_token(&mut self) {
         self.source_length = self.text_len();
     }
 
+    /// Returns `true` if the cursor is at the end of file.
     pub(super) fn is_eof(&self) -> bool {
         self.chars.as_str().is_empty()
     }
 
-    /// Consumes the next character
+    /// Moves the cursor to the next character, returning the previous character.
+    /// Returns [`None`] if there is no next character.
     pub(super) fn bump(&mut self) -> Option<char> {
         let prev = self.chars.next()?;
 

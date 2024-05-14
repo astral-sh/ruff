@@ -3,13 +3,20 @@ use ruff_text_size::TextRange;
 use crate::lexer::{Lexer, LexicalError, Token, TokenValue};
 use crate::{Mode, TokenKind};
 
+/// Token source for the parser that skips over any trivia tokens.
 #[derive(Debug)]
 pub(crate) struct TokenSource<'src> {
+    /// The underlying source for the tokens.
     lexer: Lexer<'src>,
+
+    /// A vector containing all the tokens emitted by the lexer. This is returned when the parser
+    /// is finished consuming all the tokens. Note that unlike the emitted tokens, this vector
+    /// holds both the trivia and non-trivia tokens.
     tokens: Vec<Token>,
 }
 
 impl<'src> TokenSource<'src> {
+    /// Create a new token source for the given lexer.
     pub(crate) fn new(lexer: Lexer<'src>) -> Self {
         Self {
             lexer,
@@ -31,11 +38,13 @@ impl<'src> TokenSource<'src> {
         self.lexer.current_range()
     }
 
+    /// Calls the underlying [`Lexer::take_value`] method on the lexer. Refer to its documentation
+    /// for more info.
     pub(crate) fn take_value(&mut self) -> TokenValue {
         self.lexer.take_value()
     }
 
-    /// Returns the next token kind and its range without consuming it.
+    /// Returns the next non-trivia token without consuming it.
     pub(crate) fn peek(&mut self) -> TokenKind {
         let checkpoint = self.lexer.checkpoint();
         let next = loop {
@@ -49,6 +58,7 @@ impl<'src> TokenSource<'src> {
         next
     }
 
+    /// Moves the lexer to the next non-trivia token.
     pub(crate) fn next_token(&mut self) {
         loop {
             let next = self.lexer.next_token();
@@ -60,9 +70,11 @@ impl<'src> TokenSource<'src> {
         }
     }
 
-    pub(crate) fn finish(mut self) -> (Vec<Token>, Vec<LexicalError>) {
+    /// Consumes the token source, returning the collected tokens and any errors encountered during
+    /// lexing. The token collection includes both the trivia and non-trivia tokens.
+    pub(crate) fn finish(self) -> (Vec<Token>, Vec<LexicalError>) {
         assert_eq!(
-            self.peek(),
+            self.current_kind(),
             TokenKind::EndOfFile,
             "TokenSource was not fully consumed"
         );
