@@ -2,8 +2,7 @@ use ruff_diagnostics::{AlwaysFixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_index::Indexer;
-use ruff_python_parser::lexer::LexResult;
-use ruff_python_parser::Tok;
+use ruff_python_parser::{TokenKind, TokenKindIter};
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -52,26 +51,26 @@ impl Token {
     }
 }
 
-impl From<(&Tok, TextRange)> for Token {
-    fn from((tok, range): (&Tok, TextRange)) -> Self {
+impl From<(TokenKind, TextRange)> for Token {
+    fn from((tok, range): (TokenKind, TextRange)) -> Self {
         let ty = match tok {
-            Tok::Name { .. } => TokenType::Named,
-            Tok::String { .. } => TokenType::String,
-            Tok::Newline => TokenType::Newline,
-            Tok::NonLogicalNewline => TokenType::NonLogicalNewline,
-            Tok::Lpar => TokenType::OpeningBracket,
-            Tok::Rpar => TokenType::ClosingBracket,
-            Tok::Lsqb => TokenType::OpeningSquareBracket,
-            Tok::Rsqb => TokenType::ClosingBracket,
-            Tok::Colon => TokenType::Colon,
-            Tok::Comma => TokenType::Comma,
-            Tok::Lbrace => TokenType::OpeningCurlyBracket,
-            Tok::Rbrace => TokenType::ClosingBracket,
-            Tok::Def => TokenType::Def,
-            Tok::For => TokenType::For,
-            Tok::Lambda => TokenType::Lambda,
+            TokenKind::Name => TokenType::Named,
+            TokenKind::String => TokenType::String,
+            TokenKind::Newline => TokenType::Newline,
+            TokenKind::NonLogicalNewline => TokenType::NonLogicalNewline,
+            TokenKind::Lpar => TokenType::OpeningBracket,
+            TokenKind::Rpar => TokenType::ClosingBracket,
+            TokenKind::Lsqb => TokenType::OpeningSquareBracket,
+            TokenKind::Rsqb => TokenType::ClosingBracket,
+            TokenKind::Colon => TokenType::Colon,
+            TokenKind::Comma => TokenType::Comma,
+            TokenKind::Lbrace => TokenType::OpeningCurlyBracket,
+            TokenKind::Rbrace => TokenType::ClosingBracket,
+            TokenKind::Def => TokenType::Def,
+            TokenKind::For => TokenType::For,
+            TokenKind::Lambda => TokenType::Lambda,
             // Import treated like a function.
-            Tok::Import => TokenType::Named,
+            TokenKind::Import => TokenType::Named,
             _ => TokenType::Irrelevant,
         };
         #[allow(clippy::inconsistent_struct_constructor)]
@@ -227,27 +226,23 @@ impl AlwaysFixableViolation for ProhibitedTrailingComma {
 /// COM812, COM818, COM819
 pub(crate) fn trailing_commas(
     diagnostics: &mut Vec<Diagnostic>,
-    tokens: &[LexResult],
+    tokens: TokenKindIter,
     locator: &Locator,
     indexer: &Indexer,
 ) {
     let mut fstrings = 0u32;
-    let tokens = tokens.iter().filter_map(|result| {
-        let Ok((tok, tok_range)) = result else {
-            return None;
-        };
-
-        match tok {
+    let tokens = tokens.filter_map(|(token, tok_range)| {
+        match token {
             // Completely ignore comments -- they just interfere with the logic.
-            Tok::Comment(_) => None,
+            TokenKind::Comment => None,
             // F-strings are handled as `String` token type with the complete range
             // of the outermost f-string. This means that the expression inside the
             // f-string is not checked for trailing commas.
-            Tok::FStringStart(_) => {
+            TokenKind::FStringStart => {
                 fstrings = fstrings.saturating_add(1);
                 None
             }
-            Tok::FStringEnd => {
+            TokenKind::FStringEnd => {
                 fstrings = fstrings.saturating_sub(1);
                 if fstrings == 0 {
                     indexer
@@ -260,7 +255,7 @@ pub(crate) fn trailing_commas(
             }
             _ => {
                 if fstrings == 0 {
-                    Some(Token::from((tok, *tok_range)))
+                    Some(Token::from((token, tok_range)))
                 } else {
                     None
                 }
