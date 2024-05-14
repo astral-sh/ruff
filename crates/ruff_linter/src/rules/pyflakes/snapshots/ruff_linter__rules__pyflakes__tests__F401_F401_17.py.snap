@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
-F401_17.py:12:27: F401 [*] `threading.Thread` imported but unused
+F401_17.py:12:27: F401 [*] `Thread` imported but unused
    |
 11 | def fn(thread: Thread):
 12 |     from threading import Thread
@@ -9,7 +9,7 @@ F401_17.py:12:27: F401 [*] `threading.Thread` imported but unused
 13 | 
 14 |     # The `Thread` on the left-hand side should resolve to the `Thread` imported at the
    |
-   = help: Remove unused import: `threading.Thread`
+   = help: Remove unused import: `Thread`
 
 ℹ Safe fix
 9  9  | 
@@ -20,7 +20,7 @@ F401_17.py:12:27: F401 [*] `threading.Thread` imported but unused
 14 13 |     # The `Thread` on the left-hand side should resolve to the `Thread` imported at the
 15 14 |     # top level.
 
-F401_17.py:20:27: F401 [*] `threading.Thread` imported but unused
+F401_17.py:20:27: F401 [*] `Thread` imported but unused
    |
 19 | def fn(thread: Thread):
 20 |     from threading import Thread
@@ -28,7 +28,7 @@ F401_17.py:20:27: F401 [*] `threading.Thread` imported but unused
 21 | 
 22 |     # The `Thread` on the left-hand side should resolve to the `Thread` imported at the
    |
-   = help: Remove unused import: `threading.Thread`
+   = help: Remove unused import: `Thread`
 
 ℹ Safe fix
 17 17 | 
@@ -38,5 +38,3 @@ F401_17.py:20:27: F401 [*] `threading.Thread` imported but unused
 21 20 | 
 22 21 |     # The `Thread` on the left-hand side should resolve to the `Thread` imported at the
 23 22 |     # top level.
-
-

@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
-__init__.py:5:15: F401 [*] `.unused` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+__init__.py:5:15: F401 [*] `unused` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
   |
 5 | from . import unused, renamed as bees  # F401: add to __all__
   |               ^^^^^^ F401
@@ -15,7 +15,7 @@ __init__.py:5:15: F401 [*] `.unused` imported but unused; consider removing, add
 8   |-__all__ = [];
   8 |+__all__ = ["bees", "unused"];
 
-__init__.py:5:34: F401 [*] `.renamed` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+__init__.py:5:34: F401 [*] `bees` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
   |
 5 | from . import unused, renamed as bees  # F401: add to __all__
   |                                  ^^^^ F401

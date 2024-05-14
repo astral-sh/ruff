@@ -85,10 +85,8 @@ enum UnusedImportContext {
 /// - [Typing documentation: interface conventions](https://typing.readthedocs.io/en/latest/source/libraries.html#library-interface-public-and-private-symbols)
 #[violation]
 pub struct UnusedImport {
-    /// Qualified name of the import
-    name: String,
     /// Name of the import binding
-    binding: String,
+    name: String,
     context: Option<UnusedImportContext>,
     multiple: bool,
 }
@@ -115,24 +113,17 @@ impl Violation for UnusedImport {
     }
 
     fn fix_title(&self) -> Option<String> {
-        let UnusedImport {
-            name,
-            binding,
-            multiple,
-            ..
-        } = self;
+        let UnusedImport { name, multiple, .. } = self;
         match self.context {
             Some(UnusedImportContext::Init {
                 first_party: true,
                 dunder_all_count: 1,
-            }) => Some(format!("Add unused import `{binding}` to __all__")),
+            }) => Some(format!("Add unused import `{name}` to __all__")),
 
             Some(UnusedImportContext::Init {
                 first_party: true,
                 dunder_all_count: 0,
-            }) => Some(format!(
-                "Use an explicit re-export: `{binding} as {binding}`"
-            )),
+            }) => Some(format!("Use an explicit re-export: `{name} as {name}`")),
 
             _ => Some(if *multiple {
                 "Remove unused import".to_string()
@@ -319,8 +310,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
         ) {
             let mut diagnostic = Diagnostic::new(
                 UnusedImport {
-                    name: binding.import.qualified_name().to_string(),
-                    binding: binding.name.to_string(),
+                    name: binding.name.to_string(),
                     context,
                     multiple,
                 },
@@ -343,8 +333,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
     for binding in ignored.into_values().flatten() {
         let mut diagnostic = Diagnostic::new(
             UnusedImport {
-                name: binding.import.qualified_name().to_string(),
-                binding: binding.name.to_string(),
+                name: binding.name.to_string(),
                 context: None,
                 multiple: false,
             },
