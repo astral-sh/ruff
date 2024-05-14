@@ -6,13 +6,4 @@ The Red Knot crate contains code working towards multifile analysis, type infere
 
 Red Knot vendors [typeshed](https://github.com/python/typeshed)'s stubs for the standard library. The vendored stubs can be found in `crates/red_knot/vendor/typeshed`. The file `crates/red_knot/vendor/typeshed/source_commit.txt` tells you the typeshed commit that our vendored stdlib stubs currently correspond to.
 
-Updating the vendored stubs is currently done manually. On a Unix machine, follow the following steps (if you have a typeshed clone in a `typeshed` directory, and a Ruff clone in a `ruff` directory):
-
-```shell
-rm -rf ruff/crates/red_knot/vendor/typeshed
-mkdir ruff/crates/red_knot/vendor/typeshed
-cp typeshed/README.md ruff/crates/red_knot/vendor/typeshed
-cp typeshed/LICENSE ruff/crates/red_knot/vendor/typeshed
-cp -r typeshed/stdlib ruff/crates/red_knot/vendor/typeshed/stdlib
-git -C typeshed rev-parse HEAD > ruff/crates/red_knot/vendor/typeshed/source_commit.txt
-```
+The typeshed stubs are updated every two weeks via an automated PR using the `sync_typeshed.yaml` workflow in the `.github/workflows` directory. This workflow can also be triggered at any time via [workflow dispatch](https://docs.github.com/en/actions/using-workflows/manually-running-a-workflow#running-a-workflow).

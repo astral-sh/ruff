@@ -1,0 +1,80 @@
+name: Sync typeshed
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Run on the 1st and the 15th of every month:
+    - cron: "0 0 1,15 * *"
+
+env:
+  FORCE_COLOR: 1
+  GH_TOKEN: ${{ github.token }}
+
+jobs:
+  sync:
+    name: Sync typeshed
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Don't run the cron job on forks:
+    if: ${{ github.repository == 'astral-sh/ruff' || github.event_name != 'schedule' }}
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        name: Checkout Ruff
+        with:
+          path: ruff
+      - uses: actions/checkout@v4
+        name: Checkout typeshed
+        with:
+          repository: python/typeshed
+          path: typeshed
+      - name: Setup git
+        run: |
+          git config --global user.name typeshedbot
+          git config --global user.email '<>'
+      - name: Sync typeshed
+        id: sync
+        run: |
+          rm -rf ruff/crates/red_knot/vendor/typeshed
+          mkdir ruff/crates/red_knot/vendor/typeshed
+          cp typeshed/README.md ruff/crates/red_knot/vendor/typeshed
+          cp typeshed/LICENSE ruff/crates/red_knot/vendor/typeshed
+          cp -r typeshed/stdlib ruff/crates/red_knot/vendor/typeshed/stdlib
+          rm -rf ruff/crates/red_knot/vendor/typeshed/stdlib/@tests
+          git -C typeshed rev-parse HEAD > ruff/crates/red_knot/vendor/typeshed/source_commit.txt
+      - name: Commit the changes
+        id: commit
+        if: ${{ steps.sync.outcome == 'success' }}
+        run: |
+          cd ruff
+          git checkout -b typeshedbot/sync-typeshed
+          git add .
+          git diff --staged --quiet || git commit -m "Sync typeshed. Source commit: https://github.com/python/typeshed/commit/$(git -C ../typeshed rev-parse HEAD)"
+      - name: Create a PR
+        if: ${{ steps.sync.outcome == 'success' && steps.commit.outcome == 'success' }}
+        run: |
+          cd ruff
+          git push --force origin typeshedbot/sync-typeshed
+          gh pr list --repo $GITHUB_REPOSITORY --head typeshedbot/sync-typeshed --json id --jq length | grep 1 && exit 0 # exit if there is existing pr
+          gh pr create --title "Sync vendored typeshed stubs" --body "Close and reopen this PR to trigger CI" --label "linter"
+
+  create-issue-on-failure:
+    name: Create an issue if the typeshed sync failed
+    runs-on: ubuntu-latest
+    needs: [sync]
+    if: ${{ github.repository == 'astral-sh/ruff' && always() && github.event_name == 'schedule' && needs.sync.result == 'failure' }}
+    permissions:
+      issues: write
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            await github.rest.issues.create({
+              owner: "astral-sh",
+              repo: "ruff",
+              title: `Automated typeshed sync failed on ${new Date().toDateString()}`,
+              body: "Runs are listed here: https://github.com/astral-sh/ruff/actions/workflows/sync_typeshed.yaml",
+            })
