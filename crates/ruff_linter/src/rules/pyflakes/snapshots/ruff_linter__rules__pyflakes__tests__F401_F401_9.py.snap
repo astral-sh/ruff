@@ -1,13 +1,13 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
-F401_9.py:4:22: F401 [*] `baz` imported but unused
+F401_9.py:4:22: F401 [*] `foo.baz` imported but unused
   |
 3 | __all__ = ("bar",)
 4 | from foo import bar, baz
   |                      ^^^ F401
   |
-  = help: Remove unused import: `baz`
+  = help: Remove unused import: `foo.baz`
 
 ℹ Safe fix
 1 1 | """Test: late-binding of `__all__`."""
@@ -15,3 +15,5 @@ F401_9.py:4:22: F401 [*] `baz` imported but unused
 3 3 | __all__ = ("bar",)
 4   |-from foo import bar, baz
   4 |+from foo import bar
+
+

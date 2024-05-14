@@ -19,7 +19,7 @@ F401_0.py:2:8: F401 [*] `functools` imported but unused
 4 4 | from collections import (
 5 5 |     Counter,
 
-F401_0.py:6:5: F401 [*] `OrderedDict` imported but unused
+F401_0.py:6:5: F401 [*] `collections.OrderedDict` imported but unused
   |
 4 | from collections import (
 5 |     Counter,
@@ -28,7 +28,7 @@ F401_0.py:6:5: F401 [*] `OrderedDict` imported but unused
 7 |     namedtuple,
 8 | )
   |
-  = help: Remove unused import: `OrderedDict`
+  = help: Remove unused import: `collections.OrderedDict`
 
 ℹ Safe fix
 3 3 | from datetime import datetime
@@ -268,13 +268,13 @@ F401_0.py:114:16: F401 [*] `b2` imported but unused
 116 115 | 
 117 116 | # Regression test for: https://github.com/astral-sh/ruff/issues/7244
 
-F401_0.py:122:1: F401 [*] `noqa` imported but unused
+F401_0.py:122:1: F401 [*] `datameta_client_lib.model_helpers.noqa` imported but unused
     |
 121 | from datameta_client_lib.model_helpers import (
 122 | noqa )
     | ^^^^ F401
     |
-    = help: Remove unused import: `noqa`
+    = help: Remove unused import: `datameta_client_lib.model_helpers.noqa`
 
 ℹ Safe fix
 118 118 | from datameta_client_lib.model_utils import (  # noqa: F401
@@ -282,3 +282,5 @@ F401_0.py:122:1: F401 [*] `noqa` imported but unused
 120 120 | 
 121     |-from datameta_client_lib.model_helpers import (
 122     |-noqa )
+
+
