@@ -94,6 +94,7 @@ pub(crate) fn lint_semantic(db: &dyn LintDb, file_id: FileId) -> QueryResult<Dia
 
         lint_unresolved_imports(&context)?;
         lint_bad_overrides(&context)?;
+        lint_unspecified_encoding(&context)?;
 
         Ok(Diagnostics::from(context.diagnostics.take()))
     })
@@ -189,6 +190,13 @@ fn lint_bad_overrides(context: &SemanticLintContext) -> QueryResult<()> {
         }
     }
     Ok(())
+}
+
+fn lint_unspecified_encoding(context: &SemanticLintContext) -> QueryResult<()> {
+    // fix the inference of an import 'definition' by adding a module type
+    //
+    // obtain the type of each definition's rhs
+    todo!()
 }
 
 pub struct SemanticLintContext<'a> {
