@@ -120,7 +120,7 @@ pub use crate::parser::Program;
 pub use crate::token::{Tok, TokenKind};
 
 use ruff_python_ast::{Expr, Mod, ModModule, PySourceType, Suite};
-use ruff_text_size::{TextRange, TextSize};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 mod error;
 pub mod lexer;
@@ -355,6 +355,44 @@ impl Tokens {
         TokenKindIter::new(&self.0)
     }
 
+    /// Returns an iterator over the [`TokenKind`] and its range for all the tokens that are
+    /// within the given `range`.
+    ///
+    /// The start and end position of the given range should correspond to the start position of
+    /// the first token and the end position of the last token in the returned iterator.
+    ///
+    /// For example, if the struct contains the following tokens:
+    /// ```txt
+    /// (Def, 0..3)
+    /// (Name, 4..7)
+    /// (Lpar, 7..8)
+    /// (Rpar, 8..9)
+    /// (Colon, 9..10)
+    /// (Ellipsis, 11..14)
+    /// (Newline, 14..14)
+    /// ```
+    ///
+    /// Then, the range `4..10` returns an iterator which yields `Name`, `Lpar`, `Rpar`, and
+    /// `Colon` token. But, if the given position doesn't match any of the tokens, an empty
+    /// iterator is returned.
+    pub fn kinds_within_range<T: Ranged>(&self, ranged: T) -> TokenKindIter {
+        let Ok(start_index) = self.binary_search_by_key(&ranged.start(), |result| match result {
+            Ok((_, range)) => range.start(),
+            Err(error) => error.location().start(),
+        }) else {
+            return TokenKindIter::default();
+        };
+
+        let Ok(end_index) = self.binary_search_by_key(&ranged.end(), |result| match result {
+            Ok((_, range)) => range.end(),
+            Err(error) => error.location().end(),
+        }) else {
+            return TokenKindIter::default();
+        };
+
+        TokenKindIter::new(self.get(start_index..=end_index).unwrap_or(&[]))
+    }
+
     /// Consumes the [`Tokens`], returning the underlying vector of [`LexResult`].
     pub fn into_inner(self) -> Vec<LexResult> {
         self.0
@@ -372,7 +410,7 @@ impl Deref for Tokens {
 /// An iterator over the [`TokenKind`] and the corresponding range.
 ///
 /// This struct is created by the [`Tokens::kinds`] method.
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct TokenKindIter<'a> {
     inner: std::iter::Flatten<std::slice::Iter<'a, LexResult>>,
 }
