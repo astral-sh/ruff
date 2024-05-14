@@ -8,7 +8,8 @@ use crate::db::{QueryResult, SemanticDb, SemanticJar};
 use crate::module::ModuleName;
 use crate::parse::parse;
 use crate::symbols::{
-    resolve_global_symbol, symbol_table, Definition, GlobalSymbolId, ImportFromDefinition,
+    resolve_global_symbol, symbol_table, Definition, GlobalSymbolId, ImportDefinition,
+    ImportFromDefinition,
 };
 use crate::types::Type;
 use crate::FileId;
@@ -59,6 +60,11 @@ pub fn infer_definition_type(
             } else {
                 Ok(Type::Unknown)
             }
+        }
+        Definition::Import(ImportDefinition { module }) => {
+            // TODO what is the type of a module
+            let _ = module;
+            Ok(Type::Unknown)
         }
         Definition::ClassDef(node_key) => {
             if let Some(ty) = type_store.get_cached_node_type(file_id, node_key.erased()) {
