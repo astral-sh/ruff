@@ -5,13 +5,13 @@ use std::path::Path;
 use ruff_notebook::CellOffsets;
 use ruff_python_ast::PySourceType;
 use ruff_python_codegen::Stylist;
-use ruff_python_parser::lexer::LexResult;
 
 use ruff_diagnostics::Diagnostic;
 use ruff_python_index::Indexer;
 use ruff_source_file::Locator;
 
 use crate::directives::TodoComment;
+use crate::linter::TokenSource;
 use crate::registry::{AsRule, Rule};
 use crate::rules::pycodestyle::rules::BlankLinesChecker;
 use crate::rules::{
@@ -22,7 +22,7 @@ use crate::settings::LinterSettings;
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn check_tokens(
-    tokens: &[LexResult],
+    tokens: &TokenSource,
     path: &Path,
     locator: &Locator,
     indexer: &Indexer,
@@ -42,7 +42,7 @@ pub(crate) fn check_tokens(
         Rule::BlankLinesBeforeNestedDefinition,
     ]) {
         BlankLinesChecker::new(locator, stylist, settings, source_type, cell_offsets)
-            .check_lines(tokens, &mut diagnostics);
+            .check_lines(tokens.kinds(), &mut diagnostics);
     }
 
     if settings.rules.enabled(Rule::BlanketTypeIgnore) {
