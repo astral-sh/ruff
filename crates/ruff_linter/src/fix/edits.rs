@@ -155,13 +155,13 @@ pub(crate) fn add_to_dunder_all<'a>(
     let (insertion_point, export_prefix_length) = match expr {
         Expr::List(ExprList { elts, range, .. }) => (
             elts.last()
-                .map_or(range.end() - "]".text_len(), |elt| elt.end()),
+                .map_or(range.end() - "]".text_len(), Ranged::end),
             elts.len(),
         ),
         Expr::Tuple(tup) if tup.parenthesized => (
             tup.elts
                 .last()
-                .map_or(tup.end() - ")".text_len(), |elt| elt.end()),
+                .map_or(tup.end() - ")".text_len(), Ranged::end),
             tup.elts.len(),
         ),
         Expr::Tuple(tup) if !tup.parenthesized => (
