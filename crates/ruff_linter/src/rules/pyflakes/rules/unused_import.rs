@@ -180,6 +180,7 @@ fn find_dunder_all_exprs<'a>(semantic: &'a SemanticModel) -> Vec<&'a ast::Expr> 
                 _ => None,
             }
         })
+        .take(2)
         .collect()
 }
 
