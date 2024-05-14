@@ -128,7 +128,7 @@ pub(crate) fn check_tokens(
     }
 
     if settings.rules.enabled(Rule::ExtraneousParentheses) {
-        pyupgrade::rules::extraneous_parentheses(&mut diagnostics, tokens, locator);
+        pyupgrade::rules::extraneous_parentheses(&mut diagnostics, tokens.kinds(), locator);
     }
 
     if source_type.is_stub() && settings.rules.enabled(Rule::TypeCommentInStub) {
