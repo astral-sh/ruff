@@ -6,7 +6,7 @@ use ruff_python_ast::identifier::Identifier;
 
 /// ## What it does
 /// Checks for functions or methods with too many branches,
-/// including (nested) `if`, `elif`, `else`, `for` loops, 
+/// including (nested) `if`, `elif`, `else`, `for` loops,
 /// `try`/`except` clauses and `match`/`case` statements.
 ///
 /// By default, this rule allows up to 12 branches. This can be configured
@@ -75,12 +75,12 @@ use ruff_python_ast::identifier::Identifier;
 ///         if len(grade) == 2 and grade[1] not in modifier_values:
 ///             raise ValueError(f"Invalid grade: {grade}")
 ///         modifier = modifier_values.get(grade[-1], 0.0)
-/// 
+///
 ///         if letter == "F":
 ///             numbers.append(0.0)
 ///         else:
 ///             numbers.append(max(0.0, min(number + modifier, 4.0)))
-/// 
+///
 ///     try:
 ///         return sum(numbers) / len(numbers)
 ///     except ZeroDivisionError:
