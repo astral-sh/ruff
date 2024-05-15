@@ -1,3 +1,5 @@
+use serde::Serialize;
+
 use std::fmt::{Debug, Display, Formatter};
 
 /// Visits [`OptionsMetadata`].
@@ -39,7 +41,7 @@ where
 }
 
 /// Metadata of an option that can either be a [`OptionField`] or [`OptionSet`].
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug, Serialize)]
 pub enum OptionEntry {
     /// A single option.
     Field(OptionField),
@@ -61,9 +63,11 @@ impl Display for OptionEntry {
 ///
 /// It extracts the options by calling the [`OptionsMetadata::record`] of a type implementing
 /// [`OptionsMetadata`].
-#[derive(Copy, Clone, Eq, PartialEq)]
+#[derive(Copy, Clone, Eq, PartialEq, Serialize)]
 pub struct OptionSet {
+    #[serde(skip_serializing)]
     record: fn(&mut dyn Visit),
+    #[serde(skip_serializing)]
     doc: fn() -> Option<&'static str>,
 }
 
@@ -331,7 +335,7 @@ impl Debug for OptionSet {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, Eq, PartialEq, Clone, Serialize)]
 pub struct OptionField {
     pub doc: &'static str,
     /// Ex) `"false"`
@@ -344,7 +348,7 @@ pub struct OptionField {
     pub deprecated: Option<Deprecated>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize)]
 pub struct Deprecated {
     pub since: Option<&'static str>,
     pub message: Option<&'static str>,
