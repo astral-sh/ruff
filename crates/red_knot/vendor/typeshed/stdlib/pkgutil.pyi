@@ -1,7 +1,7 @@
 import sys
 from _typeshed import SupportsRead
+from _typeshed.importlib import LoaderProtocol, MetaPathFinderProtocol, PathEntryFinderProtocol
 from collections.abc import Callable, Iterable, Iterator
-from importlib.abc import Loader, MetaPathFinder, PathEntryFinder
 from typing import IO, Any, NamedTuple, TypeVar
 from typing_extensions import deprecated
 
@@ -23,7 +23,7 @@ if sys.version_info < (3, 12):
 _PathT = TypeVar("_PathT", bound=Iterable[str])
 
 class ModuleInfo(NamedTuple):
-    module_finder: MetaPathFinder | PathEntryFinder
+    module_finder: MetaPathFinderProtocol | PathEntryFinderProtocol
     name: str
     ispkg: bool
 
@@ -37,11 +37,11 @@ if sys.version_info < (3, 12):
         def __init__(self, fullname: str, file: IO[str], filename: str, etc: tuple[str, str, int]) -> None: ...
 
 @deprecated("Use importlib.util.find_spec() instead. Will be removed in Python 3.14.")
-def find_loader(fullname: str) -> Loader | None: ...
-def get_importer(path_item: str) -> PathEntryFinder | None: ...
+def find_loader(fullname: str) -> LoaderProtocol | None: ...
+def get_importer(path_item: str) -> PathEntryFinderProtocol | None: ...
 @deprecated("Use importlib.util.find_spec() instead. Will be removed in Python 3.14.")
-def get_loader(module_or_name: str) -> Loader | None: ...
-def iter_importers(fullname: str = "") -> Iterator[MetaPathFinder | PathEntryFinder]: ...
+def get_loader(module_or_name: str) -> LoaderProtocol | None: ...
+def iter_importers(fullname: str = "") -> Iterator[MetaPathFinderProtocol | PathEntryFinderProtocol]: ...
 def iter_modules(path: Iterable[str] | None = None, prefix: str = "") -> Iterator[ModuleInfo]: ...
 def read_code(stream: SupportsRead[bytes]) -> Any: ...  # undocumented
 def walk_packages(

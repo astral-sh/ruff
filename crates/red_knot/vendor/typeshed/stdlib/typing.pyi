@@ -8,7 +8,6 @@ import typing_extensions
 from _collections_abc import dict_items, dict_keys, dict_values
 from _typeshed import IdentityFunction, ReadableBuffer, SupportsKeysAndGetItem
 from abc import ABCMeta, abstractmethod
-from contextlib import AbstractAsyncContextManager, AbstractContextManager
 from re import Match as Match, Pattern as Pattern
 from types import (
     BuiltinFunctionType,
@@ -24,10 +23,10 @@ from types import (
 )
 from typing_extensions import Never as _Never, ParamSpec as _ParamSpec
 
-if sys.version_info >= (3, 10):
-    from types import UnionType
 if sys.version_info >= (3, 9):
     from types import GenericAlias
+if sys.version_info >= (3, 10):
+    from types import UnionType
 
 __all__ = [
     "AbstractSet",
@@ -402,8 +401,8 @@ class Reversible(Iterable[_T_co], Protocol[_T_co]):
     def __reversed__(self) -> Iterator[_T_co]: ...
 
 _YieldT_co = TypeVar("_YieldT_co", covariant=True)
-_SendT_contra = TypeVar("_SendT_contra", contravariant=True)
-_ReturnT_co = TypeVar("_ReturnT_co", covariant=True)
+_SendT_contra = TypeVar("_SendT_contra", contravariant=True, default=None)
+_ReturnT_co = TypeVar("_ReturnT_co", covariant=True, default=None)
 
 class Generator(Iterator[_YieldT_co], Generic[_YieldT_co, _SendT_contra, _ReturnT_co]):
     def __next__(self) -> _YieldT_co: ...
@@ -428,24 +427,28 @@ class Generator(Iterator[_YieldT_co], Generic[_YieldT_co, _SendT_contra, _Return
     @property
     def gi_yieldfrom(self) -> Generator[Any, Any, Any] | None: ...
 
-# NOTE: Technically we would like this to be able to accept a second parameter as well, just
-#   like it's counterpart in contextlib, however `typing._SpecialGenericAlias` enforces the
-#   correct number of arguments at runtime, so we would be hiding runtime errors.
-@runtime_checkable
-class ContextManager(AbstractContextManager[_T_co, bool | None], Protocol[_T_co]): ...
+# NOTE: Prior to Python 3.13 these aliases are lacking the second _ExitT_co parameter
+if sys.version_info >= (3, 13):
+    from contextlib import AbstractAsyncContextManager as AsyncContextManager, AbstractContextManager as ContextManager
+else:
+    from contextlib import AbstractAsyncContextManager, AbstractContextManager
 
-# NOTE: Technically we would like this to be able to accept a second parameter as well, just
-#   like it's counterpart in contextlib, however `typing._SpecialGenericAlias` enforces the
-#   correct number of arguments at runtime, so we would be hiding runtime errors.
-@runtime_checkable
-class AsyncContextManager(AbstractAsyncContextManager[_T_co, bool | None], Protocol[_T_co]): ...
+    @runtime_checkable
+    class ContextManager(AbstractContextManager[_T_co, bool | None], Protocol[_T_co]): ...
+
+    @runtime_checkable
+    class AsyncContextManager(AbstractAsyncContextManager[_T_co, bool | None], Protocol[_T_co]): ...
 
 @runtime_checkable
 class Awaitable(Protocol[_T_co]):
     @abstractmethod
     def __await__(self) -> Generator[Any, Any, _T_co]: ...
 
-class Coroutine(Awaitable[_ReturnT_co], Generic[_YieldT_co, _SendT_contra, _ReturnT_co]):
+# Non-default variations to accommodate couroutines, and `AwaitableGenerator` having a 4th type parameter.
+_SendT_contra_nd = TypeVar("_SendT_contra_nd", contravariant=True)
+_ReturnT_co_nd = TypeVar("_ReturnT_co_nd", covariant=True)
+
+class Coroutine(Awaitable[_ReturnT_co_nd], Generic[_YieldT_co, _SendT_contra_nd, _ReturnT_co_nd]):
     __name__: str
     __qualname__: str
     @property
@@ -457,7 +460,7 @@ class Coroutine(Awaitable[_ReturnT_co], Generic[_YieldT_co, _SendT_contra, _Retu
     @property
     def cr_running(self) -> bool: ...
     @abstractmethod
-    def send(self, value: _SendT_contra, /) -> _YieldT_co: ...
+    def send(self, value: _SendT_contra_nd, /) -> _YieldT_co: ...
     @overload
     @abstractmethod
     def throw(
@@ -473,9 +476,9 @@ class Coroutine(Awaitable[_ReturnT_co], Generic[_YieldT_co, _SendT_contra, _Retu
 # The parameters correspond to Generator, but the 4th is the original type.
 @type_check_only
 class AwaitableGenerator(
-    Awaitable[_ReturnT_co],
-    Generator[_YieldT_co, _SendT_contra, _ReturnT_co],
-    Generic[_YieldT_co, _SendT_contra, _ReturnT_co, _S],
+    Awaitable[_ReturnT_co_nd],
+    Generator[_YieldT_co, _SendT_contra_nd, _ReturnT_co_nd],
+    Generic[_YieldT_co, _SendT_contra_nd, _ReturnT_co_nd, _S],
     metaclass=ABCMeta,
 ): ...
 
