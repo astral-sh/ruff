@@ -474,6 +474,13 @@ if sys.version_info >= (3, 12):
             ETHERTYPE_VLAN as ETHERTYPE_VLAN,
         )
 
+    if sys.platform == "linux":
+        from _socket import ETH_P_ALL as ETH_P_ALL
+
+    if sys.platform != "linux" and sys.platform != "win32" and sys.platform != "darwin":
+        # FreeBSD >= 14.0
+        from _socket import PF_DIVERT as PF_DIVERT
+
 # Re-exported from errno
 EBADF: int
 EAGAIN: int
@@ -525,6 +532,9 @@ class AddressFamily(IntEnum):
             AF_BLUETOOTH = 32
     if sys.platform == "win32" and sys.version_info >= (3, 12):
         AF_HYPERV = 34
+    if sys.platform != "linux" and sys.platform != "win32" and sys.platform != "darwin" and sys.version_info >= (3, 12):
+        # FreeBSD >= 14.0
+        AF_DIVERT = 44
 
 AF_INET = AddressFamily.AF_INET
 AF_INET6 = AddressFamily.AF_INET6
@@ -577,6 +587,9 @@ if sys.platform != "win32" or sys.version_info >= (3, 9):
 
 if sys.platform == "win32" and sys.version_info >= (3, 12):
     AF_HYPERV = AddressFamily.AF_HYPERV
+if sys.platform != "linux" and sys.platform != "win32" and sys.platform != "darwin" and sys.version_info >= (3, 12):
+    # FreeBSD >= 14.0
+    AF_DIVERT = AddressFamily.AF_DIVERT
 
 class SocketKind(IntEnum):
     SOCK_STREAM = 1

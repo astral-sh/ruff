@@ -1,3 +1,5 @@
+import sys
+from _typeshed import StrOrBytesPath
 from collections.abc import Iterator, MutableMapping
 from dbm import _TFlags
 from types import TracebackType
@@ -41,6 +43,17 @@ class BsdDbShelf(Shelf[_VT]):
     def last(self) -> tuple[str, _VT]: ...
 
 class DbfilenameShelf(Shelf[_VT]):
-    def __init__(self, filename: str, flag: _TFlags = "c", protocol: int | None = None, writeback: bool = False) -> None: ...
+    if sys.version_info >= (3, 11):
+        def __init__(
+            self, filename: StrOrBytesPath, flag: _TFlags = "c", protocol: int | None = None, writeback: bool = False
+        ) -> None: ...
+    else:
+        def __init__(self, filename: str, flag: _TFlags = "c", protocol: int | None = None, writeback: bool = False) -> None: ...
 
-def open(filename: str, flag: _TFlags = "c", protocol: int | None = None, writeback: bool = False) -> Shelf[Any]: ...
+if sys.version_info >= (3, 11):
+    def open(
+        filename: StrOrBytesPath, flag: _TFlags = "c", protocol: int | None = None, writeback: bool = False
+    ) -> Shelf[Any]: ...
+
+else:
+    def open(filename: str, flag: _TFlags = "c", protocol: int | None = None, writeback: bool = False) -> Shelf[Any]: ...

@@ -1,9 +1,8 @@
 import sys
 from _typeshed import OptExcInfo, ProfileFunction, TraceFunction, structseq
+from _typeshed.importlib import MetaPathFinderProtocol, PathEntryFinderProtocol
 from builtins import object as _object
 from collections.abc import AsyncGenerator, Callable, Sequence
-from importlib.abc import PathEntryFinder
-from importlib.machinery import ModuleSpec
 from io import TextIOWrapper
 from types import FrameType, ModuleType, TracebackType
 from typing import Any, Final, Literal, NoReturn, Protocol, TextIO, TypeVar, final
@@ -14,10 +13,6 @@ _T = TypeVar("_T")
 # see https://github.com/python/typeshed/issues/8513#issue-1333671093 for the rationale behind this alias
 _ExitCode: TypeAlias = str | int | None
 _OptExcInfo: TypeAlias = OptExcInfo  # noqa: Y047  # TODO: obsolete, remove fall 2022 or later
-
-# Intentionally omits one deprecated and one optional method of `importlib.abc.MetaPathFinder`
-class _MetaPathFinder(Protocol):
-    def find_spec(self, fullname: str, path: Sequence[str] | None, target: ModuleType | None = ..., /) -> ModuleSpec | None: ...
 
 # ----- sys variables -----
 if sys.platform != "win32":
@@ -44,13 +39,13 @@ if sys.version_info >= (3, 12):
     last_exc: BaseException  # or undefined.
 maxsize: int
 maxunicode: int
-meta_path: list[_MetaPathFinder]
+meta_path: list[MetaPathFinderProtocol]
 modules: dict[str, ModuleType]
 if sys.version_info >= (3, 10):
     orig_argv: list[str]
 path: list[str]
-path_hooks: list[Callable[[str], PathEntryFinder]]
-path_importer_cache: dict[str, PathEntryFinder | None]
+path_hooks: list[Callable[[str], PathEntryFinderProtocol]]
+path_importer_cache: dict[str, PathEntryFinderProtocol | None]
 platform: str
 if sys.version_info >= (3, 9):
     platlibdir: str

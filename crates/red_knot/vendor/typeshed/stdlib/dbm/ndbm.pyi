@@ -1,5 +1,5 @@
 import sys
-from _typeshed import ReadOnlyBuffer
+from _typeshed import ReadOnlyBuffer, StrOrBytesPath
 from types import TracebackType
 from typing import TypeVar, overload
 from typing_extensions import Self, TypeAlias
@@ -34,4 +34,7 @@ if sys.platform != "win32":
         __new__: None  # type: ignore[assignment]
         __init__: None  # type: ignore[assignment]
 
-    def open(filename: str, flags: str = "r", mode: int = 0o666, /) -> _dbm: ...
+    if sys.version_info >= (3, 11):
+        def open(filename: StrOrBytesPath, flags: str = "r", mode: int = 0o666, /) -> _dbm: ...
+    else:
+        def open(filename: str, flags: str = "r", mode: int = 0o666, /) -> _dbm: ...
