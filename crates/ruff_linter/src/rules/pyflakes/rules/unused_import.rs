@@ -46,15 +46,31 @@ enum UnusedImportContext {
 /// from module import member as member
 /// ```
 ///
+/// Within `__init__.py` re-export a symbol with an `__all__` declaration containing a string
+/// matching the symbol, as in:
+///
+/// ```python
+/// # __init__.py
+/// import some_module
+///
+/// __all__ = [ "some_module"]
+/// ```
+///
 /// ## Fix safety
 ///
-/// When `ignore_init_module_imports` is disabled, fixes can remove for unused imports in `__init__` files.
-/// These fixes are considered unsafe because they can change the public interface.
+/// Fixes to remove unused imports are safe, except in `__init__.py` files, where they could
+/// change the public interface. Fixes in `__init__.py` files are currently gated within preview
+/// mode.
+///
+/// In preview mode, `__init__.py` files containing unused first party imports will have
+/// safe fixes to add those imports `__all__` if there is exactly one `__all__` declaration
+/// (otherwise the fixes recommend conversion to "redundant" import aliases).
+/// Unused standard library and third-party imports in `__init__.py` have unsafe fixes to remove
+/// the import statement.
 ///
 /// ## Example
 /// ```python
 /// import numpy as np  # unused import
-///
 ///
 /// def area(radius):
 ///     return 3.14 * radius**2
@@ -75,9 +91,6 @@ enum UnusedImportContext {
 /// else:
 ///     print("numpy is not installed")
 /// ```
-///
-/// ## Options
-/// - `lint.ignore-init-module-imports`
 ///
 /// ## References
 /// - [Python documentation: `import`](https://docs.python.org/3/reference/simple_stmts.html#the-import-statement)
