@@ -138,9 +138,10 @@ impl<'a> LogicalLine<'a> {
 
     /// Returns `true` if this is a comment only line
     pub(crate) fn is_comment_only(&self) -> bool {
-        !self
-            .flags()
-            .intersects(!(TokenFlags::COMMENT | TokenFlags::NON_LOGICAL_NEWLINE))
+        self.flags().contains(TokenFlags::COMMENT)
+            && !self
+                .flags()
+                .intersects(!(TokenFlags::COMMENT | TokenFlags::NON_LOGICAL_NEWLINE))
     }
 
     /// Returns logical line's text including comments, indents, dedent and trailing new lines.
