@@ -62,10 +62,8 @@ impl Program {
         Parser::new(source, mode).parse_program()
     }
 
-    pub fn parse_starts_at(source: &str, mode: Mode, offset: TextSize) -> Program {
-        Parser::new(source, mode)
-            .with_start_offset(offset)
-            .parse_program()
+    pub fn parse_starts_at(source: &str, mode: Mode, start_offset: TextSize) -> Program {
+        Parser::new_starts_at(source, mode, start_offset).parse_program()
     }
 }
 
@@ -86,20 +84,25 @@ pub(crate) struct Parser<'src> {
     /// to avoid infinite loops when the parser is stuck.
     current_token_id: TokenId,
 
-    /// The end of the previous token processed. Used to determine a node's end.
+    /// The end of the previous token processed. This is used to determine a node's end.
     prev_token_end: TextSize,
 
+    /// The recovery context in which the parser is currently in.
     recovery_context: RecoveryContext,
 
+    /// The start offset in the source code from which to start parsing at.
     start_offset: TextSize,
 }
 
 impl<'src> Parser<'src> {
-    pub(crate) fn new(source: &'src str, mode: Mode) -> Parser<'src> {
-        let mut tokens = TokenSource::from_source(source, mode);
+    /// Create a new parser for the given source code.
+    pub(crate) fn new(source: &'src str, mode: Mode) -> Self {
+        Parser::new_starts_at(source, mode, TextSize::new(0))
+    }
 
-        // Initialize the token source so that the current token is set correctly.
-        tokens.next_token();
+    /// Create a new parser for the given source code which starts parsing at the given offset.
+    pub(crate) fn new_starts_at(source: &'src str, mode: Mode, start_offset: TextSize) -> Self {
+        let tokens = TokenSource::from_source(source, mode, start_offset);
 
         Parser {
             mode,
@@ -108,14 +111,9 @@ impl<'src> Parser<'src> {
             tokens,
             recovery_context: RecoveryContext::empty(),
             prev_token_end: TextSize::new(0),
-            start_offset: TextSize::new(0),
+            start_offset,
             current_token_id: TokenId::default(),
         }
-    }
-
-    pub(crate) fn with_start_offset(mut self, offset: TextSize) -> Parser<'src> {
-        self.start_offset = offset;
-        self
     }
 
     /// Consumes the [`Parser`] and returns the parsed [`Program`].
@@ -240,7 +238,7 @@ impl<'src> Parser<'src> {
 
     /// Returns the start position for a node that starts at the current token.
     fn node_start(&self) -> TextSize {
-        self.tokens.current_range().start()
+        self.current_token_range().start()
     }
 
     fn node_range(&self, start: TextSize) -> TextRange {
@@ -332,7 +330,7 @@ impl<'src> Parser<'src> {
             // formatters semicolon detection. Exclude it for now
             | TokenKind::Semi
         ) {
-            self.prev_token_end = self.tokens.current_range().end();
+            self.prev_token_end = self.current_token_range().end();
         }
     }
 
@@ -370,6 +368,11 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// Take the token value from the underlying token source and bump the current token.
+    ///
+    /// # Panics
+    ///
+    /// If the current token is not of the given kind.
     fn bump_value(&mut self, kind: TokenKind) -> TokenValue {
         let value = self.tokens.take_value();
         self.bump(kind);
@@ -449,11 +452,7 @@ impl<'src> Parser<'src> {
     where
         T: Ranged,
     {
-        let range = ranged.range();
-        // `ranged` uses absolute ranges to the source text of an entire file. Fix the source by
-        // subtracting the start offset when parsing only a part of a file (when parsing the tokens
-        // from `lex_starts_at`).
-        &self.source[range - self.start_offset]
+        &self.source[ranged.range()]
     }
 
     /// Parses a list of elements into a vector where each element is parsed using

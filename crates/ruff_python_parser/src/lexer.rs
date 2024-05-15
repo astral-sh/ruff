@@ -85,20 +85,23 @@ pub struct Lexer<'src> {
 }
 
 impl<'src> Lexer<'src> {
-    /// Create a new lexer from T and a starting location. You probably want to use
-    /// [`lex`] instead.
-    pub fn new(input: &'src str, mode: Mode) -> Self {
+    /// Create a new lexer for the given input source which starts at the given offset.
+    ///
+    /// If the start offset is greater than 0, the cursor is moved ahead that many bytes.
+    /// This means that the input source should be the complete source code and not the
+    /// sliced version.
+    pub(crate) fn new(source: &'src str, mode: Mode, start_offset: TextSize) -> Self {
         assert!(
-            u32::try_from(input.len()).is_ok(),
+            u32::try_from(source.len()).is_ok(),
             "Lexer only supports files with a size up to 4GB"
         );
 
         let mut lexer = Lexer {
-            source: input,
-            cursor: Cursor::new(input),
+            source,
+            cursor: Cursor::new(source),
             state: State::AfterNewline,
             value: TokenValue::None,
-            current: Token::new(TokenKind::EndOfFile, TextRange::default()),
+            current: Token::new(TokenKind::EndOfFile, TextRange::empty(start_offset)),
             nesting: 0,
             indentations: Indentations::default(),
             pending_indentation: None,
@@ -110,6 +113,10 @@ impl<'src> Lexer<'src> {
         // TODO: Handle possible mismatch between BOM and explicit encoding declaration.
         // spell-checker:ignore feff
         lexer.cursor.eat_char('\u{feff}');
+
+        if start_offset > TextSize::new(0) {
+            lexer.cursor.skip_bytes(start_offset.to_usize());
+        }
 
         lexer
     }
@@ -1722,7 +1729,7 @@ mod tests {
     const UNIX_EOL: &str = "\n";
 
     fn lex(source: &str, mode: Mode) -> (Vec<Token>, Vec<LexicalError>) {
-        let mut lexer = Lexer::new(source, mode);
+        let mut lexer = Lexer::new(source, mode, TextSize::default());
         let mut tokens = Vec::new();
         loop {
             let next = lexer.next_token();

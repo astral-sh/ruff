@@ -1,4 +1,4 @@
-use ruff_text_size::TextRange;
+use ruff_text_size::{TextRange, TextSize};
 
 use crate::lexer::{Lexer, LexicalError, Token, TokenValue};
 use crate::{Mode, TokenKind};
@@ -18,14 +18,20 @@ pub(crate) struct TokenSource<'src> {
 impl<'src> TokenSource<'src> {
     /// Create a new token source for the given lexer.
     pub(crate) fn new(lexer: Lexer<'src>) -> Self {
-        Self {
+        TokenSource {
             lexer,
             tokens: vec![],
         }
     }
 
-    pub(crate) fn from_source(source: &'src str, mode: Mode) -> Self {
-        Self::new(Lexer::new(source, mode))
+    /// Create a new token source from the given source code which starts at the given offset.
+    pub(crate) fn from_source(source: &'src str, mode: Mode, start_offset: TextSize) -> Self {
+        let lexer = Lexer::new(source, mode, start_offset);
+        let mut source = TokenSource::new(lexer);
+
+        // Initialize the token source so that the current token is set correctly.
+        source.next_token();
+        source
     }
 
     /// Returns the kind of the current token.
