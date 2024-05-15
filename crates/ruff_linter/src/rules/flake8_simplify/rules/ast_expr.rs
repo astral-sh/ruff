@@ -1,5 +1,6 @@
-use ast::{StringLiteralFlags, StringLiteralPrefix};
-use ruff_python_ast::{self as ast, Arguments, Expr};
+use ruff_python_ast::{
+    self as ast, str_prefix::StringLiteralPrefix, Arguments, Expr, StringLiteralFlags,
+};
 use ruff_text_size::Ranged;
 
 use crate::fix::snippet::SourceCodeSnippet;

@@ -2,7 +2,11 @@ pub(crate) use any::AnyString;
 pub(crate) use normalize::{normalize_string, NormalizedString, StringNormalizer};
 use ruff_formatter::format_args;
 use ruff_python_ast::str::Quote;
-use ruff_python_ast::{self as ast, AnyStringFlags, AnyStringPrefix};
+use ruff_python_ast::{
+    self as ast,
+    str_prefix::{AnyStringPrefix, StringLiteralPrefix},
+    AnyStringFlags,
+};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::comments::{leading_comments, trailing_comments};
@@ -58,9 +62,7 @@ impl Format<PyFormatContext<'_>> for AnyStringPrefix {
         // Remove the unicode prefix `u` if any because it is meaningless in Python 3+.
         if !matches!(
             self,
-            AnyStringPrefix::Regular(
-                ast::StringLiteralPrefix::Empty | ast::StringLiteralPrefix::Unicode
-            )
+            AnyStringPrefix::Regular(StringLiteralPrefix::Empty | StringLiteralPrefix::Unicode)
         ) {
             token(self.as_str()).fmt(f)?;
         }

@@ -693,7 +693,11 @@ impl UnicodeEscape {
 mod tests {
     use std::borrow::Cow;
 
-    use ruff_python_ast::{str::Quote, AnyStringFlags, AnyStringPrefix, ByteStringPrefix};
+    use ruff_python_ast::{
+        str::Quote,
+        str_prefix::{AnyStringPrefix, ByteStringPrefix},
+        AnyStringFlags,
+    };
 
     use super::{normalize_string, UnicodeEscape};
 
