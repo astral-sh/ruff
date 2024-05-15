@@ -128,7 +128,14 @@ pub(crate) fn check_logical_lines(
                 //     &mut context,
                 // );
 
-                continuation_lines(&mut context, &line, locator, indent_char, indent_size);
+                continuation_lines(
+                    &line,
+                    indent_char,
+                    indent_size,
+                    locator,
+                    indexer,
+                    &mut context,
+                );
             }
         }
 

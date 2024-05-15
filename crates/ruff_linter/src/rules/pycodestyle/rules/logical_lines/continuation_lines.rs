@@ -4,9 +4,10 @@ use super::{LogicalLine, LogicalLineToken};
 use crate::checkers::logical_lines::LogicalLinesContext;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_index::Indexer;
 use ruff_python_parser::TokenKind;
 use ruff_source_file::Locator;
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 use rustc_hash::FxHashMap;
 
 /// ## What it does
@@ -39,12 +40,11 @@ impl Violation for MissingOrOutdentedIndentation {
 }
 
 #[derive(Debug)]
-struct TokenInfo<'a> {
+struct TokenInfo {
     start_physical_line_idx: usize,
     end_physical_line_idx: usize,
     token_start_within_physical_line: i64,
     token_end_within_physical_line: i64,
-    line: &'a str,
 }
 
 #[derive(Debug, Clone)]
@@ -58,16 +58,23 @@ enum IndentFlag {
 }
 
 /// Compute the `TokenInfo` of each token.
-fn get_token_infos<'a>(logical_line: &LogicalLine, locator: &'a Locator) -> Vec<TokenInfo<'a>> {
+fn get_token_infos<'a>(
+    logical_line: &LogicalLine,
+    locator: &'a Locator,
+    indexer: &'a Indexer,
+) -> Vec<TokenInfo> {
     let mut token_infos = Vec::new();
     let mut current_line_idx: usize = 0;
     // The first physical line occupied by the token, since a token can span multiple physical lines.
-    let mut first_physical_line_start: usize = if let Some(first_token) = logical_line.first_token()
-    {
-        first_token.range.start().into()
+    let mut first_physical_line_start: usize;
+    let mut next_continuation;
+    if let Some(first_token) = logical_line.first_token() {
+        first_physical_line_start = first_token.range.start().into();
+        next_continuation = continuation_line_end(first_token, locator, indexer);
     } else {
         return token_infos;
     };
+
     let mut current_physical_line_start: usize;
     let mut prev_token: Option<&LogicalLineToken> = None;
     for token in logical_line.tokens() {
@@ -76,18 +83,26 @@ fn get_token_infos<'a>(logical_line: &LogicalLine, locator: &'a Locator) -> Vec<
 
         // Check for escaped ('\') continuation lines between the previous and current tokens.
         if let Some(prev_token) = prev_token {
-            let trivia = locator.slice(TextRange::new(prev_token.range.end(), token.range.start()));
-            for (index, _text) in trivia.match_indices('\n') {
-                start_physical_line_idx += 1;
-                current_line_idx = start_physical_line_idx;
-                first_physical_line_start = usize::from(prev_token.range.end()) + index + 1;
-                current_physical_line_start = first_physical_line_start;
+            if next_continuation.is_some() && token.start() >= next_continuation.unwrap() {
+                next_continuation = continuation_line_end(token, locator, indexer);
+
+                let trivia =
+                    locator.slice(TextRange::new(prev_token.range.end(), token.range.start()));
+                for (index, _text) in trivia.match_indices('\n') {
+                    start_physical_line_idx += 1;
+                    current_line_idx = start_physical_line_idx;
+                    first_physical_line_start = usize::from(prev_token.range.end()) + index + 1;
+                    current_physical_line_start = first_physical_line_start;
+                }
             }
         }
 
-        if !matches!(
+        if matches!(
             token.kind,
-            TokenKind::NonLogicalNewline | TokenKind::Newline
+            TokenKind::String
+                | TokenKind::FStringStart
+                | TokenKind::FStringMiddle
+                | TokenKind::FStringEnd
         ) {
             // Look for newlines within strings.
             let trivia = locator.slice(token.range);
@@ -108,7 +123,6 @@ fn get_token_infos<'a>(logical_line: &LogicalLine, locator: &'a Locator) -> Vec<
                 usize::from(token.range.end()) - current_physical_line_start,
             )
             .expect("Lines are expected to be relatively short."),
-            line: locator.full_lines(token.range),
         });
 
         if matches!(
@@ -124,6 +138,19 @@ fn get_token_infos<'a>(logical_line: &LogicalLine, locator: &'a Locator) -> Vec<
     }
 
     token_infos
+}
+
+fn continuation_line_end(
+    token: &LogicalLineToken,
+    locator: &Locator,
+    indexer: &Indexer,
+) -> Option<TextSize> {
+    let continuation_lines = indexer.continuation_line_starts();
+    let continuation_line_index = continuation_lines
+        .binary_search(&token.start())
+        .unwrap_or_else(|err_index| err_index);
+    let continuation_line_start = continuation_lines.get(continuation_line_index)?;
+    Some(locator.full_line_end(*continuation_line_start))
 }
 
 /// Return the amount of indentation of the given line.
@@ -151,16 +178,17 @@ fn expand_indent(line: &str) -> i64 {
 
 /// E122
 pub(crate) fn continuation_lines(
-    context: &mut LogicalLinesContext,
-    logical_line: &LogicalLine,
-    locator: &Locator,
+    line: &LogicalLine,
     indent_char: char,
     indent_size: usize,
+    locator: &Locator,
+    indexer: &Indexer,
+    context: &mut LogicalLinesContext,
 ) {
     // The pycodestyle implementation makes use of negative values,
     // converting the indent_size type at the start avoids converting it multiple times later.
     let indent_size = i64::try_from(indent_size).expect("Indent size to be relatively small.");
-    let token_infos = get_token_infos(logical_line, locator);
+    let token_infos = get_token_infos(line, locator, indexer);
     let nb_physical_lines = if let Some(last_token_info) = token_infos.last() {
         1 + last_token_info.start_physical_line_idx
     } else {
@@ -174,8 +202,7 @@ pub(crate) fn continuation_lines(
     // Indent of the first physical line.
     let start_indent_level = expand_indent(
         locator.line(
-            logical_line
-                .first_token()
+            line.first_token()
                 .expect("Would have returned earlier if the logical line was empty")
                 .start(),
         ),
@@ -184,7 +211,7 @@ pub(crate) fn continuation_lines(
     // indent_next tells us whether the next block is indented.
     // Assuming that it is indented by 4 spaces, then we should not allow 4-space indents on the final continuation line.
     // In turn, some other indents are allowed to have an extra 4 spaces.
-    let indent_next = logical_line.text().trim_end().ends_with(':');
+    let indent_next = line.text().trim_end().ends_with(':');
 
     // Here "row" is the physical line index (within the logical line).
     let mut row = 0;
@@ -212,7 +239,7 @@ pub(crate) fn continuation_lines(
     // For each depth, memorize the visual indent column.
     let mut indent = vec![start_indent_level];
 
-    for (token, token_info) in zip(logical_line.tokens(), &token_infos) {
+    for (token, token_info) in zip(line.tokens(), &token_infos) {
         let mut is_newline = row < token_info.start_physical_line_idx;
         if is_newline {
             row = token_info.start_physical_line_idx;
@@ -233,7 +260,7 @@ pub(crate) fn continuation_lines(
             last_indent = token_info.token_start_within_physical_line;
 
             // Record the initial indent.
-            rel_indent[row] = expand_indent(token_info.line) - start_indent_level;
+            rel_indent[row] = expand_indent(locator.full_lines(token.range)) - start_indent_level;
 
             // Is the indent relative to an opening bracket line ?
             for open_row in open_rows[depth].iter().rev() {
@@ -327,8 +354,10 @@ pub(crate) fn continuation_lines(
                 IndentFlag::Standard,
             );
         } else if matches!(token.kind, TokenKind::Colon)
-            && token_info.line[usize::try_from(token_info.token_end_within_physical_line)
-                .expect("Line to be relatively short.")..]
+            && locator.full_lines(token.range)[usize::try_from(
+                token_info.token_end_within_physical_line,
+            )
+            .expect("Line to be relatively short.")..]
                 .trim()
                 .is_empty()
         {
