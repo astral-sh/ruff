@@ -344,7 +344,7 @@ pub(crate) fn continuation_lines(
                 TokenKind::Assert | TokenKind::Raise | TokenKind::With
             ))
         // Special case for the "if" statement because "if (".len() == 4
-       || (indent_chances.is_empty()
+        || (indent_chances.is_empty()
             && row == 0
             && depth == 0
             && matches!(token.kind, TokenKind::If))
