@@ -119,15 +119,6 @@ pub(crate) fn check_logical_lines(
                 .contains(TokenFlags::NON_LOGICAL_NEWLINE | TokenFlags::BRACKET)
                 || line.contains_backslash(indexer)
             {
-                // continuation_lines(
-                //     &line,
-                //     indent_level,
-                //     settings.tab_size,
-                //     locator,
-                //     indexer,
-                //     &mut context,
-                // );
-
                 continuation_lines(
                     &line,
                     indent_char,

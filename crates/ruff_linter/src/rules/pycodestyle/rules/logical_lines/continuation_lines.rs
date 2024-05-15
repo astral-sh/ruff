@@ -145,9 +145,10 @@ fn continuation_line_end(
     locator: &Locator,
     indexer: &Indexer,
 ) -> Option<TextSize> {
+    let line_start = locator.line_start(token.start());
     let continuation_lines = indexer.continuation_line_starts();
     let continuation_line_index = continuation_lines
-        .binary_search(&token.start())
+        .binary_search(&line_start)
         .unwrap_or_else(|err_index| err_index);
     let continuation_line_start = continuation_lines.get(continuation_line_index)?;
     Some(locator.full_line_end(*continuation_line_start))
@@ -283,10 +284,9 @@ pub(crate) fn continuation_lines(
                 None
             };
 
-            if is_closing_bracket && indent[depth] != 0 {
-            } else if is_closing_bracket && hang == 0 {
-            } else if indent[depth] != 0
-                && token_info.token_start_within_physical_line < indent[depth]
+            if (is_closing_bracket && (indent[depth] != 0 || hang == 0))
+                || (indent[depth] != 0
+                    && token_info.token_start_within_physical_line < indent[depth])
             {
             } else if hanging_indent || (indent_next && rel_indent[row] == (2 * indent_size)) {
                 hangs[depth] = Some(hang);
