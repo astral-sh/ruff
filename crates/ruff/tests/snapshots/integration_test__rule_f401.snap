@@ -34,8 +34,8 @@ marking it as unused, as in:
 from module import member as member
 ```
 
-Within `__init__.py` re-export a symbol with an `__all__` declaration containing a string
-matching the symbol, as in:
+Alternatively, you can use `__all__` to declare a symbol as part of the module's
+interface, as in:
 
 ```python
 # __init__.py
@@ -46,15 +46,14 @@ __all__ = [ "some_module"]
 
 ## Fix safety
 
-Fixes to remove unused imports are safe, except in `__init__.py` files, where they could
-change the public interface. Fixes in `__init__.py` files are currently gated within preview
-mode.
+Fixes to remove unused imports are safe, except in `__init__.py` files.
 
-In preview mode, `__init__.py` files containing unused first party imports will have
-safe fixes to add those imports `__all__` if there is exactly one `__all__` declaration
-(otherwise the fixes recommend conversion to "redundant" import aliases).
-Unused standard library and third-party imports in `__init__.py` have unsafe fixes to remove
-the import statement.
+Applying fixes to `__init__.py` files is currently in preview. The fix offered depends on the
+type of the unused import. Ruff will suggest a safe fix to export first-party imports with
+either a redundant alias or, if already present in the file, an `__all__` entry. If multiple
+`__all__` declarations are present, Ruff will not offer a fix. Ruff will suggest an unsafe fix
+to remove third-party and standard library imports -- the fix is unsafe because the module's
+interface changes.
 
 ## Example
 ```python
