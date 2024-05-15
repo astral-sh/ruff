@@ -638,7 +638,7 @@ Otherwise, follow the instructions from the linux section.
 utils with it:
 
 - `cargo dev print-ast <file>`: Print the AST of a python file using Ruff's
-    [custom Python parser](https://github.com/astral-sh/ruff/tree/main/crates/ruff_python_parser).
+    [Python parser](https://github.com/astral-sh/ruff/tree/main/crates/ruff_python_parser).
     For `if True: pass # comment`, you can see the syntax tree, the byte offsets for start and
     stop of each node and also how the `:` token, the comment and whitespace are not represented
     anymore:
