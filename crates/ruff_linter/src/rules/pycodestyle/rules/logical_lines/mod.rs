@@ -1,6 +1,6 @@
+pub(crate) use continuation_lines::*;
 pub(crate) use extraneous_whitespace::*;
 pub(crate) use indentation::*;
-pub(crate) use missing_or_outdented_indentation::*;
 pub(crate) use missing_whitespace::*;
 pub(crate) use missing_whitespace_after_keyword::*;
 pub(crate) use missing_whitespace_around_operator::*;
@@ -22,9 +22,9 @@ use ruff_python_trivia::is_python_whitespace;
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
+mod continuation_lines;
 mod extraneous_whitespace;
 mod indentation;
-mod missing_or_outdented_indentation;
 mod missing_whitespace;
 mod missing_whitespace_after_keyword;
 mod missing_whitespace_around_operator;

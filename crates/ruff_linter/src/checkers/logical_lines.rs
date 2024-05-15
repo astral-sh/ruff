@@ -10,7 +10,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::registry::AsRule;
 use crate::rules::pycodestyle::rules::logical_lines::{
-    extraneous_whitespace, indentation, missing_or_outdented_indentation, missing_whitespace,
+    continuation_lines, extraneous_whitespace, indentation, missing_whitespace,
     missing_whitespace_after_keyword, missing_whitespace_around_operator, redundant_backslash,
     space_after_comma, space_around_operator, whitespace_around_keywords,
     whitespace_around_named_parameter_equals, whitespace_before_comment,
@@ -119,14 +119,16 @@ pub(crate) fn check_logical_lines(
                 .contains(TokenFlags::NON_LOGICAL_NEWLINE | TokenFlags::BRACKET)
                 || line.contains_backslash(indexer)
             {
-                missing_or_outdented_indentation(
-                    &line,
-                    indent_level,
-                    settings.tab_size,
-                    locator,
-                    indexer,
-                    &mut context,
-                );
+                // continuation_lines(
+                //     &line,
+                //     indent_level,
+                //     settings.tab_size,
+                //     locator,
+                //     indexer,
+                //     &mut context,
+                // );
+
+                continuation_lines(&mut context, &line, locator, indent_char, indent_size);
             }
         }
 
