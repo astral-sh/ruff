@@ -246,9 +246,11 @@ pub(crate) fn continuation_lines(
     // Relative indents of physical lines.
     let mut rel_indent: Vec<i64> = vec![0; nb_physical_lines];
     // For each depth, collect a list of opening rows.
-    let mut open_rows = vec![vec![0]];
+    let mut open_rows: Vec<Vec<usize>> = Vec::with_capacity(max_depth + 1);
+    open_rows.push(vec![0]);
     // For each depth, record the hanging indentation.
-    let mut hangs: Vec<Option<i64>> = vec![None];
+    let mut hangs: Vec<Option<i64>> = Vec::with_capacity(max_depth + 1);
+    hangs.push(None);
     let mut hang: i64 = 0;
     let mut hanging_indent: bool = false;
     // Visual indents
@@ -257,8 +259,8 @@ pub(crate) fn continuation_lines(
     let mut visual_indent;
     let mut last_token_multiline = false;
     // For each depth, record the visual indent column.
-    let mut indent = vec![0; max_depth + 1];
-    indent[0] = start_indent_level;
+    let mut indent = Vec::with_capacity(max_depth + 1);
+    indent.push(start_indent_level);
 
     for (token, token_info) in zip(logical_line.tokens(), &token_infos) {
         let mut is_newline = row < token_info.start_physical_line_idx;
@@ -394,7 +396,7 @@ pub(crate) fn continuation_lines(
         if is_opening_bracket || is_closing_bracket {
             if is_opening_bracket {
                 depth += 1;
-                indent[depth] = 0;
+                indent.push(0);
                 hangs.push(None);
                 if open_rows.len() == depth {
                     open_rows.push(Vec::new());
@@ -403,9 +405,9 @@ pub(crate) fn continuation_lines(
                 brackets_opened += 1;
             } else if is_closing_bracket && depth > 0 {
                 // Parent indents should not be more than this one.
-                let prev_indent = if let Some(i) = indent.last() {
-                    if *i > 0 {
-                        *i
+                let prev_indent = if let Some(i) = indent.pop() {
+                    if i > 0 {
+                        i
                     } else {
                         last_indent
                     }
