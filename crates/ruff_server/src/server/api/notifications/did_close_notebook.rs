@@ -1,4 +1,3 @@
-use crate::edit::DocumentKey;
 use crate::server::api::LSPResult;
 use crate::server::client::{Notifier, Requester};
 use crate::server::Result;
@@ -23,7 +22,7 @@ impl super::SyncNotificationHandler for DidCloseNotebook {
             ..
         }: types::DidCloseNotebookDocumentParams,
     ) -> Result<()> {
-        let key = DocumentKey::from_url(&uri);
+        let key = session.key_from_url(&uri);
 
         session
             .close_document(&key)

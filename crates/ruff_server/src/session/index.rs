@@ -116,6 +116,24 @@ impl Index {
         Ok(())
     }
 
+    pub(super) fn key_from_url(&self, url: &lsp_types::Url) -> DocumentKey {
+        if self.notebook_cells.contains_key(url) {
+            return DocumentKey::NotebookCell(url.clone());
+        }
+        let path = url
+            .to_file_path()
+            .expect("non-notebook cell URL should be a valid path");
+        match path
+            .extension()
+            .unwrap_or_default()
+            .to_str()
+            .unwrap_or_default()
+        {
+            "ipynb" => DocumentKey::Notebook(path),
+            _ => DocumentKey::Text(path),
+        }
+    }
+
     pub(super) fn update_notebook_document(
         &mut self,
         key: &DocumentKey,

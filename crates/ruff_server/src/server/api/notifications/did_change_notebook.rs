@@ -1,4 +1,3 @@
-use crate::edit::DocumentKey;
 use crate::server::api::diagnostics::publish_diagnostics_for_document;
 use crate::server::api::LSPResult;
 use crate::server::client::{Notifier, Requester};
@@ -24,7 +23,7 @@ impl super::SyncNotificationHandler for DidChangeNotebook {
             change: types::NotebookDocumentChangeEvent { cells, metadata },
         }: types::DidChangeNotebookDocumentParams,
     ) -> Result<()> {
-        let key = DocumentKey::from_url(&uri);
+        let key = session.key_from_url(&uri);
         session
             .update_notebook_document(&key, cells, metadata, version)
             .with_failure_code(ErrorCode::InternalError)?;

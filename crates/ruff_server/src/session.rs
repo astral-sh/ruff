@@ -54,9 +54,13 @@ impl Session {
         }
     }
 
+    pub(crate) fn key_from_url(&self, url: &lsp_types::Url) -> DocumentKey {
+        self.index.key_from_url(url)
+    }
+
     /// Creates a document snapshot with the URL referencing the document to snapshot.
     pub(crate) fn take_snapshot(&self, url: &Url) -> Option<DocumentSnapshot> {
-        let key = DocumentKey::from_url(url);
+        let key = self.key_from_url(url);
         Some(DocumentSnapshot {
             resolved_client_capabilities: self.resolved_client_capabilities.clone(),
             client_settings: self.index.client_settings(&key, &self.global_settings),
@@ -67,7 +71,7 @@ impl Session {
 
     /// Updates a text document at the associated `key`.
     ///
-    /// The document key must point to a text document.
+    /// The document key must point to a text document, or this will throw an error.
     pub(crate) fn update_text_document(
         &mut self,
         key: &DocumentKey,
@@ -83,7 +87,8 @@ impl Session {
     /// Updates a notebook document at the associated `key` with potentially new
     /// cell, metadata, and version values.
     ///
-    /// The document key must point to a notebook document or cell.
+    /// The document key must point to a notebook document or cell, or this will
+    /// throw an error.
     pub(crate) fn update_notebook_document(
         &mut self,
         key: &DocumentKey,

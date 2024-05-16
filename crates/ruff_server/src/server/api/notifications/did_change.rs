@@ -1,4 +1,3 @@
-use crate::edit::DocumentKey;
 use crate::server::api::diagnostics::publish_diagnostics_for_document;
 use crate::server::api::LSPResult;
 use crate::server::client::{Notifier, Requester};
@@ -27,7 +26,7 @@ impl super::SyncNotificationHandler for DidChange {
             content_changes,
         }: types::DidChangeTextDocumentParams,
     ) -> Result<()> {
-        let key = DocumentKey::from_url(&uri);
+        let key = session.key_from_url(&uri);
 
         session
             .update_text_document(&key, content_changes, new_version)

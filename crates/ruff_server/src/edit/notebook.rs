@@ -8,6 +8,8 @@ use crate::{PositionEncoding, TextDocument};
 
 use super::DocumentVersion;
 
+pub(super) type CellId = usize;
+
 /// The state of a notebook document in the server. Contains an array of cells whose
 /// contents are internally represented by [`TextDocument`]s.
 #[derive(Clone, Debug)]
@@ -16,9 +18,10 @@ pub(crate) struct NotebookDocument {
     metadata: ruff_notebook::RawNotebookMetadata,
     version: DocumentVersion,
     // Used to quickly find the index of a cell for a given URL.
-    cell_index: FxHashMap<lsp_types::Url, usize>,
+    cell_index: FxHashMap<lsp_types::Url, CellId>,
 }
 
+/// A single cell within a notebook, which has text contents represented as a `TextDocument`.
 #[derive(Clone, Debug)]
 struct NotebookCell {
     url: Url,
@@ -82,9 +85,15 @@ impl NotebookDocument {
                 }
             })
             .collect();
+        let raw_notebook = ruff_notebook::RawNotebook {
+            cells,
+            metadata: self.metadata.clone(),
+            nbformat: 4,
+            nbformat_minor: 5,
+        };
 
-        ruff_notebook::Notebook::from_cells(cells, self.metadata.clone())
-            .expect("notebook should convert successfully")
+        ruff_notebook::Notebook::from_raw_notebook(raw_notebook, false)
+            .unwrap_or_else(|err| panic!("Server notebook document could not be converted to Ruff's notebook document format: {err}"))
     }
 
     pub(crate) fn update(
@@ -103,18 +112,22 @@ impl NotebookDocument {
         }) = cells
         {
             if let Some(structure) = structure {
-                let start = usize::try_from(structure.array.start).unwrap();
-                let delete = usize::try_from(structure.array.delete_count).unwrap();
+                let start = structure.array.start as usize;
+                let delete = structure.array.delete_count as usize;
                 if delete > 0 {
-                    self.cells.drain(start..start + delete);
+                    for cell in self.cells.drain(start..start + delete) {
+                        self.cell_index.remove(&cell.url);
+                    }
                 }
                 for cell in structure.array.cells.into_iter().flatten().rev() {
                     self.cells
                         .insert(start, NotebookCell::new(cell, String::new(), version));
                 }
 
-                // the array has been updated - rebuild the cell index
-                self.rebuild_cell_index();
+                // register any new cells in the index and update existing ones that came after the insertion
+                for (i, cell) in self.cells.iter().enumerate().skip(start) {
+                    self.cell_index.insert(cell.url.clone(), i);
+                }
             }
             if let Some(cell_data) = data {
                 for cell in cell_data {
@@ -138,20 +151,24 @@ impl NotebookDocument {
         Ok(())
     }
 
+    /// Get the current version of the notebook document.
     pub(crate) fn version(&self) -> DocumentVersion {
         self.version
     }
 
-    pub(crate) fn cell_uri_by_index(&self, index: usize) -> Option<&lsp_types::Url> {
+    /// Get the URI for a cell by its index within the cell array.
+    pub(crate) fn cell_uri_by_index(&self, index: CellId) -> Option<&lsp_types::Url> {
         self.cells.get(index).map(|cell| &cell.url)
     }
 
+    /// Get the text document representing the contents of a cell by the cell URI.
     pub(crate) fn cell_document_by_uri(&self, uri: &lsp_types::Url) -> Option<&TextDocument> {
         self.cells
             .get(*self.cell_index.get(uri)?)
             .map(|cell| &cell.document)
     }
 
+    /// Returns a list of cell URIs in the order they appear in the array.
     pub(crate) fn urls(&self) -> impl Iterator<Item = &lsp_types::Url> {
         self.cells.iter().map(|cell| &cell.url)
     }
@@ -160,11 +177,7 @@ impl NotebookDocument {
         self.cells.get_mut(*self.cell_index.get(uri)?)
     }
 
-    fn rebuild_cell_index(&mut self) {
-        self.cell_index = Self::make_cell_index(&self.cells);
-    }
-
-    fn make_cell_index(cells: &[NotebookCell]) -> FxHashMap<lsp_types::Url, usize> {
+    fn make_cell_index(cells: &[NotebookCell]) -> FxHashMap<lsp_types::Url, CellId> {
         let mut index =
             HashMap::with_capacity_and_hasher(cells.len(), BuildHasherDefault::default());
         for (i, cell) in cells.iter().enumerate() {

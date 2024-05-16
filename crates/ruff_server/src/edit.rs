@@ -5,13 +5,13 @@ mod notebook;
 mod range;
 mod replacement;
 
-use std::{collections::HashMap, ffi::OsStr, path::PathBuf};
+use std::{collections::HashMap, path::PathBuf};
 
 pub(crate) use document::DocumentVersion;
 pub use document::TextDocument;
 use lsp_types::PositionEncodingKind;
 pub(crate) use notebook::NotebookDocument;
-pub(crate) use range::{RangeExt, ToRangeExt};
+pub(crate) use range::{NotebookRange, RangeExt, ToRangeExt};
 pub(crate) use replacement::Replacement;
 
 use crate::{fix::Fixes, session::ResolvedClientCapabilities};
@@ -41,26 +41,6 @@ pub(crate) enum DocumentKey {
 }
 
 impl DocumentKey {
-    /// Creates a document key from a URL provided in an LSP request.
-    pub(crate) fn from_url(url: &lsp_types::Url) -> Self {
-        if url.scheme() != "file" {
-            return Self::NotebookCell(url.clone());
-        }
-        let Some(path) = url.to_file_path().ok() else {
-            return Self::NotebookCell(url.clone());
-        };
-
-        // figure out whether this is a notebook or a text document
-        if path.extension() == Some(OsStr::new("ipynb")) {
-            Self::Notebook(path)
-        } else {
-            // Until we support additional document types, we need to confirm
-            // that any non-notebook file is a Python file
-            debug_assert_eq!(path.extension(), Some(OsStr::new("py")));
-            Self::Text(path)
-        }
-    }
-
     /// Converts the key back into its original URL.
     pub(crate) fn into_url(self) -> lsp_types::Url {
         match self {

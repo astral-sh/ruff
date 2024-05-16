@@ -1,9 +1,15 @@
+use super::notebook;
 use super::PositionEncoding;
 use lsp_types as types;
 use ruff_notebook::NotebookIndex;
 use ruff_source_file::OneIndexed;
 use ruff_source_file::{LineIndex, SourceLocation};
 use ruff_text_size::{TextRange, TextSize};
+
+pub(crate) struct NotebookRange {
+    pub(crate) cell: notebook::CellId,
+    pub(crate) range: types::Range,
+}
 
 pub(crate) trait RangeExt {
     fn to_text_range(&self, text: &str, index: &LineIndex, encoding: PositionEncoding)
@@ -18,7 +24,7 @@ pub(crate) trait ToRangeExt {
         source_index: &LineIndex,
         notebook_index: &NotebookIndex,
         encoding: PositionEncoding,
-    ) -> (usize, types::Range);
+    ) -> NotebookRange;
 }
 
 fn u32_index_to_usize(index: u32) -> usize {
@@ -112,7 +118,7 @@ impl ToRangeExt for TextRange {
         source_index: &LineIndex,
         notebook_index: &NotebookIndex,
         encoding: PositionEncoding,
-    ) -> (usize, types::Range) {
+    ) -> NotebookRange {
         let start = offset_to_source_location(self.start(), text, source_index, encoding);
         let mut end = offset_to_source_location(self.end(), text, source_index, encoding);
         let cell = notebook_index.cell(start.row);
@@ -131,10 +137,10 @@ impl ToRangeExt for TextRange {
         let start = source_location_to_position(&notebook_index.translate_location(&start));
         let end = source_location_to_position(&notebook_index.translate_location(&end));
 
-        (
-            cell.map(OneIndexed::to_zero_indexed).unwrap_or_default(),
-            types::Range { start, end },
-        )
+        NotebookRange {
+            cell: cell.map(OneIndexed::to_zero_indexed).unwrap_or_default(),
+            range: types::Range { start, end },
+        }
     }
 }
 

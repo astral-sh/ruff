@@ -19,7 +19,11 @@ use ruff_text_size::Ranged;
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 
-use crate::{edit::ToRangeExt, session::DocumentQuery, PositionEncoding, DIAGNOSTIC_NAME};
+use crate::{
+    edit::{NotebookRange, ToRangeExt},
+    session::DocumentQuery,
+    PositionEncoding, DIAGNOSTIC_NAME,
+};
 
 /// This is serialized on the diagnostic `data` field.
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -214,7 +218,7 @@ fn to_lsp_diagnostic(
                                 notebook_index,
                                 encoding,
                             )
-                            .1
+                            .range
                     } else {
                         edit.range()
                             .to_range(source_kind.source_code(), index, encoding)
@@ -234,7 +238,7 @@ fn to_lsp_diagnostic(
                             notebook_index,
                             encoding,
                         )
-                        .1
+                        .range
                 } else {
                     noqa_edit
                         .range()
@@ -258,7 +262,7 @@ fn to_lsp_diagnostic(
     let cell: usize;
 
     if let Some(notebook_index) = source_kind.as_ipy_notebook().map(Notebook::index) {
-        (cell, range) = diagnostic_range.to_notebook_range(
+        NotebookRange { cell, range } = diagnostic_range.to_notebook_range(
             source_kind.source_code(),
             index,
             notebook_index,

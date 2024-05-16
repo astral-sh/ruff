@@ -85,23 +85,6 @@ impl Notebook {
         Self::from_reader(Cursor::new(source_code))
     }
 
-    /// Generate a pseudo-representation of a notebook that can be used
-    /// for linting by the language server. As this is not generated directly from the raw JSON
-    /// of a notebook file, writing this back into the file system is a bad idea.
-    pub fn from_cells(
-        cells: Vec<Cell>,
-        metadata: crate::RawNotebookMetadata,
-    ) -> Result<Self, NotebookError> {
-        let raw_notebook = RawNotebook {
-            cells,
-            metadata,
-            nbformat: 4,
-            nbformat_minor: 5,
-        };
-
-        Self::from_raw(raw_notebook, false)
-    }
-
     /// Read a Jupyter Notebook from a [`Read`] implementer.
     ///
     /// See also the black implementation
@@ -130,10 +113,10 @@ impl Notebook {
                 });
             }
         };
-        Self::from_raw(raw_notebook, trailing_newline)
+        Self::from_raw_notebook(raw_notebook, trailing_newline)
     }
 
-    fn from_raw(
+    pub fn from_raw_notebook(
         mut raw_notebook: RawNotebook,
         trailing_newline: bool,
     ) -> Result<Self, NotebookError> {
