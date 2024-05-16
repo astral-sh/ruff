@@ -136,6 +136,7 @@ def f():
 
 # OK
 def f():
+# comment
     x = ((
         (
         )
@@ -184,7 +185,7 @@ FROM {DISKS_SYSTEM_TABLE}
 WHERE type = 'local'
 """
 
-# # Ok
+# OK
 [21,
  21,
  21]
