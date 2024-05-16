@@ -445,7 +445,7 @@ impl LogicalLinesBuilder {
 
         if matches!(kind, TokenKind::Comma | TokenKind::Semi | TokenKind::Colon) {
             line.flags.insert(TokenFlags::PUNCTUATION);
-        } else if kind.is_non_soft_keyword() {
+        } else if kind.is_keyword() {
             line.flags.insert(TokenFlags::KEYWORD);
         }
 
