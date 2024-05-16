@@ -5,10 +5,9 @@
 //!
 //! [CPython source]: https://github.com/python/cpython/blob/dfc2e065a2e71011017077e549cd2f9bf4944c54/Grammar/Tokens
 
-use ruff_python_ast::{AnyStringFlags, BoolOp, Int, IpyEscapeKind, Operator, UnaryOp};
 use std::fmt;
 
-use crate::Mode;
+use ruff_python_ast::{AnyStringFlags, BoolOp, Int, IpyEscapeKind, Operator, UnaryOp};
 
 /// The set of tokens the Python source code can be tokenized in.
 #[derive(Clone, Debug, PartialEq, is_macro::Is)]
@@ -61,7 +60,9 @@ pub enum Tok {
     /// Token value for the end of an f-string. This includes the closing quote.
     FStringEnd,
     /// Token value for IPython escape commands. These are recognized by the lexer
-    /// only when the mode is [`Mode::Ipython`].
+    /// only when the mode is [`Ipython`].
+    ///
+    /// [`Ipython`]: crate::Mode::Ipython
     IpyEscapeCommand {
         /// The magic command value.
         value: Box<str>,
@@ -80,7 +81,9 @@ pub enum Tok {
     /// Token value for a dedent.
     Dedent,
     EndOfFile,
-    /// Token value for a question mark `?`. This is only used in [`Mode::Ipython`].
+    /// Token value for a question mark `?`. This is only used in [`Ipython`].
+    ///
+    /// [`Ipython`]: crate::Mode::Ipython
     Question,
     /// Token value for a exclamation mark `!`.
     Exclamation,
@@ -222,22 +225,12 @@ pub enum Tok {
     Yield,
 
     Unknown,
-    // RustPython specific.
-    StartModule,
-    StartExpression,
 }
 
 impl Tok {
     #[inline]
     pub fn kind(&self) -> TokenKind {
         TokenKind::from_token(self)
-    }
-
-    pub fn start_marker(mode: Mode) -> Self {
-        match mode {
-            Mode::Module | Mode::Ipython => Tok::StartModule,
-            Mode::Expression => Tok::StartExpression,
-        }
     }
 }
 
@@ -261,8 +254,6 @@ impl fmt::Display for Tok {
             NonLogicalNewline => f.write_str("NonLogicalNewline"),
             Indent => f.write_str("Indent"),
             Dedent => f.write_str("Dedent"),
-            StartModule => f.write_str("StartProgram"),
-            StartExpression => f.write_str("StartExpression"),
             EndOfFile => f.write_str("EOF"),
             Question => f.write_str("?"),
             Exclamation => f.write_str("!"),
@@ -537,10 +528,6 @@ pub enum TokenKind {
     Yield,
 
     Unknown,
-    // RustPython specific.
-    StartModule,
-    StartInteractive,
-    StartExpression,
 }
 
 impl TokenKind {
@@ -900,8 +887,6 @@ impl TokenKind {
             Tok::With => TokenKind::With,
             Tok::Yield => TokenKind::Yield,
             Tok::Unknown => TokenKind::Unknown,
-            Tok::StartModule => TokenKind::StartModule,
-            Tok::StartExpression => TokenKind::StartExpression,
         }
     }
 }
@@ -965,9 +950,6 @@ impl fmt::Display for TokenKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let value = match self {
             TokenKind::Unknown => "Unknown",
-            TokenKind::StartModule => "StartModule",
-            TokenKind::StartExpression => "StartExpression",
-            TokenKind::StartInteractive => "StartInteractive",
             TokenKind::Newline => "newline",
             TokenKind::NonLogicalNewline => "NonLogicalNewline",
             TokenKind::Indent => "indent",
