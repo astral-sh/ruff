@@ -48,7 +48,7 @@ pub(crate) fn check_logical_lines(
     let mut prev_indent_level = None;
     let indent_char = stylist.indentation().as_char();
 
-    for line in &LogicalLines::from_tokens(tokens, locator) {
+    for mut line in &LogicalLines::from_tokens(tokens, locator) {
         if line.flags().contains(TokenFlags::OPERATOR) {
             space_around_operator(&line, &mut context);
             whitespace_around_named_parameter_equals(&line, &mut context);

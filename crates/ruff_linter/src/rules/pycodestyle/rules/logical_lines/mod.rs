@@ -128,6 +128,7 @@ impl<'a> IntoIterator for &'a LogicalLines<'a> {
 pub(crate) struct LogicalLine<'a> {
     lines: &'a LogicalLines<'a>,
     line: &'a Line,
+    contains_backslash: Option<bool>,
 }
 
 impl<'a> LogicalLine<'a> {
@@ -252,20 +253,26 @@ impl<'a> LogicalLine<'a> {
     }
 
     // Checks if the line contains explicit line joins, i.e. backslashes
-    pub(crate) fn contains_backslash(&self, locator: &Locator, indexer: &Indexer) -> bool {
-        let Some(first_token) = self.tokens().first() else {
-            return false;
-        };
-        let line_start = locator.line_start(first_token.start());
-        let last_token = self.tokens().last().unwrap();
-        let continuation_lines = indexer.continuation_line_starts();
-        let start_index = continuation_lines
-            .binary_search(&line_start)
-            .unwrap_or_else(|err_index| err_index);
-        let end_index = continuation_lines
-            .binary_search(&last_token.start())
-            .unwrap_or_else(|err_index| err_index);
-        end_index > start_index
+    pub(crate) fn contains_backslash(&mut self, locator: &Locator, indexer: &Indexer) -> bool {
+        if let Some(contains_backslash) = self.contains_backslash {
+            contains_backslash
+        } else {
+            let Some(first_token) = self.tokens().first() else {
+                return false;
+            };
+            let line_start = locator.line_start(first_token.start());
+            let last_token = self.tokens().last().unwrap();
+            let continuation_lines = indexer.continuation_line_starts();
+            let start_index = continuation_lines
+                .binary_search(&line_start)
+                .unwrap_or_else(|err_index| err_index);
+            let end_index = continuation_lines
+                .binary_search(&last_token.start())
+                .unwrap_or_else(|err_index| err_index);
+            let contains_backslash = end_index > start_index;
+            self.contains_backslash = Some(contains_backslash);
+            contains_backslash
+        }
     }
 }
 
@@ -297,6 +304,7 @@ impl<'a> Iterator for LogicalLinesIter<'a> {
         Some(LogicalLine {
             lines: self.lines,
             line,
+            contains_backslash: None,
         })
     }
 
@@ -312,6 +320,7 @@ impl DoubleEndedIterator for LogicalLinesIter<'_> {
         Some(LogicalLine {
             lines: self.lines,
             line,
+            contains_backslash: None,
         })
     }
 }
