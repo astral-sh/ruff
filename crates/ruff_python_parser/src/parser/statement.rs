@@ -121,8 +121,26 @@ impl<'src> Parser<'src> {
             TokenKind::With => Stmt::With(self.parse_with_statement(start)),
             TokenKind::At => self.parse_decorators(),
             TokenKind::Async => self.parse_async_statement(),
-            TokenKind::Match => Stmt::Match(self.parse_match_statement()),
-            _ => self.parse_single_simple_statement(),
+            token => {
+                if token == TokenKind::Match {
+                    // Match is considered a soft keyword, so we will treat it as an identifier if
+                    // it's followed by an unexpected token.
+
+                    match self.classify_match_token() {
+                        MatchTokenType::Keyword => {
+                            return Stmt::Match(self.parse_match_statement());
+                        }
+                        MatchTokenType::KeywordOrIdentifier => {
+                            if let Some(match_stmt) = self.try_parse_match_statement() {
+                                return Stmt::Match(match_stmt);
+                            }
+                        }
+                        MatchTokenType::Identifier => {}
+                    }
+                }
+
+                self.parse_single_simple_statement()
+            }
         }
     }
 
@@ -2340,6 +2358,55 @@ impl<'src> Parser<'src> {
         target
     }
 
+    fn try_parse_match_statement(&mut self) -> Option<ast::StmtMatch> {
+        let checkpoint = self.checkpoint();
+
+        let start = self.node_start();
+        self.bump(TokenKind::Match);
+
+        let subject = self.parse_match_subject_expression();
+
+        match self.current_token_kind() {
+            TokenKind::Colon => {
+                // `match` is a keyword
+                self.bump(TokenKind::Colon);
+
+                let cases = self.parse_match_body();
+
+                Some(ast::StmtMatch {
+                    subject: Box::new(subject),
+                    cases,
+                    range: self.node_range(start),
+                })
+            }
+            TokenKind::Newline
+                if matches!(self.tokens.peek2(), (TokenKind::Indent, TokenKind::Case)) =>
+            {
+                // `match` is a keyword
+                self.add_error(
+                    ParseErrorType::ExpectedToken {
+                        found: self.current_token_kind(),
+                        expected: TokenKind::Colon,
+                    },
+                    self.current_token_range(),
+                );
+
+                let cases = self.parse_match_body();
+
+                Some(ast::StmtMatch {
+                    subject: Box::new(subject),
+                    cases,
+                    range: self.node_range(start),
+                })
+            }
+            _ => {
+                // `match` is an identifier
+                self.rewind(checkpoint);
+                None
+            }
+        }
+    }
+
     /// Parses a match statement.
     ///
     /// # Panics
@@ -2351,7 +2418,21 @@ impl<'src> Parser<'src> {
         let start = self.node_start();
         self.bump(TokenKind::Match);
 
-        let subject_start = self.node_start();
+        let subject = self.parse_match_subject_expression();
+        self.expect(TokenKind::Colon);
+
+        let cases = self.parse_match_body();
+
+        ast::StmtMatch {
+            subject: Box::new(subject),
+            cases,
+            range: self.node_range(start),
+        }
+    }
+
+    /// Parses the subject expression for a `match` statement.
+    fn parse_match_subject_expression(&mut self) -> Expr {
+        let start = self.node_start();
 
         // Subject expression grammar is:
         //
@@ -2383,13 +2464,12 @@ impl<'src> Parser<'src> {
         //     case _: ...
         // match yield x:
         //     case _: ...
-        let subject = if self.at(TokenKind::Comma) {
-            let tuple =
-                self.parse_tuple_expression(subject.expr, subject_start, Parenthesized::No, |p| {
-                    p.parse_named_expression_or_higher(ExpressionContext::starred_bitwise_or())
-                });
+        if self.at(TokenKind::Comma) {
+            let tuple = self.parse_tuple_expression(subject.expr, start, Parenthesized::No, |p| {
+                p.parse_named_expression_or_higher(ExpressionContext::starred_bitwise_or())
+            });
 
-            Expr::Tuple(tuple).into()
+            Expr::Tuple(tuple)
         } else {
             if subject.is_unparenthesized_starred_expr() {
                 // test_err match_stmt_single_starred_subject
@@ -2397,11 +2477,12 @@ impl<'src> Parser<'src> {
                 //     case _: ...
                 self.add_error(ParseErrorType::InvalidStarredExpressionUsage, &subject);
             }
-            subject
-        };
+            subject.expr
+        }
+    }
 
-        self.expect(TokenKind::Colon);
-
+    /// Parses the body of a `match` statement.
+    fn parse_match_body(&mut self) -> Vec<ast::MatchCase> {
         // test_err match_stmt_no_newline_before_case
         // match foo: case _: ...
         self.expect(TokenKind::Newline);
@@ -2424,11 +2505,7 @@ impl<'src> Parser<'src> {
         // TODO(dhruvmanila): Should we expect `Dedent` only if there was an `Indent` present?
         self.expect(TokenKind::Dedent);
 
-        ast::StmtMatch {
-            subject: Box::new(subject.expr),
-            cases,
-            range: self.node_range(start),
-        }
+        cases
     }
 
     /// Parses a list of match case blocks.
@@ -3399,6 +3476,37 @@ impl<'src> Parser<'src> {
         }
     }
 
+    fn classify_match_token(&mut self) -> MatchTokenType {
+        assert_eq!(self.current_token_kind(), TokenKind::Match);
+
+        let (first, second) = self.tokens.peek2();
+
+        match first {
+            TokenKind::Not if second == TokenKind::In => MatchTokenType::Identifier,
+            TokenKind::Name
+            | TokenKind::Int
+            | TokenKind::Float
+            | TokenKind::Complex
+            | TokenKind::String
+            | TokenKind::FStringStart
+            | TokenKind::Lbrace
+            | TokenKind::Tilde
+            | TokenKind::Lambda => MatchTokenType::Keyword,
+            TokenKind::Lpar
+            | TokenKind::Lsqb
+            | TokenKind::Star
+            | TokenKind::Plus
+            | TokenKind::Minus => MatchTokenType::KeywordOrIdentifier,
+            _ => {
+                if first.is_soft_keyword() {
+                    MatchTokenType::Keyword
+                } else {
+                    MatchTokenType::Identifier
+                }
+            }
+        }
+    }
+
     /// Specialized [`Parser::parse_list_into_vec`] for parsing a sequence of clauses.
     ///
     /// The difference is that the parser only continues parsing for as long as it sees the token
@@ -3488,6 +3596,13 @@ impl Display for Clause {
             Clause::Finally => write!(f, "`finally` clause"),
         }
     }
+}
+
+#[derive(Debug, Clone, Copy)]
+enum MatchTokenType {
+    Keyword,
+    Identifier,
+    KeywordOrIdentifier,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
