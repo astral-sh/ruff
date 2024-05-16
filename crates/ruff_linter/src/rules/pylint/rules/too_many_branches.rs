@@ -5,9 +5,9 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::identifier::Identifier;
 
 /// ## What it does
-/// Checks for functions or methods with too many branches,
-/// including (nested) `if`, `elif`, `else`, `for` loops,
-/// `try`/`except` clauses and `match`/`case` statements.
+/// Checks for functions or methods with too many branches, including (nested)
+/// `if`, `elif`, and `else` branches, `for` loops, `try`-`except` clauses, and
+/// `match` and `case` statements.
 ///
 /// By default, this rule allows up to 12 branches. This can be configured
 /// using the [`lint.pylint.max-branches`] option.
@@ -17,7 +17,7 @@ use ruff_python_ast::identifier::Identifier;
 /// and maintain than functions or methods with fewer branches.
 ///
 /// ## Example
-/// Instead of:
+/// Given:
 /// ```python
 /// def capital(country):
 ///     if country == "Australia":
@@ -48,7 +48,7 @@ use ruff_python_ast::identifier::Identifier;
 ///         return "Unknown"  # 13th branch
 /// ```
 ///
-/// Use:
+/// Use instead:
 /// ```python
 /// def capital(country):
 ///     capitals = {
@@ -69,7 +69,7 @@ use ruff_python_ast::identifier::Identifier;
 ///     return city
 /// ```
 ///
-/// Instead of:
+/// Given:
 /// ```python
 /// def grades_to_average_number(grades):
 ///     numbers = []
@@ -109,7 +109,7 @@ use ruff_python_ast::identifier::Identifier;
 ///         return 0
 /// ```
 ///
-/// Use:
+/// Use instead:
 /// ```python
 /// def grades_to_average_number(grades):
 ///     grade_values = {"F": 0.0, "E": 0.0, "D": 1.0, "C": 2.0, "B": 3.0, "A": 4.0}
