@@ -5,8 +5,9 @@
 //!
 //! [CPython source]: https://github.com/python/cpython/blob/dfc2e065a2e71011017077e549cd2f9bf4944c54/Grammar/Tokens
 
-use ruff_python_ast::{AnyStringFlags, BoolOp, Int, IpyEscapeKind, Operator, UnaryOp};
 use std::fmt;
+
+use ruff_python_ast::{AnyStringFlags, BoolOp, Int, IpyEscapeKind, Operator, UnaryOp};
 
 /// The set of tokens the Python source code can be tokenized in.
 #[derive(Clone, Debug, PartialEq, is_macro::Is)]
@@ -59,7 +60,9 @@ pub enum Tok {
     /// Token value for the end of an f-string. This includes the closing quote.
     FStringEnd,
     /// Token value for IPython escape commands. These are recognized by the lexer
-    /// only when the mode is [`Mode::Ipython`].
+    /// only when the mode is [`Ipython`].
+    ///
+    /// [`Ipython`]: crate::Mode::Ipython
     IpyEscapeCommand {
         /// The magic command value.
         value: Box<str>,
@@ -78,7 +81,9 @@ pub enum Tok {
     /// Token value for a dedent.
     Dedent,
     EndOfFile,
-    /// Token value for a question mark `?`. This is only used in [`Mode::Ipython`].
+    /// Token value for a question mark `?`. This is only used in [`Ipython`].
+    ///
+    /// [`Ipython`]: crate::Mode::Ipython
     Question,
     /// Token value for a exclamation mark `!`.
     Exclamation,
