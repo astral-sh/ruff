@@ -181,8 +181,8 @@ fn num_branches(stmts: &[Stmt]) -> usize {
                     .map(|case| num_branches(&case.body))
                     .sum::<usize>()
             }
-            Stmt::With(ast::StmtWith { body, .. }) => num_branches(body), // The `with` statement
-            // is not considered a branch but the statements inside the `with` should be counted
+            // The `with` statement is not considered a branch but the statements inside the `with` should be counted.
+            Stmt::With(ast::StmtWith { body, .. }) => num_branches(body),
             Stmt::For(ast::StmtFor { body, orelse, .. })
             | Stmt::While(ast::StmtWhile { body, orelse, .. }) => {
                 1 + num_branches(body)
