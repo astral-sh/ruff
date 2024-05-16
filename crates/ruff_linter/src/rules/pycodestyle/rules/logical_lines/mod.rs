@@ -252,19 +252,19 @@ impl<'a> LogicalLine<'a> {
     }
 
     // Checks if the line contains explicit line joins, i.e. backslashes
-    pub(crate) fn contains_backslash(&self, indexer: &Indexer) -> bool {
+    pub(crate) fn contains_backslash(&self, locator: &Locator, indexer: &Indexer) -> bool {
         let Some(first_token) = self.tokens().first() else {
             return false;
         };
+        let line_start = locator.line_start(first_token.start());
         let last_token = self.tokens().last().unwrap();
         let continuation_lines = indexer.continuation_line_starts();
         let start_index = continuation_lines
-            .binary_search(&first_token.start())
+            .binary_search(&line_start)
             .unwrap_or_else(|err_index| err_index);
         let end_index = continuation_lines
             .binary_search(&last_token.start())
             .unwrap_or_else(|err_index| err_index);
-
         end_index > start_index
     }
 }

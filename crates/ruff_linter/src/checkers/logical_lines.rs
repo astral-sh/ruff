@@ -80,7 +80,9 @@ pub(crate) fn check_logical_lines(
         }
 
         if settings.rules.enabled(Rule::RedundantBackslash) {
-            if line.flags().contains(TokenFlags::BRACKET) && line.contains_backslash(indexer) {
+            if line.flags().contains(TokenFlags::BRACKET)
+                && line.contains_backslash(locator, indexer)
+            {
                 redundant_backslash(&line, locator, indexer, &mut context);
             }
         }
@@ -117,7 +119,7 @@ pub(crate) fn check_logical_lines(
             if line
                 .flags()
                 .contains(TokenFlags::NON_LOGICAL_NEWLINE | TokenFlags::BRACKET)
-                || line.contains_backslash(indexer)
+                || line.contains_backslash(locator, indexer)
             {
                 continuation_lines(
                     &line,
