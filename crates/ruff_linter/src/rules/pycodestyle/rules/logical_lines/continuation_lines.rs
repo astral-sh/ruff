@@ -222,13 +222,13 @@ pub(crate) fn continuation_lines(
     } else {
         vec![indent_size]
     };
-    // Remember how many brackets were opened on each line.
-    let mut parens = vec![0; nb_physical_lines];
+    // Record when a bracket is opened on each line.
+    let mut brackets_opened = 0u32;
     // Relative indents of physical lines.
     let mut rel_indent: Vec<i64> = vec![0; nb_physical_lines];
     // For each depth, collect a list of opening rows.
     let mut open_rows = vec![vec![0]];
-    // For each depth, memorize the hanging indentation.
+    // For each depth, record the hanging indentation.
     let mut hangs: Vec<Option<i64>> = vec![None];
     let mut hang: i64 = 0;
     let mut hanging_indent: bool = false;
@@ -237,13 +237,14 @@ pub(crate) fn continuation_lines(
     let mut last_indent = start_indent_level;
     let mut visual_indent;
     let mut last_token_multiline = false;
-    // For each depth, memorize the visual indent column.
+    // For each depth, record the visual indent column.
     let mut indent = vec![start_indent_level];
 
     for (token, token_info) in zip(line.tokens(), &token_infos) {
         let mut is_newline = row < token_info.start_physical_line_idx;
         if is_newline {
             row = token_info.start_physical_line_idx;
+            brackets_opened = 0;
             is_newline = !last_token_multiline
                 && !matches!(
                     token.kind,
@@ -316,7 +317,7 @@ pub(crate) fn continuation_lines(
         }
 
         // Look for visual indenting.
-        if parens[row] != 0
+        if brackets_opened != 0
             && !matches!(
                 token.kind,
                 TokenKind::Newline | TokenKind::NonLogicalNewline | TokenKind::Comment
@@ -379,7 +380,7 @@ pub(crate) fn continuation_lines(
                     open_rows.push(Vec::new());
                 }
                 open_rows[depth].push(row);
-                parens[row] += 1;
+                brackets_opened += 1;
             } else if is_closing_bracket && depth > 0 {
                 // Parent indents should not be more than this one.
                 let prev_indent = if let Some(i) = indent.pop() {
@@ -403,11 +404,8 @@ pub(crate) fn continuation_lines(
                 if depth > 0 {
                     indent_chances.insert(indent[depth], IndentFlag::Standard);
                 }
-                for idx in (0..=row).rev() {
-                    if parens[idx] != 0 {
-                        parens[idx] -= 1;
-                        break;
-                    }
+                if brackets_opened > 0 {
+                    brackets_opened -= 1;
                 }
             }
             indent_chances
