@@ -352,7 +352,7 @@ impl fmt::Display for Tok {
 ///
 /// This is a lightweight representation of [`Tok`] which doesn't contain any information
 /// about the token itself.
-#[derive(Copy, Clone, PartialEq, Eq, Hash, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash, Debug, PartialOrd, Ord)]
 pub enum TokenKind {
     /// Token value for a name, commonly known as an identifier.
     Name,
@@ -485,12 +485,10 @@ pub enum TokenKind {
     /// Token value for ellipsis `...`.
     Ellipsis,
 
-    // Self documenting.
-    // Keywords (alphabetically):
-    False,
-    None,
-    True,
+    // The keywords should be sorted in alphabetical order. If the boundary tokens for the
+    // "Keywords" and "Soft keywords" group change, update the related methods on `TokenKind`.
 
+    // Keywords
     And,
     As,
     Assert,
@@ -504,6 +502,7 @@ pub enum TokenKind {
     Elif,
     Else,
     Except,
+    False,
     Finally,
     For,
     From,
@@ -513,19 +512,23 @@ pub enum TokenKind {
     In,
     Is,
     Lambda,
+    None,
     Nonlocal,
     Not,
     Or,
     Pass,
     Raise,
     Return,
+    True,
     Try,
     While,
-    Match,
-    Type,
-    Case,
     With,
     Yield,
+
+    // Soft keywords
+    Case,
+    Match,
+    Type,
 
     Unknown,
 }
@@ -536,45 +539,28 @@ impl TokenKind {
         matches!(self, TokenKind::Newline | TokenKind::NonLogicalNewline)
     }
 
+    /// Returns `true` if the token is a keyword (including soft keywords).
+    ///
+    /// See also [`TokenKind::is_soft_keyword`], [`TokenKind::is_non_soft_keyword`].
     #[inline]
-    pub const fn is_keyword(self) -> bool {
-        matches!(
-            self,
-            TokenKind::False
-                | TokenKind::True
-                | TokenKind::None
-                | TokenKind::And
-                | TokenKind::As
-                | TokenKind::Assert
-                | TokenKind::Await
-                | TokenKind::Break
-                | TokenKind::Class
-                | TokenKind::Continue
-                | TokenKind::Def
-                | TokenKind::Del
-                | TokenKind::Elif
-                | TokenKind::Else
-                | TokenKind::Except
-                | TokenKind::Finally
-                | TokenKind::For
-                | TokenKind::From
-                | TokenKind::Global
-                | TokenKind::If
-                | TokenKind::Import
-                | TokenKind::In
-                | TokenKind::Is
-                | TokenKind::Lambda
-                | TokenKind::Nonlocal
-                | TokenKind::Not
-                | TokenKind::Or
-                | TokenKind::Pass
-                | TokenKind::Raise
-                | TokenKind::Return
-                | TokenKind::Try
-                | TokenKind::While
-                | TokenKind::With
-                | TokenKind::Yield
-        )
+    pub fn is_keyword(self) -> bool {
+        TokenKind::And <= self && self <= TokenKind::Type
+    }
+
+    /// Returns `true` if the token is strictly a soft keyword.
+    ///
+    /// See also [`TokenKind::is_keyword`], [`TokenKind::is_non_soft_keyword`].
+    #[inline]
+    pub fn is_soft_keyword(self) -> bool {
+        TokenKind::Case <= self && self <= TokenKind::Type
+    }
+
+    /// Returns `true` if the token is strictly a non-soft keyword.
+    ///
+    /// See also [`TokenKind::is_keyword`], [`TokenKind::is_soft_keyword`].
+    #[inline]
+    pub fn is_non_soft_keyword(self) -> bool {
+        TokenKind::And <= self && self <= TokenKind::Yield
     }
 
     #[inline]
@@ -683,11 +669,6 @@ impl TokenKind {
                 | TokenKind::CircumflexEqual
                 | TokenKind::Tilde
         )
-    }
-
-    #[inline]
-    pub const fn is_soft_keyword(self) -> bool {
-        matches!(self, TokenKind::Match | TokenKind::Case)
     }
 
     /// Returns `true` if the current token is a unary arithmetic operator.
