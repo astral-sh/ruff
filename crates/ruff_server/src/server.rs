@@ -11,6 +11,7 @@ use types::CodeActionOptions;
 use types::DiagnosticOptions;
 use types::DidChangeWatchedFilesRegistrationOptions;
 use types::FileSystemWatcher;
+use types::NotebookCellSelector;
 use types::NotebookDocumentSyncOptions;
 use types::NotebookSelector;
 use types::OneOf;
@@ -257,15 +258,11 @@ impl Server {
             hover_provider: Some(types::HoverProviderCapability::Simple(true)),
             notebook_document_sync: Some(types::OneOf::Left(NotebookDocumentSyncOptions {
                 save: Some(false),
-                notebook_selector: [NotebookSelector::ByNotebook {
-                    notebook: types::Notebook::NotebookDocumentFilter(
-                        types::NotebookDocumentFilter::ByType {
-                            notebook_type: "jupyter-notebook".to_string(),
-                            scheme: Some("file".to_string()),
-                            pattern: None,
-                        },
-                    ),
-                    cells: None,
+                notebook_selector: [NotebookSelector::ByCells {
+                    notebook: None,
+                    cells: vec![NotebookCellSelector {
+                        language: "python".to_string(),
+                    }],
                 }]
                 .to_vec(),
             })),
