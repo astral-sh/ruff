@@ -1,4 +1,5 @@
-use serde::Serialize;
+use serde::{Serialize, Serializer};
+use std::collections::BTreeMap;
 
 use std::fmt::{Debug, Display, Formatter};
 
@@ -42,11 +43,12 @@ where
 
 /// Metadata of an option that can either be a [`OptionField`] or [`OptionSet`].
 #[derive(Clone, PartialEq, Eq, Debug, Serialize)]
+#[serde(untagged)]
 pub enum OptionEntry {
     /// A single option.
     Field(OptionField),
 
-    /// A set of options
+    /// A set of options.
     Set(OptionSet),
 }
 
@@ -63,11 +65,9 @@ impl Display for OptionEntry {
 ///
 /// It extracts the options by calling the [`OptionsMetadata::record`] of a type implementing
 /// [`OptionsMetadata`].
-#[derive(Copy, Clone, Eq, PartialEq, Serialize)]
+#[derive(Copy, Clone, Eq, PartialEq)]
 pub struct OptionSet {
-    #[serde(skip_serializing)]
     record: fn(&mut dyn Visit),
-    #[serde(skip_serializing)]
     doc: fn() -> Option<&'static str>,
 }
 
@@ -326,6 +326,44 @@ impl Display for OptionSet {
         let mut visitor = DisplayVisitor::new(f);
         self.record(&mut visitor);
         visitor.finish()
+    }
+}
+
+struct SerializeVisitor<'a> {
+    entries: &'a mut BTreeMap<String, OptionField>,
+}
+
+impl<'a> Visit for SerializeVisitor<'a> {
+    fn record_set(&mut self, name: &str, set: OptionSet) {
+        // Collect the entries of the set.
+        let mut entries = BTreeMap::new();
+        let mut visitor = SerializeVisitor {
+            entries: &mut entries,
+        };
+        set.record(&mut visitor);
+
+        // Insert the set into the entries.
+        for (key, value) in entries {
+            self.entries.insert(format!("{name}.{key}"), value);
+        }
+    }
+
+    fn record_field(&mut self, name: &str, field: OptionField) {
+        self.entries.insert(name.to_string(), field);
+    }
+}
+
+impl Serialize for OptionSet {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut entries = BTreeMap::new();
+        let mut visitor = SerializeVisitor {
+            entries: &mut entries,
+        };
+        self.record(&mut visitor);
+        entries.serialize(serializer)
     }
 }
 
