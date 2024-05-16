@@ -3,6 +3,7 @@ use crate::server::api::LSPResult;
 use crate::server::client::{Notifier, Requester};
 use crate::server::Result;
 use crate::session::Session;
+use lsp_server::ErrorCode;
 use lsp_types as types;
 use lsp_types::notification as notif;
 
@@ -26,11 +27,13 @@ impl super::SyncNotificationHandler for DidChange {
             content_changes,
         }: types::DidChangeTextDocumentParams,
     ) -> Result<()> {
-        let key = session.key_from_url(&uri);
+        let key = session
+            .key_from_url(&uri)
+            .with_failure_code(ErrorCode::InternalError)?;
 
         session
             .update_text_document(&key, content_changes, new_version)
-            .with_failure_code(lsp_server::ErrorCode::InternalError)?;
+            .with_failure_code(ErrorCode::InternalError)?;
 
         // Publish diagnostics if the client doesnt support pull diagnostics
         if !session.resolved_client_capabilities().pull_diagnostics {

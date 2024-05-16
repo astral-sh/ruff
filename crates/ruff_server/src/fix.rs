@@ -70,6 +70,13 @@ pub(crate) fn fix_all(
     if let (Some(source_notebook), Some(modified_notebook)) =
         (source_kind.as_ipy_notebook(), transformed.as_ipy_notebook())
     {
+        fn cell_source(cell: &ruff_notebook::Cell) -> String {
+            match cell.source() {
+                SourceValue::String(string) => string.clone(),
+                SourceValue::StringArray(array) => array.join(""),
+            }
+        }
+
         let Some(notebook) = query.as_notebook() else {
             anyhow::bail!("Notebook document expected from notebook source kind");
         };
@@ -77,19 +84,8 @@ pub(crate) fn fix_all(
         for ((source, modified), url) in source_notebook
             .cells()
             .iter()
-            .map(|cell| match cell.source() {
-                SourceValue::String(string) => string.clone(),
-                SourceValue::StringArray(array) => array.join(""),
-            })
-            .zip(
-                modified_notebook
-                    .cells()
-                    .iter()
-                    .map(|cell| match cell.source() {
-                        SourceValue::String(string) => string.clone(),
-                        SourceValue::StringArray(array) => array.join(""),
-                    }),
-            )
+            .map(cell_source)
+            .zip(modified_notebook.cells().iter().map(cell_source))
             .zip(notebook.urls())
         {
             let source_index = LineIndex::from_source_text(&source);

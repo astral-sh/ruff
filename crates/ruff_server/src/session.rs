@@ -7,6 +7,7 @@ mod settings;
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use anyhow::anyhow;
 use lsp_types::{ClientCapabilities, NotebookDocumentCellChange, Url};
 
 use crate::edit::{DocumentKey, DocumentVersion, NotebookDocument};
@@ -54,13 +55,15 @@ impl Session {
         }
     }
 
-    pub(crate) fn key_from_url(&self, url: &lsp_types::Url) -> DocumentKey {
-        self.index.key_from_url(url)
+    pub(crate) fn key_from_url(&self, url: &lsp_types::Url) -> crate::Result<DocumentKey> {
+        self.index
+            .key_from_url(url)
+            .ok_or_else(|| anyhow!("No document found for {url}"))
     }
 
     /// Creates a document snapshot with the URL referencing the document to snapshot.
     pub(crate) fn take_snapshot(&self, url: &Url) -> Option<DocumentSnapshot> {
-        let key = self.key_from_url(url);
+        let key = self.key_from_url(url).ok()?;
         Some(DocumentSnapshot {
             resolved_client_capabilities: self.resolved_client_capabilities.clone(),
             client_settings: self.index.client_settings(&key, &self.global_settings),

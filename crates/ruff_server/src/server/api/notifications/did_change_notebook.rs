@@ -23,7 +23,9 @@ impl super::SyncNotificationHandler for DidChangeNotebook {
             change: types::NotebookDocumentChangeEvent { cells, metadata },
         }: types::DidChangeNotebookDocumentParams,
     ) -> Result<()> {
-        let key = session.key_from_url(&uri);
+        let key = session
+            .key_from_url(&uri)
+            .with_failure_code(ErrorCode::InternalError)?;
         session
             .update_notebook_document(&key, cells, metadata, version)
             .with_failure_code(ErrorCode::InternalError)?;

@@ -48,7 +48,7 @@ enum DocumentController {
 }
 
 /// A read-only query to an open document.
-/// This query can 'select' a text document, full notebook, or notebook cell.
+/// This query can 'select' a text document, full notebook, or a specific notebook cell.
 /// It also includes document settings.
 #[derive(Clone)]
 pub(crate) enum DocumentQuery {
@@ -58,8 +58,7 @@ pub(crate) enum DocumentQuery {
         settings: Arc<RuffSettings>,
     },
     Notebook {
-        /// The selected notebook cell.
-        /// If this is `None`, the entire notebook file is selected.
+        /// The selected notebook cell, if it exists.
         cell_uri: Option<lsp_types::Url>,
         file_path: PathBuf,
         notebook: Arc<NotebookDocument>,
@@ -96,12 +95,7 @@ impl Index {
         new_version: DocumentVersion,
         encoding: PositionEncoding,
     ) -> crate::Result<()> {
-        let Some(path) = self.path_for_key(key).cloned() else {
-            anyhow::bail!("Tried to open unavailable document `{key}`");
-        };
-        let Some(controller) = self.documents.get_mut(&path) else {
-            anyhow::bail!("Document controller not available at `{}`", path.display());
-        };
+        let controller = self.document_controller_for_key(key)?;
         let Some(document) = controller.as_text_mut() else {
             anyhow::bail!("Text document URI does not point to a text document");
         };
@@ -116,22 +110,22 @@ impl Index {
         Ok(())
     }
 
-    pub(super) fn key_from_url(&self, url: &lsp_types::Url) -> DocumentKey {
+    pub(super) fn key_from_url(&self, url: &lsp_types::Url) -> Option<DocumentKey> {
         if self.notebook_cells.contains_key(url) {
-            return DocumentKey::NotebookCell(url.clone());
+            return Some(DocumentKey::NotebookCell(url.clone()));
         }
-        let path = url
-            .to_file_path()
-            .expect("non-notebook cell URL should be a valid path");
-        match path
-            .extension()
-            .unwrap_or_default()
-            .to_str()
-            .unwrap_or_default()
-        {
-            "ipynb" => DocumentKey::Notebook(path),
-            _ => DocumentKey::Text(path),
-        }
+        let path = url.to_file_path().ok()?;
+        Some(
+            match path
+                .extension()
+                .unwrap_or_default()
+                .to_str()
+                .unwrap_or_default()
+            {
+                "ipynb" => DocumentKey::Notebook(path),
+                _ => DocumentKey::Text(path),
+            },
+        )
     }
 
     pub(super) fn update_notebook_document(
@@ -142,10 +136,6 @@ impl Index {
         new_version: DocumentVersion,
         encoding: PositionEncoding,
     ) -> crate::Result<()> {
-        let Some(path) = self.path_for_key(key).cloned() else {
-            anyhow::bail!("Tried to open unavailable document `{key}`");
-        };
-
         // update notebook cell index
         if let Some(lsp_types::NotebookDocumentCellChangeStructure {
             did_open,
@@ -153,6 +143,10 @@ impl Index {
             ..
         }) = cells.as_ref().and_then(|cells| cells.structure.as_ref())
         {
+            let Some(path) = self.path_for_key(key).cloned() else {
+                anyhow::bail!("Tried to open unavailable document `{key}`");
+            };
+
             for opened_cell in did_open.iter().flatten() {
                 self.notebook_cells
                     .insert(opened_cell.uri.clone(), path.clone());
@@ -167,9 +161,7 @@ impl Index {
             }
         }
 
-        let Some(controller) = self.documents.get_mut(&path) else {
-            anyhow::bail!("Document controller not available at `{}`", path.display());
-        };
+        let controller = self.document_controller_for_key(key)?;
         let Some(notebook) = controller.as_notebook_mut() else {
             anyhow::bail!("Notebook document URI does not point to a notebook document");
         };
@@ -304,6 +296,19 @@ impl Index {
             return ResolvedClientSettings::global(global_settings);
         };
         client_settings.clone()
+    }
+
+    fn document_controller_for_key(
+        &mut self,
+        key: &DocumentKey,
+    ) -> crate::Result<&mut DocumentController> {
+        let Some(path) = self.path_for_key(key).cloned() else {
+            anyhow::bail!("Tried to open unavailable document `{key}`");
+        };
+        let Some(controller) = self.documents.get_mut(&path) else {
+            anyhow::bail!("Document controller not available at `{}`", path.display());
+        };
+        Ok(controller)
     }
 
     fn path_for_key<'a>(&'a self, key: &'a DocumentKey) -> Option<&'a PathBuf> {

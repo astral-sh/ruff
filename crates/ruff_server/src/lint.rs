@@ -15,7 +15,7 @@ use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 use ruff_python_parser::AsMode;
 use ruff_source_file::{LineIndex, Locator};
-use ruff_text_size::Ranged;
+use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 
@@ -127,20 +127,23 @@ pub(crate) fn check(
         }
     }
 
-    for (index, diagnostic) in data
+    let lsp_diagnostics = data
         .into_iter()
         .zip(noqa_edits)
         .map(|(diagnostic, noqa_edit)| {
             to_lsp_diagnostic(diagnostic, &noqa_edit, &source_kind, &index, encoding)
-        })
-    {
-        if let Some(notebook) = query.as_notebook() {
+        });
+
+    if let Some(notebook) = query.as_notebook() {
+        for (index, diagnostic) in lsp_diagnostics {
             let Some(uri) = notebook.cell_uri_by_index(index) else {
                 tracing::warn!("Unable to find notebook cell at index {index}.");
                 continue;
             };
             diagnostics.entry(uri.clone()).or_default().push(diagnostic);
-        } else {
+        }
+    } else {
+        for (_, diagnostic) in lsp_diagnostics {
             diagnostics
                 .entry(query.make_key().into_url())
                 .or_default()
@@ -208,42 +211,12 @@ fn to_lsp_diagnostic(
                 .into_iter()
                 .flat_map(Fix::edits)
                 .map(|edit| lsp_types::TextEdit {
-                    range: if let Some(notebook_index) =
-                        source_kind.as_ipy_notebook().map(Notebook::index)
-                    {
-                        edit.range()
-                            .to_notebook_range(
-                                source_kind.source_code(),
-                                index,
-                                notebook_index,
-                                encoding,
-                            )
-                            .range
-                    } else {
-                        edit.range()
-                            .to_range(source_kind.source_code(), index, encoding)
-                    },
+                    range: diagnostic_edit_range(edit.range(), source_kind, index, encoding),
                     new_text: edit.content().unwrap_or_default().to_string(),
                 })
                 .collect();
             let noqa_edit = noqa_edit.as_ref().map(|noqa_edit| lsp_types::TextEdit {
-                range: if let Some(notebook_index) =
-                    source_kind.as_ipy_notebook().map(Notebook::index)
-                {
-                    noqa_edit
-                        .range()
-                        .to_notebook_range(
-                            source_kind.source_code(),
-                            index,
-                            notebook_index,
-                            encoding,
-                        )
-                        .range
-                } else {
-                    noqa_edit
-                        .range()
-                        .to_range(source_kind.source_code(), index, encoding)
-                },
+                range: diagnostic_edit_range(noqa_edit.range(), source_kind, index, encoding),
                 new_text: noqa_edit.content().unwrap_or_default().to_string(),
             });
             serde_json::to_value(AssociatedDiagnosticData {
@@ -291,6 +264,21 @@ fn to_lsp_diagnostic(
             data,
         },
     )
+}
+
+fn diagnostic_edit_range(
+    range: TextRange,
+    source_kind: &SourceKind,
+    index: &LineIndex,
+    encoding: PositionEncoding,
+) -> lsp_types::Range {
+    if let Some(notebook_index) = source_kind.as_ipy_notebook().map(Notebook::index) {
+        range
+            .to_notebook_range(source_kind.source_code(), index, notebook_index, encoding)
+            .range
+    } else {
+        range.to_range(source_kind.source_code(), index, encoding)
+    }
 }
 
 fn severity(code: &str) -> lsp_types::DiagnosticSeverity {
