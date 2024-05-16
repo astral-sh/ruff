@@ -283,7 +283,8 @@ pub(crate) fn continuation_lines(
             last_indent = token_info.token_start_within_physical_line;
 
             // Record the initial indent.
-            rel_indent[row] = expand_indent(locator.full_lines(token.range)) - start_indent_level;
+            let indent_range = TextRange::new(locator.line_start(token.start()), token.start());
+            rel_indent[row] = expand_indent(locator.slice(indent_range)) - start_indent_level;
 
             // Is the indent relative to an opening bracket line ?
             for open_row in open_rows[depth].iter().rev() {
