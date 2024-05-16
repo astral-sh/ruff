@@ -13,6 +13,7 @@ mod tests {
     use crate::assert_messages;
     use crate::registry::Rule;
 
+    use crate::settings::types::PreviewMode;
     use crate::settings::LinterSettings;
     use crate::test::test_path;
 
@@ -69,6 +70,26 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_bugbear").join(path).as_path(),
             &LinterSettings::for_rule(rule_code),
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::UselessExpression, Path::new("B018.ipynb"))]
+    #[test_case(Rule::UselessExpression, Path::new("B018.py"))]
+    #[test_case(Rule::UselessExpression, Path::new("B018_attribute_docstring.py"))]
+    fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "preview__{}_{}",
+            rule_code.noqa_code(),
+            path.to_string_lossy()
+        );
+        let diagnostics = test_path(
+            Path::new("flake8_bugbear").join(path).as_path(),
+            &LinterSettings {
+                preview: PreviewMode::Enabled,
+                ..LinterSettings::for_rule(rule_code)
+            },
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())

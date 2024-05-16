@@ -1,0 +1,165 @@
+---
+source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
+---
+B018_attribute_docstring.py:10:1: B018 Found useless expression. Either assign it to a variable or remove it.
+   |
+ 8 | b = 1
+ 9 | "b: docstring" " continue"
+10 | "b: not a docstring"
+   | ^^^^^^^^^^^^^^^^^^^^ B018
+11 | 
+12 | c: int = 1
+   |
+
+B018_attribute_docstring.py:20:5: B018 Found useless expression. Either assign it to a variable or remove it.
+   |
+18 | if True:
+19 |     d = 1
+20 |     "d: not a docstring"
+   |     ^^^^^^^^^^^^^^^^^^^^ B018
+21 | 
+22 | (e := 1)
+   |
+
+B018_attribute_docstring.py:22:2: B018 Found useless expression. Either assign it to a variable or remove it.
+   |
+20 |     "d: not a docstring"
+21 | 
+22 | (e := 1)
+   |  ^^^^^^ B018
+23 | "e: not a docstring"
+   |
+
+B018_attribute_docstring.py:23:1: B018 Found useless expression. Either assign it to a variable or remove it.
+   |
+22 | (e := 1)
+23 | "e: not a docstring"
+   | ^^^^^^^^^^^^^^^^^^^^ B018
+24 | 
+25 | f = 0
+   |
+
+B018_attribute_docstring.py:27:1: B018 Found useless expression. Either assign it to a variable or remove it.
+   |
+25 | f = 0
+26 | f += 1
+27 | "f: not a docstring"
+   | ^^^^^^^^^^^^^^^^^^^^ B018
+28 | 
+29 | g.h = 1
+   |
+
+B018_attribute_docstring.py:30:1: B018 Found useless expression. Either assign it to a variable or remove it.
+   |
+29 | g.h = 1
+30 | "g.h: not a docstring"
+   | ^^^^^^^^^^^^^^^^^^^^^^ B018
+31 | 
+32 | (i) = 1
+   |
+
+B018_attribute_docstring.py:42:1: B018 Found useless expression. Either assign it to a variable or remove it.
+   |
+41 | l = m = 1
+42 | "l m: not a docstring"
+   | ^^^^^^^^^^^^^^^^^^^^^^ B018
+43 | 
+44 | n.a = n.b = n.c = 1
+   |
+
+B018_attribute_docstring.py:45:1: B018 Found useless expression. Either assign it to a variable or remove it.
+   |
+44 | n.a = n.b = n.c = 1
+45 | "n.*: not a docstring"
+   | ^^^^^^^^^^^^^^^^^^^^^^ B018
+46 | 
+47 | (o, p) = (1, 2)
+   |
+
+B018_attribute_docstring.py:48:1: B018 Found useless expression. Either assign it to a variable or remove it.
+   |
+47 | (o, p) = (1, 2)
+48 | "o p: not a docstring"
+   | ^^^^^^^^^^^^^^^^^^^^^^ B018
+49 | 
+50 | [q, r] = [1, 2]
+   |
+
+B018_attribute_docstring.py:51:1: B018 Found useless expression. Either assign it to a variable or remove it.
+   |
+50 | [q, r] = [1, 2]
+51 | "q r: not a docstring"
+   | ^^^^^^^^^^^^^^^^^^^^^^ B018
+52 | 
+53 | *s = 1
+   |
+
+B018_attribute_docstring.py:54:1: B018 Found useless expression. Either assign it to a variable or remove it.
+   |
+53 | *s = 1
+54 | "s: not a docstring"
+   | ^^^^^^^^^^^^^^^^^^^^ B018
+   |
+
+B018_attribute_docstring.py:63:5: B018 Found useless expression. Either assign it to a variable or remove it.
+   |
+61 |     b: int
+62 |     "Foo.b: docstring"
+63 |     "Foo.b: not a docstring"
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^ B018
+64 | 
+65 |     c: int = 1
+   |
+
+B018_attribute_docstring.py:71:9: B018 Found useless expression. Either assign it to a variable or remove it.
+   |
+69 |         # This is actually a docstring but we currently don't detect it.
+70 |         self.x = 1
+71 |         "self.x: not a docstring"
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^ B018
+72 | 
+73 |         t = 2
+   |
+
+B018_attribute_docstring.py:74:9: B018 Found useless expression. Either assign it to a variable or remove it.
+   |
+73 |         t = 2
+74 |         "t: not a docstring"
+   |         ^^^^^^^^^^^^^^^^^^^^ B018
+75 | 
+76 |     def random(self):
+   |
+
+B018_attribute_docstring.py:78:9: B018 Found useless expression. Either assign it to a variable or remove it.
+   |
+76 |     def random(self):
+77 |         self.y = 2
+78 |         "self.y: not a docstring"
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^ B018
+79 | 
+80 |         u = 2
+   |
+
+B018_attribute_docstring.py:81:9: B018 Found useless expression. Either assign it to a variable or remove it.
+   |
+80 |         u = 2
+81 |         "u: not a docstring"
+   |         ^^^^^^^^^^^^^^^^^^^^ B018
+82 | 
+83 |     def add(self, y: int):
+   |
+
+B018_attribute_docstring.py:89:5: B018 Found useless expression. Either assign it to a variable or remove it.
+   |
+87 | def function():
+88 |     v = 2
+89 |     "v: not a docstring"
+   |     ^^^^^^^^^^^^^^^^^^^^ B018
+   |
+
+B018_attribute_docstring.py:93:1: B018 Found useless expression. Either assign it to a variable or remove it.
+   |
+92 | function.a = 1
+93 | "function.a: not a docstring"
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ B018
+   |

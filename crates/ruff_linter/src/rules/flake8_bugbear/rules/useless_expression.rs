@@ -73,7 +73,12 @@ pub(crate) fn useless_expression(checker: &mut Checker, value: &Expr) {
         return;
     }
 
-    if checker.semantic().in_pep_257_docstring() || checker.semantic().in_attribute_docstring() {
+    if checker.settings.preview.is_enabled() {
+        if checker.semantic().in_pep_257_docstring() || checker.semantic().in_attribute_docstring()
+        {
+            return;
+        }
+    } else if matches!(value, Expr::StringLiteral(_) | Expr::FString(_)) {
         return;
     }
 
