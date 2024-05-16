@@ -29,8 +29,12 @@ pub(super) fn format_document(snapshot: &DocumentSnapshot) -> Result<super::Form
         .as_single_document()
         .expect("hover should only be called on text documents or notebook cells");
     let source = doc.contents();
-    let formatted = crate::format::format(doc, snapshot.query().settings().formatter())
-        .with_failure_code(lsp_server::ErrorCode::InternalError)?;
+    let formatted = crate::format::format(
+        doc,
+        snapshot.query().source_type(),
+        snapshot.query().settings().formatter(),
+    )
+    .with_failure_code(lsp_server::ErrorCode::InternalError)?;
     // fast path - if the code is the same, return early
     if formatted == source {
         return Ok(None);

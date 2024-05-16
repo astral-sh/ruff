@@ -24,9 +24,13 @@ impl super::BackgroundDocumentRequestHandler for FormatRange {
         let text = document.contents();
         let index = document.index();
         let range = params.range.to_text_range(text, index, snapshot.encoding());
-        let formatted_range =
-            crate::format::format_range(document, snapshot.query().settings().formatter(), range)
-                .with_failure_code(lsp_server::ErrorCode::InternalError)?;
+        let formatted_range = crate::format::format_range(
+            document,
+            snapshot.query().source_type(),
+            snapshot.query().settings().formatter(),
+            range,
+        )
+        .with_failure_code(lsp_server::ErrorCode::InternalError)?;
         Ok(Some(vec![types::TextEdit {
             range: formatted_range
                 .source_range()
