@@ -1,3 +1,4 @@
+use std::cmp::max;
 use std::iter::zip;
 
 use super::{LogicalLine, LogicalLineToken};
@@ -177,9 +178,25 @@ fn expand_indent(line: &str) -> i64 {
     indent
 }
 
+fn calculate_max_depth(logical_line: &LogicalLine) -> usize {
+    let mut depth = 0;
+    let mut max_depth = 0;
+    for token in logical_line.tokens() {
+        match token.kind {
+            TokenKind::Lpar | TokenKind::Lsqb | TokenKind::Lbrace => {
+                depth += 1;
+                max_depth = max(max_depth, depth);
+            }
+            TokenKind::Rpar | TokenKind::Rsqb | TokenKind::Rbrace => depth -= 1,
+            _ => continue,
+        }
+    }
+    max_depth
+}
+
 /// E122
 pub(crate) fn continuation_lines(
-    line: &LogicalLine,
+    logical_line: &LogicalLine,
     indent_char: char,
     indent_size: usize,
     locator: &Locator,
@@ -189,7 +206,7 @@ pub(crate) fn continuation_lines(
     // The pycodestyle implementation makes use of negative values,
     // converting the indent_size type at the start avoids converting it multiple times later.
     let indent_size = i64::try_from(indent_size).expect("Indent size to be relatively small.");
-    let token_infos = get_token_infos(line, locator, indexer);
+    let token_infos = get_token_infos(logical_line, locator, indexer);
     let nb_physical_lines = if let Some(last_token_info) = token_infos.last() {
         1 + last_token_info.start_physical_line_idx
     } else {
@@ -203,7 +220,8 @@ pub(crate) fn continuation_lines(
     // Indent of the first physical line.
     let start_indent_level = expand_indent(
         locator.line(
-            line.first_token()
+            logical_line
+                .first_token()
                 .expect("Would have returned earlier if the logical line was empty")
                 .start(),
         ),
@@ -212,17 +230,18 @@ pub(crate) fn continuation_lines(
     // indent_next tells us whether the next block is indented.
     // Assuming that it is indented by 4 spaces, then we should not allow 4-space indents on the final continuation line.
     // In turn, some other indents are allowed to have an extra 4 spaces.
-    let indent_next = line.text().trim_end().ends_with(':');
+    let indent_next = logical_line.text().trim_end().ends_with(':');
 
     // Here "row" is the physical line index (within the logical line).
     let mut row = 0;
     let mut depth = 0;
+    let max_depth = calculate_max_depth(logical_line);
     let valid_hangs = if indent_char == '\t' {
         vec![indent_size, indent_size * 2]
     } else {
         vec![indent_size]
     };
-    // Record when a bracket is opened on each line.
+    // Brackets opened on a line.
     let mut brackets_opened = 0u32;
     // Relative indents of physical lines.
     let mut rel_indent: Vec<i64> = vec![0; nb_physical_lines];
@@ -238,9 +257,10 @@ pub(crate) fn continuation_lines(
     let mut visual_indent;
     let mut last_token_multiline = false;
     // For each depth, record the visual indent column.
-    let mut indent = vec![start_indent_level];
+    let mut indent = vec![0; max_depth + 1];
+    indent[0] = start_indent_level;
 
-    for (token, token_info) in zip(line.tokens(), &token_infos) {
+    for (token, token_info) in zip(logical_line.tokens(), &token_infos) {
         let mut is_newline = row < token_info.start_physical_line_idx;
         if is_newline {
             row = token_info.start_physical_line_idx;
@@ -374,7 +394,7 @@ pub(crate) fn continuation_lines(
         if is_opening_bracket || is_closing_bracket {
             if is_opening_bracket {
                 depth += 1;
-                indent.push(0);
+                indent[depth] = 0;
                 hangs.push(None);
                 if open_rows.len() == depth {
                     open_rows.push(Vec::new());
@@ -383,9 +403,9 @@ pub(crate) fn continuation_lines(
                 brackets_opened += 1;
             } else if is_closing_bracket && depth > 0 {
                 // Parent indents should not be more than this one.
-                let prev_indent = if let Some(i) = indent.pop() {
-                    if i > 0 {
-                        i
+                let prev_indent = if let Some(i) = indent.last() {
+                    if *i > 0 {
+                        *i
                     } else {
                         last_indent
                     }
@@ -404,9 +424,7 @@ pub(crate) fn continuation_lines(
                 if depth > 0 {
                     indent_chances.insert(indent[depth], IndentFlag::Standard);
                 }
-                if brackets_opened > 0 {
-                    brackets_opened -= 1;
-                }
+                brackets_opened = brackets_opened.saturating_sub(1);
             }
             indent_chances
                 .entry(token_info.token_start_within_physical_line)
