@@ -32,13 +32,6 @@ impl super::SyncNotificationHandler for DidOpenNotebook {
             cell_text_documents,
         }: types::DidOpenNotebookDocumentParams,
     ) -> Result<()> {
-        if notebook_type != "jupyter-notebook" {
-            return Err(anyhow!(
-                "Tried to open an unsupported notebook type: {notebook_type}"
-            ))
-            .with_failure_code(ErrorCode::InvalidParams);
-        }
-
         let notebook = NotebookDocument::new(
             version,
             cells,
