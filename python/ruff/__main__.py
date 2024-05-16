@@ -12,6 +12,12 @@ def find_ruff_bin() -> str:
     if os.path.isfile(path):
         return path
 
+    # search in bin adjacent to package root (pip install --target)
+    pkg_root = os.path.dirname(os.path.dirname(__file__))
+    path = os.path.join(pkg_root, "bin", ruff_exe)
+    if os.path.isfile(path):
+        return path
+
     if sys.version_info >= (3, 10):
         user_scheme = sysconfig.get_preferred_scheme("user")
     elif os.name == "nt":
