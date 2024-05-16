@@ -1,7 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Expr, Stmt, StmtGlobal};
-use ruff_python_semantic::{BindingKind, ScopeKind};
+use ruff_python_semantic::{BindingKind, Scope, ScopeKind};
 
 use crate::checkers::ast::Checker;
 
@@ -52,6 +52,15 @@ pub(crate) fn global_variable_undefined(checker: &mut Checker, stmt: &Stmt) {
     let Stmt::Global(StmtGlobal { names, range }) = stmt else {
         return;
     };
+
+    if checker
+        .semantic()
+        .current_scopes()
+        .any(Scope::uses_star_imports)
+    {
+        return;
+    }
+
     let Some(module_scope) = checker
         .semantic()
         .current_scopes()

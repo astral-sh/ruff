@@ -68,6 +68,10 @@ mod tests {
         Rule::GlobalVariableUndefined,
         Path::new("global_variable_undefined.py")
     )]
+    #[test_case(
+        Rule::GlobalVariableUndefined,
+        Path::new("global_variable_undefined_star_import.py")
+    )]
     #[test_case(Rule::ImportOutsideTopLevel, Path::new("import_outside_top_level.py"))]
     #[test_case(
         Rule::ImportPrivateName,
