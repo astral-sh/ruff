@@ -64,7 +64,7 @@ fn get_token_infos<'a>(
     locator: &'a Locator,
     indexer: &'a Indexer,
 ) -> Vec<TokenInfo> {
-    let mut token_infos = Vec::new();
+    let mut token_infos = Vec::with_capacity(logical_line.tokens().len());
     let mut current_line_idx: usize = 0;
     // The first physical line occupied by the token, since a token can span multiple physical lines.
     let mut first_physical_line_start: usize;
@@ -194,6 +194,10 @@ fn calculate_max_depth(logical_line: &LogicalLine) -> usize {
     max_depth
 }
 
+fn valid_hang(hang: i64, indent_size: i64, indent_char: char) -> bool {
+    hang == indent_size || (indent_char == '\t' && hang == 2 * indent_size)
+}
+
 /// E122
 pub(crate) fn continuation_lines(
     logical_line: &LogicalLine,
@@ -236,11 +240,6 @@ pub(crate) fn continuation_lines(
     let mut row = 0;
     let mut depth = 0;
     let max_depth = calculate_max_depth(logical_line);
-    let valid_hangs = if indent_char == '\t' {
-        vec![indent_size, indent_size * 2]
-    } else {
-        vec![indent_size]
-    };
     // Brackets opened on a line.
     let mut brackets_opened = 0u32;
     // Relative indents of physical lines.
@@ -289,7 +288,7 @@ pub(crate) fn continuation_lines(
             // Is the indent relative to an opening bracket line ?
             for open_row in open_rows[depth].iter().rev() {
                 hang = rel_indent[row] - rel_indent[*open_row];
-                hanging_indent = valid_hangs.contains(&hang);
+                hanging_indent = valid_hang(hang, indent_size, indent_char);
                 if hanging_indent {
                     break;
                 }
