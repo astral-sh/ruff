@@ -235,7 +235,7 @@ pub(crate) fn continuation_lines(
     // Visual indents
     let mut indent_chances: FxHashMap<i64, IndentFlag> = FxHashMap::default();
     let mut last_indent = start_indent_level;
-    let mut visual_indent: Option<IndentFlag> = None;
+    let mut visual_indent;
     let mut last_token_multiline = false;
     // For each depth, memorize the visual indent column.
     let mut indent = vec![start_indent_level];
