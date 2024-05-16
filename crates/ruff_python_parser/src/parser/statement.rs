@@ -253,11 +253,22 @@ impl<'src> Parser<'src> {
             TokenKind::Assert => Stmt::Assert(self.parse_assert_statement()),
             TokenKind::Global => Stmt::Global(self.parse_global_statement()),
             TokenKind::Nonlocal => Stmt::Nonlocal(self.parse_nonlocal_statement()),
-            TokenKind::Type => Stmt::TypeAlias(self.parse_type_alias_statement()),
             TokenKind::IpyEscapeCommand => {
                 Stmt::IpyEscapeCommand(self.parse_ipython_escape_command_statement())
             }
-            _ => {
+            token => {
+                if token == TokenKind::Type {
+                    // Type is considered a soft keyword, so we will treat it as an identifier if
+                    // it's followed by an unexpected token.
+                    let (first, second) = self.tokens.peek2();
+
+                    if (first == TokenKind::Name || first.is_soft_keyword())
+                        && matches!(second, TokenKind::Lpar | TokenKind::Equal)
+                    {
+                        return Stmt::TypeAlias(self.parse_type_alias_statement());
+                    }
+                }
+
                 let start = self.node_start();
 
                 // simple_stmt: `... | yield_stmt | star_expressions | ...`
