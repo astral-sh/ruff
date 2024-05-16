@@ -16,6 +16,9 @@ use super::super::helpers::at_last_top_level_expression_in_cell;
 /// by mistake. Assign a useless expression to a variable, or remove it
 /// entirely.
 ///
+/// In [preview mode], this rule will also flag string literals and f-strings that
+/// are not used as a docstring or an attribute docstring.
+///
 /// ## Example
 /// ```python
 /// 1 + 1
@@ -45,6 +48,8 @@ use super::super::helpers::at_last_top_level_expression_in_cell;
 /// with errors.ExceptionRaisedContext():
 ///     _ = obj.attribute
 /// ```
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[violation]
 pub struct UselessExpression {
     kind: Kind,
