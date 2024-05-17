@@ -2,20 +2,15 @@ use std::cmp::Ordering;
 
 use bitflags::bitflags;
 
-use ast::Mod;
 use ruff_python_ast as ast;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
-use crate::lexer::lex;
+use crate::lexer::{Token, TokenValue};
+use crate::parser::expression::ExpressionContext;
 use crate::parser::progress::{ParserProgress, TokenId};
-use crate::{
-    lexer::{LexResult, Spanned},
-    token_set::TokenSet,
-    token_source::TokenSource,
-    Mode, ParseError, ParseErrorType, Tok, TokenKind,
-};
-
-use self::expression::ExpressionContext;
+use crate::token_set::TokenSet;
+use crate::token_source::TokenSource;
+use crate::{Mode, ParseError, ParseErrorType, TokenKind};
 
 mod expression;
 mod helpers;
@@ -32,6 +27,7 @@ mod tests;
 #[derive(Debug)]
 pub struct Program {
     ast: ast::Mod,
+    tokens: Vec<Token>,
     parse_errors: Vec<ParseError>,
 }
 
@@ -62,21 +58,21 @@ impl Program {
     }
 
     /// Parse the given Python source code using the specified [`Mode`].
-    pub fn parse_str(source: &str, mode: Mode) -> Program {
-        let tokens = lex(source, mode);
-        Self::parse_tokens(source, tokens.collect(), mode)
+    pub fn parse(source: &str, mode: Mode) -> Program {
+        Parser::new(source, mode).parse_program()
     }
 
-    /// Parse a vector of [`LexResult`]s using the specified [`Mode`].
-    pub fn parse_tokens(source: &str, tokens: Vec<LexResult>, mode: Mode) -> Program {
-        Parser::new(source, mode, TokenSource::new(tokens)).parse_program()
+    pub fn parse_starts_at(source: &str, mode: Mode, start_offset: TextSize) -> Program {
+        Parser::new_starts_at(source, mode, start_offset).parse_program()
     }
 }
 
 #[derive(Debug)]
 pub(crate) struct Parser<'src> {
     source: &'src str,
-    tokens: TokenSource,
+
+    /// Token source for the parser that skips over any non-trivia token.
+    tokens: TokenSource<'src>,
 
     /// Stores all the syntax errors found during the parsing.
     errors: Vec<ParseError>,
@@ -84,37 +80,29 @@ pub(crate) struct Parser<'src> {
     /// Specify the mode in which the code will be parsed.
     mode: Mode,
 
-    /// Current token along with its range.
-    current: Spanned,
-
     /// The ID of the current token. This is used to track the progress of the parser
     /// to avoid infinite loops when the parser is stuck.
     current_token_id: TokenId,
 
-    /// The end of the last processed. Used to determine a node's end.
-    last_token_end: TextSize,
+    /// The end of the previous token processed. This is used to determine a node's end.
+    prev_token_end: TextSize,
 
-    /// The range of the tokens to parse.
-    ///
-    /// The range is equal to `[0; source.len())` when parsing an entire file. The range can be
-    /// different when parsing only a part of a file using the [`crate::lex_starts_at`] and
-    /// [`crate::parse_expression_starts_at`] APIs in which case the the range is equal to
-    /// `[offset; subrange.len())`.
-    tokens_range: TextRange,
-
+    /// The recovery context in which the parser is currently in.
     recovery_context: RecoveryContext,
+
+    /// The start offset in the source code from which to start parsing at.
+    start_offset: TextSize,
 }
 
 impl<'src> Parser<'src> {
-    pub(crate) fn new(source: &'src str, mode: Mode, mut tokens: TokenSource) -> Parser<'src> {
-        let tokens_range = TextRange::new(
-            tokens.position().unwrap_or_default(),
-            tokens.end().unwrap_or_default(),
-        );
+    /// Create a new parser for the given source code.
+    pub(crate) fn new(source: &'src str, mode: Mode) -> Self {
+        Parser::new_starts_at(source, mode, TextSize::new(0))
+    }
 
-        let current = tokens
-            .next()
-            .unwrap_or_else(|| (Tok::EndOfFile, TextRange::empty(tokens_range.end())));
+    /// Create a new parser for the given source code which starts parsing at the given offset.
+    pub(crate) fn new_starts_at(source: &'src str, mode: Mode, start_offset: TextSize) -> Self {
+        let tokens = TokenSource::from_source(source, mode, start_offset);
 
         Parser {
             mode,
@@ -122,24 +110,20 @@ impl<'src> Parser<'src> {
             errors: Vec::new(),
             tokens,
             recovery_context: RecoveryContext::empty(),
-            last_token_end: tokens_range.start(),
-            current,
+            prev_token_end: TextSize::new(0),
+            start_offset,
             current_token_id: TokenId::default(),
-            tokens_range,
         }
     }
 
     /// Consumes the [`Parser`] and returns the parsed [`Program`].
     pub(crate) fn parse_program(mut self) -> Program {
         let ast = match self.mode {
-            Mode::Expression => Mod::Expression(self.parse_single_expression()),
-            Mode::Module | Mode::Ipython => Mod::Module(self.parse_module()),
+            Mode::Expression => ast::Mod::Expression(self.parse_single_expression()),
+            Mode::Module | Mode::Ipython => ast::Mod::Module(self.parse_module()),
         };
 
-        Program {
-            ast,
-            parse_errors: self.finish(),
-        }
+        self.finish(ast)
     }
 
     /// Parses a single expression.
@@ -195,11 +179,11 @@ impl<'src> Parser<'src> {
 
         ast::ModModule {
             body,
-            range: self.tokens_range,
+            range: TextRange::new(self.start_offset, self.current_token_range().end()),
         }
     }
 
-    fn finish(self) -> Vec<ParseError> {
+    fn finish(self, ast: ast::Mod) -> Program {
         assert_eq!(
             self.current_token_kind(),
             TokenKind::EndOfFile,
@@ -208,13 +192,17 @@ impl<'src> Parser<'src> {
 
         // TODO consider re-integrating lexical error handling into the parser?
         let parse_errors = self.errors;
-        let lex_errors = self.tokens.finish();
+        let (tokens, lex_errors) = self.tokens.finish();
 
         // Fast path for when there are no lex errors.
         // There's no fast path for when there are no parse errors because a lex error
         // always results in a parse error.
         if lex_errors.is_empty() {
-            return parse_errors;
+            return Program {
+                ast,
+                tokens,
+                parse_errors,
+            };
         }
 
         let mut merged = Vec::with_capacity(parse_errors.len().saturating_add(lex_errors.len()));
@@ -241,7 +229,11 @@ impl<'src> Parser<'src> {
         merged.extend(parse_errors);
         merged.extend(lex_errors.map(ParseError::from));
 
-        merged
+        Program {
+            ast,
+            tokens,
+            parse_errors: merged,
+        }
     }
 
     /// Returns the start position for a node that starts at the current token.
@@ -280,7 +272,7 @@ impl<'src> Parser<'src> {
         //
         // In either of the above cases, there's a "gap" between the end of the last token and start
         // of the current token.
-        if self.last_token_end <= start {
+        if self.prev_token_end <= start {
             // We need to create an empty range at the last token end instead of the start because
             // otherwise this node range will fall outside the range of it's parent node. Taking
             // the above example:
@@ -302,9 +294,9 @@ impl<'src> Parser<'src> {
             // def foo # comment
             // def bar(): ...
             // def baz
-            TextRange::empty(self.last_token_end)
+            TextRange::empty(self.prev_token_end)
         } else {
-            TextRange::new(start, self.last_token_end)
+            TextRange::new(start, self.prev_token_end)
         }
     }
 
@@ -319,65 +311,44 @@ impl<'src> Parser<'src> {
         // #       ^^^^ expression range
         // #      ^ last token end
         // ```
-        TextRange::empty(self.last_token_end)
+        TextRange::empty(self.prev_token_end)
     }
 
     /// Moves the parser to the next token.
-    ///
-    /// Returns the old current token as an owned value.
-    fn next_token(&mut self) -> Spanned {
-        let next = self
-            .tokens
-            .next()
-            .unwrap_or_else(|| (Tok::EndOfFile, TextRange::empty(self.tokens_range.end())));
+    fn next_token(&mut self) {
+        self.tokens.next_token();
 
         self.current_token_id.increment();
 
-        let current = std::mem::replace(&mut self.current, next);
-
         if !matches!(
-            current.0,
+            self.tokens.current_kind(),
             // TODO explore including everything up to the dedent as part of the body.
-            Tok::Dedent
+            TokenKind::Dedent
             // Don't include newlines in the body
-            | Tok::Newline
+            | TokenKind::Newline
             // TODO(micha): Including the semi feels more correct but it isn't compatible with lalrpop and breaks the
             // formatters semicolon detection. Exclude it for now
-            | Tok::Semi
+            | TokenKind::Semi
         ) {
-            self.last_token_end = current.1.end();
+            self.prev_token_end = self.current_token_range().end();
         }
-
-        current
     }
 
     /// Returns the next token kind without consuming it.
-    fn peek(&self) -> TokenKind {
-        self.tokens
-            .peek()
-            .map_or(TokenKind::EndOfFile, |spanned| spanned.0)
-    }
-
-    /// Returns the current token kind along with its range.
-    ///
-    /// Use [`Parser::current_token_kind`] or [`Parser::current_token_range`] to only get the kind
-    /// or range respectively.
-    #[inline]
-    fn current_token(&self) -> (TokenKind, TextRange) {
-        (self.current_token_kind(), self.current_token_range())
+    fn peek(&mut self) -> TokenKind {
+        self.tokens.peek()
     }
 
     /// Returns the current token kind.
     #[inline]
     fn current_token_kind(&self) -> TokenKind {
-        // TODO: Converting the token kind over and over again can be expensive.
-        TokenKind::from_token(&self.current.0)
+        self.tokens.current_kind()
     }
 
     /// Returns the range of the current token.
     #[inline]
     fn current_token_range(&self) -> TextRange {
-        self.current.1
+        self.tokens.current_range()
     }
 
     /// Returns the current token ID.
@@ -397,30 +368,48 @@ impl<'src> Parser<'src> {
         }
     }
 
-    /// Bumps the current token assuming it is of the given kind.
-    ///
-    /// Returns the current token as an owned value.
+    /// Take the token value from the underlying token source and bump the current token.
     ///
     /// # Panics
     ///
     /// If the current token is not of the given kind.
-    fn bump(&mut self, kind: TokenKind) -> (Tok, TextRange) {
+    fn bump_value(&mut self, kind: TokenKind) -> TokenValue {
+        let value = self.tokens.take_value();
+        self.bump(kind);
+        value
+    }
+
+    /// Bumps the current token assuming it is of the given kind.
+    ///
+    /// # Panics
+    ///
+    /// If the current token is not of the given kind.
+    fn bump(&mut self, kind: TokenKind) {
         assert_eq!(self.current_token_kind(), kind);
 
-        self.next_token()
+        self.next_token();
     }
 
     /// Bumps the current token assuming it is found in the given token set.
     ///
-    /// Returns the current token as an owned value.
-    ///
     /// # Panics
     ///
     /// If the current token is not found in the given token set.
-    fn bump_ts(&mut self, ts: TokenSet) -> (Tok, TextRange) {
+    fn bump_ts(&mut self, ts: TokenSet) {
         assert!(ts.contains(self.current_token_kind()));
 
-        self.next_token()
+        self.next_token();
+    }
+
+    /// Bumps the current token regardless of its kind and advances to the next token.
+    ///
+    /// # Panics
+    ///
+    /// If the parser is at end of file.
+    fn bump_any(&mut self) {
+        assert_ne!(self.current_token_kind(), TokenKind::EndOfFile);
+
+        self.next_token();
     }
 
     fn expect(&mut self, expected: TokenKind) -> bool {
@@ -428,8 +417,14 @@ impl<'src> Parser<'src> {
             return true;
         }
 
-        let (found, range) = self.current_token();
-        self.add_error(ParseErrorType::ExpectedToken { found, expected }, range);
+        self.add_error(
+            ParseErrorType::ExpectedToken {
+                found: self.current_token_kind(),
+                expected,
+            },
+            self.current_token_range(),
+        );
+
         false
     }
 
@@ -468,11 +463,7 @@ impl<'src> Parser<'src> {
     where
         T: Ranged,
     {
-        let range = ranged.range();
-        // `ranged` uses absolute ranges to the source text of an entire file. Fix the source by
-        // subtracting the start offset when parsing only a part of a file (when parsing the tokens
-        // from `lex_starts_at`).
-        &self.source[range - self.tokens_range.start()]
+        &self.source[ranged.range()]
     }
 
     /// Parses a list of elements into a vector where each element is parsed using
