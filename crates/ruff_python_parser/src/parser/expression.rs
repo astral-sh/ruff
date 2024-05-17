@@ -471,7 +471,7 @@ impl<'src> Parser<'src> {
 
         if self.current_token_kind().is_soft_keyword() {
             let id = self.src_text(range).to_string();
-            self.bump_any();
+            self.bump_soft_keyword_as_name();
             return ast::Identifier { id, range };
         }
 
@@ -1343,7 +1343,7 @@ impl<'src> Parser<'src> {
                 // `Invalid` tokens are created when there's a lexical error, so
                 // we ignore it here to avoid creating unexpected token errors
                 TokenKind::Unknown => {
-                    parser.next_token();
+                    parser.bump_any();
                     return;
                 }
                 tok => {
