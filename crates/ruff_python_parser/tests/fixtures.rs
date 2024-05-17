@@ -36,7 +36,7 @@ fn inline_err() {
 /// Snapshots the AST.
 fn test_valid_syntax(input_path: &Path) {
     let source = fs::read_to_string(input_path).expect("Expected test file to exist");
-    let program = Program::parse_str(&source, Mode::Module);
+    let program = Program::parse(&source, Mode::Module);
 
     if !program.is_valid() {
         let line_index = LineIndex::from_source_text(&source);
@@ -79,7 +79,7 @@ fn test_valid_syntax(input_path: &Path) {
 /// Snapshots the AST and the error messages.
 fn test_invalid_syntax(input_path: &Path) {
     let source = fs::read_to_string(input_path).expect("Expected test file to exist");
-    let program = Program::parse_str(&source, Mode::Module);
+    let program = Program::parse(&source, Mode::Module);
 
     assert!(
         !program.is_valid(),
@@ -129,7 +129,7 @@ fn parser_quick_test() {
 data[*x,]
 ";
 
-    let program = Program::parse_str(source, Mode::Module);
+    let program = Program::parse(source, Mode::Module);
 
     println!("AST:\n----\n{:#?}", program.ast());
 
