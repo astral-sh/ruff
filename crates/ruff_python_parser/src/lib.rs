@@ -125,7 +125,6 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 mod error;
 pub mod lexer;
 mod parser;
-mod soft_keywords;
 mod string;
 mod token;
 mod token_set;
