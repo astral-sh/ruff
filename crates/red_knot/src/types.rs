@@ -564,7 +564,8 @@ impl std::fmt::Display for DisplayType<'_> {
             Type::Unknown => f.write_str("Unknown"),
             Type::Unbound => f.write_str("Unbound"),
             Type::Module(module_id) => {
-                todo!("Display for DisplayType for Type::Module: {module_id:?}")
+                // NOTE: something like this?: "<module 'module-name' from 'path-from-fileid'>"
+                todo!("{module_id:?}")
             }
             // TODO functions and classes should display using a fully qualified name
             Type::Class(class_id) => {
