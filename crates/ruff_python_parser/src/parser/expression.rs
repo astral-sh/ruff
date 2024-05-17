@@ -11,11 +11,12 @@ use ruff_python_ast::{
 };
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
+use crate::lexer::TokenValue;
 use crate::parser::progress::ParserProgress;
 use crate::parser::{helpers, FunctionKind, Parser};
 use crate::string::{parse_fstring_literal_element, parse_string_literal, StringType};
 use crate::token_set::TokenSet;
-use crate::{FStringErrorType, Mode, ParseErrorType, Tok, TokenKind};
+use crate::{FStringErrorType, Mode, ParseErrorType, TokenKind};
 
 use super::{Parenthesized, RecoveryContextKind};
 
@@ -459,36 +460,43 @@ impl<'src> Parser<'src> {
         let range = self.current_token_range();
 
         if self.at(TokenKind::Name) {
-            let (Tok::Name { name }, _) = self.bump(TokenKind::Name) else {
+            let TokenValue::Name(name) = self.bump_value(TokenKind::Name) else {
                 unreachable!();
             };
-            ast::Identifier {
+            return ast::Identifier {
                 id: name.to_string(),
                 range,
-            }
-        } else {
-            if self.current_token_kind().is_keyword() {
-                let (tok, range) = self.next_token();
-                self.add_error(
-                    ParseErrorType::OtherError(format!(
-                        "Expected an identifier, but found a keyword '{tok}' that cannot be used here"
-                    )),
-                    range,
-                );
+            };
+        }
 
-                ast::Identifier {
-                    id: tok.to_string(),
-                    range,
-                }
-            } else {
-                self.add_error(
-                    ParseErrorType::OtherError("Expected an identifier".into()),
-                    range,
-                );
-                ast::Identifier {
-                    id: String::new(),
-                    range: self.missing_node_range(),
-                }
+        if self.current_token_kind().is_soft_keyword() {
+            let id = self.src_text(range).to_string();
+            self.bump_any();
+            return ast::Identifier { id, range };
+        }
+
+        if self.current_token_kind().is_keyword() {
+            // Non-soft keyword
+            self.add_error(
+                ParseErrorType::OtherError(format!(
+                    "Expected an identifier, but found a keyword '{}' that cannot be used here",
+                    self.current_token_kind()
+                )),
+                range,
+            );
+
+            let id = self.src_text(range).to_string();
+            self.bump_any();
+            ast::Identifier { id, range }
+        } else {
+            self.add_error(
+                ParseErrorType::OtherError("Expected an identifier".into()),
+                range,
+            );
+
+            ast::Identifier {
+                id: String::new(),
+                range: self.missing_node_range(),
             }
         }
     }
@@ -501,7 +509,7 @@ impl<'src> Parser<'src> {
 
         let lhs = match self.current_token_kind() {
             TokenKind::Float => {
-                let (Tok::Float { value }, _) = self.bump(TokenKind::Float) else {
+                let TokenValue::Float(value) = self.bump_value(TokenKind::Float) else {
                     unreachable!()
                 };
 
@@ -511,7 +519,7 @@ impl<'src> Parser<'src> {
                 })
             }
             TokenKind::Complex => {
-                let (Tok::Complex { real, imag }, _) = self.bump(TokenKind::Complex) else {
+                let TokenValue::Complex { real, imag } = self.bump_value(TokenKind::Complex) else {
                     unreachable!()
                 };
                 Expr::NumberLiteral(ast::ExprNumberLiteral {
@@ -520,7 +528,7 @@ impl<'src> Parser<'src> {
                 })
             }
             TokenKind::Int => {
-                let (Tok::Int { value }, _) = self.bump(TokenKind::Int) else {
+                let TokenValue::Int(value) = self.bump_value(TokenKind::Int) else {
                     unreachable!()
                 };
                 Expr::NumberLiteral(ast::ExprNumberLiteral {
@@ -566,7 +574,7 @@ impl<'src> Parser<'src> {
             TokenKind::Lbrace => self.parse_set_or_dict_like_expression(),
 
             kind => {
-                if kind.is_keyword() {
+                if kind.is_keyword() || kind.is_soft_keyword() {
                     Expr::Name(self.parse_name())
                 } else {
                     self.add_error(
@@ -1231,7 +1239,8 @@ impl<'src> Parser<'src> {
     ///
     /// See: <https://docs.python.org/3.13/reference/lexical_analysis.html#string-and-bytes-literals>
     fn parse_string_or_byte_literal(&mut self) -> StringType {
-        let (Tok::String { value, flags }, range) = self.bump(TokenKind::String) else {
+        let range = self.current_token_range();
+        let TokenValue::String { value, flags } = self.bump_value(TokenKind::String) else {
             unreachable!()
         };
 
@@ -1278,7 +1287,7 @@ impl<'src> Parser<'src> {
     fn parse_fstring(&mut self) -> ast::FString {
         let start = self.node_start();
 
-        let (Tok::FStringStart(kind), _) = self.bump(TokenKind::FStringStart) else {
+        let TokenValue::FStringStart(kind) = self.bump_value(TokenKind::FStringStart) else {
             unreachable!()
         };
         let elements = self.parse_fstring_elements();
@@ -1306,7 +1315,9 @@ impl<'src> Parser<'src> {
                     FStringElement::Expression(parser.parse_fstring_expression_element())
                 }
                 TokenKind::FStringMiddle => {
-                    let (Tok::FStringMiddle { value, flags, .. }, range) = parser.next_token()
+                    let range = parser.current_token_range();
+                    let TokenValue::FStringMiddle { value, flags, .. } =
+                        parser.bump_value(TokenKind::FStringMiddle)
                     else {
                         unreachable!()
                     };
@@ -1396,7 +1407,10 @@ impl<'src> Parser<'src> {
 
         let conversion = if self.eat(TokenKind::Exclamation) {
             let conversion_flag_range = self.current_token_range();
-            if let Tok::Name { name } = self.next_token().0 {
+            if self.at(TokenKind::Name) {
+                let TokenValue::Name(name) = self.bump_value(TokenKind::Name) else {
+                    unreachable!();
+                };
                 match &*name {
                     "s" => ConversionFlag::Str,
                     "r" => ConversionFlag::Repr,
@@ -2229,7 +2243,8 @@ impl<'src> Parser<'src> {
     fn parse_ipython_escape_command_expression(&mut self) -> ast::ExprIpyEscapeCommand {
         let start = self.node_start();
 
-        let (Tok::IpyEscapeCommand { value, kind }, _) = self.bump(TokenKind::IpyEscapeCommand)
+        let TokenValue::IpyEscapeCommand { value, kind } =
+            self.bump_value(TokenKind::IpyEscapeCommand)
         else {
             unreachable!()
         };
