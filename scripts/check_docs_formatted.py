@@ -74,7 +74,6 @@ KNOWN_FORMATTING_VIOLATIONS = [
     "redundant-backslash",
     "shebang-leading-whitespace",
     "surrounding-whitespace",
-    "tab-indentation",
     "too-few-spaces-before-inline-comment",
     "too-many-blank-lines",
     "too-many-boolean-expressions",
