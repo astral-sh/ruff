@@ -248,7 +248,7 @@ impl Workspace {
 
     /// Parses the content and returns its AST
     pub fn parse(&self, contents: &str) -> Result<String, Error> {
-        let program = Program::parse_str(contents, Mode::Module);
+        let program = Program::parse(contents, Mode::Module);
 
         Ok(format!("{:#?}", program.into_ast()))
     }

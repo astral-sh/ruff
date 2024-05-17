@@ -127,4 +127,17 @@ impl FStrings {
     pub(crate) fn current_mut(&mut self) -> Option<&mut FStringContext> {
         self.stack.last_mut()
     }
+
+    pub(crate) fn checkpoint(&self) -> FStringsCheckpoint {
+        FStringsCheckpoint(self.stack.len())
+    }
+
+    pub(crate) fn rewind(&mut self, checkpoint: FStringsCheckpoint) {
+        assert!(self.stack.len() <= checkpoint.0);
+
+        self.stack.truncate(checkpoint.0);
+    }
 }
+
+#[derive(Debug, Copy, Clone)]
+pub(crate) struct FStringsCheckpoint(usize);

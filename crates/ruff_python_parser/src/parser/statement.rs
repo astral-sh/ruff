@@ -8,13 +8,14 @@ use ruff_python_ast::{
 };
 use ruff_text_size::{Ranged, TextSize};
 
+use crate::lexer::TokenValue;
 use crate::parser::expression::{GeneratorExpressionInParentheses, ParsedExpr, EXPR_SET};
 use crate::parser::progress::ParserProgress;
 use crate::parser::{
     helpers, FunctionKind, Parser, RecoveryContext, RecoveryContextKind, WithItemKind,
 };
 use crate::token_set::TokenSet;
-use crate::{Mode, ParseErrorType, Tok, TokenKind};
+use crate::{Mode, ParseErrorType, TokenKind};
 
 use super::expression::{ExpressionContext, OperatorPrecedence};
 use super::Parenthesized;
@@ -872,7 +873,8 @@ impl<'src> Parser<'src> {
     fn parse_ipython_escape_command_statement(&mut self) -> ast::StmtIpyEscapeCommand {
         let start = self.node_start();
 
-        let (Tok::IpyEscapeCommand { value, kind }, _) = self.bump(TokenKind::IpyEscapeCommand)
+        let TokenValue::IpyEscapeCommand { value, kind } =
+            self.bump_value(TokenKind::IpyEscapeCommand)
         else {
             unreachable!()
         };
