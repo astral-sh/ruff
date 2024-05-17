@@ -11,7 +11,7 @@ use crate::symbols::{
     resolve_global_symbol, symbol_table, Definition, GlobalSymbolId, ImportDefinition,
     ImportFromDefinition,
 };
-use crate::types::{self as types, Type};
+use crate::types::{ModuleTypeId, Type};
 use crate::FileId;
 
 // FIXME: Figure out proper dead-lock free synchronisation now that this takes `&db` instead of `&mut db`.
@@ -65,7 +65,7 @@ pub fn infer_definition_type(
             module: module_name,
         }) => {
             if let Some(module) = resolve_module(db, module_name.clone())? {
-                Ok(Type::Module(types::ModuleTypeId { module, file_id }))
+                Ok(Type::Module(ModuleTypeId { module, file_id }))
             } else {
                 Ok(Type::Unknown)
             }
