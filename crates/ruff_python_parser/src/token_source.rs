@@ -30,7 +30,7 @@ impl<'src> TokenSource<'src> {
         let mut source = TokenSource::new(lexer);
 
         // Initialize the token source so that the current token is set correctly.
-        source.next_token();
+        source.do_bump();
         source
     }
 
@@ -53,26 +53,40 @@ impl<'src> TokenSource<'src> {
     /// Returns the next non-trivia token without consuming it.
     pub(crate) fn peek(&mut self) -> TokenKind {
         let checkpoint = self.lexer.checkpoint();
-        let next = loop {
+        let next = self.next_non_trivia_token();
+        self.lexer.rewind(checkpoint);
+        next
+    }
+
+    /// Bumps the token source to the next non-trivia token.
+    ///
+    /// It pushes the given kind to the token vector with the current token range.
+    pub(crate) fn bump(&mut self, kind: TokenKind) {
+        self.tokens.push(Token::new(kind, self.current_range()));
+        self.do_bump();
+    }
+
+    /// Bumps the token source to the next non-trivia token without adding the current token to the
+    /// token vector. It does add the trivia tokens to the token vector.
+    fn do_bump(&mut self) {
+        loop {
+            let next = self.lexer.next_token();
+            if next.is_trivia() {
+                self.tokens.push(next);
+                continue;
+            }
+            break;
+        }
+    }
+
+    /// Returns the next non-trivia token without adding it to the token vector.
+    fn next_non_trivia_token(&mut self) -> TokenKind {
+        loop {
             let next = self.lexer.next_token();
             if next.is_trivia() {
                 continue;
             }
             break next.kind();
-        };
-        self.lexer.rewind(checkpoint);
-        next
-    }
-
-    /// Moves the lexer to the next non-trivia token.
-    pub(crate) fn next_token(&mut self) {
-        loop {
-            let next = self.lexer.next_token();
-            self.tokens.push(next);
-            if next.is_trivia() {
-                continue;
-            }
-            break;
         }
     }
 
