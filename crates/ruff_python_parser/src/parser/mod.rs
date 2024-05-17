@@ -9,7 +9,7 @@ use crate::lexer::{Token, TokenValue};
 use crate::parser::expression::ExpressionContext;
 use crate::parser::progress::{ParserProgress, TokenId};
 use crate::token_set::TokenSet;
-use crate::token_source::TokenSource;
+use crate::token_source::{TokenSource, TokenSourceCheckpoint};
 use crate::{Mode, ParseError, ParseErrorType, TokenKind};
 
 mod expression;
@@ -632,6 +632,34 @@ impl<'src> Parser<'src> {
 
         false
     }
+
+    /// Creates a checkpoint to which the parser can later return to using [`Self::rewind`].
+    fn checkpoint(&self) -> ParserCheckpoint<'src> {
+        ParserCheckpoint {
+            tokens: self.tokens.checkpoint(),
+            errors_position: self.errors.len(),
+            current_token_id: self.current_token_id,
+            prev_token_end: self.prev_token_end,
+            recovery_context: self.recovery_context,
+        }
+    }
+
+    /// Restore the parser to the given checkpoint.
+    fn rewind(&mut self, checkpoint: ParserCheckpoint<'src>) {
+        self.tokens.rewind(checkpoint.tokens);
+        self.errors.truncate(checkpoint.errors_position);
+        self.current_token_id = checkpoint.current_token_id;
+        self.prev_token_end = checkpoint.prev_token_end;
+        self.recovery_context = checkpoint.recovery_context;
+    }
+}
+
+struct ParserCheckpoint<'src> {
+    tokens: TokenSourceCheckpoint<'src>,
+    errors_position: usize,
+    current_token_id: TokenId,
+    prev_token_end: TextSize,
+    recovery_context: RecoveryContext,
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]

@@ -1,6 +1,6 @@
 use ruff_text_size::{TextRange, TextSize};
 
-use crate::lexer::{Lexer, LexicalError, Token, TokenValue};
+use crate::lexer::{Lexer, LexerCheckpoint, LexicalError, Token, TokenValue};
 use crate::{Mode, TokenKind};
 
 /// Token source for the parser that skips over any trivia tokens.
@@ -76,6 +76,20 @@ impl<'src> TokenSource<'src> {
         }
     }
 
+    /// Creates a checkpoint to which the token source can later return to using [`Self::rewind`].
+    pub(crate) fn checkpoint(&self) -> TokenSourceCheckpoint<'src> {
+        TokenSourceCheckpoint {
+            lexer: self.lexer.checkpoint(),
+            tokens_position: self.tokens.len(),
+        }
+    }
+
+    /// Restore the token source to the given checkpoint.
+    pub(crate) fn rewind(&mut self, checkpoint: TokenSourceCheckpoint<'src>) {
+        self.lexer.rewind(checkpoint.lexer);
+        self.tokens.truncate(checkpoint.tokens_position);
+    }
+
     /// Consumes the token source, returning the collected tokens and any errors encountered during
     /// lexing. The token collection includes both the trivia and non-trivia tokens.
     pub(crate) fn finish(self) -> (Vec<Token>, Vec<LexicalError>) {
@@ -87,4 +101,9 @@ impl<'src> TokenSource<'src> {
 
         (self.tokens, self.lexer.finish())
     }
+}
+
+pub(crate) struct TokenSourceCheckpoint<'src> {
+    lexer: LexerCheckpoint<'src>,
+    tokens_position: usize,
 }
