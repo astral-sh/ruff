@@ -11,18 +11,6 @@ use ruff_text_size::{TextRange, TextSize};
 /// According to [PEP 8], spaces are preferred over tabs (unless used to remain
 /// consistent with code that is already indented with tabs).
 ///
-/// ## Example
-/// ```python
-/// if True:
-/// 	a = 1
-/// ```
-///
-/// Use instead:
-/// ```python
-/// if True:
-///     a = 1
-/// ```
-///
 /// ## Formatter compatibility
 /// We recommend against using this rule alongside the [formatter]. The
 /// formatter enforces consistent indentation, making the rule redundant.
