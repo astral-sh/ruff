@@ -355,7 +355,7 @@ impl ModuleTypeId {
         Ok(jar.type_store.add_or_get_module(self.file_id).downgrade())
     }
 
-    // NOTE: following example of `ClassTypeId::name` but returning `ModuleName` insead of `Name`
+    // NOTE: following example of `ClassTypeId::name` but returning `ModuleName` instead of `Name`
     pub(crate) fn name(self, db: &dyn SemanticDb) -> QueryResult<ModuleName> {
         self.module.name(db)
     }
@@ -564,6 +564,7 @@ impl std::fmt::Display for DisplayType<'_> {
             Type::Unknown => f.write_str("Unknown"),
             Type::Unbound => f.write_str("Unbound"),
             Type::Module(module_id) => {
+                todo!("Display for DisplayType for Type::Module: {module_id:?}")
             }
             // TODO functions and classes should display using a fully qualified name
             Type::Class(class_id) => {

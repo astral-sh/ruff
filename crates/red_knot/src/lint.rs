@@ -192,11 +192,11 @@ fn lint_bad_overrides(context: &SemanticLintContext) -> QueryResult<()> {
     Ok(())
 }
 
-fn lint_unspecified_encoding(context: &SemanticLintContext) -> QueryResult<()> {
+fn lint_unspecified_encoding(_context: &SemanticLintContext) -> QueryResult<()> {
     // fix the inference of an import 'definition' by adding a module type
     //
     // obtain the type of each definition's rhs
-    todo!()
+    todo!("lint_unspecified_encoding: todo")
 }
 
 pub struct SemanticLintContext<'a> {
