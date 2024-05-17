@@ -1,7 +1,7 @@
 use ruff_python_ast::AnyStringFlags;
 
 /// The context representing the current f-string that the lexer is in.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub(crate) struct FStringContext {
     flags: AnyStringFlags,
 
@@ -129,15 +129,13 @@ impl FStrings {
     }
 
     pub(crate) fn checkpoint(&self) -> FStringsCheckpoint {
-        FStringsCheckpoint(self.stack.len())
+        FStringsCheckpoint(self.stack.clone())
     }
 
     pub(crate) fn rewind(&mut self, checkpoint: FStringsCheckpoint) {
-        assert!(self.stack.len() <= checkpoint.0);
-
-        self.stack.truncate(checkpoint.0);
+        self.stack = checkpoint.0;
     }
 }
 
-#[derive(Debug, Copy, Clone)]
-pub(crate) struct FStringsCheckpoint(usize);
+#[derive(Debug, Clone)]
+pub(crate) struct FStringsCheckpoint(Vec<FStringContext>);

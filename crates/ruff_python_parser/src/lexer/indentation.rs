@@ -126,18 +126,16 @@ impl Indentations {
     }
 
     pub(crate) fn checkpoint(&self) -> IndentationsCheckpoint {
-        IndentationsCheckpoint(self.stack.len())
+        IndentationsCheckpoint(self.stack.clone())
     }
 
     pub(crate) fn rewind(&mut self, checkpoint: IndentationsCheckpoint) {
-        assert!(self.stack.len() <= checkpoint.0);
-
-        self.stack.truncate(checkpoint.0);
+        self.stack = checkpoint.0;
     }
 }
 
-#[derive(Debug, Copy, Clone)]
-pub(crate) struct IndentationsCheckpoint(usize);
+#[derive(Debug, Clone)]
+pub(crate) struct IndentationsCheckpoint(Vec<Indentation>);
 
 assert_eq_size!(Indentation, u64);
 

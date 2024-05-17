@@ -423,7 +423,7 @@ impl<'src> Lexer<'src> {
         TokenKind::Comment
     }
 
-    /// Lex a single `IPython` escape command.
+    /// Lex a single IPython escape command.
     fn lex_ipython_escape_command(&mut self, escape_kind: IpyEscapeKind) -> TokenKind {
         let mut value = String::new();
 
@@ -1341,11 +1341,6 @@ impl<'src> Lexer<'src> {
     }
 
     /// Restore the lexer to the given checkpoint.
-    ///
-    /// # Panics
-    ///
-    /// If the current indentation is less than the indentation at the checkpoint
-    /// If the lexer is out of any f-strings it was in at the time of checkpoint
     pub(crate) fn rewind(&mut self, checkpoint: LexerCheckpoint<'src>) {
         self.value = checkpoint.value;
         self.current = checkpoint.current;
@@ -1554,7 +1549,7 @@ pub(crate) enum TokenValue {
         /// and prefixes of the string
         flags: AnyStringFlags,
     },
-    /// Token value for `IPython` escape commands. These are recognized by the lexer
+    /// Token value for IPython escape commands. These are recognized by the lexer
     /// only when the mode is [`Mode::Ipython`].
     IpyEscapeCommand {
         /// The magic command value.
