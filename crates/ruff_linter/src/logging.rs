@@ -253,7 +253,7 @@ impl Display for DisplayParseError {
             ErrorLocation::Cell(cell, location) => {
                 write!(
                     f,
-                    "{cell}{colon}{row}{colon}{column}{colon} {inner}",
+                    "cell {cell}{colon}{row}{colon}{column}{colon} {inner}",
                     cell = cell,
                     row = location.row,
                     column = location.column,
