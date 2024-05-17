@@ -535,6 +535,11 @@ pub enum TokenKind {
 
 impl TokenKind {
     #[inline]
+    pub const fn is_eof(self) -> bool {
+        matches!(self, TokenKind::EndOfFile)
+    }
+
+    #[inline]
     pub const fn is_newline(self) -> bool {
         matches!(self, TokenKind::Newline | TokenKind::NonLogicalNewline)
     }
