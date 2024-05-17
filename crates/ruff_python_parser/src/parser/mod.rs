@@ -37,6 +37,11 @@ impl Program {
         &self.ast
     }
 
+    /// Returns all the tokens for the program.
+    pub fn tokens(&self) -> &[Token] {
+        &self.tokens
+    }
+
     /// Returns a list of syntax errors found during parsing.
     pub fn errors(&self) -> &[ParseError] {
         &self.parse_errors
@@ -154,7 +159,7 @@ impl<'src> Parser<'src> {
                 if self.at(TokenKind::EndOfFile) {
                     break;
                 }
-                self.next_token();
+                self.bump_any();
             }
         }
 
@@ -315,8 +320,8 @@ impl<'src> Parser<'src> {
     }
 
     /// Moves the parser to the next token.
-    fn next_token(&mut self) {
-        self.tokens.next_token();
+    fn do_bump(&mut self, kind: TokenKind) {
+        self.tokens.bump(kind);
 
         self.current_token_id.increment();
 
@@ -357,15 +362,15 @@ impl<'src> Parser<'src> {
         self.current_token_id
     }
 
-    /// Eat the current token if it is of the given kind, returning `true` in
-    /// that case. Otherwise, return `false`.
-    fn eat(&mut self, kind: TokenKind) -> bool {
-        if self.at(kind) {
-            self.next_token();
-            true
-        } else {
-            false
-        }
+    /// Bumps the current token assuming it is of the given kind.
+    ///
+    /// # Panics
+    ///
+    /// If the current token is not of the given kind.
+    fn bump(&mut self, kind: TokenKind) {
+        assert_eq!(self.current_token_kind(), kind);
+
+        self.do_bump(kind);
     }
 
     /// Take the token value from the underlying token source and bump the current token.
@@ -379,26 +384,16 @@ impl<'src> Parser<'src> {
         value
     }
 
-    /// Bumps the current token assuming it is of the given kind.
-    ///
-    /// # Panics
-    ///
-    /// If the current token is not of the given kind.
-    fn bump(&mut self, kind: TokenKind) {
-        assert_eq!(self.current_token_kind(), kind);
-
-        self.next_token();
-    }
-
     /// Bumps the current token assuming it is found in the given token set.
     ///
     /// # Panics
     ///
     /// If the current token is not found in the given token set.
     fn bump_ts(&mut self, ts: TokenSet) {
-        assert!(ts.contains(self.current_token_kind()));
+        let kind = self.current_token_kind();
+        assert!(ts.contains(kind));
 
-        self.next_token();
+        self.do_bump(kind);
     }
 
     /// Bumps the current token regardless of its kind and advances to the next token.
@@ -407,11 +402,35 @@ impl<'src> Parser<'src> {
     ///
     /// If the parser is at end of file.
     fn bump_any(&mut self) {
-        assert_ne!(self.current_token_kind(), TokenKind::EndOfFile);
+        let kind = self.current_token_kind();
+        assert_ne!(kind, TokenKind::EndOfFile);
 
-        self.next_token();
+        self.do_bump(kind);
     }
 
+    /// Bumps the soft keyword token as a `Name` token.
+    ///
+    /// # Panics
+    ///
+    /// If the current token is not a soft keyword.
+    pub(crate) fn bump_soft_keyword_as_name(&mut self) {
+        assert!(self.current_token_kind().is_soft_keyword());
+
+        self.do_bump(TokenKind::Name);
+    }
+
+    /// Consume the current token if it is of the given kind. Returns `true` if it matches, `false`
+    /// otherwise.
+    fn eat(&mut self, kind: TokenKind) -> bool {
+        if self.at(kind) {
+            self.do_bump(kind);
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Eat the current token if its of the expected kind, otherwise adds an appropriate error.
     fn expect(&mut self, expected: TokenKind) -> bool {
         if self.eat(expected) {
             return true;
@@ -522,7 +541,7 @@ impl<'src> Parser<'src> {
                     break;
                 }
 
-                self.next_token();
+                self.bump_any();
             }
         }
 
@@ -606,7 +625,7 @@ impl<'src> Parser<'src> {
                     trailing_comma_range = None;
                 }
 
-                self.next_token();
+                self.bump_any();
             }
         }
 
