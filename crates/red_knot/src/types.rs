@@ -25,6 +25,8 @@ pub enum Type {
     Unbound,
     /// a specific function object
     Function(FunctionTypeId),
+    /// a specific module object
+    Module(ModuleTypeId),
     /// a specific class object
     Class(ClassTypeId),
     /// the set of Python objects with the given class in their __class__'s method resolution order
@@ -337,6 +339,11 @@ impl FunctionTypeId {
 }
 
 #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
+pub struct ModuleTypeId {
+    file_id: FileId,
+}
+
+#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
 pub struct ClassTypeId {
     file_id: FileId,
     class_id: ModuleClassTypeId,
@@ -529,6 +536,8 @@ impl std::fmt::Display for DisplayType<'_> {
             Type::Never => f.write_str("Never"),
             Type::Unknown => f.write_str("Unknown"),
             Type::Unbound => f.write_str("Unbound"),
+            Type::Module(module_id) => {
+            }
             // TODO functions and classes should display using a fully qualified name
             Type::Class(class_id) => {
                 f.write_str("Literal[")?;

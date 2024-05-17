@@ -11,7 +11,7 @@ use crate::symbols::{
     resolve_global_symbol, symbol_table, Definition, GlobalSymbolId, ImportDefinition,
     ImportFromDefinition,
 };
-use crate::types::Type;
+use crate::types::{self as types, Type};
 use crate::FileId;
 
 // FIXME: Figure out proper dead-lock free synchronisation now that this takes `&db` instead of `&mut db`.
@@ -62,9 +62,9 @@ pub fn infer_definition_type(
             }
         }
         Definition::Import(ImportDefinition { module }) => {
-            // TODO what is the type of a module
-            let _ = module;
-            Ok(Type::Unknown)
+            // FIXME: do we need to trigger a parse of the module here?
+            // FIXME: should the module type contain ModuleStoreRef?
+            Ok(Type::Module(types::ModuleTypeId { file_id }))
         }
         Definition::ClassDef(node_key) => {
             if let Some(ty) = type_store.get_cached_node_type(file_id, node_key.erased()) {
