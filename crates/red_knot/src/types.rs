@@ -2,6 +2,7 @@
 use crate::ast_ids::NodeKey;
 use crate::db::{QueryResult, SemanticDb, SemanticJar};
 use crate::files::FileId;
+use crate::module::Module;
 use crate::symbols::{symbol_table, GlobalSymbolId, ScopeId, ScopeKind, SymbolId};
 use crate::{FxDashMap, FxIndexSet, Name};
 use ruff_index::{newtype_index, IndexVec};
@@ -340,6 +341,7 @@ impl FunctionTypeId {
 
 #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
 pub struct ModuleTypeId {
+    module: Module,
     file_id: FileId,
 }
 

@@ -5,7 +5,7 @@ use ruff_python_ast::AstNode;
 
 use crate::db::{QueryResult, SemanticDb, SemanticJar};
 
-use crate::module::ModuleName;
+use crate::module::{resolve_module, ModuleName};
 use crate::parse::parse;
 use crate::symbols::{
     resolve_global_symbol, symbol_table, Definition, GlobalSymbolId, ImportDefinition,
@@ -61,10 +61,14 @@ pub fn infer_definition_type(
                 Ok(Type::Unknown)
             }
         }
-        Definition::Import(ImportDefinition { module }) => {
-            // FIXME: do we need to trigger a parse of the module here?
-            // FIXME: should the module type contain ModuleStoreRef?
-            Ok(Type::Module(types::ModuleTypeId { file_id }))
+        Definition::Import(ImportDefinition {
+            module: module_name,
+        }) => {
+            if let Some(module) = resolve_module(db, module_name.clone())? {
+                Ok(Type::Module(types::ModuleTypeId { module, file_id }))
+            } else {
+                Ok(Type::Unknown)
+            }
         }
         Definition::ClassDef(node_key) => {
             if let Some(ty) = type_store.get_cached_node_type(file_id, node_key.erased()) {
