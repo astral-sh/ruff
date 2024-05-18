@@ -12,7 +12,7 @@ use crate::symbols::{
     ImportFromDefinition,
 };
 use crate::types::{ModuleTypeId, Type};
-use crate::FileId;
+use crate::{FileId, Name};
 
 // FIXME: Figure out proper dead-lock free synchronisation now that this takes `&db` instead of `&mut db`.
 #[tracing::instrument(level = "trace", skip(db))]
@@ -142,6 +142,11 @@ fn infer_expr_type(db: &dyn SemanticDb, file_id: FileId, expr: &ast::Expr) -> Qu
             } else {
                 Ok(Type::Unknown)
             }
+        }
+        ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. }) => {
+            let value_type = infer_expr_type(db, file_id, value)?;
+            let attr_name = &Name::new(&attr.id);
+            value_type.get_member(db, attr_name)
         }
         _ => todo!("full expression type resolution"),
     }

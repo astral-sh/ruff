@@ -51,6 +51,44 @@ impl Type {
     pub const fn is_unknown(&self) -> bool {
         matches!(self, Type::Unknown)
     }
+
+    pub fn get_member(&self, db: &dyn SemanticDb, name: &Name) -> QueryResult<Type> {
+        // NOTE: maybe make this a trait that each TypeID implements?
+        match self {
+            Type::Any => todo!("attribute lookup on Any type"),
+            Type::Never => todo!("attribute lookup on Never type"),
+            Type::Unknown => todo!("attribute lookup on Unknown type"),
+            Type::Unbound => todo!("attribute lookup on Unbound type"),
+            Type::Function(_) => todo!("attribute lookup on Function type"),
+            Type::Module(module_id) => module_id
+                .get_member(db, name)
+                // FIXME: don't want to unwrap here; need to add a QueryError ctor for the case
+                // where the get_member result is Ok(None)
+                .map(Option::unwrap),
+            Type::Class(class_id) => class_id
+                .get_own_class_member(db, name)
+                .or_else(|_| class_id.get_super_class_member(db, name))
+                // FIXME: don't want to unwrap here; need to add a QueryError ctor for the case
+                // where the get_member result is Ok(None)
+                .map(Option::unwrap),
+            Type::Instance(_) => {
+                // TODO MRO? get_own_instance_member, get_instance_member
+                todo!("attribute lookup on Instance type")
+            }
+            Type::Union(union_id) => {
+                let jar: &SemanticJar = db.jar()?;
+                let union_ref = jar.type_store.get_union(*union_id);
+                // TODO return a type FF at least one of the unioned-types have the member; return
+                // the union over those member types
+                todo!("attribute lookup on Union type")
+            }
+            Type::Intersection(_) => {
+                // TODO return a type IFF all of the intersected-types have the member; but what
+                // type?
+                todo!("attribute lookup on Intersection type")
+            }
+        }
+    }
 }
 
 impl From<FunctionTypeId> for Type {
