@@ -220,11 +220,6 @@ pub(crate) fn continuation_lines(
         ),
     );
 
-    // indent_next tells us whether the next block is indented.
-    // Assuming that it is indented by 4 spaces, then we should not allow 4-space indents on the final continuation line.
-    // In turn, some other indents are allowed to have an extra 4 spaces.
-    let indent_next = logical_line.text().trim_end().ends_with(':');
-
     // Here "row" is the physical line index (within the logical line).
     let mut row = 0;
     let mut depth = 0;
@@ -242,7 +237,6 @@ pub(crate) fn continuation_lines(
     let mut hangs: Vec<Option<i64>> = Vec::with_capacity(max_depth + 1);
     hangs.push(None);
     let mut hang: i64 = 0;
-    let mut hanging_indent: bool = false;
     // Visual indents
     let mut last_indent = start_indent_level;
     let mut last_token_multiline = false;
@@ -278,31 +272,18 @@ pub(crate) fn continuation_lines(
             // Is the indent relative to an opening bracket line ?
             for open_row in open_rows[depth].iter().rev() {
                 hang = rel_indent[row] - rel_indent[*open_row];
-                hanging_indent = valid_hang(hang, indent_size, indent_char);
-                if hanging_indent {
+                if valid_hang(hang, indent_size, indent_char) {
                     break;
                 }
             }
-            if let Some(depth_hang) = hangs[depth] {
-                hanging_indent = hang == depth_hang;
-            }
 
-            // if (is_closing_bracket && (indent[depth] != 0 || hang == 0))
-            //     || (indent[depth] != 0
-            //         && token_info.token_start_within_physical_line < indent[depth])
-            // {
-            // } else if hanging_indent || (indent_next && rel_indent[row] == (2 * indent_size)) {
-            //     hangs[depth] = Some(hang);
-            // } else {
-            //     if hang <= 0 {
-            //         // E122.
-            //         let diagnostic = Diagnostic::new(MissingOrOutdentedIndentation, token.range);
-            //         context.push_diagnostic(diagnostic);
-            //     }
-            // }
-
-            if token_info.token_start_within_physical_line < indent[depth] {
-            } else if hang < 0 || (!is_closing_bracket && hang == 0) {
+            let is_visual_indent_violation =
+                token_info.token_start_within_physical_line < indent[depth];
+            // E122 is triggered by the following:
+            // 1. There is no visual indent violation (this is a different rule in pycodestyle)
+            // 2. The relative hang is less than or equal to zero.
+            // 3. Unless this is a closing bracket, in which case it can be zero.
+            if !is_visual_indent_violation && (hang < 0 || (!is_closing_bracket && hang == 0)) {
                 // E122.
                 let diagnostic = Diagnostic::new(MissingOrOutdentedIndentation, token.range);
                 context.push_diagnostic(diagnostic);
