@@ -177,3 +177,33 @@ FURB110.py:34:5: FURB110 [*] Replace ternary `if` expression with `or` operator
 39    |-    y
    34 |+    x or y
 40 35 | )
+41 36 | 
+42 37 | # FURB110
+
+FURB110.py:44:5: FURB110 [*] Replace ternary `if` expression with `or` operator
+   |
+42 |   # FURB110
+43 |   z = (
+44 |       x
+   |  _____^
+45 | |     if x
+46 | |     else y
+47 | |     if y > 0
+48 | |     else None
+   | |_____________^ FURB110
+49 |   )
+   |
+   = help: Replace with `or` operator
+
+ℹ Safe fix
+41 41 | 
+42 42 | # FURB110
+43 43 | z = (
+44    |-    x
+45    |-    if x
+46    |-    else y
+   44 |+    x or (y
+47 45 |     if y > 0
+48    |-    else None
+   46 |+    else None)
+49 47 | )
