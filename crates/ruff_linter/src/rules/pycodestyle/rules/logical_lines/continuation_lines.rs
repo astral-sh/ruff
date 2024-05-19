@@ -294,10 +294,25 @@ pub(crate) fn continuation_lines(
             } else {
                 if hang <= 0 {
                     // E122.
+                    for open_row in open_rows[depth].iter().rev() {
+                        hang = rel_indent[row] - rel_indent[*open_row];
+                        hanging_indent = valid_hang(hang, indent_size, indent_char);
+                        println!("{} {}", hang, hanging_indent);
+                        if hanging_indent {
+                            break;
+                        }
+                    }
                     let diagnostic = Diagnostic::new(MissingOrOutdentedIndentation, token.range);
                     context.push_diagnostic(diagnostic);
                 }
             }
+
+            // if token_info.token_start_within_physical_line < indent[depth] {
+            // } else if hang < 0 || (!is_closing_bracket && hang == 0) {
+            //     // E122.
+            //     let diagnostic = Diagnostic::new(MissingOrOutdentedIndentation, token.range);
+            //     context.push_diagnostic(diagnostic);
+            // }
         }
 
         // Look for visual indenting.
@@ -355,7 +370,7 @@ pub(crate) fn continuation_lines(
                         *ind = 0;
                     }
                 }
-                open_rows.truncate(depth);
+                open_rows.truncate(depth + 1);
                 depth -= 1;
                 brackets_opened = brackets_opened.saturating_sub(1);
             }
