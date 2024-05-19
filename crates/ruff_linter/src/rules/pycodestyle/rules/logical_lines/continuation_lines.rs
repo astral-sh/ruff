@@ -3,6 +3,8 @@ use std::iter::zip;
 
 use super::{LogicalLine, LogicalLineToken};
 use crate::checkers::logical_lines::LogicalLinesContext;
+use crate::line_width::IndentWidth;
+use crate::rules::pycodestyle::helpers::expand_indent;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_index::Indexer;
@@ -43,8 +45,8 @@ impl Violation for MissingOrOutdentedIndentation {
 struct TokenInfo {
     start_physical_line_idx: usize,
     end_physical_line_idx: usize,
-    token_start_within_physical_line: i64,
-    token_end_within_physical_line: i64,
+    token_start_within_physical_line: i16,
+    token_end_within_physical_line: i16,
 }
 
 /// Compute the `TokenInfo` of each token.
@@ -105,11 +107,11 @@ fn get_token_infos<'a>(
         token_infos.push(TokenInfo {
             start_physical_line_idx,
             end_physical_line_idx: current_line_idx,
-            token_start_within_physical_line: i64::try_from(
+            token_start_within_physical_line: i16::try_from(
                 usize::from(token.range.start()) - first_physical_line_start,
             )
             .expect("Lines are expected to be relatively short."),
-            token_end_within_physical_line: i64::try_from(
+            token_end_within_physical_line: i16::try_from(
                 usize::from(token.range.end()) - current_physical_line_start,
             )
             .expect("Lines are expected to be relatively short."),
@@ -144,29 +146,6 @@ fn continuation_line_end(
     Some(locator.full_line_end(*continuation_line_start))
 }
 
-/// Return the amount of indentation of the given line.
-/// Tabs are expanded to the next multiple of 8.
-fn expand_indent(line: &str) -> i64 {
-    if !line.contains('\t') {
-        // If there are no tabs in the line, return the leading space count
-        return i64::try_from(line.len() - line.trim_start().len())
-            .expect("Line length to be relatively small.");
-    }
-    let mut indent = 0;
-
-    for ch in line.chars() {
-        if ch == '\t' {
-            indent = indent / 8 * 8 + 8;
-        } else if ch == ' ' {
-            indent += 1;
-        } else {
-            break;
-        }
-    }
-
-    indent
-}
-
 fn calculate_max_depth(logical_line: &LogicalLine) -> usize {
     let mut depth = 0;
     let mut max_depth = 0;
@@ -183,22 +162,27 @@ fn calculate_max_depth(logical_line: &LogicalLine) -> usize {
     max_depth
 }
 
-fn valid_hang(hang: i64, indent_size: i64, indent_char: char) -> bool {
+fn valid_hang(hang: i16, indent_size: i16, indent_char: char) -> bool {
     hang == indent_size || (indent_char == '\t' && hang == 2 * indent_size)
+}
+
+fn expand_indent_i16(line: &str, indent_width: IndentWidth) -> i16 {
+    i16::try_from(expand_indent(line, indent_width)).expect("Indent to be relatively small.")
 }
 
 /// E122
 pub(crate) fn continuation_lines(
     logical_line: &LogicalLine,
     indent_char: char,
-    indent_size: usize,
+    indent_width: IndentWidth,
     locator: &Locator,
     indexer: &Indexer,
     context: &mut LogicalLinesContext,
 ) {
     // The pycodestyle implementation makes use of negative values,
     // converting the indent_size type at the start avoids converting it multiple times later.
-    let indent_size = i64::try_from(indent_size).expect("Indent size to be relatively small.");
+    let indent_size =
+        i16::try_from(indent_width.as_usize()).expect("Indent size to be relatively small.");
     let token_infos = get_token_infos(logical_line, locator, indexer);
     let nb_physical_lines = if let Some(last_token_info) = token_infos.last() {
         1 + last_token_info.start_physical_line_idx
@@ -211,13 +195,14 @@ pub(crate) fn continuation_lines(
     }
 
     // Indent of the first physical line.
-    let start_indent_level = expand_indent(
+    let start_indent_level = expand_indent_i16(
         locator.line(
             logical_line
                 .first_token()
                 .expect("Would have returned earlier if the logical line was empty")
                 .start(),
         ),
+        indent_width,
     );
 
     // Here "row" is the physical line index (within the logical line).
@@ -225,18 +210,18 @@ pub(crate) fn continuation_lines(
     let mut depth = 0;
     let max_depth = calculate_max_depth(logical_line);
     // Brackets opened on a line.
-    let mut brackets_opened = 0u32;
+    let mut brackets_opened = 0u8;
     // In fstring
-    let mut fstrings_opened = 0u32;
+    let mut fstrings_opened = 0u8;
     // Relative indents of physical lines.
-    let mut rel_indent: Vec<i64> = vec![0; nb_physical_lines];
+    let mut rel_indent: Vec<i16> = vec![0; nb_physical_lines];
     // For each depth, collect a list of opening rows.
     let mut open_rows: Vec<Vec<usize>> = Vec::with_capacity(max_depth + 1);
     open_rows.push(vec![0]);
     // For each depth, record the hanging indentation.
-    let mut hangs: Vec<Option<i64>> = Vec::with_capacity(max_depth + 1);
+    let mut hangs: Vec<Option<i16>> = Vec::with_capacity(max_depth + 1);
     hangs.push(None);
-    let mut hang: i64 = 0;
+    let mut hang = 0i16;
     // Visual indents
     let mut last_indent = start_indent_level;
     let mut last_token_multiline = false;
@@ -267,7 +252,8 @@ pub(crate) fn continuation_lines(
 
             // Record the initial indent.
             let indent_range = TextRange::new(locator.line_start(token.start()), token.start());
-            rel_indent[row] = expand_indent(locator.slice(indent_range)) - start_indent_level;
+            rel_indent[row] =
+                expand_indent_i16(locator.slice(indent_range), indent_width) - start_indent_level;
 
             // Is the indent relative to an opening bracket line ?
             for open_row in open_rows[depth].iter().rev() {

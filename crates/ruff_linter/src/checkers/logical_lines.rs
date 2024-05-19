@@ -1,4 +1,3 @@
-use crate::line_width::IndentWidth;
 use crate::registry::Rule;
 use ruff_diagnostics::Diagnostic;
 use ruff_python_codegen::Stylist;
@@ -9,6 +8,7 @@ use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::registry::AsRule;
+use crate::rules::pycodestyle::helpers::expand_indent;
 use crate::rules::pycodestyle::rules::logical_lines::{
     continuation_lines, extraneous_whitespace, indentation, missing_whitespace,
     missing_whitespace_after_keyword, missing_whitespace_around_operator, redundant_backslash,
@@ -17,23 +17,6 @@ use crate::rules::pycodestyle::rules::logical_lines::{
     whitespace_before_parameters, LogicalLines, TokenFlags,
 };
 use crate::settings::LinterSettings;
-
-/// Return the amount of indentation, expanding tabs to the next multiple of the settings' tab size.
-pub(crate) fn expand_indent(line: &str, indent_width: IndentWidth) -> usize {
-    let line = line.trim_end_matches(['\n', '\r']);
-
-    let mut indent = 0;
-    let tab_size = indent_width.as_usize();
-    for c in line.bytes() {
-        match c {
-            b'\t' => indent = (indent / tab_size) * tab_size + tab_size,
-            b' ' => indent += 1,
-            _ => break,
-        }
-    }
-
-    indent
-}
 
 pub(crate) fn check_logical_lines(
     tokens: &[LexResult],
@@ -124,7 +107,7 @@ pub(crate) fn check_logical_lines(
                 continuation_lines(
                     &line,
                     indent_char,
-                    indent_size,
+                    settings.tab_size,
                     locator,
                     indexer,
                     &mut context,
