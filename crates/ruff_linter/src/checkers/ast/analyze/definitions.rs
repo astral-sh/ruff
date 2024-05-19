@@ -10,7 +10,7 @@ use crate::checkers::ast::Checker;
 use crate::codes::Rule;
 use crate::docstrings::Docstring;
 use crate::fs::relativize_path;
-use crate::rules::{flake8_annotations, flake8_pyi, pydocstyle, pylint};
+use crate::rules::{darglint, flake8_annotations, flake8_pyi, pydocstyle, pylint};
 use crate::{docstrings, warn_user};
 
 /// Run lint rules over all [`Definition`] nodes in the [`SemanticModel`].
@@ -83,12 +83,17 @@ pub(crate) fn definitions(checker: &mut Checker) {
         Rule::UndocumentedPublicNestedClass,
         Rule::UndocumentedPublicPackage,
     ]);
+    let enforce_darglint = checker.any_enabled(&[
+        Rule::DocstringMissingException,
+        Rule::DocstringExtraneousException,
+    ]);
 
     if !enforce_annotations
         && !enforce_docstrings
         && !enforce_stubs
         && !enforce_stubs_and_runtime
         && !enforce_dunder_method
+        && !enforce_darglint
     {
         return;
     }
@@ -169,8 +174,8 @@ pub(crate) fn definitions(checker: &mut Checker) {
             }
         }
 
-        // pydocstyle
-        if enforce_docstrings {
+        // pydocstyle, darglint
+        if enforce_docstrings || enforce_darglint {
             if pydocstyle::helpers::should_ignore_definition(
                 definition,
                 &checker.settings.pydocstyle.ignore_decorators,
@@ -307,6 +312,18 @@ pub(crate) fn definitions(checker: &mut Checker) {
             ]) {
                 pydocstyle::rules::sections(
                     checker,
+                    &docstring,
+                    checker.settings.pydocstyle.convention.as_ref(),
+                );
+            }
+
+            if checker.any_enabled(&[
+                Rule::DocstringMissingException,
+                Rule::DocstringExtraneousException,
+            ]) {
+                darglint::rules::check_docstring(
+                    checker,
+                    definition,
                     &docstring,
                     checker.settings.pydocstyle.convention.as_ref(),
                 );

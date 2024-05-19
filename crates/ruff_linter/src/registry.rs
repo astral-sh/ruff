@@ -205,6 +205,9 @@ pub enum Linter {
     /// [refurb](https://pypi.org/project/refurb/)
     #[prefix = "FURB"]
     Refurb,
+    /// [darglint](https://pypi.org/project/darglint/)
+    #[prefix = "DAR"]
+    Darglint,
     /// Ruff-specific rules
     #[prefix = "RUF"]
     Ruff,

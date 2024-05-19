@@ -396,7 +396,7 @@ impl<'a> SectionContext<'a> {
         NewlineWithTrailingNewline::with_offset(lines, self.offset() + self.data.summary_full_end)
     }
 
-    fn following_lines_str(&self) -> &'a str {
+    pub(crate) fn following_lines_str(&self) -> &'a str {
         &self.docstring_body.as_str()[self.following_range_relative()]
     }
 
