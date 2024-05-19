@@ -80,10 +80,10 @@ fn get_token_infos<'a>(
 
                 let trivia =
                     locator.slice(TextRange::new(prev_token.range.end(), token.range.start()));
-                for (index, _text) in trivia.match_indices('\n') {
+                if let Some(idx) = trivia.rfind('\n') {
                     start_physical_line_idx += 1;
                     current_line_idx = start_physical_line_idx;
-                    first_physical_line_start = usize::from(prev_token.range.end()) + index + 1;
+                    first_physical_line_start = usize::from(prev_token.range.end()) + idx + 1;
                     current_physical_line_start = first_physical_line_start;
                 }
             }
@@ -98,9 +98,9 @@ fn get_token_infos<'a>(
         ) {
             // Look for newlines within strings.
             let trivia = locator.slice(token.range);
-            for (index, _text) in trivia.match_indices('\n') {
+            if let Some(idx) = trivia.rfind('\n') {
                 current_line_idx += 1;
-                current_physical_line_start = usize::from(token.range.start()) + index + 1;
+                current_physical_line_start = usize::from(token.range.start()) + idx + 1;
             }
         }
 
