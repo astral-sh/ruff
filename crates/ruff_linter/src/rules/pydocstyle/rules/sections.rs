@@ -1324,67 +1324,16 @@ impl AlwaysFixableViolation for BlankLinesBetweenHeaderAndContent {
 pub(crate) fn sections(
     checker: &mut Checker,
     docstring: &Docstring,
+    section_contexts: &SectionContexts,
     convention: Option<&Convention>,
 ) {
     match convention {
-        Some(Convention::Google) => {
-            parse_google_sections(
-                checker,
-                docstring,
-                &SectionContexts::from_docstring(docstring, SectionStyle::Google),
-            );
-        }
-        Some(Convention::Numpy) => {
-            parse_numpy_sections(
-                checker,
-                docstring,
-                &SectionContexts::from_docstring(docstring, SectionStyle::Numpy),
-            );
-        }
-        Some(Convention::Pep257) | None => {
-            // There are some overlapping section names, between the Google and NumPy conventions
-            // (e.g., "Returns", "Raises"). Break ties by checking for the presence of some of the
-            // section names that are unique to each convention.
-
-            // If the docstring contains `Parameters:` or `Other Parameters:`, use the NumPy
-            // convention.
-            let numpy_sections = SectionContexts::from_docstring(docstring, SectionStyle::Numpy);
-            if numpy_sections.iter().any(|context| {
-                matches!(
-                    context.kind(),
-                    SectionKind::Parameters
-                        | SectionKind::OtherParams
-                        | SectionKind::OtherParameters
-                )
-            }) {
-                parse_numpy_sections(checker, docstring, &numpy_sections);
-                return;
-            }
-
-            // If the docstring contains any argument specifier, use the Google convention.
-            let google_sections = SectionContexts::from_docstring(docstring, SectionStyle::Google);
-            if google_sections.iter().any(|context| {
-                matches!(
-                    context.kind(),
-                    SectionKind::Args
-                        | SectionKind::Arguments
-                        | SectionKind::KeywordArgs
-                        | SectionKind::KeywordArguments
-                        | SectionKind::OtherArgs
-                        | SectionKind::OtherArguments
-                )
-            }) {
-                parse_google_sections(checker, docstring, &google_sections);
-                return;
-            }
-
-            // Otherwise, use whichever convention matched more sections.
-            if google_sections.len() > numpy_sections.len() {
-                parse_google_sections(checker, docstring, &google_sections);
-            } else {
-                parse_numpy_sections(checker, docstring, &numpy_sections);
-            }
-        }
+        Some(Convention::Google) => parse_google_sections(checker, docstring, &section_contexts),
+        Some(Convention::Numpy) => parse_numpy_sections(checker, docstring, &section_contexts),
+        Some(Convention::Pep257) | None => match section_contexts.style() {
+            SectionStyle::Google => parse_google_sections(checker, docstring, &section_contexts),
+            SectionStyle::Numpy => parse_numpy_sections(checker, docstring, &section_contexts),
+        },
     }
 }
 

@@ -293,7 +293,8 @@ pub(crate) fn definitions(checker: &mut Checker) {
             if checker.enabled(Rule::OverloadWithDocstring) {
                 pydocstyle::rules::if_needed(checker, &docstring);
             }
-            if checker.any_enabled(&[
+
+            let enforce_sections = checker.any_enabled(&[
                 Rule::BlankLineAfterLastSection,
                 Rule::BlankLinesBetweenHeaderAndContent,
                 Rule::CapitalizeSectionName,
@@ -309,24 +310,30 @@ pub(crate) fn definitions(checker: &mut Checker) {
                 Rule::SectionUnderlineMatchesSectionLength,
                 Rule::SectionUnderlineNotOverIndented,
                 Rule::UndocumentedParam,
-            ]) {
-                pydocstyle::rules::sections(
-                    checker,
+            ]);
+            if enforce_sections || enforce_darglint {
+                let section_contexts = pydocstyle::helpers::get_section_contexts(
                     &docstring,
                     checker.settings.pydocstyle.convention.as_ref(),
                 );
-            }
 
-            if checker.any_enabled(&[
-                Rule::DocstringMissingException,
-                Rule::DocstringExtraneousException,
-            ]) {
-                darglint::rules::check_docstring(
-                    checker,
-                    definition,
-                    &docstring,
-                    checker.settings.pydocstyle.convention.as_ref(),
-                );
+                if enforce_sections {
+                    pydocstyle::rules::sections(
+                        checker,
+                        &docstring,
+                        &section_contexts,
+                        checker.settings.pydocstyle.convention.as_ref(),
+                    );
+                }
+
+                if enforce_darglint {
+                    darglint::rules::check_docstring(
+                        checker,
+                        definition,
+                        &section_contexts,
+                        checker.settings.pydocstyle.convention.as_ref(),
+                    );
+                }
             }
         }
     }

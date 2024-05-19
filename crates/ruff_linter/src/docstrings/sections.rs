@@ -163,6 +163,7 @@ impl SectionKind {
 pub(crate) struct SectionContexts<'a> {
     contexts: Vec<SectionContextData>,
     docstring: &'a Docstring<'a>,
+    style: SectionStyle,
 }
 
 impl<'a> SectionContexts<'a> {
@@ -221,7 +222,12 @@ impl<'a> SectionContexts<'a> {
         Self {
             contexts,
             docstring,
+            style,
         }
+    }
+
+    pub(crate) fn style(&self) -> SectionStyle {
+        self.style
     }
 
     pub(crate) fn len(&self) -> usize {
