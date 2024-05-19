@@ -73,19 +73,17 @@ DEFAULT_TARGETS = [
     Project(
         repo=Repository(owner="scikit-build", name="scikit-build-core", ref="main")
     ),
-    # TODO(charlie): Ecosystem check fails in non-preview due to the direct
-    # selection of preview rules.
-    # Project(
-    #     repo=Repository(
-    #         owner="sphinx-doc",
-    #         name="sphinx",
-    #         ref="master",
-    #     ),
-    #     format_options=FormatOptions(
-    #         # Does not contain valid UTF-8
-    #         exclude="tests/roots/test-pycode/cp_1251_coded.py"
-    #     ),
-    # ),
+    Project(
+        repo=Repository(
+            owner="sphinx-doc",
+            name="sphinx",
+            ref="master",
+        ),
+        format_options=FormatOptions(
+            # Does not contain valid UTF-8
+            exclude="tests/roots/test-pycode/cp_1251_coded.py"
+        ),
+    ),
     Project(repo=Repository(owner="spruceid", name="siwe-py", ref="main")),
     Project(repo=Repository(owner="tiangolo", name="fastapi", ref="master")),
     Project(repo=Repository(owner="yandex", name="ch-backup", ref="main")),
