@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::HashSet;
 
 use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Violation;
@@ -198,12 +198,14 @@ struct Entry {
 #[derive(Debug)]
 struct BodyEntries {
     raised_exceptions: Vec<Entry>,
+    named_exceptions: HashSet<String>,
 }
 
 impl BodyEntries {
     fn new() -> Self {
         Self {
             raised_exceptions: Vec::new(),
+            named_exceptions: HashSet::new(),
         }
     }
 }
@@ -212,10 +214,13 @@ impl Visitor<'_> for BodyEntries {
     fn visit_stmt(&mut self, stmt: &Stmt) {
         if let Stmt::Raise(ast::StmtRaise { exc: Some(exc), .. }) = stmt {
             if let Expr::Name(ast::ExprName { id, range, .. }) = exc.as_ref() {
-                self.raised_exceptions.push(Entry {
-                    id: id.to_string(),
-                    range: *range,
-                });
+                // Skip variable exceptions for now
+                if !self.named_exceptions.contains(id) {
+                    self.raised_exceptions.push(Entry {
+                        id: id.to_string(),
+                        range: *range,
+                    });
+                }
             }
         }
         visitor::walk_stmt(self, stmt);
@@ -223,12 +228,11 @@ impl Visitor<'_> for BodyEntries {
 
     fn visit_except_handler(&mut self, except_handler: &ExceptHandler) {
         if let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
-            type_: Some(type_),
             name: Some(name),
             ..
         }) = except_handler
         {
-            println!("{:?} {:?}", type_, name.id);
+            self.named_exceptions.insert(name.id.to_string());
         }
         visitor::walk_except_handler(self, except_handler);
     }
