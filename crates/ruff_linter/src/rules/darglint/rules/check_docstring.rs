@@ -177,7 +177,7 @@ fn parse_entries_numpy(content: &str) -> Vec<String> {
     };
     let indentation = dashes.len() - dashes.trim_start().len();
     for potential in split {
-        if let Some(first_char) = potential[indentation..].chars().next() {
+        if let Some(first_char) = potential.chars().nth(indentation) {
             if !first_char.is_whitespace() {
                 let entry = potential[indentation..].trim().to_string();
                 entries.push(entry);
