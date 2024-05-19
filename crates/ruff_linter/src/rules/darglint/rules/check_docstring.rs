@@ -3,7 +3,7 @@ use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::visitor::{self, Visitor};
 use ruff_python_ast::{self as ast, Expr, Stmt};
-use ruff_python_semantic::Definition;
+use ruff_python_semantic::{Definition, MemberKind};
 use ruff_text_size::TextRange;
 
 use crate::checkers::ast::Checker;
@@ -231,6 +231,13 @@ pub(crate) fn check_docstring(
         return;
     };
 
+    if matches!(
+        member.kind,
+        MemberKind::Class(_) | MemberKind::NestedClass(_)
+    ) {
+        return;
+    }
+
     let docstring_entries = match convention {
         Some(Convention::Google) => DocstringEntries::new(section_contexts, SectionStyle::Google),
         Some(Convention::Numpy) => DocstringEntries::new(section_contexts, SectionStyle::Numpy),
@@ -243,6 +250,10 @@ pub(crate) fn check_docstring(
     // DAR401
     if checker.enabled(Rule::DocstringMissingException) {
         for body_raise in &body_entries.raised_exceptions {
+            if body_raise.id == "NotImplementedError" {
+                continue;
+            }
+
             if !docstring_entries.raised_exceptions.contains(&body_raise.id) {
                 let diagnostic = Diagnostic::new(
                     DocstringMissingException {

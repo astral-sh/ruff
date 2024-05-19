@@ -1,3 +1,4 @@
+# DAR401
 def calculate_speed(distance: float, time: float) -> float:
     """Calculate speed as distance divided by time.
 
@@ -17,6 +18,7 @@ def calculate_speed(distance: float, time: float) -> float:
         raise FasterThanLightError from exc
 
 
+# DAR401
 def calculate_speed(distance: float, time: float) -> float:
     """Calculate speed as distance divided by time.
 
@@ -33,6 +35,7 @@ def calculate_speed(distance: float, time: float) -> float:
         raise FasterThanLightError from exc
 
 
+# DAR401
 def calculate_speed(distance: float, time: float) -> float:
     """Calculate speed as distance divided by time.
 
@@ -49,3 +52,16 @@ def calculate_speed(distance: float, time: float) -> float:
         raise FasterThanLightError from exc
     except:
         raise ValueError
+
+
+# OK
+def calculate_speed(distance: float, time: float) -> float:
+    try:
+        return distance / time
+    except ZeroDivisionError as exc:
+        raise FasterThanLightError from exc
+
+
+# OK
+def calculate_speed(distance: float, time: float) -> float:
+    raise NotImplementedError
