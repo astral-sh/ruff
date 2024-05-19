@@ -46,7 +46,6 @@ struct TokenInfo {
     start_physical_line_idx: usize,
     end_physical_line_idx: usize,
     token_start_within_physical_line: i16,
-    token_end_within_physical_line: i16,
 }
 
 /// Compute the `TokenInfo` of each token.
@@ -109,10 +108,6 @@ fn get_token_infos<'a>(
             end_physical_line_idx: current_line_idx,
             token_start_within_physical_line: i16::try_from(
                 usize::from(token.range.start()) - first_physical_line_start,
-            )
-            .expect("Lines are expected to be relatively short."),
-            token_end_within_physical_line: i16::try_from(
-                usize::from(token.range.end()) - current_physical_line_start,
             )
             .expect("Lines are expected to be relatively short."),
         });
@@ -294,16 +289,13 @@ pub(crate) fn continuation_lines(
             TokenKind::FStringStart => fstrings_opened += 1,
             TokenKind::FStringEnd => fstrings_opened -= 1,
             TokenKind::Lpar | TokenKind::Lsqb | TokenKind::Lbrace => is_opening_bracket = true,
-            TokenKind::Colon
-                if locator.full_lines(token.range)[usize::try_from(
-                    token_info.token_end_within_physical_line,
-                )
-                .expect("Line to be relatively short.")..]
-                    .trim()
-                    .is_empty() =>
-            {
-                open_rows[depth].push(row)
+            TokenKind::Colon => {
+                let post_colon_range = TextRange::new(token.end(), locator.line_end(token.end()));
+                if locator.slice(post_colon_range).trim().is_empty() {
+                    open_rows[depth].push(row);
+                }
             }
+
             _ => {}
         }
 
