@@ -1,0 +1,28 @@
+---
+source: crates/ruff_linter/src/rules/darglint/mod.rs
+---
+DAR401_numpy.py:47:15: DAR401 Raised exception `FasterThanLightError` missing from docstring
+   |
+45 |         return distance / time
+46 |     except ZeroDivisionError as exc:
+47 |         raise FasterThanLightError from exc
+   |               ^^^^^^^^^^^^^^^^^^^^ DAR401
+   |
+
+DAR401_numpy.py:69:15: DAR401 Raised exception `FasterThanLightError` missing from docstring
+   |
+67 |         return distance / time
+68 |     except ZeroDivisionError as exc:
+69 |         raise FasterThanLightError from exc
+   |               ^^^^^^^^^^^^^^^^^^^^ DAR401
+70 |     except:
+71 |         raise ValueError
+   |
+
+DAR401_numpy.py:71:15: DAR401 Raised exception `ValueError` missing from docstring
+   |
+69 |         raise FasterThanLightError from exc
+70 |     except:
+71 |         raise ValueError
+   |               ^^^^^^^^^^ DAR401
+   |

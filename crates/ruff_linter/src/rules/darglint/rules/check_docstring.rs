@@ -132,14 +132,14 @@ struct DocstringEntries {
 }
 
 impl DocstringEntries {
-    fn new(sections: &SectionContexts) -> Self {
+    fn new(sections: &SectionContexts, style: SectionStyle) -> Self {
         let mut raised_exceptions: Vec<String> = Vec::new();
         let mut raised_exceptions_range = None;
 
         for section in sections.iter() {
             match section.kind() {
                 SectionKind::Raises => {
-                    raised_exceptions = parse_entries(section.following_lines_str());
+                    raised_exceptions = parse_entries(section.following_lines_str(), style);
                     raised_exceptions_range = Some(section.range());
                 }
                 _ => {}
@@ -153,7 +153,14 @@ impl DocstringEntries {
     }
 }
 
-fn parse_entries(content: &str) -> Vec<String> {
+fn parse_entries(content: &str, style: SectionStyle) -> Vec<String> {
+    match style {
+        SectionStyle::Google => parse_entries_google(content),
+        SectionStyle::Numpy => parse_entries_numpy(content),
+    }
+}
+
+fn parse_entries_google(content: &str) -> Vec<String> {
     let mut entries: Vec<String> = Vec::new();
     for potential in content.split('\n') {
         let Some(colon_idx) = potential.find(':') else {
@@ -161,6 +168,24 @@ fn parse_entries(content: &str) -> Vec<String> {
         };
         let entry = potential[..colon_idx].trim().to_string();
         entries.push(entry);
+    }
+    entries
+}
+
+fn parse_entries_numpy(content: &str) -> Vec<String> {
+    let mut entries: Vec<String> = Vec::new();
+    let mut split = content.split('\n');
+    let Some(dashes) = split.next() else {
+        return entries;
+    };
+    let indentation = dashes.len() - dashes.trim_start().len();
+    for potential in split {
+        if let Some(first_char) = potential[indentation..].chars().next() {
+            if !first_char.is_whitespace() {
+                let entry = potential[indentation..].trim().to_string();
+                entries.push(entry);
+            }
+        }
     }
     entries
 }
@@ -211,19 +236,21 @@ pub(crate) fn check_docstring(
     let Definition::Member(member) = definition else {
         return;
     };
-    // let sections = match convention {
-    //     Some(Convention::Google) => {
-    //         &SectionContexts::from_docstring(docstring, SectionStyle::Google)
-    //     }
 
-    //     Some(Convention::Numpy) => &SectionContexts::from_docstring(docstring, SectionStyle::Numpy),
-    //     _ => {
-    //         return;
-    //     }
-    // };
+    let docstring_entries = match convention {
+        Some(Convention::Google) => {
+            let sections = SectionContexts::from_docstring(docstring, SectionStyle::Google);
+            DocstringEntries::new(&sections, SectionStyle::Google)
+        }
 
-    let sections = SectionContexts::from_docstring(docstring, SectionStyle::Google);
-    let docstring_entries = DocstringEntries::new(&sections);
+        Some(Convention::Numpy) => {
+            let sections = SectionContexts::from_docstring(docstring, SectionStyle::Numpy);
+            DocstringEntries::new(&sections, SectionStyle::Numpy)
+        }
+        _ => {
+            return;
+        }
+    };
 
     let mut body_entries = BodyEntries::new();
     visitor::walk_body(&mut body_entries, &member.body());

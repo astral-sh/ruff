@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/darglint/mod.rs
 ---
-DAR402.py:11:1: DAR402 FasterThanLightError not explicitly raised.
+DAR402_google.py:11:1: DAR402 FasterThanLightError not explicitly raised.
    |
  9 |           Speed as distance divided by time.
 10 |   
@@ -12,7 +12,7 @@ DAR402.py:11:1: DAR402 FasterThanLightError not explicitly raised.
 14 |       return distance / time
    |
 
-DAR402.py:27:1: DAR402 FasterThanLightError, DivisionByZero not explicitly raised.
+DAR402_google.py:27:1: DAR402 FasterThanLightError, DivisionByZero not explicitly raised.
    |
 25 |           Speed as distance divided by time.
 26 |   
@@ -24,7 +24,7 @@ DAR402.py:27:1: DAR402 FasterThanLightError, DivisionByZero not explicitly raise
 31 |       return distance / time
    |
 
-DAR402.py:44:1: DAR402 DivisionByZero not explicitly raised.
+DAR402_google.py:44:1: DAR402 DivisionByZero not explicitly raised.
    |
 42 |           Speed as distance divided by time.
 43 |   
