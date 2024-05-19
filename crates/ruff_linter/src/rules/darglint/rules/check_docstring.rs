@@ -94,7 +94,7 @@ impl Violation for DocstringMissingException {
 ///     Raises:
 ///         ZeroDivisionError: Divided by zero.
 ///     """
-///         return distance / time
+///     return distance / time
 /// ```
 ///
 /// Use instead:
@@ -109,7 +109,7 @@ impl Violation for DocstringMissingException {
 ///     Returns:
 ///         Speed as distance divided by time.
 ///     """
-///         return distance / time
+///     return distance / time
 /// ```
 #[violation]
 pub struct DocstringExtraneousException {
