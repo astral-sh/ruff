@@ -181,6 +181,7 @@ fn check(
 
         // If we're at the end of line, skip.
         if matches!(next_char, '\n' | '\r') {
+            contains_valid_escape_sequence = true;
             continue;
         }
 
