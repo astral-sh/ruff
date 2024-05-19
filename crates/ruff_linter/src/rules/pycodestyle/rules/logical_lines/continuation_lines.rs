@@ -213,6 +213,8 @@ pub(crate) fn continuation_lines(
     let mut brackets_opened = 0u8;
     // In fstring
     let mut fstrings_opened = 0u8;
+    // Is opening bracket
+    let mut is_opening_bracket: bool;
     // Relative indents of physical lines.
     let mut rel_indent: Vec<i16> = vec![0; nb_physical_lines];
     // For each depth, collect a list of opening rows.
@@ -277,36 +279,32 @@ pub(crate) fn continuation_lines(
         }
 
         // Look for visual indenting.
-        if brackets_opened != 0
+        if indent[depth] == 0
+            && brackets_opened != 0
             && !matches!(
                 token.kind,
                 TokenKind::Newline | TokenKind::NonLogicalNewline | TokenKind::Comment
             )
-            && indent[depth] == 0
         {
             indent[depth] = token_info.token_start_within_physical_line;
         }
 
-        if matches!(token.kind, TokenKind::Colon)
-            && locator.full_lines(token.range)[usize::try_from(
-                token_info.token_end_within_physical_line,
-            )
-            .expect("Line to be relatively short.")..]
-                .trim()
-                .is_empty()
-        {
-            open_rows[depth].push(row);
-        }
-
-        let is_opening_bracket = matches!(
-            token.kind,
-            TokenKind::Lpar | TokenKind::Lsqb | TokenKind::Lbrace
-        );
-
-        if matches!(token.kind, TokenKind::FStringStart) {
-            fstrings_opened += 1;
-        } else if matches!(token.kind, TokenKind::FStringEnd) {
-            fstrings_opened -= 1;
+        is_opening_bracket = false;
+        match token.kind {
+            TokenKind::FStringStart => fstrings_opened += 1,
+            TokenKind::FStringEnd => fstrings_opened -= 1,
+            TokenKind::Lpar | TokenKind::Lsqb | TokenKind::Lbrace => is_opening_bracket = true,
+            TokenKind::Colon
+                if locator.full_lines(token.range)[usize::try_from(
+                    token_info.token_end_within_physical_line,
+                )
+                .expect("Line to be relatively short.")..]
+                    .trim()
+                    .is_empty() =>
+            {
+                open_rows[depth].push(row)
+            }
+            _ => {}
         }
 
         // Keep track of bracket depth.
