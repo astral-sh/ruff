@@ -285,7 +285,7 @@ pub(crate) fn continuation_lines(
             // 3. Unless this is a closing bracket, in which case it can be zero.
             if !is_visual_indent_violation && (hang < 0 || (!is_closing_bracket && hang == 0)) {
                 // E122.
-                let diagnostic = Diagnostic::new(MissingOrOutdentedIndentation, token.range);
+                let diagnostic = Diagnostic::new(MissingOrOutdentedIndentation, indent_range);
                 context.push_diagnostic(diagnostic);
             }
         }
