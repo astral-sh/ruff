@@ -121,7 +121,7 @@ DEFAULT_TARGETS = [
     Project(repo=Repository(owner="python-trio", name="trio", ref="master")),
     Project(repo=Repository(owner="wntrblm", name="nox", ref="main")),
     Project(repo=Repository(owner="pytest-dev", name="pytest", ref="main")),
-    Project(repo=Repository(owner="encode", name="httpx", ref="main")),
+    Project(repo=Repository(owner="encode", name="httpx", ref="master")),
     Project(repo=Repository(owner="mesonbuild", name="meson-python", ref="main")),
     Project(repo=Repository(owner="pdm-project", name="pdm", ref="main")),
 ]
