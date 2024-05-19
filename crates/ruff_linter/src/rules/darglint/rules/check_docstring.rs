@@ -137,12 +137,9 @@ impl DocstringEntries {
         let mut raised_exceptions_range = None;
 
         for section in sections.iter() {
-            match section.kind() {
-                SectionKind::Raises => {
-                    raised_exceptions = parse_entries(section.following_lines_str(), style);
-                    raised_exceptions_range = Some(section.range());
-                }
-                _ => {}
+            if section.kind() == SectionKind::Raises {
+                raised_exceptions = parse_entries(section.following_lines_str(), style);
+                raised_exceptions_range = Some(section.range());
             }
         }
 
@@ -212,14 +209,12 @@ impl BodyEntries {
 
 impl Visitor<'_> for BodyEntries {
     fn visit_stmt(&mut self, stmt: &Stmt) {
-        if let Stmt::Raise(ast::StmtRaise { exc, .. }) = stmt {
-            if let Some(exc) = exc {
-                if let Expr::Name(ast::ExprName { id, range, .. }) = exc.as_ref() {
-                    self.raised_exceptions.push(Entry {
-                        id: id.to_string(),
-                        range: *range,
-                    });
-                }
+        if let Stmt::Raise(ast::StmtRaise { exc: Some(exc), .. }) = stmt {
+            if let Expr::Name(ast::ExprName { id, range, .. }) = exc.as_ref() {
+                self.raised_exceptions.push(Entry {
+                    id: id.to_string(),
+                    range: *range,
+                });
             }
         }
         visitor::walk_stmt(self, stmt);
@@ -241,12 +236,12 @@ pub(crate) fn check_docstring(
     match convention {
         Some(Convention::Google) => {
             let sections = SectionContexts::from_docstring(docstring, SectionStyle::Google);
-            docstring_entries = DocstringEntries::new(&sections, SectionStyle::Google)
+            docstring_entries = DocstringEntries::new(&sections, SectionStyle::Google);
         }
 
         Some(Convention::Numpy) => {
             let sections = SectionContexts::from_docstring(docstring, SectionStyle::Numpy);
-            docstring_entries = DocstringEntries::new(&sections, SectionStyle::Numpy)
+            docstring_entries = DocstringEntries::new(&sections, SectionStyle::Numpy);
         }
         _ => 'unspecified: {
             // There are some overlapping section names, between the Google and NumPy conventions
@@ -295,11 +290,11 @@ pub(crate) fn check_docstring(
     };
 
     let mut body_entries = BodyEntries::new();
-    visitor::walk_body(&mut body_entries, &member.body());
+    visitor::walk_body(&mut body_entries, member.body());
 
     // DAR401
     if checker.enabled(Rule::DocstringMissingException) {
-        for body_raise in body_entries.raised_exceptions.iter() {
+        for body_raise in &body_entries.raised_exceptions {
             if !docstring_entries.raised_exceptions.contains(&body_raise.id) {
                 let diagnostic = Diagnostic::new(
                     DocstringMissingException {
