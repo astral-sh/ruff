@@ -231,6 +231,8 @@ pub(crate) fn continuation_lines(
     let max_depth = calculate_max_depth(logical_line);
     // Brackets opened on a line.
     let mut brackets_opened = 0u32;
+    // In fstring
+    let mut fstrings_opened = 0u32;
     // Relative indents of physical lines.
     let mut rel_indent: Vec<i64> = vec![0; nb_physical_lines];
     // For each depth, collect a list of opening rows.
@@ -285,34 +287,26 @@ pub(crate) fn continuation_lines(
                 hanging_indent = hang == depth_hang;
             }
 
-            if (is_closing_bracket && (indent[depth] != 0 || hang == 0))
-                || (indent[depth] != 0
-                    && token_info.token_start_within_physical_line < indent[depth])
-            {
-            } else if hanging_indent || (indent_next && rel_indent[row] == (2 * indent_size)) {
-                hangs[depth] = Some(hang);
-            } else {
-                if hang <= 0 {
-                    // E122.
-                    for open_row in open_rows[depth].iter().rev() {
-                        hang = rel_indent[row] - rel_indent[*open_row];
-                        hanging_indent = valid_hang(hang, indent_size, indent_char);
-                        println!("{} {}", hang, hanging_indent);
-                        if hanging_indent {
-                            break;
-                        }
-                    }
-                    let diagnostic = Diagnostic::new(MissingOrOutdentedIndentation, token.range);
-                    context.push_diagnostic(diagnostic);
-                }
-            }
-
-            // if token_info.token_start_within_physical_line < indent[depth] {
-            // } else if hang < 0 || (!is_closing_bracket && hang == 0) {
-            //     // E122.
-            //     let diagnostic = Diagnostic::new(MissingOrOutdentedIndentation, token.range);
-            //     context.push_diagnostic(diagnostic);
+            // if (is_closing_bracket && (indent[depth] != 0 || hang == 0))
+            //     || (indent[depth] != 0
+            //         && token_info.token_start_within_physical_line < indent[depth])
+            // {
+            // } else if hanging_indent || (indent_next && rel_indent[row] == (2 * indent_size)) {
+            //     hangs[depth] = Some(hang);
+            // } else {
+            //     if hang <= 0 {
+            //         // E122.
+            //         let diagnostic = Diagnostic::new(MissingOrOutdentedIndentation, token.range);
+            //         context.push_diagnostic(diagnostic);
+            //     }
             // }
+
+            if token_info.token_start_within_physical_line < indent[depth] {
+            } else if hang < 0 || (!is_closing_bracket && hang == 0) {
+                // E122.
+                let diagnostic = Diagnostic::new(MissingOrOutdentedIndentation, token.range);
+                context.push_diagnostic(diagnostic);
+            }
         }
 
         // Look for visual indenting.
@@ -342,8 +336,14 @@ pub(crate) fn continuation_lines(
             TokenKind::Lpar | TokenKind::Lsqb | TokenKind::Lbrace
         );
 
+        if matches!(token.kind, TokenKind::FStringStart) {
+            fstrings_opened += 1;
+        } else if matches!(token.kind, TokenKind::FStringEnd) {
+            fstrings_opened -= 1;
+        }
+
         // Keep track of bracket depth.
-        if is_opening_bracket || is_closing_bracket {
+        if fstrings_opened == 0 {
             if is_opening_bracket {
                 depth += 1;
                 indent.push(0);
