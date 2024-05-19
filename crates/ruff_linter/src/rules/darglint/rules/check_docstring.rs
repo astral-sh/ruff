@@ -237,18 +237,60 @@ pub(crate) fn check_docstring(
         return;
     };
 
-    let docstring_entries = match convention {
+    let docstring_entries;
+    match convention {
         Some(Convention::Google) => {
             let sections = SectionContexts::from_docstring(docstring, SectionStyle::Google);
-            DocstringEntries::new(&sections, SectionStyle::Google)
+            docstring_entries = DocstringEntries::new(&sections, SectionStyle::Google)
         }
 
         Some(Convention::Numpy) => {
             let sections = SectionContexts::from_docstring(docstring, SectionStyle::Numpy);
-            DocstringEntries::new(&sections, SectionStyle::Numpy)
+            docstring_entries = DocstringEntries::new(&sections, SectionStyle::Numpy)
         }
-        _ => {
-            return;
+        _ => 'unspecified: {
+            // There are some overlapping section names, between the Google and NumPy conventions
+            // (e.g., "Returns", "Raises"). Break ties by checking for the presence of some of the
+            // section names that are unique to each convention.
+
+            // If the docstring contains any argument specifier, use the Google convention.
+            let google_sections = SectionContexts::from_docstring(docstring, SectionStyle::Google);
+            if google_sections.iter().any(|context| {
+                matches!(
+                    context.kind(),
+                    SectionKind::Args
+                        | SectionKind::Arguments
+                        | SectionKind::KeywordArgs
+                        | SectionKind::KeywordArguments
+                        | SectionKind::OtherArgs
+                        | SectionKind::OtherArguments
+                )
+            }) {
+                docstring_entries = DocstringEntries::new(&google_sections, SectionStyle::Google);
+                break 'unspecified;
+            }
+
+            // If the docstring contains `Parameters:` or `Other Parameters:`, use the NumPy
+            // convention.
+            let numpy_sections = SectionContexts::from_docstring(docstring, SectionStyle::Numpy);
+            if numpy_sections.iter().any(|context| {
+                matches!(
+                    context.kind(),
+                    SectionKind::Parameters
+                        | SectionKind::OtherParams
+                        | SectionKind::OtherParameters
+                )
+            }) {
+                docstring_entries = DocstringEntries::new(&numpy_sections, SectionStyle::Numpy);
+                break 'unspecified;
+            }
+
+            // Otherwise, use whichever convention matched more sections.
+            if google_sections.len() > numpy_sections.len() {
+                docstring_entries = DocstringEntries::new(&google_sections, SectionStyle::Google);
+            } else {
+                docstring_entries = DocstringEntries::new(&numpy_sections, SectionStyle::Numpy);
+            }
         }
     };
 
