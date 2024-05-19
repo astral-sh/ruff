@@ -167,6 +167,9 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: "Run tests"
         shell: bash
+        env:
+          # Workaround for <https://github.com/nextest-rs/nextest/issues/1493>.
+          RUSTUP_WINDOWS_PATH_ADD_BIN: 1
         run: |
           cargo nextest run --all-features --profile ci
           cargo test --all-features --doc
