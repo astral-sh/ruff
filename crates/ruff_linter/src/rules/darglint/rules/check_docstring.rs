@@ -1,8 +1,10 @@
+use std::collections::HashMap;
+
 use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::visitor::{self, Visitor};
-use ruff_python_ast::{self as ast, Expr, Stmt};
+use ruff_python_ast::{self as ast, ExceptHandler, Expr, Stmt};
 use ruff_python_semantic::{Definition, MemberKind};
 use ruff_text_size::TextRange;
 
@@ -217,6 +219,18 @@ impl Visitor<'_> for BodyEntries {
             }
         }
         visitor::walk_stmt(self, stmt);
+    }
+
+    fn visit_except_handler(&mut self, except_handler: &ExceptHandler) {
+        if let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
+            type_: Some(type_),
+            name: Some(name),
+            ..
+        }) = except_handler
+        {
+            println!("{:?} {:?}", type_, name.id);
+        }
+        visitor::walk_except_handler(self, except_handler);
     }
 }
 

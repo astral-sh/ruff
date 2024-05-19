@@ -84,6 +84,21 @@ pub(crate) fn get_section_contexts<'a>(
             // (e.g., "Returns", "Raises"). Break ties by checking for the presence of some of the
             // section names that are unique to each convention.
 
+            // If the docstring contains `Parameters:` or `Other Parameters:`, use the NumPy
+            // convention.
+            let numpy_sections = SectionContexts::from_docstring(docstring, SectionStyle::Numpy);
+            if numpy_sections.iter().any(|context| {
+                matches!(
+                    context.kind(),
+                    SectionKind::Parameters
+                        | SectionKind::OtherParams
+                        | SectionKind::OtherParameters
+                )
+            }) {
+                section_contexts = numpy_sections;
+                break 'unspecified;
+            }
+
             // If the docstring contains any argument specifier, use the Google convention.
             let google_sections = SectionContexts::from_docstring(docstring, SectionStyle::Google);
             if google_sections.iter().any(|context| {
@@ -98,21 +113,6 @@ pub(crate) fn get_section_contexts<'a>(
                 )
             }) {
                 section_contexts = google_sections;
-                break 'unspecified;
-            }
-
-            // If the docstring contains `Parameters:` or `Other Parameters:`, use the NumPy
-            // convention.
-            let numpy_sections = SectionContexts::from_docstring(docstring, SectionStyle::Numpy);
-            if numpy_sections.iter().any(|context| {
-                matches!(
-                    context.kind(),
-                    SectionKind::Parameters
-                        | SectionKind::OtherParams
-                        | SectionKind::OtherParameters
-                )
-            }) {
-                section_contexts = numpy_sections;
                 break 'unspecified;
             }
 
