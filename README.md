@@ -152,7 +152,7 @@ Ruff can also be used as a [pre-commit](https://pre-commit.com/) hook via [`ruff
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.4.3
+  rev: v0.4.4
   hooks:
     # Run the linter.
     - id: ruff
@@ -265,6 +265,11 @@ The remaining configuration options can be provided through a catch-all `--confi
 ```shell
 ruff check --config "lint.per-file-ignores = {'some_file.py' = ['F841']}"
 ```
+
+To opt in to the latest lint rules, formatter style changes, interface updates, and more, enable
+[preview mode](https://docs.astral.sh/ruff/rules/) by setting `preview = true` in your configuration
+file or passing `--preview` on the command line. Preview mode enables a collection of unstable
+features that may change prior to stabilization.
 
 See `ruff help` for more on Ruff's top-level commands, or `ruff help check` and `ruff help format`
 for more on the linting and formatting commands, respectively.

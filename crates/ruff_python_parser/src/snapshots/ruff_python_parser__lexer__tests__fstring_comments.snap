@@ -5,7 +5,7 @@ expression: lex_source(source)
 [
     (
         FStringStart(
-            StringKind {
+            AnyStringFlags {
                 prefix: Format(
                     Regular,
                 ),
@@ -18,7 +18,7 @@ expression: lex_source(source)
     (
         FStringMiddle {
             value: "\n# not a comment ",
-            kind: StringKind {
+            flags: AnyStringFlags {
                 prefix: Format(
                     Regular,
                 ),
@@ -59,7 +59,7 @@ expression: lex_source(source)
     (
         FStringMiddle {
             value: " # not a comment\n",
-            kind: StringKind {
+            flags: AnyStringFlags {
                 prefix: Format(
                     Regular,
                 ),

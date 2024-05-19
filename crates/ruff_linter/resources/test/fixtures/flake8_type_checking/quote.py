@@ -90,3 +90,10 @@ def f():
 
     def func() -> DataFrame[[DataFrame[_P, _R]], DataFrame[_P, _R]]:
         ...
+
+
+def f():
+    from pandas import DataFrame, Series
+
+    def func(self) -> DataFrame | list[Series]:
+        pass

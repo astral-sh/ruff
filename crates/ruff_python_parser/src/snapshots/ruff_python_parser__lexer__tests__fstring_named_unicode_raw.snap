@@ -5,7 +5,7 @@ expression: lex_source(source)
 [
     (
         FStringStart(
-            StringKind {
+            AnyStringFlags {
                 prefix: Format(
                     Raw {
                         uppercase_r: false,
@@ -20,7 +20,7 @@ expression: lex_source(source)
     (
         FStringMiddle {
             value: "\\N",
-            kind: StringKind {
+            flags: AnyStringFlags {
                 prefix: Format(
                     Raw {
                         uppercase_r: false,
@@ -49,7 +49,7 @@ expression: lex_source(source)
     (
         FStringMiddle {
             value: " normal",
-            kind: StringKind {
+            flags: AnyStringFlags {
                 prefix: Format(
                     Raw {
                         uppercase_r: false,

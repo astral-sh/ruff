@@ -30,7 +30,6 @@ DEFAULT_TARGETS = [
         repo=Repository(owner="bokeh", name="bokeh", ref="branch-3.3"),
         check_options=CheckOptions(select="ALL"),
     ),
-    Project(repo=Repository(owner="commaai", name="openpilot", ref="master")),
     Project(
         repo=Repository(owner="demisto", name="content", ref="master"),
         format_options=FormatOptions(

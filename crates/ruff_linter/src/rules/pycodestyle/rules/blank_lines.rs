@@ -12,10 +12,7 @@ use ruff_diagnostics::Fix;
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::PySourceType;
 use ruff_python_codegen::Stylist;
-use ruff_python_parser::lexer::LexResult;
-use ruff_python_parser::lexer::LexicalError;
-use ruff_python_parser::Tok;
-use ruff_python_parser::TokenKind;
+use ruff_python_parser::{TokenKind, TokenKindIter};
 use ruff_source_file::{Locator, UniversalNewlines};
 use ruff_text_size::TextRange;
 use ruff_text_size::TextSize;
@@ -384,7 +381,7 @@ struct LogicalLineInfo {
 /// Iterator that processes tokens until a full logical line (or comment line) is "built".
 /// It then returns characteristics of that logical line (see `LogicalLineInfo`).
 struct LinePreprocessor<'a> {
-    tokens: Iter<'a, Result<(Tok, TextRange), LexicalError>>,
+    tokens: TokenKindIter<'a>,
     locator: &'a Locator<'a>,
     indent_width: IndentWidth,
     /// The start position of the next logical line.
@@ -400,13 +397,13 @@ struct LinePreprocessor<'a> {
 
 impl<'a> LinePreprocessor<'a> {
     fn new(
-        tokens: &'a [LexResult],
+        tokens: TokenKindIter<'a>,
         locator: &'a Locator,
         indent_width: IndentWidth,
         cell_offsets: Option<&'a CellOffsets>,
     ) -> LinePreprocessor<'a> {
         LinePreprocessor {
-            tokens: tokens.iter(),
+            tokens,
             locator,
             line_start: TextSize::new(0),
             max_preceding_blank_lines: BlankLines::Zero,
@@ -430,16 +427,10 @@ impl<'a> Iterator for LinePreprocessor<'a> {
         let mut last_token: TokenKind = TokenKind::EndOfFile;
         let mut parens = 0u32;
 
-        while let Some(result) = self.tokens.next() {
-            let Ok((token, range)) = result else {
-                continue;
-            };
-
-            if matches!(token, Tok::Indent | Tok::Dedent) {
+        while let Some((token, range)) = self.tokens.next() {
+            if matches!(token, TokenKind::Indent | TokenKind::Dedent) {
                 continue;
             }
-
-            let token_kind = TokenKind::from_token(token);
 
             let (logical_line_kind, first_token_range) = if let Some(first_token_range) =
                 first_logical_line_token
@@ -462,25 +453,23 @@ impl<'a> Iterator for LinePreprocessor<'a> {
                 }
 
                 // An empty line
-                if token_kind == TokenKind::NonLogicalNewline {
-                    blank_lines.add(*range);
+                if token == TokenKind::NonLogicalNewline {
+                    blank_lines.add(range);
 
                     self.line_start = range.end();
 
                     continue;
                 }
 
-                is_docstring = token_kind == TokenKind::String;
+                is_docstring = token == TokenKind::String;
 
-                let logical_line_kind = match token_kind {
+                let logical_line_kind = match token {
                     TokenKind::Class => LogicalLineKind::Class,
                     TokenKind::Comment => LogicalLineKind::Comment,
                     TokenKind::At => LogicalLineKind::Decorator,
                     TokenKind::Def => LogicalLineKind::Function,
                     // Lookahead to distinguish `async def` from `async with`.
-                    TokenKind::Async
-                        if matches!(self.tokens.as_slice().first(), Some(Ok((Tok::Def, _)))) =>
-                    {
+                    TokenKind::Async if matches!(self.tokens.peek(), Some((TokenKind::Def, _))) => {
                         LogicalLineKind::Function
                     }
                     TokenKind::Import => LogicalLineKind::Import,
@@ -488,22 +477,22 @@ impl<'a> Iterator for LinePreprocessor<'a> {
                     _ => LogicalLineKind::Other,
                 };
 
-                first_logical_line_token = Some((logical_line_kind, *range));
+                first_logical_line_token = Some((logical_line_kind, range));
 
-                (logical_line_kind, *range)
+                (logical_line_kind, range)
             };
 
-            if !token_kind.is_trivia() {
+            if !token.is_trivia() {
                 line_is_comment_only = false;
             }
 
             // A docstring line is composed only of the docstring (TokenKind::String) and trivia tokens.
             // (If a comment follows a docstring, we still count the line as a docstring)
-            if token_kind != TokenKind::String && !token_kind.is_trivia() {
+            if token != TokenKind::String && !token.is_trivia() {
                 is_docstring = false;
             }
 
-            match token_kind {
+            match token {
                 TokenKind::Lbrace | TokenKind::Lpar | TokenKind::Lsqb => {
                     parens = parens.saturating_add(1);
                 }
@@ -549,8 +538,8 @@ impl<'a> Iterator for LinePreprocessor<'a> {
                 _ => {}
             }
 
-            if !token_kind.is_trivia() {
-                last_token = token_kind;
+            if !token.is_trivia() {
+                last_token = token;
             }
         }
 
@@ -733,7 +722,7 @@ impl<'a> BlankLinesChecker<'a> {
     }
 
     /// E301, E302, E303, E304, E305, E306
-    pub(crate) fn check_lines(&self, tokens: &[LexResult], diagnostics: &mut Vec<Diagnostic>) {
+    pub(crate) fn check_lines(&self, tokens: TokenKindIter<'a>, diagnostics: &mut Vec<Diagnostic>) {
         let mut prev_indent_length: Option<usize> = None;
         let mut state = BlankLinesState::default();
         let line_preprocessor =

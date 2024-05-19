@@ -11,7 +11,6 @@ mod tests {
 
     use anyhow::Result;
     use regex::Regex;
-    use ruff_python_parser::lexer::LexResult;
 
     use test_case::test_case;
 
@@ -208,7 +207,11 @@ mod tests {
     #[test_case(Rule::UnusedVariable, Path::new("F841_4.py"))]
     #[test_case(Rule::UnusedImport, Path::new("__init__.py"))]
     #[test_case(Rule::UnusedImport, Path::new("F401_24/__init__.py"))]
-    #[test_case(Rule::UnusedImport, Path::new("F401_25__all/__init__.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_25__all_nonempty/__init__.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_26__all_empty/__init__.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_27__all_mistyped/__init__.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_28__all_multiple/__init__.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_29__all_conditional/__init__.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",
@@ -591,7 +594,7 @@ mod tests {
         let source_type = PySourceType::default();
         let source_kind = SourceKind::Python(contents.to_string());
         let settings = LinterSettings::for_rules(Linter::Pyflakes.rules());
-        let tokens: Vec<LexResult> = ruff_python_parser::tokenize(&contents, source_type.as_mode());
+        let tokens = ruff_python_parser::tokenize(&contents, source_type.as_mode());
         let locator = Locator::new(&contents);
         let stylist = Stylist::from_tokens(&tokens, &locator);
         let indexer = Indexer::from_tokens(&tokens, &locator);

@@ -43,3 +43,13 @@ from typing_extensions import TYPE_CHECKING
 
 if TYPE_CHECKING:
     pass  # TCH005
+
+# https://github.com/astral-sh/ruff/issues/11368
+if TYPE_CHECKING:
+    pass
+else:
+    pass
+if TYPE_CHECKING:
+    pass
+elif test:
+    pass

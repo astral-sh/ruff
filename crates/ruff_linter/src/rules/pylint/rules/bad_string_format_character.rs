@@ -2,14 +2,13 @@ use std::str::FromStr;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{AnyStringKind, Expr};
+use ruff_python_ast::{AnyStringFlags, Expr, ExprStringLiteral};
 use ruff_python_literal::{
     cformat::{CFormatErrorType, CFormatString},
     format::FormatPart,
     format::FromTemplate,
     format::{FormatSpec, FormatSpecError, FormatString},
 };
-use ruff_python_parser::{lexer, Mode, Tok};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -90,29 +89,12 @@ pub(crate) fn call(checker: &mut Checker, string: &str, range: TextRange) {
 
 /// PLE1300
 /// Ex) `"%z" % "1"`
-pub(crate) fn percent(checker: &mut Checker, expr: &Expr) {
-    // Grab each string segment (in case there's an implicit concatenation).
-    let mut strings: Vec<(TextRange, AnyStringKind)> = vec![];
-    for (tok, range) in
-        lexer::lex_starts_at(checker.locator().slice(expr), Mode::Module, expr.start()).flatten()
-    {
-        match tok {
-            Tok::String { kind, .. } => strings.push((range, kind)),
-            // Break as soon as we find the modulo symbol.
-            Tok::Percent => break,
-            _ => {}
-        }
-    }
-
-    // If there are no string segments, abort.
-    if strings.is_empty() {
-        return;
-    }
-
-    for (range, kind) in &strings {
-        let string = checker.locator().slice(*range);
+pub(crate) fn percent(checker: &mut Checker, expr: &Expr, format_string: &ExprStringLiteral) {
+    for string_literal in &format_string.value {
+        let string = checker.locator().slice(string_literal);
+        let flags = AnyStringFlags::from(string_literal.flags);
         let string = &string
-            [usize::from(kind.opener_len())..(string.len() - usize::from(kind.closer_len()))];
+            [usize::from(flags.opener_len())..(string.len() - usize::from(flags.closer_len()))];
 
         // Parse the format string (e.g. `"%s"`) into a list of `PercentFormat`.
         if let Err(format_error) = CFormatString::from_str(string) {

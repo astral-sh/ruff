@@ -10,7 +10,7 @@ use ruff_linter::settings::{flags, LinterSettings};
 use ruff_linter::source_kind::SourceKind;
 use ruff_linter::{registry::Rule, RuleSelector};
 use ruff_python_ast::PySourceType;
-use ruff_python_parser::{lexer, parse_program_tokens, Mode};
+use ruff_python_parser::{parse_program_tokens, tokenize, Mode};
 
 #[cfg(target_os = "windows")]
 #[global_allocator]
@@ -55,7 +55,7 @@ fn benchmark_linter(mut group: BenchmarkGroup, settings: &LinterSettings) {
             &case,
             |b, case| {
                 // Tokenize the source.
-                let tokens: Vec<_> = lexer::lex(case.code(), Mode::Module).collect();
+                let tokens = tokenize(case.code(), Mode::Module);
 
                 // Parse the source.
                 let ast = parse_program_tokens(tokens.clone(), case.code(), false).unwrap();

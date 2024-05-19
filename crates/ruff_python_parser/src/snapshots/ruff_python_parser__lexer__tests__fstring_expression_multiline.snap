@@ -5,7 +5,7 @@ expression: lex_source(source)
 [
     (
         FStringStart(
-            StringKind {
+            AnyStringFlags {
                 prefix: Format(
                     Regular,
                 ),
@@ -18,7 +18,7 @@ expression: lex_source(source)
     (
         FStringMiddle {
             value: "first ",
-            kind: StringKind {
+            flags: AnyStringFlags {
                 prefix: Format(
                     Regular,
                 ),
@@ -71,7 +71,7 @@ expression: lex_source(source)
     (
         FStringMiddle {
             value: " second",
-            kind: StringKind {
+            flags: AnyStringFlags {
                 prefix: Format(
                     Regular,
                 ),

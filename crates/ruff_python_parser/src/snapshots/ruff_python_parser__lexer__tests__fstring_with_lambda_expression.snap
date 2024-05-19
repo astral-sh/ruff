@@ -5,7 +5,7 @@ expression: lex_source(source)
 [
     (
         FStringStart(
-            StringKind {
+            AnyStringFlags {
                 prefix: Format(
                     Regular,
                 ),
@@ -61,7 +61,7 @@ expression: lex_source(source)
     ),
     (
         FStringStart(
-            StringKind {
+            AnyStringFlags {
                 prefix: Format(
                     Regular,
                 ),

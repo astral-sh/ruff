@@ -56,7 +56,7 @@ impl<'a> FormatFStringLiteralElement<'a> {
 impl Format<PyFormatContext<'_>> for FormatFStringLiteralElement<'_> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
         let literal_content = f.context().locator().slice(self.element.range());
-        let normalized = normalize_string(literal_content, 0, self.context.kind(), true);
+        let normalized = normalize_string(literal_content, 0, self.context.flags(), true);
         match &normalized {
             Cow::Borrowed(_) => source_text_slice(self.element.range()).fmt(f),
             Cow::Owned(normalized) => text(normalized).fmt(f),
@@ -102,7 +102,7 @@ impl FStringExpressionElementContext {
             // But, if the original source code already contained a newline, they'll be preserved.
             //
             // The Python version is irrelevant in this case.
-            && !(self.parent_context.kind().is_triple_quoted() && self.has_format_spec)
+            && !(self.parent_context.flags().is_triple_quoted() && self.has_format_spec)
     }
 }
 

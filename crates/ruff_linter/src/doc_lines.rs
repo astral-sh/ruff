@@ -4,27 +4,26 @@
 use std::iter::FusedIterator;
 
 use ruff_python_ast::{self as ast, Stmt, Suite};
-use ruff_python_parser::lexer::LexResult;
-use ruff_python_parser::Tok;
+use ruff_python_parser::{TokenKind, TokenKindIter};
 use ruff_text_size::{Ranged, TextSize};
 
 use ruff_python_ast::statement_visitor::{walk_stmt, StatementVisitor};
 use ruff_source_file::{Locator, UniversalNewlineIterator};
 
 /// Extract doc lines (standalone comments) from a token sequence.
-pub(crate) fn doc_lines_from_tokens(lxr: &[LexResult]) -> DocLines {
-    DocLines::new(lxr)
+pub(crate) fn doc_lines_from_tokens(tokens: TokenKindIter) -> DocLines {
+    DocLines::new(tokens)
 }
 
 pub(crate) struct DocLines<'a> {
-    inner: std::iter::Flatten<core::slice::Iter<'a, LexResult>>,
+    inner: TokenKindIter<'a>,
     prev: TextSize,
 }
 
 impl<'a> DocLines<'a> {
-    fn new(lxr: &'a [LexResult]) -> Self {
+    fn new(tokens: TokenKindIter<'a>) -> Self {
         Self {
-            inner: lxr.iter().flatten(),
+            inner: tokens,
             prev: TextSize::default(),
         }
     }
@@ -39,15 +38,15 @@ impl Iterator for DocLines<'_> {
             let (tok, range) = self.inner.next()?;
 
             match tok {
-                Tok::Comment(..) => {
+                TokenKind::Comment => {
                     if at_start_of_line {
                         break Some(range.start());
                     }
                 }
-                Tok::Newline | Tok::NonLogicalNewline => {
+                TokenKind::Newline | TokenKind::NonLogicalNewline => {
                     at_start_of_line = true;
                 }
-                Tok::Indent | Tok::Dedent => {
+                TokenKind::Indent | TokenKind::Dedent => {
                     // ignore
                 }
                 _ => {

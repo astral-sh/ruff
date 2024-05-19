@@ -147,6 +147,28 @@ fn is_attributes_not_in_slots(body: &[Stmt]) -> Vec<AttributeAssignment> {
         return vec![];
     }
 
+    // And, collect all the property name with setter.
+    for statement in body {
+        let Stmt::FunctionDef(ast::StmtFunctionDef { decorator_list, .. }) = statement else {
+            continue;
+        };
+
+        for decorator in decorator_list {
+            let Some(ast::ExprAttribute { value, attr, .. }) =
+                decorator.expression.as_attribute_expr()
+            else {
+                continue;
+            };
+
+            if attr == "setter" {
+                let Some(ast::ExprName { id, .. }) = value.as_name_expr() else {
+                    continue;
+                };
+                slots.insert(id.as_str());
+            }
+        }
+    }
+
     // Second, find any assignments that aren't included in `__slots__`.
     let mut assignments = vec![];
     for statement in body {

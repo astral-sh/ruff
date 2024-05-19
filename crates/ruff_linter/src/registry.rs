@@ -270,7 +270,6 @@ impl Rule {
             | Rule::InvalidCharacterNul
             | Rule::InvalidCharacterSub
             | Rule::InvalidCharacterZeroWidthSpace
-            | Rule::InvalidEscapeSequence
             | Rule::InvalidTodoCapitalization
             | Rule::InvalidTodoTag
             | Rule::LineContainsFixme

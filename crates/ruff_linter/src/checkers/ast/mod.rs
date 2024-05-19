@@ -73,7 +73,7 @@ mod annotation;
 mod deferred;
 
 /// State representing whether a docstring is expected or not for the next statement.
-#[derive(Default, Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 enum DocstringState {
     /// The next statement is expected to be a docstring, but not necessarily so.
     ///
@@ -92,15 +92,84 @@ enum DocstringState {
     /// For `Foo`, the state is expected when the checker is visiting the class
     /// body but isn't going to be present. While, for `bar` function, the docstring
     /// is expected and present.
-    #[default]
-    Expected,
+    Expected(ExpectedDocstringKind),
     Other,
 }
 
+impl Default for DocstringState {
+    /// Returns the default docstring state which is to expect a module-level docstring.
+    fn default() -> Self {
+        Self::Expected(ExpectedDocstringKind::Module)
+    }
+}
+
 impl DocstringState {
-    /// Returns `true` if the next statement is expected to be a docstring.
-    const fn is_expected(self) -> bool {
-        matches!(self, DocstringState::Expected)
+    /// Returns the docstring kind if the state is expecting a docstring.
+    const fn expected_kind(self) -> Option<ExpectedDocstringKind> {
+        match self {
+            DocstringState::Expected(kind) => Some(kind),
+            DocstringState::Other => None,
+        }
+    }
+}
+
+/// The kind of an expected docstring.
+#[derive(Debug, Copy, Clone, PartialEq)]
+enum ExpectedDocstringKind {
+    /// A module-level docstring.
+    ///
+    /// For example,
+    /// ```python
+    /// """This is a module-level docstring."""
+    ///
+    /// a = 1
+    /// ```
+    Module,
+
+    /// A class-level docstring.
+    ///
+    /// For example,
+    /// ```python
+    /// class Foo:
+    ///     """This is the docstring for `Foo` class."""
+    ///
+    ///     def __init__(self) -> None:
+    ///         ...
+    /// ```
+    Class,
+
+    /// A function-level docstring.
+    ///
+    /// For example,
+    /// ```python
+    /// def foo():
+    ///     """This is the docstring for `foo` function."""
+    ///     pass
+    /// ```
+    Function,
+
+    /// An attribute-level docstring.
+    ///
+    /// For example,
+    /// ```python
+    /// a = 1
+    /// """This is the docstring for `a` variable."""
+    ///
+    ///
+    /// class Foo:
+    ///     b = 1
+    ///     """This is the docstring for `Foo.b` class variable."""
+    /// ```
+    Attribute,
+}
+
+impl ExpectedDocstringKind {
+    /// Returns the semantic model flag that represents the current docstring state.
+    const fn as_flag(self) -> SemanticModelFlags {
+        match self {
+            ExpectedDocstringKind::Attribute => SemanticModelFlags::ATTRIBUTE_DOCSTRING,
+            _ => SemanticModelFlags::PEP_257_DOCSTRING,
+        }
     }
 }
 
@@ -383,9 +452,9 @@ impl<'a> Visitor<'a> for Checker<'a> {
 
         // Update the semantic model if it is in a docstring. This should be done after the
         // flags snapshot to ensure that it gets reset once the statement is analyzed.
-        if self.docstring_state.is_expected() {
+        if let Some(kind) = self.docstring_state.expected_kind() {
             if is_docstring_stmt(stmt) {
-                self.semantic.flags |= SemanticModelFlags::DOCSTRING;
+                self.semantic.flags |= kind.as_flag();
             }
             // Reset the state irrespective of whether the statement is a docstring or not.
             self.docstring_state = DocstringState::Other;
@@ -709,7 +778,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 }
 
                 // Set the docstring state before visiting the class body.
-                self.docstring_state = DocstringState::Expected;
+                self.docstring_state = DocstringState::Expected(ExpectedDocstringKind::Class);
                 self.visit_body(body);
 
                 let scope_id = self.semantic.scope_id;
@@ -873,6 +942,24 @@ impl<'a> Visitor<'a> for Checker<'a> {
             }
             _ => visitor::walk_stmt(self, stmt),
         };
+
+        if self.semantic().at_top_level() || self.semantic().current_scope().kind.is_class() {
+            match stmt {
+                Stmt::Assign(ast::StmtAssign { targets, .. }) => {
+                    if let [Expr::Name(_)] = targets.as_slice() {
+                        self.docstring_state =
+                            DocstringState::Expected(ExpectedDocstringKind::Attribute);
+                    }
+                }
+                Stmt::AnnAssign(ast::StmtAnnAssign { target, .. }) => {
+                    if target.is_name_expr() {
+                        self.docstring_state =
+                            DocstringState::Expected(ExpectedDocstringKind::Attribute);
+                    }
+                }
+                _ => {}
+            }
+        }
 
         // Step 3: Clean-up
 
@@ -2122,7 +2209,7 @@ impl<'a> Checker<'a> {
 
                 self.visit_parameters(parameters);
                 // Set the docstring state before visiting the function body.
-                self.docstring_state = DocstringState::Expected;
+                self.docstring_state = DocstringState::Expected(ExpectedDocstringKind::Function);
                 self.visit_body(body);
             }
         }

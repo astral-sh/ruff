@@ -180,8 +180,11 @@ pub fn run(
             }
             Ok(ExitStatus::Success)
         }
-        Command::Config { option } => {
-            commands::config::config(option.as_deref())?;
+        Command::Config {
+            option,
+            output_format,
+        } => {
+            commands::config::config(option.as_deref(), output_format)?;
             Ok(ExitStatus::Success)
         }
         Command::Linter { output_format } => {

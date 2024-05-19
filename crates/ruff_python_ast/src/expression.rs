@@ -1,7 +1,8 @@
+use std::iter::FusedIterator;
+
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::AnyNodeRef;
-use crate::{self as ast, Expr};
+use crate::{self as ast, AnyNodeRef, AnyStringFlags, Expr};
 
 /// Unowned pendant to [`ast::Expr`] that stores a reference instead of a owned value.
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -394,14 +395,24 @@ impl LiteralExpressionRef<'_> {
     }
 }
 
-/// An enum that holds a reference to a string-like literal from the AST.
-/// This includes string literals, bytes literals, and the literal parts of
-/// f-strings.
+/// An enum that holds a reference to a string-like expression from the AST. This includes string
+/// literals, bytes literals, and f-strings.
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum StringLike<'a> {
     String(&'a ast::ExprStringLiteral),
     Bytes(&'a ast::ExprBytesLiteral),
     FString(&'a ast::ExprFString),
+}
+
+impl<'a> StringLike<'a> {
+    /// Returns an iterator over the [`StringLikePart`] contained in this string-like expression.
+    pub fn parts(&self) -> StringLikePartIter<'_> {
+        match self {
+            StringLike::String(expr) => StringLikePartIter::String(expr.value.iter()),
+            StringLike::Bytes(expr) => StringLikePartIter::Bytes(expr.value.iter()),
+            StringLike::FString(expr) => StringLikePartIter::FString(expr.value.iter()),
+        }
+    }
 }
 
 impl<'a> From<&'a ast::ExprStringLiteral> for StringLike<'a> {
@@ -431,3 +442,92 @@ impl Ranged for StringLike<'_> {
         }
     }
 }
+
+/// An enum that holds a reference to an individual part of a string-like expression.
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum StringLikePart<'a> {
+    String(&'a ast::StringLiteral),
+    Bytes(&'a ast::BytesLiteral),
+    FString(&'a ast::FString),
+}
+
+impl StringLikePart<'_> {
+    /// Returns the [`AnyStringFlags`] for the current string-like part.
+    pub fn flags(&self) -> AnyStringFlags {
+        match self {
+            StringLikePart::String(string) => AnyStringFlags::from(string.flags),
+            StringLikePart::Bytes(bytes) => AnyStringFlags::from(bytes.flags),
+            StringLikePart::FString(f_string) => AnyStringFlags::from(f_string.flags),
+        }
+    }
+}
+
+impl<'a> From<&'a ast::StringLiteral> for StringLikePart<'a> {
+    fn from(value: &'a ast::StringLiteral) -> Self {
+        StringLikePart::String(value)
+    }
+}
+
+impl<'a> From<&'a ast::BytesLiteral> for StringLikePart<'a> {
+    fn from(value: &'a ast::BytesLiteral) -> Self {
+        StringLikePart::Bytes(value)
+    }
+}
+
+impl<'a> From<&'a ast::FString> for StringLikePart<'a> {
+    fn from(value: &'a ast::FString) -> Self {
+        StringLikePart::FString(value)
+    }
+}
+
+impl Ranged for StringLikePart<'_> {
+    fn range(&self) -> TextRange {
+        match self {
+            StringLikePart::String(part) => part.range(),
+            StringLikePart::Bytes(part) => part.range(),
+            StringLikePart::FString(part) => part.range(),
+        }
+    }
+}
+
+/// An iterator over all the [`StringLikePart`] of a string-like expression.
+///
+/// This is created by the [`StringLike::parts`] method.
+pub enum StringLikePartIter<'a> {
+    String(std::slice::Iter<'a, ast::StringLiteral>),
+    Bytes(std::slice::Iter<'a, ast::BytesLiteral>),
+    FString(std::slice::Iter<'a, ast::FStringPart>),
+}
+
+impl<'a> Iterator for StringLikePartIter<'a> {
+    type Item = StringLikePart<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let part = match self {
+            StringLikePartIter::String(inner) => StringLikePart::String(inner.next()?),
+            StringLikePartIter::Bytes(inner) => StringLikePart::Bytes(inner.next()?),
+            StringLikePartIter::FString(inner) => {
+                let part = inner.next()?;
+                match part {
+                    ast::FStringPart::Literal(string_literal) => {
+                        StringLikePart::String(string_literal)
+                    }
+                    ast::FStringPart::FString(f_string) => StringLikePart::FString(f_string),
+                }
+            }
+        };
+
+        Some(part)
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        match self {
+            StringLikePartIter::String(inner) => inner.size_hint(),
+            StringLikePartIter::Bytes(inner) => inner.size_hint(),
+            StringLikePartIter::FString(inner) => inner.size_hint(),
+        }
+    }
+}
+
+impl FusedIterator for StringLikePartIter<'_> {}
+impl ExactSizeIterator for StringLikePartIter<'_> {}

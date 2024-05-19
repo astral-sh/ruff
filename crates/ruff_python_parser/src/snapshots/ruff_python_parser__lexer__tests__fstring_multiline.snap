@@ -5,7 +5,7 @@ expression: lex_source(source)
 [
     (
         FStringStart(
-            StringKind {
+            AnyStringFlags {
                 prefix: Format(
                     Regular,
                 ),
@@ -18,7 +18,7 @@ expression: lex_source(source)
     (
         FStringMiddle {
             value: "\nhello\n    world\n",
-            kind: StringKind {
+            flags: AnyStringFlags {
                 prefix: Format(
                     Regular,
                 ),
@@ -34,7 +34,7 @@ expression: lex_source(source)
     ),
     (
         FStringStart(
-            StringKind {
+            AnyStringFlags {
                 prefix: Format(
                     Regular,
                 ),
@@ -47,7 +47,7 @@ expression: lex_source(source)
     (
         FStringMiddle {
             value: "\n    world\nhello\n",
-            kind: StringKind {
+            flags: AnyStringFlags {
                 prefix: Format(
                     Regular,
                 ),
@@ -63,7 +63,7 @@ expression: lex_source(source)
     ),
     (
         FStringStart(
-            StringKind {
+            AnyStringFlags {
                 prefix: Format(
                     Regular,
                 ),
@@ -76,7 +76,7 @@ expression: lex_source(source)
     (
         FStringMiddle {
             value: "some ",
-            kind: StringKind {
+            flags: AnyStringFlags {
                 prefix: Format(
                     Regular,
                 ),
@@ -92,7 +92,7 @@ expression: lex_source(source)
     ),
     (
         FStringStart(
-            StringKind {
+            AnyStringFlags {
                 prefix: Format(
                     Regular,
                 ),
@@ -105,7 +105,7 @@ expression: lex_source(source)
     (
         FStringMiddle {
             value: "multiline\nallowed ",
-            kind: StringKind {
+            flags: AnyStringFlags {
                 prefix: Format(
                     Regular,
                 ),
@@ -140,7 +140,7 @@ expression: lex_source(source)
     (
         FStringMiddle {
             value: " string",
-            kind: StringKind {
+            flags: AnyStringFlags {
                 prefix: Format(
                     Regular,
                 ),

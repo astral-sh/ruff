@@ -465,6 +465,7 @@ pub enum PythonVersion {
     Py310,
     Py311,
     Py312,
+    Py313,
 }
 
 impl PythonVersion {

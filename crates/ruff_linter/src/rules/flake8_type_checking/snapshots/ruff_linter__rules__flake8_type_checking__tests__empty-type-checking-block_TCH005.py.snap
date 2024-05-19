@@ -101,6 +101,8 @@ TCH005.py:45:5: TCH005 [*] Found empty type-checking block
 44 | if TYPE_CHECKING:
 45 |     pass  # TCH005
    |     ^^^^ TCH005
+46 | 
+47 | # https://github.com/astral-sh/ruff/issues/11368
    |
    = help: Delete empty type-checking block
 
@@ -110,5 +112,6 @@ TCH005.py:45:5: TCH005 [*] Found empty type-checking block
 43 43 | 
 44    |-if TYPE_CHECKING:
 45    |-    pass  # TCH005
-
-
+46 44 | 
+47 45 | # https://github.com/astral-sh/ruff/issues/11368
+48 46 | if TYPE_CHECKING:

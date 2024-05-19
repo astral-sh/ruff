@@ -5,13 +5,13 @@ use std::path::Path;
 use ruff_notebook::CellOffsets;
 use ruff_python_ast::PySourceType;
 use ruff_python_codegen::Stylist;
-use ruff_python_parser::lexer::LexResult;
 
 use ruff_diagnostics::Diagnostic;
 use ruff_python_index::Indexer;
 use ruff_source_file::Locator;
 
 use crate::directives::TodoComment;
+use crate::linter::TokenSource;
 use crate::registry::{AsRule, Rule};
 use crate::rules::pycodestyle::rules::BlankLinesChecker;
 use crate::rules::{
@@ -22,7 +22,7 @@ use crate::settings::LinterSettings;
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn check_tokens(
-    tokens: &[LexResult],
+    tokens: &TokenSource,
     path: &Path,
     locator: &Locator,
     indexer: &Indexer,
@@ -42,7 +42,7 @@ pub(crate) fn check_tokens(
         Rule::BlankLinesBeforeNestedDefinition,
     ]) {
         BlankLinesChecker::new(locator, stylist, settings, source_type, cell_offsets)
-            .check_lines(tokens, &mut diagnostics);
+            .check_lines(tokens.kinds(), &mut diagnostics);
     }
 
     if settings.rules.enabled(Rule::BlanketTypeIgnore) {
@@ -75,18 +75,6 @@ pub(crate) fn check_tokens(
         pyupgrade::rules::unnecessary_coding_comment(&mut diagnostics, locator, indexer);
     }
 
-    if settings.rules.enabled(Rule::InvalidEscapeSequence) {
-        for (tok, range) in tokens.iter().flatten() {
-            pycodestyle::rules::invalid_escape_sequence(
-                &mut diagnostics,
-                locator,
-                indexer,
-                tok,
-                *range,
-            );
-        }
-    }
-
     if settings.rules.enabled(Rule::TabIndentation) {
         pycodestyle::rules::tab_indentation(&mut diagnostics, locator, indexer);
     }
@@ -98,8 +86,8 @@ pub(crate) fn check_tokens(
         Rule::InvalidCharacterNul,
         Rule::InvalidCharacterZeroWidthSpace,
     ]) {
-        for (tok, range) in tokens.iter().flatten() {
-            pylint::rules::invalid_string_characters(&mut diagnostics, tok, *range, locator);
+        for (token, range) in tokens.kinds() {
+            pylint::rules::invalid_string_characters(&mut diagnostics, token, range, locator);
         }
     }
 
@@ -110,7 +98,7 @@ pub(crate) fn check_tokens(
     ]) {
         pycodestyle::rules::compound_statements(
             &mut diagnostics,
-            tokens,
+            tokens.kinds(),
             locator,
             indexer,
             source_type,
@@ -124,7 +112,7 @@ pub(crate) fn check_tokens(
     ]) {
         flake8_implicit_str_concat::rules::implicit(
             &mut diagnostics,
-            tokens,
+            tokens.kinds(),
             settings,
             locator,
             indexer,
@@ -136,11 +124,11 @@ pub(crate) fn check_tokens(
         Rule::TrailingCommaOnBareTuple,
         Rule::ProhibitedTrailingComma,
     ]) {
-        flake8_commas::rules::trailing_commas(&mut diagnostics, tokens, locator, indexer);
+        flake8_commas::rules::trailing_commas(&mut diagnostics, tokens.kinds(), locator, indexer);
     }
 
     if settings.rules.enabled(Rule::ExtraneousParentheses) {
-        pyupgrade::rules::extraneous_parentheses(&mut diagnostics, tokens, locator);
+        pyupgrade::rules::extraneous_parentheses(&mut diagnostics, tokens.kinds(), locator);
     }
 
     if source_type.is_stub() && settings.rules.enabled(Rule::TypeCommentInStub) {
@@ -184,7 +172,7 @@ pub(crate) fn check_tokens(
     }
 
     if settings.rules.enabled(Rule::TooManyNewlinesAtEndOfFile) {
-        pycodestyle::rules::too_many_newlines_at_end_of_file(&mut diagnostics, tokens);
+        pycodestyle::rules::too_many_newlines_at_end_of_file(&mut diagnostics, tokens.kinds());
     }
 
     diagnostics.retain(|diagnostic| settings.rules.enabled(diagnostic.kind.rule()));

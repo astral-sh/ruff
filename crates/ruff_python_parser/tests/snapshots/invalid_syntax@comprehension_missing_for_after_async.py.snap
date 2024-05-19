@@ -12,38 +12,11 @@ Module(
             Expr(
                 StmtExpr {
                     range: 0..7,
-                    value: Generator(
-                        ExprGenerator {
-                            range: 0..7,
-                            elt: Name(
-                                ExprName {
-                                    range: 1..1,
-                                    id: "",
-                                    ctx: Invalid,
-                                },
-                            ),
-                            generators: [
-                                Comprehension {
-                                    range: 1..6,
-                                    target: Name(
-                                        ExprName {
-                                            range: 6..6,
-                                            id: "",
-                                            ctx: Store,
-                                        },
-                                    ),
-                                    iter: Name(
-                                        ExprName {
-                                            range: 6..6,
-                                            id: "",
-                                            ctx: Invalid,
-                                        },
-                                    ),
-                                    ifs: [],
-                                    is_async: true,
-                                },
-                            ],
-                            parenthesized: true,
+                    value: Name(
+                        ExprName {
+                            range: 1..6,
+                            id: "async",
+                            ctx: Load,
                         },
                     ),
                 },
@@ -95,14 +68,7 @@ Module(
 
   |
 1 | (async)
-  |  ^^^^^ Syntax Error: Expected an expression
-2 | (x async x in iter)
-  |
-
-
-  |
-1 | (async)
-  |       ^ Syntax Error: Expected 'for', found ')'
+  |  ^^^^^ Syntax Error: Expected an identifier, but found a keyword 'async' that cannot be used here
 2 | (x async x in iter)
   |
 
