@@ -232,9 +232,9 @@ pub(crate) fn check_docstring(
     };
 
     let docstring_entries = match convention {
-        Some(Convention::Google) => DocstringEntries::new(&section_contexts, SectionStyle::Google),
-        Some(Convention::Numpy) => DocstringEntries::new(&section_contexts, SectionStyle::Numpy),
-        _ => DocstringEntries::new(&section_contexts, section_contexts.style()),
+        Some(Convention::Google) => DocstringEntries::new(section_contexts, SectionStyle::Google),
+        Some(Convention::Numpy) => DocstringEntries::new(section_contexts, SectionStyle::Numpy),
+        _ => DocstringEntries::new(section_contexts, section_contexts.style()),
     };
 
     let mut body_entries = BodyEntries::new();

@@ -1328,11 +1328,11 @@ pub(crate) fn sections(
     convention: Option<&Convention>,
 ) {
     match convention {
-        Some(Convention::Google) => parse_google_sections(checker, docstring, &section_contexts),
-        Some(Convention::Numpy) => parse_numpy_sections(checker, docstring, &section_contexts),
+        Some(Convention::Google) => parse_google_sections(checker, docstring, section_contexts),
+        Some(Convention::Numpy) => parse_numpy_sections(checker, docstring, section_contexts),
         Some(Convention::Pep257) | None => match section_contexts.style() {
-            SectionStyle::Google => parse_google_sections(checker, docstring, &section_contexts),
-            SectionStyle::Numpy => parse_numpy_sections(checker, docstring, &section_contexts),
+            SectionStyle::Google => parse_google_sections(checker, docstring, section_contexts),
+            SectionStyle::Numpy => parse_numpy_sections(checker, docstring, section_contexts),
         },
     }
 }
