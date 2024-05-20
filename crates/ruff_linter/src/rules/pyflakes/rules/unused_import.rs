@@ -99,6 +99,8 @@ enum UnusedImportContext {
 pub struct UnusedImport {
     /// Qualified name of the import
     name: String,
+    /// Unqualified name of the import
+    module: String,
     /// Name of the import binding
     binding: String,
     context: Option<UnusedImportContext>,
@@ -129,6 +131,7 @@ impl Violation for UnusedImport {
     fn fix_title(&self) -> Option<String> {
         let UnusedImport {
             name,
+            module,
             binding,
             multiple,
             ..
@@ -142,9 +145,7 @@ impl Violation for UnusedImport {
             Some(UnusedImportContext::Init {
                 first_party: true,
                 dunder_all_count: 0,
-            }) => Some(format!(
-                "Use an explicit re-export: `{binding} as {binding}`"
-            )),
+            }) => Some(format!("Use an explicit re-export: `{module} as {module}`")),
 
             _ => Some(if *multiple {
                 "Remove unused import".to_string()
@@ -332,6 +333,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
             let mut diagnostic = Diagnostic::new(
                 UnusedImport {
                     name: binding.import.qualified_name().to_string(),
+                    module: binding.import.member_name().to_string(),
                     binding: binding.name.to_string(),
                     context,
                     multiple,
@@ -356,6 +358,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
         let mut diagnostic = Diagnostic::new(
             UnusedImport {
                 name: binding.import.qualified_name().to_string(),
+                module: binding.import.member_name().to_string(),
                 binding: binding.name.to_string(),
                 context: None,
                 multiple: false,
