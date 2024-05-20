@@ -190,4 +190,22 @@ E27.py:35:14: E271 [*] Multiple spaces after keyword
 37 37 | from w import(e, f)
 38 38 | #: E275
 
+E27.py:70:5: E271 [*] Multiple spaces after keyword
+   |
+69 | #: E271
+70 | type  Number = int
+   |     ^^ E271
+71 | 
+72 | #: E273
+   |
+   = help: Replace with single space
 
+ℹ Safe fix
+67 67 | # Soft keywords
+68 68 | 
+69 69 | #: E271
+70    |-type  Number = int
+   70 |+type Number = int
+71 71 | 
+72 72 | #: E273
+73 73 | type	Number = int
