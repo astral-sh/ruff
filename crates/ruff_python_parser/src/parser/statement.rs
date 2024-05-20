@@ -3526,9 +3526,6 @@ impl<'src> Parser<'src> {
             | TokenKind::FStringStart
             | TokenKind::Lbrace
             | TokenKind::Tilde
-            | TokenKind::None
-            | TokenKind::True
-            | TokenKind::False
             | TokenKind::Await
             | TokenKind::Yield
             | TokenKind::Lambda => MatchTokenType::Keyword,
@@ -3538,7 +3535,7 @@ impl<'src> Parser<'src> {
             | TokenKind::Plus
             | TokenKind::Minus => MatchTokenType::KeywordOrIdentifier,
             _ => {
-                if first.is_soft_keyword() {
+                if first.is_soft_keyword() || first.is_singleton() {
                     MatchTokenType::Keyword
                 } else {
                     MatchTokenType::Identifier
