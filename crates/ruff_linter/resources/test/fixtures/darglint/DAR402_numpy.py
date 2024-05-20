@@ -1,3 +1,7 @@
+class FasterThanLightError(Exception):
+    ...
+
+
 def calculate_speed(distance: float, time: float) -> float:
     """
     Calculate speed as distance divided by time.

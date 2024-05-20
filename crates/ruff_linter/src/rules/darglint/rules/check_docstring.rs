@@ -1,10 +1,9 @@
-use std::collections::HashSet;
-
 use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::visitor::{self, Visitor};
-use ruff_python_ast::{self as ast, ExceptHandler, Expr, Stmt};
+use ruff_python_ast::{self as ast, Expr, Stmt};
+use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::{Definition, MemberKind};
 use ruff_text_size::TextRange;
 
@@ -195,27 +194,37 @@ struct Entry {
     range: TextRange,
 }
 
-#[derive(Debug)]
 struct BodyEntries {
     raised_exceptions: Vec<Entry>,
-    named_exceptions: HashSet<String>,
 }
 
-impl BodyEntries {
-    fn new() -> Self {
+struct BodyVisitor<'a> {
+    raised_exceptions: Vec<Entry>,
+    semantic: &'a SemanticModel<'a>,
+}
+
+impl<'a> BodyVisitor<'a> {
+    fn new(semantic: &'a SemanticModel<'a>) -> Self {
         Self {
             raised_exceptions: Vec::new(),
-            named_exceptions: HashSet::new(),
+            semantic,
+        }
+    }
+
+    fn finish(self) -> BodyEntries {
+        BodyEntries {
+            raised_exceptions: self.raised_exceptions,
         }
     }
 }
 
-impl Visitor<'_> for BodyEntries {
+impl Visitor<'_> for BodyVisitor<'_> {
     fn visit_stmt(&mut self, stmt: &Stmt) {
         if let Stmt::Raise(ast::StmtRaise { exc: Some(exc), .. }) = stmt {
             if let Expr::Name(ast::ExprName { id, range, .. }) = exc.as_ref() {
-                // Skip variable exceptions for now
-                if !self.named_exceptions.contains(id) {
+                // SemanticModel will resolve qualified_name for local Class definitions,
+                // or imported definitions, but not variables which we want to ignore.
+                if self.semantic.resolve_qualified_name(exc.as_ref()).is_some() {
                     self.raised_exceptions.push(Entry {
                         id: id.to_string(),
                         range: *range,
@@ -224,17 +233,6 @@ impl Visitor<'_> for BodyEntries {
             }
         }
         visitor::walk_stmt(self, stmt);
-    }
-
-    fn visit_except_handler(&mut self, except_handler: &ExceptHandler) {
-        if let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
-            name: Some(name),
-            ..
-        }) = except_handler
-        {
-            self.named_exceptions.insert(name.id.to_string());
-        }
-        visitor::walk_except_handler(self, except_handler);
     }
 }
 
@@ -262,8 +260,9 @@ pub(crate) fn check_docstring(
         _ => DocstringEntries::new(section_contexts, section_contexts.style()),
     };
 
-    let mut body_entries = BodyEntries::new();
-    visitor::walk_body(&mut body_entries, member.body());
+    let mut visitor = BodyVisitor::new(checker.semantic());
+    visitor::walk_body(&mut visitor, member.body());
+    let body_entries = visitor.finish();
 
     // DAR401
     if checker.enabled(Rule::DocstringMissingException) {

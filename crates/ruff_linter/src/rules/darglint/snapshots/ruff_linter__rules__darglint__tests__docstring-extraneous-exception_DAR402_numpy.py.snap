@@ -1,46 +1,46 @@
 ---
 source: crates/ruff_linter/src/rules/darglint/mod.rs
 ---
-DAR402_numpy.py:17:1: DAR402 FasterThanLightError not explicitly raised.
+DAR402_numpy.py:21:1: DAR402 FasterThanLightError not explicitly raised.
    |
-15 |           Speed as distance divided by time.
-16 |   
-17 | /     Raises
-18 | |     ------
-19 | |     FasterThanLightError
-20 | |         If speed is greater than the speed of light.
-21 | |     """
+19 |           Speed as distance divided by time.
+20 |   
+21 | /     Raises
+22 | |     ------
+23 | |     FasterThanLightError
+24 | |         If speed is greater than the speed of light.
+25 | |     """
    | |____^ DAR402
-22 |       return distance / time
+26 |       return distance / time
    |
 
-DAR402_numpy.py:41:1: DAR402 FasterThanLightError, DivisionByZero not explicitly raised.
+DAR402_numpy.py:45:1: DAR402 FasterThanLightError, DivisionByZero not explicitly raised.
    |
-39 |           Speed as distance divided by time.
-40 |   
-41 | /     Raises
-42 | |     ------
-43 | |     FasterThanLightError
-44 | |         If speed is greater than the speed of light.
-45 | |     DivisionByZero
-46 | |         If attempting to divide by zero.
-47 | |     """
+43 |           Speed as distance divided by time.
+44 |   
+45 | /     Raises
+46 | |     ------
+47 | |     FasterThanLightError
+48 | |         If speed is greater than the speed of light.
+49 | |     DivisionByZero
+50 | |         If attempting to divide by zero.
+51 | |     """
    | |____^ DAR402
-48 |       return distance / time
+52 |       return distance / time
    |
 
-DAR402_numpy.py:67:1: DAR402 DivisionByZero not explicitly raised.
+DAR402_numpy.py:71:1: DAR402 DivisionByZero not explicitly raised.
    |
-65 |           Speed as distance divided by time.
-66 |   
-67 | /     Raises
-68 | |     ------
-69 | |     FasterThanLightError
-70 | |         If speed is greater than the speed of light.
-71 | |     DivisionByZero
-72 | |         If attempting to divide by zero.
-73 | |     """
+69 |           Speed as distance divided by time.
+70 |   
+71 | /     Raises
+72 | |     ------
+73 | |     FasterThanLightError
+74 | |         If speed is greater than the speed of light.
+75 | |     DivisionByZero
+76 | |         If attempting to divide by zero.
+77 | |     """
    | |____^ DAR402
-74 |       try:
-75 |           return distance / time
+78 |       try:
+79 |           return distance / time
    |

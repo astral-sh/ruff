@@ -1,28 +1,36 @@
 ---
 source: crates/ruff_linter/src/rules/darglint/mod.rs
 ---
-DAR401_google.py:35:15: DAR401 Raised exception `FasterThanLightError` missing from docstring
+DAR401_google.py:45:15: DAR401 Raised exception `FasterThanLightError` missing from docstring
    |
-33 |         return distance / time
-34 |     except ZeroDivisionError as exc:
-35 |         raise FasterThanLightError from exc
+43 |         return distance / time
+44 |     except ZeroDivisionError as exc:
+45 |         raise FasterThanLightError from exc
    |               ^^^^^^^^^^^^^^^^^^^^ DAR401
    |
 
-DAR401_google.py:52:15: DAR401 Raised exception `FasterThanLightError` missing from docstring
+DAR401_google.py:62:15: DAR401 Raised exception `FasterThanLightError` missing from docstring
    |
-50 |         return distance / time
-51 |     except ZeroDivisionError as exc:
-52 |         raise FasterThanLightError from exc
+60 |         return distance / time
+61 |     except ZeroDivisionError as exc:
+62 |         raise FasterThanLightError from exc
    |               ^^^^^^^^^^^^^^^^^^^^ DAR401
-53 |     except:
-54 |         raise ValueError
+63 |     except:
+64 |         raise ValueError
    |
 
-DAR401_google.py:54:15: DAR401 Raised exception `ValueError` missing from docstring
+DAR401_google.py:64:15: DAR401 Raised exception `ValueError` missing from docstring
    |
-52 |         raise FasterThanLightError from exc
-53 |     except:
-54 |         raise ValueError
+62 |         raise FasterThanLightError from exc
+63 |     except:
+64 |         raise ValueError
    |               ^^^^^^^^^^ DAR401
    |
+
+DAR401_google.py:114:11: DAR401 Raised exception `AnotherError` missing from docstring
+    |
+112 |         Speed as distance divided by time.
+113 |     """
+114 |     raise AnotherError
+    |           ^^^^^^^^^^^^ DAR401
+    |

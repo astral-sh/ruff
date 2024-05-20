@@ -1,38 +1,38 @@
 ---
 source: crates/ruff_linter/src/rules/darglint/mod.rs
 ---
-DAR402_google.py:11:1: DAR402 FasterThanLightError not explicitly raised.
+DAR402_google.py:15:1: DAR402 FasterThanLightError not explicitly raised.
    |
- 9 |           Speed as distance divided by time.
-10 |   
-11 | /     Raises:
-12 | |         FasterThanLightError: If speed is greater than the speed of light.
-13 | |     """
+13 |           Speed as distance divided by time.
+14 |   
+15 | /     Raises:
+16 | |         FasterThanLightError: If speed is greater than the speed of light.
+17 | |     """
    | |____^ DAR402
-14 |       return distance / time
+18 |       return distance / time
    |
 
-DAR402_google.py:27:1: DAR402 FasterThanLightError, DivisionByZero not explicitly raised.
+DAR402_google.py:31:1: DAR402 FasterThanLightError, DivisionByZero not explicitly raised.
    |
-25 |           Speed as distance divided by time.
-26 |   
-27 | /     Raises:
-28 | |         FasterThanLightError: If speed is greater than the speed of light.
-29 | |         DivisionByZero: Divide by zero.
-30 | |     """
+29 |           Speed as distance divided by time.
+30 |   
+31 | /     Raises:
+32 | |         FasterThanLightError: If speed is greater than the speed of light.
+33 | |         DivisionByZero: Divide by zero.
+34 | |     """
    | |____^ DAR402
-31 |       return distance / time
+35 |       return distance / time
    |
 
-DAR402_google.py:44:1: DAR402 DivisionByZero not explicitly raised.
+DAR402_google.py:48:1: DAR402 DivisionByZero not explicitly raised.
    |
-42 |           Speed as distance divided by time.
-43 |   
-44 | /     Raises:
-45 | |         FasterThanLightError: If speed is greater than the speed of light.
-46 | |         DivisionByZero: Divide by zero.
-47 | |     """
+46 |           Speed as distance divided by time.
+47 |   
+48 | /     Raises:
+49 | |         FasterThanLightError: If speed is greater than the speed of light.
+50 | |         DivisionByZero: Divide by zero.
+51 | |     """
    | |____^ DAR402
-48 |       try:
-49 |           return distance / time
+52 |       try:
+53 |           return distance / time
    |
