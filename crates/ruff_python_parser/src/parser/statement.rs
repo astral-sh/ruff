@@ -260,7 +260,7 @@ impl<'src> Parser<'src> {
                 if token == TokenKind::Type {
                     // Type is considered a soft keyword, so we will treat it as an identifier if
                     // it's followed by an unexpected token.
-                    let (first, second) = self.tokens.peek2();
+                    let (first, second) = self.peek2();
 
                     if (first == TokenKind::Name || first.is_soft_keyword())
                         && matches!(second, TokenKind::Lsqb | TokenKind::Equal)
