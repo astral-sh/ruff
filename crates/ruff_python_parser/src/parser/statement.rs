@@ -3491,6 +3491,11 @@ impl<'src> Parser<'src> {
             | TokenKind::FStringStart
             | TokenKind::Lbrace
             | TokenKind::Tilde
+            | TokenKind::None
+            | TokenKind::True
+            | TokenKind::False
+            | TokenKind::Await
+            | TokenKind::Yield
             | TokenKind::Lambda => MatchTokenType::Keyword,
             TokenKind::Lpar
             | TokenKind::Lsqb
