@@ -314,26 +314,27 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
             });
 
         // generate fixes that are shared across bindings in the statement
-        let (fix_remove, fix_reexport) = if (!in_init || fix_init) && !in_except_handler {
-            (
-                fix_by_removing_imports(
-                    checker,
-                    import_statement,
-                    to_remove.iter().map(|(binding, _)| binding),
-                    in_init,
+        let (fix_remove, fix_reexport) =
+            if (!in_init || fix_init || preview_mode) && !in_except_handler {
+                (
+                    fix_by_removing_imports(
+                        checker,
+                        import_statement,
+                        to_remove.iter().map(|(binding, _)| binding),
+                        in_init,
+                    )
+                    .ok(),
+                    fix_by_reexporting(
+                        checker,
+                        import_statement,
+                        &to_reexport.iter().map(|(b, _)| b).collect::<Vec<_>>(),
+                        &dunder_all_exprs,
+                    )
+                    .ok(),
                 )
-                .ok(),
-                fix_by_reexporting(
-                    checker,
-                    import_statement,
-                    &to_reexport.iter().map(|(b, _)| b).collect::<Vec<_>>(),
-                    &dunder_all_exprs,
-                )
-                .ok(),
-            )
-        } else {
-            (None, None)
-        };
+            } else {
+                (None, None)
+            };
 
         for ((binding, context), fix) in iter::Iterator::chain(
             iter::zip(to_remove, iter::repeat(fix_remove)),
