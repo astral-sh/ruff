@@ -660,7 +660,12 @@ impl LintConfiguration {
             .collect();
 
         #[allow(deprecated)]
-        let ignore_init_module_imports = options.common.ignore_init_module_imports;
+        let ignore_init_module_imports = {
+            if options.common.ignore_init_module_imports.is_some_and(|t| t) {
+                warn_user_once!("The `ignore-init-module-imports` option has been deprecated because Ruff will soon suggest reexports in `__init__.py` files with safe fixes when possible (currently in preview mode). Please update your configuration to remove `ignore-init-module-imports` because it will be removed in a future version.");
+            }
+            options.common.ignore_init_module_imports
+        };
 
         Ok(LintConfiguration {
             exclude: options.exclude.map(|paths| {
