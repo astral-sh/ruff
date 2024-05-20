@@ -321,12 +321,8 @@ impl<'src> Parser<'src> {
 
     /// Moves the parser to the next token.
     fn do_bump(&mut self, kind: TokenKind) {
-        self.tokens.bump(kind);
-
-        self.current_token_id.increment();
-
         if !matches!(
-            self.tokens.current_kind(),
+            self.current_token_kind(),
             // TODO explore including everything up to the dedent as part of the body.
             TokenKind::Dedent
             // Don't include newlines in the body
@@ -337,6 +333,9 @@ impl<'src> Parser<'src> {
         ) {
             self.prev_token_end = self.current_token_range().end();
         }
+
+        self.tokens.bump(kind);
+        self.current_token_id.increment();
     }
 
     /// Returns the next token kind without consuming it.
