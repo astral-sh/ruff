@@ -2,6 +2,8 @@
 source: crates/ruff_python_parser/src/lexer.rs
 expression: newline_in_brackets_eol(WINDOWS_EOL)
 ---
+## Tokens
+```
 [
     (
         Name {
@@ -140,3 +142,4 @@ expression: newline_in_brackets_eol(WINDOWS_EOL)
         46..48,
     ),
 ]
+```

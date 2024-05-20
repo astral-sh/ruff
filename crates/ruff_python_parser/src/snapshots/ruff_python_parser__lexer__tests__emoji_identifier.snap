@@ -7,11 +7,7 @@ expression: "lex_invalid(source, Mode::Module)"
 [
     (
         Unknown,
-        0..85,
-    ),
-    (
-        Newline,
-        85..85,
+        0..4,
     ),
 ]
 ```
@@ -19,10 +15,10 @@ expression: "lex_invalid(source, Mode::Module)"
 ```
 [
     LexicalError {
-        error: OtherError(
-            "Invalid decimal integer literal",
-        ),
-        location: 0..85,
+        error: UnrecognizedToken {
+            tok: '🐦',
+        },
+        location: 0..4,
     },
 ]
 ```
