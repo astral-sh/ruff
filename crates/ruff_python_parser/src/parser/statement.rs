@@ -263,7 +263,7 @@ impl<'src> Parser<'src> {
                     let (first, second) = self.tokens.peek2();
 
                     if (first == TokenKind::Name || first.is_soft_keyword())
-                        && matches!(second, TokenKind::Lpar | TokenKind::Equal)
+                        && matches!(second, TokenKind::Lsqb | TokenKind::Equal)
                     {
                         return Stmt::TypeAlias(self.parse_type_alias_statement());
                     }
