@@ -412,7 +412,7 @@ impl<'src> Parser<'src> {
                 })
             }
             TokenKind::Int => {
-                let TokenValue::Int(value) = self.bump_value(TokenKind::Int) else {
+                let TokenValue::Int { value } = self.bump_value(TokenKind::Int) else {
                     unreachable!()
                 };
                 let range = self.node_range(start);
@@ -426,7 +426,7 @@ impl<'src> Parser<'src> {
                 })
             }
             TokenKind::Float => {
-                let TokenValue::Float(value) = self.bump_value(TokenKind::Float) else {
+                let TokenValue::Float { value } = self.bump_value(TokenKind::Float) else {
                     unreachable!()
                 };
                 let range = self.node_range(start);
