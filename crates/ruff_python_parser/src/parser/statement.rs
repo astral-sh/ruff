@@ -2590,7 +2590,6 @@ impl<'src> Parser<'src> {
         self.bump(TokenKind::Case);
 
         // test_err match_stmt_missing_pattern
-        // # TODO(dhruvmanila): Here, `case` is a name token because of soft keyword transformer
         // match x:
         //     case : ...
         let pattern = self.parse_match_patterns();
@@ -2689,8 +2688,6 @@ impl<'src> Parser<'src> {
                 // async while test: ...
                 // async x = 1
                 // async async def foo(): ...
-                // # TODO(dhruvmanila): Here, `match` is actually a Name token because
-                // # of the soft keyword # transformer
                 // async match test:
                 //     case _: ...
                 self.add_error(
