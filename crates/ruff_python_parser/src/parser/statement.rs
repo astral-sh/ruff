@@ -2405,9 +2405,7 @@ impl<'src> Parser<'src> {
                     range: self.node_range(start),
                 })
             }
-            TokenKind::Newline
-                if matches!(self.tokens.peek2(), (TokenKind::Indent, TokenKind::Case)) =>
-            {
+            TokenKind::Newline if matches!(self.peek2(), (TokenKind::Indent, TokenKind::Case)) => {
                 // `match` is a keyword
                 self.add_error(
                     ParseErrorType::ExpectedToken {
@@ -3514,7 +3512,7 @@ impl<'src> Parser<'src> {
     fn classify_match_token(&mut self) -> MatchTokenKind {
         assert_eq!(self.current_token_kind(), TokenKind::Match);
 
-        let (first, second) = self.tokens.peek2();
+        let (first, second) = self.peek2();
 
         match first {
             TokenKind::Not if second == TokenKind::In => MatchTokenKind::Identifier,
