@@ -127,15 +127,15 @@ impl<'src> Parser<'src> {
                     // it's followed by an unexpected token.
 
                     match self.classify_match_token() {
-                        MatchTokenType::Keyword => {
+                        MatchTokenKind::Keyword => {
                             return Stmt::Match(self.parse_match_statement());
                         }
-                        MatchTokenType::KeywordOrIdentifier => {
+                        MatchTokenKind::KeywordOrIdentifier => {
                             if let Some(match_stmt) = self.try_parse_match_statement() {
                                 return Stmt::Match(match_stmt);
                             }
                         }
-                        MatchTokenType::Identifier => {}
+                        MatchTokenKind::Identifier => {}
                     }
                 }
 
@@ -3511,13 +3511,13 @@ impl<'src> Parser<'src> {
     /// # Panics
     ///
     /// If the parser isn't positioned at a `match` token.
-    fn classify_match_token(&mut self) -> MatchTokenType {
+    fn classify_match_token(&mut self) -> MatchTokenKind {
         assert_eq!(self.current_token_kind(), TokenKind::Match);
 
         let (first, second) = self.tokens.peek2();
 
         match first {
-            TokenKind::Not if second == TokenKind::In => MatchTokenType::Identifier,
+            TokenKind::Not if second == TokenKind::In => MatchTokenKind::Identifier,
             TokenKind::Name
             | TokenKind::Int
             | TokenKind::Float
@@ -3528,17 +3528,17 @@ impl<'src> Parser<'src> {
             | TokenKind::Tilde
             | TokenKind::Await
             | TokenKind::Yield
-            | TokenKind::Lambda => MatchTokenType::Keyword,
+            | TokenKind::Lambda => MatchTokenKind::Keyword,
             TokenKind::Lpar
             | TokenKind::Lsqb
             | TokenKind::Star
             | TokenKind::Plus
-            | TokenKind::Minus => MatchTokenType::KeywordOrIdentifier,
+            | TokenKind::Minus => MatchTokenKind::KeywordOrIdentifier,
             _ => {
                 if first.is_soft_keyword() || first.is_singleton() {
-                    MatchTokenType::Keyword
+                    MatchTokenKind::Keyword
                 } else {
-                    MatchTokenType::Identifier
+                    MatchTokenKind::Identifier
                 }
             }
         }
@@ -3640,7 +3640,7 @@ impl Display for Clause {
 /// The `match` token is a soft keyword which means, depending on the context, it can be used as a
 /// keyword or an identifier.
 #[derive(Debug, Clone, Copy)]
-enum MatchTokenType {
+enum MatchTokenKind {
     /// The `match` token is used as a keyword.
     ///
     /// For example:
