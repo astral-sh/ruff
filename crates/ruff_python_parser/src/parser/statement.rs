@@ -2358,6 +2358,32 @@ impl<'src> Parser<'src> {
         target
     }
 
+    /// Try parsing a `match` statement.
+    ///
+    /// This uses speculative parsing to remove the ambiguity of whether the `match` token is used
+    /// as a keyword or an identifier. This ambiguity arises only in if the `match` token is
+    /// followed by certain tokens. For example, if `match` is followed by `[`, we can't know if
+    /// it's used in the context of a subscript expression or as a list expression:
+    ///
+    /// ```python
+    /// # Subcript expression; `match` is an identifier
+    /// match[x]
+    ///
+    /// # List expression; `match` is a keyword
+    /// match [x, y]:
+    ///     case [1, 2]:
+    ///         pass
+    /// ```
+    ///
+    /// This is done by parsing the subject expression considering `match` as a keyword token.
+    /// Then, based on certain heuristics we'll determine if our assumption is true. If so, we'll
+    /// continue parsing the entire match statement. Otherwise, return `None`.
+    ///
+    /// # Panics
+    ///
+    /// If the parser isn't positioned at a `match` token.
+    ///
+    /// See: <https://docs.python.org/3/reference/compound_stmts.html#the-match-statement>
     fn try_parse_match_statement(&mut self) -> Option<ast::StmtMatch> {
         let checkpoint = self.checkpoint();
 
@@ -2402,6 +2428,7 @@ impl<'src> Parser<'src> {
             _ => {
                 // `match` is an identifier
                 self.rewind(checkpoint);
+
                 None
             }
         }
@@ -2482,6 +2509,9 @@ impl<'src> Parser<'src> {
     }
 
     /// Parses the body of a `match` statement.
+    ///
+    /// This method expects that the parser is positioned at a `Newline` token. If not, it adds a
+    /// syntax error and continues parsing.
     fn parse_match_body(&mut self) -> Vec<ast::MatchCase> {
         // test_err match_stmt_no_newline_before_case
         // match foo: case _: ...
@@ -3476,6 +3506,11 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// Classify the `match` soft keyword token.
+    ///
+    /// # Panics
+    ///
+    /// If the parser isn't positioned at a `match` token.
     fn classify_match_token(&mut self) -> MatchTokenType {
         assert_eq!(self.current_token_kind(), TokenKind::Match);
 
@@ -3603,10 +3638,43 @@ impl Display for Clause {
     }
 }
 
+/// The classification of the `match` token.
+///
+/// The `match` token is a soft keyword which means, depending on the context, it can be used as a
+/// keyword or an identifier.
 #[derive(Debug, Clone, Copy)]
 enum MatchTokenType {
+    /// The `match` token is used as a keyword.
+    ///
+    /// For example:
+    /// ```python
+    /// match foo:
+    ///     case _:
+    ///         pass
+    /// ```
     Keyword,
+
+    /// The `match` token is used as an identifier.
+    ///
+    /// For example:
+    /// ```python
+    /// match.values()
+    /// match is None
+    /// ````
     Identifier,
+
+    /// The `match` token is used as either a keyword or an identifier.
+    ///
+    /// For example:
+    /// ```python
+    /// # Used as a keyword
+    /// match [x, y]:
+    ///     case [1, 2]:
+    ///         pass
+    ///
+    /// # Used as an identifier
+    /// match[x]
+    /// ```
     KeywordOrIdentifier,
 }
 
