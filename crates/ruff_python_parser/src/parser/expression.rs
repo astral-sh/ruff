@@ -479,7 +479,7 @@ impl<'src> Parser<'src> {
             // Non-soft keyword
             self.add_error(
                 ParseErrorType::OtherError(format!(
-                    "Expected an identifier, but found a keyword '{}' that cannot be used here",
+                    "Expected an identifier, but found a keyword {} that cannot be used here",
                     self.current_token_kind()
                 )),
                 range,
