@@ -24,6 +24,7 @@ enum UnusedImportContext {
     Init {
         first_party: bool,
         dunder_all_count: usize,
+        ignore_init_module_imports: bool,
     },
 }
 
@@ -91,6 +92,10 @@ enum UnusedImportContext {
 ///     print("numpy is not installed")
 /// ```
 ///
+/// ## Options
+/// - Deprecated `lint.ignore-init-module-imports` to `true`. When set to `false`, unused imports
+/// in `__init__.py` files are removed (unsafe).
+///
 /// ## References
 /// - [Python documentation: `import`](https://docs.python.org/3/reference/simple_stmts.html#the-import-statement)
 /// - [Python documentation: `importlib.util.find_spec`](https://docs.python.org/3/library/importlib.html#importlib.util.find_spec)
@@ -140,11 +145,13 @@ impl Violation for UnusedImport {
             Some(UnusedImportContext::Init {
                 first_party: true,
                 dunder_all_count: 1,
+                ignore_init_module_imports: true,
             }) => Some(format!("Add unused import `{binding}` to __all__")),
 
             Some(UnusedImportContext::Init {
                 first_party: true,
                 dunder_all_count: 0,
+                ignore_init_module_imports: true,
             }) => Some(format!("Use an explicit re-export: `{module} as {module}`")),
 
             _ => Some(if *multiple {
@@ -257,7 +264,8 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
     }
 
     let in_init = checker.path().ends_with("__init__.py");
-    let fix_init = checker.settings.preview.is_enabled();
+    let fix_init = !checker.settings.ignore_init_module_imports;
+    let preview_mode = checker.settings.preview.is_enabled();
     let dunder_all_exprs = find_dunder_all_exprs(checker.semantic());
 
     // Generate a diagnostic for every import, but share fixes across all imports within the same
@@ -288,6 +296,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
                             checker,
                         ),
                         dunder_all_count: dunder_all_exprs.len(),
+                        ignore_init_module_imports: !fix_init,
                     })
                 } else {
                     None
@@ -301,7 +310,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
                         first_party: true,
                         ..
                     })
-                )
+                ) && preview_mode
             });
 
         // generate fixes that are shared across bindings in the statement
