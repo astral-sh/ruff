@@ -69,20 +69,24 @@ enum UnusedImportContext {
 /// interface changes.
 ///
 /// ## Example
+///
 /// ```python
 /// import numpy as np  # unused import
+///
 ///
 /// def area(radius):
 ///     return 3.14 * radius**2
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// def area(radius):
 ///     return 3.14 * radius**2
 /// ```
 ///
 /// To check the availability of a module, use `importlib.util.find_spec`:
+///
 /// ```python
 /// from importlib.util import find_spec
 ///
