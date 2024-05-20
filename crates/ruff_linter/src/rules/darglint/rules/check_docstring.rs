@@ -221,16 +221,35 @@ impl<'a> BodyVisitor<'a> {
 impl Visitor<'_> for BodyVisitor<'_> {
     fn visit_stmt(&mut self, stmt: &Stmt) {
         if let Stmt::Raise(ast::StmtRaise { exc: Some(exc), .. }) = stmt {
-            if let Expr::Name(ast::ExprName { id, range, .. }) = exc.as_ref() {
-                // SemanticModel will resolve qualified_name for local Class definitions,
-                // or imported definitions, but not variables which we want to ignore.
-                if self.semantic.resolve_qualified_name(exc.as_ref()).is_some() {
-                    self.raised_exceptions.push(Entry {
-                        id: id.to_string(),
-                        range: *range,
-                    });
+            match exc.as_ref() {
+                Expr::Name(ast::ExprName { id, range, .. }) => {
+                    // SemanticModel will resolve qualified_name for local Class definitions,
+                    // or imported definitions, but not variables which we want to ignore.
+                    if self.semantic.resolve_qualified_name(exc.as_ref()).is_some() {
+                        self.raised_exceptions.push(Entry {
+                            id: id.to_string(),
+                            range: *range,
+                        });
+                    }
                 }
-            }
+                Expr::Call(ast::ExprCall { func, range, .. }) => {
+                    if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
+                        // SemanticModel will resolve qualified_name for local Class definitions,
+                        // or imported definitions, but not variables which we want to ignore.
+                        if self
+                            .semantic
+                            .resolve_qualified_name(func.as_ref())
+                            .is_some()
+                        {
+                            self.raised_exceptions.push(Entry {
+                                id: id.to_string(),
+                                range: *range,
+                            });
+                        }
+                    }
+                }
+                _ => {}
+            };
         }
         visitor::walk_stmt(self, stmt);
     }

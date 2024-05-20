@@ -34,3 +34,11 @@ DAR401_google.py:114:11: DAR401 Raised exception `AnotherError` missing from doc
 114 |     raise AnotherError
     |           ^^^^^^^^^^^^ DAR401
     |
+
+DAR401_google.py:128:11: DAR401 Raised exception `AnotherError` missing from docstring
+    |
+126 |         Speed as distance divided by time.
+127 |     """
+128 |     raise AnotherError()
+    |           ^^^^^^^^^^^^^^ DAR401
+    |

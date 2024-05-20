@@ -114,6 +114,20 @@ def calculate_speed(distance: float, time: float) -> float:
     raise AnotherError
 
 
+# DAR401
+def calculate_speed(distance: float, time: float) -> float:
+    """Calculate speed as distance divided by time.
+
+    Args:
+        distance: Distance traveled.
+        time: Time spent traveling.
+
+    Returns:
+        Speed as distance divided by time.
+    """
+    raise AnotherError()
+
+
 # DAR401, but can't resolve the error
 def calculate_speed(distance: float, time: float) -> float:
     """Calculate speed as distance divided by time.
