@@ -292,8 +292,15 @@ pub(crate) enum SupportedCodeAction {
     SourceFixAll,
     /// Maps to `source.organizeImports` and `source.organizeImports.ruff` code action kinds.
     /// This is a source action that applies import sorting fixes to the currently open document.
-    #[allow(dead_code)] // TODO: remove
     SourceOrganizeImports,
+    /// Maps to the `notebook.source.fixAll` and `notebook.source.fixAll.ruff` code action kinds.
+    /// This is a source action, specifically for notebooks, that applies all safe fixes
+    /// to the currently open document.
+    NotebookSourceFixAll,
+    /// Maps to `source.organizeImports` and `source.organizeImports.ruff` code action kinds.
+    /// This is a source action, specifically for notebooks, that applies import sorting fixes
+    /// to the currently open document.
+    NotebookSourceOrganizeImports,
 }
 
 impl SupportedCodeAction {
@@ -303,6 +310,8 @@ impl SupportedCodeAction {
             Self::QuickFix => CodeActionKind::QUICKFIX,
             Self::SourceFixAll => crate::SOURCE_FIX_ALL_RUFF,
             Self::SourceOrganizeImports => crate::SOURCE_ORGANIZE_IMPORTS_RUFF,
+            Self::NotebookSourceFixAll => crate::NOTEBOOK_SOURCE_FIX_ALL_RUFF,
+            Self::NotebookSourceOrganizeImports => crate::NOTEBOOK_SOURCE_ORGANIZE_IMPORTS_RUFF,
         }
     }
 
@@ -318,6 +327,8 @@ impl SupportedCodeAction {
             Self::QuickFix,
             Self::SourceFixAll,
             Self::SourceOrganizeImports,
+            Self::NotebookSourceFixAll,
+            Self::NotebookSourceOrganizeImports,
         ]
         .into_iter()
     }

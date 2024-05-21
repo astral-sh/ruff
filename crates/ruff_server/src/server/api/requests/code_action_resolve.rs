@@ -50,7 +50,7 @@ impl super::BackgroundDocumentRequestHandler for CodeActionResolve {
         };
 
         action.edit = match action_kind {
-            SupportedCodeAction::SourceFixAll => Some(
+            SupportedCodeAction::SourceFixAll | SupportedCodeAction::NotebookSourceFixAll => Some(
                 resolve_edit_for_fix_all(
                     query,
                     snapshot.resolved_client_capabilities(),
@@ -59,7 +59,8 @@ impl super::BackgroundDocumentRequestHandler for CodeActionResolve {
                 )
                 .with_failure_code(ErrorCode::InternalError)?,
             ),
-            SupportedCodeAction::SourceOrganizeImports => Some(
+            SupportedCodeAction::SourceOrganizeImports
+            | SupportedCodeAction::NotebookSourceOrganizeImports => Some(
                 resolve_edit_for_organize_imports(
                     query,
                     snapshot.resolved_client_capabilities(),

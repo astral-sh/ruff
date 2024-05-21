@@ -19,6 +19,10 @@ pub(crate) const DIAGNOSTIC_NAME: &str = "Ruff";
 pub(crate) const SOURCE_FIX_ALL_RUFF: CodeActionKind = CodeActionKind::new("source.fixAll.ruff");
 pub(crate) const SOURCE_ORGANIZE_IMPORTS_RUFF: CodeActionKind =
     CodeActionKind::new("source.organizeImports.ruff");
+pub(crate) const NOTEBOOK_SOURCE_FIX_ALL_RUFF: CodeActionKind =
+    CodeActionKind::new("notebook.source.fixAll.ruff");
+pub(crate) const NOTEBOOK_SOURCE_ORGANIZE_IMPORTS_RUFF: CodeActionKind =
+    CodeActionKind::new("notebook.source.organizeImports.ruff");
 
 /// A common result type used in most cases where a
 /// result type is needed.

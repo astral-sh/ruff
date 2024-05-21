@@ -57,6 +57,20 @@ impl super::BackgroundDocumentRequestHandler for CodeActions {
             response.push(organize_imports(&snapshot).with_failure_code(ErrorCode::InternalError)?);
         }
 
+        if snapshot.client_settings().fix_all()
+            && supported_code_actions.contains(&SupportedCodeAction::NotebookSourceFixAll)
+        {
+            response.push(notebook_fix_all(&snapshot).with_failure_code(ErrorCode::InternalError)?);
+        }
+
+        if snapshot.client_settings().organize_imports()
+            && supported_code_actions.contains(&SupportedCodeAction::NotebookSourceOrganizeImports)
+        {
+            response.push(
+                notebook_organize_imports(&snapshot).with_failure_code(ErrorCode::InternalError)?,
+            );
+        }
+
         Ok(Some(response))
     }
 }
@@ -161,6 +175,42 @@ fn fix_all(snapshot: &DocumentSnapshot) -> crate::Result<CodeActionOrCommand> {
     }))
 }
 
+fn notebook_fix_all(snapshot: &DocumentSnapshot) -> crate::Result<CodeActionOrCommand> {
+    let document = snapshot.query();
+
+    let (edit, data) = if snapshot
+        .resolved_client_capabilities()
+        .code_action_deferred_edit_resolution
+    {
+        // The editor will request the edit in a `CodeActionsResolve` request
+        (
+            None,
+            Some(
+                serde_json::to_value(snapshot.query().make_key().into_url())
+                    .expect("document url should serialize"),
+            ),
+        )
+    } else {
+        (
+            Some(resolve_edit_for_fix_all(
+                document,
+                snapshot.resolved_client_capabilities(),
+                snapshot.query().settings().linter(),
+                snapshot.encoding(),
+            )?),
+            None,
+        )
+    };
+
+    Ok(CodeActionOrCommand::CodeAction(types::CodeAction {
+        title: format!("{DIAGNOSTIC_NAME}: Fix all auto-fixable problems"),
+        kind: Some(crate::NOTEBOOK_SOURCE_FIX_ALL_RUFF),
+        edit,
+        data,
+        ..Default::default()
+    }))
+}
+
 fn organize_imports(snapshot: &DocumentSnapshot) -> crate::Result<CodeActionOrCommand> {
     let document = snapshot.query();
 
@@ -191,6 +241,42 @@ fn organize_imports(snapshot: &DocumentSnapshot) -> crate::Result<CodeActionOrCo
     Ok(CodeActionOrCommand::CodeAction(types::CodeAction {
         title: format!("{DIAGNOSTIC_NAME}: Organize imports"),
         kind: Some(crate::SOURCE_ORGANIZE_IMPORTS_RUFF),
+        edit,
+        data,
+        ..Default::default()
+    }))
+}
+
+fn notebook_organize_imports(snapshot: &DocumentSnapshot) -> crate::Result<CodeActionOrCommand> {
+    let document = snapshot.query();
+
+    let (edit, data) = if snapshot
+        .resolved_client_capabilities()
+        .code_action_deferred_edit_resolution
+    {
+        // The edit will be resolved later in the `CodeActionsResolve` request
+        (
+            None,
+            Some(
+                serde_json::to_value(snapshot.query().make_key().into_url())
+                    .expect("document url should serialize"),
+            ),
+        )
+    } else {
+        (
+            Some(resolve_edit_for_organize_imports(
+                document,
+                snapshot.resolved_client_capabilities(),
+                snapshot.query().settings().linter(),
+                snapshot.encoding(),
+            )?),
+            None,
+        )
+    };
+
+    Ok(CodeActionOrCommand::CodeAction(types::CodeAction {
+        title: format!("{DIAGNOSTIC_NAME}: Organize imports"),
+        kind: Some(crate::NOTEBOOK_SOURCE_ORGANIZE_IMPORTS_RUFF),
         edit,
         data,
         ..Default::default()
