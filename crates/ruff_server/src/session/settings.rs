@@ -354,8 +354,13 @@ mod tests {
 
     use super::*;
 
+    #[cfg(not(windows))]
     const VS_CODE_INIT_OPTIONS_FIXTURE: &str =
         include_str!("../../resources/test/fixtures/settings/vs_code_initialization_options.json");
+    // Initialization options that use paths/URIs compatible with Windows
+    #[cfg(windows)]
+    const VS_CODE_INIT_OPTIONS_FIXTURE: &str =
+        include_str!("../../resources/test/fixtures/settings/vs_code_initialization_options_windows.json");
     const GLOBAL_ONLY_INIT_OPTIONS_FIXTURE: &str =
         include_str!("../../resources/test/fixtures/settings/global_only.json");
     const EMPTY_INIT_OPTIONS_FIXTURE: &str =
