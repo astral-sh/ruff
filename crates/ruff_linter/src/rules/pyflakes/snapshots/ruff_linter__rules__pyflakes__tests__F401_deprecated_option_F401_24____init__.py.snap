@@ -22,21 +22,26 @@ __init__.py:33:15: F401 [*] `.unused` imported but unused; consider removing, ad
 33 | from . import unused  # F401: change to redundant alias
    |               ^^^^^^ F401
    |
-   = help: Use an explicit re-export: `unused as unused`
+   = help: Remove unused import: `.unused`
 
-ℹ Safe fix
+ℹ Unsafe fix
 30 30 | from . import aliased as aliased  # Ok: is redundant alias
 31 31 | 
 32 32 | 
 33    |-from . import unused  # F401: change to redundant alias
-   33 |+from . import unused as unused  # F401: change to redundant alias
-34 34 | 
-35 35 | 
-36 36 | from . import renamed as bees  # F401: no fix
+34 33 | 
+35 34 | 
+36 35 | from . import renamed as bees  # F401: no fix
 
-__init__.py:36:26: F401 `.renamed` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+__init__.py:36:26: F401 [*] `.renamed` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
    |
 36 | from . import renamed as bees  # F401: no fix
    |                          ^^^^ F401
    |
-   = help: Use an explicit re-export: `renamed as renamed`
+   = help: Remove unused import: `.renamed`
+
+ℹ Unsafe fix
+33 33 | from . import unused  # F401: change to redundant alias
+34 34 | 
+35 35 | 
+36    |-from . import renamed as bees  # F401: no fix

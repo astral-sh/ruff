@@ -229,6 +229,49 @@ mod tests {
         Ok(())
     }
 
+    #[test_case(Rule::UnusedImport, Path::new("F401_24/__init__.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_25__all_nonempty/__init__.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_26__all_empty/__init__.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_27__all_mistyped/__init__.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_28__all_multiple/__init__.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_29__all_conditional/__init__.py"))]
+    fn f401_stable(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "{}_stable_{}",
+            rule_code.noqa_code(),
+            path.to_string_lossy()
+        );
+        let diagnostics = test_path(
+            Path::new("pyflakes").join(path).as_path(),
+            &LinterSettings::for_rule(rule_code),
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::UnusedImport, Path::new("F401_24/__init__.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_25__all_nonempty/__init__.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_26__all_empty/__init__.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_27__all_mistyped/__init__.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_28__all_multiple/__init__.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_29__all_conditional/__init__.py"))]
+    fn f401_deprecated_option(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "{}_deprecated_option_{}",
+            rule_code.noqa_code(),
+            path.to_string_lossy()
+        );
+        let diagnostics = test_path(
+            Path::new("pyflakes").join(path).as_path(),
+            &LinterSettings {
+                ignore_init_module_imports: false,
+                ..LinterSettings::for_rule(rule_code)
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
     #[test]
     fn f841_dummy_variable_rgx() -> Result<()> {
         let diagnostics = test_path(
