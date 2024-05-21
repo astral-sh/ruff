@@ -121,32 +121,29 @@ impl ToRangeExt for TextRange {
     ) -> NotebookRange {
         let start = offset_to_source_location(self.start(), text, source_index, encoding);
         let mut end = offset_to_source_location(self.end(), text, source_index, encoding);
-        let cell = notebook_index.cell(start.row);
+        let starting_cell = notebook_index.cell(start.row);
 
         // weird edge case here - if the end of the range is where the newline after the cell got added (making it 'out of bounds')
         // we need to move it one character back (which should place it at the end of the last line).
-        match (cell, notebook_index.cell(end.row)) {
-            // If the ending offset is not within a cell boundary, this usually means it is in between the cell boundaries -
-            // in other words, it's pointing to the newline between the cells.
-            // By subtracting the end position by 1, we get it to point to the end of the cell.
-            (Some(_), None) => {
-                end.row = end.row.saturating_sub(1);
-                end.column = offset_to_source_location(
-                    self.end().checked_sub(1.into()).unwrap_or_default(),
-                    text,
-                    source_index,
-                    encoding,
-                )
-                .column;
-            }
-            _ => {}
+        // we test this by checking if the ending offset is in a different (or nonexistent) cell compared to the cell of the starting offset.
+        if notebook_index.cell(end.row) != starting_cell {
+            end.row = end.row.saturating_sub(1);
+            end.column = offset_to_source_location(
+                self.end().checked_sub(1.into()).unwrap_or_default(),
+                text,
+                source_index,
+                encoding,
+            )
+            .column;
         }
 
         let start = source_location_to_position(&notebook_index.translate_location(&start));
         let end = source_location_to_position(&notebook_index.translate_location(&end));
 
         NotebookRange {
-            cell: cell.map(OneIndexed::to_zero_indexed).unwrap_or_default(),
+            cell: starting_cell
+                .map(OneIndexed::to_zero_indexed)
+                .unwrap_or_default(),
             range: types::Range { start, end },
         }
     }
