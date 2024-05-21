@@ -27,9 +27,9 @@ pub(super) fn format_document(snapshot: &DocumentSnapshot) -> Result<super::Form
     let doc = snapshot
         .query()
         .as_single_document()
-        .expect("hover should only be called on text documents or notebook cells");
+        .expect("format should only be called on text documents or notebook cells");
     let source = doc.contents();
-    let formatted = crate::format::format(
+    let mut formatted = crate::format::format(
         doc,
         snapshot.query().source_type(),
         snapshot.query().settings().formatter(),
@@ -39,6 +39,19 @@ pub(super) fn format_document(snapshot: &DocumentSnapshot) -> Result<super::Form
     if formatted == source {
         return Ok(None);
     }
+
+    // special case - avoid adding a newline to a notebook cell if it didn't already exist
+    if snapshot.query().as_notebook().is_some() {
+        let mut trimmed = formatted.as_str();
+        if !source.ends_with('\n') {
+            trimmed = trimmed.trim_end_matches('\n');
+        }
+        if !source.ends_with('\r') {
+            trimmed = trimmed.trim_end_matches('\r');
+        }
+        formatted = trimmed.to_string();
+    }
+
     let formatted_index: LineIndex = LineIndex::from_source_text(&formatted);
 
     let unformatted_index = doc.index();
