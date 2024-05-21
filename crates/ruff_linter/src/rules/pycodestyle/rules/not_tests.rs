@@ -9,10 +9,10 @@ use crate::checkers::ast::Checker;
 use crate::registry::Rule;
 
 /// ## What it does
-/// Checks for negative comparison using `not {foo} in {bar}`.
+/// Checks for membership tests using `not {element} in {collection}`.
 ///
 /// ## Why is this bad?
-/// Negative comparison should be done using `not in`.
+/// Testing membership with `{element} not in {collection}` is more readable.
 ///
 /// ## Example
 /// ```python
@@ -42,10 +42,11 @@ impl AlwaysFixableViolation for NotInTest {
 }
 
 /// ## What it does
-/// Checks for negative comparison using `not {foo} is {bar}`.
+/// Checks for identity comparisons using `not {foo} is {bar}`.
 ///
 /// ## Why is this bad?
-/// Negative comparison should be done using `is not`.
+/// According to [PEP8], testing for an object's identity with `is not` is more
+/// readable.
 ///
 /// ## Example
 /// ```python
@@ -60,6 +61,8 @@ impl AlwaysFixableViolation for NotInTest {
 ///     pass
 /// Z = X.B is not Y
 /// ```
+///
+/// [PEP8]: https://peps.python.org/pep-0008/#programming-recommendations
 #[violation]
 pub struct NotIsTest;
 
