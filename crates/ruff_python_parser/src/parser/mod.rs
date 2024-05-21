@@ -343,6 +343,11 @@ impl<'src> Parser<'src> {
         self.tokens.peek()
     }
 
+    /// Returns the next two token kinds without consuming it.
+    fn peek2(&mut self) -> (TokenKind, TokenKind) {
+        self.tokens.peek2()
+    }
+
     /// Returns the current token kind.
     #[inline]
     fn current_token_kind(&self) -> TokenKind {
