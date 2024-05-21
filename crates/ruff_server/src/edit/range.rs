@@ -126,16 +126,14 @@ impl ToRangeExt for TextRange {
         // weird edge case here - if the end of the range is where the newline after the cell got added (making it 'out of bounds')
         // we need to move it one character back (which should place it at the end of the last line).
         match (cell, notebook_index.cell(end.row)) {
+            // If the start and end of the range are in two different cells, this is a logic error.
+            // We should never generate text ranges that cross over cells.
             (Some(start_cell), Some(end_cell)) if start_cell != end_cell => {
-                end.row = end.row.saturating_sub(1);
-                end.column = offset_to_source_location(
-                    self.end().checked_sub(1.into()).unwrap_or_default(),
-                    text,
-                    source_index,
-                    encoding,
-                )
-                .column;
+                panic!("attempted to create notebook range that crosses cell boundaries")
             }
+            // If the ending offset is not within a cell boundary, this usually means it is in between the cell boundaries -
+            // in other words, it's pointing to the newline between the cells.
+            // By subtracting the end position by 1, we get it to point to the end of the cell.
             (Some(_), None) => {
                 end.row = end.row.saturating_sub(1);
                 end.column = offset_to_source_location(
