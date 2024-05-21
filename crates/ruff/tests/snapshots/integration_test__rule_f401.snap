@@ -84,8 +84,7 @@ else:
 ```
 
 ## Options
-- Deprecated `lint.ignore-init-module-imports` to `true`. When set to `false`, unused imports
-in `__init__.py` files are removed (unsafe).
+- `lint.ignore-init-module-imports`
 
 ## References
 - [Python documentation: `import`](https://docs.python.org/3/reference/simple_stmts.html#the-import-statement)
