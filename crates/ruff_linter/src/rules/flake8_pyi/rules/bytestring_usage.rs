@@ -42,7 +42,7 @@ impl Violation for ByteStringUsage {
 
     fn fix_title(&self) -> Option<String> {
         let ByteStringUsage { full_name } = self;
-        return Some(format!("Do not use `{full_name}`"));
+        Some(format!("Do not use `{full_name}`"))
     }
 }
 
