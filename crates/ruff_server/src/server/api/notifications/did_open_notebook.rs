@@ -27,7 +27,7 @@ impl super::SyncNotificationHandler for DidOpenNotebook {
                     version,
                     cells,
                     metadata,
-                    notebook_type,
+                    ..
                 },
             cell_text_documents,
         }: types::DidOpenNotebookDocumentParams,

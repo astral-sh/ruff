@@ -123,7 +123,7 @@ impl WorkspaceEditTracker {
     pub(crate) fn set_edits_for_document(
         &mut self,
         uri: lsp_types::Url,
-        version: DocumentVersion,
+        _version: DocumentVersion,
         edits: Vec<lsp_types::TextEdit>,
     ) -> crate::Result<()> {
         match self {
@@ -139,7 +139,7 @@ impl WorkspaceEditTracker {
                 document_edits.push(lsp_types::TextDocumentEdit {
                     text_document: lsp_types::OptionalVersionedTextDocumentIdentifier {
                         uri,
-                        version: Some(version),
+                        version: None,
                     },
                     edits: edits.into_iter().map(lsp_types::OneOf::Left).collect(),
                 });
