@@ -139,6 +139,7 @@ impl WorkspaceEditTracker {
                 document_edits.push(lsp_types::TextDocumentEdit {
                     text_document: lsp_types::OptionalVersionedTextDocumentIdentifier {
                         uri,
+                        // TODO(jane): Re-enable versioned edits after investigating whether it could work with notebook cells
                         version: None,
                     },
                     edits: edits.into_iter().map(lsp_types::OneOf::Left).collect(),
