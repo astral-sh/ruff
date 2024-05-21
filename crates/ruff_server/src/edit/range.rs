@@ -125,13 +125,28 @@ impl ToRangeExt for TextRange {
 
         // weird edge case here - if the end of the range is where the newline after the cell got added (making it 'out of bounds')
         // we need to move it one character back (which should place it at the end of the last line).
-        if notebook_index.cell(end.row) != cell {
-            end = offset_to_source_location(
-                self.end().checked_sub(1.into()).unwrap_or_default(),
-                text,
-                source_index,
-                encoding,
-            );
+        match (cell, notebook_index.cell(end.row)) {
+            (Some(start_cell), Some(end_cell)) if start_cell != end_cell => {
+                end.row = end.row.saturating_sub(1);
+                end.column = offset_to_source_location(
+                    self.end().checked_sub(1.into()).unwrap_or_default(),
+                    text,
+                    source_index,
+                    encoding,
+                )
+                .column;
+            }
+            (Some(_), None) => {
+                end.row = end.row.saturating_sub(1);
+                end.column = offset_to_source_location(
+                    self.end().checked_sub(1.into()).unwrap_or_default(),
+                    text,
+                    source_index,
+                    encoding,
+                )
+                .column;
+            }
+            _ => {}
         }
 
         let start = source_location_to_position(&notebook_index.translate_location(&start));
