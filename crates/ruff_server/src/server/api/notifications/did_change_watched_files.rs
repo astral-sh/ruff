@@ -20,9 +20,7 @@ impl super::SyncNotificationHandler for DidChangeWatchedFiles {
         params: types::DidChangeWatchedFilesParams,
     ) -> Result<()> {
         for change in &params.changes {
-            session
-                .reload_settings(&change.uri)
-                .with_failure_code(lsp_server::ErrorCode::InternalError)?;
+            session.reload_settings(&change.uri.to_file_path().unwrap());
         }
 
         if session.resolved_client_capabilities().workspace_refresh && !params.changes.is_empty() {

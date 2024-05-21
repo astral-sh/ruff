@@ -23,7 +23,7 @@ impl fmt::Display for SourceValue {
 
 impl Cell {
     /// Return the [`SourceValue`] of the cell.
-    pub(crate) fn source(&self) -> &SourceValue {
+    pub fn source(&self) -> &SourceValue {
         match self {
             Cell::Code(cell) => &cell.source,
             Cell::Markdown(cell) => &cell.source,

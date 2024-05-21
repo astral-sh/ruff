@@ -21,7 +21,7 @@ enum Command {
 pub(crate) struct ExecuteCommand;
 
 #[derive(Deserialize)]
-struct TextDocumentArgument {
+struct Argument {
     uri: types::Url,
     version: DocumentVersion,
 }
@@ -45,7 +45,7 @@ impl super::SyncRequestHandler for ExecuteCommand {
             return Err(anyhow::anyhow!("Cannot execute the '{}' command: the client does not support `workspace/applyEdit`", command.label())).with_failure_code(ErrorCode::InternalError);
         }
 
-        let mut arguments: Vec<TextDocumentArgument> = params
+        let mut arguments: Vec<Argument> = params
             .arguments
             .into_iter()
             .map(|value| serde_json::from_value(value).with_failure_code(ErrorCode::InvalidParams))
@@ -55,22 +55,21 @@ impl super::SyncRequestHandler for ExecuteCommand {
         arguments.dedup_by(|a, b| a.uri == b.uri);
 
         let mut edit_tracker = WorkspaceEditTracker::new(session.resolved_client_capabilities());
-        for TextDocumentArgument { uri, version } in arguments {
+        for Argument { uri, version } in arguments {
             let snapshot = session
                 .take_snapshot(&uri)
                 .ok_or(anyhow::anyhow!("Document snapshot not available for {uri}",))
                 .with_failure_code(ErrorCode::InternalError)?;
             match command {
                 Command::FixAll => {
-                    let edits = super::code_action_resolve::fix_all_edit(
-                        snapshot.document(),
-                        snapshot.url(),
-                        snapshot.settings().linter(),
+                    let fixes = super::code_action_resolve::fix_all_edit(
+                        snapshot.query(),
+                        snapshot.query().settings().linter(),
                         snapshot.encoding(),
                     )
                     .with_failure_code(ErrorCode::InternalError)?;
                     edit_tracker
-                        .set_edits_for_document(uri, version, edits)
+                        .set_fixes_for_document(fixes, snapshot.query().version())
                         .with_failure_code(ErrorCode::InternalError)?;
                 }
                 Command::Format => {
@@ -82,15 +81,14 @@ impl super::SyncRequestHandler for ExecuteCommand {
                     }
                 }
                 Command::OrganizeImports => {
-                    let edits = super::code_action_resolve::organize_imports_edit(
-                        snapshot.document(),
-                        snapshot.url(),
-                        snapshot.settings().linter(),
+                    let fixes = super::code_action_resolve::organize_imports_edit(
+                        snapshot.query(),
+                        snapshot.query().settings().linter(),
                         snapshot.encoding(),
                     )
                     .with_failure_code(ErrorCode::InternalError)?;
                     edit_tracker
-                        .set_edits_for_document(uri, version, edits)
+                        .set_fixes_for_document(fixes, snapshot.query().version())
                         .with_failure_code(ErrorCode::InternalError)?;
                 }
             }

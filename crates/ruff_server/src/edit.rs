@@ -1,18 +1,20 @@
 //! Types and utilities for working with text, modifying source files, and `Ruff <-> LSP` type conversion.
 
 mod document;
+mod notebook;
 mod range;
 mod replacement;
 
-use std::collections::HashMap;
+use std::{collections::HashMap, path::PathBuf};
 
-pub use document::Document;
 pub(crate) use document::DocumentVersion;
+pub use document::TextDocument;
 use lsp_types::PositionEncodingKind;
-pub(crate) use range::{RangeExt, ToRangeExt};
+pub(crate) use notebook::NotebookDocument;
+pub(crate) use range::{NotebookRange, RangeExt, ToRangeExt};
 pub(crate) use replacement::Replacement;
 
-use crate::session::ResolvedClientCapabilities;
+use crate::{fix::Fixes, session::ResolvedClientCapabilities};
 
 /// A convenient enumeration for supported text encodings. Can be converted to [`lsp_types::PositionEncodingKind`].
 // Please maintain the order from least to greatest priority for the derived `Ord` impl.
@@ -27,6 +29,37 @@ pub enum PositionEncoding {
 
     /// Ruff's preferred encoding
     UTF8,
+}
+
+/// A unique document ID, derived from a URL passed as part of an LSP request.
+/// This document ID can point to either be a standalone Python file, a full notebook, or a cell within a notebook.
+#[derive(Clone, Debug)]
+pub(crate) enum DocumentKey {
+    Notebook(PathBuf),
+    NotebookCell(lsp_types::Url),
+    Text(PathBuf),
+}
+
+impl DocumentKey {
+    /// Converts the key back into its original URL.
+    pub(crate) fn into_url(self) -> lsp_types::Url {
+        match self {
+            DocumentKey::NotebookCell(url) => url,
+            DocumentKey::Notebook(path) | DocumentKey::Text(path) => {
+                lsp_types::Url::from_file_path(path)
+                    .expect("file path originally from URL should convert back to URL")
+            }
+        }
+    }
+}
+
+impl std::fmt::Display for DocumentKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::NotebookCell(url) => url.fmt(f),
+            Self::Notebook(path) | Self::Text(path) => path.display().fmt(f),
+        }
+    }
 }
 
 /// Tracks multi-document edits to eventually merge into a `WorkspaceEdit`.
@@ -72,13 +105,25 @@ impl WorkspaceEditTracker {
         }
     }
 
+    /// Sets a series of [`Fixes`] for a text or notebook document.
+    pub(crate) fn set_fixes_for_document(
+        &mut self,
+        fixes: Fixes,
+        version: DocumentVersion,
+    ) -> crate::Result<()> {
+        for (uri, edits) in fixes {
+            self.set_edits_for_document(uri, version, edits)?;
+        }
+        Ok(())
+    }
+
     /// Sets the edits made to a specific document. This should only be called
     /// once for each document `uri`, and will fail if this is called for the same `uri`
     /// multiple times.
     pub(crate) fn set_edits_for_document(
         &mut self,
         uri: lsp_types::Url,
-        version: DocumentVersion,
+        _version: DocumentVersion,
         edits: Vec<lsp_types::TextEdit>,
     ) -> crate::Result<()> {
         match self {
@@ -94,7 +139,8 @@ impl WorkspaceEditTracker {
                 document_edits.push(lsp_types::TextDocumentEdit {
                     text_document: lsp_types::OptionalVersionedTextDocumentIdentifier {
                         uri,
-                        version: Some(version),
+                        // TODO(jane): Re-enable versioned edits after investigating whether it could work with notebook cells
+                        version: None,
                     },
                     edits: edits.into_iter().map(lsp_types::OneOf::Left).collect(),
                 });
