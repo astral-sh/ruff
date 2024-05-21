@@ -43,6 +43,9 @@ pub(super) fn format_document(snapshot: &DocumentSnapshot) -> Result<super::Form
     // special case - avoid adding a newline to a notebook cell if it didn't already exist
     if snapshot.query().as_notebook().is_some() {
         let mut trimmed = formatted.as_str();
+        if !source.ends_with("\r\n") {
+            trimmed = trimmed.trim_end_matches("\r\n");
+        }
         if !source.ends_with('\n') {
             trimmed = trimmed.trim_end_matches('\n');
         }
