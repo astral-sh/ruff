@@ -3524,6 +3524,7 @@ impl<'src> Parser<'src> {
             | TokenKind::FStringStart
             | TokenKind::Lbrace
             | TokenKind::Tilde
+            | TokenKind::Ellipsis
             | TokenKind::Await
             | TokenKind::Yield
             | TokenKind::Lambda => MatchTokenKind::Keyword,
