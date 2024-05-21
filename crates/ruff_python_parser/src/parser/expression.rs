@@ -37,6 +37,7 @@ const LITERAL_SET: TokenSet = TokenSet::new([
 
 /// Tokens that represents either an expression or the start of one.
 pub(super) const EXPR_SET: TokenSet = TokenSet::new([
+    TokenKind::Case,
     TokenKind::Name,
     TokenKind::Minus,
     TokenKind::Plus,
@@ -574,7 +575,7 @@ impl<'src> Parser<'src> {
             TokenKind::Lbrace => self.parse_set_or_dict_like_expression(),
 
             kind => {
-                if kind.is_keyword() || kind.is_soft_keyword() {
+                if kind.is_keyword() {
                     Expr::Name(self.parse_name())
                 } else {
                     self.add_error(
