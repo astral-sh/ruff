@@ -1,6 +1,6 @@
 use ruff_diagnostics::{Diagnostic, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Expr, ExprAttribute};
+use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -47,30 +47,23 @@ impl Violation for ByteStringUsage {
 }
 
 /// PYI057
-pub(crate) fn bytestring_attribute(checker: &mut Checker, attribute: &ExprAttribute) {
-    let name = attribute.attr.as_str();
-    if name != "ByteString" {
-        return;
-    }
-
-    if let Expr::Name(ast::ExprName { id, .. }) = attribute.value.as_ref() {
-        if id == "typing" {
-            let full_name = format!("{}.{}", id, name);
-            let diagnostic = Diagnostic::new(ByteStringUsage { full_name }, attribute.range());
-            checker.diagnostics.push(diagnostic);
-        }
-    } else if let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = attribute.value.as_ref()
+pub(crate) fn bytestring_attribute(checker: &mut Checker, attribute: &Expr) {
+    if let Some(full_name) = checker
+        .semantic()
+        .resolve_qualified_name(attribute)
+        .and_then(|qualified_name| match qualified_name.segments() {
+            ["typing", "ByteString"] => Some("typing.ByteString"),
+            ["collections", "abc", "ByteString"] => Some("collections.abc.ByteString"),
+            _ => None,
+        })
     {
-        if attr.as_str() != "abc" {
-            return;
-        }
-        if let Expr::Name(ast::ExprName { id, .. }) = value.as_ref() {
-            if id == "collections" {
-                let full_name = format!("{}.{}.{}", id, attr, name);
-                let diagnostic = Diagnostic::new(ByteStringUsage { full_name }, attribute.range());
-                checker.diagnostics.push(diagnostic);
-            }
-        }
+        let diagnostic = Diagnostic::new(
+            ByteStringUsage {
+                full_name: full_name.to_string(),
+            },
+            attribute.range(),
+        );
+        checker.diagnostics.push(diagnostic);
     }
 }
 
