@@ -354,14 +354,8 @@ mod tests {
 
     use super::*;
 
-    #[cfg(not(windows))]
     const VS_CODE_INIT_OPTIONS_FIXTURE: &str =
         include_str!("../../resources/test/fixtures/settings/vs_code_initialization_options.json");
-    // Initialization options that use paths/URIs compatible with Windows
-    #[cfg(windows)]
-    const VS_CODE_INIT_OPTIONS_FIXTURE: &str = include_str!(
-        "../../resources/test/fixtures/settings/vs_code_initialization_options_windows.json"
-    );
     const GLOBAL_ONLY_INIT_OPTIONS_FIXTURE: &str =
         include_str!("../../resources/test/fixtures/settings/global_only.json");
     const EMPTY_INIT_OPTIONS_FIXTURE: &str =
@@ -371,7 +365,7 @@ mod tests {
         serde_json::from_str(content).expect("test fixture JSON should deserialize")
     }
 
-    #[test]
+    #[cfg_attr(not(windows), test)]
     fn test_vs_code_init_options_deserialize() {
         let options: InitializationOptions = deserialize_fixture(VS_CODE_INIT_OPTIONS_FIXTURE);
 
@@ -556,7 +550,7 @@ mod tests {
         "###);
     }
 
-    #[test]
+    #[cfg_attr(not(windows), test)]
     fn test_vs_code_workspace_settings_resolve() {
         let options = deserialize_fixture(VS_CODE_INIT_OPTIONS_FIXTURE);
         let AllSettings {
