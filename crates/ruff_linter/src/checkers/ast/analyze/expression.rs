@@ -62,6 +62,8 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 if !checker.semantic.future_annotations_or_stub()
                     && checker.settings.target_version < PythonVersion::Py39
                     && checker.semantic.in_annotation()
+                    && checker.semantic.in_runtime_evaluated_annotation()
+                    && !checker.semantic.in_string_type_definition()
                     && typing::is_pep585_generic(value, &checker.semantic)
                 {
                     flake8_future_annotations::rules::future_required_type_annotation(
@@ -1195,6 +1197,8 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 if !checker.semantic.future_annotations_or_stub()
                     && checker.settings.target_version < PythonVersion::Py310
                     && checker.semantic.in_annotation()
+                    && checker.semantic.in_runtime_evaluated_annotation()
+                    && !checker.semantic.in_string_type_definition()
                 {
                     flake8_future_annotations::rules::future_required_type_annotation(
                         checker,
