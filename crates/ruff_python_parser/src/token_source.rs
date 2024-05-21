@@ -51,11 +51,24 @@ impl<'src> TokenSource<'src> {
     }
 
     /// Returns the next non-trivia token without consuming it.
+    ///
+    /// Use [`TokenSource::peek2`] to get the next two tokens.
     pub(crate) fn peek(&mut self) -> TokenKind {
         let checkpoint = self.lexer.checkpoint();
         let next = self.next_non_trivia_token();
         self.lexer.rewind(checkpoint);
         next
+    }
+
+    /// Returns the next two non-trivia tokens without consuming it.
+    ///
+    /// Use [`TokenSource::peek`] to only get the next token.
+    pub(crate) fn peek2(&mut self) -> (TokenKind, TokenKind) {
+        let checkpoint = self.lexer.checkpoint();
+        let first = self.next_non_trivia_token();
+        let second = self.next_non_trivia_token();
+        self.lexer.rewind(checkpoint);
+        (first, second)
     }
 
     /// Bumps the token source to the next non-trivia token.
