@@ -73,12 +73,10 @@ impl super::SyncRequestHandler for ExecuteCommand {
                         .with_failure_code(ErrorCode::InternalError)?;
                 }
                 Command::Format => {
-                    let response = super::format::format_document(&snapshot)?;
-                    if let Some(edits) = response {
-                        edit_tracker
-                            .set_edits_for_document(uri, version, edits)
-                            .with_failure_code(ErrorCode::InternalError)?;
-                    }
+                    let fixes = super::format::format_full_document(&snapshot)?;
+                    edit_tracker
+                        .set_fixes_for_document(fixes, version)
+                        .with_failure_code(ErrorCode::InternalError)?;
                 }
                 Command::OrganizeImports => {
                     let fixes = super::code_action_resolve::organize_imports_edit(
