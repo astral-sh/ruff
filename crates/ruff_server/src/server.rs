@@ -66,11 +66,6 @@ impl Server {
 
         crate::message::init_messenger(connection.make_sender());
 
-        tracing::info!(
-            "Initialization options: {:?}",
-            init_params.initialization_options
-        );
-
         let AllSettings {
             global_settings,
             mut workspace_settings,
@@ -93,9 +88,10 @@ impl Server {
 
         let workspaces = init_params
             .workspace_folders
-            .and_then(|folders| (!folders.is_empty()).then(|| folders.into_iter().map(|folder| {
+            .filter(|folders| !folders.is_empty())
+            .map(|folders| folders.into_iter().map(|folder| {
                 workspace_for_path(folder.uri.to_file_path().unwrap())
-            }).collect()))
+            }).collect())
             .or_else(|| {
                 tracing::warn!("No workspace(s) were provided during initialization. Using the current working directory as a default workspace...");
                 let uri = types::Url::from_file_path(std::env::current_dir().ok()?).ok()?;
