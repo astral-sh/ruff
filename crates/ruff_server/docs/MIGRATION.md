@@ -42,3 +42,41 @@ used to run `ruff server`. But the server itself will no longer accept these as 
 
 Several of these new settings are replacements for the now-unsupported `format.args` and `lint.args`. For example, if you have been passing in `--select=<RULES>`
 to `lint.args`, you can migrate to the new server by using `lint.select` with a value of `["<RULES>"]`.
+
+### Examples
+
+Let's say you have these settings in VS Code:
+
+```json
+{
+    "ruff.lint.args": "--select=E,F --line-length 80 --config ~/.config/custom_ruff_config.toml"
+}
+```
+
+These can be migrated to the new language server like so:
+
+```json
+{
+    "ruff.configuration": "~/.config/custom_ruff_config.toml",
+    "ruff.lineLength": 80,
+    "ruff.lint.select": ["E", "F"]
+}
+```
+
+Similarly, let's say you have these settings in Helix:
+
+```toml
+[language-server.ruff.config.lint]
+args = "--select=E,F --line-length 80 --config ~/.config/custom_ruff_config.toml"
+```
+
+These can be migrated like so:
+
+```toml
+[language-server.ruff.config]
+configuration = "~/.config/custom_ruff_config.toml"
+lineLength = 80
+
+[language-server.ruff.config.lint]
+select = ["E", "F"]
+```
