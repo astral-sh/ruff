@@ -67,7 +67,7 @@ impl Session {
         Some(DocumentSnapshot {
             resolved_client_capabilities: self.resolved_client_capabilities.clone(),
             client_settings: self.index.client_settings(&key, &self.global_settings),
-            document_ref: self.index.make_document_ref(key)?,
+            document_ref: self.index.make_document_ref(key, &self.global_settings)?,
             position_encoding: self.position_encoding,
         })
     }

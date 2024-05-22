@@ -130,7 +130,8 @@ enum InitializationOptions {
         workspace_settings: Vec<WorkspaceSettings>,
     },
     GlobalOnly {
-        settings: Option<ClientSettings>,
+        #[serde(flatten)]
+        settings: ClientSettings,
     },
 }
 
@@ -157,7 +158,7 @@ impl AllSettings {
 
     fn from_init_options(options: InitializationOptions) -> Self {
         let (global_settings, workspace_settings) = match options {
-            InitializationOptions::GlobalOnly { settings } => (settings.unwrap_or_default(), None),
+            InitializationOptions::GlobalOnly { settings } => (settings, None),
             InitializationOptions::HasWorkspaces {
                 global_settings,
                 workspace_settings,
@@ -341,7 +342,9 @@ impl ResolvedClientSettings {
 
 impl Default for InitializationOptions {
     fn default() -> Self {
-        Self::GlobalOnly { settings: None }
+        Self::GlobalOnly {
+            settings: ClientSettings::default(),
+        }
     }
 }
 
@@ -626,52 +629,50 @@ mod tests {
 
         assert_debug_snapshot!(options, @r###"
         GlobalOnly {
-            settings: Some(
-                ClientSettings {
-                    configuration: None,
-                    fix_all: Some(
-                        false,
-                    ),
-                    organize_imports: None,
-                    lint: Some(
-                        LintOptions {
-                            enable: None,
-                            preview: None,
-                            select: None,
-                            extend_select: None,
-                            ignore: Some(
-                                [
-                                    "RUF001",
-                                ],
-                            ),
-                        },
-                    ),
-                    format: None,
-                    code_action: Some(
-                        CodeActionOptions {
-                            disable_rule_comment: Some(
-                                CodeActionParameters {
-                                    enable: Some(
-                                        false,
-                                    ),
-                                },
-                            ),
-                            fix_violation: None,
-                        },
-                    ),
-                    exclude: Some(
-                        [
-                            "third_party",
-                        ],
-                    ),
-                    line_length: Some(
-                        LineLength(
-                            80,
+            settings: ClientSettings {
+                configuration: None,
+                fix_all: Some(
+                    false,
+                ),
+                organize_imports: None,
+                lint: Some(
+                    LintOptions {
+                        enable: None,
+                        preview: None,
+                        select: None,
+                        extend_select: None,
+                        ignore: Some(
+                            [
+                                "RUF001",
+                            ],
                         ),
+                    },
+                ),
+                format: None,
+                code_action: Some(
+                    CodeActionOptions {
+                        disable_rule_comment: Some(
+                            CodeActionParameters {
+                                enable: Some(
+                                    false,
+                                ),
+                            },
+                        ),
+                        fix_violation: None,
+                    },
+                ),
+                exclude: Some(
+                    [
+                        "third_party",
+                    ],
+                ),
+                line_length: Some(
+                    LineLength(
+                        80,
                     ),
-                    configuration_preference: None,
-                },
-            ),
+                ),
+                configuration_preference: None,
+            },
         }
         "###);
     }

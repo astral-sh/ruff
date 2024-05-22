@@ -119,12 +119,14 @@ pub(crate) fn check(
 
     let mut diagnostics = Diagnostics::default();
 
-    // Populate all cell URLs with an empty diagnostic list.
-    // This ensures that cells without diagnostics still get updated.
+    // Populates all relevant URLs with an empty diagnostic list.
+    // This ensures that documents without diagnostics still get updated.
     if let Some(notebook) = query.as_notebook() {
         for url in notebook.urls() {
             diagnostics.entry(url.clone()).or_default();
         }
+    } else {
+        diagnostics.entry(query.make_key().into_url()).or_default();
     }
 
     let lsp_diagnostics = data
