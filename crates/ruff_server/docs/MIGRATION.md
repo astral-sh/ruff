@@ -1,12 +1,13 @@
 ## Migrating From `ruff-lsp`
 
-`ruff server`'s configuration is significantly different from `ruff-lsp`, and as such you may need to update your existing configuration.
+While `ruff server` supports the same feature set as [`ruff-lsp`](https://github.com/astral-sh/ruff-lsp), migrating to
+`ruff server` may require changes to your Ruff or language server configuration.
 
 > \[!NOTE\]
 >
-> The VS Code extension settings have documentation that will tell you whether `ruff server` supports a given setting.
-> This migration guide may be more useful for the editors that do not have explicitly documented settings for the language server,
-> such as Helix or Neovim.
+> The [VS Code extension](https://github.com/astral-sh/ruff-vscode) settings include documentation to indicate which
+> settings are supported by `ruff server`. As such, this migration guide is primarily targeted at editors that lack
+> explicit documentation for `ruff server` settings, such as Helix or Neovim.
 
 ### Unsupported Settings
 
@@ -20,14 +21,15 @@ Several `ruff-lsp` settings are not supported by `ruff server`. These are, as fo
 - `logLevel`
 - `path`
 
-Note that some of these settings, like `interpreter` and `path`, are still accepted by the VS Code extension. `path`, in particular, can be used to set the ruff binary
-used to run `ruff server`. But the server itself will no longer accept these as settings.
+Note that some of these settings, like `interpreter` and `path`, are still accepted by the VS Code extension. `path`,
+in particular, can be used to specify a dedicated binary to use when initializing `ruff server`. But the language server
+itself will no longer accept such settings.
 
 ### New Settings
 
 `ruff server` introduces several new settings that `ruff-lsp` does not have. These are, as follows:
 
-- `configuration`: This is a path to a `ruff.toml` or `pyproject.toml` file to use for configuration. By default, Ruff will discover configuration for each project from the filesystem, mirroring the behavior of the Ruff CLI.
+- `configuration`: A path to a `ruff.toml` or `pyproject.toml` file to use for configuration. By default, Ruff will discover configuration for each project from the filesystem, mirroring the behavior of the Ruff CLI.
 - `configurationPreference`: Used to specify how you want to resolve server settings with local file configuration. The following values are available:
     - `"editorFirst"`: The default strategy - configuration set in the server settings takes priority over configuration set in `.toml` files.
     - `"filesystemFirst"`: An alternative strategy - configuration set in `.toml` files takes priority over configuration set in the server settings.
@@ -40,8 +42,9 @@ used to run `ruff server`. But the server itself will no longer accept these as 
 - `lint.ignore`: Sets rule codes to disable. See [the documentation](https://docs.astral.sh/ruff/settings/#lint_ignore) for more details.
 - `lint.preview`: Enables [preview mode](https://docs.astral.sh/ruff/settings/#lint_preview) for the linter; enables unstable rules and fixes.
 
-Several of these new settings are replacements for the now-unsupported `format.args` and `lint.args`. For example, if you have been passing in `--select=<RULES>`
-to `lint.args`, you can migrate to the new server by using `lint.select` with a value of `["<RULES>"]`.
+Several of these new settings are replacements for the now-unsupported `format.args` and `lint.args`. For example, if
+you've been passing `--select=<RULES>` to `lint.args`, you can migrate to the new server by using `lint.select` with a
+value of `["<RULES>"]`.
 
 ### Examples
 
@@ -53,7 +56,7 @@ Let's say you have these settings in VS Code:
 }
 ```
 
-These can be migrated to the new language server like so:
+After enabling the native server, you can migrate your settings like so:
 
 ```json
 {
