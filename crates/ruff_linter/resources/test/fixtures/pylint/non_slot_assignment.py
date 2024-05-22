@@ -82,3 +82,16 @@ class Foo:
     @qux.setter
     def qux(self, value):
         self.bar = value / 2
+
+
+class StudentG:
+    names = ("surname",)
+    __slots__ = (*names, "a")
+
+    def __init__(self, name, surname):
+        self.name = name
+        self.surname = surname  # [assigning-non-slot]
+        self.setup()
+
+    def setup(self):
+        pass
