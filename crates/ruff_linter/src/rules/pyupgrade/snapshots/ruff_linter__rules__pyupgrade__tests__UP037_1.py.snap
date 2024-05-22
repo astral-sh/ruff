@@ -1,0 +1,22 @@
+---
+source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+---
+UP037_1.py:9:8: UP037 [*] Remove quotes from type annotation
+   |
+ 7 | def foo():
+ 8 |     # UP037
+ 9 |     x: "Tuple[int, int]" = (0, 0)
+   |        ^^^^^^^^^^^^^^^^^ UP037
+10 |     print(x)
+   |
+   = help: Remove quotes
+
+ℹ Safe fix
+6  6  | 
+7  7  | def foo():
+8  8  |     # UP037
+9     |-    x: "Tuple[int, int]" = (0, 0)
+   9  |+    x: Tuple[int, int] = (0, 0)
+10 10 |     print(x)
+11 11 | 
+12 12 |

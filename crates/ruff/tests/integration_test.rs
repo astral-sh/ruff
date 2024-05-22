@@ -1414,7 +1414,7 @@ fn check_input_from_argfile() -> Result<()> {
     fs::write(&file_a_path, b"import os")?;
     fs::write(&file_b_path, b"print('hello, world!')")?;
 
-    // Create a the input file for argfile to expand
+    // Create the input file for argfile to expand
     let input_file_path = tempdir.path().join("file_paths.txt");
     fs::write(
         &input_file_path,
