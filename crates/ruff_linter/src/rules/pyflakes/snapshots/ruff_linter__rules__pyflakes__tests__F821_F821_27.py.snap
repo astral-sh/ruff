@@ -42,5 +42,5 @@ F821_27.py:47:17: F821 Undefined name `Tree`
 46 | class Leaf: ...
 47 | class Tree(list[Tree | Leaf]): ...  # Still invalid even when `__future__.annotations` are enabled
    |                 ^^^^ F821
-48 | class Tree2(list["Tree | Leaf"]): ...  # always okay
+48 | class Tree2(list["Tree2 | Leaf"]): ...  # always okay
    |

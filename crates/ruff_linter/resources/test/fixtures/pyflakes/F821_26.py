@@ -1,6 +1,6 @@
 """Tests for constructs allowed in `.pyi` stub files but not at runtime"""
 
-from typing import Optional, TypeAlias, Union
+from typing import Optional, TypeAlias, Union, TYPE_CHECKING
 
 __version__: str
 __author__: str
@@ -42,3 +42,7 @@ class MyClass:
 baz: MyClass
 eggs = baz  # valid in a `.pyi` stub file, not in a `.py` runtime file
 eggs = "baz"  # always okay
+
+if TYPE_CHECKING:
+    class Tree3(list[Tree3 | Leaf]): ...  # Always okay if it's in a `TYPE_CHECKING` block
+    Recursive: TypeAlias = Recursive | None  # Always okay if it's in a `TYPE_CHECKING` block
