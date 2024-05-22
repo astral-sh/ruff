@@ -75,8 +75,7 @@ pub(crate) fn bytestring_import(checker: &mut Checker, import_from: &ast::StmtIm
         if let Some(module) = module {
             let full_name = format!("{}.{}", module.id, name.name);
             if full_name == "typing.ByteString" || full_name == "collections.abc.ByteString" {
-                let diagnostic =
-                    Diagnostic::new(ByteStringUsage { full_name }, import_from.range());
+                let diagnostic = Diagnostic::new(ByteStringUsage { full_name }, name.range());
                 checker.diagnostics.push(diagnostic);
             }
         }
