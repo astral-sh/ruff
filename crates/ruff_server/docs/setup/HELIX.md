@@ -34,7 +34,7 @@ language-servers = ["ruff", "pylsp"]
 
 Once you've set up the server, you should see diagnostics in your Python files. Code actions and other LSP features should also be available.
 
-![image](assets/SuccessfulHelixSetup.png "A screenshot showing an open Python file in Helix with highlighted diagnostics and a code action dropdown menu open")
+![A screenshot showing an open Python file in Helix with highlighted diagnostics and a code action dropdown menu open](assets/SuccessfulHelixSetup.png)
 *This screenshot is using `select=["ALL]"` for demonstration purposes.*
 
 If you want to, as an example, turn on auto-formatting, add `auto-format = true`:
