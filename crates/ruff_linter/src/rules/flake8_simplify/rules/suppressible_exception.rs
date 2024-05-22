@@ -125,7 +125,11 @@ pub(crate) fn suppressible_exception(
         },
         stmt.range(),
     );
-    if !checker.indexer().has_comments(stmt, checker.locator()) {
+    if !checker
+        .indexer()
+        .comment_ranges()
+        .has_comments(stmt, checker.locator())
+    {
         diagnostic.try_set_fix(|| {
             // let range = statement_range(stmt, checker.locator(), checker.indexer());
 

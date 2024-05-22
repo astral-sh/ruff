@@ -112,25 +112,6 @@ impl Indexer {
         self.continuation_lines.binary_search(&line_start).is_ok()
     }
 
-    /// Returns `true` if a statement or expression includes at least one comment.
-    pub fn has_comments<T>(&self, node: &T, locator: &Locator) -> bool
-    where
-        T: Ranged,
-    {
-        let start = if has_leading_content(node.start(), locator) {
-            node.start()
-        } else {
-            locator.line_start(node.start())
-        };
-        let end = if has_trailing_content(node.end(), locator) {
-            node.end()
-        } else {
-            locator.line_end(node.end())
-        };
-
-        self.comment_ranges().intersects(TextRange::new(start, end))
-    }
-
     /// Given an offset at the end of a line (including newlines), return the offset of the
     /// continuation at the end of that line.
     fn find_continuation(&self, offset: TextSize, locator: &Locator) -> Option<TextSize> {
