@@ -15,7 +15,7 @@ Install the [Ruff extension from the VS Code Marketplace](https://marketplace.vi
 
 **As this server is still in beta, you will need to enable the `Native Server` extension setting**.
 
-![image](assets/nativeServer.png A screenshot showing an enabled "Native Server" extension setting in the VS Code settings view)
+![A screenshot showing an enabled "Native Server" extension setting in the VS Code settings view](assets/nativeServer.png)
 
 You can also set it in your user / workspace JSON settings as follows:
 
