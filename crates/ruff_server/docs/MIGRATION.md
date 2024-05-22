@@ -4,7 +4,7 @@
 
 > \[!NOTE\]
 >
-> The VS Code extension settings have documentation that will tell you whether or not the beta server (`ruff server`) supports a given setting.
+> The VS Code extension settings have documentation that will tell you whether `ruff server` supports a given setting.
 > This migration guide may be more useful for the editors that do not have explicitly documented settings for the language server,
 > such as Helix or Neovim.
 
