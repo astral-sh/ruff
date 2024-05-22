@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{Expr, ExprCall, ExprNumberLiteral, Number};
 use ruff_python_semantic::Modules;
@@ -34,9 +34,14 @@ use crate::{checkers::ast::Checker, importer::ImportRequest};
 pub struct SleepForeverCall;
 
 impl Violation for SleepForeverCall {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`trio.sleep()` with >24 hour interval should usually be `trio.sleep_forever()`.")
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        Some(format!("Consider replacing with `trio.sleep_forever()`"))
     }
 }
 
@@ -50,7 +55,6 @@ pub(crate) fn sleep_forever_call(checker: &mut Checker, call: &ExprCall) {
         return;
     }
 
-    // Is this the zeroth arg?
     let Some(arg) = call.arguments.find_argument("seconds", 0) else {
         return;
     };
@@ -78,13 +82,14 @@ pub(crate) fn sleep_forever_call(checker: &mut Checker, call: &ExprCall) {
                 return;
             }
         }
-        Number::Float(float_value) => {
+        Number::Float(float_value) =>
+        {
+            #[allow(clippy::cast_precision_loss)]
             if *float_value <= one_day_in_secs as f64 {
                 return;
             }
         }
-        // Number::Complex is a type error.
-        _ => return,
+        Number::Complex { .. } => return,
     }
 
     let mut diagnostic = Diagnostic::new(SleepForeverCall, call.range());
