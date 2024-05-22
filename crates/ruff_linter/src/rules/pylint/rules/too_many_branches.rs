@@ -199,7 +199,9 @@ fn num_branches(stmts: &[Stmt]) -> usize {
                 finalbody,
                 ..
             }) => {
-                1 + num_branches(body)
+                // Count each `except` clause as a branch; the `else` and `finally` clauses also
+                // count, but the `try` clause itself does not.
+                num_branches(body)
                     + (if orelse.is_empty() {
                         0
                     } else {
@@ -324,6 +326,47 @@ return 1
     }
 
     #[test]
+    fn try_except() -> Result<()> {
+        let source: &str = r"
+try:
+    pass
+except:
+    pass
+";
+
+        test_helper(source, 1)?;
+        Ok(())
+    }
+
+    #[test]
+    fn try_except_else() -> Result<()> {
+        let source: &str = r"
+try:
+    pass
+except:
+    pass
+else:
+    pass
+";
+
+        test_helper(source, 2)?;
+        Ok(())
+    }
+
+    #[test]
+    fn try_finally() -> Result<()> {
+        let source: &str = r"
+try:
+    pass
+finally:
+    pass
+";
+
+        test_helper(source, 1)?;
+        Ok(())
+    }
+
+    #[test]
     fn try_except_except_else_finally() -> Result<()> {
         let source: &str = r"
 try:
@@ -338,7 +381,7 @@ finally:
     pass
 ";
 
-        test_helper(source, 5)?;
+        test_helper(source, 4)?;
         Ok(())
     }
 
