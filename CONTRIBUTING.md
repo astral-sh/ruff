@@ -331,7 +331,7 @@ even patch releases may contain [non-backwards-compatible changes](https://semve
 ### Creating a new release
 
 1. Install `uv`: `curl -LsSf https://astral.sh/uv/install.sh | sh`
-1. Run `./scripts/release/bump.sh`; this command will:
+1. Run `./scripts/release.sh`; this command will:
     - Generate a temporary virtual environment with `rooster`
     - Generate a changelog entry in `CHANGELOG.md`
     - Update versions in `pyproject.toml` and `Cargo.toml`
