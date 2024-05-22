@@ -173,8 +173,12 @@ impl Server {
                             watchers: vec![
                                 FileSystemWatcher {
                                     glob_pattern: types::GlobPattern::String(
-                                        "**/.?ruff.toml".into(),
+                                        "**/.ruff.toml".into(),
                                     ),
+                                    kind: None,
+                                },
+                                FileSystemWatcher {
+                                    glob_pattern: types::GlobPattern::String("**/ruff.toml".into()),
                                     kind: None,
                                 },
                                 FileSystemWatcher {
