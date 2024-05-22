@@ -88,6 +88,24 @@ impl Index {
         }
     }
 
+    pub(super) fn text_document_urls(&self) -> impl Iterator<Item = lsp_types::Url> + '_ {
+        self.documents
+            .iter()
+            .filter(|(_, doc)| doc.as_text().is_some())
+            .map(|(path, _)| {
+                lsp_types::Url::from_file_path(path).expect("valid file path should convert to URL")
+            })
+    }
+
+    pub(super) fn notebook_document_urls(&self) -> impl Iterator<Item = lsp_types::Url> + '_ {
+        self.documents
+            .iter()
+            .filter(|(_, doc)| doc.as_notebook().is_some())
+            .map(|(path, _)| {
+                lsp_types::Url::from_file_path(path).expect("valid file path should convert to URL")
+            })
+    }
+
     pub(super) fn update_text_document(
         &mut self,
         key: &DocumentKey,
@@ -234,11 +252,14 @@ impl Index {
         Some(controller.make_ref(cell_uri, path, document_settings))
     }
 
+    /// Reloads relevant existing settings files based on a changed settings file path.
+    /// This does not currently register new settings files.
     pub(super) fn reload_settings(&mut self, changed_path: &PathBuf) {
+        let search_path = changed_path.parent().unwrap_or(changed_path);
         for (root, settings) in self
             .settings
             .iter_mut()
-            .filter(|(path, _)| path.starts_with(changed_path))
+            .filter(|(path, _)| path.starts_with(search_path))
         {
             settings.workspace_settings_index = ruff_settings::RuffSettingsIndex::new(
                 root,

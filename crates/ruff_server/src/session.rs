@@ -72,6 +72,16 @@ impl Session {
         })
     }
 
+    /// Iterates over the LSP URLs for all open text documents. These URLs are valid file paths.
+    pub(super) fn text_document_urls(&self) -> impl Iterator<Item = lsp_types::Url> + '_ {
+        self.index.text_document_urls()
+    }
+
+    /// Iterates over the LSP URLs for all open notebook documents. These URLs are valid file paths.
+    pub(super) fn notebook_document_urls(&self) -> impl Iterator<Item = lsp_types::Url> + '_ {
+        self.index.notebook_document_urls()
+    }
+
     /// Updates a text document at the associated `key`.
     ///
     /// The document key must point to a text document, or this will throw an error.

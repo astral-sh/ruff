@@ -1,3 +1,4 @@
+use crate::server::api::diagnostics::publish_diagnostics_for_document;
 use crate::server::api::LSPResult;
 use crate::server::client::{Notifier, Requester};
 use crate::server::schedule::Task;
@@ -15,7 +16,7 @@ impl super::NotificationHandler for DidChangeWatchedFiles {
 impl super::SyncNotificationHandler for DidChangeWatchedFiles {
     fn run(
         session: &mut Session,
-        _notifier: Notifier,
+        notifier: Notifier,
         requester: &mut Requester,
         params: types::DidChangeWatchedFilesParams,
     ) -> Result<()> {
@@ -23,10 +24,28 @@ impl super::SyncNotificationHandler for DidChangeWatchedFiles {
             session.reload_settings(&change.uri.to_file_path().unwrap());
         }
 
-        if session.resolved_client_capabilities().workspace_refresh && !params.changes.is_empty() {
-            requester
-                .request::<types::request::WorkspaceDiagnosticRefresh>((), |()| Task::nothing())
-                .with_failure_code(lsp_server::ErrorCode::InternalError)?;
+        if !params.changes.is_empty() {
+            if session.resolved_client_capabilities().workspace_refresh {
+                requester
+                    .request::<types::request::WorkspaceDiagnosticRefresh>((), |()| Task::nothing())
+                    .with_failure_code(lsp_server::ErrorCode::InternalError)?;
+            } else {
+                // publish diagnostics for text documents
+                for url in session.text_document_urls() {
+                    let snapshot = session
+                        .take_snapshot(&url)
+                        .expect("snapshot should be available");
+                    publish_diagnostics_for_document(&snapshot, &notifier)?;
+                }
+            }
+
+            // always publish diagnostics for notebook files (since they don't use pull diagnostics)
+            for url in session.notebook_document_urls() {
+                let snapshot = session
+                    .take_snapshot(&url)
+                    .expect("snapshot should be available");
+                publish_diagnostics_for_document(&snapshot, &notifier)?;
+            }
         }
 
         Ok(())
