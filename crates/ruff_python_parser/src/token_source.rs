@@ -1,4 +1,5 @@
-use ruff_text_size::{TextRange, TextSize};
+use ruff_python_trivia::CommentRanges;
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::lexer::{Lexer, LexerCheckpoint, LexicalError, Token, TokenValue};
 use crate::{Mode, TokenKind};
@@ -13,14 +14,19 @@ pub(crate) struct TokenSource<'src> {
     /// is finished consuming all the tokens. Note that unlike the emitted tokens, this vector
     /// holds both the trivia and non-trivia tokens.
     tokens: Vec<Token>,
+
+    /// A vector containing the range of all the comment tokens emitted by the lexer.
+    comments: Vec<TextRange>,
 }
 
 impl<'src> TokenSource<'src> {
     /// Create a new token source for the given lexer.
     pub(crate) fn new(lexer: Lexer<'src>) -> Self {
+        // TODO(dhruvmanila): Use `allocate_tokens_vec`
         TokenSource {
             lexer,
             tokens: vec![],
+            comments: vec![],
         }
     }
 
@@ -85,6 +91,9 @@ impl<'src> TokenSource<'src> {
         loop {
             let next = self.lexer.next_token();
             if next.is_trivia() {
+                if next.is_comment() {
+                    self.comments.push(next.range());
+                }
                 self.tokens.push(next);
                 continue;
             }
@@ -92,7 +101,7 @@ impl<'src> TokenSource<'src> {
         }
     }
 
-    /// Returns the next non-trivia token without adding it to the token vector.
+    /// Returns the next non-trivia token without adding it to any vector.
     fn next_non_trivia_token(&mut self) -> TokenKind {
         loop {
             let next = self.lexer.next_token();
@@ -108,6 +117,7 @@ impl<'src> TokenSource<'src> {
         TokenSourceCheckpoint {
             lexer: self.lexer.checkpoint(),
             tokens_position: self.tokens.len(),
+            comments_position: self.comments.len(),
         }
     }
 
@@ -115,22 +125,35 @@ impl<'src> TokenSource<'src> {
     pub(crate) fn rewind(&mut self, checkpoint: TokenSourceCheckpoint<'src>) {
         self.lexer.rewind(checkpoint.lexer);
         self.tokens.truncate(checkpoint.tokens_position);
+        self.comments.truncate(checkpoint.comments_position);
     }
 
     /// Consumes the token source, returning the collected tokens and any errors encountered during
     /// lexing. The token collection includes both the trivia and non-trivia tokens.
-    pub(crate) fn finish(self) -> (Vec<Token>, Vec<LexicalError>) {
+    pub(crate) fn finish(self) -> (Vec<Token>, CommentRanges, Vec<LexicalError>) {
         assert_eq!(
             self.current_kind(),
             TokenKind::EndOfFile,
             "TokenSource was not fully consumed"
         );
 
-        (self.tokens, self.lexer.finish())
+        let comment_ranges = CommentRanges::new(self.comments);
+        (self.tokens, comment_ranges, self.lexer.finish())
     }
 }
 
 pub(crate) struct TokenSourceCheckpoint<'src> {
     lexer: LexerCheckpoint<'src>,
     tokens_position: usize,
+    comments_position: usize,
+}
+
+/// Allocates a [`Vec`] with an approximated capacity to fit all tokens
+/// of `contents`.
+///
+/// See [#9546](https://github.com/astral-sh/ruff/pull/9546) for a more detailed explanation.
+#[allow(dead_code)]
+fn allocate_tokens_vec(contents: &str) -> Vec<Token> {
+    let lower_bound = contents.len().saturating_mul(15) / 100;
+    Vec::with_capacity(lower_bound)
 }

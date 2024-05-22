@@ -2,15 +2,16 @@ use std::cmp::Ordering;
 
 use bitflags::bitflags;
 
-use ruff_python_ast as ast;
+use ruff_python_ast::{Mod, ModExpression, ModModule};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
-use crate::lexer::{Token, TokenValue};
+use crate::lexer::TokenValue;
 use crate::parser::expression::ExpressionContext;
 use crate::parser::progress::{ParserProgress, TokenId};
 use crate::token_set::TokenSet;
 use crate::token_source::{TokenSource, TokenSourceCheckpoint};
 use crate::{Mode, ParseError, ParseErrorType, TokenKind};
+use crate::{Program, Tokens};
 
 mod expression;
 mod helpers;
@@ -20,57 +21,6 @@ mod recovery;
 mod statement;
 #[cfg(test)]
 mod tests;
-
-/// Represents the parsed source code.
-///
-/// This includes the AST and all of the errors encountered during parsing.
-#[derive(Debug)]
-pub struct Program {
-    ast: ast::Mod,
-    tokens: Vec<Token>,
-    parse_errors: Vec<ParseError>,
-}
-
-impl Program {
-    /// Returns the parsed AST.
-    pub fn ast(&self) -> &ast::Mod {
-        &self.ast
-    }
-
-    /// Returns all the tokens for the program.
-    pub fn tokens(&self) -> &[Token] {
-        &self.tokens
-    }
-
-    /// Returns a list of syntax errors found during parsing.
-    pub fn errors(&self) -> &[ParseError] {
-        &self.parse_errors
-    }
-
-    /// Consumes the [`Program`] and returns the parsed AST.
-    pub fn into_ast(self) -> ast::Mod {
-        self.ast
-    }
-
-    /// Consumes the [`Program`] and returns a list of syntax errors found during parsing.
-    pub fn into_errors(self) -> Vec<ParseError> {
-        self.parse_errors
-    }
-
-    /// Returns `true` if the program is valid i.e., it has no syntax errors.
-    pub fn is_valid(&self) -> bool {
-        self.parse_errors.is_empty()
-    }
-
-    /// Parse the given Python source code using the specified [`Mode`].
-    pub fn parse(source: &str, mode: Mode) -> Program {
-        Parser::new(source, mode).parse_program()
-    }
-
-    pub fn parse_starts_at(source: &str, mode: Mode, start_offset: TextSize) -> Program {
-        Parser::new_starts_at(source, mode, start_offset).parse_program()
-    }
-}
 
 #[derive(Debug)]
 pub(crate) struct Parser<'src> {
@@ -122,13 +72,13 @@ impl<'src> Parser<'src> {
     }
 
     /// Consumes the [`Parser`] and returns the parsed [`Program`].
-    pub(crate) fn parse_program(mut self) -> Program {
-        let ast = match self.mode {
-            Mode::Expression => ast::Mod::Expression(self.parse_single_expression()),
-            Mode::Module | Mode::Ipython => ast::Mod::Module(self.parse_module()),
+    pub(crate) fn parse(mut self) -> Program<Mod> {
+        let syntax = match self.mode {
+            Mode::Expression => Mod::Expression(self.parse_single_expression()),
+            Mode::Module | Mode::Ipython => Mod::Module(self.parse_module()),
         };
 
-        self.finish(ast)
+        self.finish(syntax)
     }
 
     /// Parses a single expression.
@@ -139,7 +89,7 @@ impl<'src> Parser<'src> {
     ///
     /// After parsing a single expression, an error is reported and all remaining tokens are
     /// dropped by the parser.
-    fn parse_single_expression(&mut self) -> ast::ModExpression {
+    fn parse_single_expression(&mut self) -> ModExpression {
         let start = self.node_start();
         let parsed_expr = self.parse_expression_list(ExpressionContext::default());
 
@@ -165,7 +115,7 @@ impl<'src> Parser<'src> {
 
         self.bump(TokenKind::EndOfFile);
 
-        ast::ModExpression {
+        ModExpression {
             body: Box::new(parsed_expr.expr),
             range: self.node_range(start),
         }
@@ -174,7 +124,7 @@ impl<'src> Parser<'src> {
     /// Parses a Python module.
     ///
     /// This is to be used for [`Mode::Module`] and [`Mode::Ipython`].
-    fn parse_module(&mut self) -> ast::ModModule {
+    fn parse_module(&mut self) -> ModModule {
         let body = self.parse_list_into_vec(
             RecoveryContextKind::ModuleStatements,
             Parser::parse_statement,
@@ -182,13 +132,13 @@ impl<'src> Parser<'src> {
 
         self.bump(TokenKind::EndOfFile);
 
-        ast::ModModule {
+        ModModule {
             body,
             range: TextRange::new(self.start_offset, self.current_token_range().end()),
         }
     }
 
-    fn finish(self, ast: ast::Mod) -> Program {
+    fn finish(self, syntax: Mod) -> Program<Mod> {
         assert_eq!(
             self.current_token_kind(),
             TokenKind::EndOfFile,
@@ -197,16 +147,17 @@ impl<'src> Parser<'src> {
 
         // TODO consider re-integrating lexical error handling into the parser?
         let parse_errors = self.errors;
-        let (tokens, lex_errors) = self.tokens.finish();
+        let (tokens, comment_ranges, lex_errors) = self.tokens.finish();
 
         // Fast path for when there are no lex errors.
         // There's no fast path for when there are no parse errors because a lex error
         // always results in a parse error.
         if lex_errors.is_empty() {
             return Program {
-                ast,
-                tokens,
-                parse_errors,
+                syntax,
+                tokens: Tokens::new(tokens),
+                comment_ranges,
+                errors: parse_errors,
             };
         }
 
@@ -235,9 +186,10 @@ impl<'src> Parser<'src> {
         merged.extend(lex_errors.map(ParseError::from));
 
         Program {
-            ast,
-            tokens,
-            parse_errors: merged,
+            syntax,
+            tokens: Tokens::new(tokens),
+            comment_ranges,
+            errors: merged,
         }
     }
 

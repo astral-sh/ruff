@@ -6,7 +6,7 @@ use ruff_python_ast::relocate::relocate_expr;
 use ruff_python_ast::{str, Expr};
 use ruff_text_size::{TextLen, TextRange};
 
-use crate::{parse_expression, parse_expression_starts_at};
+use crate::{parse_expression, parse_expression_range};
 
 #[derive(is_macro::Is, Copy, Clone, Debug)]
 pub enum AnnotationKind {
@@ -24,23 +24,30 @@ pub enum AnnotationKind {
 
 /// Parse a type annotation from a string.
 pub fn parse_type_annotation(
-    value: &str,
+    // Parsed contents of the string literal node that represents this type annotation.
+    parsed_contents: &str,
+    // Range of the string literal node that represents this type annotation.
     range: TextRange,
+    // The source code.
     source: &str,
 ) -> Result<(Expr, AnnotationKind)> {
     let expression = &source[range];
 
-    if str::raw_contents(expression).is_some_and(|body| body == value) {
+    if str::raw_contents(expression).is_some_and(|raw_contents| raw_contents == parsed_contents) {
         // The annotation is considered "simple" if and only if the raw representation (e.g.,
         // `List[int]` within "List[int]") exactly matches the parsed representation. This
         // isn't the case, e.g., for implicit concatenations, or for annotations that contain
         // escaped quotes.
-        let leading_quote = str::leading_quote(expression).unwrap();
-        let expr = parse_expression_starts_at(value, range.start() + leading_quote.text_len())?;
+        let leading_quote_len = str::leading_quote(expression).unwrap().text_len();
+        let trailing_quote_len = str::trailing_quote(expression).unwrap().text_len();
+        let range = range
+            .add_start(leading_quote_len)
+            .sub_end(trailing_quote_len);
+        let expr = parse_expression_range(source, range)?.into_expr();
         Ok((expr, AnnotationKind::Simple))
     } else {
         // Otherwise, consider this a "complex" annotation.
-        let mut expr = parse_expression(value)?;
+        let mut expr = parse_expression(parsed_contents)?.into_expr();
         relocate_expr(&mut expr, range);
         Ok((expr, AnnotationKind::Complex))
     }

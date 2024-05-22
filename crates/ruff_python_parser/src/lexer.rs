@@ -9,23 +9,6 @@
 //! as a `Result<Spanned, LexicalError>`, where [`Spanned`] is a tuple containing the
 //! start and end [`TextSize`] and a [`Tok`] denoting the token.
 //!
-//! # Example
-//!
-//! ```
-//! use ruff_python_parser::{lexer::lex, Tok, Mode};
-//!
-//! let source = "x = 'RustPython'";
-//! let tokens = lex(source, Mode::Module)
-//!     .map(|tok| tok.expect("Failed to lex"))
-//!     .collect::<Vec<_>>();
-//!
-//! for (token, range) in tokens {
-//!     println!(
-//!         "{token:?}@{range:?}",
-//!     );
-//! }
-//! ```
-//!
 //! [Lexical analysis]: https://docs.python.org/3/reference/lexical_analysis.html
 
 use std::{char, cmp::Ordering, str::FromStr};
@@ -1379,6 +1362,10 @@ impl Token {
     #[inline]
     pub const fn kind(&self) -> TokenKind {
         self.kind
+    }
+
+    pub(crate) const fn is_comment(self) -> bool {
+        matches!(self.kind, TokenKind::Comment)
     }
 
     pub(crate) const fn is_trivia(self) -> bool {
