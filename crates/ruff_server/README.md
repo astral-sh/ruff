@@ -20,7 +20,9 @@ As this server is still in beta, you will need to enable the `Native Server` ext
 You can also set it in your user / workspace JSON settings as follows:
 
 ```json
-"ruff.nativeServer": true
+{
+    "ruff.nativeServer": true
+}
 ```
 
 The language server used by the extension will be, by default, the one in your actively-installed `ruff` binary. If you don't have `ruff` installed and haven't provided a path to the extension, it comes with a bundled `ruff` version that it will use instead.
