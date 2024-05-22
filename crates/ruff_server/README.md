@@ -13,7 +13,7 @@ We have specific setup instructions depending on your editor. If you don't see y
 
 Install the [Ruff extension from the VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=charliermarsh.ruff).
 
-**As this server is still in beta, you will need to enable the `Native Server` extension setting**.
+As this server is still in beta, you will need to enable the `Native Server` extension setting:
 
 ![A screenshot showing an enabled "Native Server" extension setting in the VS Code settings view](assets/nativeServer.png)
 
