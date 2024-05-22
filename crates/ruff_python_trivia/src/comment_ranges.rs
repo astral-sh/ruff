@@ -6,7 +6,7 @@ use ruff_source_file::Locator;
 
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
-use crate::is_python_whitespace;
+use crate::{has_leading_content, has_trailing_content, is_python_whitespace};
 
 /// Stores the ranges of comments sorted by [`TextRange::start`] in increasing order. No two ranges are overlapping.
 #[derive(Clone, Default)]
@@ -47,6 +47,25 @@ impl CommentRanges {
             Some((in_range, _element)) => &self.raw[start..start + in_range],
             None => &self.raw[start..],
         }
+    }
+
+    /// Returns `true` if a statement or expression includes at least one comment.
+    pub fn has_comments<T>(&self, node: &T, locator: &Locator) -> bool
+    where
+        T: Ranged,
+    {
+        let start = if has_leading_content(node.start(), locator) {
+            node.start()
+        } else {
+            locator.line_start(node.start())
+        };
+        let end = if has_trailing_content(node.end(), locator) {
+            node.end()
+        } else {
+            locator.line_end(node.end())
+        };
+
+        self.intersects(TextRange::new(start, end))
     }
 
     /// Given a [`CommentRanges`], determine which comments are grouped together
