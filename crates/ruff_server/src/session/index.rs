@@ -237,12 +237,27 @@ impl Index {
         Ok(())
     }
 
-    pub(super) fn make_document_ref(&self, key: DocumentKey) -> Option<DocumentQuery> {
+    pub(super) fn make_document_ref(
+        &self,
+        key: DocumentKey,
+        global_settings: &ClientSettings,
+    ) -> Option<DocumentQuery> {
         let path = self.path_for_key(&key)?.clone();
         let document_settings = self
-            .settings_for_path(&path)?
-            .workspace_settings_index
-            .get(&path);
+            .settings_for_path(&path)
+            .map(|settings| settings.workspace_settings_index.get(&path))
+            .unwrap_or_else(|| {
+                tracing::warn!(
+                    "No settings available for {} - falling back to default settings",
+                    path.display()
+                );
+                let resolved_global = ResolvedClientSettings::global(global_settings);
+                let root = path.parent().unwrap_or(&path);
+                Arc::new(RuffSettings::fallback(
+                    resolved_global.editor_settings(),
+                    root,
+                ))
+            });
 
         let controller = self.documents.get(&path)?;
         let cell_uri = match key {

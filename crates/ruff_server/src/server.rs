@@ -66,10 +66,19 @@ impl Server {
 
         crate::message::init_messenger(connection.make_sender());
 
+        tracing::info!(
+            "Initialization options: {:?}",
+            init_params.initialization_options
+        );
+
         let AllSettings {
             global_settings,
             mut workspace_settings,
-        } = AllSettings::from_value(init_params.initialization_options.unwrap_or_default());
+        } = AllSettings::from_value(
+            init_params
+                .initialization_options
+                .unwrap_or_else(|| serde_json::Value::Object(serde_json::Map::default())),
+        );
 
         let mut workspace_for_path = |path: PathBuf| {
             let Some(workspace_settings) = workspace_settings.as_mut() else {
@@ -84,11 +93,11 @@ impl Server {
 
         let workspaces = init_params
             .workspace_folders
-            .map(|folders| folders.into_iter().map(|folder| {
+            .and_then(|folders| (!folders.is_empty()).then(|| folders.into_iter().map(|folder| {
                 workspace_for_path(folder.uri.to_file_path().unwrap())
-            }).collect())
+            }).collect()))
             .or_else(|| {
-                tracing::debug!("No workspace(s) were provided during initialization. Using the current working directory as a default workspace...");
+                tracing::warn!("No workspace(s) were provided during initialization. Using the current working directory as a default workspace...");
                 let uri = types::Url::from_file_path(std::env::current_dir().ok()?).ok()?;
                 Some(vec![workspace_for_path(uri.to_file_path().unwrap())])
             })

@@ -43,6 +43,32 @@ impl std::fmt::Display for RuffSettings {
 }
 
 impl RuffSettings {
+    pub(crate) fn fallback(editor_settings: &ResolvedEditorSettings, root: &Path) -> RuffSettings {
+        let fallback = find_user_settings_toml()
+            .and_then(|user_settings| {
+                ruff_workspace::resolver::resolve_root_settings(
+                    &user_settings,
+                    Relativity::Cwd,
+                    &EditorConfigurationTransformer(editor_settings, root),
+                )
+                .ok()
+            })
+            .unwrap_or_else(|| {
+                let default_configuration = ruff_workspace::configuration::Configuration::default();
+                EditorConfigurationTransformer(editor_settings, root)
+                    .transform(default_configuration)
+                    .into_settings(root)
+                    .expect(
+                        "editor configuration should merge successfully with default configuration",
+                    )
+            });
+
+        RuffSettings {
+            formatter: fallback.formatter,
+            linter: fallback.linter,
+        }
+    }
+
     pub(crate) fn linter(&self) -> &ruff_linter::settings::LinterSettings {
         &self.linter
     }
@@ -80,32 +106,9 @@ impl RuffSettingsIndex {
             }
         }
 
-        let fallback = find_user_settings_toml()
-            .and_then(|user_settings| {
-                ruff_workspace::resolver::resolve_root_settings(
-                    &user_settings,
-                    Relativity::Cwd,
-                    &EditorConfigurationTransformer(editor_settings, root),
-                )
-                .ok()
-            })
-            .unwrap_or_else(|| {
-                let default_configuration = ruff_workspace::configuration::Configuration::default();
-                EditorConfigurationTransformer(editor_settings, root)
-                    .transform(default_configuration)
-                    .into_settings(root)
-                    .expect(
-                        "editor configuration should merge successfully with default configuration",
-                    )
-            });
+        let fallback = Arc::new(RuffSettings::fallback(editor_settings, root));
 
-        Self {
-            index,
-            fallback: Arc::new(RuffSettings {
-                formatter: fallback.formatter,
-                linter: fallback.linter,
-            }),
-        }
+        Self { index, fallback }
     }
 
     pub(super) fn get(&self, document_path: &Path) -> Arc<RuffSettings> {
@@ -117,11 +120,6 @@ impl RuffSettingsIndex {
         {
             return settings.clone();
         }
-
-        tracing::info!(
-            "No Ruff settings file found for {}; falling back to default configuration",
-            document_path.display()
-        );
 
         self.fallback.clone()
     }
