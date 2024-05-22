@@ -10,12 +10,12 @@ too_many_branches.py:8:5: PLR0912 Too many branches (13 > 12)
 10 |     if 1:
    |
 
-too_many_branches.py:76:5: PLR0912 Too many branches (13 > 12)
+too_many_branches.py:80:5: PLR0912 Too many branches (13 > 12)
    |
-74 |         pass
-75 | 
-76 | def with_statement_wrong():
+78 |         pass
+79 | 
+80 | def with_statement_wrong():
    |     ^^^^^^^^^^^^^^^^^^^^ PLR0912
-77 |     """statements inside the with statement should get counted"""
-78 |     with suppress(Exception):
+81 |     """statements inside the with statement should get counted"""
+82 |     with suppress(Exception):
    |

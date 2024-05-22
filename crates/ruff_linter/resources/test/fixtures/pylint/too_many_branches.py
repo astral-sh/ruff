@@ -21,6 +21,8 @@ def wrong(): # [too-many-branches]
         pass
     try:
         pass
+    except Exception:
+        pass
     finally:
         pass
     if 2:
@@ -56,6 +58,8 @@ def good():
         pass
     try:
         pass
+    except Exception:
+        pass
     finally:
         pass
     if 1:
@@ -89,6 +93,8 @@ def with_statement_wrong():
         elif 1:
             pass
         try:
+            pass
+        except Exception:
             pass
         finally:
             pass
