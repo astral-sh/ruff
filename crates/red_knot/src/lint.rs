@@ -192,10 +192,25 @@ fn lint_bad_overrides(context: &SemanticLintContext) -> QueryResult<()> {
     Ok(())
 }
 
-fn lint_unspecified_encoding(_context: &SemanticLintContext) -> QueryResult<()> {
-    // fix the inference of an import 'definition' by adding a module type
-    //
-    // obtain the type of each definition's rhs
+fn lint_unspecified_encoding(context: &SemanticLintContext) -> QueryResult<()> {
+    let symbols = context.symbols();
+    for (symbol_id, definition) in symbols.all_definitions() {
+        if !matches!(definition, Definition::Assignment(_)) {
+            // FIXME: only looks at definitions that are assignments, not all function calls
+            continue;
+        }
+        let ty = infer_definition_type(
+            context.db.upcast(),
+            GlobalSymbolId {
+                file_id: context.file_id,
+                symbol_id,
+            },
+            definition.clone(),
+        )?;
+        let symbol = symbol_id.symbol(symbols);
+        println!("{symbol:?} : {ty:?}");
+        todo!("if is a specific global symbol (e.g. tempfile.TemporaryFile) check that it has a specific argument (e.g. an encoding kwarg)");
+    }
     todo!("lint_unspecified_encoding: todo")
 }
 
