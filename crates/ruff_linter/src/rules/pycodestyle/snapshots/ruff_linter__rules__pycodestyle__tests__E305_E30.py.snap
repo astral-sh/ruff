@@ -11,14 +11,13 @@ E30.py:806:1: E305 [*] Expected 2 blank lines after class or function definition
     = help: Add missing blank line(s)
 
 ℹ Safe fix
-803 803 |     # comment
-804 804 | 
-805 805 |     # another comment
-    806 |+
-    807 |+
-806 808 | fn()
-807 809 | # end
-808 810 | 
+800 800 | def fn():
+801 801 |     print()
+802 802 | 
+    803 |+
+803 804 |     # comment
+804 805 | 
+805 806 |     # another comment
 
 E30.py:817:1: E305 [*] Expected 2 blank lines after class or function definition, found (1)
     |
@@ -30,14 +29,13 @@ E30.py:817:1: E305 [*] Expected 2 blank lines after class or function definition
     = help: Add missing blank line(s)
 
 ℹ Safe fix
-814 814 |     # comment
-815 815 | 
-816 816 |     # another comment
-    817 |+
-    818 |+
-817 819 | a = 1
-818 820 | # end
-819 821 | 
+811 811 | class Class():
+812 812 |     pass
+813 813 | 
+    814 |+
+814 815 |     # comment
+815 816 | 
+816 817 |     # another comment
 
 E30.py:829:1: E305 [*] Expected 2 blank lines after class or function definition, found (1)
     |
@@ -70,14 +68,13 @@ E30.py:841:1: E305 [*] Expected 2 blank lines after class or function definition
     = help: Add missing blank line(s)
 
 ℹ Safe fix
+837 837 | def a():
 838 838 |     print()
 839 839 | 
-840 840 | # Two spaces before comments, too.
-    841 |+
-    842 |+
-841 843 | if a():
-842 844 |     a()
-843 845 | # end
+    840 |+
+840 841 | # Two spaces before comments, too.
+841 842 | if a():
+842 843 |     a()
 
 E30.py:854:1: E305 [*] Expected 2 blank lines after class or function definition, found (1)
     |
