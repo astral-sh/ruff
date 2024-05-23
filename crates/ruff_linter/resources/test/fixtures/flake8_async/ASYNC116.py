@@ -19,7 +19,7 @@ async def foo():
     await trio.sleep(86400.01)  # error: 116, "async"
     await trio.sleep(86401)  # error: 116, "async"
 
-    # catch from import 
+    # catch from import
     await sleep(86401)  # error: 116, "async"
 
     await trio.sleep(-1)  # will raise a runtime error
@@ -34,18 +34,18 @@ async def foo():
     await trio.sleep(np.inf)
 
     # don't evaluate expressions (TODO)
-    one_day = 86401 
+    one_day = 86401
     await trio.sleep(86400 + 1)
     await trio.sleep(60 * 60 * 24 + 1)
     await trio.sleep(foo())
     await trio.sleep(one_day)
-    await trio.sleep(86400 + foo()) 
+    await trio.sleep(86400 + foo())
     await trio.sleep(86400 + ...)
     await trio.sleep("hello")
     await trio.sleep(...)
 
 
 # does not require the call to be awaited, nor in an async fun
-trio.sleep(86401)  # error: 116, "async" 
+trio.sleep(86401)  # error: 116, "async"
 # also checks that we don't break visit_Call
 trio.run(trio.sleep(86401))  # error: 116, "async"
