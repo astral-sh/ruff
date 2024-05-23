@@ -7,11 +7,13 @@ use ruff_text_size::Ranged;
 use crate::{checkers::ast::Checker, importer::ImportRequest};
 
 /// ## What it does
-/// Checks for uses of `trio.sleep()` with >24 hour interval.
+/// Checks for uses of `trio.sleep()` with an interval greater than 24 hours.
 ///
 /// ## Why is this bad?
-/// `trio.sleep()` with a >24 hour interval is usually intended to sleep indefintely.
-/// This intent is be better conveyed using `trio.sleep_forever()`.
+/// `trio.sleep()` with an interval greater than 24 hours is usually intended
+/// to sleep indefinitely. Instead of using a large interval,
+/// `trio.sleep_forever()` better conveys the intent.
+///
 ///
 /// ## Example
 /// ```python
@@ -37,7 +39,7 @@ impl Violation for SleepForeverCall {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`trio.sleep()` with >24 hour interval should usually be `trio.sleep_forever()`.")
+        format!("`trio.sleep()` with >24 hour interval should usually be `trio.sleep_forever()`")
     }
 
     fn fix_title(&self) -> Option<String> {
@@ -71,7 +73,7 @@ pub(crate) fn sleep_forever_call(checker: &mut Checker, call: &ExprCall) {
         return;
     };
 
-    // TODO: Replace with Duration::from_days(1).as_secs(); when available.
+    // TODO(ekohilas): Replace with Duration::from_days(1).as_secs(); when available.
     let one_day_in_secs = 60 * 60 * 24;
     match value {
         Number::Int(int_value) => {
