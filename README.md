@@ -433,6 +433,7 @@ Ruff is used by a number of major open-source projects and companies, including:
 - Modern Treasury ([Python SDK](https://github.com/Modern-Treasury/modern-treasury-python))
 - Mozilla ([Firefox](https://github.com/mozilla/gecko-dev))
 - [Mypy](https://github.com/python/mypy)
+- [Nautobot](https://github.com/nautobot/nautobot)
 - Netflix ([Dispatch](https://github.com/Netflix/dispatch))
 - [Neon](https://github.com/neondatabase/neon)
 - [Nokia](https://nokia.com/)
