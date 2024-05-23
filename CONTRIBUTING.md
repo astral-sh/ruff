@@ -90,6 +90,7 @@ pre-commit install
 ```
 
 Prior to opening a pull request you can run the below to ensure that the following has been run respectively:
+
 - Linting against Rust code
 - Rust tests and updating of ruff.schema.json
 - Rust and Python formatting, Markdown and Python linting, etc.
@@ -163,6 +164,7 @@ At the time of writing, the repository includes the following crates:
 ### Example: Adding a new lint rule
 
 To add a new rule, you can run the helper script `python scripts/add_rule.py` from within the ruff repository, which will take the following values:
+
 - name: The name of the check to generate, in PascalCase (e.g., 'PreferListBuiltin').
 - prefix: Prefix code for the plugin (e.g. 'PIE').
 - code: The code of the check to generate (e.g., '807').
@@ -185,6 +187,7 @@ At a high level, the steps are as follows:
     an `ast::StmtAssert` node).
 
 1. Define the logic for invoking the diagnostic in one of the following files:
+
     - `crates/ruff_linter/src/checkers/ast/analyze/statement.rs` (for AST-based rules based on analyzing statements, like imports)
     - `crates/ruff_linter/src/checkers/ast/analyze/expression.rs` (for AST-based rules based on analyzing expressions, like function calls).
     - `crates/ruff_linter/src/checkers/tokens.rs` (for token-based rules)
