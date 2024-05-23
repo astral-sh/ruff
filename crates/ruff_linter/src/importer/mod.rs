@@ -8,6 +8,7 @@ use std::error::Error;
 use anyhow::Result;
 use libcst_native::{ImportAlias, Name, NameOrAttribute};
 use ruff_python_ast::{self as ast, PySourceType, Stmt};
+use ruff_python_parser::Tokens;
 use ruff_text_size::{Ranged, TextSize};
 
 use ruff_diagnostics::Edit;
@@ -27,6 +28,8 @@ mod insertion;
 pub(crate) struct Importer<'a> {
     /// The Python AST to which we are adding imports.
     python_ast: &'a [Stmt],
+    /// The tokens representing the Python AST.
+    tokens: &'a Tokens,
     /// The [`Locator`] for the Python AST.
     locator: &'a Locator<'a>,
     /// The [`Stylist`] for the Python AST.
@@ -40,11 +43,13 @@ pub(crate) struct Importer<'a> {
 impl<'a> Importer<'a> {
     pub(crate) fn new(
         python_ast: &'a [Stmt],
+        tokens: &'a Tokens,
         locator: &'a Locator<'a>,
         stylist: &'a Stylist<'a>,
     ) -> Self {
         Self {
             python_ast,
+            tokens,
             locator,
             stylist,
             runtime_imports: Vec::default(),
@@ -455,13 +460,8 @@ impl<'a> Importer<'a> {
     }
 
     /// Add an import statement to an existing `TYPE_CHECKING` block.
-    fn add_to_type_checking_block(
-        &self,
-        content: &str,
-        at: TextSize,
-        source_type: PySourceType,
-    ) -> Edit {
-        Insertion::start_of_block(at, self.locator, self.stylist, source_type).into_edit(content)
+    fn add_to_type_checking_block(&self, content: &str, at: TextSize) -> Edit {
+        Insertion::start_of_block(at, self.locator, self.stylist, self.tokens).into_edit(content)
     }
 
     /// Return the import statement that precedes the given position, if any.

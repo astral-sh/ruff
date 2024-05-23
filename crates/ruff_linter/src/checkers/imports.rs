@@ -7,6 +7,7 @@ use ruff_python_ast::statement_visitor::StatementVisitor;
 use ruff_python_ast::{PySourceType, Suite};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
+use ruff_python_parser::Tokens;
 use ruff_source_file::Locator;
 
 use crate::directives::IsortDirectives;
@@ -18,6 +19,7 @@ use crate::settings::LinterSettings;
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn check_imports(
     python_ast: &Suite,
+    tokens: &Tokens,
     locator: &Locator,
     indexer: &Indexer,
     directives: &IsortDirectives,
@@ -50,6 +52,7 @@ pub(crate) fn check_imports(
                     settings,
                     package,
                     source_type,
+                    tokens,
                 ) {
                     diagnostics.push(diagnostic);
                 }
@@ -59,6 +62,7 @@ pub(crate) fn check_imports(
     if settings.rules.enabled(Rule::MissingRequiredImport) {
         diagnostics.extend(isort::rules::add_required_imports(
             python_ast,
+            tokens,
             locator,
             stylist,
             settings,

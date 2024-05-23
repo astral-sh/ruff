@@ -12,6 +12,7 @@ use normalize::normalize_imports;
 use order::order_imports;
 use ruff_python_ast::PySourceType;
 use ruff_python_codegen::Stylist;
+use ruff_python_parser::Tokens;
 use ruff_source_file::Locator;
 use settings::Settings;
 use types::EitherImport::{Import, ImportFrom};
@@ -72,6 +73,7 @@ pub(crate) fn format_imports(
     source_type: PySourceType,
     target_version: PythonVersion,
     settings: &Settings,
+    tokens: &Tokens,
 ) -> String {
     let trailer = &block.trailer;
     let block = annotate_imports(
@@ -79,7 +81,7 @@ pub(crate) fn format_imports(
         comments,
         locator,
         settings.split_on_trailing_comma,
-        source_type,
+        tokens,
     );
 
     // Normalize imports (i.e., deduplicate, aggregate `from` imports).
