@@ -61,14 +61,7 @@ cargo install cargo-insta
 And you'll need pre-commit to run some validation checks:
 
 ```shell
-pipx install pre-commit  # or `pip install pre-commit` if you have a virtualenv
-```
-
-You can optionally install pre-commit hooks to automatically run the validation checks
-when making a commit:
-
-```shell
-pre-commit install
+pipx install pre-commit  # or `pip install pre-commit` if you are in a virtualenv
 ```
 
 We recommend [nextest](https://nexte.st/) to run Ruff's test suite (via `cargo nextest run`),
@@ -83,19 +76,28 @@ if you choose to install `nextest`.
 
 ### Development
 
-After cloning the repository, run Ruff locally from the repository root with:
+After cloning the repository, Ruff can be run locally from the repository root on a file such as `add_rule.py` using:
 
 ```shell
-cargo run -p ruff -- check /path/to/file.py --no-cache
+cargo run -p ruff -- check ./scripts/add_rule.py --no-cache
 ```
 
-Prior to opening a pull request, ensure that your code has been auto-formatted,
-and that it passes both the lint and test validation checks:
+Now that the repository is cloned, you can optionally install pre-commit hooks to automatically run the validation checks
+when making a commit:
 
 ```shell
-cargo clippy --workspace --all-targets --all-features -- -D warnings  # Rust linting
-RUFF_UPDATE_SCHEMA=1 cargo test  # Rust testing and updating ruff.schema.json
-pre-commit run --all-files --show-diff-on-failure  # Rust and Python formatting, Markdown and Python linting, etc.
+pre-commit install
+```
+
+Prior to opening a pull request you can run the below to ensure that the following has been run respectively:
+- Linting against Rust code
+- Rust tests and updating of ruff.schema.json
+- Rust and Python formatting, Markdown and Python linting, etc.
+
+```shell
+cargo clippy --workspace --all-targets --all-features -- -D warnings
+RUFF_UPDATE_SCHEMA=1 cargo test
+pre-commit run --all-files --show-diff-on-failure
 ```
 
 These checks will run on GitHub Actions when you open your pull request, but running them locally
@@ -160,7 +162,15 @@ At the time of writing, the repository includes the following crates:
 
 ### Example: Adding a new lint rule
 
-At a high level, the steps involved in adding a new lint rule are as follows:
+To add a new rule, you can run the helper script `python scripts/add_rule.py` from within the ruff repository, which will take the following values:
+- name: The name of the check to generate, in PascalCase (e.g., 'PreferListBuiltin').
+- prefix: Prefix code for the plugin (e.g. 'PIE').
+- code: The code of the check to generate (e.g., '807').
+- linter: The source with which the check originated (e.g., 'flake8-pie').
+
+This will generate the stubs required and begin the steps involved in adding a new lint rule.
+
+At a high level, the steps are as follows:
 
 1. Determine a name for the new rule as per our [rule naming convention](#rule-naming-convention)
     (e.g., `AssertFalse`, as in, "allow `assert False`").
@@ -174,13 +184,13 @@ At a high level, the steps involved in adding a new lint rule are as follows:
     (e.g., `pub(crate) fn assert_false`) based on whatever inputs are required for the rule (e.g.,
     an `ast::StmtAssert` node).
 
-1. Define the logic for invoking the diagnostic in `crates/ruff_linter/src/checkers/ast/analyze` (for
-    AST-based rules), `crates/ruff_linter/src/checkers/tokens.rs` (for token-based rules),
-    `crates/ruff_linter/src/checkers/physical_lines.rs` (for text-based rules),
-    `crates/ruff_linter/src/checkers/filesystem.rs` (for filesystem-based rules), etc. For AST-based rules,
-    you'll likely want to modify `analyze/statement.rs` (if your rule is based on analyzing
-    statements, like imports) or `analyze/expression.rs` (if your rule is based on analyzing
-    expressions, like function calls).
+1. Define the logic for invoking the diagnostic in one of the following files:
+    - `crates/ruff_linter/src/checkers/ast/analyze/statement.rs` (for AST-based rules based on analyzing statements, like imports)
+    - `crates/ruff_linter/src/checkers/ast/analyze/expression.rs` (for AST-based rules based on analyzing expressions, like function calls).
+    - `crates/ruff_linter/src/checkers/tokens.rs` (for token-based rules)
+    - `crates/ruff_linter/src/checkers/physical_lines.rs` (for text-based rules)
+    - `crates/ruff_linter/src/checkers/filesystem.rs` (for filesystem-based rules)
+    - etc.
 
 1. Map the violation struct to a rule code in `crates/ruff_linter/src/codes.rs` (e.g., `B011`). New rules
     should be added in `RuleGroup::Preview`.
