@@ -5,7 +5,11 @@
 ### Ruff's language server is now in Beta
 
 `v0.4.5` marks the official Beta release of `ruff server`, an integrated language server built into Ruff.
-`ruff server` does everything `ruff-lsp` does and more, bringing significant improvements to performance along the way.
+`ruff server` supports the same feature set as `ruff-lsp`, powering linting, formatting, and
+code fixes in Ruff's editor integrations -- but with superior performance and
+no installation required. We'd love your feedback!
+
+You can enable `ruff server` in the [VS Code extension](https://github.com/astral-sh/ruff-vscode?tab=readme-ov-file#enabling-the-rust-based-language-server) today.
 
 To read more about this exciting milestone, check out our [blog post](https://astral.sh/blog/ruff-v0.4.5)!
 
@@ -47,7 +51,8 @@ To read more about this exciting milestone, check out our [blog post](https://as
 
 ### Documentation
 
-- Add a note on `--preview` to the README ([#11395](https://github.com/astral-sh/ruff/pull/11395))
+- Add `--preview` to the README ([#11395](https://github.com/astral-sh/ruff/pull/11395))
+- Add Python 3.13 to list of allowed Python versions ([#11411](https://github.com/astral-sh/ruff/pull/11411))
 - Simplify Neovim setup documentation ([#11489](https://github.com/astral-sh/ruff/pull/11489))
 - Update CONTRIBUTING.md to reflect the new parser ([#11434](https://github.com/astral-sh/ruff/pull/11434))
 - Update server documentation with new migration guide ([#11499](https://github.com/astral-sh/ruff/pull/11499))
