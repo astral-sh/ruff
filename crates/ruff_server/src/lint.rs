@@ -4,7 +4,7 @@ use ruff_diagnostics::{Applicability, Diagnostic, DiagnosticKind, Edit, Fix};
 use ruff_linter::{
     directives::{extract_directives, Flags},
     generate_noqa_edits,
-    linter::{check_path, LinterResult, TokenSource},
+    linter::{check_path, LinterResult},
     packaging::detect_package_root,
     registry::AsRule,
     settings::{flags, LinterSettings},
@@ -75,8 +75,9 @@ pub(crate) fn check(
 
     let source_type = query.source_type();
 
-    // Tokenize once.
-    let tokens = ruff_python_parser::tokenize(source_kind.source_code(), source_type.as_mode());
+    // Parse once.
+    let program =
+        ruff_python_parser::parse_unchecked_source(source_kind.source_code(), source_type);
 
     let index = LineIndex::from_source_text(source_kind.source_code());
 
@@ -84,13 +85,13 @@ pub(crate) fn check(
     let locator = Locator::with_index(source_kind.source_code(), index.clone());
 
     // Detect the current code style (lazily).
-    let stylist = Stylist::from_tokens(&tokens, &locator);
+    let stylist = Stylist::from_tokens(&program, &locator);
 
     // Extra indices from the code.
-    let indexer = Indexer::from_tokens(&tokens, &locator);
+    let indexer = Indexer::from_tokens(&program, &locator);
 
     // Extract the `# noqa` and `# isort: skip` directives from the source.
-    let directives = extract_directives(&tokens, Flags::all(), &locator, &indexer);
+    let directives = extract_directives(&program, Flags::all(), &locator, &indexer);
 
     // Generate checks.
     let LinterResult { data, .. } = check_path(
@@ -104,7 +105,7 @@ pub(crate) fn check(
         flags::Noqa::Enabled,
         &source_kind,
         source_type,
-        TokenSource::Tokens(tokens),
+        program,
     );
 
     let noqa_edits = generate_noqa_edits(

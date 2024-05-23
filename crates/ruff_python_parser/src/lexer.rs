@@ -33,6 +33,9 @@ mod cursor;
 mod fstring;
 mod indentation;
 
+#[deprecated]
+pub fn lex(_source: &str, _mode: Mode) {}
+
 /// A lexer for Python source code.
 #[derive(Debug)]
 pub struct Lexer<'src> {
