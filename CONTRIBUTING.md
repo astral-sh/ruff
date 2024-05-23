@@ -197,7 +197,7 @@ At a high level, the steps are as follows:
 
 1. Add proper [testing](#rule-testing-fixtures-and-snapshots) for your rule.
 
-1. Update the generated files (documentation and generated code).
+1. Update the generated files (documentation and generated code), such as `ruff.schema.json` which stores the configurations for rules and is auto updated via `RUFF_UPDATE_SCHEMA=1 cargo test`.
 
 To trigger the violation, you'll likely want to augment the logic in `crates/ruff_linter/src/checkers/ast.rs`
 to call your new function at the appropriate time and with the appropriate inputs. The `Checker`
