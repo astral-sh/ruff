@@ -62,8 +62,8 @@ pub fn format_and_debug_print(source: &str, cli: &Cli, source_path: &Path) -> Re
         });
 
     let source_code = SourceCode::new(source);
-    let formatted = format_module_ast(program.syntax(), program.comment_ranges(), source, options)
-        .context("Failed to format node")?;
+    let formatted =
+        format_module_ast(&program, source, options).context("Failed to format node")?;
     if cli.print_ir {
         println!("{}", formatted.document().display(source_code));
     }
