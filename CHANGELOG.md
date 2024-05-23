@@ -1,5 +1,72 @@
 # Changelog
 
+## 0.4.5
+
+### Ruff's language server is now in Beta
+
+`v0.4.5` marks the official Beta release of `ruff server`, an integrated language server built into Ruff.
+`ruff server` does everything `ruff-lsp` does and more, bringing significant improvements to performance along the way.
+
+To read more about this exciting milestone, check out our [blog post](https://astral.sh/blog/ruff-v0.4.5)!
+
+### Rule changes
+
+- \[`flake8-future-annotations`\] Reword `future-rewritable-type-annotation` (`FA100`) message ([#11381](https://github.com/astral-sh/ruff/pull/11381))
+- \[`pycodestyle`\] Consider soft keywords for `E27` rules ([#11446](https://github.com/astral-sh/ruff/pull/11446))
+- \[`pyflakes`\] Recommend adding unused import bindings to `__all__` ([#11314](https://github.com/astral-sh/ruff/pull/11314))
+- \[`pyflakes`\] Update documentation and deprecate `ignore_init_module_imports` ([#11436](https://github.com/astral-sh/ruff/pull/11436))
+- \[`pyupgrade`\] Mark quotes as unnecessary for non-evaluated annotations ([#11485](https://github.com/astral-sh/ruff/pull/11485))
+
+### Formatter
+
+- Avoid multiline quotes warning with `quote-style = preserve` ([#11490](https://github.com/astral-sh/ruff/pull/11490))
+
+### Server
+
+- Support Jupyter Notebook files ([#11206](https://github.com/astral-sh/ruff/pull/11206))
+- Support `noqa` comment code actions ([#11276](https://github.com/astral-sh/ruff/pull/11276))
+- Fix automatic configuration reloading ([#11492](https://github.com/astral-sh/ruff/pull/11492))
+- Fix several issues with configuration in Neovim and Helix ([#11497](https://github.com/astral-sh/ruff/pull/11497))
+
+### CLI
+
+- Add `--output-format` as a CLI option for `ruff config` ([#11438](https://github.com/astral-sh/ruff/pull/11438))
+
+### Bug fixes
+
+- Avoid `PLE0237` for property with setter ([#11377](https://github.com/astral-sh/ruff/pull/11377))
+- Avoid `TCH005` for `if` stmt with `elif`/`else` block ([#11376](https://github.com/astral-sh/ruff/pull/11376))
+- Avoid flagging `__future__` annotations as required for non-evaluated type annotations ([#11414](https://github.com/astral-sh/ruff/pull/11414))
+- Check for ruff executable in 'bin' directory as installed by 'pip install --target'. ([#11450](https://github.com/astral-sh/ruff/pull/11450))
+- Sort edits prior to deduplicating in quotation fix ([#11452](https://github.com/astral-sh/ruff/pull/11452))
+- Treat escaped newline as valid sequence ([#11465](https://github.com/astral-sh/ruff/pull/11465))
+- \[`flake8-pie`\] Preserve parentheses in `unnecessary-dict-kwargs` ([#11372](https://github.com/astral-sh/ruff/pull/11372))
+- \[`pylint`\] Ignore `__slots__` with dynamic values ([#11488](https://github.com/astral-sh/ruff/pull/11488))
+- \[`pylint`\] Remove `try` body from branch counting ([#11487](https://github.com/astral-sh/ruff/pull/11487))
+- \[`refurb`\] Respect operator precedence in `FURB110` ([#11464](https://github.com/astral-sh/ruff/pull/11464))
+
+### Documentation
+
+- Add a note on `--preview` to the README ([#11395](https://github.com/astral-sh/ruff/pull/11395))
+- Simplify Neovim setup documentation ([#11489](https://github.com/astral-sh/ruff/pull/11489))
+- Update CONTRIBUTING.md to reflect the new parser ([#11434](https://github.com/astral-sh/ruff/pull/11434))
+- Update server documentation with new migration guide ([#11499](https://github.com/astral-sh/ruff/pull/11499))
+- \[`pycodestyle`\] Clarify motivation for `E713` and `E714` ([#11483](https://github.com/astral-sh/ruff/pull/11483))
+- \[`pyflakes`\] Update docs to describe WAI behavior (F541) ([#11362](https://github.com/astral-sh/ruff/pull/11362))
+- \[`pylint`\] Clearly indicate what is counted as a branch ([#11423](https://github.com/astral-sh/ruff/pull/11423))
+
+## CI
+
+- Add automation for updating our vendored typeshed stubs ([#11427](https://github.com/astral-sh/ruff/pull/11427))
+
+## Internal
+
+- Migrate `sys.rs` generation to `stdlibs` ([#11374](https://github.com/astral-sh/ruff/pull/11374))
+
+### Other changes
+
+- Add Python 3.13 to list of allowed Python versions ([#11411](https://github.com/astral-sh/ruff/pull/11411))
+
 ## 0.4.4
 
 ### Preview features
