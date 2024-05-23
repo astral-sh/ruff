@@ -41,7 +41,7 @@ impl Violation for SleepForeverCall {
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some(format!("Consider replacing with `trio.sleep_forever()`"))
+        Some(format!("Replace with `trio.sleep_forever()`"))
     }
 }
 
