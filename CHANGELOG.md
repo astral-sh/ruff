@@ -63,10 +63,6 @@ To read more about this exciting milestone, check out our [blog post](https://as
 
 - Migrate `sys.rs` generation to `stdlibs` ([#11374](https://github.com/astral-sh/ruff/pull/11374))
 
-### Other changes
-
-- Add Python 3.13 to list of allowed Python versions ([#11411](https://github.com/astral-sh/ruff/pull/11411))
-
 ## 0.4.4
 
 ### Preview features
