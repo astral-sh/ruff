@@ -55,14 +55,6 @@ To read more about this exciting milestone, check out our [blog post](https://as
 - \[`pyflakes`\] Update docs to describe WAI behavior (F541) ([#11362](https://github.com/astral-sh/ruff/pull/11362))
 - \[`pylint`\] Clearly indicate what is counted as a branch ([#11423](https://github.com/astral-sh/ruff/pull/11423))
 
-## CI
-
-- Add automation for updating our vendored typeshed stubs ([#11427](https://github.com/astral-sh/ruff/pull/11427))
-
-## Internal
-
-- Migrate `sys.rs` generation to `stdlibs` ([#11374](https://github.com/astral-sh/ruff/pull/11374))
-
 ## 0.4.4
 
 ### Preview features
