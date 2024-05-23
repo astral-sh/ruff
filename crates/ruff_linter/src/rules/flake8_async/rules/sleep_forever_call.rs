@@ -95,13 +95,12 @@ pub(crate) fn sleep_forever_call(checker: &mut Checker, call: &ExprCall) {
     let mut diagnostic = Diagnostic::new(SleepForeverCall, call.range());
     let replacement_function = "sleep_forever";
     diagnostic.try_set_fix(|| {
-        let (import_edit, ..) = checker.importer().get_or_import_symbol(
+        let (import_edit, binding) = checker.importer().get_or_import_symbol(
             &ImportRequest::import_from("trio", replacement_function),
             call.func.start(),
             checker.semantic(),
         )?;
-        let reference_edit =
-            Edit::range_replacement(replacement_function.to_string(), call.func.range());
+        let reference_edit = Edit::range_replacement(binding, call.func.range());
         let arg_edit = Edit::range_replacement("()".to_string(), call.arguments.range());
         Ok(Fix::unsafe_edits(import_edit, [reference_edit, arg_edit]))
     });
