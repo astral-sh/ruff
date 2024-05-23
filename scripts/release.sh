@@ -17,4 +17,4 @@ cargo update -p ruff
 echo "Generating contributors list..."
 echo ""
 echo ""
-rooster contributors --quiet
+uv tool run --from rooster-blue --isolated -- rooster contributors --quiet
