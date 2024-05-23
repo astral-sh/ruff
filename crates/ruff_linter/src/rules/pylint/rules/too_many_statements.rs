@@ -90,6 +90,7 @@ fn num_statements(stmts: &[Stmt]) -> usize {
             Stmt::Match(ast::StmtMatch { cases, .. }) => {
                 count += 1;
                 for case in cases {
+                    count += 1;
                     count += num_statements(&case.body);
                 }
             }
@@ -230,6 +231,21 @@ def f():
 ";
         let stmts = parse_suite(source)?;
         assert_eq!(num_statements(&stmts), 9);
+        Ok(())
+    }
+
+    #[test]
+    fn match_case() -> Result<()> {
+        let source: &str = r"
+def f():
+    match x:
+        case 3:
+            pass
+        case _:
+            pass
+";
+        let stmts = parse_suite(source)?;
+        assert_eq!(num_statements(&stmts), 6);
         Ok(())
     }
 

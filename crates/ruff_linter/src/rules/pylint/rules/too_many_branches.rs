@@ -176,10 +176,11 @@ fn num_branches(stmts: &[Stmt]) -> usize {
                         .sum::<usize>()
             }
             Stmt::Match(ast::StmtMatch { cases, .. }) => {
-                1 + cases
-                    .iter()
-                    .map(|case| num_branches(&case.body))
-                    .sum::<usize>()
+                1 + cases.len()
+                    + cases
+                        .iter()
+                        .map(|case| num_branches(&case.body))
+                        .sum::<usize>()
             }
             // The `with` statement is not considered a branch but the statements inside the `with` should be counted.
             Stmt::With(ast::StmtWith { body, .. }) => num_branches(body),
@@ -275,6 +276,19 @@ else:
         pass
 ";
         test_helper(source, 4)?;
+        Ok(())
+    }
+
+    #[test]
+    fn match_case() -> Result<()> {
+        let source: &str = r"
+match x: # 3
+    case 0:
+        pass
+    case 1:
+        pass
+";
+        test_helper(source, 3)?;
         Ok(())
     }
 

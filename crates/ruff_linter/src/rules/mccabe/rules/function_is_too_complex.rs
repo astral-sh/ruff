@@ -98,6 +98,7 @@ fn get_complexity_number(stmts: &[Stmt]) -> usize {
             Stmt::Match(ast::StmtMatch { cases, .. }) => {
                 complexity += 1;
                 for case in cases {
+                    complexity += 1;
                     complexity += get_complexity_number(&case.body);
                 }
             }
@@ -427,6 +428,21 @@ def with_lock():
 ";
         let stmts = parse_suite(source)?;
         assert_eq!(get_complexity_number(&stmts), 2);
+        Ok(())
+    }
+
+    #[test]
+    fn match_case() -> Result<()> {
+        let source = r"
+def f():
+    match a:
+        case 30:
+            print('foo')
+        case _:
+            print('bar')
+";
+        let stmts = parse_suite(source)?;
+        assert_eq!(get_complexity_number(&stmts), 4);
         Ok(())
     }
 }
