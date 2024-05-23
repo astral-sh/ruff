@@ -10,14 +10,14 @@ ASYNC116.py:12:11: ASYNC116 [*] `trio.sleep()` with >24 hour interval should usu
 13 | 
 14 |     # 'inf literal' overflow trick
    |
-   = help: Consider replacing with `trio.sleep_forever()`
+   = help: Replace with `trio.sleep_forever()`
 
 ℹ Unsafe fix
 9  9  | 
 10 10 | async def foo():
 11 11 |     # These examples are probably not meant to ever wake up:
 12    |-    await trio.sleep(100000)  # error: 116, "async"
-   12 |+    await sleep_forever()  # error: 116, "async"
+   12 |+    await trio.sleep_forever()  # error: 116, "async"
 13 13 | 
 14 14 |     # 'inf literal' overflow trick
 15 15 |     await trio.sleep(1e999)  # error: 116, "async"
@@ -30,14 +30,14 @@ ASYNC116.py:15:11: ASYNC116 [*] `trio.sleep()` with >24 hour interval should usu
 16 | 
 17 |     await trio.sleep(86399)
    |
-   = help: Consider replacing with `trio.sleep_forever()`
+   = help: Replace with `trio.sleep_forever()`
 
 ℹ Unsafe fix
 12 12 |     await trio.sleep(100000)  # error: 116, "async"
 13 13 | 
 14 14 |     # 'inf literal' overflow trick
 15    |-    await trio.sleep(1e999)  # error: 116, "async"
-   15 |+    await sleep_forever()  # error: 116, "async"
+   15 |+    await trio.sleep_forever()  # error: 116, "async"
 16 16 | 
 17 17 |     await trio.sleep(86399)
 18 18 |     await trio.sleep(86400)
@@ -50,17 +50,17 @@ ASYNC116.py:19:11: ASYNC116 [*] `trio.sleep()` with >24 hour interval should usu
    |           ^^^^^^^^^^^^^^^^^^^^ ASYNC116
 20 |     await trio.sleep(86401)  # error: 116, "async"
    |
-   = help: Consider replacing with `trio.sleep_forever()`
+   = help: Replace with `trio.sleep_forever()`
 
 ℹ Unsafe fix
 16 16 | 
 17 17 |     await trio.sleep(86399)
 18 18 |     await trio.sleep(86400)
 19    |-    await trio.sleep(86400.01)  # error: 116, "async"
-   19 |+    await sleep_forever()  # error: 116, "async"
+   19 |+    await trio.sleep_forever()  # error: 116, "async"
 20 20 |     await trio.sleep(86401)  # error: 116, "async"
 21 21 | 
-22 22 |     # catch from import 
+22 22 |     # catch from import
 
 ASYNC116.py:20:11: ASYNC116 [*] `trio.sleep()` with >24 hour interval should usually be `trio.sleep_forever()`.
    |
@@ -69,36 +69,36 @@ ASYNC116.py:20:11: ASYNC116 [*] `trio.sleep()` with >24 hour interval should usu
 20 |     await trio.sleep(86401)  # error: 116, "async"
    |           ^^^^^^^^^^^^^^^^^ ASYNC116
 21 | 
-22 |     # catch from import 
+22 |     # catch from import
    |
-   = help: Consider replacing with `trio.sleep_forever()`
+   = help: Replace with `trio.sleep_forever()`
 
 ℹ Unsafe fix
 17 17 |     await trio.sleep(86399)
 18 18 |     await trio.sleep(86400)
 19 19 |     await trio.sleep(86400.01)  # error: 116, "async"
 20    |-    await trio.sleep(86401)  # error: 116, "async"
-   20 |+    await sleep_forever()  # error: 116, "async"
+   20 |+    await trio.sleep_forever()  # error: 116, "async"
 21 21 | 
-22 22 |     # catch from import 
+22 22 |     # catch from import
 23 23 |     await sleep(86401)  # error: 116, "async"
 
 ASYNC116.py:23:11: ASYNC116 [*] `trio.sleep()` with >24 hour interval should usually be `trio.sleep_forever()`.
    |
-22 |     # catch from import 
+22 |     # catch from import
 23 |     await sleep(86401)  # error: 116, "async"
    |           ^^^^^^^^^^^^ ASYNC116
 24 | 
 25 |     await trio.sleep(-1)  # will raise a runtime error
    |
-   = help: Consider replacing with `trio.sleep_forever()`
+   = help: Replace with `trio.sleep_forever()`
 
 ℹ Unsafe fix
 20 20 |     await trio.sleep(86401)  # error: 116, "async"
 21 21 | 
-22 22 |     # catch from import 
+22 22 |     # catch from import
 23    |-    await sleep(86401)  # error: 116, "async"
-   23 |+    await sleep_forever()  # error: 116, "async"
+   23 |+    await trio.sleep_forever()  # error: 116, "async"
 24 24 | 
 25 25 |     await trio.sleep(-1)  # will raise a runtime error
 26 26 |     await trio.sleep(0)  # handled by different check
@@ -106,34 +106,34 @@ ASYNC116.py:23:11: ASYNC116 [*] `trio.sleep()` with >24 hour interval should usu
 ASYNC116.py:49:1: ASYNC116 [*] `trio.sleep()` with >24 hour interval should usually be `trio.sleep_forever()`.
    |
 48 | # does not require the call to be awaited, nor in an async fun
-49 | trio.sleep(86401)  # error: 116, "async" 
+49 | trio.sleep(86401)  # error: 116, "async"
    | ^^^^^^^^^^^^^^^^^ ASYNC116
 50 | # also checks that we don't break visit_Call
 51 | trio.run(trio.sleep(86401))  # error: 116, "async"
    |
-   = help: Consider replacing with `trio.sleep_forever()`
+   = help: Replace with `trio.sleep_forever()`
 
 ℹ Unsafe fix
 46 46 | 
 47 47 | 
 48 48 | # does not require the call to be awaited, nor in an async fun
-49    |-trio.sleep(86401)  # error: 116, "async" 
-   49 |+sleep_forever()  # error: 116, "async" 
+49    |-trio.sleep(86401)  # error: 116, "async"
+   49 |+trio.sleep_forever()  # error: 116, "async"
 50 50 | # also checks that we don't break visit_Call
 51 51 | trio.run(trio.sleep(86401))  # error: 116, "async"
 
 ASYNC116.py:51:10: ASYNC116 [*] `trio.sleep()` with >24 hour interval should usually be `trio.sleep_forever()`.
    |
-49 | trio.sleep(86401)  # error: 116, "async" 
+49 | trio.sleep(86401)  # error: 116, "async"
 50 | # also checks that we don't break visit_Call
 51 | trio.run(trio.sleep(86401))  # error: 116, "async"
    |          ^^^^^^^^^^^^^^^^^ ASYNC116
    |
-   = help: Consider replacing with `trio.sleep_forever()`
+   = help: Replace with `trio.sleep_forever()`
 
 ℹ Unsafe fix
 48 48 | # does not require the call to be awaited, nor in an async fun
-49 49 | trio.sleep(86401)  # error: 116, "async" 
+49 49 | trio.sleep(86401)  # error: 116, "async"
 50 50 | # also checks that we don't break visit_Call
 51    |-trio.run(trio.sleep(86401))  # error: 116, "async"
-   51 |+trio.run(sleep_forever())  # error: 116, "async"
+   51 |+trio.run(trio.sleep_forever())  # error: 116, "async"
