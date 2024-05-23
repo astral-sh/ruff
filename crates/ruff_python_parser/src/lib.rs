@@ -76,7 +76,7 @@ use crate::parser::Parser;
 use itertools::Itertools;
 use ruff_python_ast::{Expr, Mod, ModExpression, ModModule, PySourceType, Suite};
 use ruff_python_trivia::CommentRanges;
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 mod error;
 pub mod lexer;
@@ -416,6 +416,15 @@ impl Tokens {
             return &[];
         };
         &self[start..=start + end]
+    }
+
+    /// Returns a slice of tokens after the given [`TextSize`] offset.
+    ///
+    /// If the given offset lies within a token, the returned slice will start from the token after
+    /// that. In other words, the returned slice will not include the token containing the offset.
+    pub fn after(&self, offset: TextSize) -> &[Token] {
+        let start = self.partition_point(|token| token.start() < offset);
+        &self[start..]
     }
 }
 

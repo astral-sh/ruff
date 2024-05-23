@@ -1718,6 +1718,14 @@ impl StringLiteralValue {
         self.iter().fold(0, |acc, part| acc + part.value.len())
     }
 
+    /// Returns the number of string literals in this value.
+    pub fn count(&self) -> usize {
+        match &self.inner {
+            StringLiteralValueInner::Single(_) => 1,
+            StringLiteralValueInner::Concatenated(value) => value.strings.len(),
+        }
+    }
+
     /// Returns an iterator over the [`char`]s of each string literal part.
     pub fn chars(&self) -> impl Iterator<Item = char> + '_ {
         self.iter().flat_map(|part| part.value.chars())
