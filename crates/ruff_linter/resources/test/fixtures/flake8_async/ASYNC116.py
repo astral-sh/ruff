@@ -3,11 +3,10 @@
 import math
 from math import inf
 
-import trio
-from trio import sleep
 
+async def import_trio():
+    import trio
 
-async def foo():
     # These examples are probably not meant to ever wake up:
     await trio.sleep(100000)  # error: 116, "async"
 
@@ -18,9 +17,6 @@ async def foo():
     await trio.sleep(86400)
     await trio.sleep(86400.01)  # error: 116, "async"
     await trio.sleep(86401)  # error: 116, "async"
-
-    # catch from import
-    await sleep(86401)  # error: 116, "async"
 
     await trio.sleep(-1)  # will raise a runtime error
     await trio.sleep(0)  # handled by different check
@@ -45,7 +41,17 @@ async def foo():
     await trio.sleep(...)
 
 
-# does not require the call to be awaited, nor in an async fun
-trio.sleep(86401)  # error: 116, "async"
-# also checks that we don't break visit_Call
-trio.run(trio.sleep(86401))  # error: 116, "async"
+def not_async_fun():
+    import trio
+
+    # does not require the call to be awaited, nor in an async fun
+    trio.sleep(86401)  # error: 116, "async"
+    # also checks that we don't break visit_Call
+    trio.run(trio.sleep(86401))  # error: 116, "async"
+
+
+async def import_from_trio():
+    from trio import sleep
+
+    # catch from import
+    await sleep(86401)  # error: 116, "async"
