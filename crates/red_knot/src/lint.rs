@@ -193,8 +193,14 @@ fn lint_bad_overrides(context: &SemanticLintContext) -> QueryResult<()> {
 }
 
 fn lint_unspecified_encoding(context: &SemanticLintContext) -> QueryResult<()> {
-    let symbols = context.symbols();
-    for (symbol_id, definition) in symbols.all_definitions() {
+    // symbol we want to match against
+    let target = resolve_global_symbol(
+        context.db.upcast(),
+        ModuleName::new("tempfile"),
+        "TemporaryFile",
+    )?;
+
+    for (symbol_id, definition) in context.symbols().all_definitions() {
         if !matches!(definition, Definition::Assignment(_)) {
             // FIXME: only looks at definitions that are assignments, not all function calls
             continue;
@@ -207,7 +213,7 @@ fn lint_unspecified_encoding(context: &SemanticLintContext) -> QueryResult<()> {
             },
             definition.clone(),
         )?;
-        let symbol = symbol_id.symbol(symbols);
+        let symbol = symbol_id.symbol(context.symbols());
         println!("{symbol:?} : {ty:?}");
         todo!("if is a specific global symbol (e.g. tempfile.TemporaryFile) check that it has a specific argument (e.g. an encoding kwarg)");
     }
