@@ -176,7 +176,7 @@ fn num_branches(stmts: &[Stmt]) -> usize {
                         .sum::<usize>()
             }
             Stmt::Match(ast::StmtMatch { cases, .. }) => {
-                1 + cases.len()
+                cases.len()
                     + cases
                         .iter()
                         .map(|case| num_branches(&case.body))
@@ -282,13 +282,13 @@ else:
     #[test]
     fn match_case() -> Result<()> {
         let source: &str = r"
-match x: # 3
+match x: # 2
     case 0:
         pass
     case 1:
         pass
 ";
-        test_helper(source, 3)?;
+        test_helper(source, 2)?;
         Ok(())
     }
 

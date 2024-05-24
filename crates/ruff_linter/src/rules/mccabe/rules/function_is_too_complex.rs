@@ -96,7 +96,6 @@ fn get_complexity_number(stmts: &[Stmt]) -> usize {
                 complexity += get_complexity_number(orelse);
             }
             Stmt::Match(ast::StmtMatch { cases, .. }) => {
-                complexity += 1;
                 for case in cases {
                     complexity += 1;
                     complexity += get_complexity_number(&case.body);
@@ -442,7 +441,7 @@ def f():
             print('bar')
 ";
         let stmts = parse_suite(source)?;
-        assert_eq!(get_complexity_number(&stmts), 4);
+        assert_eq!(get_complexity_number(&stmts), 3);
         Ok(())
     }
 }
