@@ -4,7 +4,7 @@ use ruff_linter::{
 };
 use ruff_workspace::{
     configuration::{Configuration, FormatConfiguration, LintConfiguration, RuleSelection},
-    pyproject::{find_user_settings_toml, settings_toml},
+    pyproject::{find_settings_toml, find_user_settings_toml},
     resolver::{ConfigurationTransformer, Relativity},
 };
 use std::{
@@ -88,7 +88,11 @@ impl RuffSettingsIndex {
             .filter(|entry| entry.file_type().is_dir())
             .map(DirEntry::into_path)
         {
-            if let Some(pyproject) = settings_toml(&directory).ok().flatten() {
+            if let Some(pyproject) = find_settings_toml(&directory).ok().flatten() {
+                if index.contains_key(&pyproject) {
+                    continue;
+                }
+
                 let Ok(settings) = ruff_workspace::resolver::resolve_root_settings(
                     &pyproject,
                     Relativity::Parent,
