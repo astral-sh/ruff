@@ -94,6 +94,7 @@ pub(crate) fn lint_semantic(db: &dyn LintDb, file_id: FileId) -> QueryResult<Dia
 
         lint_unresolved_imports(&context)?;
         lint_bad_overrides(&context)?;
+        lint_unspecified_encoding(&context)?;
 
         Ok(Diagnostics::from(context.diagnostics.take()))
     })
@@ -189,6 +190,34 @@ fn lint_bad_overrides(context: &SemanticLintContext) -> QueryResult<()> {
         }
     }
     Ok(())
+}
+
+fn lint_unspecified_encoding(context: &SemanticLintContext) -> QueryResult<()> {
+    // symbol we want to match against
+    let target = resolve_global_symbol(
+        context.db.upcast(),
+        ModuleName::new("tempfile"),
+        "TemporaryFile",
+    )?;
+
+    for (symbol_id, definition) in context.symbols().all_definitions() {
+        if !matches!(definition, Definition::Assignment(_)) {
+            // FIXME: only looks at definitions that are assignments, not all function calls
+            continue;
+        }
+        let ty = infer_definition_type(
+            context.db.upcast(),
+            GlobalSymbolId {
+                file_id: context.file_id,
+                symbol_id,
+            },
+            definition.clone(),
+        )?;
+        let symbol = symbol_id.symbol(context.symbols());
+        println!("{symbol:?} : {ty:?}");
+        todo!("if is a specific global symbol (e.g. tempfile.TemporaryFile) check that it has a specific argument (e.g. an encoding kwarg)");
+    }
+    todo!("lint_unspecified_encoding: todo")
 }
 
 pub struct SemanticLintContext<'a> {
