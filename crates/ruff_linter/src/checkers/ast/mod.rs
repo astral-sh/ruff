@@ -661,7 +661,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     AnnotationContext::from_function(function_def, &self.semantic, self.settings);
 
                 // The first parameter may be a single dispatch.
-                let mut singledispatch =
+                let singledispatch =
                     flake8_type_checking::helpers::is_singledispatch_implementation(
                         function_def,
                         self.semantic(),
@@ -677,7 +677,6 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     if let Some(expr) = parameter.annotation() {
                         if singledispatch && !parameter.is_variadic() {
                             self.visit_runtime_required_annotation(expr);
-                            singledispatch = false;
                         } else {
                             match annotation {
                                 AnnotationContext::RuntimeRequired => {
