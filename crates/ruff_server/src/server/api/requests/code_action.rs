@@ -45,26 +45,27 @@ impl super::BackgroundDocumentRequestHandler for CodeActions {
             response.extend(noqa_comments(&snapshot, &fixes));
         }
 
-        if snapshot.client_settings().fix_all()
-            && supported_code_actions.contains(&SupportedCodeAction::SourceFixAll)
-        {
-            response.push(fix_all(&snapshot).with_failure_code(ErrorCode::InternalError)?);
-        } else if snapshot.client_settings().fix_all()
-            && supported_code_actions.contains(&SupportedCodeAction::NotebookSourceFixAll)
-        {
-            response.push(notebook_fix_all(&snapshot).with_failure_code(ErrorCode::InternalError)?);
+        if snapshot.client_settings().fix_all() {
+            if supported_code_actions.contains(&SupportedCodeAction::SourceFixAll) {
+                response.push(fix_all(&snapshot).with_failure_code(ErrorCode::InternalError)?);
+            } else if supported_code_actions.contains(&SupportedCodeAction::NotebookSourceFixAll) {
+                response
+                    .push(notebook_fix_all(&snapshot).with_failure_code(ErrorCode::InternalError)?);
+            }
         }
 
-        if snapshot.client_settings().organize_imports()
-            && supported_code_actions.contains(&SupportedCodeAction::SourceOrganizeImports)
-        {
-            response.push(organize_imports(&snapshot).with_failure_code(ErrorCode::InternalError)?);
-        } else if snapshot.client_settings().organize_imports()
-            && supported_code_actions.contains(&SupportedCodeAction::NotebookSourceOrganizeImports)
-        {
-            response.push(
-                notebook_organize_imports(&snapshot).with_failure_code(ErrorCode::InternalError)?,
-            );
+        if snapshot.client_settings().organize_imports() {
+            if supported_code_actions.contains(&SupportedCodeAction::SourceOrganizeImports) {
+                response
+                    .push(organize_imports(&snapshot).with_failure_code(ErrorCode::InternalError)?);
+            } else if supported_code_actions
+                .contains(&SupportedCodeAction::NotebookSourceOrganizeImports)
+            {
+                response.push(
+                    notebook_organize_imports(&snapshot)
+                        .with_failure_code(ErrorCode::InternalError)?,
+                );
+            }
         }
 
         Ok(Some(response))
