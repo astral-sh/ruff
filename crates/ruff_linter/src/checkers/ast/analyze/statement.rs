@@ -1558,6 +1558,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::ListReverseCopy) {
                 refurb::rules::list_assign_reversed(checker, assign);
             }
+            if checker.enabled(Rule::NonPEP695TypeAlias) {
+                pyupgrade::rules::non_pep695_type_alias_type(checker, assign);
+            }
         }
         Stmt::AnnAssign(
             assign_stmt @ ast::StmtAnnAssign {
