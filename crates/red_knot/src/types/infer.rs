@@ -313,4 +313,36 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn resolve_module_member() -> anyhow::Result<()> {
+        let case = create_test()?;
+        let db = &case.db;
+
+        let a_path = case.src.path().join("a.py");
+        let b_path = case.src.path().join("b.py");
+        std::fs::write(a_path, "import b; D = b.C")?;
+        std::fs::write(b_path, "class C: pass")?;
+        let a_file = resolve_module(db, ModuleName::new("a"))?
+            .expect("module should be found")
+            .path(db)?
+            .file();
+        let a_syms = symbol_table(db, a_file)?;
+        let d_sym = a_syms
+            .root_symbol_id_by_name("D")
+            .expect("D symbol should be found");
+
+        let ty = infer_symbol_type(
+            db,
+            GlobalSymbolId {
+                file_id: a_file,
+                symbol_id: d_sym,
+            },
+        )?;
+
+        let jar = HasJar::<SemanticJar>::jar(db)?;
+        assert!(matches!(ty, Type::Class(_)));
+        assert_eq!(format!("{}", ty.display(&jar.type_store)), "Literal[C]");
+        Ok(())
+    }
 }
