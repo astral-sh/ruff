@@ -52,6 +52,7 @@ impl Type {
         matches!(self, Type::Unknown)
     }
 
+    // NOTE: naming? `get_member_type`
     pub fn get_member(&self, db: &dyn SemanticDb, name: &Name) -> QueryResult<Type> {
         // NOTE: maybe make this a trait that each TypeID implements?
         match self {
