@@ -498,7 +498,7 @@ fn collect_string_sequence_lines<'a>(
     // ... all state regarding a single line of a string sequence
     // is encapsulated in this variable
     let mut line_state = LineState::default();
-
+    // An iterator over the string values in the sequence.
     let mut string_items_iter = string_items.iter();
 
     // `lex_starts_at()` gives us absolute ranges rather than relative ranges,
@@ -524,7 +524,7 @@ fn collect_string_sequence_lines<'a>(
             }
             Tok::String { .. } => {
                 let Some(string_value) = string_items_iter.next() else {
-                    unreachable!();
+                    unreachable!("Expected the number of string tokens to be equal to the number of string items in the sequence");
                 };
                 line_state.visit_string_token(string_value, subrange);
                 ends_with_trailing_comma = false;
