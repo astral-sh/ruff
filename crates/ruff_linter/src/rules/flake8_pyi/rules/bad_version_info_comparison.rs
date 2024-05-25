@@ -5,6 +5,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::registry::Rule;
 
 /// ## What it does
 /// Checks for uses of comparators other than `<` and `>=` for
@@ -57,8 +58,47 @@ impl Violation for BadVersionInfoComparison {
     }
 }
 
-/// PYI006
-pub(crate) fn bad_version_info_comparison(checker: &mut Checker, test: &Expr) {
+/// ## What it does
+/// Checks for if-else statements with `sys.version_info` comparisons that use
+/// `<` comparators.
+///
+/// ## Why is this bad?
+/// As a convention, code for newer Python versions should be put first when
+/// writing multiple versions of code while comparing Python versions.
+///
+/// ## Example
+/// ```python
+/// import sys
+///
+/// if sys.version_info < (3, 10):
+///     def read_data(x, *, preserve_order=True): ...
+/// else:
+///     def read_data(x): ...
+/// ```
+///
+/// Use instead:
+/// ```python
+/// if sys.version_info >= (3, 10):
+///     def read_data(x): ...
+/// else:
+///     def read_data(x, *, preserve_order=True): ...
+/// ```
+#[violation]
+pub struct BadVersionInfoOrder;
+
+impl Violation for BadVersionInfoOrder {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Use `>=` when using if-else with `sys.version_info` comparisons")
+    }
+}
+
+/// PYI006, PYI066
+pub(crate) fn bad_version_info_comparison(
+    checker: &mut Checker,
+    test: &Expr,
+    has_else_clause: bool,
+) {
     let Expr::Compare(ast::ExprCompare {
         left,
         ops,
@@ -81,11 +121,25 @@ pub(crate) fn bad_version_info_comparison(checker: &mut Checker, test: &Expr) {
         return;
     }
 
-    if matches!(op, CmpOp::Lt | CmpOp::GtE) {
+    if matches!(op, CmpOp::GtE) {
+        // No issue to be raised, early exit.
         return;
     }
 
-    checker
-        .diagnostics
-        .push(Diagnostic::new(BadVersionInfoComparison, test.range()));
+    if matches!(op, CmpOp::Lt) {
+        if !checker.enabled(Rule::BadVersionInfoOrder) {
+            return;
+        }
+        if has_else_clause {
+            checker
+                .diagnostics
+                .push(Diagnostic::new(BadVersionInfoOrder, test.range()));
+        }
+    } else {
+        if checker.enabled(Rule::BadVersionInfoComparison) {
+            checker
+                .diagnostics
+                .push(Diagnostic::new(BadVersionInfoComparison, test.range()));
+        };
+    }
 }
