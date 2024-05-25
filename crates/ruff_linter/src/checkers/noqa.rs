@@ -52,7 +52,7 @@ pub(crate) fn check_noqa(
         }
 
         match &exemption {
-            Some(FileExemption::All) => {
+            Some(FileExemption::All(_)) => {
                 // If the file is exempted, ignore all diagnostics.
                 ignored_diagnostics.push(index);
                 continue;
@@ -109,8 +109,8 @@ pub(crate) fn check_noqa(
     // suppressed.
     if settings.rules.enabled(Rule::UnusedNOQA)
         && analyze_directives
-        && !exemption.is_some_and(|exemption| match exemption {
-            FileExemption::All => true,
+        && !exemption.as_ref().is_some_and(|exemption| match exemption {
+            FileExemption::All(_) => true,
             FileExemption::Codes(codes) => codes.contains(&Rule::UnusedNOQA.noqa_code()),
         })
         && !per_file_ignores.contains(Rule::UnusedNOQA)
@@ -215,7 +215,7 @@ pub(crate) fn check_noqa(
     }
 
     if settings.rules.enabled(Rule::BlanketNOQA) {
-        pygrep_hooks::rules::blanket_noqa(diagnostics, &noqa_directives, locator);
+        pygrep_hooks::rules::blanket_noqa(diagnostics, &noqa_directives, locator, &exemption);
     }
 
     if settings.rules.enabled(Rule::RedirectedNOQA) {

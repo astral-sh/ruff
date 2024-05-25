@@ -1,0 +1,8 @@
+---
+source: crates/ruff_linter/src/rules/pygrep_hooks/mod.rs
+---
+PGH004_2.py:1:1: PGH004 Use specific rule codes when using `noqa`
+  |
+1 | # ruff: noqa
+  | ^^^^^^^^^^^^ PGH004
+  |

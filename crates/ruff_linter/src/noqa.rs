@@ -279,7 +279,7 @@ pub(crate) fn rule_is_ignored(
 #[derive(Debug)]
 pub(crate) enum FileExemption {
     /// The file is exempt from all rules.
-    All,
+    All(All),
     /// The file is exempt from the given rules.
     Codes(Vec<NoqaCode>),
 }
@@ -315,7 +315,7 @@ impl FileExemption {
 
                     match exemption {
                         ParsedFileExemption::All => {
-                            return Some(Self::All);
+                            return Some(Self::All(All { range: *range }));
                         }
                         ParsedFileExemption::Codes(codes) => {
                             exempt_codes.extend(codes.into_iter().filter_map(|code| {
@@ -329,7 +329,7 @@ impl FileExemption {
                                     Some(rule.noqa_code())
                                 } else {
                                     #[allow(deprecated)]
-                                    let line = locator.compute_line_index(range.start());
+                                        let line = locator.compute_line_index(range.start());
                                     let path_display = relativize_path(path);
                                     warn!("Invalid rule code provided to `# ruff: noqa` at {path_display}:{line}: {code}");
                                     None
@@ -656,7 +656,7 @@ fn find_noqa_comments<'a>(
     // Mark any non-ignored diagnostics.
     for diagnostic in diagnostics {
         match &exemption {
-            Some(FileExemption::All) => {
+            Some(FileExemption::All(_)) => {
                 // If the file is exempted, don't add any noqa directives.
                 comments_by_line.push(None);
                 continue;

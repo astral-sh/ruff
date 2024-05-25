@@ -17,6 +17,8 @@ mod tests {
     #[test_case(Rule::BlanketTypeIgnore, Path::new("PGH003_1.py"))]
     #[test_case(Rule::BlanketNOQA, Path::new("PGH004_0.py"))]
     #[test_case(Rule::BlanketNOQA, Path::new("PGH004_1.py"))]
+    #[test_case(Rule::BlanketNOQA, Path::new("PGH004_2.py"))]
+    #[test_case(Rule::BlanketNOQA, Path::new("PGH004_3.py"))]
     #[test_case(Rule::InvalidMockAccess, Path::new("PGH005_0.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());

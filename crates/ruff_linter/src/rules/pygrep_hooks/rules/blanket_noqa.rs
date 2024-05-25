@@ -4,7 +4,7 @@ use ruff_python_trivia::Cursor;
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::noqa::{Directive, NoqaDirectives};
+use crate::noqa::{Directive, FileExemption, NoqaDirectives};
 
 /// ## What it does
 /// Check for `noqa` annotations that suppress all diagnostics, as opposed to
@@ -85,7 +85,18 @@ pub(crate) fn blanket_noqa(
     diagnostics: &mut Vec<Diagnostic>,
     noqa_directives: &NoqaDirectives,
     locator: &Locator,
+    exemption: &Option<FileExemption>,
 ) {
+    if let Some(FileExemption::All(all)) = exemption {
+        diagnostics.push(Diagnostic::new(
+            BlanketNOQA {
+                missing_colon: false,
+                space_before_colon: false,
+            },
+            all.range(),
+        ));
+    }
+
     for directive_line in noqa_directives.lines() {
         if let Directive::All(all) = &directive_line.directive {
             let line = locator.slice(directive_line);
