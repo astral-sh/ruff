@@ -215,7 +215,13 @@ pub(crate) fn check_noqa(
     }
 
     if settings.rules.enabled(Rule::BlanketNOQA) {
-        pygrep_hooks::rules::blanket_noqa(diagnostics, &noqa_directives, locator, &exemption);
+        pygrep_hooks::rules::blanket_noqa(
+            diagnostics,
+            &noqa_directives,
+            locator,
+            &exemption,
+            settings.preview,
+        );
     }
 
     if settings.rules.enabled(Rule::RedirectedNOQA) {

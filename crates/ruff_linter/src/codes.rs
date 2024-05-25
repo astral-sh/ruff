@@ -737,7 +737,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (PygrepHooks, "001") => (RuleGroup::Removed, rules::pygrep_hooks::rules::Eval),
         (PygrepHooks, "002") => (RuleGroup::Removed, rules::pygrep_hooks::rules::DeprecatedLogWarn),
         (PygrepHooks, "003") => (RuleGroup::Stable, rules::pygrep_hooks::rules::BlanketTypeIgnore),
-        (PygrepHooks, "004") => (RuleGroup::Preview, rules::pygrep_hooks::rules::BlanketNOQA),
+        (PygrepHooks, "004") => (RuleGroup::Stable, rules::pygrep_hooks::rules::BlanketNOQA),
         (PygrepHooks, "005") => (RuleGroup::Stable, rules::pygrep_hooks::rules::InvalidMockAccess),
 
         // pandas-vet

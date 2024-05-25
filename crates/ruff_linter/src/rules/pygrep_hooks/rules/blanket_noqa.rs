@@ -5,6 +5,7 @@ use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::noqa::{Directive, FileExemption, NoqaDirectives};
+use crate::settings::types::PreviewMode;
 
 /// ## What it does
 /// Check for `noqa` annotations that suppress all diagnostics, as opposed to
@@ -86,8 +87,9 @@ pub(crate) fn blanket_noqa(
     noqa_directives: &NoqaDirectives,
     locator: &Locator,
     exemption: &Option<FileExemption>,
+    preview: PreviewMode,
 ) {
-    if let Some(FileExemption::All(all)) = exemption {
+    if let (Some(FileExemption::All(all)), PreviewMode::Enabled) = (exemption, preview) {
         diagnostics.push(Diagnostic::new(
             BlanketNOQA {
                 missing_colon: false,
