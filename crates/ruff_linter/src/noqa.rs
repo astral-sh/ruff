@@ -329,7 +329,7 @@ impl FileExemption {
                                     Some(rule.noqa_code())
                                 } else {
                                     #[allow(deprecated)]
-                                        let line = locator.compute_line_index(range.start());
+                                    let line = locator.compute_line_index(range.start());
                                     let path_display = relativize_path(path);
                                     warn!("Invalid rule code provided to `# ruff: noqa` at {path_display}:{line}: {code}");
                                     None
