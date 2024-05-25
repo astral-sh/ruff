@@ -67,21 +67,33 @@ impl Violation for BadVersionInfoComparison {
 /// writing multiple versions of code while comparing Python versions.
 ///
 /// ## Example
+///
 /// ```python
 /// import sys
 ///
 /// if sys.version_info < (3, 10):
-///     def read_data(x, *, preserve_order=True): ...
+///
+///     def read_data(x, *, preserve_order=True):
+///         ...
+///
 /// else:
-///     def read_data(x): ...
+///
+///     def read_data(x):
+///         ...
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// if sys.version_info >= (3, 10):
-///     def read_data(x): ...
+///
+///     def read_data(x):
+///         ...
+///
 /// else:
-///     def read_data(x, *, preserve_order=True): ...
+///
+///     def read_data(x, *, preserve_order=True):
+///         ...
 /// ```
 #[violation]
 pub struct BadVersionInfoOrder;
