@@ -1,6 +1,7 @@
 name: "[flake8-to-ruff] Release"
 
-on: workflow_dispatch
+on:
+  pull_request:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -9,14 +10,14 @@ concurrency:
 env:
   PACKAGE_NAME: flake8-to-ruff
   CRATE_NAME: flake8_to_ruff
-  PYTHON_VERSION: "3.7" # to build abi3 wheels
+  PYTHON_VERSION: "3.11"
   CARGO_INCREMENTAL: 0
   CARGO_NET_RETRY: 10
   RUSTUP_MAX_RETRIES: 10
 
 jobs:
   macos-x86_64:
-    runs-on: macos-latest
+    runs-on: macos-12
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
@@ -42,8 +43,9 @@ jobs:
         with:
           name: wheels
           path: dist
+
   macos-universal:
-    runs-on: macos-latest
+    runs-on: macos-14
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
@@ -232,62 +234,3 @@ jobs:
         with:
           name: wheels
           path: dist
-
-  pypy:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, macos-latest]
-        target: [x86_64, aarch64]
-        python-version:
-          - "3.7"
-          - "3.8"
-          - "3.9"
-        exclude:
-          - os: macos-latest
-            target: aarch64
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
-        with:
-          python-version: pypy${{ matrix.python-version }}
-      - name: Build wheels
-        uses: messense/maturin-action@v1
-        with:
-          target: ${{ matrix.target }}
-          manylinux: auto
-          args: --release --out dist -i pypy${{ matrix.python-version }} -m ./${{ env.CRATE_NAME }}/Cargo.toml
-      - name: Install built wheel
-        if: matrix.target == 'x86_64'
-        run: |
-          pip install dist/${{ env.CRATE_NAME }}-*.whl --force-reinstall
-      - name: Upload wheels
-        uses: actions/upload-artifact@v2
-        with:
-          name: wheels
-          path: dist
-
-  release:
-    name: Release
-    runs-on: ubuntu-latest
-    needs:
-      - macos-universal
-      - macos-x86_64
-      - windows
-      - linux
-      - linux-cross
-      - musllinux
-      - musllinux-cross
-      - pypy
-    steps:
-      - uses: actions/download-artifact@v2
-        with:
-          name: wheels
-      - uses: actions/setup-python@v4
-      - name: Publish to PyPi
-        env:
-          TWINE_USERNAME: __token__
-          TWINE_PASSWORD: ${{ secrets.FLAKE8_TO_RUFF_TOKEN }}
-        run: |
-          pip install --upgrade twine
-          twine upload --skip-existing *
