@@ -16,8 +16,8 @@ use crate::checkers::ast::Checker;
 use crate::settings::types::PythonVersion;
 
 /// ## What it does
-/// Checks for use of `TypeAlias` annotation or `TypeAliasType` assignment for declaring type
-/// aliases.
+/// Checks for use of `TypeAlias` annotations and `TypeAliasType` assignments
+/// for declaring type aliases.
 ///
 /// ## Why is this bad?
 /// The `type` keyword was introduced in Python 3.12 by [PEP 695] for defining
@@ -88,21 +88,26 @@ pub(crate) fn non_pep695_type_alias_type(checker: &mut Checker, stmt: &StmtAssig
     }
 
     let StmtAssign { targets, value, .. } = stmt;
+
     let Expr::Call(ExprCall {
         func, arguments, ..
     }) = value.as_ref()
     else {
         return;
     };
+
     let [Expr::Name(target_name)] = targets.as_slice() else {
         return;
     };
+
     let [Expr::StringLiteral(name), value] = arguments.args.as_ref() else {
         return;
     };
+
     if name.value.to_str() != target_name.id {
         return;
     }
+
     let type_params = match arguments.keywords.as_ref() {
         [] => &[],
         [Keyword {
@@ -130,16 +135,17 @@ pub(crate) fn non_pep695_type_alias_type(checker: &mut Checker, stmt: &StmtAssig
                 })
             })
         })
-        .collect()
+        .collect::<Option<Vec<_>>>()
     else {
         return;
     };
-    checker.diagnostics.push(get_diagnostic(
+
+    checker.diagnostics.push(create_diagnostic(
         checker.generator(),
         stmt.range(),
-        target_name.id.clone(),
-        Box::new(value.clone()),
-        vars,
+        &target_name.id,
+        value,
+        &vars,
         Applicability::Safe,
         TypeAliasKind::TypeAliasType,
     ));
@@ -147,17 +153,16 @@ pub(crate) fn non_pep695_type_alias_type(checker: &mut Checker, stmt: &StmtAssig
 
 /// UP040
 pub(crate) fn non_pep695_type_alias(checker: &mut Checker, stmt: &StmtAnnAssign) {
+    if checker.settings.target_version < PythonVersion::Py312 {
+        return;
+    }
+
     let StmtAnnAssign {
         target,
         annotation,
         value,
         ..
     } = stmt;
-
-    // Syntax only available in 3.12+
-    if checker.settings.target_version < PythonVersion::Py312 {
-        return;
-    }
 
     if !checker
         .semantic()
@@ -191,12 +196,12 @@ pub(crate) fn non_pep695_type_alias(checker: &mut Checker, stmt: &StmtAnnAssign)
         .unique_by(|TypeVar { name, .. }| name.id.as_str())
         .collect::<Vec<_>>();
 
-    checker.diagnostics.push(get_diagnostic(
+    checker.diagnostics.push(create_diagnostic(
         checker.generator(),
         stmt.range(),
-        name.clone(),
-        value.clone(),
-        vars,
+        name,
+        value,
+        &vars,
         // The fix is only safe in a type stub because new-style aliases have different runtime behavior
         // See https://github.com/astral-sh/ruff/issues/6434
         if checker.source_type.is_stub() {
@@ -208,12 +213,13 @@ pub(crate) fn non_pep695_type_alias(checker: &mut Checker, stmt: &StmtAnnAssign)
     ));
 }
 
-fn get_diagnostic(
+/// Generate a [`Diagnostic`] for a non-PEP 695 type alias or type alias type.
+fn create_diagnostic(
     generator: Generator,
     stmt_range: TextRange,
-    name: String,
-    value: Box<Expr>,
-    vars: Vec<TypeVar>,
+    name: &str,
+    value: &Expr,
+    vars: &[TypeVar],
     applicability: Applicability,
     type_alias_kind: TypeAliasKind,
 ) -> Diagnostic {
@@ -223,17 +229,19 @@ fn get_diagnostic(
         Some(ast::TypeParams {
             range: TextRange::default(),
             type_params: vars
-                .into_iter()
+                .iter()
                 .map(|TypeVar { name, restriction }| {
                     TypeParam::TypeVar(TypeParamTypeVar {
                         range: TextRange::default(),
                         name: Identifier::new(name.id.clone(), TextRange::default()),
                         bound: match restriction {
-                            Some(TypeVarRestriction::Bound(bound)) => Some(Box::new(bound.clone())),
+                            Some(TypeVarRestriction::Bound(bound)) => {
+                                Some(Box::new((*bound).clone()))
+                            }
                             Some(TypeVarRestriction::Constraint(constraints)) => {
                                 Some(Box::new(Expr::Tuple(ast::ExprTuple {
                                     range: TextRange::default(),
-                                    elts: constraints.into_iter().cloned().collect(),
+                                    elts: constraints.iter().map(|expr| (*expr).clone()).collect(),
                                     ctx: ast::ExprContext::Load,
                                     parenthesized: true,
                                 })))
@@ -251,7 +259,7 @@ fn get_diagnostic(
 
     Diagnostic::new(
         NonPEP695TypeAlias {
-            name: name.clone(),
+            name: name.to_string(),
             type_alias_kind,
         },
         stmt_range,
@@ -262,11 +270,11 @@ fn get_diagnostic(
                 range: TextRange::default(),
                 name: Box::new(Expr::Name(ExprName {
                     range: TextRange::default(),
-                    id: name,
+                    id: name.to_string(),
                     ctx: ast::ExprContext::Load,
                 })),
                 type_params,
-                value,
+                value: Box::new(value.clone()),
             })),
             stmt_range,
         ),
