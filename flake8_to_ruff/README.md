@@ -1,5 +1,10 @@
 # flake8-to-ruff
 
+> [!WARNING]
+>
+> `flake8-to-ruff` is no longer supported. You may experience warnings or breakages when using it with versions of Ruff
+> released after `v0.0.233`.
+
 Convert existing Flake8 configuration files (`setup.cfg`, `tox.ini`, or `.flake8`) for use with
 [Ruff](https://github.com/charliermarsh/ruff).
 
