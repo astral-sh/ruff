@@ -85,6 +85,10 @@ impl RuffSettingsIndex {
         // Add any settings from above the workspace root.
         for directory in root.ancestors() {
             if let Some(pyproject) = settings_toml(directory).ok().flatten() {
+                if index.contains_key(&pyproject) {
+                    continue;
+                }
+
                 let Ok(settings) = ruff_workspace::resolver::resolve_root_settings(
                     &pyproject,
                     Relativity::Parent,
@@ -111,6 +115,10 @@ impl RuffSettingsIndex {
             .map(DirEntry::into_path)
         {
             if let Some(pyproject) = settings_toml(&directory).ok().flatten() {
+                if index.contains_key(&pyproject) {
+                    continue;
+                }
+
                 let Ok(settings) = ruff_workspace::resolver::resolve_root_settings(
                     &pyproject,
                     Relativity::Parent,
