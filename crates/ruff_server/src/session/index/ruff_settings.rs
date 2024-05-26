@@ -4,7 +4,7 @@ use ruff_linter::{
 };
 use ruff_workspace::{
     configuration::{Configuration, FormatConfiguration, LintConfiguration, RuleSelection},
-    pyproject::{find_settings_toml, find_user_settings_toml},
+    pyproject::{find_user_settings_toml, settings_toml},
     resolver::{ConfigurationTransformer, Relativity},
 };
 use std::{
@@ -82,17 +82,35 @@ impl RuffSettingsIndex {
     pub(super) fn new(root: &Path, editor_settings: &ResolvedEditorSettings) -> Self {
         let mut index = BTreeMap::default();
 
+        // Add any settings from above the workspace root.
+        for directory in root.ancestors() {
+            if let Some(pyproject) = settings_toml(directory).ok().flatten() {
+                let Ok(settings) = ruff_workspace::resolver::resolve_root_settings(
+                    &pyproject,
+                    Relativity::Parent,
+                    &EditorConfigurationTransformer(editor_settings, root),
+                ) else {
+                    continue;
+                };
+                index.insert(
+                    directory.to_path_buf(),
+                    Arc::new(RuffSettings {
+                        linter: settings.linter,
+                        formatter: settings.formatter,
+                    }),
+                );
+                break;
+            }
+        }
+
+        // Add any settings within the workspace itself.
         for directory in WalkDir::new(root)
             .into_iter()
             .filter_map(Result::ok)
             .filter(|entry| entry.file_type().is_dir())
             .map(DirEntry::into_path)
         {
-            if let Some(pyproject) = find_settings_toml(&directory).ok().flatten() {
-                if index.contains_key(&pyproject) {
-                    continue;
-                }
-
+            if let Some(pyproject) = settings_toml(&directory).ok().flatten() {
                 let Ok(settings) = ruff_workspace::resolver::resolve_root_settings(
                     &pyproject,
                     Relativity::Parent,
