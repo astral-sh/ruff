@@ -5,7 +5,7 @@ use ruff_python_ast::str::Quote;
 use ruff_python_ast::{
     self as ast,
     str_prefix::{AnyStringPrefix, StringLiteralPrefix},
-    AnyStringFlags,
+    AbstractStringFlags, AnyStringFlags,
 };
 use ruff_text_size::{Ranged, TextRange};
 

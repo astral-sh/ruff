@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{AnyStringFlags, Expr, ExprStringLiteral};
+use ruff_python_ast::{AbstractStringFlags, Expr, ExprStringLiteral, StringLiteral};
 use ruff_python_literal::{
     cformat::{CFormatErrorType, CFormatString},
     format::FormatPart,
@@ -90,9 +90,13 @@ pub(crate) fn call(checker: &mut Checker, string: &str, range: TextRange) {
 /// PLE1300
 /// Ex) `"%z" % "1"`
 pub(crate) fn percent(checker: &mut Checker, expr: &Expr, format_string: &ExprStringLiteral) {
-    for string_literal in &format_string.value {
-        let string = checker.locator().slice(string_literal);
-        let flags = AnyStringFlags::from(string_literal.flags);
+    for StringLiteral {
+        value: _,
+        range,
+        flags,
+    } in &format_string.value
+    {
+        let string = checker.locator().slice(range);
         let string = &string
             [usize::from(flags.opener_len())..(string.len() - usize::from(flags.closer_len()))];
 

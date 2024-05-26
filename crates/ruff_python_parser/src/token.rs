@@ -7,7 +7,9 @@
 
 use std::fmt;
 
-use ruff_python_ast::{AnyStringFlags, BoolOp, Int, IpyEscapeKind, Operator, UnaryOp};
+use ruff_python_ast::{
+    AbstractStringFlags, AnyStringFlags, BoolOp, Int, IpyEscapeKind, Operator, UnaryOp,
+};
 
 /// The set of tokens the Python source code can be tokenized in.
 #[derive(Clone, Debug, PartialEq, is_macro::Is)]

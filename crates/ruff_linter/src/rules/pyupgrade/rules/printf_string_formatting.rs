@@ -3,8 +3,9 @@ use std::str::FromStr;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::whitespace::indentation;
-use ruff_python_ast::{self as ast, AnyStringFlags, Expr};
+use ruff_python_ast::{
+    self as ast, whitespace::indentation, AbstractStringFlags, AnyStringFlags, Expr,
+};
 use ruff_python_codegen::Stylist;
 use ruff_python_literal::cformat::{
     CConversionFlags, CFormatPart, CFormatPrecision, CFormatQuantity, CFormatString,

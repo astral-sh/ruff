@@ -1,9 +1,9 @@
-use ruff_python_ast::AnyStringFlags;
+use ruff_python_ast::AbstractStringFlags;
 use ruff_text_size::TextLen;
 
 /// Returns the raw contents of the string given the string's contents and flags.
 /// This is a string without the prefix and quotes.
-pub(super) fn raw_contents(contents: &str, flags: AnyStringFlags) -> &str {
+pub(super) fn raw_contents(contents: &str, flags: impl AbstractStringFlags) -> &str {
     &contents[flags.opener_len().to_usize()..(contents.text_len() - flags.closer_len()).to_usize()]
 }
 

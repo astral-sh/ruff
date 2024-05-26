@@ -1,4 +1,4 @@
-use ruff_python_ast::AnyStringFlags;
+use ruff_python_ast::{AbstractStringFlags, AnyStringFlags};
 
 /// The context representing the current f-string that the lexer is in.
 #[derive(Debug)]
@@ -42,7 +42,7 @@ impl FStringContext {
 
     /// Returns the triple quotes for the current f-string if it is a triple-quoted
     /// f-string, `None` otherwise.
-    pub(crate) const fn triple_quotes(&self) -> Option<&'static str> {
+    pub(crate) fn triple_quotes(&self) -> Option<&'static str> {
         if self.is_triple_quoted() {
             Some(self.flags.quote_str())
         } else {

@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use ruff_python_ast::{self as ast, AnyStringFlags, Expr};
+use ruff_python_ast::{self as ast, AbstractStringFlags, Expr, StringLiteral};
 use ruff_python_literal::cformat::{CFormatPart, CFormatSpec, CFormatStrOrBytes, CFormatString};
 use ruff_text_size::Ranged;
 use rustc_hash::FxHashMap;
@@ -217,12 +217,15 @@ pub(crate) fn bad_string_format_type(
 ) {
     // Parse each string segment.
     let mut format_strings = vec![];
-    for string_literal in &format_string.value {
-        let string = checker.locator().slice(string_literal);
-        let flags = AnyStringFlags::from(string_literal.flags);
-        let quote_len = usize::from(flags.quote_len());
-        let string =
-            &string[(usize::from(flags.prefix_len()) + quote_len)..(string.len() - quote_len)];
+    for StringLiteral {
+        value: _,
+        range,
+        flags,
+    } in &format_string.value
+    {
+        let string = checker.locator().slice(range);
+        let string = &string
+            [usize::from(flags.opener_len())..(string.len() - usize::from(flags.closer_len()))];
 
         // Parse the format string (e.g. `"%s"`) into a list of `PercentFormat`.
         if let Ok(format_string) = CFormatString::from_str(string) {

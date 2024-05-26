@@ -15,7 +15,9 @@ use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use crate::{
     int,
     str::Quote,
-    str_prefix::{AnyStringPrefix, ByteStringPrefix, FStringPrefix, StringLiteralPrefix},
+    str_prefix::{
+        AbstractStringPrefix, AnyStringPrefix, ByteStringPrefix, FStringPrefix, StringLiteralPrefix,
+    },
     LiteralExpressionRef,
 };
 
@@ -1351,6 +1353,72 @@ impl Ranged for FStringPart {
     }
 }
 
+pub trait AbstractStringFlags: Copy {
+    /// Does the string use single or double quotes in its opener and closer?
+    fn quote_style(self) -> Quote;
+
+    /// Is the string triple-quoted, i.e.,
+    /// does it begin and end with three consecutive quote characters?
+    fn is_triple_quoted(self) -> bool;
+
+    fn is_raw_string(self) -> bool;
+
+    fn prefix(self) -> impl AbstractStringPrefix;
+
+    #[must_use]
+    fn with_quote_style(self, quotes: Quote) -> Self;
+
+    #[must_use]
+    fn with_triple_quotes(self) -> Self;
+
+    /// A `str` representation of the quotes used to start and close.
+    /// This does not include any prefixes the string has in its opener.
+    fn quote_str(self) -> &'static str {
+        if self.is_triple_quoted() {
+            match self.quote_style() {
+                Quote::Single => "'''",
+                Quote::Double => r#"""""#,
+            }
+        } else {
+            match self.quote_style() {
+                Quote::Single => "'",
+                Quote::Double => "\"",
+            }
+        }
+    }
+
+    /// The length of the quotes used to start and close the string.
+    /// This does not include the length of any prefixes the string has
+    /// in its opener.
+    fn quote_len(self) -> TextSize {
+        if self.is_triple_quoted() {
+            TextSize::new(3)
+        } else {
+            TextSize::new(1)
+        }
+    }
+
+    /// The total length of the string's opener,
+    /// i.e., the length of the prefixes plus the length
+    /// of the quotes used to open the string.
+    fn opener_len(self) -> TextSize {
+        self.prefix().as_str().text_len() + self.quote_len()
+    }
+
+    /// The total length of the string's closer.
+    /// This is always equal to `self.quote_len()`,
+    /// but is provided here for symmetry with the `opener_len()` method.
+    fn closer_len(self) -> TextSize {
+        self.quote_len()
+    }
+
+    fn format_string_contents(self, contents: &str) -> String {
+        let prefix = self.prefix();
+        let quote_str = self.quote_str();
+        format!("{prefix}{quote_str}{contents}{quote_str}")
+    }
+}
+
 bitflags! {
     #[derive(Default, Copy, Clone, PartialEq, Eq, Hash)]
     struct FStringFlagsInner: u8 {
@@ -1438,6 +1506,37 @@ impl FStringFlags {
         } else {
             Quote::Single
         }
+    }
+
+    pub const fn is_raw_string(self) -> bool {
+        self.0
+            .intersects(FStringFlagsInner::R_PREFIX_LOWER.union(FStringFlagsInner::R_PREFIX_UPPER))
+    }
+}
+
+impl AbstractStringFlags for FStringFlags {
+    fn quote_style(self) -> Quote {
+        self.quote_style()
+    }
+
+    fn is_triple_quoted(self) -> bool {
+        self.is_triple_quoted()
+    }
+
+    fn is_raw_string(self) -> bool {
+        self.is_raw_string()
+    }
+
+    fn prefix(self) -> impl AbstractStringPrefix {
+        self.prefix()
+    }
+
+    fn with_quote_style(self, quotes: Quote) -> Self {
+        self.with_quote_style(quotes)
+    }
+
+    fn with_triple_quotes(self) -> Self {
+        self.with_triple_quotes()
     }
 }
 
@@ -1849,6 +1948,38 @@ impl StringLiteralFlags {
     pub const fn is_triple_quoted(self) -> bool {
         self.0.contains(StringLiteralFlagsInner::TRIPLE_QUOTED)
     }
+
+    pub const fn is_raw_string(self) -> bool {
+        self.0.intersects(
+            StringLiteralFlagsInner::R_PREFIX_LOWER.union(StringLiteralFlagsInner::R_PREFIX_UPPER),
+        )
+    }
+}
+
+impl AbstractStringFlags for StringLiteralFlags {
+    fn quote_style(self) -> Quote {
+        self.quote_style()
+    }
+
+    fn is_triple_quoted(self) -> bool {
+        self.is_triple_quoted()
+    }
+
+    fn is_raw_string(self) -> bool {
+        self.is_raw_string()
+    }
+
+    fn prefix(self) -> impl AbstractStringPrefix {
+        self.prefix()
+    }
+
+    fn with_quote_style(self, quotes: Quote) -> Self {
+        self.with_quote_style(quotes)
+    }
+
+    fn with_triple_quotes(self) -> Self {
+        self.with_triple_quotes()
+    }
 }
 
 impl fmt::Debug for StringLiteralFlags {
@@ -2190,6 +2321,38 @@ impl BytesLiteralFlags {
             Quote::Single
         }
     }
+
+    pub const fn is_raw_string(self) -> bool {
+        self.0.intersects(
+            BytesLiteralFlagsInner::R_PREFIX_LOWER.union(BytesLiteralFlagsInner::R_PREFIX_UPPER),
+        )
+    }
+}
+
+impl AbstractStringFlags for BytesLiteralFlags {
+    fn quote_style(self) -> Quote {
+        self.quote_style()
+    }
+
+    fn is_triple_quoted(self) -> bool {
+        self.is_triple_quoted()
+    }
+
+    fn is_raw_string(self) -> bool {
+        self.is_raw_string()
+    }
+
+    fn prefix(self) -> impl AbstractStringPrefix {
+        self.prefix()
+    }
+
+    fn with_quote_style(self, quotes: Quote) -> Self {
+        self.with_quote_style(quotes)
+    }
+
+    fn with_triple_quotes(self) -> Self {
+        self.with_triple_quotes()
+    }
 }
 
 impl fmt::Debug for BytesLiteralFlags {
@@ -2424,62 +2587,6 @@ impl AnyStringFlags {
         self.0.contains(AnyStringFlagsInner::TRIPLE_QUOTED)
     }
 
-    /// A `str` representation of the quotes used to start and close.
-    /// This does not include any prefixes the string has in its opener.
-    pub const fn quote_str(self) -> &'static str {
-        if self.is_triple_quoted() {
-            match self.quote_style() {
-                Quote::Single => "'''",
-                Quote::Double => r#"""""#,
-            }
-        } else {
-            match self.quote_style() {
-                Quote::Single => "'",
-                Quote::Double => "\"",
-            }
-        }
-    }
-
-    /// The length of the prefixes used (if any) in the string's opener.
-    pub fn prefix_len(self) -> TextSize {
-        self.prefix().as_str().text_len()
-    }
-
-    /// The length of the quotes used to start and close the string.
-    /// This does not include the length of any prefixes the string has
-    /// in its opener.
-    pub const fn quote_len(self) -> TextSize {
-        if self.is_triple_quoted() {
-            TextSize::new(3)
-        } else {
-            TextSize::new(1)
-        }
-    }
-
-    /// The total length of the string's opener,
-    /// i.e., the length of the prefixes plus the length
-    /// of the quotes used to open the string.
-    pub fn opener_len(self) -> TextSize {
-        self.prefix_len() + self.quote_len()
-    }
-
-    /// The total length of the string's closer.
-    /// This is always equal to `self.quote_len()`,
-    /// but is provided here for symmetry with the `opener_len()` method.
-    pub const fn closer_len(self) -> TextSize {
-        self.quote_len()
-    }
-
-    pub fn format_string_contents(self, contents: &str) -> String {
-        format!(
-            "{}{}{}{}",
-            self.prefix(),
-            self.quote_str(),
-            contents,
-            self.quote_str()
-        )
-    }
-
     #[must_use]
     pub fn with_quote_style(mut self, quotes: Quote) -> Self {
         match quotes {
@@ -2493,6 +2600,32 @@ impl AnyStringFlags {
     pub fn with_triple_quotes(mut self) -> Self {
         self.0 |= AnyStringFlagsInner::TRIPLE_QUOTED;
         self
+    }
+}
+
+impl AbstractStringFlags for AnyStringFlags {
+    fn quote_style(self) -> Quote {
+        self.quote_style()
+    }
+
+    fn is_triple_quoted(self) -> bool {
+        self.is_triple_quoted()
+    }
+
+    fn is_raw_string(self) -> bool {
+        self.is_raw_string()
+    }
+
+    fn prefix(self) -> impl AbstractStringPrefix {
+        self.prefix()
+    }
+
+    fn with_quote_style(self, quotes: Quote) -> Self {
+        self.with_quote_style(quotes)
+    }
+
+    fn with_triple_quotes(self) -> Self {
+        self.with_triple_quotes()
     }
 }
 
