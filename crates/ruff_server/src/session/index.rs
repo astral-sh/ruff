@@ -465,7 +465,7 @@ impl DocumentQuery {
     /// Get the source type of the document associated with this query.
     pub(crate) fn source_type(&self) -> ruff_python_ast::PySourceType {
         match self {
-            Self::Text { .. } => ruff_python_ast::PySourceType::Python,
+            Self::Text { .. } => ruff_python_ast::PySourceType::from(self.file_path()),
             Self::Notebook { .. } => ruff_python_ast::PySourceType::Ipynb,
         }
     }
