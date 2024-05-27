@@ -1,4 +1,4 @@
-use crate::{lex, parse, parse_expression, parse_suite, parse_tokens, Mode};
+use crate::{parse, parse_expression, parse_module, Mode};
 
 #[test]
 fn test_modes() {
@@ -45,23 +45,23 @@ fn test_expr_mode_valid_syntax() {
     let source = "first
 
 ";
-    let expr = parse_expression(source).unwrap();
+    let program = parse_expression(source).unwrap();
 
-    insta::assert_debug_snapshot!(expr);
+    insta::assert_debug_snapshot!(program.expr());
 }
 
 #[test]
 fn test_unicode_aliases() {
     // https://github.com/RustPython/RustPython/issues/4566
     let source = r#"x = "\N{BACKSPACE}another cool trick""#;
-    let parse_ast = parse_suite(source).unwrap();
+    let suite = parse_module(source).unwrap().into_suite();
 
-    insta::assert_debug_snapshot!(parse_ast);
+    insta::assert_debug_snapshot!(suite);
 }
 
 #[test]
 fn test_ipython_escape_commands() {
-    let parse_ast = parse(
+    let program = parse(
         r"
 # Normal Python code
 (
@@ -132,21 +132,5 @@ foo.bar[0].baz[2].egg??
         Mode::Ipython,
     )
     .unwrap();
-    insta::assert_debug_snapshot!(parse_ast);
-}
-
-#[test]
-fn test_ipython_escape_command_parse_error() {
-    let source = r"
-a = 1
-%timeit a == 1
-    "
-    .trim();
-    let lxr = lex(source, Mode::Ipython);
-    let parse_err = parse_tokens(lxr.collect(), source, Mode::Module).unwrap_err();
-    assert_eq!(
-        parse_err.to_string(),
-        "IPython escape commands are only allowed in `Mode::Ipython` at byte range 6..20"
-            .to_string()
-    );
+    insta::assert_debug_snapshot!(program.syntax());
 }
