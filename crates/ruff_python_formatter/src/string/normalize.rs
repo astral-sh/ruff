@@ -2,7 +2,7 @@ use std::borrow::Cow;
 use std::iter::FusedIterator;
 
 use ruff_formatter::FormatContext;
-use ruff_python_ast::{str::Quote, AnyStringFlags};
+use ruff_python_ast::{str::Quote, AnyStringFlags, StringFlags};
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
 

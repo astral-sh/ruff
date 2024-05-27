@@ -1480,11 +1480,13 @@ impl FStringFlags {
             FStringPrefix::Regular
         }
     }
+}
 
+impl StringFlags for FStringFlags {
     /// Return `true` if the f-string is triple-quoted, i.e.,
     /// it begins and ends with three consecutive quote characters.
     /// For example: `f"""{bar}"""`
-    pub const fn is_triple_quoted(self) -> bool {
+    fn is_triple_quoted(self) -> bool {
         self.0.contains(FStringFlagsInner::TRIPLE_QUOTED)
     }
 
@@ -1492,7 +1494,7 @@ impl FStringFlags {
     /// used by the f-string's opener and closer:
     /// - `f"{"a"}"` -> `QuoteStyle::Double`
     /// - `f'{"a"}'` -> `QuoteStyle::Single`
-    pub const fn quote_style(self) -> Quote {
+    fn quote_style(self) -> Quote {
         if self.0.contains(FStringFlagsInner::DOUBLE) {
             Quote::Double
         } else {
@@ -1500,23 +1502,9 @@ impl FStringFlags {
         }
     }
 
-    pub const fn is_raw_string(self) -> bool {
+    fn is_raw_string(self) -> bool {
         self.0
             .intersects(FStringFlagsInner::R_PREFIX_LOWER.union(FStringFlagsInner::R_PREFIX_UPPER))
-    }
-}
-
-impl StringFlags for FStringFlags {
-    fn quote_style(self) -> Quote {
-        self.quote_style()
-    }
-
-    fn is_triple_quoted(self) -> bool {
-        self.is_triple_quoted()
-    }
-
-    fn is_raw_string(self) -> bool {
-        self.is_raw_string()
     }
 
     fn prefix(self) -> AnyStringPrefix {
@@ -1913,12 +1901,14 @@ impl StringLiteralFlags {
             StringLiteralPrefix::Empty
         }
     }
+}
 
+impl StringFlags for StringLiteralFlags {
     /// Return the quoting style (single or double quotes)
     /// used by the string's opener and closer:
     /// - `"a"` -> `QuoteStyle::Double`
     /// - `'a'` -> `QuoteStyle::Single`
-    pub const fn quote_style(self) -> Quote {
+    fn quote_style(self) -> Quote {
         if self.0.contains(StringLiteralFlagsInner::DOUBLE) {
             Quote::Double
         } else {
@@ -1929,28 +1919,14 @@ impl StringLiteralFlags {
     /// Return `true` if the string is triple-quoted, i.e.,
     /// it begins and ends with three consecutive quote characters.
     /// For example: `"""bar"""`
-    pub const fn is_triple_quoted(self) -> bool {
+    fn is_triple_quoted(self) -> bool {
         self.0.contains(StringLiteralFlagsInner::TRIPLE_QUOTED)
     }
 
-    pub const fn is_raw_string(self) -> bool {
+    fn is_raw_string(self) -> bool {
         self.0.intersects(
             StringLiteralFlagsInner::R_PREFIX_LOWER.union(StringLiteralFlagsInner::R_PREFIX_UPPER),
         )
-    }
-}
-
-impl StringFlags for StringLiteralFlags {
-    fn quote_style(self) -> Quote {
-        self.quote_style()
-    }
-
-    fn is_triple_quoted(self) -> bool {
-        self.is_triple_quoted()
-    }
-
-    fn is_raw_string(self) -> bool {
-        self.is_raw_string()
     }
 
     fn prefix(self) -> AnyStringPrefix {
@@ -2278,11 +2254,13 @@ impl BytesLiteralFlags {
             ByteStringPrefix::Regular
         }
     }
+}
 
+impl StringFlags for BytesLiteralFlags {
     /// Return `true` if the bytestring is triple-quoted, i.e.,
     /// it begins and ends with three consecutive quote characters.
     /// For example: `b"""{bar}"""`
-    pub const fn is_triple_quoted(self) -> bool {
+    fn is_triple_quoted(self) -> bool {
         self.0.contains(BytesLiteralFlagsInner::TRIPLE_QUOTED)
     }
 
@@ -2290,7 +2268,7 @@ impl BytesLiteralFlags {
     /// used by the bytestring's opener and closer:
     /// - `b"a"` -> `QuoteStyle::Double`
     /// - `b'a'` -> `QuoteStyle::Single`
-    pub const fn quote_style(self) -> Quote {
+    fn quote_style(self) -> Quote {
         if self.0.contains(BytesLiteralFlagsInner::DOUBLE) {
             Quote::Double
         } else {
@@ -2298,24 +2276,10 @@ impl BytesLiteralFlags {
         }
     }
 
-    pub const fn is_raw_string(self) -> bool {
+    fn is_raw_string(self) -> bool {
         self.0.intersects(
             BytesLiteralFlagsInner::R_PREFIX_LOWER.union(BytesLiteralFlagsInner::R_PREFIX_UPPER),
         )
-    }
-}
-
-impl StringFlags for BytesLiteralFlags {
-    fn quote_style(self) -> Quote {
-        self.quote_style()
-    }
-
-    fn is_triple_quoted(self) -> bool {
-        self.is_triple_quoted()
-    }
-
-    fn is_raw_string(self) -> bool {
-        self.is_raw_string()
     }
 
     fn prefix(self) -> AnyStringPrefix {
@@ -2471,7 +2435,70 @@ impl AnyStringFlags {
         self
     }
 
-    pub const fn prefix(self) -> AnyStringPrefix {
+    pub fn new(prefix: AnyStringPrefix, quotes: Quote, triple_quoted: bool) -> Self {
+        let new = Self::default().with_prefix(prefix).with_quote_style(quotes);
+        if triple_quoted {
+            new.with_triple_quotes()
+        } else {
+            new
+        }
+    }
+
+    /// Does the string have a `u` or `U` prefix?
+    pub const fn is_u_string(self) -> bool {
+        self.0.contains(AnyStringFlagsInner::U_PREFIX)
+    }
+
+    /// Does the string have an `f` or `F` prefix?
+    pub const fn is_f_string(self) -> bool {
+        self.0.contains(AnyStringFlagsInner::F_PREFIX)
+    }
+
+    /// Does the string have a `b` or `B` prefix?
+    pub const fn is_byte_string(self) -> bool {
+        self.0.contains(AnyStringFlagsInner::B_PREFIX)
+    }
+
+    #[must_use]
+    pub fn with_quote_style(mut self, quotes: Quote) -> Self {
+        match quotes {
+            Quote::Double => self.0 |= AnyStringFlagsInner::DOUBLE,
+            Quote::Single => self.0 -= AnyStringFlagsInner::DOUBLE,
+        };
+        self
+    }
+
+    #[must_use]
+    pub fn with_triple_quotes(mut self) -> Self {
+        self.0 |= AnyStringFlagsInner::TRIPLE_QUOTED;
+        self
+    }
+}
+
+impl StringFlags for AnyStringFlags {
+    /// Does the string use single or double quotes in its opener and closer?
+    fn quote_style(self) -> Quote {
+        if self.0.contains(AnyStringFlagsInner::DOUBLE) {
+            Quote::Double
+        } else {
+            Quote::Single
+        }
+    }
+
+    /// Is the string triple-quoted, i.e.,
+    /// does it begin and end with three consecutive quote characters?
+    fn is_triple_quoted(self) -> bool {
+        self.0.contains(AnyStringFlagsInner::TRIPLE_QUOTED)
+    }
+
+    /// Does the string have an `r` or `R` prefix?
+    fn is_raw_string(self) -> bool {
+        self.0.intersects(
+            AnyStringFlagsInner::R_PREFIX_LOWER.union(AnyStringFlagsInner::R_PREFIX_UPPER),
+        )
+    }
+
+    fn prefix(self) -> AnyStringPrefix {
         let AnyStringFlags(flags) = self;
 
         // f-strings
@@ -2507,85 +2534,6 @@ impl AnyStringFlags {
             return AnyStringPrefix::Regular(StringLiteralPrefix::Unicode);
         }
         AnyStringPrefix::Regular(StringLiteralPrefix::Empty)
-    }
-
-    pub fn new(prefix: AnyStringPrefix, quotes: Quote, triple_quoted: bool) -> Self {
-        let new = Self::default().with_prefix(prefix).with_quote_style(quotes);
-        if triple_quoted {
-            new.with_triple_quotes()
-        } else {
-            new
-        }
-    }
-
-    /// Does the string have a `u` or `U` prefix?
-    pub const fn is_u_string(self) -> bool {
-        self.0.contains(AnyStringFlagsInner::U_PREFIX)
-    }
-
-    /// Does the string have an `r` or `R` prefix?
-    pub const fn is_raw_string(self) -> bool {
-        self.0.intersects(
-            AnyStringFlagsInner::R_PREFIX_LOWER.union(AnyStringFlagsInner::R_PREFIX_UPPER),
-        )
-    }
-
-    /// Does the string have an `f` or `F` prefix?
-    pub const fn is_f_string(self) -> bool {
-        self.0.contains(AnyStringFlagsInner::F_PREFIX)
-    }
-
-    /// Does the string have a `b` or `B` prefix?
-    pub const fn is_byte_string(self) -> bool {
-        self.0.contains(AnyStringFlagsInner::B_PREFIX)
-    }
-
-    /// Does the string use single or double quotes in its opener and closer?
-    pub const fn quote_style(self) -> Quote {
-        if self.0.contains(AnyStringFlagsInner::DOUBLE) {
-            Quote::Double
-        } else {
-            Quote::Single
-        }
-    }
-
-    /// Is the string triple-quoted, i.e.,
-    /// does it begin and end with three consecutive quote characters?
-    pub const fn is_triple_quoted(self) -> bool {
-        self.0.contains(AnyStringFlagsInner::TRIPLE_QUOTED)
-    }
-
-    #[must_use]
-    pub fn with_quote_style(mut self, quotes: Quote) -> Self {
-        match quotes {
-            Quote::Double => self.0 |= AnyStringFlagsInner::DOUBLE,
-            Quote::Single => self.0 -= AnyStringFlagsInner::DOUBLE,
-        };
-        self
-    }
-
-    #[must_use]
-    pub fn with_triple_quotes(mut self) -> Self {
-        self.0 |= AnyStringFlagsInner::TRIPLE_QUOTED;
-        self
-    }
-}
-
-impl StringFlags for AnyStringFlags {
-    fn quote_style(self) -> Quote {
-        self.quote_style()
-    }
-
-    fn is_triple_quoted(self) -> bool {
-        self.is_triple_quoted()
-    }
-
-    fn is_raw_string(self) -> bool {
-        self.is_raw_string()
-    }
-
-    fn prefix(self) -> AnyStringPrefix {
-        self.prefix()
     }
 }
 

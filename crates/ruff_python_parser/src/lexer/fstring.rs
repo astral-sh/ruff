@@ -36,7 +36,7 @@ impl FStringContext {
     }
 
     /// Returns the quote character for the current f-string.
-    pub(crate) const fn quote_char(&self) -> char {
+    pub(crate) fn quote_char(&self) -> char {
         self.flags.quote_style().as_char()
     }
 
@@ -56,7 +56,7 @@ impl FStringContext {
     }
 
     /// Returns `true` if the current f-string is a triple-quoted f-string.
-    pub(crate) const fn is_triple_quoted(&self) -> bool {
+    pub(crate) fn is_triple_quoted(&self) -> bool {
         self.flags.is_triple_quoted()
     }
 
