@@ -1359,8 +1359,6 @@ pub trait StringFlags: Copy {
     /// does it begin and end with three consecutive quote characters?
     fn is_triple_quoted(self) -> bool;
 
-    fn is_raw_string(self) -> bool;
-
     fn prefix(self) -> AnyStringPrefix;
 
     /// A `str` representation of the quotes used to start and close.
@@ -1500,11 +1498,6 @@ impl StringFlags for FStringFlags {
         } else {
             Quote::Single
         }
-    }
-
-    fn is_raw_string(self) -> bool {
-        self.0
-            .intersects(FStringFlagsInner::R_PREFIX_LOWER.union(FStringFlagsInner::R_PREFIX_UPPER))
     }
 
     fn prefix(self) -> AnyStringPrefix {
@@ -1923,12 +1916,6 @@ impl StringFlags for StringLiteralFlags {
         self.0.contains(StringLiteralFlagsInner::TRIPLE_QUOTED)
     }
 
-    fn is_raw_string(self) -> bool {
-        self.0.intersects(
-            StringLiteralFlagsInner::R_PREFIX_LOWER.union(StringLiteralFlagsInner::R_PREFIX_UPPER),
-        )
-    }
-
     fn prefix(self) -> AnyStringPrefix {
         AnyStringPrefix::Regular(self.prefix())
     }
@@ -2276,12 +2263,6 @@ impl StringFlags for BytesLiteralFlags {
         }
     }
 
-    fn is_raw_string(self) -> bool {
-        self.0.intersects(
-            BytesLiteralFlagsInner::R_PREFIX_LOWER.union(BytesLiteralFlagsInner::R_PREFIX_UPPER),
-        )
-    }
-
     fn prefix(self) -> AnyStringPrefix {
         AnyStringPrefix::Bytes(self.prefix())
     }
@@ -2449,6 +2430,13 @@ impl AnyStringFlags {
         self.0.contains(AnyStringFlagsInner::U_PREFIX)
     }
 
+    /// Does the string have an `r` or `R` prefix?
+    pub const fn is_raw_string(self) -> bool {
+        self.0.intersects(
+            AnyStringFlagsInner::R_PREFIX_LOWER.union(AnyStringFlagsInner::R_PREFIX_UPPER),
+        )
+    }
+
     /// Does the string have an `f` or `F` prefix?
     pub const fn is_f_string(self) -> bool {
         self.0.contains(AnyStringFlagsInner::F_PREFIX)
@@ -2489,13 +2477,6 @@ impl StringFlags for AnyStringFlags {
     /// does it begin and end with three consecutive quote characters?
     fn is_triple_quoted(self) -> bool {
         self.0.contains(AnyStringFlagsInner::TRIPLE_QUOTED)
-    }
-
-    /// Does the string have an `r` or `R` prefix?
-    fn is_raw_string(self) -> bool {
-        self.0.intersects(
-            AnyStringFlagsInner::R_PREFIX_LOWER.union(AnyStringFlagsInner::R_PREFIX_UPPER),
-        )
     }
 
     fn prefix(self) -> AnyStringPrefix {
