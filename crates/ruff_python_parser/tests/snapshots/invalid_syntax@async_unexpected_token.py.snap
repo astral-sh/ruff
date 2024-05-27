@@ -7,7 +7,7 @@ input_file: crates/ruff_python_parser/resources/inline/err/async_unexpected_toke
 ```
 Module(
     ModModule {
-        range: 0..220,
+        range: 0..116,
         body: [
             ClassDef(
                 StmtClassDef {
@@ -113,56 +113,41 @@ Module(
                     ],
                 },
             ),
-            Expr(
-                StmtExpr {
-                    range: 192..197,
-                    value: Name(
+            Match(
+                StmtMatch {
+                    range: 88..115,
+                    subject: Name(
                         ExprName {
-                            range: 192..197,
-                            id: "match",
+                            range: 94..98,
+                            id: "test",
                             ctx: Load,
                         },
                     ),
-                },
-            ),
-            AnnAssign(
-                StmtAnnAssign {
-                    range: 198..203,
-                    target: Name(
-                        ExprName {
-                            range: 198..202,
-                            id: "test",
-                            ctx: Store,
+                    cases: [
+                        MatchCase {
+                            range: 104..115,
+                            pattern: MatchAs(
+                                PatternMatchAs {
+                                    range: 109..110,
+                                    pattern: None,
+                                    name: None,
+                                },
+                            ),
+                            guard: None,
+                            body: [
+                                Expr(
+                                    StmtExpr {
+                                        range: 112..115,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                range: 112..115,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
                         },
-                    ),
-                    annotation: Name(
-                        ExprName {
-                            range: 203..203,
-                            id: "",
-                            ctx: Invalid,
-                        },
-                    ),
-                    value: None,
-                    simple: true,
-                },
-            ),
-            AnnAssign(
-                StmtAnnAssign {
-                    range: 213..219,
-                    target: Name(
-                        ExprName {
-                            range: 213..214,
-                            id: "_",
-                            ctx: Store,
-                        },
-                    ),
-                    annotation: EllipsisLiteral(
-                        ExprEllipsisLiteral {
-                            range: 216..219,
-                        },
-                    ),
-                    value: None,
-                    simple: true,
+                    ],
                 },
             ),
         ],
@@ -194,7 +179,7 @@ Module(
 3 | async x = 1
   |       ^ Syntax Error: Expected 'def', 'with' or 'for' to follow 'async', found name
 4 | async async def foo(): ...
-5 | # TODO(dhruvmanila): Here, `match` is actually a Name token because
+5 | async match test:
   |
 
 
@@ -203,55 +188,15 @@ Module(
 3 | async x = 1
 4 | async async def foo(): ...
   |       ^^^^^ Syntax Error: Expected 'def', 'with' or 'for' to follow 'async', found 'async'
-5 | # TODO(dhruvmanila): Here, `match` is actually a Name token because
-6 | # of the soft keyword # transformer
+5 | async match test:
+6 |     case _: ...
   |
 
 
   |
-5 | # TODO(dhruvmanila): Here, `match` is actually a Name token because
-6 | # of the soft keyword # transformer
-7 | async match test:
-  |       ^^^^^ Syntax Error: Expected 'def', 'with' or 'for' to follow 'async', found name
-8 |     case _: ...
-  |
-
-
-  |
-5 | # TODO(dhruvmanila): Here, `match` is actually a Name token because
-6 | # of the soft keyword # transformer
-7 | async match test:
-  |             ^^^^ Syntax Error: Simple statements must be separated by newlines or semicolons
-8 |     case _: ...
-  |
-
-
-  |
-5 | # TODO(dhruvmanila): Here, `match` is actually a Name token because
-6 | # of the soft keyword # transformer
-7 | async match test:
-  |                  ^ Syntax Error: Expected an expression
-8 |     case _: ...
-  |
-
-
-  |
-6 | # of the soft keyword # transformer
-7 | async match test:
-8 |     case _: ...
-  | ^^^^ Syntax Error: Unexpected indentation
-  |
-
-
-  |
-6 | # of the soft keyword # transformer
-7 | async match test:
-8 |     case _: ...
-  |     ^^^^ Syntax Error: Expected a statement
-  |
-
-
-  |
-7 | async match test:
-8 |     case _: ...
+3 | async x = 1
+4 | async async def foo(): ...
+5 | async match test:
+  |       ^^^^^ Syntax Error: Expected 'def', 'with' or 'for' to follow 'async', found 'match'
+6 |     case _: ...
   |

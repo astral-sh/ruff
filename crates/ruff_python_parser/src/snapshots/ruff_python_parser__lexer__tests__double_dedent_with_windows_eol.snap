@@ -2,6 +2,8 @@
 source: crates/ruff_python_parser/src/lexer.rs
 expression: double_dedent_with_eol(WINDOWS_EOL)
 ---
+## Tokens
+```
 [
     (
         Def,
@@ -86,3 +88,4 @@ expression: double_dedent_with_eol(WINDOWS_EOL)
         37..37,
     ),
 ]
+```
