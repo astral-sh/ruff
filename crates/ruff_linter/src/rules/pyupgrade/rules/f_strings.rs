@@ -218,8 +218,8 @@ fn formatted_expr<'a>(expr: &Expr, context: FormatContext, locator: &Locator<'a>
 enum FStringConversion {
     /// The format string only contains literal parts and is empty.
     EmptyLiteral,
-    /// The format string only contains literal parts.
-    Literal,
+    /// The format string only contains literal parts and is non-empty.
+    NonEmptyLiteral,
     /// The format call uses arguments with side effects which are repeated within the
     /// format string. For example: `"{x} {x}".format(x=foo())`.
     SideEffects,
@@ -277,7 +277,7 @@ impl FStringConversion {
             .iter()
             .all(|part| matches!(part, FormatPart::Literal(..)))
         {
-            return Ok(Self::Literal);
+            return Ok(Self::NonEmptyLiteral);
         }
 
         let mut converted = String::with_capacity(contents.len());
@@ -457,7 +457,7 @@ pub(crate) fn f_strings(checker: &mut Checker, call: &ast::ExprCall, summary: &F
         let fstring = match conversion {
             FStringConversion::Convert(fstring) => Some(fstring),
             FStringConversion::EmptyLiteral => None,
-            FStringConversion::Literal => {
+            FStringConversion::NonEmptyLiteral => {
                 // Convert escaped curly brackets e.g. `{{` to `{` in literal string parts
                 Some(curly_unescape(checker.locator().slice(range)).to_string())
             }
