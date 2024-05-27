@@ -85,13 +85,13 @@ impl<'src> Parser<'src> {
     /// Returns `true` if the current token is the start of a simple statement,
     /// including expressions.
     fn at_simple_stmt(&self) -> bool {
-        self.at_ts(SIMPLE_STMT_WITH_EXPR_SET)
+        self.at_ts(SIMPLE_STMT_WITH_EXPR_SET) || self.at_soft_keyword()
     }
 
     /// Returns `true` if the current token is the start of a simple, compound or expression
     /// statement.
     pub(super) fn at_stmt(&self) -> bool {
-        self.at_ts(STMTS_SET)
+        self.at_ts(STMTS_SET) || self.at_soft_keyword()
     }
 
     /// Checks if the parser is currently positioned at the start of a type parameter.
@@ -528,7 +528,12 @@ impl<'src> Parser<'src> {
             }
         }
 
-        let module = if self.at(TokenKind::Name) {
+        let module = if self.at_name_or_soft_keyword() {
+            // test_ok from_import_soft_keyword_module_name
+            // from match import pattern
+            // from type import bar
+            // from case import pattern
+            // from match.type.case import foo
             Some(self.parse_dotted_name())
         } else {
             if leading_dots == 0 {
@@ -633,7 +638,11 @@ impl<'src> Parser<'src> {
         };
 
         let asname = if self.eat(TokenKind::As) {
-            if self.at(TokenKind::Name) {
+            if self.at_name_or_soft_keyword() {
+                // test_ok import_as_name_soft_keyword
+                // import foo as match
+                // import bar as case
+                // import baz as type
                 Some(self.parse_identifier())
             } else {
                 // test_err import_alias_missing_asname
@@ -1500,7 +1509,12 @@ impl<'src> Parser<'src> {
         };
 
         let name = if self.eat(TokenKind::As) {
-            if self.at(TokenKind::Name) {
+            if self.at_name_or_soft_keyword() {
+                // test_ok except_stmt_as_name_soft_keyword
+                // try: ...
+                // except Exception as match: ...
+                // except Exception as case: ...
+                // except Exception as type: ...
                 Some(self.parse_identifier())
             } else {
                 // test_err except_stmt_missing_as_name
@@ -3008,7 +3022,7 @@ impl<'src> Parser<'src> {
                     let star_range = parser.current_token_range();
                     parser.bump(TokenKind::Star);
 
-                    if parser.at(TokenKind::Name) {
+                    if parser.at_name_or_soft_keyword() {
                         let param = parser.parse_parameter(param_start, function_kind, AllowStarAnnotation::Yes);
                         let param_star_range = parser.node_range(star_range.start());
 
@@ -3167,7 +3181,7 @@ impl<'src> Parser<'src> {
 
                     last_keyword_only_separator_range = None;
                 }
-                TokenKind::Name => {
+                _ if parser.at_name_or_soft_keyword() => {
                     let param = parser.parse_parameter_with_default(param_start, function_kind);
 
                     // TODO(dhruvmanila): Pyright seems to only highlight the first non-default argument

@@ -37,7 +37,6 @@ const LITERAL_SET: TokenSet = TokenSet::new([
 
 /// Tokens that represents either an expression or the start of one.
 pub(super) const EXPR_SET: TokenSet = TokenSet::new([
-    TokenKind::Case,
     TokenKind::Name,
     TokenKind::Minus,
     TokenKind::Plus,
@@ -108,9 +107,24 @@ pub(super) const END_EXPR_SET: TokenSet = TokenSet::new([
 const END_SEQUENCE_SET: TokenSet = END_EXPR_SET.remove(TokenKind::Comma);
 
 impl<'src> Parser<'src> {
+    /// Returns `true` if the parser is at a name or keyword (including soft keyword) token.
+    pub(super) fn at_name_or_keyword(&self) -> bool {
+        self.at(TokenKind::Name) || self.current_token_kind().is_keyword()
+    }
+
+    /// Returns `true` if the parser is at a name or soft keyword token.
+    pub(super) fn at_name_or_soft_keyword(&self) -> bool {
+        self.at(TokenKind::Name) || self.at_soft_keyword()
+    }
+
+    /// Returns `true` if the parser is at a soft keyword token.
+    pub(super) fn at_soft_keyword(&self) -> bool {
+        self.current_token_kind().is_soft_keyword()
+    }
+
     /// Returns `true` if the current token is the start of an expression.
     pub(super) fn at_expr(&self) -> bool {
-        self.at_ts(EXPR_SET)
+        self.at_ts(EXPR_SET) || self.at_soft_keyword()
     }
 
     /// Returns `true` if the current token ends a sequence.
@@ -1434,6 +1448,8 @@ impl<'src> Parser<'src> {
                     ParseErrorType::FStringError(FStringErrorType::InvalidConversionFlag),
                     conversion_flag_range,
                 );
+                // TODO(dhruvmanila): Avoid dropping this token
+                self.bump_any();
                 ConversionFlag::None
             }
         } else {
