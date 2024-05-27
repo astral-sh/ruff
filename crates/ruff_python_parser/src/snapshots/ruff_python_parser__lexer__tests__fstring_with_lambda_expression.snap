@@ -2,6 +2,8 @@
 source: crates/ruff_python_parser/src/lexer.rs
 expression: lex_source(source)
 ---
+## Tokens
+```
 [
     (
         FStringStart(
@@ -124,3 +126,4 @@ expression: lex_source(source)
         37..37,
     ),
 ]
+```

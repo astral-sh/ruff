@@ -2,6 +2,8 @@
 source: crates/ruff_python_parser/src/lexer.rs
 expression: fstring_single_quote_escape_eol(UNIX_EOL)
 ---
+## Tokens
+```
 [
     (
         FStringStart(
@@ -37,3 +39,4 @@ expression: fstring_single_quote_escape_eol(UNIX_EOL)
         20..20,
     ),
 ]
+```
