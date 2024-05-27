@@ -1,5 +1,4 @@
-use ast::Pattern;
-use ruff_python_ast::{self as ast, ExceptHandler, Stmt};
+use ruff_python_ast::{self as ast, ExceptHandler, Pattern, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -104,8 +103,21 @@ fn get_complexity_number(stmts: &[Stmt]) -> usize {
                 if let Some(last_case) = cases.last() {
                     if let Pattern::MatchAs(match_as_pattern) = &last_case.pattern {
                         if match_as_pattern.pattern.is_none() {
-                            // the catch all `_` or named catch all case doesn't increase
-                            // the complexity similar to a plain `else` stmt.
+                            // The complexity of an irrefutable pattern is similar to an `else` block of an `if` statement.
+                            // This is either a wildcard pattern or a named catch-all pattern.
+                            // 
+                            // For example:
+                            // ```python
+                            // match subject:
+                            //     case 1: ...
+                            //     case _: ...
+                            //
+                            // match subject:
+                            //     case 1: ...
+                            //     case foo: ...
+                            // ```
+                            //
+                            // Irrefutable pattern: https://peps.python.org/pep-0634/#irrefutable-case-blocks
                             complexity -= 1;
                         }
                     }
