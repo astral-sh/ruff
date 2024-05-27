@@ -33,3 +33,13 @@ async def create_item4(item: Item) -> Item:
 @app.post("/items/", response_model=Item)
 async def create_item5(item: Item) -> Item:
     return item
+
+
+@app.post("/items/", response_model=str)
+async def create_item6(item: Item) -> Item:
+    return item
+
+
+@app.post("/items/")
+async def create_item7(item: Item) -> Item:
+    return item
