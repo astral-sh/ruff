@@ -9,13 +9,12 @@ use ruff_workspace::{
     pyproject::{find_user_settings_toml, settings_toml},
     resolver::{ConfigurationTransformer, Relativity},
 };
-use std::cell::RefCell;
 use std::{
     collections::BTreeMap,
     path::{Path, PathBuf},
     sync::Arc,
 };
-use walkdir::{DirEntry, WalkDir};
+use walkdir::WalkDir;
 
 use crate::session::settings::{ConfigurationPreference, ResolvedEditorSettings};
 
@@ -85,7 +84,7 @@ impl RuffSettings {
 
 impl RuffSettingsIndex {
     pub(super) fn new(root: &Path, editor_settings: &ResolvedEditorSettings) -> Self {
-        let index = RefCell::new(BTreeMap::new());
+        let mut index = BTreeMap::default();
 
         // Add any settings from above the workspace root.
         for directory in root.ancestors() {
@@ -98,7 +97,7 @@ impl RuffSettingsIndex {
                     continue;
                 };
 
-                index.borrow_mut().insert(
+                index.insert(
                     directory.to_path_buf(),
                     Arc::new(RuffSettings {
                         file_resolver: settings.file_resolver,
@@ -110,52 +109,54 @@ impl RuffSettingsIndex {
             }
         }
 
-        // Add any settings within the workspace itself.
-        for directory in WalkDir::new(root)
-            .into_iter()
-            .filter_entry(|entry: &DirEntry| {
-                if !entry.file_type().is_dir() {
-                    return true;
-                }
+        // Add any settings within the workspace itself
+        let mut walker = WalkDir::new(root).into_iter();
 
-                let directory = entry.path();
+        while let Some(entry) = walker.next() {
+            let Ok(entry) = entry else {
+                continue;
+            };
 
-                // If the directory is excluded from the workspace, skip it.
+            // Skip non-directories.
+            if !entry.file_type().is_dir() {
+                continue;
+            }
+
+            let directory = entry.into_path();
+
+            // If the directory is excluded from the workspace, skip it.
+            if let Some(file_name) = directory.file_name() {
                 if let Some((_, settings)) = index
-                    .borrow()
-                    .range(..directory.to_path_buf())
-                    .rev()
-                    .find(|(path, _)| directory.starts_with(path))
+                    .range(..directory.clone())
+                    .rfind(|(path, _)| directory.starts_with(path))
                 {
-                    if let Some(file_name) = directory.file_name() {
-                        let candidate = Candidate::new(&directory);
-                        let basename = Candidate::new(file_name);
-                        if match_candidate_exclusion(
-                            &candidate,
-                            &basename,
-                            &settings.file_resolver.exclude,
-                        ) {
-                            tracing::debug!("Ignored path via `exclude`: {}", directory.display());
-                            return false;
-                        } else if match_candidate_exclusion(
-                            &candidate,
-                            &basename,
-                            &settings.file_resolver.extend_exclude,
-                        ) {
-                            tracing::debug!(
-                                "Ignored path via `extend-exclude`: {}",
-                                directory.display()
-                            );
-                            return false;
-                        }
+                    let candidate = Candidate::new(&directory);
+                    let basename = Candidate::new(file_name);
+                    if match_candidate_exclusion(
+                        &candidate,
+                        &basename,
+                        &settings.file_resolver.exclude,
+                    ) {
+                        tracing::debug!("Ignored path via `exclude`: {}", directory.display());
+
+                        walker.skip_current_dir();
+                        continue;
+                    } else if match_candidate_exclusion(
+                        &candidate,
+                        &basename,
+                        &settings.file_resolver.extend_exclude,
+                    ) {
+                        tracing::debug!(
+                            "Ignored path via `extend-exclude`: {}",
+                            directory.display()
+                        );
+
+                        walker.skip_current_dir();
+                        continue;
                     }
                 }
+            }
 
-                true
-            })
-            .filter_map(Result::ok)
-            .map(DirEntry::into_path)
-        {
             if let Some(pyproject) = settings_toml(&directory).ok().flatten() {
                 let Ok(settings) = ruff_workspace::resolver::resolve_root_settings(
                     &pyproject,
@@ -164,7 +165,7 @@ impl RuffSettingsIndex {
                 ) else {
                     continue;
                 };
-                index.borrow_mut().insert(
+                index.insert(
                     directory,
                     Arc::new(RuffSettings {
                         file_resolver: settings.file_resolver,
@@ -175,8 +176,6 @@ impl RuffSettingsIndex {
             }
         }
 
-        let index = index.into_inner();
-
         let fallback = Arc::new(RuffSettings::fallback(editor_settings, root));
 
         Self { index, fallback }
@@ -186,8 +185,7 @@ impl RuffSettingsIndex {
         if let Some((_, settings)) = self
             .index
             .range(..document_path.to_path_buf())
-            .rev()
-            .find(|(path, _)| document_path.starts_with(path))
+            .rfind(|(path, _)| document_path.starts_with(path))
         {
             return settings.clone();
         }
