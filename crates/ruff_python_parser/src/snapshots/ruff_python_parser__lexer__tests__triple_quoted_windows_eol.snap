@@ -2,6 +2,8 @@
 source: crates/ruff_python_parser/src/lexer.rs
 expression: triple_quoted_eol(WINDOWS_EOL)
 ---
+## Tokens
+```
 [
     (
         String {
@@ -21,3 +23,4 @@ expression: triple_quoted_eol(WINDOWS_EOL)
         23..23,
     ),
 ]
+```
