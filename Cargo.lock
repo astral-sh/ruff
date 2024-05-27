@@ -2253,6 +2253,7 @@ dependencies = [
  "itertools 0.13.0",
  "memchr",
  "ruff_python_ast",
+ "ruff_python_trivia",
  "ruff_source_file",
  "ruff_text_size",
  "rustc-hash",

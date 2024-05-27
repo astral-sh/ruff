@@ -60,66 +60,23 @@
 //! - parser: This module contains an interface to the [Program] and is responsible for generating the AST.
 //! - mode: This module contains the definition of the different modes that the `ruff_python_parser` can be in.
 //!
-//! # Examples
-//!
-//! For example, to get a stream of tokens from a given string, one could do this:
-//!
-//! ```
-//! use ruff_python_parser::{lexer::lex, Mode};
-//!
-//! let python_source = r#"
-//! def is_odd(i):
-//!     return bool(i & 1)
-//! "#;
-//! let mut tokens = lex(python_source, Mode::Module);
-//! assert!(tokens.all(|t| t.is_ok()));
-//! ```
-//!
-//! These tokens can be directly fed into the `ruff_python_parser` to generate an AST:
-//!
-//! ```
-//! use ruff_python_parser::lexer::lex;
-//! use ruff_python_parser::{Mode, parse_tokens};
-//!
-//! let python_source = r#"
-//! def is_odd(i):
-//!    return bool(i & 1)
-//! "#;
-//! let tokens = lex(python_source, Mode::Module);
-//! let ast = parse_tokens(tokens.collect(), python_source, Mode::Module);
-//!
-//! assert!(ast.is_ok());
-//! ```
-//!
-//! Alternatively, you can use one of the other `parse_*` functions to parse a string directly without using a specific
-//! mode or tokenizing the source beforehand:
-//!
-//! ```
-//! use ruff_python_parser::parse_suite;
-//!
-//! let python_source = r#"
-//! def is_odd(i):
-//!   return bool(i & 1)
-//! "#;
-//! let ast = parse_suite(python_source);
-//!
-//! assert!(ast.is_ok());
-//! ```
-//!
 //! [lexical analysis]: https://en.wikipedia.org/wiki/Lexical_analysis
 //! [parsing]: https://en.wikipedia.org/wiki/Parsing
 //! [lexer]: crate::lexer
 
-use std::iter::FusedIterator;
+use std::cell::OnceCell;
 use std::ops::Deref;
 
-use ruff_python_ast::{Expr, Mod, ModModule, PySourceType, Suite};
-use ruff_text_size::{TextRange, TextSize};
-
 pub use crate::error::{FStringErrorType, ParseError, ParseErrorType};
-use crate::lexer::{lex, lex_starts_at, LexResult};
-pub use crate::parser::Program;
+pub use crate::lexer::Token;
 pub use crate::token::{Tok, TokenKind};
+
+use crate::parser::Parser;
+
+use itertools::Itertools;
+use ruff_python_ast::{Expr, Mod, ModExpression, ModModule, PySourceType, Suite};
+use ruff_python_trivia::CommentRanges;
+use ruff_text_size::{Ranged, TextRange};
 
 mod error;
 pub mod lexer;
@@ -130,7 +87,7 @@ mod token_set;
 mod token_source;
 pub mod typing;
 
-/// Parse a full Python program usually consisting of multiple lines.
+/// Parse a full Python module usually consisting of multiple lines.
 ///
 /// This is a convenience function that can be used to parse a full Python program without having to
 /// specify the [`Mode`] or the location. It is probably what you want to use most of the time.
@@ -140,7 +97,7 @@ pub mod typing;
 /// For example, parsing a simple function definition and a call to that function:
 ///
 /// ```
-/// use ruff_python_parser::parse_program;
+/// use ruff_python_parser::parse_module;
 ///
 /// let source = r#"
 /// def foo():
@@ -149,41 +106,15 @@ pub mod typing;
 /// print(foo())
 /// "#;
 ///
-/// let program = parse_program(source);
-/// assert!(program.is_ok());
+/// let module = parse_module(source);
+/// assert!(module.is_ok());
 /// ```
-pub fn parse_program(source: &str) -> Result<ModModule, ParseError> {
-    let lexer = lex(source, Mode::Module);
-    match parse_tokens(lexer.collect(), source, Mode::Module)? {
-        Mod::Module(m) => Ok(m),
-        Mod::Expression(_) => unreachable!("Mode::Module doesn't return other variant"),
-    }
-}
-
-/// Parse a full Python program into a [`Suite`].
-///
-/// This function is similar to [`parse_program`] except that it returns the module body
-/// instead of the module itself.
-///
-/// # Example
-///
-/// For example, parsing a simple function definition and a call to that function:
-///
-/// ```
-/// use ruff_python_parser::parse_suite;
-///
-/// let source = r#"
-/// def foo():
-///    return 42
-///
-/// print(foo())
-/// "#;
-///
-/// let body = parse_suite(source);
-/// assert!(body.is_ok());
-/// ```
-pub fn parse_suite(source: &str) -> Result<Suite, ParseError> {
-    parse_program(source).map(|m| m.body)
+pub fn parse_module(source: &str) -> Result<Program<ModModule>, ParseError> {
+    Parser::new(source, Mode::Module)
+        .parse()
+        .try_into_module()
+        .unwrap()
+        .into_result()
 }
 
 /// Parses a single Python expression.
@@ -201,37 +132,40 @@ pub fn parse_suite(source: &str) -> Result<Suite, ParseError> {
 /// let expr = parse_expression("1 + 2");
 /// assert!(expr.is_ok());
 /// ```
-pub fn parse_expression(source: &str) -> Result<Expr, ParseError> {
-    let lexer = lex(source, Mode::Expression).collect();
-    match parse_tokens(lexer, source, Mode::Expression)? {
-        Mod::Expression(expression) => Ok(*expression.body),
-        Mod::Module(_m) => unreachable!("Mode::Expression doesn't return other variant"),
-    }
+pub fn parse_expression(source: &str) -> Result<Program<ModExpression>, ParseError> {
+    Parser::new(source, Mode::Expression)
+        .parse()
+        .try_into_expression()
+        .unwrap()
+        .into_result()
 }
 
-/// Parses a Python expression from a given location.
+/// Parses a Python expression for the given range in the source.
 ///
-/// This function allows to specify the location of the expression in the source code, other than
+/// This function allows to specify the range of the expression in the source code, other than
 /// that, it behaves exactly like [`parse_expression`].
 ///
 /// # Example
 ///
-/// Parsing a single expression denoting the addition of two numbers, but this time specifying a different,
-/// somewhat silly, location:
+/// Parsing one of the numeric literal which is part of an addition expression:
 ///
 /// ```
-/// use ruff_python_parser::parse_expression_starts_at;
-/// # use ruff_text_size::TextSize;
+/// use ruff_python_parser::parse_expression_range;
+/// # use ruff_text_size::{TextRange, TextSize};
 ///
-/// let expr = parse_expression_starts_at("1 + 2", TextSize::from(400));
-/// assert!(expr.is_ok());
+/// let program = parse_expression_range("11 + 22 + 33", TextRange::new(TextSize::new(5), TextSize::new(7)));
+/// assert!(program.is_ok());
 /// ```
-pub fn parse_expression_starts_at(source: &str, offset: TextSize) -> Result<Expr, ParseError> {
-    let lexer = lex_starts_at(source, Mode::Module, offset).collect();
-    match parse_tokens(lexer, source, Mode::Expression)? {
-        Mod::Expression(expression) => Ok(*expression.body),
-        Mod::Module(_m) => unreachable!("Mode::Expression doesn't return other variant"),
-    }
+pub fn parse_expression_range(
+    source: &str,
+    range: TextRange,
+) -> Result<Program<ModExpression>, ParseError> {
+    let source = &source[..range.end().to_usize()];
+    Parser::new_starts_at(source, Mode::Expression, range.start())
+        .parse()
+        .try_into_expression()
+        .unwrap()
+        .into_result()
 }
 
 /// Parse the given Python source code using the specified [`Mode`].
@@ -248,8 +182,8 @@ pub fn parse_expression_starts_at(source: &str, offset: TextSize) -> Result<Expr
 /// ```
 /// use ruff_python_parser::{Mode, parse};
 ///
-/// let expr = parse("1 + 2", Mode::Expression);
-/// assert!(expr.is_ok());
+/// let program = parse("1 + 2", Mode::Expression);
+/// assert!(program.is_ok());
 /// ```
 ///
 /// Alternatively, we can parse a full Python program consisting of multiple lines:
@@ -280,186 +214,213 @@ pub fn parse_expression_starts_at(source: &str, offset: TextSize) -> Result<Expr
 /// let program = parse(source, Mode::Ipython);
 /// assert!(program.is_ok());
 /// ```
-pub fn parse(source: &str, mode: Mode) -> Result<Mod, ParseError> {
-    let lxr = lexer::lex(source, mode);
-    parse_tokens(lxr.collect(), source, mode)
+pub fn parse(source: &str, mode: Mode) -> Result<Program<Mod>, ParseError> {
+    parse_unchecked(source, mode).into_result()
 }
 
-/// Parse the given Python source code using the specified [`Mode`] and [`TextSize`].
+/// Parse the given Python source code using the specified [`Mode`].
 ///
-/// This function allows to specify the location of the source code, other than
-/// that, it behaves exactly like [`parse`].
-///
-/// # Example
-///
-/// ```
-/// # use ruff_text_size::TextSize;
-/// use ruff_python_parser::{Mode, parse_starts_at};
-///
-/// let source = r#"
-/// def fib(i):
-///    a, b = 0, 1
-///    for _ in range(i):
-///       a, b = b, a + b
-///    return a
-///
-/// print(fib(42))
-/// "#;
-/// let program = parse_starts_at(source, Mode::Module, TextSize::from(0));
-/// assert!(program.is_ok());
-/// ```
-pub fn parse_starts_at(source: &str, mode: Mode, offset: TextSize) -> Result<Mod, ParseError> {
-    let lxr = lexer::lex_starts_at(source, mode, offset);
-    parse_tokens(lxr.collect(), source, mode)
+/// This is same as the [`parse`] function except that it doesn't check for any [`ParseError`]
+/// and returns the [`Program`] as is.
+pub fn parse_unchecked(source: &str, mode: Mode) -> Program<Mod> {
+    Parser::new(source, mode).parse()
 }
 
-/// Parse an iterator of [`LexResult`]s using the specified [`Mode`].
-///
-/// This could allow you to perform some preprocessing on the tokens before parsing them.
-///
-/// # Example
-///
-/// As an example, instead of parsing a string, we can parse a list of tokens after we generate
-/// them using the [`lexer::lex`] function:
-///
-/// ```
-/// use ruff_python_parser::lexer::lex;
-/// use ruff_python_parser::{Mode, parse_tokens};
-///
-/// let source = "1 + 2";
-/// let tokens = lex(source, Mode::Expression);
-/// let expr = parse_tokens(tokens.collect(), source, Mode::Expression);
-/// assert!(expr.is_ok());
-/// ```
-pub fn parse_tokens(tokens: Vec<LexResult>, source: &str, mode: Mode) -> Result<Mod, ParseError> {
-    let program = Program::parse_tokens(source, tokens, mode);
-    if program.is_valid() {
-        Ok(program.into_ast())
-    } else {
-        Err(program.into_errors().into_iter().next().unwrap())
+/// Parse the given Python source code using the specificed [`PySourceType`].
+pub fn parse_unchecked_source(source: &str, source_type: PySourceType) -> Program<ModModule> {
+    // SAFETY: Safe because `PySourceType` always parses to a `ModModule`
+    Parser::new(source, source_type.as_mode())
+        .parse()
+        .try_into_module()
+        .unwrap()
+}
+
+/// Represents the parsed source code.
+#[derive(Debug)]
+pub struct Program<T> {
+    syntax: T,
+    tokens: Tokens,
+    errors: Vec<ParseError>,
+    comment_ranges: CommentRanges,
+}
+
+impl<T> Program<T> {
+    /// Returns the syntax node represented by this program.
+    pub fn syntax(&self) -> &T {
+        &self.syntax
+    }
+
+    /// Returns all the tokens for the program.
+    pub fn tokens(&self) -> &Tokens {
+        &self.tokens
+    }
+
+    /// Returns a list of syntax errors found during parsing.
+    pub fn errors(&self) -> &[ParseError] {
+        &self.errors
+    }
+
+    /// Returns the comment ranges for the program.
+    pub fn comment_ranges(&self) -> &CommentRanges {
+        &self.comment_ranges
+    }
+
+    /// Consumes the [`Program`] and returns the syntax node represented by this program.
+    pub fn into_syntax(self) -> T {
+        self.syntax
+    }
+
+    /// Consumes the [`Program`] and returns a list of syntax errors found during parsing.
+    pub fn into_errors(self) -> Vec<ParseError> {
+        self.errors
+    }
+
+    /// Returns `true` if the program is valid i.e., it has no syntax errors.
+    pub fn is_valid(&self) -> bool {
+        self.errors.is_empty()
+    }
+
+    /// Transforms the [`Program`] into a [`Result`], returning [`Ok`] if the program has no syntax
+    /// errors, or [`Err`] containing the first [`ParseError`] encountered.
+    pub fn into_result(self) -> Result<Program<T>, ParseError> {
+        if self.is_valid() {
+            Ok(self)
+        } else {
+            Err(self.into_errors().into_iter().next().unwrap())
+        }
     }
 }
 
-/// Tokens represents a vector of [`LexResult`].
-///
-/// This should only include tokens up to and including the first error. This struct is created
-/// by the [`tokenize`] function.
-#[derive(Debug, Clone)]
-pub struct Tokens(Vec<LexResult>);
+impl Program<Mod> {
+    /// Attempts to convert the [`Program<Mod>`] into a [`Program<ModModule>`].
+    ///
+    /// This method checks if the `syntax` field of the program is a [`Mod::Module`]. If it is, the
+    /// method returns [`Some(Program<ModModule>)`] with the contained module. Otherwise, it
+    /// returns [`None`].
+    ///
+    /// [`Some(Program<ModModule>)`]: Some
+    fn try_into_module(self) -> Option<Program<ModModule>> {
+        match self.syntax {
+            Mod::Module(module) => Some(Program {
+                syntax: module,
+                tokens: self.tokens,
+                errors: self.errors,
+                comment_ranges: self.comment_ranges,
+            }),
+            Mod::Expression(_) => None,
+        }
+    }
+
+    /// Attempts to convert the [`Program<Mod>`] into a [`Program<ModExpression>`].
+    ///
+    /// This method checks if the `syntax` field of the program is a [`Mod::Expression`]. If it is,
+    /// the method returns [`Some(Program<ModExpression>)`] with the contained expression.
+    /// Otherwise, it returns [`None`].
+    ///
+    /// [`Some(Program<ModExpression>)`]: Some
+    fn try_into_expression(self) -> Option<Program<ModExpression>> {
+        match self.syntax {
+            Mod::Module(_) => None,
+            Mod::Expression(expression) => Some(Program {
+                syntax: expression,
+                tokens: self.tokens,
+                errors: self.errors,
+                comment_ranges: self.comment_ranges,
+            }),
+        }
+    }
+}
+
+impl Program<ModModule> {
+    /// Returns the module body contained in this program as a [`Suite`].
+    pub fn suite(&self) -> &Suite {
+        &self.syntax.body
+    }
+
+    /// Consumes the [`Program`] and returns the module body as a [`Suite`].
+    pub fn into_suite(self) -> Suite {
+        self.syntax.body
+    }
+}
+
+impl Program<ModExpression> {
+    /// Returns the expression contained in this program.
+    pub fn expr(&self) -> &Expr {
+        &self.syntax.body
+    }
+
+    /// Consumes the [`Program`] and returns the parsed [`Expr`].
+    pub fn into_expr(self) -> Expr {
+        *self.syntax.body
+    }
+}
+
+/// Tokens represents a vector of lexed [`Token`].
+#[derive(Debug)]
+pub struct Tokens {
+    raw: Vec<Token>,
+
+    /// Index of the first [`TokenKind::Unknown`] token or the length of the token vector.
+    first_unknown_or_len: OnceCell<usize>,
+}
 
 impl Tokens {
-    /// Returns an iterator over the [`TokenKind`] and the range corresponding to the tokens.
-    pub fn kinds(&self) -> TokenKindIter {
-        TokenKindIter::new(&self.0)
+    pub(crate) fn new(tokens: Vec<Token>) -> Tokens {
+        Tokens {
+            raw: tokens,
+            first_unknown_or_len: OnceCell::new(),
+        }
     }
 
-    /// Consumes the [`Tokens`], returning the underlying vector of [`LexResult`].
-    pub fn into_inner(self) -> Vec<LexResult> {
-        self.0
+    /// Returns a slice of tokens up to (and excluding) the first [`TokenKind::Unknown`] token or
+    /// all the tokens if there is none.
+    pub fn up_to_first_unknown(&self) -> &[Token] {
+        let end = *self.first_unknown_or_len.get_or_init(|| {
+            self.raw
+                .iter()
+                .find_position(|token| token.kind() == TokenKind::Unknown)
+                .map(|(idx, _)| idx)
+                .unwrap_or_else(|| self.raw.len())
+        });
+        &self.raw[..end]
+    }
+
+    /// Returns a slice of the [`Token`] that are within the given `range`.
+    ///
+    /// The start and end position of the given range should correspond to the start position of
+    /// the first token and the end position of the last token in the returned slice.
+    ///
+    /// For example, considering the following tokens and their corresponding range:
+    ///
+    /// ```txt
+    /// Def        0..3
+    /// Name       4..7
+    /// Lpar       7..8
+    /// Rpar       8..9
+    /// Colon      9..10
+    /// Ellipsis  11..14
+    /// Newline   14..14
+    /// ```
+    ///
+    /// The range `4..10` would return a slice of `Name`, `Lpar`, `Rpar`, and `Colon` tokens. But,
+    /// if either the start or end position of the given range doesn't match any of the tokens
+    /// (like `5..10` or `4..12`), the returned slice will be empty.
+    pub fn tokens_in_range(&self, range: TextRange) -> &[Token] {
+        let Ok(start) = self.binary_search_by_key(&range.start(), Ranged::start) else {
+            return &[];
+        };
+        let Ok(end) = self[start..].binary_search_by_key(&range.end(), Ranged::end) else {
+            return &[];
+        };
+        &self[start..=start + end]
     }
 }
 
 impl Deref for Tokens {
-    type Target = [LexResult];
+    type Target = [Token];
 
     fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-/// An iterator over the [`TokenKind`] and the corresponding range.
-///
-/// This struct is created by the [`Tokens::kinds`] method.
-#[derive(Clone, Default)]
-pub struct TokenKindIter<'a> {
-    inner: std::iter::Flatten<std::slice::Iter<'a, LexResult>>,
-}
-
-impl<'a> TokenKindIter<'a> {
-    /// Create a new iterator from a slice of [`LexResult`].
-    pub fn new(tokens: &'a [LexResult]) -> Self {
-        Self {
-            inner: tokens.iter().flatten(),
-        }
-    }
-
-    /// Return the next value without advancing the iterator.
-    pub fn peek(&mut self) -> Option<(TokenKind, TextRange)> {
-        self.clone().next()
-    }
-}
-
-impl Iterator for TokenKindIter<'_> {
-    type Item = (TokenKind, TextRange);
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let &(ref tok, range) = self.inner.next()?;
-        Some((TokenKind::from_token(tok), range))
-    }
-}
-
-impl FusedIterator for TokenKindIter<'_> {}
-
-impl DoubleEndedIterator for TokenKindIter<'_> {
-    fn next_back(&mut self) -> Option<Self::Item> {
-        let &(ref tok, range) = self.inner.next_back()?;
-        Some((TokenKind::from_token(tok), range))
-    }
-}
-
-/// Collect tokens up to and including the first error.
-pub fn tokenize(contents: &str, mode: Mode) -> Tokens {
-    let mut tokens: Vec<LexResult> = allocate_tokens_vec(contents);
-    for tok in lexer::lex(contents, mode) {
-        let is_err = tok.is_err();
-        tokens.push(tok);
-        if is_err {
-            break;
-        }
-    }
-
-    Tokens(tokens)
-}
-
-/// Tokenizes all tokens.
-///
-/// It differs from [`tokenize`] in that it tokenizes all tokens and doesn't stop
-/// after the first `Err`.
-pub fn tokenize_all(contents: &str, mode: Mode) -> Vec<LexResult> {
-    let mut tokens = allocate_tokens_vec(contents);
-    for token in lexer::lex(contents, mode) {
-        tokens.push(token);
-    }
-    tokens
-}
-
-/// Allocates a [`Vec`] with an approximated capacity to fit all tokens
-/// of `contents`.
-///
-/// See [#9546](https://github.com/astral-sh/ruff/pull/9546) for a more detailed explanation.
-pub fn allocate_tokens_vec(contents: &str) -> Vec<LexResult> {
-    Vec::with_capacity(approximate_tokens_lower_bound(contents))
-}
-
-/// Approximates the number of tokens when lexing `contents`.
-fn approximate_tokens_lower_bound(contents: &str) -> usize {
-    contents.len().saturating_mul(15) / 100
-}
-
-/// Parse a full Python program from its tokens.
-pub fn parse_program_tokens(
-    tokens: Tokens,
-    source: &str,
-    is_jupyter_notebook: bool,
-) -> anyhow::Result<Suite, ParseError> {
-    let mode = if is_jupyter_notebook {
-        Mode::Ipython
-    } else {
-        Mode::Module
-    };
-    match parse_tokens(tokens.into_inner(), source, mode)? {
-        Mod::Module(m) => Ok(m.body),
-        Mod::Expression(_) => unreachable!("Mode::Module doesn't return other variant"),
+        &self.raw
     }
 }
 
