@@ -2,6 +2,8 @@
 source: crates/ruff_python_parser/src/lexer.rs
 expression: lex_source(source)
 ---
+## Tokens
+```
 [
     (
         Lpar,
@@ -88,3 +90,4 @@ expression: lex_source(source)
         38..38,
     ),
 ]
+```
