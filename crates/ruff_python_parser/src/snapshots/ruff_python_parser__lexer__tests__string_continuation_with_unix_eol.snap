@@ -2,6 +2,8 @@
 source: crates/ruff_python_parser/src/lexer.rs
 expression: string_continuation_with_eol(UNIX_EOL)
 ---
+## Tokens
+```
 [
     (
         String {
@@ -21,3 +23,4 @@ expression: string_continuation_with_eol(UNIX_EOL)
         10..10,
     ),
 ]
+```
