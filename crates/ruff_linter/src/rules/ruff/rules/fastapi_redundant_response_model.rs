@@ -86,6 +86,20 @@ pub(crate) fn fastapi_redundant_response_model(
         let Some(response_model_arg) = call.arguments.find_keyword("response_model") else {
             continue;
         };
+        let Some(return_value) = &(function_def.returns) else {
+            continue;
+        };
+        let Some(response_mode_name_expr) = response_model_arg.value.as_name_expr() else {
+            continue;
+        };
+        let Some(return_value_name_expr) = return_value.as_name_expr() else {
+            continue;
+        };
+        let is_response_model_redundant = checker.semantic().resolve_name(response_mode_name_expr)
+            == checker.semantic().resolve_name(return_value_name_expr);
+        if !is_response_model_redundant {
+            continue;
+        }
         checker.diagnostics.push(Diagnostic::new(
             FastApiRedundantResponseModel,
             response_model_arg.range(),
