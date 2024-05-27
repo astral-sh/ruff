@@ -418,7 +418,7 @@ impl<'src> Parser<'src> {
     ///
     /// If the current token is not a soft keyword.
     pub(crate) fn bump_soft_keyword_as_name(&mut self) {
-        assert!(self.current_token_kind().is_soft_keyword());
+        assert!(self.at_soft_keyword());
 
         self.do_bump(TokenKind::Name);
     }
@@ -1050,9 +1050,9 @@ impl RecoveryContextKind {
             RecoveryContextKind::Except => p.at(TokenKind::Except),
             RecoveryContextKind::AssignmentTargets => p.at(TokenKind::Equal),
             RecoveryContextKind::TypeParams => p.at_type_param(),
-            RecoveryContextKind::ImportNames => p.at(TokenKind::Name),
+            RecoveryContextKind::ImportNames => p.at_name_or_soft_keyword(),
             RecoveryContextKind::ImportFromAsNames(_) => {
-                matches!(p.current_token_kind(), TokenKind::Star | TokenKind::Name)
+                p.at(TokenKind::Star) || p.at_name_or_soft_keyword()
             }
             RecoveryContextKind::Slices => p.at(TokenKind::Colon) || p.at_expr(),
             RecoveryContextKind::ListElements
@@ -1071,11 +1071,13 @@ impl RecoveryContextKind {
             RecoveryContextKind::MatchPatternClassArguments => p.at_pattern_start(),
             RecoveryContextKind::Arguments => p.at_expr(),
             RecoveryContextKind::DeleteTargets => p.at_expr(),
-            RecoveryContextKind::Identifiers => p.at(TokenKind::Name),
-            RecoveryContextKind::Parameters(_) => matches!(
-                p.current_token_kind(),
-                TokenKind::Name | TokenKind::Star | TokenKind::DoubleStar | TokenKind::Slash
-            ),
+            RecoveryContextKind::Identifiers => p.at_name_or_soft_keyword(),
+            RecoveryContextKind::Parameters(_) => {
+                matches!(
+                    p.current_token_kind(),
+                    TokenKind::Star | TokenKind::DoubleStar | TokenKind::Slash
+                ) || p.at_name_or_soft_keyword()
+            }
             RecoveryContextKind::WithItems(_) => p.at_expr(),
             RecoveryContextKind::FStringElements => matches!(
                 p.current_token_kind(),
