@@ -1298,7 +1298,7 @@ impl<'src> Parser<'src> {
     ///
     /// If the parser isn't positioned at a `{` or `FStringMiddle` token.
     fn parse_fstring_elements(&mut self) -> FStringElements {
-        let mut elements = FStringElements::default();
+        let mut elements = vec![];
 
         self.parse_list(RecoveryContextKind::FStringElements, |parser| {
             let element = match parser.current_token_kind() {
@@ -1348,7 +1348,7 @@ impl<'src> Parser<'src> {
             elements.push(element);
         });
 
-        elements
+        FStringElements::from(elements)
     }
 
     /// Parses a f-string expression element.
