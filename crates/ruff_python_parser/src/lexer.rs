@@ -195,7 +195,9 @@ impl<'src> Lexer<'src> {
         let text = self.token_text();
 
         if !is_ascii {
-            self.value = TokenValue::Name(text.nfkc().collect::<String>().into_boxed_str());
+            self.value = TokenValue::Name {
+                name: text.nfkc().collect::<String>().into_boxed_str(),
+            };
             return TokenKind::Name;
         }
 
@@ -239,7 +241,9 @@ impl<'src> Lexer<'src> {
             "with" => TokenKind::With,
             "yield" => TokenKind::Yield,
             _ => {
-                self.value = TokenValue::Name(text.to_string().into_boxed_str());
+                self.value = TokenValue::Name {
+                    name: text.to_string().into_boxed_str(),
+                };
                 TokenKind::Name
             }
         }
@@ -286,7 +290,7 @@ impl<'src> Lexer<'src> {
                 ));
             }
         };
-        self.value = TokenValue::Int(value);
+        self.value = TokenValue::Int { value };
         TokenKind::Int
     }
 
@@ -354,7 +358,7 @@ impl<'src> Lexer<'src> {
                 };
                 TokenKind::Complex
             } else {
-                self.value = TokenValue::Float(value);
+                self.value = TokenValue::Float { value };
                 TokenKind::Float
             }
         } else {
@@ -386,7 +390,7 @@ impl<'src> Lexer<'src> {
                         ))
                     }
                 };
-                self.value = TokenValue::Int(value);
+                self.value = TokenValue::Int { value };
                 TokenKind::Int
             }
         }
@@ -1516,14 +1520,23 @@ pub(crate) enum TokenValue {
     #[default]
     None,
     /// Token value for a name, commonly known as an identifier.
-    ///
-    /// Unicode names are NFKC-normalized by the lexer, matching
-    /// [the behaviour of Python's lexer](https://docs.python.org/3/reference/lexical_analysis.html#identifiers)
-    Name(Box<str>),
+    Name {
+        /// The name value.
+        ///
+        /// Unicode names are NFKC-normalized by the lexer,
+        /// matching [the behaviour of Python's lexer](https://docs.python.org/3/reference/lexical_analysis.html#identifiers)
+        name: Box<str>,
+    },
     /// Token value for an integer.
-    Int(Int),
+    Int {
+        /// The integer value.
+        value: Int,
+    },
     /// Token value for a floating point number.
-    Float(f64),
+    Float {
+        /// The float value.
+        value: f64,
+    },
     /// Token value for a complex number.
     Complex {
         /// The real part of the complex number.
