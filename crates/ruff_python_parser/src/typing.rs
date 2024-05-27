@@ -22,13 +22,11 @@ pub enum AnnotationKind {
     Complex,
 }
 
-/// Parse a type annotation from a string.
+/// Parses the value of a string literal node (`parsed_contents`) with `range` as a type
+/// annotation. The given `source` is the entire source code.
 pub fn parse_type_annotation(
-    // Parsed contents of the string literal node that represents this type annotation.
     parsed_contents: &str,
-    // Range of the string literal node that represents this type annotation.
     range: TextRange,
-    // The source code.
     source: &str,
 ) -> Result<(Expr, AnnotationKind)> {
     let expression = &source[range];
