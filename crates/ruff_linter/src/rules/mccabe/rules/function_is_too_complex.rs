@@ -1,3 +1,4 @@
+use ast::Pattern;
 use ruff_python_ast::{self as ast, ExceptHandler, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
@@ -96,8 +97,16 @@ fn get_complexity_number(stmts: &[Stmt]) -> usize {
                 complexity += get_complexity_number(orelse);
             }
             Stmt::Match(ast::StmtMatch { cases, .. }) => {
-                for case in cases {
+                let last_index = cases.len() - 1;
+                for (i, case) in cases.iter().enumerate() {
                     complexity += 1;
+                    if let Pattern::MatchAs(match_as_pattern) = &case.pattern {
+                        if match_as_pattern.pattern.is_none() && i == last_index {
+                            // the catch all `_` or named catch all case doesn't increase
+                            // the complexity similar to a plain `else` stmt.
+                            complexity -= 1;
+                        }
+                    }
                     complexity += get_complexity_number(&case.body);
                 }
             }
@@ -431,17 +440,49 @@ def with_lock():
     }
 
     #[test]
-    fn match_case() -> Result<()> {
+    fn simple_match_case() -> Result<()> {
         let source = r"
 def f():
-    match a:
-        case 30:
+    match subject:
+        case 2:
             print('foo')
         case _:
             print('bar')
 ";
         let stmts = parse_suite(source)?;
+        assert_eq!(get_complexity_number(&stmts), 2);
+        Ok(())
+    }
+
+    #[test]
+    fn multiple_match_case() -> Result<()> {
+        let source = r"
+def f():
+    match subject:
+        case 2:
+            print('foo')
+        case 2:
+            print('bar')
+        case _:
+            print('baz')
+";
+        let stmts = parse_suite(source)?;
         assert_eq!(get_complexity_number(&stmts), 3);
+        Ok(())
+    }
+
+    #[test]
+    fn named_catch_all_match_case() -> Result<()> {
+        let source = r"
+def f():
+    match subject:
+        case 2:
+            print('hello')
+        case x:
+            print(x)
+";
+        let stmts = parse_suite(source)?;
+        assert_eq!(get_complexity_number(&stmts), 2);
         Ok(())
     }
 }
