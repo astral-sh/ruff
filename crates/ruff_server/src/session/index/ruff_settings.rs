@@ -9,7 +9,7 @@ use ruff_workspace::{
     pyproject::{find_user_settings_toml, settings_toml},
     resolver::{ConfigurationTransformer, Relativity},
 };
-use std::sync::RwLock;
+use std::cell::RefCell;
 use std::{
     collections::BTreeMap,
     path::{Path, PathBuf},
@@ -85,7 +85,7 @@ impl RuffSettings {
 
 impl RuffSettingsIndex {
     pub(super) fn new(root: &Path, editor_settings: &ResolvedEditorSettings) -> Self {
-        let index = RwLock::new(BTreeMap::new());
+        let index = RefCell::new(BTreeMap::new());
 
         // Add any settings from above the workspace root.
         for directory in root.ancestors() {
@@ -97,7 +97,8 @@ impl RuffSettingsIndex {
                 ) else {
                     continue;
                 };
-                index.write().unwrap().insert(
+
+                index.borrow_mut().insert(
                     directory.to_path_buf(),
                     Arc::new(RuffSettings {
                         file_resolver: settings.file_resolver,
@@ -121,8 +122,7 @@ impl RuffSettingsIndex {
 
                 // If the directory is excluded from the workspace, skip it.
                 if let Some((_, settings)) = index
-                    .read()
-                    .unwrap()
+                    .borrow()
                     .range(..directory.to_path_buf())
                     .rev()
                     .find(|(path, _)| directory.starts_with(path))
@@ -164,7 +164,7 @@ impl RuffSettingsIndex {
                 ) else {
                     continue;
                 };
-                index.write().unwrap().insert(
+                index.borrow_mut().insert(
                     directory,
                     Arc::new(RuffSettings {
                         file_resolver: settings.file_resolver,
@@ -175,7 +175,7 @@ impl RuffSettingsIndex {
             }
         }
 
-        let index = index.into_inner().unwrap();
+        let index = index.into_inner();
 
         let fallback = Arc::new(RuffSettings::fallback(editor_settings, root));
 
