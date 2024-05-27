@@ -1,7 +1,8 @@
-use ruff_diagnostics::Violation;
+use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
 use ruff_python_semantic::analyze::typing::resolve_assignment;
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 
@@ -48,7 +49,7 @@ pub struct FastApiRedundantResponseModel;
 impl Violation for FastApiRedundantResponseModel {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Class method defined without decorator")
+        format!("FastAPI route with redundant response_model parameter")
     }
 }
 
@@ -74,16 +75,20 @@ pub(crate) fn fastapi_redundant_response_model(
             continue;
         }
         let ra = resolve_assignment(&*decorator_method.value, checker.semantic());
-        if ra.is_some_and(|qualified_name| {
+        if !ra.is_some_and(|qualified_name| {
             matches!(
                 qualified_name.segments(),
                 ["fastapi", "FastAPI"] | ["fastapi", "APIRouter"]
             )
         }) {
-            println!(
-                "found fast api route: {}, {:?}",
-                method_name, function_def.name.id
-            );
+            continue;
         }
+        let Some(response_model_arg) = call.arguments.find_keyword("response_model") else {
+            continue;
+        };
+        checker.diagnostics.push(Diagnostic::new(
+            FastApiRedundantResponseModel,
+            response_model_arg.range(),
+        ));
     }
 }
