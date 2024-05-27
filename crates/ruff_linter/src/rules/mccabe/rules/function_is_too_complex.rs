@@ -100,6 +100,23 @@ fn get_complexity_number(stmts: &[Stmt]) -> usize {
                     complexity += 1;
                     complexity += get_complexity_number(&case.body);
                 }
+                if let Some(last_case) = cases.last() {
+                    // The complexity of an irrefutable pattern is similar to an `else` block of an `if` statement.
+                    //
+                    // For example:
+                    // ```python
+                    // match subject:
+                    //     case 1: ...
+                    //     case _: ...
+                    //
+                    // match subject:
+                    //     case 1: ...
+                    //     case foo: ...
+                    // ```
+                    if last_case.guard.is_none() && last_case.pattern.is_irrefutable() {
+                        complexity -= 1;
+                    }
+                }
             }
             Stmt::Try(ast::StmtTry {
                 body,
@@ -431,17 +448,64 @@ def with_lock():
     }
 
     #[test]
-    fn match_case() -> Result<()> {
+    fn simple_match_case() -> Result<()> {
         let source = r"
 def f():
-    match a:
-        case 30:
+    match subject:
+        case 2:
             print('foo')
         case _:
             print('bar')
 ";
         let stmts = parse_suite(source)?;
+        assert_eq!(get_complexity_number(&stmts), 2);
+        Ok(())
+    }
+
+    #[test]
+    fn multiple_match_case() -> Result<()> {
+        let source = r"
+def f():
+    match subject:
+        case 2:
+            print('foo')
+        case 2:
+            print('bar')
+        case _:
+            print('baz')
+";
+        let stmts = parse_suite(source)?;
         assert_eq!(get_complexity_number(&stmts), 3);
+        Ok(())
+    }
+
+    #[test]
+    fn named_catch_all_match_case() -> Result<()> {
+        let source = r"
+def f():
+    match subject:
+        case 2:
+            print('hello')
+        case x:
+            print(x)
+";
+        let stmts = parse_suite(source)?;
+        assert_eq!(get_complexity_number(&stmts), 2);
+        Ok(())
+    }
+
+    #[test]
+    fn match_case_catch_all_with_seuqnece() -> Result<()> {
+        let source = r"
+def f():
+    match subject:
+        case 2:
+            print('hello')
+        case 5 | _:
+            print(x)
+";
+        let stmts = parse_suite(source)?;
+        assert_eq!(get_complexity_number(&stmts), 2);
         Ok(())
     }
 }

@@ -3020,6 +3020,21 @@ pub enum Pattern {
     MatchOr(PatternMatchOr),
 }
 
+impl Pattern {
+    /// Checks if the [`Pattern`] is an [irrefutable pattern].
+    ///
+    /// [irrefutable pattern]: https://peps.python.org/pep-0634/#irrefutable-case-blocks
+    pub fn is_irrefutable(&self) -> bool {
+        match self {
+            Pattern::MatchAs(PatternMatchAs { pattern: None, .. }) => true,
+            Pattern::MatchOr(PatternMatchOr { patterns, .. }) => {
+                patterns.iter().any(Pattern::is_irrefutable)
+            }
+            _ => false,
+        }
+    }
+}
+
 /// See also [MatchValue](https://docs.python.org/3/library/ast.html#ast.MatchValue)
 #[derive(Clone, Debug, PartialEq)]
 pub struct PatternMatchValue {
