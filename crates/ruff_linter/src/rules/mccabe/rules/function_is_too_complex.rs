@@ -105,7 +105,7 @@ fn get_complexity_number(stmts: &[Stmt]) -> usize {
                         if match_as_pattern.pattern.is_none() {
                             // The complexity of an irrefutable pattern is similar to an `else` block of an `if` statement.
                             // This is either a wildcard pattern or a named catch-all pattern.
-                            // 
+                            //
                             // For example:
                             // ```python
                             // match subject:
