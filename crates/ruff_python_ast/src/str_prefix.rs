@@ -1,15 +1,10 @@
 use std::fmt;
 
-pub trait AbstractStringPrefix: Copy + fmt::Display {
-    fn as_str(self) -> &'static str;
-    fn is_raw(self) -> bool;
-}
-
 /// Enumerations of the valid prefixes a string literal can have.
 ///
 /// Bytestrings and f-strings are excluded from this enumeration,
 /// as they are represented by different AST nodes.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, is_macro::Is)]
 pub enum StringLiteralPrefix {
     /// Just a regular string with no prefixes
     Empty,
@@ -29,10 +24,6 @@ pub enum StringLiteralPrefix {
 }
 
 impl StringLiteralPrefix {
-    pub fn is_unicode(self) -> bool {
-        matches!(self, Self::Unicode)
-    }
-
     /// Return a `str` representation of the prefix
     pub const fn as_str(self) -> &'static str {
         match self {
@@ -41,20 +32,6 @@ impl StringLiteralPrefix {
             Self::Raw { uppercase: true } => "R",
             Self::Raw { uppercase: false } => "r",
         }
-    }
-
-    pub const fn is_raw(self) -> bool {
-        matches!(self, Self::Raw { .. })
-    }
-}
-
-impl AbstractStringPrefix for StringLiteralPrefix {
-    fn as_str(self) -> &'static str {
-        self.as_str()
-    }
-
-    fn is_raw(self) -> bool {
-        self.is_raw()
     }
 }
 
@@ -92,16 +69,6 @@ impl FStringPrefix {
     }
 }
 
-impl AbstractStringPrefix for FStringPrefix {
-    fn as_str(self) -> &'static str {
-        self.as_str()
-    }
-
-    fn is_raw(self) -> bool {
-        self.is_raw()
-    }
-}
-
 impl fmt::Display for FStringPrefix {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(self.as_str())
@@ -133,16 +100,6 @@ impl ByteStringPrefix {
     /// e.g. `rb"foo"` or `Rb"foo"`
     pub const fn is_raw(self) -> bool {
         matches!(self, Self::Raw { .. })
-    }
-}
-
-impl AbstractStringPrefix for ByteStringPrefix {
-    fn as_str(self) -> &'static str {
-        self.as_str()
-    }
-
-    fn is_raw(self) -> bool {
-        self.is_raw()
     }
 }
 
@@ -190,16 +147,6 @@ impl AnyStringPrefix {
             Self::Bytes(bytestring_prefix) => bytestring_prefix.is_raw(),
             Self::Format(fstring_prefix) => fstring_prefix.is_raw(),
         }
-    }
-}
-
-impl AbstractStringPrefix for AnyStringPrefix {
-    fn as_str(self) -> &'static str {
-        self.as_str()
-    }
-
-    fn is_raw(self) -> bool {
-        self.is_raw()
     }
 }
 

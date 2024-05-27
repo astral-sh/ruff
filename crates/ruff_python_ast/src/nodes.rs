@@ -15,9 +15,7 @@ use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use crate::{
     int,
     str::Quote,
-    str_prefix::{
-        AbstractStringPrefix, AnyStringPrefix, ByteStringPrefix, FStringPrefix, StringLiteralPrefix,
-    },
+    str_prefix::{AnyStringPrefix, ByteStringPrefix, FStringPrefix, StringLiteralPrefix},
     LiteralExpressionRef,
 };
 
@@ -1353,7 +1351,7 @@ impl Ranged for FStringPart {
     }
 }
 
-pub trait AbstractStringFlags: Copy {
+pub trait StringFlags: Copy {
     /// Does the string use single or double quotes in its opener and closer?
     fn quote_style(self) -> Quote;
 
@@ -1363,13 +1361,7 @@ pub trait AbstractStringFlags: Copy {
 
     fn is_raw_string(self) -> bool;
 
-    fn prefix(self) -> impl AbstractStringPrefix;
-
-    #[must_use]
-    fn with_quote_style(self, quotes: Quote) -> Self;
-
-    #[must_use]
-    fn with_triple_quotes(self) -> Self;
+    fn prefix(self) -> AnyStringPrefix;
 
     /// A `str` representation of the quotes used to start and close.
     /// This does not include any prefixes the string has in its opener.
@@ -1514,7 +1506,7 @@ impl FStringFlags {
     }
 }
 
-impl AbstractStringFlags for FStringFlags {
+impl StringFlags for FStringFlags {
     fn quote_style(self) -> Quote {
         self.quote_style()
     }
@@ -1527,16 +1519,8 @@ impl AbstractStringFlags for FStringFlags {
         self.is_raw_string()
     }
 
-    fn prefix(self) -> impl AbstractStringPrefix {
-        self.prefix()
-    }
-
-    fn with_quote_style(self, quotes: Quote) -> Self {
-        self.with_quote_style(quotes)
-    }
-
-    fn with_triple_quotes(self) -> Self {
-        self.with_triple_quotes()
+    fn prefix(self) -> AnyStringPrefix {
+        AnyStringPrefix::Format(self.prefix())
     }
 }
 
@@ -1956,7 +1940,7 @@ impl StringLiteralFlags {
     }
 }
 
-impl AbstractStringFlags for StringLiteralFlags {
+impl StringFlags for StringLiteralFlags {
     fn quote_style(self) -> Quote {
         self.quote_style()
     }
@@ -1969,16 +1953,8 @@ impl AbstractStringFlags for StringLiteralFlags {
         self.is_raw_string()
     }
 
-    fn prefix(self) -> impl AbstractStringPrefix {
-        self.prefix()
-    }
-
-    fn with_quote_style(self, quotes: Quote) -> Self {
-        self.with_quote_style(quotes)
-    }
-
-    fn with_triple_quotes(self) -> Self {
-        self.with_triple_quotes()
+    fn prefix(self) -> AnyStringPrefix {
+        AnyStringPrefix::Regular(self.prefix())
     }
 }
 
@@ -2329,7 +2305,7 @@ impl BytesLiteralFlags {
     }
 }
 
-impl AbstractStringFlags for BytesLiteralFlags {
+impl StringFlags for BytesLiteralFlags {
     fn quote_style(self) -> Quote {
         self.quote_style()
     }
@@ -2342,16 +2318,8 @@ impl AbstractStringFlags for BytesLiteralFlags {
         self.is_raw_string()
     }
 
-    fn prefix(self) -> impl AbstractStringPrefix {
-        self.prefix()
-    }
-
-    fn with_quote_style(self, quotes: Quote) -> Self {
-        self.with_quote_style(quotes)
-    }
-
-    fn with_triple_quotes(self) -> Self {
-        self.with_triple_quotes()
+    fn prefix(self) -> AnyStringPrefix {
+        AnyStringPrefix::Bytes(self.prefix())
     }
 }
 
@@ -2603,7 +2571,7 @@ impl AnyStringFlags {
     }
 }
 
-impl AbstractStringFlags for AnyStringFlags {
+impl StringFlags for AnyStringFlags {
     fn quote_style(self) -> Quote {
         self.quote_style()
     }
@@ -2616,16 +2584,8 @@ impl AbstractStringFlags for AnyStringFlags {
         self.is_raw_string()
     }
 
-    fn prefix(self) -> impl AbstractStringPrefix {
+    fn prefix(self) -> AnyStringPrefix {
         self.prefix()
-    }
-
-    fn with_quote_style(self, quotes: Quote) -> Self {
-        self.with_quote_style(quotes)
-    }
-
-    fn with_triple_quotes(self) -> Self {
-        self.with_triple_quotes()
     }
 }
 

@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use ruff_python_ast::{self as ast, AbstractStringFlags, Expr, StringLiteral};
+use ruff_python_ast::{self as ast, Expr, StringFlags, StringLiteral};
 use ruff_python_literal::cformat::{CFormatPart, CFormatSpec, CFormatStrOrBytes, CFormatString};
 use ruff_text_size::Ranged;
 use rustc_hash::FxHashMap;

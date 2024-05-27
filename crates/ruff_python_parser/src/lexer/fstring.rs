@@ -1,4 +1,4 @@
-use ruff_python_ast::{AbstractStringFlags, AnyStringFlags};
+use ruff_python_ast::{AnyStringFlags, StringFlags};
 
 /// The context representing the current f-string that the lexer is in.
 #[derive(Debug)]
