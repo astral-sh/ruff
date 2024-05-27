@@ -101,25 +101,8 @@ fn get_complexity_number(stmts: &[Stmt]) -> usize {
                     complexity += get_complexity_number(&case.body);
                 }
                 if let Some(last_case) = cases.last() {
-                    if let Pattern::MatchAs(match_as_pattern) = &last_case.pattern {
-                        if match_as_pattern.pattern.is_none() {
-                            // The complexity of an irrefutable pattern is similar to an `else` block of an `if` statement.
-                            // This is either a wildcard pattern or a named catch-all pattern.
-                            //
-                            // For example:
-                            // ```python
-                            // match subject:
-                            //     case 1: ...
-                            //     case _: ...
-                            //
-                            // match subject:
-                            //     case 1: ...
-                            //     case foo: ...
-                            // ```
-                            //
-                            // Irrefutable pattern: https://peps.python.org/pep-0634/#irrefutable-case-blocks
-                            complexity -= 1;
-                        }
+                    if is_irrefutable_pattern(&last_case.pattern) && last_case.guard.is_none() {
+                        complexity -= 1;
                     }
                 }
             }
@@ -155,6 +138,29 @@ fn get_complexity_number(stmts: &[Stmt]) -> usize {
         }
     }
     complexity
+}
+
+fn is_irrefutable_pattern(last_pattern: &Pattern) -> bool {
+    // The complexity of an irrefutable pattern is similar to an `else` block of an `if` statement.
+    // This is either a wildcard pattern or a named catch-all pattern.
+    //
+    // For example:
+    // ```python
+    // match subject:
+    //     case 1: ...
+    //     case _: ...
+    //
+    // match subject:
+    //     case 1: ...
+    //     case foo: ...
+    // ```
+    //
+    // Irrefutable pattern: https://peps.python.org/pep-0634/#irrefutable-case-blocks
+    match last_pattern {
+        Pattern::MatchAs(p) => p.pattern.is_none(),
+        Pattern::MatchOr(p) => p.patterns.iter().any(is_irrefutable_pattern),
+        _ => false,
+    }
 }
 
 pub(crate) fn function_is_too_complex(
@@ -492,6 +498,21 @@ def f():
         case 2:
             print('hello')
         case x:
+            print(x)
+";
+        let stmts = parse_suite(source)?;
+        assert_eq!(get_complexity_number(&stmts), 2);
+        Ok(())
+    }
+
+    #[test]
+    fn match_case_catch_all_with_seuqnece() -> Result<()> {
+        let source = r"
+def f():
+    match subject:
+        case 2:
+            print('hello')
+        case 5 | _:
             print(x)
 ";
         let stmts = parse_suite(source)?;
