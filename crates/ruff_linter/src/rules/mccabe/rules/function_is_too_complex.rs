@@ -97,17 +97,18 @@ fn get_complexity_number(stmts: &[Stmt]) -> usize {
                 complexity += get_complexity_number(orelse);
             }
             Stmt::Match(ast::StmtMatch { cases, .. }) => {
-                let last_index = cases.len() - 1;
-                for (i, case) in cases.iter().enumerate() {
+                for case in cases {
                     complexity += 1;
-                    if let Pattern::MatchAs(match_as_pattern) = &case.pattern {
-                        if match_as_pattern.pattern.is_none() && i == last_index {
+                    complexity += get_complexity_number(&case.body);
+                }
+                if let Some(last_case) = cases.last() {
+                    if let Pattern::MatchAs(match_as_pattern) = &last_case.pattern {
+                        if match_as_pattern.pattern.is_none() {
                             // the catch all `_` or named catch all case doesn't increase
                             // the complexity similar to a plain `else` stmt.
                             complexity -= 1;
                         }
                     }
-                    complexity += get_complexity_number(&case.body);
                 }
             }
             Stmt::Try(ast::StmtTry {
