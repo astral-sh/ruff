@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, ExceptHandler, Pattern, Stmt};
+use ruff_python_ast::{self as ast, ExceptHandler, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -101,7 +101,19 @@ fn get_complexity_number(stmts: &[Stmt]) -> usize {
                     complexity += get_complexity_number(&case.body);
                 }
                 if let Some(last_case) = cases.last() {
-                    if is_irrefutable_pattern(&last_case.pattern) && last_case.guard.is_none() {
+                    // The complexity of an irrefutable pattern is similar to an `else` block of an `if` statement.
+                    //
+                    // For example:
+                    // ```python
+                    // match subject:
+                    //     case 1: ...
+                    //     case _: ...
+                    //
+                    // match subject:
+                    //     case 1: ...
+                    //     case foo: ...
+                    // ```
+                    if last_case.guard.is_none() && last_case.pattern.is_irrefutable() {
                         complexity -= 1;
                     }
                 }
@@ -138,29 +150,6 @@ fn get_complexity_number(stmts: &[Stmt]) -> usize {
         }
     }
     complexity
-}
-
-fn is_irrefutable_pattern(last_pattern: &Pattern) -> bool {
-    // The complexity of an irrefutable pattern is similar to an `else` block of an `if` statement.
-    // This is either a wildcard pattern or a named catch-all pattern.
-    //
-    // For example:
-    // ```python
-    // match subject:
-    //     case 1: ...
-    //     case _: ...
-    //
-    // match subject:
-    //     case 1: ...
-    //     case foo: ...
-    // ```
-    //
-    // Irrefutable pattern: https://peps.python.org/pep-0634/#irrefutable-case-blocks
-    match last_pattern {
-        Pattern::MatchAs(p) => p.pattern.is_none(),
-        Pattern::MatchOr(p) => p.patterns.iter().any(is_irrefutable_pattern),
-        _ => false,
-    }
 }
 
 pub(crate) fn function_is_too_complex(
