@@ -1580,7 +1580,7 @@ impl<'a> IntoIterator for &'a mut FStringElements {
 }
 
 impl Deref for FStringElements {
-    type Target = Vec<FStringElement>;
+    type Target = [FStringElement];
 
     fn deref(&self) -> &Self::Target {
         &self.0
