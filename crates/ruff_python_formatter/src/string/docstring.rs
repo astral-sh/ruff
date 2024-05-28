@@ -1558,7 +1558,7 @@ fn docstring_format_source(
         crate::Comments::from_ast(program.syntax(), source_code, program.comment_ranges());
     let locator = Locator::new(source);
 
-    let ctx = PyFormatContext::new(options, locator.contents(), comments)
+    let ctx = PyFormatContext::new(options, locator.contents(), comments, program.tokens())
         .in_docstring(docstring_quote_style);
     let formatted = crate::format!(ctx, [program.syntax().format()])?;
     formatted

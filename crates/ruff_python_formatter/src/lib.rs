@@ -6,7 +6,7 @@ use ruff_formatter::prelude::*;
 use ruff_formatter::{format, write, FormatError, Formatted, PrintError, Printed, SourceCode};
 use ruff_python_ast::AstNode;
 use ruff_python_ast::Mod;
-use ruff_python_parser::{parse, AsMode, ParseError, ParseErrorType};
+use ruff_python_parser::{parse, AsMode, ParseError, ParseErrorType, Program};
 use ruff_python_trivia::CommentRanges;
 use ruff_source_file::Locator;
 
@@ -114,23 +114,22 @@ pub fn format_module_source(
 ) -> Result<Printed, FormatModuleError> {
     let source_type = options.source_type();
     let program = parse(source, source_type.as_mode())?;
-    let formatted = format_module_ast(program.syntax(), program.comment_ranges(), source, options)?;
+    let formatted = format_module_ast(&program, source, options)?;
     Ok(formatted.print()?)
 }
 
 pub fn format_module_ast<'a>(
-    module: &'a Mod,
-    comment_ranges: &'a CommentRanges,
+    program: &'a Program<Mod>,
     source: &'a str,
     options: PyFormatOptions,
 ) -> FormatResult<Formatted<PyFormatContext<'a>>> {
     let source_code = SourceCode::new(source);
-    let comments = Comments::from_ast(module, source_code, comment_ranges);
+    let comments = Comments::from_ast(program.syntax(), source_code, program.comment_ranges());
     let locator = Locator::new(source);
 
     let formatted = format!(
-        PyFormatContext::new(options, locator.contents(), comments),
-        [module.format()]
+        PyFormatContext::new(options, locator.contents(), comments, program.tokens()),
+        [program.syntax().format()]
     )?;
     formatted
         .context()
@@ -201,8 +200,7 @@ def main() -> None:
         let source_path = "code_inline.py";
         let program = parse(source, source_type.as_mode()).unwrap();
         let options = PyFormatOptions::from_extension(Path::new(source_path));
-        let formatted =
-            format_module_ast(program.syntax(), program.comment_ranges(), source, options).unwrap();
+        let formatted = format_module_ast(&program, source, options).unwrap();
 
         // Uncomment the `dbg` to print the IR.
         // Use `dbg_write!(f, []) instead of `write!(f, [])` in your formatting code to print some IR

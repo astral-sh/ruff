@@ -57,13 +57,8 @@ fn benchmark_formatter(criterion: &mut Criterion) {
                 b.iter(|| {
                     let options = PyFormatOptions::from_extension(Path::new(case.name()))
                         .with_preview(PreviewMode::Enabled);
-                    let formatted = format_module_ast(
-                        program.syntax(),
-                        program.comment_ranges(),
-                        case.code(),
-                        options,
-                    )
-                    .expect("Formatting to succeed");
+                    let formatted = format_module_ast(&program, case.code(), options)
+                        .expect("Formatting to succeed");
 
                     formatted.print().expect("Printing to succeed")
                 });
