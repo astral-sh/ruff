@@ -39,11 +39,6 @@ impl Violation for ByteStringUsage {
         let ByteStringUsage { full_name } = self;
         format!("Do not use `{full_name}`, which has unclear semantics and is deprecated")
     }
-
-    fn fix_title(&self) -> Option<String> {
-        let ByteStringUsage { full_name } = self;
-        Some(format!("Do not use `{full_name}`"))
-    }
 }
 
 /// PYI057
