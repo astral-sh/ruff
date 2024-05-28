@@ -103,7 +103,7 @@ pub fn check_path(
         .any(|rule_code| rule_code.lint_source().is_tokens())
     {
         diagnostics.extend(check_tokens(
-            program.tokens(),
+            &program,
             path,
             locator,
             indexer,
@@ -120,7 +120,13 @@ pub fn check_path(
         .iter_enabled()
         .any(|rule_code| rule_code.lint_source().is_filesystem())
     {
-        diagnostics.extend(check_file_path(path, package, locator, indexer, settings));
+        diagnostics.extend(check_file_path(
+            path,
+            package,
+            locator,
+            program.comment_ranges(),
+            settings,
+        ));
     }
 
     // Run the logical line-based rules.
@@ -209,7 +215,12 @@ pub fn check_path(
         .any(|rule_code| rule_code.lint_source().is_physical_lines())
     {
         diagnostics.extend(check_physical_lines(
-            locator, stylist, indexer, &doc_lines, settings,
+            locator,
+            stylist,
+            indexer,
+            program.comment_ranges(),
+            &doc_lines,
+            settings,
         ));
     }
 
@@ -221,36 +232,56 @@ pub fn check_path(
                 continue;
             }
             let diagnostic = match test_rule {
-                Rule::StableTestRule => test_rules::StableTestRule::diagnostic(locator, indexer),
+                Rule::StableTestRule => {
+                    test_rules::StableTestRule::diagnostic(locator, program.comment_ranges())
+                }
                 Rule::StableTestRuleSafeFix => {
-                    test_rules::StableTestRuleSafeFix::diagnostic(locator, indexer)
+                    test_rules::StableTestRuleSafeFix::diagnostic(locator, program.comment_ranges())
                 }
-                Rule::StableTestRuleUnsafeFix => {
-                    test_rules::StableTestRuleUnsafeFix::diagnostic(locator, indexer)
-                }
+                Rule::StableTestRuleUnsafeFix => test_rules::StableTestRuleUnsafeFix::diagnostic(
+                    locator,
+                    program.comment_ranges(),
+                ),
                 Rule::StableTestRuleDisplayOnlyFix => {
-                    test_rules::StableTestRuleDisplayOnlyFix::diagnostic(locator, indexer)
+                    test_rules::StableTestRuleDisplayOnlyFix::diagnostic(
+                        locator,
+                        program.comment_ranges(),
+                    )
                 }
-                Rule::NurseryTestRule => test_rules::NurseryTestRule::diagnostic(locator, indexer),
-                Rule::PreviewTestRule => test_rules::PreviewTestRule::diagnostic(locator, indexer),
+                Rule::NurseryTestRule => {
+                    test_rules::NurseryTestRule::diagnostic(locator, program.comment_ranges())
+                }
+                Rule::PreviewTestRule => {
+                    test_rules::PreviewTestRule::diagnostic(locator, program.comment_ranges())
+                }
                 Rule::DeprecatedTestRule => {
-                    test_rules::DeprecatedTestRule::diagnostic(locator, indexer)
+                    test_rules::DeprecatedTestRule::diagnostic(locator, program.comment_ranges())
                 }
                 Rule::AnotherDeprecatedTestRule => {
-                    test_rules::AnotherDeprecatedTestRule::diagnostic(locator, indexer)
+                    test_rules::AnotherDeprecatedTestRule::diagnostic(
+                        locator,
+                        program.comment_ranges(),
+                    )
                 }
-                Rule::RemovedTestRule => test_rules::RemovedTestRule::diagnostic(locator, indexer),
-                Rule::AnotherRemovedTestRule => {
-                    test_rules::AnotherRemovedTestRule::diagnostic(locator, indexer)
+                Rule::RemovedTestRule => {
+                    test_rules::RemovedTestRule::diagnostic(locator, program.comment_ranges())
                 }
+                Rule::AnotherRemovedTestRule => test_rules::AnotherRemovedTestRule::diagnostic(
+                    locator,
+                    program.comment_ranges(),
+                ),
                 Rule::RedirectedToTestRule => {
-                    test_rules::RedirectedToTestRule::diagnostic(locator, indexer)
+                    test_rules::RedirectedToTestRule::diagnostic(locator, program.comment_ranges())
                 }
-                Rule::RedirectedFromTestRule => {
-                    test_rules::RedirectedFromTestRule::diagnostic(locator, indexer)
-                }
+                Rule::RedirectedFromTestRule => test_rules::RedirectedFromTestRule::diagnostic(
+                    locator,
+                    program.comment_ranges(),
+                ),
                 Rule::RedirectedFromPrefixTestRule => {
-                    test_rules::RedirectedFromPrefixTestRule::diagnostic(locator, indexer)
+                    test_rules::RedirectedFromPrefixTestRule::diagnostic(
+                        locator,
+                        program.comment_ranges(),
+                    )
                 }
                 _ => unreachable!("All test rules must have an implementation"),
             };
@@ -287,7 +318,7 @@ pub fn check_path(
             &mut diagnostics,
             path,
             locator,
-            indexer.comment_ranges(),
+            program.comment_ranges(),
             &directives.noqa_line_for,
             error.is_none(),
             &per_file_ignores,
@@ -407,7 +438,7 @@ pub fn add_noqa_to_path(
         path,
         &diagnostics,
         &locator,
-        indexer.comment_ranges(),
+        program.comment_ranges(),
         &settings.external,
         &directives.noqa_line_for,
         stylist.line_ending(),

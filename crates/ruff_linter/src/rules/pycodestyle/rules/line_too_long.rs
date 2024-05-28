@@ -1,6 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_index::Indexer;
+use ruff_python_trivia::CommentRanges;
 use ruff_source_file::Line;
 
 use crate::rules::pycodestyle::overlong::Overlong;
@@ -82,14 +82,14 @@ impl Violation for LineTooLong {
 /// E501
 pub(crate) fn line_too_long(
     line: &Line,
-    indexer: &Indexer,
+    comment_ranges: &CommentRanges,
     settings: &LinterSettings,
 ) -> Option<Diagnostic> {
     let limit = settings.pycodestyle.max_line_length;
 
     Overlong::try_from_line(
         line,
-        indexer,
+        comment_ranges,
         limit,
         if settings.pycodestyle.ignore_overlong_task_comments {
             &settings.task_tags

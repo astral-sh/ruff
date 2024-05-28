@@ -166,7 +166,7 @@ fn remove_unused_variable(binding: &Binding, checker: &Checker) -> Option<Fix> {
                     let start = parenthesized_range(
                         target.into(),
                         statement.into(),
-                        checker.indexer().comment_ranges(),
+                        checker.program().comment_ranges(),
                         checker.locator().contents(),
                     )
                     .unwrap_or(target.range())
