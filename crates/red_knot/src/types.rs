@@ -60,7 +60,7 @@ impl Type {
             Type::Unbound => todo!("attribute lookup on Unbound type"),
             Type::Function(_) => todo!("attribute lookup on Function type"),
             Type::Module(module_id) => module_id.get_member(db, name),
-            Type::Class(class_id) => class_id.get_member(db, name),
+            Type::Class(class_id) => class_id.get_class_member(db, name),
             Type::Instance(_) => {
                 // TODO MRO? get_own_instance_member, get_instance_member
                 todo!("attribute lookup on Instance type")
@@ -448,13 +448,13 @@ impl ClassTypeId {
         }
     }
 
-    /// Get own class member or fallback to super-class member.
-    fn get_member(self, db: &dyn SemanticDb, name: &Name) -> QueryResult<Option<Type>> {
+    /// Get own class member or fall back to super-class member.
+    fn get_class_member(self, db: &dyn SemanticDb, name: &Name) -> QueryResult<Option<Type>> {
         self.get_own_class_member(db, name)
             .or_else(|_| self.get_super_class_member(db, name))
     }
 
-    // TODO: get_own_instance_member, get_class_member, get_instance_member
+    // TODO: get_own_instance_member, get_instance_member
 }
 
 #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
