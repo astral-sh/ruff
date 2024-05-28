@@ -36,7 +36,6 @@ if TYPE_CHECKING:
         Project,
     )
 
-
 # Matches lines that are summaries rather than diagnostics
 CHECK_SUMMARY_LINE_RE = re.compile(r"^(Found \d+ error.*)|(.* fixable with .*)$")
 
