@@ -124,10 +124,20 @@ pub fn infer_definition_type(
             let parsed = parse(db.upcast(), file_id)?;
             let ast = parsed.ast();
             let node = node_key.resolve_unwrap(ast.as_any_node_ref());
-            // TODO handle unpacking assignment correctly
+            // TODO handle unpacking assignment correctly (here and for AnnotatedAssignment case, below)
             infer_expr_type(db, file_id, &node.value)
         }
-        _ => todo!("other kinds of definitions"),
+        Definition::AnnotatedAssignment(node_key) => {
+            let parsed = parse(db.upcast(), file_id)?;
+            let ast = parsed.ast();
+            let node = node_key.resolve_unwrap(ast.as_any_node_ref());
+            // TODO actually look at the annotation
+            let Some(value) = &node.value else {
+                return Ok(Type::Unknown);
+            };
+            // TODO handle unpacking assignment correctly (here and for Assignment case, above)
+            infer_expr_type(db, file_id, value)
+        }
     }
 }
 
