@@ -1,5 +1,5 @@
-use ruff_python_ast::{PySourceType, Stmt};
-use ruff_python_parser::{lexer, AsMode, Tok};
+use ruff_python_ast::Stmt;
+use ruff_python_parser::{TokenKind, Tokens};
 use ruff_python_trivia::PythonWhitespace;
 use ruff_source_file::{Locator, UniversalNewlines};
 use ruff_text_size::Ranged;
@@ -8,31 +8,23 @@ use crate::rules::isort::types::TrailingComma;
 
 /// Return `true` if a `Stmt::ImportFrom` statement ends with a magic
 /// trailing comma.
-pub(super) fn trailing_comma(
-    stmt: &Stmt,
-    locator: &Locator,
-    source_type: PySourceType,
-) -> TrailingComma {
-    let contents = locator.slice(stmt);
+pub(super) fn trailing_comma(stmt: &Stmt, tokens: &Tokens) -> TrailingComma {
     let mut count = 0u32;
     let mut trailing_comma = TrailingComma::Absent;
-    for (tok, _) in lexer::lex_starts_at(contents, source_type.as_mode(), stmt.start()).flatten() {
-        if matches!(tok, Tok::Lpar) {
-            count = count.saturating_add(1);
-        }
-        if matches!(tok, Tok::Rpar) {
-            count = count.saturating_sub(1);
+    for token in tokens.tokens_in_range(stmt.range()) {
+        match token.kind() {
+            TokenKind::Lpar => count = count.saturating_add(1),
+            TokenKind::Rpar => count = count.saturating_sub(1),
+            _ => {}
         }
         if count == 1 {
-            if matches!(
-                tok,
-                Tok::NonLogicalNewline | Tok::Indent | Tok::Dedent | Tok::Comment(_)
-            ) {
-                continue;
-            } else if matches!(tok, Tok::Comma) {
-                trailing_comma = TrailingComma::Present;
-            } else {
-                trailing_comma = TrailingComma::Absent;
+            match token.kind() {
+                TokenKind::NonLogicalNewline
+                | TokenKind::Indent
+                | TokenKind::Dedent
+                | TokenKind::Comment => continue,
+                TokenKind::Comma => trailing_comma = TrailingComma::Present,
+                _ => trailing_comma = TrailingComma::Absent,
             }
         }
     }

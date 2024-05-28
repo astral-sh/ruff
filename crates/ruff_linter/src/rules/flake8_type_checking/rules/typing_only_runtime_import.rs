@@ -491,7 +491,6 @@ fn fix_imports(checker: &Checker, node_id: NodeId, imports: &[ImportBinding]) ->
             },
             at,
             checker.semantic(),
-            checker.source_type,
         )?
         .into_edits();
 

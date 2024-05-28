@@ -2,7 +2,7 @@
 use std::ops::Add;
 
 use ruff_python_ast::{PySourceType, Stmt};
-use ruff_python_parser::{lexer, AsMode, Tok};
+use ruff_python_parser::{lexer, AsMode, Tok, TokenKind, Tokens};
 use ruff_text_size::{Ranged, TextSize};
 
 use ruff_diagnostics::Edit;
@@ -145,7 +145,7 @@ impl<'a> Insertion<'a> {
         mut location: TextSize,
         locator: &Locator<'a>,
         stylist: &Stylist,
-        source_type: PySourceType,
+        tokens: &Tokens,
     ) -> Insertion<'a> {
         enum Awaiting {
             Colon(u32),
@@ -154,40 +154,38 @@ impl<'a> Insertion<'a> {
         }
 
         let mut state = Awaiting::Colon(0);
-        for (tok, range) in
-            lexer::lex_starts_at(locator.after(location), source_type.as_mode(), location).flatten()
-        {
+        for token in tokens.after(location) {
             match state {
                 // Iterate until we find the colon indicating the start of the block body.
-                Awaiting::Colon(depth) => match tok {
-                    Tok::Colon if depth == 0 => {
+                Awaiting::Colon(depth) => match token.kind() {
+                    TokenKind::Colon if depth == 0 => {
                         state = Awaiting::Newline;
                     }
-                    Tok::Lpar | Tok::Lbrace | Tok::Lsqb => {
+                    TokenKind::Lpar | TokenKind::Lbrace | TokenKind::Lsqb => {
                         state = Awaiting::Colon(depth.saturating_add(1));
                     }
-                    Tok::Rpar | Tok::Rbrace | Tok::Rsqb => {
+                    TokenKind::Rpar | TokenKind::Rbrace | TokenKind::Rsqb => {
                         state = Awaiting::Colon(depth.saturating_sub(1));
                     }
                     _ => {}
                 },
                 // Once we've seen the colon, we're looking for a newline; otherwise, there's no
                 // block body (e.g. `if True: pass`).
-                Awaiting::Newline => match tok {
-                    Tok::Comment(..) => {}
-                    Tok::Newline => {
+                Awaiting::Newline => match token.kind() {
+                    TokenKind::Comment(..) => {}
+                    TokenKind::Newline => {
                         state = Awaiting::Indent;
                     }
                     _ => {
-                        location = range.start();
+                        location = token.start();
                         break;
                     }
                 },
                 // Once we've seen the newline, we're looking for the indentation of the block body.
-                Awaiting::Indent => match tok {
-                    Tok::Comment(..) => {}
-                    Tok::NonLogicalNewline => {}
-                    Tok::Indent => {
+                Awaiting::Indent => match token.kind() {
+                    TokenKind::Comment(..) => {}
+                    TokenKind::NonLogicalNewline => {}
+                    TokenKind::Indent => {
                         // This is like:
                         // ```python
                         // if True:
@@ -196,13 +194,13 @@ impl<'a> Insertion<'a> {
                         // Where `range` is the indentation before the `pass` token.
                         return Insertion::indented(
                             "",
-                            range.start(),
+                            token.start(),
                             stylist.line_ending().as_str(),
-                            locator.slice(range),
+                            locator.slice(token),
                         );
                     }
                     _ => {
-                        location = range.start();
+                        location = token.start();
                         break;
                     }
                 },
@@ -442,10 +440,10 @@ x = 1
     #[test]
     fn start_of_block() {
         fn insert(contents: &str, offset: TextSize) -> Insertion {
-            let tokens = ruff_python_parser::tokenize(contents, Mode::Module);
+            let program = ruff_python_parser::parse_module(contents).unwrap();
             let locator = Locator::new(contents);
-            let stylist = Stylist::from_tokens(&tokens, &locator);
-            Insertion::start_of_block(offset, &locator, &stylist, PySourceType::default())
+            let stylist = Stylist::from_tokens(&program, &locator);
+            Insertion::start_of_block(offset, &locator, &stylist, program.tokens())
         }
 
         let contents = "if True: pass";

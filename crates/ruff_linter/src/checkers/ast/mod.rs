@@ -253,7 +253,7 @@ impl<'a> Checker<'a> {
             locator,
             stylist,
             indexer,
-            importer: Importer::new(program.suite(), locator, stylist),
+            importer: Importer::new(program, locator, stylist),
             semantic: SemanticModel::new(&settings.typing_modules, path, module),
             visit: deferred::Visit::default(),
             analyze: deferred::Analyze::default(),
