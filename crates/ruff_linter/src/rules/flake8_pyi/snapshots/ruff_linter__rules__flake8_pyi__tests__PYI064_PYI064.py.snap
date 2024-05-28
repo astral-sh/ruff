@@ -1,0 +1,97 @@
+---
+source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
+---
+PYI064.py:3:1: PYI064 [*] `Final[Literal[True]]` can be replaced with a bare `Final`
+  |
+1 | from typing import Final, Literal
+2 | 
+3 | x: Final[Literal[True]] = True  # PYI064
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI064
+4 | y: Final[Literal[None]] = None  # PYI064
+5 | z: Final[Literal[  # PYI064
+  |
+  = help: Replace with `Final`
+
+ℹ Safe fix
+1 1 | from typing import Final, Literal
+2 2 | 
+3   |-x: Final[Literal[True]] = True  # PYI064
+  3 |+x: Final = True  # PYI064
+4 4 | y: Final[Literal[None]] = None  # PYI064
+5 5 | z: Final[Literal[  # PYI064
+6 6 |     "this is a really long literal, that won't be rendered in the issue text"
+
+PYI064.py:4:1: PYI064 [*] `Final[Literal[None]]` can be replaced with a bare `Final`
+  |
+3 | x: Final[Literal[True]] = True  # PYI064
+4 | y: Final[Literal[None]] = None  # PYI064
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI064
+5 | z: Final[Literal[  # PYI064
+6 |     "this is a really long literal, that won't be rendered in the issue text"
+  |
+  = help: Replace with `Final`
+
+ℹ Safe fix
+1 1 | from typing import Final, Literal
+2 2 | 
+3 3 | x: Final[Literal[True]] = True  # PYI064
+4   |-y: Final[Literal[None]] = None  # PYI064
+  4 |+y: Final = None  # PYI064
+5 5 | z: Final[Literal[  # PYI064
+6 6 |     "this is a really long literal, that won't be rendered in the issue text"
+7 7 | ]] = "this is a really long literal, that won't be rendered in the issue text"
+
+PYI064.py:5:1: PYI064 [*] `Final[Literal[...]]` can be replaced with a bare `Final`
+  |
+3 |   x: Final[Literal[True]] = True  # PYI064
+4 |   y: Final[Literal[None]] = None  # PYI064
+5 | / z: Final[Literal[  # PYI064
+6 | |     "this is a really long literal, that won't be rendered in the issue text"
+7 | | ]] = "this is a really long literal, that won't be rendered in the issue text"
+  | |______________________________________________________________________________^ PYI064
+8 |   
+9 |   # This should be fixable, and marked as safe
+  |
+  = help: Replace with `Final`
+
+ℹ Safe fix
+2 2 | 
+3 3 | x: Final[Literal[True]] = True  # PYI064
+4 4 | y: Final[Literal[None]] = None  # PYI064
+5   |-z: Final[Literal[  # PYI064
+6   |-    "this is a really long literal, that won't be rendered in the issue text"
+7   |-]] = "this is a really long literal, that won't be rendered in the issue text"
+  5 |+z: Final = "this is a really long literal, that won't be rendered in the issue text"
+8 6 | 
+9 7 | # This should be fixable, and marked as safe
+10 8 | w1: Final[Literal[123]]  # PYI064
+
+PYI064.py:10:1: PYI064 [*] `Final[Literal[123]]` can be replaced with a bare `Final`
+   |
+ 9 | # This should be fixable, and marked as safe
+10 | w1: Final[Literal[123]]  # PYI064
+   | ^^^^^^^^^^^^^^^^^^^^^^^ PYI064
+11 | 
+12 | # This should not be fixable
+   |
+   = help: Replace with `Final`
+
+ℹ Safe fix
+7  7  | ]] = "this is a really long literal, that won't be rendered in the issue text"
+8  8  | 
+9  9  | # This should be fixable, and marked as safe
+10    |-w1: Final[Literal[123]]  # PYI064
+   10 |+w1: Final = 123  # PYI064
+11 11 | 
+12 12 | # This should not be fixable
+13 13 | w2: Final[Literal[123]] = "random value"  # PYI064
+
+PYI064.py:13:1: PYI064 `Final[Literal[123]]` can be replaced with a bare `Final`
+   |
+12 | # This should not be fixable
+13 | w2: Final[Literal[123]] = "random value"  # PYI064
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI064
+14 | 
+15 | n1: Final[Literal[True, False]] = True # No issue here
+   |
+   = help: Replace with `Final`
