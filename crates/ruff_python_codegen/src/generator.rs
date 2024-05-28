@@ -1416,7 +1416,7 @@ impl<'a> Generator<'a> {
 #[cfg(test)]
 mod tests {
     use ruff_python_ast::{str::Quote, Mod, ModModule};
-    use ruff_python_parser::{self, parse_suite, Mode};
+    use ruff_python_parser::{self, parse_module, Mode};
     use ruff_source_file::LineEnding;
 
     use crate::stylist::Indentation;
@@ -1427,9 +1427,9 @@ mod tests {
         let indentation = Indentation::default();
         let quote = Quote::default();
         let line_ending = LineEnding::default();
-        let stmt = parse_suite(contents).unwrap();
+        let module = parse_module(contents).unwrap();
         let mut generator = Generator::new(&indentation, quote, line_ending);
-        generator.unparse_suite(&stmt);
+        generator.unparse_suite(module.suite());
         generator.generate()
     }
 
@@ -1439,9 +1439,9 @@ mod tests {
         line_ending: LineEnding,
         contents: &str,
     ) -> String {
-        let stmt = parse_suite(contents).unwrap();
+        let module = parse_module(contents).unwrap();
         let mut generator = Generator::new(indentation, quote, line_ending);
-        generator.unparse_suite(&stmt);
+        generator.unparse_suite(module.suite());
         generator.generate()
     }
 
@@ -1449,8 +1449,8 @@ mod tests {
         let indentation = Indentation::default();
         let quote = Quote::default();
         let line_ending = LineEnding::default();
-        let ast = ruff_python_parser::parse(contents, Mode::Ipython).unwrap();
-        let Mod::Module(ModModule { body, .. }) = ast else {
+        let program = ruff_python_parser::parse(contents, Mode::Ipython).unwrap();
+        let Mod::Module(ModModule { body, .. }) = program.into_syntax() else {
             panic!("Source code didn't return ModModule")
         };
         let [stmt] = body.as_slice() else {

@@ -7,7 +7,7 @@ use ruff_formatter::{
 use ruff_python_ast::visitor::preorder::{walk_body, PreorderVisitor, TraversalSignal};
 use ruff_python_ast::{AnyNode, AnyNodeRef, Stmt, StmtMatch, StmtTry};
 use ruff_python_index::tokens_and_ranges;
-use ruff_python_parser::{parse_tokens, AsMode, ParseError, ParseErrorType};
+use ruff_python_parser::{parse, parse_tokens, AsMode, ParseError, ParseErrorType};
 use ruff_python_trivia::{indentation_at_offset, BackwardsTokenizer, SimpleToken, SimpleTokenKind};
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
@@ -71,18 +71,11 @@ pub fn format_range(
         return Ok(PrintedRange::new(formatted.into_code(), range));
     }
 
-    let (tokens, comment_ranges) =
-        tokens_and_ranges(source, options.source_type()).map_err(|err| ParseError {
-            location: err.location(),
-            error: ParseErrorType::Lexical(err.into_error()),
-        })?;
-
     assert_valid_char_boundaries(range, source);
 
-    let module = parse_tokens(tokens, source, options.source_type().as_mode())?;
-    let root = AnyNode::from(module);
+    let program = parse(source, options.source_type().as_mode())?;
     let source_code = SourceCode::new(source);
-    let comments = Comments::from_ast(root.as_ref(), source_code, &comment_ranges);
+    let comments = Comments::from_ast(program.syntax(), source_code, program.comment_ranges());
 
     let mut context = PyFormatContext::new(
         options.with_source_map_generation(SourceMapGeneration::Enabled),
@@ -90,13 +83,14 @@ pub fn format_range(
         comments,
     );
 
-    let (enclosing_node, base_indent) = match find_enclosing_node(range, root.as_ref(), &context) {
-        EnclosingNode::Node { node, indent_level } => (node, indent_level),
-        EnclosingNode::Suppressed => {
-            // The entire range falls into a suppressed range. There's nothing to format.
-            return Ok(PrintedRange::empty());
-        }
-    };
+    let (enclosing_node, base_indent) =
+        match find_enclosing_node(range, AnyNodeRef::from(program.syntax()), &context) {
+            EnclosingNode::Node { node, indent_level } => (node, indent_level),
+            EnclosingNode::Suppressed => {
+                // The entire range falls into a suppressed range. There's nothing to format.
+                return Ok(PrintedRange::empty());
+            }
+        };
 
     let narrowed_range = narrow_range(range, enclosing_node, &context);
     assert_valid_char_boundaries(narrowed_range, source);

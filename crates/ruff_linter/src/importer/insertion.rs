@@ -321,7 +321,7 @@ mod tests {
 
     use ruff_python_ast::PySourceType;
     use ruff_python_codegen::Stylist;
-    use ruff_python_parser::{parse_suite, Mode};
+    use ruff_python_parser::{parse, parse_module, Mode};
     use ruff_source_file::{LineEnding, Locator};
     use ruff_text_size::TextSize;
 
@@ -330,11 +330,11 @@ mod tests {
     #[test]
     fn start_of_file() -> Result<()> {
         fn insert(contents: &str) -> Result<Insertion> {
-            let program = parse_suite(contents)?;
+            let suite = parse_module(contents)?.into_suite();
             let tokens = ruff_python_parser::tokenize(contents, Mode::Module);
             let locator = Locator::new(contents);
             let stylist = Stylist::from_tokens(&tokens, &locator);
-            Ok(Insertion::start_of_file(&program, &locator, &stylist))
+            Ok(Insertion::start_of_file(&suite, &locator, &stylist))
         }
 
         let contents = "";

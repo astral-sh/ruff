@@ -6,7 +6,7 @@ use ruff_python_ast::helpers::is_docstring_stmt;
 use ruff_python_ast::imports::{Alias, AnyImport, FutureImport, Import, ImportFrom};
 use ruff_python_ast::{self as ast, PySourceType, Stmt, Suite};
 use ruff_python_codegen::Stylist;
-use ruff_python_parser::parse_suite;
+use ruff_python_parser::{parse_module, Program};
 use ruff_source_file::Locator;
 use ruff_text_size::{TextRange, TextSize};
 
@@ -135,7 +135,7 @@ pub(crate) fn add_required_imports(
         .required_imports
         .iter()
         .flat_map(|required_import| {
-            let Ok(body) = parse_suite(required_import) else {
+            let Ok(body) = parse_module(required_import).map(Program::into_suite) else {
                 error!("Failed to parse required import: `{}`", required_import);
                 return vec![];
             };
