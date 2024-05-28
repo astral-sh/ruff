@@ -32,8 +32,10 @@ use itertools::Itertools;
 use log::debug;
 use ruff_python_ast::{
     self as ast, AnyParameterRef, Comprehension, ElifElseClause, ExceptHandler, Expr, ExprContext,
-    FStringElement, Keyword, MatchCase, Parameter, Parameters, Pattern, Stmt, Suite, UnaryOp,
+    FStringElement, Keyword, MatchCase, ModModule, Parameter, Parameters, Pattern, Stmt, Suite,
+    UnaryOp,
 };
+use ruff_python_parser::Program;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use ruff_diagnostics::{Diagnostic, IsolationLevel};
@@ -174,6 +176,8 @@ impl ExpectedDocstringKind {
 }
 
 pub(crate) struct Checker<'a> {
+    /// The parsed [`Program`].
+    program: &'a Program<ModModule>,
     /// The [`Path`] to the file under analysis.
     path: &'a Path,
     /// The [`Path`] to the package containing the current file.
@@ -223,6 +227,7 @@ pub(crate) struct Checker<'a> {
 impl<'a> Checker<'a> {
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn new(
+        program: &'a Program<ModModule>,
         settings: &'a LinterSettings,
         noqa_line_for: &'a NoqaMapping,
         noqa: flags::Noqa,
@@ -232,12 +237,12 @@ impl<'a> Checker<'a> {
         locator: &'a Locator,
         stylist: &'a Stylist,
         indexer: &'a Indexer,
-        importer: Importer<'a>,
         source_type: PySourceType,
         cell_offsets: Option<&'a CellOffsets>,
         notebook_index: Option<&'a NotebookIndex>,
     ) -> Checker<'a> {
         Checker {
+            program,
             settings,
             noqa_line_for,
             noqa,
@@ -248,7 +253,7 @@ impl<'a> Checker<'a> {
             locator,
             stylist,
             indexer,
-            importer,
+            importer: Importer::new(program.suite(), locator, stylist),
             semantic: SemanticModel::new(&settings.typing_modules, path, module),
             visit: deferred::Visit::default(),
             analyze: deferred::Analyze::default(),
@@ -316,6 +321,11 @@ impl<'a> Checker<'a> {
         } else {
             SourceRow::SourceFile { line }
         }
+    }
+
+    /// The [`Program`] for the current file, which contains the tokens, AST, and more.
+    pub(crate) const fn program(&self) -> &'a Program<ModModule> {
+        self.program
     }
 
     /// The [`Locator`] for the current file, which enables extraction of source code from byte
@@ -2321,7 +2331,7 @@ impl<'a> Checker<'a> {
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn check_ast(
-    python_ast: &Suite,
+    program: &Program<ModModule>,
     locator: &Locator,
     stylist: &Stylist,
     indexer: &Indexer,
@@ -2351,10 +2361,11 @@ pub(crate) fn check_ast(
         } else {
             ModuleSource::File(path)
         },
-        python_ast,
+        python_ast: program.suite(),
     };
 
     let mut checker = Checker::new(
+        program,
         settings,
         noqa_line_for,
         noqa,
@@ -2364,7 +2375,6 @@ pub(crate) fn check_ast(
         locator,
         stylist,
         indexer,
-        Importer::new(python_ast, locator, stylist),
         source_type,
         cell_offsets,
         notebook_index,
@@ -2372,8 +2382,8 @@ pub(crate) fn check_ast(
     checker.bind_builtins();
 
     // Iterate over the AST.
-    checker.visit_module(python_ast);
-    checker.visit_body(python_ast);
+    checker.visit_module(program.suite());
+    checker.visit_body(program.suite());
 
     // Visit any deferred syntax nodes. Take care to visit in order, such that we avoid adding
     // new deferred nodes after visiting nodes of that kind. For example, visiting a deferred

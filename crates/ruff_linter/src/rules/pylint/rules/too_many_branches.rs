@@ -254,13 +254,13 @@ pub(crate) fn too_many_branches(
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
-    use ruff_python_parser::parse_suite;
+    use ruff_python_parser::parse_module;
 
     use super::num_branches;
 
     fn test_helper(source: &str, expected_num_branches: usize) -> Result<()> {
-        let branches = parse_suite(source)?;
-        assert_eq!(num_branches(&branches), expected_num_branches);
+        let branches = parse_module(source)?.suite();
+        assert_eq!(num_branches(branches), expected_num_branches);
         Ok(())
     }
 
