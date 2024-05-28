@@ -1,10 +1,11 @@
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
 use ruff_python_semantic::analyze::typing::resolve_assignment;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::fix::edits::{remove_argument, Parentheses};
 
 /// ## What it does
 /// Checks for FastApi routes that uses the optional `response_model` parameter with the same type as the return type.
@@ -47,10 +48,14 @@ use crate::checkers::ast::Checker;
 #[violation]
 pub struct FastApiRedundantResponseModel;
 
-impl Violation for FastApiRedundantResponseModel {
+impl AlwaysFixableViolation for FastApiRedundantResponseModel {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("FastAPI route with redundant response_model parameter")
+        format!("FastAPI route with redundant response_model argument")
+    }
+
+    fn fix_title(&self) -> String {
+        "Remove redundant response_model argument".to_string()
     }
 }
 
@@ -101,9 +106,17 @@ pub(crate) fn fastapi_redundant_response_model(
         if !is_response_model_redundant {
             continue;
         }
-        checker.diagnostics.push(Diagnostic::new(
-            FastApiRedundantResponseModel,
-            response_model_arg.range(),
-        ));
+        let mut diagnostic =
+            Diagnostic::new(FastApiRedundantResponseModel, response_model_arg.range());
+        diagnostic.try_set_fix(|| {
+            remove_argument(
+                response_model_arg,
+                &call.arguments,
+                Parentheses::Preserve,
+                checker.locator().contents(),
+            )
+            .map(Fix::unsafe_edit)
+        });
+        checker.diagnostics.push(diagnostic)
     }
 }
