@@ -74,8 +74,8 @@ impl Type {
                 todo!("attribute lookup on Union type")
             }
             Type::Intersection(_) => {
-                // TODO return a type IFF all of the intersected-types have the member; but what
-                // type?
+                // TODO perform the get_member on each type in the intersection
+                // TODO return the intersection of those results
                 todo!("attribute lookup on Intersection type")
             }
         }
