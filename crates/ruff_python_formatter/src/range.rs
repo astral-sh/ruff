@@ -81,6 +81,7 @@ pub fn format_range(
         options.with_source_map_generation(SourceMapGeneration::Enabled),
         source,
         comments,
+        program.tokens(),
     );
 
     let (enclosing_node, base_indent) =
