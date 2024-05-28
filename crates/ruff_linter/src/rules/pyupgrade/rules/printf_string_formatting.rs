@@ -352,7 +352,7 @@ pub(crate) fn printf_string_formatting(
     let mut num_positional_arguments = 0;
     let mut num_keyword_arguments = 0;
     let mut format_strings: Vec<(TextRange, String)> =
-        Vec::with_capacity(string_expr.value.count());
+        Vec::with_capacity(string_expr.value.as_slice().len());
 
     // Parse each string segment.
     for string_literal in &string_expr.value {

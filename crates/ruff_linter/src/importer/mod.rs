@@ -7,8 +7,8 @@ use std::error::Error;
 
 use anyhow::Result;
 use libcst_native::{ImportAlias, Name, NameOrAttribute};
-use ruff_python_ast::{self as ast, PySourceType, Stmt};
-use ruff_python_parser::Tokens;
+use ruff_python_ast::{self as ast, ModModule, Stmt};
+use ruff_python_parser::{Program, Tokens};
 use ruff_text_size::{Ranged, TextSize};
 
 use ruff_diagnostics::Edit;
@@ -42,14 +42,13 @@ pub(crate) struct Importer<'a> {
 
 impl<'a> Importer<'a> {
     pub(crate) fn new(
-        python_ast: &'a [Stmt],
-        tokens: &'a Tokens,
+        program: &'a Program<ModModule>,
         locator: &'a Locator<'a>,
         stylist: &'a Stylist<'a>,
     ) -> Self {
         Self {
-            python_ast,
-            tokens,
+            python_ast: program.suite(),
+            tokens: program.tokens(),
             locator,
             stylist,
             runtime_imports: Vec::default(),
@@ -126,7 +125,6 @@ impl<'a> Importer<'a> {
         import: &ImportedMembers,
         at: TextSize,
         semantic: &SemanticModel,
-        source_type: PySourceType,
     ) -> Result<TypingImportEdit> {
         // Generate the modified import statement.
         let content = fix::codemods::retain_imports(
@@ -183,7 +181,7 @@ impl<'a> Importer<'a> {
         // Add the import to a `TYPE_CHECKING` block.
         let add_import_edit = if let Some(block) = self.preceding_type_checking_block(at) {
             // Add the import to the `TYPE_CHECKING` block.
-            self.add_to_type_checking_block(&content, block.start(), source_type)
+            self.add_to_type_checking_block(&content, block.start())
         } else {
             // Add the import to a new `TYPE_CHECKING` block.
             self.add_type_checking_block(
