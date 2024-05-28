@@ -4,8 +4,6 @@ use crate::server::client::{Notifier, Requester};
 use crate::server::Result;
 use crate::session::Session;
 use crate::TextDocument;
-use anyhow::anyhow;
-use lsp_server::ErrorCode;
 use lsp_types as types;
 use lsp_types::notification as notif;
 
@@ -30,14 +28,9 @@ impl super::SyncNotificationHandler for DidOpen {
                 },
         }: types::DidOpenTextDocumentParams,
     ) -> Result<()> {
-        let document_path: std::path::PathBuf = uri
-            .to_file_path()
-            .map_err(|()| anyhow!("expected document URI {uri} to be a valid file path"))
-            .with_failure_code(ErrorCode::InvalidParams)?;
-
         let document = TextDocument::new(text, version);
 
-        session.open_text_document(document_path, document);
+        session.open_text_document(uri.clone(), document);
 
         // Publish diagnostics if the client doesnt support pull diagnostics
         if !session.resolved_client_capabilities().pull_diagnostics {

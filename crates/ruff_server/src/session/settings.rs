@@ -7,7 +7,7 @@ use serde::Deserialize;
 use ruff_linter::{line_width::LineLength, RuleSelector};
 
 /// Maps a workspace URI to its associated client settings. Used during server initialization.
-pub(crate) type WorkspaceSettingsMap = FxHashMap<PathBuf, ClientSettings>;
+pub(crate) type WorkspaceSettingsMap = FxHashMap<Url, ClientSettings>;
 
 /// Resolved client settings for a specific document. These settings are meant to be
 /// used directly by the server, and are *not* a 1:1 representation with how the client
@@ -170,12 +170,7 @@ impl AllSettings {
             workspace_settings: workspace_settings.map(|workspace_settings| {
                 workspace_settings
                     .into_iter()
-                    .map(|settings| {
-                        (
-                            settings.workspace.to_file_path().unwrap(),
-                            settings.settings,
-                        )
-                    })
+                    .map(|settings| (settings.workspace, settings.settings))
                     .collect()
             }),
         }
@@ -357,6 +352,7 @@ mod tests {
 
     use super::*;
 
+    #[allow(dead_code)]
     const VS_CODE_INIT_OPTIONS_FIXTURE: &str =
         include_str!("../../resources/test/fixtures/settings/vs_code_initialization_options.json");
     const GLOBAL_ONLY_INIT_OPTIONS_FIXTURE: &str =
@@ -369,6 +365,7 @@ mod tests {
     }
 
     #[cfg_attr(not(windows), test)]
+    #[allow(dead_code)]
     fn test_vs_code_init_options_deserialize() {
         let options: InitializationOptions = deserialize_fixture(VS_CODE_INIT_OPTIONS_FIXTURE);
 
@@ -554,13 +551,15 @@ mod tests {
     }
 
     #[cfg_attr(not(windows), test)]
+    #[allow(dead_code)]
     fn test_vs_code_workspace_settings_resolve() {
         let options = deserialize_fixture(VS_CODE_INIT_OPTIONS_FIXTURE);
         let AllSettings {
             global_settings,
             workspace_settings,
         } = AllSettings::from_init_options(options);
-        let path = PathBuf::from_str("/Users/test/projects/pandas").expect("path should be valid");
+        let path =
+            Url::from_str("file:///Users/test/projects/pandas").expect("path should be valid");
         let workspace_settings = workspace_settings.expect("workspace settings should exist");
         assert_eq!(
             ResolvedClientSettings::with_workspace(
@@ -591,7 +590,8 @@ mod tests {
                 }
             }
         );
-        let path = PathBuf::from_str("/Users/test/projects/scipy").expect("path should be valid");
+        let path =
+            Url::from_str("file:///Users/test/projects/scipy").expect("path should be valid");
         assert_eq!(
             ResolvedClientSettings::with_workspace(
                 workspace_settings

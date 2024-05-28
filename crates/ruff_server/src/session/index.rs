@@ -1,10 +1,7 @@
 use anyhow::anyhow;
+use lsp_types::Url;
 use rustc_hash::FxHashMap;
-use std::{
-    collections::BTreeMap,
-    path::{Path, PathBuf},
-    sync::Arc,
-};
+use std::{collections::BTreeMap, path::Path, sync::Arc};
 
 use crate::{
     edit::{DocumentKey, DocumentVersion, NotebookDocument},
@@ -20,9 +17,9 @@ mod ruff_settings;
 
 pub(crate) use ruff_settings::RuffSettings;
 
-type DocumentIndex = FxHashMap<PathBuf, DocumentController>;
-type NotebookCellIndex = FxHashMap<lsp_types::Url, PathBuf>;
-type SettingsIndex = BTreeMap<PathBuf, WorkspaceSettings>;
+type DocumentIndex = FxHashMap<Url, DocumentController>;
+type NotebookCellIndex = FxHashMap<Url, Url>;
+type SettingsIndex = BTreeMap<Url, WorkspaceSettings>;
 
 /// Stores and tracks all open documents in a session, along with their associated settings.
 #[derive(Default)]
@@ -53,14 +50,14 @@ enum DocumentController {
 #[derive(Clone)]
 pub(crate) enum DocumentQuery {
     Text {
-        file_path: PathBuf,
+        file_path: Url,
         document: Arc<TextDocument>,
         settings: Arc<RuffSettings>,
     },
     Notebook {
         /// The selected notebook cell, if it exists.
-        cell_uri: Option<lsp_types::Url>,
-        file_path: PathBuf,
+        cell_uri: Option<Url>,
+        file_path: Url,
         notebook: Arc<NotebookDocument>,
         settings: Arc<RuffSettings>,
     },
@@ -68,7 +65,7 @@ pub(crate) enum DocumentQuery {
 
 impl Index {
     pub(super) fn new(
-        workspace_folders: Vec<(PathBuf, ClientSettings)>,
+        workspace_folders: Vec<(Url, ClientSettings)>,
         global_settings: &ClientSettings,
     ) -> Self {
         let mut settings_index = BTreeMap::new();
@@ -88,22 +85,18 @@ impl Index {
         }
     }
 
-    pub(super) fn text_document_urls(&self) -> impl Iterator<Item = lsp_types::Url> + '_ {
+    pub(super) fn text_document_urls(&self) -> impl Iterator<Item = Url> + '_ {
         self.documents
             .iter()
             .filter(|(_, doc)| doc.as_text().is_some())
-            .map(|(path, _)| {
-                lsp_types::Url::from_file_path(path).expect("valid file path should convert to URL")
-            })
+            .map(|(path, _)| path.clone())
     }
 
-    pub(super) fn notebook_document_urls(&self) -> impl Iterator<Item = lsp_types::Url> + '_ {
+    pub(super) fn notebook_document_urls(&self) -> impl Iterator<Item = Url> + '_ {
         self.documents
             .iter()
             .filter(|(_, doc)| doc.as_notebook().is_some())
-            .map(|(path, _)| {
-                lsp_types::Url::from_file_path(path).expect("valid file path should convert to URL")
-            })
+            .map(|(path, _)| path.clone())
     }
 
     pub(super) fn update_text_document(
@@ -128,22 +121,15 @@ impl Index {
         Ok(())
     }
 
-    pub(super) fn key_from_url(&self, url: &lsp_types::Url) -> Option<DocumentKey> {
+    #[allow(clippy::unnecessary_wraps)]
+    pub(super) fn key_from_url(&self, url: &Url) -> Option<DocumentKey> {
         if self.notebook_cells.contains_key(url) {
             return Some(DocumentKey::NotebookCell(url.clone()));
         }
-        let path = url.to_file_path().ok()?;
-        Some(
-            match path
-                .extension()
-                .unwrap_or_default()
-                .to_str()
-                .unwrap_or_default()
-            {
-                "ipynb" => DocumentKey::Notebook(path),
-                _ => DocumentKey::Text(path),
-            },
-        )
+        if url.path().ends_with("ipynb") {
+            return Some(DocumentKey::Notebook(url.clone()));
+        }
+        Some(DocumentKey::Text(url.clone()))
     }
 
     pub(super) fn update_notebook_document(
@@ -188,18 +174,14 @@ impl Index {
         Ok(())
     }
 
-    pub(super) fn open_workspace_folder(
-        &mut self,
-        path: PathBuf,
-        global_settings: &ClientSettings,
-    ) {
+    pub(super) fn open_workspace_folder(&mut self, path: Url, global_settings: &ClientSettings) {
         // TODO(jane): Find a way for workspace client settings to be added or changed dynamically.
         Self::register_workspace_settings(&mut self.settings, path, None, global_settings);
     }
 
     fn register_workspace_settings(
         settings_index: &mut SettingsIndex,
-        workspace_path: PathBuf,
+        workspace_path: Url,
         workspace_settings: Option<ClientSettings>,
         global_settings: &ClientSettings,
     ) {
@@ -209,7 +191,7 @@ impl Index {
             ResolvedClientSettings::global(global_settings)
         };
         let workspace_settings_index = ruff_settings::RuffSettingsIndex::new(
-            &workspace_path,
+            Path::new(workspace_path.path()),
             client_settings.editor_settings(),
         );
 
@@ -222,18 +204,18 @@ impl Index {
         );
     }
 
-    pub(super) fn close_workspace_folder(&mut self, workspace_path: &PathBuf) -> crate::Result<()> {
+    pub(super) fn close_workspace_folder(&mut self, workspace_path: &Url) -> crate::Result<()> {
         self.settings.remove(workspace_path).ok_or_else(|| {
             anyhow!(
                 "Tried to remove non-existent folder {}",
-                workspace_path.display()
+                workspace_path.path()
             )
         })?;
         // O(n) complexity, which isn't ideal... but this is an uncommon operation.
         self.documents
-            .retain(|path, _| !path.starts_with(workspace_path));
+            .retain(|path, _| !path.path().starts_with(workspace_path.path()));
         self.notebook_cells
-            .retain(|_, path| !path.starts_with(workspace_path));
+            .retain(|_, path| !path.path().starts_with(workspace_path.path()));
         Ok(())
     }
 
@@ -242,53 +224,54 @@ impl Index {
         key: DocumentKey,
         global_settings: &ClientSettings,
     ) -> Option<DocumentQuery> {
-        let path = self.path_for_key(&key)?.clone();
+        let url = self.path_for_key(&key)?.clone();
+        let path = Path::new(url.path());
         let document_settings = self
-            .settings_for_path(&path)
-            .map(|settings| settings.workspace_settings_index.get(&path))
+            .settings_for_path(&url)
+            .map(|settings| settings.workspace_settings_index.get(path))
             .unwrap_or_else(|| {
                 tracing::warn!(
                     "No settings available for {} - falling back to default settings",
                     path.display()
                 );
                 let resolved_global = ResolvedClientSettings::global(global_settings);
-                let root = path.parent().unwrap_or(&path);
+                let root = path.parent().unwrap_or(path);
                 Arc::new(RuffSettings::fallback(
                     resolved_global.editor_settings(),
                     root,
                 ))
             });
 
-        let controller = self.documents.get(&path)?;
+        let controller = self.documents.get(&url)?;
         let cell_uri = match key {
             DocumentKey::NotebookCell(uri) => Some(uri),
             _ => None,
         };
-        Some(controller.make_ref(cell_uri, path, document_settings))
+        Some(controller.make_ref(cell_uri, url, document_settings))
     }
 
     /// Reloads relevant existing settings files based on a changed settings file path.
     /// This does not currently register new settings files.
-    pub(super) fn reload_settings(&mut self, changed_path: &PathBuf) {
+    pub(super) fn reload_settings(&mut self, changed_path: &Url) {
+        let changed_path = Path::new(changed_path.path());
         let search_path = changed_path.parent().unwrap_or(changed_path);
-        for (root, settings) in self
-            .settings
-            .iter_mut()
-            .filter(|(path, _)| path.starts_with(search_path))
-        {
+        for (root, settings) in self.settings.iter_mut().filter(|(path, _)| {
+            path.path()
+                .starts_with(search_path.as_os_str().to_str().unwrap())
+        }) {
             settings.workspace_settings_index = ruff_settings::RuffSettingsIndex::new(
-                root,
+                Path::new(root.path()),
                 settings.client_settings.editor_settings(),
             );
         }
     }
 
-    pub(super) fn open_text_document(&mut self, path: PathBuf, document: TextDocument) {
+    pub(super) fn open_text_document(&mut self, path: Url, document: TextDocument) {
         self.documents
             .insert(path, DocumentController::new_text(document));
     }
 
-    pub(super) fn open_notebook_document(&mut self, path: PathBuf, document: NotebookDocument) {
+    pub(super) fn open_notebook_document(&mut self, path: Url, document: NotebookDocument) {
         for url in document.urls() {
             self.notebook_cells.insert(url.clone(), path.clone());
         }
@@ -304,7 +287,7 @@ impl Index {
         let Some(controller) = self.documents.remove(&path) else {
             anyhow::bail!(
                 "tried to close document that didn't exist at {}",
-                path.display()
+                path.path()
             )
         };
         if let Some(notebook) = controller.as_notebook() {
@@ -342,21 +325,21 @@ impl Index {
             anyhow::bail!("Tried to open unavailable document `{key}`");
         };
         let Some(controller) = self.documents.get_mut(&path) else {
-            anyhow::bail!("Document controller not available at `{}`", path.display());
+            anyhow::bail!("Document controller not available at `{}`", path.path());
         };
         Ok(controller)
     }
 
-    fn path_for_key<'a>(&'a self, key: &'a DocumentKey) -> Option<&'a PathBuf> {
+    fn path_for_key<'a>(&'a self, key: &'a DocumentKey) -> Option<&'a Url> {
         match key {
             DocumentKey::Notebook(path) | DocumentKey::Text(path) => Some(path),
             DocumentKey::NotebookCell(uri) => self.notebook_cells.get(uri),
         }
     }
 
-    fn settings_for_path(&self, path: &Path) -> Option<&WorkspaceSettings> {
+    fn settings_for_path(&self, path: &Url) -> Option<&WorkspaceSettings> {
         self.settings
-            .range(..path.to_path_buf())
+            .range(..path)
             .next_back()
             .map(|(_, settings)| settings)
     }
@@ -373,8 +356,8 @@ impl DocumentController {
 
     fn make_ref(
         &self,
-        cell_uri: Option<lsp_types::Url>,
-        file_path: PathBuf,
+        cell_uri: Option<Url>,
+        file_path: Url,
         settings: Arc<RuffSettings>,
     ) -> DocumentQuery {
         match &self {
@@ -479,9 +462,9 @@ impl DocumentQuery {
     }
 
     /// Get the underlying file path for the document selected by this query.
-    pub(crate) fn file_path(&self) -> &PathBuf {
+    pub(crate) fn file_path(&self) -> &str {
         match self {
-            Self::Text { file_path, .. } | Self::Notebook { file_path, .. } => file_path,
+            Self::Text { file_path, .. } | Self::Notebook { file_path, .. } => file_path.path(),
         }
     }
 

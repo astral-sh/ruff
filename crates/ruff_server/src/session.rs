@@ -4,7 +4,6 @@ mod capabilities;
 mod index;
 mod settings;
 
-use std::path::PathBuf;
 use std::sync::Arc;
 
 use anyhow::anyhow;
@@ -43,7 +42,7 @@ impl Session {
         client_capabilities: &ClientCapabilities,
         position_encoding: PositionEncoding,
         global_settings: ClientSettings,
-        workspace_folders: Vec<(PathBuf, ClientSettings)>,
+        workspace_folders: Vec<(Url, ClientSettings)>,
     ) -> Self {
         Self {
             position_encoding,
@@ -116,13 +115,13 @@ impl Session {
 
     /// Registers a notebook document at the provided `path`.
     /// If a document is already open here, it will be overwritten.
-    pub(crate) fn open_notebook_document(&mut self, path: PathBuf, document: NotebookDocument) {
+    pub(crate) fn open_notebook_document(&mut self, path: Url, document: NotebookDocument) {
         self.index.open_notebook_document(path, document);
     }
 
     /// Registers a text document at the provided `path`.
     /// If a document is already open here, it will be overwritten.
-    pub(crate) fn open_text_document(&mut self, path: PathBuf, document: TextDocument) {
+    pub(crate) fn open_text_document(&mut self, path: Url, document: TextDocument) {
         self.index.open_text_document(path, document);
     }
 
@@ -134,18 +133,18 @@ impl Session {
     }
 
     /// Reloads the settings index
-    pub(crate) fn reload_settings(&mut self, changed_path: &PathBuf) {
+    pub(crate) fn reload_settings(&mut self, changed_path: &Url) {
         self.index.reload_settings(changed_path);
     }
 
     /// Open a workspace folder at the given `path`.
-    pub(crate) fn open_workspace_folder(&mut self, path: PathBuf) {
+    pub(crate) fn open_workspace_folder(&mut self, path: Url) {
         self.index
             .open_workspace_folder(path, &self.global_settings);
     }
 
     /// Close a workspace folder at the given `path`.
-    pub(crate) fn close_workspace_folder(&mut self, path: &PathBuf) -> crate::Result<()> {
+    pub(crate) fn close_workspace_folder(&mut self, path: &Url) -> crate::Result<()> {
         self.index.close_workspace_folder(path)?;
         Ok(())
     }

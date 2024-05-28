@@ -21,7 +21,7 @@ impl super::SyncNotificationHandler for DidChangeWatchedFiles {
         params: types::DidChangeWatchedFilesParams,
     ) -> Result<()> {
         for change in &params.changes {
-            session.reload_settings(&change.uri.to_file_path().unwrap());
+            session.reload_settings(&change.uri);
         }
 
         if !params.changes.is_empty() {

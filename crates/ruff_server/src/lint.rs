@@ -1,5 +1,7 @@
 //! Access to the Ruff linting API for the LSP
 
+use std::path::Path;
+
 use ruff_diagnostics::{Applicability, Diagnostic, DiagnosticKind, Edit, Fix};
 use ruff_linter::{
     directives::{extract_directives, Flags},
@@ -63,7 +65,7 @@ pub(crate) fn check(
     linter_settings: &LinterSettings,
     encoding: PositionEncoding,
 ) -> Diagnostics {
-    let document_path = query.file_path();
+    let document_path = Path::new(query.file_path());
     let source_kind = query.make_source_kind();
 
     let package = detect_package_root(

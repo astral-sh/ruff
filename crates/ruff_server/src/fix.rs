@@ -6,7 +6,7 @@ use ruff_linter::{
 use ruff_notebook::SourceValue;
 use ruff_source_file::LineIndex;
 use rustc_hash::FxHashMap;
-use std::borrow::Cow;
+use std::{borrow::Cow, path::Path};
 
 use crate::{
     edit::{Replacement, ToRangeExt},
@@ -23,7 +23,7 @@ pub(crate) fn fix_all(
     linter_settings: &LinterSettings,
     encoding: PositionEncoding,
 ) -> crate::Result<Fixes> {
-    let document_path = query.file_path();
+    let document_path = Path::new(query.file_path());
     let source_kind = query.make_source_kind();
 
     let package = detect_package_root(
