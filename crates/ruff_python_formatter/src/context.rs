@@ -3,6 +3,7 @@ use crate::other::f_string_element::FStringExpressionElementContext;
 use crate::PyFormatOptions;
 use ruff_formatter::{Buffer, FormatContext, GroupId, IndentWidth, SourceCode};
 use ruff_python_ast::str::Quote;
+use ruff_python_parser::Tokens;
 use ruff_source_file::Locator;
 use std::fmt::{Debug, Formatter};
 use std::ops::{Deref, DerefMut};
@@ -12,6 +13,7 @@ pub struct PyFormatContext<'a> {
     options: PyFormatOptions,
     contents: &'a str,
     comments: Comments<'a>,
+    tokens: &Tokens,
     node_level: NodeLevel,
     indent_level: IndentLevel,
     /// Set to a non-None value when the formatter is running on a code
@@ -28,11 +30,17 @@ pub struct PyFormatContext<'a> {
 }
 
 impl<'a> PyFormatContext<'a> {
-    pub(crate) fn new(options: PyFormatOptions, contents: &'a str, comments: Comments<'a>) -> Self {
+    pub(crate) fn new(
+        options: PyFormatOptions,
+        contents: &'a str,
+        comments: Comments<'a>,
+        tokens: &Tokens,
+    ) -> Self {
         Self {
             options,
             contents,
             comments,
+            tokens,
             node_level: NodeLevel::TopLevel(TopLevelStatementPosition::Other),
             indent_level: IndentLevel::new(0),
             docstring: None,
@@ -67,6 +75,10 @@ impl<'a> PyFormatContext<'a> {
 
     pub(crate) fn comments(&self) -> &Comments<'a> {
         &self.comments
+    }
+
+    pub(crate) fn tokens(&self) -> &Tokens {
+        self.tokens
     }
 
     /// Returns a non-None value only if the formatter is running on a code

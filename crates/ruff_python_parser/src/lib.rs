@@ -408,6 +408,11 @@ impl Tokens {
     /// The range `4..10` would return a slice of `Name`, `Lpar`, `Rpar`, and `Colon` tokens. But,
     /// if either the start or end position of the given range doesn't match any of the tokens
     /// (like `5..10` or `4..12`), the returned slice will be empty.
+    ///
+    /// ## Note
+    ///
+    /// The returned slice can contain the [`TokenKind::Unknown`] token if there was a lexical
+    /// error encountered within the given range.
     pub fn tokens_in_range(&self, range: TextRange) -> &[Token] {
         let Ok(start) = self.binary_search_by_key(&range.start(), Ranged::start) else {
             return &[];

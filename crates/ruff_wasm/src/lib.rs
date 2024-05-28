@@ -293,11 +293,6 @@ impl<'a> ParsedModule<'a> {
             .to_format_options(PySourceType::default(), self.source_code)
             .with_source_map_generation(SourceMapGeneration::Enabled);
 
-        format_module_ast(
-            self.program.syntax(),
-            self.program.comment_ranges(),
-            self.source_code,
-            options,
-        )
+        format_module_ast(&self.program, self.source_code, options)
     }
 }
