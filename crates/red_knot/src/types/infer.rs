@@ -47,6 +47,15 @@ pub fn infer_definition_type(
     let file_id = symbol.file_id;
 
     match definition {
+        Definition::Import(ImportDefinition {
+            module: module_name,
+        }) => {
+            if let Some(module) = resolve_module(db, module_name.clone())? {
+                Ok(Type::Module(ModuleTypeId { module, file_id }))
+            } else {
+                Ok(Type::Unknown)
+            }
+        }
         Definition::ImportFrom(ImportFromDefinition {
             module,
             name,
@@ -57,15 +66,6 @@ pub fn infer_definition_type(
             let module_name = ModuleName::new(module.as_ref().expect("TODO relative imports"));
             if let Some(remote_symbol) = resolve_global_symbol(db, module_name, &name)? {
                 infer_symbol_type(db, remote_symbol)
-            } else {
-                Ok(Type::Unknown)
-            }
-        }
-        Definition::Import(ImportDefinition {
-            module: module_name,
-        }) => {
-            if let Some(module) = resolve_module(db, module_name.clone())? {
-                Ok(Type::Module(ModuleTypeId { module, file_id }))
             } else {
                 Ok(Type::Unknown)
             }
