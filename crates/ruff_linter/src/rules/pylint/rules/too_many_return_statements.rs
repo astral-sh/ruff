@@ -98,13 +98,13 @@ pub(crate) fn too_many_return_statements(
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
-    use ruff_python_parser::parse_suite;
+    use ruff_python_parser::parse_module;
 
     use super::num_returns;
 
     fn test_helper(source: &str, expected: usize) -> Result<()> {
-        let stmts = parse_suite(source)?;
-        assert_eq!(num_returns(&stmts), expected);
+        let stmts = parse_module(source)?.suite();
+        assert_eq!(num_returns(stmts), expected);
         Ok(())
     }
 

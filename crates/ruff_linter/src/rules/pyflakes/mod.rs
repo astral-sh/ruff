@@ -638,12 +638,13 @@ mod tests {
         let source_type = PySourceType::default();
         let source_kind = SourceKind::Python(contents.to_string());
         let settings = LinterSettings::for_rules(Linter::Pyflakes.rules());
-        let tokens = ruff_python_parser::tokenize(&contents, source_type.as_mode());
+        let program =
+            ruff_python_parser::parse_unchecked_source(source_kind.source_code(), source_type);
         let locator = Locator::new(&contents);
-        let stylist = Stylist::from_tokens(&tokens, &locator);
-        let indexer = Indexer::from_tokens(&tokens, &locator);
+        let stylist = Stylist::from_tokens(&program, &locator);
+        let indexer = Indexer::from_tokens(&program, &locator);
         let directives = directives::extract_directives(
-            &tokens,
+            &program,
             directives::Flags::from_settings(&settings),
             &locator,
             &indexer,
@@ -662,7 +663,7 @@ mod tests {
             flags::Noqa::Enabled,
             &source_kind,
             source_type,
-            TokenSource::Tokens(tokens),
+            program,
         );
         diagnostics.sort_by_key(Ranged::start);
         let actual = diagnostics

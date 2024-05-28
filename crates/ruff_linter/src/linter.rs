@@ -10,11 +10,11 @@ use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::Diagnostic;
 use ruff_notebook::Notebook;
-use ruff_python_ast::{PySourceType, Suite};
+use ruff_python_ast::{ModModule, PySourceType, Suite};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 use ruff_python_parser::lexer::LexResult;
-use ruff_python_parser::{AsMode, ParseError, TokenKindIter, Tokens};
+use ruff_python_parser::{AsMode, ParseError, Program, TokenKindIter, Tokens};
 use ruff_source_file::{Locator, SourceFileBuilder};
 use ruff_text_size::Ranged;
 
@@ -82,7 +82,7 @@ pub fn check_path(
     noqa: flags::Noqa,
     source_kind: &SourceKind,
     source_type: PySourceType,
-    tokens: TokenSource,
+    program: Program<ModModule>,
 ) -> LinterResult<Vec<Diagnostic>> {
     // Aggregate all diagnostics.
     let mut diagnostics = vec![];
@@ -93,7 +93,7 @@ pub fn check_path(
     let use_doc_lines = settings.rules.enabled(Rule::DocLineTooLong);
     let mut doc_lines = vec![];
     if use_doc_lines {
-        doc_lines.extend(doc_lines_from_tokens(tokens.kinds()));
+        doc_lines.extend(doc_lines_from_tokens(program.kinds()));
     }
 
     // Run the token-based rules.
@@ -103,7 +103,7 @@ pub fn check_path(
         .any(|rule_code| rule_code.lint_source().is_tokens())
     {
         diagnostics.extend(check_tokens(
-            &tokens,
+            &program,
             path,
             locator,
             indexer,
@@ -130,7 +130,7 @@ pub fn check_path(
         .any(|rule_code| rule_code.lint_source().is_logical_lines())
     {
         diagnostics.extend(crate::checkers::logical_lines::check_logical_lines(
-            &tokens, locator, indexer, stylist, settings,
+            &program, locator, indexer, stylist, settings,
         ));
     }
 
@@ -145,14 +145,13 @@ pub fn check_path(
             .iter_enabled()
             .any(|rule_code| rule_code.lint_source().is_imports());
     if use_ast || use_imports || use_doc_lines {
-        // Parse, if the AST wasn't pre-provided provided.
-        match tokens.into_ast(source_kind, source_type) {
-            Ok(python_ast) => {
+        match program.into_result() {
+            Ok(program) => {
                 let cell_offsets = source_kind.as_ipy_notebook().map(Notebook::cell_offsets);
                 let notebook_index = source_kind.as_ipy_notebook().map(Notebook::index);
                 if use_ast {
                     diagnostics.extend(check_ast(
-                        &python_ast,
+                        &program,
                         locator,
                         stylist,
                         indexer,
@@ -168,7 +167,7 @@ pub fn check_path(
                 }
                 if use_imports {
                     let import_diagnostics = check_imports(
-                        &python_ast,
+                        program.suite(),
                         locator,
                         indexer,
                         &directives.isort,
@@ -182,7 +181,7 @@ pub fn check_path(
                     diagnostics.extend(import_diagnostics);
                 }
                 if use_doc_lines {
-                    doc_lines.extend(doc_lines_from_ast(&python_ast, locator));
+                    doc_lines.extend(doc_lines_from_ast(program.suite(), locator));
                 }
             }
             Err(parse_error) => {
@@ -350,23 +349,22 @@ pub fn add_noqa_to_path(
     source_type: PySourceType,
     settings: &LinterSettings,
 ) -> Result<usize> {
-    let contents = source_kind.source_code();
-
-    // Tokenize once.
-    let tokens = ruff_python_parser::tokenize(contents, source_type.as_mode());
+    // Parse once.
+    let program =
+        ruff_python_parser::parse_unchecked_source(source_kind.source_code(), source_type);
 
     // Map row and column locations to byte slices (lazily).
-    let locator = Locator::new(contents);
+    let locator = Locator::new(source_kind.source_code());
 
     // Detect the current code style (lazily).
-    let stylist = Stylist::from_tokens(&tokens, &locator);
+    let stylist = Stylist::from_tokens(&program, &locator);
 
     // Extra indices from the code.
-    let indexer = Indexer::from_tokens(&tokens, &locator);
+    let indexer = Indexer::from_tokens(&program, &locator);
 
     // Extract the `# noqa` and `# isort: skip` directives from the source.
     let directives = directives::extract_directives(
-        &tokens,
+        &program,
         directives::Flags::from_settings(settings),
         &locator,
         &indexer,
@@ -387,7 +385,7 @@ pub fn add_noqa_to_path(
         flags::Noqa::Disabled,
         source_kind,
         source_type,
-        TokenSource::Tokens(tokens),
+        program,
     );
 
     // Log any parse errors.
@@ -425,23 +423,22 @@ pub fn lint_only(
     noqa: flags::Noqa,
     source_kind: &SourceKind,
     source_type: PySourceType,
-    data: ParseSource,
+    source: ParseSource,
 ) -> LinterResult<Vec<Message>> {
-    // Tokenize once.
-    let tokens = data.into_token_source(source_kind, source_type);
+    let program = source.into_program(source_kind, source_type);
 
     // Map row and column locations to byte slices (lazily).
     let locator = Locator::new(source_kind.source_code());
 
     // Detect the current code style (lazily).
-    let stylist = Stylist::from_tokens(&tokens, &locator);
+    let stylist = Stylist::from_tokens(&program, &locator);
 
     // Extra indices from the code.
-    let indexer = Indexer::from_tokens(&tokens, &locator);
+    let indexer = Indexer::from_tokens(&program, &locator);
 
     // Extract the `# noqa` and `# isort: skip` directives from the source.
     let directives = directives::extract_directives(
-        &tokens,
+        &program,
         directives::Flags::from_settings(settings),
         &locator,
         &indexer,
@@ -459,7 +456,7 @@ pub fn lint_only(
         noqa,
         source_kind,
         source_type,
-        tokens,
+        program,
     );
 
     result.map(|diagnostics| diagnostics_to_messages(diagnostics, path, &locator, &directives))
@@ -517,21 +514,22 @@ pub fn lint_fix<'a>(
 
     // Continuously fix until the source code stabilizes.
     loop {
-        // Tokenize once.
-        let tokens = ruff_python_parser::tokenize(transformed.source_code(), source_type.as_mode());
+        // Parse once.
+        let program =
+            ruff_python_parser::parse_unchecked_source(source_kind.source_code(), source_type);
 
         // Map row and column locations to byte slices (lazily).
         let locator = Locator::new(transformed.source_code());
 
         // Detect the current code style (lazily).
-        let stylist = Stylist::from_tokens(&tokens, &locator);
+        let stylist = Stylist::from_tokens(&program, &locator);
 
         // Extra indices from the code.
-        let indexer = Indexer::from_tokens(&tokens, &locator);
+        let indexer = Indexer::from_tokens(&program, &locator);
 
         // Extract the `# noqa` and `# isort: skip` directives from the source.
         let directives = directives::extract_directives(
-            &tokens,
+            &program,
             directives::Flags::from_settings(settings),
             &locator,
             &indexer,
@@ -549,7 +547,7 @@ pub fn lint_fix<'a>(
             noqa,
             &transformed,
             source_type,
-            TokenSource::Tokens(tokens),
+            program,
         );
 
         if iterations == 0 {
@@ -685,70 +683,25 @@ This indicates a bug in Ruff. If you could open an issue at:
 
 #[derive(Debug, Clone)]
 pub enum ParseSource {
-    /// Extract the tokens and AST from the given source code.
+    /// Parse the [`Program`] from the given source code.
     None,
-    /// Use the precomputed tokens and AST.
-    Precomputed { tokens: Tokens, ast: Suite },
+    /// Use the precomputed [`Program`].
+    Precomputed(Program<ModModule>),
 }
 
 impl ParseSource {
-    /// Convert to a [`TokenSource`], tokenizing if necessary.
-    fn into_token_source(self, source_kind: &SourceKind, source_type: PySourceType) -> TokenSource {
-        match self {
-            Self::None => TokenSource::Tokens(ruff_python_parser::tokenize(
-                source_kind.source_code(),
-                source_type.as_mode(),
-            )),
-            Self::Precomputed { tokens, ast } => TokenSource::Precomputed { tokens, ast },
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub enum TokenSource {
-    /// Use the precomputed tokens to generate the AST.
-    Tokens(Tokens),
-    /// Use the precomputed tokens and AST.
-    Precomputed { tokens: Tokens, ast: Suite },
-}
-
-impl TokenSource {
-    /// Returns an iterator over the [`TokenKind`] and the corresponding range.
-    ///
-    /// [`TokenKind`]: ruff_python_parser::TokenKind
-    pub fn kinds(&self) -> TokenKindIter {
-        match self {
-            TokenSource::Tokens(tokens) => tokens.kinds(),
-            TokenSource::Precomputed { tokens, .. } => TokenKindIter::new(tokens),
-        }
-    }
-}
-
-impl Deref for TokenSource {
-    type Target = [LexResult];
-
-    fn deref(&self) -> &Self::Target {
-        match self {
-            Self::Tokens(tokens) => tokens,
-            Self::Precomputed { tokens, .. } => tokens,
-        }
-    }
-}
-
-impl TokenSource {
-    /// Convert to an [`AstSource`], parsing if necessary.
-    fn into_ast(
+    /// Consumes the [`ParseSource`] and returns the parsed [`Program`], parsing the source code if
+    /// necessary.
+    fn into_program(
         self,
         source_kind: &SourceKind,
         source_type: PySourceType,
-    ) -> Result<Suite, ParseError> {
+    ) -> Program<ModModule> {
         match self {
-            Self::Tokens(tokens) => Ok(ruff_python_parser::parse_program_tokens(
-                tokens,
-                source_kind.source_code(),
-                source_type.is_ipynb(),
-            )?),
-            Self::Precomputed { ast, .. } => Ok(ast),
+            ParseSource::None => {
+                ruff_python_parser::parse_unchecked_source(source_kind.source_code(), source_type)
+            }
+            ParseSource::Precomputed(program) => program,
         }
     }
 }
