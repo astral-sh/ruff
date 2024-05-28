@@ -387,19 +387,15 @@ pub struct ModuleTypeId {
 }
 
 impl ModuleTypeId {
-    // NOTE: following example of `ClasstypeId::class` but instead of making a `ModuleTypeRef`
-    // return the `ModuleStoreRef` directly
     fn module(self, db: &dyn SemanticDb) -> QueryResult<ModuleStoreRef> {
         let jar: &SemanticJar = db.jar()?;
         Ok(jar.type_store.add_or_get_module(self.file_id).downgrade())
     }
 
-    // NOTE: following example of `ClassTypeId::name` but returning `ModuleName` instead of `Name`
     pub(crate) fn name(self, db: &dyn SemanticDb) -> QueryResult<ModuleName> {
         self.module.name(db)
     }
 
-    // NOTE: following examples of `ClassTypeId::get_*member`
     fn get_member(self, db: &dyn SemanticDb, name: &Name) -> QueryResult<Option<Type>> {
         if let Some(symbol_id) = resolve_global_symbol(db, self.name(db)?, name)? {
             Ok(Some(infer_symbol_type(db, symbol_id)?))
