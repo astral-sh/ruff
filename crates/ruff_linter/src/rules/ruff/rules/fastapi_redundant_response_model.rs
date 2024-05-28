@@ -12,7 +12,8 @@ use crate::checkers::ast::Checker;
 /// ## Why is this bad?
 /// FastApi routes automatically infer the response model from the return type, so specifying it explicitly is redundant.
 /// `Response_model` is used to override the default response model, for example,
-/// when the function returns an unstructured response and FastAPI should use a specific model for it.
+/// when the function returns a non-serializable type and fastapi should serialize it to a different type.
+/// For more information, see the [FastAPI documentation](https://fastapi.tiangolo.com/tutorial/response-model/).
 ///
 /// ## Example
 /// ```python
