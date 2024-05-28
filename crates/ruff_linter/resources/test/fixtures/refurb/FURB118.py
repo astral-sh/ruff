@@ -60,6 +60,7 @@ op_itemgetter = lambda x, y: (x[0], y[0])
 op_itemgetter = lambda x: ()
 op_itemgetter = lambda x: (*x[0], x[1])
 op_itemgetter = lambda x: (x[0],)
+op_itemgetter = lambda x: x[x]
 
 
 def op_neg3(x, y):

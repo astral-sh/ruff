@@ -553,11 +553,6 @@ impl PrintedRange {
     pub fn source_range(&self) -> TextRange {
         self.source_range
     }
-
-    #[must_use]
-    pub fn with_code(self, code: String) -> Self {
-        Self { code, ..self }
-    }
 }
 
 /// Public return type of the formatter
@@ -779,10 +774,6 @@ where
     pub fn with_item(mut self, item: T) -> Self {
         self.item = item;
         self
-    }
-
-    pub fn into_item(self) -> T {
-        self.item
     }
 }
 

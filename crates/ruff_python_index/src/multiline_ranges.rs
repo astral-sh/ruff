@@ -1,3 +1,4 @@
+use ruff_python_ast::StringFlags;
 use ruff_python_parser::Tok;
 use ruff_text_size::TextRange;
 

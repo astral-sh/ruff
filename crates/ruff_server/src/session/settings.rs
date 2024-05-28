@@ -130,7 +130,7 @@ enum InitializationOptions {
         workspace_settings: Vec<WorkspaceSettings>,
     },
     GlobalOnly {
-        #[serde(flatten)]
+        #[serde(default)]
         settings: ClientSettings,
     },
 }

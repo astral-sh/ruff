@@ -79,7 +79,7 @@ def markdown_check_result(result: Result) -> str:
     total_added_fixes = all_rule_changes.total_added_fixes()
     total_removed_fixes = all_rule_changes.total_removed_fixes()
     total_changes = (
-            total_added + total_removed + total_added_fixes + total_removed_fixes
+        total_added + total_removed + total_added_fixes + total_removed_fixes
     )
     error_count = len(result.errored)
     total_affected_rules = len(all_rule_changes.rule_codes())
@@ -136,10 +136,10 @@ def markdown_check_result(result: Result) -> str:
         project_added_fixes = rule_changes.total_added_fixes()
         project_removed_fixes = rule_changes.total_removed_fixes()
         project_changes = (
-                project_added_violations
-                + project_removed_violations
-                + project_added_fixes
-                + project_removed_fixes
+            project_added_violations
+            + project_removed_violations
+            + project_added_fixes
+            + project_removed_fixes
         )
 
         # Limit the number of items displayed per project to between 10 and 50
@@ -153,7 +153,7 @@ def markdown_check_result(result: Result) -> str:
                     # skip display. This shouldn't really happen and indicates a problem in the
                     # calculation of these values. Instead of skipping entirely when `total_changes`
                     # is zero, we'll attempt to report the results to help diagnose the problem.
-                        project_changes / max(total_changes, 1)
+                    project_changes / max(total_changes, 1)
                 )
                 * 50
             ),
@@ -188,11 +188,11 @@ def markdown_check_result(result: Result) -> str:
             # If we just reached the maximum... display an omission line
             if displayed_changes_per_rule[rule_code] > max_display_per_rule:
                 hidden_count = (
-                        rule_changes.added_violations[rule_code]
-                        + rule_changes.removed_violations[rule_code]
-                        + rule_changes.added_fixes[rule_code]
-                        + rule_changes.removed_fixes[rule_code]
-                        - max_display_per_rule
+                    rule_changes.added_violations[rule_code]
+                    + rule_changes.removed_violations[rule_code]
+                    + rule_changes.added_fixes[rule_code]
+                    + rule_changes.removed_fixes[rule_code]
+                    - max_display_per_rule
                 )
                 diff_lines.append(
                     f"... {hidden_count} additional changes omitted for rule {rule_code}"
@@ -243,9 +243,9 @@ def markdown_check_result(result: Result) -> str:
         )
         table_lines.append("| ---- | ------- | --------- | -------- | ----- | ---- |")
         for rule, total in sorted(
-                all_rule_changes.total_changes_by_rule(),
-                key=lambda item: item[1],  # Sort by the total changes
-                reverse=True,
+            all_rule_changes.total_changes_by_rule(),
+            key=lambda item: item[1],  # Sort by the total changes
+            reverse=True,
         ):
             added_violations, removed_violations, added_fixes, removed_fixes = (
                 all_rule_changes.added_violations[rule],
@@ -432,10 +432,10 @@ class CheckDiff(Diff):
     """
 
     def __init__(
-            self,
-            lines: Iterable[str],
-            parsed_lines: list[DiagnosticLine],
-            fix_only_lines: set[DiagnosticLine],
+        self,
+        lines: Iterable[str],
+        parsed_lines: list[DiagnosticLine],
+        fix_only_lines: set[DiagnosticLine],
     ) -> None:
         self.parsed_lines = parsed_lines
         self.fix_only_lines = fix_only_lines
@@ -492,11 +492,11 @@ def add_permalink_to_diagnostic_line(repo: ClonedRepository, line: str) -> str:
 
 
 async def compare_check(
-        ruff_baseline_executable: Path,
-        ruff_comparison_executable: Path,
-        options: CheckOptions,
-        config_overrides: ConfigOverrides,
-        cloned_repo: ClonedRepository,
+    ruff_baseline_executable: Path,
+    ruff_comparison_executable: Path,
+    options: CheckOptions,
+    config_overrides: ConfigOverrides,
+    cloned_repo: ClonedRepository,
 ) -> Comparison:
     with config_overrides.patch_config(cloned_repo.path, options.preview):
         async with asyncio.TaskGroup() as tg:
@@ -528,7 +528,7 @@ async def compare_check(
 
 
 async def ruff_check(
-        *, executable: Path, path: Path, name: str, options: CheckOptions
+    *, executable: Path, path: Path, name: str, options: CheckOptions
 ) -> Sequence[str]:
     """Run the given ruff binary against the specified path."""
     ruff_args = options.to_ruff_args()

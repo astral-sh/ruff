@@ -4,7 +4,7 @@ use memchr::memchr2;
 
 use ruff_python_ast::{
     self as ast, AnyNodeRef, AnyStringFlags, Expr, ExprBytesLiteral, ExprFString,
-    ExprStringLiteral, ExpressionRef, StringLiteral,
+    ExprStringLiteral, ExpressionRef, StringFlags, StringLiteral,
 };
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};

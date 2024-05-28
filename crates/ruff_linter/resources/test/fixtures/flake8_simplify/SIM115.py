@@ -46,3 +46,15 @@ with contextlib.ExitStack() as exit_stack:
 # OK (quick one-liner to clear file contents)
 open("filename", "w").close()
 pathlib.Path("filename").open("w").close()
+
+
+# OK (custom context manager)
+class MyFile:
+    def __init__(self, filename: str):
+        self.filename = filename
+
+    def __enter__(self):
+        self.file = open(self.filename)
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.file.close()

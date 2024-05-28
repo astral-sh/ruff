@@ -1351,6 +1351,64 @@ impl Ranged for FStringPart {
     }
 }
 
+pub trait StringFlags: Copy {
+    /// Does the string use single or double quotes in its opener and closer?
+    fn quote_style(self) -> Quote;
+
+    /// Is the string triple-quoted, i.e.,
+    /// does it begin and end with three consecutive quote characters?
+    fn is_triple_quoted(self) -> bool;
+
+    fn prefix(self) -> AnyStringPrefix;
+
+    /// A `str` representation of the quotes used to start and close.
+    /// This does not include any prefixes the string has in its opener.
+    fn quote_str(self) -> &'static str {
+        if self.is_triple_quoted() {
+            match self.quote_style() {
+                Quote::Single => "'''",
+                Quote::Double => r#"""""#,
+            }
+        } else {
+            match self.quote_style() {
+                Quote::Single => "'",
+                Quote::Double => "\"",
+            }
+        }
+    }
+
+    /// The length of the quotes used to start and close the string.
+    /// This does not include the length of any prefixes the string has
+    /// in its opener.
+    fn quote_len(self) -> TextSize {
+        if self.is_triple_quoted() {
+            TextSize::new(3)
+        } else {
+            TextSize::new(1)
+        }
+    }
+
+    /// The total length of the string's opener,
+    /// i.e., the length of the prefixes plus the length
+    /// of the quotes used to open the string.
+    fn opener_len(self) -> TextSize {
+        self.prefix().as_str().text_len() + self.quote_len()
+    }
+
+    /// The total length of the string's closer.
+    /// This is always equal to `self.quote_len()`,
+    /// but is provided here for symmetry with the `opener_len()` method.
+    fn closer_len(self) -> TextSize {
+        self.quote_len()
+    }
+
+    fn format_string_contents(self, contents: &str) -> String {
+        let prefix = self.prefix();
+        let quote_str = self.quote_str();
+        format!("{prefix}{quote_str}{contents}{quote_str}")
+    }
+}
+
 bitflags! {
     #[derive(Default, Copy, Clone, PartialEq, Eq, Hash)]
     struct FStringFlagsInner: u8 {
@@ -1420,11 +1478,13 @@ impl FStringFlags {
             FStringPrefix::Regular
         }
     }
+}
 
+impl StringFlags for FStringFlags {
     /// Return `true` if the f-string is triple-quoted, i.e.,
     /// it begins and ends with three consecutive quote characters.
     /// For example: `f"""{bar}"""`
-    pub const fn is_triple_quoted(self) -> bool {
+    fn is_triple_quoted(self) -> bool {
         self.0.contains(FStringFlagsInner::TRIPLE_QUOTED)
     }
 
@@ -1432,12 +1492,16 @@ impl FStringFlags {
     /// used by the f-string's opener and closer:
     /// - `f"{"a"}"` -> `QuoteStyle::Double`
     /// - `f'{"a"}'` -> `QuoteStyle::Single`
-    pub const fn quote_style(self) -> Quote {
+    fn quote_style(self) -> Quote {
         if self.0.contains(FStringFlagsInner::DOUBLE) {
             Quote::Double
         } else {
             Quote::Single
         }
+    }
+
+    fn prefix(self) -> AnyStringPrefix {
+        AnyStringPrefix::Format(self.prefix())
     }
 }
 
@@ -1516,7 +1580,7 @@ impl<'a> IntoIterator for &'a mut FStringElements {
 }
 
 impl Deref for FStringElements {
-    type Target = Vec<FStringElement>;
+    type Target = [FStringElement];
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -1830,12 +1894,14 @@ impl StringLiteralFlags {
             StringLiteralPrefix::Empty
         }
     }
+}
 
+impl StringFlags for StringLiteralFlags {
     /// Return the quoting style (single or double quotes)
     /// used by the string's opener and closer:
     /// - `"a"` -> `QuoteStyle::Double`
     /// - `'a'` -> `QuoteStyle::Single`
-    pub const fn quote_style(self) -> Quote {
+    fn quote_style(self) -> Quote {
         if self.0.contains(StringLiteralFlagsInner::DOUBLE) {
             Quote::Double
         } else {
@@ -1846,8 +1912,12 @@ impl StringLiteralFlags {
     /// Return `true` if the string is triple-quoted, i.e.,
     /// it begins and ends with three consecutive quote characters.
     /// For example: `"""bar"""`
-    pub const fn is_triple_quoted(self) -> bool {
+    fn is_triple_quoted(self) -> bool {
         self.0.contains(StringLiteralFlagsInner::TRIPLE_QUOTED)
+    }
+
+    fn prefix(self) -> AnyStringPrefix {
+        AnyStringPrefix::Regular(self.prefix())
     }
 }
 
@@ -2171,11 +2241,13 @@ impl BytesLiteralFlags {
             ByteStringPrefix::Regular
         }
     }
+}
 
+impl StringFlags for BytesLiteralFlags {
     /// Return `true` if the bytestring is triple-quoted, i.e.,
     /// it begins and ends with three consecutive quote characters.
     /// For example: `b"""{bar}"""`
-    pub const fn is_triple_quoted(self) -> bool {
+    fn is_triple_quoted(self) -> bool {
         self.0.contains(BytesLiteralFlagsInner::TRIPLE_QUOTED)
     }
 
@@ -2183,12 +2255,16 @@ impl BytesLiteralFlags {
     /// used by the bytestring's opener and closer:
     /// - `b"a"` -> `QuoteStyle::Double`
     /// - `b'a'` -> `QuoteStyle::Single`
-    pub const fn quote_style(self) -> Quote {
+    fn quote_style(self) -> Quote {
         if self.0.contains(BytesLiteralFlagsInner::DOUBLE) {
             Quote::Double
         } else {
             Quote::Single
         }
+    }
+
+    fn prefix(self) -> AnyStringPrefix {
+        AnyStringPrefix::Bytes(self.prefix())
     }
 }
 
@@ -2340,7 +2416,70 @@ impl AnyStringFlags {
         self
     }
 
-    pub const fn prefix(self) -> AnyStringPrefix {
+    pub fn new(prefix: AnyStringPrefix, quotes: Quote, triple_quoted: bool) -> Self {
+        let new = Self::default().with_prefix(prefix).with_quote_style(quotes);
+        if triple_quoted {
+            new.with_triple_quotes()
+        } else {
+            new
+        }
+    }
+
+    /// Does the string have a `u` or `U` prefix?
+    pub const fn is_u_string(self) -> bool {
+        self.0.contains(AnyStringFlagsInner::U_PREFIX)
+    }
+
+    /// Does the string have an `r` or `R` prefix?
+    pub const fn is_raw_string(self) -> bool {
+        self.0.intersects(
+            AnyStringFlagsInner::R_PREFIX_LOWER.union(AnyStringFlagsInner::R_PREFIX_UPPER),
+        )
+    }
+
+    /// Does the string have an `f` or `F` prefix?
+    pub const fn is_f_string(self) -> bool {
+        self.0.contains(AnyStringFlagsInner::F_PREFIX)
+    }
+
+    /// Does the string have a `b` or `B` prefix?
+    pub const fn is_byte_string(self) -> bool {
+        self.0.contains(AnyStringFlagsInner::B_PREFIX)
+    }
+
+    #[must_use]
+    pub fn with_quote_style(mut self, quotes: Quote) -> Self {
+        match quotes {
+            Quote::Double => self.0 |= AnyStringFlagsInner::DOUBLE,
+            Quote::Single => self.0 -= AnyStringFlagsInner::DOUBLE,
+        };
+        self
+    }
+
+    #[must_use]
+    pub fn with_triple_quotes(mut self) -> Self {
+        self.0 |= AnyStringFlagsInner::TRIPLE_QUOTED;
+        self
+    }
+}
+
+impl StringFlags for AnyStringFlags {
+    /// Does the string use single or double quotes in its opener and closer?
+    fn quote_style(self) -> Quote {
+        if self.0.contains(AnyStringFlagsInner::DOUBLE) {
+            Quote::Double
+        } else {
+            Quote::Single
+        }
+    }
+
+    /// Is the string triple-quoted, i.e.,
+    /// does it begin and end with three consecutive quote characters?
+    fn is_triple_quoted(self) -> bool {
+        self.0.contains(AnyStringFlagsInner::TRIPLE_QUOTED)
+    }
+
+    fn prefix(self) -> AnyStringPrefix {
         let AnyStringFlags(flags) = self;
 
         // f-strings
@@ -2376,123 +2515,6 @@ impl AnyStringFlags {
             return AnyStringPrefix::Regular(StringLiteralPrefix::Unicode);
         }
         AnyStringPrefix::Regular(StringLiteralPrefix::Empty)
-    }
-
-    pub fn new(prefix: AnyStringPrefix, quotes: Quote, triple_quoted: bool) -> Self {
-        let new = Self::default().with_prefix(prefix).with_quote_style(quotes);
-        if triple_quoted {
-            new.with_triple_quotes()
-        } else {
-            new
-        }
-    }
-
-    /// Does the string have a `u` or `U` prefix?
-    pub const fn is_u_string(self) -> bool {
-        self.0.contains(AnyStringFlagsInner::U_PREFIX)
-    }
-
-    /// Does the string have an `r` or `R` prefix?
-    pub const fn is_raw_string(self) -> bool {
-        self.0.intersects(
-            AnyStringFlagsInner::R_PREFIX_LOWER.union(AnyStringFlagsInner::R_PREFIX_UPPER),
-        )
-    }
-
-    /// Does the string have an `f` or `F` prefix?
-    pub const fn is_f_string(self) -> bool {
-        self.0.contains(AnyStringFlagsInner::F_PREFIX)
-    }
-
-    /// Does the string have a `b` or `B` prefix?
-    pub const fn is_byte_string(self) -> bool {
-        self.0.contains(AnyStringFlagsInner::B_PREFIX)
-    }
-
-    /// Does the string use single or double quotes in its opener and closer?
-    pub const fn quote_style(self) -> Quote {
-        if self.0.contains(AnyStringFlagsInner::DOUBLE) {
-            Quote::Double
-        } else {
-            Quote::Single
-        }
-    }
-
-    /// Is the string triple-quoted, i.e.,
-    /// does it begin and end with three consecutive quote characters?
-    pub const fn is_triple_quoted(self) -> bool {
-        self.0.contains(AnyStringFlagsInner::TRIPLE_QUOTED)
-    }
-
-    /// A `str` representation of the quotes used to start and close.
-    /// This does not include any prefixes the string has in its opener.
-    pub const fn quote_str(self) -> &'static str {
-        if self.is_triple_quoted() {
-            match self.quote_style() {
-                Quote::Single => "'''",
-                Quote::Double => r#"""""#,
-            }
-        } else {
-            match self.quote_style() {
-                Quote::Single => "'",
-                Quote::Double => "\"",
-            }
-        }
-    }
-
-    /// The length of the prefixes used (if any) in the string's opener.
-    pub fn prefix_len(self) -> TextSize {
-        self.prefix().as_str().text_len()
-    }
-
-    /// The length of the quotes used to start and close the string.
-    /// This does not include the length of any prefixes the string has
-    /// in its opener.
-    pub const fn quote_len(self) -> TextSize {
-        if self.is_triple_quoted() {
-            TextSize::new(3)
-        } else {
-            TextSize::new(1)
-        }
-    }
-
-    /// The total length of the string's opener,
-    /// i.e., the length of the prefixes plus the length
-    /// of the quotes used to open the string.
-    pub fn opener_len(self) -> TextSize {
-        self.prefix_len() + self.quote_len()
-    }
-
-    /// The total length of the string's closer.
-    /// This is always equal to `self.quote_len()`,
-    /// but is provided here for symmetry with the `opener_len()` method.
-    pub const fn closer_len(self) -> TextSize {
-        self.quote_len()
-    }
-
-    pub fn format_string_contents(self, contents: &str) -> String {
-        format!(
-            "{}{}{}{}",
-            self.prefix(),
-            self.quote_str(),
-            contents,
-            self.quote_str()
-        )
-    }
-
-    #[must_use]
-    pub fn with_quote_style(mut self, quotes: Quote) -> Self {
-        match quotes {
-            Quote::Double => self.0 |= AnyStringFlagsInner::DOUBLE,
-            Quote::Single => self.0 -= AnyStringFlagsInner::DOUBLE,
-        };
-        self
-    }
-
-    #[must_use]
-    pub fn with_triple_quotes(mut self) -> Self {
-        self.0 |= AnyStringFlagsInner::TRIPLE_QUOTED;
-        self
     }
 }
 
@@ -2996,6 +3018,21 @@ pub enum Pattern {
     MatchStar(PatternMatchStar),
     MatchAs(PatternMatchAs),
     MatchOr(PatternMatchOr),
+}
+
+impl Pattern {
+    /// Checks if the [`Pattern`] is an [irrefutable pattern].
+    ///
+    /// [irrefutable pattern]: https://peps.python.org/pep-0634/#irrefutable-case-blocks
+    pub fn is_irrefutable(&self) -> bool {
+        match self {
+            Pattern::MatchAs(PatternMatchAs { pattern: None, .. }) => true,
+            Pattern::MatchOr(PatternMatchOr { patterns, .. }) => {
+                patterns.iter().any(Pattern::is_irrefutable)
+            }
+            _ => false,
+        }
+    }
 }
 
 /// See also [MatchValue](https://docs.python.org/3/library/ast.html#ast.MatchValue)
@@ -3692,20 +3729,6 @@ impl fmt::Display for IpyEscapeKind {
 }
 
 impl IpyEscapeKind {
-    /// Returns the length of the escape kind token.
-    pub fn prefix_len(self) -> TextSize {
-        let len = match self {
-            IpyEscapeKind::Shell
-            | IpyEscapeKind::Magic
-            | IpyEscapeKind::Help
-            | IpyEscapeKind::Quote
-            | IpyEscapeKind::Quote2
-            | IpyEscapeKind::Paren => 1,
-            IpyEscapeKind::ShCap | IpyEscapeKind::Magic2 | IpyEscapeKind::Help2 => 2,
-        };
-        len.into()
-    }
-
     /// Returns `true` if the escape kind is help i.e., `?` or `??`.
     pub const fn is_help(self) -> bool {
         matches!(self, IpyEscapeKind::Help | IpyEscapeKind::Help2)

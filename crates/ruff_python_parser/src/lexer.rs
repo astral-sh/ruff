@@ -37,7 +37,7 @@ use unicode_normalization::UnicodeNormalization;
 use ruff_python_ast::{
     str::Quote,
     str_prefix::{AnyStringPrefix, FStringPrefix},
-    AnyStringFlags, Int, IpyEscapeKind,
+    AnyStringFlags, Int, IpyEscapeKind, StringFlags,
 };
 use ruff_text_size::{TextLen, TextRange, TextSize};
 

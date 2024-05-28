@@ -1,18 +1,18 @@
 //! Types and utilities for working with text, modifying source files, and `Ruff <-> LSP` type conversion.
 
-mod document;
 mod notebook;
 mod range;
 mod replacement;
+mod text_document;
 
 use std::{collections::HashMap, path::PathBuf};
 
-pub(crate) use document::DocumentVersion;
-pub use document::TextDocument;
 use lsp_types::PositionEncodingKind;
 pub(crate) use notebook::NotebookDocument;
 pub(crate) use range::{NotebookRange, RangeExt, ToRangeExt};
 pub(crate) use replacement::Replacement;
+pub(crate) use text_document::DocumentVersion;
+pub use text_document::TextDocument;
 
 use crate::{fix::Fixes, session::ResolvedClientCapabilities};
 

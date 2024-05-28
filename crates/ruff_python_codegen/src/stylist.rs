@@ -4,7 +4,7 @@ use std::ops::Deref;
 
 use once_cell::unsync::OnceCell;
 
-use ruff_python_ast::str::Quote;
+use ruff_python_ast::{str::Quote, StringFlags};
 use ruff_python_parser::lexer::LexResult;
 use ruff_python_parser::Tok;
 use ruff_source_file::{find_newline, LineEnding, Locator};

@@ -8,7 +8,7 @@ use std::{borrow::Cow, collections::VecDeque};
 use itertools::Itertools;
 
 use ruff_formatter::printer::SourceMapGeneration;
-use ruff_python_ast::str::Quote;
+use ruff_python_ast::{str::Quote, StringFlags};
 use ruff_python_parser::ParseError;
 use {once_cell::sync::Lazy, regex::Regex};
 use {
