@@ -52,6 +52,7 @@ use crate::fix::edits::{remove_argument, Parentheses};
 /// async def create_item(item: Item) -> Item:
 ///     return item
 /// ```
+
 #[violation]
 pub struct FastApiRedundantResponseModel;
 
