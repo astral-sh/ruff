@@ -1,28 +1,30 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, comparable::ComparableExpr, helpers::map_subscript};
-use ruff_text_size::Ranged;
+use ruff_python_ast::{self as ast, comparable::ComparableExpr};
+use ruff_source_file::Locator;
+use ruff_text_size::{Ranged, TextSize};
 
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
 
 /// ## What it does
-/// Checks for redundant `Final[Literal[]]` annotations.
+/// Checks for redundant `Final[Literal[...]]` annotations.
 ///
 /// ## Why is this bad?
-/// A `Final[Literal[x]]` annotation can be replaced with just `Final`.
+/// A `Final[Literal[...]]` annotation can be replaced with `Final`; the literal
+/// use is unnecessary.
 ///
 /// ## Example
 ///
 /// ```python
 /// x: Final[Literal[42]]
-/// # or,
-/// x: Final[Literal[42]] = 42
+/// y: Final[Literal[42]] = 42
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// x: Final = 42
+/// y: Final = 42
 /// ```
 #[violation]
 pub struct RedundantFinalLiteral {
@@ -35,22 +37,14 @@ impl Violation for RedundantFinalLiteral {
     #[derive_message_formats]
     fn message(&self) -> String {
         let RedundantFinalLiteral { literal } = self;
-        if let Some(literal) = literal.full_display() {
-            format!("`Final[Literal[{literal}]]` can be replaced with a bare `Final`")
-        } else {
-            format!("`Final[Literal[...]] can be replaced with a bare `Final`")
-        }
+        format!(
+            "`Final[Literal[{literal}]]` can be replaced with a bare `Final`",
+            literal = literal.truncated_display()
+        )
     }
 
     fn fix_title(&self) -> Option<String> {
-        let RedundantFinalLiteral { literal } = self;
-        if let Some(literal) = literal.full_display() {
-            Some(format!(
-                "Replace `Final[Literal[{literal}]]` with a bare `Final`"
-            ))
-        } else {
-            Some(format!("Replace `Final[Literal[...]] with a bare `Final`"))
-        }
+        Some("Replace with `Final`".to_string())
     }
 }
 
@@ -66,27 +60,24 @@ pub(crate) fn redundant_final_literal(checker: &mut Checker, ann_assign: &ast::S
         ..
     } = ann_assign;
 
+    let ast::Expr::Subscript(annotation) = &**annotation else {
+        return;
+    };
+
+    // Ensure it is `Final[Literal[...]]`.
     let ast::Expr::Subscript(ast::ExprSubscript {
-        slice: literal_slice,
+        value,
+        slice: literal,
         ..
-    }) = &**annotation
+    }) = &*annotation.slice
     else {
         return;
     };
-
-    // Ensure it is `Final[Literal[...]]`
-    if !checker
-        .semantic()
-        .match_typing_expr(map_subscript(literal_slice), "Literal")
-    {
+    if !checker.semantic().match_typing_expr(value, "Literal") {
         return;
     }
-    let ast::Expr::Subscript(ast::ExprSubscript { slice: literal, .. }) = &**literal_slice else {
-        return;
-    };
 
-    // Discards tuples like `Literal[1, 2, 3]`
-    // and complex literals like `Literal[{1, 2}]`
+    // Discards tuples like `Literal[1, 2, 3]` and complex literals like `Literal[{1, 2}]`.
     if !matches!(
         &**literal,
         ast::Expr::StringLiteral(_)
@@ -105,36 +96,47 @@ pub(crate) fn redundant_final_literal(checker: &mut Checker, ann_assign: &ast::S
         },
         ann_assign.range(),
     );
-    // The literal value and the assignment value being different doesn't
-    // make sense, so we don't do an autofix if that happens.
-    if !assign_value.as_ref().is_some_and(|assign_value| {
-        ComparableExpr::from(assign_value) != ComparableExpr::from(literal)
-    }) {
-        diagnostic.set_fix(generate_fix(
-            checker,
-            annotation,
-            literal,
-            assign_value.is_none(),
-        ));
+
+    // The literal value and the assignment value being different doesn't make sense, so we skip
+    // fixing in that case.
+    if let Some(assign_value) = assign_value.as_ref() {
+        if ComparableExpr::from(assign_value) == ComparableExpr::from(literal) {
+            diagnostic.set_fix(generate_fix(annotation, None, checker.locator()));
+        }
+    } else {
+        diagnostic.set_fix(generate_fix(annotation, Some(literal), checker.locator()));
     }
+
     checker.diagnostics.push(diagnostic);
 }
 
+/// Generate a fix to convert a `Final[Literal[...]]` annotation to a `Final` annotation.
 fn generate_fix(
-    checker: &Checker,
-    annotation: &ast::Expr,
-    literal: &ast::Expr,
-    add_assignment: bool,
+    annotation: &ast::ExprSubscript,
+    literal: Option<&ast::Expr>,
+    locator: &Locator,
 ) -> Fix {
-    let deletion = Edit::range_deletion(annotation.range());
-    let mut insertions = vec![Edit::insertion(format!("Final"), annotation.start())];
+    // Remove the `Literal[...]` part from `Final[Literal[...]]`.
+    let deletion = Edit::range_deletion(
+        annotation
+            .slice
+            .range()
+            .sub_start(TextSize::new(1))
+            .add_end(TextSize::new(1)),
+    );
 
-    if add_assignment {
-        // If no assignment exists, add our own, same as the literal value.
-        let literal_source = checker.locator().slice(literal.range());
-        let assignment = Edit::insertion(format!(" = {literal_source}"), annotation.end());
-        insertions.push(assignment);
-    };
-
-    Fix::safe_edits(deletion, insertions)
+    if let Some(literal) = literal {
+        // If a literal was provided, insert an assignment.
+        let assignment = Edit::insertion(
+            format!(
+                " = {literal_source}",
+                literal_source = locator.slice(literal)
+            ),
+            annotation.end(),
+        );
+        Fix::safe_edits(deletion, std::iter::once(assignment))
+    } else {
+        // If no literal exists, we can remove the assignment.
+        Fix::safe_edit(deletion)
+    }
 }

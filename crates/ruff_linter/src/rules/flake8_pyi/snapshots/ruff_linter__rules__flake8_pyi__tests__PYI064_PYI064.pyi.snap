@@ -10,7 +10,7 @@ PYI064.pyi:3:1: PYI064 [*] `Final[Literal[True]]` can be replaced with a bare `F
 4 | y: Final[Literal[None]] = None  # PYI064
 5 | z: Final[Literal["this is a really long literal, that won't be rendered in the issue text"]]  # PYI064
   |
-  = help: Replace `Final[Literal[True]]` with a bare `Final`
+  = help: Replace with `Final`
 
 ℹ Safe fix
 1 1 | from typing import Final, Literal
@@ -28,7 +28,7 @@ PYI064.pyi:4:1: PYI064 [*] `Final[Literal[None]]` can be replaced with a bare `F
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI064
 5 | z: Final[Literal["this is a really long literal, that won't be rendered in the issue text"]]  # PYI064
   |
-  = help: Replace `Final[Literal[None]]` with a bare `Final`
+  = help: Replace with `Final`
 
 ℹ Safe fix
 1 1 | from typing import Final, Literal
@@ -40,7 +40,7 @@ PYI064.pyi:4:1: PYI064 [*] `Final[Literal[None]]` can be replaced with a bare `F
 6 6 | 
 7 7 | # This should be fixable, and marked as safe
 
-PYI064.pyi:5:1: PYI064 [*] `Final[Literal[...]] can be replaced with a bare `Final`
+PYI064.pyi:5:1: PYI064 [*] `Final[Literal[...]]` can be replaced with a bare `Final`
   |
 3 | x: Final[Literal[True]]  # PYI064
 4 | y: Final[Literal[None]] = None  # PYI064
@@ -49,7 +49,7 @@ PYI064.pyi:5:1: PYI064 [*] `Final[Literal[...]] can be replaced with a bare `Fin
 6 | 
 7 | # This should be fixable, and marked as safe
   |
-  = help: Replace `Final[Literal[...]] with a bare `Final`
+  = help: Replace with `Final`
 
 ℹ Safe fix
 2 2 | 
@@ -69,7 +69,7 @@ PYI064.pyi:8:1: PYI064 [*] `Final[Literal[123]]` can be replaced with a bare `Fi
  9 | 
 10 | # This should not be fixable
    |
-   = help: Replace `Final[Literal[123]]` with a bare `Final`
+   = help: Replace with `Final`
 
 ℹ Safe fix
 5 5 | z: Final[Literal["this is a really long literal, that won't be rendered in the issue text"]]  # PYI064
@@ -89,4 +89,4 @@ PYI064.pyi:11:1: PYI064 `Final[Literal[123]]` can be replaced with a bare `Final
 12 | 
 13 | n1: Final[Literal[True, False]] # No issue here
    |
-   = help: Replace `Final[Literal[123]]` with a bare `Final`
+   = help: Replace with `Final`
