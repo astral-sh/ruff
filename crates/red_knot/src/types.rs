@@ -67,7 +67,7 @@ impl Type {
             }
             Type::Union(union_id) => {
                 let jar: &SemanticJar = db.jar()?;
-                let _TODO_union_ref = jar.type_store.get_union(*union_id);
+                let _todo_union_ref = jar.type_store.get_union(*union_id);
                 // TODO perform the get_member on each type in the union
                 // TODO return the union of those results
                 // TODO if any of those results is `None` then include Unknown in the result union
