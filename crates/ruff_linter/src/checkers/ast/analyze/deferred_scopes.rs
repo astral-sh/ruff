@@ -345,6 +345,10 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
             if checker.enabled(Rule::UnusedVariable) {
                 pyflakes::rules::unused_variable(checker, scope, &mut diagnostics);
             }
+            // TODO: Put in the right place
+            if checker.enabled(Rule::ControlVarUsedAfterLoop) {
+                pylint::rules::control_var_used_after_block(checker, scope);
+            }
 
             if checker.enabled(Rule::UnusedAnnotation) {
                 pyflakes::rules::unused_annotation(checker, scope, &mut diagnostics);
