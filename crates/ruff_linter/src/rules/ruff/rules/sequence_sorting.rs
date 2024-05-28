@@ -8,7 +8,7 @@ use std::cmp::Ordering;
 
 use ruff_python_ast as ast;
 use ruff_python_codegen::Stylist;
-use ruff_python_parser::{lexer, Mode, Tok, TokenKind};
+use ruff_python_parser::{TokenKind, Tokens};
 use ruff_python_stdlib::str::is_cased_uppercase;
 use ruff_python_trivia::{first_non_trivia_token, leading_indentation, SimpleTokenKind};
 use ruff_source_file::Locator;
@@ -336,6 +336,7 @@ impl<'a> MultilineStringSequenceValue<'a> {
         range: TextRange,
         kind: SequenceKind,
         locator: &Locator,
+        tokens: &Tokens,
         string_items: &[&'a str],
     ) -> Option<MultilineStringSequenceValue<'a>> {
         // Parse the multiline string sequence using the raw tokens.
@@ -344,7 +345,7 @@ impl<'a> MultilineStringSequenceValue<'a> {
         //
         // Step (1). Start by collecting information on each line individually:
         let (lines, ends_with_trailing_comma) =
-            collect_string_sequence_lines(range, kind, locator, string_items)?;
+            collect_string_sequence_lines(range, kind, locator, tokens, string_items)?;
 
         // Step (2). Group lines together into sortable "items":
         //   - Any "item" contains a single element of the list/tuple
@@ -489,6 +490,7 @@ fn collect_string_sequence_lines<'a>(
     range: TextRange,
     kind: SequenceKind,
     locator: &Locator,
+    tokens: &Tokens,
     string_items: &[&'a str],
 ) -> Option<(Vec<StringSequenceLine<'a>>, bool)> {
     // These first two variables are used for keeping track of state
@@ -501,39 +503,34 @@ fn collect_string_sequence_lines<'a>(
     // An iterator over the string values in the sequence.
     let mut string_items_iter = string_items.iter();
 
-    // `lex_starts_at()` gives us absolute ranges rather than relative ranges,
-    // but (surprisingly) we still need to pass in the slice of code we want it to lex,
-    // rather than the whole source file:
-    let mut token_iter =
-        lexer::lex_starts_at(locator.slice(range), Mode::Expression, range.start());
-    let (first_tok, _) = token_iter.next()?.ok()?;
-    if TokenKind::from(&first_tok) != kind.opening_token_for_multiline_definition() {
+    let mut token_iter = tokens.tokens_in_range(range).iter();
+    let first_token = token_iter.next()?;
+    if first_token.kind() != kind.opening_token_for_multiline_definition() {
         return None;
     }
     let expected_final_token = kind.closing_token_for_multiline_definition();
 
-    for pair in token_iter {
-        let (tok, subrange) = pair.ok()?;
-        match tok {
-            Tok::NonLogicalNewline => {
+    for token in token_iter {
+        match token.kind() {
+            TokenKind::NonLogicalNewline => {
                 lines.push(line_state.into_string_sequence_line());
                 line_state = LineState::default();
             }
-            Tok::Comment(_) => {
-                line_state.visit_comment_token(subrange);
+            TokenKind::Comment => {
+                line_state.visit_comment_token(token.range());
             }
-            Tok::String { .. } => {
+            TokenKind::String => {
                 let Some(string_value) = string_items_iter.next() else {
                     unreachable!("Expected the number of string tokens to be equal to the number of string items in the sequence");
                 };
-                line_state.visit_string_token(string_value, subrange);
+                line_state.visit_string_token(string_value, token.range());
                 ends_with_trailing_comma = false;
             }
-            Tok::Comma => {
-                line_state.visit_comma_token(subrange);
+            TokenKind::Comma => {
+                line_state.visit_comma_token(token.range());
                 ends_with_trailing_comma = true;
             }
-            tok if TokenKind::from(&tok) == expected_final_token => {
+            kind if kind == expected_final_token => {
                 lines.push(line_state.into_string_sequence_line());
                 break;
             }

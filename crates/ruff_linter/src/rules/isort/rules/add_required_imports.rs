@@ -4,9 +4,9 @@ use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_docstring_stmt;
 use ruff_python_ast::imports::{Alias, AnyImport, FutureImport, Import, ImportFrom};
-use ruff_python_ast::{self as ast, PySourceType, Stmt, Suite};
+use ruff_python_ast::{self as ast, ModModule, PySourceType, Stmt, Suite};
 use ruff_python_codegen::Stylist;
-use ruff_python_parser::{parse_module, Program};
+use ruff_python_parser::{parse_module, Program, Tokens};
 use ruff_source_file::Locator;
 use ruff_text_size::{TextRange, TextSize};
 
@@ -87,13 +87,13 @@ fn includes_import(stmt: &Stmt, target: &AnyImport) -> bool {
 #[allow(clippy::too_many_arguments)]
 fn add_required_import(
     required_import: &AnyImport,
-    python_ast: &Suite,
+    program: &Program<ModModule>,
     locator: &Locator,
     stylist: &Stylist,
     source_type: PySourceType,
 ) -> Option<Diagnostic> {
     // Don't add imports to semantically-empty files.
-    if python_ast.iter().all(is_docstring_stmt) {
+    if program.suite().iter().all(is_docstring_stmt) {
         return None;
     }
 
@@ -103,7 +103,8 @@ fn add_required_import(
     }
 
     // If the import is already present in a top-level block, don't add it.
-    if python_ast
+    if program
+        .suite()
         .iter()
         .any(|stmt| includes_import(stmt, required_import))
     {
@@ -116,15 +117,14 @@ fn add_required_import(
         TextRange::default(),
     );
     diagnostic.set_fix(Fix::safe_edit(
-        Importer::new(python_ast, locator, stylist)
-            .add_import(required_import, TextSize::default()),
+        Importer::new(program, locator, stylist).add_import(required_import, TextSize::default()),
     ));
     Some(diagnostic)
 }
 
 /// I002
 pub(crate) fn add_required_imports(
-    python_ast: &Suite,
+    program: &Program<ModModule>,
     locator: &Locator,
     stylist: &Stylist,
     settings: &LinterSettings,
@@ -165,7 +165,7 @@ pub(crate) fn add_required_imports(
                                 },
                                 level: *level,
                             }),
-                            python_ast,
+                            program,
                             locator,
                             stylist,
                             source_type,
@@ -182,7 +182,7 @@ pub(crate) fn add_required_imports(
                                     as_name: name.asname.as_deref(),
                                 },
                             }),
-                            python_ast,
+                            program,
                             locator,
                             stylist,
                             source_type,
