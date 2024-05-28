@@ -17,6 +17,7 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
         Rule::AsyncioDanglingTask,
         Rule::BadStaticmethodArgument,
         Rule::BuiltinAttributeShadowing,
+        Rule::ControlVarUsedAfterBlock,
         Rule::GlobalVariableNotAssigned,
         Rule::ImportPrivateName,
         Rule::ImportShadowedByLoopVar,
@@ -346,7 +347,8 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
                 pyflakes::rules::unused_variable(checker, scope, &mut diagnostics);
             }
             // TODO: Put in the right place
-            if checker.enabled(Rule::ControlVarUsedAfterLoop) {
+            // TODO: How to make this run with the global scope outside of a function?
+            if checker.enabled(Rule::ControlVarUsedAfterBlock) {
                 pylint::rules::control_var_used_after_block(checker, scope);
             }
 

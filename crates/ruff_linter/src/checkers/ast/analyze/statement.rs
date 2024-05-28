@@ -1316,10 +1316,6 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::RedefinedLoopName) {
                 pylint::rules::redefined_loop_name(checker, stmt);
             }
-            // TODO: Put in the right place
-            if checker.enabled(Rule::ControlVarUsedAfterLoop) {
-                pylint::rules::control_var_used_after_block(checker, stmt);
-            }
             if checker.enabled(Rule::IterationOverSet) {
                 pylint::rules::iteration_over_set(checker, iter);
             }

@@ -120,6 +120,11 @@ mod tests {
         Rule::RedefinedArgumentFromLocal,
         Path::new("redefined_argument_from_local.py")
     )]
+    // TODO: Put this in the right spot
+    #[test_case(
+        Rule::ControlVarUsedAfterBlock,
+        Path::new("control_var_used_after_block.py")
+    )]
     #[test_case(Rule::RedefinedLoopName, Path::new("redefined_loop_name.py"))]
     #[test_case(Rule::ReturnInInit, Path::new("return_in_init.py"))]
     #[test_case(Rule::TooManyArguments, Path::new("too_many_arguments.py"))]

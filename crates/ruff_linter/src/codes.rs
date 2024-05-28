@@ -1087,6 +1087,10 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Logging, "002") => (RuleGroup::Stable, rules::flake8_logging::rules::InvalidGetLoggerArgument),
         (Flake8Logging, "007") => (RuleGroup::Stable, rules::flake8_logging::rules::ExceptionWithoutExcInfo),
         (Flake8Logging, "009") => (RuleGroup::Stable, rules::flake8_logging::rules::UndocumentedWarn),
+        
+        // wemake-python-styleguide
+        // TODO: Put in the right spot
+        (WemakePythonStyleguide, "441") => (RuleGroup::Stable, rules::pylint::rules::ControlVarUsedAfterBlock),
 
         _ => return None,
     })
