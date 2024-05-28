@@ -10,8 +10,3 @@ benchmark = "bench -p ruff_benchmark --bench linter --bench formatter --"
 rustflags = ["-C", "target-feature=+crt-static"]
 [target.i686-pc-windows-msvc]
 rustflags = ["-C", "target-feature=+crt-static"]
-[target.x86_64-unknown-linux-musl]
-rustflags = [
-  "-C", "target-feature=+crt-static",
-  "-C", "link-self-contained=yes",
-]
