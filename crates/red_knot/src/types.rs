@@ -68,8 +68,9 @@ impl Type {
             Type::Union(union_id) => {
                 let jar: &SemanticJar = db.jar()?;
                 let union_ref = jar.type_store.get_union(*union_id);
-                // TODO return a type IFF at least one of the unioned-types have the member; return
-                // the union over those member types
+                // TODO perform the get_member on each type in the union
+                // TODO return the union of those results
+                // TODO if any of those results is `None` then include Unknown in the result union
                 todo!("attribute lookup on Union type")
             }
             Type::Intersection(_) => {
