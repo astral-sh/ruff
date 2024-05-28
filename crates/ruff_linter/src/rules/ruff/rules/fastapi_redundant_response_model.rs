@@ -18,11 +18,14 @@ use crate::fix::edits::{remove_argument, Parentheses};
 /// For more information, see the [FastAPI documentation](https://fastapi.tiangolo.com/tutorial/response-model/).
 ///
 /// ## Example
+///
 /// ```python
 /// from fastapi import FastAPI
 /// from pydantic import BaseModel
 ///
 /// app = FastAPI()
+///
+///
 /// class Item(BaseModel):
 ///     name: str
 ///
@@ -33,11 +36,14 @@ use crate::fix::edits::{remove_argument, Parentheses};
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// from fastapi import FastAPI
 /// from pydantic import BaseModel
 ///
 /// app = FastAPI()
+///
+///
 /// class Item(BaseModel):
 ///     name: str
 ///
