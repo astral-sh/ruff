@@ -68,7 +68,7 @@ impl Type {
             Type::Union(union_id) => {
                 let jar: &SemanticJar = db.jar()?;
                 let union_ref = jar.type_store.get_union(*union_id);
-                // TODO return a type FF at least one of the unioned-types have the member; return
+                // TODO return a type IFF at least one of the unioned-types have the member; return
                 // the union over those member types
                 todo!("attribute lookup on Union type")
             }
