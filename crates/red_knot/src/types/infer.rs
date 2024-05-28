@@ -146,7 +146,9 @@ fn infer_expr_type(db: &dyn SemanticDb, file_id: FileId, expr: &ast::Expr) -> Qu
         ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. }) => {
             let value_type = infer_expr_type(db, file_id, value)?;
             let attr_name = &Name::new(&attr.id);
-            value_type.get_member(db, attr_name)
+            value_type
+                .get_member(db, attr_name)
+                .map(|ty| ty.unwrap_or(Type::Unknown))
         }
         _ => todo!("full expression type resolution"),
     }

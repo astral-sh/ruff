@@ -52,26 +52,15 @@ impl Type {
         matches!(self, Type::Unknown)
     }
 
-    // NOTE: naming? `get_member_type`
-    pub fn get_member(&self, db: &dyn SemanticDb, name: &Name) -> QueryResult<Type> {
-        // NOTE: maybe make this a trait that each TypeID implements?
+    pub fn get_member(&self, db: &dyn SemanticDb, name: &Name) -> QueryResult<Option<Type>> {
         match self {
             Type::Any => todo!("attribute lookup on Any type"),
             Type::Never => todo!("attribute lookup on Never type"),
             Type::Unknown => todo!("attribute lookup on Unknown type"),
             Type::Unbound => todo!("attribute lookup on Unbound type"),
             Type::Function(_) => todo!("attribute lookup on Function type"),
-            Type::Module(module_id) => module_id
-                .get_member(db, name)
-                // FIXME: don't want to unwrap here; need to add a QueryError ctor for the case
-                // where the get_member result is Ok(None)
-                .map(Option::unwrap),
-            Type::Class(class_id) => class_id
-                .get_own_class_member(db, name)
-                .or_else(|_| class_id.get_super_class_member(db, name))
-                // FIXME: don't want to unwrap here; need to add a QueryError ctor for the case
-                // where the get_member result is Ok(None)
-                .map(Option::unwrap),
+            Type::Module(module_id) => module_id.get_member(db, name),
+            Type::Class(class_id) => class_id.get_member(db, name),
             Type::Instance(_) => {
                 // TODO MRO? get_own_instance_member, get_instance_member
                 todo!("attribute lookup on Instance type")
