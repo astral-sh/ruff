@@ -1,0 +1,58 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF102.py:10:22: RUF102 FastAPI route with redundant response_model parameter
+   |
+ 9 | # Errors.
+10 | @app.post("/items/", response_model=Item)
+   |                      ^^^^^^^^^^^^^^^^^^^ RUF102
+11 | async def create_item(item: Item) -> Item:
+12 |     return item
+   |
+
+RUF102.py:14:22: RUF102 FastAPI route with redundant response_model parameter
+   |
+12 |     return item
+13 | 
+14 | @app.post("/items/", response_model=str)
+   |                      ^^^^^^^^^^^^^^^^^^ RUF102
+15 | async def create_item(item: Item) -> str:
+16 |     return item
+   |
+
+RUF102.py:18:21: RUF102 FastAPI route with redundant response_model parameter
+   |
+16 |     return item
+17 | 
+18 | @app.get("/items/", response_model=Item)
+   |                     ^^^^^^^^^^^^^^^^^^^ RUF102
+19 | async def create_item(item: Item) -> Item:
+20 |     return item
+   |
+
+RUF102.py:23:21: RUF102 FastAPI route with redundant response_model parameter
+   |
+23 | @app.get("/items/", response_model=Item)
+   |                     ^^^^^^^^^^^^^^^^^^^ RUF102
+24 | @app.post("/items/", response_model=Item)
+25 | async def create_item(item: Item) -> Item:
+   |
+
+RUF102.py:24:22: RUF102 FastAPI route with redundant response_model parameter
+   |
+23 | @app.get("/items/", response_model=Item)
+24 | @app.post("/items/", response_model=Item)
+   |                      ^^^^^^^^^^^^^^^^^^^ RUF102
+25 | async def create_item(item: Item) -> Item:
+26 |     return item
+   |
+
+RUF102.py:28:24: RUF102 FastAPI route with redundant response_model parameter
+   |
+26 |     return item
+27 | 
+28 | @router.get("/items/", response_model=Item)
+   |                        ^^^^^^^^^^^^^^^^^^^ RUF102
+29 | async def create_item(item: Item) -> Item:
+30 |     return item
+   |
