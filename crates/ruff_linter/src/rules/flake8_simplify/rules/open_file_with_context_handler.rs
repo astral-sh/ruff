@@ -2,7 +2,7 @@ use ruff_python_ast::{self as ast, Expr, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_semantic::SemanticModel;
+use ruff_python_semantic::{ScopeKind, SemanticModel};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -114,24 +114,27 @@ fn match_exit_stack(semantic: &SemanticModel) -> bool {
 
 /// Return `true` if `func` is the builtin `open` or `pathlib.Path(...).open`.
 fn is_open(semantic: &SemanticModel, func: &Expr) -> bool {
-    // open(...)
+    // Ex) `open(...)`
     if semantic.match_builtin_expr(func, "open") {
         return true;
     }
 
-    // pathlib.Path(...).open()
+    // Ex) `pathlib.Path(...).open()`
     let Expr::Attribute(ast::ExprAttribute { attr, value, .. }) = func else {
         return false;
     };
+
     if attr != "open" {
         return false;
     }
+
     let Expr::Call(ast::ExprCall {
         func: value_func, ..
     }) = &**value
     else {
         return false;
     };
+
     semantic
         .resolve_qualified_name(value_func)
         .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["pathlib", "Path"]))
@@ -187,6 +190,15 @@ pub(crate) fn open_file_with_context_handler(checker: &mut Checker, func: &Expr)
     // Ex) `with contextlib.AsyncExitStack() as exit_stack: ...`
     if match_async_exit_stack(semantic) {
         return;
+    }
+
+    // Ex) `def __enter__(self): ...`
+    if let ScopeKind::Function(ast::StmtFunctionDef { name, .. }) =
+        &checker.semantic().current_scope().kind
+    {
+        if name == "__enter__" {
+            return;
+        }
     }
 
     checker
