@@ -160,15 +160,6 @@ fn infer_expr_type(db: &dyn SemanticDb, file_id: FileId, expr: &ast::Expr) -> Qu
                 .get_member(db, attr_name)
                 .map(|ty| ty.unwrap_or(Type::Unknown))
         }
-        ast::Expr::Call(ast::ExprCall { func, .. }) => {
-            let func_type = infer_expr_type(db, file_id, func)?;
-            // TODO: check that func_type is a function type, else type error? are we doing
-            // type-checking here?
-            //
-            // TODO: infer each type of `arguments` and check that it matches the corresponding
-            // argument type of the function? if one doesn't match, type error
-            todo!("extract result of function type {func_type:?}")
-        }
         _ => todo!("full expression type resolution"),
     }
 }
