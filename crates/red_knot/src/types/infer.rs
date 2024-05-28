@@ -5,13 +5,14 @@ use ruff_python_ast::AstNode;
 
 use crate::db::{QueryResult, SemanticDb, SemanticJar};
 
-use crate::module::ModuleName;
+use crate::module::{resolve_module, ModuleName};
 use crate::parse::parse;
 use crate::symbols::{
-    resolve_global_symbol, symbol_table, Definition, GlobalSymbolId, ImportFromDefinition,
+    resolve_global_symbol, symbol_table, Definition, GlobalSymbolId, ImportDefinition,
+    ImportFromDefinition,
 };
-use crate::types::Type;
-use crate::FileId;
+use crate::types::{ModuleTypeId, Type};
+use crate::{FileId, Name};
 
 // FIXME: Figure out proper dead-lock free synchronisation now that this takes `&db` instead of `&mut db`.
 #[tracing::instrument(level = "trace", skip(db))]
@@ -46,6 +47,15 @@ pub fn infer_definition_type(
     let file_id = symbol.file_id;
 
     match definition {
+        Definition::Import(ImportDefinition {
+            module: module_name,
+        }) => {
+            if let Some(module) = resolve_module(db, module_name.clone())? {
+                Ok(Type::Module(ModuleTypeId { module, file_id }))
+            } else {
+                Ok(Type::Unknown)
+            }
+        }
         Definition::ImportFrom(ImportFromDefinition {
             module,
             name,
@@ -114,10 +124,20 @@ pub fn infer_definition_type(
             let parsed = parse(db.upcast(), file_id)?;
             let ast = parsed.ast();
             let node = node_key.resolve_unwrap(ast.as_any_node_ref());
-            // TODO handle unpacking assignment correctly
+            // TODO handle unpacking assignment correctly (here and for AnnotatedAssignment case, below)
             infer_expr_type(db, file_id, &node.value)
         }
-        _ => todo!("other kinds of definitions"),
+        Definition::AnnotatedAssignment(node_key) => {
+            let parsed = parse(db.upcast(), file_id)?;
+            let ast = parsed.ast();
+            let node = node_key.resolve_unwrap(ast.as_any_node_ref());
+            // TODO actually look at the annotation
+            let Some(value) = &node.value else {
+                return Ok(Type::Unknown);
+            };
+            // TODO handle unpacking assignment correctly (here and for Assignment case, above)
+            infer_expr_type(db, file_id, value)
+        }
     }
 }
 
@@ -132,6 +152,13 @@ fn infer_expr_type(db: &dyn SemanticDb, file_id: FileId, expr: &ast::Expr) -> Qu
             } else {
                 Ok(Type::Unknown)
             }
+        }
+        ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. }) => {
+            let value_type = infer_expr_type(db, file_id, value)?;
+            let attr_name = &Name::new(&attr.id);
+            value_type
+                .get_member(db, attr_name)
+                .map(|ty| ty.unwrap_or(Type::Unknown))
         }
         _ => todo!("full expression type resolution"),
     }
@@ -287,6 +314,38 @@ mod tests {
         let function = jar.type_store.get_function(func_id);
         assert_eq!(function.name(), "f");
 
+        Ok(())
+    }
+
+    #[test]
+    fn resolve_module_member() -> anyhow::Result<()> {
+        let case = create_test()?;
+        let db = &case.db;
+
+        let a_path = case.src.path().join("a.py");
+        let b_path = case.src.path().join("b.py");
+        std::fs::write(a_path, "import b; D = b.C")?;
+        std::fs::write(b_path, "class C: pass")?;
+        let a_file = resolve_module(db, ModuleName::new("a"))?
+            .expect("module should be found")
+            .path(db)?
+            .file();
+        let a_syms = symbol_table(db, a_file)?;
+        let d_sym = a_syms
+            .root_symbol_id_by_name("D")
+            .expect("D symbol should be found");
+
+        let ty = infer_symbol_type(
+            db,
+            GlobalSymbolId {
+                file_id: a_file,
+                symbol_id: d_sym,
+            },
+        )?;
+
+        let jar = HasJar::<SemanticJar>::jar(db)?;
+        assert!(matches!(ty, Type::Class(_)));
+        assert_eq!(format!("{}", ty.display(&jar.type_store)), "Literal[C]");
         Ok(())
     }
 }

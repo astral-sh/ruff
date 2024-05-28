@@ -2,7 +2,10 @@
 use crate::ast_ids::NodeKey;
 use crate::db::{QueryResult, SemanticDb, SemanticJar};
 use crate::files::FileId;
-use crate::symbols::{symbol_table, GlobalSymbolId, ScopeId, ScopeKind, SymbolId};
+use crate::module::{Module, ModuleName};
+use crate::symbols::{
+    resolve_global_symbol, symbol_table, GlobalSymbolId, ScopeId, ScopeKind, SymbolId,
+};
 use crate::{FxDashMap, FxIndexSet, Name};
 use ruff_index::{newtype_index, IndexVec};
 use rustc_hash::FxHashMap;
@@ -25,6 +28,8 @@ pub enum Type {
     Unbound,
     /// a specific function object
     Function(FunctionTypeId),
+    /// a specific module object
+    Module(ModuleTypeId),
     /// a specific class object
     Class(ClassTypeId),
     /// the set of Python objects with the given class in their __class__'s method resolution order
@@ -45,6 +50,35 @@ impl Type {
 
     pub const fn is_unknown(&self) -> bool {
         matches!(self, Type::Unknown)
+    }
+
+    pub fn get_member(&self, db: &dyn SemanticDb, name: &Name) -> QueryResult<Option<Type>> {
+        match self {
+            Type::Any => todo!("attribute lookup on Any type"),
+            Type::Never => todo!("attribute lookup on Never type"),
+            Type::Unknown => todo!("attribute lookup on Unknown type"),
+            Type::Unbound => todo!("attribute lookup on Unbound type"),
+            Type::Function(_) => todo!("attribute lookup on Function type"),
+            Type::Module(module_id) => module_id.get_member(db, name),
+            Type::Class(class_id) => class_id.get_class_member(db, name),
+            Type::Instance(_) => {
+                // TODO MRO? get_own_instance_member, get_instance_member
+                todo!("attribute lookup on Instance type")
+            }
+            Type::Union(union_id) => {
+                let jar: &SemanticJar = db.jar()?;
+                let _todo_union_ref = jar.type_store.get_union(*union_id);
+                // TODO perform the get_member on each type in the union
+                // TODO return the union of those results
+                // TODO if any of those results is `None` then include Unknown in the result union
+                todo!("attribute lookup on Union type")
+            }
+            Type::Intersection(_) => {
+                // TODO perform the get_member on each type in the intersection
+                // TODO return the intersection of those results
+                todo!("attribute lookup on Intersection type")
+            }
+        }
     }
 }
 
@@ -337,6 +371,31 @@ impl FunctionTypeId {
 }
 
 #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
+pub struct ModuleTypeId {
+    module: Module,
+    file_id: FileId,
+}
+
+impl ModuleTypeId {
+    fn module(self, db: &dyn SemanticDb) -> QueryResult<ModuleStoreRef> {
+        let jar: &SemanticJar = db.jar()?;
+        Ok(jar.type_store.add_or_get_module(self.file_id).downgrade())
+    }
+
+    pub(crate) fn name(self, db: &dyn SemanticDb) -> QueryResult<ModuleName> {
+        self.module.name(db)
+    }
+
+    fn get_member(self, db: &dyn SemanticDb, name: &Name) -> QueryResult<Option<Type>> {
+        if let Some(symbol_id) = resolve_global_symbol(db, self.name(db)?, name)? {
+            Ok(Some(infer_symbol_type(db, symbol_id)?))
+        } else {
+            Ok(None)
+        }
+    }
+}
+
+#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
 pub struct ClassTypeId {
     file_id: FileId,
     class_id: ModuleClassTypeId,
@@ -389,7 +448,13 @@ impl ClassTypeId {
         }
     }
 
-    // TODO: get_own_instance_member, get_class_member, get_instance_member
+    /// Get own class member or fall back to super-class member.
+    fn get_class_member(self, db: &dyn SemanticDb, name: &Name) -> QueryResult<Option<Type>> {
+        self.get_own_class_member(db, name)
+            .or_else(|_| self.get_super_class_member(db, name))
+    }
+
+    // TODO: get_own_instance_member, get_instance_member
 }
 
 #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
@@ -529,6 +594,10 @@ impl std::fmt::Display for DisplayType<'_> {
             Type::Never => f.write_str("Never"),
             Type::Unknown => f.write_str("Unknown"),
             Type::Unbound => f.write_str("Unbound"),
+            Type::Module(module_id) => {
+                // NOTE: something like this?: "<module 'module-name' from 'path-from-fileid'>"
+                todo!("{module_id:?}")
+            }
             // TODO functions and classes should display using a fully qualified name
             Type::Class(class_id) => {
                 f.write_str("Literal[")?;
