@@ -130,6 +130,10 @@ pub(crate) fn control_var_used_after_block(checker: &Checker, scope: &Scope) {
     //     None
     // })
     {
-        println!("asdfasdfasdfasdf {:?} {:?} asdf", name, binding);
+        println!("asdf {:?} {:?}", name, binding);
+        println!("asdfasdf {:?}", binding.references);
+        for reference in binding.references() {
+            println!("asdfasdfasdf {:?}", checker.semantic().reference(reference));
+        }
     }
 }

@@ -8,22 +8,22 @@ def foo():
 
     _ = event
 
-    # Tuple destructuring
-    for a, b, c in []:
-        pass
+    # # Tuple destructuring
+    # for a, b, c in []:
+    #     pass
 
-    _ = a
-    _ = b
-    _ = c
+    # _ = a
+    # _ = b
+    # _ = c
 
 
-    # Array destructuring
-    for [d, e, f] in []:
-        pass
+    # # Array destructuring
+    # for [d, e, f] in []:
+    #     pass
 
-    _ = d
-    _ = e
-    _ = f
+    # _ = d
+    # _ = e
+    # _ = f
 
     # # With -> for, variable reused
     # with None as i:
