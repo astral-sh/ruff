@@ -125,8 +125,10 @@ fn generate_fix(
             .add_end(TextSize::new(1)),
     );
 
+    // If a literal was provided, insert an assignment.
+    //
+    // For example, change `x: Final[Literal[42]]` to `x: Final = 42`.
     if let Some(literal) = literal {
-        // If a literal was provided, insert an assignment.
         let assignment = Edit::insertion(
             format!(
                 " = {literal_source}",
@@ -136,7 +138,6 @@ fn generate_fix(
         );
         Fix::safe_edits(deletion, std::iter::once(assignment))
     } else {
-        // If no literal exists, we can remove the assignment.
         Fix::safe_edit(deletion)
     }
 }
