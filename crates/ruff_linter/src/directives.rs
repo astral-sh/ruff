@@ -4,6 +4,7 @@ use std::iter::Peekable;
 use std::str::FromStr;
 
 use bitflags::bitflags;
+use ruff_python_ast::StringFlags;
 use ruff_python_parser::lexer::LexResult;
 use ruff_python_parser::Tok;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
@@ -43,22 +44,6 @@ pub struct IsortDirectives {
     /// Text positions at which splits should be inserted
     pub splits: Vec<TextSize>,
     pub skip_file: bool,
-}
-
-impl IsortDirectives {
-    pub fn is_excluded(&self, offset: TextSize) -> bool {
-        for range in &self.exclusions {
-            if range.contains(offset) {
-                return true;
-            }
-
-            if range.start() > offset {
-                break;
-            }
-        }
-
-        false
-    }
 }
 
 pub struct Directives {
@@ -131,7 +116,7 @@ fn extract_noqa_line_for(lxr: &[LexResult], locator: &Locator, indexer: &Indexer
 
             // For multi-line strings, we expect `noqa` directives on the last line of the
             // string.
-            Tok::String { kind, .. } if kind.is_triple_quoted() => {
+            Tok::String { flags, .. } if flags.is_triple_quoted() => {
                 if locator.contains_line_break(*range) {
                     string_mappings.push(TextRange::new(
                         locator.line_start(range.start()),

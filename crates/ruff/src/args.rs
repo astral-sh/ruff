@@ -111,7 +111,13 @@ pub enum Command {
         output_format: HelpFormat,
     },
     /// List or describe the available configuration options.
-    Config { option: Option<String> },
+    Config {
+        /// Config key to show
+        option: Option<String>,
+        /// Output format
+        #[arg(long, value_enum, default_value = "text")]
+        output_format: HelpFormat,
+    },
     /// List all supported upstream linters.
     Linter {
         /// Output format

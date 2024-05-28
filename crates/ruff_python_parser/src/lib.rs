@@ -110,14 +110,16 @@
 //! [parsing]: https://en.wikipedia.org/wiki/Parsing
 //! [lexer]: crate::lexer
 
-use crate::lexer::{lex, lex_starts_at, LexResult};
-
-pub use crate::error::{FStringErrorType, ParseError, ParseErrorType};
-pub use crate::parser::Program;
-pub use crate::token::{Tok, TokenKind};
+use std::iter::FusedIterator;
+use std::ops::Deref;
 
 use ruff_python_ast::{Expr, Mod, ModModule, PySourceType, Suite};
-use ruff_text_size::TextSize;
+use ruff_text_size::{TextRange, TextSize};
+
+pub use crate::error::{FStringErrorType, ParseError, ParseErrorType};
+use crate::lexer::{lex, lex_starts_at, LexResult};
+pub use crate::parser::Program;
+pub use crate::token::{Tok, TokenKind};
 
 mod error;
 pub mod lexer;
@@ -339,8 +341,75 @@ pub fn parse_tokens(tokens: Vec<LexResult>, source: &str, mode: Mode) -> Result<
     }
 }
 
+/// Tokens represents a vector of [`LexResult`].
+///
+/// This should only include tokens up to and including the first error. This struct is created
+/// by the [`tokenize`] function.
+#[derive(Debug, Clone)]
+pub struct Tokens(Vec<LexResult>);
+
+impl Tokens {
+    /// Returns an iterator over the [`TokenKind`] and the range corresponding to the tokens.
+    pub fn kinds(&self) -> TokenKindIter {
+        TokenKindIter::new(&self.0)
+    }
+
+    /// Consumes the [`Tokens`], returning the underlying vector of [`LexResult`].
+    pub fn into_inner(self) -> Vec<LexResult> {
+        self.0
+    }
+}
+
+impl Deref for Tokens {
+    type Target = [LexResult];
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+/// An iterator over the [`TokenKind`] and the corresponding range.
+///
+/// This struct is created by the [`Tokens::kinds`] method.
+#[derive(Clone, Default)]
+pub struct TokenKindIter<'a> {
+    inner: std::iter::Flatten<std::slice::Iter<'a, LexResult>>,
+}
+
+impl<'a> TokenKindIter<'a> {
+    /// Create a new iterator from a slice of [`LexResult`].
+    pub fn new(tokens: &'a [LexResult]) -> Self {
+        Self {
+            inner: tokens.iter().flatten(),
+        }
+    }
+
+    /// Return the next value without advancing the iterator.
+    pub fn peek(&mut self) -> Option<(TokenKind, TextRange)> {
+        self.clone().next()
+    }
+}
+
+impl Iterator for TokenKindIter<'_> {
+    type Item = (TokenKind, TextRange);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let &(ref tok, range) = self.inner.next()?;
+        Some((TokenKind::from_token(tok), range))
+    }
+}
+
+impl FusedIterator for TokenKindIter<'_> {}
+
+impl DoubleEndedIterator for TokenKindIter<'_> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        let &(ref tok, range) = self.inner.next_back()?;
+        Some((TokenKind::from_token(tok), range))
+    }
+}
+
 /// Collect tokens up to and including the first error.
-pub fn tokenize(contents: &str, mode: Mode) -> Vec<LexResult> {
+pub fn tokenize(contents: &str, mode: Mode) -> Tokens {
     let mut tokens: Vec<LexResult> = allocate_tokens_vec(contents);
     for tok in lexer::lex(contents, mode) {
         let is_err = tok.is_err();
@@ -350,7 +419,7 @@ pub fn tokenize(contents: &str, mode: Mode) -> Vec<LexResult> {
         }
     }
 
-    tokens
+    Tokens(tokens)
 }
 
 /// Tokenizes all tokens.
@@ -380,7 +449,7 @@ fn approximate_tokens_lower_bound(contents: &str) -> usize {
 
 /// Parse a full Python program from its tokens.
 pub fn parse_program_tokens(
-    tokens: Vec<LexResult>,
+    tokens: Tokens,
     source: &str,
     is_jupyter_notebook: bool,
 ) -> anyhow::Result<Suite, ParseError> {
@@ -389,7 +458,7 @@ pub fn parse_program_tokens(
     } else {
         Mode::Module
     };
-    match parse_tokens(tokens, source, mode)? {
+    match parse_tokens(tokens.into_inner(), source, mode)? {
         Mod::Module(m) => Ok(m.body),
         Mod::Expression(_) => unreachable!("Mode::Module doesn't return other variant"),
     }

@@ -7,27 +7,27 @@ input_file: crates/ruff_python_parser/resources/invalid/statements/function_type
 ```
 Module(
     ModModule {
-        range: 0..986,
+        range: 0..988,
         body: [
             FunctionDef(
                 StmtFunctionDef {
-                    range: 795..823,
+                    range: 796..824,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: "keyword",
-                        range: 799..806,
+                        range: 800..807,
                     },
                     type_params: Some(
                         TypeParams {
-                            range: 806..816,
+                            range: 807..817,
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
-                                        range: 807..808,
+                                        range: 808..809,
                                         name: Identifier {
                                             id: "A",
-                                            range: 807..808,
+                                            range: 808..809,
                                         },
                                         bound: None,
                                         default: None,
@@ -35,10 +35,10 @@ Module(
                                 ),
                                 TypeVar(
                                     TypeParamTypeVar {
-                                        range: 810..815,
+                                        range: 811..816,
                                         name: Identifier {
                                             id: "await",
-                                            range: 810..815,
+                                            range: 811..816,
                                         },
                                         bound: None,
                                         default: None,
@@ -48,7 +48,7 @@ Module(
                         },
                     ),
                     parameters: Parameters {
-                        range: 816..818,
+                        range: 817..819,
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -59,10 +59,10 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                range: 820..823,
+                                range: 821..824,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        range: 820..823,
+                                        range: 821..824,
                                     },
                                 ),
                             },
@@ -72,23 +72,23 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
-                    range: 825..861,
+                    range: 826..862,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: "not_a_type_param",
-                        range: 829..845,
+                        range: 830..846,
                     },
                     type_params: Some(
                         TypeParams {
-                            range: 845..854,
+                            range: 846..855,
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
-                                        range: 846..847,
+                                        range: 847..848,
                                         name: Identifier {
                                             id: "A",
-                                            range: 846..847,
+                                            range: 847..848,
                                         },
                                         bound: None,
                                         default: None,
@@ -96,10 +96,10 @@ Module(
                                 ),
                                 TypeVar(
                                     TypeParamTypeVar {
-                                        range: 852..853,
+                                        range: 853..854,
                                         name: Identifier {
                                             id: "B",
-                                            range: 852..853,
+                                            range: 853..854,
                                         },
                                         bound: None,
                                         default: None,
@@ -109,7 +109,7 @@ Module(
                         },
                     ),
                     parameters: Parameters {
-                        range: 854..856,
+                        range: 855..857,
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -120,10 +120,10 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                range: 858..861,
+                                range: 859..862,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        range: 858..861,
+                                        range: 859..862,
                                     },
                                 ),
                             },
@@ -133,23 +133,23 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
-                    range: 863..895,
+                    range: 864..896,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: "multiple_commas",
-                        range: 867..882,
+                        range: 868..883,
                     },
                     type_params: Some(
                         TypeParams {
-                            range: 882..888,
+                            range: 883..889,
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
-                                        range: 883..884,
+                                        range: 884..885,
                                         name: Identifier {
                                             id: "A",
-                                            range: 883..884,
+                                            range: 884..885,
                                         },
                                         bound: None,
                                         default: None,
@@ -157,10 +157,10 @@ Module(
                                 ),
                                 TypeVar(
                                     TypeParamTypeVar {
-                                        range: 886..887,
+                                        range: 887..888,
                                         name: Identifier {
                                             id: "B",
-                                            range: 886..887,
+                                            range: 887..888,
                                         },
                                         bound: None,
                                         default: None,
@@ -170,7 +170,7 @@ Module(
                         },
                     ),
                     parameters: Parameters {
-                        range: 888..890,
+                        range: 889..891,
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -181,10 +181,10 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                range: 892..895,
+                                range: 893..896,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        range: 892..895,
+                                        range: 893..896,
                                     },
                                 ),
                             },
@@ -194,23 +194,23 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
-                    range: 897..937,
+                    range: 898..938,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: "multiple_trailing_commas",
-                        range: 901..925,
+                        range: 902..926,
                     },
                     type_params: Some(
                         TypeParams {
-                            range: 925..930,
+                            range: 926..931,
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
-                                        range: 926..927,
+                                        range: 927..928,
                                         name: Identifier {
                                             id: "A",
-                                            range: 926..927,
+                                            range: 927..928,
                                         },
                                         bound: None,
                                         default: None,
@@ -220,7 +220,7 @@ Module(
                         },
                     ),
                     parameters: Parameters {
-                        range: 930..932,
+                        range: 931..933,
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -231,10 +231,10 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                range: 934..937,
+                                range: 935..938,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        range: 934..937,
+                                        range: 935..938,
                                     },
                                 ),
                             },
@@ -244,23 +244,23 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
-                    range: 939..978,
+                    range: 940..979,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: "multiple_commas_and_recovery",
-                        range: 943..971,
+                        range: 944..972,
                     },
                     type_params: Some(
                         TypeParams {
-                            range: 971..975,
+                            range: 972..976,
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
-                                        range: 972..973,
+                                        range: 973..974,
                                         name: Identifier {
                                             id: "A",
-                                            range: 972..973,
+                                            range: 973..974,
                                         },
                                         bound: None,
                                         default: None,
@@ -270,7 +270,7 @@ Module(
                         },
                     ),
                     parameters: Parameters {
-                        range: 975..975,
+                        range: 976..976,
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -281,10 +281,10 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                range: 975..978,
+                                range: 976..979,
                                 value: NumberLiteral(
                                     ExprNumberLiteral {
-                                        range: 975..978,
+                                        range: 976..979,
                                         value: Int(
                                             100,
                                         ),
@@ -297,10 +297,10 @@ Module(
             ),
             AnnAssign(
                 StmtAnnAssign {
-                    range: 979..986,
+                    range: 980..987,
                     target: Tuple(
                         ExprTuple {
-                            range: 979..981,
+                            range: 980..982,
                             elts: [],
                             ctx: Store,
                             parenthesized: true,
@@ -308,7 +308,7 @@ Module(
                     ),
                     annotation: EllipsisLiteral(
                         ExprEllipsisLiteral {
-                            range: 983..986,
+                            range: 984..987,
                         },
                     ),
                     value: None,

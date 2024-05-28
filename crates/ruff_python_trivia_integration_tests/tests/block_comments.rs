@@ -1,5 +1,4 @@
 use ruff_python_index::Indexer;
-use ruff_python_parser::lexer::LexResult;
 use ruff_python_parser::{tokenize, Mode};
 use ruff_source_file::Locator;
 use ruff_text_size::TextSize;
@@ -38,7 +37,7 @@ fn block_comments_indented_block() {
 fn block_comments_single_line_is_not_a_block() {
     // arrange
     let source = "\n";
-    let tokens: Vec<LexResult> = tokenize(source, Mode::Module);
+    let tokens = tokenize(source, Mode::Module);
     let locator = Locator::new(source);
     let indexer = Indexer::from_tokens(&tokens, &locator);
 

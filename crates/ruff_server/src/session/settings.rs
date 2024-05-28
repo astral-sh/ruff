@@ -7,7 +7,7 @@ use serde::Deserialize;
 use ruff_linter::{line_width::LineLength, RuleSelector};
 
 /// Maps a workspace URI to its associated client settings. Used during server initialization.
-pub(crate) type WorkspaceSettingsMap = FxHashMap<Url, ClientSettings>;
+pub(crate) type WorkspaceSettingsMap = FxHashMap<PathBuf, ClientSettings>;
 
 /// Resolved client settings for a specific document. These settings are meant to be
 /// used directly by the server, and are *not* a 1:1 representation with how the client
@@ -19,8 +19,6 @@ pub(crate) struct ResolvedClientSettings {
     fix_all: bool,
     organize_imports: bool,
     lint_enable: bool,
-    // TODO(jane): Remove once noqa auto-fix is implemented
-    #[allow(dead_code)]
     disable_rule_comment_enable: bool,
     fix_violation_enable: bool,
     editor_settings: ResolvedEditorSettings,
@@ -132,7 +130,8 @@ enum InitializationOptions {
         workspace_settings: Vec<WorkspaceSettings>,
     },
     GlobalOnly {
-        settings: Option<ClientSettings>,
+        #[serde(default)]
+        settings: ClientSettings,
     },
 }
 
@@ -159,7 +158,7 @@ impl AllSettings {
 
     fn from_init_options(options: InitializationOptions) -> Self {
         let (global_settings, workspace_settings) = match options {
-            InitializationOptions::GlobalOnly { settings } => (settings.unwrap_or_default(), None),
+            InitializationOptions::GlobalOnly { settings } => (settings, None),
             InitializationOptions::HasWorkspaces {
                 global_settings,
                 workspace_settings,
@@ -171,7 +170,12 @@ impl AllSettings {
             workspace_settings: workspace_settings.map(|workspace_settings| {
                 workspace_settings
                     .into_iter()
-                    .map(|settings| (settings.workspace, settings.settings))
+                    .map(|settings| {
+                        (
+                            settings.workspace.to_file_path().unwrap(),
+                            settings.settings,
+                        )
+                    })
                     .collect()
             }),
         }
@@ -323,6 +327,10 @@ impl ResolvedClientSettings {
         self.lint_enable
     }
 
+    pub(crate) fn noqa_comments(&self) -> bool {
+        self.disable_rule_comment_enable
+    }
+
     pub(crate) fn fix_violation(&self) -> bool {
         self.fix_violation_enable
     }
@@ -334,7 +342,9 @@ impl ResolvedClientSettings {
 
 impl Default for InitializationOptions {
     fn default() -> Self {
-        Self::GlobalOnly { settings: None }
+        Self::GlobalOnly {
+            settings: ClientSettings::default(),
+        }
     }
 }
 
@@ -358,7 +368,7 @@ mod tests {
         serde_json::from_str(content).expect("test fixture JSON should deserialize")
     }
 
-    #[test]
+    #[cfg_attr(not(windows), test)]
     fn test_vs_code_init_options_deserialize() {
         let options: InitializationOptions = deserialize_fixture(VS_CODE_INIT_OPTIONS_FIXTURE);
 
@@ -543,19 +553,19 @@ mod tests {
         "###);
     }
 
-    #[test]
+    #[cfg_attr(not(windows), test)]
     fn test_vs_code_workspace_settings_resolve() {
         let options = deserialize_fixture(VS_CODE_INIT_OPTIONS_FIXTURE);
         let AllSettings {
             global_settings,
             workspace_settings,
         } = AllSettings::from_init_options(options);
-        let url = Url::parse("file:///Users/test/projects/pandas").expect("url should parse");
+        let path = PathBuf::from_str("/Users/test/projects/pandas").expect("path should be valid");
         let workspace_settings = workspace_settings.expect("workspace settings should exist");
         assert_eq!(
             ResolvedClientSettings::with_workspace(
                 workspace_settings
-                    .get(&url)
+                    .get(&path)
                     .expect("workspace setting should exist"),
                 &global_settings
             ),
@@ -581,11 +591,11 @@ mod tests {
                 }
             }
         );
-        let url = Url::parse("file:///Users/test/projects/scipy").expect("url should parse");
+        let path = PathBuf::from_str("/Users/test/projects/scipy").expect("path should be valid");
         assert_eq!(
             ResolvedClientSettings::with_workspace(
                 workspace_settings
-                    .get(&url)
+                    .get(&path)
                     .expect("workspace setting should exist"),
                 &global_settings
             ),
@@ -619,52 +629,50 @@ mod tests {
 
         assert_debug_snapshot!(options, @r###"
         GlobalOnly {
-            settings: Some(
-                ClientSettings {
-                    configuration: None,
-                    fix_all: Some(
-                        false,
-                    ),
-                    organize_imports: None,
-                    lint: Some(
-                        LintOptions {
-                            enable: None,
-                            preview: None,
-                            select: None,
-                            extend_select: None,
-                            ignore: Some(
-                                [
-                                    "RUF001",
-                                ],
-                            ),
-                        },
-                    ),
-                    format: None,
-                    code_action: Some(
-                        CodeActionOptions {
-                            disable_rule_comment: Some(
-                                CodeActionParameters {
-                                    enable: Some(
-                                        false,
-                                    ),
-                                },
-                            ),
-                            fix_violation: None,
-                        },
-                    ),
-                    exclude: Some(
-                        [
-                            "third_party",
-                        ],
-                    ),
-                    line_length: Some(
-                        LineLength(
-                            80,
+            settings: ClientSettings {
+                configuration: None,
+                fix_all: Some(
+                    false,
+                ),
+                organize_imports: None,
+                lint: Some(
+                    LintOptions {
+                        enable: None,
+                        preview: None,
+                        select: None,
+                        extend_select: None,
+                        ignore: Some(
+                            [
+                                "RUF001",
+                            ],
                         ),
+                    },
+                ),
+                format: None,
+                code_action: Some(
+                    CodeActionOptions {
+                        disable_rule_comment: Some(
+                            CodeActionParameters {
+                                enable: Some(
+                                    false,
+                                ),
+                            },
+                        ),
+                        fix_violation: None,
+                    },
+                ),
+                exclude: Some(
+                    [
+                        "third_party",
+                    ],
+                ),
+                line_length: Some(
+                    LineLength(
+                        80,
                     ),
-                    configuration_preference: None,
-                },
-            ),
+                ),
+                configuration_preference: None,
+            },
         }
         "###);
     }

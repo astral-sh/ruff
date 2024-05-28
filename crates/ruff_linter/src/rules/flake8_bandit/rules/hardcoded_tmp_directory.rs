@@ -64,7 +64,7 @@ pub(crate) fn hardcoded_tmp_directory(checker: &mut Checker, string: StringLike)
                         check(checker, literal, literal.range());
                     }
                     ast::FStringPart::FString(f_string) => {
-                        for literal in f_string.literals() {
+                        for literal in f_string.elements.literals() {
                             check(checker, literal, literal.range());
                         }
                     }

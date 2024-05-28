@@ -11,7 +11,6 @@ impl super::NotificationHandler for Cancel {
 }
 
 impl super::SyncNotificationHandler for Cancel {
-    #[tracing::instrument(skip_all)]
     fn run(
         _session: &mut Session,
         _notifier: Notifier,

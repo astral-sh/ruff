@@ -383,7 +383,7 @@ impl AlwaysFixableViolation for LoggingWarn {
     }
 
     fn fix_title(&self) -> String {
-        "Convert to `warn`".to_string()
+        "Convert to `warning`".to_string()
     }
 }
 

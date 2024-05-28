@@ -383,26 +383,6 @@ impl KnownModules {
         Some((section, reason))
     }
 
-    /// Return the list of modules that are known to be of a given type.
-    pub fn modules_for_known_type(
-        &self,
-        import_type: ImportType,
-    ) -> impl Iterator<Item = &glob::Pattern> {
-        self.known
-            .iter()
-            .filter_map(move |(module, known_section)| {
-                if let ImportSection::Known(section) = known_section {
-                    if *section == import_type {
-                        Some(module)
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                }
-            })
-    }
-
     /// Return the list of user-defined modules, indexed by section.
     pub fn user_defined(&self) -> FxHashMap<&str, Vec<&glob::Pattern>> {
         let mut user_defined: FxHashMap<&str, Vec<&glob::Pattern>> = FxHashMap::default();

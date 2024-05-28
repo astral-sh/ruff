@@ -29,7 +29,11 @@ pub(crate) fn hover(
     snapshot: &DocumentSnapshot,
     position: &types::TextDocumentPositionParams,
 ) -> Option<types::Hover> {
-    let document = snapshot.document();
+    // Hover only operates on text documents or notebook cells
+    let document = snapshot
+        .query()
+        .as_single_document()
+        .expect("hover should only be called on text documents or notebook cells");
     let line_number: usize = position
         .position
         .line

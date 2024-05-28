@@ -180,8 +180,11 @@ pub fn run(
             }
             Ok(ExitStatus::Success)
         }
-        Command::Config { option } => {
-            commands::config::config(option.as_deref())?;
+        Command::Config {
+            option,
+            output_format,
+        } => {
+            commands::config::config(option.as_deref(), output_format)?;
             Ok(ExitStatus::Success)
         }
         Command::Linter { output_format } => {
@@ -234,6 +237,9 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
     let mut writer: Box<dyn Write> = match cli.output_file {
         Some(path) if !cli.watch => {
             colored::control::set_override(false);
+            if let Some(parent) = path.parent() {
+                std::fs::create_dir_all(parent)?;
+            }
             let file = File::create(path)?;
             Box::new(BufWriter::new(file))
         }

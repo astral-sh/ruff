@@ -14,25 +14,48 @@ use ruff_index::{newtype_index, IndexVec};
 use ruff_python_ast as ast;
 use ruff_python_ast::visitor::preorder::PreorderVisitor;
 
-use crate::ast_ids::TypedNodeKey;
+use crate::ast_ids::{NodeKey, TypedNodeKey};
 use crate::cache::KeyValueCache;
-use crate::db::{HasJar, QueryResult, SemanticDb, SemanticJar};
+use crate::db::{QueryResult, SemanticDb, SemanticJar};
 use crate::files::FileId;
-use crate::module::ModuleName;
+use crate::module::{resolve_module, ModuleName};
+use crate::parse::parse;
 use crate::Name;
 
-#[allow(unreachable_pub)]
 #[tracing::instrument(level = "debug", skip(db))]
-pub fn symbol_table<Db>(db: &Db, file_id: FileId) -> QueryResult<Arc<SymbolTable>>
-where
-    Db: SemanticDb + HasJar<SemanticJar>,
-{
-    let jar = db.jar()?;
+pub fn symbol_table(db: &dyn SemanticDb, file_id: FileId) -> QueryResult<Arc<SymbolTable>> {
+    let jar: &SemanticJar = db.jar()?;
 
     jar.symbol_tables.get(&file_id, |_| {
-        let parsed = db.parse(file_id)?;
+        let parsed = parse(db.upcast(), file_id)?;
         Ok(Arc::from(SymbolTable::from_ast(parsed.ast())))
     })
+}
+
+#[tracing::instrument(level = "debug", skip(db))]
+pub fn resolve_global_symbol(
+    db: &dyn SemanticDb,
+    module: ModuleName,
+    name: &str,
+) -> QueryResult<Option<GlobalSymbolId>> {
+    let Some(typing_module) = resolve_module(db, module)? else {
+        return Ok(None);
+    };
+    let typing_file = typing_module.path(db)?.file();
+    let typing_table = symbol_table(db, typing_file)?;
+    let Some(typing_override) = typing_table.root_symbol_id_by_name(name) else {
+        return Ok(None);
+    };
+    Ok(Some(GlobalSymbolId {
+        file_id: typing_file,
+        symbol_id: typing_override,
+    }))
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub struct GlobalSymbolId {
+    pub(crate) file_id: FileId,
+    pub(crate) symbol_id: SymbolId,
 }
 
 type Map<K, V> = hashbrown::HashMap<K, V, ()>;
@@ -67,7 +90,12 @@ pub(crate) enum ScopeKind {
 pub(crate) struct Scope {
     name: Name,
     kind: ScopeKind,
-    child_scopes: Vec<ScopeId>,
+    parent: Option<ScopeId>,
+    children: Vec<ScopeId>,
+    /// the definition (e.g. class or function) that created this scope
+    definition: Option<Definition>,
+    /// the symbol (e.g. class or function) that owns this scope
+    defining_symbol: Option<SymbolId>,
     /// symbol IDs, hashed by symbol name
     symbols_by_name: Map<SymbolId, ()>,
 }
@@ -79,6 +107,14 @@ impl Scope {
 
     pub(crate) fn kind(&self) -> ScopeKind {
         self.kind
+    }
+
+    pub(crate) fn definition(&self) -> Option<Definition> {
+        self.definition.clone()
+    }
+
+    pub(crate) fn defining_symbol(&self) -> Option<SymbolId> {
+        self.defining_symbol
     }
 }
 
@@ -116,6 +152,10 @@ impl Symbol {
         self.name.as_str()
     }
 
+    pub(crate) fn scope_id(&self) -> ScopeId {
+        self.scope_id
+    }
+
     /// Is the symbol used in its containing scope?
     pub(crate) fn is_used(&self) -> bool {
         self.flags.contains(SymbolFlags::IS_USED)
@@ -134,6 +174,7 @@ impl Symbol {
 // TODO storing TypedNodeKey for definitions means we have to search to find them again in the AST;
 // this is at best O(log n). If looking up definitions is a bottleneck we should look for
 // alternatives here.
+// TODO intern Definitions in SymbolTable and reference using IDs?
 #[derive(Clone, Debug)]
 pub(crate) enum Definition {
     // For the import cases, we don't need reference to any arbitrary AST subtrees (annotations,
@@ -142,7 +183,7 @@ pub(crate) enum Definition {
     // the small amount of information we need from the AST.
     Import(ImportDefinition),
     ImportFrom(ImportFromDefinition),
-    ClassDef(ClassDefinition),
+    ClassDef(TypedNodeKey<ast::StmtClassDef>),
     FunctionDef(TypedNodeKey<ast::StmtFunctionDef>),
     Assignment(TypedNodeKey<ast::StmtAssign>),
     AnnotatedAssignment(TypedNodeKey<ast::StmtAnnAssign>),
@@ -175,12 +216,6 @@ impl ImportFromDefinition {
     }
 }
 
-#[derive(Clone, Debug)]
-pub(crate) struct ClassDefinition {
-    pub(crate) node_key: TypedNodeKey<ast::StmtClassDef>,
-    pub(crate) scope_id: ScopeId,
-}
-
 #[derive(Debug, Clone)]
 pub enum Dependency {
     Module(ModuleName),
@@ -195,7 +230,11 @@ pub enum Dependency {
 pub struct SymbolTable {
     scopes_by_id: IndexVec<ScopeId, Scope>,
     symbols_by_id: IndexVec<SymbolId, Symbol>,
+    /// the definitions for each symbol
     defs: FxHashMap<SymbolId, Vec<Definition>>,
+    /// map of AST node (e.g. class/function def) to sub-scope it creates
+    scopes_by_node: FxHashMap<NodeKey, ScopeId>,
+    /// dependencies of this module
     dependencies: Vec<Dependency>,
 }
 
@@ -216,12 +255,16 @@ impl SymbolTable {
             scopes_by_id: IndexVec::new(),
             symbols_by_id: IndexVec::new(),
             defs: FxHashMap::default(),
+            scopes_by_node: FxHashMap::default(),
             dependencies: Vec::new(),
         };
         table.scopes_by_id.push(Scope {
             name: Name::new("<module>"),
             kind: ScopeKind::Module,
-            child_scopes: Vec::new(),
+            parent: None,
+            children: Vec::new(),
+            definition: None,
+            defining_symbol: None,
             symbols_by_name: Map::default(),
         });
         table
@@ -262,7 +305,7 @@ impl SymbolTable {
     }
 
     pub(crate) fn child_scope_ids_of(&self, scope_id: ScopeId) -> &[ScopeId] {
-        &self.scopes_by_id[scope_id].child_scopes
+        &self.scopes_by_id[scope_id].children
     }
 
     pub(crate) fn child_scopes_of(&self, scope_id: ScopeId) -> ScopeIterator<&[ScopeId]> {
@@ -284,11 +327,13 @@ impl SymbolTable {
         let scope = &self.scopes_by_id[scope_id];
         let hash = SymbolTable::hash_name(name);
         let name = Name::new(name);
-        scope
-            .symbols_by_name
-            .raw_entry()
-            .from_hash(hash, |symid| self.symbols_by_id[*symid].name == name)
-            .map(|(symbol_id, ())| *symbol_id)
+        Some(
+            *scope
+                .symbols_by_name
+                .raw_entry()
+                .from_hash(hash, |symid| self.symbols_by_id[*symid].name == name)?
+                .0,
+        )
     }
 
     pub(crate) fn symbol_by_name(&self, scope_id: ScopeId, name: &str) -> Option<&Symbol> {
@@ -301,6 +346,32 @@ impl SymbolTable {
 
     pub(crate) fn root_symbol_by_name(&self, name: &str) -> Option<&Symbol> {
         self.symbol_by_name(SymbolTable::root_scope_id(), name)
+    }
+
+    pub(crate) fn scope_id_of_symbol(&self, symbol_id: SymbolId) -> ScopeId {
+        self.symbols_by_id[symbol_id].scope_id
+    }
+
+    pub(crate) fn scope_of_symbol(&self, symbol_id: SymbolId) -> &Scope {
+        &self.scopes_by_id[self.scope_id_of_symbol(symbol_id)]
+    }
+
+    pub(crate) fn parent_scopes(
+        &self,
+        scope_id: ScopeId,
+    ) -> ScopeIterator<impl Iterator<Item = ScopeId> + '_> {
+        ScopeIterator {
+            table: self,
+            ids: std::iter::successors(Some(scope_id), |scope| self.scopes_by_id[*scope].parent),
+        }
+    }
+
+    pub(crate) fn parent_scope(&self, scope_id: ScopeId) -> Option<ScopeId> {
+        self.scopes_by_id[scope_id].parent
+    }
+
+    pub(crate) fn scope_id_for_node(&self, node_key: &NodeKey) -> ScopeId {
+        self.scopes_by_node[node_key]
     }
 
     pub(crate) fn definitions(&self, symbol_id: SymbolId) -> &[Definition] {
@@ -316,7 +387,7 @@ impl SymbolTable {
             .flat_map(|(sym_id, defs)| defs.iter().map(move |def| (*sym_id, def)))
     }
 
-    fn add_or_update_symbol(
+    pub(crate) fn add_or_update_symbol(
         &mut self,
         scope_id: ScopeId,
         name: &str,
@@ -344,7 +415,9 @@ impl SymbolTable {
                     flags,
                     scope_id,
                 });
-                entry.insert_with_hasher(hash, id, (), |_| hash);
+                entry.insert_with_hasher(hash, id, (), |symid| {
+                    SymbolTable::hash_name(&self.symbols_by_id[*symid].name)
+                });
                 id
             }
         }
@@ -355,15 +428,20 @@ impl SymbolTable {
         parent_scope_id: ScopeId,
         name: &str,
         kind: ScopeKind,
+        definition: Option<Definition>,
+        defining_symbol: Option<SymbolId>,
     ) -> ScopeId {
         let new_scope_id = self.scopes_by_id.push(Scope {
             name: Name::new(name),
             kind,
-            child_scopes: Vec::new(),
+            parent: Some(parent_scope_id),
+            children: Vec::new(),
+            definition,
+            defining_symbol,
             symbols_by_name: Map::default(),
         });
         let parent_scope = &mut self.scopes_by_id[parent_scope_id];
-        parent_scope.child_scopes.push(new_scope_id);
+        parent_scope.children.push(new_scope_id);
         new_scope_id
     }
 
@@ -410,20 +488,22 @@ where
     }
 }
 
+// TODO maybe get rid of this and just do all data access via methods on ScopeId?
 pub(crate) struct ScopeIterator<'a, I> {
     table: &'a SymbolTable,
     ids: I,
 }
 
+/// iterate (`ScopeId`, `Scope`) pairs for given `ScopeId` iterator
 impl<'a, I> Iterator for ScopeIterator<'a, I>
 where
     I: Iterator<Item = ScopeId>,
 {
-    type Item = &'a Scope;
+    type Item = (ScopeId, &'a Scope);
 
     fn next(&mut self) -> Option<Self::Item> {
         let id = self.ids.next()?;
-        Some(&self.table.scopes_by_id[id])
+        Some((id, &self.table.scopes_by_id[id]))
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
@@ -439,7 +519,7 @@ where
 {
     fn next_back(&mut self) -> Option<Self::Item> {
         let id = self.ids.next_back()?;
-        Some(&self.table.scopes_by_id[id])
+        Some((id, &self.table.scopes_by_id[id]))
     }
 }
 
@@ -470,8 +550,16 @@ impl SymbolTableBuilder {
         symbol_id
     }
 
-    fn push_scope(&mut self, name: &str, kind: ScopeKind) -> ScopeId {
-        let scope_id = self.table.add_child_scope(self.cur_scope(), name, kind);
+    fn push_scope(
+        &mut self,
+        name: &str,
+        kind: ScopeKind,
+        definition: Option<Definition>,
+        defining_symbol: Option<SymbolId>,
+    ) -> ScopeId {
+        let scope_id =
+            self.table
+                .add_child_scope(self.cur_scope(), name, kind, definition, defining_symbol);
         self.scopes.push(scope_id);
         scope_id
     }
@@ -489,14 +577,20 @@ impl SymbolTableBuilder {
             .expect("Scope stack should never be empty")
     }
 
+    fn record_scope_for_node(&mut self, node_key: NodeKey, scope_id: ScopeId) {
+        self.table.scopes_by_node.insert(node_key, scope_id);
+    }
+
     fn with_type_params(
         &mut self,
         name: &str,
         params: &Option<Box<ast::TypeParams>>,
+        definition: Option<Definition>,
+        defining_symbol: Option<SymbolId>,
         nested: impl FnOnce(&mut Self) -> ScopeId,
     ) -> ScopeId {
         if let Some(type_params) = params {
-            self.push_scope(name, ScopeKind::Annotation);
+            self.push_scope(name, ScopeKind::Annotation, definition, defining_symbol);
             for type_param in &type_params.type_params {
                 let name = match type_param {
                     ast::TypeParam::TypeVar(ast::TypeParamTypeVar { name, .. }) => name,
@@ -537,27 +631,50 @@ impl PreorderVisitor<'_> for SymbolTableBuilder {
         // TODO need to capture more definition statements here
         match stmt {
             ast::Stmt::ClassDef(node) => {
-                let scope_id = self.with_type_params(&node.name, &node.type_params, |builder| {
-                    let scope_id = builder.push_scope(&node.name, ScopeKind::Class);
-                    ast::visitor::preorder::walk_stmt(builder, stmt);
-                    builder.pop_scope();
-                    scope_id
-                });
-                let def = Definition::ClassDef(ClassDefinition {
-                    node_key: TypedNodeKey::from_node(node),
-                    scope_id,
-                });
-                self.add_or_update_symbol_with_def(&node.name, def);
+                let node_key = TypedNodeKey::from_node(node);
+                let def = Definition::ClassDef(node_key.clone());
+                let symbol_id = self.add_or_update_symbol_with_def(&node.name, def.clone());
+                let scope_id = self.with_type_params(
+                    &node.name,
+                    &node.type_params,
+                    Some(def.clone()),
+                    Some(symbol_id),
+                    |builder| {
+                        let scope_id = builder.push_scope(
+                            &node.name,
+                            ScopeKind::Class,
+                            Some(def.clone()),
+                            Some(symbol_id),
+                        );
+                        ast::visitor::preorder::walk_stmt(builder, stmt);
+                        builder.pop_scope();
+                        scope_id
+                    },
+                );
+                self.record_scope_for_node(*node_key.erased(), scope_id);
             }
             ast::Stmt::FunctionDef(node) => {
-                let def = Definition::FunctionDef(TypedNodeKey::from_node(node));
-                self.add_or_update_symbol_with_def(&node.name, def);
-                self.with_type_params(&node.name, &node.type_params, |builder| {
-                    let scope_id = builder.push_scope(&node.name, ScopeKind::Function);
-                    ast::visitor::preorder::walk_stmt(builder, stmt);
-                    builder.pop_scope();
-                    scope_id
-                });
+                let node_key = TypedNodeKey::from_node(node);
+                let def = Definition::FunctionDef(node_key.clone());
+                let symbol_id = self.add_or_update_symbol_with_def(&node.name, def.clone());
+                let scope_id = self.with_type_params(
+                    &node.name,
+                    &node.type_params,
+                    Some(def.clone()),
+                    Some(symbol_id),
+                    |builder| {
+                        let scope_id = builder.push_scope(
+                            &node.name,
+                            ScopeKind::Function,
+                            Some(def.clone()),
+                            Some(symbol_id),
+                        );
+                        ast::visitor::preorder::walk_stmt(builder, stmt);
+                        builder.pop_scope();
+                        scope_id
+                    },
+                );
+                self.record_scope_for_node(*node_key.erased(), scope_id);
             }
             ast::Stmt::Import(ast::StmtImport { names, .. }) => {
                 for alias in names {
@@ -931,7 +1048,7 @@ mod tests {
         let mut table = SymbolTable::new();
         let root_scope_id = SymbolTable::root_scope_id();
         let foo_symbol_top = table.add_or_update_symbol(root_scope_id, "foo", SymbolFlags::empty());
-        let c_scope = table.add_child_scope(root_scope_id, "C", ScopeKind::Class);
+        let c_scope = table.add_child_scope(root_scope_id, "C", ScopeKind::Class, None, None);
         let foo_symbol_inner = table.add_or_update_symbol(c_scope, "foo", SymbolFlags::empty());
         assert_ne!(foo_symbol_top, foo_symbol_inner);
     }
@@ -952,5 +1069,21 @@ mod tests {
         let foo_symbol_id = table.add_or_update_symbol(root_scope_id, "foo", SymbolFlags::empty());
         let symbol = foo_symbol_id.symbol(&table);
         assert_eq!(symbol.name.as_str(), "foo");
+    }
+
+    #[test]
+    fn bigger_symbol_table() {
+        let mut table = SymbolTable::new();
+        let root_scope_id = SymbolTable::root_scope_id();
+        let foo_symbol_id = table.add_or_update_symbol(root_scope_id, "foo", SymbolFlags::empty());
+        table.add_or_update_symbol(root_scope_id, "bar", SymbolFlags::empty());
+        table.add_or_update_symbol(root_scope_id, "baz", SymbolFlags::empty());
+        table.add_or_update_symbol(root_scope_id, "qux", SymbolFlags::empty());
+
+        let foo_symbol_id_2 = table
+            .root_symbol_id_by_name("foo")
+            .expect("foo symbol to be found");
+
+        assert_eq!(foo_symbol_id_2, foo_symbol_id);
     }
 }

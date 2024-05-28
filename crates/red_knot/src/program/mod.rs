@@ -5,19 +5,10 @@ use std::sync::Arc;
 use rustc_hash::FxHashMap;
 
 use crate::db::{
-    Database, Db, DbRuntime, HasJar, HasJars, JarsStorage, LintDb, LintJar, ParallelDatabase,
-    QueryResult, SemanticDb, SemanticJar, Snapshot, SourceDb, SourceJar,
+    Database, Db, DbRuntime, DbWithJar, HasJar, HasJars, JarsStorage, LintDb, LintJar,
+    ParallelDatabase, QueryResult, SemanticDb, SemanticJar, Snapshot, SourceDb, SourceJar, Upcast,
 };
 use crate::files::{FileId, Files};
-use crate::lint::{lint_semantic, lint_syntax, Diagnostics};
-use crate::module::{
-    add_module, file_to_module, path_to_module, resolve_module, set_module_search_paths, Module,
-    ModuleData, ModuleName, ModuleSearchPath,
-};
-use crate::parse::{parse, Parsed};
-use crate::source::{source_text, Source};
-use crate::symbols::{symbol_table, SymbolId, SymbolTable};
-use crate::types::{infer_symbol_type, Type};
 use crate::Workspace;
 
 pub mod check;
@@ -83,54 +74,33 @@ impl SourceDb for Program {
     fn file_path(&self, file_id: FileId) -> Arc<Path> {
         self.files.path(file_id)
     }
+}
 
-    fn source(&self, file_id: FileId) -> QueryResult<Source> {
-        source_text(self, file_id)
-    }
+impl DbWithJar<SourceJar> for Program {}
 
-    fn parse(&self, file_id: FileId) -> QueryResult<Parsed> {
-        parse(self, file_id)
+impl SemanticDb for Program {}
+
+impl DbWithJar<SemanticJar> for Program {}
+
+impl LintDb for Program {}
+
+impl DbWithJar<LintJar> for Program {}
+
+impl Upcast<dyn SemanticDb> for Program {
+    fn upcast(&self) -> &(dyn SemanticDb + 'static) {
+        self
     }
 }
 
-impl SemanticDb for Program {
-    fn resolve_module(&self, name: ModuleName) -> QueryResult<Option<Module>> {
-        resolve_module(self, name)
-    }
-
-    fn file_to_module(&self, file_id: FileId) -> QueryResult<Option<Module>> {
-        file_to_module(self, file_id)
-    }
-
-    fn path_to_module(&self, path: &Path) -> QueryResult<Option<Module>> {
-        path_to_module(self, path)
-    }
-
-    fn symbol_table(&self, file_id: FileId) -> QueryResult<Arc<SymbolTable>> {
-        symbol_table(self, file_id)
-    }
-
-    fn infer_symbol_type(&self, file_id: FileId, symbol_id: SymbolId) -> QueryResult<Type> {
-        infer_symbol_type(self, file_id, symbol_id)
-    }
-
-    // Mutations
-    fn add_module(&mut self, path: &Path) -> Option<(Module, Vec<Arc<ModuleData>>)> {
-        add_module(self, path)
-    }
-
-    fn set_module_search_paths(&mut self, paths: Vec<ModuleSearchPath>) {
-        set_module_search_paths(self, paths);
+impl Upcast<dyn SourceDb> for Program {
+    fn upcast(&self) -> &(dyn SourceDb + 'static) {
+        self
     }
 }
 
-impl LintDb for Program {
-    fn lint_syntax(&self, file_id: FileId) -> QueryResult<Diagnostics> {
-        lint_syntax(self, file_id)
-    }
-
-    fn lint_semantic(&self, file_id: FileId) -> QueryResult<Diagnostics> {
-        lint_semantic(self, file_id)
+impl Upcast<dyn LintDb> for Program {
+    fn upcast(&self) -> &(dyn LintDb + 'static) {
+        self
     }
 }
 

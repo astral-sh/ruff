@@ -1,9 +1,9 @@
-use ruff_python_ast::AnyStringKind;
+use ruff_python_ast::{AnyStringFlags, StringFlags};
 
 /// The context representing the current f-string that the lexer is in.
 #[derive(Debug)]
 pub(crate) struct FStringContext {
-    kind: AnyStringKind,
+    flags: AnyStringFlags,
 
     /// The level of nesting for the lexer when it entered the current f-string.
     /// The nesting level includes all kinds of parentheses i.e., round, square,
@@ -17,18 +17,18 @@ pub(crate) struct FStringContext {
 }
 
 impl FStringContext {
-    pub(crate) const fn new(kind: AnyStringKind, nesting: u32) -> Self {
-        debug_assert!(kind.is_f_string());
+    pub(crate) const fn new(flags: AnyStringFlags, nesting: u32) -> Self {
+        debug_assert!(flags.is_f_string());
         Self {
-            kind,
+            flags,
             nesting,
             format_spec_depth: 0,
         }
     }
 
-    pub(crate) const fn kind(&self) -> AnyStringKind {
-        debug_assert!(self.kind.is_f_string());
-        self.kind
+    pub(crate) const fn flags(&self) -> AnyStringFlags {
+        debug_assert!(self.flags.is_f_string());
+        self.flags
     }
 
     pub(crate) const fn nesting(&self) -> u32 {
@@ -36,15 +36,15 @@ impl FStringContext {
     }
 
     /// Returns the quote character for the current f-string.
-    pub(crate) const fn quote_char(&self) -> char {
-        self.kind.quote_style().as_char()
+    pub(crate) fn quote_char(&self) -> char {
+        self.flags.quote_style().as_char()
     }
 
     /// Returns the triple quotes for the current f-string if it is a triple-quoted
     /// f-string, `None` otherwise.
-    pub(crate) const fn triple_quotes(&self) -> Option<&'static str> {
+    pub(crate) fn triple_quotes(&self) -> Option<&'static str> {
         if self.is_triple_quoted() {
-            Some(self.kind.quote_str())
+            Some(self.flags.quote_str())
         } else {
             None
         }
@@ -52,12 +52,12 @@ impl FStringContext {
 
     /// Returns `true` if the current f-string is a raw f-string.
     pub(crate) fn is_raw_string(&self) -> bool {
-        self.kind.is_raw_string()
+        self.flags.is_raw_string()
     }
 
     /// Returns `true` if the current f-string is a triple-quoted f-string.
-    pub(crate) const fn is_triple_quoted(&self) -> bool {
-        self.kind.is_triple_quoted()
+    pub(crate) fn is_triple_quoted(&self) -> bool {
+        self.flags.is_triple_quoted()
     }
 
     /// Calculates the number of open parentheses for the current f-string

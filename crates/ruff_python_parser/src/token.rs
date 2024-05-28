@@ -5,10 +5,9 @@
 //!
 //! [CPython source]: https://github.com/python/cpython/blob/dfc2e065a2e71011017077e549cd2f9bf4944c54/Grammar/Tokens
 
-use ruff_python_ast::{AnyStringKind, BoolOp, Int, IpyEscapeKind, Operator, UnaryOp};
 use std::fmt;
 
-use crate::Mode;
+use ruff_python_ast::{AnyStringFlags, BoolOp, Int, IpyEscapeKind, Operator, StringFlags, UnaryOp};
 
 /// The set of tokens the Python source code can be tokenized in.
 #[derive(Clone, Debug, PartialEq, is_macro::Is)]
@@ -44,11 +43,11 @@ pub enum Tok {
         value: Box<str>,
         /// Flags that can be queried to determine the quote style
         /// and prefixes of the string
-        kind: AnyStringKind,
+        flags: AnyStringFlags,
     },
     /// Token value for the start of an f-string. This includes the `f`/`F`/`fr` prefix
     /// and the opening quote(s).
-    FStringStart(AnyStringKind),
+    FStringStart(AnyStringFlags),
     /// Token value that includes the portion of text inside the f-string that's not
     /// part of the expression part and isn't an opening or closing brace.
     FStringMiddle {
@@ -56,12 +55,14 @@ pub enum Tok {
         value: Box<str>,
         /// Flags that can be queried to determine the quote style
         /// and prefixes of the string
-        kind: AnyStringKind,
+        flags: AnyStringFlags,
     },
     /// Token value for the end of an f-string. This includes the closing quote.
     FStringEnd,
     /// Token value for IPython escape commands. These are recognized by the lexer
-    /// only when the mode is [`Mode::Ipython`].
+    /// only when the mode is [`Ipython`].
+    ///
+    /// [`Ipython`]: crate::Mode::Ipython
     IpyEscapeCommand {
         /// The magic command value.
         value: Box<str>,
@@ -80,7 +81,9 @@ pub enum Tok {
     /// Token value for a dedent.
     Dedent,
     EndOfFile,
-    /// Token value for a question mark `?`. This is only used in [`Mode::Ipython`].
+    /// Token value for a question mark `?`. This is only used in [`Ipython`].
+    ///
+    /// [`Ipython`]: crate::Mode::Ipython
     Question,
     /// Token value for a exclamation mark `!`.
     Exclamation,
@@ -222,17 +225,12 @@ pub enum Tok {
     Yield,
 
     Unknown,
-    // RustPython specific.
-    StartModule,
-    StartExpression,
 }
 
 impl Tok {
-    pub fn start_marker(mode: Mode) -> Self {
-        match mode {
-            Mode::Module | Mode::Ipython => Tok::StartModule,
-            Mode::Expression => Tok::StartExpression,
-        }
+    #[inline]
+    pub fn kind(&self) -> TokenKind {
+        TokenKind::from_token(self)
     }
 }
 
@@ -245,8 +243,8 @@ impl fmt::Display for Tok {
             Int { value } => write!(f, "{value}"),
             Float { value } => write!(f, "{value}"),
             Complex { real, imag } => write!(f, "{real}j{imag}"),
-            String { value, kind } => {
-                write!(f, "{}", kind.format_string_contents(value))
+            String { value, flags } => {
+                write!(f, "{}", flags.format_string_contents(value))
             }
             FStringStart(_) => f.write_str("FStringStart"),
             FStringMiddle { value, .. } => f.write_str(value),
@@ -256,8 +254,6 @@ impl fmt::Display for Tok {
             NonLogicalNewline => f.write_str("NonLogicalNewline"),
             Indent => f.write_str("Indent"),
             Dedent => f.write_str("Dedent"),
-            StartModule => f.write_str("StartProgram"),
-            StartExpression => f.write_str("StartExpression"),
             EndOfFile => f.write_str("EOF"),
             Question => f.write_str("?"),
             Exclamation => f.write_str("!"),
@@ -356,7 +352,7 @@ impl fmt::Display for Tok {
 ///
 /// This is a lightweight representation of [`Tok`] which doesn't contain any information
 /// about the token itself.
-#[derive(Copy, Clone, PartialEq, Eq, Hash, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash, Debug, PartialOrd, Ord)]
 pub enum TokenKind {
     /// Token value for a name, commonly known as an identifier.
     Name,
@@ -489,12 +485,10 @@ pub enum TokenKind {
     /// Token value for ellipsis `...`.
     Ellipsis,
 
-    // Self documenting.
-    // Keywords (alphabetically):
-    False,
-    None,
-    True,
+    // The keywords should be sorted in alphabetical order. If the boundary tokens for the
+    // "Keywords" and "Soft keywords" group change, update the related methods on `TokenKind`.
 
+    // Keywords
     And,
     As,
     Assert,
@@ -508,6 +502,7 @@ pub enum TokenKind {
     Elif,
     Else,
     Except,
+    False,
     Finally,
     For,
     From,
@@ -517,25 +512,25 @@ pub enum TokenKind {
     In,
     Is,
     Lambda,
+    None,
     Nonlocal,
     Not,
     Or,
     Pass,
     Raise,
     Return,
+    True,
     Try,
     While,
-    Match,
-    Type,
-    Case,
     With,
     Yield,
 
+    // Soft keywords
+    Case,
+    Match,
+    Type,
+
     Unknown,
-    // RustPython specific.
-    StartModule,
-    StartInteractive,
-    StartExpression,
 }
 
 impl TokenKind {
@@ -544,45 +539,28 @@ impl TokenKind {
         matches!(self, TokenKind::Newline | TokenKind::NonLogicalNewline)
     }
 
+    /// Returns `true` if the token is a keyword (including soft keywords).
+    ///
+    /// See also [`TokenKind::is_soft_keyword`], [`TokenKind::is_non_soft_keyword`].
     #[inline]
-    pub const fn is_keyword(self) -> bool {
-        matches!(
-            self,
-            TokenKind::False
-                | TokenKind::True
-                | TokenKind::None
-                | TokenKind::And
-                | TokenKind::As
-                | TokenKind::Assert
-                | TokenKind::Await
-                | TokenKind::Break
-                | TokenKind::Class
-                | TokenKind::Continue
-                | TokenKind::Def
-                | TokenKind::Del
-                | TokenKind::Elif
-                | TokenKind::Else
-                | TokenKind::Except
-                | TokenKind::Finally
-                | TokenKind::For
-                | TokenKind::From
-                | TokenKind::Global
-                | TokenKind::If
-                | TokenKind::Import
-                | TokenKind::In
-                | TokenKind::Is
-                | TokenKind::Lambda
-                | TokenKind::Nonlocal
-                | TokenKind::Not
-                | TokenKind::Or
-                | TokenKind::Pass
-                | TokenKind::Raise
-                | TokenKind::Return
-                | TokenKind::Try
-                | TokenKind::While
-                | TokenKind::With
-                | TokenKind::Yield
-        )
+    pub fn is_keyword(self) -> bool {
+        TokenKind::And <= self && self <= TokenKind::Type
+    }
+
+    /// Returns `true` if the token is strictly a soft keyword.
+    ///
+    /// See also [`TokenKind::is_keyword`], [`TokenKind::is_non_soft_keyword`].
+    #[inline]
+    pub fn is_soft_keyword(self) -> bool {
+        TokenKind::Case <= self && self <= TokenKind::Type
+    }
+
+    /// Returns `true` if the token is strictly a non-soft keyword.
+    ///
+    /// See also [`TokenKind::is_keyword`], [`TokenKind::is_soft_keyword`].
+    #[inline]
+    pub fn is_non_soft_keyword(self) -> bool {
+        TokenKind::And <= self && self <= TokenKind::Yield
     }
 
     #[inline]
@@ -691,11 +669,6 @@ impl TokenKind {
                 | TokenKind::CircumflexEqual
                 | TokenKind::Tilde
         )
-    }
-
-    #[inline]
-    pub const fn is_soft_keyword(self) -> bool {
-        matches!(self, TokenKind::Match | TokenKind::Case)
     }
 
     /// Returns `true` if the current token is a unary arithmetic operator.
@@ -895,8 +868,6 @@ impl TokenKind {
             Tok::With => TokenKind::With,
             Tok::Yield => TokenKind::Yield,
             Tok::Unknown => TokenKind::Unknown,
-            Tok::StartModule => TokenKind::StartModule,
-            Tok::StartExpression => TokenKind::StartExpression,
         }
     }
 }
@@ -960,9 +931,6 @@ impl fmt::Display for TokenKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let value = match self {
             TokenKind::Unknown => "Unknown",
-            TokenKind::StartModule => "StartModule",
-            TokenKind::StartExpression => "StartExpression",
-            TokenKind::StartInteractive => "StartInteractive",
             TokenKind::Newline => "newline",
             TokenKind::NonLogicalNewline => "NonLogicalNewline",
             TokenKind::Indent => "indent",

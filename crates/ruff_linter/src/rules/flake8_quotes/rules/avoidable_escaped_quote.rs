@@ -1,7 +1,7 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::visitor::{walk_f_string, Visitor};
-use ruff_python_ast::{self as ast, AnyStringKind, StringLike};
+use ruff_python_ast::{self as ast, AnyStringFlags, StringFlags, StringLike};
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -52,7 +52,7 @@ impl AlwaysFixableViolation for AvoidableEscapedQuote {
 
 /// Q003
 pub(crate) fn avoidable_escaped_quote(checker: &mut Checker, string_like: StringLike) {
-    if checker.semantic().in_docstring()
+    if checker.semantic().in_pep_257_docstring()
         || checker.semantic().in_string_type_definition()
         // This rule has support for strings nested inside another f-strings but they're checked
         // via the outermost f-string. This means that we shouldn't be checking any nested string
@@ -64,28 +64,15 @@ pub(crate) fn avoidable_escaped_quote(checker: &mut Checker, string_like: String
 
     let mut rule_checker = AvoidableEscapedQuoteChecker::new(checker.locator(), checker.settings);
 
-    match string_like {
-        StringLike::String(expr) => {
-            for string_literal in &expr.value {
+    for part in string_like.parts() {
+        match part {
+            ast::StringLikePart::String(string_literal) => {
                 rule_checker.visit_string_literal(string_literal);
             }
-        }
-        StringLike::Bytes(expr) => {
-            for bytes_literal in &expr.value {
+            ast::StringLikePart::Bytes(bytes_literal) => {
                 rule_checker.visit_bytes_literal(bytes_literal);
             }
-        }
-        StringLike::FString(expr) => {
-            for part in &expr.value {
-                match part {
-                    ast::FStringPart::Literal(string_literal) => {
-                        rule_checker.visit_string_literal(string_literal);
-                    }
-                    ast::FStringPart::FString(f_string) => {
-                        rule_checker.visit_f_string(f_string);
-                    }
-                }
-            }
+            ast::StringLikePart::FString(f_string) => rule_checker.visit_f_string(f_string),
         }
     }
 
@@ -123,7 +110,7 @@ impl Visitor<'_> for AvoidableEscapedQuoteChecker<'_> {
             self.locator,
             self.quotes_settings,
             string_literal.range(),
-            AnyStringKind::from(string_literal.flags),
+            AnyStringFlags::from(string_literal.flags),
         ) {
             self.diagnostics.push(diagnostic);
         }
@@ -134,7 +121,7 @@ impl Visitor<'_> for AvoidableEscapedQuoteChecker<'_> {
             self.locator,
             self.quotes_settings,
             bytes_literal.range(),
-            AnyStringKind::from(bytes_literal.flags),
+            AnyStringFlags::from(bytes_literal.flags),
         ) {
             self.diagnostics.push(diagnostic);
         }
@@ -205,6 +192,7 @@ impl Visitor<'_> for AvoidableEscapedQuoteChecker<'_> {
         // f"'normal' {f'\'nested\' {x} "double quotes"'} normal"
         // ```
         if !f_string
+            .elements
             .literals()
             .any(|literal| contains_quote(literal, opposite_quote_char))
         {
@@ -226,20 +214,20 @@ fn check_string_or_bytes(
     locator: &Locator,
     quotes_settings: &flake8_quotes::settings::Settings,
     range: TextRange,
-    kind: AnyStringKind,
+    flags: AnyStringFlags,
 ) -> Option<Diagnostic> {
-    assert!(!kind.is_f_string());
+    assert!(!flags.is_f_string());
 
-    if kind.is_triple_quoted() || kind.is_raw_string() {
+    if flags.is_triple_quoted() || flags.is_raw_string() {
         return None;
     }
 
     // Check if we're using the preferred quotation style.
-    if Quote::from(kind.quote_style()) != quotes_settings.inline_quotes {
+    if Quote::from(flags.quote_style()) != quotes_settings.inline_quotes {
         return None;
     }
 
-    let contents = raw_contents(locator.slice(range), kind);
+    let contents = raw_contents(locator.slice(range), flags);
 
     if !contains_escaped_quote(contents, quotes_settings.inline_quotes.as_char())
         || contains_quote(contents, quotes_settings.inline_quotes.opposite().as_char())
@@ -250,7 +238,7 @@ fn check_string_or_bytes(
     let mut diagnostic = Diagnostic::new(AvoidableEscapedQuote, range);
     let fixed_contents = format!(
         "{prefix}{quote}{value}{quote}",
-        prefix = kind.prefix(),
+        prefix = flags.prefix(),
         quote = quotes_settings.inline_quotes.opposite().as_char(),
         value = unescape_string(contents, quotes_settings.inline_quotes.as_char())
     );
@@ -282,7 +270,7 @@ fn check_f_string(
     let opposite_quote_char = quotes_settings.inline_quotes.opposite().as_char();
 
     let mut edits = vec![];
-    for literal in f_string.literals() {
+    for literal in f_string.elements.literals() {
         let content = locator.slice(literal);
         if !contains_escaped_quote(content, quote_char) {
             continue;

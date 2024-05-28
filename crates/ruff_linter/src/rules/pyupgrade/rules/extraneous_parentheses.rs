@@ -1,6 +1,5 @@
-use ruff_python_parser::lexer::LexResult;
-use ruff_python_parser::Tok;
-use ruff_text_size::{Ranged, TextRange};
+use ruff_python_parser::{TokenKind, TokenKindIter};
+use ruff_text_size::TextRange;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -37,93 +36,70 @@ impl AlwaysFixableViolation for ExtraneousParentheses {
 }
 
 // See: https://github.com/asottile/pyupgrade/blob/97ed6fb3cf2e650d4f762ba231c3f04c41797710/pyupgrade/_main.py#L148
-fn match_extraneous_parentheses(tokens: &[LexResult], mut i: usize) -> Option<(usize, usize)> {
-    i += 1;
+fn match_extraneous_parentheses(tokens: &mut TokenKindIter) -> Option<(TextRange, TextRange)> {
+    // Store the location of the extraneous opening parenthesis.
+    let start_range = loop {
+        let (token, range) = tokens.next()?;
 
-    loop {
-        if i >= tokens.len() {
-            return None;
-        }
-        let Ok((tok, _)) = &tokens[i] else {
-            return None;
-        };
-        match tok {
-            Tok::Comment(..) | Tok::NonLogicalNewline => {
-                i += 1;
+        match token {
+            TokenKind::Comment | TokenKind::NonLogicalNewline => {
+                continue;
             }
-            Tok::Lpar => {
-                break;
+            TokenKind::Lpar => {
+                break range;
             }
             _ => {
                 return None;
             }
         }
-    }
+    };
 
-    // Store the location of the extraneous opening parenthesis.
-    let start = i;
+    // Verify that we're not in an empty tuple.
+    let mut empty_tuple = true;
 
     // Verify that we're not in a tuple or coroutine.
     let mut depth = 1u32;
-    while depth > 0 {
-        i += 1;
-        if i >= tokens.len() {
-            return None;
-        }
-        let Ok((tok, _)) = &tokens[i] else {
-            return None;
-        };
-
-        // If we find a comma or a yield at depth 1 or 2, it's a tuple or coroutine.
-        if depth == 1 && matches!(tok, Tok::Comma | Tok::Yield) {
-            return None;
-        } else if matches!(tok, Tok::Lpar | Tok::Lbrace | Tok::Lsqb) {
-            depth = depth.saturating_add(1);
-        } else if matches!(tok, Tok::Rpar | Tok::Rbrace | Tok::Rsqb) {
-            depth = depth.saturating_sub(1);
-        }
-    }
 
     // Store the location of the extraneous closing parenthesis.
-    let end = i;
+    let end_range = loop {
+        let (token, range) = tokens.next()?;
 
-    // Verify that we're not in an empty tuple.
-    if (start + 1..i).all(|i| {
-        matches!(
-            tokens[i],
-            Ok((Tok::Comment(..) | Tok::NonLogicalNewline, _))
-        )
-    }) {
+        // If we find a comma or a yield at depth 1 or 2, it's a tuple or coroutine.
+        if depth == 1 && matches!(token, TokenKind::Comma | TokenKind::Yield) {
+            return None;
+        } else if matches!(token, TokenKind::Lpar | TokenKind::Lbrace | TokenKind::Lsqb) {
+            depth = depth.saturating_add(1);
+        } else if matches!(token, TokenKind::Rpar | TokenKind::Rbrace | TokenKind::Rsqb) {
+            depth = depth.saturating_sub(1);
+        }
+
+        if depth == 0 {
+            break range;
+        }
+
+        if !matches!(token, TokenKind::Comment | TokenKind::NonLogicalNewline) {
+            empty_tuple = false;
+        }
+    };
+
+    if empty_tuple {
         return None;
     }
 
     // Find the next non-coding token.
-    i += 1;
-    loop {
-        if i >= tokens.len() {
-            return None;
-        }
-        let Ok((tok, _)) = &tokens[i] else {
-            return None;
-        };
-        match tok {
-            Tok::Comment(..) | Tok::NonLogicalNewline => {
-                i += 1;
-            }
-            _ => {
-                break;
-            }
-        }
-    }
+    let token = loop {
+        let (token, _) = tokens.next()?;
 
-    if i >= tokens.len() {
-        return None;
-    }
-    let Ok((tok, _)) = &tokens[i] else {
-        return None;
+        match token {
+            TokenKind::Comment | TokenKind::NonLogicalNewline => continue,
+            _ => {
+                break token;
+            }
+        }
     };
-    if matches!(tok, Tok::Rpar) {
-        Some((start, end))
+
+    if matches!(token, TokenKind::Rpar) {
+        Some((start_range, end_range))
     } else {
         None
     }
@@ -132,36 +108,28 @@ fn match_extraneous_parentheses(tokens: &[LexResult], mut i: usize) -> Option<(u
 /// UP034
 pub(crate) fn extraneous_parentheses(
     diagnostics: &mut Vec<Diagnostic>,
-    tokens: &[LexResult],
+    mut tokens: TokenKindIter,
     locator: &Locator,
 ) {
-    let mut i = 0;
-    while i < tokens.len() {
-        if matches!(tokens[i], Ok((Tok::Lpar, _))) {
-            if let Some((start, end)) = match_extraneous_parentheses(tokens, i) {
-                i = end + 1;
-                let Ok((_, start_range)) = &tokens[start] else {
-                    return;
-                };
-                let Ok((.., end_range)) = &tokens[end] else {
-                    return;
-                };
-                let mut diagnostic = Diagnostic::new(
-                    ExtraneousParentheses,
-                    TextRange::new(start_range.start(), end_range.end()),
-                );
-                let contents = locator.slice(TextRange::new(start_range.start(), end_range.end()));
-                diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
-                    contents[1..contents.len() - 1].to_string(),
-                    start_range.start(),
-                    end_range.end(),
-                )));
-                diagnostics.push(diagnostic);
-            } else {
-                i += 1;
-            }
-        } else {
-            i += 1;
+    while let Some((token, _)) = tokens.next() {
+        if !matches!(token, TokenKind::Lpar) {
+            continue;
         }
+
+        let Some((start_range, end_range)) = match_extraneous_parentheses(&mut tokens) else {
+            continue;
+        };
+
+        let mut diagnostic = Diagnostic::new(
+            ExtraneousParentheses,
+            TextRange::new(start_range.start(), end_range.end()),
+        );
+        let contents = locator.slice(TextRange::new(start_range.start(), end_range.end()));
+        diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
+            contents[1..contents.len() - 1].to_string(),
+            start_range.start(),
+            end_range.end(),
+        )));
+        diagnostics.push(diagnostic);
     }
 }

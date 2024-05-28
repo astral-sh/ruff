@@ -1,6 +1,7 @@
-use ruff_python_ast::{all::DunderAllName, str::raw_contents_range};
+use ruff_python_ast::str::raw_contents_range;
 use ruff_text_size::{Ranged, TextRange};
 
+use ruff_python_semantic::all::DunderAllName;
 use ruff_python_semantic::{
     BindingKind, ContextualizedDefinition, Definition, Export, Member, MemberKind,
 };

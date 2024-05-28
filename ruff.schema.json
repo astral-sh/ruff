@@ -2119,6 +2119,7 @@
         },
         "ignore-init-module-imports": {
           "description": "Avoid automatically removing unused imports in `__init__.py` files. Such imports will still be flagged, but with a dedicated message suggesting that the import is either added to the module's `__all__` symbol, or re-exported with a redundant alias (e.g., `import os as os`).\n\nThis option is enabled by default, but you can opt-in to removal of imports via an unsafe fix.",
+          "deprecated": true,
           "type": [
             "boolean",
             "null"
@@ -2585,7 +2586,8 @@
         "py39",
         "py310",
         "py311",
-        "py312"
+        "py312",
+        "py313"
       ]
     },
     "Quote": {
@@ -2683,6 +2685,8 @@
         "ASYNC100",
         "ASYNC101",
         "ASYNC102",
+        "ASYNC11",
+        "ASYNC116",
         "B",
         "B0",
         "B00",

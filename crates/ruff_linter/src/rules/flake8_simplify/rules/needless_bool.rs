@@ -193,7 +193,11 @@ pub(crate) fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
     }
 
     // Generate the replacement condition.
-    let condition = if checker.indexer().has_comments(&range, checker.locator()) {
+    let condition = if checker
+        .indexer()
+        .comment_ranges()
+        .has_comments(&range, checker.locator())
+    {
         None
     } else {
         // If the return values are inverted, wrap the condition in a `not`.

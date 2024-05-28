@@ -1581,15 +1581,15 @@ mod tests {
             ctx: ExprContext::Load,
         });
         let constant_one = Expr::NumberLiteral(ExprNumberLiteral {
-            value: Number::Int(1.into()),
+            value: Number::Int(Int::from(1u8)),
             range: TextRange::default(),
         });
         let constant_two = Expr::NumberLiteral(ExprNumberLiteral {
-            value: Number::Int(2.into()),
+            value: Number::Int(Int::from(2u8)),
             range: TextRange::default(),
         });
         let constant_three = Expr::NumberLiteral(ExprNumberLiteral {
-            value: Number::Int(3.into()),
+            value: Number::Int(Int::from(3u8)),
             range: TextRange::default(),
         });
         let type_var_one = TypeParam::TypeVar(TypeParamTypeVar {

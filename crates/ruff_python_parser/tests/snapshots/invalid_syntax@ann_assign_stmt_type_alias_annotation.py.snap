@@ -11,7 +11,7 @@ Module(
         body: [
             AnnAssign(
                 StmtAnnAssign {
-                    range: 0..2,
+                    range: 0..7,
                     target: Name(
                         ExprName {
                             range: 0..1,
@@ -21,26 +21,27 @@ Module(
                     ),
                     annotation: Name(
                         ExprName {
-                            range: 2..2,
-                            id: "",
-                            ctx: Invalid,
+                            range: 3..7,
+                            id: "type",
+                            ctx: Load,
                         },
                     ),
                     value: None,
                     simple: true,
                 },
             ),
-            TypeAlias(
-                StmtTypeAlias {
-                    range: 3..15,
-                    name: Name(
-                        ExprName {
-                            range: 8..9,
-                            id: "X",
-                            ctx: Store,
-                        },
-                    ),
-                    type_params: None,
+            Assign(
+                StmtAssign {
+                    range: 8..15,
+                    targets: [
+                        Name(
+                            ExprName {
+                                range: 8..9,
+                                id: "X",
+                                ctx: Store,
+                            },
+                        ),
+                    ],
                     value: Name(
                         ExprName {
                             range: 12..15,
@@ -52,33 +53,34 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 16..23,
+                    range: 16..28,
                     value: Lambda(
                         ExprLambda {
-                            range: 16..23,
+                            range: 16..28,
                             parameters: None,
                             body: Name(
                                 ExprName {
-                                    range: 23..23,
-                                    id: "",
-                                    ctx: Invalid,
+                                    range: 24..28,
+                                    id: "type",
+                                    ctx: Load,
                                 },
                             ),
                         },
                     ),
                 },
             ),
-            TypeAlias(
-                StmtTypeAlias {
-                    range: 24..36,
-                    name: Name(
-                        ExprName {
-                            range: 29..30,
-                            id: "X",
-                            ctx: Store,
-                        },
-                    ),
-                    type_params: None,
+            Assign(
+                StmtAssign {
+                    range: 29..36,
+                    targets: [
+                        Name(
+                            ExprName {
+                                range: 29..30,
+                                id: "X",
+                                ctx: Store,
+                            },
+                        ),
+                    ],
                     value: Name(
                         ExprName {
                             range: 33..36,
@@ -96,7 +98,14 @@ Module(
 
   |
 1 | a: type X = int
-  |    ^^^^ Syntax Error: Expected an expression
+  |    ^^^^ Syntax Error: Expected an identifier, but found a keyword 'type' that cannot be used here
+2 | lambda: type X = int
+  |
+
+
+  |
+1 | a: type X = int
+  |         ^ Syntax Error: Simple statements must be separated by newlines or semicolons
 2 | lambda: type X = int
   |
 
@@ -104,5 +113,12 @@ Module(
   |
 1 | a: type X = int
 2 | lambda: type X = int
-  |         ^^^^ Syntax Error: Expected an expression
+  |         ^^^^ Syntax Error: Expected an identifier, but found a keyword 'type' that cannot be used here
+  |
+
+
+  |
+1 | a: type X = int
+2 | lambda: type X = int
+  |              ^ Syntax Error: Simple statements must be separated by newlines or semicolons
   |

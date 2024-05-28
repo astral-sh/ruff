@@ -8,7 +8,7 @@ use std::{borrow::Cow, collections::VecDeque};
 use itertools::Itertools;
 
 use ruff_formatter::printer::SourceMapGeneration;
-use ruff_python_ast::str::Quote;
+use ruff_python_ast::{str::Quote, StringFlags};
 use ruff_python_parser::ParseError;
 use {once_cell::sync::Lazy, regex::Regex};
 use {
@@ -127,7 +127,7 @@ pub(crate) fn format(normalized: &NormalizedString, f: &mut PyFormatter) -> Form
     let mut lines = docstring.split('\n').peekable();
 
     // Start the string
-    let kind = normalized.kind();
+    let kind = normalized.flags();
     let quotes = StringQuotes::from(kind);
     write!(f, [kind.prefix(), quotes])?;
     // We track where in the source docstring we are (in source code byte offsets)
@@ -1573,7 +1573,7 @@ fn docstring_format_source(
 /// that avoids `content""""` and `content\"""`. This does only applies to un-escaped backslashes,
 /// so `content\\ """` doesn't need a space while `content\\\ """` does.
 fn needs_chaperone_space(normalized: &NormalizedString, trim_end: &str) -> bool {
-    trim_end.ends_with(normalized.kind().quote_style().as_char())
+    trim_end.ends_with(normalized.flags().quote_style().as_char())
         || trim_end.chars().rev().take_while(|c| *c == '\\').count() % 2 == 1
 }
 

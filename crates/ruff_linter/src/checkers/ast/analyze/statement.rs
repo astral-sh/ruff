@@ -2,7 +2,6 @@ use ruff_diagnostics::Diagnostic;
 use ruff_python_ast::helpers;
 use ruff_python_ast::types::Node;
 use ruff_python_ast::{self as ast, Expr, Stmt};
-use ruff_python_semantic::analyze::typing;
 use ruff_python_semantic::ScopeKind;
 use ruff_text_size::Ranged;
 
@@ -1098,9 +1097,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 pylint::rules::too_many_nested_blocks(checker, stmt);
             }
             if checker.enabled(Rule::EmptyTypeCheckingBlock) {
-                if typing::is_type_checking_block(if_, &checker.semantic) {
-                    flake8_type_checking::rules::empty_type_checking_block(checker, if_);
-                }
+                flake8_type_checking::rules::empty_type_checking_block(checker, if_);
             }
             if checker.enabled(Rule::IfTuple) {
                 pyflakes::rules::if_tuple(checker, if_);
@@ -1560,6 +1557,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.enabled(Rule::ListReverseCopy) {
                 refurb::rules::list_assign_reversed(checker, assign);
+            }
+            if checker.enabled(Rule::NonPEP695TypeAlias) {
+                pyupgrade::rules::non_pep695_type_alias_type(checker, assign);
             }
         }
         Stmt::AnnAssign(

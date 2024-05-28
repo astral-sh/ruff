@@ -98,6 +98,8 @@ impl Ranged for AttributeAssignment<'_> {
 }
 
 /// Return a list of attributes that are assigned to but not included in `__slots__`.
+///
+/// If the `__slots__` attribute cannot be statically determined, returns an empty vector.
 fn is_attributes_not_in_slots(body: &[Stmt]) -> Vec<AttributeAssignment> {
     // First, collect all the attributes that are assigned to `__slots__`.
     let mut slots = FxHashSet::default();
@@ -110,7 +112,13 @@ fn is_attributes_not_in_slots(body: &[Stmt]) -> Vec<AttributeAssignment> {
                 };
 
                 if id == "__slots__" {
-                    slots.extend(slots_attributes(value));
+                    for attribute in slots_attributes(value) {
+                        if let Some(attribute) = attribute {
+                            slots.insert(attribute);
+                        } else {
+                            return vec![];
+                        }
+                    }
                 }
             }
 
@@ -125,7 +133,13 @@ fn is_attributes_not_in_slots(body: &[Stmt]) -> Vec<AttributeAssignment> {
                 };
 
                 if id == "__slots__" {
-                    slots.extend(slots_attributes(value));
+                    for attribute in slots_attributes(value) {
+                        if let Some(attribute) = attribute {
+                            slots.insert(attribute);
+                        } else {
+                            return vec![];
+                        }
+                    }
                 }
             }
 
@@ -136,7 +150,13 @@ fn is_attributes_not_in_slots(body: &[Stmt]) -> Vec<AttributeAssignment> {
                 };
 
                 if id == "__slots__" {
-                    slots.extend(slots_attributes(value));
+                    for attribute in slots_attributes(value) {
+                        if let Some(attribute) = attribute {
+                            slots.insert(attribute);
+                        } else {
+                            return vec![];
+                        }
+                    }
                 }
             }
             _ => {}
@@ -145,6 +165,28 @@ fn is_attributes_not_in_slots(body: &[Stmt]) -> Vec<AttributeAssignment> {
 
     if slots.is_empty() || slots.contains("__dict__") {
         return vec![];
+    }
+
+    // And, collect all the property name with setter.
+    for statement in body {
+        let Stmt::FunctionDef(ast::StmtFunctionDef { decorator_list, .. }) = statement else {
+            continue;
+        };
+
+        for decorator in decorator_list {
+            let Some(ast::ExprAttribute { value, attr, .. }) =
+                decorator.expression.as_attribute_expr()
+            else {
+                continue;
+            };
+
+            if attr == "setter" {
+                let Some(ast::ExprName { id, .. }) = value.as_name_expr() else {
+                    continue;
+                };
+                slots.insert(id.as_str());
+            }
+        }
     }
 
     // Second, find any assignments that aren't included in `__slots__`.
@@ -215,12 +257,14 @@ fn is_attributes_not_in_slots(body: &[Stmt]) -> Vec<AttributeAssignment> {
 }
 
 /// Return an iterator over the attributes enumerated in the given `__slots__` value.
-fn slots_attributes(expr: &Expr) -> impl Iterator<Item = &str> {
+///
+/// If an attribute can't be statically determined, it will be `None`.
+fn slots_attributes(expr: &Expr) -> impl Iterator<Item = Option<&str>> {
     // Ex) `__slots__ = ("name",)`
     let elts_iter = match expr {
         Expr::Tuple(ast::ExprTuple { elts, .. })
         | Expr::List(ast::ExprList { elts, .. })
-        | Expr::Set(ast::ExprSet { elts, .. }) => Some(elts.iter().filter_map(|elt| match elt {
+        | Expr::Set(ast::ExprSet { elts, .. }) => Some(elts.iter().map(|elt| match elt {
             Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => Some(value.to_str()),
             _ => None,
         })),
@@ -229,7 +273,7 @@ fn slots_attributes(expr: &Expr) -> impl Iterator<Item = &str> {
 
     // Ex) `__slots__ = {"name": ...}`
     let keys_iter = match expr {
-        Expr::Dict(dict) => Some(dict.iter_keys().filter_map(|key| match key {
+        Expr::Dict(dict) => Some(dict.iter_keys().map(|key| match key {
             Some(Expr::StringLiteral(ast::ExprStringLiteral { value, .. })) => Some(value.to_str()),
             _ => None,
         })),

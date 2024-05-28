@@ -125,8 +125,8 @@ impl Renamer {
         let scope_id = scope.get_all(name).find_map(|binding_id| {
             let binding = semantic.binding(binding_id);
             match binding.kind {
-                BindingKind::Global => Some(ScopeId::global()),
-                BindingKind::Nonlocal(symbol_id) => Some(symbol_id),
+                BindingKind::Global(_) => Some(ScopeId::global()),
+                BindingKind::Nonlocal(_, scope_id) => Some(scope_id),
                 _ => None,
             }
         });
@@ -266,8 +266,8 @@ impl Renamer {
             | BindingKind::LoopVar
             | BindingKind::ComprehensionVar
             | BindingKind::WithItemVar
-            | BindingKind::Global
-            | BindingKind::Nonlocal(_)
+            | BindingKind::Global(_)
+            | BindingKind::Nonlocal(_, _)
             | BindingKind::ClassDefinition(_)
             | BindingKind::FunctionDefinition(_)
             | BindingKind::Deletion

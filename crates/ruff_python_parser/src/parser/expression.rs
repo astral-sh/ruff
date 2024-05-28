@@ -6,8 +6,8 @@ use bitflags::bitflags;
 use rustc_hash::FxHashSet;
 
 use ruff_python_ast::{
-    self as ast, BoolOp, CmpOp, ConversionFlag, Expr, ExprContext, FStringElement, IpyEscapeKind,
-    Number, Operator, UnaryOp,
+    self as ast, BoolOp, CmpOp, ConversionFlag, Expr, ExprContext, FStringElement, FStringElements,
+    IpyEscapeKind, Number, Operator, UnaryOp,
 };
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
@@ -1231,17 +1231,17 @@ impl<'src> Parser<'src> {
     ///
     /// See: <https://docs.python.org/3.13/reference/lexical_analysis.html#string-and-bytes-literals>
     fn parse_string_or_byte_literal(&mut self) -> StringType {
-        let (Tok::String { value, kind }, range) = self.bump(TokenKind::String) else {
+        let (Tok::String { value, flags }, range) = self.bump(TokenKind::String) else {
             unreachable!()
         };
 
-        match parse_string_literal(value, kind, range) {
+        match parse_string_literal(value, flags, range) {
             Ok(string) => string,
             Err(error) => {
                 let location = error.location();
                 self.add_error(ParseErrorType::Lexical(error.into_error()), location);
 
-                if kind.is_byte_string() {
+                if flags.is_byte_string() {
                     // test_err invalid_byte_literal
                     // b'123a𝐁c'
                     // rb"a𝐁c123"
@@ -1249,7 +1249,7 @@ impl<'src> Parser<'src> {
                     StringType::Bytes(ast::BytesLiteral {
                         value: Box::new([]),
                         range,
-                        flags: ast::BytesLiteralFlags::from(kind).with_invalid(),
+                        flags: ast::BytesLiteralFlags::from(flags).with_invalid(),
                     })
                 } else {
                     // test_err invalid_string_literal
@@ -1258,7 +1258,7 @@ impl<'src> Parser<'src> {
                     StringType::Str(ast::StringLiteral {
                         value: "".into(),
                         range,
-                        flags: ast::StringLiteralFlags::from(kind).with_invalid(),
+                        flags: ast::StringLiteralFlags::from(flags).with_invalid(),
                     })
                 }
             }
@@ -1297,7 +1297,7 @@ impl<'src> Parser<'src> {
     /// # Panics
     ///
     /// If the parser isn't positioned at a `{` or `FStringMiddle` token.
-    fn parse_fstring_elements(&mut self) -> Vec<FStringElement> {
+    fn parse_fstring_elements(&mut self) -> FStringElements {
         let mut elements = vec![];
 
         self.parse_list(RecoveryContextKind::FStringElements, |parser| {
@@ -1306,12 +1306,12 @@ impl<'src> Parser<'src> {
                     FStringElement::Expression(parser.parse_fstring_expression_element())
                 }
                 TokenKind::FStringMiddle => {
-                    let (Tok::FStringMiddle { value, kind, .. }, range) = parser.next_token()
+                    let (Tok::FStringMiddle { value, flags, .. }, range) = parser.next_token()
                     else {
                         unreachable!()
                     };
                     FStringElement::Literal(
-                        parse_fstring_literal_element(value, kind, range).unwrap_or_else(
+                        parse_fstring_literal_element(value, flags, range).unwrap_or_else(
                             |lex_error| {
                                 // test_err invalid_fstring_literal_element
                                 // f'hello \N{INVALID} world'
@@ -1348,7 +1348,7 @@ impl<'src> Parser<'src> {
             elements.push(element);
         });
 
-        elements
+        FStringElements::from(elements)
     }
 
     /// Parses a f-string expression element.
@@ -2326,7 +2326,7 @@ impl Ranged for ParsedExpr {
 /// See: <https://docs.python.org/3/reference/expressions.html#operator-precedence>
 #[derive(Debug, Ord, Eq, PartialEq, PartialOrd, Copy, Clone)]
 pub(super) enum OperatorPrecedence {
-    /// The initital precedence when parsing an expression.
+    /// The initial precedence when parsing an expression.
     Initial,
     /// Precedence of boolean `or` operator.
     Or,

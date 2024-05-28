@@ -15,12 +15,10 @@ license = { workspace = true }
 doctest = false
 
 [dependencies]
-ruff_python_ast = { path = "../ruff_python_ast" }
+ruff_python_ast = { workspace = true }
 
 bitflags = { workspace = true }
-hexf-parse = { workspace = true }
 itertools = { workspace = true }
-lexical-parse-float = { workspace = true, features = ["format"] }
 unic-ucd-category = { workspace = true }
 
 [dev-dependencies]

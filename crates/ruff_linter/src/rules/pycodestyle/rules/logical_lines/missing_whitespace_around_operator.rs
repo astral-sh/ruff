@@ -198,9 +198,7 @@ pub(crate) fn missing_whitespace_around_operator(
                 matches!(
                     prev_kind,
                     TokenKind::Rpar | TokenKind::Rsqb | TokenKind::Rbrace
-                ) || !(prev_kind.is_operator()
-                    || prev_kind.is_keyword()
-                    || prev_kind.is_soft_keyword())
+                ) || !(prev_kind.is_operator() || prev_kind.is_keyword())
             };
 
             if is_binary {

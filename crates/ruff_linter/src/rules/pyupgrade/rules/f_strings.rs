@@ -216,8 +216,10 @@ fn formatted_expr<'a>(expr: &Expr, context: FormatContext, locator: &Locator<'a>
 
 #[derive(Debug, Clone)]
 enum FStringConversion {
-    /// The format string only contains literal parts.
-    Literal,
+    /// The format string only contains literal parts and is empty.
+    EmptyLiteral,
+    /// The format string only contains literal parts and is non-empty.
+    NonEmptyLiteral,
     /// The format call uses arguments with side effects which are repeated within the
     /// format string. For example: `"{x} {x}".format(x=foo())`.
     SideEffects,
@@ -263,7 +265,7 @@ impl FStringConversion {
 
         // If the format string is empty, it doesn't need to be converted.
         if contents.is_empty() {
-            return Ok(Self::Literal);
+            return Ok(Self::EmptyLiteral);
         }
 
         // Parse the format string.
@@ -275,7 +277,7 @@ impl FStringConversion {
             .iter()
             .all(|part| matches!(part, FormatPart::Literal(..)))
         {
-            return Ok(Self::Literal);
+            return Ok(Self::NonEmptyLiteral);
         }
 
         let mut converted = String::with_capacity(contents.len());
@@ -406,7 +408,7 @@ pub(crate) fn f_strings(checker: &mut Checker, call: &ast::ExprCall, summary: &F
         return;
     };
 
-    let mut patches: Vec<(TextRange, String)> = vec![];
+    let mut patches: Vec<(TextRange, FStringConversion)> = vec![];
     let mut lex = lexer::lex_starts_at(
         checker.locator().slice(call.func.range()),
         Mode::Expression,
@@ -431,18 +433,14 @@ pub(crate) fn f_strings(checker: &mut Checker, call: &ast::ExprCall, summary: &F
             }
             Some((Tok::String { .. }, range)) => {
                 match FStringConversion::try_convert(range, &mut summary, checker.locator()) {
-                    Ok(FStringConversion::Convert(fstring)) => patches.push((range, fstring)),
-                    // Convert escaped curly brackets e.g. `{{` to `{` in literal string parts
-                    Ok(FStringConversion::Literal) => patches.push((
-                        range,
-                        curly_unescape(checker.locator().slice(range)).to_string(),
-                    )),
                     // If the format string contains side effects that would need to be repeated,
                     // we can't convert it to an f-string.
                     Ok(FStringConversion::SideEffects) => return,
                     // If any of the segments fail to convert, then we can't convert the entire
                     // expression.
                     Err(_) => return,
+                    // Otherwise, push the conversion to be processed later.
+                    Ok(conversion) => patches.push((range, conversion)),
                 }
             }
             Some(_) => continue,
@@ -455,30 +453,28 @@ pub(crate) fn f_strings(checker: &mut Checker, call: &ast::ExprCall, summary: &F
 
     let mut contents = String::with_capacity(checker.locator().slice(call).len());
     let mut prev_end = call.start();
-    for (range, fstring) in patches {
-        contents.push_str(
-            checker
-                .locator()
-                .slice(TextRange::new(prev_end, range.start())),
-        );
-        contents.push_str(&fstring);
+    for (range, conversion) in patches {
+        let fstring = match conversion {
+            FStringConversion::Convert(fstring) => Some(fstring),
+            FStringConversion::EmptyLiteral => None,
+            FStringConversion::NonEmptyLiteral => {
+                // Convert escaped curly brackets e.g. `{{` to `{` in literal string parts
+                Some(curly_unescape(checker.locator().slice(range)).to_string())
+            }
+            // We handled this in the previous loop.
+            FStringConversion::SideEffects => unreachable!(),
+        };
+        if let Some(fstring) = fstring {
+            contents.push_str(
+                checker
+                    .locator()
+                    .slice(TextRange::new(prev_end, range.start())),
+            );
+            contents.push_str(&fstring);
+        }
         prev_end = range.end();
     }
-
-    // If the remainder is non-empty, add it to the contents.
-    let rest = checker.locator().slice(TextRange::new(prev_end, end));
-    if !lexer::lex_starts_at(rest, Mode::Expression, prev_end)
-        .flatten()
-        .all(|(token, _)| match token {
-            Tok::Comment(_) | Tok::Newline | Tok::NonLogicalNewline | Tok::Indent | Tok::Dedent => {
-                true
-            }
-            Tok::String { value, .. } => value.is_empty(),
-            _ => false,
-        })
-    {
-        contents.push_str(rest);
-    }
+    contents.push_str(checker.locator().slice(TextRange::new(prev_end, end)));
 
     // If necessary, add a space between any leading keyword (`return`, `yield`, `assert`, etc.)
     // and the string. For example, `return"foo"` is valid, but `returnf"foo"` is not.

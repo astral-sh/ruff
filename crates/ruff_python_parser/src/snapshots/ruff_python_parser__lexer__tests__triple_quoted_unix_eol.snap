@@ -6,7 +6,7 @@ expression: triple_quoted_eol(UNIX_EOL)
     (
         String {
             value: "\n test string\n ",
-            kind: StringKind {
+            flags: AnyStringFlags {
                 prefix: Regular(
                     Empty,
                 ),

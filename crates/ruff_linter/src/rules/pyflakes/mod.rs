@@ -11,7 +11,6 @@ mod tests {
 
     use anyhow::Result;
     use regex::Regex;
-    use ruff_python_parser::lexer::LexResult;
 
     use test_case::test_case;
 
@@ -161,6 +160,7 @@ mod tests {
     #[test_case(Rule::UndefinedExport, Path::new("F822_0.py"))]
     #[test_case(Rule::UndefinedExport, Path::new("F822_0.pyi"))]
     #[test_case(Rule::UndefinedExport, Path::new("F822_1.py"))]
+    #[test_case(Rule::UndefinedExport, Path::new("F822_1b.py"))]
     #[test_case(Rule::UndefinedExport, Path::new("F822_2.py"))]
     #[test_case(Rule::UndefinedExport, Path::new("F822_3.py"))]
     #[test_case(Rule::UndefinedLocal, Path::new("F823.py"))]
@@ -207,7 +207,11 @@ mod tests {
     #[test_case(Rule::UnusedVariable, Path::new("F841_4.py"))]
     #[test_case(Rule::UnusedImport, Path::new("__init__.py"))]
     #[test_case(Rule::UnusedImport, Path::new("F401_24/__init__.py"))]
-    #[test_case(Rule::UnusedImport, Path::new("F401_25__all/__init__.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_25__all_nonempty/__init__.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_26__all_empty/__init__.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_27__all_mistyped/__init__.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_28__all_multiple/__init__.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_29__all_conditional/__init__.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",
@@ -218,6 +222,49 @@ mod tests {
             Path::new("pyflakes").join(path).as_path(),
             &LinterSettings {
                 preview: PreviewMode::Enabled,
+                ..LinterSettings::for_rule(rule_code)
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::UnusedImport, Path::new("F401_24/__init__.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_25__all_nonempty/__init__.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_26__all_empty/__init__.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_27__all_mistyped/__init__.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_28__all_multiple/__init__.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_29__all_conditional/__init__.py"))]
+    fn f401_stable(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "{}_stable_{}",
+            rule_code.noqa_code(),
+            path.to_string_lossy()
+        );
+        let diagnostics = test_path(
+            Path::new("pyflakes").join(path).as_path(),
+            &LinterSettings::for_rule(rule_code),
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::UnusedImport, Path::new("F401_24/__init__.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_25__all_nonempty/__init__.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_26__all_empty/__init__.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_27__all_mistyped/__init__.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_28__all_multiple/__init__.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_29__all_conditional/__init__.py"))]
+    fn f401_deprecated_option(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "{}_deprecated_option_{}",
+            rule_code.noqa_code(),
+            path.to_string_lossy()
+        );
+        let diagnostics = test_path(
+            Path::new("pyflakes").join(path).as_path(),
+            &LinterSettings {
+                ignore_init_module_imports: false,
                 ..LinterSettings::for_rule(rule_code)
             },
         )?;
@@ -590,7 +637,7 @@ mod tests {
         let source_type = PySourceType::default();
         let source_kind = SourceKind::Python(contents.to_string());
         let settings = LinterSettings::for_rules(Linter::Pyflakes.rules());
-        let tokens: Vec<LexResult> = ruff_python_parser::tokenize(&contents, source_type.as_mode());
+        let tokens = ruff_python_parser::tokenize(&contents, source_type.as_mode());
         let locator = Locator::new(&contents);
         let stylist = Stylist::from_tokens(&tokens, &locator);
         let indexer = Indexer::from_tokens(&tokens, &locator);

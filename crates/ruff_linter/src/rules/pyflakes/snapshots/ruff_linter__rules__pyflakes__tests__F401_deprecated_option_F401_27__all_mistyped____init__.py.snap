@@ -1,0 +1,34 @@
+---
+source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+---
+__init__.py:5:15: F401 [*] `.unused` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+  |
+5 | from . import unused  # F401: recommend add to all w/o fix
+  |               ^^^^^^ F401
+  |
+  = help: Remove unused import: `.unused`
+
+ℹ Unsafe fix
+2 2 | """
+3 3 | 
+4 4 | 
+5   |-from . import unused  # F401: recommend add to all w/o fix
+6 5 | 
+7 6 | 
+8 7 | from . import renamed as bees  # F401: recommend add to all w/o fix
+
+__init__.py:8:26: F401 [*] `.renamed` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+  |
+8 | from . import renamed as bees  # F401: recommend add to all w/o fix
+  |                          ^^^^ F401
+  |
+  = help: Remove unused import: `.renamed`
+
+ℹ Unsafe fix
+5 5 | from . import unused  # F401: recommend add to all w/o fix
+6 6 | 
+7 7 | 
+8   |-from . import renamed as bees  # F401: recommend add to all w/o fix
+9 8 | 
+10 9 | 
+11 10 | __all__ = None

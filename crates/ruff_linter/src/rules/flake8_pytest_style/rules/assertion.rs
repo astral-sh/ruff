@@ -384,7 +384,11 @@ pub(crate) fn unittest_raises_assertion(
         },
         call.func.range(),
     );
-    if !checker.indexer().has_comments(call, checker.locator()) {
+    if !checker
+        .indexer()
+        .comment_ranges()
+        .has_comments(call, checker.locator())
+    {
         if let Some(args) = to_pytest_raises_args(checker, attr.as_str(), &call.arguments) {
             diagnostic.try_set_fix(|| {
                 let (import_edit, binding) = checker.importer().get_or_import_symbol(

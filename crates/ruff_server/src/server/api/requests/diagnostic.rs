@@ -26,7 +26,13 @@ impl super::BackgroundDocumentRequestHandler for DocumentDiagnostic {
                 full_document_diagnostic_report: FullDocumentDiagnosticReport {
                     // TODO(jane): eventually this will be important for caching diagnostic information.
                     result_id: None,
-                    items: generate_diagnostics(&snapshot),
+                    // Pull diagnostic requests are only called for text documents.
+                    // Since diagnostic requests generate
+                    items: generate_diagnostics(&snapshot)
+                        .into_iter()
+                        .next()
+                        .map(|(_, diagnostics)| diagnostics)
+                        .unwrap_or_default(),
                 },
             }),
         ))

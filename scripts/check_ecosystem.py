@@ -124,7 +124,6 @@ REPOSITORIES: list[Repository] = [
     Repository("aws", "aws-sam-cli", "develop"),
     Repository("bloomberg", "pytest-memray", "main"),
     Repository("bokeh", "bokeh", "branch-3.3", select="ALL"),
-    Repository("commaai", "openpilot", "master"),
     Repository("demisto", "content", "master"),
     Repository("docker", "docker-py", "main"),
     Repository("freedomofpress", "securedrop", "develop"),

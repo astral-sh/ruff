@@ -4,7 +4,7 @@ use std::ops::Deref;
 
 use once_cell::unsync::OnceCell;
 
-use ruff_python_ast::str::Quote;
+use ruff_python_ast::{str::Quote, StringFlags};
 use ruff_python_parser::lexer::LexResult;
 use ruff_python_parser::Tok;
 use ruff_source_file::{find_newline, LineEnding, Locator};
@@ -50,8 +50,8 @@ impl<'a> Stylist<'a> {
 fn detect_quote(tokens: &[LexResult]) -> Quote {
     for (token, _) in tokens.iter().flatten() {
         match token {
-            Tok::String { kind, .. } if !kind.is_triple_quoted() => return kind.quote_style(),
-            Tok::FStringStart(kind) => return kind.quote_style(),
+            Tok::String { flags, .. } if !flags.is_triple_quoted() => return flags.quote_style(),
+            Tok::FStringStart(flags) => return flags.quote_style(),
             _ => continue,
         }
     }

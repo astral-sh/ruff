@@ -1,11 +1,12 @@
 use rayon::{current_num_threads, yield_local};
 use rustc_hash::FxHashSet;
 
-use crate::db::{Database, LintDb, QueryError, QueryResult, SemanticDb};
+use crate::db::{Database, QueryError, QueryResult};
 use crate::files::FileId;
-use crate::lint::Diagnostics;
+use crate::lint::{lint_semantic, lint_syntax, Diagnostics};
+use crate::module::{file_to_module, resolve_module};
 use crate::program::Program;
-use crate::symbols::Dependency;
+use crate::symbols::{symbol_table, Dependency};
 
 impl Program {
     /// Checks all open files in the workspace and its dependencies.
@@ -27,11 +28,11 @@ impl Program {
     fn check_file(&self, file: FileId, context: &CheckFileContext) -> QueryResult<Diagnostics> {
         self.cancelled()?;
 
-        let symbol_table = self.symbol_table(file)?;
+        let symbol_table = symbol_table(self, file)?;
         let dependencies = symbol_table.dependencies();
 
         if !dependencies.is_empty() {
-            let module = self.file_to_module(file)?;
+            let module = file_to_module(self, file)?;
 
             // TODO scheduling all dependencies here is wasteful if we don't infer any types on them
             //  but I think that's unlikely, so it is okay?
@@ -50,7 +51,7 @@ impl Program {
                     // TODO We may want to have a different check functions for non-first-party
                     //   files because we only need to index them and not check them.
                     //   Supporting non-first-party code also requires supporting typing stubs.
-                    if let Some(dependency) = self.resolve_module(dependency_name)? {
+                    if let Some(dependency) = resolve_module(self, dependency_name)? {
                         if dependency.path(self)?.root().kind().is_first_party() {
                             context.schedule_dependency(dependency.path(self)?.file());
                         }
@@ -62,8 +63,8 @@ impl Program {
         let mut diagnostics = Vec::new();
 
         if self.workspace().is_file_open(file) {
-            diagnostics.extend_from_slice(&self.lint_syntax(file)?);
-            diagnostics.extend_from_slice(&self.lint_semantic(file)?);
+            diagnostics.extend_from_slice(&lint_syntax(self, file)?);
+            diagnostics.extend_from_slice(&lint_semantic(self, file)?);
         }
 
         Ok(Diagnostics::from(diagnostics))

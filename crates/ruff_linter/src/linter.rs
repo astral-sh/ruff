@@ -14,7 +14,7 @@ use ruff_python_ast::{PySourceType, Suite};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 use ruff_python_parser::lexer::LexResult;
-use ruff_python_parser::{AsMode, ParseError};
+use ruff_python_parser::{AsMode, ParseError, TokenKindIter, Tokens};
 use ruff_source_file::{Locator, SourceFileBuilder};
 use ruff_text_size::Ranged;
 
@@ -93,7 +93,7 @@ pub fn check_path(
     let use_doc_lines = settings.rules.enabled(Rule::DocLineTooLong);
     let mut doc_lines = vec![];
     if use_doc_lines {
-        doc_lines.extend(doc_lines_from_tokens(&tokens));
+        doc_lines.extend(doc_lines_from_tokens(tokens.kinds()));
     }
 
     // Run the token-based rules.
@@ -353,7 +353,7 @@ pub fn add_noqa_to_path(
     let contents = source_kind.source_code();
 
     // Tokenize once.
-    let tokens: Vec<LexResult> = ruff_python_parser::tokenize(contents, source_type.as_mode());
+    let tokens = ruff_python_parser::tokenize(contents, source_type.as_mode());
 
     // Map row and column locations to byte slices (lazily).
     let locator = Locator::new(contents);
@@ -518,8 +518,7 @@ pub fn lint_fix<'a>(
     // Continuously fix until the source code stabilizes.
     loop {
         // Tokenize once.
-        let tokens: Vec<LexResult> =
-            ruff_python_parser::tokenize(transformed.source_code(), source_type.as_mode());
+        let tokens = ruff_python_parser::tokenize(transformed.source_code(), source_type.as_mode());
 
         // Map row and column locations to byte slices (lazily).
         let locator = Locator::new(transformed.source_code());
@@ -715,12 +714,24 @@ impl<'a> ParseSource<'a> {
 #[derive(Debug, Clone)]
 pub enum TokenSource<'a> {
     /// Use the precomputed tokens to generate the AST.
-    Tokens(Vec<LexResult>),
+    Tokens(Tokens),
     /// Use the precomputed tokens and AST.
     Precomputed {
         tokens: &'a [LexResult],
         ast: &'a Suite,
     },
+}
+
+impl TokenSource<'_> {
+    /// Returns an iterator over the [`TokenKind`] and the corresponding range.
+    ///
+    /// [`TokenKind`]: ruff_python_parser::TokenKind
+    pub fn kinds(&self) -> TokenKindIter {
+        match self {
+            TokenSource::Tokens(tokens) => tokens.kinds(),
+            TokenSource::Precomputed { tokens, .. } => TokenKindIter::new(tokens),
+        }
+    }
 }
 
 impl Deref for TokenSource<'_> {

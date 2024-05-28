@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from functools import singledispatch
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from numpy import asarray
@@ -31,4 +32,25 @@ def _(a: spmatrix) -> spmatrix:
 
 
 def _(a: DataFrame) -> DataFrame:
+    return a
+
+
+@singledispatch
+def process_path(a: int | str, p: Path) -> int:
+    """Convert arg to array or leaves it as sparse matrix."""
+    msg = f"Unhandled type {type(a)}"
+    raise NotImplementedError(msg)
+
+
+@process_path.register
+def _(a: int, p: Path) -> int:
+    return asarray(a)
+
+
+@process_path.register
+def _(a: str, p: Path) -> int:
+    return a
+
+
+def _(a: DataFrame, p: Path) -> DataFrame:
     return a

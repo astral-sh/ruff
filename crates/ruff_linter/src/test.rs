@@ -16,7 +16,6 @@ use ruff_notebook::NotebookError;
 use ruff_python_ast::PySourceType;
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
-use ruff_python_parser::lexer::LexResult;
 use ruff_python_parser::AsMode;
 use ruff_python_trivia::textwrap::dedent;
 use ruff_source_file::{Locator, SourceFileBuilder};
@@ -92,7 +91,7 @@ pub fn test_snippet(contents: &str, settings: &LinterSettings) -> Vec<Message> {
 }
 
 thread_local! {
-    static MAX_ITERATIONS: std::cell::Cell<usize> = const { std::cell::Cell::new(8) };
+    static MAX_ITERATIONS: std::cell::Cell<usize> = const { std::cell::Cell::new(10) };
 }
 
 pub fn set_max_iterations(max: usize) {
@@ -111,8 +110,7 @@ pub(crate) fn test_contents<'a>(
     settings: &LinterSettings,
 ) -> (Vec<Message>, Cow<'a, SourceKind>) {
     let source_type = PySourceType::from(path);
-    let tokens: Vec<LexResult> =
-        ruff_python_parser::tokenize(source_kind.source_code(), source_type.as_mode());
+    let tokens = ruff_python_parser::tokenize(source_kind.source_code(), source_type.as_mode());
     let locator = Locator::new(source_kind.source_code());
     let stylist = Stylist::from_tokens(&tokens, &locator);
     let indexer = Indexer::from_tokens(&tokens, &locator);
@@ -177,7 +175,7 @@ pub(crate) fn test_contents<'a>(
 
             transformed = Cow::Owned(transformed.updated(fixed_contents, &source_map));
 
-            let tokens: Vec<LexResult> =
+            let tokens =
                 ruff_python_parser::tokenize(transformed.source_code(), source_type.as_mode());
             let locator = Locator::new(transformed.source_code());
             let stylist = Stylist::from_tokens(&tokens, &locator);

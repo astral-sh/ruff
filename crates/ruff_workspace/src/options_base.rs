@@ -1,3 +1,6 @@
+use serde::{Serialize, Serializer};
+use std::collections::BTreeMap;
+
 use std::fmt::{Debug, Display, Formatter};
 
 /// Visits [`OptionsMetadata`].
@@ -39,12 +42,13 @@ where
 }
 
 /// Metadata of an option that can either be a [`OptionField`] or [`OptionSet`].
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug, Serialize)]
+#[serde(untagged)]
 pub enum OptionEntry {
     /// A single option.
     Field(OptionField),
 
-    /// A set of options
+    /// A set of options.
     Set(OptionSet),
 }
 
@@ -325,13 +329,51 @@ impl Display for OptionSet {
     }
 }
 
+struct SerializeVisitor<'a> {
+    entries: &'a mut BTreeMap<String, OptionField>,
+}
+
+impl<'a> Visit for SerializeVisitor<'a> {
+    fn record_set(&mut self, name: &str, set: OptionSet) {
+        // Collect the entries of the set.
+        let mut entries = BTreeMap::new();
+        let mut visitor = SerializeVisitor {
+            entries: &mut entries,
+        };
+        set.record(&mut visitor);
+
+        // Insert the set into the entries.
+        for (key, value) in entries {
+            self.entries.insert(format!("{name}.{key}"), value);
+        }
+    }
+
+    fn record_field(&mut self, name: &str, field: OptionField) {
+        self.entries.insert(name.to_string(), field);
+    }
+}
+
+impl Serialize for OptionSet {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut entries = BTreeMap::new();
+        let mut visitor = SerializeVisitor {
+            entries: &mut entries,
+        };
+        self.record(&mut visitor);
+        entries.serialize(serializer)
+    }
+}
+
 impl Debug for OptionSet {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         Display::fmt(self, f)
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, Eq, PartialEq, Clone, Serialize)]
 pub struct OptionField {
     pub doc: &'static str,
     /// Ex) `"false"`
@@ -344,7 +386,7 @@ pub struct OptionField {
     pub deprecated: Option<Deprecated>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize)]
 pub struct Deprecated {
     pub since: Option<&'static str>,
     pub message: Option<&'static str>,

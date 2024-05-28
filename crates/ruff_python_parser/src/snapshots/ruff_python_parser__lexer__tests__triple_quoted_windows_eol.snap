@@ -6,7 +6,7 @@ expression: triple_quoted_eol(WINDOWS_EOL)
     (
         String {
             value: "\r\n test string\r\n ",
-            kind: StringKind {
+            flags: AnyStringFlags {
                 prefix: Regular(
                     Empty,
                 ),

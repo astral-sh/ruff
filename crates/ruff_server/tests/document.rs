@@ -1,11 +1,11 @@
 const PANDAS_HTML_SRC: &str = include_str!("../resources/test/fixtures/pandas_html.py");
 
 use lsp_types::{Position, Range, TextDocumentContentChangeEvent};
-use ruff_server::{Document, PositionEncoding};
+use ruff_server::{PositionEncoding, TextDocument};
 
 #[test]
 fn delete_lines_pandas_html() {
-    let mut document = Document::new(PANDAS_HTML_SRC.to_string(), 1);
+    let mut document = TextDocument::new(PANDAS_HTML_SRC.to_string(), 1);
 
     let changes = vec![
         TextDocumentContentChangeEvent {

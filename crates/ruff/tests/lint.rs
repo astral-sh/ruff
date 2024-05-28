@@ -1553,3 +1553,68 @@ def unused(x):  # noqa: ANN001, ARG001, D103
 
     Ok(())
 }
+
+#[test]
+fn add_noqa_multiline_comment() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+[lint]
+select = ["UP031"]
+"#,
+    )?;
+
+    let test_path = tempdir.path().join("noqa.py");
+
+    fs::write(
+        &test_path,
+        r#"
+print(
+    """First line
+    second line
+    third line
+      %s"""
+    % name
+)
+"#,
+    )?;
+
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
+    }, {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .current_dir(tempdir.path())
+        .args(STDIN_BASE_OPTIONS)
+        .args(["--config", &ruff_toml.file_name().unwrap().to_string_lossy()])
+        .arg(&test_path)
+        .arg("--preview")
+        .args(["--add-noqa"])
+        .arg("-")
+        .pass_stdin(r#"
+
+"#), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Added 1 noqa directive.
+    "###);
+    });
+
+    let test_code = std::fs::read_to_string(&test_path).expect("should read test file");
+
+    insta::assert_snapshot!(test_code, @r###"
+    print(
+        """First line
+        second line
+        third line
+          %s"""  # noqa: UP031
+        % name
+    )
+    "###);
+
+    Ok(())
+}
