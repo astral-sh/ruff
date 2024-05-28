@@ -167,7 +167,7 @@ pub fn check_path(
                 }
                 if use_imports {
                     let import_diagnostics = check_imports(
-                        program.suite(),
+                        &program,
                         locator,
                         indexer,
                         &directives.isort,
