@@ -162,7 +162,7 @@ def markdown_check_result(result: Result) -> str:
         # Limit the number of items displayed per rule to between 5 and the max for
         # the project based on the number of rules affected (less rules, more per rule)
         max_display_per_rule = max(
-            5, max_display_per_project // max(len(rule_changes.rule_codes()), 1)
+            5, max_display_per_project // len(rule_changes.rule_codes())
         )
 
         # Display the diff
