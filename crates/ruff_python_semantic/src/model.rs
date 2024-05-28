@@ -540,6 +540,23 @@ impl<'a> SemanticModel<'a> {
                         return ReadResult::Resolved(binding_id);
                     }
 
+                    BindingKind::Global(Some(binding_id))
+                    | BindingKind::Nonlocal(binding_id, _) => {
+                        // Mark the shadowed binding as used.
+                        let reference_id = self.resolved_references.push(
+                            self.scope_id,
+                            self.node_id,
+                            ExprContext::Load,
+                            self.flags,
+                            name.range,
+                        );
+                        self.bindings[binding_id].references.push(reference_id);
+
+                        // Treat it as resolved.
+                        self.resolved_names.insert(name.into(), binding_id);
+                        return ReadResult::Resolved(binding_id);
+                    }
+
                     _ => {
                         // Otherwise, treat it as resolved.
                         self.resolved_names.insert(name.into(), binding_id);

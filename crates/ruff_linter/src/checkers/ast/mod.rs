@@ -588,8 +588,10 @@ impl<'a> Visitor<'a> for Checker<'a> {
             Stmt::Global(ast::StmtGlobal { names, range: _ }) => {
                 if !self.semantic.scope_id.is_global() {
                     for name in names {
-                        if let Some(binding_id) = self.semantic.global_scope().get(name) {
-                            // Mark the binding in the global scope as "rebound" in the current scope.
+                        let binding_id = self.semantic.global_scope().get(name);
+
+                        // Mark the binding in the global scope as "rebound" in the current scope.
+                        if let Some(binding_id) = binding_id {
                             self.semantic
                                 .add_rebinding_scope(binding_id, self.semantic.scope_id);
                         }
@@ -597,7 +599,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                         // Add a binding to the current scope.
                         let binding_id = self.semantic.push_binding(
                             name.range(),
-                            BindingKind::Global,
+                            BindingKind::Global(binding_id),
                             BindingFlags::GLOBAL,
                         );
                         let scope = self.semantic.current_scope_mut();
@@ -609,7 +611,8 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 if !self.semantic.scope_id.is_global() {
                     for name in names {
                         if let Some((scope_id, binding_id)) = self.semantic.nonlocal(name) {
-                            // Mark the binding as "used".
+                            // Mark the binding as "used", since the `nonlocal` requires an existing
+                            // binding.
                             self.semantic.add_local_reference(
                                 binding_id,
                                 ExprContext::Load,
@@ -624,7 +627,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                             // Add a binding to the current scope.
                             let binding_id = self.semantic.push_binding(
                                 name.range(),
-                                BindingKind::Nonlocal(scope_id),
+                                BindingKind::Nonlocal(binding_id, scope_id),
                                 BindingFlags::NONLOCAL,
                             );
                             let scope = self.semantic.current_scope_mut();
