@@ -87,6 +87,9 @@ mod token_set;
 mod token_source;
 pub mod typing;
 
+#[deprecated]
+pub fn tokenize(_source: &str, _mode: Mode) {}
+
 /// Parse a full Python module usually consisting of multiple lines.
 ///
 /// This is a convenience function that can be used to parse a full Python program without having to

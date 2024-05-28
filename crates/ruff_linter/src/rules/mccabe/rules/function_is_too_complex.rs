@@ -177,9 +177,14 @@ pub(crate) fn function_is_too_complex(
 mod tests {
     use anyhow::Result;
 
-    use ruff_python_parser::parse_suite;
+    use ruff_python_ast::Suite;
+    use ruff_python_parser::parse_module;
 
     use super::get_complexity_number;
+
+    fn parse_suite(source: &str) -> Result<Suite> {
+        parse_module(source).map(|program| program.into_suite())
+    }
 
     #[test]
     fn trivial() -> Result<()> {

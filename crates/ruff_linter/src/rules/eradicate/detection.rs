@@ -4,7 +4,7 @@ use itertools::Itertools;
 use once_cell::sync::Lazy;
 use regex::{Regex, RegexSet};
 
-use ruff_python_parser::parse_suite;
+use ruff_python_parser::parse_module;
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::TextSize;
 
@@ -84,7 +84,7 @@ pub(crate) fn comment_contains_code(line: &str, task_tags: &[String]) -> bool {
     }
 
     // Finally, compile the source code.
-    parse_suite(line).is_ok()
+    parse_module(line).is_ok()
 }
 
 #[cfg(test)]

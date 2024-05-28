@@ -1552,16 +1552,15 @@ fn docstring_format_source(
     use ruff_python_parser::AsMode;
 
     let source_type = options.source_type();
-    let (tokens, comment_ranges) =
-        ruff_python_index::tokens_and_ranges(source, source_type).map_err(ParseError::from)?;
-    let module = ruff_python_parser::parse_tokens(tokens, source, source_type.as_mode())?;
+    let program = ruff_python_parser::parse(source, source_type.as_mode())?;
     let source_code = ruff_formatter::SourceCode::new(source);
-    let comments = crate::Comments::from_ast(&module, source_code, &comment_ranges);
+    let comments =
+        crate::Comments::from_ast(program.syntax(), source_code, program.comment_ranges());
     let locator = Locator::new(source);
 
     let ctx = PyFormatContext::new(options, locator.contents(), comments)
         .in_docstring(docstring_quote_style);
-    let formatted = crate::format!(ctx, [module.format()])?;
+    let formatted = crate::format!(ctx, [program.syntax().format()])?;
     formatted
         .context()
         .comments()

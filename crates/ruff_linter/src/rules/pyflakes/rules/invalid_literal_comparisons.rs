@@ -269,9 +269,9 @@ mod tests {
     #[test]
     fn extract_cmp_op_location() -> Result<()> {
         let contents = "x == 1";
-        let expr = parse_expression(contents)?;
+        let expr = parse_expression(contents)?.expr();
         assert_eq!(
-            locate_cmp_ops(&expr, contents),
+            locate_cmp_ops(expr, contents),
             vec![LocatedCmpOp::new(
                 TextSize::from(2)..TextSize::from(4),
                 CmpOp::Eq
@@ -279,9 +279,9 @@ mod tests {
         );
 
         let contents = "x != 1";
-        let expr = parse_expression(contents)?;
+        let expr = parse_expression(contents)?.expr();
         assert_eq!(
-            locate_cmp_ops(&expr, contents),
+            locate_cmp_ops(expr, contents),
             vec![LocatedCmpOp::new(
                 TextSize::from(2)..TextSize::from(4),
                 CmpOp::NotEq
@@ -289,9 +289,9 @@ mod tests {
         );
 
         let contents = "x is 1";
-        let expr = parse_expression(contents)?;
+        let expr = parse_expression(contents)?.expr();
         assert_eq!(
-            locate_cmp_ops(&expr, contents),
+            locate_cmp_ops(expr, contents),
             vec![LocatedCmpOp::new(
                 TextSize::from(2)..TextSize::from(4),
                 CmpOp::Is
@@ -299,9 +299,9 @@ mod tests {
         );
 
         let contents = "x is not 1";
-        let expr = parse_expression(contents)?;
+        let expr = parse_expression(contents)?.expr();
         assert_eq!(
-            locate_cmp_ops(&expr, contents),
+            locate_cmp_ops(expr, contents),
             vec![LocatedCmpOp::new(
                 TextSize::from(2)..TextSize::from(8),
                 CmpOp::IsNot
@@ -309,9 +309,9 @@ mod tests {
         );
 
         let contents = "x in 1";
-        let expr = parse_expression(contents)?;
+        let expr = parse_expression(contents)?.expr();
         assert_eq!(
-            locate_cmp_ops(&expr, contents),
+            locate_cmp_ops(expr, contents),
             vec![LocatedCmpOp::new(
                 TextSize::from(2)..TextSize::from(4),
                 CmpOp::In
@@ -319,9 +319,9 @@ mod tests {
         );
 
         let contents = "x not in 1";
-        let expr = parse_expression(contents)?;
+        let expr = parse_expression(contents)?.expr();
         assert_eq!(
-            locate_cmp_ops(&expr, contents),
+            locate_cmp_ops(expr, contents),
             vec![LocatedCmpOp::new(
                 TextSize::from(2)..TextSize::from(8),
                 CmpOp::NotIn
@@ -329,9 +329,9 @@ mod tests {
         );
 
         let contents = "x != (1 is not 2)";
-        let expr = parse_expression(contents)?;
+        let expr = parse_expression(contents)?.expr();
         assert_eq!(
-            locate_cmp_ops(&expr, contents),
+            locate_cmp_ops(expr, contents),
             vec![LocatedCmpOp::new(
                 TextSize::from(2)..TextSize::from(4),
                 CmpOp::NotEq
