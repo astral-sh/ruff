@@ -134,6 +134,9 @@ pub(crate) fn control_var_used_after_block(checker: &Checker, scope: &Scope) {
         println!("asdfasdf {:?}", binding.references);
         for reference in binding.references() {
             println!("asdfasdfasdf {:?}", checker.semantic().reference(reference));
+
+            // TODO: Look if the reference is under the same block as the binding
+            // (see `too_many_nested_blocks` for an example of how to work with blocks)
         }
     }
 }
