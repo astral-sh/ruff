@@ -458,6 +458,12 @@ impl ClassTypeId {
         }
     }
 
+    /// Get own class member or fallback to super-class member.
+    fn get_member(self, db: &dyn SemanticDb, name: &Name) -> QueryResult<Option<Type>> {
+        self.get_own_class_member(db, name)
+            .or_else(|_| self.get_super_class_member(db, name))
+    }
+
     // TODO: get_own_instance_member, get_class_member, get_instance_member
 }
 
