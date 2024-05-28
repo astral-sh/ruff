@@ -46,22 +46,6 @@ pub struct IsortDirectives {
     pub skip_file: bool,
 }
 
-impl IsortDirectives {
-    pub fn is_excluded(&self, offset: TextSize) -> bool {
-        for range in &self.exclusions {
-            if range.contains(offset) {
-                return true;
-            }
-
-            if range.start() > offset {
-                break;
-            }
-        }
-
-        false
-    }
-}
-
 pub struct Directives {
     pub noqa_line_for: NoqaMapping,
     pub isort: IsortDirectives,
