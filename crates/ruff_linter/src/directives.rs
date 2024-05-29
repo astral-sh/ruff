@@ -4,9 +4,10 @@ use std::iter::Peekable;
 use std::str::FromStr;
 
 use bitflags::bitflags;
-use ruff_python_ast::StringFlags;
+use ruff_python_ast::{ModModule, StringFlags};
 use ruff_python_parser::lexer::LexResult;
-use ruff_python_parser::Tok;
+use ruff_python_parser::{Program, Tok};
+use ruff_python_trivia::CommentRanges;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use ruff_python_index::Indexer;
@@ -68,7 +69,7 @@ pub struct Directives {
 }
 
 pub fn extract_directives(
-    lxr: &[LexResult],
+    program: &Program<ModModule>,
     flags: Flags,
     locator: &Locator,
     indexer: &Indexer,
@@ -80,7 +81,7 @@ pub fn extract_directives(
             NoqaMapping::default()
         },
         isort: if flags.intersects(Flags::ISORT) {
-            extract_isort_directives(locator, indexer)
+            extract_isort_directives(locator, program.comment_ranges())
         } else {
             IsortDirectives::default()
         },
@@ -213,12 +214,12 @@ fn extract_noqa_line_for(lxr: &[LexResult], locator: &Locator, indexer: &Indexer
 }
 
 /// Extract a set of ranges over which to disable isort.
-fn extract_isort_directives(locator: &Locator, indexer: &Indexer) -> IsortDirectives {
+fn extract_isort_directives(locator: &Locator, comment_ranges: &CommentRanges) -> IsortDirectives {
     let mut exclusions: Vec<TextRange> = Vec::default();
     let mut splits: Vec<TextSize> = Vec::default();
     let mut off: Option<TextSize> = None;
 
-    for range in indexer.comment_ranges() {
+    for range in comment_ranges {
         let comment_text = locator.slice(range);
 
         // `isort` allows for `# isort: skip` and `# isort: skip_file` to include or

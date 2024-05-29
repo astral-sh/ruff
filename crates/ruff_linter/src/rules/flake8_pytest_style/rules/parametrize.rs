@@ -353,7 +353,7 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
                         let name_range = get_parametrize_name_range(
                             decorator,
                             expr,
-                            checker.indexer().comment_ranges(),
+                            checker.program().comment_ranges(),
                             checker.locator().contents(),
                         )
                         .unwrap_or(expr.range());
@@ -388,7 +388,7 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
                         let name_range = get_parametrize_name_range(
                             decorator,
                             expr,
-                            checker.indexer().comment_ranges(),
+                            checker.program().comment_ranges(),
                             checker.locator().contents(),
                         )
                         .unwrap_or(expr.range());
@@ -682,7 +682,7 @@ fn check_duplicates(checker: &mut Checker, values: &Expr) {
                         trailing_comma(element, checker.locator().contents(), values_end);
                     let deletion_range = TextRange::new(previous_end, element_end);
                     if !checker
-                        .indexer()
+                        .program()
                         .comment_ranges()
                         .intersects(deletion_range)
                     {
