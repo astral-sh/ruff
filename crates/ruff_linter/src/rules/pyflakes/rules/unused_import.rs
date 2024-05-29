@@ -54,7 +54,7 @@ enum UnusedImportContext {
 /// # __init__.py
 /// import some_module
 ///
-/// __all__ = [ "some_module"]
+/// __all__ = ["some_module"]
 /// ```
 ///
 /// ## Fix safety

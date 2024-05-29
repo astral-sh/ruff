@@ -47,16 +47,30 @@ PYI006.pyi:16:4: PYI006 Use `<` or `>=` for `sys.version_info` comparisons
 15 | 
 16 | if sys.version_info > (3, 10): ...  # Error: PYI006 Use only `<` and `>=` for version info comparisons
    |    ^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI006
-17 | 
-18 | if python_version > (3, 10): ...  # Error: PYI006 Use only `<` and `>=` for version info comparisons
+17 | elif sys.version_info > (3, 11): ...  # Error: PYI006 Use only `<` and `>=` for version info comparisons
    |
 
-PYI006.pyi:18:4: PYI006 Use `<` or `>=` for `sys.version_info` comparisons
+PYI006.pyi:17:6: PYI006 Use `<` or `>=` for `sys.version_info` comparisons
    |
 16 | if sys.version_info > (3, 10): ...  # Error: PYI006 Use only `<` and `>=` for version info comparisons
-17 | 
-18 | if python_version > (3, 10): ...  # Error: PYI006 Use only `<` and `>=` for version info comparisons
-   |    ^^^^^^^^^^^^^^^^^^^^^^^^ PYI006
+17 | elif sys.version_info > (3, 11): ...  # Error: PYI006 Use only `<` and `>=` for version info comparisons
+   |      ^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI006
+18 | 
+19 | if python_version > (3, 10): ...  # Error: PYI006 Use only `<` and `>=` for version info comparisons
    |
 
+PYI006.pyi:19:4: PYI006 Use `<` or `>=` for `sys.version_info` comparisons
+   |
+17 | elif sys.version_info > (3, 11): ...  # Error: PYI006 Use only `<` and `>=` for version info comparisons
+18 | 
+19 | if python_version > (3, 10): ...  # Error: PYI006 Use only `<` and `>=` for version info comparisons
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^ PYI006
+20 | elif python_version == (3, 11): ...  # Error: PYI006 Use only `<` and `>=` for version info comparisons
+   |
 
+PYI006.pyi:20:6: PYI006 Use `<` or `>=` for `sys.version_info` comparisons
+   |
+19 | if python_version > (3, 10): ...  # Error: PYI006 Use only `<` and `>=` for version info comparisons
+20 | elif python_version == (3, 11): ...  # Error: PYI006 Use only `<` and `>=` for version info comparisons
+   |      ^^^^^^^^^^^^^^^^^^^^^^^^^ PYI006
+   |

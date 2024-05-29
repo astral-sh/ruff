@@ -1027,6 +1027,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     checker.diagnostics.push(diagnostic);
                 }
             }
+            if checker.enabled(Rule::ByteStringUsage) {
+                flake8_pyi::rules::bytestring_import(checker, import_from);
+            }
         }
         Stmt::Raise(raise @ ast::StmtRaise { exc, .. }) => {
             if checker.enabled(Rule::RaiseNotImplemented) {
@@ -1092,7 +1095,13 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 ruff::rules::sort_dunder_all_aug_assign(checker, aug_assign);
             }
         }
-        Stmt::If(if_ @ ast::StmtIf { test, .. }) => {
+        Stmt::If(
+            if_ @ ast::StmtIf {
+                test,
+                elif_else_clauses,
+                ..
+            },
+        ) => {
             if checker.enabled(Rule::TooManyNestedBlocks) {
                 pylint::rules::too_many_nested_blocks(checker, stmt);
             }
@@ -1172,13 +1181,38 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                         flake8_pyi::rules::unrecognized_platform(checker, test);
                     }
                 }
-                if checker.enabled(Rule::BadVersionInfoComparison) {
-                    if let Expr::BoolOp(ast::ExprBoolOp { values, .. }) = test.as_ref() {
-                        for value in values {
-                            flake8_pyi::rules::bad_version_info_comparison(checker, value);
+                if checker.any_enabled(&[Rule::BadVersionInfoComparison, Rule::BadVersionInfoOrder])
+                {
+                    fn bad_version_info_comparison(
+                        checker: &mut Checker,
+                        test: &Expr,
+                        has_else_clause: bool,
+                    ) {
+                        if let Expr::BoolOp(ast::ExprBoolOp { values, .. }) = test {
+                            for value in values {
+                                flake8_pyi::rules::bad_version_info_comparison(
+                                    checker,
+                                    value,
+                                    has_else_clause,
+                                );
+                            }
+                        } else {
+                            flake8_pyi::rules::bad_version_info_comparison(
+                                checker,
+                                test,
+                                has_else_clause,
+                            );
                         }
-                    } else {
-                        flake8_pyi::rules::bad_version_info_comparison(checker, test);
+                    }
+
+                    let has_else_clause =
+                        elif_else_clauses.iter().any(|clause| clause.test.is_none());
+
+                    bad_version_info_comparison(checker, test.as_ref(), has_else_clause);
+                    for clause in elif_else_clauses {
+                        if let Some(test) = clause.test.as_ref() {
+                            bad_version_info_comparison(checker, test, has_else_clause);
+                        }
                     }
                 }
                 if checker.enabled(Rule::ComplexIfStatementInStub) {
@@ -1632,6 +1666,13 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 }
                 if checker.enabled(Rule::TSuffixedTypeAlias) {
                     flake8_pyi::rules::t_suffixed_type_alias(checker, target);
+                }
+            } else if checker
+                .semantic
+                .match_typing_expr(helpers::map_subscript(annotation), "Final")
+            {
+                if checker.enabled(Rule::RedundantFinalLiteral) {
+                    flake8_pyi::rules::redundant_final_literal(checker, assign_stmt);
                 }
             }
         }

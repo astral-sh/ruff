@@ -1,3 +1,7 @@
+use std::{borrow::Cow, path::Path};
+
+use rustc_hash::FxHashMap;
+
 use ruff_linter::{
     linter::{FixerResult, LinterResult},
     packaging::detect_package_root,
@@ -5,8 +9,7 @@ use ruff_linter::{
 };
 use ruff_notebook::SourceValue;
 use ruff_source_file::LineIndex;
-use rustc_hash::FxHashMap;
-use std::{borrow::Cow, path::Path};
+use ruff_workspace::resolver::match_any_exclusion;
 
 use crate::{
     edit::{Replacement, ToRangeExt},
@@ -25,6 +28,24 @@ pub(crate) fn fix_all(
 ) -> crate::Result<Fixes> {
     let document_path = Path::new(query.file_path());
     let source_kind = query.make_source_kind();
+
+    let file_resolver_settings = query.settings().file_resolver();
+
+    // If the document is excluded, return an empty list of fixes.
+    if let Some(exclusion) = match_any_exclusion(
+        document_path,
+        &file_resolver_settings.exclude,
+        &file_resolver_settings.extend_exclude,
+        Some(&linter_settings.exclude),
+        None,
+    ) {
+        tracing::debug!(
+            "Ignored path via `{}`: {}",
+            exclusion,
+            document_path.display()
+        );
+        return Ok(Fixes::default());
+    }
 
     let package = detect_package_root(
         document_path

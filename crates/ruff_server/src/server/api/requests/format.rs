@@ -1,14 +1,19 @@
+use std::path::Path;
+
+use lsp_types::{self as types, request as req};
+use types::TextEdit;
+
+use ruff_python_ast::PySourceType;
+use ruff_source_file::LineIndex;
+use ruff_workspace::resolver::match_any_exclusion;
+use ruff_workspace::{FileResolverSettings, FormatterSettings};
+
 use crate::edit::{Replacement, ToRangeExt};
 use crate::fix::Fixes;
 use crate::server::api::LSPResult;
 use crate::server::{client::Notifier, Result};
 use crate::session::DocumentSnapshot;
 use crate::{PositionEncoding, TextDocument};
-use lsp_types::{self as types, request as req};
-use ruff_python_ast::PySourceType;
-use ruff_source_file::LineIndex;
-use ruff_workspace::FormatterSettings;
-use types::TextEdit;
 
 pub(crate) struct Format;
 
@@ -30,6 +35,7 @@ impl super::BackgroundDocumentRequestHandler for Format {
 /// Formats either a full text document or each individual cell in a single notebook document.
 pub(super) fn format_full_document(snapshot: &DocumentSnapshot) -> Result<Fixes> {
     let mut fixes = Fixes::default();
+    let query = snapshot.query();
 
     if let Some(notebook) = snapshot.query().as_notebook() {
         for (url, text_document) in notebook
@@ -38,8 +44,10 @@ pub(super) fn format_full_document(snapshot: &DocumentSnapshot) -> Result<Fixes>
         {
             if let Some(changes) = format_text_document(
                 text_document,
-                snapshot.query().source_type(),
-                snapshot.query().settings().formatter(),
+                query.source_type(),
+                query.file_path(),
+                query.settings().file_resolver(),
+                query.settings().formatter(),
                 snapshot.encoding(),
                 true,
             )? {
@@ -48,9 +56,11 @@ pub(super) fn format_full_document(snapshot: &DocumentSnapshot) -> Result<Fixes>
         }
     } else {
         if let Some(changes) = format_text_document(
-            snapshot.query().as_single_document().unwrap(),
-            snapshot.query().source_type(),
-            snapshot.query().settings().formatter(),
+            query.as_single_document().unwrap(),
+            query.source_type(),
+            query.file_path(),
+            query.settings().file_resolver(),
+            query.settings().formatter(),
             snapshot.encoding(),
             false,
         )? {
@@ -68,22 +78,39 @@ pub(super) fn format_document(snapshot: &DocumentSnapshot) -> Result<super::Form
         .query()
         .as_single_document()
         .expect("format should only be called on text documents or notebook cells");
+    let query = snapshot.query();
     format_text_document(
         text_document,
-        snapshot.query().source_type(),
-        snapshot.query().settings().formatter(),
+        query.source_type(),
+        query.file_path(),
+        query.settings().file_resolver(),
+        query.settings().formatter(),
         snapshot.encoding(),
-        snapshot.query().as_notebook().is_some(),
+        query.as_notebook().is_some(),
     )
 }
 
 fn format_text_document(
     text_document: &TextDocument,
     source_type: PySourceType,
+    file_path: &Path,
+    file_resolver_settings: &FileResolverSettings,
     formatter_settings: &FormatterSettings,
     encoding: PositionEncoding,
     is_notebook: bool,
 ) -> Result<super::FormatResponse> {
+    // If the document is excluded, return early.
+    if let Some(exclusion) = match_any_exclusion(
+        file_path,
+        &file_resolver_settings.exclude,
+        &file_resolver_settings.extend_exclude,
+        None,
+        Some(&formatter_settings.exclude),
+    ) {
+        tracing::debug!("Ignored path via `{}`: {}", exclusion, file_path.display());
+        return Ok(None);
+    }
+
     let source = text_document.contents();
     let mut formatted = crate::format::format(text_document, source_type, formatter_settings)
         .with_failure_code(lsp_server::ErrorCode::InternalError)?;

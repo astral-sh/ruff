@@ -1,0 +1,52 @@
+---
+source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
+---
+PYI066.pyi:3:4: PYI066 Use `>=` when using `if`-`else` with `sys.version_info` comparisons
+  |
+1 | import sys
+2 | 
+3 | if sys.version_info < (3, 10):  # Y066 When using if/else with sys.version_info, put the code for new Python versions first, e.g. "if sys.version_info >= (3, 10)"
+  |    ^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI066
+4 |     def foo(x): ...
+5 | else:
+  |
+
+PYI066.pyi:8:4: PYI066 Use `>=` when using `if`-`else` with `sys.version_info` comparisons
+   |
+ 6 |     def foo(x, *, bar=True): ...
+ 7 | 
+ 8 | if sys.version_info < (3, 8):  # Y066 When using if/else with sys.version_info, put the code for new Python versions first, e.g. "if sys.version_info >= (3, 8)"
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^ PYI066
+ 9 |     def bar(x): ...
+10 | elif sys.version_info < (3, 9):  # Y066 When using if/else with sys.version_info, put the code for new Python versions first, e.g. "if sys.version_info >= (3, 9)"
+   |
+
+PYI066.pyi:10:6: PYI066 Use `>=` when using `if`-`else` with `sys.version_info` comparisons
+   |
+ 8 | if sys.version_info < (3, 8):  # Y066 When using if/else with sys.version_info, put the code for new Python versions first, e.g. "if sys.version_info >= (3, 8)"
+ 9 |     def bar(x): ...
+10 | elif sys.version_info < (3, 9):  # Y066 When using if/else with sys.version_info, put the code for new Python versions first, e.g. "if sys.version_info >= (3, 9)"
+   |      ^^^^^^^^^^^^^^^^^^^^^^^^^ PYI066
+11 |     def bar(x, *, bar=True): ...
+12 | elif sys.version_info < (3, 11):  # Y066 When using if/else with sys.version_info, put the code for new Python versions first, e.g. "if sys.version_info >= (3, 10)"
+   |
+
+PYI066.pyi:12:6: PYI066 Use `>=` when using `if`-`else` with `sys.version_info` comparisons
+   |
+10 | elif sys.version_info < (3, 9):  # Y066 When using if/else with sys.version_info, put the code for new Python versions first, e.g. "if sys.version_info >= (3, 9)"
+11 |     def bar(x, *, bar=True): ...
+12 | elif sys.version_info < (3, 11):  # Y066 When using if/else with sys.version_info, put the code for new Python versions first, e.g. "if sys.version_info >= (3, 10)"
+   |      ^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI066
+13 |     def bar(x, *, bar=True, baz=False): ...
+14 | else:
+   |
+
+PYI066.pyi:20:6: PYI066 Use `>=` when using `if`-`else` with `sys.version_info` comparisons
+   |
+18 | if sys.version_info >= (3, 5):
+19 |     ...
+20 | elif sys.version_info < (3, 9):  # Y066 When using if/else with sys.version_info, put the code for new Python versions first, e.g. "if sys.version_info >= (3, 10)"
+   |      ^^^^^^^^^^^^^^^^^^^^^^^^^ PYI066
+21 |     ...
+22 | else:
+   |

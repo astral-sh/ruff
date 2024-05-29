@@ -205,12 +205,9 @@ impl Index {
 
     pub(super) fn close_workspace_folder(&mut self, workspace_url: &Url) -> crate::Result<()> {
         let workspace_path = workspace_url.path();
-        self.settings.remove(workspace_url).ok_or_else(|| {
-            anyhow!(
-                "Tried to remove non-existent folder {}",
-                workspace_path
-            )
-        })?;
+        self.settings
+            .remove(workspace_url)
+            .ok_or_else(|| anyhow!("Tried to remove non-existent folder {}", workspace_path))?;
         // O(n) complexity, which isn't ideal... but this is an uncommon operation.
         self.documents
             .retain(|path, _| !path.path().starts_with(workspace_path));
@@ -285,10 +282,7 @@ impl Index {
         };
 
         let Some(controller) = self.documents.remove(&url) else {
-            anyhow::bail!(
-                "tried to close document that didn't exist at {}",
-                url
-            )
+            anyhow::bail!("tried to close document that didn't exist at {}", url)
         };
         if let Some(notebook) = controller.as_notebook() {
             for url in notebook.urls() {
@@ -409,12 +403,18 @@ impl DocumentQuery {
     /// Retrieve the original key that describes this document query.
     pub(crate) fn make_key(&self) -> DocumentKey {
         match self {
-            Self::Text { file_url: file_path, .. } => DocumentKey::Text(file_path.clone()),
+            Self::Text {
+                file_url: file_path,
+                ..
+            } => DocumentKey::Text(file_path.clone()),
             Self::Notebook {
                 cell_url: Some(cell_uri),
                 ..
             } => DocumentKey::NotebookCell(cell_uri.clone()),
-            Self::Notebook { file_url: file_path, .. } => DocumentKey::Notebook(file_path.clone()),
+            Self::Notebook {
+                file_url: file_path,
+                ..
+            } => DocumentKey::Notebook(file_path.clone()),
         }
     }
 
@@ -462,9 +462,16 @@ impl DocumentQuery {
     }
 
     /// Get the underlying file path for the document selected by this query.
-    pub(crate) fn file_path(&self) -> &str {
+    pub(crate) fn file_path(&self) -> &Path {
         match self {
-            Self::Text { file_url: file_path, .. } | Self::Notebook { file_url: file_path, .. } => file_path.path(),
+            Self::Text {
+                file_url: file_path,
+                ..
+            }
+            | Self::Notebook {
+                file_url: file_path,
+                ..
+            } => Path::new(file_path.path()),
         }
     }
 
@@ -474,7 +481,9 @@ impl DocumentQuery {
         match self {
             Self::Text { document, .. } => Some(document),
             Self::Notebook {
-                notebook, cell_url: cell_uri, ..
+                notebook,
+                cell_url: cell_uri,
+                ..
             } => cell_uri
                 .as_ref()
                 .and_then(|cell_uri| notebook.cell_document_by_uri(cell_uri)),

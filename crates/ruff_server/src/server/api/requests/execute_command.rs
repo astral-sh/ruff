@@ -64,7 +64,6 @@ impl super::SyncRequestHandler for ExecuteCommand {
                 Command::FixAll => {
                     let fixes = super::code_action_resolve::fix_all_edit(
                         snapshot.query(),
-                        snapshot.query().settings().linter(),
                         snapshot.encoding(),
                     )
                     .with_failure_code(ErrorCode::InternalError)?;
@@ -81,7 +80,6 @@ impl super::SyncRequestHandler for ExecuteCommand {
                 Command::OrganizeImports => {
                     let fixes = super::code_action_resolve::organize_imports_edit(
                         snapshot.query(),
-                        snapshot.query().settings().linter(),
                         snapshot.encoding(),
                     )
                     .with_failure_code(ErrorCode::InternalError)?;
