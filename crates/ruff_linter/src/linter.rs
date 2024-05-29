@@ -146,7 +146,7 @@ pub fn check_path(
             .any(|rule_code| rule_code.lint_source().is_imports());
     if use_ast || use_imports || use_doc_lines {
         // Parse, if the AST wasn't pre-provided provided.
-        match tokens.into_ast_source(source_kind, source_type) {
+        match tokens.into_ast(source_kind, source_type) {
             Ok(python_ast) => {
                 let cell_offsets = source_kind.as_ipy_notebook().map(Notebook::cell_offsets);
                 let notebook_index = source_kind.as_ipy_notebook().map(Notebook::index);
@@ -684,23 +684,16 @@ This indicates a bug in Ruff. If you could open an issue at:
 }
 
 #[derive(Debug, Clone)]
-pub enum ParseSource<'a> {
+pub enum ParseSource {
     /// Extract the tokens and AST from the given source code.
     None,
     /// Use the precomputed tokens and AST.
-    Precomputed {
-        tokens: &'a [LexResult],
-        ast: &'a Suite,
-    },
+    Precomputed { tokens: Tokens, ast: Suite },
 }
 
-impl<'a> ParseSource<'a> {
+impl ParseSource {
     /// Convert to a [`TokenSource`], tokenizing if necessary.
-    fn into_token_source(
-        self,
-        source_kind: &SourceKind,
-        source_type: PySourceType,
-    ) -> TokenSource<'a> {
+    fn into_token_source(self, source_kind: &SourceKind, source_type: PySourceType) -> TokenSource {
         match self {
             Self::None => TokenSource::Tokens(ruff_python_parser::tokenize(
                 source_kind.source_code(),
@@ -712,17 +705,14 @@ impl<'a> ParseSource<'a> {
 }
 
 #[derive(Debug, Clone)]
-pub enum TokenSource<'a> {
+pub enum TokenSource {
     /// Use the precomputed tokens to generate the AST.
     Tokens(Tokens),
     /// Use the precomputed tokens and AST.
-    Precomputed {
-        tokens: &'a [LexResult],
-        ast: &'a Suite,
-    },
+    Precomputed { tokens: Tokens, ast: Suite },
 }
 
-impl TokenSource<'_> {
+impl TokenSource {
     /// Returns an iterator over the [`TokenKind`] and the corresponding range.
     ///
     /// [`TokenKind`]: ruff_python_parser::TokenKind
@@ -734,7 +724,7 @@ impl TokenSource<'_> {
     }
 }
 
-impl Deref for TokenSource<'_> {
+impl Deref for TokenSource {
     type Target = [LexResult];
 
     fn deref(&self) -> &Self::Target {
@@ -745,39 +735,20 @@ impl Deref for TokenSource<'_> {
     }
 }
 
-impl<'a> TokenSource<'a> {
+impl TokenSource {
     /// Convert to an [`AstSource`], parsing if necessary.
-    fn into_ast_source(
+    fn into_ast(
         self,
         source_kind: &SourceKind,
         source_type: PySourceType,
-    ) -> Result<AstSource<'a>, ParseError> {
+    ) -> Result<Suite, ParseError> {
         match self {
-            Self::Tokens(tokens) => Ok(AstSource::Ast(ruff_python_parser::parse_program_tokens(
+            Self::Tokens(tokens) => Ok(ruff_python_parser::parse_program_tokens(
                 tokens,
                 source_kind.source_code(),
                 source_type.is_ipynb(),
-            )?)),
-            Self::Precomputed { ast, .. } => Ok(AstSource::Precomputed(ast)),
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub enum AstSource<'a> {
-    /// Extract the AST from the given source code.
-    Ast(Suite),
-    /// Use the precomputed AST.
-    Precomputed(&'a Suite),
-}
-
-impl Deref for AstSource<'_> {
-    type Target = Suite;
-
-    fn deref(&self) -> &Self::Target {
-        match self {
-            Self::Ast(ast) => ast,
-            Self::Precomputed(ast) => ast,
+            )?),
+            Self::Precomputed { ast, .. } => Ok(ast),
         }
     }
 }
