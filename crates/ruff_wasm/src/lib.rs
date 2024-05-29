@@ -263,9 +263,9 @@ impl Workspace {
     }
 
     pub fn tokens(&self, contents: &str) -> Result<String, Error> {
-        let tokens: Vec<_> = ruff_python_parser::lexer::lex(contents, Mode::Module).collect();
+        let program = ruff_python_parser::parse_module(contents)?;
 
-        Ok(format!("{tokens:#?}"))
+        Ok(format!("{:#?}", program.tokens()))
     }
 }
 

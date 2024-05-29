@@ -7,7 +7,7 @@ use anyhow::Result;
 
 use ruff_linter::source_kind::SourceKind;
 use ruff_python_ast::PySourceType;
-use ruff_python_parser::{lexer, AsMode};
+use ruff_python_parser::parse_unchecked_source;
 
 #[derive(clap::Args)]
 pub(crate) struct Args {
@@ -24,11 +24,13 @@ pub(crate) fn main(args: &Args) -> Result<()> {
             args.file.display()
         )
     })?;
-    for (tok, range) in lexer::lex(source_kind.source_code(), source_type.as_mode()).flatten() {
+    let program = parse_unchecked_source(source_kind.source_code(), source_type);
+    for token in program.tokens() {
         println!(
-            "{start:#?} {tok:#?} {end:#?}",
-            start = range.start(),
-            end = range.end()
+            "{start:#?} {kind:#?} {end:#?}",
+            start = token.start(),
+            end = token.end()
+            kind = token.kind()
         );
     }
     Ok(())
