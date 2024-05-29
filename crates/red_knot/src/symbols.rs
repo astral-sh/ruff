@@ -142,7 +142,7 @@ pub(crate) struct Symbol {
     name: Name,
     flags: SymbolFlags,
     scope_id: ScopeId,
-    // kind: Kind,
+    kind: Kind,
 }
 
 impl Symbol {
@@ -412,6 +412,7 @@ impl SymbolTable {
                     name,
                     flags,
                     scope_id,
+                    kind: Kind::FreeVar, // default kind until doing second pass
                 });
                 entry.insert_with_hasher(hash, id, (), |symid| {
                     SymbolTable::hash_name(&self.symbols_by_id[*symid].name)
