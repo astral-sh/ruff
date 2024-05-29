@@ -73,10 +73,17 @@ impl RuffSettings {
         }
     }
 
+    /// Return the [`ruff_workspace::FileResolverSettings`] for this [`RuffSettings`].
+    pub(crate) fn file_resolver(&self) -> &ruff_workspace::FileResolverSettings {
+        &self.file_resolver
+    }
+
+    /// Return the [`ruff_linter::settings::LinterSettings`] for this [`RuffSettings`].
     pub(crate) fn linter(&self) -> &ruff_linter::settings::LinterSettings {
         &self.linter
     }
 
+    /// Return the [`ruff_workspace::FormatterSettings`] for this [`RuffSettings`].
     pub(crate) fn formatter(&self) -> &ruff_workspace::FormatterSettings {
         &self.formatter
     }
