@@ -1,6 +1,7 @@
 use ruff_diagnostics::{Diagnostic, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Expr};
+use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -58,18 +59,25 @@ impl std::fmt::Display for ByteStringOrigin {
 
 /// PYI057
 pub(crate) fn bytestring_attribute(checker: &mut Checker, attribute: &Expr) {
-    if let Some(origin) = checker
-        .semantic()
-        .resolve_qualified_name(attribute)
-        .and_then(|qualified_name| match qualified_name.segments() {
-            ["typing", "ByteString"] => Some(ByteStringOrigin::Typing),
-            ["collections", "abc", "ByteString"] => Some(ByteStringOrigin::CollectionsAbc),
-            _ => None,
-        })
+    let semantic = checker.semantic();
+    if !semantic
+        .seen
+        .intersects(Modules::TYPING | Modules::COLLECTIONS)
     {
-        let diagnostic = Diagnostic::new(ByteStringUsage { origin }, attribute.range());
-        checker.diagnostics.push(diagnostic);
+        return;
     }
+    let Some(qualified_name) = semantic.resolve_qualified_name(attribute) else {
+        return;
+    };
+    let origin = match qualified_name.segments() {
+        ["typing", "ByteString"] => ByteStringOrigin::Typing,
+        ["collections", "abc", "ByteString"] => ByteStringOrigin::CollectionsAbc,
+        _ => return,
+    };
+    checker.diagnostics.push(Diagnostic::new(
+        ByteStringUsage { origin },
+        attribute.range(),
+    ));
 }
 
 /// PYI057
@@ -88,10 +96,10 @@ pub(crate) fn bytestring_import(checker: &mut Checker, import_from: &ast::StmtIm
     };
 
     for name in names {
-        if name.name.as_str() != "ByteString" {
-            continue;
+        if name.name.as_str() == "ByteString" {
+            checker
+                .diagnostics
+                .push(Diagnostic::new(ByteStringUsage { origin }, name.range()));
         }
-        let diagnostic = Diagnostic::new(ByteStringUsage { origin }, name.range());
-        checker.diagnostics.push(diagnostic);
     }
 }
