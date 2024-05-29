@@ -1,7 +1,7 @@
 use ruff_python_trivia::CommentRanges;
 use ruff_text_size::{TextRange, TextSize};
 
-use crate::lexer::{Lexer, LexerCheckpoint, LexicalError, Token, TokenValue};
+use crate::lexer::{Lexer, LexerCheckpoint, LexicalError, Token, TokenFlags, TokenValue};
 use crate::{Mode, TokenKind};
 
 /// Token source for the parser that skips over any trivia tokens.
@@ -50,6 +50,11 @@ impl<'src> TokenSource<'src> {
         self.lexer.current_range()
     }
 
+    /// Returns the flags for the current token.
+    pub(crate) fn current_flags(&self) -> TokenFlags {
+        self.lexer.current_flags()
+    }
+
     /// Calls the underlying [`take_value`] method on the lexer. Refer to its documentation
     /// for more info.
     ///
@@ -83,7 +88,8 @@ impl<'src> TokenSource<'src> {
     ///
     /// It pushes the given kind to the token vector with the current token range.
     pub(crate) fn bump(&mut self, kind: TokenKind) {
-        self.tokens.push(Token::new(kind, self.current_range()));
+        self.tokens
+            .push(Token::new(kind, self.current_range(), self.current_flags()));
         self.do_bump();
     }
 
@@ -96,7 +102,8 @@ impl<'src> TokenSource<'src> {
                 if kind == TokenKind::Comment {
                     self.comments.push(self.current_range());
                 }
-                self.tokens.push(Token::new(kind, self.current_range()));
+                self.tokens
+                    .push(Token::new(kind, self.current_range(), self.current_flags()));
                 continue;
             }
             break;
