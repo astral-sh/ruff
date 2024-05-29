@@ -34,7 +34,6 @@ rustc-hash = { workspace = true }
 salsa = { git = "https://github.com/salsa-rs/salsa.git", package = "salsa-2022", rev = "05b4e3ebdcdc47730cdd359e7e97fb2470527279" }
 smol_str = { version = "0.2.1" }
 tracing = { workspace = true }
-tracing-log = { version = "0.2.0" }
 tracing-subscriber = { workspace = true }
 tracing-tree = { workspace = true }
 
