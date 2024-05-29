@@ -85,8 +85,10 @@ fn quick_fix(
         .map(|fix| {
             let mut tracker = WorkspaceEditTracker::new(snapshot.resolved_client_capabilities());
 
+            let document_url = snapshot.query().make_key().into_url();
+
             tracker.set_edits_for_document(
-                snapshot.query().make_key().into_url(),
+                document_url.clone(),
                 document.version(),
                 fix.edits.clone(),
             )?;
@@ -97,8 +99,7 @@ fn quick_fix(
                 edit: Some(tracker.into_workspace_edit()),
                 diagnostics: Some(vec![fix.fixed_diagnostic.clone()]),
                 data: Some(
-                    serde_json::to_value(snapshot.query().make_key().into_url())
-                        .expect("document url should serialize"),
+                    serde_json::to_value(document_url).expect("document url should serialize"),
                 ),
                 ..Default::default()
             }))
@@ -157,8 +158,6 @@ fn fix_all(snapshot: &DocumentSnapshot) -> crate::Result<CodeActionOrCommand> {
             Some(resolve_edit_for_fix_all(
                 document,
                 snapshot.resolved_client_capabilities(),
-                snapshot.query().settings().file_resolver(),
-                snapshot.query().settings().linter(),
                 snapshot.encoding(),
             )?),
             None,
@@ -194,8 +193,6 @@ fn notebook_fix_all(snapshot: &DocumentSnapshot) -> crate::Result<CodeActionOrCo
             Some(resolve_edit_for_fix_all(
                 document,
                 snapshot.resolved_client_capabilities(),
-                snapshot.query().settings().file_resolver(),
-                snapshot.query().settings().linter(),
                 snapshot.encoding(),
             )?),
             None,
@@ -231,8 +228,6 @@ fn organize_imports(snapshot: &DocumentSnapshot) -> crate::Result<CodeActionOrCo
             Some(resolve_edit_for_organize_imports(
                 document,
                 snapshot.resolved_client_capabilities(),
-                snapshot.query().settings().file_resolver(),
-                snapshot.query().settings().linter(),
                 snapshot.encoding(),
             )?),
             None,
@@ -268,8 +263,6 @@ fn notebook_organize_imports(snapshot: &DocumentSnapshot) -> crate::Result<CodeA
             Some(resolve_edit_for_organize_imports(
                 document,
                 snapshot.resolved_client_capabilities(),
-                snapshot.query().settings().file_resolver(),
-                snapshot.query().settings().linter(),
                 snapshot.encoding(),
             )?),
             None,
