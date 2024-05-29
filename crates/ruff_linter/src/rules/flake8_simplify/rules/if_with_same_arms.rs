@@ -8,8 +8,7 @@ use ruff_python_ast::comparable::ComparableStmt;
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::stmt_if::{if_elif_branches, IfElifBranch};
 use ruff_python_ast::{self as ast, Expr};
-use ruff_python_index::Indexer;
-use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
+use ruff_python_trivia::{CommentRanges, SimpleTokenKind, SimpleTokenizer};
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -74,13 +73,13 @@ pub(crate) fn if_with_same_arms(checker: &mut Checker, stmt_if: &ast::StmtIf) {
 
         // ...and the same comments
         let first_comments = checker
-            .indexer()
+            .program()
             .comment_ranges()
             .comments_in_range(body_range(&current_branch, checker.locator()))
             .iter()
             .map(|range| checker.locator().slice(*range));
         let second_comments = checker
-            .indexer()
+            .program()
             .comment_ranges()
             .comments_in_range(body_range(following_branch, checker.locator()))
             .iter()
@@ -100,7 +99,7 @@ pub(crate) fn if_with_same_arms(checker: &mut Checker, stmt_if: &ast::StmtIf) {
                 &current_branch,
                 following_branch,
                 checker.locator(),
-                checker.indexer(),
+                checker.program().comment_ranges(),
             )
         });
 
@@ -114,7 +113,7 @@ fn merge_branches(
     current_branch: &IfElifBranch,
     following_branch: &IfElifBranch,
     locator: &Locator,
-    indexer: &Indexer,
+    comment_ranges: &CommentRanges,
 ) -> Result<Fix> {
     // Identify the colon (`:`) at the end of the current branch's test.
     let Some(current_branch_colon) =
@@ -133,7 +132,7 @@ fn merge_branches(
     let following_branch_test = if let Some(range) = parenthesized_range(
         following_branch.test.into(),
         stmt_if.into(),
-        indexer.comment_ranges(),
+        comment_ranges,
         locator.contents(),
     ) {
         Cow::Borrowed(locator.slice(range))

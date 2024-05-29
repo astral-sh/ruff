@@ -114,7 +114,7 @@ pub(crate) fn repeated_append(checker: &mut Checker, stmt: &Stmt) {
             // # comment
             // a.append(2)
             // ```
-            if group.is_consecutive && !checker.indexer().comment_ranges().intersects(group.range())
+            if group.is_consecutive && !checker.program().comment_ranges().intersects(group.range())
             {
                 diagnostic.set_fix(Fix::unsafe_edit(Edit::replacement(
                     replacement,

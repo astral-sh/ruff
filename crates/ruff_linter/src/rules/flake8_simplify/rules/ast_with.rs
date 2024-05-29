@@ -168,7 +168,7 @@ pub(crate) fn multiple_with_statements(
             TextRange::new(with_stmt.start(), colon.end()),
         );
         if !checker
-            .indexer()
+            .program()
             .comment_ranges()
             .intersects(TextRange::new(with_stmt.start(), with_stmt.body[0].start()))
         {

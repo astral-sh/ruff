@@ -51,7 +51,7 @@ pub(crate) fn check_imports(
                     settings,
                     package,
                     source_type,
-                    program.tokens(),
+                    program,
                 ) {
                     diagnostics.push(diagnostic);
                 }
