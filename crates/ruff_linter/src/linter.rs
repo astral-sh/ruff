@@ -103,7 +103,7 @@ pub fn check_path(
         .any(|rule_code| rule_code.lint_source().is_tokens())
     {
         diagnostics.extend(check_tokens(
-            &program,
+            program.tokens(),
             path,
             locator,
             indexer,
