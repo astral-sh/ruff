@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_index::Indexer;
+use ruff_python_trivia::CommentRanges;
 use ruff_source_file::Locator;
 use ruff_text_size::{TextRange, TextSize};
 
@@ -45,7 +45,7 @@ pub(crate) fn implicit_namespace_package(
     path: &Path,
     package: Option<&Path>,
     locator: &Locator,
-    indexer: &Indexer,
+    comment_ranges: &CommentRanges,
     project_root: &Path,
     src: &[PathBuf],
 ) -> Option<Diagnostic> {
@@ -61,8 +61,7 @@ pub(crate) fn implicit_namespace_package(
             .parent()
             .is_some_and( |parent| src.iter().any(|src| src == parent))
         // Ignore files that contain a shebang.
-        && !indexer
-            .comment_ranges()
+        && !comment_ranges
             .first().filter(|range| range.start() == TextSize::from(0))
             .is_some_and(|range| ShebangDirective::try_extract(locator.slice(*range)).is_some())
     {

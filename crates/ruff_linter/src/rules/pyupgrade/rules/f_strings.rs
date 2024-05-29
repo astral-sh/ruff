@@ -517,7 +517,7 @@ pub(crate) fn f_strings(checker: &mut Checker, call: &ast::ExprCall, summary: &F
     // )
     // ```
     let has_comments = checker
-        .indexer()
+        .program()
         .comment_ranges()
         .intersects(call.arguments.range());
 
