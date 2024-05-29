@@ -28,21 +28,29 @@ use crate::rules::pyupgrade::helpers::curly_escape;
 /// formatting.
 ///
 /// ## Example
+///
 /// ```python
 /// "%s, %s" % ("Hello", "World")  # "Hello, World"
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// "{}, {}".format("Hello", "World")  # "Hello, World"
 /// ```
 ///
+/// ```python
+/// f"{'Hello'}, {'World'}"  # "Hello, World"
+/// ```
+///
 /// ## Fix safety
+///
 /// In cases where the format string contains a single generic format specifier
 /// (e.g. `%s`), and the right-hand side is an ambiguous expression,
 /// we cannot offer a safe fix.
 ///
 /// For example, given:
+///
 /// ```python
 /// "%s" % val
 /// ```
@@ -73,7 +81,7 @@ impl Violation for PrintfStringFormatting {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use format specifiers instead of percent format")
+        format!("Use format specifiers or f-strings instead of percent format")
     }
 
     fn fix_title(&self) -> Option<String> {
@@ -384,6 +392,9 @@ pub(crate) fn printf_string_formatting(checker: &mut Checker, expr: &Expr, right
             return;
         };
         if !convertible(&format_string, right) {
+            checker
+                .diagnostics
+                .push(Diagnostic::new(PrintfStringFormatting, expr.range()));
             return;
         }
 
@@ -439,6 +450,9 @@ pub(crate) fn printf_string_formatting(checker: &mut Checker, expr: &Expr, right
             let Some(params_string) =
                 clean_params_dictionary(right, checker.locator(), checker.stylist())
             else {
+                checker
+                    .diagnostics
+                    .push(Diagnostic::new(PrintfStringFormatting, expr.range()));
                 return;
             };
             Cow::Owned(params_string)
