@@ -115,7 +115,8 @@ impl ModuleName {
         Self(smol_str::SmolStr::new(name))
     }
 
-    fn from_relative_path(path: &Path) -> Option<Self> {
+    // TODO(Micha): Make private again when the Salsa db module resolution logic lives next to this module again.
+    pub(crate) fn from_relative_path(path: &Path) -> Option<Self> {
         let path = if path.ends_with("__init__.py") || path.ends_with("__init__.pyi") {
             path.parent()?
         } else {

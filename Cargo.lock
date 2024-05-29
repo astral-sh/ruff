@@ -1829,7 +1829,6 @@ dependencies = [
  "smol_str",
  "tempfile",
  "tracing",
- "tracing-log",
  "tracing-subscriber",
  "tracing-tree",
 ]
