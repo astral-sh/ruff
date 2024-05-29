@@ -10,11 +10,10 @@ use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::Diagnostic;
 use ruff_notebook::Notebook;
-use ruff_python_ast::{ModModule, PySourceType, Suite};
+use ruff_python_ast::{ModModule, PySourceType};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
-use ruff_python_parser::lexer::LexResult;
-use ruff_python_parser::{AsMode, ParseError, Program, TokenKindIter, Tokens};
+use ruff_python_parser::{ParseError, Program};
 use ruff_source_file::{Locator, SourceFileBuilder};
 use ruff_text_size::Ranged;
 
@@ -93,7 +92,7 @@ pub fn check_path(
     let use_doc_lines = settings.rules.enabled(Rule::DocLineTooLong);
     let mut doc_lines = vec![];
     if use_doc_lines {
-        doc_lines.extend(doc_lines_from_tokens(program.kinds()));
+        doc_lines.extend(doc_lines_from_tokens(program.tokens()));
     }
 
     // Run the token-based rules.
@@ -378,10 +377,10 @@ pub fn add_noqa_to_path(
     let locator = Locator::new(source_kind.source_code());
 
     // Detect the current code style (lazily).
-    let stylist = Stylist::from_tokens(&program, &locator);
+    let stylist = Stylist::from_program(&program, &locator);
 
     // Extra indices from the code.
-    let indexer = Indexer::from_tokens(&program, &locator);
+    let indexer = Indexer::from_program(&program, &locator);
 
     // Extract the `# noqa` and `# isort: skip` directives from the source.
     let directives = directives::extract_directives(
@@ -452,10 +451,10 @@ pub fn lint_only(
     let locator = Locator::new(source_kind.source_code());
 
     // Detect the current code style (lazily).
-    let stylist = Stylist::from_tokens(&program, &locator);
+    let stylist = Stylist::from_program(&program, &locator);
 
     // Extra indices from the code.
-    let indexer = Indexer::from_tokens(&program, &locator);
+    let indexer = Indexer::from_program(&program, &locator);
 
     // Extract the `# noqa` and `# isort: skip` directives from the source.
     let directives = directives::extract_directives(
@@ -543,10 +542,10 @@ pub fn lint_fix<'a>(
         let locator = Locator::new(transformed.source_code());
 
         // Detect the current code style (lazily).
-        let stylist = Stylist::from_tokens(&program, &locator);
+        let stylist = Stylist::from_program(&program, &locator);
 
         // Extra indices from the code.
-        let indexer = Indexer::from_tokens(&program, &locator);
+        let indexer = Indexer::from_program(&program, &locator);
 
         // Extract the `# noqa` and `# isort: skip` directives from the source.
         let directives = directives::extract_directives(

@@ -85,10 +85,10 @@ pub(crate) fn check(
     let locator = Locator::with_index(source_kind.source_code(), index.clone());
 
     // Detect the current code style (lazily).
-    let stylist = Stylist::from_tokens(&program, &locator);
+    let stylist = Stylist::from_program(&program, &locator);
 
     // Extra indices from the code.
-    let indexer = Indexer::from_tokens(&program, &locator);
+    let indexer = Indexer::from_program(&program, &locator);
 
     // Extract the `# noqa` and `# isort: skip` directives from the source.
     let directives = extract_directives(&program, Flags::all(), &locator, &indexer);

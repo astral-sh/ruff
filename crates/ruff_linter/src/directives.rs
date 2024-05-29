@@ -6,7 +6,7 @@ use std::str::FromStr;
 use bitflags::bitflags;
 use ruff_python_ast::{ModModule, StringFlags};
 use ruff_python_parser::lexer::LexResult;
-use ruff_python_parser::{Program, Tok};
+use ruff_python_parser::{Program, Tok, TokenKind, Tokens};
 use ruff_python_trivia::CommentRanges;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
@@ -122,22 +122,22 @@ where
 }
 
 /// Extract a mapping from logical line to noqa line.
-fn extract_noqa_line_for(lxr: &[LexResult], locator: &Locator, indexer: &Indexer) -> NoqaMapping {
+fn extract_noqa_line_for(tokens: &Tokens, locator: &Locator, indexer: &Indexer) -> NoqaMapping {
     let mut string_mappings = Vec::new();
 
-    for (tok, range) in lxr.iter().flatten() {
-        match tok {
-            Tok::EndOfFile => {
+    for token in tokens.up_to_first_unknown() {
+        match token.kind() {
+            TokenKind::EndOfFile => {
                 break;
             }
 
             // For multi-line strings, we expect `noqa` directives on the last line of the
             // string.
-            Tok::String { flags, .. } if flags.is_triple_quoted() => {
-                if locator.contains_line_break(*range) {
+            TokenKind::String if token.is_triple_quoted_string() => {
+                if locator.contains_line_break(token.range()) {
                     string_mappings.push(TextRange::new(
-                        locator.line_start(range.start()),
-                        range.end(),
+                        locator.line_start(token.start()),
+                        token.end(),
                     ));
                 }
             }
@@ -397,7 +397,7 @@ impl TodoDirectiveKind {
 #[cfg(test)]
 mod tests {
     use ruff_python_parser::lexer::LexResult;
-    use ruff_python_parser::{lexer, Mode};
+    use ruff_python_parser::{lexer, parse_module, Mode};
     use ruff_text_size::{TextLen, TextRange, TextSize};
 
     use ruff_python_index::Indexer;
@@ -408,12 +408,14 @@ mod tests {
     };
     use crate::noqa::NoqaMapping;
 
-    fn noqa_mappings(contents: &str) -> NoqaMapping {
-        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
-        let locator = Locator::new(contents);
-        let indexer = Indexer::from_tokens(&lxr, &locator);
+    use super::IsortDirectives;
 
-        extract_noqa_line_for(&lxr, &locator, &indexer)
+    fn noqa_mappings(contents: &str) -> NoqaMapping {
+        let program = parse_module(contents).unwrap();
+        let locator = Locator::new(contents);
+        let indexer = Indexer::from_program(&program, &locator);
+
+        extract_noqa_line_for(program.tokens(), &locator, &indexer)
     }
 
     #[test]
@@ -583,29 +585,26 @@ assert foo, \
         );
     }
 
+    fn isort_directives(contents: &str) -> IsortDirectives {
+        let program = parse_module(contents).unwrap();
+        let locator = Locator::new(contents);
+        extract_isort_directives(&locator, program.comment_ranges())
+    }
+
     #[test]
     fn isort_exclusions() {
         let contents = "x = 1
 y = 2
 z = x + 1";
-        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
-        let locator = Locator::new(contents);
-        let indexer = Indexer::from_tokens(&lxr, &locator);
-        assert_eq!(
-            extract_isort_directives(&locator, &indexer).exclusions,
-            Vec::default()
-        );
+        assert_eq!(isort_directives(contents).exclusions, Vec::default());
 
         let contents = "# isort: off
 x = 1
 y = 2
 # isort: on
 z = x + 1";
-        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
-        let locator = Locator::new(contents);
-        let indexer = Indexer::from_tokens(&lxr, &locator);
         assert_eq!(
-            extract_isort_directives(&locator, &indexer).exclusions,
+            isort_directives(contents).exclusions,
             Vec::from_iter([TextRange::new(TextSize::from(0), TextSize::from(25))])
         );
 
@@ -616,11 +615,8 @@ y = 2
 # isort: on
 z = x + 1
 # isort: on";
-        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
-        let locator = Locator::new(contents);
-        let indexer = Indexer::from_tokens(&lxr, &locator);
         assert_eq!(
-            extract_isort_directives(&locator, &indexer).exclusions,
+            isort_directives(contents).exclusions,
             Vec::from_iter([TextRange::new(TextSize::from(0), TextSize::from(38))])
         );
 
@@ -628,11 +624,8 @@ z = x + 1
 x = 1
 y = 2
 z = x + 1";
-        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
-        let locator = Locator::new(contents);
-        let indexer = Indexer::from_tokens(&lxr, &locator);
         assert_eq!(
-            extract_isort_directives(&locator, &indexer).exclusions,
+            isort_directives(contents).exclusions,
             Vec::from_iter([TextRange::at(TextSize::from(0), contents.text_len())])
         );
 
@@ -640,13 +633,7 @@ z = x + 1";
 x = 1
 y = 2
 z = x + 1";
-        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
-        let locator = Locator::new(contents);
-        let indexer = Indexer::from_tokens(&lxr, &locator);
-        assert_eq!(
-            extract_isort_directives(&locator, &indexer).exclusions,
-            Vec::default()
-        );
+        assert_eq!(isort_directives(contents).exclusions, Vec::default());
 
         let contents = "# isort: off
 x = 1
@@ -654,13 +641,7 @@ x = 1
 y = 2
 # isort: skip_file
 z = x + 1";
-        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
-        let locator = Locator::new(contents);
-        let indexer = Indexer::from_tokens(&lxr, &locator);
-        assert_eq!(
-            extract_isort_directives(&locator, &indexer).exclusions,
-            Vec::default()
-        );
+        assert_eq!(isort_directives(contents).exclusions, Vec::default());
     }
 
     #[test]
@@ -668,36 +649,18 @@ z = x + 1";
         let contents = "x = 1
 y = 2
 z = x + 1";
-        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
-        let locator = Locator::new(contents);
-        let indexer = Indexer::from_tokens(&lxr, &locator);
-        assert_eq!(
-            extract_isort_directives(&locator, &indexer).splits,
-            Vec::new()
-        );
+        assert_eq!(isort_directives(contents).splits, Vec::new());
 
         let contents = "x = 1
 y = 2
 # isort: split
 z = x + 1";
-        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
-        let locator = Locator::new(contents);
-        let indexer = Indexer::from_tokens(&lxr, &locator);
-        assert_eq!(
-            extract_isort_directives(&locator, &indexer).splits,
-            vec![TextSize::from(12)]
-        );
+        assert_eq!(isort_directives(contents).splits, vec![TextSize::from(12)]);
 
         let contents = "x = 1
 y = 2  # isort: split
 z = x + 1";
-        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
-        let locator = Locator::new(contents);
-        let indexer = Indexer::from_tokens(&lxr, &locator);
-        assert_eq!(
-            extract_isort_directives(&locator, &indexer).splits,
-            vec![TextSize::from(13)]
-        );
+        assert_eq!(isort_directives(contents).splits, vec![TextSize::from(13)]);
     }
 
     #[test]
