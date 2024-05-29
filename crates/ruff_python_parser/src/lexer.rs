@@ -807,6 +807,7 @@ impl<'src> Lexer<'src> {
     /// Lex the next token.
     pub(crate) fn next_token(&mut self) -> TokenKind {
         self.cursor.start_token();
+        self.current_value = TokenValue::None;
         self.current_kind = self.lex_token();
         self.current_range = self.token_range();
         self.current_kind
