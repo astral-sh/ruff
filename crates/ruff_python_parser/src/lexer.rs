@@ -1362,16 +1362,21 @@ impl Token {
         Self { kind, range }
     }
 
+    /// Returns the token kind.
     #[inline]
     pub const fn kind(&self) -> TokenKind {
         self.kind
     }
 
-    pub(crate) const fn is_comment(self) -> bool {
-        matches!(self.kind, TokenKind::Comment)
+    /// Returns the token as a tuple of (kind, range).
+    #[inline]
+    pub const fn as_tuple(&self) -> (TokenKind, TextRange) {
+        (self.kind, self.range)
     }
 
-    pub(crate) const fn is_trivia(self) -> bool {
+    /// Returns `true` if this is a trivia token.
+    #[inline]
+    pub const fn is_trivia(self) -> bool {
         matches!(self.kind, TokenKind::Comment | TokenKind::NonLogicalNewline)
     }
 }
