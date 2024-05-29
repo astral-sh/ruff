@@ -3,6 +3,7 @@
 use ruff_diagnostics::Diagnostic;
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
+use ruff_python_trivia::CommentRanges;
 use ruff_source_file::{Locator, UniversalNewlines};
 use ruff_text_size::TextSize;
 
@@ -19,6 +20,7 @@ pub(crate) fn check_physical_lines(
     locator: &Locator,
     stylist: &Stylist,
     indexer: &Indexer,
+    comment_ranges: &CommentRanges,
     doc_lines: &[TextSize],
     settings: &LinterSettings,
 ) -> Vec<Diagnostic> {
@@ -42,7 +44,7 @@ pub(crate) fn check_physical_lines(
             .is_some()
         {
             if enforce_doc_line_too_long {
-                if let Some(diagnostic) = doc_line_too_long(&line, indexer, settings) {
+                if let Some(diagnostic) = doc_line_too_long(&line, comment_ranges, settings) {
                     diagnostics.push(diagnostic);
                 }
             }
@@ -55,7 +57,7 @@ pub(crate) fn check_physical_lines(
         }
 
         if enforce_line_too_long {
-            if let Some(diagnostic) = line_too_long(&line, indexer, settings) {
+            if let Some(diagnostic) = line_too_long(&line, comment_ranges, settings) {
                 diagnostics.push(diagnostic);
             }
         }

@@ -324,7 +324,7 @@ pub(crate) fn literal_comparisons(checker: &mut Checker, compare: &ast::ExprComp
             &ops,
             &compare.comparators,
             compare.into(),
-            checker.indexer().comment_ranges(),
+            checker.program().comment_ranges(),
             checker.locator(),
         );
         for diagnostic in &mut diagnostics {

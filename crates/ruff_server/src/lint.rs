@@ -132,7 +132,7 @@ pub(crate) fn check(query: &DocumentQuery, encoding: PositionEncoding) -> Diagno
         query.virtual_file_path(),
         data.as_slice(),
         &locator,
-        indexer.comment_ranges(),
+        program.comment_ranges(),
         &linter_settings.external,
         &directives.noqa_line_for,
         stylist.line_ending(),
