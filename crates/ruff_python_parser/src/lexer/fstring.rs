@@ -1,9 +1,11 @@
-use ruff_python_ast::{AnyStringFlags, StringFlags};
+use ruff_python_ast::StringFlags;
+
+use super::TokenFlags;
 
 /// The context representing the current f-string that the lexer is in.
 #[derive(Clone, Debug)]
 pub(crate) struct FStringContext {
-    flags: AnyStringFlags,
+    flags: TokenFlags,
 
     /// The level of nesting for the lexer when it entered the current f-string.
     /// The nesting level includes all kinds of parentheses i.e., round, square,
@@ -17,8 +19,9 @@ pub(crate) struct FStringContext {
 }
 
 impl FStringContext {
-    pub(crate) const fn new(flags: AnyStringFlags, nesting: u32) -> Self {
-        debug_assert!(flags.is_f_string());
+    pub(crate) const fn new(flags: TokenFlags, nesting: u32) -> Self {
+        assert!(flags.is_f_string());
+
         Self {
             flags,
             nesting,
@@ -26,8 +29,7 @@ impl FStringContext {
         }
     }
 
-    pub(crate) const fn flags(&self) -> AnyStringFlags {
-        debug_assert!(self.flags.is_f_string());
+    pub(crate) const fn flags(&self) -> TokenFlags {
         self.flags
     }
 

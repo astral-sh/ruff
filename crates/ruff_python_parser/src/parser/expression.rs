@@ -1255,7 +1255,9 @@ impl<'src> Parser<'src> {
     /// See: <https://docs.python.org/3.13/reference/lexical_analysis.html#string-and-bytes-literals>
     fn parse_string_or_byte_literal(&mut self) -> StringType {
         let range = self.current_token_range();
-        let TokenValue::String { value, flags } = self.bump_value(TokenKind::String) else {
+        let flags = self.tokens.current_flags().as_any_string_flags();
+
+        let TokenValue::String { value } = self.bump_value(TokenKind::String) else {
             unreachable!()
         };
 
@@ -1301,18 +1303,17 @@ impl<'src> Parser<'src> {
     /// See: <https://docs.python.org/3/reference/lexical_analysis.html#formatted-string-literals>
     fn parse_fstring(&mut self) -> ast::FString {
         let start = self.node_start();
+        let flags = self.tokens.current_flags().as_any_string_flags();
 
-        let TokenValue::FStringStart(kind) = self.bump_value(TokenKind::FStringStart) else {
-            unreachable!()
-        };
-        let elements = self.parse_fstring_elements();
+        self.bump(TokenKind::FStringStart);
+        let elements = self.parse_fstring_elements(flags);
 
         self.expect(TokenKind::FStringEnd);
 
         ast::FString {
             elements,
             range: self.node_range(start),
-            flags: kind.into(),
+            flags: ast::FStringFlags::from(flags),
         }
     }
 
@@ -1321,17 +1322,17 @@ impl<'src> Parser<'src> {
     /// # Panics
     ///
     /// If the parser isn't positioned at a `{` or `FStringMiddle` token.
-    fn parse_fstring_elements(&mut self) -> FStringElements {
+    fn parse_fstring_elements(&mut self, flags: ast::AnyStringFlags) -> FStringElements {
         let mut elements = vec![];
 
         self.parse_list(RecoveryContextKind::FStringElements, |parser| {
             let element = match parser.current_token_kind() {
                 TokenKind::Lbrace => {
-                    FStringElement::Expression(parser.parse_fstring_expression_element())
+                    FStringElement::Expression(parser.parse_fstring_expression_element(flags))
                 }
                 TokenKind::FStringMiddle => {
                     let range = parser.current_token_range();
-                    let TokenValue::FStringMiddle { value, flags, .. } =
+                    let TokenValue::FStringMiddle { value } =
                         parser.bump_value(TokenKind::FStringMiddle)
                     else {
                         unreachable!()
@@ -1382,7 +1383,10 @@ impl<'src> Parser<'src> {
     /// # Panics
     ///
     /// If the parser isn't positioned at a `{` token.
-    fn parse_fstring_expression_element(&mut self) -> ast::FStringExpressionElement {
+    fn parse_fstring_expression_element(
+        &mut self,
+        flags: ast::AnyStringFlags,
+    ) -> ast::FStringExpressionElement {
         let start = self.node_start();
         self.bump(TokenKind::Lbrace);
 
@@ -1458,7 +1462,7 @@ impl<'src> Parser<'src> {
 
         let format_spec = if self.eat(TokenKind::Colon) {
             let spec_start = self.node_start();
-            let elements = self.parse_fstring_elements();
+            let elements = self.parse_fstring_elements(flags);
             Some(Box::new(ast::FStringFormatSpec {
                 range: self.node_range(spec_start),
                 elements,

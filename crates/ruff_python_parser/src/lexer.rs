@@ -13,14 +13,15 @@
 
 use std::{char, cmp::Ordering, str::FromStr};
 
+use bitflags::bitflags;
+use ruff_python_ast::str::Quote;
+use ruff_python_ast::str_prefix::{
+    AnyStringPrefix, ByteStringPrefix, FStringPrefix, StringLiteralPrefix,
+};
 use unicode_ident::{is_xid_continue, is_xid_start};
 use unicode_normalization::UnicodeNormalization;
 
-use ruff_python_ast::{
-    str::Quote,
-    str_prefix::{AnyStringPrefix, FStringPrefix},
-    AnyStringFlags, Int, IpyEscapeKind, StringFlags,
-};
+use ruff_python_ast::{AnyStringFlags, Int, IpyEscapeKind, StringFlags};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::error::FStringErrorType;
@@ -35,6 +36,8 @@ mod indentation;
 
 #[deprecated]
 pub fn lex(_source: &str, _mode: Mode) {}
+#[deprecated]
+pub fn lex_starts_at(_source: &str, _mode: Mode, _offset: TextSize) {}
 
 /// A lexer for Python source code.
 #[derive(Debug)]
@@ -53,6 +56,9 @@ pub struct Lexer<'src> {
 
     /// The value of the current token.
     current_value: TokenValue,
+
+    /// Flags for the current token.
+    current_flags: TokenFlags,
 
     /// Lexer state.
     state: State,
@@ -94,6 +100,7 @@ impl<'src> Lexer<'src> {
             current_kind: TokenKind::EndOfFile,
             current_range: TextRange::empty(start_offset),
             current_value: TokenValue::None,
+            current_flags: TokenFlags::empty(),
             nesting: 0,
             indentations: Indentations::default(),
             pending_indentation: None,
@@ -123,44 +130,73 @@ impl<'src> Lexer<'src> {
         self.current_range
     }
 
+    /// Returns the flags for the current token.
+    pub(crate) fn current_flags(&self) -> TokenFlags {
+        self.current_flags
+    }
+
     /// Helper function to push the given error and return the [`TokenKind::Unknown`] token.
     fn push_error(&mut self, error: LexicalError) -> TokenKind {
         self.errors.push(error);
         TokenKind::Unknown
     }
 
+    /// Try lexing the single character string prefix, updating the token flags accordingly.
+    /// Returns `true` if it matches.
+    fn try_single_char_prefix(&mut self, first: char) -> bool {
+        match first {
+            'f' | 'F' => self.current_flags |= TokenFlags::F_STRING,
+            'u' | 'U' => self.current_flags |= TokenFlags::UNICODE_STRING,
+            'b' | 'B' => self.current_flags |= TokenFlags::BYTE_STRING,
+            'r' => self.current_flags |= TokenFlags::RAW_STRING_LOWERCASE,
+            'R' => self.current_flags |= TokenFlags::RAW_STRING_UPPERCASE,
+            _ => return false,
+        }
+        true
+    }
+
+    /// Try lexing the double character string prefix, updating the token flags accordingly.
+    /// Returns `true` if it matches.
+    fn try_double_char_prefix(&mut self, value: [char; 2]) -> bool {
+        match value {
+            ['r', 'f' | 'F'] | ['f' | 'F', 'r'] => {
+                self.current_flags |= TokenFlags::F_STRING | TokenFlags::RAW_STRING_LOWERCASE;
+            }
+            ['R', 'f' | 'F'] | ['f' | 'F', 'R'] => {
+                self.current_flags |= TokenFlags::F_STRING | TokenFlags::RAW_STRING_UPPERCASE;
+            }
+            ['r', 'b' | 'B'] | ['b' | 'B', 'r'] => {
+                self.current_flags |= TokenFlags::BYTE_STRING | TokenFlags::RAW_STRING_LOWERCASE;
+            }
+            ['R', 'b' | 'B'] | ['b' | 'B', 'R'] => {
+                self.current_flags |= TokenFlags::BYTE_STRING | TokenFlags::RAW_STRING_UPPERCASE;
+            }
+            _ => return false,
+        }
+        true
+    }
+
     /// Lex an identifier. Also used for keywords and string/bytes literals with a prefix.
     fn lex_identifier(&mut self, first: char) -> TokenKind {
         // Detect potential string like rb'' b'' f'' u'' r''
-        match (first, self.cursor.first()) {
-            ('f' | 'F', quote @ ('\'' | '"')) => {
-                self.cursor.bump();
-                return self.lex_fstring_start(quote, FStringPrefix::Regular);
-            }
-            ('r', 'f' | 'F') | ('f' | 'F', 'r') if is_quote(self.cursor.second()) => {
-                self.cursor.bump();
-                let quote = self.cursor.bump().unwrap();
-                return self.lex_fstring_start(quote, FStringPrefix::Raw { uppercase_r: false });
-            }
-            ('R', 'f' | 'F') | ('f' | 'F', 'R') if is_quote(self.cursor.second()) => {
-                self.cursor.bump();
-                let quote = self.cursor.bump().unwrap();
-                return self.lex_fstring_start(quote, FStringPrefix::Raw { uppercase_r: true });
-            }
-            (_, quote @ ('\'' | '"')) => {
-                if let Ok(prefix) = AnyStringPrefix::try_from(first) {
+        let quote = match (first, self.cursor.first()) {
+            (_, quote @ ('\'' | '"')) => self.try_single_char_prefix(first).then_some(quote),
+            (_, second) if is_quote(self.cursor.second()) => {
+                self.try_double_char_prefix([first, second]).then(|| {
                     self.cursor.bump();
-                    return self.lex_string(prefix, quote);
-                }
+                    // SAFETY: Safe because of the `is_quote` check in this match arm's guard
+                    self.cursor.bump().unwrap()
+                })
             }
-            (_, second @ ('r' | 'R' | 'b' | 'B')) if is_quote(self.cursor.second()) => {
-                self.cursor.bump();
-                if let Ok(prefix) = AnyStringPrefix::try_from([first, second]) {
-                    let quote = self.cursor.bump().unwrap();
-                    return self.lex_string(prefix, quote);
-                }
+            _ => None,
+        };
+
+        if let Some(quote) = quote {
+            if self.current_flags.is_f_string() {
+                return self.lex_fstring_start(quote);
             }
-            _ => {}
+
+            return self.lex_string(quote);
         }
 
         // Keep track of whether the identifier is ASCII-only or not.
@@ -528,25 +564,21 @@ impl<'src> Lexer<'src> {
     }
 
     /// Lex a f-string start token.
-    fn lex_fstring_start(&mut self, quote: char, prefix: FStringPrefix) -> TokenKind {
+    fn lex_fstring_start(&mut self, quote: char) -> TokenKind {
         #[cfg(debug_assertions)]
         debug_assert_eq!(self.cursor.previous(), quote);
 
-        let mut flags = AnyStringFlags::default()
-            .with_prefix(AnyStringPrefix::Format(prefix))
-            .with_quote_style(if quote == '"' {
-                Quote::Double
-            } else {
-                Quote::Single
-            });
-
-        if self.cursor.eat_char2(quote, quote) {
-            flags = flags.with_triple_quotes();
+        if quote == '"' {
+            self.current_flags |= TokenFlags::DOUBLE_QUOTES;
         }
 
-        self.fstrings.push(FStringContext::new(flags, self.nesting));
+        if self.cursor.eat_char2(quote, quote) {
+            self.current_flags = TokenFlags::TRIPLE_QUOTED_STRING;
+        }
 
-        self.current_value = TokenValue::FStringStart(flags);
+        self.fstrings
+            .push(FStringContext::new(self.current_flags, self.nesting));
+
         TokenKind::FStringStart
     }
 
@@ -554,6 +586,9 @@ impl<'src> Lexer<'src> {
     fn lex_fstring_middle_or_end(&mut self) -> Option<TokenKind> {
         // SAFETY: Safe because the function is only called when `self.fstrings` is not empty.
         let fstring = self.fstrings.current().unwrap();
+
+        // Keep the current flags in sync throughout the f-string context.
+        self.current_flags = fstring.flags();
 
         // Check if we're at the end of the f-string.
         if fstring.is_triple_quoted() {
@@ -682,35 +717,30 @@ impl<'src> Lexer<'src> {
 
         self.current_value = TokenValue::FStringMiddle {
             value: value.into_boxed_str(),
-            flags: fstring.flags(),
         };
 
         Some(TokenKind::FStringMiddle)
     }
 
     /// Lex a string literal.
-    fn lex_string(&mut self, prefix: AnyStringPrefix, quote: char) -> TokenKind {
+    fn lex_string(&mut self, quote: char) -> TokenKind {
         #[cfg(debug_assertions)]
         debug_assert_eq!(self.cursor.previous(), quote);
 
-        let mut flags = AnyStringFlags::default()
-            .with_prefix(prefix)
-            .with_quote_style(if quote == '"' {
-                Quote::Double
-            } else {
-                Quote::Single
-            });
+        if quote == '"' {
+            self.current_flags |= TokenFlags::DOUBLE_QUOTES;
+        }
 
         // If the next two characters are also the quote character, then we have a triple-quoted
         // string; consume those two characters and ensure that we require a triple-quote to close
         if self.cursor.eat_char2(quote, quote) {
-            flags = flags.with_triple_quotes();
+            self.current_flags = TokenFlags::TRIPLE_QUOTED_STRING;
         }
 
         let value_start = self.offset();
 
         let quote_byte = u8::try_from(quote).expect("char that fits in u8");
-        let value_end = if flags.is_triple_quoted() {
+        let value_end = if self.current_flags.is_triple_quoted() {
             // For triple-quoted strings, scan until we find the closing quote (ignoring escaped
             // quotes) or the end of the file.
             loop {
@@ -798,7 +828,6 @@ impl<'src> Lexer<'src> {
             value: self.source[TextRange::new(value_start, value_end)]
                 .to_string()
                 .into_boxed_str(),
-            flags,
         };
 
         TokenKind::String
@@ -808,6 +837,7 @@ impl<'src> Lexer<'src> {
     pub(crate) fn next_token(&mut self) -> TokenKind {
         self.cursor.start_token();
         self.current_value = TokenValue::None;
+        self.current_flags = TokenFlags::empty();
         self.current_kind = self.lex_token();
         self.current_range = self.token_range();
         self.current_kind
@@ -1026,7 +1056,7 @@ impl<'src> Lexer<'src> {
             c if is_ascii_identifier_start(c) => self.lex_identifier(c),
             '0'..='9' => self.lex_number(c),
             '#' => return self.lex_comment(),
-            '\'' | '"' => self.lex_string(AnyStringPrefix::default(), c),
+            '\'' | '"' => self.lex_string(c),
             '=' => {
                 if self.cursor.eat_char('=') {
                     TokenKind::EqEqual
@@ -1310,6 +1340,7 @@ impl<'src> Lexer<'src> {
             value: self.current_value.clone(),
             current_kind: self.current_kind,
             current_range: self.current_range,
+            current_flags: self.current_flags,
             cursor: self.cursor.clone(),
             state: self.state,
             nesting: self.nesting,
@@ -1322,20 +1353,118 @@ impl<'src> Lexer<'src> {
 
     /// Restore the lexer to the given checkpoint.
     pub(crate) fn rewind(&mut self, checkpoint: LexerCheckpoint<'src>) {
-        self.current_value = checkpoint.value;
-        self.current_kind = checkpoint.current_kind;
-        self.current_range = checkpoint.current_range;
-        self.cursor = checkpoint.cursor;
-        self.state = checkpoint.state;
-        self.nesting = checkpoint.nesting;
-        self.indentations.rewind(checkpoint.indentations_checkpoint);
-        self.pending_indentation = checkpoint.pending_indentation;
-        self.fstrings.rewind(checkpoint.fstrings_checkpoint);
-        self.errors.truncate(checkpoint.errors_position);
+        let LexerCheckpoint {
+            value,
+            current_kind,
+            current_range,
+            current_flags,
+            cursor,
+            state,
+            nesting,
+            indentations_checkpoint,
+            pending_indentation,
+            fstrings_checkpoint,
+            errors_position,
+        } = checkpoint;
+
+        self.current_value = value;
+        self.current_kind = current_kind;
+        self.current_range = current_range;
+        self.current_flags = current_flags;
+        self.cursor = cursor;
+        self.state = state;
+        self.nesting = nesting;
+        self.indentations.rewind(indentations_checkpoint);
+        self.pending_indentation = pending_indentation;
+        self.fstrings.rewind(fstrings_checkpoint);
+        self.errors.truncate(errors_position);
     }
 
     pub fn finish(self) -> Vec<LexicalError> {
         self.errors
+    }
+}
+
+bitflags! {
+    #[derive(Clone, Copy, Debug)]
+    pub(crate) struct TokenFlags: u8 {
+        /// The token is a string with double quotes (`"`).
+        const DOUBLE_QUOTES = 1 << 0;
+        /// The token is a triple-quoted string i.e., it starts and ends with three consecutive
+        /// quote characters (`"""` or `'''`).
+        const TRIPLE_QUOTED_STRING = 1 << 1;
+
+        /// The token is a unicode string i.e., prefixed with `u` or `U`
+        const UNICODE_STRING = 1 << 2;
+        /// The token is a byte string i.e., prefixed with `b` or `B`
+        const BYTE_STRING = 1 << 3;
+        /// The token is an f-string i.e., prefixed with `f` or `F`
+        const F_STRING = 1 << 4;
+        /// The token is a raw string and the prefix character is in lowercase.
+        const RAW_STRING_LOWERCASE = 1 << 5;
+        /// The token is a raw string and the prefix character is in uppercase.
+        const RAW_STRING_UPPERCASE = 1 << 6;
+
+        /// The token is a raw string i.e., prefixed with `r` or `R`
+        const RAW_STRING = Self::RAW_STRING_LOWERCASE.bits() | Self::RAW_STRING_UPPERCASE.bits();
+    }
+}
+
+impl StringFlags for TokenFlags {
+    fn quote_style(self) -> Quote {
+        if self.contains(TokenFlags::DOUBLE_QUOTES) {
+            Quote::Double
+        } else {
+            Quote::Single
+        }
+    }
+
+    fn is_triple_quoted(self) -> bool {
+        self.contains(TokenFlags::TRIPLE_QUOTED_STRING)
+    }
+
+    fn prefix(self) -> AnyStringPrefix {
+        if self.contains(TokenFlags::F_STRING) {
+            if self.contains(TokenFlags::RAW_STRING_LOWERCASE) {
+                AnyStringPrefix::Format(FStringPrefix::Raw { uppercase_r: false })
+            } else if self.contains(TokenFlags::RAW_STRING_UPPERCASE) {
+                AnyStringPrefix::Format(FStringPrefix::Raw { uppercase_r: true })
+            } else {
+                AnyStringPrefix::Format(FStringPrefix::Regular)
+            }
+        } else if self.contains(TokenFlags::BYTE_STRING) {
+            if self.contains(TokenFlags::RAW_STRING_LOWERCASE) {
+                AnyStringPrefix::Bytes(ByteStringPrefix::Raw { uppercase_r: false })
+            } else if self.contains(TokenFlags::RAW_STRING_UPPERCASE) {
+                AnyStringPrefix::Bytes(ByteStringPrefix::Raw { uppercase_r: true })
+            } else {
+                AnyStringPrefix::Bytes(ByteStringPrefix::Regular)
+            }
+        } else if self.contains(TokenFlags::RAW_STRING_LOWERCASE) {
+            AnyStringPrefix::Regular(StringLiteralPrefix::Raw { uppercase: false })
+        } else if self.contains(TokenFlags::RAW_STRING_UPPERCASE) {
+            AnyStringPrefix::Regular(StringLiteralPrefix::Raw { uppercase: true })
+        } else if self.contains(TokenFlags::UNICODE_STRING) {
+            AnyStringPrefix::Regular(StringLiteralPrefix::Unicode)
+        } else {
+            AnyStringPrefix::Regular(StringLiteralPrefix::Empty)
+        }
+    }
+}
+
+impl TokenFlags {
+    /// Returns `true` if the token is an f-string.
+    const fn is_f_string(self) -> bool {
+        self.contains(TokenFlags::F_STRING)
+    }
+
+    /// Returns `true` if the token is a raw string.
+    const fn is_raw_string(self) -> bool {
+        self.contains(TokenFlags::RAW_STRING)
+    }
+
+    pub(crate) fn as_any_string_flags(self) -> AnyStringFlags {
+        AnyStringFlags::new(self.prefix(), self.quote_style(), self.is_triple_quoted())
     }
 }
 
@@ -1345,11 +1474,13 @@ pub struct Token {
     kind: TokenKind,
     /// The range of the token.
     range: TextRange,
+    /// The set of flags describing this token.
+    flags: TokenFlags,
 }
 
 impl Token {
-    pub(crate) fn new(kind: TokenKind, range: TextRange) -> Self {
-        Self { kind, range }
+    pub(crate) fn new(kind: TokenKind, range: TextRange, flags: TokenFlags) -> Token {
+        Self { kind, range, flags }
     }
 
     /// Returns the token kind.
@@ -1533,21 +1664,12 @@ pub(crate) enum TokenValue {
     String {
         /// The string value.
         value: Box<str>,
-        /// Flags that can be queried to determine the quote style
-        /// and prefixes of the string
-        flags: AnyStringFlags,
     },
-    /// Token value for the start of an f-string. This includes the `f`/`F`/`fr` prefix
-    /// and the opening quote(s).
-    FStringStart(AnyStringFlags),
     /// Token value that includes the portion of text inside the f-string that's not
     /// part of the expression part and isn't an opening or closing brace.
     FStringMiddle {
         /// The string value.
         value: Box<str>,
-        /// Flags that can be queried to determine the quote style
-        /// and prefixes of the string
-        flags: AnyStringFlags,
     },
     /// Token value for IPython escape commands. These are recognized by the lexer
     /// only when the mode is [`Mode::Ipython`].
@@ -1563,6 +1685,7 @@ pub(crate) struct LexerCheckpoint<'src> {
     value: TokenValue,
     current_kind: TokenKind,
     current_range: TextRange,
+    current_flags: TokenFlags,
     cursor: Cursor<'src>,
     state: State,
     nesting: u32,
