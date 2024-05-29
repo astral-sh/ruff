@@ -27,31 +27,31 @@ enum TokenType {
 
 /// Simplified token specialized for the task.
 #[derive(Copy, Clone)]
-struct RuleToken {
+struct SimpleToken {
     ty: TokenType,
     range: TextRange,
 }
 
-impl Ranged for RuleToken {
+impl Ranged for SimpleToken {
     fn range(&self) -> TextRange {
         self.range
     }
 }
 
-impl RuleToken {
+impl SimpleToken {
     fn new(ty: TokenType, range: TextRange) -> Self {
         Self { ty, range }
     }
 
-    fn irrelevant() -> RuleToken {
-        RuleToken {
+    fn irrelevant() -> SimpleToken {
+        SimpleToken {
             ty: TokenType::Irrelevant,
             range: TextRange::default(),
         }
     }
 }
 
-impl From<(TokenKind, TextRange)> for RuleToken {
+impl From<(TokenKind, TextRange)> for SimpleToken {
     fn from((tok, range): (TokenKind, TextRange)) -> Self {
         let ty = match tok {
             TokenKind::Name => TokenType::Named,
@@ -231,7 +231,7 @@ pub(crate) fn trailing_commas(
     indexer: &Indexer,
 ) {
     let mut fstrings = 0u32;
-    let rule_tokens = tokens.up_to_first_unknown().iter().filter_map(|token| {
+    let simple_tokens = tokens.up_to_first_unknown().iter().filter_map(|token| {
         match token.kind() {
             // Completely ignore comments -- they just interfere with the logic.
             TokenKind::Comment => None,
@@ -248,14 +248,14 @@ pub(crate) fn trailing_commas(
                     indexer
                         .fstring_ranges()
                         .outermost(token.start())
-                        .map(|range| RuleToken::new(TokenType::String, range))
+                        .map(|range| SimpleToken::new(TokenType::String, range))
                 } else {
                     None
                 }
             }
             _ => {
                 if fstrings == 0 {
-                    Some(RuleToken::from(token.as_tuple()))
+                    Some(SimpleToken::from(token.as_tuple()))
                 } else {
                     None
                 }
@@ -263,12 +263,12 @@ pub(crate) fn trailing_commas(
         }
     });
 
-    let mut prev = RuleToken::irrelevant();
-    let mut prev_prev = RuleToken::irrelevant();
+    let mut prev = SimpleToken::irrelevant();
+    let mut prev_prev = SimpleToken::irrelevant();
 
     let mut stack = vec![Context::new(ContextType::No)];
 
-    for token in rule_tokens {
+    for token in simple_tokens {
         if prev.ty == TokenType::NonLogicalNewline && token.ty == TokenType::NonLogicalNewline {
             // Collapse consecutive newlines to the first one -- trailing commas are
             // added before the first newline.
@@ -301,9 +301,9 @@ pub(crate) fn trailing_commas(
 }
 
 fn check_token(
-    token: RuleToken,
-    prev: RuleToken,
-    prev_prev: RuleToken,
+    token: SimpleToken,
+    prev: SimpleToken,
+    prev_prev: SimpleToken,
     context: Context,
     locator: &Locator,
 ) -> Option<Diagnostic> {
@@ -387,9 +387,9 @@ fn check_token(
 }
 
 fn update_context(
-    token: RuleToken,
-    prev: RuleToken,
-    prev_prev: RuleToken,
+    token: SimpleToken,
+    prev: SimpleToken,
+    prev_prev: SimpleToken,
     stack: &mut Vec<Context>,
 ) -> Context {
     let new_context = match token.ty {
