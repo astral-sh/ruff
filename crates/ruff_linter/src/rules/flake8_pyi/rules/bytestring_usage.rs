@@ -28,7 +28,7 @@ use crate::checkers::ast::Checker;
 /// - [Python documentation: The `ByteString` type](https://docs.python.org/3/library/typing.html#typing.ByteString)
 #[violation]
 pub struct ByteStringUsage {
-    full_name: String,
+    origin: ByteStringOrigin,
 }
 
 impl Violation for ByteStringUsage {
@@ -36,28 +36,38 @@ impl Violation for ByteStringUsage {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let ByteStringUsage { full_name } = self;
-        format!("Do not use `{full_name}`, which has unclear semantics and is deprecated")
+        let ByteStringUsage { origin } = self;
+        format!("Do not use `{origin}.ByteString`, which has unclear semantics and is deprecated")
+    }
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+enum ByteStringOrigin {
+    Typing,
+    CollectionsAbc,
+}
+
+impl std::fmt::Display for ByteStringOrigin {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::Typing => "typing",
+            Self::CollectionsAbc => "collections.abc",
+        })
     }
 }
 
 /// PYI057
 pub(crate) fn bytestring_attribute(checker: &mut Checker, attribute: &Expr) {
-    if let Some(full_name) = checker
+    if let Some(origin) = checker
         .semantic()
         .resolve_qualified_name(attribute)
         .and_then(|qualified_name| match qualified_name.segments() {
-            ["typing", "ByteString"] => Some("typing.ByteString"),
-            ["collections", "abc", "ByteString"] => Some("collections.abc.ByteString"),
+            ["typing", "ByteString"] => Some(ByteStringOrigin::Typing),
+            ["collections", "abc", "ByteString"] => Some(ByteStringOrigin::CollectionsAbc),
             _ => None,
         })
     {
-        let diagnostic = Diagnostic::new(
-            ByteStringUsage {
-                full_name: full_name.to_string(),
-            },
-            attribute.range(),
-        );
+        let diagnostic = Diagnostic::new(ByteStringUsage { origin }, attribute.range());
         checker.diagnostics.push(diagnostic);
     }
 }
@@ -66,13 +76,22 @@ pub(crate) fn bytestring_attribute(checker: &mut Checker, attribute: &Expr) {
 pub(crate) fn bytestring_import(checker: &mut Checker, import_from: &ast::StmtImportFrom) {
     let ast::StmtImportFrom { names, module, .. } = import_from;
 
+    let module_id = match module {
+        Some(module) => module.id.as_str(),
+        None => return,
+    };
+
+    let origin = match module_id {
+        "typing" => ByteStringOrigin::Typing,
+        "collections.abc" => ByteStringOrigin::CollectionsAbc,
+        _ => return,
+    };
+
     for name in names {
-        if let Some(module) = module {
-            let full_name = format!("{}.{}", module.id, name.name);
-            if full_name == "typing.ByteString" || full_name == "collections.abc.ByteString" {
-                let diagnostic = Diagnostic::new(ByteStringUsage { full_name }, name.range());
-                checker.diagnostics.push(diagnostic);
-            }
+        if name.name.as_str() != "ByteString" {
+            continue;
         }
+        let diagnostic = Diagnostic::new(ByteStringUsage { origin }, name.range());
+        checker.diagnostics.push(diagnostic);
     }
 }
