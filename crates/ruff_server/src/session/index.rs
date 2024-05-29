@@ -50,14 +50,14 @@ enum DocumentController {
 #[derive(Clone)]
 pub(crate) enum DocumentQuery {
     Text {
-        file_path: Url,
+        file_url: Url,
         document: Arc<TextDocument>,
         settings: Arc<RuffSettings>,
     },
     Notebook {
         /// The selected notebook cell, if it exists.
-        cell_uri: Option<Url>,
-        file_path: Url,
+        cell_url: Option<Url>,
+        file_url: Url,
         notebook: Arc<NotebookDocument>,
         settings: Arc<RuffSettings>,
     },
@@ -85,18 +85,18 @@ impl Index {
         }
     }
 
-    pub(super) fn text_document_urls(&self) -> impl Iterator<Item = Url> + '_ {
+    pub(super) fn text_document_urls(&self) -> impl Iterator<Item = &Url> + '_ {
         self.documents
             .iter()
             .filter(|(_, doc)| doc.as_text().is_some())
-            .map(|(path, _)| path.clone())
+            .map(|(url, _)| url)
     }
 
-    pub(super) fn notebook_document_urls(&self) -> impl Iterator<Item = Url> + '_ {
+    pub(super) fn notebook_document_urls(&self) -> impl Iterator<Item = &Url> + '_ {
         self.documents
             .iter()
             .filter(|(_, doc)| doc.as_notebook().is_some())
-            .map(|(path, _)| path.clone())
+            .map(|(url, _)| url)
     }
 
     pub(super) fn update_text_document(
@@ -121,15 +121,14 @@ impl Index {
         Ok(())
     }
 
-    #[allow(clippy::unnecessary_wraps)]
-    pub(super) fn key_from_url(&self, url: &Url) -> Option<DocumentKey> {
+    pub(super) fn key_from_url(&self, url: &Url) -> DocumentKey {
         if self.notebook_cells.contains_key(url) {
-            return Some(DocumentKey::NotebookCell(url.clone()));
+            DocumentKey::NotebookCell(url.clone())
+        } else if url.path().ends_with("ipynb") {
+            DocumentKey::Notebook(url.clone())
+        } else {
+            DocumentKey::Text(url.clone())
         }
-        if url.path().ends_with("ipynb") {
-            return Some(DocumentKey::Notebook(url.clone()));
-        }
-        Some(DocumentKey::Text(url.clone()))
     }
 
     pub(super) fn update_notebook_document(
@@ -147,7 +146,7 @@ impl Index {
             ..
         }) = cells.as_ref().and_then(|cells| cells.structure.as_ref())
         {
-            let Some(path) = self.path_for_key(key).cloned() else {
+            let Some(path) = self.url_for_key(key).cloned() else {
                 anyhow::bail!("Tried to open unavailable document `{key}`");
             };
 
@@ -174,14 +173,14 @@ impl Index {
         Ok(())
     }
 
-    pub(super) fn open_workspace_folder(&mut self, path: Url, global_settings: &ClientSettings) {
+    pub(super) fn open_workspace_folder(&mut self, url: Url, global_settings: &ClientSettings) {
         // TODO(jane): Find a way for workspace client settings to be added or changed dynamically.
-        Self::register_workspace_settings(&mut self.settings, path, None, global_settings);
+        Self::register_workspace_settings(&mut self.settings, url, None, global_settings);
     }
 
     fn register_workspace_settings(
         settings_index: &mut SettingsIndex,
-        workspace_path: Url,
+        workspace_url: Url,
         workspace_settings: Option<ClientSettings>,
         global_settings: &ClientSettings,
     ) {
@@ -191,12 +190,12 @@ impl Index {
             ResolvedClientSettings::global(global_settings)
         };
         let workspace_settings_index = ruff_settings::RuffSettingsIndex::new(
-            Path::new(workspace_path.path()),
+            Path::new(workspace_url.path()),
             client_settings.editor_settings(),
         );
 
         settings_index.insert(
-            workspace_path,
+            workspace_url,
             WorkspaceSettings {
                 client_settings,
                 workspace_settings_index,
@@ -204,18 +203,19 @@ impl Index {
         );
     }
 
-    pub(super) fn close_workspace_folder(&mut self, workspace_path: &Url) -> crate::Result<()> {
-        self.settings.remove(workspace_path).ok_or_else(|| {
+    pub(super) fn close_workspace_folder(&mut self, workspace_url: &Url) -> crate::Result<()> {
+        let workspace_path = workspace_url.path();
+        self.settings.remove(workspace_url).ok_or_else(|| {
             anyhow!(
                 "Tried to remove non-existent folder {}",
-                workspace_path.path()
+                workspace_path
             )
         })?;
         // O(n) complexity, which isn't ideal... but this is an uncommon operation.
         self.documents
-            .retain(|path, _| !path.path().starts_with(workspace_path.path()));
+            .retain(|path, _| !path.path().starts_with(workspace_path));
         self.notebook_cells
-            .retain(|_, path| !path.path().starts_with(workspace_path.path()));
+            .retain(|_, path| !path.path().starts_with(workspace_path));
         Ok(())
     }
 
@@ -224,7 +224,7 @@ impl Index {
         key: DocumentKey,
         global_settings: &ClientSettings,
     ) -> Option<DocumentQuery> {
-        let url = self.path_for_key(&key)?.clone();
+        let url = self.url_for_key(&key)?.clone();
         let path = Path::new(url.path());
         let document_settings = self
             .settings_for_path(&url)
@@ -280,14 +280,14 @@ impl Index {
     }
 
     pub(super) fn close_document(&mut self, key: &DocumentKey) -> crate::Result<()> {
-        let Some(path) = self.path_for_key(key).cloned() else {
+        let Some(url) = self.url_for_key(key).cloned() else {
             anyhow::bail!("Tried to open unavailable document `{key}`");
         };
 
-        let Some(controller) = self.documents.remove(&path) else {
+        let Some(controller) = self.documents.remove(&url) else {
             anyhow::bail!(
                 "tried to close document that didn't exist at {}",
-                path.path()
+                url
             )
         };
         if let Some(notebook) = controller.as_notebook() {
@@ -305,7 +305,7 @@ impl Index {
         key: &DocumentKey,
         global_settings: &ClientSettings,
     ) -> settings::ResolvedClientSettings {
-        let Some(path) = self.path_for_key(key) else {
+        let Some(path) = self.url_for_key(key) else {
             return ResolvedClientSettings::global(global_settings);
         };
         let Some(WorkspaceSettings {
@@ -321,16 +321,16 @@ impl Index {
         &mut self,
         key: &DocumentKey,
     ) -> crate::Result<&mut DocumentController> {
-        let Some(path) = self.path_for_key(key).cloned() else {
+        let Some(url) = self.url_for_key(key).cloned() else {
             anyhow::bail!("Tried to open unavailable document `{key}`");
         };
-        let Some(controller) = self.documents.get_mut(&path) else {
-            anyhow::bail!("Document controller not available at `{}`", path.path());
+        let Some(controller) = self.documents.get_mut(&url) else {
+            anyhow::bail!("Document controller not available at `{}`", url);
         };
         Ok(controller)
     }
 
-    fn path_for_key<'a>(&'a self, key: &'a DocumentKey) -> Option<&'a Url> {
+    fn url_for_key<'a>(&'a self, key: &'a DocumentKey) -> Option<&'a Url> {
         match key {
             DocumentKey::Notebook(path) | DocumentKey::Text(path) => Some(path),
             DocumentKey::NotebookCell(uri) => self.notebook_cells.get(uri),
@@ -356,19 +356,19 @@ impl DocumentController {
 
     fn make_ref(
         &self,
-        cell_uri: Option<Url>,
-        file_path: Url,
+        cell_url: Option<Url>,
+        file_url: Url,
         settings: Arc<RuffSettings>,
     ) -> DocumentQuery {
         match &self {
             Self::Notebook(notebook) => DocumentQuery::Notebook {
-                cell_uri,
-                file_path,
+                cell_url,
+                file_url,
                 notebook: notebook.clone(),
                 settings,
             },
             Self::Text(document) => DocumentQuery::Text {
-                file_path,
+                file_url,
                 document: document.clone(),
                 settings,
             },
@@ -409,12 +409,12 @@ impl DocumentQuery {
     /// Retrieve the original key that describes this document query.
     pub(crate) fn make_key(&self) -> DocumentKey {
         match self {
-            Self::Text { file_path, .. } => DocumentKey::Text(file_path.clone()),
+            Self::Text { file_url: file_path, .. } => DocumentKey::Text(file_path.clone()),
             Self::Notebook {
-                cell_uri: Some(cell_uri),
+                cell_url: Some(cell_uri),
                 ..
             } => DocumentKey::NotebookCell(cell_uri.clone()),
-            Self::Notebook { file_path, .. } => DocumentKey::Notebook(file_path.clone()),
+            Self::Notebook { file_url: file_path, .. } => DocumentKey::Notebook(file_path.clone()),
         }
     }
 
@@ -464,7 +464,7 @@ impl DocumentQuery {
     /// Get the underlying file path for the document selected by this query.
     pub(crate) fn file_path(&self) -> &str {
         match self {
-            Self::Text { file_path, .. } | Self::Notebook { file_path, .. } => file_path.path(),
+            Self::Text { file_url: file_path, .. } | Self::Notebook { file_url: file_path, .. } => file_path.path(),
         }
     }
 
@@ -474,7 +474,7 @@ impl DocumentQuery {
         match self {
             Self::Text { document, .. } => Some(document),
             Self::Notebook {
-                notebook, cell_uri, ..
+                notebook, cell_url: cell_uri, ..
             } => cell_uri
                 .as_ref()
                 .and_then(|cell_uri| notebook.cell_document_by_uri(cell_uri)),

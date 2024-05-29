@@ -18,12 +18,12 @@ impl super::SyncNotificationHandler for DidChangeWorkspace {
         _requester: &mut Requester,
         params: types::DidChangeWorkspaceFoldersParams,
     ) -> Result<()> {
-        for types::WorkspaceFolder { ref uri, .. } in params.event.added {
-            session.open_workspace_folder(uri.clone());
+        for types::WorkspaceFolder { uri, .. } in params.event.added {
+            session.open_workspace_folder(uri);
         }
-        for types::WorkspaceFolder { ref uri, .. } in params.event.removed {
+        for types::WorkspaceFolder { uri, .. } in params.event.removed {
             session
-                .close_workspace_folder(uri)
+                .close_workspace_folder(&uri)
                 .with_failure_code(lsp_server::ErrorCode::InvalidParams)?;
         }
         Ok(())

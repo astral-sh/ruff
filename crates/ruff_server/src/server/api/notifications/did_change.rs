@@ -27,9 +27,7 @@ impl super::SyncNotificationHandler for DidChange {
             content_changes,
         }: types::DidChangeTextDocumentParams,
     ) -> Result<()> {
-        let key = session
-            .key_from_url(&uri)
-            .with_failure_code(ErrorCode::InternalError)?;
+        let key = session.key_from_url(&uri);
 
         session
             .update_text_document(&key, content_changes, new_version)

@@ -74,27 +74,27 @@ impl Server {
                 .unwrap_or_else(|| serde_json::Value::Object(serde_json::Map::default())),
         );
 
-        let mut workspace_for_path = |path: lsp_types::Url| {
+        let mut workspace_for_url = |url: lsp_types::Url| {
             let Some(workspace_settings) = workspace_settings.as_mut() else {
-                return (path, ClientSettings::default());
+                return (url, ClientSettings::default());
             };
-            let settings = workspace_settings.remove(&path).unwrap_or_else(|| {
-                tracing::warn!("No workspace settings found for {}", path.path());
+            let settings = workspace_settings.remove(&url).unwrap_or_else(|| {
+                tracing::warn!("No workspace settings found for {}", url);
                 ClientSettings::default()
             });
-            (path, settings)
+            (url, settings)
         };
 
         let workspaces = init_params
             .workspace_folders
             .filter(|folders| !folders.is_empty())
             .map(|folders| folders.into_iter().map(|folder| {
-                workspace_for_path(folder.uri)
+                workspace_for_url(folder.uri)
             }).collect())
             .or_else(|| {
                 tracing::warn!("No workspace(s) were provided during initialization. Using the current working directory as a default workspace...");
                 let uri = types::Url::from_file_path(std::env::current_dir().ok()?).ok()?;
-                Some(vec![workspace_for_path(uri)])
+                Some(vec![workspace_for_url(uri)])
             })
             .ok_or_else(|| {
                 anyhow::anyhow!("Failed to get the current working directory while creating a default workspace.")
