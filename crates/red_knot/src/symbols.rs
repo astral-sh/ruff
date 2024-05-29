@@ -120,10 +120,18 @@ impl Scope {
 
 #[derive(Debug)]
 pub(crate) enum Kind {
+    /// ...
+    /// TODO: correct?
     FreeVar,
+    /// Defined in current scope, used in at least one nested scope
     CellVar,
+    /// Defined in current scope, defined and `MARKED_NONLOCAL` in at least one nested scope
     CellVarAssigned,
+    /// `MARKED_GLOBAL` in current scope
+    /// TODO: correct?
     ExplicitGlobal,
+    /// Referenced but not defined in current scope
+    /// TODO: correct?
     ImplicitGlobal,
 }
 
