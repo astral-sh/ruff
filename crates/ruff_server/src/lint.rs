@@ -1,6 +1,5 @@
 //! Access to the Ruff linting API for the LSP
 
-use globset::Candidate;
 use ruff_diagnostics::{Applicability, Diagnostic, DiagnosticKind, Edit, Fix};
 use ruff_linter::{
     directives::{extract_directives, Flags},
@@ -17,7 +16,7 @@ use ruff_python_index::Indexer;
 use ruff_python_parser::AsMode;
 use ruff_source_file::{LineIndex, Locator};
 use ruff_text_size::{Ranged, TextRange};
-use ruff_workspace::resolver::match_candidate_exclusion;
+use ruff_workspace::resolver::match_any_exclusion;
 use ruff_workspace::FileResolverSettings;
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
@@ -71,29 +70,19 @@ pub(crate) fn check(
     let source_kind = query.make_source_kind();
 
     // If the document is excluded, return an empty list of diagnostics.
-    for path in document_path.ancestors() {
-        if let Some(basename) = path.file_name() {
-            let path = Candidate::new(&path);
-            let basename = Candidate::new(basename);
-            if match_candidate_exclusion(&path, &basename, &file_resolver_settings.exclude) {
-                tracing::debug!("Ignored path via `exclude`: {}", document_path.display());
-                return Diagnostics::default();
-            }
-            if match_candidate_exclusion(&path, &basename, &file_resolver_settings.extend_exclude) {
-                tracing::debug!(
-                    "Ignored path via `extend-exclude`: {}",
-                    document_path.display()
-                );
-                return Diagnostics::default();
-            }
-            if match_candidate_exclusion(&path, &basename, &linter_settings.exclude) {
-                tracing::debug!(
-                    "Ignored path via `lint.exclude`: {}",
-                    document_path.display()
-                );
-                return Diagnostics::default();
-            }
-        }
+    if let Some(exclusion) = match_any_exclusion(
+        document_path,
+        &file_resolver_settings.exclude,
+        &file_resolver_settings.extend_exclude,
+        Some(&linter_settings.exclude),
+        None,
+    ) {
+        tracing::debug!(
+            "Ignored path via `{}`: {}",
+            exclusion,
+            document_path.display()
+        );
+        return Diagnostics::default();
     }
 
     let package = detect_package_root(
