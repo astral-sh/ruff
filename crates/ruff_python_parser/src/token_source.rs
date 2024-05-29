@@ -1,5 +1,5 @@
 use ruff_python_trivia::CommentRanges;
-use ruff_text_size::{Ranged, TextRange, TextSize};
+use ruff_text_size::{TextRange, TextSize};
 
 use crate::lexer::{Lexer, LexerCheckpoint, LexicalError, Token, TokenValue};
 use crate::{Mode, TokenKind};
@@ -50,8 +50,10 @@ impl<'src> TokenSource<'src> {
         self.lexer.current_range()
     }
 
-    /// Calls the underlying [`Lexer::take_value`] method on the lexer. Refer to its documentation
+    /// Calls the underlying [`take_value`] method on the lexer. Refer to its documentation
     /// for more info.
+    ///
+    /// [`take_value`]: Lexer::take_value
     pub(crate) fn take_value(&mut self) -> TokenValue {
         self.lexer.take_value()
     }
@@ -89,26 +91,26 @@ impl<'src> TokenSource<'src> {
     /// token vector. It does add the trivia tokens to the token vector.
     fn do_bump(&mut self) {
         loop {
-            let next = self.lexer.next_token();
-            if next.is_trivia() {
-                if next.is_comment() {
-                    self.comments.push(next.range());
+            let kind = self.lexer.next_token();
+            if is_trivia(kind) {
+                if kind == TokenKind::Comment {
+                    self.comments.push(self.current_range());
                 }
-                self.tokens.push(next);
+                self.tokens.push(Token::new(kind, self.current_range()));
                 continue;
             }
             break;
         }
     }
 
-    /// Returns the next non-trivia token without adding it to any vector.
+    /// Returns the next non-trivia token without adding it to the token vector.
     fn next_non_trivia_token(&mut self) -> TokenKind {
         loop {
-            let next = self.lexer.next_token();
-            if next.is_trivia() {
+            let kind = self.lexer.next_token();
+            if is_trivia(kind) {
                 continue;
             }
-            break next.kind();
+            break kind;
         }
     }
 
@@ -156,4 +158,8 @@ pub(crate) struct TokenSourceCheckpoint<'src> {
 fn allocate_tokens_vec(contents: &str) -> Vec<Token> {
     let lower_bound = contents.len().saturating_mul(15) / 100;
     Vec::with_capacity(lower_bound)
+}
+
+fn is_trivia(token: TokenKind) -> bool {
+    matches!(token, TokenKind::Comment | TokenKind::NonLogicalNewline)
 }
