@@ -10,7 +10,6 @@ PYI057.py:4:20: PYI057 Do not use `typing.ByteString`, which has unclear semanti
 5 | from collections.abc import ByteString
 6 | from foo import ByteString
   |
-  = help: Do not use `typing.ByteString`
 
 PYI057.py:5:29: PYI057 Do not use `collections.abc.ByteString`, which has unclear semantics and is deprecated
   |
@@ -20,7 +19,6 @@ PYI057.py:5:29: PYI057 Do not use `collections.abc.ByteString`, which has unclea
   |                             ^^^^^^^^^^ PYI057
 6 | from foo import ByteString
   |
-  = help: Do not use `collections.abc.ByteString`
 
 PYI057.py:8:4: PYI057 Do not use `typing.ByteString`, which has unclear semantics and is deprecated
    |
@@ -31,7 +29,6 @@ PYI057.py:8:4: PYI057 Do not use `typing.ByteString`, which has unclear semantic
  9 | b: collections.abc.ByteString
 10 | c: foo.ByteString
    |
-   = help: Do not use `typing.ByteString`
 
 PYI057.py:9:4: PYI057 Do not use `collections.abc.ByteString`, which has unclear semantics and is deprecated
    |
@@ -40,4 +37,3 @@ PYI057.py:9:4: PYI057 Do not use `collections.abc.ByteString`, which has unclear
    |    ^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI057
 10 | c: foo.ByteString
    |
-   = help: Do not use `collections.abc.ByteString`
