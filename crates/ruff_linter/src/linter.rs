@@ -227,61 +227,51 @@ pub fn check_path(
     // Raise violations for internal test rules
     #[cfg(any(feature = "test-rules", test))]
     {
+        let comment_ranges = program.comment_ranges();
+
         for test_rule in TEST_RULES {
             if !settings.rules.enabled(*test_rule) {
                 continue;
             }
             let diagnostic = match test_rule {
                 Rule::StableTestRule => {
-                    test_rules::StableTestRule::diagnostic(locator, program.comment_ranges())
+                    test_rules::StableTestRule::diagnostic(locator, comment_ranges)
                 }
                 Rule::StableTestRuleSafeFix => {
-                    test_rules::StableTestRuleSafeFix::diagnostic(locator, program.comment_ranges())
+                    test_rules::StableTestRuleSafeFix::diagnostic(locator, comment_ranges)
                 }
-                Rule::StableTestRuleUnsafeFix => test_rules::StableTestRuleUnsafeFix::diagnostic(
-                    locator,
-                    program.comment_ranges(),
-                ),
+                Rule::StableTestRuleUnsafeFix => {
+                    test_rules::StableTestRuleUnsafeFix::diagnostic(locator, comment_ranges)
+                }
                 Rule::StableTestRuleDisplayOnlyFix => {
-                    test_rules::StableTestRuleDisplayOnlyFix::diagnostic(
-                        locator,
-                        program.comment_ranges(),
-                    )
+                    test_rules::StableTestRuleDisplayOnlyFix::diagnostic(locator, comment_ranges)
                 }
                 Rule::NurseryTestRule => {
-                    test_rules::NurseryTestRule::diagnostic(locator, program.comment_ranges())
+                    test_rules::NurseryTestRule::diagnostic(locator, comment_ranges)
                 }
                 Rule::PreviewTestRule => {
-                    test_rules::PreviewTestRule::diagnostic(locator, program.comment_ranges())
+                    test_rules::PreviewTestRule::diagnostic(locator, comment_ranges)
                 }
                 Rule::DeprecatedTestRule => {
-                    test_rules::DeprecatedTestRule::diagnostic(locator, program.comment_ranges())
+                    test_rules::DeprecatedTestRule::diagnostic(locator, comment_ranges)
                 }
                 Rule::AnotherDeprecatedTestRule => {
-                    test_rules::AnotherDeprecatedTestRule::diagnostic(
-                        locator,
-                        program.comment_ranges(),
-                    )
+                    test_rules::AnotherDeprecatedTestRule::diagnostic(locator, comment_ranges)
                 }
                 Rule::RemovedTestRule => {
-                    test_rules::RemovedTestRule::diagnostic(locator, program.comment_ranges())
+                    test_rules::RemovedTestRule::diagnostic(locator, comment_ranges)
                 }
-                Rule::AnotherRemovedTestRule => test_rules::AnotherRemovedTestRule::diagnostic(
-                    locator,
-                    program.comment_ranges(),
-                ),
+                Rule::AnotherRemovedTestRule => {
+                    test_rules::AnotherRemovedTestRule::diagnostic(locator, comment_ranges)
+                }
                 Rule::RedirectedToTestRule => {
-                    test_rules::RedirectedToTestRule::diagnostic(locator, program.comment_ranges())
+                    test_rules::RedirectedToTestRule::diagnostic(locator, comment_ranges)
                 }
-                Rule::RedirectedFromTestRule => test_rules::RedirectedFromTestRule::diagnostic(
-                    locator,
-                    program.comment_ranges(),
-                ),
+                Rule::RedirectedFromTestRule => {
+                    test_rules::RedirectedFromTestRule::diagnostic(locator, comment_ranges)
+                }
                 Rule::RedirectedFromPrefixTestRule => {
-                    test_rules::RedirectedFromPrefixTestRule::diagnostic(
-                        locator,
-                        program.comment_ranges(),
-                    )
+                    test_rules::RedirectedFromPrefixTestRule::diagnostic(locator, comment_ranges)
                 }
                 _ => unreachable!("All test rules must have an implementation"),
             };

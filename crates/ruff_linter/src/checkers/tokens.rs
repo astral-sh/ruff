@@ -34,6 +34,9 @@ pub(crate) fn check_tokens(
 ) -> Vec<Diagnostic> {
     let mut diagnostics: Vec<Diagnostic> = vec![];
 
+    let tokens = program.tokens();
+    let comment_ranges = program.comment_ranges();
+
     if settings.rules.any_enabled(&[
         Rule::BlankLineBetweenMethods,
         Rule::BlankLinesTopLevel,
@@ -43,26 +46,22 @@ pub(crate) fn check_tokens(
         Rule::BlankLinesBeforeNestedDefinition,
     ]) {
         BlankLinesChecker::new(locator, stylist, settings, source_type, cell_offsets)
-            .check_lines(program.tokens(), &mut diagnostics);
+            .check_lines(tokens, &mut diagnostics);
     }
 
     if settings.rules.enabled(Rule::BlanketTypeIgnore) {
-        pygrep_hooks::rules::blanket_type_ignore(
-            &mut diagnostics,
-            program.comment_ranges(),
-            locator,
-        );
+        pygrep_hooks::rules::blanket_type_ignore(&mut diagnostics, comment_ranges, locator);
     }
 
     if settings.rules.enabled(Rule::EmptyComment) {
-        pylint::rules::empty_comments(&mut diagnostics, program.comment_ranges(), locator);
+        pylint::rules::empty_comments(&mut diagnostics, comment_ranges, locator);
     }
 
     if settings
         .rules
         .enabled(Rule::AmbiguousUnicodeCharacterComment)
     {
-        for range in program.comment_ranges() {
+        for range in comment_ranges {
             ruff::rules::ambiguous_unicode_character_comment(
                 &mut diagnostics,
                 locator,
@@ -73,12 +72,7 @@ pub(crate) fn check_tokens(
     }
 
     if settings.rules.enabled(Rule::CommentedOutCode) {
-        eradicate::rules::commented_out_code(
-            &mut diagnostics,
-            locator,
-            program.comment_ranges(),
-            settings,
-        );
+        eradicate::rules::commented_out_code(&mut diagnostics, locator, comment_ranges, settings);
     }
 
     if settings.rules.enabled(Rule::UTF8EncodingDeclaration) {
@@ -86,7 +80,7 @@ pub(crate) fn check_tokens(
             &mut diagnostics,
             locator,
             indexer,
-            program.comment_ranges(),
+            comment_ranges,
         );
     }
 
@@ -101,7 +95,7 @@ pub(crate) fn check_tokens(
         Rule::InvalidCharacterNul,
         Rule::InvalidCharacterZeroWidthSpace,
     ]) {
-        for token in program.tokens().up_to_first_unknown() {
+        for token in tokens.up_to_first_unknown() {
             pylint::rules::invalid_string_characters(
                 &mut diagnostics,
                 token.kind(),
@@ -118,7 +112,7 @@ pub(crate) fn check_tokens(
     ]) {
         pycodestyle::rules::compound_statements(
             &mut diagnostics,
-            program.tokens(),
+            tokens,
             locator,
             indexer,
             source_type,
@@ -132,7 +126,7 @@ pub(crate) fn check_tokens(
     ]) {
         flake8_implicit_str_concat::rules::implicit(
             &mut diagnostics,
-            program.tokens(),
+            tokens,
             settings,
             locator,
             indexer,
@@ -144,19 +138,15 @@ pub(crate) fn check_tokens(
         Rule::TrailingCommaOnBareTuple,
         Rule::ProhibitedTrailingComma,
     ]) {
-        flake8_commas::rules::trailing_commas(&mut diagnostics, program.tokens(), locator, indexer);
+        flake8_commas::rules::trailing_commas(&mut diagnostics, tokens, locator, indexer);
     }
 
     if settings.rules.enabled(Rule::ExtraneousParentheses) {
-        pyupgrade::rules::extraneous_parentheses(&mut diagnostics, program.tokens(), locator);
+        pyupgrade::rules::extraneous_parentheses(&mut diagnostics, tokens, locator);
     }
 
     if source_type.is_stub() && settings.rules.enabled(Rule::TypeCommentInStub) {
-        flake8_pyi::rules::type_comment_in_stub(
-            &mut diagnostics,
-            locator,
-            program.comment_ranges(),
-        );
+        flake8_pyi::rules::type_comment_in_stub(&mut diagnostics, locator, comment_ranges);
     }
 
     if settings.rules.any_enabled(&[
@@ -166,12 +156,7 @@ pub(crate) fn check_tokens(
         Rule::ShebangNotFirstLine,
         Rule::ShebangMissingPython,
     ]) {
-        flake8_executable::rules::from_tokens(
-            &mut diagnostics,
-            path,
-            locator,
-            program.comment_ranges(),
-        );
+        flake8_executable::rules::from_tokens(&mut diagnostics, path, locator, comment_ranges);
     }
 
     if settings.rules.any_enabled(&[
@@ -187,8 +172,7 @@ pub(crate) fn check_tokens(
         Rule::LineContainsTodo,
         Rule::LineContainsHack,
     ]) {
-        let todo_comments: Vec<TodoComment> = program
-            .comment_ranges()
+        let todo_comments: Vec<TodoComment> = comment_ranges
             .iter()
             .enumerate()
             .filter_map(|(i, comment_range)| {
@@ -196,17 +180,12 @@ pub(crate) fn check_tokens(
                 TodoComment::from_comment(comment, *comment_range, i)
             })
             .collect();
-        flake8_todos::rules::todos(
-            &mut diagnostics,
-            &todo_comments,
-            locator,
-            program.comment_ranges(),
-        );
+        flake8_todos::rules::todos(&mut diagnostics, &todo_comments, locator, comment_ranges);
         flake8_fixme::rules::todos(&mut diagnostics, &todo_comments);
     }
 
     if settings.rules.enabled(Rule::TooManyNewlinesAtEndOfFile) {
-        pycodestyle::rules::too_many_newlines_at_end_of_file(&mut diagnostics, program.tokens());
+        pycodestyle::rules::too_many_newlines_at_end_of_file(&mut diagnostics, tokens);
     }
 
     diagnostics.retain(|diagnostic| settings.rules.enabled(diagnostic.kind.rule()));
