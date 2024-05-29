@@ -353,10 +353,12 @@ mod tests {
     use insta::assert_debug_snapshot;
     use serde::de::DeserializeOwned;
 
+    #[cfg(not(windows))]
     use ruff_linter::registry::Linter;
 
     use super::*;
 
+    #[cfg(not(windows))]
     const VS_CODE_INIT_OPTIONS_FIXTURE: &str =
         include_str!("../../resources/test/fixtures/settings/vs_code_initialization_options.json");
     const GLOBAL_ONLY_INIT_OPTIONS_FIXTURE: &str =
@@ -368,7 +370,8 @@ mod tests {
         serde_json::from_str(content).expect("test fixture JSON should deserialize")
     }
 
-    #[cfg_attr(not(windows), test)]
+    #[cfg(not(windows))]
+    #[test]
     fn test_vs_code_init_options_deserialize() {
         let options: InitializationOptions = deserialize_fixture(VS_CODE_INIT_OPTIONS_FIXTURE);
 
@@ -553,7 +556,8 @@ mod tests {
         "###);
     }
 
-    #[cfg_attr(not(windows), test)]
+    #[cfg(not(windows))]
+    #[test]
     fn test_vs_code_workspace_settings_resolve() {
         let options = deserialize_fixture(VS_CODE_INIT_OPTIONS_FIXTURE);
         let AllSettings {
