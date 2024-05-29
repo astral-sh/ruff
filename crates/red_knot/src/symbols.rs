@@ -132,9 +132,7 @@ bitflags! {
     pub(crate) struct SymbolFlags: u8 {
         const IS_USED         = 1 << 0;
         const IS_DEFINED      = 1 << 1;
-        /// TODO: This flag is not yet set by anything
         const MARKED_GLOBAL   = 1 << 2;
-        /// TODO: This flag is not yet set by anything
         const MARKED_NONLOCAL = 1 << 3;
     }
 }
@@ -739,6 +737,18 @@ impl PreorderVisitor<'_> for SymbolTableBuilder {
                     Some(Definition::Assignment(TypedNodeKey::from_node(node)));
                 ast::visitor::preorder::walk_stmt(self, stmt);
                 self.current_definition = None;
+            }
+            ast::Stmt::Global(ast::StmtGlobal { names, .. }) => {
+                for name in names {
+                    self.add_or_update_symbol(&name.id, SymbolFlags::MARKED_GLOBAL);
+                }
+                ast::visitor::preorder::walk_stmt(self, stmt);
+            }
+            ast::Stmt::Nonlocal(ast::StmtNonlocal { names, .. }) => {
+                for name in names {
+                    self.add_or_update_symbol(&name.id, SymbolFlags::MARKED_NONLOCAL);
+                }
+                ast::visitor::preorder::walk_stmt(self, stmt);
             }
             _ => {
                 ast::visitor::preorder::walk_stmt(self, stmt);
