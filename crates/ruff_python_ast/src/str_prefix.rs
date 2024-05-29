@@ -150,45 +150,6 @@ impl AnyStringPrefix {
     }
 }
 
-impl TryFrom<char> for AnyStringPrefix {
-    type Error = String;
-
-    fn try_from(value: char) -> Result<Self, String> {
-        let result = match value {
-            'r' => Self::Regular(StringLiteralPrefix::Raw { uppercase: false }),
-            'R' => Self::Regular(StringLiteralPrefix::Raw { uppercase: true }),
-            'u' | 'U' => Self::Regular(StringLiteralPrefix::Unicode),
-            'b' | 'B' => Self::Bytes(ByteStringPrefix::Regular),
-            'f' | 'F' => Self::Format(FStringPrefix::Regular),
-            _ => return Err(format!("Unexpected prefix '{value}'")),
-        };
-        Ok(result)
-    }
-}
-
-impl TryFrom<[char; 2]> for AnyStringPrefix {
-    type Error = String;
-
-    fn try_from(value: [char; 2]) -> Result<Self, String> {
-        let result = match value {
-            ['r', 'f' | 'F'] | ['f' | 'F', 'r'] => {
-                Self::Format(FStringPrefix::Raw { uppercase_r: false })
-            }
-            ['R', 'f' | 'F'] | ['f' | 'F', 'R'] => {
-                Self::Format(FStringPrefix::Raw { uppercase_r: true })
-            }
-            ['r', 'b' | 'B'] | ['b' | 'B', 'r'] => {
-                Self::Bytes(ByteStringPrefix::Raw { uppercase_r: false })
-            }
-            ['R', 'b' | 'B'] | ['b' | 'B', 'R'] => {
-                Self::Bytes(ByteStringPrefix::Raw { uppercase_r: true })
-            }
-            _ => return Err(format!("Unexpected prefix '{}{}'", value[0], value[1])),
-        };
-        Ok(result)
-    }
-}
-
 impl fmt::Display for AnyStringPrefix {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(self.as_str())
