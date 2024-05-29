@@ -318,13 +318,13 @@ impl<'a> SortClassification<'a> {
 // An instance of this struct encapsulates an analysis
 /// of a multiline Python tuple/list that represents an
 /// `__all__`/`__slots__`/etc. definition or augmentation.
-pub(super) struct MultilineStringSequenceValue {
-    items: Vec<StringSequenceItem>,
+pub(super) struct MultilineStringSequenceValue<'a> {
+    items: Vec<StringSequenceItem<'a>>,
     range: TextRange,
     ends_with_trailing_comma: bool,
 }
 
-impl MultilineStringSequenceValue {
+impl<'a> MultilineStringSequenceValue<'a> {
     pub(super) fn len(&self) -> usize {
         self.items.len()
     }
@@ -336,14 +336,15 @@ impl MultilineStringSequenceValue {
         range: TextRange,
         kind: SequenceKind,
         locator: &Locator,
-    ) -> Option<MultilineStringSequenceValue> {
+        string_items: &[&'a str],
+    ) -> Option<MultilineStringSequenceValue<'a>> {
         // Parse the multiline string sequence using the raw tokens.
         // See the docs for `collect_string_sequence_lines()` for why we have to
         // use the raw tokens, rather than just the AST, to do this parsing.
         //
         // Step (1). Start by collecting information on each line individually:
         let (lines, ends_with_trailing_comma) =
-            collect_string_sequence_lines(range, kind, locator)?;
+            collect_string_sequence_lines(range, kind, locator, string_items)?;
 
         // Step (2). Group lines together into sortable "items":
         //   - Any "item" contains a single element of the list/tuple
@@ -447,7 +448,7 @@ impl MultilineStringSequenceValue {
                 .map_or(true, |tok| tok.kind() != SimpleTokenKind::Comma);
 
         self.items
-            .sort_by(|a, b| sorting_style.compare(&a.value, &b.value));
+            .sort_by(|a, b| sorting_style.compare(a.value, b.value));
         let joined_items = join_multiline_string_sequence_items(
             &self.items,
             locator,
@@ -460,7 +461,7 @@ impl MultilineStringSequenceValue {
     }
 }
 
-impl Ranged for MultilineStringSequenceValue {
+impl Ranged for MultilineStringSequenceValue<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
@@ -484,11 +485,12 @@ impl Ranged for MultilineStringSequenceValue {
 /// stage if we're to sort items without doing unnecessary
 /// brutality to the comments and pre-existing style choices
 /// in the original source code.
-fn collect_string_sequence_lines(
+fn collect_string_sequence_lines<'a>(
     range: TextRange,
     kind: SequenceKind,
     locator: &Locator,
-) -> Option<(Vec<StringSequenceLine>, bool)> {
+    string_items: &[&'a str],
+) -> Option<(Vec<StringSequenceLine<'a>>, bool)> {
     // These first two variables are used for keeping track of state
     // regarding the entirety of the string sequence...
     let mut ends_with_trailing_comma = false;
@@ -496,6 +498,8 @@ fn collect_string_sequence_lines(
     // ... all state regarding a single line of a string sequence
     // is encapsulated in this variable
     let mut line_state = LineState::default();
+    // An iterator over the string values in the sequence.
+    let mut string_items_iter = string_items.iter();
 
     // `lex_starts_at()` gives us absolute ranges rather than relative ranges,
     // but (surprisingly) we still need to pass in the slice of code we want it to lex,
@@ -518,8 +522,11 @@ fn collect_string_sequence_lines(
             Tok::Comment(_) => {
                 line_state.visit_comment_token(subrange);
             }
-            Tok::String { value, .. } => {
-                line_state.visit_string_token(value, subrange);
+            Tok::String { .. } => {
+                let Some(string_value) = string_items_iter.next() else {
+                    unreachable!("Expected the number of string tokens to be equal to the number of string items in the sequence");
+                };
+                line_state.visit_string_token(string_value, subrange);
                 ends_with_trailing_comma = false;
             }
             Tok::Comma => {
@@ -558,15 +565,15 @@ fn collect_string_sequence_lines(
 /// `into_string_sequence_line()` is called, which consumes
 /// `self` and produces the classification for the line.
 #[derive(Debug, Default)]
-struct LineState {
-    first_item_in_line: Option<(Box<str>, TextRange)>,
-    following_items_in_line: Vec<(Box<str>, TextRange)>,
+struct LineState<'a> {
+    first_item_in_line: Option<(&'a str, TextRange)>,
+    following_items_in_line: Vec<(&'a str, TextRange)>,
     comment_range_start: Option<TextSize>,
     comment_in_line: Option<TextRange>,
 }
 
-impl LineState {
-    fn visit_string_token(&mut self, token_value: Box<str>, token_range: TextRange) {
+impl<'a> LineState<'a> {
+    fn visit_string_token(&mut self, token_value: &'a str, token_range: TextRange) {
         if self.first_item_in_line.is_none() {
             self.first_item_in_line = Some((token_value, token_range));
         } else {
@@ -600,7 +607,7 @@ impl LineState {
         }
     }
 
-    fn into_string_sequence_line(self) -> StringSequenceLine {
+    fn into_string_sequence_line(self) -> StringSequenceLine<'a> {
         if let Some(first_item) = self.first_item_in_line {
             StringSequenceLine::OneOrMoreItems(LineWithItems {
                 first_item,
@@ -627,17 +634,17 @@ struct LineWithJustAComment(TextRange);
 /// 1 element of the sequence. The line may contain > 1 element of the
 /// sequence, and may also have a trailing comment after the element(s).
 #[derive(Debug)]
-struct LineWithItems {
+struct LineWithItems<'a> {
     // For elements in the list, we keep track of the value of the
     // value of the element as well as the source-code range of the element.
     // (We need to know the actual value so that we can sort the items.)
-    first_item: (Box<str>, TextRange),
-    following_items: Vec<(Box<str>, TextRange)>,
+    first_item: (&'a str, TextRange),
+    following_items: Vec<(&'a str, TextRange)>,
     // For comments, we only need to keep track of the source-code range.
     trailing_comment_range: Option<TextRange>,
 }
 
-impl LineWithItems {
+impl LineWithItems<'_> {
     fn num_items(&self) -> usize {
         self.following_items.len() + 1
     }
@@ -651,9 +658,9 @@ impl LineWithItems {
 ///   and may also have a trailing comment.
 /// - An entirely empty line.
 #[derive(Debug)]
-enum StringSequenceLine {
+enum StringSequenceLine<'a> {
     JustAComment(LineWithJustAComment),
-    OneOrMoreItems(LineWithItems),
+    OneOrMoreItems(LineWithItems<'a>),
     Empty,
 }
 
@@ -667,11 +674,11 @@ enum StringSequenceLine {
 /// Note that any comments following the last item are discarded here,
 /// but that doesn't matter: we add them back in `into_sorted_source_code()`
 /// as part of the `postlude` (see comments in that function)
-fn collect_string_sequence_items(
-    lines: Vec<StringSequenceLine>,
+fn collect_string_sequence_items<'a>(
+    lines: Vec<StringSequenceLine<'a>>,
     dunder_all_range: TextRange,
     locator: &Locator,
-) -> Vec<StringSequenceItem> {
+) -> Vec<StringSequenceItem<'a>> {
     let mut all_items = Vec::with_capacity(match lines.as_slice() {
         [StringSequenceLine::OneOrMoreItems(single)] => single.num_items(),
         _ => lines.len(),
@@ -752,8 +759,8 @@ fn collect_string_sequence_items(
 /// of `# comment1` does not form a contiguous range with the
 /// source-code range of `"a"`.
 #[derive(Debug)]
-struct StringSequenceItem {
-    value: Box<str>,
+struct StringSequenceItem<'a> {
+    value: &'a str,
     preceding_comment_ranges: Vec<TextRange>,
     element_range: TextRange,
     // total_range incorporates the ranges of preceding comments
@@ -764,9 +771,9 @@ struct StringSequenceItem {
     end_of_line_comments: Option<TextRange>,
 }
 
-impl StringSequenceItem {
+impl<'a> StringSequenceItem<'a> {
     fn new(
-        value: Box<str>,
+        value: &'a str,
         preceding_comment_ranges: Vec<TextRange>,
         element_range: TextRange,
         end_of_line_comments: Option<TextRange>,
@@ -787,12 +794,12 @@ impl StringSequenceItem {
         }
     }
 
-    fn with_no_comments(value: Box<str>, element_range: TextRange) -> Self {
+    fn with_no_comments(value: &'a str, element_range: TextRange) -> Self {
         Self::new(value, vec![], element_range, None)
     }
 }
 
-impl Ranged for StringSequenceItem {
+impl Ranged for StringSequenceItem<'_> {
     fn range(&self) -> TextRange {
         self.total_range
     }

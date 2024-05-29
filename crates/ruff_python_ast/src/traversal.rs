@@ -79,15 +79,3 @@ pub fn next_sibling<'a>(stmt: &'a Stmt, suite: &'a Suite) -> Option<&'a Stmt> {
     }
     None
 }
-
-/// Given a [`Stmt`] and its containing [`Suite`], return the previous [`Stmt`] in the [`Suite`].
-pub fn prev_sibling<'a>(stmt: &'a Stmt, suite: &'a Suite) -> Option<&'a Stmt> {
-    let mut prev = None;
-    for sibling in suite {
-        if sibling == stmt {
-            return prev;
-        }
-        prev = Some(sibling);
-    }
-    None
-}

@@ -65,6 +65,8 @@ mod tests {
     #[test_case(Rule::PatchVersionComparison, Path::new("PYI004.pyi"))]
     #[test_case(Rule::QuotedAnnotationInStub, Path::new("PYI020.py"))]
     #[test_case(Rule::QuotedAnnotationInStub, Path::new("PYI020.pyi"))]
+    #[test_case(Rule::RedundantFinalLiteral, Path::new("PYI064.py"))]
+    #[test_case(Rule::RedundantFinalLiteral, Path::new("PYI064.pyi"))]
     #[test_case(Rule::RedundantLiteralUnion, Path::new("PYI051.py"))]
     #[test_case(Rule::RedundantLiteralUnion, Path::new("PYI051.pyi"))]
     #[test_case(Rule::RedundantNumericUnion, Path::new("PYI041.py"))]

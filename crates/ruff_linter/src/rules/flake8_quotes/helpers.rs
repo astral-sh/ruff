@@ -1,4 +1,4 @@
-use ruff_python_ast::AnyStringFlags;
+use ruff_python_ast::{AnyStringFlags, StringFlags};
 use ruff_text_size::TextLen;
 
 /// Returns the raw contents of the string given the string's contents and flags.

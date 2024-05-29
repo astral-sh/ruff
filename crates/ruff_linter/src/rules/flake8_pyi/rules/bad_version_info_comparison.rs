@@ -63,8 +63,10 @@ impl Violation for BadVersionInfoComparison {
 /// `<` comparators.
 ///
 /// ## Why is this bad?
-/// As a convention, code for newer Python versions should be put first when
-/// writing multiple versions of code while comparing Python versions.
+/// As a convention, branches that correspond to newer Python versions should
+/// come first when using `sys.version_info` comparisons. This makes it easier
+/// to understand the desired behavior, which typically corresponds to the
+/// latest Python versions.
 ///
 /// ## Example
 ///
@@ -101,7 +103,7 @@ pub struct BadVersionInfoOrder;
 impl Violation for BadVersionInfoOrder {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use `>=` when using if-else with `sys.version_info` comparisons")
+        format!("Use `>=` when using `if`-`else` with `sys.version_info` comparisons")
     }
 }
 
@@ -139,13 +141,12 @@ pub(crate) fn bad_version_info_comparison(
     }
 
     if matches!(op, CmpOp::Lt) {
-        if !checker.enabled(Rule::BadVersionInfoOrder) {
-            return;
-        }
-        if has_else_clause {
-            checker
-                .diagnostics
-                .push(Diagnostic::new(BadVersionInfoOrder, test.range()));
+        if checker.enabled(Rule::BadVersionInfoOrder) {
+            if has_else_clause {
+                checker
+                    .diagnostics
+                    .push(Diagnostic::new(BadVersionInfoOrder, test.range()));
+            }
         }
     } else {
         if checker.enabled(Rule::BadVersionInfoComparison) {

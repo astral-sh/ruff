@@ -212,7 +212,12 @@ fn create_fix(
         // bare minimum of token-processing for single-line `__all__`
         // definitions:
         if is_multiline {
-            let value = MultilineStringSequenceValue::from_source_range(range, kind, locator)?;
+            let value = MultilineStringSequenceValue::from_source_range(
+                range,
+                kind,
+                locator,
+                string_items,
+            )?;
             assert_eq!(value.len(), elts.len());
             value.into_sorted_source_code(SORTING_STYLE, locator, checker.stylist())
         } else {

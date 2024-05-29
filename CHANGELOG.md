@@ -1,5 +1,42 @@
 # Changelog
 
+## 0.4.6
+
+### Breaking changes
+
+- Use project-relative paths when calculating GitLab fingerprints ([#11532](https://github.com/astral-sh/ruff/pull/11532))
+
+### Preview features
+
+- \[`flake8-async`\] Sleep with >24 hour interval should usually sleep forever (`ASYNC116`) ([#11498](https://github.com/astral-sh/ruff/pull/11498))
+
+### Rule changes
+
+- \[`numpy`\] Add missing functions to NumPy 2.0 migration rule ([#11528](https://github.com/astral-sh/ruff/pull/11528))
+- \[`mccabe`\] Consider irrefutable pattern similar to `if .. else` for `C901` ([#11565](https://github.com/astral-sh/ruff/pull/11565))
+- Consider `match`-`case` statements for `C901`, `PLR0912`, and `PLR0915` ([#11521](https://github.com/astral-sh/ruff/pull/11521))
+- Remove empty strings when converting to f-string (`UP032`) ([#11524](https://github.com/astral-sh/ruff/pull/11524))
+- \[`flake8-bandit`\] `request-without-timeout` should warn for `requests.request` ([#11548](https://github.com/astral-sh/ruff/pull/11548))
+- \[`flake8-self`\] Ignore sunder accesses in `flake8-self` rules ([#11546](https://github.com/astral-sh/ruff/pull/11546))
+- \[`pyupgrade`\] Lint for `TypeAliasType` usages (`UP040`) ([#11530](https://github.com/astral-sh/ruff/pull/11530))
+
+### Server
+
+- Respect excludes in `ruff server` configuration discovery ([#11551](https://github.com/astral-sh/ruff/pull/11551))
+- Use default settings if initialization options is empty or not provided ([#11566](https://github.com/astral-sh/ruff/pull/11566))
+- `ruff server` correctly treats `.pyi` files as stub files ([#11535](https://github.com/astral-sh/ruff/pull/11535))
+- `ruff server` searches for configuration in parent directories ([#11537](https://github.com/astral-sh/ruff/pull/11537))
+- `ruff server`: An empty code action filter no longer returns notebook source actions ([#11526](https://github.com/astral-sh/ruff/pull/11526))
+
+### Bug fixes
+
+- \[`flake8-logging-format`\] Fix autofix title in `logging-warn` (`G010`) ([#11514](https://github.com/astral-sh/ruff/pull/11514))
+- \[`refurb`\] Avoid recommending `operator.itemgetter` with dependence on lambda arguments ([#11574](https://github.com/astral-sh/ruff/pull/11574))
+- \[`flake8-simplify`\] Avoid recommending context manager in `__enter__` implementations ([#11575](https://github.com/astral-sh/ruff/pull/11575))
+- Create intermediary directories for `--output-file` ([#11550](https://github.com/astral-sh/ruff/pull/11550))
+- Propagate reads on global variables ([#11584](https://github.com/astral-sh/ruff/pull/11584))
+- Treat all `singledispatch` arguments as runtime-required ([#11523](https://github.com/astral-sh/ruff/pull/11523))
+
 ## 0.4.5
 
 ### Ruff's language server is now in Beta

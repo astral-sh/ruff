@@ -4,6 +4,7 @@ use std::iter::Peekable;
 use std::str::FromStr;
 
 use bitflags::bitflags;
+use ruff_python_ast::StringFlags;
 use ruff_python_parser::lexer::LexResult;
 use ruff_python_parser::Tok;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
@@ -43,22 +44,6 @@ pub struct IsortDirectives {
     /// Text positions at which splits should be inserted
     pub splits: Vec<TextSize>,
     pub skip_file: bool,
-}
-
-impl IsortDirectives {
-    pub fn is_excluded(&self, offset: TextSize) -> bool {
-        for range in &self.exclusions {
-            if range.contains(offset) {
-                return true;
-            }
-
-            if range.start() > offset {
-                break;
-            }
-        }
-
-        false
-    }
 }
 
 pub struct Directives {

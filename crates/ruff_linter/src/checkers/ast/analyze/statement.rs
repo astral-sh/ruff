@@ -1180,7 +1180,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 }
                 if checker.any_enabled(&[Rule::BadVersionInfoComparison, Rule::BadVersionInfoOrder])
                 {
-                    fn run_bad_version_info_comparison(
+                    fn bad_version_info_comparison(
                         checker: &mut Checker,
                         test: &Expr,
                         has_else_clause: bool,
@@ -1205,10 +1205,10 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     let has_else_clause =
                         elif_else_clauses.iter().any(|clause| clause.test.is_none());
 
-                    run_bad_version_info_comparison(checker, test.as_ref(), has_else_clause);
+                    bad_version_info_comparison(checker, test.as_ref(), has_else_clause);
                     for clause in elif_else_clauses {
                         if let Some(test) = clause.test.as_ref() {
-                            run_bad_version_info_comparison(checker, test, has_else_clause);
+                            bad_version_info_comparison(checker, test, has_else_clause);
                         }
                     }
                 }
@@ -1589,6 +1589,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::ListReverseCopy) {
                 refurb::rules::list_assign_reversed(checker, assign);
             }
+            if checker.enabled(Rule::NonPEP695TypeAlias) {
+                pyupgrade::rules::non_pep695_type_alias_type(checker, assign);
+            }
         }
         Stmt::AnnAssign(
             assign_stmt @ ast::StmtAnnAssign {
@@ -1660,6 +1663,13 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 }
                 if checker.enabled(Rule::TSuffixedTypeAlias) {
                     flake8_pyi::rules::t_suffixed_type_alias(checker, target);
+                }
+            } else if checker
+                .semantic
+                .match_typing_expr(helpers::map_subscript(annotation), "Final")
+            {
+                if checker.enabled(Rule::RedundantFinalLiteral) {
+                    flake8_pyi::rules::redundant_final_literal(checker, assign_stmt);
                 }
             }
         }

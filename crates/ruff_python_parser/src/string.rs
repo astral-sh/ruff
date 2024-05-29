@@ -2,7 +2,7 @@
 
 use bstr::ByteSlice;
 
-use ruff_python_ast::{self as ast, AnyStringFlags, Expr};
+use ruff_python_ast::{self as ast, AnyStringFlags, Expr, StringFlags};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::lexer::{LexicalError, LexicalErrorType};

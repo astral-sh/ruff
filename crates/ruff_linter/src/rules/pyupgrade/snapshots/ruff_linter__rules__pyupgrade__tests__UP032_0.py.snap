@@ -767,16 +767,16 @@ UP032_0.py:86:1: UP032 [*] Use f-string instead of `format` call
 85 85 | 
 86 86 | (
 87    |-    "{a}"
-   87 |+    f"{1}"
-88 88 |     ""
+88    |-    ""
 89    |-    "{b}"
-   89 |+    f"{1}"
-90 90 |     ""
+90    |-    ""
 91    |-).format(a=1, b=1)
-   91 |+)
-92 92 | 
-93 93 | (
-94 94 |     (
+   87 |+    f"{1}"
+   88 |+    f"{1}"
+   89 |+)
+92 90 | 
+93 91 | (
+94 92 |     (
 
 UP032_0.py:94:5: UP032 [*] Use f-string instead of `format` call
     |
@@ -1089,11 +1089,10 @@ UP032_0.py:212:18: UP032 [*] Use f-string instead of `format` call
 211 211 | # When fixing, trim the trailing empty string.
 212     |-raise ValueError("Conflicting configuration dicts: {!r} {!r}"
 213     |-                 "".format(new_dict, d))
-    212 |+raise ValueError(f"Conflicting configuration dicts: {new_dict!r} {d!r}"
-    213 |+                 "")
-214 214 | 
-215 215 | # When fixing, trim the trailing empty string.
-216 216 | raise ValueError("Conflicting configuration dicts: {!r} {!r}"
+    212 |+raise ValueError(f"Conflicting configuration dicts: {new_dict!r} {d!r}")
+214 213 | 
+215 214 | # When fixing, trim the trailing empty string.
+216 215 | raise ValueError("Conflicting configuration dicts: {!r} {!r}"
 
 UP032_0.py:216:18: UP032 [*] Use f-string instead of `format` call
     |
@@ -1113,10 +1112,11 @@ UP032_0.py:216:18: UP032 [*] Use f-string instead of `format` call
 215 215 | # When fixing, trim the trailing empty string.
 216     |-raise ValueError("Conflicting configuration dicts: {!r} {!r}"
 217     |-                 .format(new_dict, d))
-    216 |+raise ValueError(f"Conflicting configuration dicts: {new_dict!r} {d!r}")
-218 217 | 
-219 218 | raise ValueError(
-220 219 |     "Conflicting configuration dicts: {!r} {!r}"
+    216 |+raise ValueError(f"Conflicting configuration dicts: {new_dict!r} {d!r}"
+    217 |+                 )
+218 218 | 
+219 219 | raise ValueError(
+220 220 |     "Conflicting configuration dicts: {!r} {!r}"
 
 UP032_0.py:220:5: UP032 [*] Use f-string instead of `format` call
     |
@@ -1136,10 +1136,9 @@ UP032_0.py:220:5: UP032 [*] Use f-string instead of `format` call
 220     |-    "Conflicting configuration dicts: {!r} {!r}"
 221     |-    "".format(new_dict, d)
     220 |+    f"Conflicting configuration dicts: {new_dict!r} {d!r}"
-    221 |+    ""
-222 222 | )
-223 223 | 
-224 224 | raise ValueError(
+222 221 | )
+223 222 | 
+224 223 | raise ValueError(
 
 UP032_0.py:225:5: UP032 [*] Use f-string instead of `format` call
     |
@@ -1160,10 +1159,9 @@ UP032_0.py:225:5: UP032 [*] Use f-string instead of `format` call
 225     |-    "Conflicting configuration dicts: {!r} {!r}"
 226     |-    "".format(new_dict, d)
     225 |+    f"Conflicting configuration dicts: {new_dict!r} {d!r}"
-    226 |+    ""
-227 227 | 
-228 228 | )
-229 229 | 
+227 226 | 
+228 227 | )
+229 228 | 
 
 UP032_0.py:231:1: UP032 [*] Use f-string instead of `format` call
     |
