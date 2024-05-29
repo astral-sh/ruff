@@ -1,3 +1,8 @@
+use std::borrow::Cow;
+
+use globset::Candidate;
+use rustc_hash::FxHashMap;
+
 use ruff_linter::{
     linter::{FixerResult, LinterResult},
     packaging::detect_package_root,
@@ -5,8 +10,8 @@ use ruff_linter::{
 };
 use ruff_notebook::SourceValue;
 use ruff_source_file::LineIndex;
-use rustc_hash::FxHashMap;
-use std::borrow::Cow;
+use ruff_workspace::resolver::match_candidate_exclusion;
+use ruff_workspace::FileResolverSettings;
 
 use crate::{
     edit::{Replacement, ToRangeExt},
@@ -20,11 +25,38 @@ pub(crate) type Fixes = FxHashMap<lsp_types::Url, Vec<lsp_types::TextEdit>>;
 
 pub(crate) fn fix_all(
     query: &DocumentQuery,
+    file_resolver_settings: &FileResolverSettings,
     linter_settings: &LinterSettings,
     encoding: PositionEncoding,
 ) -> crate::Result<Fixes> {
     let document_path = query.file_path();
     let source_kind = query.make_source_kind();
+
+    // If the document is excluded, return an empty list of diagnostics.
+    for path in document_path.ancestors() {
+        if let Some(basename) = path.file_name() {
+            let path = Candidate::new(&path);
+            let basename = Candidate::new(basename);
+            if match_candidate_exclusion(&path, &basename, &file_resolver_settings.exclude) {
+                tracing::debug!("Ignored path via `exclude`: {}", document_path.display());
+                return Ok(Fixes::default());
+            }
+            if match_candidate_exclusion(&path, &basename, &file_resolver_settings.extend_exclude) {
+                tracing::debug!(
+                    "Ignored path via `extend-exclude`: {}",
+                    document_path.display()
+                );
+                return Ok(Fixes::default());
+            }
+            if match_candidate_exclusion(&path, &basename, &linter_settings.exclude) {
+                tracing::debug!(
+                    "Ignored path via `lint.exclude`: {}",
+                    document_path.display()
+                );
+                return Ok(Fixes::default());
+            }
+        }
+    }
 
     let package = detect_package_root(
         document_path

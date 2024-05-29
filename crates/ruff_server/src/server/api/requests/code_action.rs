@@ -1,3 +1,8 @@
+use lsp_server::ErrorCode;
+use lsp_types::{self as types, request as req};
+use rustc_hash::FxHashSet;
+use types::{CodeActionKind, CodeActionOrCommand};
+
 use crate::edit::WorkspaceEditTracker;
 use crate::lint::{fixes_for_diagnostics, DiagnosticFix};
 use crate::server::api::LSPResult;
@@ -5,10 +10,6 @@ use crate::server::SupportedCodeAction;
 use crate::server::{client::Notifier, Result};
 use crate::session::DocumentSnapshot;
 use crate::DIAGNOSTIC_NAME;
-use lsp_server::ErrorCode;
-use lsp_types::{self as types, request as req};
-use rustc_hash::FxHashSet;
-use types::{CodeActionKind, CodeActionOrCommand};
 
 use super::code_action_resolve::{resolve_edit_for_fix_all, resolve_edit_for_organize_imports};
 
@@ -156,6 +157,7 @@ fn fix_all(snapshot: &DocumentSnapshot) -> crate::Result<CodeActionOrCommand> {
             Some(resolve_edit_for_fix_all(
                 document,
                 snapshot.resolved_client_capabilities(),
+                snapshot.query().settings().file_resolver(),
                 snapshot.query().settings().linter(),
                 snapshot.encoding(),
             )?),
@@ -192,6 +194,7 @@ fn notebook_fix_all(snapshot: &DocumentSnapshot) -> crate::Result<CodeActionOrCo
             Some(resolve_edit_for_fix_all(
                 document,
                 snapshot.resolved_client_capabilities(),
+                snapshot.query().settings().file_resolver(),
                 snapshot.query().settings().linter(),
                 snapshot.encoding(),
             )?),
@@ -228,6 +231,7 @@ fn organize_imports(snapshot: &DocumentSnapshot) -> crate::Result<CodeActionOrCo
             Some(resolve_edit_for_organize_imports(
                 document,
                 snapshot.resolved_client_capabilities(),
+                snapshot.query().settings().file_resolver(),
                 snapshot.query().settings().linter(),
                 snapshot.encoding(),
             )?),
@@ -264,6 +268,7 @@ fn notebook_organize_imports(snapshot: &DocumentSnapshot) -> crate::Result<CodeA
             Some(resolve_edit_for_organize_imports(
                 document,
                 snapshot.resolved_client_capabilities(),
+                snapshot.query().settings().file_resolver(),
                 snapshot.query().settings().linter(),
                 snapshot.encoding(),
             )?),

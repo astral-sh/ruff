@@ -10,6 +10,7 @@ pub(super) fn generate_diagnostics(snapshot: &DocumentSnapshot) -> Diagnostics {
     if snapshot.client_settings().lint() {
         crate::lint::check(
             snapshot.query(),
+            snapshot.query().settings().file_resolver(),
             snapshot.query().settings().linter(),
             snapshot.encoding(),
         )

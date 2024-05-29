@@ -479,7 +479,7 @@ impl DocumentQuery {
     }
 
     /// Get the underlying file path for the document selected by this query.
-    pub(crate) fn file_path(&self) -> &PathBuf {
+    pub(crate) fn file_path(&self) -> &Path {
         match self {
             Self::Text { file_path, .. } | Self::Notebook { file_path, .. } => file_path,
         }
