@@ -23,6 +23,8 @@ mod tests {
     #[test_case(Rule::BadExitAnnotation, Path::new("PYI036.pyi"))]
     #[test_case(Rule::BadVersionInfoComparison, Path::new("PYI006.py"))]
     #[test_case(Rule::BadVersionInfoComparison, Path::new("PYI006.pyi"))]
+    #[test_case(Rule::BadVersionInfoOrder, Path::new("PYI066.py"))]
+    #[test_case(Rule::BadVersionInfoOrder, Path::new("PYI066.pyi"))]
     #[test_case(Rule::CollectionsNamedTuple, Path::new("PYI024.py"))]
     #[test_case(Rule::CollectionsNamedTuple, Path::new("PYI024.pyi"))]
     #[test_case(Rule::ComplexAssignmentInStub, Path::new("PYI017.py"))]
