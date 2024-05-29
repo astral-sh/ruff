@@ -17,7 +17,7 @@ use ruff_python_ast::{Mod, PySourceType};
 use ruff_python_codegen::Stylist;
 use ruff_python_formatter::{format_module_ast, pretty_comments, PyFormatContext, QuoteStyle};
 use ruff_python_index::Indexer;
-use ruff_python_parser::{parse, AsMode, Mode, Program};
+use ruff_python_parser::{parse, parse_unchecked, parse_unchecked_source, AsMode, Mode, Program};
 use ruff_python_trivia::CommentRanges;
 use ruff_source_file::{Locator, SourceLocation};
 use ruff_text_size::Ranged;
@@ -161,17 +161,16 @@ impl Workspace {
         let source_kind = SourceKind::Python(contents.to_string());
 
         // Parse once.
-        let program =
-            ruff_python_parser::parse_unchecked_source(source_kind.source_code(), source_type);
+        let program = parse_unchecked_source(source_kind.source_code(), source_type);
 
         // Map row and column locations to byte slices (lazily).
         let locator = Locator::new(contents);
 
         // Detect the current code style (lazily).
-        let stylist = Stylist::from_tokens(&program, &locator);
+        let stylist = Stylist::from_tokens(program.tokens(), &locator);
 
         // Extra indices from the code.
-        let indexer = Indexer::from_tokens(&program, &locator);
+        let indexer = Indexer::from_tokens(program.tokens(), &locator);
 
         // Extract the `# noqa` and `# isort: skip` directives from the source.
         let directives = directives::extract_directives(
@@ -257,9 +256,9 @@ impl Workspace {
 
     /// Parses the content and returns its AST
     pub fn parse(&self, contents: &str) -> Result<String, Error> {
-        let program = Program::parse(contents, Mode::Module);
+        let program = parse_unchecked(contents, Mode::Module);
 
-        Ok(format!("{:#?}", program.into_ast()))
+        Ok(format!("{:#?}", program.into_syntax()))
     }
 
     pub fn tokens(&self, contents: &str) -> Result<String, Error> {

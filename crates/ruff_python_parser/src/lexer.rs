@@ -1500,6 +1500,37 @@ impl Token {
     pub const fn is_trivia(self) -> bool {
         matches!(self.kind, TokenKind::Comment | TokenKind::NonLogicalNewline)
     }
+
+    /// Returns `true` if this is any kind of string token.
+    const fn is_any_string(self) -> bool {
+        matches!(
+            self.kind,
+            TokenKind::String
+                | TokenKind::FStringStart
+                | TokenKind::FStringMiddle
+                | TokenKind::FStringEnd
+        )
+    }
+
+    /// Returns `true` if the current token is a triple-quoted string of any kind.
+    ///
+    /// # Panics
+    ///
+    /// If it isn't a string or any f-string tokens.
+    pub fn is_triple_quoted_string(self) -> bool {
+        assert!(self.is_any_string());
+        self.flags.is_triple_quoted()
+    }
+
+    /// Returns the [`Quote`] style for the current string token of any kind.
+    ///
+    /// # Panics
+    ///
+    /// If it isn't a string or any f-string tokens.
+    pub fn string_quote_style(self) -> Quote {
+        assert!(self.is_any_string());
+        self.flags.quote_style()
+    }
 }
 
 impl Ranged for Token {
