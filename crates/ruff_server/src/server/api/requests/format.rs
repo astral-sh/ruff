@@ -35,6 +35,7 @@ impl super::BackgroundDocumentRequestHandler for Format {
 /// Formats either a full text document or each individual cell in a single notebook document.
 pub(super) fn format_full_document(snapshot: &DocumentSnapshot) -> Result<Fixes> {
     let mut fixes = Fixes::default();
+    let query = snapshot.query();
 
     if let Some(notebook) = snapshot.query().as_notebook() {
         for (url, text_document) in notebook
@@ -43,10 +44,10 @@ pub(super) fn format_full_document(snapshot: &DocumentSnapshot) -> Result<Fixes>
         {
             if let Some(changes) = format_text_document(
                 text_document,
-                snapshot.query().source_type(),
-                snapshot.query().file_path(),
-                snapshot.query().settings().file_resolver(),
-                snapshot.query().settings().formatter(),
+                query.source_type(),
+                query.file_path(),
+                query.settings().file_resolver(),
+                query.settings().formatter(),
                 snapshot.encoding(),
                 true,
             )? {
@@ -55,11 +56,11 @@ pub(super) fn format_full_document(snapshot: &DocumentSnapshot) -> Result<Fixes>
         }
     } else {
         if let Some(changes) = format_text_document(
-            snapshot.query().as_single_document().unwrap(),
-            snapshot.query().source_type(),
-            snapshot.query().file_path(),
-            snapshot.query().settings().file_resolver(),
-            snapshot.query().settings().formatter(),
+            query.as_single_document().unwrap(),
+            query.source_type(),
+            query.file_path(),
+            query.settings().file_resolver(),
+            query.settings().formatter(),
             snapshot.encoding(),
             false,
         )? {
@@ -77,14 +78,15 @@ pub(super) fn format_document(snapshot: &DocumentSnapshot) -> Result<super::Form
         .query()
         .as_single_document()
         .expect("format should only be called on text documents or notebook cells");
+    let query = snapshot.query();
     format_text_document(
         text_document,
-        snapshot.query().source_type(),
-        snapshot.query().file_path(),
-        snapshot.query().settings().file_resolver(),
-        snapshot.query().settings().formatter(),
+        query.source_type(),
+        query.file_path(),
+        query.settings().file_resolver(),
+        query.settings().formatter(),
         snapshot.encoding(),
-        snapshot.query().as_notebook().is_some(),
+        query.as_notebook().is_some(),
     )
 }
 

@@ -7,7 +7,7 @@ use ruff_linter::{
     linter::{check_path, LinterResult, TokenSource},
     packaging::detect_package_root,
     registry::AsRule,
-    settings::{flags, LinterSettings},
+    settings::flags,
     source_kind::SourceKind,
 };
 use ruff_notebook::Notebook;
@@ -17,7 +17,6 @@ use ruff_python_parser::AsMode;
 use ruff_source_file::{LineIndex, Locator};
 use ruff_text_size::{Ranged, TextRange};
 use ruff_workspace::resolver::match_any_exclusion;
-use ruff_workspace::FileResolverSettings;
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 
@@ -60,14 +59,11 @@ pub(crate) struct DiagnosticFix {
 /// A series of diagnostics across a single text document or an arbitrary number of notebook cells.
 pub(crate) type Diagnostics = FxHashMap<lsp_types::Url, Vec<lsp_types::Diagnostic>>;
 
-pub(crate) fn check(
-    query: &DocumentQuery,
-    file_resolver_settings: &FileResolverSettings,
-    linter_settings: &LinterSettings,
-    encoding: PositionEncoding,
-) -> Diagnostics {
+pub(crate) fn check(query: &DocumentQuery, encoding: PositionEncoding) -> Diagnostics {
     let document_path = query.file_path();
     let source_kind = query.make_source_kind();
+    let file_resolver_settings = query.settings().file_resolver();
+    let linter_settings = query.settings().linter();
 
     // If the document is excluded, return an empty list of diagnostics.
     if let Some(exclusion) = match_any_exclusion(

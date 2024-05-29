@@ -4,8 +4,6 @@ use lsp_server::ErrorCode;
 use lsp_types::{self as types, request as req};
 
 use ruff_linter::codes::Rule;
-use ruff_linter::settings::LinterSettings;
-use ruff_workspace::FileResolverSettings;
 
 use crate::edit::WorkspaceEditTracker;
 use crate::fix::Fixes;
@@ -57,8 +55,6 @@ impl super::BackgroundDocumentRequestHandler for CodeActionResolve {
                 resolve_edit_for_fix_all(
                     query,
                     snapshot.resolved_client_capabilities(),
-                    query.settings().file_resolver(),
-                    query.settings().linter(),
                     snapshot.encoding(),
                 )
                 .with_failure_code(ErrorCode::InternalError)?,
@@ -68,8 +64,6 @@ impl super::BackgroundDocumentRequestHandler for CodeActionResolve {
                 resolve_edit_for_organize_imports(
                     query,
                     snapshot.resolved_client_capabilities(),
-                    query.settings().file_resolver(),
-                    query.settings().linter(),
                     snapshot.encoding(),
                 )
                 .with_failure_code(ErrorCode::InternalError)?,
@@ -89,49 +83,35 @@ impl super::BackgroundDocumentRequestHandler for CodeActionResolve {
 pub(super) fn resolve_edit_for_fix_all(
     query: &DocumentQuery,
     client_capabilities: &ResolvedClientCapabilities,
-    file_resolver_settings: &FileResolverSettings,
-    linter_settings: &LinterSettings,
     encoding: PositionEncoding,
 ) -> crate::Result<types::WorkspaceEdit> {
     let mut tracker = WorkspaceEditTracker::new(client_capabilities);
-    tracker.set_fixes_for_document(
-        fix_all_edit(query, file_resolver_settings, linter_settings, encoding)?,
-        query.version(),
-    )?;
+    tracker.set_fixes_for_document(fix_all_edit(query, encoding)?, query.version())?;
     Ok(tracker.into_workspace_edit())
 }
 
 pub(super) fn fix_all_edit(
     query: &DocumentQuery,
-    file_resolver_settings: &FileResolverSettings,
-    linter_settings: &LinterSettings,
     encoding: PositionEncoding,
 ) -> crate::Result<Fixes> {
-    crate::fix::fix_all(query, file_resolver_settings, linter_settings, encoding)
+    crate::fix::fix_all(query, query.settings().linter(), encoding)
 }
 
 pub(super) fn resolve_edit_for_organize_imports(
     query: &DocumentQuery,
     client_capabilities: &ResolvedClientCapabilities,
-    file_resolver_settings: &FileResolverSettings,
-    linter_settings: &LinterSettings,
     encoding: PositionEncoding,
 ) -> crate::Result<types::WorkspaceEdit> {
     let mut tracker = WorkspaceEditTracker::new(client_capabilities);
-    tracker.set_fixes_for_document(
-        organize_imports_edit(query, file_resolver_settings, linter_settings, encoding)?,
-        query.version(),
-    )?;
+    tracker.set_fixes_for_document(organize_imports_edit(query, encoding)?, query.version())?;
     Ok(tracker.into_workspace_edit())
 }
 
 pub(super) fn organize_imports_edit(
     query: &DocumentQuery,
-    file_resolver_settings: &FileResolverSettings,
-    linter_settings: &LinterSettings,
     encoding: PositionEncoding,
 ) -> crate::Result<Fixes> {
-    let mut linter_settings = linter_settings.clone();
+    let mut linter_settings = query.settings().linter().clone();
     linter_settings.rules = [
         Rule::UnsortedImports,       // I001
         Rule::MissingRequiredImport, // I002
@@ -139,5 +119,5 @@ pub(super) fn organize_imports_edit(
     .into_iter()
     .collect();
 
-    crate::fix::fix_all(query, file_resolver_settings, &linter_settings, encoding)
+    crate::fix::fix_all(query, &linter_settings, encoding)
 }

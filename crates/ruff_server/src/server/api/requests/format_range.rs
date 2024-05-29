@@ -38,13 +38,14 @@ fn format_document_range(
         .query()
         .as_single_document()
         .expect("format should only be called on text documents or notebook cells");
+    let query = snapshot.query();
     format_text_document_range(
         text_document,
         range,
-        snapshot.query().source_type(),
-        snapshot.query().file_path(),
-        snapshot.query().settings().file_resolver(),
-        snapshot.query().settings().formatter(),
+        query.source_type(),
+        query.file_path(),
+        query.settings().file_resolver(),
+        query.settings().formatter(),
         snapshot.encoding(),
     )
 }
