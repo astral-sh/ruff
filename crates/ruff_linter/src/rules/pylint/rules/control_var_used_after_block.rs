@@ -1,13 +1,14 @@
 use std::{fmt, iter};
 
 use regex::Regex;
+use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::{self as ast, Arguments, Expr, ExprContext, Stmt, WithItem};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::statement_visitor::{walk_stmt, StatementVisitor};
-use ruff_python_semantic::{Binding, Scope, SemanticModel};
+use ruff_python_semantic::{Binding, NodeId, Scope, SemanticModel};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -98,11 +99,17 @@ impl fmt::Display for BlockKind {
 }
 
 /// WPS441: Forbid control variables after the block body.
-pub(crate) fn control_var_used_after_block(checker: &Checker, scope: &Scope) {
-    println!("qwerqwere control_var_used_after_block");
+pub(crate) fn control_var_used_after_block(
+    checker: &Checker,
+    scope: &Scope,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    println!("Running control_var_used_after_block");
     // if scope.uses_locals() && scope.kind.is_function() {
     //     return;
     // }
+
+    println!("nodes {:#?}", checker.semantic().nodes());
 
     for (name, binding) in scope
         .bindings()
@@ -130,10 +137,71 @@ pub(crate) fn control_var_used_after_block(checker: &Checker, scope: &Scope) {
     //     None
     // })
     {
-        println!("asdf {:?} {:?}", name, binding);
-        println!("asdfasdf {:?}", binding.references);
+        println!("Binding {:?} {:?}", name, binding);
+        // Find for-loop variable bindings
+        let binding_statement = binding.statement(checker.semantic()).unwrap();
+        let binding_source_node_id = binding.source.unwrap();
+        // The node_id of the for-loop that contains the binding
+        // let binding_statement_id = checker
+        //     .semantic()
+        //     .parent_statement_id(binding_source_node_id)
+        //     .unwrap();
+        let binding_statement_id = checker.semantic().statement_id(binding_source_node_id);
+
+        println!("binding_statement={:?}", binding_statement);
+        println!("Binding references {:?}", binding.references);
+
+        // Loop over the references of those bindings to see if they're in the same block-scope
         for reference in binding.references() {
-            println!("asdfasdfasdf {:?}", checker.semantic().reference(reference));
+            let reference = checker.semantic().reference(reference);
+            let reference_node_id = reference.expression_id().unwrap();
+
+            // Traverse the hierarchy and look for a block match
+            let statement_hierarchy: Vec<NodeId> = checker
+                .semantic()
+                .parent_statement_ids(reference_node_id)
+                .collect();
+
+            println!(
+                "\t\x1b[32mreference\x1b[0m {:?} <- {:?}",
+                reference, statement_hierarchy
+            );
+
+            let mut found_match = false;
+            for ancestor_node_id in statement_hierarchy {
+                let ancestor_statement = checker.semantic().statement(ancestor_node_id);
+                println!("\t\tancestor_statement={:?}", ancestor_statement);
+                println!(
+                    "\t\tbinding_source_node_id={:?} binding_statement_id={:?} ancestor_node_id={:?}",
+                    binding_source_node_id, binding_statement_id, ancestor_node_id
+                );
+                if (binding_statement_id == ancestor_node_id) {
+                    println!("\t\to");
+                    found_match = true;
+                    break;
+                } else {
+                    println!("\t\tx");
+                }
+            }
+
+            if (!found_match) {
+                println!("\t\temits error={:?}", reference_node_id);
+                let block_kind = match binding_statement {
+                    Stmt::For(_) => BlockKind::For,
+                    Stmt::With(_) => BlockKind::With,
+                    _ => {
+                        panic!("unexpected block item")
+                    }
+                };
+
+                diagnostics.push(Diagnostic::new(
+                    ControlVarUsedAfterBlock {
+                        control_var_name: name.to_owned(),
+                        block_kind: block_kind,
+                    },
+                    reference.range(),
+                ))
+            }
 
             // TODO: Look if the reference is under the same block as the binding
             // (see `too_many_nested_blocks` for an example of how to work with blocks)

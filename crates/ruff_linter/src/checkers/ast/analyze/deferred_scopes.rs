@@ -87,6 +87,12 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
     for scope_id in checker.analyze.scopes.iter().rev().copied() {
         let scope = &checker.semantic.scopes[scope_id];
 
+        // TODO: Put in the right place
+        // TODO: How to make this run with the global scope outside of a function?
+        if checker.enabled(Rule::ControlVarUsedAfterBlock) {
+            pylint::rules::control_var_used_after_block(checker, scope, &mut diagnostics);
+        }
+
         if checker.enabled(Rule::UndefinedLocal) {
             pyflakes::rules::undefined_local(checker, scope_id, scope, &mut diagnostics);
         }
@@ -345,11 +351,6 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
         if matches!(scope.kind, ScopeKind::Function(_) | ScopeKind::Lambda(_)) {
             if checker.enabled(Rule::UnusedVariable) {
                 pyflakes::rules::unused_variable(checker, scope, &mut diagnostics);
-            }
-            // TODO: Put in the right place
-            // TODO: How to make this run with the global scope outside of a function?
-            if checker.enabled(Rule::ControlVarUsedAfterBlock) {
-                pylint::rules::control_var_used_after_block(checker, scope);
             }
 
             if checker.enabled(Rule::UnusedAnnotation) {

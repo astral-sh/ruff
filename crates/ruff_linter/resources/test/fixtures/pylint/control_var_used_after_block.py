@@ -1,36 +1,49 @@
 import typing
 from typing import cast
 
+# TODO: Figure this out
+# for global_var in []:
+#     _ = global_var
+#     pass
+
+# _ = global_var
+
 def foo():
     # For control var used outside block
     for event in []:
+        _ = event
         pass
 
     _ = event
 
     # # Tuple destructuring
-    # for a, b, c in []:
-    #     pass
+    for a, b, c in []:
+        pass
 
-    # _ = a
-    # _ = b
-    # _ = c
+    _ = a
+    _ = b
+    _ = c
 
 
     # # Array destructuring
-    # for [d, e, f] in []:
-    #     pass
+    for [d, e, f] in []:
+        pass
 
-    # _ = d
-    # _ = e
-    # _ = f
+    _ = d
+    _ = e
+    _ = f
 
-    # # With -> for, variable reused
-    # with None as i:
-    #     for i in []:  # error
-    #         pass
+    with None as i:
+        pass
 
-    # # For -> with, variable reused
-    # for i in []:
-    #     with None as i:  # error
-    #         pass
+    _ = i
+
+    with None as i:
+        for n in []:
+            pass
+
+        _ = n
+
+    _ = n
+
+
