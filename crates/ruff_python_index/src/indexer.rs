@@ -1,8 +1,8 @@
 //! Struct used to index source code, to enable efficient lookup of tokens that
 //! are omitted from the AST (e.g., commented lines).
 
-use ruff_python_ast::{ModModule, Stmt};
-use ruff_python_parser::{Program, TokenKind};
+use ruff_python_ast::Stmt;
+use ruff_python_parser::{TokenKind, Tokens};
 use ruff_python_trivia::{has_leading_content, has_trailing_content, is_python_whitespace};
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -22,7 +22,7 @@ pub struct Indexer {
 }
 
 impl Indexer {
-    pub fn from_program(program: &Program<ModModule>, locator: &Locator<'_>) -> Self {
+    pub fn from_tokens(tokens: &Tokens, locator: &Locator<'_>) -> Self {
         assert!(TextSize::try_from(locator.contents().len()).is_ok());
 
         let mut fstring_ranges_builder = FStringRangesBuilder::default();
@@ -32,7 +32,7 @@ impl Indexer {
         let mut prev_end = TextSize::default();
         let mut line_start = TextSize::default();
 
-        for token in program.tokens().up_to_first_unknown() {
+        for token in tokens.up_to_first_unknown() {
             let trivia = locator.slice(TextRange::new(prev_end, token.start()));
 
             // Get the trivia between the previous and the current token and detect any newlines.
@@ -220,7 +220,7 @@ mod tests {
     fn new_indexer(contents: &str) -> Indexer {
         let program = parse_module(contents).unwrap();
         let locator = Locator::new(contents);
-        Indexer::from_program(&program, &locator)
+        Indexer::from_tokens(program.tokens(), &locator)
     }
 
     #[test]

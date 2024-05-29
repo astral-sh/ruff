@@ -640,8 +640,8 @@ mod tests {
         let program =
             ruff_python_parser::parse_unchecked_source(source_kind.source_code(), source_type);
         let locator = Locator::new(&contents);
-        let stylist = Stylist::from_program(&program, &locator);
-        let indexer = Indexer::from_program(&program, &locator);
+        let stylist = Stylist::from_tokens(program.tokens(), &locator);
+        let indexer = Indexer::from_tokens(program.tokens(), &locator);
         let directives = directives::extract_directives(
             &program,
             directives::Flags::from_settings(&settings),

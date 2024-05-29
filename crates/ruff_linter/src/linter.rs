@@ -377,10 +377,10 @@ pub fn add_noqa_to_path(
     let locator = Locator::new(source_kind.source_code());
 
     // Detect the current code style (lazily).
-    let stylist = Stylist::from_program(&program, &locator);
+    let stylist = Stylist::from_tokens(program.tokens(), &locator);
 
     // Extra indices from the code.
-    let indexer = Indexer::from_program(&program, &locator);
+    let indexer = Indexer::from_tokens(program.tokens(), &locator);
 
     // Extract the `# noqa` and `# isort: skip` directives from the source.
     let directives = directives::extract_directives(
@@ -451,10 +451,10 @@ pub fn lint_only(
     let locator = Locator::new(source_kind.source_code());
 
     // Detect the current code style (lazily).
-    let stylist = Stylist::from_program(&program, &locator);
+    let stylist = Stylist::from_tokens(program.tokens(), &locator);
 
     // Extra indices from the code.
-    let indexer = Indexer::from_program(&program, &locator);
+    let indexer = Indexer::from_tokens(program.tokens(), &locator);
 
     // Extract the `# noqa` and `# isort: skip` directives from the source.
     let directives = directives::extract_directives(
@@ -542,10 +542,10 @@ pub fn lint_fix<'a>(
         let locator = Locator::new(transformed.source_code());
 
         // Detect the current code style (lazily).
-        let stylist = Stylist::from_program(&program, &locator);
+        let stylist = Stylist::from_tokens(program.tokens(), &locator);
 
         // Extra indices from the code.
-        let indexer = Indexer::from_program(&program, &locator);
+        let indexer = Indexer::from_tokens(program.tokens(), &locator);
 
         // Extract the `# noqa` and `# isort: skip` directives from the source.
         let directives = directives::extract_directives(

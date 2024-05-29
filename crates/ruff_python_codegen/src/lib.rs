@@ -10,7 +10,7 @@ pub use stylist::Stylist;
 pub fn round_trip(code: &str) -> Result<String, ParseError> {
     let locator = Locator::new(code);
     let program = parse_module(code)?;
-    let stylist = Stylist::from_program(&program, &locator);
+    let stylist = Stylist::from_tokens(program.tokens(), &locator);
     let mut generator: Generator = (&stylist).into();
     generator.unparse_suite(program.suite());
     Ok(generator.generate())
