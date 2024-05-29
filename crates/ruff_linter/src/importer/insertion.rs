@@ -328,11 +328,14 @@ mod tests {
     #[test]
     fn start_of_file() -> Result<()> {
         fn insert(contents: &str) -> Result<Insertion> {
-            let suite = parse_module(contents)?.into_suite();
-            let tokens = ruff_python_parser::tokenize(contents, Mode::Module);
+            let program = parse_module(contents)?;
             let locator = Locator::new(contents);
-            let stylist = Stylist::from_tokens(&tokens, &locator);
-            Ok(Insertion::start_of_file(&suite, &locator, &stylist))
+            let stylist = Stylist::from_tokens(program.tokens(), &locator);
+            Ok(Insertion::start_of_file(
+                program.suite(),
+                &locator,
+                &stylist,
+            ))
         }
 
         let contents = "";
@@ -440,9 +443,9 @@ x = 1
     #[test]
     fn start_of_block() {
         fn insert(contents: &str, offset: TextSize) -> Insertion {
-            let program = ruff_python_parser::parse_module(contents).unwrap();
+            let program = parse_module(contents).unwrap();
             let locator = Locator::new(contents);
-            let stylist = Stylist::from_tokens(&program, &locator);
+            let stylist = Stylist::from_tokens(program.tokens(), &locator);
             Insertion::start_of_block(offset, &locator, &stylist, program.tokens())
         }
 
