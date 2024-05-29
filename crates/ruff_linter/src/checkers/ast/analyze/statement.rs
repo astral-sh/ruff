@@ -1027,6 +1027,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     checker.diagnostics.push(diagnostic);
                 }
             }
+            if checker.enabled(Rule::ByteStringUsage) {
+                flake8_pyi::rules::bytestring_import(checker, import_from);
+            }
         }
         Stmt::Raise(raise @ ast::StmtRaise { exc, .. }) => {
             if checker.enabled(Rule::RaiseNotImplemented) {
