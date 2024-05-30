@@ -1,7 +1,7 @@
-use ruff_python_ast::{Alias, StmtImportFrom};
-use ruff_python_parser::{lexer, Mode, Tok, TokenKind, Tokens};
+use ruff_python_ast::StmtImportFrom;
+use ruff_python_parser::{TokenKind, Tokens};
 use ruff_source_file::Locator;
-use ruff_text_size::{Ranged, TextRange, TextSize};
+use ruff_text_size::{Ranged, TextRange};
 
 /// Remove any imports matching `members` from an import-from statement.
 pub(crate) fn remove_import_members(
@@ -25,7 +25,7 @@ pub(crate) fn remove_import_members(
 
     // Reconstruct the source code by skipping any names that are in `members`.
     let mut output = String::with_capacity(import_from_stmt.range().len().to_usize());
-    let mut last_pos = TextSize::default();
+    let mut last_pos = import_from_stmt.start();
     let mut is_first = true;
 
     for (index, member) in import_from_stmt.names.iter().enumerate() {
@@ -58,7 +58,7 @@ pub(crate) fn remove_import_members(
     }
 
     // Add the remaining content.
-    let slice = locator.after(last_pos);
+    let slice = locator.slice(TextRange::new(last_pos, import_from_stmt.end()));
     output.push_str(slice);
     output
 }

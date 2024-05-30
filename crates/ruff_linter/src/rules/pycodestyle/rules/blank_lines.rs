@@ -2,7 +2,6 @@ use itertools::Itertools;
 use ruff_notebook::CellOffsets;
 use ruff_python_parser::Token;
 use ruff_python_parser::Tokens;
-use ruff_text_size::Ranged;
 use std::cmp::Ordering;
 use std::iter::Peekable;
 use std::num::NonZeroU32;
@@ -436,55 +435,59 @@ impl<'a> Iterator for LinePreprocessor<'a> {
                 continue;
             }
 
-            let (logical_line_kind, first_token_range) = if let Some(first_token_range) =
-                first_logical_line_token
-            {
-                first_token_range
-            }
-            // At the start of the line...
-            else {
-                // Check if we are at the beginning of a cell in a notebook.
-                if let Some(ref mut cell_offsets) = self.cell_offsets {
-                    if cell_offsets
-                        .peek()
-                        .is_some_and(|offset| offset == &&self.line_start)
-                    {
-                        self.is_beginning_of_cell = true;
-                        cell_offsets.next();
-                        blank_lines = BlankLines::Zero;
-                        self.max_preceding_blank_lines = BlankLines::Zero;
-                    }
+            let (logical_line_kind, first_token_range) =
+                if let Some(first_token_range) = first_logical_line_token {
+                    first_token_range
                 }
-
-                // An empty line
-                if kind == TokenKind::NonLogicalNewline {
-                    blank_lines.add(range);
-
-                    self.line_start = range.end();
-
-                    continue;
-                }
-
-                is_docstring = kind == TokenKind::String;
-
-                let logical_line_kind = match kind {
-                    TokenKind::Class => LogicalLineKind::Class,
-                    TokenKind::Comment => LogicalLineKind::Comment,
-                    TokenKind::At => LogicalLineKind::Decorator,
-                    TokenKind::Def => LogicalLineKind::Function,
-                    // Lookahead to distinguish `async def` from `async with`.
-                    TokenKind::Async if matches!(self.tokens.peek(), Some((TokenKind::Def, _))) => {
-                        LogicalLineKind::Function
+                // At the start of the line...
+                else {
+                    // Check if we are at the beginning of a cell in a notebook.
+                    if let Some(ref mut cell_offsets) = self.cell_offsets {
+                        if cell_offsets
+                            .peek()
+                            .is_some_and(|offset| offset == &&self.line_start)
+                        {
+                            self.is_beginning_of_cell = true;
+                            cell_offsets.next();
+                            blank_lines = BlankLines::Zero;
+                            self.max_preceding_blank_lines = BlankLines::Zero;
+                        }
                     }
-                    TokenKind::Import => LogicalLineKind::Import,
-                    TokenKind::From => LogicalLineKind::FromImport,
-                    _ => LogicalLineKind::Other,
+
+                    // An empty line
+                    if kind == TokenKind::NonLogicalNewline {
+                        blank_lines.add(range);
+
+                        self.line_start = range.end();
+
+                        continue;
+                    }
+
+                    is_docstring = kind == TokenKind::String;
+
+                    let logical_line_kind = match kind {
+                        TokenKind::Class => LogicalLineKind::Class,
+                        TokenKind::Comment => LogicalLineKind::Comment,
+                        TokenKind::At => LogicalLineKind::Decorator,
+                        TokenKind::Def => LogicalLineKind::Function,
+                        // Lookahead to distinguish `async def` from `async with`.
+                        TokenKind::Async
+                            if self
+                                .tokens
+                                .peek()
+                                .is_some_and(|token| token.kind() == TokenKind::Def) =>
+                        {
+                            LogicalLineKind::Function
+                        }
+                        TokenKind::Import => LogicalLineKind::Import,
+                        TokenKind::From => LogicalLineKind::FromImport,
+                        _ => LogicalLineKind::Other,
+                    };
+
+                    first_logical_line_token = Some((logical_line_kind, range));
+
+                    (logical_line_kind, range)
                 };
-
-                first_logical_line_token = Some((logical_line_kind, range));
-
-                (logical_line_kind, range)
-            };
 
             if !kind.is_trivia() {
                 line_is_comment_only = false;
@@ -543,7 +546,7 @@ impl<'a> Iterator for LinePreprocessor<'a> {
             }
 
             if !kind.is_trivia() {
-                last_token = token;
+                last_token = kind;
             }
         }
 

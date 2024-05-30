@@ -139,12 +139,16 @@ impl<'src> TokenSource<'src> {
 
     /// Consumes the token source, returning the collected tokens and any errors encountered during
     /// lexing. The token collection includes both the trivia and non-trivia tokens.
-    pub(crate) fn finish(self) -> (Vec<Token>, CommentRanges, Vec<LexicalError>) {
+    pub(crate) fn finish(mut self) -> (Vec<Token>, CommentRanges, Vec<LexicalError>) {
         assert_eq!(
             self.current_kind(),
             TokenKind::EndOfFile,
             "TokenSource was not fully consumed"
         );
+
+        if let Some(last) = self.tokens.pop() {
+            assert_eq!(last.kind(), TokenKind::EndOfFile);
+        }
 
         let comment_ranges = CommentRanges::new(self.comments);
         (self.tokens, comment_ranges, self.lexer.finish())
