@@ -8,119 +8,63 @@ expression: lex_source(source)
     (
         String {
             value: "double",
-            flags: AnyStringFlags {
-                prefix: Regular(
-                    Empty,
-                ),
-                triple_quoted: false,
-                quote_style: Double,
-            },
         },
         0..8,
+        TokenFlags(
+            DOUBLE_QUOTES,
+        ),
     ),
     (
         String {
             value: "single",
-            flags: AnyStringFlags {
-                prefix: Regular(
-                    Empty,
-                ),
-                triple_quoted: false,
-                quote_style: Single,
-            },
         },
         9..17,
     ),
     (
         String {
             value: "can\\'t",
-            flags: AnyStringFlags {
-                prefix: Regular(
-                    Empty,
-                ),
-                triple_quoted: false,
-                quote_style: Single,
-            },
         },
         18..26,
     ),
     (
         String {
             value: "\\\\\\\"",
-            flags: AnyStringFlags {
-                prefix: Regular(
-                    Empty,
-                ),
-                triple_quoted: false,
-                quote_style: Double,
-            },
         },
         27..33,
+        TokenFlags(
+            DOUBLE_QUOTES,
+        ),
     ),
     (
         String {
             value: "\\t\\r\\n",
-            flags: AnyStringFlags {
-                prefix: Regular(
-                    Empty,
-                ),
-                triple_quoted: false,
-                quote_style: Single,
-            },
         },
         34..42,
     ),
     (
         String {
             value: "\\g",
-            flags: AnyStringFlags {
-                prefix: Regular(
-                    Empty,
-                ),
-                triple_quoted: false,
-                quote_style: Single,
-            },
         },
         43..47,
     ),
     (
         String {
             value: "raw\\'",
-            flags: AnyStringFlags {
-                prefix: Regular(
-                    Raw {
-                        uppercase: false,
-                    },
-                ),
-                triple_quoted: false,
-                quote_style: Single,
-            },
         },
         48..56,
+        TokenFlags(
+            RAW_STRING_LOWERCASE,
+        ),
     ),
     (
         String {
             value: "\\420",
-            flags: AnyStringFlags {
-                prefix: Regular(
-                    Empty,
-                ),
-                triple_quoted: false,
-                quote_style: Single,
-            },
         },
         57..63,
     ),
     (
         String {
             value: "\\200\\0a",
-            flags: AnyStringFlags {
-                prefix: Regular(
-                    Empty,
-                ),
-                triple_quoted: false,
-                quote_style: Single,
-            },
         },
         64..73,
     ),

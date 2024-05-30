@@ -6,16 +6,11 @@ expression: lex_source(source)
 ```
 [
     (
-        FStringStart(
-            AnyStringFlags {
-                prefix: Format(
-                    Regular,
-                ),
-                triple_quoted: false,
-                quote_style: Double,
-            },
-        ),
+        FStringStart,
         0..2,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING,
+        ),
     ),
     (
         Lbrace,
@@ -44,15 +39,11 @@ expression: lex_source(source)
     (
         FStringMiddle {
             value: " ",
-            flags: AnyStringFlags {
-                prefix: Format(
-                    Regular,
-                ),
-                triple_quoted: false,
-                quote_style: Double,
-            },
         },
         7..8,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING,
+        ),
     ),
     (
         Lbrace,
@@ -85,15 +76,11 @@ expression: lex_source(source)
     (
         FStringMiddle {
             value: " ",
-            flags: AnyStringFlags {
-                prefix: Format(
-                    Regular,
-                ),
-                triple_quoted: false,
-                quote_style: Double,
-            },
         },
         14..15,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING,
+        ),
     ),
     (
         Lbrace,
@@ -112,15 +99,11 @@ expression: lex_source(source)
     (
         FStringMiddle {
             value: ".3f!r",
-            flags: AnyStringFlags {
-                prefix: Format(
-                    Regular,
-                ),
-                triple_quoted: false,
-                quote_style: Double,
-            },
         },
         18..23,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING,
+        ),
     ),
     (
         Rbrace,
@@ -129,19 +112,18 @@ expression: lex_source(source)
     (
         FStringMiddle {
             value: " {x!r}",
-            flags: AnyStringFlags {
-                prefix: Format(
-                    Regular,
-                ),
-                triple_quoted: false,
-                quote_style: Double,
-            },
         },
         24..32,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING,
+        ),
     ),
     (
         FStringEnd,
         32..33,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING,
+        ),
     ),
     (
         Newline,
