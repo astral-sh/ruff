@@ -341,6 +341,7 @@ mod tests {
     #[test_case(Path::new("split.py"))]
     #[test_case(Path::new("star_before_others.py"))]
     #[test_case(Path::new("trailing_suffix.py"))]
+    #[test_case(Path::new("two_space.py"))]
     #[test_case(Path::new("type_comments.py"))]
     #[test_case(Path::new("unicode.py"))]
     fn default(path: &Path) -> Result<()> {
