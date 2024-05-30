@@ -98,7 +98,7 @@ fn detect_indention(tokens: &[Token], locator: &Locator) -> Indentation {
         // )
         // ```
         let mut depth = 0usize;
-        for (token, range) in tokens.iter().flatten() {
+        for token in tokens {
             match token.kind() {
                 TokenKind::Lpar | TokenKind::Lbrace | TokenKind::Lsqb => {
                     depth = depth.saturating_add(1);
@@ -107,7 +107,7 @@ fn detect_indention(tokens: &[Token], locator: &Locator) -> Indentation {
                     depth = depth.saturating_sub(1);
                 }
                 TokenKind::NonLogicalNewline => {
-                    let line = locator.line(range.end());
+                    let line = locator.line(token.end());
                     let indent_index = line.chars().position(|c| !c.is_whitespace());
                     if let Some(indent_index) = indent_index {
                         if indent_index > 0 {
@@ -212,7 +212,7 @@ x = (
         let locator = Locator::new(contents);
         let program = parse_module(contents).unwrap();
         let stylist = Stylist::from_tokens(program.tokens(), &locator);
-        assert_eq!(stylist.indentation(), &Indentation::default());
+        assert_eq!(stylist.indentation(), &Indentation("  ".to_string()));
 
         // formfeed indent, see `detect_indention` comment.
         let contents = r"

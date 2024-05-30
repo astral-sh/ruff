@@ -4,9 +4,8 @@ use std::iter::Peekable;
 use std::str::FromStr;
 
 use bitflags::bitflags;
-use ruff_python_ast::{ModModule, StringFlags};
-use ruff_python_parser::lexer::LexResult;
-use ruff_python_parser::{Program, Tok, TokenKind, Tokens};
+use ruff_python_ast::ModModule;
+use ruff_python_parser::{Program, TokenKind, Tokens};
 use ruff_python_trivia::CommentRanges;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
@@ -60,7 +59,7 @@ pub fn extract_directives(
 ) -> Directives {
     Directives {
         noqa_line_for: if flags.intersects(Flags::NOQA) {
-            extract_noqa_line_for(lxr, locator, indexer)
+            extract_noqa_line_for(program.tokens(), locator, indexer)
         } else {
             NoqaMapping::default()
         },
@@ -380,8 +379,7 @@ impl TodoDirectiveKind {
 
 #[cfg(test)]
 mod tests {
-    use ruff_python_parser::lexer::LexResult;
-    use ruff_python_parser::{lexer, parse_module, Mode};
+    use ruff_python_parser::parse_module;
     use ruff_text_size::{TextLen, TextRange, TextSize};
 
     use ruff_python_index::Indexer;

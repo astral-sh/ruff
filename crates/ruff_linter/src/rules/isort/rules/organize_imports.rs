@@ -8,7 +8,7 @@ use ruff_python_ast::whitespace::trailing_lines_end;
 use ruff_python_ast::{ModModule, PySourceType, Stmt};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
-use ruff_python_parser::{Program, Tokens};
+use ruff_python_parser::Program;
 use ruff_python_trivia::{leading_indentation, textwrap::indent, PythonWhitespace};
 use ruff_source_file::{Locator, UniversalNewlines};
 use ruff_text_size::{Ranged, TextRange};
@@ -79,7 +79,7 @@ fn matches_ignoring_indentation(val1: &str, val2: &str) -> bool {
         })
 }
 
-#[allow(clippy::cast_sign_loss)]
+#[allow(clippy::cast_sign_loss, clippy::too_many_arguments)]
 /// I001
 pub(crate) fn organize_imports(
     block: &Block,

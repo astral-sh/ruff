@@ -119,7 +119,7 @@ fn match_encoding_arg(arguments: &Arguments) -> Option<EncodingArg> {
 /// Return a [`Fix`] replacing the call to encode with a byte string.
 fn replace_with_bytes_literal(locator: &Locator, call: &ast::ExprCall, tokens: &Tokens) -> Fix {
     // Build up a replacement string by prefixing all string tokens with `b`.
-    let mut replacement = String::with_capacity(call.range() + 1);
+    let mut replacement = String::with_capacity(call.range().len().to_usize() + 1);
     let mut prev = call.start();
     for token in tokens.tokens_in_range(call.range()) {
         match token.kind() {

@@ -81,18 +81,21 @@ pub fn check_path(
     noqa: flags::Noqa,
     source_kind: &SourceKind,
     source_type: PySourceType,
-    program: Program<ModModule>,
+    program: &Program<ModModule>,
 ) -> LinterResult<Vec<Diagnostic>> {
     // Aggregate all diagnostics.
     let mut diagnostics = vec![];
     let mut error = None;
+
+    let tokens = program.tokens();
+    let comment_ranges = program.comment_ranges();
 
     // Collect doc lines. This requires a rare mix of tokens (for comments) and AST
     // (for docstrings), which demands special-casing at this level.
     let use_doc_lines = settings.rules.enabled(Rule::DocLineTooLong);
     let mut doc_lines = vec![];
     if use_doc_lines {
-        doc_lines.extend(doc_lines_from_tokens(program.tokens()));
+        doc_lines.extend(doc_lines_from_tokens(tokens));
     }
 
     // Run the token-based rules.
@@ -102,7 +105,7 @@ pub fn check_path(
         .any(|rule_code| rule_code.lint_source().is_tokens())
     {
         diagnostics.extend(check_tokens(
-            &program,
+            program,
             path,
             locator,
             indexer,
@@ -123,7 +126,7 @@ pub fn check_path(
             path,
             package,
             locator,
-            program.comment_ranges(),
+            comment_ranges,
             settings,
         ));
     }
@@ -135,7 +138,7 @@ pub fn check_path(
         .any(|rule_code| rule_code.lint_source().is_logical_lines())
     {
         diagnostics.extend(crate::checkers::logical_lines::check_logical_lines(
-            &program, locator, indexer, stylist, settings,
+            tokens, locator, indexer, stylist, settings,
         ));
     }
 
@@ -150,13 +153,13 @@ pub fn check_path(
             .iter_enabled()
             .any(|rule_code| rule_code.lint_source().is_imports());
     if use_ast || use_imports || use_doc_lines {
-        match program.into_result() {
+        match program.as_result() {
             Ok(program) => {
                 let cell_offsets = source_kind.as_ipy_notebook().map(Notebook::cell_offsets);
                 let notebook_index = source_kind.as_ipy_notebook().map(Notebook::index);
                 if use_ast {
                     diagnostics.extend(check_ast(
-                        &program,
+                        program,
                         locator,
                         stylist,
                         indexer,
@@ -172,7 +175,7 @@ pub fn check_path(
                 }
                 if use_imports {
                     let import_diagnostics = check_imports(
-                        &program,
+                        program,
                         locator,
                         indexer,
                         &directives.isort,
@@ -195,8 +198,9 @@ pub fn check_path(
                 // if it's disabled via any of the usual mechanisms (e.g., `noqa`,
                 // `per-file-ignores`), and the easiest way to detect that suppression is
                 // to see if the diagnostic persists to the end of the function.
-                pycodestyle::rules::syntax_error(&mut diagnostics, &parse_error, locator);
-                error = Some(parse_error);
+                pycodestyle::rules::syntax_error(&mut diagnostics, parse_error, locator);
+                // TODO(dhruvmanila): Remove this clone
+                error = Some(parse_error.clone());
             }
         }
     }
@@ -217,7 +221,7 @@ pub fn check_path(
             locator,
             stylist,
             indexer,
-            program.comment_ranges(),
+            comment_ranges,
             &doc_lines,
             settings,
         ));
@@ -226,8 +230,6 @@ pub fn check_path(
     // Raise violations for internal test rules
     #[cfg(any(feature = "test-rules", test))]
     {
-        let comment_ranges = program.comment_ranges();
-
         for test_rule in TEST_RULES {
             if !settings.rules.enabled(*test_rule) {
                 continue;
@@ -307,7 +309,7 @@ pub fn check_path(
             &mut diagnostics,
             path,
             locator,
-            program.comment_ranges(),
+            comment_ranges,
             &directives.noqa_line_for,
             error.is_none(),
             &per_file_ignores,
@@ -405,7 +407,7 @@ pub fn add_noqa_to_path(
         flags::Noqa::Disabled,
         source_kind,
         source_type,
-        program,
+        &program,
     );
 
     // Log any parse errors.
@@ -476,7 +478,7 @@ pub fn lint_only(
         noqa,
         source_kind,
         source_type,
-        program,
+        &program,
     );
 
     result.map(|diagnostics| diagnostics_to_messages(diagnostics, path, &locator, &directives))
@@ -567,7 +569,7 @@ pub fn lint_fix<'a>(
             noqa,
             &transformed,
             source_type,
-            program,
+            &program,
         );
 
         if iterations == 0 {

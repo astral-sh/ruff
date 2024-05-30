@@ -126,12 +126,14 @@ fn test_invalid_syntax(input_path: &Path) {
 #[allow(clippy::print_stdout)]
 fn parser_quick_test() {
     let source = "\
-data[*x,]
+def foo()
+    pass
 ";
 
     let program = parse_unchecked(source, Mode::Module);
 
     println!("AST:\n----\n{:#?}", program.syntax());
+    println!("Tokens:\n-------\n{:#?}", program.tokens());
 
     if !program.is_valid() {
         println!("Errors:\n-------");

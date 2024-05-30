@@ -13,7 +13,6 @@ use ruff_linter::{
 use ruff_notebook::Notebook;
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
-use ruff_python_parser::AsMode;
 use ruff_source_file::{LineIndex, Locator};
 use ruff_text_size::{Ranged, TextRange};
 use ruff_workspace::resolver::match_any_exclusion;
@@ -120,7 +119,7 @@ pub(crate) fn check(query: &DocumentQuery, encoding: PositionEncoding) -> Diagno
         flags::Noqa::Enabled,
         &source_kind,
         source_type,
-        program,
+        &program,
     );
 
     let noqa_edits = generate_noqa_edits(

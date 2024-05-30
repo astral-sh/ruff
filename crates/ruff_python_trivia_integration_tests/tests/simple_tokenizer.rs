@@ -1,7 +1,6 @@
 use insta::assert_debug_snapshot;
 
-use ruff_python_parser::lexer::lex;
-use ruff_python_parser::{parse_module, Mode, Tok};
+use ruff_python_parser::{parse_unchecked, Mode};
 use ruff_python_trivia::{lines_after, lines_before, SimpleToken, SimpleTokenizer};
 use ruff_python_trivia::{BackwardsTokenizer, SimpleTokenKind};
 use ruff_text_size::{TextLen, TextRange, TextSize};
@@ -23,7 +22,7 @@ impl TokenizationTestCase {
     }
 
     fn tokenize_reverse(&self) -> Vec<SimpleToken> {
-        let program = parse_module(self.source).expect("Input to be a valid Python program");
+        let program = parse_unchecked(self.source, Mode::Module);
         BackwardsTokenizer::new(self.source, self.range, program.comment_ranges()).collect()
     }
 

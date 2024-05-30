@@ -32,17 +32,19 @@ impl Parsed {
         let result = ruff_python_parser::parse(text, Mode::Module);
 
         let (module, errors) = match result {
-            Ok(ast::Mod::Module(module)) => (module, vec![]),
-            Ok(ast::Mod::Expression(expression)) => (
-                ast::ModModule {
-                    range: expression.range(),
-                    body: vec![ast::Stmt::Expr(ast::StmtExpr {
+            Ok(parsed) => match parsed.into_syntax() {
+                ast::Mod::Module(module) => (module, vec![]),
+                ast::Mod::Expression(expression) => (
+                    ast::ModModule {
                         range: expression.range(),
-                        value: expression.body,
-                    })],
-                },
-                vec![],
-            ),
+                        body: vec![ast::Stmt::Expr(ast::StmtExpr {
+                            range: expression.range(),
+                            value: expression.body,
+                        })],
+                    },
+                    vec![],
+                ),
+            },
             Err(errors) => (
                 ast::ModModule {
                     range: TextRange::default(),
