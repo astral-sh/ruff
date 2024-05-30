@@ -1,14 +1,14 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
 ---
-B006_5.py:5:49: B006 [*] Do not use mutable data structures for argument defaults
+error[B006]: B006_5.py:5:49: [*] Do not use mutable data structures for argument defaults
+
   |
 5 | def import_module_wrong(value: dict[str, str] = {}):
-  |                                                 ^^ B006
+  |                                                 ^^
 6 |     import os
   |
   = help: Replace with `None`; initialize within function
-
 ℹ Unsafe fix
 2 2 | # https://github.com/astral-sh/ruff/issues/7616
 3 3 | 
@@ -22,14 +22,14 @@ B006_5.py:5:49: B006 [*] Do not use mutable data structures for argument default
 8 10 | 
 9 11 | def import_module_with_values_wrong(value: dict[str, str] = {}):
 
-B006_5.py:9:61: B006 [*] Do not use mutable data structures for argument defaults
+error[B006]: B006_5.py:9:61: [*] Do not use mutable data structures for argument defaults
+
    |
  9 | def import_module_with_values_wrong(value: dict[str, str] = {}):
-   |                                                             ^^ B006
+   |                                                             ^^
 10 |     import os
    |
    = help: Replace with `None`; initialize within function
-
 ℹ Unsafe fix
 6  6  |     import os
 7  7  | 
@@ -44,15 +44,15 @@ B006_5.py:9:61: B006 [*] Do not use mutable data structures for argument default
 13 15 | 
 14 16 | 
 
-B006_5.py:15:50: B006 [*] Do not use mutable data structures for argument defaults
+error[B006]: B006_5.py:15:50: [*] Do not use mutable data structures for argument defaults
+
    |
 15 | def import_modules_wrong(value: dict[str, str] = {}):
-   |                                                  ^^ B006
+   |                                                  ^^
 16 |     import os
 17 |     import sys
    |
    = help: Replace with `None`; initialize within function
-
 ℹ Unsafe fix
 12 12 |     return 2
 13 13 | 
@@ -68,14 +68,14 @@ B006_5.py:15:50: B006 [*] Do not use mutable data structures for argument defaul
 20 22 | 
 21 23 | def from_import_module_wrong(value: dict[str, str] = {}):
 
-B006_5.py:21:54: B006 [*] Do not use mutable data structures for argument defaults
+error[B006]: B006_5.py:21:54: [*] Do not use mutable data structures for argument defaults
+
    |
 21 | def from_import_module_wrong(value: dict[str, str] = {}):
-   |                                                      ^^ B006
+   |                                                      ^^
 22 |     from os import path
    |
    = help: Replace with `None`; initialize within function
-
 ℹ Unsafe fix
 18 18 |     import itertools
 19 19 | 
@@ -89,15 +89,15 @@ B006_5.py:21:54: B006 [*] Do not use mutable data structures for argument defaul
 24 26 | 
 25 27 | def from_imports_module_wrong(value: dict[str, str] = {}):
 
-B006_5.py:25:55: B006 [*] Do not use mutable data structures for argument defaults
+error[B006]: B006_5.py:25:55: [*] Do not use mutable data structures for argument defaults
+
    |
 25 | def from_imports_module_wrong(value: dict[str, str] = {}):
-   |                                                       ^^ B006
+   |                                                       ^^
 26 |     from os import path
 27 |     from sys import version_info
    |
    = help: Replace with `None`; initialize within function
-
 ℹ Unsafe fix
 22 22 |     from os import path
 23 23 | 
@@ -112,15 +112,15 @@ B006_5.py:25:55: B006 [*] Do not use mutable data structures for argument defaul
 29 31 | 
 30 32 | def import_and_from_imports_module_wrong(value: dict[str, str] = {}):
 
-B006_5.py:30:66: B006 [*] Do not use mutable data structures for argument defaults
+error[B006]: B006_5.py:30:66: [*] Do not use mutable data structures for argument defaults
+
    |
 30 | def import_and_from_imports_module_wrong(value: dict[str, str] = {}):
-   |                                                                  ^^ B006
+   |                                                                  ^^
 31 |     import os
 32 |     from sys import version_info
    |
    = help: Replace with `None`; initialize within function
-
 ℹ Unsafe fix
 27 27 |     from sys import version_info
 28 28 | 
@@ -135,15 +135,15 @@ B006_5.py:30:66: B006 [*] Do not use mutable data structures for argument defaul
 34 36 | 
 35 37 | def import_docstring_module_wrong(value: dict[str, str] = {}):
 
-B006_5.py:35:59: B006 [*] Do not use mutable data structures for argument defaults
+error[B006]: B006_5.py:35:59: [*] Do not use mutable data structures for argument defaults
+
    |
 35 | def import_docstring_module_wrong(value: dict[str, str] = {}):
-   |                                                           ^^ B006
+   |                                                           ^^
 36 |     """Docstring"""
 37 |     import os
    |
    = help: Replace with `None`; initialize within function
-
 ℹ Unsafe fix
 32 32 |     from sys import version_info
 33 33 | 
@@ -158,15 +158,15 @@ B006_5.py:35:59: B006 [*] Do not use mutable data structures for argument defaul
 39 41 | 
 40 42 | def import_module_wrong(value: dict[str, str] = {}):
 
-B006_5.py:40:49: B006 [*] Do not use mutable data structures for argument defaults
+error[B006]: B006_5.py:40:49: [*] Do not use mutable data structures for argument defaults
+
    |
 40 | def import_module_wrong(value: dict[str, str] = {}):
-   |                                                 ^^ B006
+   |                                                 ^^
 41 |     """Docstring"""
 42 |     import os; import sys
    |
    = help: Replace with `None`; initialize within function
-
 ℹ Unsafe fix
 37 37 |     import os
 38 38 | 
@@ -181,15 +181,15 @@ B006_5.py:40:49: B006 [*] Do not use mutable data structures for argument defaul
 44 46 | 
 45 47 | def import_module_wrong(value: dict[str, str] = {}):
 
-B006_5.py:45:49: B006 [*] Do not use mutable data structures for argument defaults
+error[B006]: B006_5.py:45:49: [*] Do not use mutable data structures for argument defaults
+
    |
 45 | def import_module_wrong(value: dict[str, str] = {}):
-   |                                                 ^^ B006
+   |                                                 ^^
 46 |     """Docstring"""
 47 |     import os; import sys; x = 1
    |
    = help: Replace with `None`; initialize within function
-
 ℹ Unsafe fix
 42 42 |     import os; import sys
 43 43 | 
@@ -203,15 +203,15 @@ B006_5.py:45:49: B006 [*] Do not use mutable data structures for argument defaul
 48 50 | 
 49 51 | 
 
-B006_5.py:50:49: B006 [*] Do not use mutable data structures for argument defaults
+error[B006]: B006_5.py:50:49: [*] Do not use mutable data structures for argument defaults
+
    |
 50 | def import_module_wrong(value: dict[str, str] = {}):
-   |                                                 ^^ B006
+   |                                                 ^^
 51 |     """Docstring"""
 52 |     import os; import sys
    |
    = help: Replace with `None`; initialize within function
-
 ℹ Unsafe fix
 47 47 |     import os; import sys; x = 1
 48 48 | 
@@ -226,14 +226,14 @@ B006_5.py:50:49: B006 [*] Do not use mutable data structures for argument defaul
 54 56 | 
 55 57 | def import_module_wrong(value: dict[str, str] = {}):
 
-B006_5.py:55:49: B006 [*] Do not use mutable data structures for argument defaults
+error[B006]: B006_5.py:55:49: [*] Do not use mutable data structures for argument defaults
+
    |
 55 | def import_module_wrong(value: dict[str, str] = {}):
-   |                                                 ^^ B006
+   |                                                 ^^
 56 |     import os; import sys
    |
    = help: Replace with `None`; initialize within function
-
 ℹ Unsafe fix
 52 52 |     import os; import sys
 53 53 | 
@@ -247,14 +247,14 @@ B006_5.py:55:49: B006 [*] Do not use mutable data structures for argument defaul
 58 60 | 
 59 61 | def import_module_wrong(value: dict[str, str] = {}):
 
-B006_5.py:59:49: B006 [*] Do not use mutable data structures for argument defaults
+error[B006]: B006_5.py:59:49: [*] Do not use mutable data structures for argument defaults
+
    |
 59 | def import_module_wrong(value: dict[str, str] = {}):
-   |                                                 ^^ B006
+   |                                                 ^^
 60 |     import os; import sys; x = 1
    |
    = help: Replace with `None`; initialize within function
-
 ℹ Unsafe fix
 56 56 |     import os; import sys
 57 57 | 
@@ -267,14 +267,14 @@ B006_5.py:59:49: B006 [*] Do not use mutable data structures for argument defaul
 61 63 | 
 62 64 | 
 
-B006_5.py:63:49: B006 [*] Do not use mutable data structures for argument defaults
+error[B006]: B006_5.py:63:49: [*] Do not use mutable data structures for argument defaults
+
    |
 63 | def import_module_wrong(value: dict[str, str] = {}):
-   |                                                 ^^ B006
+   |                                                 ^^
 64 |     import os; import sys
    |
    = help: Replace with `None`; initialize within function
-
 ℹ Unsafe fix
 60 60 |     import os; import sys; x = 1
 61 61 | 
@@ -288,26 +288,25 @@ B006_5.py:63:49: B006 [*] Do not use mutable data structures for argument defaul
 66 68 | 
 67 69 | def import_module_wrong(value: dict[str, str] = {}): import os
 
-B006_5.py:67:49: B006 Do not use mutable data structures for argument defaults
+error[B006]: B006_5.py:67:49: Do not use mutable data structures for argument defaults
+
    |
 67 | def import_module_wrong(value: dict[str, str] = {}): import os
-   |                                                 ^^ B006
+   |                                                 ^^
    |
    = help: Replace with `None`; initialize within function
+error[B006]: B006_5.py:70:49: Do not use mutable data structures for argument defaults
 
-B006_5.py:70:49: B006 Do not use mutable data structures for argument defaults
    |
 70 | def import_module_wrong(value: dict[str, str] = {}): import os; import sys
-   |                                                 ^^ B006
+   |                                                 ^^
    |
    = help: Replace with `None`; initialize within function
+error[B006]: B006_5.py:73:49: Do not use mutable data structures for argument defaults
 
-B006_5.py:73:49: B006 Do not use mutable data structures for argument defaults
    |
 73 | def import_module_wrong(value: dict[str, str] = {}): \
-   |                                                 ^^ B006
+   |                                                 ^^
 74 |     import os
    |
    = help: Replace with `None`; initialize within function
-
-

@@ -1,16 +1,16 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-E20.py:19:23: E202 [*] Whitespace before ')'
+error[E202]: E20.py:19:23: [*] Whitespace before ')'
+
    |
 18 | #: E202:1:23
 19 | spam(ham[1], {eggs: 2} )
-   |                       ^ E202
+   |                       ^
 20 | #: E202:1:22
 21 | spam(ham[1], {eggs: 2 })
    |
    = help: Remove whitespace before ')'
-
 ℹ Safe fix
 16 16 | 
 17 17 | 
@@ -21,17 +21,17 @@ E20.py:19:23: E202 [*] Whitespace before ')'
 21 21 | spam(ham[1], {eggs: 2 })
 22 22 | #: E202:1:11
 
-E20.py:21:22: E202 [*] Whitespace before '}'
+error[E202]: E20.py:21:22: [*] Whitespace before '}'
+
    |
 19 | spam(ham[1], {eggs: 2} )
 20 | #: E202:1:22
 21 | spam(ham[1], {eggs: 2 })
-   |                      ^ E202
+   |                      ^
 22 | #: E202:1:11
 23 | spam(ham[1 ], {eggs: 2})
    |
    = help: Remove whitespace before '}'
-
 ℹ Safe fix
 18 18 | #: E202:1:23
 19 19 | spam(ham[1], {eggs: 2} )
@@ -42,17 +42,17 @@ E20.py:21:22: E202 [*] Whitespace before '}'
 23 23 | spam(ham[1 ], {eggs: 2})
 24 24 | #: E202:1:23
 
-E20.py:23:11: E202 [*] Whitespace before ']'
+error[E202]: E20.py:23:11: [*] Whitespace before ']'
+
    |
 21 | spam(ham[1], {eggs: 2 })
 22 | #: E202:1:11
 23 | spam(ham[1 ], {eggs: 2})
-   |           ^ E202
+   |           ^
 24 | #: E202:1:23
 25 | spam(ham[1], {eggs: 2}  )
    |
    = help: Remove whitespace before ']'
-
 ℹ Safe fix
 20 20 | #: E202:1:22
 21 21 | spam(ham[1], {eggs: 2 })
@@ -63,17 +63,17 @@ E20.py:23:11: E202 [*] Whitespace before ']'
 25 25 | spam(ham[1], {eggs: 2}	)
 26 26 | #: E202:1:22
 
-E20.py:25:23: E202 [*] Whitespace before ')'
+error[E202]: E20.py:25:23: [*] Whitespace before ')'
+
    |
 23 | spam(ham[1 ], {eggs: 2})
 24 | #: E202:1:23
 25 | spam(ham[1], {eggs: 2}  )
-   |                       ^^ E202
+   |                       ^^
 26 | #: E202:1:22
 27 | spam(ham[1], {eggs: 2   })
    |
    = help: Remove whitespace before ')'
-
 ℹ Safe fix
 22 22 | #: E202:1:11
 23 23 | spam(ham[1 ], {eggs: 2})
@@ -84,17 +84,17 @@ E20.py:25:23: E202 [*] Whitespace before ')'
 27 27 | spam(ham[1], {eggs: 2	})
 28 28 | #: E202:1:11
 
-E20.py:27:22: E202 [*] Whitespace before '}'
+error[E202]: E20.py:27:22: [*] Whitespace before '}'
+
    |
 25 | spam(ham[1], {eggs: 2}  )
 26 | #: E202:1:22
 27 | spam(ham[1], {eggs: 2   })
-   |                      ^^^ E202
+   |                      ^^^
 28 | #: E202:1:11
 29 | spam(ham[1  ], {eggs: 2})
    |
    = help: Remove whitespace before '}'
-
 ℹ Safe fix
 24 24 | #: E202:1:23
 25 25 | spam(ham[1], {eggs: 2}	)
@@ -105,17 +105,17 @@ E20.py:27:22: E202 [*] Whitespace before '}'
 29 29 | spam(ham[1	], {eggs: 2})
 30 30 | #: Okay
 
-E20.py:29:11: E202 [*] Whitespace before ']'
+error[E202]: E20.py:29:11: [*] Whitespace before ']'
+
    |
 27 | spam(ham[1], {eggs: 2   })
 28 | #: E202:1:11
 29 | spam(ham[1  ], {eggs: 2})
-   |           ^^ E202
+   |           ^^
 30 | #: Okay
 31 | spam(ham[1], {eggs: 2})
    |
    = help: Remove whitespace before ']'
-
 ℹ Safe fix
 26 26 | #: E202:1:22
 27 27 | spam(ham[1], {eggs: 2	})
@@ -126,16 +126,16 @@ E20.py:29:11: E202 [*] Whitespace before ']'
 31 31 | spam(ham[1], {eggs: 2})
 32 32 | 
 
-E20.py:90:18: E202 [*] Whitespace before ']'
+error[E202]: E20.py:90:18: [*] Whitespace before ']'
+
    |
 88 | # F-strings
 89 | f"{ {'a': 1} }"
 90 | f"{[ { {'a': 1} } ]}"
-   |                  ^ E202
+   |                  ^
 91 | f"normal { {f"{ { [1, 2] } }" } } normal"
    |
    = help: Remove whitespace before ']'
-
 ℹ Safe fix
 87 87 | 
 88 88 | # F-strings
@@ -146,16 +146,16 @@ E20.py:90:18: E202 [*] Whitespace before ']'
 92 92 | 
 93 93 | #: Okay
 
-E20.py:146:12: E202 [*] Whitespace before ']'
+error[E202]: E20.py:146:12: [*] Whitespace before ']'
+
     |
 145 | #: E202:1:12
 146 | ham[upper : ]
-    |            ^ E202
+    |            ^
 147 | 
 148 | #: E203:1:10
     |
     = help: Remove whitespace before ']'
-
 ℹ Safe fix
 143 143 | ham[upper :]
 144 144 | 
@@ -165,5 +165,3 @@ E20.py:146:12: E202 [*] Whitespace before ']'
 147 147 | 
 148 148 | #: E203:1:10
 149 149 | ham[upper  :]
-
-

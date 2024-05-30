@@ -295,67 +295,74 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | # For parenthesized with items test cases, refer to `./ambiguous_lpar_with_items.py`
 2 | 
 3 | with item,: pass
-  |          ^ Syntax Error: Trailing comma not allowed
+  |          ^ Trailing comma not allowed
 4 | with item as x,: pass
 5 | with *item: pass
   |
 
 
+error: Invalid syntax
   |
 3 | with item,: pass
 4 | with item as x,: pass
-  |               ^ Syntax Error: Trailing comma not allowed
+  |               ^ Trailing comma not allowed
 5 | with *item: pass
 6 | with *item as x: pass
   |
 
 
+error: Invalid syntax
   |
 3 | with item,: pass
 4 | with item as x,: pass
 5 | with *item: pass
-  |      ^^^^^ Syntax Error: Starred expression cannot be used here
+  |      ^^^^^ Starred expression cannot be used here
 6 | with *item as x: pass
 7 | with *item1, item2 as f: pass
   |
 
 
+error: Invalid syntax
   |
 4 | with item as x,: pass
 5 | with *item: pass
 6 | with *item as x: pass
-  |      ^^^^^ Syntax Error: Starred expression cannot be used here
+  |      ^^^^^ Starred expression cannot be used here
 7 | with *item1, item2 as f: pass
 8 | with item1 as f, *item2: pass
   |
 
 
+error: Invalid syntax
   |
 5 | with *item: pass
 6 | with *item as x: pass
 7 | with *item1, item2 as f: pass
-  |      ^^^^^^ Syntax Error: Starred expression cannot be used here
+  |      ^^^^^^ Starred expression cannot be used here
 8 | with item1 as f, *item2: pass
 9 | with item := 0 as f: pass
   |
 
 
+error: Invalid syntax
   |
 6 | with *item as x: pass
 7 | with *item1, item2 as f: pass
 8 | with item1 as f, *item2: pass
-  |                  ^^^^^^ Syntax Error: Starred expression cannot be used here
+  |                  ^^^^^^ Starred expression cannot be used here
 9 | with item := 0 as f: pass
   |
 
 
+error: Invalid syntax
   |
 7 | with *item1, item2 as f: pass
 8 | with item1 as f, *item2: pass
 9 | with item := 0 as f: pass
-  |           ^^ Syntax Error: Expected ',', found ':='
+  |           ^^ Expected ',', found ':='
   |

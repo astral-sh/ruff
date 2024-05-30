@@ -195,75 +195,84 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | del x + 1
-  |     ^^^^^ Syntax Error: Invalid delete target
+  |     ^^^^^ Invalid delete target
 2 | del {'x': 1}
 3 | del {'x', 'y'}
   |
 
 
-  |
-1 | del x + 1
-2 | del {'x': 1}
-  |     ^^^^^^^^ Syntax Error: Invalid delete target
-3 | del {'x', 'y'}
-4 | del None, True, False, 1, 1.0, "abc"
-  |
-
-
+error: Invalid syntax
   |
 1 | del x + 1
 2 | del {'x': 1}
+  |     ^^^^^^^^ Invalid delete target
 3 | del {'x', 'y'}
-  |     ^^^^^^^^^^ Syntax Error: Invalid delete target
 4 | del None, True, False, 1, 1.0, "abc"
   |
 
 
+error: Invalid syntax
+  |
+1 | del x + 1
+2 | del {'x': 1}
+3 | del {'x', 'y'}
+  |     ^^^^^^^^^^ Invalid delete target
+4 | del None, True, False, 1, 1.0, "abc"
+  |
+
+
+error: Invalid syntax
   |
 2 | del {'x': 1}
 3 | del {'x', 'y'}
 4 | del None, True, False, 1, 1.0, "abc"
-  |     ^^^^ Syntax Error: Invalid delete target
+  |     ^^^^ Invalid delete target
   |
 
 
-  |
-2 | del {'x': 1}
-3 | del {'x', 'y'}
-4 | del None, True, False, 1, 1.0, "abc"
-  |           ^^^^ Syntax Error: Invalid delete target
-  |
-
-
+error: Invalid syntax
   |
 2 | del {'x': 1}
 3 | del {'x', 'y'}
 4 | del None, True, False, 1, 1.0, "abc"
-  |                 ^^^^^ Syntax Error: Invalid delete target
+  |           ^^^^ Invalid delete target
   |
 
 
-  |
-2 | del {'x': 1}
-3 | del {'x', 'y'}
-4 | del None, True, False, 1, 1.0, "abc"
-  |                        ^ Syntax Error: Invalid delete target
-  |
-
-
+error: Invalid syntax
   |
 2 | del {'x': 1}
 3 | del {'x', 'y'}
 4 | del None, True, False, 1, 1.0, "abc"
-  |                           ^^^ Syntax Error: Invalid delete target
+  |                 ^^^^^ Invalid delete target
   |
 
 
+error: Invalid syntax
   |
 2 | del {'x': 1}
 3 | del {'x', 'y'}
 4 | del None, True, False, 1, 1.0, "abc"
-  |                                ^^^^^ Syntax Error: Invalid delete target
+  |                        ^ Invalid delete target
+  |
+
+
+error: Invalid syntax
+  |
+2 | del {'x': 1}
+3 | del {'x', 'y'}
+4 | del None, True, False, 1, 1.0, "abc"
+  |                           ^^^ Invalid delete target
+  |
+
+
+error: Invalid syntax
+  |
+2 | del {'x': 1}
+3 | del {'x', 'y'}
+4 | del None, True, False, 1, 1.0, "abc"
+  |                                ^^^^^ Invalid delete target
   |

@@ -73,17 +73,19 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | call(x
 2 | 
 3 | def foo():
-  | ^^^ Syntax Error: Expected ',', found 'def'
+  | ^^^ Expected ',', found 'def'
 4 |     pass
   |
 
 
+error: Invalid syntax
   |
 3 | def foo():
 4 |     pass
-  |          Syntax Error: unexpected EOF while parsing
+  |         ^ unexpected EOF while parsing
   |

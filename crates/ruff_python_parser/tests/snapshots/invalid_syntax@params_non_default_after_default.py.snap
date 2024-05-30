@@ -102,13 +102,15 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | def foo(a=10, b, c: int): ...
-  |               ^ Syntax Error: Parameter without a default cannot follow a parameter with a default
+  |               ^ Parameter without a default cannot follow a parameter with a default
   |
 
 
+error: Invalid syntax
   |
 1 | def foo(a=10, b, c: int): ...
-  |                  ^^^^^^ Syntax Error: Parameter without a default cannot follow a parameter with a default
+  |                  ^^^^^^ Parameter without a default cannot follow a parameter with a default
   |

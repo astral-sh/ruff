@@ -100,34 +100,38 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | match x:
 2 |     x = 1
-  |     ^ Syntax Error: Expected `case` block
+  |     ^ Expected `case` block
 3 | match x:
 4 |     match y:
   |
 
 
+error: Invalid syntax
   |
 1 | match x:
 2 |     x = 1
 3 | match x:
-  |  Syntax Error: Expected a statement
+  | ^ Expected a statement
 4 |     match y:
 5 |         case _: ...
   |
 
 
+error: Invalid syntax
   |
 2 |     x = 1
 3 | match x:
 4 |     match y:
-  |     ^^^^^ Syntax Error: Expected `case` block
+  |     ^^^^^ Expected `case` block
 5 |         case _: ...
   |
 
 
+error: Invalid syntax
   |
 4 |     match y:
 5 |         case _: ...

@@ -109,15 +109,17 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | del x, y.
-  |          ^ Syntax Error: Expected an identifier
+  |          ^ Expected an identifier
 2 | z
 3 | del x, y[
 4 | z
   |
 
 
+error: Invalid syntax
   |
 3 | del x, y[
 4 | z

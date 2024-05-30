@@ -152,20 +152,22 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 |   'hello' 'world
   |  _________^
 2 | | 1 + 1
-  | |_^ Syntax Error: missing closing quote in string literal
+  | |_^ missing closing quote in string literal
 3 |   'hello' f'world {x}
 4 |   2 + 2
   |
 
 
+error: Invalid syntax
   |
 1 | 'hello' 'world
 2 | 1 + 1
 3 | 'hello' f'world {x}
-  |                     Syntax Error: f-string: unterminated string
+  |                    ^ f-string: unterminated string
 4 | 2 + 2
   |

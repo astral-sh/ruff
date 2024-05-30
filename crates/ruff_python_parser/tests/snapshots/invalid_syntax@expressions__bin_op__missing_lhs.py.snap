@@ -54,9 +54,10 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | / y
-  | ^ Syntax Error: Expected a statement
+  | ^ Expected a statement
 2 | 
 3 | 1 + 2
   |

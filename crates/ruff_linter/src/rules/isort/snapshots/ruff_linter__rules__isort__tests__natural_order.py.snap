@@ -1,7 +1,8 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
 ---
-natural_order.py:1:1: I001 [*] Import block is un-sorted or un-formatted
+error[I001]: natural_order.py:1:1: [*] Import block is un-sorted or un-formatted
+
    |
  1 | / import numpy1
  2 | | import numpy10
@@ -21,7 +22,6 @@ natural_order.py:1:1: I001 [*] Import block is un-sorted or un-formatted
 16 | | )
    |
    = help: Organize imports
-
 ℹ Safe fix
 1  1  | import numpy1
    2  |+import numpy2
@@ -42,5 +42,3 @@ natural_order.py:1:1: I001 [*] Import block is un-sorted or un-formatted
 14 14 |     uint32,
 15 15 |     uint64,
 16 16 | )
-
-

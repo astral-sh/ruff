@@ -675,122 +675,135 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | # Iterable unpacking not allowed
 2 | [*x for x in y]
-  |  ^^ Syntax Error: Iterable unpacking cannot be used in a comprehension
+  |  ^^ Iterable unpacking cannot be used in a comprehension
 3 | 
 4 | # Invalid target
   |
 
 
+error: Invalid syntax
   |
 4 | # Invalid target
 5 | [x for 1 in y]
-  |        ^ Syntax Error: Invalid assignment target
+  |        ^ Invalid assignment target
 6 | [x for 'a' in y]
 7 | [x for call() in y]
   |
 
 
+error: Invalid syntax
   |
 4 | # Invalid target
 5 | [x for 1 in y]
 6 | [x for 'a' in y]
-  |        ^^^ Syntax Error: Invalid assignment target
+  |        ^^^ Invalid assignment target
 7 | [x for call() in y]
 8 | [x for {a, b} in y]
   |
 
 
+error: Invalid syntax
   |
 5 | [x for 1 in y]
 6 | [x for 'a' in y]
 7 | [x for call() in y]
-  |        ^^^^^^ Syntax Error: Invalid assignment target
+  |        ^^^^^^ Invalid assignment target
 8 | [x for {a, b} in y]
   |
 
 
+error: Invalid syntax
    |
  6 | [x for 'a' in y]
  7 | [x for call() in y]
  8 | [x for {a, b} in y]
-   |        ^^^^^^ Syntax Error: Invalid assignment target
+   |        ^^^^^^ Invalid assignment target
  9 | 
 10 | # Invalid iter
    |
 
 
+error: Invalid syntax
    |
 10 | # Invalid iter
 11 | [x for x in *y]
-   |             ^^ Syntax Error: Starred expression cannot be used here
+   |             ^^ Starred expression cannot be used here
 12 | [x for x in yield y]
 13 | [x for x in yield from y]
    |
 
 
+error: Invalid syntax
    |
 10 | # Invalid iter
 11 | [x for x in *y]
 12 | [x for x in yield y]
-   |             ^^^^^^^ Syntax Error: Yield expression cannot be used here
+   |             ^^^^^^^ Yield expression cannot be used here
 13 | [x for x in yield from y]
 14 | [x for x in lambda y: y]
    |
 
 
+error: Invalid syntax
    |
 11 | [x for x in *y]
 12 | [x for x in yield y]
 13 | [x for x in yield from y]
-   |             ^^^^^^^^^^^^ Syntax Error: Yield expression cannot be used here
+   |             ^^^^^^^^^^^^ Yield expression cannot be used here
 14 | [x for x in lambda y: y]
    |
 
 
+error: Invalid syntax
    |
 12 | [x for x in yield y]
 13 | [x for x in yield from y]
 14 | [x for x in lambda y: y]
-   |             ^^^^^^^^^^^ Syntax Error: Lambda expression cannot be used here
+   |             ^^^^^^^^^^^ Lambda expression cannot be used here
 15 | 
 16 | # Invalid if
    |
 
 
+error: Invalid syntax
    |
 16 | # Invalid if
 17 | [x for x in data if *y]
-   |                     ^^ Syntax Error: Starred expression cannot be used here
+   |                     ^^ Starred expression cannot be used here
 18 | [x for x in data if yield y]
 19 | [x for x in data if yield from y]
    |
 
 
+error: Invalid syntax
    |
 16 | # Invalid if
 17 | [x for x in data if *y]
 18 | [x for x in data if yield y]
-   |                     ^^^^^^^ Syntax Error: Yield expression cannot be used here
+   |                     ^^^^^^^ Yield expression cannot be used here
 19 | [x for x in data if yield from y]
 20 | [x for x in data if lambda y: y]
    |
 
 
+error: Invalid syntax
    |
 17 | [x for x in data if *y]
 18 | [x for x in data if yield y]
 19 | [x for x in data if yield from y]
-   |                     ^^^^^^^^^^^^ Syntax Error: Yield expression cannot be used here
+   |                     ^^^^^^^^^^^^ Yield expression cannot be used here
 20 | [x for x in data if lambda y: y]
    |
 
 
+error: Invalid syntax
    |
 18 | [x for x in data if yield y]
 19 | [x for x in data if yield from y]
 20 | [x for x in data if lambda y: y]
-   |                     ^^^^^^^^^^^ Syntax Error: Lambda expression cannot be used here
+   |                     ^^^^^^^^^^^ Lambda expression cannot be used here
    |

@@ -1,14 +1,14 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 ---
-UP004.py:5:9: UP004 [*] Class `A` inherits from `object`
+error[UP004]: UP004.py:5:9: [*] Class `A` inherits from `object`
+
   |
 5 | class A(object):
-  |         ^^^^^^ UP004
+  |         ^^^^^^
 6 |     ...
   |
   = help: Remove `object` inheritance
-
 ℹ Safe fix
 2 2 |     ...
 3 3 | 
@@ -19,16 +19,16 @@ UP004.py:5:9: UP004 [*] Class `A` inherits from `object`
 7 7 | 
 8 8 | 
 
-UP004.py:10:5: UP004 [*] Class `A` inherits from `object`
+error[UP004]: UP004.py:10:5: [*] Class `A` inherits from `object`
+
    |
  9 | class A(
 10 |     object,
-   |     ^^^^^^ UP004
+   |     ^^^^^^
 11 | ):
 12 |     ...
    |
    = help: Remove `object` inheritance
-
 ℹ Safe fix
 6  6  |     ...
 7  7  | 
@@ -41,16 +41,16 @@ UP004.py:10:5: UP004 [*] Class `A` inherits from `object`
 13 11 | 
 14 12 | 
 
-UP004.py:16:5: UP004 [*] Class `A` inherits from `object`
+error[UP004]: UP004.py:16:5: [*] Class `A` inherits from `object`
+
    |
 15 | class A(
 16 |     object,
-   |     ^^^^^^ UP004
+   |     ^^^^^^
 17 |     #
 18 | ):
    |
    = help: Remove `object` inheritance
-
 ℹ Safe fix
 12 12 |     ...
 13 13 | 
@@ -64,17 +64,17 @@ UP004.py:16:5: UP004 [*] Class `A` inherits from `object`
 20 17 | 
 21 18 | 
 
-UP004.py:24:5: UP004 [*] Class `A` inherits from `object`
+error[UP004]: UP004.py:24:5: [*] Class `A` inherits from `object`
+
    |
 22 | class A(
 23 |     #
 24 |     object,
-   |     ^^^^^^ UP004
+   |     ^^^^^^
 25 | ):
 26 |     ...
    |
    = help: Remove `object` inheritance
-
 ℹ Safe fix
 19 19 |     ...
 20 20 | 
@@ -88,17 +88,17 @@ UP004.py:24:5: UP004 [*] Class `A` inherits from `object`
 27 24 | 
 28 25 | 
 
-UP004.py:31:5: UP004 [*] Class `A` inherits from `object`
+error[UP004]: UP004.py:31:5: [*] Class `A` inherits from `object`
+
    |
 29 | class A(
 30 |     #
 31 |     object
-   |     ^^^^^^ UP004
+   |     ^^^^^^
 32 | ):
 33 |     ...
    |
    = help: Remove `object` inheritance
-
 ℹ Safe fix
 26 26 |     ...
 27 27 | 
@@ -112,16 +112,16 @@ UP004.py:31:5: UP004 [*] Class `A` inherits from `object`
 34 31 | 
 35 32 | 
 
-UP004.py:37:5: UP004 [*] Class `A` inherits from `object`
+error[UP004]: UP004.py:37:5: [*] Class `A` inherits from `object`
+
    |
 36 | class A(
 37 |     object
-   |     ^^^^^^ UP004
+   |     ^^^^^^
 38 |     #
 39 | ):
    |
    = help: Remove `object` inheritance
-
 ℹ Safe fix
 33 33 |     ...
 34 34 | 
@@ -135,17 +135,17 @@ UP004.py:37:5: UP004 [*] Class `A` inherits from `object`
 41 38 | 
 42 39 | 
 
-UP004.py:45:5: UP004 [*] Class `A` inherits from `object`
+error[UP004]: UP004.py:45:5: [*] Class `A` inherits from `object`
+
    |
 43 | class A(
 44 |     #
 45 |     object,
-   |     ^^^^^^ UP004
+   |     ^^^^^^
 46 |     #
 47 | ):
    |
    = help: Remove `object` inheritance
-
 ℹ Safe fix
 40 40 |     ...
 41 41 | 
@@ -160,17 +160,17 @@ UP004.py:45:5: UP004 [*] Class `A` inherits from `object`
 49 45 | 
 50 46 | 
 
-UP004.py:53:5: UP004 [*] Class `A` inherits from `object`
+error[UP004]: UP004.py:53:5: [*] Class `A` inherits from `object`
+
    |
 51 | class A(
 52 |     #
 53 |     object,
-   |     ^^^^^^ UP004
+   |     ^^^^^^
 54 |     #
 55 | ):
    |
    = help: Remove `object` inheritance
-
 ℹ Safe fix
 48 48 |     ...
 49 49 | 
@@ -185,17 +185,17 @@ UP004.py:53:5: UP004 [*] Class `A` inherits from `object`
 57 53 | 
 58 54 | 
 
-UP004.py:61:5: UP004 [*] Class `A` inherits from `object`
+error[UP004]: UP004.py:61:5: [*] Class `A` inherits from `object`
+
    |
 59 | class A(
 60 |     #
 61 |     object
-   |     ^^^^^^ UP004
+   |     ^^^^^^
 62 |     #
 63 | ):
    |
    = help: Remove `object` inheritance
-
 ℹ Safe fix
 56 56 |     ...
 57 57 | 
@@ -210,17 +210,17 @@ UP004.py:61:5: UP004 [*] Class `A` inherits from `object`
 65 61 | 
 66 62 | 
 
-UP004.py:69:5: UP004 [*] Class `A` inherits from `object`
+error[UP004]: UP004.py:69:5: [*] Class `A` inherits from `object`
+
    |
 67 | class A(
 68 |     #
 69 |     object
-   |     ^^^^^^ UP004
+   |     ^^^^^^
 70 |     #
 71 | ):
    |
    = help: Remove `object` inheritance
-
 ℹ Safe fix
 64 64 |     ...
 65 65 | 
@@ -235,14 +235,14 @@ UP004.py:69:5: UP004 [*] Class `A` inherits from `object`
 73 69 | 
 74 70 | 
 
-UP004.py:75:12: UP004 [*] Class `B` inherits from `object`
+error[UP004]: UP004.py:75:12: [*] Class `B` inherits from `object`
+
    |
 75 | class B(A, object):
-   |            ^^^^^^ UP004
+   |            ^^^^^^
 76 |     ...
    |
    = help: Remove `object` inheritance
-
 ℹ Safe fix
 72 72 |     ...
 73 73 | 
@@ -253,14 +253,14 @@ UP004.py:75:12: UP004 [*] Class `B` inherits from `object`
 77 77 | 
 78 78 | 
 
-UP004.py:79:9: UP004 [*] Class `B` inherits from `object`
+error[UP004]: UP004.py:79:9: [*] Class `B` inherits from `object`
+
    |
 79 | class B(object, A):
-   |         ^^^^^^ UP004
+   |         ^^^^^^
 80 |     ...
    |
    = help: Remove `object` inheritance
-
 ℹ Safe fix
 76 76 |     ...
 77 77 | 
@@ -271,16 +271,16 @@ UP004.py:79:9: UP004 [*] Class `B` inherits from `object`
 81 81 | 
 82 82 | 
 
-UP004.py:84:5: UP004 [*] Class `B` inherits from `object`
+error[UP004]: UP004.py:84:5: [*] Class `B` inherits from `object`
+
    |
 83 | class B(
 84 |     object,
-   |     ^^^^^^ UP004
+   |     ^^^^^^
 85 |     A,
 86 | ):
    |
    = help: Remove `object` inheritance
-
 ℹ Safe fix
 81 81 | 
 82 82 | 
@@ -290,17 +290,17 @@ UP004.py:84:5: UP004 [*] Class `B` inherits from `object`
 86 85 | ):
 87 86 |     ...
 
-UP004.py:92:5: UP004 [*] Class `B` inherits from `object`
+error[UP004]: UP004.py:92:5: [*] Class `B` inherits from `object`
+
    |
 90 | class B(
 91 |     A,
 92 |     object,
-   |     ^^^^^^ UP004
+   |     ^^^^^^
 93 | ):
 94 |     ...
    |
    = help: Remove `object` inheritance
-
 ℹ Safe fix
 89 89 | 
 90 90 | class B(
@@ -310,16 +310,16 @@ UP004.py:92:5: UP004 [*] Class `B` inherits from `object`
 94 93 |     ...
 95 94 | 
 
-UP004.py:98:5: UP004 [*] Class `B` inherits from `object`
+error[UP004]: UP004.py:98:5: [*] Class `B` inherits from `object`
+
     |
  97 | class B(
  98 |     object,
-    |     ^^^^^^ UP004
+    |     ^^^^^^
  99 |     # Comment on A.
 100 |     A,
     |
     = help: Remove `object` inheritance
-
 ℹ Safe fix
 95 95 | 
 96 96 | 
@@ -329,17 +329,17 @@ UP004.py:98:5: UP004 [*] Class `B` inherits from `object`
 100 99 |     A,
 101 100 | ):
 
-UP004.py:108:5: UP004 [*] Class `B` inherits from `object`
+error[UP004]: UP004.py:108:5: [*] Class `B` inherits from `object`
+
     |
 106 |     # Comment on A.
 107 |     A,
 108 |     object,
-    |     ^^^^^^ UP004
+    |     ^^^^^^
 109 | ):
 110 |     ...
     |
     = help: Remove `object` inheritance
-
 ℹ Safe fix
 105 105 | class B(
 106 106 |     # Comment on A.
@@ -349,16 +349,16 @@ UP004.py:108:5: UP004 [*] Class `B` inherits from `object`
 110 109 |     ...
 111 110 | 
 
-UP004.py:119:5: UP004 [*] Class `A` inherits from `object`
+error[UP004]: UP004.py:119:5: [*] Class `A` inherits from `object`
+
     |
 118 | class A(
 119 |     object,
-    |     ^^^^^^ UP004
+    |     ^^^^^^
 120 | ):
 121 |     ...
     |
     = help: Remove `object` inheritance
-
 ℹ Safe fix
 115 115 |         ...
 116 116 | 
@@ -371,16 +371,16 @@ UP004.py:119:5: UP004 [*] Class `A` inherits from `object`
 122 120 | 
 123 121 | 
 
-UP004.py:125:5: UP004 [*] Class `A` inherits from `object`
+error[UP004]: UP004.py:125:5: [*] Class `A` inherits from `object`
+
     |
 124 | class A(
 125 |     object,  # )
-    |     ^^^^^^ UP004
+    |     ^^^^^^
 126 | ):
 127 |     ...
     |
     = help: Remove `object` inheritance
-
 ℹ Safe fix
 121 121 |     ...
 122 122 | 
@@ -393,16 +393,16 @@ UP004.py:125:5: UP004 [*] Class `A` inherits from `object`
 128 126 | 
 129 127 | 
 
-UP004.py:131:5: UP004 [*] Class `A` inherits from `object`
+error[UP004]: UP004.py:131:5: [*] Class `A` inherits from `object`
+
     |
 130 | class A(
 131 |     object  # )
-    |     ^^^^^^ UP004
+    |     ^^^^^^
 132 |     ,
 133 | ):
     |
     = help: Remove `object` inheritance
-
 ℹ Safe fix
 127 127 |     ...
 128 128 | 
@@ -416,14 +416,14 @@ UP004.py:131:5: UP004 [*] Class `A` inherits from `object`
 135 132 | 
 136 133 | 
 
-UP004.py:137:9: UP004 [*] Class `A` inherits from `object`
+error[UP004]: UP004.py:137:9: [*] Class `A` inherits from `object`
+
     |
 137 | class A(object, object):
-    |         ^^^^^^ UP004
+    |         ^^^^^^
 138 |     ...
     |
     = help: Remove `object` inheritance
-
 ℹ Safe fix
 134 134 |     ...
 135 135 | 
@@ -434,14 +434,14 @@ UP004.py:137:9: UP004 [*] Class `A` inherits from `object`
 139 139 | 
 140 140 | 
 
-UP004.py:137:17: UP004 [*] Class `A` inherits from `object`
+error[UP004]: UP004.py:137:17: [*] Class `A` inherits from `object`
+
     |
 137 | class A(object, object):
-    |                 ^^^^^^ UP004
+    |                 ^^^^^^
 138 |     ...
     |
     = help: Remove `object` inheritance
-
 ℹ Safe fix
 134 134 |     ...
 135 135 | 
@@ -452,15 +452,15 @@ UP004.py:137:17: UP004 [*] Class `A` inherits from `object`
 139 139 | 
 140 140 | 
 
-UP004.py:142:9: UP004 [*] Class `A` inherits from `object`
+error[UP004]: UP004.py:142:9: [*] Class `A` inherits from `object`
+
     |
 141 | @decorator()
 142 | class A(object):
-    |         ^^^^^^ UP004
+    |         ^^^^^^
 143 |     ...
     |
     = help: Remove `object` inheritance
-
 ℹ Safe fix
 139 139 | 
 140 140 | 
@@ -471,15 +471,15 @@ UP004.py:142:9: UP004 [*] Class `A` inherits from `object`
 144 144 | 
 145 145 | @decorator()  # class A(object):
 
-UP004.py:146:9: UP004 [*] Class `A` inherits from `object`
+error[UP004]: UP004.py:146:9: [*] Class `A` inherits from `object`
+
     |
 145 | @decorator()  # class A(object):
 146 | class A(object):
-    |         ^^^^^^ UP004
+    |         ^^^^^^
 147 |     ...
     |
     = help: Remove `object` inheritance
-
 ℹ Safe fix
 143 143 |     ...
 144 144 | 
@@ -490,16 +490,16 @@ UP004.py:146:9: UP004 [*] Class `A` inherits from `object`
 148 148 | 
 149 149 | 
 
-UP004.py:159:15: UP004 [*] Class `Unusual` inherits from `object`
+error[UP004]: UP004.py:159:15: [*] Class `Unusual` inherits from `object`
+
     |
 157 | import builtins
 158 | 
 159 | class Unusual(builtins.object):
-    |               ^^^^^^^^^^^^^^^ UP004
+    |               ^^^^^^^^^^^^^^^
 160 |     ...
     |
     = help: Remove `object` inheritance
-
 ℹ Safe fix
 156 156 | 
 157 157 | import builtins

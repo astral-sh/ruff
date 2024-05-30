@@ -171,86 +171,96 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | async class Foo: ...
-  |       ^^^^^ Syntax Error: Expected 'def', 'with' or 'for' to follow 'async', found 'class'
+  |       ^^^^^ Expected 'def', 'with' or 'for' to follow 'async', found 'class'
 2 | async while test: ...
 3 | async x = 1
   |
 
 
+error: Invalid syntax
   |
 1 | async class Foo: ...
 2 | async while test: ...
-  |       ^^^^^ Syntax Error: Expected 'def', 'with' or 'for' to follow 'async', found 'while'
+  |       ^^^^^ Expected 'def', 'with' or 'for' to follow 'async', found 'while'
 3 | async x = 1
 4 | async async def foo(): ...
   |
 
 
+error: Invalid syntax
   |
 1 | async class Foo: ...
 2 | async while test: ...
 3 | async x = 1
-  |       ^ Syntax Error: Expected 'def', 'with' or 'for' to follow 'async', found name
+  |       ^ Expected 'def', 'with' or 'for' to follow 'async', found name
 4 | async async def foo(): ...
 5 | # TODO(dhruvmanila): Here, `match` is actually a Name token because
   |
 
 
+error: Invalid syntax
   |
 2 | async while test: ...
 3 | async x = 1
 4 | async async def foo(): ...
-  |       ^^^^^ Syntax Error: Expected 'def', 'with' or 'for' to follow 'async', found 'async'
+  |       ^^^^^ Expected 'def', 'with' or 'for' to follow 'async', found 'async'
 5 | # TODO(dhruvmanila): Here, `match` is actually a Name token because
 6 | # of the soft keyword # transformer
   |
 
 
+error: Invalid syntax
   |
 5 | # TODO(dhruvmanila): Here, `match` is actually a Name token because
 6 | # of the soft keyword # transformer
 7 | async match test:
-  |       ^^^^^ Syntax Error: Expected 'def', 'with' or 'for' to follow 'async', found name
+  |       ^^^^^ Expected 'def', 'with' or 'for' to follow 'async', found name
 8 |     case _: ...
   |
 
 
+error: Invalid syntax
   |
 5 | # TODO(dhruvmanila): Here, `match` is actually a Name token because
 6 | # of the soft keyword # transformer
 7 | async match test:
-  |             ^^^^ Syntax Error: Simple statements must be separated by newlines or semicolons
+  |             ^^^^ Simple statements must be separated by newlines or semicolons
 8 |     case _: ...
   |
 
 
+error: Invalid syntax
   |
 5 | # TODO(dhruvmanila): Here, `match` is actually a Name token because
 6 | # of the soft keyword # transformer
 7 | async match test:
-  |                  ^ Syntax Error: Expected an expression
+  |                  ^ Expected an expression
 8 |     case _: ...
   |
 
 
+error: Invalid syntax
   |
 6 | # of the soft keyword # transformer
 7 | async match test:
 8 |     case _: ...
-  | ^^^^ Syntax Error: Unexpected indentation
+  | ^^^^ Unexpected indentation
   |
 
 
+error: Invalid syntax
   |
 6 | # of the soft keyword # transformer
 7 | async match test:
 8 |     case _: ...
-  |     ^^^^ Syntax Error: Expected a statement
+  |     ^^^^ Expected a statement
   |
 
 
+error: Invalid syntax
   |
 7 | async match test:
 8 |     case _: ...

@@ -90,37 +90,43 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | f"{lambda x: x}"
-  |             ^^ Syntax Error: Expected an expression
+  |             ^^ Expected an expression
   |
 
 
-  |
-1 | f"{lambda x: x}"
-  |    ^^^^^^^^^ Syntax Error: f-string: lambda expressions are not allowed without parentheses
-  |
-
-
+error: Invalid syntax
   |
 1 | f"{lambda x: x}"
-  |             ^^ Syntax Error: f-string: expecting '}'
+  |    ^^^^^^^^^ f-string: lambda expressions are not allowed without parentheses
   |
 
 
-  |
-1 | f"{lambda x: x}"
-  |               ^ Syntax Error: Expected FStringEnd, found '}'
-  |
-
-
+error: Invalid syntax
   |
 1 | f"{lambda x: x}"
-  |                ^ Syntax Error: Expected a statement
+  |             ^^ f-string: expecting '}'
   |
 
 
+error: Invalid syntax
   |
 1 | f"{lambda x: x}"
-  |                 ^ Syntax Error: Expected a statement
+  |               ^ Expected FStringEnd, found '}'
+  |
+
+
+error: Invalid syntax
+  |
+1 | f"{lambda x: x}"
+  |                ^ Expected a statement
+  |
+
+
+error: Invalid syntax
+  |
+1 | f"{lambda x: x}"
+  |                 ^ Expected a statement
   |

@@ -114,20 +114,23 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | f"hello {x:"
-  |            ^ Syntax Error: f-string: expecting '}'
+  |            ^ f-string: expecting '}'
 2 | f"hello {x:.3f"
   |
 
 
+error: Invalid syntax
   |
 1 | f"hello {x:"
 2 | f"hello {x:.3f"
-  |               ^ Syntax Error: f-string: expecting '}'
+  |               ^ f-string: expecting '}'
   |
 
 
+error: Invalid syntax
   |
 1 | f"hello {x:"
 2 | f"hello {x:.3f"

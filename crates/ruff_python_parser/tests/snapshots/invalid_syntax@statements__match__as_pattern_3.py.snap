@@ -95,59 +95,66 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 2 |     #     Not in the mapping start token set, so the list parsing bails
 3 |     #     v
 4 |     case {(x as y): 1}:
-  |           ^ Syntax Error: Expected a mapping pattern or the end of the mapping pattern
+  |           ^ Expected a mapping pattern or the end of the mapping pattern
 5 |         pass
   |
 
 
+error: Invalid syntax
   |
 2 |     #     Not in the mapping start token set, so the list parsing bails
 3 |     #     v
 4 |     case {(x as y): 1}:
-  |          ^ Syntax Error: Invalid value for a class pattern
+  |          ^ Invalid value for a class pattern
 5 |         pass
   |
 
 
+error: Invalid syntax
   |
 2 |     #     Not in the mapping start token set, so the list parsing bails
 3 |     #     v
 4 |     case {(x as y): 1}:
-  |                      ^ Syntax Error: Expected newline, found '}'
+  |                      ^ Expected newline, found '}'
 5 |         pass
   |
 
 
+error: Invalid syntax
   |
 2 |     #     Not in the mapping start token set, so the list parsing bails
 3 |     #     v
 4 |     case {(x as y): 1}:
-  |                       ^ Syntax Error: Expected a statement
+  |                       ^ Expected a statement
 5 |         pass
   |
 
 
+error: Invalid syntax
   |
 2 |     #     Not in the mapping start token set, so the list parsing bails
 3 |     #     v
 4 |     case {(x as y): 1}:
-  |                        ^ Syntax Error: Expected a statement
+  |                        ^ Expected a statement
 5 |         pass
   |
 
 
+error: Invalid syntax
   |
 3 |     #     v
 4 |     case {(x as y): 1}:
 5 |         pass
-  | ^^^^^^^^ Syntax Error: Unexpected indentation
+  | ^^^^^^^^ Unexpected indentation
   |
 
 
+error: Invalid syntax
   |
 4 |     case {(x as y): 1}:
 5 |         pass

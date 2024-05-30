@@ -70,7 +70,8 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | def foo(a, **kwargs1, **kwargs2): ...
-  |                       ^^ Syntax Error: Parameter cannot follow var-keyword parameter
+  |                       ^^ Parameter cannot follow var-keyword parameter
   |

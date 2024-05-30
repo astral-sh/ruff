@@ -67,15 +67,17 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | import (a)
-  |        ^ Syntax Error: Expected an import name
+  |        ^ Expected an import name
 2 | import (a, b)
   |
 
 
+error: Invalid syntax
   |
 1 | import (a)
 2 | import (a, b)
-  |        ^ Syntax Error: Expected an import name
+  |        ^ Expected an import name
   |

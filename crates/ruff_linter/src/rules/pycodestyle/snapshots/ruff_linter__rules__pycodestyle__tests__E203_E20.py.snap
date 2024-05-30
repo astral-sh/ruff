@@ -1,16 +1,16 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-E20.py:51:10: E203 [*] Whitespace before ':'
+error[E203]: E20.py:51:10: [*] Whitespace before ':'
+
    |
 50 | #: E203:1:10
 51 | if x == 4 :
-   |          ^ E203
+   |          ^
 52 |     print x, y
 53 |     x, y = y, x
    |
    = help: Remove whitespace before ':'
-
 ℹ Safe fix
 48 48 | 
 49 49 | 
@@ -21,17 +21,17 @@ E20.py:51:10: E203 [*] Whitespace before ':'
 53 53 |     x, y = y, x
 54 54 | #: E203:1:10
 
-E20.py:55:10: E203 [*] Whitespace before ':'
+error[E203]: E20.py:55:10: [*] Whitespace before ':'
+
    |
 53 |     x, y = y, x
 54 | #: E203:1:10
 55 | if x == 4   :
-   |          ^^^ E203
+   |          ^^^
 56 |     print x, y
 57 |     x, y = y, x
    |
    = help: Remove whitespace before ':'
-
 ℹ Safe fix
 52 52 |     print x, y
 53 53 |     x, y = y, x
@@ -42,17 +42,17 @@ E20.py:55:10: E203 [*] Whitespace before ':'
 57 57 |     x, y = y, x
 58 58 | #: E203:2:15 E702:2:16
 
-E20.py:60:15: E203 [*] Whitespace before ';'
+error[E203]: E20.py:60:15: [*] Whitespace before ';'
+
    |
 58 | #: E203:2:15 E702:2:16
 59 | if x == 4:
 60 |     print x, y ; x, y = y, x
-   |               ^ E203
+   |               ^
 61 | #: E203:2:15 E702:2:16
 62 | if x == 4:
    |
    = help: Remove whitespace before ';'
-
 ℹ Safe fix
 57 57 |     x, y = y, x
 58 58 | #: E203:2:15 E702:2:16
@@ -63,17 +63,17 @@ E20.py:60:15: E203 [*] Whitespace before ';'
 62 62 | if x == 4:
 63 63 |     print x, y	; x, y = y, x
 
-E20.py:63:15: E203 [*] Whitespace before ';'
+error[E203]: E20.py:63:15: [*] Whitespace before ';'
+
    |
 61 | #: E203:2:15 E702:2:16
 62 | if x == 4:
 63 |     print x, y  ; x, y = y, x
-   |               ^^ E203
+   |               ^^
 64 | #: E203:3:13
 65 | if x == 4:
    |
    = help: Remove whitespace before ';'
-
 ℹ Safe fix
 60 60 |     print x, y ; x, y = y, x
 61 61 | #: E203:2:15 E702:2:16
@@ -84,17 +84,17 @@ E20.py:63:15: E203 [*] Whitespace before ';'
 65 65 | if x == 4:
 66 66 |     print x, y
 
-E20.py:67:13: E203 [*] Whitespace before ','
+error[E203]: E20.py:67:13: [*] Whitespace before ','
+
    |
 65 | if x == 4:
 66 |     print x, y
 67 |     x, y = y , x
-   |             ^ E203
+   |             ^
 68 | #: E203:3:13
 69 | if x == 4:
    |
    = help: Remove whitespace before ','
-
 ℹ Safe fix
 64 64 | #: E203:3:13
 65 65 | if x == 4:
@@ -105,17 +105,17 @@ E20.py:67:13: E203 [*] Whitespace before ','
 69 69 | if x == 4:
 70 70 |     print x, y
 
-E20.py:71:13: E203 [*] Whitespace before ','
+error[E203]: E20.py:71:13: [*] Whitespace before ','
+
    |
 69 | if x == 4:
 70 |     print x, y
 71 |     x, y = y    , x
-   |             ^^^^ E203
+   |             ^^^^
 72 | #: Okay
 73 | if x == 4:
    |
    = help: Remove whitespace before ','
-
 ℹ Safe fix
 68 68 | #: E203:3:13
 69 69 | if x == 4:
@@ -126,16 +126,16 @@ E20.py:71:13: E203 [*] Whitespace before ','
 73 73 | if x == 4:
 74 74 |     print x, y
 
-E20.py:100:19: E203 [*] Whitespace before ':'
+error[E203]: E20.py:100:19: [*] Whitespace before ':'
+
     |
  99 | #: E203:1:19
 100 | ham{lower + offset : upper + offset}
-    |                   ^ E203
+    |                   ^
 101 | 
 102 | #: E203:1:19
     |
     = help: Remove whitespace before ':'
-
 ℹ Safe fix
 97  97  | ham[(lower + offset) : upper + offset]
 98  98  | 
@@ -146,16 +146,16 @@ E20.py:100:19: E203 [*] Whitespace before ':'
 102 102 | #: E203:1:19
 103 103 | ham[lower + offset  : upper + offset]
 
-E20.py:103:19: E203 [*] Whitespace before ':'
+error[E203]: E20.py:103:19: [*] Whitespace before ':'
+
     |
 102 | #: E203:1:19
 103 | ham[lower + offset  : upper + offset]
-    |                   ^^ E203
+    |                   ^^
 104 | 
 105 | #: Okay
     |
     = help: Remove whitespace before ':'
-
 ℹ Safe fix
 100 100 | ham{lower + offset : upper + offset}
 101 101 | 
@@ -166,16 +166,16 @@ E20.py:103:19: E203 [*] Whitespace before ':'
 105 105 | #: Okay
 106 106 | release_lines = history_file_lines[history_file_lines.index('## Unreleased') + 1: -1]
 
-E20.py:131:21: E203 [*] Whitespace before ':'
+error[E203]: E20.py:131:21: [*] Whitespace before ':'
+
     |
 130 | #: E203:1:21
 131 | ham[lower + offset : : upper + offset]
-    |                     ^ E203
+    |                     ^
 132 | 
 133 | #: E203:1:20
     |
     = help: Remove whitespace before ':'
-
 ℹ Safe fix
 128 128 | ham[lower + offset::upper + offset]
 129 129 | 
@@ -186,16 +186,16 @@ E20.py:131:21: E203 [*] Whitespace before ':'
 133 133 | #: E203:1:20
 134 134 | ham[lower + offset: :upper + offset]
 
-E20.py:134:20: E203 [*] Whitespace before ':'
+error[E203]: E20.py:134:20: [*] Whitespace before ':'
+
     |
 133 | #: E203:1:20
 134 | ham[lower + offset: :upper + offset]
-    |                    ^ E203
+    |                    ^
 135 | 
 136 | #: E203:1:20
     |
     = help: Remove whitespace before ':'
-
 ℹ Safe fix
 131 131 | ham[lower + offset : : upper + offset]
 132 132 | 
@@ -206,16 +206,16 @@ E20.py:134:20: E203 [*] Whitespace before ':'
 136 136 | #: E203:1:20
 137 137 | ham[{lower + offset : upper + offset} : upper + offset]
 
-E20.py:137:20: E203 [*] Whitespace before ':'
+error[E203]: E20.py:137:20: [*] Whitespace before ':'
+
     |
 136 | #: E203:1:20
 137 | ham[{lower + offset : upper + offset} : upper + offset]
-    |                    ^ E203
+    |                    ^
 138 | 
 139 | #: Okay
     |
     = help: Remove whitespace before ':'
-
 ℹ Safe fix
 134 134 | ham[lower + offset: :upper + offset]
 135 135 | 
@@ -226,16 +226,16 @@ E20.py:137:20: E203 [*] Whitespace before ':'
 139 139 | #: Okay
 140 140 | ham[upper:]
 
-E20.py:149:10: E203 [*] Whitespace before ':'
+error[E203]: E20.py:149:10: [*] Whitespace before ':'
+
     |
 148 | #: E203:1:10
 149 | ham[upper  :]
-    |          ^^ E203
+    |          ^^
 150 | 
 151 | #: Okay
     |
     = help: Remove whitespace before ':'
-
 ℹ Safe fix
 146 146 | ham[upper : ]
 147 147 | 
@@ -246,16 +246,16 @@ E20.py:149:10: E203 [*] Whitespace before ':'
 151 151 | #: Okay
 152 152 | ham[lower +1 :, "columnname"]
 
-E20.py:155:14: E203 [*] Whitespace before ':'
+error[E203]: E20.py:155:14: [*] Whitespace before ':'
+
     |
 154 | #: E203:1:13
 155 | ham[lower + 1  :, "columnname"]
-    |              ^^ E203
+    |              ^^
 156 | 
 157 | #: Okay
     |
     = help: Remove whitespace before ':'
-
 ℹ Safe fix
 152 152 | ham[lower +1 :, "columnname"]
 153 153 | 
@@ -266,14 +266,14 @@ E20.py:155:14: E203 [*] Whitespace before ':'
 157 157 | #: Okay
 158 158 | f"{ham[lower +1 :, "columnname"]}"
 
-E20.py:161:17: E203 [*] Whitespace before ':'
+error[E203]: E20.py:161:17: [*] Whitespace before ':'
+
     |
 160 | #: E203:1:13
 161 | f"{ham[lower + 1  :, "columnname"]}"
-    |                 ^^ E203
+    |                 ^^
     |
     = help: Remove whitespace before ':'
-
 ℹ Safe fix
 158 158 | f"{ham[lower +1 :, "columnname"]}"
 159 159 | 

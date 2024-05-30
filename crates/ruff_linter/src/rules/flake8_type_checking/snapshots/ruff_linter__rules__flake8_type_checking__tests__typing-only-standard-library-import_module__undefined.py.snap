@@ -1,15 +1,15 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
 ---
-undefined.py:3:29: TCH003 [*] Move standard library import `collections.abc.Sequence` into a type-checking block
+error[TCH003]: undefined.py:3:29: [*] Move standard library import `collections.abc.Sequence` into a type-checking block
+
   |
 1 | from __future__ import annotations
 2 | 
 3 | from collections.abc import Sequence
-  |                             ^^^^^^^^ TCH003
+  |                             ^^^^^^^^
   |
   = help: Move into type-checking block
-
 ℹ Unsafe fix
 1 1 | from __future__ import annotations
 2 2 | 
@@ -21,5 +21,3 @@ undefined.py:3:29: TCH003 [*] Move standard library import `collections.abc.Sequ
 4 7 | 
 5 8 | 
 6 9 | class Foo(MyBaseClass):
-
-

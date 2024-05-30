@@ -55,8 +55,9 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | if True:
 2 | 1 + 1
-  | ^ Syntax Error: Expected an indented block after `if` statement
+  | ^ Expected an indented block after `if` statement
   |

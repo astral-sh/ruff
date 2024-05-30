@@ -67,11 +67,12 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 3 |     #             complex literal pattern
 4 |     #             v
 5 |     case (x as y) + 1j:
-  |           ^^^^^^ Syntax Error: Expected a real number in complex literal pattern
+  |           ^^^^^^ Expected a real number in complex literal pattern
 6 |     #     ^^^^^^
 7 |     #    as-pattern
   |

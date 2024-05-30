@@ -88,43 +88,49 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | import *
-  |        ^ Syntax Error: Expected an import name
+  |        ^ Expected an import name
 2 | import x, *, y
   |
 
 
+error: Invalid syntax
   |
 1 | import *
-  |         ^ Syntax Error: Expected an expression
+  |         ^ Expected an expression
 2 | import x, *, y
   |
 
 
+error: Invalid syntax
   |
 1 | import *
 2 | import x, *, y
-  |           ^ Syntax Error: Expected an import name
+  |           ^ Expected an import name
   |
 
 
-  |
-1 | import *
-2 | import x, *, y
-  |         ^ Syntax Error: Trailing comma not allowed
-  |
-
-
+error: Invalid syntax
   |
 1 | import *
 2 | import x, *, y
-  |           ^ Syntax Error: Simple statements must be separated by newlines or semicolons
+  |         ^ Trailing comma not allowed
   |
 
 
+error: Invalid syntax
   |
 1 | import *
 2 | import x, *, y
-  |            ^ Syntax Error: Expected an expression
+  |           ^ Simple statements must be separated by newlines or semicolons
+  |
+
+
+error: Invalid syntax
+  |
+1 | import *
+2 | import x, *, y
+  |            ^ Expected an expression
   |

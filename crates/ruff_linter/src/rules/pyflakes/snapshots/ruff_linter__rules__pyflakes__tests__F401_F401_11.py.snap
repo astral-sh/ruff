@@ -1,14 +1,14 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
-F401_11.py:4:27: F401 [*] `pathlib.PurePath` imported but unused
+error[F401]: F401_11.py:4:27: [*] `pathlib.PurePath` imported but unused
+
   |
 3 | from typing import List
 4 | from pathlib import Path, PurePath
-  |                           ^^^^^^^^ F401
+  |                           ^^^^^^^^
   |
   = help: Remove unused import: `pathlib.PurePath`
-
 ℹ Safe fix
 1 1 | """Test: parsing of nested string annotations."""
 2 2 | 
@@ -18,5 +18,3 @@ F401_11.py:4:27: F401 [*] `pathlib.PurePath` imported but unused
 5 5 | 
 6 6 | 
 7 7 | x: """List['Path']""" = []
-
-

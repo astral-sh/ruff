@@ -47,14 +47,16 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | # TODO(dhruvmanila): Here, `case` is a name token because of soft keyword transformer
 2 | match x:
 3 |     case : ...
-  |     ^^^^ Syntax Error: Expected `case` block
+  |     ^^^^ Expected `case` block
   |
 
 
+error: Invalid syntax
   |
 2 | match x:
 3 |     case : ...

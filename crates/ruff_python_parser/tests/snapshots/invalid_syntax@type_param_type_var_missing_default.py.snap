@@ -145,25 +145,28 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | type X[T =] = int
-  |           ^ Syntax Error: Expected an expression
+  |           ^ Expected an expression
 2 | type X[T: int =] = int
 3 | type X[T1 =, T2] = int
   |
 
 
+error: Invalid syntax
   |
 1 | type X[T =] = int
 2 | type X[T: int =] = int
-  |                ^ Syntax Error: Expected an expression
+  |                ^ Expected an expression
 3 | type X[T1 =, T2] = int
   |
 
 
+error: Invalid syntax
   |
 1 | type X[T =] = int
 2 | type X[T: int =] = int
 3 | type X[T1 =, T2] = int
-  |            ^ Syntax Error: Expected an expression
+  |            ^ Expected an expression
   |

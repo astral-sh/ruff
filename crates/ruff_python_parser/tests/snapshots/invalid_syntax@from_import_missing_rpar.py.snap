@@ -129,32 +129,36 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | from x import (a, b
 2 | 1 + 1
-  | ^ Syntax Error: Expected ',', found int
+  | ^ Expected ',', found int
 3 | from x import (a, b,
 4 | 2 + 2
   |
 
 
+error: Invalid syntax
   |
 1 | from x import (a, b
 2 | 1 + 1
 3 | from x import (a, b,
-  | ^^^^ Syntax Error: Simple statements must be separated by newlines or semicolons
+  | ^^^^ Simple statements must be separated by newlines or semicolons
 4 | 2 + 2
   |
 
 
+error: Invalid syntax
   |
 2 | 1 + 1
 3 | from x import (a, b,
 4 | 2 + 2
-  | ^ Syntax Error: Expected an import name or a ')'
+  | ^ Expected an import name or a ')'
   |
 
 
+error: Invalid syntax
   |
 3 | from x import (a, b,
 4 | 2 + 2

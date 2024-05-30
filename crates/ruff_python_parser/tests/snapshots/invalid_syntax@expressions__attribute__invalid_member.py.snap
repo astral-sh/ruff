@@ -114,33 +114,37 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | x.1
-  |  ^^ Syntax Error: Simple statements must be separated by newlines or semicolons
+  |  ^^ Simple statements must be separated by newlines or semicolons
 2 | x.1.0
 3 | x.[0]
   |
 
 
+error: Invalid syntax
   |
 1 | x.1
 2 | x.1.0
-  |  ^^ Syntax Error: Simple statements must be separated by newlines or semicolons
+  |  ^^ Simple statements must be separated by newlines or semicolons
 3 | x.[0]
   |
 
 
+error: Invalid syntax
   |
 1 | x.1
 2 | x.1.0
-  |    ^^ Syntax Error: Simple statements must be separated by newlines or semicolons
+  |    ^^ Simple statements must be separated by newlines or semicolons
 3 | x.[0]
   |
 
 
+error: Invalid syntax
   |
 1 | x.1
 2 | x.1.0
 3 | x.[0]
-  |   ^ Syntax Error: Expected an identifier
+  |   ^ Expected an identifier
   |

@@ -116,29 +116,33 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | (*x for x in y)
-  |  ^^ Syntax Error: Iterable unpacking cannot be used in a comprehension
+  |  ^^ Iterable unpacking cannot be used in a comprehension
 2 | (x := 1, for x in y)
   |
 
 
+error: Invalid syntax
   |
 1 | (*x for x in y)
 2 | (x := 1, for x in y)
-  |          ^^^ Syntax Error: Expected an expression or a ')'
+  |          ^^^ Expected an expression or a ')'
   |
 
 
-  |
-1 | (*x for x in y)
-2 | (x := 1, for x in y)
-  |                    ^ Syntax Error: Expected ':', found ')'
-  |
-
-
+error: Invalid syntax
   |
 1 | (*x for x in y)
 2 | (x := 1, for x in y)
-  |                      Syntax Error: Expected a statement
+  |                    ^ Expected ':', found ')'
+  |
+
+
+error: Invalid syntax
+  |
+1 | (*x for x in y)
+2 | (x := 1, for x in y)
+  |                     ^ Expected a statement
   |

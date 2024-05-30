@@ -1,16 +1,16 @@
 ---
 source: crates/ruff_linter/src/rules/refurb/mod.rs
 ---
-FURB163.py:4:1: FURB163 [*] Prefer `math.log2(1)` over `math.log` with a redundant base
+error[FURB163]: FURB163.py:4:1: [*] Prefer `math.log2(1)` over `math.log` with a redundant base
+
   |
 3 | # Errors
 4 | math.log(1, 2)
-  | ^^^^^^^^^^^^^^ FURB163
+  | ^^^^^^^^^^^^^^
 5 | math.log(1, 10)
 6 | math.log(1, math.e)
   |
   = help: Replace with `math.log2(1)`
-
 ℹ Safe fix
 1 1 | import math
 2 2 | 
@@ -21,17 +21,17 @@ FURB163.py:4:1: FURB163 [*] Prefer `math.log2(1)` over `math.log` with a redunda
 6 6 | math.log(1, math.e)
 7 7 | foo = ...
 
-FURB163.py:5:1: FURB163 [*] Prefer `math.log10(1)` over `math.log` with a redundant base
+error[FURB163]: FURB163.py:5:1: [*] Prefer `math.log10(1)` over `math.log` with a redundant base
+
   |
 3 | # Errors
 4 | math.log(1, 2)
 5 | math.log(1, 10)
-  | ^^^^^^^^^^^^^^^ FURB163
+  | ^^^^^^^^^^^^^^^
 6 | math.log(1, math.e)
 7 | foo = ...
   |
   = help: Replace with `math.log10(1)`
-
 ℹ Safe fix
 2 2 | 
 3 3 | # Errors
@@ -42,17 +42,17 @@ FURB163.py:5:1: FURB163 [*] Prefer `math.log10(1)` over `math.log` with a redund
 7 7 | foo = ...
 8 8 | math.log(foo, 2)
 
-FURB163.py:6:1: FURB163 [*] Prefer `math.log(1)` over `math.log` with a redundant base
+error[FURB163]: FURB163.py:6:1: [*] Prefer `math.log(1)` over `math.log` with a redundant base
+
   |
 4 | math.log(1, 2)
 5 | math.log(1, 10)
 6 | math.log(1, math.e)
-  | ^^^^^^^^^^^^^^^^^^^ FURB163
+  | ^^^^^^^^^^^^^^^^^^^
 7 | foo = ...
 8 | math.log(foo, 2)
   |
   = help: Replace with `math.log(1)`
-
 ℹ Safe fix
 3 3 | # Errors
 4 4 | math.log(1, 2)
@@ -63,17 +63,17 @@ FURB163.py:6:1: FURB163 [*] Prefer `math.log(1)` over `math.log` with a redundan
 8 8 | math.log(foo, 2)
 9 9 | math.log(foo, 10)
 
-FURB163.py:8:1: FURB163 [*] Prefer `math.log2(foo)` over `math.log` with a redundant base
+error[FURB163]: FURB163.py:8:1: [*] Prefer `math.log2(foo)` over `math.log` with a redundant base
+
    |
  6 | math.log(1, math.e)
  7 | foo = ...
  8 | math.log(foo, 2)
-   | ^^^^^^^^^^^^^^^^ FURB163
+   | ^^^^^^^^^^^^^^^^
  9 | math.log(foo, 10)
 10 | math.log(foo, math.e)
    |
    = help: Replace with `math.log2(foo)`
-
 ℹ Safe fix
 5 5 | math.log(1, 10)
 6 6 | math.log(1, math.e)
@@ -84,17 +84,17 @@ FURB163.py:8:1: FURB163 [*] Prefer `math.log2(foo)` over `math.log` with a redun
 10 10 | math.log(foo, math.e)
 11 11 | math.log(1, 2.0)
 
-FURB163.py:9:1: FURB163 [*] Prefer `math.log10(foo)` over `math.log` with a redundant base
+error[FURB163]: FURB163.py:9:1: [*] Prefer `math.log10(foo)` over `math.log` with a redundant base
+
    |
  7 | foo = ...
  8 | math.log(foo, 2)
  9 | math.log(foo, 10)
-   | ^^^^^^^^^^^^^^^^^ FURB163
+   | ^^^^^^^^^^^^^^^^^
 10 | math.log(foo, math.e)
 11 | math.log(1, 2.0)
    |
    = help: Replace with `math.log10(foo)`
-
 ℹ Safe fix
 6  6  | math.log(1, math.e)
 7  7  | foo = ...
@@ -105,17 +105,17 @@ FURB163.py:9:1: FURB163 [*] Prefer `math.log10(foo)` over `math.log` with a redu
 11 11 | math.log(1, 2.0)
 12 12 | math.log(1, 10.0)
 
-FURB163.py:10:1: FURB163 [*] Prefer `math.log(foo)` over `math.log` with a redundant base
+error[FURB163]: FURB163.py:10:1: [*] Prefer `math.log(foo)` over `math.log` with a redundant base
+
    |
  8 | math.log(foo, 2)
  9 | math.log(foo, 10)
 10 | math.log(foo, math.e)
-   | ^^^^^^^^^^^^^^^^^^^^^ FURB163
+   | ^^^^^^^^^^^^^^^^^^^^^
 11 | math.log(1, 2.0)
 12 | math.log(1, 10.0)
    |
    = help: Replace with `math.log(foo)`
-
 ℹ Safe fix
 7  7  | foo = ...
 8  8  | math.log(foo, 2)
@@ -126,16 +126,16 @@ FURB163.py:10:1: FURB163 [*] Prefer `math.log(foo)` over `math.log` with a redun
 12 12 | math.log(1, 10.0)
 13 13 | 
 
-FURB163.py:11:1: FURB163 [*] Prefer `math.log2(1)` over `math.log` with a redundant base
+error[FURB163]: FURB163.py:11:1: [*] Prefer `math.log2(1)` over `math.log` with a redundant base
+
    |
  9 | math.log(foo, 10)
 10 | math.log(foo, math.e)
 11 | math.log(1, 2.0)
-   | ^^^^^^^^^^^^^^^^ FURB163
+   | ^^^^^^^^^^^^^^^^
 12 | math.log(1, 10.0)
    |
    = help: Replace with `math.log2(1)`
-
 ℹ Safe fix
 8  8  | math.log(foo, 2)
 9  9  | math.log(foo, 10)
@@ -146,17 +146,17 @@ FURB163.py:11:1: FURB163 [*] Prefer `math.log2(1)` over `math.log` with a redund
 13 13 | 
 14 14 | # OK
 
-FURB163.py:12:1: FURB163 [*] Prefer `math.log10(1)` over `math.log` with a redundant base
+error[FURB163]: FURB163.py:12:1: [*] Prefer `math.log10(1)` over `math.log` with a redundant base
+
    |
 10 | math.log(foo, math.e)
 11 | math.log(1, 2.0)
 12 | math.log(1, 10.0)
-   | ^^^^^^^^^^^^^^^^^ FURB163
+   | ^^^^^^^^^^^^^^^^^
 13 | 
 14 | # OK
    |
    = help: Replace with `math.log10(1)`
-
 ℹ Safe fix
 9  9  | math.log(foo, 10)
 10 10 | math.log(foo, math.e)

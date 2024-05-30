@@ -106,20 +106,22 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | try:
 2 |     pass
 3 | except yield x:
-  |        ^^^^^^^ Syntax Error: Yield expression cannot be used here
+  |        ^^^^^^^ Yield expression cannot be used here
 4 |     pass
 5 | try:
   |
 
 
+error: Invalid syntax
   |
 5 | try:
 6 |     pass
 7 | except* *x:
-  |         ^^ Syntax Error: Starred expression cannot be used here
+  |         ^^ Starred expression cannot be used here
 8 |     pass
   |

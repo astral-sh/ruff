@@ -1,18 +1,18 @@
 ---
 source: crates/ruff_linter/src/linter.rs
 ---
-isort.ipynb:cell 1:1:1: I001 [*] Import block is un-sorted or un-formatted
+error[I001]: isort.ipynb:cell 1:1:1: [*] Import block is un-sorted or un-formatted
+
   |
 1 | / from pathlib import Path
 2 | | import random
 3 | | import math
 4 | | from typing import Any
-  | |_^ I001
+  | |_^
 5 |   import collections
 6 |   # Newline should be added here
   |
   = help: Organize imports
-
 ℹ Safe fix
   1 |+import math
   2 |+import random
@@ -23,17 +23,17 @@ isort.ipynb:cell 1:1:1: I001 [*] Import block is un-sorted or un-formatted
 5 5 | import collections
 6 6 | # Newline should be added here
 
-isort.ipynb:cell 2:1:1: I001 [*] Import block is un-sorted or un-formatted
+error[I001]: isort.ipynb:cell 2:1:1: [*] Import block is un-sorted or un-formatted
+
   |
 1 | / from typing import Any
 2 | | import collections
 3 | | # Newline should be added here
-  | |_^ I001
+  | |_^
 4 |   def foo():
 5 |       pass
   |
   = help: Organize imports
-
 ℹ Safe fix
 1 1 | from pathlib import Path
 2 2 | import random
@@ -47,17 +47,17 @@ isort.ipynb:cell 2:1:1: I001 [*] Import block is un-sorted or un-formatted
 7 9 | def foo():
 8 10 |     pass
 
-isort.ipynb:cell 3:1:1: I001 [*] Import block is un-sorted or un-formatted
+error[I001]: isort.ipynb:cell 3:1:1: [*] Import block is un-sorted or un-formatted
+
   |
 1 | / from pathlib import Path
 2 | | import sys
 3 | | 
 4 | | %matplotlib \
-  | |_^ I001
+  | |_^
 5 |       --inline
   |
   = help: Organize imports
-
 ℹ Safe fix
 6  6  | # Newline should be added here
 7  7  | def foo():
@@ -69,7 +69,8 @@ isort.ipynb:cell 3:1:1: I001 [*] Import block is un-sorted or un-formatted
 12 12 | %matplotlib \
 13 13 |     --inline
 
-isort.ipynb:cell 3:7:1: I001 [*] Import block is un-sorted or un-formatted
+error[I001]: isort.ipynb:cell 3:7:1: [*] Import block is un-sorted or un-formatted
+
   |
 5 |       --inline
 6 |   
@@ -77,7 +78,6 @@ isort.ipynb:cell 3:7:1: I001 [*] Import block is un-sorted or un-formatted
 8 | | import abc
   |
   = help: Organize imports
-
 ℹ Safe fix
 12 12 | %matplotlib \
 13 13 |     --inline
@@ -85,5 +85,3 @@ isort.ipynb:cell 3:7:1: I001 [*] Import block is un-sorted or un-formatted
    15 |+import abc
 15 16 | import math
 16    |-import abc
-
-

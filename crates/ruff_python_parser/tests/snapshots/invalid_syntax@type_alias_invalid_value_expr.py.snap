@@ -126,35 +126,39 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | type x = *y
-  |          ^^ Syntax Error: Starred expression cannot be used here
+  |          ^^ Starred expression cannot be used here
 2 | type x = yield y
 3 | type x = yield from y
   |
 
 
+error: Invalid syntax
   |
 1 | type x = *y
 2 | type x = yield y
-  |          ^^^^^^^ Syntax Error: Yield expression cannot be used here
+  |          ^^^^^^^ Yield expression cannot be used here
 3 | type x = yield from y
 4 | type x = x := 1
   |
 
 
+error: Invalid syntax
   |
 1 | type x = *y
 2 | type x = yield y
 3 | type x = yield from y
-  |          ^^^^^^^^^^^^ Syntax Error: Yield expression cannot be used here
+  |          ^^^^^^^^^^^^ Yield expression cannot be used here
 4 | type x = x := 1
   |
 
 
+error: Invalid syntax
   |
 2 | type x = yield y
 3 | type x = yield from y
 4 | type x = x := 1
-  |            ^^ Syntax Error: Expected a statement
+  |            ^^ Expected a statement
   |

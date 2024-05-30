@@ -89,17 +89,19 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | def foo():
 2 | def foo() -> int:
-  | ^^^ Syntax Error: Expected an indented block after function definition
+  | ^^^ Expected an indented block after function definition
 3 | x = 42
   |
 
 
+error: Invalid syntax
   |
 1 | def foo():
 2 | def foo() -> int:
 3 | x = 42
-  | ^ Syntax Error: Expected an indented block after function definition
+  | ^ Expected an indented block after function definition
   |

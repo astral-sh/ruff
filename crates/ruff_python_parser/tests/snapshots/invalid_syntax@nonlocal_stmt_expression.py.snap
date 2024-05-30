@@ -45,7 +45,8 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | nonlocal x + 1
-  |            ^ Syntax Error: Expected ',', found '+'
+  |            ^ Expected ',', found '+'
   |

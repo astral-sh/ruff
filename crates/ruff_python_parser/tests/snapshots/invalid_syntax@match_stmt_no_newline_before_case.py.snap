@@ -59,13 +59,15 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | match foo: case _: ...
-  |            ^^^^ Syntax Error: Expected newline, found name
+  |            ^^^^ Expected newline, found name
   |
 
 
+error: Invalid syntax
   |
 1 | match foo: case _: ...
-  |                 ^ Syntax Error: Simple statements must be separated by newlines or semicolons
+  |                 ^ Simple statements must be separated by newlines or semicolons
   |

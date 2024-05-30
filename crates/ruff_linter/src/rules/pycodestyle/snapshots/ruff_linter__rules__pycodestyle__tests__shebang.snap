@@ -1,21 +1,19 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-shebang.py:3:1: E265 [*] Block comment should start with `# `
+error[E265]: shebang.py:3:1: [*] Block comment should start with `# `
+
   |
 1 | #!/usr/bin/python
 2 | #
 3 | #!
-  | ^^ E265
+  | ^^
 4 | #:
   |
   = help: Format space
-
 ℹ Safe fix
 1 1 | #!/usr/bin/python
 2 2 | #
 3   |-#!
   3 |+# !
 4 4 | #:
-
-

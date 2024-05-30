@@ -97,15 +97,17 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | f"{x!123}"
-  |      ^^^ Syntax Error: f-string: invalid conversion character
+  |      ^^^ f-string: invalid conversion character
 2 | f"{x!'a'}"
   |
 
 
+error: Invalid syntax
   |
 1 | f"{x!123}"
 2 | f"{x!'a'}"
-  |      ^^^ Syntax Error: f-string: invalid conversion character
+  |      ^^^ f-string: invalid conversion character
   |

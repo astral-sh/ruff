@@ -98,15 +98,17 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | type X[**P =] = int
-  |             ^ Syntax Error: Expected an expression
+  |             ^ Expected an expression
 2 | type X[**P =, T2] = int
   |
 
 
+error: Invalid syntax
   |
 1 | type X[**P =] = int
 2 | type X[**P =, T2] = int
-  |             ^ Syntax Error: Expected an expression
+  |             ^ Expected an expression
   |

@@ -171,84 +171,93 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 |   f"{"
   |  ____^
 2 | | f"{foo!r"
-  | |_^ Syntax Error: missing closing quote in string literal
+  | |_^ missing closing quote in string literal
 3 |   f"{foo="
 4 |   f"{"
   |
 
 
+error: Invalid syntax
   |
 1 | f"{"
 2 | f"{foo!r"
-  | ^^ Syntax Error: Expected an f-string element or the end of the f-string
+  | ^^ Expected an f-string element or the end of the f-string
 3 | f"{foo="
 4 | f"{"
   |
 
 
+error: Invalid syntax
   |
 1 |   f"{"
 2 |   f"{foo!r"
   |  ________^
 3 | | f"{foo="
-  | |_^ Syntax Error: missing closing quote in string literal
+  | |_^ missing closing quote in string literal
 4 |   f"{"
 5 |   f"""{"""
   |
 
 
+error: Invalid syntax
   |
 1 | f"{"
 2 | f"{foo!r"
 3 | f"{foo="
-  | ^^ Syntax Error: f-string: expecting '}'
+  | ^^ f-string: expecting '}'
 4 | f"{"
 5 | f"""{"""
   |
 
 
+error: Invalid syntax
   |
 1 |   f"{"
 2 |   f"{foo!r"
 3 |   f"{foo="
   |  ________^
 4 | | f"{"
-  | |_^ Syntax Error: missing closing quote in string literal
+  | |_^ missing closing quote in string literal
 5 |   f"""{"""
   |
 
 
+error: Invalid syntax
   |
 2 | f"{foo!r"
 3 | f"{foo="
 4 | f"{"
-  | ^^ Syntax Error: Expected an f-string element or the end of the f-string
+  | ^^ Expected an f-string element or the end of the f-string
 5 | f"""{"""
   |
 
 
+error: Invalid syntax
   |
 2 |   f"{foo!r"
 3 |   f"{foo="
 4 |   f"{"
   |  ____^
 5 | | f"""{"""
-  | |_^ Syntax Error: missing closing quote in string literal
+  | |_^ missing closing quote in string literal
   |
 
 
+error: Invalid syntax
   |
 3 | f"{foo="
 4 | f"{"
 5 | f"""{"""
-  | ^^^^ Syntax Error: Expected an f-string element or the end of the f-string
+  | ^^^^ Expected an f-string element or the end of the f-string
   |
 
 
+error: Invalid syntax
   |
 3 | f"{foo="
 4 | f"{"
@@ -257,36 +266,42 @@ Module(
   |
 
 
+error: Invalid syntax
   |
 4 | f"{"
 5 | f"""{"""
   |
 
 
+error: Invalid syntax
   |
 4 | f"{"
 5 | f"""{"""
   |
 
 
+error: Invalid syntax
   |
 4 | f"{"
 5 | f"""{"""
   |
 
 
+error: Invalid syntax
   |
 4 | f"{"
 5 | f"""{"""
   |
 
 
+error: Invalid syntax
   |
 4 | f"{"
 5 | f"""{"""
   |
 
 
+error: Invalid syntax
   |
 4 | f"{"
 5 | f"""{"""

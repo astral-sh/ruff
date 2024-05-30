@@ -1,9 +1,9 @@
 use std::borrow::Cow;
+use std::fmt::Write as _;
 use std::fmt::{Display, Formatter};
 use std::io::Write;
 
-use annotate_snippets::display_list::{DisplayList, FormatOptions};
-use annotate_snippets::snippet::{Annotation, AnnotationType, Slice, Snippet, SourceAnnotation};
+use annotate_snippets::{Level, Renderer, Snippet};
 use bitflags::bitflags;
 use colored::Colorize;
 
@@ -71,8 +71,9 @@ impl Emitter for TextEmitter {
         context: &EmitterContext,
     ) -> anyhow::Result<()> {
         for message in messages {
+            let mut title = String::new();
             write!(
-                writer,
+                title,
                 "{path}{sep}",
                 path = relativize_path(message.filename()).bold(),
                 sep = ":".cyan(),
@@ -84,7 +85,7 @@ impl Emitter for TextEmitter {
             // Check if we're working on a jupyter notebook and translate positions with cell accordingly
             let diagnostic_location = if let Some(notebook_index) = notebook_index {
                 write!(
-                    writer,
+                    title,
                     "cell {cell}{sep}",
                     cell = notebook_index
                         .cell(start_location.row)
@@ -103,7 +104,7 @@ impl Emitter for TextEmitter {
             };
 
             writeln!(
-                writer,
+                title,
                 "{row}{sep}{col}{sep} {code_and_body}",
                 row = diagnostic_location.row,
                 col = diagnostic_location.column,
@@ -115,16 +116,33 @@ impl Emitter for TextEmitter {
                 }
             )?;
 
-            if self.flags.intersects(EmitterFlags::SHOW_SOURCE) {
-                writeln!(
-                    writer,
-                    "{}",
-                    MessageCodeFrame {
-                        message,
-                        notebook_index
-                    }
-                )?;
-            }
+            let code = message.kind.rule().noqa_code().to_string();
+            let mut snippet_message = Level::Error.title(&title).id(&code);
+
+            let (code_frame, advise) = if self.flags.intersects(EmitterFlags::SHOW_SOURCE) {
+                (
+                    Some(CodeFrameSnippet::new(message, notebook_index)),
+                    create_suggestion_footer(&message),
+                )
+            } else {
+                (None, None)
+            };
+
+            snippet_message = snippet_message
+                .snippets(code_frame.as_ref().map(|snippet| snippet.as_snippet()))
+                .footers(advise);
+
+            let renderer = if cfg!(not(test)) {
+                if colored::control::SHOULD_COLORIZE.should_colorize() {
+                    Renderer::styled()
+                } else {
+                    Renderer::plain()
+                }
+            } else {
+                Renderer::plain()
+            };
+
+            writeln!(writer, "{}", renderer.render(snippet_message))?;
 
             if self.flags.intersects(EmitterFlags::SHOW_FIX_DIFF) {
                 if let Some(diff) = Diff::from_message(message) {
@@ -152,8 +170,7 @@ impl Display for RuleCodeAndBody<'_> {
                 if fix.applies(self.unsafe_fixes.required_applicability()) {
                     return write!(
                         f,
-                        "{code} {fix}{body}",
-                        code = kind.rule().noqa_code().to_string().red().bold(),
+                        "{fix}{body}",
                         fix = format_args!("[{}] ", "*".cyan()),
                         body = kind.body,
                     );
@@ -161,36 +178,18 @@ impl Display for RuleCodeAndBody<'_> {
             }
         };
 
-        write!(
-            f,
-            "{code} {body}",
-            code = kind.rule().noqa_code().to_string().red().bold(),
-            body = kind.body,
-        )
+        write!(f, "{body}", body = kind.body,)
     }
 }
 
-pub(super) struct MessageCodeFrame<'a> {
-    pub(crate) message: &'a Message,
-    pub(crate) notebook_index: Option<&'a NotebookIndex>,
+struct CodeFrameSnippet<'a> {
+    source: SourceCode<'a>,
+    line_start: OneIndexed,
 }
 
-impl Display for MessageCodeFrame<'_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let Message {
-            kind, file, range, ..
-        } = self.message;
-
-        let suggestion = kind.suggestion.as_deref();
-        let footer = if suggestion.is_some() {
-            vec![Annotation {
-                id: None,
-                label: suggestion,
-                annotation_type: AnnotationType::Help,
-            }]
-        } else {
-            Vec::new()
-        };
+impl<'a> CodeFrameSnippet<'a> {
+    fn new(message: &'a Message, notebook_index: Option<&NotebookIndex>) -> Self {
+        let Message { file, range, .. } = message;
 
         let source_code = file.to_source_code();
 
@@ -199,7 +198,7 @@ impl Display for MessageCodeFrame<'_> {
 
         // If we're working with a Jupyter Notebook, skip the lines which are
         // outside of the cell containing the diagnostic.
-        if let Some(index) = self.notebook_index {
+        if let Some(index) = notebook_index {
             let content_start_cell = index.cell(content_start_index).unwrap_or(OneIndexed::MIN);
             while start_index < content_start_index {
                 if index.cell(start_index).unwrap_or(OneIndexed::MIN) == content_start_cell {
@@ -224,7 +223,7 @@ impl Display for MessageCodeFrame<'_> {
 
         // If we're working with a Jupyter Notebook, skip the lines which are
         // outside of the cell containing the diagnostic.
-        if let Some(index) = self.notebook_index {
+        if let Some(index) = notebook_index {
             let content_end_cell = index.cell(content_end_index).unwrap_or(OneIndexed::MIN);
             while end_index > content_end_index {
                 if index.cell(end_index).unwrap_or(OneIndexed::MIN) == content_end_cell {
@@ -251,49 +250,29 @@ impl Display for MessageCodeFrame<'_> {
             range - start_offset,
         );
 
-        let start_char = source.text[TextRange::up_to(source.annotation_range.start())]
-            .chars()
-            .count();
-
-        let char_length = source.text[source.annotation_range].chars().count();
-
-        let label = kind.rule().noqa_code().to_string();
-
-        let snippet = Snippet {
-            title: None,
-            slices: vec![Slice {
-                source: &source.text,
-                line_start: self.notebook_index.map_or_else(
-                    || start_index.get(),
-                    |notebook_index| {
-                        notebook_index
-                            .cell_row(start_index)
-                            .unwrap_or(OneIndexed::MIN)
-                            .get()
-                    },
-                ),
-                annotations: vec![SourceAnnotation {
-                    label: &label,
-                    annotation_type: AnnotationType::Error,
-                    range: (start_char, start_char + char_length),
-                }],
-                // The origin (file name, line number, and column number) is already encoded
-                // in the `label`.
-                origin: None,
-                fold: false,
-            }],
-            footer,
-            opt: FormatOptions {
-                #[cfg(test)]
-                color: false,
-                #[cfg(not(test))]
-                color: colored::control::SHOULD_COLORIZE.should_colorize(),
-                ..FormatOptions::default()
+        let line_start = notebook_index.map_or_else(
+            || start_index,
+            |notebook_index| {
+                notebook_index
+                    .cell_row(start_index)
+                    .unwrap_or(OneIndexed::MIN)
             },
-        };
+        );
 
-        writeln!(f, "{message}", message = DisplayList::from(snippet))
+        Self { line_start, source }
     }
+
+    pub(super) fn as_snippet(&self) -> Snippet {
+        Snippet::source(&self.source.text)
+            .line_start(self.line_start.get())
+            .annotation(Level::Error.span(self.source.annotation_range.into()))
+    }
+}
+
+fn create_suggestion_footer(message: &Message) -> Option<annotate_snippets::Message> {
+    let suggestion = message.kind.suggestion.as_deref()?;
+
+    Some(Level::Help.title(suggestion))
 }
 
 fn replace_whitespace(source: &str, annotation_range: TextRange) -> SourceCode {

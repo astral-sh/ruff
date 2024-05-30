@@ -178,27 +178,30 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | # Starred expression inside f-string has a minimum precedence of bitwise or.
 2 | f"{*}"
-  |     ^ Syntax Error: Expected an expression
+  |     ^ Expected an expression
 3 | f"{*x and y}"
 4 | f"{*yield x}"
   |
 
 
+error: Invalid syntax
   |
 1 | # Starred expression inside f-string has a minimum precedence of bitwise or.
 2 | f"{*}"
 3 | f"{*x and y}"
-  |     ^^^^^^^ Syntax Error: Boolean expression cannot be used here
+  |     ^^^^^^^ Boolean expression cannot be used here
 4 | f"{*yield x}"
   |
 
 
+error: Invalid syntax
   |
 2 | f"{*}"
 3 | f"{*x and y}"
 4 | f"{*yield x}"
-  |     ^^^^^^^ Syntax Error: Yield expression cannot be used here
+  |     ^^^^^^^ Yield expression cannot be used here
   |

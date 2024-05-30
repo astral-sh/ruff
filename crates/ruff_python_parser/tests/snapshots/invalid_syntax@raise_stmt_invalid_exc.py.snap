@@ -86,25 +86,28 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | raise *x
-  |       ^^ Syntax Error: Starred expression cannot be used here
+  |       ^^ Starred expression cannot be used here
 2 | raise yield x
 3 | raise x := 1
   |
 
 
+error: Invalid syntax
   |
 1 | raise *x
 2 | raise yield x
-  |       ^^^^^^^ Syntax Error: Yield expression cannot be used here
+  |       ^^^^^^^ Yield expression cannot be used here
 3 | raise x := 1
   |
 
 
+error: Invalid syntax
   |
 1 | raise *x
 2 | raise yield x
 3 | raise x := 1
-  |         ^^ Syntax Error: Expected a statement
+  |         ^^ Expected a statement
   |

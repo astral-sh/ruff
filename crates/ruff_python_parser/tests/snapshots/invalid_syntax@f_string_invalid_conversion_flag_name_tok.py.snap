@@ -56,7 +56,8 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | f"{x!z}"
-  |      ^ Syntax Error: f-string: invalid conversion character
+  |      ^ f-string: invalid conversion character
   |

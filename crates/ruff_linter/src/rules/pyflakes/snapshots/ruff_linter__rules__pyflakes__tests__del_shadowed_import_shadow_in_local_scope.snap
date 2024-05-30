@@ -1,15 +1,15 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
-<filename>:2:8: F401 [*] `os` imported but unused
+error[F401]: <filename>:2:8: [*] `os` imported but unused
+
   |
 2 | import os
-  |        ^^ F401
+  |        ^^
 3 | 
 4 | def f():
   |
   = help: Remove unused import: `os`
-
 ℹ Safe fix
 1 1 | 
 2   |-import os
@@ -17,13 +17,12 @@ source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 4 3 | def f():
 5 4 |     os = 1
 
-<filename>:5:5: F811 Redefinition of unused `os` from line 2
+error[F811]: <filename>:5:5: Redefinition of unused `os` from line 2
+
   |
 4 | def f():
 5 |     os = 1
-  |     ^^ F811
+  |     ^^
 6 |     print(os)
   |
   = help: Remove definition: `os`
-
-

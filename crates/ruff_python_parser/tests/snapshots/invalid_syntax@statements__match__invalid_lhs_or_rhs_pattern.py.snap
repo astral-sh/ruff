@@ -918,183 +918,202 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | match invalid_lhs_pattern:
 2 |     case Foo() + 1j:
-  |          ^^^^^ Syntax Error: Expected a real number in complex literal pattern
+  |          ^^^^^ Expected a real number in complex literal pattern
 3 |         pass
 4 |     case x + 2j:
   |
 
 
+error: Invalid syntax
   |
 2 |     case Foo() + 1j:
 3 |         pass
 4 |     case x + 2j:
-  |          ^ Syntax Error: Expected a real number in complex literal pattern
+  |          ^ Expected a real number in complex literal pattern
 5 |         pass
 6 |     case _ + 3j:
   |
 
 
+error: Invalid syntax
   |
 4 |     case x + 2j:
 5 |         pass
 6 |     case _ + 3j:
-  |          ^ Syntax Error: Expected a real number in complex literal pattern
+  |          ^ Expected a real number in complex literal pattern
 7 |         pass
 8 |     case (1 | 2) + 4j:
   |
 
 
+error: Invalid syntax
    |
  6 |     case _ + 3j:
  7 |         pass
  8 |     case (1 | 2) + 4j:
-   |           ^^^^^ Syntax Error: Expected a real number in complex literal pattern
+   |           ^^^^^ Expected a real number in complex literal pattern
  9 |         pass
 10 |     case [1, 2] + 5j:
    |
 
 
+error: Invalid syntax
    |
  8 |     case (1 | 2) + 4j:
  9 |         pass
 10 |     case [1, 2] + 5j:
-   |          ^^^^^^ Syntax Error: Expected a real number in complex literal pattern
+   |          ^^^^^^ Expected a real number in complex literal pattern
 11 |         pass
 12 |     case {True: 1} + 6j:
    |
 
 
+error: Invalid syntax
    |
 10 |     case [1, 2] + 5j:
 11 |         pass
 12 |     case {True: 1} + 6j:
-   |          ^^^^^^^^^ Syntax Error: Expected a real number in complex literal pattern
+   |          ^^^^^^^^^ Expected a real number in complex literal pattern
 13 |         pass
 14 |     case 1j + 2j:
    |
 
 
+error: Invalid syntax
    |
 12 |     case {True: 1} + 6j:
 13 |         pass
 14 |     case 1j + 2j:
-   |          ^^ Syntax Error: Expected a real number in complex literal pattern
+   |          ^^ Expected a real number in complex literal pattern
 15 |         pass
 16 |     case -1j + 2j:
    |
 
 
+error: Invalid syntax
    |
 14 |     case 1j + 2j:
 15 |         pass
 16 |     case -1j + 2j:
-   |          ^^^ Syntax Error: Expected a real number in complex literal pattern
+   |          ^^^ Expected a real number in complex literal pattern
 17 |         pass
 18 |     case Foo(a as b) + 1j:
    |
 
 
+error: Invalid syntax
    |
 16 |     case -1j + 2j:
 17 |         pass
 18 |     case Foo(a as b) + 1j:
-   |          ^^^^^^^^^^^ Syntax Error: Expected a real number in complex literal pattern
+   |          ^^^^^^^^^^^ Expected a real number in complex literal pattern
 19 |         pass
    |
 
 
+error: Invalid syntax
    |
 21 | match invalid_rhs_pattern:
 22 |     case 1 + Foo():
-   |              ^^^^^ Syntax Error: Expected an imaginary number in complex literal pattern
+   |              ^^^^^ Expected an imaginary number in complex literal pattern
 23 |         pass
 24 |     case 2 + x:
    |
 
 
+error: Invalid syntax
    |
 22 |     case 1 + Foo():
 23 |         pass
 24 |     case 2 + x:
-   |              ^ Syntax Error: Expected an imaginary number in complex literal pattern
+   |              ^ Expected an imaginary number in complex literal pattern
 25 |         pass
 26 |     case 3 + _:
    |
 
 
+error: Invalid syntax
    |
 24 |     case 2 + x:
 25 |         pass
 26 |     case 3 + _:
-   |              ^ Syntax Error: Expected an imaginary number in complex literal pattern
+   |              ^ Expected an imaginary number in complex literal pattern
 27 |         pass
 28 |     case 4 + (1 | 2):
    |
 
 
+error: Invalid syntax
    |
 26 |     case 3 + _:
 27 |         pass
 28 |     case 4 + (1 | 2):
-   |               ^^^^^ Syntax Error: Expected an imaginary number in complex literal pattern
+   |               ^^^^^ Expected an imaginary number in complex literal pattern
 29 |         pass
 30 |     case 5 + [1, 2]:
    |
 
 
+error: Invalid syntax
    |
 28 |     case 4 + (1 | 2):
 29 |         pass
 30 |     case 5 + [1, 2]:
-   |              ^^^^^^ Syntax Error: Expected an imaginary number in complex literal pattern
+   |              ^^^^^^ Expected an imaginary number in complex literal pattern
 31 |         pass
 32 |     case 6 + {True: 1}:
    |
 
 
+error: Invalid syntax
    |
 30 |     case 5 + [1, 2]:
 31 |         pass
 32 |     case 6 + {True: 1}:
-   |              ^^^^^^^^^ Syntax Error: Expected an imaginary number in complex literal pattern
+   |              ^^^^^^^^^ Expected an imaginary number in complex literal pattern
 33 |         pass
 34 |     case 1 + 2:
    |
 
 
+error: Invalid syntax
    |
 32 |     case 6 + {True: 1}:
 33 |         pass
 34 |     case 1 + 2:
-   |              ^ Syntax Error: Expected an imaginary number in complex literal pattern
+   |              ^ Expected an imaginary number in complex literal pattern
 35 |         pass
 36 |     case 1 + Foo(a as b):
    |
 
 
+error: Invalid syntax
    |
 34 |     case 1 + 2:
 35 |         pass
 36 |     case 1 + Foo(a as b):
-   |              ^^^^^^^^^^^ Syntax Error: Expected an imaginary number in complex literal pattern
+   |              ^^^^^^^^^^^ Expected an imaginary number in complex literal pattern
 37 |         pass
    |
 
 
+error: Invalid syntax
    |
 39 | match invalid_lhs_rhs_pattern:
 40 |     case Foo() + Bar():
-   |          ^^^^^ Syntax Error: Expected a real number in complex literal pattern
+   |          ^^^^^ Expected a real number in complex literal pattern
 41 |         pass
    |
 
 
+error: Invalid syntax
    |
 39 | match invalid_lhs_rhs_pattern:
 40 |     case Foo() + Bar():
-   |                  ^^^^^ Syntax Error: Expected an imaginary number in complex literal pattern
+   |                  ^^^^^ Expected an imaginary number in complex literal pattern
 41 |         pass
    |

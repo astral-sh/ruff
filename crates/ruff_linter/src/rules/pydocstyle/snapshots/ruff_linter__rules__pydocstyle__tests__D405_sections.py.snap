@@ -1,17 +1,17 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 ---
-sections.py:19:5: D405 [*] Section name should be properly capitalized ("returns")
+error[D405]: sections.py:19:5: [*] Section name should be properly capitalized ("returns")
+
    |
 17 |     """Toggle the gizmo.
 18 | 
 19 |     returns
-   |     ^^^^^^^ D405
+   |     ^^^^^^^
 20 |     -------
 21 |     A value of some sort.
    |
    = help: Capitalize "returns"
-
 ℹ Safe fix
 16 16 | def not_capitalized():  # noqa: D416
 17 17 |     """Toggle the gizmo.
@@ -22,16 +22,16 @@ sections.py:19:5: D405 [*] Section name should be properly capitalized ("returns
 21 21 |     A value of some sort.
 22 22 | 
 
-sections.py:218:5: D405 [*] Section name should be properly capitalized ("Short summary")
+error[D405]: sections.py:218:5: [*] Section name should be properly capitalized ("Short summary")
+
     |
 216 |     """Toggle the gizmo.
 217 | 
 218 |     Short summary
-    |     ^^^^^^^^^^^^^ D405
+    |     ^^^^^^^^^^^^^
 219 |     -------------
     |
     = help: Capitalize "Short summary"
-
 ℹ Safe fix
 215 215 | def multiple_sections():  # noqa: D416
 216 216 |     """Toggle the gizmo.

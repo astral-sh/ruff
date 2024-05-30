@@ -47,33 +47,37 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | nonlocal ,
-  |          ^ Syntax Error: Expected an identifier
+  |          ^ Expected an identifier
 2 | nonlocal x,
 3 | nonlocal x, y,
   |
 
 
+error: Invalid syntax
   |
 1 | nonlocal ,
-  |           ^ Syntax Error: Nonlocal statement must have at least one name
+  |           ^ Nonlocal statement must have at least one name
 2 | nonlocal x,
 3 | nonlocal x, y,
   |
 
 
+error: Invalid syntax
   |
 1 | nonlocal ,
 2 | nonlocal x,
-  |           ^ Syntax Error: Trailing comma not allowed
+  |           ^ Trailing comma not allowed
 3 | nonlocal x, y,
   |
 
 
+error: Invalid syntax
   |
 1 | nonlocal ,
 2 | nonlocal x,
 3 | nonlocal x, y,
-  |              ^ Syntax Error: Trailing comma not allowed
+  |              ^ Trailing comma not allowed
   |

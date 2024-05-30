@@ -294,91 +294,102 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | f"hello
-  |   ^^^^^ Syntax Error: f-string: unterminated string
+  |   ^^^^^ f-string: unterminated string
 2 | 1 + 1
 3 | f"hello {x
   |
 
 
+error: Invalid syntax
   |
 1 | f"hello
-  |        ^ Syntax Error: Expected FStringEnd, found newline
+  |        ^ Expected FStringEnd, found newline
 2 | 1 + 1
 3 | f"hello {x
 4 | 2 + 2
   |
 
 
+error: Invalid syntax
   |
 2 | 1 + 1
 3 | f"hello {x
 4 | 2 + 2
-  | ^ Syntax Error: f-string: expecting '}'
+  | ^ f-string: expecting '}'
 5 | f"hello {x:
 6 | 3 + 3
   |
 
 
+error: Invalid syntax
   |
 3 | f"hello {x
 4 | 2 + 2
 5 | f"hello {x:
-  | ^^ Syntax Error: Simple statements must be separated by newlines or semicolons
+  | ^^ Simple statements must be separated by newlines or semicolons
 6 | 3 + 3
 7 | f"hello {x}
   |
 
 
+error: Invalid syntax
   |
 4 | 2 + 2
 5 | f"hello {x:
 6 | 3 + 3
-  | ^ Syntax Error: Expected an f-string element or the end of the f-string
+  | ^ Expected an f-string element or the end of the f-string
 7 | f"hello {x}
 8 | 4 + 4
   |
 
 
+error: Invalid syntax
   |
 5 | f"hello {x:
 6 | 3 + 3
 7 | f"hello {x}
-  | ^^ Syntax Error: Simple statements must be separated by newlines or semicolons
+  | ^^ Simple statements must be separated by newlines or semicolons
 8 | 4 + 4
   |
 
 
+error: Invalid syntax
   |
 5 | f"hello {x:
 6 | 3 + 3
 7 | f"hello {x}
-  |             Syntax Error: f-string: unterminated string
+  |            ^ f-string: unterminated string
 8 | 4 + 4
   |
 
 
+error: Invalid syntax
   |
 6 | 3 + 3
 7 | f"hello {x}
 8 | 4 + 4
-  | ^ Syntax Error: Expected an f-string element or the end of the f-string
+  | ^ Expected an f-string element or the end of the f-string
   |
 
 
-  |
-7 | f"hello {x}
-8 | 4 + 4
-  |
-
-
+error: Invalid syntax
   |
 7 | f"hello {x}
 8 | 4 + 4
   |
 
 
+error: Invalid syntax
+  |
+7 | f"hello {x}
+8 | 4 + 4
+  |
+
+
+error: Invalid syntax
   |
 7 | f"hello {x}
 8 | 4 + 4

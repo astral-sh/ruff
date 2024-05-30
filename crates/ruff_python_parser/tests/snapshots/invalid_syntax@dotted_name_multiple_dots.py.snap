@@ -67,22 +67,25 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | import a..b
-  |          ^ Syntax Error: Expected an identifier
+  |          ^ Expected an identifier
 2 | import a...b
   |
 
 
+error: Invalid syntax
   |
 1 | import a..b
 2 | import a...b
-  |         ^^^ Syntax Error: Expected ',', found '...'
+  |         ^^^ Expected ',', found '...'
   |
 
 
+error: Invalid syntax
   |
 1 | import a..b
 2 | import a...b
-  |            ^ Syntax Error: Simple statements must be separated by newlines or semicolons
+  |            ^ Simple statements must be separated by newlines or semicolons
   |

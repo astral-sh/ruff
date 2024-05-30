@@ -89,7 +89,8 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | lambda a, b=20, c: 1
-  |                 ^ Syntax Error: Parameter without a default cannot follow a parameter with a default
+  |                 ^ Parameter without a default cannot follow a parameter with a default
   |

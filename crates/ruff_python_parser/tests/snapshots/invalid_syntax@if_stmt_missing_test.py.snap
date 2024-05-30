@@ -40,7 +40,8 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | if : ...
-  |    ^ Syntax Error: Expected an expression
+  |    ^ Expected an expression
   |

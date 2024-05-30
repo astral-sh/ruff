@@ -142,25 +142,29 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | def foo(a, **kwargs={'b': 1, 'c': 2}): ...
-  |                    ^ Syntax Error: Parameter with '*' or '**' cannot have default value
+  |                    ^ Parameter with '*' or '**' cannot have default value
   |
 
 
-  |
-1 | def foo(a, **kwargs={'b': 1, 'c': 2}): ...
-  |                     ^ Syntax Error: Expected a parameter or the end of the parameter list
-  |
-
-
+error: Invalid syntax
   |
 1 | def foo(a, **kwargs={'b': 1, 'c': 2}): ...
-  |                                     ^ Syntax Error: Expected newline, found ')'
+  |                     ^ Expected a parameter or the end of the parameter list
   |
 
 
+error: Invalid syntax
   |
 1 | def foo(a, **kwargs={'b': 1, 'c': 2}): ...
-  |                                      ^ Syntax Error: Expected a statement
+  |                                     ^ Expected newline, found ')'
+  |
+
+
+error: Invalid syntax
+  |
+1 | def foo(a, **kwargs={'b': 1, 'c': 2}): ...
+  |                                      ^ Expected a statement
   |

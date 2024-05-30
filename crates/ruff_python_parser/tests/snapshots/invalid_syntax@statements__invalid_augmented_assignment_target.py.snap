@@ -1275,283 +1275,312 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 2 | # assignment targets.
 3 | 
 4 | x or y += 42
-  | ^^^^^^ Syntax Error: Invalid augmented assignment target
+  | ^^^^^^ Invalid augmented assignment target
 5 | (x := 5) += 42
 6 | x + y += 42
   |
 
 
+error: Invalid syntax
   |
 4 | x or y += 42
 5 | (x := 5) += 42
-  |  ^^^^^^ Syntax Error: Invalid augmented assignment target
+  |  ^^^^^^ Invalid augmented assignment target
 6 | x + y += 42
 7 | -x += 42
   |
 
 
+error: Invalid syntax
   |
 4 | x or y += 42
 5 | (x := 5) += 42
 6 | x + y += 42
-  | ^^^^^ Syntax Error: Invalid augmented assignment target
+  | ^^^^^ Invalid augmented assignment target
 7 | -x += 42
 8 | (lambda _: 1) += 42
   |
 
 
+error: Invalid syntax
   |
 5 | (x := 5) += 42
 6 | x + y += 42
 7 | -x += 42
-  | ^^ Syntax Error: Invalid augmented assignment target
+  | ^^ Invalid augmented assignment target
 8 | (lambda _: 1) += 42
 9 | a if b else c += 42
   |
 
 
+error: Invalid syntax
    |
  6 | x + y += 42
  7 | -x += 42
  8 | (lambda _: 1) += 42
-   |  ^^^^^^^^^^^ Syntax Error: Invalid augmented assignment target
+   |  ^^^^^^^^^^^ Invalid augmented assignment target
  9 | a if b else c += 42
 10 | {"a": 5} += 42
    |
 
 
+error: Invalid syntax
    |
  7 | -x += 42
  8 | (lambda _: 1) += 42
  9 | a if b else c += 42
-   | ^^^^^^^^^^^^^ Syntax Error: Invalid augmented assignment target
+   | ^^^^^^^^^^^^^ Invalid augmented assignment target
 10 | {"a": 5} += 42
 11 | {a} += 42
    |
 
 
+error: Invalid syntax
    |
  8 | (lambda _: 1) += 42
  9 | a if b else c += 42
 10 | {"a": 5} += 42
-   | ^^^^^^^^ Syntax Error: Invalid augmented assignment target
+   | ^^^^^^^^ Invalid augmented assignment target
 11 | {a} += 42
 12 | [x for x in xs] += 42
    |
 
 
+error: Invalid syntax
    |
  9 | a if b else c += 42
 10 | {"a": 5} += 42
 11 | {a} += 42
-   | ^^^ Syntax Error: Invalid augmented assignment target
+   | ^^^ Invalid augmented assignment target
 12 | [x for x in xs] += 42
 13 | {x for x in xs} += 42
    |
 
 
+error: Invalid syntax
    |
 10 | {"a": 5} += 42
 11 | {a} += 42
 12 | [x for x in xs] += 42
-   | ^^^^^^^^^^^^^^^ Syntax Error: Invalid augmented assignment target
+   | ^^^^^^^^^^^^^^^ Invalid augmented assignment target
 13 | {x for x in xs} += 42
 14 | {x: x * 2 for x in xs} += 42
    |
 
 
+error: Invalid syntax
    |
 11 | {a} += 42
 12 | [x for x in xs] += 42
 13 | {x for x in xs} += 42
-   | ^^^^^^^^^^^^^^^ Syntax Error: Invalid augmented assignment target
+   | ^^^^^^^^^^^^^^^ Invalid augmented assignment target
 14 | {x: x * 2 for x in xs} += 42
 15 | (x for x in xs) += 42
    |
 
 
+error: Invalid syntax
    |
 12 | [x for x in xs] += 42
 13 | {x for x in xs} += 42
 14 | {x: x * 2 for x in xs} += 42
-   | ^^^^^^^^^^^^^^^^^^^^^^ Syntax Error: Invalid augmented assignment target
+   | ^^^^^^^^^^^^^^^^^^^^^^ Invalid augmented assignment target
 15 | (x for x in xs) += 42
 16 | await x += 42
    |
 
 
+error: Invalid syntax
    |
 13 | {x for x in xs} += 42
 14 | {x: x * 2 for x in xs} += 42
 15 | (x for x in xs) += 42
-   | ^^^^^^^^^^^^^^^ Syntax Error: Invalid augmented assignment target
+   | ^^^^^^^^^^^^^^^ Invalid augmented assignment target
 16 | await x += 42
 17 | (yield x) += 42
    |
 
 
+error: Invalid syntax
    |
 14 | {x: x * 2 for x in xs} += 42
 15 | (x for x in xs) += 42
 16 | await x += 42
-   | ^^^^^^^ Syntax Error: Invalid augmented assignment target
+   | ^^^^^^^ Invalid augmented assignment target
 17 | (yield x) += 42
 18 | (yield from xs) += 42
    |
 
 
+error: Invalid syntax
    |
 15 | (x for x in xs) += 42
 16 | await x += 42
 17 | (yield x) += 42
-   |  ^^^^^^^ Syntax Error: Invalid augmented assignment target
+   |  ^^^^^^^ Invalid augmented assignment target
 18 | (yield from xs) += 42
 19 | a < b < c += 42
    |
 
 
+error: Invalid syntax
    |
 16 | await x += 42
 17 | (yield x) += 42
 18 | (yield from xs) += 42
-   |  ^^^^^^^^^^^^^ Syntax Error: Invalid augmented assignment target
+   |  ^^^^^^^^^^^^^ Invalid augmented assignment target
 19 | a < b < c += 42
 20 | foo() += 42
    |
 
 
+error: Invalid syntax
    |
 17 | (yield x) += 42
 18 | (yield from xs) += 42
 19 | a < b < c += 42
-   | ^^^^^^^^^ Syntax Error: Invalid augmented assignment target
+   | ^^^^^^^^^ Invalid augmented assignment target
 20 | foo() += 42
    |
 
 
+error: Invalid syntax
    |
 18 | (yield from xs) += 42
 19 | a < b < c += 42
 20 | foo() += 42
-   | ^^^^^ Syntax Error: Invalid augmented assignment target
+   | ^^^^^ Invalid augmented assignment target
 21 | 
 22 | f"{quux}" += 42
    |
 
 
+error: Invalid syntax
    |
 20 | foo() += 42
 21 | 
 22 | f"{quux}" += 42
-   | ^^^^^^^^^ Syntax Error: Invalid augmented assignment target
+   | ^^^^^^^^^ Invalid augmented assignment target
 23 | f"{foo} and {bar}" += 42
    |
 
 
+error: Invalid syntax
    |
 22 | f"{quux}" += 42
 23 | f"{foo} and {bar}" += 42
-   | ^^^^^^^^^^^^^^^^^^ Syntax Error: Invalid augmented assignment target
+   | ^^^^^^^^^^^^^^^^^^ Invalid augmented assignment target
 24 | 
 25 | "foo" += 42
    |
 
 
+error: Invalid syntax
    |
 23 | f"{foo} and {bar}" += 42
 24 | 
 25 | "foo" += 42
-   | ^^^^^ Syntax Error: Invalid augmented assignment target
+   | ^^^^^ Invalid augmented assignment target
 26 | b"foo" += 42
 27 | 123 += 42
    |
 
 
+error: Invalid syntax
    |
 25 | "foo" += 42
 26 | b"foo" += 42
-   | ^^^^^^ Syntax Error: Invalid augmented assignment target
+   | ^^^^^^ Invalid augmented assignment target
 27 | 123 += 42
 28 | True += 42
    |
 
 
+error: Invalid syntax
    |
 25 | "foo" += 42
 26 | b"foo" += 42
 27 | 123 += 42
-   | ^^^ Syntax Error: Invalid augmented assignment target
+   | ^^^ Invalid augmented assignment target
 28 | True += 42
 29 | None += 42
    |
 
 
+error: Invalid syntax
    |
 26 | b"foo" += 42
 27 | 123 += 42
 28 | True += 42
-   | ^^^^ Syntax Error: Invalid augmented assignment target
+   | ^^^^ Invalid augmented assignment target
 29 | None += 42
 30 | ... += 42
    |
 
 
+error: Invalid syntax
    |
 27 | 123 += 42
 28 | True += 42
 29 | None += 42
-   | ^^^^ Syntax Error: Invalid augmented assignment target
+   | ^^^^ Invalid augmented assignment target
 30 | ... += 42
 31 | *foo() += 42
    |
 
 
+error: Invalid syntax
    |
 28 | True += 42
 29 | None += 42
 30 | ... += 42
-   | ^^^ Syntax Error: Invalid augmented assignment target
+   | ^^^ Invalid augmented assignment target
 31 | *foo() += 42
 32 | [x, foo(), y] += [42, 42, 42]
    |
 
 
+error: Invalid syntax
    |
 29 | None += 42
 30 | ... += 42
 31 | *foo() += 42
-   | ^^^^^^ Syntax Error: Invalid augmented assignment target
+   | ^^^^^^ Invalid augmented assignment target
 32 | [x, foo(), y] += [42, 42, 42]
 33 | [[a, b], [[42]], d] += [[1, 2], [[3]], 4]
    |
 
 
+error: Invalid syntax
    |
 30 | ... += 42
 31 | *foo() += 42
 32 | [x, foo(), y] += [42, 42, 42]
-   | ^^^^^^^^^^^^^ Syntax Error: Invalid augmented assignment target
+   | ^^^^^^^^^^^^^ Invalid augmented assignment target
 33 | [[a, b], [[42]], d] += [[1, 2], [[3]], 4]
 34 | (x, foo(), y) += (42, 42, 42)
    |
 
 
+error: Invalid syntax
    |
 31 | *foo() += 42
 32 | [x, foo(), y] += [42, 42, 42]
 33 | [[a, b], [[42]], d] += [[1, 2], [[3]], 4]
-   | ^^^^^^^^^^^^^^^^^^^ Syntax Error: Invalid augmented assignment target
+   | ^^^^^^^^^^^^^^^^^^^ Invalid augmented assignment target
 34 | (x, foo(), y) += (42, 42, 42)
    |
 
 
+error: Invalid syntax
    |
 32 | [x, foo(), y] += [42, 42, 42]
 33 | [[a, b], [[42]], d] += [[1, 2], [[3]], 4]
 34 | (x, foo(), y) += (42, 42, 42)
-   | ^^^^^^^^^^^^^ Syntax Error: Invalid augmented assignment target
+   | ^^^^^^^^^^^^^ Invalid augmented assignment target
    |

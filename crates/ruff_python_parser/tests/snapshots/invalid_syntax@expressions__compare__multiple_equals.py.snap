@@ -91,33 +91,37 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | # This is not JavaScript
 2 | x === y
-  |     ^ Syntax Error: Expected an expression
+  |     ^ Expected an expression
 3 | x !== y
   |
 
 
+error: Invalid syntax
   |
 1 | # This is not JavaScript
 2 | x === y
-  | ^^^^ Syntax Error: Invalid assignment target
+  | ^^^^ Invalid assignment target
 3 | x !== y
   |
 
 
+error: Invalid syntax
   |
 1 | # This is not JavaScript
 2 | x === y
 3 | x !== y
-  |     ^ Syntax Error: Expected an expression
+  |     ^ Expected an expression
   |
 
 
+error: Invalid syntax
   |
 1 | # This is not JavaScript
 2 | x === y
 3 | x !== y
-  | ^^^^ Syntax Error: Invalid assignment target
+  | ^^^^ Invalid assignment target
   |

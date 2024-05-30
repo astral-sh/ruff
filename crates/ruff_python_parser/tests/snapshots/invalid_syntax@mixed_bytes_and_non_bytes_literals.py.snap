@@ -153,25 +153,28 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | 'first' b'second'
-  | ^^^^^^^^^^^^^^^^^ Syntax Error: Bytes literal cannot be mixed with non-bytes literals
+  | ^^^^^^^^^^^^^^^^^ Bytes literal cannot be mixed with non-bytes literals
 2 | f'first' b'second'
 3 | 'first' f'second' b'third'
   |
 
 
+error: Invalid syntax
   |
 1 | 'first' b'second'
 2 | f'first' b'second'
-  | ^^^^^^^^^^^^^^^^^^ Syntax Error: Bytes literal cannot be mixed with non-bytes literals
+  | ^^^^^^^^^^^^^^^^^^ Bytes literal cannot be mixed with non-bytes literals
 3 | 'first' f'second' b'third'
   |
 
 
+error: Invalid syntax
   |
 1 | 'first' b'second'
 2 | f'first' b'second'
 3 | 'first' f'second' b'third'
-  | ^^^^^^^^^^^^^^^^^^^^^^^^^^ Syntax Error: Bytes literal cannot be mixed with non-bytes literals
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^ Bytes literal cannot be mixed with non-bytes literals
   |

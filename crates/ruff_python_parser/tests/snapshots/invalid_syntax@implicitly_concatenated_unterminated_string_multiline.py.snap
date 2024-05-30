@@ -184,62 +184,68 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | (
 2 |     'hello'
 3 |     f'world {x}
-  |                 Syntax Error: f-string: unterminated string
+  |                ^ f-string: unterminated string
 4 | )
 5 | 1 + 1
   |
 
 
+error: Invalid syntax
   |
 2 |     'hello'
 3 |     f'world {x}
 4 | )
-  | ^ Syntax Error: Expected an f-string element or the end of the f-string
+  | ^ Expected an f-string element or the end of the f-string
 5 | 1 + 1
 6 | (
   |
 
 
+error: Invalid syntax
   |
 2 |     'hello'
 3 |     f'world {x}
 4 | )
-  |  ^ Syntax Error: Expected FStringEnd, found newline
+  |  ^ Expected FStringEnd, found newline
 5 | 1 + 1
 6 | (
 7 |     'first'
   |
 
 
+error: Invalid syntax
    |
  6 |   (
  7 |       'first'
  8 |       'second
    |  _____^
  9 | |     f'third'
-   | |_^ Syntax Error: missing closing quote in string literal
+   | |_^ missing closing quote in string literal
 10 |   )
 11 |   2 + 2
    |
 
 
+error: Invalid syntax
    |
  8 |     'second
  9 |     f'third'
 10 | )
-   | ^ Syntax Error: Expected a statement
+   | ^ Expected a statement
 11 | 2 + 2
    |
 
 
+error: Invalid syntax
    |
  8 |     'second
  9 |     f'third'
 10 | )
-   |  ^ Syntax Error: Expected a statement
+   |  ^ Expected a statement
 11 | 2 + 2
    |

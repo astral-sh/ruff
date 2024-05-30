@@ -1,15 +1,15 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-E30.pyi:32:5: E304 [*] Blank lines found after function decorator (1)
+error[E304]: E30.pyi:32:5: [*] Blank lines found after function decorator (1)
+
    |
 30 |     @decorated
 31 |     
 32 |     def with_blank_line(): ...
-   |     ^^^ E304
+   |     ^^^
    |
    = help: Remove extraneous blank line(s)
-
 ℹ Safe fix
 28 28 |     def grouped2(): ...
 29 29 |     def grouped3( ): ...

@@ -1,10 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
 ---
-S604.py:5:5: S604 Function call with `shell=True` parameter identified, security issue
+error[S604]: S604.py:5:5: Function call with `shell=True` parameter identified, security issue
+
   |
 5 | foo(shell=True)
-  |     ^^^^^^^^^^ S604
+  |     ^^^^^^^^^^
   |
-
-

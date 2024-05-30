@@ -96,29 +96,33 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | a: type X = int
-  |    ^^^^ Syntax Error: Expected an identifier, but found a keyword 'type' that cannot be used here
+  |    ^^^^ Expected an identifier, but found a keyword 'type' that cannot be used here
 2 | lambda: type X = int
   |
 
 
+error: Invalid syntax
   |
 1 | a: type X = int
-  |         ^ Syntax Error: Simple statements must be separated by newlines or semicolons
+  |         ^ Simple statements must be separated by newlines or semicolons
 2 | lambda: type X = int
   |
 
 
+error: Invalid syntax
   |
 1 | a: type X = int
 2 | lambda: type X = int
-  |         ^^^^ Syntax Error: Expected an identifier, but found a keyword 'type' that cannot be used here
+  |         ^^^^ Expected an identifier, but found a keyword 'type' that cannot be used here
   |
 
 
+error: Invalid syntax
   |
 1 | a: type X = int
 2 | lambda: type X = int
-  |              ^ Syntax Error: Simple statements must be separated by newlines or semicolons
+  |              ^ Simple statements must be separated by newlines or semicolons
   |

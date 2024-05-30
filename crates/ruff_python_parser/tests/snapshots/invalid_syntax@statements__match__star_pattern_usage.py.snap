@@ -427,120 +427,132 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | # Star pattern is only allowed inside a sequence pattern
 2 | match subject:
 3 |     case *_:
-  |          ^^ Syntax Error: Star pattern cannot be used here
+  |          ^^ Star pattern cannot be used here
 4 |         pass
 5 |     case *_ as x:
   |
 
 
+error: Invalid syntax
   |
 3 |     case *_:
 4 |         pass
 5 |     case *_ as x:
-  |          ^^ Syntax Error: Star pattern cannot be used here
+  |          ^^ Star pattern cannot be used here
 6 |         pass
 7 |     case *foo:
   |
 
 
+error: Invalid syntax
   |
 5 |     case *_ as x:
 6 |         pass
 7 |     case *foo:
-  |          ^^^^ Syntax Error: Star pattern cannot be used here
+  |          ^^^^ Star pattern cannot be used here
 8 |         pass
 9 |     case *foo | 1:
   |
 
 
+error: Invalid syntax
    |
  7 |     case *foo:
  8 |         pass
  9 |     case *foo | 1:
-   |          ^^^^ Syntax Error: Star pattern cannot be used here
+   |          ^^^^ Star pattern cannot be used here
 10 |         pass
 11 |     case 1 | *foo:
    |
 
 
+error: Invalid syntax
    |
  9 |     case *foo | 1:
 10 |         pass
 11 |     case 1 | *foo:
-   |              ^^^^ Syntax Error: Star pattern cannot be used here
+   |              ^^^^ Star pattern cannot be used here
 12 |         pass
 13 |     case Foo(*_):
    |
 
 
+error: Invalid syntax
    |
 11 |     case 1 | *foo:
 12 |         pass
 13 |     case Foo(*_):
-   |              ^^ Syntax Error: Star pattern cannot be used here
+   |              ^^ Star pattern cannot be used here
 14 |         pass
 15 |     case Foo(x=*_):
    |
 
 
+error: Invalid syntax
    |
 13 |     case Foo(*_):
 14 |         pass
 15 |     case Foo(x=*_):
-   |                ^^ Syntax Error: Star pattern cannot be used here
+   |                ^^ Star pattern cannot be used here
 16 |         pass
 17 |     case {*_}:
    |
 
 
+error: Invalid syntax
    |
 15 |     case Foo(x=*_):
 16 |         pass
 17 |     case {*_}:
-   |           ^^ Syntax Error: Star pattern cannot be used here
+   |           ^^ Star pattern cannot be used here
 18 |         pass
 19 |     case {*_: 1}:
    |
 
 
+error: Invalid syntax
    |
 15 |     case Foo(x=*_):
 16 |         pass
 17 |     case {*_}:
-   |             ^ Syntax Error: Expected ':', found '}'
+   |             ^ Expected ':', found '}'
 18 |         pass
 19 |     case {*_: 1}:
    |
 
 
+error: Invalid syntax
    |
 17 |     case {*_}:
 18 |         pass
 19 |     case {*_: 1}:
-   |           ^^ Syntax Error: Star pattern cannot be used here
+   |           ^^ Star pattern cannot be used here
 20 |         pass
 21 |     case {None: *_}:
    |
 
 
+error: Invalid syntax
    |
 19 |     case {*_: 1}:
 20 |         pass
 21 |     case {None: *_}:
-   |                 ^^ Syntax Error: Star pattern cannot be used here
+   |                 ^^ Star pattern cannot be used here
 22 |         pass
 23 |     case 1 + *_:
    |
 
 
+error: Invalid syntax
    |
 21 |     case {None: *_}:
 22 |         pass
 23 |     case 1 + *_:
-   |              ^^ Syntax Error: Star pattern cannot be used here
+   |              ^^ Star pattern cannot be used here
 24 |         pass
    |

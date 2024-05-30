@@ -115,15 +115,17 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | def foo(x=): ...
-  |           ^ Syntax Error: Expected an expression
+  |           ^ Expected an expression
 2 | def foo(x: int = ): ...
   |
 
 
+error: Invalid syntax
   |
 1 | def foo(x=): ...
 2 | def foo(x: int = ): ...
-  |                  ^ Syntax Error: Expected an expression
+  |                  ^ Expected an expression
   |

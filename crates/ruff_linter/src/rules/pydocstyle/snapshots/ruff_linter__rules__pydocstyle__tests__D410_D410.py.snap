@@ -1,17 +1,17 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 ---
-D410.py:4:5: D410 [*] Missing blank line after section ("Parameters")
+error[D410]: D410.py:4:5: [*] Missing blank line after section ("Parameters")
+
   |
 2 |     """Showcase function.
 3 | 
 4 |     Parameters
-  |     ^^^^^^^^^^ D410
+  |     ^^^^^^^^^^
 5 |     ----------
 6 |     a : int
   |
   = help: Add blank line after "Parameters"
-
 ℹ Safe fix
 7  7  |         _description_
 8  8  |     b : int
@@ -21,17 +21,17 @@ D410.py:4:5: D410 [*] Missing blank line after section ("Parameters")
 11 12 |     -------
 12 13 |     int
 
-D410.py:21:5: D410 [*] Missing blank line after section ("Parameters")
+error[D410]: D410.py:21:5: [*] Missing blank line after section ("Parameters")
+
    |
 19 |     """Showcase function.
 20 | 
 21 |     Parameters
-   |     ^^^^^^^^^^ D410
+   |     ^^^^^^^^^^
 22 |     ----------
 23 |     Returns
    |
    = help: Add blank line after "Parameters"
-
 ℹ Safe fix
 20 20 | 
 21 21 |     Parameters

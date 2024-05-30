@@ -104,22 +104,25 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | class Foo[T1, *T2(a, b):
-  |                  ^ Syntax Error: Expected ']', found '('
+  |                  ^ Expected ']', found '('
 2 |     pass
 3 | x = 10
   |
 
 
+error: Invalid syntax
   |
 1 | class Foo[T1, *T2(a, b):
 2 |     pass
 3 | x = 10
-  | ^ Syntax Error: Simple statements must be separated by newlines or semicolons
+  | ^ Simple statements must be separated by newlines or semicolons
   |
 
 
+error: Invalid syntax
   |
 2 |     pass
 3 | x = 10

@@ -202,25 +202,28 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | def foo(arg: *int): ...
-  |              ^^^^ Syntax Error: Starred expression cannot be used here
+  |              ^^^^ Starred expression cannot be used here
 2 | def foo(arg: yield int): ...
 3 | def foo(arg: x := int): ...
   |
 
 
+error: Invalid syntax
   |
 1 | def foo(arg: *int): ...
 2 | def foo(arg: yield int): ...
-  |              ^^^^^^^^^ Syntax Error: Yield expression cannot be used here
+  |              ^^^^^^^^^ Yield expression cannot be used here
 3 | def foo(arg: x := int): ...
   |
 
 
+error: Invalid syntax
   |
 1 | def foo(arg: *int): ...
 2 | def foo(arg: yield int): ...
 3 | def foo(arg: x := int): ...
-  |                ^^ Syntax Error: Expected ',', found ':='
+  |                ^^ Expected ',', found ':='
   |
