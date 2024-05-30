@@ -110,7 +110,7 @@ pub(crate) fn implicit(
         let (a_range, b_range) = match (a_token.kind(), b_token.kind()) {
             (TokenKind::String, TokenKind::String) => (a_token.range(), b_token.range()),
             (TokenKind::String, TokenKind::FStringStart) => {
-                match indexer.fstring_ranges().innermost(a_token.start()) {
+                match indexer.fstring_ranges().innermost(b_token.start()) {
                     Some(b_range) => (a_token.range(), b_range),
                     None => continue,
                 }

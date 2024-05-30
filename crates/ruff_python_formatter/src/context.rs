@@ -13,7 +13,7 @@ pub struct PyFormatContext<'a> {
     options: PyFormatOptions,
     contents: &'a str,
     comments: Comments<'a>,
-    tokens: &Tokens,
+    tokens: &'a Tokens,
     node_level: NodeLevel,
     indent_level: IndentLevel,
     /// Set to a non-None value when the formatter is running on a code
@@ -34,7 +34,7 @@ impl<'a> PyFormatContext<'a> {
         options: PyFormatOptions,
         contents: &'a str,
         comments: Comments<'a>,
-        tokens: &Tokens,
+        tokens: &'a Tokens,
     ) -> Self {
         Self {
             options,
@@ -77,7 +77,7 @@ impl<'a> PyFormatContext<'a> {
         &self.comments
     }
 
-    pub(crate) fn tokens(&self) -> &Tokens {
+    pub(crate) fn tokens(&self) -> &'a Tokens {
         self.tokens
     }
 
