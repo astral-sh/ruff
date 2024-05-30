@@ -108,7 +108,7 @@ impl Server {
                 position_encoding,
                 global_settings,
                 workspaces,
-            ),
+            )?,
             client_capabilities,
         })
     }

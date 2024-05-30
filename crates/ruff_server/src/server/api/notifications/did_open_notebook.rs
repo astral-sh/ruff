@@ -43,7 +43,7 @@ impl super::SyncNotificationHandler for DidOpenNotebook {
 
         // publish diagnostics
         let snapshot = session
-            .take_snapshot(&uri)
+            .take_snapshot(uri)
             .expect("snapshot should be available");
         publish_diagnostics_for_document(&snapshot, &notifier)?;
 

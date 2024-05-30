@@ -1,9 +1,5 @@
 //! Data model, state management, and configuration resolution.
 
-mod capabilities;
-mod index;
-mod settings;
-
 use std::sync::Arc;
 
 use lsp_types::{ClientCapabilities, NotebookDocumentCellChange, Url};
@@ -14,6 +10,10 @@ use crate::{PositionEncoding, TextDocument};
 pub(crate) use self::capabilities::ResolvedClientCapabilities;
 pub(crate) use self::index::DocumentQuery;
 pub(crate) use self::settings::{AllSettings, ClientSettings};
+
+mod capabilities;
+mod index;
+mod settings;
 
 /// The global state for the LSP
 pub(crate) struct Session {
@@ -42,23 +42,23 @@ impl Session {
         position_encoding: PositionEncoding,
         global_settings: ClientSettings,
         workspace_folders: Vec<(Url, ClientSettings)>,
-    ) -> Self {
-        Self {
+    ) -> crate::Result<Self> {
+        Ok(Self {
             position_encoding,
-            index: index::Index::new(workspace_folders, &global_settings),
+            index: index::Index::new(workspace_folders, &global_settings)?,
             global_settings,
             resolved_client_capabilities: Arc::new(ResolvedClientCapabilities::new(
                 client_capabilities,
             )),
-        }
+        })
     }
 
-    pub(crate) fn key_from_url(&self, url: &lsp_types::Url) -> DocumentKey {
+    pub(crate) fn key_from_url(&self, url: Url) -> DocumentKey {
         self.index.key_from_url(url)
     }
 
     /// Creates a document snapshot with the URL referencing the document to snapshot.
-    pub(crate) fn take_snapshot(&self, url: &Url) -> Option<DocumentSnapshot> {
+    pub(crate) fn take_snapshot(&self, url: Url) -> Option<DocumentSnapshot> {
         let key = self.key_from_url(url);
         Some(DocumentSnapshot {
             resolved_client_capabilities: self.resolved_client_capabilities.clone(),
@@ -135,8 +135,8 @@ impl Session {
     }
 
     /// Open a workspace folder at the given `url`.
-    pub(crate) fn open_workspace_folder(&mut self, url: Url) {
-        self.index.open_workspace_folder(url, &self.global_settings);
+    pub(crate) fn open_workspace_folder(&mut self, url: Url) -> crate::Result<()> {
+        self.index.open_workspace_folder(url, &self.global_settings)
     }
 
     /// Close a workspace folder at the given `url`.

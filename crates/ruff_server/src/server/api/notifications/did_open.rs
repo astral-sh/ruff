@@ -21,10 +21,7 @@ impl super::SyncNotificationHandler for DidOpen {
         types::DidOpenTextDocumentParams {
             text_document:
                 types::TextDocumentItem {
-                    ref uri,
-                    text,
-                    version,
-                    ..
+                    uri, text, version, ..
                 },
         }: types::DidOpenTextDocumentParams,
     ) -> Result<()> {
@@ -35,7 +32,7 @@ impl super::SyncNotificationHandler for DidOpen {
         // Publish diagnostics if the client doesnt support pull diagnostics
         if !session.resolved_client_capabilities().pull_diagnostics {
             let snapshot = session
-                .take_snapshot(uri)
+                .take_snapshot(uri.clone())
                 .ok_or_else(|| {
                     anyhow::anyhow!("Unable to take snapshot for document with URL {uri}")
                 })

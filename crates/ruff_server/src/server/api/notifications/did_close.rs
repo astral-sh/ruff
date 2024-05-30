@@ -24,7 +24,7 @@ impl super::SyncNotificationHandler for DidClose {
     ) -> Result<()> {
         // Publish an empty diagnostic report for the document. This will de-register any existing diagnostics.
         let snapshot = session
-            .take_snapshot(&uri)
+            .take_snapshot(uri.clone())
             .ok_or_else(|| anyhow::anyhow!("Unable to take snapshot for document with URL {uri}"))
             .with_failure_code(lsp_server::ErrorCode::InternalError)?;
         clear_diagnostics_for_document(snapshot.query(), &notifier)?;
