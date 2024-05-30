@@ -171,6 +171,11 @@ To read more about this exciting milestone, check out our [blog post](https://as
 - Avoid allocations for isort module names ([#11251](https://github.com/astral-sh/ruff/pull/11251))
 - Build a separate ARM wheel for macOS ([#11149](https://github.com/astral-sh/ruff/pull/11149))
 
+### Windows
+
+- Increase the minimum requirement to Windows 10.
+
+
 ## 0.4.2
 
 ### Rule changes
