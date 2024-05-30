@@ -94,25 +94,28 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | from a import b,
-  |                ^ Syntax Error: Trailing comma not allowed
+  |                ^ Trailing comma not allowed
 2 | from a import b as c,
 3 | from a import b, c,
   |
 
 
+error: Invalid syntax
   |
 1 | from a import b,
 2 | from a import b as c,
-  |                     ^ Syntax Error: Trailing comma not allowed
+  |                     ^ Trailing comma not allowed
 3 | from a import b, c,
   |
 
 
+error: Invalid syntax
   |
 1 | from a import b,
 2 | from a import b as c,
 3 | from a import b, c,
-  |                   ^ Syntax Error: Trailing comma not allowed
+  |                   ^ Trailing comma not allowed
   |

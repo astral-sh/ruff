@@ -82,11 +82,12 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 3 |     #            class pattern
 4 |     #            v
 5 |     case (x as y)(a, b):
-  |           ^^^^^^ Syntax Error: Invalid value for a class pattern
+  |           ^^^^^^ Invalid value for a class pattern
 6 |     #     ^^^^^^
 7 |     #    as-pattern
   |

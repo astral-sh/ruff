@@ -1,25 +1,24 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-E742.py:1:7: E742 Ambiguous class name: `l`
+error[E742]: E742.py:1:7: Ambiguous class name: `l`
+
   |
 1 | class l:
-  |       ^ E742
+  |       ^
 2 |     pass
   |
+error[E742]: E742.py:5:7: Ambiguous class name: `I`
 
-E742.py:5:7: E742 Ambiguous class name: `I`
   |
 5 | class I:
-  |       ^ E742
+  |       ^
 6 |     pass
   |
+error[E742]: E742.py:9:7: Ambiguous class name: `O`
 
-E742.py:9:7: E742 Ambiguous class name: `O`
    |
  9 | class O:
-   |       ^ E742
+   |       ^
 10 |     pass
    |
-
-

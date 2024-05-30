@@ -64,11 +64,12 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | # No expression on the right side of the assignment expression
 2 | 
 3 | (x := )
-  |       ^ Syntax Error: Expected an expression
+  |       ^ Expected an expression
 4 | 
 5 | x + y
   |

@@ -52,13 +52,15 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | match foo:
 2 | case _: ...
-  | ^^^^ Syntax Error: Expected an indented block after `match` statement
+  | ^^^^ Expected an indented block after `match` statement
   |
 
 
+error: Invalid syntax
   |
 1 | match foo:
 2 | case _: ...

@@ -97,15 +97,17 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | f"{}"
-  |    ^ Syntax Error: Expected an expression
+  |    ^ Expected an expression
 2 | f"{  }"
   |
 
 
+error: Invalid syntax
   |
 1 | f"{}"
 2 | f"{  }"
-  |      ^ Syntax Error: Expected an expression
+  |      ^ Expected an expression
   |

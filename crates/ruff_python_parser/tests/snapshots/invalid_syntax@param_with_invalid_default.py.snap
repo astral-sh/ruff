@@ -196,25 +196,28 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | def foo(x=*int): ...
-  |           ^^^^ Syntax Error: Starred expression cannot be used here
+  |           ^^^^ Starred expression cannot be used here
 2 | def foo(x=(*int)): ...
 3 | def foo(x=yield y): ...
   |
 
 
+error: Invalid syntax
   |
 1 | def foo(x=*int): ...
 2 | def foo(x=(*int)): ...
-  |            ^^^^ Syntax Error: Starred expression cannot be used here
+  |            ^^^^ Starred expression cannot be used here
 3 | def foo(x=yield y): ...
   |
 
 
+error: Invalid syntax
   |
 1 | def foo(x=*int): ...
 2 | def foo(x=(*int)): ...
 3 | def foo(x=yield y): ...
-  |           ^^^^^^^ Syntax Error: Yield expression cannot be used here
+  |           ^^^^^^^ Yield expression cannot be used here
   |

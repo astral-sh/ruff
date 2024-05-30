@@ -108,51 +108,56 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 2 | # it's actually a comprehension.
 3 | 
 4 | {**x: y for x, y in data}
-  |     ^ Syntax Error: Expected an expression or a '}'
+  |     ^ Expected an expression or a '}'
 5 | 
 6 | # TODO(dhruvmanila): This test case fails because there's no way to represent `**y`
   |
 
 
+error: Invalid syntax
   |
 2 | # it's actually a comprehension.
 3 | 
 4 | {**x: y for x, y in data}
-  |         ^^^ Syntax Error: Expected ':', found 'for'
+  |         ^^^ Expected ':', found 'for'
 5 | 
 6 | # TODO(dhruvmanila): This test case fails because there's no way to represent `**y`
   |
 
 
+error: Invalid syntax
   |
 2 | # it's actually a comprehension.
 3 | 
 4 | {**x: y for x, y in data}
-  |             ^ Syntax Error: Expected ',', found name
+  |             ^ Expected ',', found name
 5 | 
 6 | # TODO(dhruvmanila): This test case fails because there's no way to represent `**y`
   |
 
 
+error: Invalid syntax
   |
 2 | # it's actually a comprehension.
 3 | 
 4 | {**x: y for x, y in data}
-  |              ^ Syntax Error: Expected ':', found ','
+  |              ^ Expected ':', found ','
 5 | 
 6 | # TODO(dhruvmanila): This test case fails because there's no way to represent `**y`
   |
 
 
+error: Invalid syntax
   |
 2 | # it's actually a comprehension.
 3 | 
 4 | {**x: y for x, y in data}
-  |                         ^ Syntax Error: Expected ':', found '}'
+  |                         ^ Expected ':', found '}'
 5 | 
 6 | # TODO(dhruvmanila): This test case fails because there's no way to represent `**y`
   |

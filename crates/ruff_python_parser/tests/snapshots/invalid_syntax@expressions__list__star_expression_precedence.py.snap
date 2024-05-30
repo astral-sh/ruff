@@ -391,77 +391,85 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | # For list expression, the minimum binding power of star expression is bitwise or.
 2 | 
 3 | [(*x), y]
-  |   ^^ Syntax Error: Starred expression cannot be used here
+  |   ^^ Starred expression cannot be used here
 4 | [*x in y, z]
 5 | [*not x, z]
   |
 
 
+error: Invalid syntax
   |
 3 | [(*x), y]
 4 | [*x in y, z]
-  |   ^^^^^^ Syntax Error: Comparison expression cannot be used here
+  |   ^^^^^^ Comparison expression cannot be used here
 5 | [*not x, z]
 6 | [*x and y, z]
   |
 
 
+error: Invalid syntax
   |
 3 | [(*x), y]
 4 | [*x in y, z]
 5 | [*not x, z]
-  |   ^^^^^ Syntax Error: Boolean expression cannot be used here
+  |   ^^^^^ Boolean expression cannot be used here
 6 | [*x and y, z]
 7 | [*x or y, z]
   |
 
 
+error: Invalid syntax
   |
 4 | [*x in y, z]
 5 | [*not x, z]
 6 | [*x and y, z]
-  |   ^^^^^^^ Syntax Error: Boolean expression cannot be used here
+  |   ^^^^^^^ Boolean expression cannot be used here
 7 | [*x or y, z]
 8 | [*x if True else y, z]
   |
 
 
+error: Invalid syntax
   |
 5 | [*not x, z]
 6 | [*x and y, z]
 7 | [*x or y, z]
-  |   ^^^^^^ Syntax Error: Boolean expression cannot be used here
+  |   ^^^^^^ Boolean expression cannot be used here
 8 | [*x if True else y, z]
 9 | [*lambda x: x, z]
   |
 
 
+error: Invalid syntax
    |
  6 | [*x and y, z]
  7 | [*x or y, z]
  8 | [*x if True else y, z]
-   |   ^^^^^^^^^^^^^^^^ Syntax Error: Conditional expression cannot be used here
+   |   ^^^^^^^^^^^^^^^^ Conditional expression cannot be used here
  9 | [*lambda x: x, z]
 10 | [*x := 2, z]
    |
 
 
+error: Invalid syntax
    |
  7 | [*x or y, z]
  8 | [*x if True else y, z]
  9 | [*lambda x: x, z]
-   |   ^^^^^^^^^^^ Syntax Error: Lambda expression cannot be used here
+   |   ^^^^^^^^^^^ Lambda expression cannot be used here
 10 | [*x := 2, z]
    |
 
 
+error: Invalid syntax
    |
  8 | [*x if True else y, z]
  9 | [*lambda x: x, z]
 10 | [*x := 2, z]
-   |  ^^ Syntax Error: Assignment expression target must be an identifier
+   |  ^^ Assignment expression target must be an identifier
    |

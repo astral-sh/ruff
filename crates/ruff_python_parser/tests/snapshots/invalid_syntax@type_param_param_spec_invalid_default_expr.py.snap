@@ -270,45 +270,50 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | type X[**P = *int] = int
-  |              ^^^^ Syntax Error: Starred expression cannot be used here
+  |              ^^^^ Starred expression cannot be used here
 2 | type X[**P = yield x] = int
 3 | type X[**P = yield from x] = int
   |
 
 
+error: Invalid syntax
   |
 1 | type X[**P = *int] = int
 2 | type X[**P = yield x] = int
-  |              ^^^^^^^ Syntax Error: Yield expression cannot be used here
+  |              ^^^^^^^ Yield expression cannot be used here
 3 | type X[**P = yield from x] = int
 4 | type X[**P = x := int] = int
   |
 
 
+error: Invalid syntax
   |
 1 | type X[**P = *int] = int
 2 | type X[**P = yield x] = int
 3 | type X[**P = yield from x] = int
-  |              ^^^^^^^^^^^^ Syntax Error: Yield expression cannot be used here
+  |              ^^^^^^^^^^^^ Yield expression cannot be used here
 4 | type X[**P = x := int] = int
 5 | type X[**P = *int] = int
   |
 
 
+error: Invalid syntax
   |
 2 | type X[**P = yield x] = int
 3 | type X[**P = yield from x] = int
 4 | type X[**P = x := int] = int
-  |                ^^ Syntax Error: Expected ',', found ':='
+  |                ^^ Expected ',', found ':='
 5 | type X[**P = *int] = int
   |
 
 
+error: Invalid syntax
   |
 3 | type X[**P = yield from x] = int
 4 | type X[**P = x := int] = int
 5 | type X[**P = *int] = int
-  |              ^^^^ Syntax Error: Starred expression cannot be used here
+  |              ^^^^ Starred expression cannot be used here
   |

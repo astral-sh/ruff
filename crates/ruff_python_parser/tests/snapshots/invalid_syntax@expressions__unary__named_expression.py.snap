@@ -77,15 +77,17 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | -x := 1
-  |    ^^ Syntax Error: Expected a statement
+  |    ^^ Expected a statement
 2 | not x := 1
   |
 
 
+error: Invalid syntax
   |
 1 | -x := 1
 2 | not x := 1
-  |       ^^ Syntax Error: Expected a statement
+  |       ^^ Expected a statement
   |

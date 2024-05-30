@@ -1,61 +1,62 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_boolean_trap/mod.rs
 ---
-FBT.py:41:11: FBT003 Boolean positional value in function call
+error[FBT003]: FBT.py:41:11: Boolean positional value in function call
+
    |
 41 | used("a", True)
-   |           ^^^^ FBT003
+   |           ^^^^
 42 | used(do=True)
    |
+error[FBT003]: FBT.py:56:11: Boolean positional value in function call
 
-FBT.py:56:11: FBT003 Boolean positional value in function call
    |
 54 | {}.pop(True, False)
 55 | dict.fromkeys(("world",), True)
 56 | {}.deploy(True, False)
-   |           ^^^^ FBT003
+   |           ^^^^
 57 | getattr(someobj, attrname, False)
 58 | mylist.index(True)
    |
+error[FBT003]: FBT.py:56:17: Boolean positional value in function call
 
-FBT.py:56:17: FBT003 Boolean positional value in function call
    |
 54 | {}.pop(True, False)
 55 | dict.fromkeys(("world",), True)
 56 | {}.deploy(True, False)
-   |                 ^^^^^ FBT003
+   |                 ^^^^^
 57 | getattr(someobj, attrname, False)
 58 | mylist.index(True)
    |
+error[FBT003]: FBT.py:120:10: Boolean positional value in function call
 
-FBT.py:120:10: FBT003 Boolean positional value in function call
     |
 120 | settings(True)
-    |          ^^^^ FBT003
+    |          ^^^^
     |
+error[FBT003]: FBT.py:144:20: Boolean positional value in function call
 
-FBT.py:144:20: FBT003 Boolean positional value in function call
     |
 142 |     is_foo_or_bar=Case(
 143 |         When(Q(is_foo=True) | Q(is_bar=True)),
 144 |         then=Value(True),
-    |                    ^^^^ FBT003
+    |                    ^^^^
 145 |     ),
 146 |     default=Value(False),
     |
+error[FBT003]: FBT.py:146:19: Boolean positional value in function call
 
-FBT.py:146:19: FBT003 Boolean positional value in function call
     |
 144 |         then=Value(True),
 145 |     ),
 146 |     default=Value(False),
-    |                   ^^^^^ FBT003
+    |                   ^^^^^
 147 | )
     |
+error[FBT003]: FBT.py:156:23: Boolean positional value in function call
 
-FBT.py:156:23: FBT003 Boolean positional value in function call
     |
 155 | class Settings(BaseSettings):
 156 |     foo: bool = Field(True, exclude=True)
-    |                       ^^^^ FBT003
+    |                       ^^^^
     |

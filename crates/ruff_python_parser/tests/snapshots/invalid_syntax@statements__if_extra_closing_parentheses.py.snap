@@ -33,46 +33,52 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | # FIXME(micha): This creates two syntax errors instead of just one (and overlapping ones)
 2 | if True)):
-  |        ^ Syntax Error: Expected ':', found ')'
+  |        ^ Expected ':', found ')'
 3 |     pass
   |
 
 
+error: Invalid syntax
   |
 1 | # FIXME(micha): This creates two syntax errors instead of just one (and overlapping ones)
 2 | if True)):
-  |         ^ Syntax Error: Expected a statement
+  |         ^ Expected a statement
 3 |     pass
   |
 
 
+error: Invalid syntax
   |
 1 | # FIXME(micha): This creates two syntax errors instead of just one (and overlapping ones)
 2 | if True)):
-  |          ^ Syntax Error: Expected a statement
+  |          ^ Expected a statement
 3 |     pass
   |
 
 
+error: Invalid syntax
   |
 1 | # FIXME(micha): This creates two syntax errors instead of just one (and overlapping ones)
 2 | if True)):
-  |           ^ Syntax Error: Expected a statement
+  |           ^ Expected a statement
 3 |     pass
   |
 
 
+error: Invalid syntax
   |
 1 | # FIXME(micha): This creates two syntax errors instead of just one (and overlapping ones)
 2 | if True)):
 3 |     pass
-  | ^^^^ Syntax Error: Unexpected indentation
+  | ^^^^ Unexpected indentation
   |
 
 
+error: Invalid syntax
   |
 2 | if True)):
 3 |     pass

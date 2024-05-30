@@ -1,7 +1,8 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_simplify/mod.rs
 ---
-SIM110.py:3:5: SIM110 [*] Use `return any(check(x) for x in iterable)` instead of `for` loop
+error[SIM110]: SIM110.py:3:5: [*] Use `return any(check(x) for x in iterable)` instead of `for` loop
+
   |
 1 |   def f():
 2 |       # SIM110
@@ -10,10 +11,9 @@ SIM110.py:3:5: SIM110 [*] Use `return any(check(x) for x in iterable)` instead o
 4 | |         if check(x):
 5 | |             return True
 6 | |     return False
-  | |________________^ SIM110
+  | |________________^
   |
   = help: Replace with `return any(check(x) for x in iterable)`
-
 ℹ Unsafe fix
 1 1 | def f():
 2 2 |     # SIM110
@@ -26,7 +26,8 @@ SIM110.py:3:5: SIM110 [*] Use `return any(check(x) for x in iterable)` instead o
 8 5 | 
 9 6 | def f():
 
-SIM110.py:25:5: SIM110 [*] Use `return all(not check(x) for x in iterable)` instead of `for` loop
+error[SIM110]: SIM110.py:25:5: [*] Use `return all(not check(x) for x in iterable)` instead of `for` loop
+
    |
 23 |   def f():
 24 |       # SIM111
@@ -35,10 +36,9 @@ SIM110.py:25:5: SIM110 [*] Use `return all(not check(x) for x in iterable)` inst
 26 | |         if check(x):
 27 | |             return False
 28 | |     return True
-   | |_______________^ SIM110
+   | |_______________^
    |
    = help: Replace with `return all(not check(x) for x in iterable)`
-
 ℹ Unsafe fix
 22 22 | 
 23 23 | def f():
@@ -52,7 +52,8 @@ SIM110.py:25:5: SIM110 [*] Use `return all(not check(x) for x in iterable)` inst
 30 27 | 
 31 28 | def f():
 
-SIM110.py:33:5: SIM110 [*] Use `return all(x.is_empty() for x in iterable)` instead of `for` loop
+error[SIM110]: SIM110.py:33:5: [*] Use `return all(x.is_empty() for x in iterable)` instead of `for` loop
+
    |
 31 |   def f():
 32 |       # SIM111
@@ -61,10 +62,9 @@ SIM110.py:33:5: SIM110 [*] Use `return all(x.is_empty() for x in iterable)` inst
 34 | |         if not x.is_empty():
 35 | |             return False
 36 | |     return True
-   | |_______________^ SIM110
+   | |_______________^
    |
    = help: Replace with `return all(x.is_empty() for x in iterable)`
-
 ℹ Unsafe fix
 30 30 | 
 31 31 | def f():
@@ -78,7 +78,8 @@ SIM110.py:33:5: SIM110 [*] Use `return all(x.is_empty() for x in iterable)` inst
 38 35 | 
 39 36 | def f():
 
-SIM110.py:55:5: SIM110 [*] Use `return any(check(x) for x in iterable)` instead of `for` loop
+error[SIM110]: SIM110.py:55:5: [*] Use `return any(check(x) for x in iterable)` instead of `for` loop
+
    |
 53 |   def f():
 54 |       # SIM110
@@ -88,10 +89,9 @@ SIM110.py:55:5: SIM110 [*] Use `return any(check(x) for x in iterable)` instead 
 57 | |             return True
 58 | |     else:
 59 | |         return False
-   | |____________________^ SIM110
+   | |____________________^
    |
    = help: Replace with `return any(check(x) for x in iterable)`
-
 ℹ Unsafe fix
 52 52 | 
 53 53 | def f():
@@ -106,7 +106,8 @@ SIM110.py:55:5: SIM110 [*] Use `return any(check(x) for x in iterable)` instead 
 61 57 | 
 62 58 | def f():
 
-SIM110.py:64:5: SIM110 [*] Use `return all(not check(x) for x in iterable)` instead of `for` loop
+error[SIM110]: SIM110.py:64:5: [*] Use `return all(not check(x) for x in iterable)` instead of `for` loop
+
    |
 62 |   def f():
 63 |       # SIM111
@@ -116,10 +117,9 @@ SIM110.py:64:5: SIM110 [*] Use `return all(not check(x) for x in iterable)` inst
 66 | |             return False
 67 | |     else:
 68 | |         return True
-   | |___________________^ SIM110
+   | |___________________^
    |
    = help: Replace with `return all(not check(x) for x in iterable)`
-
 ℹ Unsafe fix
 61 61 | 
 62 62 | def f():
@@ -134,7 +134,8 @@ SIM110.py:64:5: SIM110 [*] Use `return all(not check(x) for x in iterable)` inst
 70 66 | 
 71 67 | def f():
 
-SIM110.py:73:5: SIM110 [*] Use `return any(check(x) for x in iterable)` instead of `for` loop
+error[SIM110]: SIM110.py:73:5: [*] Use `return any(check(x) for x in iterable)` instead of `for` loop
+
    |
 71 |   def f():
 72 |       # SIM110
@@ -144,11 +145,10 @@ SIM110.py:73:5: SIM110 [*] Use `return any(check(x) for x in iterable)` instead 
 75 | |             return True
 76 | |     else:
 77 | |         return False
-   | |____________________^ SIM110
+   | |____________________^
 78 |       return True
    |
    = help: Replace with `return any(check(x) for x in iterable)`
-
 ℹ Unsafe fix
 70 70 | 
 71 71 | def f():
@@ -163,7 +163,8 @@ SIM110.py:73:5: SIM110 [*] Use `return any(check(x) for x in iterable)` instead 
 79 75 | 
 80 76 | 
 
-SIM110.py:83:5: SIM110 [*] Use `return all(not check(x) for x in iterable)` instead of `for` loop
+error[SIM110]: SIM110.py:83:5: [*] Use `return all(not check(x) for x in iterable)` instead of `for` loop
+
    |
 81 |   def f():
 82 |       # SIM111
@@ -173,11 +174,10 @@ SIM110.py:83:5: SIM110 [*] Use `return all(not check(x) for x in iterable)` inst
 85 | |             return False
 86 | |     else:
 87 | |         return True
-   | |___________________^ SIM110
+   | |___________________^
 88 |       return False
    |
    = help: Replace with `return all(not check(x) for x in iterable)`
-
 ℹ Unsafe fix
 80 80 | 
 81 81 | def f():
@@ -192,7 +192,8 @@ SIM110.py:83:5: SIM110 [*] Use `return all(not check(x) for x in iterable)` inst
 89 85 | 
 90 86 | 
 
-SIM110.py:124:5: SIM110 Use `return any(check(x) for x in iterable)` instead of `for` loop
+error[SIM110]: SIM110.py:124:5: Use `return any(check(x) for x in iterable)` instead of `for` loop
+
     |
 122 |           pass
 123 |   
@@ -201,11 +202,11 @@ SIM110.py:124:5: SIM110 Use `return any(check(x) for x in iterable)` instead of 
 125 | |         if check(x):
 126 | |             return True
 127 | |     return False
-    | |________________^ SIM110
+    | |________________^
     |
     = help: Replace with `return any(check(x) for x in iterable)`
+error[SIM110]: SIM110.py:134:5: Use `return all(not check(x) for x in iterable)` instead of `for` loop
 
-SIM110.py:134:5: SIM110 Use `return all(not check(x) for x in iterable)` instead of `for` loop
     |
 132 |           pass
 133 |   
@@ -214,11 +215,11 @@ SIM110.py:134:5: SIM110 Use `return all(not check(x) for x in iterable)` instead
 135 | |         if check(x):
 136 | |             return False
 137 | |     return True
-    | |_______________^ SIM110
+    | |_______________^
     |
     = help: Replace with `return all(not check(x) for x in iterable)`
+error[SIM110]: SIM110.py:144:5: [*] Use `return any(check(x) for x in iterable)` instead of `for` loop
 
-SIM110.py:144:5: SIM110 [*] Use `return any(check(x) for x in iterable)` instead of `for` loop
     |
 143 |       # SIM110
 144 |       for x in iterable:
@@ -226,10 +227,9 @@ SIM110.py:144:5: SIM110 [*] Use `return any(check(x) for x in iterable)` instead
 145 | |         if check(x):
 146 | |             return True
 147 | |     return False
-    | |________________^ SIM110
+    | |________________^
     |
     = help: Replace with `return any(check(x) for x in iterable)`
-
 ℹ Unsafe fix
 141 141 |     x = 1
 142 142 | 
@@ -243,7 +243,8 @@ SIM110.py:144:5: SIM110 [*] Use `return any(check(x) for x in iterable)` instead
 149 146 | 
 150 147 | def f():
 
-SIM110.py:154:5: SIM110 [*] Use `return all(not check(x) for x in iterable)` instead of `for` loop
+error[SIM110]: SIM110.py:154:5: [*] Use `return all(not check(x) for x in iterable)` instead of `for` loop
+
     |
 153 |       # SIM111
 154 |       for x in iterable:
@@ -251,10 +252,9 @@ SIM110.py:154:5: SIM110 [*] Use `return all(not check(x) for x in iterable)` ins
 155 | |         if check(x):
 156 | |             return False
 157 | |     return True
-    | |_______________^ SIM110
+    | |_______________^
     |
     = help: Replace with `return all(not check(x) for x in iterable)`
-
 ℹ Unsafe fix
 151 151 |     x = 1
 152 152 | 
@@ -268,7 +268,8 @@ SIM110.py:154:5: SIM110 [*] Use `return all(not check(x) for x in iterable)` ins
 159 156 | 
 160 157 | def f():
 
-SIM110.py:162:5: SIM110 [*] Use `return any(x.isdigit() for x in "012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ")` instead of `for` loop
+error[SIM110]: SIM110.py:162:5: [*] Use `return any(x.isdigit() for x in "012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ")` instead of `for` loop
+
     |
 160 |   def f():
 161 |       # SIM110
@@ -277,10 +278,9 @@ SIM110.py:162:5: SIM110 [*] Use `return any(x.isdigit() for x in "012ß9💣2ℝ
 163 | |         if x.isdigit():
 164 | |             return True
 165 | |     return False
-    | |________________^ SIM110
+    | |________________^
     |
     = help: Replace with `return any(x.isdigit() for x in "012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ")`
-
 ℹ Unsafe fix
 159 159 | 
 160 160 | def f():
@@ -294,7 +294,8 @@ SIM110.py:162:5: SIM110 [*] Use `return any(x.isdigit() for x in "012ß9💣2ℝ
 167 164 | 
 168 165 | def f():
 
-SIM110.py:184:5: SIM110 [*] Use `return any(check(x) for x in iterable)` instead of `for` loop
+error[SIM110]: SIM110.py:184:5: [*] Use `return any(check(x) for x in iterable)` instead of `for` loop
+
     |
 182 |   async def f():
 183 |       # SIM110
@@ -303,12 +304,11 @@ SIM110.py:184:5: SIM110 [*] Use `return any(check(x) for x in iterable)` instead
 185 | |         if check(x):
 186 | |             return True
 187 | |     return False
-    | |________________^ SIM110
+    | |________________^
 188 |   
 189 |   async def f():
     |
     = help: Replace with `return any(check(x) for x in iterable)`
-
 ℹ Unsafe fix
 181 181 | 
 182 182 | async def f():
@@ -322,7 +322,8 @@ SIM110.py:184:5: SIM110 [*] Use `return any(check(x) for x in iterable)` instead
 189 186 | async def f():
 190 187 |     # SIM110
 
-SIM110.py:191:5: SIM110 [*] Use `return any(check(x) for x in await iterable)` instead of `for` loop
+error[SIM110]: SIM110.py:191:5: [*] Use `return any(check(x) for x in await iterable)` instead of `for` loop
+
     |
 189 |   async def f():
 190 |       # SIM110
@@ -331,12 +332,11 @@ SIM110.py:191:5: SIM110 [*] Use `return any(check(x) for x in await iterable)` i
 192 | |         if check(x):
 193 | |             return True
 194 | |     return False
-    | |________________^ SIM110
+    | |________________^
 195 |   
 196 |   def f():
     |
     = help: Replace with `return any(check(x) for x in await iterable)`
-
 ℹ Unsafe fix
 188 188 | 
 189 189 | async def f():
@@ -349,5 +349,3 @@ SIM110.py:191:5: SIM110 [*] Use `return any(check(x) for x in await iterable)` i
 195 192 | 
 196 193 | def f():
 197 194 |     # OK (can't turn this into any() because the yield would end up inside a genexp)
-
-

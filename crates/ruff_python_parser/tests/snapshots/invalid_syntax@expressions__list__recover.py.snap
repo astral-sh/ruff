@@ -239,76 +239,84 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | # Test cases for list expressions where the parser recovers from a syntax error.
 2 | 
 3 | [,]
-  |  ^ Syntax Error: Expected an expression
+  |  ^ Expected an expression
 4 | 
 5 | [1,,2]
   |
 
 
+error: Invalid syntax
   |
 3 | [,]
 4 | 
 5 | [1,,2]
-  |    ^ Syntax Error: Expected an expression or a ']'
+  |    ^ Expected an expression or a ']'
 6 | 
 7 | [1,,]
   |
 
 
+error: Invalid syntax
   |
 5 | [1,,2]
 6 | 
 7 | [1,,]
-  |    ^ Syntax Error: Expected an expression or a ']'
+  |    ^ Expected an expression or a ']'
 8 | 
 9 | # Missing comma
   |
 
 
+error: Invalid syntax
    |
  9 | # Missing comma
 10 | [1 2]
-   |    ^ Syntax Error: Expected ',', found int
+   |    ^ Expected ',', found int
 11 | 
 12 | # Dictionary element in a list
    |
 
 
+error: Invalid syntax
    |
 12 | # Dictionary element in a list
 13 | [1: 2]
-   |   ^ Syntax Error: Expected an expression or a ']'
+   |   ^ Expected an expression or a ']'
 14 | 
 15 | # Missing expression
    |
 
 
+error: Invalid syntax
    |
 15 | # Missing expression
 16 | [1, x + ]
-   |         ^ Syntax Error: Expected an expression
+   |         ^ Expected an expression
 17 | 
 18 | [1; 2]
    |
 
 
+error: Invalid syntax
    |
 16 | [1, x + ]
 17 | 
 18 | [1; 2]
-   |   ^ Syntax Error: Expected an expression or a ']'
+   |   ^ Expected an expression or a ']'
 19 | 
 20 | [*]
    |
 
 
+error: Invalid syntax
    |
 18 | [1; 2]
 19 | 
 20 | [*]
-   |   ^ Syntax Error: Expected an expression
+   |   ^ Expected an expression
    |

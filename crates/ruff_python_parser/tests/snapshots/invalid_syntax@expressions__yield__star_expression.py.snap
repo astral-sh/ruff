@@ -96,18 +96,20 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | # Cannot use starred expression here
 2 | yield (*x)
-  |        ^^ Syntax Error: Starred expression cannot be used here
+  |        ^^ Starred expression cannot be used here
 3 | 
 4 | yield *x and y, z
   |
 
 
+error: Invalid syntax
   |
 2 | yield (*x)
 3 | 
 4 | yield *x and y, z
-  |        ^^^^^^^ Syntax Error: Boolean expression cannot be used here
+  |        ^^^^^^^ Boolean expression cannot be used here
   |

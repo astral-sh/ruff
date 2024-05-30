@@ -75,64 +75,71 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | a = (🐶
-  |      ^^ Syntax Error: Got unexpected token 🐶
+  |      ^^ Got unexpected token 🐶
 2 |     # comment 🐶
 3 | )
   |
 
 
+error: Invalid syntax
   |
 1 | a = (🐶
 2 |     # comment 🐶
 3 | )
-  | ^ Syntax Error: Expected a statement
+  | ^ Expected a statement
 4 | 
 5 | a = (🐶 +
   |
 
 
+error: Invalid syntax
   |
 1 | a = (🐶
 2 |     # comment 🐶
 3 | )
-  |  ^ Syntax Error: Expected a statement
+  |  ^ Expected a statement
 4 | 
 5 | a = (🐶 +
 6 |     # comment
   |
 
 
+error: Invalid syntax
   |
 3 | )
 4 | 
 5 | a = (🐶 +
-  |      ^^ Syntax Error: Got unexpected token 🐶
+  |      ^^ Got unexpected token 🐶
 6 |     # comment
 7 | 🐶)
   |
 
 
+error: Invalid syntax
   |
 5 | a = (🐶 +
 6 |     # comment
 7 | 🐶)
-  | ^^ Syntax Error: Got unexpected token 🐶
+  | ^^ Got unexpected token 🐶
   |
 
 
-  |
-5 | a = (🐶 +
-6 |     # comment
-7 | 🐶)
-  |   ^ Syntax Error: Expected a statement
-  |
-
-
+error: Invalid syntax
   |
 5 | a = (🐶 +
 6 |     # comment
 7 | 🐶)
-  |    ^ Syntax Error: Expected a statement
+  |   ^ Expected a statement
+  |
+
+
+error: Invalid syntax
+  |
+5 | a = (🐶 +
+6 |     # comment
+7 | 🐶)
+  |    ^ Expected a statement
   |

@@ -284,55 +284,61 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | lambda a, a: 1
-  |           ^ Syntax Error: Duplicate parameter "a"
+  |           ^ Duplicate parameter "a"
 2 | 
 3 | lambda a, *, a: 1
   |
 
 
+error: Invalid syntax
   |
 1 | lambda a, a: 1
 2 | 
 3 | lambda a, *, a: 1
-  |              ^ Syntax Error: Duplicate parameter "a"
+  |              ^ Duplicate parameter "a"
 4 | 
 5 | lambda a, a=20: 1
   |
 
 
+error: Invalid syntax
   |
 3 | lambda a, *, a: 1
 4 | 
 5 | lambda a, a=20: 1
-  |           ^ Syntax Error: Duplicate parameter "a"
+  |           ^ Duplicate parameter "a"
 6 | 
 7 | lambda a, *a: 1
   |
 
 
+error: Invalid syntax
   |
 5 | lambda a, a=20: 1
 6 | 
 7 | lambda a, *a: 1
-  |            ^ Syntax Error: Duplicate parameter "a"
+  |            ^ Duplicate parameter "a"
 8 | 
 9 | lambda a, *, **a: 1
   |
 
 
+error: Invalid syntax
   |
 7 | lambda a, *a: 1
 8 | 
 9 | lambda a, *, **a: 1
-  |              ^^^ Syntax Error: Expected one or more keyword parameter after '*' separator
+  |              ^^^ Expected one or more keyword parameter after '*' separator
   |
 
 
+error: Invalid syntax
   |
 7 | lambda a, *a: 1
 8 | 
 9 | lambda a, *, **a: 1
-  |                ^ Syntax Error: Duplicate parameter "a"
+  |                ^ Duplicate parameter "a"
   |

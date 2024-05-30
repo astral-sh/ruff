@@ -207,45 +207,50 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | x += *a and b
-  |       ^^^^^^^ Syntax Error: Boolean expression cannot be used here
+  |       ^^^^^^^ Boolean expression cannot be used here
 2 | x += *yield x
 3 | x += *yield from x
   |
 
 
+error: Invalid syntax
   |
 1 | x += *a and b
 2 | x += *yield x
-  |       ^^^^^^^ Syntax Error: Yield expression cannot be used here
+  |       ^^^^^^^ Yield expression cannot be used here
 3 | x += *yield from x
 4 | x += *lambda x: x
   |
 
 
+error: Invalid syntax
   |
 1 | x += *a and b
 2 | x += *yield x
 3 | x += *yield from x
-  |       ^^^^^^^^^^^^ Syntax Error: Yield expression cannot be used here
+  |       ^^^^^^^^^^^^ Yield expression cannot be used here
 4 | x += *lambda x: x
 5 | x += y := 1
   |
 
 
+error: Invalid syntax
   |
 2 | x += *yield x
 3 | x += *yield from x
 4 | x += *lambda x: x
-  |       ^^^^^^^^^^^ Syntax Error: Lambda expression cannot be used here
+  |       ^^^^^^^^^^^ Lambda expression cannot be used here
 5 | x += y := 1
   |
 
 
+error: Invalid syntax
   |
 3 | x += *yield from x
 4 | x += *lambda x: x
 5 | x += y := 1
-  |        ^^ Syntax Error: Expected a statement
+  |        ^^ Expected a statement
   |

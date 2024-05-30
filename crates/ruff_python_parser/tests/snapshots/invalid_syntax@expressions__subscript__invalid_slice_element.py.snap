@@ -251,53 +251,59 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | x[x := 1:]
-  |   ^^^^^^ Syntax Error: Unparenthesized named expression cannot be used here
+  |   ^^^^^^ Unparenthesized named expression cannot be used here
 2 | 
 3 | # Starred expression
   |
 
 
+error: Invalid syntax
   |
 3 | # Starred expression
 4 | x[*x:]
-  |   ^^ Syntax Error: Starred expression cannot be used here
+  |   ^^ Starred expression cannot be used here
 5 | x[:*x]
 6 | x[::*x]
   |
 
 
+error: Invalid syntax
   |
 3 | # Starred expression
 4 | x[*x:]
 5 | x[:*x]
-  |    ^^ Syntax Error: Starred expression cannot be used here
+  |    ^^ Starred expression cannot be used here
 6 | x[::*x]
   |
 
 
+error: Invalid syntax
   |
 4 | x[*x:]
 5 | x[:*x]
 6 | x[::*x]
-  |     ^^ Syntax Error: Starred expression cannot be used here
+  |     ^^ Starred expression cannot be used here
 7 | 
 8 | # Empty slice
   |
 
 
+error: Invalid syntax
    |
  8 | # Empty slice
  9 | x[]
-   |   ^ Syntax Error: Expected index or slice expression
+   |   ^ Expected index or slice expression
 10 | 
 11 | # Mixed starred expression and named expression
    |
 
 
+error: Invalid syntax
    |
 11 | # Mixed starred expression and named expression
 12 | x[*x := 1]
-   |   ^^ Syntax Error: Assignment expression target must be an identifier
+   |   ^^ Assignment expression target must be an identifier
    |

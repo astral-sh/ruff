@@ -59,11 +59,12 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 2 | # The parser should recover from this syntax error.
 3 | 
 4 | with : ...
-  |      ^ Syntax Error: Expected the start of an expression after `with` keyword
+  |      ^ Expected the start of an expression after `with` keyword
 5 | 
 6 | x + y
   |

@@ -1,16 +1,16 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
 ---
-TCH003.py:8:12: TCH003 [*] Move standard library import `os` into a type-checking block
+error[TCH003]: TCH003.py:8:12: [*] Move standard library import `os` into a type-checking block
+
    |
  7 | def f():
  8 |     import os
-   |            ^^ TCH003
+   |            ^^
  9 | 
 10 |     x: os
    |
    = help: Move into type-checking block
-
 ℹ Unsafe fix
 2  2  | 
 3  3  | For typing-only import detection tests, see `TCH002.py`.
@@ -25,6 +25,4 @@ TCH003.py:8:12: TCH003 [*] Move standard library import `os` into a type-checkin
 8     |-    import os
 9  12 | 
 10 13 |     x: os
-11 14 | 
-
-
+11 14 |

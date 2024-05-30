@@ -156,35 +156,39 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | from x import *, a
-  |               ^^^^ Syntax Error: Star import must be the only import
+  |               ^^^^ Star import must be the only import
 2 | from x import a, *, b
 3 | from x import *, a as b
   |
 
 
+error: Invalid syntax
   |
 1 | from x import *, a
 2 | from x import a, *, b
-  |               ^^^^^^^ Syntax Error: Star import must be the only import
+  |               ^^^^^^^ Star import must be the only import
 3 | from x import *, a as b
 4 | from x import *, *, a
   |
 
 
+error: Invalid syntax
   |
 1 | from x import *, a
 2 | from x import a, *, b
 3 | from x import *, a as b
-  |               ^^^^^^^^^ Syntax Error: Star import must be the only import
+  |               ^^^^^^^^^ Star import must be the only import
 4 | from x import *, *, a
   |
 
 
+error: Invalid syntax
   |
 2 | from x import a, *, b
 3 | from x import *, a as b
 4 | from x import *, *, a
-  |               ^^^^^^^ Syntax Error: Star import must be the only import
+  |               ^^^^^^^ Star import must be the only import
   |

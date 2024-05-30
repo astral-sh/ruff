@@ -28,7 +28,8 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | assert
-  |       ^ Syntax Error: Expected an expression
+  |       ^ Expected an expression
   |

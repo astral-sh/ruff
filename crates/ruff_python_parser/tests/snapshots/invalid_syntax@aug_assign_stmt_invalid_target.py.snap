@@ -178,55 +178,61 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | 1 += 1
-  | ^ Syntax Error: Invalid augmented assignment target
+  | ^ Invalid augmented assignment target
 2 | "a" += "b"
 3 | *x += 1
   |
 
 
+error: Invalid syntax
   |
 1 | 1 += 1
 2 | "a" += "b"
-  | ^^^ Syntax Error: Invalid augmented assignment target
+  | ^^^ Invalid augmented assignment target
 3 | *x += 1
 4 | pass += 1
   |
 
 
+error: Invalid syntax
   |
 1 | 1 += 1
 2 | "a" += "b"
 3 | *x += 1
-  | ^^ Syntax Error: Invalid augmented assignment target
+  | ^^ Invalid augmented assignment target
 4 | pass += 1
 5 | x += pass
   |
 
 
+error: Invalid syntax
   |
 2 | "a" += "b"
 3 | *x += 1
 4 | pass += 1
-  |      ^^ Syntax Error: Expected a statement
+  |      ^^ Expected a statement
 5 | x += pass
 6 | (x + y) += 1
   |
 
 
+error: Invalid syntax
   |
 3 | *x += 1
 4 | pass += 1
 5 | x += pass
-  |      ^^^^ Syntax Error: Expected an identifier, but found a keyword 'pass' that cannot be used here
+  |      ^^^^ Expected an identifier, but found a keyword 'pass' that cannot be used here
 6 | (x + y) += 1
   |
 
 
+error: Invalid syntax
   |
 4 | pass += 1
 5 | x += pass
 6 | (x + y) += 1
-  |  ^^^^^ Syntax Error: Invalid augmented assignment target
+  |  ^^^^^ Invalid augmented assignment target
   |

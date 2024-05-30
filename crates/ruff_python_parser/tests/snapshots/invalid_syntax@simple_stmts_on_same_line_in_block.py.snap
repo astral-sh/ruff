@@ -54,13 +54,15 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | if True: break; continue pass; continue break
-  |                          ^^^^ Syntax Error: Simple statements must be separated by newlines or semicolons
+  |                          ^^^^ Simple statements must be separated by newlines or semicolons
   |
 
 
+error: Invalid syntax
   |
 1 | if True: break; continue pass; continue break
-  |                                         ^^^^^ Syntax Error: Simple statements must be separated by newlines or semicolons
+  |                                         ^^^^^ Simple statements must be separated by newlines or semicolons
   |

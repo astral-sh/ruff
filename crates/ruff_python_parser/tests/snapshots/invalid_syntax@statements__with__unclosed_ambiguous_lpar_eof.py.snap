@@ -35,7 +35,8 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | with (
-  |        Syntax Error: unexpected EOF while parsing
+  |       ^ unexpected EOF while parsing
   |

@@ -71,28 +71,31 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | if x
-  |     ^ Syntax Error: Expected ':', found newline
+  |     ^ Expected ':', found newline
 2 | if x
 3 |     pass
 4 | a = 1
   |
 
 
+error: Invalid syntax
   |
 1 | if x
 2 | if x
-  | ^^ Syntax Error: Expected an indented block after `if` statement
+  | ^^ Expected an indented block after `if` statement
 3 |     pass
 4 | a = 1
   |
 
 
+error: Invalid syntax
   |
 1 | if x
 2 | if x
-  |     ^ Syntax Error: Expected ':', found newline
+  |     ^ Expected ':', found newline
 3 |     pass
 4 | a = 1
   |

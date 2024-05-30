@@ -47,33 +47,37 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | global ,
-  |        ^ Syntax Error: Expected an identifier
+  |        ^ Expected an identifier
 2 | global x,
 3 | global x, y,
   |
 
 
+error: Invalid syntax
   |
 1 | global ,
-  |         ^ Syntax Error: Global statement must have at least one name
+  |         ^ Global statement must have at least one name
 2 | global x,
 3 | global x, y,
   |
 
 
+error: Invalid syntax
   |
 1 | global ,
 2 | global x,
-  |         ^ Syntax Error: Trailing comma not allowed
+  |         ^ Trailing comma not allowed
 3 | global x, y,
   |
 
 
+error: Invalid syntax
   |
 1 | global ,
 2 | global x,
 3 | global x, y,
-  |            ^ Syntax Error: Trailing comma not allowed
+  |            ^ Trailing comma not allowed
   |

@@ -131,19 +131,21 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | x++
-  |    ^ Syntax Error: Expected an expression
+  |    ^ Expected an expression
 2 | 1 + 2
 3 | x--
 4 | 1 - 2
   |
 
 
+error: Invalid syntax
   |
 1 | x++
 2 | 1 + 2
 3 | x--
-  |    ^ Syntax Error: Expected an expression
+  |    ^ Expected an expression
 4 | 1 - 2
   |

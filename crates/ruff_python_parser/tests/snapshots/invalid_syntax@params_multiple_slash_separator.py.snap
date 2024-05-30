@@ -145,15 +145,17 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | def foo(a, /, /, b): ...
-  |               ^ Syntax Error: Only one '/' separator allowed
+  |               ^ Only one '/' separator allowed
 2 | def foo(a, /, b, c, /): ...
   |
 
 
+error: Invalid syntax
   |
 1 | def foo(a, /, /, b): ...
 2 | def foo(a, /, b, c, /): ...
-  |                     ^ Syntax Error: Only one '/' separator allowed
+  |                     ^ Only one '/' separator allowed
   |

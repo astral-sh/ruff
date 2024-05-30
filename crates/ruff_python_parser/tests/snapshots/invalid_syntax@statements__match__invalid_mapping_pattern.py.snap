@@ -457,124 +457,137 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | # Starred expression is not allowed as a mapping pattern key
 2 | match subject:
 3 |     case {*key}:
-  |           ^^^^ Syntax Error: Star pattern cannot be used here
+  |           ^^^^ Star pattern cannot be used here
 4 |         pass
 5 |     case {*key: 1}:
   |
 
 
+error: Invalid syntax
   |
 1 | # Starred expression is not allowed as a mapping pattern key
 2 | match subject:
 3 |     case {*key}:
-  |               ^ Syntax Error: Expected ':', found '}'
+  |               ^ Expected ':', found '}'
 4 |         pass
 5 |     case {*key: 1}:
   |
 
 
+error: Invalid syntax
   |
 3 |     case {*key}:
 4 |         pass
 5 |     case {*key: 1}:
-  |           ^^^^ Syntax Error: Star pattern cannot be used here
+  |           ^^^^ Star pattern cannot be used here
 6 |         pass
 7 |     case {*key 1}:
   |
 
 
+error: Invalid syntax
   |
 5 |     case {*key: 1}:
 6 |         pass
 7 |     case {*key 1}:
-  |           ^^^^ Syntax Error: Star pattern cannot be used here
+  |           ^^^^ Star pattern cannot be used here
 8 |         pass
 9 |     case {*key, None: 1}:
   |
 
 
+error: Invalid syntax
   |
 5 |     case {*key: 1}:
 6 |         pass
 7 |     case {*key 1}:
-  |                ^ Syntax Error: Expected ':', found int
+  |                ^ Expected ':', found int
 8 |         pass
 9 |     case {*key, None: 1}:
   |
 
 
+error: Invalid syntax
    |
  7 |     case {*key 1}:
  8 |         pass
  9 |     case {*key, None: 1}:
-   |           ^^^^ Syntax Error: Star pattern cannot be used here
+   |           ^^^^ Star pattern cannot be used here
 10 |         pass
    |
 
 
+error: Invalid syntax
    |
  7 |     case {*key 1}:
  8 |         pass
  9 |     case {*key, None: 1}:
-   |               ^ Syntax Error: Expected ':', found ','
+   |               ^ Expected ':', found ','
 10 |         pass
    |
 
 
+error: Invalid syntax
    |
 13 | # Multiple double star patterns are not allowed
 14 | match subject:
 15 |     case {**rest, None: 1}:
-   |                   ^^^^^^^ Syntax Error: Pattern cannot follow a double star pattern
+   |                   ^^^^^^^ Pattern cannot follow a double star pattern
 16 |         pass
 17 |     case {**rest1, **rest2, None: 1}:
    |
 
 
+error: Invalid syntax
    |
 15 |     case {**rest, None: 1}:
 16 |         pass
 17 |     case {**rest1, **rest2, None: 1}:
-   |                    ^^^^^^^ Syntax Error: Only one double star pattern is allowed
+   |                    ^^^^^^^ Only one double star pattern is allowed
 18 |         pass
 19 |     case {**rest1, None: 1, **rest2}:
    |
 
 
+error: Invalid syntax
    |
 15 |     case {**rest, None: 1}:
 16 |         pass
 17 |     case {**rest1, **rest2, None: 1}:
-   |                             ^^^^^^^ Syntax Error: Pattern cannot follow a double star pattern
+   |                             ^^^^^^^ Pattern cannot follow a double star pattern
 18 |         pass
 19 |     case {**rest1, None: 1, **rest2}:
    |
 
 
+error: Invalid syntax
    |
 17 |     case {**rest1, **rest2, None: 1}:
 18 |         pass
 19 |     case {**rest1, None: 1, **rest2}:
-   |                    ^^^^^^^ Syntax Error: Pattern cannot follow a double star pattern
+   |                    ^^^^^^^ Pattern cannot follow a double star pattern
 20 |         pass
    |
 
 
+error: Invalid syntax
    |
 17 |     case {**rest1, **rest2, None: 1}:
 18 |         pass
 19 |     case {**rest1, None: 1, **rest2}:
-   |                             ^^^^^^^ Syntax Error: Only one double star pattern is allowed
+   |                             ^^^^^^^ Only one double star pattern is allowed
 20 |         pass
    |
 
 
+error: Invalid syntax
    |
 22 | match subject:
 23 |     case {Foo(a as b): 1}: ...
-   |           ^^^^^^^^^^^ Syntax Error: Invalid mapping pattern key
+   |           ^^^^^^^^^^^ Invalid mapping pattern key
    |

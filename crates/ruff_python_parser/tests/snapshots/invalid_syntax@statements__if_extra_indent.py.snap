@@ -86,19 +86,21 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 2 | if True:
 3 |     pass
 4 |         a + b
-  | ^^^^^^^^ Syntax Error: Unexpected indentation
+  | ^^^^^^^^ Unexpected indentation
 5 | 
 6 |     pass
   |
 
 
+error: Invalid syntax
   |
 6 |     pass
 7 | 
 8 | a = 10
-  |  Syntax Error: Expected a statement
+  | ^ Expected a statement
   |

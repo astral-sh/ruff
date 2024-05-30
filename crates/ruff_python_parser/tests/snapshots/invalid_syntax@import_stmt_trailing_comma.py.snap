@@ -44,22 +44,25 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | import ,
-  |        ^ Syntax Error: Expected an import name
+  |        ^ Expected an import name
 2 | import x, y,
   |
 
 
+error: Invalid syntax
   |
 1 | import ,
-  |         ^ Syntax Error: Expected one or more symbol names after import
+  |         ^ Expected one or more symbol names after import
 2 | import x, y,
   |
 
 
+error: Invalid syntax
   |
 1 | import ,
 2 | import x, y,
-  |            ^ Syntax Error: Trailing comma not allowed
+  |            ^ Trailing comma not allowed
   |

@@ -1,17 +1,17 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
 ---
-<filename>:6:8: TCH003 [*] Move standard library import `os` into a type-checking block
+error[TCH003]: <filename>:6:8: [*] Move standard library import `os` into a type-checking block
+
   |
 4 | from typing import TYPE_CHECKING
 5 | 
 6 | import os, sys
-  |        ^^ TCH003
+  |        ^^
 7 | 
 8 | def f(x: os, y: sys):
   |
   = help: Move into type-checking block
-
 ℹ Unsafe fix
 3  3  | 
 4  4  | from typing import TYPE_CHECKING
@@ -24,17 +24,17 @@ source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
 8  10 | def f(x: os, y: sys):
 9  11 |     pass
 
-<filename>:6:12: TCH003 [*] Move standard library import `sys` into a type-checking block
+error[TCH003]: <filename>:6:12: [*] Move standard library import `sys` into a type-checking block
+
   |
 4 | from typing import TYPE_CHECKING
 5 | 
 6 | import os, sys
-  |            ^^^ TCH003
+  |            ^^^
 7 | 
 8 | def f(x: os, y: sys):
   |
   = help: Move into type-checking block
-
 ℹ Unsafe fix
 3  3  | 
 4  4  | from typing import TYPE_CHECKING
@@ -46,5 +46,3 @@ source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
    9  |+
 8  10 | def f(x: os, y: sys):
 9  11 |     pass
-
-

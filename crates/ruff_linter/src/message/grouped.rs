@@ -9,7 +9,7 @@ use ruff_source_file::OneIndexed;
 
 use crate::fs::relativize_path;
 use crate::message::diff::calculate_print_width;
-use crate::message::text::{MessageCodeFrame, RuleCodeAndBody};
+use crate::message::text::RuleCodeAndBody;
 use crate::message::{
     group_messages_by_filename, Emitter, EmitterContext, Message, MessageWithLocation,
 };
@@ -154,16 +154,16 @@ impl Display for DisplayGroupedMessage<'_> {
         )?;
 
         if self.show_source {
-            use std::fmt::Write;
-            let mut padded = PadAdapter::new(f);
-            writeln!(
-                padded,
-                "{}",
-                MessageCodeFrame {
-                    message,
-                    notebook_index: self.notebook_index
-                }
-            )?;
+            // use std::fmt::Write;
+            // let mut padded = PadAdapter::new(f);
+            // writeln!(
+            //     padded,
+            //     "{}",
+            //     MessageCodeFrame {
+            //         message,
+            //         notebook_index: self.notebook_index
+            //     }
+            // )?;
         }
 
         Ok(())

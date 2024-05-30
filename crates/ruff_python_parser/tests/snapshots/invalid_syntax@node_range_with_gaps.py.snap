@@ -92,30 +92,34 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | def foo # comment
-  |                  ^ Syntax Error: Expected '(', found newline
+  |                  ^ Expected '(', found newline
 2 | def bar(): ...
 3 | def baz
   |
 
 
+error: Invalid syntax
   |
 1 | def foo # comment
 2 | def bar(): ...
-  | ^^^ Syntax Error: Expected ')', found 'def'
+  | ^^^ Expected ')', found 'def'
 3 | def baz
   |
 
 
+error: Invalid syntax
   |
 1 | def foo # comment
 2 | def bar(): ...
 3 | def baz
-  |        ^ Syntax Error: Expected '(', found newline
+  |        ^ Expected '(', found newline
   |
 
 
+error: Invalid syntax
   |
 2 | def bar(): ...
 3 | def baz

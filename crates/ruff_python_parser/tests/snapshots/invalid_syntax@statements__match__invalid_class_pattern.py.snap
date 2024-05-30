@@ -323,61 +323,67 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | # Invalid keyword pattern in class argument
 2 | match subject:
 3 |     case Foo(x as y = 1):
-  |              ^^^^^^ Syntax Error: Expected an identifier for the keyword pattern
+  |              ^^^^^^ Expected an identifier for the keyword pattern
 4 |         pass
 5 |     case Foo(x | y = 1):
   |
 
 
+error: Invalid syntax
   |
 3 |     case Foo(x as y = 1):
 4 |         pass
 5 |     case Foo(x | y = 1):
-  |              ^^^^^ Syntax Error: Expected an identifier for the keyword pattern
+  |              ^^^^^ Expected an identifier for the keyword pattern
 6 |         pass
 7 |     case Foo([x, y] = 1):
   |
 
 
+error: Invalid syntax
   |
 5 |     case Foo(x | y = 1):
 6 |         pass
 7 |     case Foo([x, y] = 1):
-  |              ^^^^^^ Syntax Error: Expected an identifier for the keyword pattern
+  |              ^^^^^^ Expected an identifier for the keyword pattern
 8 |         pass
 9 |     case Foo({False: 0} = 1):
   |
 
 
+error: Invalid syntax
    |
  7 |     case Foo([x, y] = 1):
  8 |         pass
  9 |     case Foo({False: 0} = 1):
-   |              ^^^^^^^^^^ Syntax Error: Expected an identifier for the keyword pattern
+   |              ^^^^^^^^^^ Expected an identifier for the keyword pattern
 10 |         pass
 11 |     case Foo(1=1):
    |
 
 
+error: Invalid syntax
    |
  9 |     case Foo({False: 0} = 1):
 10 |         pass
 11 |     case Foo(1=1):
-   |              ^ Syntax Error: Expected an identifier for the keyword pattern
+   |              ^ Expected an identifier for the keyword pattern
 12 |         pass
 13 |     case Foo(Bar()=1):
    |
 
 
+error: Invalid syntax
    |
 11 |     case Foo(1=1):
 12 |         pass
 13 |     case Foo(Bar()=1):
-   |              ^^^^^ Syntax Error: Expected an identifier for the keyword pattern
+   |              ^^^^^ Expected an identifier for the keyword pattern
 14 |         pass
 15 |     # Positional pattern cannot follow keyword pattern
    |

@@ -60,8 +60,9 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | for x in:
-  |         ^ Syntax Error: Expected an expression
+  |         ^ Expected an expression
 2 |     a = 1
   |

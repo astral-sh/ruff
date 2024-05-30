@@ -130,39 +130,44 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | x in not y
-  |      ^^^^^ Syntax Error: Boolean 'not' expression cannot be used here
+  |      ^^^^^ Boolean 'not' expression cannot be used here
 2 | 
 3 | # `=>` instead of `>=`
   |
 
 
+error: Invalid syntax
   |
 3 | # `=>` instead of `>=`
 4 | x => y
-  |    ^ Syntax Error: Expected an expression
+  |    ^ Expected an expression
 5 | 
 6 | # Same here as well, `not` without `in` is considered to be a unary operator
   |
 
 
+error: Invalid syntax
   |
 6 | # Same here as well, `not` without `in` is considered to be a unary operator
 7 | x not is y
-  |   ^^^ Syntax Error: Simple statements must be separated by newlines or semicolons
+  |   ^^^ Simple statements must be separated by newlines or semicolons
   |
 
 
-  |
-6 | # Same here as well, `not` without `in` is considered to be a unary operator
-7 | x not is y
-  |       ^^ Syntax Error: Expected an identifier, but found a keyword 'is' that cannot be used here
-  |
-
-
+error: Invalid syntax
   |
 6 | # Same here as well, `not` without `in` is considered to be a unary operator
 7 | x not is y
-  |          ^ Syntax Error: Simple statements must be separated by newlines or semicolons
+  |       ^^ Expected an identifier, but found a keyword 'is' that cannot be used here
+  |
+
+
+error: Invalid syntax
+  |
+6 | # Same here as well, `not` without `in` is considered to be a unary operator
+7 | x not is y
+  |          ^ Simple statements must be separated by newlines or semicolons
   |

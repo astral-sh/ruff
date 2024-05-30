@@ -65,62 +65,69 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | if True:
 2 |     pass
 3 | elf:
-  |     ^ Syntax Error: Expected an expression
+  |     ^ Expected an expression
 4 |     pass
 5 | else:
 6 |     pass
   |
 
 
+error: Invalid syntax
   |
 2 |     pass
 3 | elf:
 4 |     pass
-  | ^^^^ Syntax Error: Unexpected indentation
+  | ^^^^ Unexpected indentation
 5 | else:
 6 |     pass
   |
 
 
+error: Invalid syntax
   |
 3 | elf:
 4 |     pass
 5 | else:
-  |  Syntax Error: Expected a statement
+  | ^ Expected a statement
 6 |     pass
   |
 
 
+error: Invalid syntax
   |
 3 | elf:
 4 |     pass
 5 | else:
-  |     ^ Syntax Error: Expected a statement
+  |     ^ Expected a statement
 6 |     pass
   |
 
 
+error: Invalid syntax
   |
 3 | elf:
 4 |     pass
 5 | else:
-  |      ^ Syntax Error: Expected a statement
+  |      ^ Expected a statement
 6 |     pass
   |
 
 
+error: Invalid syntax
   |
 4 |     pass
 5 | else:
 6 |     pass
-  | ^^^^ Syntax Error: Unexpected indentation
+  | ^^^^ Unexpected indentation
   |
 
 
+error: Invalid syntax
   |
 5 | else:
 6 |     pass

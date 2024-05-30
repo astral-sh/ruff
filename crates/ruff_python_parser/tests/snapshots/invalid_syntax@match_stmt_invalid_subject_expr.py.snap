@@ -176,28 +176,31 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | match (*x):
-  |        ^^ Syntax Error: Starred expression cannot be used here
+  |        ^^ Starred expression cannot be used here
 2 |     case _: ...
 3 | # Starred expression precedence test
   |
 
 
+error: Invalid syntax
   |
 2 |     case _: ...
 3 | # Starred expression precedence test
 4 | match *x and y, z:
-  |        ^^^^^^^ Syntax Error: Boolean expression cannot be used here
+  |        ^^^^^^^ Boolean expression cannot be used here
 5 |     case _: ...
 6 | match yield x:
   |
 
 
+error: Invalid syntax
   |
 4 | match *x and y, z:
 5 |     case _: ...
 6 | match yield x:
-  |       ^^^^^^^ Syntax Error: Yield expression cannot be used here
+  |       ^^^^^^^ Yield expression cannot be used here
 7 |     case _: ...
   |

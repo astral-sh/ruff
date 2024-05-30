@@ -1116,265 +1116,293 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 2 | # Test the first and any other element as the there are two separate calls.
 3 | 
 4 | (*x in y, z, *x in y)
-  |   ^^^^^^ Syntax Error: Comparison expression cannot be used here
+  |   ^^^^^^ Comparison expression cannot be used here
 5 | (*not x, z, *not x)
 6 | (*x and y, z, *x and y)
   |
 
 
+error: Invalid syntax
   |
 2 | # Test the first and any other element as the there are two separate calls.
 3 | 
 4 | (*x in y, z, *x in y)
-  |               ^^^^^^ Syntax Error: Comparison expression cannot be used here
+  |               ^^^^^^ Comparison expression cannot be used here
 5 | (*not x, z, *not x)
 6 | (*x and y, z, *x and y)
   |
 
 
+error: Invalid syntax
   |
 4 | (*x in y, z, *x in y)
 5 | (*not x, z, *not x)
-  |   ^^^^^ Syntax Error: Boolean expression cannot be used here
+  |   ^^^^^ Boolean expression cannot be used here
 6 | (*x and y, z, *x and y)
 7 | (*x or y, z, *x or y)
   |
 
 
+error: Invalid syntax
   |
 4 | (*x in y, z, *x in y)
 5 | (*not x, z, *not x)
-  |              ^^^^^ Syntax Error: Boolean expression cannot be used here
+  |              ^^^^^ Boolean expression cannot be used here
 6 | (*x and y, z, *x and y)
 7 | (*x or y, z, *x or y)
   |
 
 
+error: Invalid syntax
   |
 4 | (*x in y, z, *x in y)
 5 | (*not x, z, *not x)
 6 | (*x and y, z, *x and y)
-  |   ^^^^^^^ Syntax Error: Boolean expression cannot be used here
+  |   ^^^^^^^ Boolean expression cannot be used here
 7 | (*x or y, z, *x or y)
 8 | (*x if True else y, z, *x if True else y)
   |
 
 
+error: Invalid syntax
   |
 4 | (*x in y, z, *x in y)
 5 | (*not x, z, *not x)
 6 | (*x and y, z, *x and y)
-  |                ^^^^^^^ Syntax Error: Boolean expression cannot be used here
+  |                ^^^^^^^ Boolean expression cannot be used here
 7 | (*x or y, z, *x or y)
 8 | (*x if True else y, z, *x if True else y)
   |
 
 
+error: Invalid syntax
   |
 5 | (*not x, z, *not x)
 6 | (*x and y, z, *x and y)
 7 | (*x or y, z, *x or y)
-  |   ^^^^^^ Syntax Error: Boolean expression cannot be used here
+  |   ^^^^^^ Boolean expression cannot be used here
 8 | (*x if True else y, z, *x if True else y)
 9 | (*lambda x: x, z, *lambda x: x)
   |
 
 
+error: Invalid syntax
   |
 5 | (*not x, z, *not x)
 6 | (*x and y, z, *x and y)
 7 | (*x or y, z, *x or y)
-  |               ^^^^^^ Syntax Error: Boolean expression cannot be used here
+  |               ^^^^^^ Boolean expression cannot be used here
 8 | (*x if True else y, z, *x if True else y)
 9 | (*lambda x: x, z, *lambda x: x)
   |
 
 
+error: Invalid syntax
    |
  6 | (*x and y, z, *x and y)
  7 | (*x or y, z, *x or y)
  8 | (*x if True else y, z, *x if True else y)
-   |   ^^^^^^^^^^^^^^^^ Syntax Error: Conditional expression cannot be used here
+   |   ^^^^^^^^^^^^^^^^ Conditional expression cannot be used here
  9 | (*lambda x: x, z, *lambda x: x)
 10 | (*x := 2, z, *x := 2)
    |
 
 
+error: Invalid syntax
    |
  6 | (*x and y, z, *x and y)
  7 | (*x or y, z, *x or y)
  8 | (*x if True else y, z, *x if True else y)
-   |                         ^^^^^^^^^^^^^^^^ Syntax Error: Conditional expression cannot be used here
+   |                         ^^^^^^^^^^^^^^^^ Conditional expression cannot be used here
  9 | (*lambda x: x, z, *lambda x: x)
 10 | (*x := 2, z, *x := 2)
    |
 
 
+error: Invalid syntax
    |
  7 | (*x or y, z, *x or y)
  8 | (*x if True else y, z, *x if True else y)
  9 | (*lambda x: x, z, *lambda x: x)
-   |   ^^^^^^^^^^^ Syntax Error: Lambda expression cannot be used here
+   |   ^^^^^^^^^^^ Lambda expression cannot be used here
 10 | (*x := 2, z, *x := 2)
    |
 
 
+error: Invalid syntax
    |
  7 | (*x or y, z, *x or y)
  8 | (*x if True else y, z, *x if True else y)
  9 | (*lambda x: x, z, *lambda x: x)
-   |                    ^^^^^^^^^^^ Syntax Error: Lambda expression cannot be used here
+   |                    ^^^^^^^^^^^ Lambda expression cannot be used here
 10 | (*x := 2, z, *x := 2)
    |
 
 
+error: Invalid syntax
    |
  8 | (*x if True else y, z, *x if True else y)
  9 | (*lambda x: x, z, *lambda x: x)
 10 | (*x := 2, z, *x := 2)
-   |  ^^ Syntax Error: Assignment expression target must be an identifier
+   |  ^^ Assignment expression target must be an identifier
    |
 
 
+error: Invalid syntax
    |
  8 | (*x if True else y, z, *x if True else y)
  9 | (*lambda x: x, z, *lambda x: x)
 10 | (*x := 2, z, *x := 2)
-   |              ^^ Syntax Error: Assignment expression target must be an identifier
+   |              ^^ Assignment expression target must be an identifier
    |
 
 
+error: Invalid syntax
    |
 13 | # Non-parenthesized
 14 | *x in y, z, *x in y
-   |  ^^^^^^ Syntax Error: Comparison expression cannot be used here
+   |  ^^^^^^ Comparison expression cannot be used here
 15 | *not x, z, *not x
 16 | *x and y, z, *x and y
    |
 
 
+error: Invalid syntax
    |
 13 | # Non-parenthesized
 14 | *x in y, z, *x in y
-   |              ^^^^^^ Syntax Error: Comparison expression cannot be used here
+   |              ^^^^^^ Comparison expression cannot be used here
 15 | *not x, z, *not x
 16 | *x and y, z, *x and y
    |
 
 
-   |
-13 | # Non-parenthesized
-14 | *x in y, z, *x in y
-15 | *not x, z, *not x
-   |  ^^^^^ Syntax Error: Boolean expression cannot be used here
-16 | *x and y, z, *x and y
-17 | *x or y, z, *x or y
-   |
-
-
+error: Invalid syntax
    |
 13 | # Non-parenthesized
 14 | *x in y, z, *x in y
 15 | *not x, z, *not x
-   |             ^^^^^ Syntax Error: Boolean expression cannot be used here
+   |  ^^^^^ Boolean expression cannot be used here
 16 | *x and y, z, *x and y
 17 | *x or y, z, *x or y
    |
 
 
+error: Invalid syntax
+   |
+13 | # Non-parenthesized
+14 | *x in y, z, *x in y
+15 | *not x, z, *not x
+   |             ^^^^^ Boolean expression cannot be used here
+16 | *x and y, z, *x and y
+17 | *x or y, z, *x or y
+   |
+
+
+error: Invalid syntax
    |
 14 | *x in y, z, *x in y
 15 | *not x, z, *not x
 16 | *x and y, z, *x and y
-   |  ^^^^^^^ Syntax Error: Boolean expression cannot be used here
+   |  ^^^^^^^ Boolean expression cannot be used here
 17 | *x or y, z, *x or y
 18 | *x if True else y, z, *x if True else y
    |
 
 
+error: Invalid syntax
    |
 14 | *x in y, z, *x in y
 15 | *not x, z, *not x
 16 | *x and y, z, *x and y
-   |               ^^^^^^^ Syntax Error: Boolean expression cannot be used here
+   |               ^^^^^^^ Boolean expression cannot be used here
 17 | *x or y, z, *x or y
 18 | *x if True else y, z, *x if True else y
    |
 
 
+error: Invalid syntax
    |
 15 | *not x, z, *not x
 16 | *x and y, z, *x and y
 17 | *x or y, z, *x or y
-   |  ^^^^^^ Syntax Error: Boolean expression cannot be used here
+   |  ^^^^^^ Boolean expression cannot be used here
 18 | *x if True else y, z, *x if True else y
 19 | *lambda x: x, z, *lambda x: x
    |
 
 
+error: Invalid syntax
    |
 15 | *not x, z, *not x
 16 | *x and y, z, *x and y
 17 | *x or y, z, *x or y
-   |              ^^^^^^ Syntax Error: Boolean expression cannot be used here
+   |              ^^^^^^ Boolean expression cannot be used here
 18 | *x if True else y, z, *x if True else y
 19 | *lambda x: x, z, *lambda x: x
    |
 
 
+error: Invalid syntax
    |
 16 | *x and y, z, *x and y
 17 | *x or y, z, *x or y
 18 | *x if True else y, z, *x if True else y
-   |  ^^^^^^^^^^^^^^^^ Syntax Error: Conditional expression cannot be used here
+   |  ^^^^^^^^^^^^^^^^ Conditional expression cannot be used here
 19 | *lambda x: x, z, *lambda x: x
 20 | *x := 2, z, *x := 2
    |
 
 
+error: Invalid syntax
    |
 16 | *x and y, z, *x and y
 17 | *x or y, z, *x or y
 18 | *x if True else y, z, *x if True else y
-   |                        ^^^^^^^^^^^^^^^^ Syntax Error: Conditional expression cannot be used here
+   |                        ^^^^^^^^^^^^^^^^ Conditional expression cannot be used here
 19 | *lambda x: x, z, *lambda x: x
 20 | *x := 2, z, *x := 2
    |
 
 
+error: Invalid syntax
    |
 17 | *x or y, z, *x or y
 18 | *x if True else y, z, *x if True else y
 19 | *lambda x: x, z, *lambda x: x
-   |  ^^^^^^^^^^^ Syntax Error: Lambda expression cannot be used here
+   |  ^^^^^^^^^^^ Lambda expression cannot be used here
 20 | *x := 2, z, *x := 2
    |
 
 
+error: Invalid syntax
    |
 17 | *x or y, z, *x or y
 18 | *x if True else y, z, *x if True else y
 19 | *lambda x: x, z, *lambda x: x
-   |                   ^^^^^^^^^^^ Syntax Error: Lambda expression cannot be used here
+   |                   ^^^^^^^^^^^ Lambda expression cannot be used here
 20 | *x := 2, z, *x := 2
    |
 
 
+error: Invalid syntax
    |
 18 | *x if True else y, z, *x if True else y
 19 | *lambda x: x, z, *lambda x: x
 20 | *x := 2, z, *x := 2
-   |    ^^ Syntax Error: Expected a statement
+   |    ^^ Expected a statement
    |
 
 
+error: Invalid syntax
    |
 18 | *x if True else y, z, *x if True else y
 19 | *lambda x: x, z, *lambda x: x
 20 | *x := 2, z, *x := 2
-   |                ^^ Syntax Error: Expected ',', found ':='
+   |                ^^ Expected ',', found ':='
    |

@@ -76,20 +76,22 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | try:
 2 |     pass
 3 | except Exception as:
-  |                    ^ Syntax Error: Expected name after `as`
+  |                    ^ Expected name after `as`
 4 |     pass
 5 | except Exception as
   |
 
 
+error: Invalid syntax
   |
 3 | except Exception as:
 4 |     pass
 5 | except Exception as
-  |                    ^ Syntax Error: Expected name after `as`
+  |                    ^ Expected name after `as`
 6 |     pass
   |

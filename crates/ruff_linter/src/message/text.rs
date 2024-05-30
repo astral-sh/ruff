@@ -1,12 +1,11 @@
 use std::borrow::Cow;
+use std::fmt::Write as _;
 use std::fmt::{Display, Formatter};
 use std::io::Write;
 
-use annotate_snippets::display_list::{DisplayList, FormatOptions};
-use annotate_snippets::snippet::{Annotation, AnnotationType, Slice, Snippet, SourceAnnotation};
+use annotate_snippets::{Level, Renderer, Snippet};
 use bitflags::bitflags;
 use colored::Colorize;
-
 use ruff_notebook::NotebookIndex;
 use ruff_source_file::{OneIndexed, SourceLocation};
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -71,8 +70,9 @@ impl Emitter for TextEmitter {
         context: &EmitterContext,
     ) -> anyhow::Result<()> {
         for message in messages {
+            let mut title = String::new();
             write!(
-                writer,
+                title,
                 "{path}{sep}",
                 path = relativize_path(message.filename()).bold(),
                 sep = ":".cyan(),
@@ -84,7 +84,7 @@ impl Emitter for TextEmitter {
             // Check if we're working on a jupyter notebook and translate positions with cell accordingly
             let diagnostic_location = if let Some(notebook_index) = notebook_index {
                 write!(
-                    writer,
+                    title,
                     "cell {cell}{sep}",
                     cell = notebook_index
                         .cell(start_location.row)
@@ -103,7 +103,7 @@ impl Emitter for TextEmitter {
             };
 
             writeln!(
-                writer,
+                title,
                 "{row}{sep}{col}{sep} {code_and_body}",
                 row = diagnostic_location.row,
                 col = diagnostic_location.column,
@@ -115,19 +115,39 @@ impl Emitter for TextEmitter {
                 }
             )?;
 
-            if self.flags.intersects(EmitterFlags::SHOW_SOURCE) {
-                // The `0..0` range is used to highlight file-level diagnostics.
-                if message.range() != TextRange::default() {
-                    writeln!(
-                        writer,
-                        "{}",
-                        MessageCodeFrame {
-                            message,
-                            notebook_index
-                        }
-                    )?;
+            let code = message
+                .rule()
+                .map(|rule| rule.noqa_code().to_string())
+                .unwrap_or_default();
+            let mut snippet_message = Level::Error.title(&title).id(&code);
+
+            // The `0..0` range is used to highlight file-level diagnostics.
+            let (code_frame, advise) = if self.flags.intersects(EmitterFlags::SHOW_SOURCE)
+                && message.range() != TextRange::default()
+            {
+                (
+                    Some(CodeFrameSnippet::new(message, notebook_index)),
+                    create_suggestion_footer(&message),
+                )
+            } else {
+                (None, None)
+            };
+
+            snippet_message = snippet_message
+                .snippets(code_frame.as_ref().map(|snippet| snippet.as_snippet()))
+                .footers(advise);
+
+            let renderer = if cfg!(not(test)) {
+                if colored::control::SHOULD_COLORIZE.should_colorize() {
+                    Renderer::styled()
+                } else {
+                    Renderer::plain()
                 }
-            }
+            } else {
+                Renderer::plain()
+            };
+
+            writeln!(writer, "{}", renderer.render(snippet_message))?;
 
             if self.flags.intersects(EmitterFlags::SHOW_FIX_DIFF) {
                 if let Some(diff) = Diff::from_message(message) {
@@ -178,32 +198,21 @@ impl Display for RuleCodeAndBody<'_> {
     }
 }
 
-pub(super) struct MessageCodeFrame<'a> {
-    pub(crate) message: &'a Message,
-    pub(crate) notebook_index: Option<&'a NotebookIndex>,
+struct CodeFrameSnippet<'a> {
+    pub(crate) source: SourceCode<'a>,
+    line_start: OneIndexed,
 }
 
-impl Display for MessageCodeFrame<'_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let suggestion = self.message.suggestion();
-        let footer = if suggestion.is_some() {
-            vec![Annotation {
-                id: None,
-                label: suggestion,
-                annotation_type: AnnotationType::Help,
-            }]
-        } else {
-            Vec::new()
-        };
+impl<'a> CodeFrameSnippet<'a> {
+    fn new(message: &'a Message, notebook_index: Option<&NotebookIndex>) -> Self {
+        let source_code = message.source_file().to_source_code();
 
-        let source_code = self.message.source_file().to_source_code();
-
-        let content_start_index = source_code.line_index(self.message.start());
+        let content_start_index = source_code.line_index(message.start());
         let mut start_index = content_start_index.saturating_sub(2);
 
         // If we're working with a Jupyter Notebook, skip the lines which are
         // outside of the cell containing the diagnostic.
-        if let Some(index) = self.notebook_index {
+        if let Some(index) = notebook_index {
             let content_start_cell = index.cell(content_start_index).unwrap_or(OneIndexed::MIN);
             while start_index < content_start_index {
                 if index.cell(start_index).unwrap_or(OneIndexed::MIN) == content_start_cell {
@@ -221,14 +230,14 @@ impl Display for MessageCodeFrame<'_> {
             start_index = start_index.saturating_add(1);
         }
 
-        let content_end_index = source_code.line_index(self.message.end());
+        let content_end_index = source_code.line_index(message.end());
         let mut end_index = content_end_index
             .saturating_add(2)
             .min(OneIndexed::from_zero_indexed(source_code.line_count()));
 
         // If we're working with a Jupyter Notebook, skip the lines which are
         // outside of the cell containing the diagnostic.
-        if let Some(index) = self.notebook_index {
+        if let Some(index) = notebook_index {
             let content_end_cell = index.cell(content_end_index).unwrap_or(OneIndexed::MIN);
             while end_index > content_end_index {
                 if index.cell(end_index).unwrap_or(OneIndexed::MIN) == content_end_cell {
@@ -252,60 +261,43 @@ impl Display for MessageCodeFrame<'_> {
 
         let source = replace_whitespace(
             source_code.slice(TextRange::new(start_offset, end_offset)),
-            self.message.range() - start_offset,
+            message.range() - start_offset,
         );
 
-        let source_text = source.text.show_nonprinting();
+        // TODO: Is it safe to keep the same annotation range after
+        // TODO handle show nonpritning
+        // showing nonprinting/replacing whitespace?
+        // let source = SourceCode {
+        //     text: source.text.show_nonprinting(),
+        //     annotation_range: source.annotation_range,
+        // };
 
-        let start_char = source.text[TextRange::up_to(source.annotation_range.start())]
-            .chars()
-            .count();
-
-        let char_length = source.text[source.annotation_range].chars().count();
-
-        let label = self
-            .message
-            .rule()
-            .map_or_else(String::new, |rule| rule.noqa_code().to_string());
-
-        let snippet = Snippet {
-            title: None,
-            slices: vec![Slice {
-                source: &source_text,
-                line_start: self.notebook_index.map_or_else(
-                    || start_index.get(),
-                    |notebook_index| {
-                        notebook_index
-                            .cell_row(start_index)
-                            .unwrap_or(OneIndexed::MIN)
-                            .get()
-                    },
-                ),
-                annotations: vec![SourceAnnotation {
-                    label: &label,
-                    annotation_type: AnnotationType::Error,
-                    range: (start_char, start_char + char_length),
-                }],
-                // The origin (file name, line number, and column number) is already encoded
-                // in the `label`.
-                origin: None,
-                fold: false,
-            }],
-            footer,
-            opt: FormatOptions {
-                #[cfg(test)]
-                color: false,
-                #[cfg(not(test))]
-                color: colored::control::SHOULD_COLORIZE.should_colorize(),
-                ..FormatOptions::default()
+        let line_start = notebook_index.map_or_else(
+            || start_index,
+            |notebook_index| {
+                notebook_index
+                    .cell_row(start_index)
+                    .unwrap_or(OneIndexed::MIN)
             },
-        };
+        );
 
-        writeln!(f, "{message}", message = DisplayList::from(snippet))
+        Self { line_start, source }
+    }
+
+    pub(super) fn as_snippet(&self) -> Snippet {
+        Snippet::source(&self.source.text)
+            .line_start(self.line_start.get())
+            .annotation(Level::Error.span(self.source.annotation_range.into()))
     }
 }
 
-fn replace_whitespace(source: &str, annotation_range: TextRange) -> SourceCode {
+fn create_suggestion_footer(message: &Message) -> Option<annotate_snippets::Message> {
+    let suggestion = message.suggestion()?;
+
+    Some(Level::Help.title(suggestion))
+}
+
+fn replace_whitespace<'a>(source: &str, annotation_range: TextRange) -> SourceCode {
     let mut result = String::new();
     let mut last_end = 0;
     let mut range = annotation_range;

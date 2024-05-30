@@ -87,20 +87,22 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | if x:
 2 |     pass
 3 | elif *x:
-  |      ^^ Syntax Error: Starred expression cannot be used here
+  |      ^^ Starred expression cannot be used here
 4 |     pass
 5 | elif yield x:
   |
 
 
+error: Invalid syntax
   |
 3 | elif *x:
 4 |     pass
 5 | elif yield x:
-  |      ^^^^^^^ Syntax Error: Yield expression cannot be used here
+  |      ^^^^^^^ Yield expression cannot be used here
 6 |     pass
   |

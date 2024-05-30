@@ -126,35 +126,39 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | assert False, *x
-  |               ^^ Syntax Error: Starred expression cannot be used here
+  |               ^^ Starred expression cannot be used here
 2 | assert False, assert x
 3 | assert False, yield x
   |
 
 
+error: Invalid syntax
   |
 1 | assert False, *x
 2 | assert False, assert x
-  |               ^^^^^^ Syntax Error: Expected an expression
+  |               ^^^^^^ Expected an expression
 3 | assert False, yield x
 4 | assert False, x := 1
   |
 
 
+error: Invalid syntax
   |
 1 | assert False, *x
 2 | assert False, assert x
 3 | assert False, yield x
-  |               ^^^^^^^ Syntax Error: Yield expression cannot be used here
+  |               ^^^^^^^ Yield expression cannot be used here
 4 | assert False, x := 1
   |
 
 
+error: Invalid syntax
   |
 2 | assert False, assert x
 3 | assert False, yield x
 4 | assert False, x := 1
-  |                 ^^ Syntax Error: Expected a statement
+  |                 ^^ Expected a statement
   |

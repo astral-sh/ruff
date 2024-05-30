@@ -1,17 +1,17 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
 ---
-singledispatch.py:11:20: TCH002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
+error[TCH002]: singledispatch.py:11:20: [*] Move third-party import `pandas.DataFrame` into a type-checking block
+
    |
  9 | from numpy.typing import ArrayLike
 10 | from scipy.sparse import spmatrix
 11 | from pandas import DataFrame
-   |                    ^^^^^^^^^ TCH002
+   |                    ^^^^^^^^^
 12 | 
 13 | if TYPE_CHECKING:
    |
    = help: Move into type-checking block
-
 ℹ Unsafe fix
 8  8  | from numpy import asarray
 9  9  | from numpy.typing import ArrayLike

@@ -1,15 +1,15 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 ---
-UP039.py:2:8: UP039 [*] Unnecessary parentheses after class definition
+error[UP039]: UP039.py:2:8: [*] Unnecessary parentheses after class definition
+
   |
 1 | # Errors
 2 | class A():
-  |        ^^ UP039
+  |        ^^
 3 |     pass
   |
   = help: Remove parentheses
-
 ℹ Safe fix
 1 1 | # Errors
 2   |-class A():
@@ -18,15 +18,15 @@ UP039.py:2:8: UP039 [*] Unnecessary parentheses after class definition
 4 4 | 
 5 5 | 
 
-UP039.py:6:8: UP039 [*] Unnecessary parentheses after class definition
+error[UP039]: UP039.py:6:8: [*] Unnecessary parentheses after class definition
+
   |
 6 | class A() \
-  |        ^^ UP039
+  |        ^^
 7 |     :
 8 |     pass
   |
   = help: Remove parentheses
-
 ℹ Safe fix
 3 3 |     pass
 4 4 | 
@@ -37,15 +37,15 @@ UP039.py:6:8: UP039 [*] Unnecessary parentheses after class definition
 8 8 |     pass
 9 9 | 
 
-UP039.py:12:9: UP039 [*] Unnecessary parentheses after class definition
+error[UP039]: UP039.py:12:9: [*] Unnecessary parentheses after class definition
+
    |
 11 | class A \
 12 |         ():
-   |         ^^ UP039
+   |         ^^
 13 |     pass
    |
    = help: Remove parentheses
-
 ℹ Safe fix
 9  9  | 
 10 10 | 
@@ -56,15 +56,15 @@ UP039.py:12:9: UP039 [*] Unnecessary parentheses after class definition
 14 14 | 
 15 15 | 
 
-UP039.py:17:8: UP039 [*] Unnecessary parentheses after class definition
+error[UP039]: UP039.py:17:8: [*] Unnecessary parentheses after class definition
+
    |
 16 | @decorator()
 17 | class A():
-   |        ^^ UP039
+   |        ^^
 18 |     pass
    |
    = help: Remove parentheses
-
 ℹ Safe fix
 14 14 | 
 15 15 | 
@@ -75,15 +75,15 @@ UP039.py:17:8: UP039 [*] Unnecessary parentheses after class definition
 19 19 | 
 20 20 | @decorator
 
-UP039.py:21:8: UP039 [*] Unnecessary parentheses after class definition
+error[UP039]: UP039.py:21:8: [*] Unnecessary parentheses after class definition
+
    |
 20 | @decorator
 21 | class A():
-   |        ^^ UP039
+   |        ^^
 22 |     pass
    |
    = help: Remove parentheses
-
 ℹ Safe fix
 18 18 |     pass
 19 19 | 
@@ -93,5 +93,3 @@ UP039.py:21:8: UP039 [*] Unnecessary parentheses after class definition
 22 22 |     pass
 23 23 | 
 24 24 | # OK
-
-

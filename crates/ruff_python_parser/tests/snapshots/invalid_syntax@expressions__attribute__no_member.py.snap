@@ -71,18 +71,20 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | # The `second` is a variable on another line and not part of the attribute expression.
 2 | first.
-  |       ^ Syntax Error: Expected an identifier
+  |       ^ Expected an identifier
 3 | second
 4 | 
 5 | # No member access after the dot.
   |
 
 
+error: Invalid syntax
   |
 5 | # No member access after the dot.
 6 | last.
-  |       Syntax Error: Expected an identifier
+  |      ^ Expected an identifier
   |

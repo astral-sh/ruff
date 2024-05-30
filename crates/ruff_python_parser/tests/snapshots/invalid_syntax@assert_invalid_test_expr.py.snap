@@ -105,44 +105,49 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | assert *x
-  |        ^^ Syntax Error: Starred expression cannot be used here
+  |        ^^ Starred expression cannot be used here
 2 | assert assert x
 3 | assert yield x
   |
 
 
+error: Invalid syntax
   |
 1 | assert *x
 2 | assert assert x
-  |        ^^^^^^ Syntax Error: Expected an identifier, but found a keyword 'assert' that cannot be used here
+  |        ^^^^^^ Expected an identifier, but found a keyword 'assert' that cannot be used here
 3 | assert yield x
 4 | assert x := 1
   |
 
 
+error: Invalid syntax
   |
 1 | assert *x
 2 | assert assert x
-  |               ^ Syntax Error: Simple statements must be separated by newlines or semicolons
+  |               ^ Simple statements must be separated by newlines or semicolons
 3 | assert yield x
 4 | assert x := 1
   |
 
 
+error: Invalid syntax
   |
 1 | assert *x
 2 | assert assert x
 3 | assert yield x
-  |        ^^^^^^^ Syntax Error: Yield expression cannot be used here
+  |        ^^^^^^^ Yield expression cannot be used here
 4 | assert x := 1
   |
 
 
+error: Invalid syntax
   |
 2 | assert assert x
 3 | assert yield x
 4 | assert x := 1
-  |          ^^ Syntax Error: Expected a statement
+  |          ^^ Expected a statement
   |

@@ -86,25 +86,28 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | b'123a𝐁c'
-  |       ^ Syntax Error: bytes can only contain ASCII literal characters
+  |       ^ bytes can only contain ASCII literal characters
 2 | rb"a𝐁c123"
 3 | b"""123a𝐁c"""
   |
 
 
+error: Invalid syntax
   |
 1 | b'123a𝐁c'
 2 | rb"a𝐁c123"
-  |     ^ Syntax Error: bytes can only contain ASCII literal characters
+  |     ^ bytes can only contain ASCII literal characters
 3 | b"""123a𝐁c"""
   |
 
 
+error: Invalid syntax
   |
 1 | b'123a𝐁c'
 2 | rb"a𝐁c123"
 3 | b"""123a𝐁c"""
-  |         ^ Syntax Error: bytes can only contain ASCII literal characters
+  |         ^ bytes can only contain ASCII literal characters
   |

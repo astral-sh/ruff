@@ -198,25 +198,28 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | x: Any = *a and b
-  |           ^^^^^^^ Syntax Error: Boolean expression cannot be used here
+  |           ^^^^^^^ Boolean expression cannot be used here
 2 | x: Any = x := 1
 3 | x: list = [x, *a | b, *a or b]
   |
 
 
+error: Invalid syntax
   |
 1 | x: Any = *a and b
 2 | x: Any = x := 1
-  |            ^^ Syntax Error: Expected a statement
+  |            ^^ Expected a statement
 3 | x: list = [x, *a | b, *a or b]
   |
 
 
+error: Invalid syntax
   |
 1 | x: Any = *a and b
 2 | x: Any = x := 1
 3 | x: list = [x, *a | b, *a or b]
-  |                        ^^^^^^ Syntax Error: Boolean expression cannot be used here
+  |                        ^^^^^^ Boolean expression cannot be used here
   |

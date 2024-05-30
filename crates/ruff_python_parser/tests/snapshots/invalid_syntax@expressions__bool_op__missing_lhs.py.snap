@@ -27,7 +27,8 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | and y
-  | ^^^ Syntax Error: Expected a statement
+  | ^^^ Expected a statement
   |

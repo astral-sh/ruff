@@ -137,46 +137,51 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | return *
-  |         ^ Syntax Error: Expected an expression
+  |         ^ Expected an expression
 2 | return yield x
 3 | return yield from x
 4 | return x := 1
   |
 
 
+error: Invalid syntax
   |
 1 | return *
 2 | return yield x
-  |        ^^^^^^^ Syntax Error: Yield expression cannot be used here
+  |        ^^^^^^^ Yield expression cannot be used here
 3 | return yield from x
 4 | return x := 1
   |
 
 
+error: Invalid syntax
   |
 1 | return *
 2 | return yield x
 3 | return yield from x
-  |        ^^^^^^^^^^^^ Syntax Error: Yield expression cannot be used here
+  |        ^^^^^^^^^^^^ Yield expression cannot be used here
 4 | return x := 1
 5 | return *x and y
   |
 
 
+error: Invalid syntax
   |
 2 | return yield x
 3 | return yield from x
 4 | return x := 1
-  |          ^^ Syntax Error: Expected a statement
+  |          ^^ Expected a statement
 5 | return *x and y
   |
 
 
+error: Invalid syntax
   |
 3 | return yield from x
 4 | return x := 1
 5 | return *x and y
-  |         ^^^^^^^ Syntax Error: Boolean expression cannot be used here
+  |         ^^^^^^^ Boolean expression cannot be used here
   |

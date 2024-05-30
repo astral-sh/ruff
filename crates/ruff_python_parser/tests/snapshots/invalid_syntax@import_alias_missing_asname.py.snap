@@ -30,7 +30,8 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | import x as
-  |            ^ Syntax Error: Expected symbol after `as`
+  |            ^ Expected symbol after `as`
   |

@@ -93,15 +93,17 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | x and a := b
-  |         ^^ Syntax Error: Expected a statement
+  |         ^^ Expected a statement
 2 | x or a := b
   |
 
 
+error: Invalid syntax
   |
 1 | x and a := b
 2 | x or a := b
-  |        ^^ Syntax Error: Expected a statement
+  |        ^^ Expected a statement
   |

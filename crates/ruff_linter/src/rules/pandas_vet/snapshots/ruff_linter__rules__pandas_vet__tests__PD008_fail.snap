@@ -1,12 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/pandas_vet/mod.rs
 ---
-<filename>:4:9: PD008 Use `.loc` instead of `.at`. If speed is important, use NumPy.
+error[PD008]: <filename>:4:9: Use `.loc` instead of `.at`. If speed is important, use NumPy.
+
   |
 2 | import pandas as pd
 3 | x = pd.DataFrame()
 4 | index = x.at[:, ["B", "A"]]
-  |         ^^^^^^^^^^^^^^^^^^^ PD008
+  |         ^^^^^^^^^^^^^^^^^^^
   |
-
-

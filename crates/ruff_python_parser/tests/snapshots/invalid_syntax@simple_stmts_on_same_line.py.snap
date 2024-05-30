@@ -114,33 +114,37 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | a b
-  |   ^ Syntax Error: Simple statements must be separated by newlines or semicolons
+  |   ^ Simple statements must be separated by newlines or semicolons
 2 | a + b c + d
 3 | break; continue pass; continue break
   |
 
 
+error: Invalid syntax
   |
 1 | a b
 2 | a + b c + d
-  |       ^ Syntax Error: Simple statements must be separated by newlines or semicolons
+  |       ^ Simple statements must be separated by newlines or semicolons
 3 | break; continue pass; continue break
   |
 
 
+error: Invalid syntax
   |
 1 | a b
 2 | a + b c + d
 3 | break; continue pass; continue break
-  |                 ^^^^ Syntax Error: Simple statements must be separated by newlines or semicolons
+  |                 ^^^^ Simple statements must be separated by newlines or semicolons
   |
 
 
+error: Invalid syntax
   |
 1 | a b
 2 | a + b c + d
 3 | break; continue pass; continue break
-  |                                ^^^^^ Syntax Error: Simple statements must be separated by newlines or semicolons
+  |                                ^^^^^ Simple statements must be separated by newlines or semicolons
   |

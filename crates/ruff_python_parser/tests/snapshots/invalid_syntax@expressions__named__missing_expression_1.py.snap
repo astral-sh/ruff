@@ -39,9 +39,10 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | # EOF after the `:=` token
 2 | 
 3 | (x :=
-  |       Syntax Error: unexpected EOF while parsing
+  |      ^ unexpected EOF while parsing
   |

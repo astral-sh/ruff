@@ -57,8 +57,9 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | match x:
 2 |     case y if: ...
-  |              ^ Syntax Error: Expected an expression
+  |              ^ Expected an expression
   |

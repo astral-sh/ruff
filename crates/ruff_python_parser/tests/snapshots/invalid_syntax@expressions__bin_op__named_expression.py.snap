@@ -108,15 +108,17 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | x - y := (1, 2)
-  |       ^^ Syntax Error: Expected a statement
+  |       ^^ Expected a statement
 2 | x / y := 2
   |
 
 
+error: Invalid syntax
   |
 1 | x - y := (1, 2)
 2 | x / y := 2
-  |       ^^ Syntax Error: Expected a statement
+  |       ^^ Expected a statement
   |

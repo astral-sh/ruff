@@ -53,16 +53,18 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | try:
 2 |     pass
 3 | try:
-  | ^^^ Syntax Error: Expected `except` or `finally` after `try` block
+  | ^^^ Expected `except` or `finally` after `try` block
 4 |     pass
 5 | else:
   |
 
 
+error: Invalid syntax
   |
 5 | else:
 6 |     pass

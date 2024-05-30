@@ -1,17 +1,17 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_quotes/mod.rs
 ---
-docstring_doubles.py:1:1: Q002 [*] Double quote docstring found but single quotes preferred
+error[Q002]: docstring_doubles.py:1:1: [*] Double quote docstring found but single quotes preferred
+
   |
 1 | / """
 2 | | Double quotes multiline module docstring
 3 | | """
-  | |___^ Q002
+  | |___^
 4 |   
 5 |   """
   |
   = help: Replace double quotes docstring with single quotes
-
 ℹ Safe fix
 1   |-"""
   1 |+'''
@@ -22,19 +22,19 @@ docstring_doubles.py:1:1: Q002 [*] Double quote docstring found but single quote
 5 5 | """
 6 6 | this is not a docstring
 
-docstring_doubles.py:12:5: Q002 [*] Double quote docstring found but single quotes preferred
+error[Q002]: docstring_doubles.py:12:5: [*] Double quote docstring found but single quotes preferred
+
    |
 11 |   class Cls:
 12 |       """
    |  _____^
 13 | |     Double quotes multiline class docstring
 14 | |     """
-   | |_______^ Q002
+   | |_______^
 15 |   
 16 |       """
    |
    = help: Replace double quotes docstring with single quotes
-
 ℹ Safe fix
 9  9  | l = []
 10 10 | 
@@ -48,7 +48,8 @@ docstring_doubles.py:12:5: Q002 [*] Double quote docstring found but single quot
 16 16 |     """
 17 17 |     this is not a docstring
 
-docstring_doubles.py:24:9: Q002 [*] Double quote docstring found but single quotes preferred
+error[Q002]: docstring_doubles.py:24:9: [*] Double quote docstring found but single quotes preferred
+
    |
 22 |           definitely not a docstring""",
 23 |           val=l[Cls():3]):
@@ -56,12 +57,11 @@ docstring_doubles.py:24:9: Q002 [*] Double quote docstring found but single quot
    |  _________^
 25 | |         Double quotes multiline function docstring
 26 | |         """
-   | |___________^ Q002
+   | |___________^
 27 |   
 28 |           some_expression = 'hello world'
    |
    = help: Replace double quotes docstring with single quotes
-
 ℹ Safe fix
 21 21 |     def f(self, bar="""
 22 22 |         definitely not a docstring""",
@@ -73,6 +73,4 @@ docstring_doubles.py:24:9: Q002 [*] Double quote docstring found but single quot
    26 |+        '''
 27 27 | 
 28 28 |         some_expression = 'hello world'
-29 29 | 
-
-
+29 29 |

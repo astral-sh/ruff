@@ -166,35 +166,39 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | x: *int = 1
-  |    ^^^^ Syntax Error: Starred expression cannot be used here
+  |    ^^^^ Starred expression cannot be used here
 2 | x: yield a = 1
 3 | x: yield from b = 1
   |
 
 
+error: Invalid syntax
   |
 1 | x: *int = 1
 2 | x: yield a = 1
-  |    ^^^^^^^ Syntax Error: Yield expression cannot be used here
+  |    ^^^^^^^ Yield expression cannot be used here
 3 | x: yield from b = 1
 4 | x: y := int = 1
   |
 
 
+error: Invalid syntax
   |
 1 | x: *int = 1
 2 | x: yield a = 1
 3 | x: yield from b = 1
-  |    ^^^^^^^^^^^^ Syntax Error: Yield expression cannot be used here
+  |    ^^^^^^^^^^^^ Yield expression cannot be used here
 4 | x: y := int = 1
   |
 
 
+error: Invalid syntax
   |
 2 | x: yield a = 1
 3 | x: yield from b = 1
 4 | x: y := int = 1
-  |      ^^ Syntax Error: Expected a statement
+  |      ^^ Expected a statement
   |

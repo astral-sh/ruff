@@ -132,27 +132,30 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | # Unparenthesized named expression
 2 | yield from x := 1
-  |              ^^ Syntax Error: Expected a statement
+  |              ^^ Expected a statement
 3 | 
 4 | # Unparenthesized tuple expression
   |
 
 
+error: Invalid syntax
   |
 4 | # Unparenthesized tuple expression
 5 | yield from x, y
-  |            ^^^^ Syntax Error: Unparenthesized tuple expression cannot be used here
+  |            ^^^^ Unparenthesized tuple expression cannot be used here
 6 | 
 7 | # This is a tuple expression parsing
   |
 
 
+error: Invalid syntax
   |
 7 | # This is a tuple expression parsing
 8 | #          vvvvvvvvvvvvv
 9 | yield from (x, *x and y)
-  |                 ^^^^^^^ Syntax Error: Boolean expression cannot be used here
+  |                 ^^^^^^^ Boolean expression cannot be used here
   |

@@ -71,9 +71,10 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | x is not
-  |         ^ Syntax Error: Expected an expression
+  |         ^ Expected an expression
 2 | 
 3 | 1 + 2
   |

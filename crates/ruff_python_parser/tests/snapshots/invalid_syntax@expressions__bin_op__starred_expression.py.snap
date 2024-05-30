@@ -77,15 +77,17 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | x + *y
-  |     ^^ Syntax Error: Starred expression cannot be used here
+  |     ^^ Starred expression cannot be used here
 2 | x ** *y
   |
 
 
+error: Invalid syntax
   |
 1 | x + *y
 2 | x ** *y
-  |      ^^ Syntax Error: Starred expression cannot be used here
+  |      ^^ Starred expression cannot be used here
   |

@@ -211,40 +211,44 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | try:
 2 |     pass
 3 | except x, y:
-  |        ^^^^ Syntax Error: Multiple exception types must be parenthesized
+  |        ^^^^ Multiple exception types must be parenthesized
 4 |     pass
 5 | except x, y as exc:
   |
 
 
+error: Invalid syntax
   |
 3 | except x, y:
 4 |     pass
 5 | except x, y as exc:
-  |        ^^^^ Syntax Error: Multiple exception types must be parenthesized
+  |        ^^^^ Multiple exception types must be parenthesized
 6 |     pass
 7 | try:
   |
 
 
+error: Invalid syntax
    |
  7 | try:
  8 |     pass
  9 | except* x, y:
-   |         ^^^^ Syntax Error: Multiple exception types must be parenthesized
+   |         ^^^^ Multiple exception types must be parenthesized
 10 |     pass
 11 | except* x, y as eg:
    |
 
 
+error: Invalid syntax
    |
  9 | except* x, y:
 10 |     pass
 11 | except* x, y as eg:
-   |         ^^^^ Syntax Error: Multiple exception types must be parenthesized
+   |         ^^^^ Multiple exception types must be parenthesized
 12 |     pass
    |

@@ -60,10 +60,11 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | # No expression after `await`, a statement on another line
 2 | await
-  |      ^ Syntax Error: Expected an expression
+  |      ^ Expected an expression
 3 | 
 4 | def foo():
 5 |     pass

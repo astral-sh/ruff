@@ -46,19 +46,21 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | # Here, the error is highlighted at the `pass` token
 2 | if True:
 3 | pass
-  | ^^^^ Syntax Error: Expected an indented block after `if` statement
+  | ^^^^ Expected an indented block after `if` statement
 4 | # The parser is at the end of the program, so let's highlight
 5 | # at the newline token after `:`
   |
 
 
+error: Invalid syntax
   |
 4 | # The parser is at the end of the program, so let's highlight
 5 | # at the newline token after `:`
 6 | if True:
-  |         ^ Syntax Error: Expected an indented block after `if` statement
+  |         ^ Expected an indented block after `if` statement
   |

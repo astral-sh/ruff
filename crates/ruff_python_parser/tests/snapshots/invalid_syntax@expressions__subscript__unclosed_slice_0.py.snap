@@ -62,9 +62,10 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | x[:
 2 | 
 3 | x + y
-  |       Syntax Error: unexpected EOF while parsing
+  |      ^ unexpected EOF while parsing
   |

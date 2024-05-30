@@ -109,28 +109,31 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | x +=
-  |     ^ Syntax Error: Expected an expression
+  |     ^ Expected an expression
 2 | 1 + 1
 3 | x += y +=
 4 | 2 + 2
   |
 
 
+error: Invalid syntax
   |
 1 | x +=
 2 | 1 + 1
 3 | x += y +=
-  |        ^^ Syntax Error: Expected a statement
+  |        ^^ Expected a statement
 4 | 2 + 2
   |
 
 
+error: Invalid syntax
   |
 1 | x +=
 2 | 1 + 1
 3 | x += y +=
-  |          ^ Syntax Error: Expected a statement
+  |          ^ Expected a statement
 4 | 2 + 2
   |

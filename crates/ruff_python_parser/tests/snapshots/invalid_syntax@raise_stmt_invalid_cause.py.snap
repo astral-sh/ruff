@@ -110,25 +110,28 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | raise x from *y
-  |              ^^ Syntax Error: Starred expression cannot be used here
+  |              ^^ Starred expression cannot be used here
 2 | raise x from yield y
 3 | raise x from y := 1
   |
 
 
+error: Invalid syntax
   |
 1 | raise x from *y
 2 | raise x from yield y
-  |              ^^^^^^^ Syntax Error: Yield expression cannot be used here
+  |              ^^^^^^^ Yield expression cannot be used here
 3 | raise x from y := 1
   |
 
 
+error: Invalid syntax
   |
 1 | raise x from *y
 2 | raise x from yield y
 3 | raise x from y := 1
-  |                ^^ Syntax Error: Expected a statement
+  |                ^^ Expected a statement
   |

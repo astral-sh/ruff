@@ -36,7 +36,8 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | x: int =
-  |         ^ Syntax Error: Expected an expression
+  |         ^ Expected an expression
   |

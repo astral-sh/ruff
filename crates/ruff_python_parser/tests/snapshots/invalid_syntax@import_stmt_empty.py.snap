@@ -21,7 +21,8 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | import
-  |       ^ Syntax Error: Expected one or more symbol names after import
+  |       ^ Expected one or more symbol names after import
   |

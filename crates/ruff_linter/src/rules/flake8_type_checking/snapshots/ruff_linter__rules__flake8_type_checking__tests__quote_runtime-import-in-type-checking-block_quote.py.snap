@@ -1,16 +1,16 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
 ---
-quote.py:64:28: TCH004 [*] Quote references to `pandas.DataFrame`. Import is in a type-checking block.
+error[TCH004]: quote.py:64:28: [*] Quote references to `pandas.DataFrame`. Import is in a type-checking block.
+
    |
 63 |     if TYPE_CHECKING:
 64 |         from pandas import DataFrame
-   |                            ^^^^^^^^^ TCH004
+   |                            ^^^^^^^^^
 65 | 
 66 |     def func(value: DataFrame):
    |
    = help: Quote references
-
 ℹ Unsafe fix
 63 63 |     if TYPE_CHECKING:
 64 64 |         from pandas import DataFrame
@@ -19,6 +19,4 @@ quote.py:64:28: TCH004 [*] Quote references to `pandas.DataFrame`. Import is in 
    66 |+    def func(value: "DataFrame"):
 67 67 |         ...
 68 68 | 
-69 69 | 
-
-
+69 69 |

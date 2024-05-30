@@ -163,15 +163,17 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | def foo(a, *args, *, b): ...
-  |                   ^ Syntax Error: Keyword-only parameter separator not allowed after '*' parameter
+  |                   ^ Keyword-only parameter separator not allowed after '*' parameter
 2 | def foo(a, *args, b, c, *): ...
   |
 
 
+error: Invalid syntax
   |
 1 | def foo(a, *args, *, b): ...
 2 | def foo(a, *args, b, c, *): ...
-  |                         ^ Syntax Error: Keyword-only parameter separator not allowed after '*' parameter
+  |                         ^ Keyword-only parameter separator not allowed after '*' parameter
   |

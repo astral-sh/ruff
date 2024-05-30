@@ -151,33 +151,37 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | for x in *a and b: ...
-  |           ^^^^^^^ Syntax Error: Boolean expression cannot be used here
+  |           ^^^^^^^ Boolean expression cannot be used here
 2 | for x in yield a: ...
 3 | for target in x := 1: ...
   |
 
 
+error: Invalid syntax
   |
 1 | for x in *a and b: ...
 2 | for x in yield a: ...
-  |          ^^^^^^^ Syntax Error: Yield expression cannot be used here
+  |          ^^^^^^^ Yield expression cannot be used here
 3 | for target in x := 1: ...
   |
 
 
+error: Invalid syntax
   |
 1 | for x in *a and b: ...
 2 | for x in yield a: ...
 3 | for target in x := 1: ...
-  |                 ^^ Syntax Error: Expected ':', found ':='
+  |                 ^^ Expected ':', found ':='
   |
 
 
+error: Invalid syntax
   |
 1 | for x in *a and b: ...
 2 | for x in yield a: ...
 3 | for target in x := 1: ...
-  |                    ^ Syntax Error: Invalid annotated assignment target
+  |                    ^ Invalid annotated assignment target
   |

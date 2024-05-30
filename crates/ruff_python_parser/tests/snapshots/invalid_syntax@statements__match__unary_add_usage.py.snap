@@ -349,50 +349,55 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | # Unary addition isn't allowed but we parse it for better error recovery.
 2 | match subject:
 3 |     case +1:
-  |          ^^ Syntax Error: Unary '+' is not allowed as a literal pattern
+  |          ^^ Unary '+' is not allowed as a literal pattern
 4 |         pass
 5 |     case 1 | +2 | -3:
   |
 
 
+error: Invalid syntax
   |
 3 |     case +1:
 4 |         pass
 5 |     case 1 | +2 | -3:
-  |              ^^ Syntax Error: Unary '+' is not allowed as a literal pattern
+  |              ^^ Unary '+' is not allowed as a literal pattern
 6 |         pass
 7 |     case [1, +2, -3]:
   |
 
 
+error: Invalid syntax
   |
 5 |     case 1 | +2 | -3:
 6 |         pass
 7 |     case [1, +2, -3]:
-  |              ^^ Syntax Error: Unary '+' is not allowed as a literal pattern
+  |              ^^ Unary '+' is not allowed as a literal pattern
 8 |         pass
 9 |     case Foo(x=+1, y=-2):
   |
 
 
+error: Invalid syntax
    |
  7 |     case [1, +2, -3]:
  8 |         pass
  9 |     case Foo(x=+1, y=-2):
-   |                ^^ Syntax Error: Unary '+' is not allowed as a literal pattern
+   |                ^^ Unary '+' is not allowed as a literal pattern
 10 |         pass
 11 |     case {True: +1, False: -2}:
    |
 
 
+error: Invalid syntax
    |
  9 |     case Foo(x=+1, y=-2):
 10 |         pass
 11 |     case {True: +1, False: -2}:
-   |                 ^^ Syntax Error: Unary '+' is not allowed as a literal pattern
+   |                 ^^ Unary '+' is not allowed as a literal pattern
 12 |         pass
    |

@@ -260,45 +260,50 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | call(**kwargs, x)
-  |                ^ Syntax Error: Positional argument cannot follow keyword argument unpacking
+  |                ^ Positional argument cannot follow keyword argument unpacking
 2 | call(x=1, y)
 3 | call(x=1, **kwargs, y)
   |
 
 
+error: Invalid syntax
   |
 1 | call(**kwargs, x)
 2 | call(x=1, y)
-  |           ^ Syntax Error: Positional argument cannot follow keyword argument
+  |           ^ Positional argument cannot follow keyword argument
 3 | call(x=1, **kwargs, y)
 4 | call(**kwargs, *args)
   |
 
 
+error: Invalid syntax
   |
 1 | call(**kwargs, x)
 2 | call(x=1, y)
 3 | call(x=1, **kwargs, y)
-  |                     ^ Syntax Error: Positional argument cannot follow keyword argument unpacking
+  |                     ^ Positional argument cannot follow keyword argument unpacking
 4 | call(**kwargs, *args)
 5 | call(**kwargs, (*args))
   |
 
 
+error: Invalid syntax
   |
 2 | call(x=1, y)
 3 | call(x=1, **kwargs, y)
 4 | call(**kwargs, *args)
-  |                ^^^^^ Syntax Error: Iterable argument unpacking cannot follow keyword argument unpacking
+  |                ^^^^^ Iterable argument unpacking cannot follow keyword argument unpacking
 5 | call(**kwargs, (*args))
   |
 
 
+error: Invalid syntax
   |
 3 | call(x=1, **kwargs, y)
 4 | call(**kwargs, *args)
 5 | call(**kwargs, (*args))
-  |                 ^^^^^ Syntax Error: Starred expression cannot be used here
+  |                 ^^^^^ Starred expression cannot be used here
   |

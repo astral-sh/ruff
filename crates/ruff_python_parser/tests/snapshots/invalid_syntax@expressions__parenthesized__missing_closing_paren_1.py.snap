@@ -40,9 +40,10 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 4 | (
 5 | 
 6 | x + y
-  |       Syntax Error: unexpected EOF while parsing
+  |      ^ unexpected EOF while parsing
   |

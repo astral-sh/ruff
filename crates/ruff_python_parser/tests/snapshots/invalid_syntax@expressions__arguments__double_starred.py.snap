@@ -179,43 +179,48 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | call(**yield x)
-  |        ^^^^^^^ Syntax Error: Yield expression cannot be used here
+  |        ^^^^^^^ Yield expression cannot be used here
 2 | call(** *x)
 3 | call(***x)
   |
 
 
+error: Invalid syntax
   |
 1 | call(**yield x)
 2 | call(** *x)
-  |         ^^ Syntax Error: Starred expression cannot be used here
+  |         ^^ Starred expression cannot be used here
 3 | call(***x)
   |
 
 
+error: Invalid syntax
   |
 1 | call(**yield x)
 2 | call(** *x)
 3 | call(***x)
-  |        ^^ Syntax Error: Starred expression cannot be used here
+  |        ^^ Starred expression cannot be used here
 4 | 
 5 | call(**x := 1)
   |
 
 
+error: Invalid syntax
   |
 3 | call(***x)
 4 | 
 5 | call(**x := 1)
-  |          ^^ Syntax Error: Expected ',', found ':='
+  |          ^^ Expected ',', found ':='
   |
 
 
+error: Invalid syntax
   |
 3 | call(***x)
 4 | 
 5 | call(**x := 1)
-  |             ^ Syntax Error: Positional argument cannot follow keyword argument unpacking
+  |             ^ Positional argument cannot follow keyword argument unpacking
   |

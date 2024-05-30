@@ -163,110 +163,121 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | try:
 2 |     pass
 3 | exept:  # spellchecker:disable-line
-  | ^^^^^ Syntax Error: Expected `except` or `finally` after `try` block
+  | ^^^^^ Expected `except` or `finally` after `try` block
 4 |     pass
 5 | finally:
   |
 
 
+error: Invalid syntax
   |
 1 | try:
 2 |     pass
 3 | exept:  # spellchecker:disable-line
-  |                                    ^ Syntax Error: Expected an expression
+  |                                    ^ Expected an expression
 4 |     pass
 5 | finally:
 6 |     pass
   |
 
 
+error: Invalid syntax
   |
 2 |     pass
 3 | exept:  # spellchecker:disable-line
 4 |     pass
-  | ^^^^ Syntax Error: Unexpected indentation
+  | ^^^^ Unexpected indentation
 5 | finally:
 6 |     pass
   |
 
 
+error: Invalid syntax
   |
 3 | exept:  # spellchecker:disable-line
 4 |     pass
 5 | finally:
-  |  Syntax Error: Expected a statement
+  | ^ Expected a statement
 6 |     pass
 7 | a = 1
   |
 
 
+error: Invalid syntax
   |
 3 | exept:  # spellchecker:disable-line
 4 |     pass
 5 | finally:
-  |        ^ Syntax Error: Expected a statement
+  |        ^ Expected a statement
 6 |     pass
 7 | a = 1
   |
 
 
+error: Invalid syntax
   |
 3 | exept:  # spellchecker:disable-line
 4 |     pass
 5 | finally:
-  |         ^ Syntax Error: Expected a statement
+  |         ^ Expected a statement
 6 |     pass
 7 | a = 1
 8 | try:
   |
 
 
+error: Invalid syntax
   |
 4 |     pass
 5 | finally:
 6 |     pass
-  | ^^^^ Syntax Error: Unexpected indentation
+  | ^^^^ Unexpected indentation
 7 | a = 1
 8 | try:
   |
 
 
+error: Invalid syntax
   |
 5 | finally:
 6 |     pass
 7 | a = 1
-  |  Syntax Error: Expected a statement
+  | ^ Expected a statement
 8 | try:
 9 |     pass
   |
 
 
+error: Invalid syntax
    |
 10 | except:
 11 |     pass
 12 | exept:  # spellchecker:disable-line
-   |                                    ^ Syntax Error: Expected an expression
+   |                                    ^ Expected an expression
 13 |     pass
 14 | b = 1
    |
 
 
+error: Invalid syntax
    |
 11 |     pass
 12 | exept:  # spellchecker:disable-line
 13 |     pass
-   | ^^^^ Syntax Error: Unexpected indentation
+   | ^^^^ Unexpected indentation
 14 | b = 1
    |
 
 
+error: Invalid syntax
    |
 12 | exept:  # spellchecker:disable-line
 13 |     pass
 14 | b = 1
-   |  Syntax Error: Expected a statement
+   | ^ Expected a statement
    |
