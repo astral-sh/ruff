@@ -388,48 +388,107 @@ impl Tokens {
         &self.raw[..end]
     }
 
-    /// Returns a slice of the [`Token`] that are within the given `range`.
+    /// Returns a slice of [`Token`] that are within the given `range`.
     ///
-    /// The start and end position of the given range should correspond to the start position of
-    /// the first token and the end position of the last token in the returned slice.
+    /// The start and end offset of the given range should be either:
+    /// 1. Token boundary
+    /// 2. Gap between the tokens
     ///
     /// For example, considering the following tokens and their corresponding range:
     ///
-    /// ```txt
-    /// Def        0..3
-    /// Name       4..7
-    /// Lpar       7..8
-    /// Rpar       8..9
-    /// Colon      9..10
-    /// Ellipsis  11..14
-    /// Newline   14..14
-    /// ```
+    /// | Token               | Range     |
+    /// |---------------------|-----------|
+    /// | `Def`               | `0..3`    |
+    /// | `Name`              | `4..7`    |
+    /// | `Lpar`              | `7..8`    |
+    /// | `Rpar`              | `8..9`    |
+    /// | `Colon`             | `9..10`   |
+    /// | `Newline`           | `10..11`  |
+    /// | `Comment`           | `15..24`  |
+    /// | `NonLogicalNewline` | `24..25`  |
+    /// | `Indent`            | `25..29`  |
+    /// | `Pass`              | `29..33`  |
     ///
-    /// The range `4..10` would return a slice of `Name`, `Lpar`, `Rpar`, and `Colon` tokens. But,
-    /// if either the start or end position of the given range doesn't match any of the tokens
-    /// (like `5..10` or `4..12`), the returned slice will be empty.
+    /// Here, for (1) a token boundary is considered either the start or end offset of any of the
+    /// above tokens. For (2), the gap would be any offset between the `Newline` and `Comment`
+    /// token which are 12, 13, and 14.
+    ///
+    /// Examples:
+    /// 1) `4..10` would give `Name`, `Lpar`, `Rpar`, `Colon`
+    /// 2) `11..25` would give `Comment`, `NonLogicalNewline`
+    /// 3) `12..25` would give same as (2) and offset 12 is in the "gap"
+    /// 4) `9..12` would give `Colon`, `Newline` and offset 12 is in the "gap"
+    /// 5) `18..27` would panic because both the start and end offset is within a token
     ///
     /// ## Note
     ///
     /// The returned slice can contain the [`TokenKind::Unknown`] token if there was a lexical
     /// error encountered within the given range.
+    ///
+    /// # Panics
+    ///
+    /// If either the start or end offset of the given range is within a token range.
     pub fn tokens_in_range(&self, range: TextRange) -> &[Token] {
-        let Ok(start) = self.binary_search_by_key(&range.start(), Ranged::start) else {
-            return &[];
-        };
-        let Ok(end) = self[start..].binary_search_by_key(&range.end(), Ranged::end) else {
-            return &[];
-        };
-        &self[start..=start + end]
+        let tokens_after_start = self.after(range.start());
+
+        match tokens_after_start.binary_search_by_key(&range.end(), Ranged::end) {
+            Ok(idx) => {
+                // If we found the token with the end offset, that token should be included in the
+                // return slice.
+                &tokens_after_start[..=idx]
+            }
+            Err(idx) => {
+                if let Some(token) = tokens_after_start.get(idx) {
+                    // If it's equal to the start offset, then it's at a token boundary which is
+                    // valid. If it's less than the start offset, then it's in the gap between the
+                    // tokens which is valid as well.
+                    assert!(
+                        range.end() <= token.start(),
+                        "End offset {:?} is inside a token range {:?}",
+                        range.end(),
+                        token.range()
+                    );
+                }
+
+                // This index is where the token with the offset _could_ be, so that token should
+                // be excluded from the return slice.
+                &tokens_after_start[..idx]
+            }
+        }
     }
 
     /// Returns a slice of tokens after the given [`TextSize`] offset.
     ///
-    /// If the given offset lies within a token, the returned slice will start from the token after
-    /// that. In other words, the returned slice will not include the token containing the offset.
+    /// If the given offset is between two tokens, the returned slice will start from the following
+    /// token. In other words, if the offset is between the end of previous token and start of next
+    /// token, the returned slice will start from the next token.
+    ///
+    /// # Panics
+    ///
+    /// If the given offset is inside a token range.
     pub fn after(&self, offset: TextSize) -> &[Token] {
-        let start = self.partition_point(|token| token.start() < offset);
-        &self[start..]
+        match self.binary_search_by(|token| token.start().cmp(&offset)) {
+            Ok(idx) => &self[idx..],
+            Err(idx) => {
+                // We can't use `saturating_sub` here because a file could contain a BOM header, in
+                // which case the token starts at offset 3 for UTF-8 encoded file content.
+                if idx > 0 {
+                    if let Some(prev) = self.get(idx - 1) {
+                        // If it's equal to the end offset, then it's at a token boundary which is
+                        // valid. If it's greater than the end offset, then it's in the gap between
+                        // the tokens which is valid as well.
+                        assert!(
+                            offset >= prev.end(),
+                            "Offset {:?} is inside a token range {:?}",
+                            offset,
+                            prev.range()
+                        );
+                    }
+                }
+
+                &self[idx..]
+            }
+        }
     }
 }
 
@@ -504,5 +563,176 @@ pub struct ModeParseError;
 impl std::fmt::Display for ModeParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, r#"mode must be "exec", "eval", "ipython", or "single""#)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::ops::Range;
+
+    use crate::lexer::TokenFlags;
+
+    use super::*;
+
+    /// Test case containing a "gap" between two tokens.
+    ///
+    /// Code: <https://play.ruff.rs/a3658340-6df8-42c5-be80-178744bf1193>
+    const TEST_CASE_WITH_GAP: [(TokenKind, Range<u32>); 10] = [
+        (TokenKind::Def, 0..3),
+        (TokenKind::Name, 4..7),
+        (TokenKind::Lpar, 7..8),
+        (TokenKind::Rpar, 8..9),
+        (TokenKind::Colon, 9..10),
+        (TokenKind::Newline, 10..11),
+        // Gap               ||..||
+        (TokenKind::Comment, 15..24),
+        (TokenKind::NonLogicalNewline, 24..25),
+        (TokenKind::Indent, 25..29),
+        (TokenKind::Pass, 29..33),
+        // No newline at the end to keep the token set full of unique tokens
+    ];
+
+    /// Test case containing [`TokenKind::Unknown`] token.
+    ///
+    /// Code: <https://play.ruff.rs/ea722760-9bf5-4d00-be9f-dc441793f88e>
+    const TEST_CASE_WITH_UNKNOWN: [(TokenKind, Range<u32>); 5] = [
+        (TokenKind::Name, 0..1),
+        (TokenKind::Equal, 2..3),
+        (TokenKind::Unknown, 4..11),
+        (TokenKind::Plus, 11..12),
+        (TokenKind::Int, 13..14),
+        // No newline at the end to keep the token set full of unique tokens
+    ];
+
+    /// Helper function to create [`Tokens`] from an iterator of (kind, range).
+    fn new_tokens(tokens: impl Iterator<Item = (TokenKind, Range<u32>)>) -> Tokens {
+        Tokens::new(
+            tokens
+                .map(|(kind, range)| {
+                    Token::new(
+                        kind,
+                        TextRange::new(TextSize::new(range.start), TextSize::new(range.end)),
+                        TokenFlags::empty(),
+                    )
+                })
+                .collect(),
+        )
+    }
+
+    #[test]
+    fn tokens_up_to_first_unknown_empty() {
+        let tokens = Tokens::new(vec![]);
+        assert_eq!(tokens.up_to_first_unknown(), &[]);
+    }
+
+    #[test]
+    fn tokens_up_to_first_unknown_noop() {
+        let tokens = new_tokens(TEST_CASE_WITH_GAP.into_iter());
+        let up_to_first_unknown = tokens.up_to_first_unknown();
+        assert_eq!(up_to_first_unknown.len(), tokens.len());
+    }
+
+    #[test]
+    fn tokens_up_to_first_unknown() {
+        let tokens = new_tokens(TEST_CASE_WITH_UNKNOWN.into_iter());
+        let up_to_first_unknown = tokens.up_to_first_unknown();
+        assert_eq!(up_to_first_unknown.len(), 2);
+    }
+
+    #[test]
+    fn tokens_after_offset_at_token_start() {
+        let tokens = new_tokens(TEST_CASE_WITH_GAP.into_iter());
+        let after = tokens.after(TextSize::new(8));
+        assert_eq!(after.len(), 7);
+        assert_eq!(after.first().unwrap().kind(), TokenKind::Rpar);
+    }
+
+    #[test]
+    fn tokens_after_offset_at_token_end() {
+        let tokens = new_tokens(TEST_CASE_WITH_GAP.into_iter());
+        let after = tokens.after(TextSize::new(11));
+        assert_eq!(after.len(), 4);
+        assert_eq!(after.first().unwrap().kind(), TokenKind::Comment);
+    }
+
+    #[test]
+    fn tokens_after_offset_between_tokens() {
+        let tokens = new_tokens(TEST_CASE_WITH_GAP.into_iter());
+        let after = tokens.after(TextSize::new(13));
+        assert_eq!(after.len(), 4);
+        assert_eq!(after.first().unwrap().kind(), TokenKind::Comment);
+    }
+
+    #[test]
+    fn tokens_after_offset_at_last_token_end() {
+        let tokens = new_tokens(TEST_CASE_WITH_GAP.into_iter());
+        let after = tokens.after(TextSize::new(33));
+        assert_eq!(after.len(), 0);
+    }
+
+    #[test]
+    #[should_panic(expected = "Offset 5 is inside a token range 4..7")]
+    fn tokens_after_offset_inside_token() {
+        let tokens = new_tokens(TEST_CASE_WITH_GAP.into_iter());
+        tokens.after(TextSize::new(5));
+    }
+
+    #[test]
+    fn tokens_in_range_at_token_offset() {
+        let tokens = new_tokens(TEST_CASE_WITH_GAP.into_iter());
+        let in_range = tokens.tokens_in_range(TextRange::new(4.into(), 10.into()));
+        assert_eq!(in_range.len(), 4);
+        assert_eq!(in_range.first().unwrap().kind(), TokenKind::Name);
+        assert_eq!(in_range.last().unwrap().kind(), TokenKind::Colon);
+    }
+
+    #[test]
+    fn tokens_in_range_start_offset_at_token_end() {
+        let tokens = new_tokens(TEST_CASE_WITH_GAP.into_iter());
+        let in_range = tokens.tokens_in_range(TextRange::new(11.into(), 29.into()));
+        assert_eq!(in_range.len(), 3);
+        assert_eq!(in_range.first().unwrap().kind(), TokenKind::Comment);
+        assert_eq!(in_range.last().unwrap().kind(), TokenKind::Indent);
+    }
+
+    #[test]
+    fn tokens_in_range_end_offset_at_token_start() {
+        let tokens = new_tokens(TEST_CASE_WITH_GAP.into_iter());
+        let in_range = tokens.tokens_in_range(TextRange::new(8.into(), 15.into()));
+        assert_eq!(in_range.len(), 3);
+        assert_eq!(in_range.first().unwrap().kind(), TokenKind::Rpar);
+        assert_eq!(in_range.last().unwrap().kind(), TokenKind::Newline);
+    }
+
+    #[test]
+    fn tokens_in_range_start_offset_between_tokens() {
+        let tokens = new_tokens(TEST_CASE_WITH_GAP.into_iter());
+        let in_range = tokens.tokens_in_range(TextRange::new(13.into(), 29.into()));
+        assert_eq!(in_range.len(), 3);
+        assert_eq!(in_range.first().unwrap().kind(), TokenKind::Comment);
+        assert_eq!(in_range.last().unwrap().kind(), TokenKind::Indent);
+    }
+
+    #[test]
+    fn tokens_in_range_end_offset_between_tokens() {
+        let tokens = new_tokens(TEST_CASE_WITH_GAP.into_iter());
+        let in_range = tokens.tokens_in_range(TextRange::new(9.into(), 13.into()));
+        assert_eq!(in_range.len(), 2);
+        assert_eq!(in_range.first().unwrap().kind(), TokenKind::Colon);
+        assert_eq!(in_range.last().unwrap().kind(), TokenKind::Newline);
+    }
+
+    #[test]
+    #[should_panic(expected = "Offset 5 is inside a token range 4..7")]
+    fn tokens_in_range_start_offset_inside_token() {
+        let tokens = new_tokens(TEST_CASE_WITH_GAP.into_iter());
+        tokens.tokens_in_range(TextRange::new(5.into(), 10.into()));
+    }
+
+    #[test]
+    #[should_panic(expected = "End offset 6 is inside a token range 4..7")]
+    fn tokens_in_range_end_offset_inside_token() {
+        let tokens = new_tokens(TEST_CASE_WITH_GAP.into_iter());
+        tokens.tokens_in_range(TextRange::new(0.into(), 6.into()));
     }
 }
