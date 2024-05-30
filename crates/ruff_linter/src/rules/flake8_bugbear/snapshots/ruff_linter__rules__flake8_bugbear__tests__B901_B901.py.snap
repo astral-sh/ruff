@@ -1,0 +1,21 @@
+---
+source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
+---
+B901.py:8:9: B901 Using `yield` together with `return x`. Use native `async def` coroutines or put a `# noqa` comment on this line if this was intentional.
+   |
+ 6 | def broken():
+ 7 |     if True:
+ 8 |         return [1, 2, 3]
+   |         ^^^^^^^^^^^^^^^^ B901
+ 9 | 
+10 |     yield 3
+   |
+
+B901.py:35:5: B901 Using `yield` together with `return x`. Use native `async def` coroutines or put a `# noqa` comment on this line if this was intentional.
+   |
+34 | def broken2():
+35 |     return [3, 2, 1]
+   |     ^^^^^^^^^^^^^^^^ B901
+36 | 
+37 |     yield from not_broken()
+   |
