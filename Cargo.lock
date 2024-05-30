@@ -2077,6 +2077,7 @@ dependencies = [
  "glob",
  "globset",
  "imperative",
+ "indexmap",
  "insta",
  "is-macro",
  "is-wsl",
