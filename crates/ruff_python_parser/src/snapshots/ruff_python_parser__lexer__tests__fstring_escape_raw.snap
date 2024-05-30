@@ -6,33 +6,20 @@ expression: lex_source(source)
 ```
 [
     (
-        FStringStart(
-            AnyStringFlags {
-                prefix: Format(
-                    Raw {
-                        uppercase_r: false,
-                    },
-                ),
-                triple_quoted: false,
-                quote_style: Double,
-            },
-        ),
+        FStringStart,
         0..3,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING | RAW_STRING_LOWERCASE,
+        ),
     ),
     (
         FStringMiddle {
             value: "\\",
-            flags: AnyStringFlags {
-                prefix: Format(
-                    Raw {
-                        uppercase_r: false,
-                    },
-                ),
-                triple_quoted: false,
-                quote_style: Double,
-            },
         },
         3..4,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING | RAW_STRING_LOWERCASE,
+        ),
     ),
     (
         Lbrace,
@@ -51,17 +38,11 @@ expression: lex_source(source)
     (
         FStringMiddle {
             value: "\\\"\\",
-            flags: AnyStringFlags {
-                prefix: Format(
-                    Raw {
-                        uppercase_r: false,
-                    },
-                ),
-                triple_quoted: false,
-                quote_style: Double,
-            },
         },
         7..10,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING | RAW_STRING_LOWERCASE,
+        ),
     ),
     (
         Lbrace,
@@ -84,21 +65,18 @@ expression: lex_source(source)
     (
         FStringMiddle {
             value: " \\\"\\\"\\\n end",
-            flags: AnyStringFlags {
-                prefix: Format(
-                    Raw {
-                        uppercase_r: false,
-                    },
-                ),
-                triple_quoted: false,
-                quote_style: Double,
-            },
         },
         14..25,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING | RAW_STRING_LOWERCASE,
+        ),
     ),
     (
         FStringEnd,
         25..26,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING | RAW_STRING_LOWERCASE,
+        ),
     ),
     (
         Newline,

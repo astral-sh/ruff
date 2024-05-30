@@ -8,15 +8,11 @@ expression: string_continuation_with_eol(WINDOWS_EOL)
     (
         String {
             value: "abc\\\r\ndef",
-            flags: AnyStringFlags {
-                prefix: Regular(
-                    Empty,
-                ),
-                triple_quoted: false,
-                quote_style: Double,
-            },
         },
         0..11,
+        TokenFlags(
+            DOUBLE_QUOTES,
+        ),
     ),
     (
         Newline,

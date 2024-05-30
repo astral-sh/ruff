@@ -6,29 +6,20 @@ expression: lex_source(source)
 ```
 [
     (
-        FStringStart(
-            AnyStringFlags {
-                prefix: Format(
-                    Regular,
-                ),
-                triple_quoted: false,
-                quote_style: Single,
-            },
-        ),
+        FStringStart,
         0..2,
+        TokenFlags(
+            F_STRING,
+        ),
     ),
     (
         FStringMiddle {
             value: "\\",
-            flags: AnyStringFlags {
-                prefix: Format(
-                    Regular,
-                ),
-                triple_quoted: false,
-                quote_style: Single,
-            },
         },
         2..3,
+        TokenFlags(
+            F_STRING,
+        ),
     ),
     (
         Lbrace,
@@ -47,31 +38,25 @@ expression: lex_source(source)
     (
         FStringEnd,
         8..9,
+        TokenFlags(
+            F_STRING,
+        ),
     ),
     (
-        FStringStart(
-            AnyStringFlags {
-                prefix: Format(
-                    Regular,
-                ),
-                triple_quoted: false,
-                quote_style: Single,
-            },
-        ),
+        FStringStart,
         10..12,
+        TokenFlags(
+            F_STRING,
+        ),
     ),
     (
         FStringMiddle {
             value: "\\\\",
-            flags: AnyStringFlags {
-                prefix: Format(
-                    Regular,
-                ),
-                triple_quoted: false,
-                quote_style: Single,
-            },
         },
         12..14,
+        TokenFlags(
+            F_STRING,
+        ),
     ),
     (
         Lbrace,
@@ -90,64 +75,55 @@ expression: lex_source(source)
     (
         FStringEnd,
         19..20,
+        TokenFlags(
+            F_STRING,
+        ),
     ),
     (
-        FStringStart(
-            AnyStringFlags {
-                prefix: Format(
-                    Regular,
-                ),
-                triple_quoted: false,
-                quote_style: Single,
-            },
-        ),
+        FStringStart,
         21..23,
+        TokenFlags(
+            F_STRING,
+        ),
     ),
     (
         FStringMiddle {
             value: "\\{foo}",
-            flags: AnyStringFlags {
-                prefix: Format(
-                    Regular,
-                ),
-                triple_quoted: false,
-                quote_style: Single,
-            },
         },
         23..31,
+        TokenFlags(
+            F_STRING,
+        ),
     ),
     (
         FStringEnd,
         31..32,
+        TokenFlags(
+            F_STRING,
+        ),
     ),
     (
-        FStringStart(
-            AnyStringFlags {
-                prefix: Format(
-                    Regular,
-                ),
-                triple_quoted: false,
-                quote_style: Single,
-            },
-        ),
+        FStringStart,
         33..35,
+        TokenFlags(
+            F_STRING,
+        ),
     ),
     (
         FStringMiddle {
             value: "\\\\{foo}",
-            flags: AnyStringFlags {
-                prefix: Format(
-                    Regular,
-                ),
-                triple_quoted: false,
-                quote_style: Single,
-            },
         },
         35..44,
+        TokenFlags(
+            F_STRING,
+        ),
     ),
     (
         FStringEnd,
         44..45,
+        TokenFlags(
+            F_STRING,
+        ),
     ),
     (
         Newline,

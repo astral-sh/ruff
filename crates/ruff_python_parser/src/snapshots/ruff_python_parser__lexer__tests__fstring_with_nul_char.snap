@@ -6,33 +6,27 @@ expression: lex_source(source)
 ```
 [
     (
-        FStringStart(
-            AnyStringFlags {
-                prefix: Format(
-                    Regular,
-                ),
-                triple_quoted: false,
-                quote_style: Single,
-            },
-        ),
+        FStringStart,
         0..2,
+        TokenFlags(
+            F_STRING,
+        ),
     ),
     (
         FStringMiddle {
             value: "\\0",
-            flags: AnyStringFlags {
-                prefix: Format(
-                    Regular,
-                ),
-                triple_quoted: false,
-                quote_style: Single,
-            },
         },
         2..4,
+        TokenFlags(
+            F_STRING,
+        ),
     ),
     (
         FStringEnd,
         4..5,
+        TokenFlags(
+            F_STRING,
+        ),
     ),
     (
         Newline,

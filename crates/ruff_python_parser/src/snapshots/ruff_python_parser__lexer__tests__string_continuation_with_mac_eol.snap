@@ -8,15 +8,11 @@ expression: string_continuation_with_eol(MAC_EOL)
     (
         String {
             value: "abc\\\rdef",
-            flags: AnyStringFlags {
-                prefix: Regular(
-                    Empty,
-                ),
-                triple_quoted: false,
-                quote_style: Double,
-            },
         },
         0..10,
+        TokenFlags(
+            DOUBLE_QUOTES,
+        ),
     ),
     (
         Newline,
