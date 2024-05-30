@@ -1386,7 +1386,7 @@ impl<'src> Lexer<'src> {
 }
 
 bitflags! {
-    #[derive(Clone, Copy, Debug)]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
     pub(crate) struct TokenFlags: u8 {
         /// The token is a string with double quotes (`"`).
         const DOUBLE_QUOTES = 1 << 0;
@@ -1468,7 +1468,7 @@ impl TokenFlags {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Token {
     /// The kind of the token.
     kind: TokenKind,
