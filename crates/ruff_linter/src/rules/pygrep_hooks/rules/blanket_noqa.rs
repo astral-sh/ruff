@@ -4,7 +4,7 @@ use ruff_python_trivia::Cursor;
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::noqa::{Directive, FileExemption, NoqaDirectives};
+use crate::noqa::{BlanketNoqaDirectives, Directive, NoqaDirectives, ParsedFileExemption};
 use crate::settings::types::PreviewMode;
 
 /// ## What it does
@@ -86,17 +86,21 @@ pub(crate) fn blanket_noqa(
     diagnostics: &mut Vec<Diagnostic>,
     noqa_directives: &NoqaDirectives,
     locator: &Locator,
-    exemption: &Option<FileExemption>,
+    maybe_blanket_noqa_directives: &Option<BlanketNoqaDirectives>,
     preview: PreviewMode,
 ) {
-    if let (Some(FileExemption::All(all)), PreviewMode::Enabled) = (exemption, preview) {
-        diagnostics.push(Diagnostic::new(
-            BlanketNOQA {
-                missing_colon: false,
-                space_before_colon: false,
-            },
-            all.range(),
-        ));
+    if let (Some(blankets), PreviewMode::Enabled) = (maybe_blanket_noqa_directives, preview) {
+        for line in blankets.lines() {
+            if let ParsedFileExemption::All = line.parsed_file_exemption {
+                diagnostics.push(Diagnostic::new(
+                    BlanketNOQA {
+                        missing_colon: false,
+                        space_before_colon: false,
+                    },
+                    line.range,
+                ));
+            }
+        }
     }
 
     for directive_line in noqa_directives.lines() {
