@@ -227,14 +227,10 @@ impl Index {
         })?;
 
         // O(n) complexity, which isn't ideal... but this is an uncommon operation.
-        self.documents.retain(|url, _| {
-            !url.to_file_path()
-                .is_ok_and(|file_path| file_path.starts_with(&workspace_path))
-        });
-        self.notebook_cells.retain(|_, url| {
-            !url.to_file_path()
-                .is_ok_and(|file_path| file_path.starts_with(&workspace_path))
-        });
+        self.documents
+            .retain(|url, _| !Path::new(url.path()).starts_with(&workspace_path));
+        self.notebook_cells
+            .retain(|_, url| !Path::new(url.path()).starts_with(&workspace_path));
 
         Ok(())
     }
@@ -248,7 +244,24 @@ impl Index {
 
         let document_settings = self
             .settings_for_url(&url)
-            .map(|settings| settings.ruff_settings.get(&url))
+            .map(|settings| {
+                if let Ok(file_path) = url.to_file_path() {
+                    settings.ruff_settings.get(&file_path)
+                } else {
+                    // For a new unsaved and untitled document, use the ruff settings from the top of the workspace
+                    // but only IF:
+                    // * It is the only workspace
+                    // * The ruff setting is at the top of the workspace (in the root folder)
+                    // Otherwise, use the fallback settings.
+                    if self.settings.len() == 1 {
+                        let workspace_path = self.settings.keys().next().unwrap();
+                        settings.ruff_settings.get(&workspace_path.join("untitled"))
+                    } else {
+                        tracing::debug!("Use the fallback settings for the new document '{url}'.");
+                        settings.ruff_settings.fallback()
+                    }
+                }
+            })
             .unwrap_or_else(|| {
                 tracing::warn!(
                     "No settings available for {} - falling back to default settings",

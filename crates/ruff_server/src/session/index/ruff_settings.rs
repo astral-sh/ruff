@@ -1,5 +1,4 @@
 use globset::Candidate;
-use lsp_types::Url;
 use ruff_linter::{
     display_settings, fs::normalize_path_to, settings::types::FilePattern,
     settings::types::PreviewMode,
@@ -190,18 +189,17 @@ impl RuffSettingsIndex {
         Self { index, fallback }
     }
 
-    pub(super) fn get(&self, document_url: &Url) -> Arc<RuffSettings> {
-        let settings = if let Ok(document_path) = document_url.to_file_path() {
-            self.index
-                .range(..document_path.to_path_buf())
-                .rfind(|(path, _)| document_path.starts_with(path))
-                .map(|(_, settings)| settings)
-        } else {
-            // For a new document, use the least specific setting available or the fallback.
-            self.index.values().next()
-        };
+    pub(super) fn get(&self, document_path: &Path) -> Arc<RuffSettings> {
+        self.index
+            .range(..document_path.to_path_buf())
+            .rfind(|(path, _)| document_path.starts_with(path))
+            .map(|(_, settings)| settings)
+            .unwrap_or_else(|| &self.fallback)
+            .clone()
+    }
 
-        settings.unwrap_or_else(|| &self.fallback).clone()
+    pub(super) fn fallback(&self) -> Arc<RuffSettings> {
+        self.fallback.clone()
     }
 }
 
