@@ -4,11 +4,6 @@
 //! governing what is and is not a valid token are defined in the Python reference
 //! guide section on [Lexical analysis].
 //!
-//! The primary function in this module is [`lex`], which takes a string slice
-//! and returns an iterator over the tokens in the source code. The tokens are currently returned
-//! as a `Result<Spanned, LexicalError>`, where [`Spanned`] is a tuple containing the
-//! start and end [`TextSize`] and a [`Tok`] denoting the token.
-//!
 //! [Lexical analysis]: https://docs.python.org/3/reference/lexical_analysis.html
 
 use std::{char, cmp::Ordering, str::FromStr};
