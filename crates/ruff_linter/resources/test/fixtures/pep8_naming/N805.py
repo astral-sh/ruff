@@ -8,6 +8,7 @@ class Class:
         pass
 
     if False:
+
         def extra_bad_method(this):
             pass
 
@@ -34,14 +35,11 @@ class Class:
     def lower(cls, my_field: str) -> str:
         pass
 
-    def __init__(self):
-        ...
+    def __init__(self): ...
 
-    def __new__(cls, *args, **kwargs):
-        ...
+    def __new__(cls, *args, **kwargs): ...
 
-    def __init_subclass__(self, default_name, **kwargs):
-        ...
+    def __init_subclass__(self, default_name, **kwargs): ...
 
 
 class MetaClass(abc.ABCMeta):
@@ -123,3 +121,33 @@ class RenamingInMethodBodyClass:
 class RenamingWithNFKC:
     def formula(household):
         hºusehold(1)
+
+
+class Empty:
+    def empty_method():
+        pass
+
+    @classmethod
+    def empty_class_method():
+        pass
+
+    @staticmethod
+    def empty_static_method():
+        pass
+
+    def no_positional_method(*, self):
+        pass
+
+    @classmethod
+    def no_positional_class_method(*, cls):
+        pass
+
+    @staticmethod
+    def no_positional_static_method(*, cls):
+        pass
+
+    def vararg_method(*args):
+        pass
+
+    def kwarg_method(**kwargs):
+        pass

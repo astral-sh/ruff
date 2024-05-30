@@ -1,155 +1,173 @@
 ---
 source: crates/ruff_linter/src/rules/pep8_naming/mod.rs
 ---
-N804.py:30:27: N804 [*] First argument of a class method should be named `cls`
+N804.py:28:27: N804 [*] First argument of a class method should be named `cls`
    |
-28 |         ...
-29 | 
-30 |     def __init_subclass__(self, default_name, **kwargs):
+26 |     def __new__(cls, *args, **kwargs): ...
+27 | 
+28 |     def __init_subclass__(self, default_name, **kwargs): ...
    |                           ^^^^ N804
-31 |         ...
+29 | 
+30 |     @classmethod
    |
    = help: Rename `self` to `cls`
 
 ℹ Unsafe fix
-27 27 |     def __new__(cls, *args, **kwargs):
-28 28 |         ...
+25 25 | 
+26 26 |     def __new__(cls, *args, **kwargs): ...
+27 27 | 
+28    |-    def __init_subclass__(self, default_name, **kwargs): ...
+   28 |+    def __init_subclass__(cls, default_name, **kwargs): ...
 29 29 | 
-30    |-    def __init_subclass__(self, default_name, **kwargs):
-   30 |+    def __init_subclass__(cls, default_name, **kwargs):
-31 31 |         ...
+30 30 |     @classmethod
+31 31 |     def class_method_with_positional_only_argument(cls, x, /, other): ...
+
+N804.py:34:56: N804 [*] First argument of a class method should be named `cls`
+   |
+33 |     @classmethod
+34 |     def bad_class_method_with_positional_only_argument(self, x, /, other): ...
+   |                                                        ^^^^ N804
+   |
+   = help: Rename `self` to `cls`
+
+ℹ Unsafe fix
+31 31 |     def class_method_with_positional_only_argument(cls, x, /, other): ...
 32 32 | 
 33 33 |     @classmethod
-
-N804.py:38:56: N804 [*] First argument of a class method should be named `cls`
-   |
-37 |     @classmethod
-38 |     def bad_class_method_with_positional_only_argument(self, x, /, other):
-   |                                                        ^^^^ N804
-39 |         ...
-   |
-   = help: Rename `self` to `cls`
-
-ℹ Unsafe fix
-35 35 |         ...
+34    |-    def bad_class_method_with_positional_only_argument(self, x, /, other): ...
+   34 |+    def bad_class_method_with_positional_only_argument(cls, x, /, other): ...
+35 35 | 
 36 36 | 
-37 37 |     @classmethod
-38    |-    def bad_class_method_with_positional_only_argument(self, x, /, other):
-   38 |+    def bad_class_method_with_positional_only_argument(cls, x, /, other):
-39 39 |         ...
-40 40 | 
-41 41 | 
+37 37 | class MetaClass(ABCMeta):
 
-N804.py:43:20: N804 [*] First argument of a class method should be named `cls`
+N804.py:38:20: N804 [*] First argument of a class method should be named `cls`
    |
-42 | class MetaClass(ABCMeta):
-43 |     def bad_method(self):
+37 | class MetaClass(ABCMeta):
+38 |     def bad_method(self):
    |                    ^^^^ N804
-44 |         pass
+39 |         pass
    |
    = help: Rename `self` to `cls`
 
 ℹ Unsafe fix
+35 35 | 
+36 36 | 
+37 37 | class MetaClass(ABCMeta):
+38    |-    def bad_method(self):
+   38 |+    def bad_method(cls):
+39 39 |         pass
 40 40 | 
-41 41 | 
-42 42 | class MetaClass(ABCMeta):
-43    |-    def bad_method(self):
-   43 |+    def bad_method(cls):
-44 44 |         pass
-45 45 | 
-46 46 |     def good_method(cls):
+41 41 |     def good_method(cls):
 
-N804.py:54:25: N804 First argument of a class method should be named `cls`
+N804.py:50:25: N804 First argument of a class method should be named `cls`
    |
-53 | class ClsInArgsClass(ABCMeta):
-54 |     def cls_as_argument(this, cls):
+49 | class ClsInArgsClass(ABCMeta):
+50 |     def cls_as_argument(this, cls):
    |                         ^^^^ N804
-55 |         pass
+51 |         pass
    |
    = help: Rename `this` to `cls`
 
-N804.py:57:34: N804 First argument of a class method should be named `cls`
+N804.py:53:34: N804 First argument of a class method should be named `cls`
    |
-55 |         pass
-56 | 
-57 |     def cls_as_pos_only_argument(this, cls, /):
+51 |         pass
+52 | 
+53 |     def cls_as_pos_only_argument(this, cls, /):
    |                                  ^^^^ N804
-58 |         pass
+54 |         pass
    |
    = help: Rename `this` to `cls`
 
-N804.py:60:33: N804 First argument of a class method should be named `cls`
+N804.py:56:33: N804 First argument of a class method should be named `cls`
    |
-58 |         pass
-59 | 
-60 |     def cls_as_kw_only_argument(this, *, cls):
+54 |         pass
+55 | 
+56 |     def cls_as_kw_only_argument(this, *, cls):
    |                                 ^^^^ N804
-61 |         pass
+57 |         pass
    |
    = help: Rename `this` to `cls`
 
-N804.py:63:23: N804 First argument of a class method should be named `cls`
+N804.py:59:23: N804 First argument of a class method should be named `cls`
    |
-61 |         pass
-62 | 
-63 |     def cls_as_varags(this, *cls):
+57 |         pass
+58 | 
+59 |     def cls_as_varags(this, *cls):
    |                       ^^^^ N804
-64 |         pass
+60 |         pass
    |
    = help: Rename `this` to `cls`
 
-N804.py:66:23: N804 First argument of a class method should be named `cls`
+N804.py:62:23: N804 First argument of a class method should be named `cls`
    |
-64 |         pass
-65 | 
-66 |     def cls_as_kwargs(this, **cls):
+60 |         pass
+61 | 
+62 |     def cls_as_kwargs(this, **cls):
    |                       ^^^^ N804
-67 |         pass
+63 |         pass
    |
    = help: Rename `this` to `cls`
 
-N804.py:70:20: N804 [*] First argument of a class method should be named `cls`
+N804.py:67:20: N804 [*] First argument of a class method should be named `cls`
    |
-69 | class RenamingInMethodBodyClass(ABCMeta):
-70 |     def bad_method(this):
+66 | class RenamingInMethodBodyClass(ABCMeta):
+67 |     def bad_method(this):
    |                    ^^^^ N804
-71 |         this = this
-72 |         this
+68 |         this = this
+69 |         this
    |
    = help: Rename `this` to `cls`
 
 ℹ Unsafe fix
-67 67 |         pass
-68 68 | 
-69 69 | class RenamingInMethodBodyClass(ABCMeta):
-70    |-    def bad_method(this):
-71    |-        this = this
-72    |-        this
-   70 |+    def bad_method(cls):
-   71 |+        cls = cls
-   72 |+        cls
-73 73 | 
-74 74 |     def bad_method(this):
-75 75 |         self = this
+64 64 | 
+65 65 | 
+66 66 | class RenamingInMethodBodyClass(ABCMeta):
+67    |-    def bad_method(this):
+68    |-        this = this
+69    |-        this
+   67 |+    def bad_method(cls):
+   68 |+        cls = cls
+   69 |+        cls
+70 70 | 
+71 71 |     def bad_method(this):
+72 72 |         self = this
 
-N804.py:74:20: N804 [*] First argument of a class method should be named `cls`
+N804.py:71:20: N804 [*] First argument of a class method should be named `cls`
    |
-72 |         this
-73 | 
-74 |     def bad_method(this):
+69 |         this
+70 | 
+71 |     def bad_method(this):
    |                    ^^^^ N804
-75 |         self = this
+72 |         self = this
    |
    = help: Rename `this` to `cls`
 
 ℹ Unsafe fix
-71 71 |         this = this
-72 72 |         this
+68 68 |         this = this
+69 69 |         this
+70 70 | 
+71    |-    def bad_method(this):
+72    |-        self = this
+   71 |+    def bad_method(cls):
+   72 |+        self = cls
 73 73 | 
-74    |-    def bad_method(this):
-75    |-        self = this
-   74 |+    def bad_method(cls):
-   75 |+        self = cls
-76 76 | 
-77 77 | def func(x):
-78 78 |     return x
+74 74 | 
+75 75 | def func(x):
+
+N804.py:84:9: N804 First argument of a class method should be named `cls`
+   |
+83 |     @classmethod
+84 |     def empty_class_method():
+   |         ^^^^^^^^^^^^^^^^^^ N804
+85 |         pass
+   |
+   = help: Add `cls` as first argument
+
+N804.py:95:9: N804 First argument of a class method should be named `cls`
+   |
+94 |     @classmethod
+95 |     def no_positional_class_method(*, cls):
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^ N804
+96 |         pass
+   |
+   = help: Add `cls` as first argument

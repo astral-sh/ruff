@@ -3,6 +3,7 @@ use anyhow::Result;
 use ruff_diagnostics::{Diagnostic, DiagnosticKind, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
+use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::ParameterWithDefault;
 use ruff_python_codegen::Stylist;
 use ruff_python_semantic::analyze::function_type;
@@ -59,7 +60,7 @@ use crate::renamer::Renamer;
 /// [PEP 8]: https://peps.python.org/pep-0008/#function-and-method-arguments
 #[violation]
 pub struct InvalidFirstArgumentNameForMethod {
-    argument_name: String,
+    argument_name: Option<String>,
 }
 
 impl Violation for InvalidFirstArgumentNameForMethod {
@@ -73,7 +74,11 @@ impl Violation for InvalidFirstArgumentNameForMethod {
 
     fn fix_title(&self) -> Option<String> {
         let Self { argument_name } = self;
-        Some(format!("Rename `{argument_name}` to `self`"))
+        if let Some(argument_name) = argument_name {
+            Some(format!("Rename `{argument_name}` to `self`"))
+        } else {
+            Some("Add `self` as first argument".to_string())
+        }
     }
 }
 
@@ -125,7 +130,7 @@ impl Violation for InvalidFirstArgumentNameForMethod {
 /// [PEP 8]: https://peps.python.org/pep-0008/#function-and-method-arguments
 #[violation]
 pub struct InvalidFirstArgumentNameForClassMethod {
-    argument_name: String,
+    argument_name: Option<String>,
 }
 
 impl Violation for InvalidFirstArgumentNameForClassMethod {
@@ -139,7 +144,11 @@ impl Violation for InvalidFirstArgumentNameForClassMethod {
 
     fn fix_title(&self) -> Option<String> {
         let Self { argument_name } = self;
-        Some(format!("Rename `{argument_name}` to `cls`"))
+        if let Some(argument_name) = argument_name {
+            Some(format!("Rename `{argument_name}` to `cls`"))
+        } else {
+            Some("Add `cls` as first argument".to_string())
+        }
     }
 }
 
@@ -152,7 +161,7 @@ enum FunctionType {
 }
 
 impl FunctionType {
-    fn diagnostic_kind(self, argument_name: String) -> DiagnosticKind {
+    fn diagnostic_kind(self, argument_name: Option<String>) -> DiagnosticKind {
         match self {
             Self::Method => InvalidFirstArgumentNameForMethod { argument_name }.into(),
             Self::ClassMethod => InvalidFirstArgumentNameForClassMethod { argument_name }.into(),
@@ -180,12 +189,14 @@ pub(crate) fn invalid_first_argument_name(
     scope: &Scope,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
-    let ScopeKind::Function(ast::StmtFunctionDef {
-        name,
-        parameters,
-        decorator_list,
-        ..
-    }) = &scope.kind
+    let ScopeKind::Function(
+        function_def @ ast::StmtFunctionDef {
+            name,
+            parameters,
+            decorator_list,
+            ..
+        },
+    ) = &scope.kind
     else {
         panic!("Expected ScopeKind::Function")
     };
@@ -208,9 +219,12 @@ pub(crate) fn invalid_first_argument_name(
         function_type::FunctionType::Method => FunctionType::Method,
         function_type::FunctionType::ClassMethod => FunctionType::ClassMethod,
     };
-    if !checker.enabled(function_type.rule())
-        || checker.settings.pep8_naming.ignore_names.matches(name)
-    {
+
+    if !checker.enabled(function_type.rule()) {
+        return;
+    }
+
+    if checker.settings.pep8_naming.ignore_names.matches(name) {
         return;
     }
 
@@ -222,6 +236,13 @@ pub(crate) fn invalid_first_argument_name(
         .first()
         .or_else(|| parameters.args.first())
     else {
+        if parameters.vararg.is_none() {
+            // Ex) `def function(): ...`
+            diagnostics.push(Diagnostic::new(
+                function_type.diagnostic_kind(None),
+                function_def.identifier(),
+            ));
+        }
         return;
     };
 
@@ -230,7 +251,7 @@ pub(crate) fn invalid_first_argument_name(
     }
 
     let mut diagnostic = Diagnostic::new(
-        function_type.diagnostic_kind(self_or_cls.name.to_string()),
+        function_type.diagnostic_kind(Some(self_or_cls.name.to_string())),
         self_or_cls.range(),
     );
     diagnostic.try_set_optional_fix(|| {
