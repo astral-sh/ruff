@@ -8,15 +8,11 @@ expression: triple_quoted_eol(WINDOWS_EOL)
     (
         String {
             value: "\r\n test string\r\n ",
-            flags: AnyStringFlags {
-                prefix: Regular(
-                    Empty,
-                ),
-                triple_quoted: true,
-                quote_style: Double,
-            },
         },
         0..23,
+        TokenFlags(
+            DOUBLE_QUOTES | TRIPLE_QUOTED_STRING,
+        ),
     ),
     (
         Newline,

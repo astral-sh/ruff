@@ -6,33 +6,20 @@ expression: lex_source(source)
 ```
 [
     (
-        FStringStart(
-            AnyStringFlags {
-                prefix: Format(
-                    Raw {
-                        uppercase_r: false,
-                    },
-                ),
-                triple_quoted: false,
-                quote_style: Double,
-            },
-        ),
+        FStringStart,
         0..3,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING | RAW_STRING_LOWERCASE,
+        ),
     ),
     (
         FStringMiddle {
             value: "\\N",
-            flags: AnyStringFlags {
-                prefix: Format(
-                    Raw {
-                        uppercase_r: false,
-                    },
-                ),
-                triple_quoted: false,
-                quote_style: Double,
-            },
         },
         3..5,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING | RAW_STRING_LOWERCASE,
+        ),
     ),
     (
         Lbrace,
@@ -51,21 +38,18 @@ expression: lex_source(source)
     (
         FStringMiddle {
             value: " normal",
-            flags: AnyStringFlags {
-                prefix: Format(
-                    Raw {
-                        uppercase_r: false,
-                    },
-                ),
-                triple_quoted: false,
-                quote_style: Double,
-            },
         },
         13..20,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING | RAW_STRING_LOWERCASE,
+        ),
     ),
     (
         FStringEnd,
         20..21,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING | RAW_STRING_LOWERCASE,
+        ),
     ),
     (
         Newline,

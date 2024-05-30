@@ -16,13 +16,6 @@ expression: lex_source(source)
     (
         String {
             value: "a",
-            flags: AnyStringFlags {
-                prefix: Regular(
-                    Empty,
-                ),
-                triple_quoted: false,
-                quote_style: Single,
-            },
         },
         6..9,
     ),
@@ -33,13 +26,6 @@ expression: lex_source(source)
     (
         String {
             value: "b",
-            flags: AnyStringFlags {
-                prefix: Regular(
-                    Empty,
-                ),
-                triple_quoted: false,
-                quote_style: Single,
-            },
         },
         14..17,
     ),
@@ -54,26 +40,12 @@ expression: lex_source(source)
     (
         String {
             value: "c",
-            flags: AnyStringFlags {
-                prefix: Regular(
-                    Empty,
-                ),
-                triple_quoted: false,
-                quote_style: Single,
-            },
         },
         23..26,
     ),
     (
         String {
             value: "d",
-            flags: AnyStringFlags {
-                prefix: Regular(
-                    Empty,
-                ),
-                triple_quoted: false,
-                quote_style: Single,
-            },
         },
         33..36,
     ),

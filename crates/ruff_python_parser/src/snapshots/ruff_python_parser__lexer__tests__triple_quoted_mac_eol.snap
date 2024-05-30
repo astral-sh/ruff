@@ -8,15 +8,11 @@ expression: triple_quoted_eol(MAC_EOL)
     (
         String {
             value: "\r test string\r ",
-            flags: AnyStringFlags {
-                prefix: Regular(
-                    Empty,
-                ),
-                triple_quoted: true,
-                quote_style: Double,
-            },
         },
         0..21,
+        TokenFlags(
+            DOUBLE_QUOTES | TRIPLE_QUOTED_STRING,
+        ),
     ),
     (
         Newline,

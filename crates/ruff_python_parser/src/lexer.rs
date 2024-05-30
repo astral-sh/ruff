@@ -585,16 +585,15 @@ impl<'src> Lexer<'src> {
         // SAFETY: Safe because the function is only called when `self.fstrings` is not empty.
         let fstring = self.fstrings.current().unwrap();
 
-        // Keep the current flags in sync throughout the f-string context.
-        self.current_flags = fstring.flags();
-
         // Check if we're at the end of the f-string.
         if fstring.is_triple_quoted() {
             let quote_char = fstring.quote_char();
             if self.cursor.eat_char3(quote_char, quote_char, quote_char) {
+                self.current_flags = fstring.flags();
                 return Some(TokenKind::FStringEnd);
             }
         } else if self.cursor.eat_char(fstring.quote_char()) {
+            self.current_flags = fstring.flags();
             return Some(TokenKind::FStringEnd);
         }
 
@@ -717,6 +716,7 @@ impl<'src> Lexer<'src> {
             value: value.into_boxed_str(),
         };
 
+        self.current_flags = fstring.flags();
         Some(TokenKind::FStringMiddle)
     }
 
@@ -1886,18 +1886,27 @@ mod tests {
     const MAC_EOL: &str = "\r";
     const UNIX_EOL: &str = "\n";
 
+    /// Same as [`Token`] except that this includes the [`TokenValue`] as well.
     struct TestToken {
         kind: TokenKind,
         value: TokenValue,
         range: TextRange,
+        flags: TokenFlags,
     }
 
     impl std::fmt::Debug for TestToken {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            if matches!(self.value, TokenValue::None) {
-                write!(f, "{:#?}", (self.kind, self.range))
+            let mut tuple = f.debug_tuple("");
+            let mut tuple = if matches!(self.value, TokenValue::None) {
+                tuple.field(&self.kind)
             } else {
-                write!(f, "{:#?}", (&self.value, self.range))
+                tuple.field(&self.value)
+            };
+            tuple = tuple.field(&self.range);
+            if self.flags.is_empty() {
+                tuple.finish()
+            } else {
+                tuple.field(&self.flags).finish()
             }
         }
     }
@@ -1931,6 +1940,7 @@ mod tests {
                 kind,
                 value: lexer.take_value(),
                 range: lexer.current_range(),
+                flags: lexer.current_flags(),
             });
         }
         LexerOutput {
