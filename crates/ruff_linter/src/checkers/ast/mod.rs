@@ -2301,7 +2301,9 @@ impl<'a> Checker<'a> {
                         }
                     } else {
                         if self.enabled(Rule::UndefinedExport) {
-                            if !self.path.ends_with("__init__.py") {
+                            if self.settings.preview.is_enabled()
+                                || !self.path.ends_with("__init__.py")
+                            {
                                 self.diagnostics.push(
                                     Diagnostic::new(
                                         pyflakes::rules::UndefinedExport {
