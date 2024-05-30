@@ -69,10 +69,10 @@ impl Index {
         global_settings: &ClientSettings,
     ) -> crate::Result<Self> {
         let mut settings_index = BTreeMap::new();
-        for (path, workspace_settings) in workspace_folders {
+        for (url, workspace_settings) in workspace_folders {
             Self::register_workspace_settings(
                 &mut settings_index,
-                path,
+                &url,
                 Some(workspace_settings),
                 global_settings,
             )?;
@@ -124,7 +124,10 @@ impl Index {
     pub(super) fn key_from_url(&self, url: Url) -> DocumentKey {
         if self.notebook_cells.contains_key(&url) {
             DocumentKey::NotebookCell(url)
-        } else if url.path().ends_with(".ipynb") {
+        } else if Path::new(url.path())
+            .extension()
+            .map_or(false, |ext| ext.eq_ignore_ascii_case("ipynb"))
+        {
             DocumentKey::Notebook(url)
         } else {
             DocumentKey::Text(url)
@@ -175,7 +178,7 @@ impl Index {
 
     pub(super) fn open_workspace_folder(
         &mut self,
-        url: Url,
+        url: &Url,
         global_settings: &ClientSettings,
     ) -> crate::Result<()> {
         // TODO(jane): Find a way for workspace client settings to be added or changed dynamically.
@@ -184,7 +187,7 @@ impl Index {
 
     fn register_workspace_settings(
         settings_index: &mut SettingsIndex,
-        workspace_url: Url,
+        workspace_url: &Url,
         workspace_settings: Option<ClientSettings>,
         global_settings: &ClientSettings,
     ) -> crate::Result<()> {
@@ -382,7 +385,7 @@ impl Index {
     }
 
     fn settings_for_url(&self, url: &Url) -> Option<&WorkspaceSettings> {
-        if let Some(path) = url.to_file_path().ok() {
+        if let Ok(path) = url.to_file_path() {
             self.settings_for_path(&path)
         } else {
             // If there's only a single workspace, use that configuration for an untitled document.

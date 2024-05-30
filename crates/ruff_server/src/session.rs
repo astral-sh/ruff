@@ -135,7 +135,7 @@ impl Session {
     }
 
     /// Open a workspace folder at the given `url`.
-    pub(crate) fn open_workspace_folder(&mut self, url: Url) -> crate::Result<()> {
+    pub(crate) fn open_workspace_folder(&mut self, url: &Url) -> crate::Result<()> {
         self.index.open_workspace_folder(url, &self.global_settings)
     }
 
