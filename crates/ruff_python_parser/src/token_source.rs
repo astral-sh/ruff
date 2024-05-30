@@ -146,6 +146,8 @@ impl<'src> TokenSource<'src> {
             "TokenSource was not fully consumed"
         );
 
+        // The `EndOfFile` token shouldn't be included in the token stream, it's mainly to signal
+        // the parser to stop. This isn't in `do_bump` because it only needs to be done once.
         if let Some(last) = self.tokens.pop() {
             assert_eq!(last.kind(), TokenKind::EndOfFile);
         }
