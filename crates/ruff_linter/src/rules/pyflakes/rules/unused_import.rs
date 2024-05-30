@@ -2,7 +2,7 @@ use std::borrow::Cow;
 use std::iter;
 
 use anyhow::{anyhow, bail, Result};
-use indexmap::map::IndexMap;
+use std::collections::BTreeMap;
 
 use ruff_diagnostics::{Applicability, Diagnostic, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -220,8 +220,8 @@ fn find_dunder_all_exprs<'a>(semantic: &'a SemanticModel) -> Vec<&'a ast::Expr> 
 ///
 pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut Vec<Diagnostic>) {
     // Collect all unused imports by statement.
-    let mut unused: IndexMap<(NodeId, Exceptions), Vec<ImportBinding>> = IndexMap::default();
-    let mut ignored: IndexMap<(NodeId, Exceptions), Vec<ImportBinding>> = IndexMap::default();
+    let mut unused: BTreeMap<(NodeId, Exceptions), Vec<ImportBinding>> = BTreeMap::default();
+    let mut ignored: BTreeMap<(NodeId, Exceptions), Vec<ImportBinding>> = BTreeMap::default();
 
     for binding_id in scope.binding_ids() {
         let binding = checker.semantic().binding(binding_id);

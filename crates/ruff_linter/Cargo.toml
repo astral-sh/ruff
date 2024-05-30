@@ -71,7 +71,6 @@ typed-arena = { workspace = true }
 unicode-width = { workspace = true }
 unicode_names2 = { workspace = true }
 url = { workspace = true }
-indexmap.workspace = true
 
 [dev-dependencies]
 insta = { workspace = true }
