@@ -538,7 +538,7 @@ pub fn lint_fix<'a>(
     loop {
         // Parse once.
         let program =
-            ruff_python_parser::parse_unchecked_source(source_kind.source_code(), source_type);
+            ruff_python_parser::parse_unchecked_source(transformed.source_code(), source_type);
 
         // Map row and column locations to byte slices (lazily).
         let locator = Locator::new(transformed.source_code());
