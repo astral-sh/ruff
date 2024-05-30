@@ -175,7 +175,6 @@ To read more about this exciting milestone, check out our [blog post](https://as
 
 - Increase the minimum requirement to Windows 10.
 
-
 ## 0.4.2
 
 ### Rule changes
