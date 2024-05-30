@@ -1966,7 +1966,6 @@ dependencies = [
  "ruff_linter",
  "ruff_python_ast",
  "ruff_python_formatter",
- "ruff_python_index",
  "ruff_python_parser",
  "serde",
  "serde_json",
@@ -2210,7 +2209,6 @@ dependencies = [
  "ruff_formatter",
  "ruff_macros",
  "ruff_python_ast",
- "ruff_python_index",
  "ruff_python_parser",
  "ruff_python_trivia",
  "ruff_source_file",
@@ -2319,7 +2317,6 @@ name = "ruff_python_trivia_integration_tests"
 version = "0.0.0"
 dependencies = [
  "insta",
- "ruff_python_index",
  "ruff_python_parser",
  "ruff_python_trivia",
  "ruff_source_file",
@@ -2394,7 +2391,6 @@ dependencies = [
  "ruff_python_formatter",
  "ruff_python_index",
  "ruff_python_parser",
- "ruff_python_trivia",
  "ruff_source_file",
  "ruff_text_size",
  "ruff_workspace",
