@@ -663,7 +663,7 @@ mod tests {
             flags::Noqa::Enabled,
             &source_kind,
             source_type,
-            program,
+            &program,
         );
         diagnostics.sort_by_key(Ranged::start);
         let actual = diagnostics

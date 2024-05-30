@@ -285,9 +285,19 @@ impl<T> Program<T> {
         self.errors.is_empty()
     }
 
-    /// Transforms the [`Program`] into a [`Result`], returning [`Ok`] if the program has no syntax
+    /// Converts the [`Program`] into a [`Result`], returning [`Ok`] if the program has no syntax
     /// errors, or [`Err`] containing the first [`ParseError`] encountered.
-    pub fn into_result(self) -> Result<Program<T>, ParseError> {
+    pub fn as_result(&self) -> Result<&Program<T>, &ParseError> {
+        if let [error, ..] = self.errors() {
+            Err(error)
+        } else {
+            Ok(self)
+        }
+    }
+
+    /// Consumes the [`Program`] and returns a [`Result`] which is [`Ok`] if the program has no
+    /// syntax errors, or [`Err`] containing the first [`ParseError`] encountered.
+    pub(crate) fn into_result(self) -> Result<Program<T>, ParseError> {
         if self.is_valid() {
             Ok(self)
         } else {
@@ -491,6 +501,15 @@ impl Tokens {
                 &self[idx..]
             }
         }
+    }
+}
+
+impl<'a> IntoIterator for &'a Tokens {
+    type Item = &'a Token;
+    type IntoIter = std::slice::Iter<'a, Token>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
     }
 }
 

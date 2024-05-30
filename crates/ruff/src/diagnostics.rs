@@ -263,7 +263,6 @@ pub(crate) fn lint_path(
         LinterResult {
             data: messages,
             error: parse_error,
-            ..
         },
         transformed,
         fixed,
@@ -409,7 +408,6 @@ pub(crate) fn lint_stdin(
         LinterResult {
             data: messages,
             error: parse_error,
-            ..
         },
         transformed,
         fixed,

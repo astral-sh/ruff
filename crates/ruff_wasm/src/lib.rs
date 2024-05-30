@@ -193,7 +193,7 @@ impl Workspace {
             flags::Noqa::Enabled,
             &source_kind,
             source_type,
-            program,
+            &program,
         );
 
         let source_code = locator.to_source_code();

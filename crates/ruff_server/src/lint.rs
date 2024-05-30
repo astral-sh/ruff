@@ -108,11 +108,7 @@ pub(crate) fn check(query: &DocumentQuery, encoding: PositionEncoding) -> Diagno
     let directives = extract_directives(&program, Flags::all(), &locator, &indexer);
 
     // Generate checks.
-    let LinterResult {
-        data,
-        comment_ranges,
-        ..
-    } = check_path(
+    let LinterResult { data, .. } = check_path(
         document_path,
         package,
         &locator,
@@ -123,14 +119,14 @@ pub(crate) fn check(query: &DocumentQuery, encoding: PositionEncoding) -> Diagno
         flags::Noqa::Enabled,
         &source_kind,
         source_type,
-        program,
+        &program,
     );
 
     let noqa_edits = generate_noqa_edits(
         document_path,
         data.as_slice(),
         &locator,
-        &comment_ranges,
+        program.comment_ranges(),
         &linter_settings.external,
         &directives.noqa_line_for,
         stylist.line_ending(),

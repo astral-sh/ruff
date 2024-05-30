@@ -123,7 +123,6 @@ pub(crate) fn test_contents<'a>(
     let LinterResult {
         data: diagnostics,
         error,
-        comment_ranges: _,
     } = check_path(
         path,
         path.parent()
@@ -136,7 +135,7 @@ pub(crate) fn test_contents<'a>(
         flags::Noqa::Enabled,
         source_kind,
         source_type,
-        program,
+        &program,
     );
 
     let source_has_errors = error.is_some();
@@ -191,7 +190,6 @@ pub(crate) fn test_contents<'a>(
             let LinterResult {
                 data: fixed_diagnostics,
                 error: fixed_error,
-                comment_ranges: _,
             } = check_path(
                 path,
                 None,
@@ -203,7 +201,7 @@ pub(crate) fn test_contents<'a>(
                 flags::Noqa::Enabled,
                 &transformed,
                 source_type,
-                program,
+                &program,
             );
 
             if let Some(fixed_error) = fixed_error {
