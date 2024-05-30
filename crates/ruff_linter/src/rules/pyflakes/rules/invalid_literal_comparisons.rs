@@ -5,7 +5,7 @@ use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers;
 use ruff_python_parser::{TokenKind, Tokens};
-use ruff_text_size::{Ranged, TextRange, TextSize};
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 
@@ -110,7 +110,7 @@ pub(crate) fn invalid_literal_comparison(
                 } {
                     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                         content,
-                        located_op.range + expr.start(),
+                        located_op.range,
                     )));
                 }
             } else {
@@ -175,11 +175,9 @@ fn locate_cmp_ops(expr: &Expr, tokens: &Tokens) -> Vec<LocatedCmpOp> {
 
         match token.kind() {
             TokenKind::Not => {
-                if let Some((_, next_range)) =
-                    tok_iter.next_if(|token| token.kind() == TokenKind::In)
-                {
+                if let Some(next_token) = tok_iter.next_if(|token| token.kind() == TokenKind::In) {
                     ops.push(LocatedCmpOp::new(
-                        TextRange::new(token.start(), next_range.end()),
+                        TextRange::new(token.start(), next_token.end()),
                         CmpOp::NotIn,
                     ));
                 }
@@ -188,11 +186,11 @@ fn locate_cmp_ops(expr: &Expr, tokens: &Tokens) -> Vec<LocatedCmpOp> {
                 ops.push(LocatedCmpOp::new(token.range(), CmpOp::In));
             }
             TokenKind::Is => {
-                let op = if let Some((_, next_range)) =
+                let op = if let Some(next_token) =
                     tok_iter.next_if(|token| token.kind() == TokenKind::Not)
                 {
                     LocatedCmpOp::new(
-                        TextRange::new(token.start(), next_range.end()),
+                        TextRange::new(token.start(), next_token.end()),
                         CmpOp::IsNot,
                     )
                 } else {

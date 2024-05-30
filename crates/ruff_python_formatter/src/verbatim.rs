@@ -792,8 +792,8 @@ struct LogicalLinesIter<'a> {
     content_end: TextSize,
 }
 
-impl LogicalLinesIter<'_> {
-    fn new(tokens: Iter<'_, parser::Token>, verbatim_range: TextRange) -> Self {
+impl<'a> LogicalLinesIter<'a> {
+    fn new(tokens: Iter<'a, parser::Token>, verbatim_range: TextRange) -> Self {
         Self {
             tokens,
             last_line_end: verbatim_range.start(),
@@ -802,7 +802,7 @@ impl LogicalLinesIter<'_> {
     }
 }
 
-impl Iterator for LogicalLinesIter {
+impl<'a> Iterator for LogicalLinesIter<'a> {
     type Item = FormatResult<LogicalLine>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -856,7 +856,7 @@ impl Iterator for LogicalLinesIter {
     }
 }
 
-impl<I> FusedIterator for LogicalLinesIter<I> where I: Iterator<Item = parser::Token> {}
+impl<'a> FusedIterator for LogicalLinesIter<'a> {}
 
 /// A logical line or a comment (or form feed only) line
 struct LogicalLine {
