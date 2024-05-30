@@ -430,23 +430,31 @@ impl Tokens {
     /// If either the start or end offset of the given range is within a token range.
     pub fn tokens_in_range(&self, range: TextRange) -> &[Token] {
         let tokens_after_start = self.after(range.start());
-        let end = tokens_after_start.partition_point(|token| token.end() <= range.end());
-        let result = &tokens_after_start[..end];
 
-        // If the end offset isn't the end of the last token in slice...
-        if result.last().is_some_and(|last| last.end() != range.end()) {
-            // Panic if it's greater than the start offset of the next token. If it's equal to the
-            // start offset, then it's at a token boundary which is valid. If it's less than the
-            // start offset, then it's in the gap between the tokens which is valid as well.
-            if tokens_after_start
-                .get(end)
-                .is_some_and(|next| range.end() > next.start())
-            {
-                panic!("Offset cannot be in between a token")
+        match tokens_after_start.binary_search_by_key(&range.end(), Ranged::end) {
+            Ok(idx) => {
+                // If we found the token with the end offset, that token should be included in the
+                // return slice.
+                &tokens_after_start[..=idx]
+            }
+            Err(idx) => {
+                if let Some(token) = tokens_after_start.get(idx) {
+                    // If it's equal to the start offset, then it's at a token boundary which is
+                    // valid. If it's less than the start offset, then it's in the gap between the
+                    // tokens which is valid as well.
+                    assert!(
+                        range.end() <= token.start(),
+                        "End offset {:?} is inside a token range {:?}",
+                        range.end(),
+                        token.range()
+                    );
+                }
+
+                // This index is where the token with the offset _could_ be, so that token should
+                // be excluded from the return slice.
+                &tokens_after_start[..idx]
             }
         }
-
-        result
     }
 
     /// Returns a slice of tokens after the given [`TextSize`] offset.
@@ -457,25 +465,30 @@ impl Tokens {
     ///
     /// # Panics
     ///
-    /// If the given offset is within a token range.
+    /// If the given offset is inside a token range.
     pub fn after(&self, offset: TextSize) -> &[Token] {
-        let start = self.partition_point(|token| token.start() < offset);
-        let result = &self[start..];
+        match self.binary_search_by(|token| token.start().cmp(&offset)) {
+            Ok(idx) => &self[idx..],
+            Err(idx) => {
+                // We can't use `saturating_sub` here because a file could contain a BOM header, in
+                // which case the token starts at offset 3 for UTF-8 encoded file content.
+                if idx > 0 {
+                    if let Some(prev) = self.get(idx - 1) {
+                        // If it's equal to the end offset, then it's at a token boundary which is
+                        // valid. If it's greater than the end offset, then it's in the gap between
+                        // the tokens which is valid as well.
+                        assert!(
+                            offset >= prev.end(),
+                            "Offset {:?} is inside a token range {:?}",
+                            offset,
+                            prev.range()
+                        );
+                    }
+                }
 
-        // If the offset isn't the start of the first token in slice...
-        if result.first().is_some_and(|token| token.start() != offset) {
-            // Panic if it's less than the end offset of the previous token. If it's equal to the
-            // end offset, then it's at a token boundary which is valid. If it's greater than the
-            // end offset, then it's in the gap between the tokens which is valid as well.
-            if self
-                .get(start.saturating_sub(1))
-                .is_some_and(|prev| offset < prev.end())
-            {
-                panic!("Offset cannot be in between a token")
+                &self[idx..]
             }
         }
-
-        result
     }
 }
 
@@ -607,73 +620,93 @@ mod tests {
     }
 
     #[test]
-    fn test_tokens_up_to_first_unknown_empty() {
+    fn tokens_up_to_first_unknown_empty() {
         let tokens = Tokens::new(vec![]);
         assert_eq!(tokens.up_to_first_unknown(), &[]);
     }
 
     #[test]
-    fn test_tokens_up_to_first_unknown() {
+    fn tokens_up_to_first_unknown_noop() {
         let tokens = new_tokens(TEST_CASE_WITH_GAP.into_iter());
         let up_to_first_unknown = tokens.up_to_first_unknown();
         assert_eq!(up_to_first_unknown.len(), tokens.len());
+    }
 
+    #[test]
+    fn tokens_up_to_first_unknown() {
         let tokens = new_tokens(TEST_CASE_WITH_UNKNOWN.into_iter());
         let up_to_first_unknown = tokens.up_to_first_unknown();
         assert_eq!(up_to_first_unknown.len(), 2);
     }
 
     #[test]
-    fn test_tokens_after() {
+    fn tokens_after_offset_at_token_start() {
         let tokens = new_tokens(TEST_CASE_WITH_GAP.into_iter());
-
         let after = tokens.after(TextSize::new(8));
         assert_eq!(after.len(), 7);
         assert_eq!(after.first().unwrap().kind(), TokenKind::Rpar);
+    }
 
+    #[test]
+    fn tokens_after_offset_at_token_end() {
+        let tokens = new_tokens(TEST_CASE_WITH_GAP.into_iter());
         let after = tokens.after(TextSize::new(11));
         assert_eq!(after.len(), 4);
         assert_eq!(after.first().unwrap().kind(), TokenKind::Comment);
+    }
 
+    #[test]
+    fn tokens_after_offset_between_tokens() {
+        let tokens = new_tokens(TEST_CASE_WITH_GAP.into_iter());
         let after = tokens.after(TextSize::new(13));
         assert_eq!(after.len(), 4);
         assert_eq!(after.first().unwrap().kind(), TokenKind::Comment);
+    }
 
+    #[test]
+    fn tokens_after_offset_at_last_token_end() {
+        let tokens = new_tokens(TEST_CASE_WITH_GAP.into_iter());
         let after = tokens.after(TextSize::new(33));
         assert_eq!(after.len(), 0);
     }
 
     #[test]
-    #[should_panic(expected = "Offset cannot be in between a token")]
-    fn test_tokens_after_panic() {
+    #[should_panic(expected = "Offset 5 is inside a token range 4..7")]
+    fn tokens_after_offset_inside_token() {
         let tokens = new_tokens(TEST_CASE_WITH_GAP.into_iter());
         tokens.after(TextSize::new(5));
     }
 
     #[test]
-    fn test_tokens_in_range() {
+    fn tokens_in_range_at_token_offset() {
         let tokens = new_tokens(TEST_CASE_WITH_GAP.into_iter());
-
         let in_range = tokens.tokens_in_range(TextRange::new(4.into(), 10.into()));
         assert_eq!(in_range.len(), 4);
         assert_eq!(in_range.first().unwrap().kind(), TokenKind::Name);
         assert_eq!(in_range.last().unwrap().kind(), TokenKind::Colon);
+    }
 
+    #[test]
+    fn tokens_in_range_start_offset_at_token_end() {
+        let tokens = new_tokens(TEST_CASE_WITH_GAP.into_iter());
         let in_range = tokens.tokens_in_range(TextRange::new(11.into(), 29.into()));
         assert_eq!(in_range.len(), 3);
         assert_eq!(in_range.first().unwrap().kind(), TokenKind::Comment);
         assert_eq!(in_range.last().unwrap().kind(), TokenKind::Indent);
+    }
 
-        let in_range = tokens.tokens_in_range(TextRange::new(9.into(), 13.into()));
-        assert_eq!(in_range.len(), 2);
-        assert_eq!(in_range.first().unwrap().kind(), TokenKind::Colon);
-        assert_eq!(in_range.last().unwrap().kind(), TokenKind::Newline);
-
+    #[test]
+    fn tokens_in_range_end_offset_at_token_start() {
+        let tokens = new_tokens(TEST_CASE_WITH_GAP.into_iter());
         let in_range = tokens.tokens_in_range(TextRange::new(8.into(), 15.into()));
         assert_eq!(in_range.len(), 3);
         assert_eq!(in_range.first().unwrap().kind(), TokenKind::Rpar);
         assert_eq!(in_range.last().unwrap().kind(), TokenKind::Newline);
+    }
 
+    #[test]
+    fn tokens_in_range_start_offset_between_tokens() {
+        let tokens = new_tokens(TEST_CASE_WITH_GAP.into_iter());
         let in_range = tokens.tokens_in_range(TextRange::new(13.into(), 29.into()));
         assert_eq!(in_range.len(), 3);
         assert_eq!(in_range.first().unwrap().kind(), TokenKind::Comment);
@@ -681,15 +714,24 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "Offset cannot be in between a token")]
-    fn test_tokens_in_range_start_panic() {
+    fn tokens_in_range_end_offset_between_tokens() {
+        let tokens = new_tokens(TEST_CASE_WITH_GAP.into_iter());
+        let in_range = tokens.tokens_in_range(TextRange::new(9.into(), 13.into()));
+        assert_eq!(in_range.len(), 2);
+        assert_eq!(in_range.first().unwrap().kind(), TokenKind::Colon);
+        assert_eq!(in_range.last().unwrap().kind(), TokenKind::Newline);
+    }
+
+    #[test]
+    #[should_panic(expected = "Offset 5 is inside a token range 4..7")]
+    fn tokens_in_range_start_offset_inside_token() {
         let tokens = new_tokens(TEST_CASE_WITH_GAP.into_iter());
         tokens.tokens_in_range(TextRange::new(5.into(), 10.into()));
     }
 
     #[test]
-    #[should_panic(expected = "Offset cannot be in between a token")]
-    fn test_tokens_in_range_end_panic() {
+    #[should_panic(expected = "End offset 6 is inside a token range 4..7")]
+    fn tokens_in_range_end_offset_inside_token() {
         let tokens = new_tokens(TEST_CASE_WITH_GAP.into_iter());
         tokens.tokens_in_range(TextRange::new(0.into(), 6.into()));
     }
