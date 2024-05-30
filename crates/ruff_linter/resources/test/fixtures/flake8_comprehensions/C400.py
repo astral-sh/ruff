@@ -11,6 +11,11 @@ x = list(
     x for x in range(3)
 )
 
+# Strip parentheses from inner generators.
+list((2 * x for x in range(3)))
+list(((2 * x for x in range(3))))
+list((((2 * x for x in range(3)))))
+
 # Not built-in list.
 def list(*args, **kwargs):
     return None
