@@ -2,6 +2,7 @@ use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
 use ruff_python_ast::comparable::ComparableExpr;
+use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::ExprGenerator;
 use ruff_text_size::{Ranged, TextSize};
 
@@ -26,11 +27,13 @@ use super::helpers;
 /// ```python
 /// list(f(x) for x in foo)
 /// list(x for x in foo)
+/// list((x for x in foo))
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// [f(x) for x in foo]
+/// list(foo)
 /// list(foo)
 /// ```
 ///
@@ -76,7 +79,10 @@ pub(crate) fn unnecessary_generator_list(checker: &mut Checker, call: &ast::Expr
     }
 
     let Some(ExprGenerator {
-        elt, generators, ..
+        elt,
+        generators,
+        parenthesized,
+        ..
     }) = argument.as_generator_expr()
     else {
         return;
@@ -125,7 +131,28 @@ pub(crate) fn unnecessary_generator_list(checker: &mut Checker, call: &ast::Expr
             call.end(),
         );
 
-        Fix::unsafe_edits(call_start, [call_end])
+        // Remove the inner parentheses, if the expression is a generator. The easiest way to do
+        // this reliably is to use the printer.
+        if *parenthesized {
+            // The generator's range will include the innermost parentheses, but it could be
+            // surrounded by additional parentheses.
+            let range = parenthesized_range(
+                argument.into(),
+                (&call.arguments).into(),
+                checker.indexer().comment_ranges(),
+                checker.locator().contents(),
+            )
+            .unwrap_or(argument.range());
+
+            // The generator always parenthesizes the expression; trim the parentheses.
+            let generator = checker.generator().expr(argument);
+            let generator = generator[1..generator.len() - 1].to_string();
+
+            let replacement = Edit::range_replacement(generator, range);
+            Fix::unsafe_edits(call_start, [call_end, replacement])
+        } else {
+            Fix::unsafe_edits(call_start, [call_end])
+        }
     });
 
     checker.diagnostics.push(diagnostic);
