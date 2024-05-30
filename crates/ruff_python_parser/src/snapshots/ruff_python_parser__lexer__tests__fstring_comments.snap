@@ -6,29 +6,20 @@ expression: lex_source(source)
 ```
 [
     (
-        FStringStart(
-            AnyStringFlags {
-                prefix: Format(
-                    Regular,
-                ),
-                triple_quoted: true,
-                quote_style: Double,
-            },
-        ),
+        FStringStart,
         0..4,
+        TokenFlags(
+            DOUBLE_QUOTES | TRIPLE_QUOTED_STRING | F_STRING,
+        ),
     ),
     (
         FStringMiddle {
             value: "\n# not a comment ",
-            flags: AnyStringFlags {
-                prefix: Format(
-                    Regular,
-                ),
-                triple_quoted: true,
-                quote_style: Double,
-            },
         },
         4..21,
+        TokenFlags(
+            DOUBLE_QUOTES | TRIPLE_QUOTED_STRING | F_STRING,
+        ),
     ),
     (
         Lbrace,
@@ -59,19 +50,18 @@ expression: lex_source(source)
     (
         FStringMiddle {
             value: " # not a comment\n",
-            flags: AnyStringFlags {
-                prefix: Format(
-                    Regular,
-                ),
-                triple_quoted: true,
-                quote_style: Double,
-            },
         },
         42..59,
+        TokenFlags(
+            DOUBLE_QUOTES | TRIPLE_QUOTED_STRING | F_STRING,
+        ),
     ),
     (
         FStringEnd,
         59..62,
+        TokenFlags(
+            DOUBLE_QUOTES | TRIPLE_QUOTED_STRING | F_STRING,
+        ),
     ),
     (
         Newline,

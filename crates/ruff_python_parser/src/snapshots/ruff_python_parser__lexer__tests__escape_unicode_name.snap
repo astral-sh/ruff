@@ -8,15 +8,11 @@ expression: lex_source(source)
     (
         String {
             value: "\\N{EN SPACE}",
-            flags: AnyStringFlags {
-                prefix: Regular(
-                    Empty,
-                ),
-                triple_quoted: false,
-                quote_style: Double,
-            },
         },
         0..14,
+        TokenFlags(
+            DOUBLE_QUOTES,
+        ),
     ),
     (
         Newline,

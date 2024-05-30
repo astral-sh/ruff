@@ -6,33 +6,27 @@ expression: fstring_single_quote_escape_eol(UNIX_EOL)
 ```
 [
     (
-        FStringStart(
-            AnyStringFlags {
-                prefix: Format(
-                    Regular,
-                ),
-                triple_quoted: false,
-                quote_style: Single,
-            },
-        ),
+        FStringStart,
         0..2,
+        TokenFlags(
+            F_STRING,
+        ),
     ),
     (
         FStringMiddle {
             value: "text \\\n more text",
-            flags: AnyStringFlags {
-                prefix: Format(
-                    Regular,
-                ),
-                triple_quoted: false,
-                quote_style: Single,
-            },
         },
         2..19,
+        TokenFlags(
+            F_STRING,
+        ),
     ),
     (
         FStringEnd,
         19..20,
+        TokenFlags(
+            F_STRING,
+        ),
     ),
     (
         Newline,
