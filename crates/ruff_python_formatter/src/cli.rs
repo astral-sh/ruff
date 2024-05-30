@@ -2,7 +2,7 @@
 
 use std::path::{Path, PathBuf};
 
-use anyhow::{format_err, Context, Result};
+use anyhow::{Context, Result};
 use clap::{command, Parser, ValueEnum};
 
 use ruff_formatter::SourceCode;

@@ -14,6 +14,7 @@ use ruff_python_ast::{ModModule, PySourceType};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 use ruff_python_parser::{ParseError, Program};
+use ruff_python_trivia::CommentRanges;
 use ruff_source_file::{Locator, SourceFileBuilder};
 use ruff_text_size::Ranged;
 
@@ -44,15 +45,20 @@ use crate::{directives, fs};
 pub struct LinterResult<T> {
     pub data: T,
     pub error: Option<ParseError>,
+    pub comment_ranges: CommentRanges,
 }
 
 impl<T> LinterResult<T> {
-    const fn new(data: T, error: Option<ParseError>) -> Self {
-        Self { data, error }
+    const fn new(data: T, error: Option<ParseError>, comment_ranges: CommentRanges) -> Self {
+        Self {
+            data,
+            error,
+            comment_ranges,
+        }
     }
 
     fn map<U, F: FnOnce(T) -> U>(self, f: F) -> LinterResult<U> {
-        LinterResult::new(f(self.data), self.error)
+        LinterResult::new(f(self.data), self.error, self.comment_ranges)
     }
 }
 
@@ -135,7 +141,11 @@ pub fn check_path(
         .any(|rule_code| rule_code.lint_source().is_logical_lines())
     {
         diagnostics.extend(crate::checkers::logical_lines::check_logical_lines(
-            &program, locator, indexer, stylist, settings,
+            program.tokens(),
+            locator,
+            indexer,
+            stylist,
+            settings,
         ));
     }
 
@@ -149,7 +159,7 @@ pub fn check_path(
             .rules
             .iter_enabled()
             .any(|rule_code| rule_code.lint_source().is_imports());
-    if use_ast || use_imports || use_doc_lines {
+    let comment_ranges = if use_ast || use_imports || use_doc_lines {
         match program.into_result() {
             Ok(program) => {
                 let cell_offsets = source_kind.as_ipy_notebook().map(Notebook::cell_offsets);
@@ -188,6 +198,7 @@ pub fn check_path(
                 if use_doc_lines {
                     doc_lines.extend(doc_lines_from_ast(program.suite(), locator));
                 }
+                program.into_comment_ranges()
             }
             Err(parse_error) => {
                 // Always add a diagnostic for the syntax error, regardless of whether
@@ -197,9 +208,12 @@ pub fn check_path(
                 // to see if the diagnostic persists to the end of the function.
                 pycodestyle::rules::syntax_error(&mut diagnostics, &parse_error, locator);
                 error = Some(parse_error);
+                CommentRanges::default()
             }
         }
-    }
+    } else {
+        program.into_comment_ranges()
+    };
 
     // Deduplicate and reorder any doc lines.
     if use_doc_lines {
@@ -217,7 +231,7 @@ pub fn check_path(
             locator,
             stylist,
             indexer,
-            program.comment_ranges(),
+            &comment_ranges,
             &doc_lines,
             settings,
         ));
@@ -226,51 +240,49 @@ pub fn check_path(
     // Raise violations for internal test rules
     #[cfg(any(feature = "test-rules", test))]
     {
-        let comment_ranges = program.comment_ranges();
-
         for test_rule in TEST_RULES {
             if !settings.rules.enabled(*test_rule) {
                 continue;
             }
             let diagnostic = match test_rule {
                 Rule::StableTestRule => {
-                    test_rules::StableTestRule::diagnostic(locator, comment_ranges)
+                    test_rules::StableTestRule::diagnostic(locator, &comment_ranges)
                 }
                 Rule::StableTestRuleSafeFix => {
-                    test_rules::StableTestRuleSafeFix::diagnostic(locator, comment_ranges)
+                    test_rules::StableTestRuleSafeFix::diagnostic(locator, &comment_ranges)
                 }
                 Rule::StableTestRuleUnsafeFix => {
-                    test_rules::StableTestRuleUnsafeFix::diagnostic(locator, comment_ranges)
+                    test_rules::StableTestRuleUnsafeFix::diagnostic(locator, &comment_ranges)
                 }
                 Rule::StableTestRuleDisplayOnlyFix => {
-                    test_rules::StableTestRuleDisplayOnlyFix::diagnostic(locator, comment_ranges)
+                    test_rules::StableTestRuleDisplayOnlyFix::diagnostic(locator, &comment_ranges)
                 }
                 Rule::NurseryTestRule => {
-                    test_rules::NurseryTestRule::diagnostic(locator, comment_ranges)
+                    test_rules::NurseryTestRule::diagnostic(locator, &comment_ranges)
                 }
                 Rule::PreviewTestRule => {
-                    test_rules::PreviewTestRule::diagnostic(locator, comment_ranges)
+                    test_rules::PreviewTestRule::diagnostic(locator, &comment_ranges)
                 }
                 Rule::DeprecatedTestRule => {
-                    test_rules::DeprecatedTestRule::diagnostic(locator, comment_ranges)
+                    test_rules::DeprecatedTestRule::diagnostic(locator, &comment_ranges)
                 }
                 Rule::AnotherDeprecatedTestRule => {
-                    test_rules::AnotherDeprecatedTestRule::diagnostic(locator, comment_ranges)
+                    test_rules::AnotherDeprecatedTestRule::diagnostic(locator, &comment_ranges)
                 }
                 Rule::RemovedTestRule => {
-                    test_rules::RemovedTestRule::diagnostic(locator, comment_ranges)
+                    test_rules::RemovedTestRule::diagnostic(locator, &comment_ranges)
                 }
                 Rule::AnotherRemovedTestRule => {
-                    test_rules::AnotherRemovedTestRule::diagnostic(locator, comment_ranges)
+                    test_rules::AnotherRemovedTestRule::diagnostic(locator, &comment_ranges)
                 }
                 Rule::RedirectedToTestRule => {
-                    test_rules::RedirectedToTestRule::diagnostic(locator, comment_ranges)
+                    test_rules::RedirectedToTestRule::diagnostic(locator, &comment_ranges)
                 }
                 Rule::RedirectedFromTestRule => {
-                    test_rules::RedirectedFromTestRule::diagnostic(locator, comment_ranges)
+                    test_rules::RedirectedFromTestRule::diagnostic(locator, &comment_ranges)
                 }
                 Rule::RedirectedFromPrefixTestRule => {
-                    test_rules::RedirectedFromPrefixTestRule::diagnostic(locator, comment_ranges)
+                    test_rules::RedirectedFromPrefixTestRule::diagnostic(locator, &comment_ranges)
                 }
                 _ => unreachable!("All test rules must have an implementation"),
             };
@@ -307,7 +319,7 @@ pub fn check_path(
             &mut diagnostics,
             path,
             locator,
-            program.comment_ranges(),
+            &comment_ranges,
             &directives.noqa_line_for,
             error.is_none(),
             &per_file_ignores,
@@ -356,7 +368,7 @@ pub fn check_path(
         }
     }
 
-    LinterResult::new(diagnostics, error)
+    LinterResult::new(diagnostics, error, comment_ranges)
 }
 
 const MAX_ITERATIONS: usize = 100;
@@ -394,6 +406,7 @@ pub fn add_noqa_to_path(
     let LinterResult {
         data: diagnostics,
         error,
+        comment_ranges,
     } = check_path(
         path,
         package,
@@ -427,7 +440,7 @@ pub fn add_noqa_to_path(
         path,
         &diagnostics,
         &locator,
-        program.comment_ranges(),
+        &comment_ranges,
         &settings.external,
         &directives.noqa_line_for,
         stylist.line_ending(),

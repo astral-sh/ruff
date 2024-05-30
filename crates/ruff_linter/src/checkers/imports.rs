@@ -4,10 +4,10 @@ use std::path::Path;
 use ruff_diagnostics::Diagnostic;
 use ruff_notebook::CellOffsets;
 use ruff_python_ast::statement_visitor::StatementVisitor;
-use ruff_python_ast::{ModModule, PySourceType, Suite};
+use ruff_python_ast::{ModModule, PySourceType};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
-use ruff_python_parser::{Program, Tokens};
+use ruff_python_parser::Program;
 use ruff_source_file::Locator;
 
 use crate::directives::IsortDirectives;

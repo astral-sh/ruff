@@ -10,7 +10,7 @@ use ruff_linter::settings::{flags, LinterSettings};
 use ruff_linter::source_kind::SourceKind;
 use ruff_linter::{registry::Rule, RuleSelector};
 use ruff_python_ast::PySourceType;
-use ruff_python_parser::{parse_module, Mode};
+use ruff_python_parser::parse_module;
 
 #[cfg(target_os = "windows")]
 #[global_allocator]

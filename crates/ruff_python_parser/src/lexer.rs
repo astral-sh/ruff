@@ -34,11 +34,6 @@ mod cursor;
 mod fstring;
 mod indentation;
 
-#[deprecated]
-pub fn lex(_source: &str, _mode: Mode) {}
-#[deprecated]
-pub fn lex_starts_at(_source: &str, _mode: Mode, _offset: TextSize) {}
-
 /// A lexer for Python source code.
 #[derive(Debug)]
 pub struct Lexer<'src> {
@@ -837,7 +832,7 @@ impl<'src> Lexer<'src> {
     }
 
     /// Lex the next token.
-    pub(crate) fn next_token(&mut self) -> TokenKind {
+    pub fn next_token(&mut self) -> TokenKind {
         self.cursor.start_token();
         self.current_value = TokenValue::None;
         self.current_flags = TokenFlags::empty();
@@ -1872,6 +1867,11 @@ impl<'a> LexedText<'a> {
             LexedText::Owned(_) => {}
         }
     }
+}
+
+/// Create a new [`Lexer`] for the given source code and [`Mode`].
+pub fn lex(source: &str, mode: Mode) -> Lexer {
+    Lexer::new(source, mode, TextSize::default())
 }
 
 #[cfg(test)]

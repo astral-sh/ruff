@@ -428,7 +428,7 @@ impl NumberLike {
 
 #[cfg(test)]
 mod tests {
-    use ruff_python_ast::{Expr, ModExpression};
+    use ruff_python_ast::ModExpression;
     use ruff_python_parser::{parse_expression, Program};
 
     use crate::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};

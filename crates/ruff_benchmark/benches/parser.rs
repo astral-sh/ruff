@@ -4,7 +4,7 @@ use ruff_benchmark::criterion::{
 use ruff_benchmark::{TestCase, TestFile, TestFileDownloadError};
 use ruff_python_ast::statement_visitor::{walk_stmt, StatementVisitor};
 use ruff_python_ast::Stmt;
-use ruff_python_parser::{parse_module, Mode};
+use ruff_python_parser::parse_module;
 
 #[cfg(target_os = "windows")]
 #[global_allocator]

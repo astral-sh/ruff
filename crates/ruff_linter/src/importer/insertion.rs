@@ -1,8 +1,8 @@
 //! Insert statements into Python code.
 use std::ops::Add;
 
-use ruff_python_ast::{PySourceType, Stmt};
-use ruff_python_parser::{lexer, AsMode, Tok, TokenKind, Tokens};
+use ruff_python_ast::Stmt;
+use ruff_python_parser::{TokenKind, Tokens};
 use ruff_text_size::{Ranged, TextSize};
 
 use ruff_diagnostics::Edit;
@@ -172,7 +172,7 @@ impl<'a> Insertion<'a> {
                 // Once we've seen the colon, we're looking for a newline; otherwise, there's no
                 // block body (e.g. `if True: pass`).
                 Awaiting::Newline => match token.kind() {
-                    TokenKind::Comment(..) => {}
+                    TokenKind::Comment => {}
                     TokenKind::Newline => {
                         state = Awaiting::Indent;
                     }
@@ -183,7 +183,7 @@ impl<'a> Insertion<'a> {
                 },
                 // Once we've seen the newline, we're looking for the indentation of the block body.
                 Awaiting::Indent => match token.kind() {
-                    TokenKind::Comment(..) => {}
+                    TokenKind::Comment => {}
                     TokenKind::NonLogicalNewline => {}
                     TokenKind::Indent => {
                         // This is like:
@@ -317,9 +317,8 @@ fn match_continuation(s: &str) -> Option<TextSize> {
 mod tests {
     use anyhow::Result;
 
-    use ruff_python_ast::PySourceType;
     use ruff_python_codegen::Stylist;
-    use ruff_python_parser::{parse, parse_module, Mode};
+    use ruff_python_parser::parse_module;
     use ruff_source_file::{LineEnding, Locator};
     use ruff_text_size::TextSize;
 

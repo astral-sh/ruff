@@ -8,6 +8,7 @@ use anyhow::Result;
 use ruff_linter::source_kind::SourceKind;
 use ruff_python_ast::PySourceType;
 use ruff_python_parser::parse_unchecked_source;
+use ruff_text_size::Ranged;
 
 #[derive(clap::Args)]
 pub(crate) struct Args {
@@ -25,12 +26,12 @@ pub(crate) fn main(args: &Args) -> Result<()> {
         )
     })?;
     let program = parse_unchecked_source(source_kind.source_code(), source_type);
-    for token in program.tokens() {
+    for token in program.tokens().iter() {
         println!(
             "{start:#?} {kind:#?} {end:#?}",
             start = token.start(),
-            end = token.end()
-            kind = token.kind()
+            end = token.end(),
+            kind = token.kind(),
         );
     }
     Ok(())

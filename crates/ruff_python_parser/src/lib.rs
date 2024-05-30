@@ -87,9 +87,6 @@ mod token_set;
 mod token_source;
 pub mod typing;
 
-#[deprecated]
-pub fn tokenize(_source: &str, _mode: Mode) {}
-
 /// Parse a full Python module usually consisting of multiple lines.
 ///
 /// This is a convenience function that can be used to parse a full Python program without having to
@@ -229,7 +226,7 @@ pub fn parse_unchecked(source: &str, mode: Mode) -> Program<Mod> {
     Parser::new(source, mode).parse()
 }
 
-/// Parse the given Python source code using the specificed [`PySourceType`].
+/// Parse the given Python source code using the specified [`PySourceType`].
 pub fn parse_unchecked_source(source: &str, source_type: PySourceType) -> Program<ModModule> {
     // SAFETY: Safe because `PySourceType` always parses to a `ModModule`
     Parser::new(source, source_type.as_mode())
@@ -239,7 +236,7 @@ pub fn parse_unchecked_source(source: &str, source_type: PySourceType) -> Progra
 }
 
 /// Represents the parsed source code.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Program<T> {
     syntax: T,
     tokens: Tokens,
@@ -276,6 +273,11 @@ impl<T> Program<T> {
     /// Consumes the [`Program`] and returns a list of syntax errors found during parsing.
     pub fn into_errors(self) -> Vec<ParseError> {
         self.errors
+    }
+
+    /// Consumes the [`Program`] and returns the comment ranges found during parsing.
+    pub fn into_comment_ranges(self) -> CommentRanges {
+        self.comment_ranges
     }
 
     /// Returns `true` if the program is valid i.e., it has no syntax errors.
@@ -359,7 +361,7 @@ impl Program<ModExpression> {
 }
 
 /// Tokens represents a vector of lexed [`Token`].
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Tokens {
     raw: Vec<Token>,
 

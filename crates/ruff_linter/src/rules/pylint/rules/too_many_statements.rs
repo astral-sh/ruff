@@ -165,7 +165,7 @@ mod tests {
     use super::num_statements;
 
     fn parse_suite(source: &str) -> Result<Suite> {
-        parse_module(source).map(|program| program.into_suite())
+        Ok(parse_module(source)?.into_suite())
     }
 
     #[test]
