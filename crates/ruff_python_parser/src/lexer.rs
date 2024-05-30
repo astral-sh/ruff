@@ -180,7 +180,10 @@ impl<'src> Lexer<'src> {
     fn lex_identifier(&mut self, first: char) -> TokenKind {
         // Detect potential string like rb'' b'' f'' u'' r''
         let quote = match (first, self.cursor.first()) {
-            (_, quote @ ('\'' | '"')) => self.try_single_char_prefix(first).then_some(quote),
+            (_, quote @ ('\'' | '"')) => self.try_single_char_prefix(first).then(|| {
+                self.cursor.bump();
+                quote
+            }),
             (_, second) if is_quote(self.cursor.second()) => {
                 self.try_double_char_prefix([first, second]).then(|| {
                     self.cursor.bump();
@@ -573,7 +576,7 @@ impl<'src> Lexer<'src> {
         }
 
         if self.cursor.eat_char2(quote, quote) {
-            self.current_flags = TokenFlags::TRIPLE_QUOTED_STRING;
+            self.current_flags |= TokenFlags::TRIPLE_QUOTED_STRING;
         }
 
         self.fstrings
@@ -734,7 +737,7 @@ impl<'src> Lexer<'src> {
         // If the next two characters are also the quote character, then we have a triple-quoted
         // string; consume those two characters and ensure that we require a triple-quote to close
         if self.cursor.eat_char2(quote, quote) {
-            self.current_flags = TokenFlags::TRIPLE_QUOTED_STRING;
+            self.current_flags |= TokenFlags::TRIPLE_QUOTED_STRING;
         }
 
         let value_start = self.offset();
@@ -1412,7 +1415,7 @@ bitflags! {
 
 impl StringFlags for TokenFlags {
     fn quote_style(self) -> Quote {
-        if self.contains(TokenFlags::DOUBLE_QUOTES) {
+        if self.intersects(TokenFlags::DOUBLE_QUOTES) {
             Quote::Double
         } else {
             Quote::Single
@@ -1420,31 +1423,31 @@ impl StringFlags for TokenFlags {
     }
 
     fn is_triple_quoted(self) -> bool {
-        self.contains(TokenFlags::TRIPLE_QUOTED_STRING)
+        self.intersects(TokenFlags::TRIPLE_QUOTED_STRING)
     }
 
     fn prefix(self) -> AnyStringPrefix {
-        if self.contains(TokenFlags::F_STRING) {
-            if self.contains(TokenFlags::RAW_STRING_LOWERCASE) {
+        if self.intersects(TokenFlags::F_STRING) {
+            if self.intersects(TokenFlags::RAW_STRING_LOWERCASE) {
                 AnyStringPrefix::Format(FStringPrefix::Raw { uppercase_r: false })
-            } else if self.contains(TokenFlags::RAW_STRING_UPPERCASE) {
+            } else if self.intersects(TokenFlags::RAW_STRING_UPPERCASE) {
                 AnyStringPrefix::Format(FStringPrefix::Raw { uppercase_r: true })
             } else {
                 AnyStringPrefix::Format(FStringPrefix::Regular)
             }
-        } else if self.contains(TokenFlags::BYTE_STRING) {
-            if self.contains(TokenFlags::RAW_STRING_LOWERCASE) {
+        } else if self.intersects(TokenFlags::BYTE_STRING) {
+            if self.intersects(TokenFlags::RAW_STRING_LOWERCASE) {
                 AnyStringPrefix::Bytes(ByteStringPrefix::Raw { uppercase_r: false })
-            } else if self.contains(TokenFlags::RAW_STRING_UPPERCASE) {
+            } else if self.intersects(TokenFlags::RAW_STRING_UPPERCASE) {
                 AnyStringPrefix::Bytes(ByteStringPrefix::Raw { uppercase_r: true })
             } else {
                 AnyStringPrefix::Bytes(ByteStringPrefix::Regular)
             }
-        } else if self.contains(TokenFlags::RAW_STRING_LOWERCASE) {
+        } else if self.intersects(TokenFlags::RAW_STRING_LOWERCASE) {
             AnyStringPrefix::Regular(StringLiteralPrefix::Raw { uppercase: false })
-        } else if self.contains(TokenFlags::RAW_STRING_UPPERCASE) {
+        } else if self.intersects(TokenFlags::RAW_STRING_UPPERCASE) {
             AnyStringPrefix::Regular(StringLiteralPrefix::Raw { uppercase: true })
-        } else if self.contains(TokenFlags::UNICODE_STRING) {
+        } else if self.intersects(TokenFlags::UNICODE_STRING) {
             AnyStringPrefix::Regular(StringLiteralPrefix::Unicode)
         } else {
             AnyStringPrefix::Regular(StringLiteralPrefix::Empty)
@@ -1455,12 +1458,12 @@ impl StringFlags for TokenFlags {
 impl TokenFlags {
     /// Returns `true` if the token is an f-string.
     const fn is_f_string(self) -> bool {
-        self.contains(TokenFlags::F_STRING)
+        self.intersects(TokenFlags::F_STRING)
     }
 
     /// Returns `true` if the token is a raw string.
     const fn is_raw_string(self) -> bool {
-        self.contains(TokenFlags::RAW_STRING)
+        self.intersects(TokenFlags::RAW_STRING)
     }
 
     pub(crate) fn as_any_string_flags(self) -> AnyStringFlags {

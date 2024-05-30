@@ -8,7 +8,7 @@ use ruff_python_codegen::Stylist;
 use ruff_python_literal::cformat::{
     CConversionFlags, CFormatPart, CFormatPrecision, CFormatQuantity, CFormatString,
 };
-use ruff_python_parser::{lexer, AsMode, Tok, TokenKind};
+use ruff_python_parser::TokenKind;
 use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
@@ -346,9 +346,11 @@ fn convertible(format_string: &CFormatString, params: &Expr) -> bool {
 /// UP031
 pub(crate) fn printf_string_formatting(
     checker: &mut Checker,
+    bin_op: &ast::ExprBinOp,
     string_expr: &ast::ExprStringLiteral,
-    right: &Expr,
 ) {
+    let right = &*bin_op.right;
+
     let mut num_positional_arguments = 0;
     let mut num_keyword_arguments = 0;
     let mut format_strings: Vec<(TextRange, String)> =
@@ -434,14 +436,14 @@ pub(crate) fn printf_string_formatting(
     // Reconstruct the string.
     let mut contents = String::new();
     let mut prev_end = None;
-    for (range, format_string) in format_strings.into_iter() {
+    for (range, format_string) in format_strings {
         // Add the content before the string segment.
         match prev_end {
             None => {
                 contents.push_str(
                     checker
                         .locator()
-                        .slice(TextRange::new(string_expr.start(), range.start())),
+                        .slice(TextRange::new(bin_op.start(), range.start())),
                 );
             }
             Some(prev_end) => {
@@ -478,10 +480,10 @@ pub(crate) fn printf_string_formatting(
     // Add the `.format` call.
     contents.push_str(&format!(".format{params_string}"));
 
-    let mut diagnostic = Diagnostic::new(PrintfStringFormatting, string_expr.range());
+    let mut diagnostic = Diagnostic::new(PrintfStringFormatting, bin_op.range());
     diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
         contents,
-        string_expr.range(),
+        bin_op.range(),
     )));
     checker.diagnostics.push(diagnostic);
 }
