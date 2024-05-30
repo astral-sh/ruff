@@ -6,7 +6,7 @@ use once_cell::unsync::OnceCell;
 
 use ruff_python_ast::{str::Quote, StringFlags};
 use ruff_python_parser::lexer::LexResult;
-use ruff_python_parser::Tok;
+use ruff_python_parser::{Tok, TokenKind};
 use ruff_source_file::{find_newline, LineEnding, Locator};
 
 #[derive(Debug, Clone)]
@@ -86,6 +86,38 @@ fn detect_indention(tokens: &[LexResult], locator: &Locator) -> Indentation {
 
         Indentation(whitespace.to_string())
     } else {
+        // If we can't find a logical indent token, search for a non-logical indent, to cover cases
+        // like:
+        //```python
+        // from math import (
+        //   sin,
+        //   tan,
+        //   cos,
+        // )
+        // ```
+        let mut depth = 0usize;
+        for (token, range) in tokens.iter().flatten() {
+            match token.kind() {
+                TokenKind::Lpar | TokenKind::Lbrace | TokenKind::Lsqb => {
+                    depth = depth.saturating_add(1);
+                }
+                TokenKind::Rpar | TokenKind::Rbrace | TokenKind::Rsqb => {
+                    depth = depth.saturating_sub(1);
+                }
+                TokenKind::NonLogicalNewline => {
+                    let line = locator.line(range.end());
+                    let indent_index = line.chars().position(|c| !c.is_whitespace());
+                    if let Some(indent_index) = indent_index {
+                        if indent_index > 0 {
+                            let whitespace = &line[..indent_index];
+                            return Indentation(whitespace.to_string());
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+
         Indentation::default()
     }
 }
@@ -177,7 +209,6 @@ if True:
             &Indentation("\t".to_string())
         );
 
-        // TODO(charlie): Should non-significant whitespace be detected?
         let contents = r"
 x = (
   1,
@@ -189,7 +220,7 @@ x = (
         let tokens: Vec<_> = lex(contents, Mode::Module).collect();
         assert_eq!(
             Stylist::from_tokens(&tokens, &locator).indentation(),
-            &Indentation::default()
+            &Indentation("  ".to_string())
         );
 
         // formfeed indent, see `detect_indention` comment.
