@@ -533,7 +533,7 @@ mod tests {
     use ruff_diagnostics::{Diagnostic, Edit, Fix};
     use ruff_python_ast::Stmt;
     use ruff_python_codegen::Stylist;
-    use ruff_python_parser::{lexer, parse, parse_expression, parse_module, Mode};
+    use ruff_python_parser::{parse_expression, parse_module};
     use ruff_source_file::Locator;
     use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -615,7 +615,7 @@ x = 1 \
     }
 
     #[test]
-    fn redundant_alias() {
+    fn redundant_alias() -> Result<()> {
         let contents = "import x, y as y, z as bees";
         let stmt = parse_first_stmt(contents)?;
         assert_eq!(
@@ -642,6 +642,7 @@ x = 1 \
             )],
             "the third item is already aliased to something else"
         );
+        Ok(())
     }
 
     #[test_case("()",             &["x", "y"], r#"("x", "y")"#             ; "2 into empty tuple")]

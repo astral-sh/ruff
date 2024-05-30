@@ -345,7 +345,7 @@ impl<'a> MultilineStringSequenceValue<'a> {
         //
         // Step (1). Start by collecting information on each line individually:
         let (lines, ends_with_trailing_comma) =
-            collect_string_sequence_lines(range, kind, locator, tokens, string_items)?;
+            collect_string_sequence_lines(range, kind, tokens, string_items)?;
 
         // Step (2). Group lines together into sortable "items":
         //   - Any "item" contains a single element of the list/tuple
@@ -489,7 +489,6 @@ impl Ranged for MultilineStringSequenceValue<'_> {
 fn collect_string_sequence_lines<'a>(
     range: TextRange,
     kind: SequenceKind,
-    locator: &Locator,
     tokens: &Tokens,
     string_items: &[&'a str],
 ) -> Option<(Vec<StringSequenceLine<'a>>, bool)> {

@@ -8,7 +8,7 @@ use ruff_formatter::printer::SourceMapGeneration;
 use ruff_formatter::{FormatResult, Formatted, IndentStyle};
 use ruff_linter::directives;
 use ruff_linter::line_width::{IndentWidth, LineLength};
-use ruff_linter::linter::{check_path, LinterResult, TokenSource};
+use ruff_linter::linter::{check_path, LinterResult};
 use ruff_linter::registry::AsRule;
 use ruff_linter::settings::types::PythonVersion;
 use ruff_linter::settings::{flags, DEFAULT_SELECTORS, DUMMY_VARIABLE_RGX};
@@ -17,8 +17,7 @@ use ruff_python_ast::{Mod, PySourceType};
 use ruff_python_codegen::Stylist;
 use ruff_python_formatter::{format_module_ast, pretty_comments, PyFormatContext, QuoteStyle};
 use ruff_python_index::Indexer;
-use ruff_python_parser::{parse, parse_unchecked, parse_unchecked_source, AsMode, Mode, Program};
-use ruff_python_trivia::CommentRanges;
+use ruff_python_parser::{parse, parse_unchecked, parse_unchecked_source, Mode, Program};
 use ruff_source_file::{Locator, SourceLocation};
 use ruff_text_size::Ranged;
 use ruff_workspace::configuration::Configuration;
@@ -194,7 +193,7 @@ impl Workspace {
             flags::Noqa::Enabled,
             &source_kind,
             source_type,
-            program,
+            &program,
         );
 
         let source_code = locator.to_source_code();
@@ -262,7 +261,7 @@ impl Workspace {
     }
 
     pub fn tokens(&self, contents: &str) -> Result<String, Error> {
-        let program = ruff_python_parser::parse_module(contents)?;
+        let program = parse_unchecked(contents, Mode::Module);
 
         Ok(format!("{:#?}", program.tokens()))
     }

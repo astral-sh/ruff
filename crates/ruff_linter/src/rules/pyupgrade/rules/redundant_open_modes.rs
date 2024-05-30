@@ -6,7 +6,6 @@ use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_parser::{TokenKind, Tokens};
-use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextSize};
 
 use crate::checkers::ast::Checker;
@@ -80,7 +79,6 @@ pub(crate) fn redundant_open_modes(checker: &mut Checker, call: &ast::ExprCall) 
                                 call,
                                 &keyword.value,
                                 mode.replacement_value(),
-                                checker.locator(),
                                 checker.program().tokens(),
                             ));
                         }
@@ -95,7 +93,6 @@ pub(crate) fn redundant_open_modes(checker: &mut Checker, call: &ast::ExprCall) 
                         call,
                         mode_param,
                         mode.replacement_value(),
-                        checker.locator(),
                         checker.program().tokens(),
                     ));
                 }
@@ -150,7 +147,6 @@ fn create_diagnostic(
     call: &ast::ExprCall,
     mode_param: &Expr,
     replacement_value: Option<&str>,
-    locator: &Locator,
     tokens: &Tokens,
 ) -> Diagnostic {
     let mut diagnostic = Diagnostic::new(
@@ -166,16 +162,14 @@ fn create_diagnostic(
             mode_param.range(),
         )));
     } else {
-        diagnostic.try_set_fix(|| {
-            create_remove_param_fix(locator, call, mode_param, tokens).map(Fix::safe_edit)
-        });
+        diagnostic
+            .try_set_fix(|| create_remove_param_fix(call, mode_param, tokens).map(Fix::safe_edit));
     }
 
     diagnostic
 }
 
 fn create_remove_param_fix(
-    locator: &Locator,
     call: &ast::ExprCall,
     mode_param: &Expr,
     tokens: &Tokens,

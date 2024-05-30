@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use ruff_python_ast::{Alias, Stmt, StmtImportFrom};
+use ruff_python_ast::{Alias, StmtImportFrom};
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};

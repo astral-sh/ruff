@@ -6,7 +6,7 @@ use ruff_formatter::prelude::*;
 use ruff_formatter::{format, write, FormatError, Formatted, PrintError, Printed, SourceCode};
 use ruff_python_ast::AstNode;
 use ruff_python_ast::Mod;
-use ruff_python_parser::{parse, AsMode, ParseError, ParseErrorType, Program};
+use ruff_python_parser::{parse, AsMode, ParseError, Program};
 use ruff_python_trivia::CommentRanges;
 use ruff_source_file::Locator;
 
