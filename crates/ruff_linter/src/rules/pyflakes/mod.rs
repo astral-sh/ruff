@@ -17,12 +17,12 @@ mod tests {
     use ruff_python_ast::PySourceType;
     use ruff_python_codegen::Stylist;
     use ruff_python_index::Indexer;
-    use ruff_python_parser::AsMode;
+
     use ruff_python_trivia::textwrap::dedent;
     use ruff_source_file::Locator;
     use ruff_text_size::Ranged;
 
-    use crate::linter::{check_path, LinterResult, TokenSource};
+    use crate::linter::{check_path, LinterResult};
     use crate::registry::{AsRule, Linter, Rule};
     use crate::rules::pyflakes;
     use crate::settings::types::PreviewMode;
@@ -663,7 +663,7 @@ mod tests {
             flags::Noqa::Enabled,
             &source_kind,
             source_type,
-            program,
+            &program,
         );
         diagnostics.sort_by_key(Ranged::start);
         let actual = diagnostics

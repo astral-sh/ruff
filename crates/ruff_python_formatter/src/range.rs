@@ -5,9 +5,8 @@ use ruff_formatter::{
     format, FormatContext, FormatError, FormatOptions, IndentStyle, PrintedRange, SourceCode,
 };
 use ruff_python_ast::visitor::preorder::{walk_body, PreorderVisitor, TraversalSignal};
-use ruff_python_ast::{AnyNode, AnyNodeRef, Stmt, StmtMatch, StmtTry};
-use ruff_python_index::tokens_and_ranges;
-use ruff_python_parser::{parse, parse_tokens, AsMode, ParseError, ParseErrorType};
+use ruff_python_ast::{AnyNodeRef, Stmt, StmtMatch, StmtTry};
+use ruff_python_parser::{parse, AsMode};
 use ruff_python_trivia::{indentation_at_offset, BackwardsTokenizer, SimpleToken, SimpleTokenKind};
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};

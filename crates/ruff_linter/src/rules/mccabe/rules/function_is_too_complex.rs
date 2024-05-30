@@ -183,7 +183,7 @@ mod tests {
     use super::get_complexity_number;
 
     fn parse_suite(source: &str) -> Result<Suite> {
-        parse_module(source).map(|program| program.into_suite())
+        Ok(parse_module(source)?.into_suite())
     }
 
     #[test]

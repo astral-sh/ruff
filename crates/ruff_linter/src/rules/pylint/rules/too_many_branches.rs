@@ -259,8 +259,8 @@ mod tests {
     use super::num_branches;
 
     fn test_helper(source: &str, expected_num_branches: usize) -> Result<()> {
-        let branches = parse_module(source)?.suite();
-        assert_eq!(num_branches(branches), expected_num_branches);
+        let program = parse_module(source)?;
+        assert_eq!(num_branches(program.suite()), expected_num_branches);
         Ok(())
     }
 

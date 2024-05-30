@@ -16,14 +16,13 @@ use ruff_notebook::NotebookError;
 use ruff_python_ast::PySourceType;
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
-use ruff_python_parser::AsMode;
 use ruff_python_trivia::textwrap::dedent;
 use ruff_source_file::{Locator, SourceFileBuilder};
 use ruff_text_size::Ranged;
 
 use crate::directives;
 use crate::fix::{fix_file, FixResult};
-use crate::linter::{check_path, LinterResult, TokenSource};
+use crate::linter::{check_path, LinterResult};
 use crate::message::{Emitter, EmitterContext, Message, TextEmitter};
 use crate::packaging::detect_package_root;
 use crate::registry::AsRule;
@@ -136,7 +135,7 @@ pub(crate) fn test_contents<'a>(
         flags::Noqa::Enabled,
         source_kind,
         source_type,
-        program,
+        &program,
     );
 
     let source_has_errors = error.is_some();
@@ -177,7 +176,7 @@ pub(crate) fn test_contents<'a>(
             transformed = Cow::Owned(transformed.updated(fixed_contents, &source_map));
 
             let program =
-                ruff_python_parser::parse_unchecked_source(source_kind.source_code(), source_type);
+                ruff_python_parser::parse_unchecked_source(transformed.source_code(), source_type);
             let locator = Locator::new(transformed.source_code());
             let stylist = Stylist::from_tokens(program.tokens(), &locator);
             let indexer = Indexer::from_tokens(program.tokens(), &locator);
@@ -202,7 +201,7 @@ pub(crate) fn test_contents<'a>(
                 flags::Noqa::Enabled,
                 &transformed,
                 source_type,
-                program,
+                &program,
             );
 
             if let Some(fixed_error) = fixed_error {
