@@ -27,9 +27,7 @@ impl super::SyncNotificationHandler for DidChange {
             content_changes,
         }: types::DidChangeTextDocumentParams,
     ) -> Result<()> {
-        let key = session
-            .key_from_url(&uri)
-            .with_failure_code(ErrorCode::InternalError)?;
+        let key = session.key_from_url(uri);
 
         session
             .update_text_document(&key, content_changes, new_version)
@@ -37,7 +35,7 @@ impl super::SyncNotificationHandler for DidChange {
 
         // Publish diagnostics if the client doesnt support pull diagnostics
         if !session.resolved_client_capabilities().pull_diagnostics {
-            let snapshot = session.take_snapshot(&uri).unwrap();
+            let snapshot = session.take_snapshot(key.into_url()).unwrap();
             publish_diagnostics_for_document(&snapshot, &notifier)?;
         }
 

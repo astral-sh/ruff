@@ -22,9 +22,7 @@ impl super::SyncNotificationHandler for DidCloseNotebook {
             ..
         }: types::DidCloseNotebookDocumentParams,
     ) -> Result<()> {
-        let key = session
-            .key_from_url(&uri)
-            .with_failure_code(ErrorCode::InternalError)?;
+        let key = session.key_from_url(uri);
 
         session
             .close_document(&key)

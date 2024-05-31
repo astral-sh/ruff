@@ -28,6 +28,7 @@ pub(crate) struct RuffSettings {
 }
 
 pub(super) struct RuffSettingsIndex {
+    /// Index from folder to the resoled ruff settings.
     index: BTreeMap<PathBuf, Arc<RuffSettings>>,
     fallback: Arc<RuffSettings>,
 }
@@ -189,14 +190,15 @@ impl RuffSettingsIndex {
     }
 
     pub(super) fn get(&self, document_path: &Path) -> Arc<RuffSettings> {
-        if let Some((_, settings)) = self
-            .index
+        self.index
             .range(..document_path.to_path_buf())
             .rfind(|(path, _)| document_path.starts_with(path))
-        {
-            return settings.clone();
-        }
+            .map(|(_, settings)| settings)
+            .unwrap_or_else(|| &self.fallback)
+            .clone()
+    }
 
+    pub(super) fn fallback(&self) -> Arc<RuffSettings> {
         self.fallback.clone()
     }
 }

@@ -122,7 +122,7 @@ fn background_request_task<'a, R: traits::BackgroundDocumentRequestHandler>(
     let (id, params) = cast_request::<R>(req)?;
     Ok(Task::background(schedule, move |session: &Session| {
         // TODO(jane): we should log an error if we can't take a snapshot.
-        let Some(snapshot) = session.take_snapshot(&R::document_url(&params)) else {
+        let Some(snapshot) = session.take_snapshot(R::document_url(&params).into_owned()) else {
             return Box::new(|_, _| {});
         };
         Box::new(move |notifier, responder| {
@@ -152,7 +152,7 @@ fn background_notification_thread<'a, N: traits::BackgroundDocumentNotificationH
     let (id, params) = cast_notification::<N>(req)?;
     Ok(Task::background(schedule, move |session: &Session| {
         // TODO(jane): we should log an error if we can't take a snapshot.
-        let Some(snapshot) = session.take_snapshot(&N::document_url(&params)) else {
+        let Some(snapshot) = session.take_snapshot(N::document_url(&params).into_owned()) else {
             return Box::new(|_, _| {});
         };
         Box::new(move |notifier, _| {

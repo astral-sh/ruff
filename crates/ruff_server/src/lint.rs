@@ -1,5 +1,8 @@
 //! Access to the Ruff linting API for the LSP
 
+use rustc_hash::FxHashMap;
+use serde::{Deserialize, Serialize};
+
 use ruff_diagnostics::{Applicability, Diagnostic, DiagnosticKind, Edit, Fix};
 use ruff_linter::{
     directives::{extract_directives, Flags},
@@ -17,8 +20,6 @@ use ruff_python_parser::AsMode;
 use ruff_source_file::{LineIndex, Locator};
 use ruff_text_size::{Ranged, TextRange};
 use ruff_workspace::resolver::match_any_exclusion;
-use rustc_hash::FxHashMap;
-use serde::{Deserialize, Serialize};
 
 use crate::{
     edit::{NotebookRange, ToRangeExt},
@@ -60,33 +61,37 @@ pub(crate) struct DiagnosticFix {
 pub(crate) type Diagnostics = FxHashMap<lsp_types::Url, Vec<lsp_types::Diagnostic>>;
 
 pub(crate) fn check(query: &DocumentQuery, encoding: PositionEncoding) -> Diagnostics {
-    let document_path = query.file_path();
     let source_kind = query.make_source_kind();
     let file_resolver_settings = query.settings().file_resolver();
     let linter_settings = query.settings().linter();
+    let document_path = query.file_path();
 
     // If the document is excluded, return an empty list of diagnostics.
-    if let Some(exclusion) = match_any_exclusion(
-        document_path,
-        &file_resolver_settings.exclude,
-        &file_resolver_settings.extend_exclude,
-        Some(&linter_settings.exclude),
-        None,
-    ) {
-        tracing::debug!(
-            "Ignored path via `{}`: {}",
-            exclusion,
-            document_path.display()
-        );
-        return Diagnostics::default();
-    }
+    let package = if let Some(document_path) = document_path.as_ref() {
+        if let Some(exclusion) = match_any_exclusion(
+            document_path,
+            &file_resolver_settings.exclude,
+            &file_resolver_settings.extend_exclude,
+            Some(&linter_settings.exclude),
+            None,
+        ) {
+            tracing::debug!(
+                "Ignored path via `{}`: {}",
+                exclusion,
+                document_path.display()
+            );
+            return Diagnostics::default();
+        }
 
-    let package = detect_package_root(
-        document_path
-            .parent()
-            .expect("a path to a document should have a parent path"),
-        &linter_settings.namespace_packages,
-    );
+        detect_package_root(
+            document_path
+                .parent()
+                .expect("a path to a document should have a parent path"),
+            &linter_settings.namespace_packages,
+        )
+    } else {
+        None
+    };
 
     let source_type = query.source_type();
 
@@ -109,7 +114,7 @@ pub(crate) fn check(query: &DocumentQuery, encoding: PositionEncoding) -> Diagno
 
     // Generate checks.
     let LinterResult { data, .. } = check_path(
-        document_path,
+        query.virtual_file_path(),
         package,
         &locator,
         &stylist,
@@ -123,7 +128,7 @@ pub(crate) fn check(query: &DocumentQuery, encoding: PositionEncoding) -> Diagno
     );
 
     let noqa_edits = generate_noqa_edits(
-        document_path,
+        query.virtual_file_path(),
         data.as_slice(),
         &locator,
         indexer.comment_ranges(),
