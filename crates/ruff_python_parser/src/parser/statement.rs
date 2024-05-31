@@ -2421,6 +2421,10 @@ impl<'src> Parser<'src> {
             }
             TokenKind::Newline if matches!(self.peek2(), (TokenKind::Indent, TokenKind::Case)) => {
                 // `match` is a keyword
+
+                // test_err match_expected_colon
+                // match [1, 2]
+                //     case _: ...
                 self.add_error(
                     ParseErrorType::ExpectedToken {
                         found: self.current_token_kind(),
@@ -3526,7 +3530,39 @@ impl<'src> Parser<'src> {
         let (first, second) = self.peek2();
 
         match first {
+            // test_ok match_classify_as_identifier_1
+            // match not in case
             TokenKind::Not if second == TokenKind::In => MatchTokenKind::Identifier,
+
+            // test_ok match_classify_as_keyword_1
+            // match foo:
+            //     case _: ...
+            // match 1:
+            //     case _: ...
+            // match 1.0:
+            //     case _: ...
+            // match 1j:
+            //     case _: ...
+            // match "foo":
+            //     case _: ...
+            // match f"foo {x}":
+            //     case _: ...
+            // match {1, 2}:
+            //     case _: ...
+            // match ~foo:
+            //     case _: ...
+            // match ...:
+            //     case _: ...
+            // match not foo:
+            //     case _: ...
+            // match await foo():
+            //     case _: ...
+            // match lambda foo: foo:
+            //     case _: ...
+
+            // test_err match_classify_as_keyword
+            // match yield foo:
+            //     case _: ...
             TokenKind::Name
             | TokenKind::Int
             | TokenKind::Float
@@ -3536,18 +3572,63 @@ impl<'src> Parser<'src> {
             | TokenKind::Lbrace
             | TokenKind::Tilde
             | TokenKind::Ellipsis
+            | TokenKind::Not
             | TokenKind::Await
             | TokenKind::Yield
             | TokenKind::Lambda => MatchTokenKind::Keyword,
+
+            // test_ok match_classify_as_keyword_or_identifier
+            // match (1, 2)  # Identifier
+            // match (1, 2):  # Keyword
+            //     case _: ...
+            // match [1:]  # Identifier
+            // match [1, 2]:  # Keyword
+            //     case _: ...
+            // match * foo  # Identifier
+            // match - foo  # Identifier
+            // match -foo:  # Keyword
+            //     case _: ...
+
+            // test_err match_classify_as_keyword_or_identifier
+            // match *foo:  # Keyword
+            //     case _: ...
             TokenKind::Lpar
             | TokenKind::Lsqb
             | TokenKind::Star
             | TokenKind::Plus
             | TokenKind::Minus => MatchTokenKind::KeywordOrIdentifier,
+
             _ => {
                 if first.is_soft_keyword() || first.is_singleton() {
+                    // test_ok match_classify_as_keyword_2
+                    // match match:
+                    //     case _: ...
+                    // match case:
+                    //     case _: ...
+                    // match type:
+                    //     case _: ...
+                    // match None:
+                    //     case _: ...
+                    // match True:
+                    //     case _: ...
+                    // match False:
+                    //     case _: ...
                     MatchTokenKind::Keyword
                 } else {
+                    // test_ok match_classify_as_identifier_2
+                    // match
+                    // match != foo
+                    // (foo, match)
+                    // [foo, match]
+                    // {foo, match}
+                    // match;
+                    // match: int
+                    // match,
+                    // match.foo
+                    // match / foo
+                    // match << foo
+                    // match and foo
+                    // match is not foo
                     MatchTokenKind::Identifier
                 }
             }
