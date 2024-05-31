@@ -13,9 +13,9 @@ expression: lex_source(source)
         ),
     ),
     (
-        FStringMiddle {
-            value: "first ",
-        },
+        FStringMiddle(
+            "first ",
+        ),
         2..8,
         TokenFlags(
             DOUBLE_QUOTES | F_STRING,
@@ -30,9 +30,9 @@ expression: lex_source(source)
         9..10,
     ),
     (
-        Name {
-            name: "x",
-        },
+        Name(
+            "x",
+        ),
         14..15,
     ),
     (
@@ -48,9 +48,9 @@ expression: lex_source(source)
         25..26,
     ),
     (
-        Name {
-            name: "y",
-        },
+        Name(
+            "y",
+        ),
         38..39,
     ),
     (
@@ -62,9 +62,9 @@ expression: lex_source(source)
         40..41,
     ),
     (
-        FStringMiddle {
-            value: " second",
-        },
+        FStringMiddle(
+            " second",
+        ),
         41..48,
         TokenFlags(
             DOUBLE_QUOTES | F_STRING,

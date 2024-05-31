@@ -6,9 +6,9 @@ expression: lex_source(source)
 ```
 [
     (
-        String {
-            value: "\\N{EN SPACE}",
-        },
+        String(
+            "\\N{EN SPACE}",
+        ),
         0..14,
         TokenFlags(
             DOUBLE_QUOTES,

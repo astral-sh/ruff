@@ -10,9 +10,9 @@ expression: double_dedent_with_tabs_eol(WINDOWS_EOL)
         0..3,
     ),
     (
-        Name {
-            name: "foo",
-        },
+        Name(
+            "foo",
+        ),
         4..7,
     ),
     (
@@ -40,9 +40,9 @@ expression: double_dedent_with_tabs_eol(WINDOWS_EOL)
         13..15,
     ),
     (
-        Name {
-            name: "x",
-        },
+        Name(
+            "x",
+        ),
         16..17,
     ),
     (
@@ -66,9 +66,9 @@ expression: double_dedent_with_tabs_eol(WINDOWS_EOL)
         25..31,
     ),
     (
-        Int {
-            value: 99,
-        },
+        Int(
+            99,
+        ),
         32..34,
     ),
     (

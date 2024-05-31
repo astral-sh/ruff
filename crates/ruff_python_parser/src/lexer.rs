@@ -1660,23 +1660,14 @@ pub(crate) enum TokenValue {
     #[default]
     None,
     /// Token value for a name, commonly known as an identifier.
-    Name {
-        /// The name value.
-        ///
-        /// Unicode names are NFKC-normalized by the lexer,
-        /// matching [the behaviour of Python's lexer](https://docs.python.org/3/reference/lexical_analysis.html#identifiers)
-        name: Box<str>,
-    },
+    ///
+    /// Unicode names are NFKC-normalized by the lexer,
+    /// matching [the behaviour of Python's lexer](https://docs.python.org/3/reference/lexical_analysis.html#identifiers)
+    Name(Box<str>),
     /// Token value for an integer.
-    Int {
-        /// The integer value.
-        value: Int,
-    },
+    Int(Int),
     /// Token value for a floating point number.
-    Float {
-        /// The float value.
-        value: f64,
-    },
+    Float(f64),
     /// Token value for a complex number.
     Complex {
         /// The real part of the complex number.
@@ -1685,16 +1676,10 @@ pub(crate) enum TokenValue {
         imag: f64,
     },
     /// Token value for a string.
-    String {
-        /// The string value.
-        value: Box<str>,
-    },
+    String(Box<str>),
     /// Token value that includes the portion of text inside the f-string that's not
     /// part of the expression part and isn't an opening or closing brace.
-    FStringMiddle {
-        /// The string value.
-        value: Box<str>,
-    },
+    FStringMiddle(Box<str>),
     /// Token value for IPython escape commands. These are recognized by the lexer
     /// only when the mode is [`Mode::Ipython`].
     IpyEscapeCommand {
@@ -1948,7 +1933,7 @@ mod tests {
         let output = lex(source, mode);
 
         if !output.errors.is_empty() {
-            let mut message = "Unexpected lexical errors for a valid program:\n".to_string();
+            let mut message = "Unexpected lexical errors for a valid source:\n".to_string();
             for error in &output.errors {
                 writeln!(&mut message, "{error:?}").unwrap();
             }

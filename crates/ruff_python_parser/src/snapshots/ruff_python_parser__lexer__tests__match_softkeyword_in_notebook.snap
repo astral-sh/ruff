@@ -10,9 +10,9 @@ expression: lex_jupyter_source(source)
         0..5,
     ),
     (
-        Name {
-            name: "foo",
-        },
+        Name(
+            "foo",
+        ),
         6..9,
     ),
     (
@@ -32,9 +32,9 @@ expression: lex_jupyter_source(source)
         15..19,
     ),
     (
-        Name {
-            name: "bar",
-        },
+        Name(
+            "bar",
+        ),
         20..23,
     ),
     (
