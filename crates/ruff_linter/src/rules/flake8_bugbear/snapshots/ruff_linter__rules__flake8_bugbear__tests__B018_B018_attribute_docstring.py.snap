@@ -1,0 +1,11 @@
+---
+source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
+---
+B018_attribute_docstring.py:22:2: B018 Found useless expression. Either assign it to a variable or remove it.
+   |
+20 |     "d: not a docstring"
+21 | 
+22 | (e := 1)
+   |  ^^^^^^ B018
+23 | "e: not a docstring"
+   |

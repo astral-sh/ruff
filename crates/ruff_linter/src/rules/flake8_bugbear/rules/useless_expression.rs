@@ -16,6 +16,9 @@ use super::super::helpers::at_last_top_level_expression_in_cell;
 /// by mistake. Assign a useless expression to a variable, or remove it
 /// entirely.
 ///
+/// In [preview mode], this rule will also flag string literals and f-strings that
+/// are not used as a docstring or an attribute docstring.
+///
 /// ## Example
 /// ```python
 /// 1 + 1
@@ -45,6 +48,8 @@ use super::super::helpers::at_last_top_level_expression_in_cell;
 /// with errors.ExceptionRaisedContext():
 ///     _ = obj.attribute
 /// ```
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[violation]
 pub struct UselessExpression {
     kind: Kind,
@@ -69,15 +74,16 @@ impl Violation for UselessExpression {
 /// B018
 pub(crate) fn useless_expression(checker: &mut Checker, value: &Expr) {
     // Ignore comparisons, as they're handled by `useless_comparison`.
-    if value.is_compare_expr() {
+    if matches!(value, Expr::Compare(_) | Expr::EllipsisLiteral(_)) {
         return;
     }
 
-    // Ignore strings, to avoid false positives with docstrings.
-    if matches!(
-        value,
-        Expr::FString(_) | Expr::StringLiteral(_) | Expr::EllipsisLiteral(_)
-    ) {
+    if checker.settings.preview.is_enabled() {
+        if checker.semantic().in_pep_257_docstring() || checker.semantic().in_attribute_docstring()
+        {
+            return;
+        }
+    } else if matches!(value, Expr::StringLiteral(_) | Expr::FString(_)) {
         return;
     }
 

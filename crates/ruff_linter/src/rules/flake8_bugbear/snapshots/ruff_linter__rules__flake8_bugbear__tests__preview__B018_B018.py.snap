@@ -1,6 +1,16 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
 ---
+B018.py:10:5: B018 Found useless expression. Either assign it to a variable or remove it.
+   |
+ 8 |     a = 2
+ 9 |     "str"  # StringLiteral
+10 |     f"{int}"  # FString
+   |     ^^^^^^^^ B018
+11 |     1j  # Number (complex)
+12 |     1  # Number (int)
+   |
+
 B018.py:11:5: B018 Found useless expression. Either assign it to a variable or remove it.
    |
  9 |     "str"  # StringLiteral
@@ -115,6 +125,26 @@ B018.py:27:5: B018 Found useless expression. Either assign it to a variable or r
    |     ^ B018
    |
 
+B018.py:37:5: B018 Found useless expression. Either assign it to a variable or remove it.
+   |
+35 |     """my docstring"""
+36 |     a = 2
+37 |     "str"  # StringLiteral
+   |     ^^^^^ B018
+38 |     f"{int}"  # FString
+39 |     1j  # Number (complex)
+   |
+
+B018.py:38:5: B018 Found useless expression. Either assign it to a variable or remove it.
+   |
+36 |     a = 2
+37 |     "str"  # StringLiteral
+38 |     f"{int}"  # FString
+   |     ^^^^^^^^ B018
+39 |     1j  # Number (complex)
+40 |     1  # Number (int)
+   |
+
 B018.py:39:5: B018 Found useless expression. Either assign it to a variable or remove it.
    |
 37 |     "str"  # StringLiteral
@@ -219,6 +249,15 @@ B018.py:52:5: B018 Found useless expression. Either assign it to a variable or r
    |     ^^^ B018
 53 |     a = 2
 54 |     "str"
+   |
+
+B018.py:54:5: B018 Found useless expression. Either assign it to a variable or remove it.
+   |
+52 |     123
+53 |     a = 2
+54 |     "str"
+   |     ^^^^^ B018
+55 |     3
    |
 
 B018.py:55:5: B018 Found useless expression. Either assign it to a variable or remove it.
