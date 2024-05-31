@@ -1,33 +1,83 @@
 use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::visitor;
-use ruff_python_ast::visitor::Visitor;
+use ruff_python_ast::statement_visitor;
+use ruff_python_ast::statement_visitor::StatementVisitor;
 use ruff_python_ast::{self as ast, Expr, Stmt, StmtFunctionDef};
 use ruff_text_size::TextRange;
 
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for `return x` statements in functions, that also contain yield
-/// statements.
+/// Checks for `return {value}` statements in functions that also contain `yield`
+/// or `yield from` statements.
 ///
 /// ## Why is this bad?
-/// Using `return x` in a generator function used to be syntactically invalid
-/// in Python 2. In Python 3 `return x` can be used in a generator as a return
-/// value in conjunction with yield from. Users coming from Python 2 may expect
-/// the old behavior which might lead to bugs. Use native async def coroutines
-/// or mark intentional return x usage with # noqa on the same line.
+/// Using `return {value}` in a generator function was syntactically invalid in
+/// Python 2. In Python 3 `return {value}` _can_ be used in a generator; however,
+/// the combination of `yield` and `return` can lead to confusing behavior, as
+/// the `return` statement will cause the generator to raise `StopIteration`
+/// with the value provided, rather than returning the value to the caller.
+///
+/// For example, given:
+/// ```python
+/// from collections.abc import Iterable
+/// from pathlib import Path
+///
+///
+/// def get_file_paths(file_types: Iterable[str] | None = None) -> Iterable[Path]:
+///     dir_path = Path(".")
+///     if file_types is None:
+///         return dir_path.glob("*")
+///
+///     for file_type in file_types:
+///         yield from dir_path.glob(f"*.{file_type}")
+/// ```
+///
+/// Readers might assume that `get_file_paths()` would return an iterable of
+/// `Path` objects in the directory; in reality, though, `list(get_file_paths())`
+/// evaluates to `[]`, since the `return` statement causes the generator to raise
+/// `StopIteration` with the value `dir_path.glob("*")`:
+///
+/// ```shell
+/// >>> list(get_file_paths(file_types=["cfg", "toml"]))
+/// [PosixPath('setup.cfg'), PosixPath('pyproject.toml')]
+/// >>> list(get_file_paths())
+/// []
+/// ```
+///
+/// For intentional uses of `return` in a generator, consider suppressing this
+/// diagnostic.
 ///
 /// ## Example
 /// ```python
-/// def broken():
-///     if True:
-///         return [1, 2, 3]
+/// from collections.abc import Iterable
+/// from pathlib import Path
 ///
-///     yield 3
-///     yield 2
-///     yield 1
+///
+/// def get_file_paths(file_types: Iterable[str] | None = None) -> Iterable[Path]:
+///     dir_path = Path(".")
+///     if file_types is None:
+///         return dir_path.glob("*")
+///
+///     for file_type in file_types:
+///         yield from dir_path.glob(f"*.{file_type}")
+/// ```
+///
+/// Use instead:
+///
+/// ```python
+/// from collections.abc import Iterable
+/// from pathlib import Path
+///
+///
+/// def get_file_paths(file_types: Iterable[str] | None = None) -> Iterable[Path]:
+///     dir_path = Path(".")
+///     if file_types is None:
+///         yield from dir_path.glob("*")
+///     else:
+///         for file_type in file_types:
+///             yield from dir_path.glob(f"*.{file_type}")
 /// ```
 #[violation]
 pub struct ReturnInGenerator;
@@ -35,7 +85,7 @@ pub struct ReturnInGenerator;
 impl Violation for ReturnInGenerator {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Using `yield` together with `return`. Use native `async def` coroutines or put a `# noqa` comment on this line if this was intentional.")
+        format!("Using `yield` and `return {{value}}` in a generator function can lead to confusing behavior")
     }
 }
 
@@ -63,7 +113,7 @@ struct ReturnInGeneratorVisitor {
     has_yield: bool,
 }
 
-impl Visitor<'_> for ReturnInGeneratorVisitor {
+impl StatementVisitor<'_> for ReturnInGeneratorVisitor {
     fn visit_stmt(&mut self, stmt: &Stmt) {
         match stmt {
             Stmt::Expr(ast::StmtExpr { value, .. }) => match **value {
@@ -73,15 +123,15 @@ impl Visitor<'_> for ReturnInGeneratorVisitor {
                 _ => {}
             },
             Stmt::FunctionDef(_) => {
-                // do not recurse into nested functions, as they are evaluated
-                // individually
+                // Do not recurse into nested functions; they're evaluated separately.
             }
-            Stmt::Return(ast::StmtReturn { value, range }) => {
-                if Option::is_some(value) {
-                    self.return_ = Some(*range);
-                }
+            Stmt::Return(ast::StmtReturn {
+                value: Some(_),
+                range,
+            }) => {
+                self.return_ = Some(*range);
             }
-            _ => visitor::walk_stmt(self, stmt),
+            _ => statement_visitor::walk_stmt(self, stmt),
         }
     }
 }
