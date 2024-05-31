@@ -6,9 +6,9 @@ expression: newline_in_brackets_eol(UNIX_EOL)
 ```
 [
     (
-        Name {
-            name: "x",
-        },
+        Name(
+            "x",
+        ),
         0..1,
     ),
     (
@@ -28,9 +28,9 @@ expression: newline_in_brackets_eol(UNIX_EOL)
         6..7,
     ),
     (
-        Int {
-            value: 1,
-        },
+        Int(
+            1,
+        ),
         11..12,
     ),
     (
@@ -38,9 +38,9 @@ expression: newline_in_brackets_eol(UNIX_EOL)
         12..13,
     ),
     (
-        Int {
-            value: 2,
-        },
+        Int(
+            2,
+        ),
         13..14,
     ),
     (
@@ -56,9 +56,9 @@ expression: newline_in_brackets_eol(UNIX_EOL)
         16..17,
     ),
     (
-        Int {
-            value: 3,
-        },
+        Int(
+            3,
+        ),
         17..18,
     ),
     (
@@ -70,9 +70,9 @@ expression: newline_in_brackets_eol(UNIX_EOL)
         19..20,
     ),
     (
-        Int {
-            value: 4,
-        },
+        Int(
+            4,
+        ),
         20..21,
     ),
     (
@@ -100,9 +100,9 @@ expression: newline_in_brackets_eol(UNIX_EOL)
         27..28,
     ),
     (
-        Int {
-            value: 5,
-        },
+        Int(
+            5,
+        ),
         28..29,
     ),
     (
@@ -114,9 +114,9 @@ expression: newline_in_brackets_eol(UNIX_EOL)
         30..31,
     ),
     (
-        Int {
-            value: 6,
-        },
+        Int(
+            6,
+        ),
         31..32,
     ),
     (
@@ -124,9 +124,9 @@ expression: newline_in_brackets_eol(UNIX_EOL)
         32..33,
     ),
     (
-        Int {
-            value: 7,
-        },
+        Int(
+            7,
+        ),
         35..36,
     ),
     (

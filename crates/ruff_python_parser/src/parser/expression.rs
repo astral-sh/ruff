@@ -475,7 +475,7 @@ impl<'src> Parser<'src> {
         let range = self.current_token_range();
 
         if self.at(TokenKind::Name) {
-            let TokenValue::Name { name } = self.bump_value(TokenKind::Name) else {
+            let TokenValue::Name(name) = self.bump_value(TokenKind::Name) else {
                 unreachable!();
             };
             return ast::Identifier {
@@ -524,7 +524,7 @@ impl<'src> Parser<'src> {
 
         let lhs = match self.current_token_kind() {
             TokenKind::Float => {
-                let TokenValue::Float { value } = self.bump_value(TokenKind::Float) else {
+                let TokenValue::Float(value) = self.bump_value(TokenKind::Float) else {
                     unreachable!()
                 };
 
@@ -543,7 +543,7 @@ impl<'src> Parser<'src> {
                 })
             }
             TokenKind::Int => {
-                let TokenValue::Int { value } = self.bump_value(TokenKind::Int) else {
+                let TokenValue::Int(value) = self.bump_value(TokenKind::Int) else {
                     unreachable!()
                 };
                 Expr::NumberLiteral(ast::ExprNumberLiteral {
@@ -1257,7 +1257,7 @@ impl<'src> Parser<'src> {
         let range = self.current_token_range();
         let flags = self.tokens.current_flags().as_any_string_flags();
 
-        let TokenValue::String { value } = self.bump_value(TokenKind::String) else {
+        let TokenValue::String(value) = self.bump_value(TokenKind::String) else {
             unreachable!()
         };
 
@@ -1332,7 +1332,7 @@ impl<'src> Parser<'src> {
                 }
                 TokenKind::FStringMiddle => {
                     let range = parser.current_token_range();
-                    let TokenValue::FStringMiddle { value } =
+                    let TokenValue::FStringMiddle(value) =
                         parser.bump_value(TokenKind::FStringMiddle)
                     else {
                         unreachable!()
@@ -1427,7 +1427,7 @@ impl<'src> Parser<'src> {
         let conversion = if self.eat(TokenKind::Exclamation) {
             let conversion_flag_range = self.current_token_range();
             if self.at(TokenKind::Name) {
-                let TokenValue::Name { name } = self.bump_value(TokenKind::Name) else {
+                let TokenValue::Name(name) = self.bump_value(TokenKind::Name) else {
                     unreachable!();
                 };
                 match &*name {

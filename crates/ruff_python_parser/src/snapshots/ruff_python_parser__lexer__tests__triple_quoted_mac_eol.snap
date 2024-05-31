@@ -6,9 +6,9 @@ expression: triple_quoted_eol(MAC_EOL)
 ```
 [
     (
-        String {
-            value: "\r test string\r ",
-        },
+        String(
+            "\r test string\r ",
+        ),
         0..21,
         TokenFlags(
             DOUBLE_QUOTES | TRIPLE_QUOTED_STRING,

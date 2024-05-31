@@ -6,9 +6,9 @@ expression: triple_quoted_eol(UNIX_EOL)
 ```
 [
     (
-        String {
-            value: "\n test string\n ",
-        },
+        String(
+            "\n test string\n ",
+        ),
         0..21,
         TokenFlags(
             DOUBLE_QUOTES | TRIPLE_QUOTED_STRING,

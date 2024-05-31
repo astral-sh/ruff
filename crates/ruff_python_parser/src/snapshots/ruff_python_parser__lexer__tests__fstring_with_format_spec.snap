@@ -17,9 +17,9 @@ expression: lex_source(source)
         2..3,
     ),
     (
-        Name {
-            name: "foo",
-        },
+        Name(
+            "foo",
+        ),
         3..6,
     ),
     (
@@ -31,9 +31,9 @@ expression: lex_source(source)
         7..8,
     ),
     (
-        FStringMiddle {
-            value: " ",
-        },
+        FStringMiddle(
+            " ",
+        ),
         8..9,
         TokenFlags(
             DOUBLE_QUOTES | F_STRING,
@@ -44,9 +44,9 @@ expression: lex_source(source)
         9..10,
     ),
     (
-        Name {
-            name: "x",
-        },
+        Name(
+            "x",
+        ),
         10..11,
     ),
     (
@@ -58,9 +58,9 @@ expression: lex_source(source)
         12..13,
     ),
     (
-        Name {
-            name: "s",
-        },
+        Name(
+            "s",
+        ),
         13..14,
     ),
     (
@@ -68,9 +68,9 @@ expression: lex_source(source)
         14..15,
     ),
     (
-        FStringMiddle {
-            value: ".3f",
-        },
+        FStringMiddle(
+            ".3f",
+        ),
         15..18,
         TokenFlags(
             DOUBLE_QUOTES | F_STRING,
@@ -81,9 +81,9 @@ expression: lex_source(source)
         18..19,
     ),
     (
-        FStringMiddle {
-            value: " ",
-        },
+        FStringMiddle(
+            " ",
+        ),
         19..20,
         TokenFlags(
             DOUBLE_QUOTES | F_STRING,
@@ -94,9 +94,9 @@ expression: lex_source(source)
         20..21,
     ),
     (
-        Name {
-            name: "x",
-        },
+        Name(
+            "x",
+        ),
         21..22,
     ),
     (
@@ -104,9 +104,9 @@ expression: lex_source(source)
         22..23,
     ),
     (
-        FStringMiddle {
-            value: ".",
-        },
+        FStringMiddle(
+            ".",
+        ),
         23..24,
         TokenFlags(
             DOUBLE_QUOTES | F_STRING,
@@ -117,9 +117,9 @@ expression: lex_source(source)
         24..25,
     ),
     (
-        Name {
-            name: "y",
-        },
+        Name(
+            "y",
+        ),
         25..26,
     ),
     (
@@ -127,9 +127,9 @@ expression: lex_source(source)
         26..27,
     ),
     (
-        FStringMiddle {
-            value: "f",
-        },
+        FStringMiddle(
+            "f",
+        ),
         27..28,
         TokenFlags(
             DOUBLE_QUOTES | F_STRING,
@@ -140,9 +140,9 @@ expression: lex_source(source)
         28..29,
     ),
     (
-        FStringMiddle {
-            value: " ",
-        },
+        FStringMiddle(
+            " ",
+        ),
         29..30,
         TokenFlags(
             DOUBLE_QUOTES | F_STRING,
@@ -153,9 +153,9 @@ expression: lex_source(source)
         30..31,
     ),
     (
-        String {
-            value: "",
-        },
+        String(
+            "",
+        ),
         31..33,
     ),
     (
@@ -163,9 +163,9 @@ expression: lex_source(source)
         33..34,
     ),
     (
-        FStringMiddle {
-            value: "*^",
-        },
+        FStringMiddle(
+            "*^",
+        ),
         34..36,
         TokenFlags(
             DOUBLE_QUOTES | F_STRING,
@@ -176,9 +176,9 @@ expression: lex_source(source)
         36..37,
     ),
     (
-        Int {
-            value: 1,
-        },
+        Int(
+            1,
+        ),
         37..38,
     ),
     (
@@ -190,9 +190,9 @@ expression: lex_source(source)
         39..40,
     ),
     (
-        Int {
-            value: 1,
-        },
+        Int(
+            1,
+        ),
         40..41,
     ),
     (
@@ -208,9 +208,9 @@ expression: lex_source(source)
         43..44,
     ),
     (
-        FStringMiddle {
-            value: " ",
-        },
+        FStringMiddle(
+            " ",
+        ),
         44..45,
         TokenFlags(
             DOUBLE_QUOTES | F_STRING,
@@ -221,9 +221,9 @@ expression: lex_source(source)
         45..46,
     ),
     (
-        Name {
-            name: "x",
-        },
+        Name(
+            "x",
+        ),
         46..47,
     ),
     (
@@ -239,9 +239,9 @@ expression: lex_source(source)
         49..50,
     ),
     (
-        Int {
-            value: 1,
-        },
+        Int(
+            1,
+        ),
         50..51,
     ),
     (
@@ -253,9 +253,9 @@ expression: lex_source(source)
         52..53,
     ),
     (
-        Name {
-            name: "pop",
-        },
+        Name(
+            "pop",
+        ),
         53..56,
     ),
     (

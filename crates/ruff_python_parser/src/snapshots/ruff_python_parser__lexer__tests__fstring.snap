@@ -13,9 +13,9 @@ expression: lex_source(source)
         ),
     ),
     (
-        FStringMiddle {
-            value: "normal ",
-        },
+        FStringMiddle(
+            "normal ",
+        ),
         2..9,
         TokenFlags(
             DOUBLE_QUOTES | F_STRING,
@@ -26,9 +26,9 @@ expression: lex_source(source)
         9..10,
     ),
     (
-        Name {
-            name: "foo",
-        },
+        Name(
+            "foo",
+        ),
         10..13,
     ),
     (
@@ -36,9 +36,9 @@ expression: lex_source(source)
         13..14,
     ),
     (
-        FStringMiddle {
-            value: " {another} ",
-        },
+        FStringMiddle(
+            " {another} ",
+        ),
         14..27,
         TokenFlags(
             DOUBLE_QUOTES | F_STRING,
@@ -49,9 +49,9 @@ expression: lex_source(source)
         27..28,
     ),
     (
-        Name {
-            name: "bar",
-        },
+        Name(
+            "bar",
+        ),
         28..31,
     ),
     (
@@ -59,9 +59,9 @@ expression: lex_source(source)
         31..32,
     ),
     (
-        FStringMiddle {
-            value: " {",
-        },
+        FStringMiddle(
+            " {",
+        ),
         32..35,
         TokenFlags(
             DOUBLE_QUOTES | F_STRING,
@@ -72,9 +72,9 @@ expression: lex_source(source)
         35..36,
     ),
     (
-        Name {
-            name: "three",
-        },
+        Name(
+            "three",
+        ),
         36..41,
     ),
     (
@@ -82,9 +82,9 @@ expression: lex_source(source)
         41..42,
     ),
     (
-        FStringMiddle {
-            value: "}",
-        },
+        FStringMiddle(
+            "}",
+        ),
         42..44,
         TokenFlags(
             DOUBLE_QUOTES | F_STRING,

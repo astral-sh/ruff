@@ -35,9 +35,9 @@ expression: lex_source(source)
         ),
     ),
     (
-        FStringMiddle {
-            value: "{}",
-        },
+        FStringMiddle(
+            "{}",
+        ),
         8..12,
         TokenFlags(
             DOUBLE_QUOTES | F_STRING,
@@ -58,9 +58,9 @@ expression: lex_source(source)
         ),
     ),
     (
-        FStringMiddle {
-            value: " ",
-        },
+        FStringMiddle(
+            " ",
+        ),
         16..17,
         TokenFlags(
             DOUBLE_QUOTES | F_STRING,
@@ -89,9 +89,9 @@ expression: lex_source(source)
         ),
     ),
     (
-        FStringMiddle {
-            value: "{",
-        },
+        FStringMiddle(
+            "{",
+        ),
         23..25,
         TokenFlags(
             DOUBLE_QUOTES | F_STRING,
@@ -106,9 +106,9 @@ expression: lex_source(source)
         26..27,
     ),
     (
-        FStringMiddle {
-            value: "}",
-        },
+        FStringMiddle(
+            "}",
+        ),
         27..29,
         TokenFlags(
             DOUBLE_QUOTES | F_STRING,
@@ -129,9 +129,9 @@ expression: lex_source(source)
         ),
     ),
     (
-        FStringMiddle {
-            value: "{{}}",
-        },
+        FStringMiddle(
+            "{{}}",
+        ),
         33..41,
         TokenFlags(
             DOUBLE_QUOTES | F_STRING,
@@ -152,9 +152,9 @@ expression: lex_source(source)
         ),
     ),
     (
-        FStringMiddle {
-            value: " ",
-        },
+        FStringMiddle(
+            " ",
+        ),
         45..46,
         TokenFlags(
             DOUBLE_QUOTES | F_STRING,
@@ -169,9 +169,9 @@ expression: lex_source(source)
         47..48,
     ),
     (
-        FStringMiddle {
-            value: " {} {",
-        },
+        FStringMiddle(
+            " {} {",
+        ),
         48..56,
         TokenFlags(
             DOUBLE_QUOTES | F_STRING,
@@ -186,9 +186,9 @@ expression: lex_source(source)
         57..58,
     ),
     (
-        FStringMiddle {
-            value: "} {{}}  ",
-        },
+        FStringMiddle(
+            "} {{}}  ",
+        ),
         58..71,
         TokenFlags(
             DOUBLE_QUOTES | F_STRING,
