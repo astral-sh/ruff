@@ -330,7 +330,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
                     fix_by_reexporting(
                         checker,
                         import_statement,
-                        &to_reexport.iter().map(|(b, _)| b).collect::<Vec<_>>(),
+                        to_reexport.iter().map(|(b, _)| b).collect::<Vec<_>>(),
                         &dunder_all_exprs,
                     )
                     .ok(),
@@ -450,13 +450,15 @@ fn fix_by_removing_imports<'a>(
 fn fix_by_reexporting(
     checker: &Checker,
     node_id: NodeId,
-    imports: &[&ImportBinding],
+    mut imports: Vec<&ImportBinding>,
     dunder_all_exprs: &[&ast::Expr],
 ) -> Result<Fix> {
     let statement = checker.semantic().statement(node_id);
     if imports.is_empty() {
         bail!("Expected import bindings");
     }
+
+    imports.sort_by_key(|b| b.name);
 
     let edits = match dunder_all_exprs {
         [] => fix::edits::make_redundant_alias(
