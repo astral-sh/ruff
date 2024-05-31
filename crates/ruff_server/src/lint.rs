@@ -90,8 +90,7 @@ pub(crate) fn check(query: &DocumentQuery, encoding: PositionEncoding) -> Diagno
     let source_type = query.source_type();
 
     // Parse once.
-    let program =
-        ruff_python_parser::parse_unchecked_source(source_kind.source_code(), source_type);
+    let parsed = ruff_python_parser::parse_unchecked_source(source_kind.source_code(), source_type);
 
     let index = LineIndex::from_source_text(source_kind.source_code());
 
@@ -99,13 +98,13 @@ pub(crate) fn check(query: &DocumentQuery, encoding: PositionEncoding) -> Diagno
     let locator = Locator::with_index(source_kind.source_code(), index.clone());
 
     // Detect the current code style (lazily).
-    let stylist = Stylist::from_tokens(program.tokens(), &locator);
+    let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
 
     // Extra indices from the code.
-    let indexer = Indexer::from_tokens(program.tokens(), &locator);
+    let indexer = Indexer::from_tokens(parsed.tokens(), &locator);
 
     // Extract the `# noqa` and `# isort: skip` directives from the source.
-    let directives = extract_directives(&program, Flags::all(), &locator, &indexer);
+    let directives = extract_directives(&parsed, Flags::all(), &locator, &indexer);
 
     // Generate checks.
     let LinterResult { data, .. } = check_path(
@@ -119,14 +118,14 @@ pub(crate) fn check(query: &DocumentQuery, encoding: PositionEncoding) -> Diagno
         flags::Noqa::Enabled,
         &source_kind,
         source_type,
-        &program,
+        &parsed,
     );
 
     let noqa_edits = generate_noqa_edits(
         document_path,
         data.as_slice(),
         &locator,
-        program.comment_ranges(),
+        parsed.comment_ranges(),
         &linter_settings.external,
         &directives.noqa_line_for,
         stylist.line_ending(),

@@ -156,7 +156,7 @@ pub(crate) fn nested_min_max(
     }) {
         let mut diagnostic = Diagnostic::new(NestedMinMax { func: min_max }, expr.range());
         if !checker
-            .program()
+            .parsed()
             .comment_ranges()
             .has_comments(expr, checker.locator())
         {

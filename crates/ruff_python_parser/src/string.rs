@@ -472,14 +472,14 @@ mod tests {
     use ruff_python_ast::Suite;
 
     use crate::lexer::LexicalErrorType;
-    use crate::{parse_module, FStringErrorType, ParseError, ParseErrorType, Program};
+    use crate::{parse_module, FStringErrorType, ParseError, ParseErrorType, Parsed};
 
     const WINDOWS_EOL: &str = "\r\n";
     const MAC_EOL: &str = "\r";
     const UNIX_EOL: &str = "\n";
 
     fn parse_suite(source: &str) -> Result<Suite, ParseError> {
-        parse_module(source).map(Program::into_suite)
+        parse_module(source).map(Parsed::into_suite)
     }
 
     fn string_parser_escaped_eol(eol: &str) -> Suite {

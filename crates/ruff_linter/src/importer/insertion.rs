@@ -327,14 +327,10 @@ mod tests {
     #[test]
     fn start_of_file() -> Result<()> {
         fn insert(contents: &str) -> Result<Insertion> {
-            let program = parse_module(contents)?;
+            let parsed = parse_module(contents)?;
             let locator = Locator::new(contents);
-            let stylist = Stylist::from_tokens(program.tokens(), &locator);
-            Ok(Insertion::start_of_file(
-                program.suite(),
-                &locator,
-                &stylist,
-            ))
+            let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
+            Ok(Insertion::start_of_file(parsed.suite(), &locator, &stylist))
         }
 
         let contents = "";
@@ -442,10 +438,10 @@ x = 1
     #[test]
     fn start_of_block() {
         fn insert(contents: &str, offset: TextSize) -> Insertion {
-            let program = parse_module(contents).unwrap();
+            let parsed = parse_module(contents).unwrap();
             let locator = Locator::new(contents);
-            let stylist = Stylist::from_tokens(program.tokens(), &locator);
-            Insertion::start_of_block(offset, &locator, &stylist, program.tokens())
+            let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
+            Insertion::start_of_block(offset, &locator, &stylist, parsed.tokens())
         }
 
         let contents = "if True: pass";

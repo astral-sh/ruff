@@ -45,9 +45,9 @@ fn test_expr_mode_valid_syntax() {
     let source = "first
 
 ";
-    let program = parse_expression(source).unwrap();
+    let parsed = parse_expression(source).unwrap();
 
-    insta::assert_debug_snapshot!(program.expr());
+    insta::assert_debug_snapshot!(parsed.expr());
 }
 
 #[test]
@@ -61,7 +61,7 @@ fn test_unicode_aliases() {
 
 #[test]
 fn test_ipython_escape_commands() {
-    let program = parse(
+    let parsed = parse(
         r"
 # Normal Python code
 (
@@ -132,5 +132,5 @@ foo.bar[0].baz[2].egg??
         Mode::Ipython,
     )
     .unwrap();
-    insta::assert_debug_snapshot!(program.syntax());
+    insta::assert_debug_snapshot!(parsed.syntax());
 }

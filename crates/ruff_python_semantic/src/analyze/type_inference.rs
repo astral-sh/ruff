@@ -429,11 +429,11 @@ impl NumberLike {
 #[cfg(test)]
 mod tests {
     use ruff_python_ast::ModExpression;
-    use ruff_python_parser::{parse_expression, Program};
+    use ruff_python_parser::{parse_expression, Parsed};
 
     use crate::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
 
-    fn parse(expression: &str) -> Program<ModExpression> {
+    fn parse(expression: &str) -> Parsed<ModExpression> {
         parse_expression(expression).unwrap()
     }
 

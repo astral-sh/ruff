@@ -11,7 +11,7 @@ use crate::parser::progress::{ParserProgress, TokenId};
 use crate::token_set::TokenSet;
 use crate::token_source::{TokenSource, TokenSourceCheckpoint};
 use crate::{Mode, ParseError, ParseErrorType, TokenKind};
-use crate::{Program, Tokens};
+use crate::{Parsed, Tokens};
 
 mod expression;
 mod helpers;
@@ -71,8 +71,8 @@ impl<'src> Parser<'src> {
         }
     }
 
-    /// Consumes the [`Parser`] and returns the parsed [`Program`].
-    pub(crate) fn parse(mut self) -> Program<Mod> {
+    /// Consumes the [`Parser`] and returns the parsed [`Parsed`].
+    pub(crate) fn parse(mut self) -> Parsed<Mod> {
         let syntax = match self.mode {
             Mode::Expression => Mod::Expression(self.parse_single_expression()),
             Mode::Module | Mode::Ipython => Mod::Module(self.parse_module()),
@@ -138,7 +138,7 @@ impl<'src> Parser<'src> {
         }
     }
 
-    fn finish(self, syntax: Mod) -> Program<Mod> {
+    fn finish(self, syntax: Mod) -> Parsed<Mod> {
         assert_eq!(
             self.current_token_kind(),
             TokenKind::EndOfFile,
@@ -153,7 +153,7 @@ impl<'src> Parser<'src> {
         // There's no fast path for when there are no parse errors because a lex error
         // always results in a parse error.
         if lex_errors.is_empty() {
-            return Program {
+            return Parsed {
                 syntax,
                 tokens: Tokens::new(tokens),
                 comment_ranges,
@@ -185,7 +185,7 @@ impl<'src> Parser<'src> {
         merged.extend(parse_errors);
         merged.extend(lex_errors.map(ParseError::from));
 
-        Program {
+        Parsed {
             syntax,
             tokens: Tokens::new(tokens),
             comment_ranges,
@@ -866,7 +866,7 @@ impl RecoveryContextKind {
 
     fn is_list_terminator(self, p: &Parser) -> bool {
         match self {
-            // The program must consume all tokens until the end
+            // The parser must consume all tokens until the end
             RecoveryContextKind::ModuleStatements => false,
             RecoveryContextKind::BlockStatements => p.at(TokenKind::Dedent),
 

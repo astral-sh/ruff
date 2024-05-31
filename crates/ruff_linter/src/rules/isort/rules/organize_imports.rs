@@ -8,7 +8,7 @@ use ruff_python_ast::whitespace::trailing_lines_end;
 use ruff_python_ast::{ModModule, PySourceType, Stmt};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
-use ruff_python_parser::Program;
+use ruff_python_parser::Parsed;
 use ruff_python_trivia::{leading_indentation, textwrap::indent, PythonWhitespace};
 use ruff_source_file::{Locator, UniversalNewlines};
 use ruff_text_size::{Ranged, TextRange};
@@ -89,7 +89,7 @@ pub(crate) fn organize_imports(
     settings: &LinterSettings,
     package: Option<&Path>,
     source_type: PySourceType,
-    program: &Program<ModModule>,
+    parsed: &Parsed<ModModule>,
 ) -> Option<Diagnostic> {
     let indentation = locator.slice(extract_indentation_range(&block.imports, locator));
     let indentation = leading_indentation(indentation);
@@ -108,7 +108,7 @@ pub(crate) fn organize_imports(
     let comments = comments::collect_comments(
         TextRange::new(range.start(), locator.full_line_end(range.end())),
         locator,
-        program.comment_ranges(),
+        parsed.comment_ranges(),
     );
 
     let trailing_line_end = if block.trailer.is_none() {
@@ -130,7 +130,7 @@ pub(crate) fn organize_imports(
         source_type,
         settings.target_version,
         &settings.isort,
-        program.tokens(),
+        parsed.tokens(),
     );
 
     // Expand the span the entire range, including leading and trailing space.

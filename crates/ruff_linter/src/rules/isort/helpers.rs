@@ -11,7 +11,7 @@ use crate::rules::isort::types::TrailingComma;
 pub(super) fn trailing_comma(stmt: &Stmt, tokens: &Tokens) -> TrailingComma {
     let mut count = 0u32;
     let mut trailing_comma = TrailingComma::Absent;
-    for token in tokens.tokens_in_range(stmt.range()) {
+    for token in tokens.in_range(stmt.range()) {
         match token.kind() {
             TokenKind::Lpar => count = count.saturating_add(1),
             TokenKind::Rpar => count = count.saturating_sub(1),

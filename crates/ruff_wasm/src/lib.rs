@@ -17,7 +17,7 @@ use ruff_python_ast::{Mod, PySourceType};
 use ruff_python_codegen::Stylist;
 use ruff_python_formatter::{format_module_ast, pretty_comments, PyFormatContext, QuoteStyle};
 use ruff_python_index::Indexer;
-use ruff_python_parser::{parse, parse_unchecked, parse_unchecked_source, Mode, Program};
+use ruff_python_parser::{parse, parse_unchecked, parse_unchecked_source, Mode, Parsed};
 use ruff_source_file::{Locator, SourceLocation};
 use ruff_text_size::Ranged;
 use ruff_workspace::configuration::Configuration;
@@ -160,24 +160,20 @@ impl Workspace {
         let source_kind = SourceKind::Python(contents.to_string());
 
         // Parse once.
-        let program = parse_unchecked_source(source_kind.source_code(), source_type);
+        let parsed = parse_unchecked_source(source_kind.source_code(), source_type);
 
         // Map row and column locations to byte slices (lazily).
         let locator = Locator::new(contents);
 
         // Detect the current code style (lazily).
-        let stylist = Stylist::from_tokens(program.tokens(), &locator);
+        let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
 
         // Extra indices from the code.
-        let indexer = Indexer::from_tokens(program.tokens(), &locator);
+        let indexer = Indexer::from_tokens(parsed.tokens(), &locator);
 
         // Extract the `# noqa` and `# isort: skip` directives from the source.
-        let directives = directives::extract_directives(
-            &program,
-            directives::Flags::empty(),
-            &locator,
-            &indexer,
-        );
+        let directives =
+            directives::extract_directives(&parsed, directives::Flags::empty(), &locator, &indexer);
 
         // Generate checks.
         let LinterResult {
@@ -193,7 +189,7 @@ impl Workspace {
             flags::Noqa::Enabled,
             &source_kind,
             source_type,
-            &program,
+            &parsed,
         );
 
         let source_code = locator.to_source_code();
@@ -246,8 +242,8 @@ impl Workspace {
     pub fn comments(&self, contents: &str) -> Result<String, Error> {
         let parsed = ParsedModule::from_source(contents)?;
         let comments = pretty_comments(
-            parsed.program.syntax(),
-            parsed.program.comment_ranges(),
+            parsed.parsed.syntax(),
+            parsed.parsed.comment_ranges(),
             contents,
         );
         Ok(comments)
@@ -255,15 +251,15 @@ impl Workspace {
 
     /// Parses the content and returns its AST
     pub fn parse(&self, contents: &str) -> Result<String, Error> {
-        let program = parse_unchecked(contents, Mode::Module);
+        let parsed = parse_unchecked(contents, Mode::Module);
 
-        Ok(format!("{:#?}", program.into_syntax()))
+        Ok(format!("{:#?}", parsed.into_syntax()))
     }
 
     pub fn tokens(&self, contents: &str) -> Result<String, Error> {
-        let program = parse_unchecked(contents, Mode::Module);
+        let parsed = parse_unchecked(contents, Mode::Module);
 
-        Ok(format!("{:#?}", program.tokens()))
+        Ok(format!("{:#?}", parsed.tokens()))
     }
 }
 
@@ -273,14 +269,14 @@ pub(crate) fn into_error<E: std::fmt::Display>(err: E) -> Error {
 
 struct ParsedModule<'a> {
     source_code: &'a str,
-    program: Program<Mod>,
+    parsed: Parsed<Mod>,
 }
 
 impl<'a> ParsedModule<'a> {
     fn from_source(source_code: &'a str) -> Result<Self, Error> {
         Ok(Self {
             source_code,
-            program: parse(source_code, Mode::Module).map_err(into_error)?,
+            parsed: parse(source_code, Mode::Module).map_err(into_error)?,
         })
     }
 
@@ -291,6 +287,6 @@ impl<'a> ParsedModule<'a> {
             .to_format_options(PySourceType::default(), self.source_code)
             .with_source_map_generation(SourceMapGeneration::Enabled);
 
-        format_module_ast(&self.program, self.source_code, options)
+        format_module_ast(&self.parsed, self.source_code, options)
     }
 }

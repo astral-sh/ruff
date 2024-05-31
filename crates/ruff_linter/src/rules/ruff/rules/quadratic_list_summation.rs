@@ -111,7 +111,7 @@ fn convert_to_reduce(iterable: &Expr, call: &ast::ExprCall, checker: &Checker) -
         parenthesized_range(
             iterable.into(),
             call.arguments.as_any_node_ref(),
-            checker.program().comment_ranges(),
+            checker.parsed().comment_ranges(),
             checker.locator().contents(),
         )
         .unwrap_or(iterable.range()),

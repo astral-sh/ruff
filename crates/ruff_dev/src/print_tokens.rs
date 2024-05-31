@@ -25,8 +25,8 @@ pub(crate) fn main(args: &Args) -> Result<()> {
             args.file.display()
         )
     })?;
-    let program = parse_unchecked_source(source_kind.source_code(), source_type);
-    for token in program.tokens() {
+    let parsed = parse_unchecked_source(source_kind.source_code(), source_type);
+    for token in parsed.tokens() {
         println!(
             "{start:#?} {kind:#?} {end:#?}",
             start = token.start(),
