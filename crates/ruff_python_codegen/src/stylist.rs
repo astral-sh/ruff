@@ -106,13 +106,7 @@ fn detect_indention(tokens: &[LexResult], locator: &Locator) -> Indentation {
                 }
                 TokenKind::NonLogicalNewline => {
                     let line = locator.line(range.end());
-                    let indent_index = line.char_indices().find_map(|(i, c)| {
-                        if c.is_whitespace() {
-                            None
-                        } else {
-                            Some(i)
-                        }
-                    });
+                    let indent_index = line.find(|c: char| !c.is_whitespace());
                     if let Some(indent_index) = indent_index {
                         if indent_index > 0 {
                             let whitespace = &line[..indent_index];
