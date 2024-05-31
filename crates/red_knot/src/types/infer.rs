@@ -145,13 +145,14 @@ fn infer_expr_type(db: &dyn SemanticDb, file_id: FileId, expr: &ast::Expr) -> Qu
     // TODO cache the resolution of the type on the node
     let symbols = symbol_table(db, file_id)?;
     match expr {
-        ast::Expr::NumberLiteral(ast::ExprNumberLiteral { value: v, .. }) => {
-            if let ast::Number::Int(n) = v {
-                // TODO support big int literals, or at least default to `builtins.int`
-                Ok(n.as_i64().map(Type::IntLiteral).unwrap_or(Type::Unknown))
-            } else {
+        ast::Expr::NumberLiteral(ast::ExprNumberLiteral { value, .. }) => {
+            match value {
+                ast::Number::Int(n) => {
+                    // TODO support big int literals
+                    Ok(n.as_i64().map(Type::IntLiteral).unwrap_or(Type::Unknown))
+                }
                 // TODO builtins.float or builtins.complex
-                Ok(Type::Unknown)
+                _ => Ok(Type::Unknown),
             }
         }
         ast::Expr::Name(name) => {
