@@ -88,10 +88,11 @@ pub(crate) fn return_x_in_generator(checker: &mut Checker, function_def: &StmtFu
     let mut visitor = ReturnXInGeneratorVisitor::default();
     visitor.visit_body(&function_def.body);
 
-    if Option::is_some(&visitor.return_) && visitor.has_yield {
-        checker.diagnostics.push(Diagnostic::new(
-            ReturnXInGenerator,
-            visitor.return_.unwrap(),
-        ));
+    if visitor.has_yield {
+        if let Some(return_) = visitor.return_ {
+            checker
+                .diagnostics
+                .push(Diagnostic::new(ReturnXInGenerator, return_))
+        }
     }
 }
