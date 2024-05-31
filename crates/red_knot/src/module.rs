@@ -103,7 +103,8 @@ impl Module {
 
 /// A module name, e.g. `foo.bar`.
 ///
-/// Always normalized to the absolute form (never a relative module name).
+/// Always normalized to the absolute form
+/// (never a relative module name, i.e., never `.foo`).
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct ModuleName(smol_str::SmolStr);
 
@@ -313,7 +314,7 @@ pub fn resolve_module(db: &dyn SemanticDb, name: ModuleName) -> QueryResult<Opti
 
 /// Resolves the module for the given path.
 ///
-/// Returns `None` if the path is not a module in `sys.path`.
+/// Returns `None` if the path is not a module locatable via `sys.path`.
 #[tracing::instrument(level = "debug", skip(db))]
 pub fn path_to_module(db: &dyn SemanticDb, path: &Path) -> QueryResult<Option<Module>> {
     let file = db.file_id(path);
@@ -322,7 +323,7 @@ pub fn path_to_module(db: &dyn SemanticDb, path: &Path) -> QueryResult<Option<Mo
 
 /// Resolves the module for the file with the given id.
 ///
-/// Returns `None` if the file is not a module in `sys.path`.
+/// Returns `None` if the file is not a module locatable via `sys.path`.
 #[tracing::instrument(level = "debug", skip(db))]
 pub fn file_to_module(db: &dyn SemanticDb, file: FileId) -> QueryResult<Option<Module>> {
     let jar: &SemanticJar = db.jar()?;
@@ -349,7 +350,7 @@ pub fn file_to_module(db: &dyn SemanticDb, file: FileId) -> QueryResult<Option<M
 
     // Resolve the module name to see if Python would resolve the name to the same path.
     // If it doesn't, then that means that multiple modules have the same in different
-    // root paths, but that the module corresponding to the past path is in a lower priority path,
+    // root paths, but that the module corresponding to the past path is in a lower priority search path,
     // in which case we ignore it.
     let Some(module) = resolve_module(db, module_name)? else {
         return Ok(None);
@@ -398,8 +399,9 @@ pub fn set_module_search_paths(db: &mut dyn SemanticDb, search_paths: Vec<Module
 /// Returns `None` if the path doesn't resolve to a module.
 ///
 /// Returns `Some(module, other_modules)`, where `module` is the resolved module
-/// with file location `path`, and `other_modules` is a `Vec` of the modules that need re-resolving
-/// because they were part of a namespace package and might now resolve differently.
+/// with file location `path`, and `other_modules` is a `Vec` of `ModuleData` instances.
+/// Each element in `other_modules` provides information regarding a single module that needs
+/// re-resolving because it was part of a namespace package and might now resolve differently.
 ///
 /// Note: This won't work with salsa because `Path` is not an ingredient.
 pub fn add_module(db: &mut dyn SemanticDb, path: &Path) -> Option<(Module, Vec<Arc<ModuleData>>)> {
@@ -407,7 +409,7 @@ pub fn add_module(db: &mut dyn SemanticDb, path: &Path) -> Option<(Module, Vec<A
 
     // TODO This needs tests
 
-    // Note: Intentionally by-pass caching here. Module should not be in the cache yet.
+    // Note: Intentionally bypass caching here. Module should not be in the cache yet.
     let module = path_to_module(db, path).ok()??;
 
     // The code below is to handle the addition of `__init__.py` files.
