@@ -13,9 +13,9 @@ expression: fstring_single_quote_escape_eol(MAC_EOL)
         ),
     ),
     (
-        FStringMiddle {
-            value: "text \\\r more text",
-        },
+        FStringMiddle(
+            "text \\\r more text",
+        ),
         2..19,
         TokenFlags(
             F_STRING,

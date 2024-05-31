@@ -13,9 +13,9 @@ expression: lex_source(source)
         ),
     ),
     (
-        FStringMiddle {
-            value: "\\0",
-        },
+        FStringMiddle(
+            "\\0",
+        ),
         2..4,
         TokenFlags(
             F_STRING,

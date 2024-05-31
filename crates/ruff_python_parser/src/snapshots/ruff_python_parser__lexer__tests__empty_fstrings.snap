@@ -20,9 +20,9 @@ expression: lex_source(source)
         ),
     ),
     (
-        String {
-            value: "",
-        },
+        String(
+            "",
+        ),
         4..6,
         TokenFlags(
             DOUBLE_QUOTES,
@@ -57,9 +57,9 @@ expression: lex_source(source)
         ),
     ),
     (
-        String {
-            value: "",
-        },
+        String(
+            "",
+        ),
         15..17,
     ),
     (

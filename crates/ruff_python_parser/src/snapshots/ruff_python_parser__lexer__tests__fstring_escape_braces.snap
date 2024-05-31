@@ -13,9 +13,9 @@ expression: lex_source(source)
         ),
     ),
     (
-        FStringMiddle {
-            value: "\\",
-        },
+        FStringMiddle(
+            "\\",
+        ),
         2..3,
         TokenFlags(
             F_STRING,
@@ -26,9 +26,9 @@ expression: lex_source(source)
         3..4,
     ),
     (
-        Name {
-            name: "foo",
-        },
+        Name(
+            "foo",
+        ),
         4..7,
     ),
     (
@@ -50,9 +50,9 @@ expression: lex_source(source)
         ),
     ),
     (
-        FStringMiddle {
-            value: "\\\\",
-        },
+        FStringMiddle(
+            "\\\\",
+        ),
         12..14,
         TokenFlags(
             F_STRING,
@@ -63,9 +63,9 @@ expression: lex_source(source)
         14..15,
     ),
     (
-        Name {
-            name: "foo",
-        },
+        Name(
+            "foo",
+        ),
         15..18,
     ),
     (
@@ -87,9 +87,9 @@ expression: lex_source(source)
         ),
     ),
     (
-        FStringMiddle {
-            value: "\\{foo}",
-        },
+        FStringMiddle(
+            "\\{foo}",
+        ),
         23..31,
         TokenFlags(
             F_STRING,
@@ -110,9 +110,9 @@ expression: lex_source(source)
         ),
     ),
     (
-        FStringMiddle {
-            value: "\\\\{foo}",
-        },
+        FStringMiddle(
+            "\\\\{foo}",
+        ),
         35..44,
         TokenFlags(
             F_STRING,

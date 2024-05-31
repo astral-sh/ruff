@@ -14,9 +14,9 @@ expression: lex_source(source)
         1..2,
     ),
     (
-        String {
-            value: "a",
-        },
+        String(
+            "a",
+        ),
         6..9,
     ),
     (
@@ -24,9 +24,9 @@ expression: lex_source(source)
         9..10,
     ),
     (
-        String {
-            value: "b",
-        },
+        String(
+            "b",
+        ),
         14..17,
     ),
     (
@@ -38,15 +38,15 @@ expression: lex_source(source)
         18..19,
     ),
     (
-        String {
-            value: "c",
-        },
+        String(
+            "c",
+        ),
         23..26,
     ),
     (
-        String {
-            value: "d",
-        },
+        String(
+            "d",
+        ),
         33..36,
     ),
     (
