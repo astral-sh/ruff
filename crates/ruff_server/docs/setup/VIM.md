@@ -3,8 +3,8 @@
 ### Using `vim-lsp`
 
 1. Install [`vim-lsp`](https://github.com/prabirshrestha/vim-lsp).
-1. Setup `vim-lsp` [as desired](https://github.com/prabirshrestha/vim-lsp?tab=readme-ov-file#registering-servers).
-1. Finally, add this to your `.vimrc`:
+2. Setup `vim-lsp` [as desired](https://github.com/prabirshrestha/vim-lsp?tab=readme-ov-file#registering-servers).
+3. Finally, add this to your `.vimrc`:
 
 ```vim
 if executable('ruff')
