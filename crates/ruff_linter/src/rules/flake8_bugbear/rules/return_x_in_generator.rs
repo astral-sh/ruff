@@ -43,13 +43,17 @@ impl Violation for ReturnXInGenerator {
 struct ReturnXInGeneratorVisitor {
     return_: Option<TextRange>,
     has_yield: bool,
-
-    in_expr_statement: bool,
 }
 
 impl Visitor<'_> for ReturnXInGeneratorVisitor {
     fn visit_stmt(&mut self, stmt: &Stmt) {
         match stmt {
+            Stmt::Expr(ast::StmtExpr { value, .. }) => match **value {
+                Expr::Yield(_) | Expr::YieldFrom(_) => {
+                    self.has_yield = true;
+                }
+                _ => {}
+            },
             Stmt::FunctionDef(_) => {
                 // do not recurse into nested functions, as they are evaluated
                 // individually
@@ -59,22 +63,7 @@ impl Visitor<'_> for ReturnXInGeneratorVisitor {
                     self.return_ = Some(*range);
                 }
             }
-            _ => {
-                self.in_expr_statement = stmt.is_expr_stmt();
-                visitor::walk_stmt(self, stmt);
-            }
-        }
-    }
-
-    fn visit_expr(&mut self, expr: &Expr) {
-        if !self.in_expr_statement {
-            return;
-        }
-        match expr {
-            Expr::Yield(_) | Expr::YieldFrom(_) => {
-                self.has_yield = true;
-            }
-            _ => {}
+            _ => visitor::walk_stmt(self, stmt),
         }
     }
 }
@@ -92,7 +81,7 @@ pub(crate) fn return_x_in_generator(checker: &mut Checker, function_def: &StmtFu
         if let Some(return_) = visitor.return_ {
             checker
                 .diagnostics
-                .push(Diagnostic::new(ReturnXInGenerator, return_))
+                .push(Diagnostic::new(ReturnXInGenerator, return_));
         }
     }
 }
