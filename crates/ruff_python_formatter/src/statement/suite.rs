@@ -240,7 +240,8 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                                     preceding_stub.end(),
                                     f.context().source(),
                                 ) < 2
-                            });
+                            })
+                        && !preceding_comments.has_trailing_own_line();
 
                     if !is_preceding_stub_function_without_empty_line {
                         match self.kind {
