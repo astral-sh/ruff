@@ -106,7 +106,13 @@ fn detect_indention(tokens: &[LexResult], locator: &Locator) -> Indentation {
                 }
                 TokenKind::NonLogicalNewline => {
                     let line = locator.line(range.end());
-                    let indent_index = line.chars().position(|c| !c.is_whitespace());
+                    let indent_index = line.char_indices().find_map(|(i, c)| {
+                        if c.is_whitespace() {
+                            None
+                        } else {
+                            Some(i)
+                        }
+                    });
                     if let Some(indent_index) = indent_index {
                         if indent_index > 0 {
                             let whitespace = &line[..indent_index];
@@ -221,6 +227,20 @@ x = (
         assert_eq!(
             Stylist::from_tokens(&tokens, &locator).indentation(),
             &Indentation("  ".to_string())
+        );
+
+        let contents = r"
+x = (
+ 1,
+ 2,
+ 3,
+)
+";
+        let locator = Locator::new(contents);
+        let tokens: Vec<_> = lex(contents, Mode::Module).collect();
+        assert_eq!(
+            Stylist::from_tokens(&tokens, &locator).indentation(),
+            &Indentation(" ".to_string())
         );
 
         // formfeed indent, see `detect_indention` comment.
