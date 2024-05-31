@@ -30,22 +30,40 @@ use crate::checkers::ast::Checker;
 ///     yield 1
 /// ```
 #[violation]
-pub struct ReturnXInGenerator;
+pub struct ReturnInGenerator;
 
-impl Violation for ReturnXInGenerator {
+impl Violation for ReturnInGenerator {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Using `yield` together with `return x`. Use native `async def` coroutines or put a `# noqa` comment on this line if this was intentional.")
+        format!("Using `yield` together with `return`. Use native `async def` coroutines or put a `# noqa` comment on this line if this was intentional.")
+    }
+}
+
+/// B901
+pub(crate) fn return_in_generator(checker: &mut Checker, function_def: &StmtFunctionDef) {
+    if function_def.name.id == "__await__" {
+        return;
+    }
+
+    let mut visitor = ReturnInGeneratorVisitor::default();
+    visitor.visit_body(&function_def.body);
+
+    if visitor.has_yield {
+        if let Some(return_) = visitor.return_ {
+            checker
+                .diagnostics
+                .push(Diagnostic::new(ReturnInGenerator, return_));
+        }
     }
 }
 
 #[derive(Default)]
-struct ReturnXInGeneratorVisitor {
+struct ReturnInGeneratorVisitor {
     return_: Option<TextRange>,
     has_yield: bool,
 }
 
-impl Visitor<'_> for ReturnXInGeneratorVisitor {
+impl Visitor<'_> for ReturnInGeneratorVisitor {
     fn visit_stmt(&mut self, stmt: &Stmt) {
         match stmt {
             Stmt::Expr(ast::StmtExpr { value, .. }) => match **value {
@@ -64,24 +82,6 @@ impl Visitor<'_> for ReturnXInGeneratorVisitor {
                 }
             }
             _ => visitor::walk_stmt(self, stmt),
-        }
-    }
-}
-
-/// B901
-pub(crate) fn return_x_in_generator(checker: &mut Checker, function_def: &StmtFunctionDef) {
-    if function_def.name.id == "__await__" {
-        return;
-    }
-
-    let mut visitor = ReturnXInGeneratorVisitor::default();
-    visitor.visit_body(&function_def.body);
-
-    if visitor.has_yield {
-        if let Some(return_) = visitor.return_ {
-            checker
-                .diagnostics
-                .push(Diagnostic::new(ReturnXInGenerator, return_));
         }
     }
 }

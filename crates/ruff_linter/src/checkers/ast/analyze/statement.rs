@@ -207,8 +207,8 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::MutableArgumentDefault) {
                 flake8_bugbear::rules::mutable_argument_default(checker, function_def);
             }
-            if checker.enabled(Rule::ReturnXInGenerator) {
-                flake8_bugbear::rules::return_x_in_generator(checker, function_def);
+            if checker.enabled(Rule::ReturnInGenerator) {
+                flake8_bugbear::rules::return_in_generator(checker, function_def);
             }
             if checker.any_enabled(&[
                 Rule::UnnecessaryReturnNone,
