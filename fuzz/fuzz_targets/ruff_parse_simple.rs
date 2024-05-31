@@ -16,8 +16,8 @@ fn do_fuzz(case: &[u8]) -> Corpus {
 
     // just round-trip it once to trigger both parse and unparse
     let locator = Locator::new(code);
-    let program = match parse_module(code) {
-        Ok(program) => program,
+    let parsed = match parse_module(code) {
+        Ok(parsed) => parsed,
         Err(ParseError { location, .. }) => {
             let offset = location.start().to_usize();
             assert!(
@@ -29,7 +29,7 @@ fn do_fuzz(case: &[u8]) -> Corpus {
         }
     };
 
-    for token in program.tokens() {
+    for token in parsed.tokens() {
         let start = token.start().to_usize();
         let end = token.end().to_usize();
         assert!(
@@ -44,9 +44,9 @@ fn do_fuzz(case: &[u8]) -> Corpus {
         );
     }
 
-    let stylist = Stylist::from_tokens(program.tokens(), &locator);
+    let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
     let mut generator: Generator = (&stylist).into();
-    generator.unparse_suite(program.suite());
+    generator.unparse_suite(parsed.suite());
 
     Corpus::Keep
 }

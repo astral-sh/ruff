@@ -51,13 +51,13 @@ fn benchmark_formatter(criterion: &mut Criterion) {
             &case,
             |b, case| {
                 // Parse the source.
-                let program =
+                let parsed =
                     parse(case.code(), Mode::Module).expect("Input should be a valid Python code");
 
                 b.iter(|| {
                     let options = PyFormatOptions::from_extension(Path::new(case.name()))
                         .with_preview(PreviewMode::Enabled);
-                    let formatted = format_module_ast(&program, case.code(), options)
+                    let formatted = format_module_ast(&parsed, case.code(), options)
                         .expect("Formatting to succeed");
 
                     formatted.print().expect("Printing to succeed")

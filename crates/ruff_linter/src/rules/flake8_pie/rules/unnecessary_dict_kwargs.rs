@@ -129,7 +129,7 @@ pub(crate) fn unnecessary_dict_kwargs(checker: &mut Checker, call: &ast::ExprCal
                                         parenthesized_range(
                                             value.into(),
                                             dict.into(),
-                                            checker.program().comment_ranges(),
+                                            checker.parsed().comment_ranges(),
                                             checker.locator().contents(),
                                         )
                                         .unwrap_or(value.range())

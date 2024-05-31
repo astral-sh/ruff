@@ -664,9 +664,9 @@ x = 1 \
     fn add_to_dunder_all_test(raw: &str, names: &[&str], expect: &str) -> Result<()> {
         let locator = Locator::new(raw);
         let edits = {
-            let program = parse_expression(raw)?;
-            let stylist = Stylist::from_tokens(program.tokens(), &locator);
-            add_to_dunder_all(names.iter().copied(), program.expr(), &stylist)
+            let parsed = parse_expression(raw)?;
+            let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
+            add_to_dunder_all(names.iter().copied(), parsed.expr(), &stylist)
         };
         let diag = {
             use crate::rules::pycodestyle::rules::MissingNewlineAtEndOfFile;

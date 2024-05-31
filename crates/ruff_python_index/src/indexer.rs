@@ -218,9 +218,9 @@ mod tests {
     use crate::Indexer;
 
     fn new_indexer(contents: &str) -> Indexer {
-        let program = parse_module(contents).unwrap();
+        let parsed = parse_module(contents).unwrap();
         let locator = Locator::new(contents);
-        Indexer::from_tokens(program.tokens(), &locator)
+        Indexer::from_tokens(parsed.tokens(), &locator)
     }
 
     #[test]

@@ -36,15 +36,15 @@ fn inline_err() {
 /// Snapshots the AST.
 fn test_valid_syntax(input_path: &Path) {
     let source = fs::read_to_string(input_path).expect("Expected test file to exist");
-    let program = parse_unchecked(&source, Mode::Module);
+    let parsed = parse_unchecked(&source, Mode::Module);
 
-    if !program.is_valid() {
+    if !parsed.is_valid() {
         let line_index = LineIndex::from_source_text(&source);
         let source_code = SourceCode::new(&source, &line_index);
 
         let mut message = "Expected no syntax errors for a valid program but the parser generated the following errors:\n".to_string();
 
-        for error in program.errors() {
+        for error in parsed.errors() {
             writeln!(
                 &mut message,
                 "{}\n",
@@ -60,11 +60,11 @@ fn test_valid_syntax(input_path: &Path) {
         panic!("{input_path:?}: {message}");
     }
 
-    validate_ast(program.syntax(), source.text_len(), input_path);
+    validate_ast(parsed.syntax(), source.text_len(), input_path);
 
     let mut output = String::new();
     writeln!(&mut output, "## AST").unwrap();
-    writeln!(&mut output, "\n```\n{:#?}\n```", program.syntax()).unwrap();
+    writeln!(&mut output, "\n```\n{:#?}\n```", parsed.syntax()).unwrap();
 
     insta::with_settings!({
         omit_expression => true,
@@ -79,25 +79,25 @@ fn test_valid_syntax(input_path: &Path) {
 /// Snapshots the AST and the error messages.
 fn test_invalid_syntax(input_path: &Path) {
     let source = fs::read_to_string(input_path).expect("Expected test file to exist");
-    let program = parse_unchecked(&source, Mode::Module);
+    let parsed = parse_unchecked(&source, Mode::Module);
 
     assert!(
-        !program.is_valid(),
+        !parsed.is_valid(),
         "{input_path:?}: Expected parser to generate at least one syntax error for a program containing syntax errors."
     );
 
-    validate_ast(program.syntax(), source.text_len(), input_path);
+    validate_ast(parsed.syntax(), source.text_len(), input_path);
 
     let mut output = String::new();
     writeln!(&mut output, "## AST").unwrap();
-    writeln!(&mut output, "\n```\n{:#?}\n```", program.syntax()).unwrap();
+    writeln!(&mut output, "\n```\n{:#?}\n```", parsed.syntax()).unwrap();
 
     writeln!(&mut output, "## Errors\n").unwrap();
 
     let line_index = LineIndex::from_source_text(&source);
     let source_code = SourceCode::new(&source, &line_index);
 
-    for error in program.errors() {
+    for error in parsed.errors() {
         writeln!(
             &mut output,
             "{}\n",
@@ -130,18 +130,18 @@ def foo()
     pass
 ";
 
-    let program = parse_unchecked(source, Mode::Module);
+    let parsed = parse_unchecked(source, Mode::Module);
 
-    println!("AST:\n----\n{:#?}", program.syntax());
-    println!("Tokens:\n-------\n{:#?}", program.tokens());
+    println!("AST:\n----\n{:#?}", parsed.syntax());
+    println!("Tokens:\n-------\n{:#?}", parsed.tokens());
 
-    if !program.is_valid() {
+    if !parsed.is_valid() {
         println!("Errors:\n-------");
 
         let line_index = LineIndex::from_source_text(source);
         let source_code = SourceCode::new(source, &line_index);
 
-        for error in program.errors() {
+        for error in parsed.errors() {
             // Sometimes the code frame doesn't show the error message, so we print
             // the message as well.
             println!("Syntax Error: {error}");

@@ -77,13 +77,13 @@ pub(crate) fn if_exp_instead_of_or_operator(checker: &mut Checker, if_expr: &ast
                 parenthesize_test(
                     test,
                     if_expr,
-                    checker.program().comment_ranges(),
+                    checker.parsed().comment_ranges(),
                     checker.locator()
                 ),
                 parenthesize_test(
                     orelse,
                     if_expr,
-                    checker.program().comment_ranges(),
+                    checker.parsed().comment_ranges(),
                     checker.locator()
                 ),
             ),

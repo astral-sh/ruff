@@ -22,8 +22,8 @@ impl TokenizationTestCase {
     }
 
     fn tokenize_reverse(&self) -> Vec<SimpleToken> {
-        let program = parse_unchecked(self.source, Mode::Module);
-        BackwardsTokenizer::new(self.source, self.range, program.comment_ranges()).collect()
+        let parsed = parse_unchecked(self.source, Mode::Module);
+        BackwardsTokenizer::new(self.source, self.range, parsed.comment_ranges()).collect()
     }
 
     fn tokens(&self) -> &[SimpleToken] {

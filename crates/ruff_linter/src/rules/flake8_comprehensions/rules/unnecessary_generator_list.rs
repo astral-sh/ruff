@@ -139,7 +139,7 @@ pub(crate) fn unnecessary_generator_list(checker: &mut Checker, call: &ast::Expr
             let range = parenthesized_range(
                 argument.into(),
                 (&call.arguments).into(),
-                checker.program().comment_ranges(),
+                checker.parsed().comment_ranges(),
                 checker.locator().contents(),
             )
             .unwrap_or(argument.range());

@@ -726,10 +726,7 @@ struct FormatVerbatimStatementRange {
 impl Format<PyFormatContext<'_>> for FormatVerbatimStatementRange {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
         let logical_lines = LogicalLinesIter::new(
-            f.context()
-                .tokens()
-                .tokens_in_range(self.verbatim_range)
-                .iter(),
+            f.context().tokens().in_range(self.verbatim_range).iter(),
             self.verbatim_range,
         );
         let mut first = true;

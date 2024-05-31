@@ -52,7 +52,7 @@ fn benchmark_lexer(criterion: &mut Criterion<WallTime>) {
                         let token = lexer.next_token();
                         match token {
                             TokenKind::EndOfFile => break,
-                            TokenKind::Unknown => panic!("Input to be a valid Python program"),
+                            TokenKind::Unknown => panic!("Input to be a valid Python source code"),
                             _ => {}
                         }
                     }

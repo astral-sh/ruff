@@ -171,8 +171,8 @@ mod tests {
     fn indentation() {
         let contents = r"x = 1";
         let locator = Locator::new(contents);
-        let program = parse_module(contents).unwrap();
-        let stylist = Stylist::from_tokens(program.tokens(), &locator);
+        let parsed = parse_module(contents).unwrap();
+        let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
         assert_eq!(stylist.indentation(), &Indentation::default());
 
         let contents = r"
@@ -180,8 +180,8 @@ if True:
   pass
 ";
         let locator = Locator::new(contents);
-        let program = parse_module(contents).unwrap();
-        let stylist = Stylist::from_tokens(program.tokens(), &locator);
+        let parsed = parse_module(contents).unwrap();
+        let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
         assert_eq!(stylist.indentation(), &Indentation("  ".to_string()));
 
         let contents = r"
@@ -189,8 +189,8 @@ if True:
     pass
 ";
         let locator = Locator::new(contents);
-        let program = parse_module(contents).unwrap();
-        let stylist = Stylist::from_tokens(program.tokens(), &locator);
+        let parsed = parse_module(contents).unwrap();
+        let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
         assert_eq!(stylist.indentation(), &Indentation("    ".to_string()));
 
         let contents = r"
@@ -198,8 +198,8 @@ if True:
 	pass
 ";
         let locator = Locator::new(contents);
-        let program = parse_module(contents).unwrap();
-        let stylist = Stylist::from_tokens(program.tokens(), &locator);
+        let parsed = parse_module(contents).unwrap();
+        let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
         assert_eq!(stylist.indentation(), &Indentation("\t".to_string()));
 
         let contents = r"
@@ -210,8 +210,8 @@ x = (
 )
 ";
         let locator = Locator::new(contents);
-        let program = parse_module(contents).unwrap();
-        let stylist = Stylist::from_tokens(program.tokens(), &locator);
+        let parsed = parse_module(contents).unwrap();
+        let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
         assert_eq!(stylist.indentation(), &Indentation("  ".to_string()));
 
         let contents = r"
@@ -235,8 +235,8 @@ class FormFeedIndent:
         print(a)
 ";
         let locator = Locator::new(contents);
-        let program = parse_module(contents).unwrap();
-        let stylist = Stylist::from_tokens(program.tokens(), &locator);
+        let parsed = parse_module(contents).unwrap();
+        let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
         assert_eq!(stylist.indentation(), &Indentation(" ".to_string()));
     }
 
@@ -244,38 +244,38 @@ class FormFeedIndent:
     fn quote() {
         let contents = r"x = 1";
         let locator = Locator::new(contents);
-        let program = parse_module(contents).unwrap();
-        let stylist = Stylist::from_tokens(program.tokens(), &locator);
+        let parsed = parse_module(contents).unwrap();
+        let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
         assert_eq!(stylist.quote(), Quote::default());
 
         let contents = r"x = '1'";
         let locator = Locator::new(contents);
-        let program = parse_module(contents).unwrap();
-        let stylist = Stylist::from_tokens(program.tokens(), &locator);
+        let parsed = parse_module(contents).unwrap();
+        let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
         assert_eq!(stylist.quote(), Quote::Single);
 
         let contents = r"x = f'1'";
         let locator = Locator::new(contents);
-        let program = parse_module(contents).unwrap();
-        let stylist = Stylist::from_tokens(program.tokens(), &locator);
+        let parsed = parse_module(contents).unwrap();
+        let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
         assert_eq!(stylist.quote(), Quote::Single);
 
         let contents = r#"x = "1""#;
         let locator = Locator::new(contents);
-        let program = parse_module(contents).unwrap();
-        let stylist = Stylist::from_tokens(program.tokens(), &locator);
+        let parsed = parse_module(contents).unwrap();
+        let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
         assert_eq!(stylist.quote(), Quote::Double);
 
         let contents = r#"x = f"1""#;
         let locator = Locator::new(contents);
-        let program = parse_module(contents).unwrap();
-        let stylist = Stylist::from_tokens(program.tokens(), &locator);
+        let parsed = parse_module(contents).unwrap();
+        let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
         assert_eq!(stylist.quote(), Quote::Double);
 
         let contents = r#"s = "It's done.""#;
         let locator = Locator::new(contents);
-        let program = parse_module(contents).unwrap();
-        let stylist = Stylist::from_tokens(program.tokens(), &locator);
+        let parsed = parse_module(contents).unwrap();
+        let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
         assert_eq!(stylist.quote(), Quote::Double);
 
         // No style if only double quoted docstring (will take default Double)
@@ -285,8 +285,8 @@ def f():
     pass
 "#;
         let locator = Locator::new(contents);
-        let program = parse_module(contents).unwrap();
-        let stylist = Stylist::from_tokens(program.tokens(), &locator);
+        let parsed = parse_module(contents).unwrap();
+        let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
         assert_eq!(stylist.quote(), Quote::default());
 
         // Detect from string literal appearing after docstring
@@ -296,8 +296,8 @@ def f():
 a = 'v'
 "#;
         let locator = Locator::new(contents);
-        let program = parse_module(contents).unwrap();
-        let stylist = Stylist::from_tokens(program.tokens(), &locator);
+        let parsed = parse_module(contents).unwrap();
+        let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
         assert_eq!(stylist.quote(), Quote::Single);
 
         let contents = r#"
@@ -306,8 +306,8 @@ a = 'v'
 a = "v"
 "#;
         let locator = Locator::new(contents);
-        let program = parse_module(contents).unwrap();
-        let stylist = Stylist::from_tokens(program.tokens(), &locator);
+        let parsed = parse_module(contents).unwrap();
+        let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
         assert_eq!(stylist.quote(), Quote::Double);
 
         // Detect from f-string appearing after docstring
@@ -317,8 +317,8 @@ a = "v"
 a = f'v'
 "#;
         let locator = Locator::new(contents);
-        let program = parse_module(contents).unwrap();
-        let stylist = Stylist::from_tokens(program.tokens(), &locator);
+        let parsed = parse_module(contents).unwrap();
+        let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
         assert_eq!(stylist.quote(), Quote::Single);
 
         let contents = r#"
@@ -327,16 +327,16 @@ a = f'v'
 a = f"v"
 "#;
         let locator = Locator::new(contents);
-        let program = parse_module(contents).unwrap();
-        let stylist = Stylist::from_tokens(program.tokens(), &locator);
+        let parsed = parse_module(contents).unwrap();
+        let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
         assert_eq!(stylist.quote(), Quote::Double);
 
         let contents = r"
 f'''Module docstring.'''
 ";
         let locator = Locator::new(contents);
-        let program = parse_module(contents).unwrap();
-        let stylist = Stylist::from_tokens(program.tokens(), &locator);
+        let parsed = parse_module(contents).unwrap();
+        let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
         assert_eq!(stylist.quote(), Quote::Single);
     }
 

@@ -450,10 +450,10 @@ mod tests {
     #[test]
     fn test_has_parentheses() {
         let expression = r#"(b().c("")).d()"#;
-        let program = parse_expression(expression).unwrap();
+        let parsed = parse_expression(expression).unwrap();
         assert!(!is_expression_parenthesized(
-            ExpressionRef::from(program.expr()),
-            program.comment_ranges(),
+            ExpressionRef::from(parsed.expr()),
+            parsed.comment_ranges(),
             expression
         ));
     }

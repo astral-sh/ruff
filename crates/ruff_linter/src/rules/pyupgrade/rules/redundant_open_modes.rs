@@ -79,7 +79,7 @@ pub(crate) fn redundant_open_modes(checker: &mut Checker, call: &ast::ExprCall) 
                                 call,
                                 &keyword.value,
                                 mode.replacement_value(),
-                                checker.program().tokens(),
+                                checker.parsed().tokens(),
                             ));
                         }
                     }
@@ -93,7 +93,7 @@ pub(crate) fn redundant_open_modes(checker: &mut Checker, call: &ast::ExprCall) 
                         call,
                         mode_param,
                         mode.replacement_value(),
-                        checker.program().tokens(),
+                        checker.parsed().tokens(),
                     ));
                 }
             }
@@ -181,7 +181,7 @@ fn create_remove_param_fix(
     let mut is_first_arg: bool = false;
     let mut delete_first_arg: bool = false;
 
-    for token in tokens.tokens_in_range(call.range()) {
+    for token in tokens.in_range(call.range()) {
         if token.start() == mode_param.start() {
             if is_first_arg {
                 delete_first_arg = true;
