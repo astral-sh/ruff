@@ -65,7 +65,9 @@ impl<'src> TokenSource<'src> {
 
     /// Returns the next non-trivia token without consuming it.
     ///
-    /// Use [`TokenSource::peek2`] to get the next two tokens.
+    /// Use [`peek2`] to get the next two tokens.
+    ///
+    /// [`peek2`]: TokenSource::peek2
     pub(crate) fn peek(&mut self) -> TokenKind {
         let checkpoint = self.lexer.checkpoint();
         let next = self.next_non_trivia_token();
@@ -75,7 +77,9 @@ impl<'src> TokenSource<'src> {
 
     /// Returns the next two non-trivia tokens without consuming it.
     ///
-    /// Use [`TokenSource::peek`] to only get the next token.
+    /// Use [`peek`] to only get the next token.
+    ///
+    /// [`peek`]: TokenSource::peek
     pub(crate) fn peek2(&mut self) -> (TokenKind, TokenKind) {
         let checkpoint = self.lexer.checkpoint();
         let first = self.next_non_trivia_token();
@@ -137,8 +141,9 @@ impl<'src> TokenSource<'src> {
         self.comments.truncate(checkpoint.comments_position);
     }
 
-    /// Consumes the token source, returning the collected tokens and any errors encountered during
-    /// lexing. The token collection includes both the trivia and non-trivia tokens.
+    /// Consumes the token source, returning the collected tokens, comment ranges, and any errors
+    /// encountered during lexing. The token collection includes both the trivia and non-trivia
+    /// tokens.
     pub(crate) fn finish(mut self) -> (Vec<Token>, CommentRanges, Vec<LexicalError>) {
         assert_eq!(
             self.current_kind(),
