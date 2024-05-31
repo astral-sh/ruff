@@ -13,10 +13,15 @@ use crate::symbols::Dependency;
 use crate::FxDashMap;
 
 /// ID uniquely identifying a module.
+///
+/// The advantage of using this newtype to identify modules over using paths
+/// is that instances are cheap and easily copied, avoiding many potential
+/// problems that could be caused by lifetimes.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub struct Module(u32);
 
 impl Module {
+    /// Return the absolute name of the module (e.g. `foo.bar`)
     pub fn name(&self, db: &dyn SemanticDb) -> QueryResult<ModuleName> {
         let jar: &SemanticJar = db.jar()?;
         let modules = &jar.module_resolver;
@@ -24,6 +29,7 @@ impl Module {
         Ok(modules.modules.get(self).unwrap().name.clone())
     }
 
+    /// Return the path to the source code that defines this module
     pub fn path(&self, db: &dyn SemanticDb) -> QueryResult<ModulePath> {
         let jar: &SemanticJar = db.jar()?;
         let modules = &jar.module_resolver;
@@ -31,6 +37,7 @@ impl Module {
         Ok(modules.modules.get(self).unwrap().path.clone())
     }
 
+    /// Determine whether this module is a single-file module or a package
     pub fn kind(&self, db: &dyn SemanticDb) -> QueryResult<ModuleKind> {
         let jar: &SemanticJar = db.jar()?;
         let modules = &jar.module_resolver;
@@ -38,6 +45,16 @@ impl Module {
         Ok(modules.modules.get(self).unwrap().kind)
     }
 
+    /// Attempt to resolve a [`Dependency`] of this module to an absolute [`ModuleName`].
+    ///
+    /// A dependency could be either absolute (e.g. the `foo` dependency implied by `from foo import bar`)
+    /// or relative to this module (e.g. the `.foo` dependency implied by `from .foo import bar`)
+    ///
+    /// - Returns an error if the query failed.
+    /// - Returns `Ok(None)` if the query succeeded,
+    ///   but the dependency refers to a module that does not exist.
+    /// - Returns `Ok(Some(ModuleName))` if the query succeeded,
+    ///   and the dependency refers to a module that exists.
     pub fn resolve_dependency(
         &self,
         db: &dyn SemanticDb,
@@ -124,10 +141,13 @@ impl ModuleName {
         Some(Self(name))
     }
 
+    /// An iterator over the components of the module name:
+    /// `foo.bar.baz` -> `foo`, `bar`, `baz`
     pub fn components(&self) -> impl DoubleEndedIterator<Item = &str> {
         self.0.split('.')
     }
 
+    /// The name of this module's immediate parent, if it has a parent
     pub fn parent(&self) -> Option<ModuleName> {
         let (_, parent) = self.0.rsplit_once('.')?;
 
@@ -159,9 +179,10 @@ impl std::fmt::Display for ModuleName {
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub enum ModuleKind {
+    /// A single-file module (e.g. `foo.py` or `foo.pyi`)
     Module,
 
-    /// A python package (a `__init__.py` or `__init__.pyi` file)
+    /// A python package (`foo/__init__.py` or `foo/__init__.pyi`)
     Package,
 }
 
@@ -181,10 +202,12 @@ impl ModuleSearchPath {
         }
     }
 
+    /// Determine whether this is a first-party, third-party or standard-library search path
     pub fn kind(&self) -> ModuleSearchPathKind {
         self.inner.kind
     }
 
+    /// Return the location of the search path on the file system
     pub fn path(&self) -> &Path {
         &self.inner.path
     }
@@ -459,6 +482,7 @@ impl ModuleResolver {
         }
     }
 
+    /// Remove a module from the inner cache
     pub(crate) fn remove_module(&mut self, file_id: FileId) {
         // No locking is required because we're holding a mutable reference to `self`.
         let Some((_, id)) = self.by_file.remove(&file_id) else {
@@ -505,15 +529,19 @@ impl ModulePath {
         Self { root, file_id }
     }
 
+    /// The search path that was used to locate the module
     pub fn root(&self) -> &ModuleSearchPath {
         &self.root
     }
 
+    /// The file containing the source code for the module
     pub fn file(&self) -> FileId {
         self.file_id
     }
 }
 
+/// Given a module name and a list of search paths in which to lookup modules,
+/// attempt to resolve the module name
 fn resolve_name(
     name: &ModuleName,
     search_paths: &[ModuleSearchPath],
@@ -635,7 +663,9 @@ enum PackageKind {
     /// A root package or module. E.g. `foo` in `foo.bar.baz` or just `foo`.
     Root,
 
-    /// A regular sub-package where the parent contains an `__init__.py`. For example `bar` in `foo.bar` when the `foo` directory contains an `__init__.py`.
+    /// A regular sub-package where the parent contains an `__init__.py`.
+    ///
+    /// For example, `bar` in `foo.bar` when the `foo` directory contains an `__init__.py`.
     Regular,
 
     /// A sub-package in a namespace package. A namespace package is a package without an `__init__.py`.
