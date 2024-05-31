@@ -152,7 +152,7 @@ impl FormatNodeRule<StmtClassDef> for FormatStmtClassDef {
         //
         // # comment
         // ```
-        empty_lines_before_trailing_comments(f, comments.trailing(item), NodeKind::StmtClassDef)
+        empty_lines_before_trailing_comments(comments.trailing(item), NodeKind::StmtClassDef)
             .fmt(f)?;
 
         Ok(())

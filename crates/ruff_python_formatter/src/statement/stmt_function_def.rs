@@ -86,7 +86,7 @@ impl FormatNodeRule<StmtFunctionDef> for FormatStmtFunctionDef {
         //
         // # comment
         // ```
-        empty_lines_before_trailing_comments(f, comments.trailing(item), NodeKind::StmtFunctionDef)
+        empty_lines_before_trailing_comments(comments.trailing(item), NodeKind::StmtFunctionDef)
             .fmt(f)
     }
 }
