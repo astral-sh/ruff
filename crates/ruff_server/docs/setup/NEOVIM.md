@@ -19,7 +19,8 @@ on how to configure the server from there.
 
 #### Tips
 
-If you're using Ruff alongside another LSP (like Pyright), you may want to defer to that LSP for certain capabilities, like `textDocument/hover`:
+If you're using Ruff alongside another LSP (like Pyright), you may want to defer to that LSP for certain capabilities,
+like `textDocument/hover`:
 
 ```lua
 local on_attach = function(client, bufnr)
@@ -34,7 +35,8 @@ require('lspconfig').ruff.setup {
 }
 ```
 
-If you'd like to use Ruff exclusively for linting, formatting, and import organization, you can disable those capabilities for Pyright:
+If you'd like to use Ruff exclusively for linting, formatting, and import organization, you can disable those
+capabilities for Pyright:
 
 ```lua
 require('lspconfig').pyright.setup {

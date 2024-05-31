@@ -2,7 +2,7 @@
 
 1. Activate the [LSP Client plugin](https://docs.kde.org/stable5/en/kate/kate/plugins.html#kate-application-plugins).
 1. Setup LSP Client [as desired](https://docs.kde.org/stable5/en/kate/kate/kate-application-plugin-lspclient.html).
-1. Finally, add this to Settings -> Configure Kate -> LSP Client -> User Server Settings:
+1. Finally, add this to `Settings` -> `Configure Kate` -> `LSP Client` -> `User Server Settings`:
 
 ```json
 {
