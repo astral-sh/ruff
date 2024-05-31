@@ -23,3 +23,6 @@ def foo(self) -> None:
     ... # comment 5
 def baz(self) -> None:
     return None
+
+def foo(self) -> None: ...
+# comment 5
