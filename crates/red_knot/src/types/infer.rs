@@ -16,12 +16,12 @@ use crate::{FileId, Name};
 
 // FIXME: Figure out proper dead-lock free synchronisation now that this takes `&db` instead of `&mut db`.
 #[tracing::instrument(level = "trace", skip(db))]
-pub fn infer_symbol_type(db: &dyn SemanticDb, symbol: GlobalSymbolId) -> QueryResult<Type> {
+pub fn infer_symbol_public_type(db: &dyn SemanticDb, symbol: GlobalSymbolId) -> QueryResult<Type> {
     let symbols = symbol_table(db, symbol.file_id)?;
     let defs = symbols.definitions(symbol.symbol_id);
     let jar: &SemanticJar = db.jar()?;
 
-    if let Some(ty) = jar.type_store.get_cached_symbol_type(symbol) {
+    if let Some(ty) = jar.type_store.get_cached_symbol_public_type(symbol) {
         return Ok(ty);
     }
 
@@ -30,7 +30,7 @@ pub fn infer_symbol_type(db: &dyn SemanticDb, symbol: GlobalSymbolId) -> QueryRe
 
     let ty = infer_definition_type(db, symbol, defs[0].clone())?;
 
-    jar.type_store.cache_symbol_type(symbol, ty);
+    jar.type_store.cache_symbol_public_type(symbol, ty);
 
     // TODO record dependencies
     Ok(ty)
@@ -65,7 +65,7 @@ pub fn infer_definition_type(
             assert!(matches!(level, 0));
             let module_name = ModuleName::new(module.as_ref().expect("TODO relative imports"));
             if let Some(remote_symbol) = resolve_global_symbol(db, module_name, &name)? {
-                infer_symbol_type(db, remote_symbol)
+                infer_symbol_public_type(db, remote_symbol)
             } else {
                 Ok(Type::Unknown)
             }
@@ -158,7 +158,7 @@ fn infer_expr_type(db: &dyn SemanticDb, file_id: FileId, expr: &ast::Expr) -> Qu
         ast::Expr::Name(name) => {
             // TODO look up in the correct scope, don't assume global
             if let Some(symbol_id) = symbols.root_symbol_id_by_name(&name.id) {
-                infer_symbol_type(db, GlobalSymbolId { file_id, symbol_id })
+                infer_symbol_public_type(db, GlobalSymbolId { file_id, symbol_id })
             } else {
                 Ok(Type::Unknown)
             }
@@ -182,7 +182,7 @@ mod tests {
         resolve_module, set_module_search_paths, ModuleName, ModuleSearchPath, ModuleSearchPathKind,
     };
     use crate::symbols::{symbol_table, GlobalSymbolId};
-    use crate::types::{infer_symbol_type, Type};
+    use crate::types::{infer_symbol_public_type, Type};
     use crate::Name;
 
     // TODO with virtual filesystem we shouldn't have to write files to disk for these
@@ -228,7 +228,7 @@ mod tests {
             .root_symbol_id_by_name("E")
             .expect("E symbol should be found");
 
-        let ty = infer_symbol_type(
+        let ty = infer_symbol_public_type(
             db,
             GlobalSymbolId {
                 file_id: a_file,
@@ -259,7 +259,7 @@ mod tests {
             .root_symbol_id_by_name("Sub")
             .expect("Sub symbol should be found");
 
-        let ty = infer_symbol_type(
+        let ty = infer_symbol_public_type(
             db,
             GlobalSymbolId {
                 file_id: file,
@@ -300,7 +300,7 @@ mod tests {
             .root_symbol_id_by_name("C")
             .expect("C symbol should be found");
 
-        let ty = infer_symbol_type(
+        let ty = infer_symbol_public_type(
             db,
             GlobalSymbolId {
                 file_id: file,
@@ -345,7 +345,7 @@ mod tests {
             .root_symbol_id_by_name("D")
             .expect("D symbol should be found");
 
-        let ty = infer_symbol_type(
+        let ty = infer_symbol_public_type(
             db,
             GlobalSymbolId {
                 file_id: a_file,
@@ -375,7 +375,7 @@ mod tests {
             .root_symbol_id_by_name("x")
             .expect("x symbol should be found");
 
-        let ty = infer_symbol_type(
+        let ty = infer_symbol_public_type(
             db,
             GlobalSymbolId {
                 file_id: file,

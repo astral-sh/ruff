@@ -12,7 +12,7 @@ use rustc_hash::FxHashMap;
 
 pub(crate) mod infer;
 
-pub(crate) use infer::{infer_definition_type, infer_symbol_type};
+pub(crate) use infer::{infer_definition_type, infer_symbol_public_type};
 
 /// unique ID for a type
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
@@ -119,7 +119,7 @@ impl TypeStore {
         self.modules.remove(&file_id);
     }
 
-    pub fn cache_symbol_type(&self, symbol: GlobalSymbolId, ty: Type) {
+    pub fn cache_symbol_public_type(&self, symbol: GlobalSymbolId, ty: Type) {
         self.add_or_get_module(symbol.file_id)
             .symbol_types
             .insert(symbol.symbol_id, ty);
@@ -131,7 +131,7 @@ impl TypeStore {
             .insert(node_key, ty);
     }
 
-    pub fn get_cached_symbol_type(&self, symbol: GlobalSymbolId) -> Option<Type> {
+    pub fn get_cached_symbol_public_type(&self, symbol: GlobalSymbolId) -> Option<Type> {
         self.try_get_module(symbol.file_id)?
             .symbol_types
             .get(&symbol.symbol_id)
@@ -393,7 +393,7 @@ impl ModuleTypeId {
 
     fn get_member(self, db: &dyn SemanticDb, name: &Name) -> QueryResult<Option<Type>> {
         if let Some(symbol_id) = resolve_global_symbol(db, self.name(db)?, name)? {
-            Ok(Some(infer_symbol_type(db, symbol_id)?))
+            Ok(Some(infer_symbol_public_type(db, symbol_id)?))
         } else {
             Ok(None)
         }
@@ -441,7 +441,7 @@ impl ClassTypeId {
         let ClassType { scope_id, .. } = *self.class(db)?;
         let table = symbol_table(db, self.file_id)?;
         if let Some(symbol_id) = table.symbol_id_by_name(scope_id, name) {
-            Ok(Some(infer_symbol_type(
+            Ok(Some(infer_symbol_public_type(
                 db,
                 GlobalSymbolId {
                     file_id: self.file_id,
@@ -497,7 +497,7 @@ struct ModuleTypeStore {
     unions: IndexVec<ModuleUnionTypeId, UnionType>,
     /// arena of all intersection types created in this module
     intersections: IndexVec<ModuleIntersectionTypeId, IntersectionType>,
-    /// cached types of symbols in this module
+    /// cached public types of symbols in this module
     symbol_types: FxHashMap<SymbolId, Type>,
     /// cached types of AST nodes in this module
     node_types: FxHashMap<NodeKey, Type>,
