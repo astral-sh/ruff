@@ -275,10 +275,7 @@ pub struct TypedNodeKey<N: AstNode> {
 
 impl<N: AstNode> TypedNodeKey<N> {
     pub fn from_node(node: &N) -> Self {
-        let inner = NodeKey {
-            kind: node.as_any_node_ref().kind(),
-            range: node.range(),
-        };
+        let inner = NodeKey::from_node(node.as_any_node_ref());
         Self {
             inner,
             _marker: PhantomData,
@@ -352,6 +349,12 @@ pub struct NodeKey {
 }
 
 impl NodeKey {
+    pub fn from_node(node: AnyNodeRef) -> Self {
+        NodeKey {
+            kind: node.kind(),
+            range: node.range(),
+        }
+    }
     pub fn resolve<'a>(&self, root: AnyNodeRef<'a>) -> Option<AnyNodeRef<'a>> {
         // We need to do a binary search here. Only traverse into a node if the range is withint the node
         let mut visitor = FindNodeKeyVisitor {

@@ -145,6 +145,16 @@ fn infer_expr_type(db: &dyn SemanticDb, file_id: FileId, expr: &ast::Expr) -> Qu
     // TODO cache the resolution of the type on the node
     let symbols = symbol_table(db, file_id)?;
     match expr {
+        ast::Expr::NumberLiteral(ast::ExprNumberLiteral { value, .. }) => {
+            match value {
+                ast::Number::Int(n) => {
+                    // TODO support big int literals
+                    Ok(n.as_i64().map(Type::IntLiteral).unwrap_or(Type::Unknown))
+                }
+                // TODO builtins.float or builtins.complex
+                _ => Ok(Type::Unknown),
+            }
+        }
         ast::Expr::Name(name) => {
             // TODO look up in the correct scope, don't assume global
             if let Some(symbol_id) = symbols.root_symbol_id_by_name(&name.id) {
@@ -346,6 +356,36 @@ mod tests {
         let jar = HasJar::<SemanticJar>::jar(db)?;
         assert!(matches!(ty, Type::Class(_)));
         assert_eq!(format!("{}", ty.display(&jar.type_store)), "Literal[C]");
+        Ok(())
+    }
+
+    #[test]
+    fn resolve_literal() -> anyhow::Result<()> {
+        let case = create_test()?;
+        let db = &case.db;
+
+        let path = case.src.path().join("a.py");
+        std::fs::write(path, "x = 1")?;
+        let file = resolve_module(db, ModuleName::new("a"))?
+            .expect("module should be found")
+            .path(db)?
+            .file();
+        let syms = symbol_table(db, file)?;
+        let x_sym = syms
+            .root_symbol_id_by_name("x")
+            .expect("x symbol should be found");
+
+        let ty = infer_symbol_type(
+            db,
+            GlobalSymbolId {
+                file_id: file,
+                symbol_id: x_sym,
+            },
+        )?;
+
+        let jar = HasJar::<SemanticJar>::jar(db)?;
+        assert!(matches!(ty, Type::IntLiteral(_)));
+        assert_eq!(format!("{}", ty.display(&jar.type_store)), "Literal[1]");
         Ok(())
     }
 }

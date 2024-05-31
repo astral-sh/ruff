@@ -1,10 +1,38 @@
 # Changelog
 
+## 0.4.7
+
+### Preview features
+
+- \[`flake8-pyi`\] Implement `PYI064` ([#11325](https://github.com/astral-sh/ruff/pull/11325))
+- \[`flake8-pyi`\] Implement `PYI066` ([#11541](https://github.com/astral-sh/ruff/pull/11541))
+- \[`flake8-pyi`\] Implement `PYI057` ([#11486](https://github.com/astral-sh/ruff/pull/11486))
+- \[`pyflakes`\] Add option to enable F822 in `__init__.py` files ([#11370](https://github.com/astral-sh/ruff/pull/11370))
+
+### Formatter
+
+- Fix incorrect placement of trailing stub function comments ([#11632](https://github.com/astral-sh/ruff/pull/11632))
+
+### Server
+
+- Respect file exclusions in `ruff server` ([#11590](https://github.com/astral-sh/ruff/pull/11590))
+- Add support for documents not exist on disk ([#11588](https://github.com/astral-sh/ruff/pull/11588))
+- Add Vim and Kate setup guide for `ruff server` ([#11615](https://github.com/astral-sh/ruff/pull/11615))
+
+### Bug fixes
+
+- Avoid removing newlines between docstring headers and rST blocks ([#11609](https://github.com/astral-sh/ruff/pull/11609))
+- Infer indentation with imports when logical indent is absent ([#11608](https://github.com/astral-sh/ruff/pull/11608))
+- Use char index rather than position for indent slice ([#11645](https://github.com/astral-sh/ruff/pull/11645))
+- \[`flake8-comprehension`\] Strip parentheses around generators in `C400` ([#11607](https://github.com/astral-sh/ruff/pull/11607))
+- Mark `repeated-isinstance-calls` as unsafe on Python 3.10 and later ([#11622](https://github.com/astral-sh/ruff/pull/11622))
+
 ## 0.4.6
 
 ### Breaking changes
 
 - Use project-relative paths when calculating GitLab fingerprints ([#11532](https://github.com/astral-sh/ruff/pull/11532))
+- Bump minimum supported Windows version to Windows 10 ([#11613](https://github.com/astral-sh/ruff/pull/11613))
 
 ### Preview features
 

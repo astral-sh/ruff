@@ -236,6 +236,7 @@ pub struct SymbolTable {
     scopes_by_node: FxHashMap<NodeKey, ScopeId>,
     /// dependencies of this module
     dependencies: Vec<Dependency>,
+    flow_graph: FlowGraph,
 }
 
 impl SymbolTable {
@@ -245,6 +246,7 @@ impl SymbolTable {
             table: SymbolTable::new(),
             scopes: vec![root_scope_id],
             current_definition: None,
+            current_flow_node: FlowGraph::start(),
         };
         builder.visit_body(&module.body);
         builder.table
@@ -257,6 +259,7 @@ impl SymbolTable {
             defs: FxHashMap::default(),
             scopes_by_node: FxHashMap::default(),
             dependencies: Vec::new(),
+            flow_graph: FlowGraph::new(),
         };
         table.scopes_by_id.push(Scope {
             name: Name::new("<module>"),
@@ -272,6 +275,23 @@ impl SymbolTable {
 
     pub(crate) fn dependencies(&self) -> &[Dependency] {
         &self.dependencies
+    }
+
+    /// Return an iterator over all definitions of `symbol_id` reachable from `use_expr`. The value
+    /// of `symbol_id` in `use_expr` must originate from one of the iterated definitions (or from
+    /// an external reassignment of the name outside of this scope).
+    pub(crate) fn reachable_definitions(
+        &self,
+        symbol_id: SymbolId,
+        use_expr: &ast::Expr,
+    ) -> ReachableDefinitionsIterator {
+        let node_key = NodeKey::from_node(use_expr.into());
+        let flow_node_id = self.flow_graph.ast_to_flow[&node_key];
+        ReachableDefinitionsIterator {
+            table: self,
+            flow_node_id,
+            symbol_id,
+        }
     }
 
     pub(crate) const fn root_scope_id() -> ScopeId {
@@ -523,11 +543,72 @@ where
     }
 }
 
+pub(crate) struct ReachableDefinitionsIterator<'a> {
+    table: &'a SymbolTable,
+    flow_node_id: FlowNodeId,
+    symbol_id: SymbolId,
+}
+
+impl<'a> Iterator for ReachableDefinitionsIterator<'a> {
+    type Item = Definition;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            match &self.table.flow_graph.flow_nodes_by_id[self.flow_node_id] {
+                FlowNode::Start => return None,
+                FlowNode::Definition(def_node) => {
+                    self.flow_node_id = def_node.predecessor;
+                    if def_node.symbol_id == self.symbol_id {
+                        return Some(def_node.definition.clone());
+                    }
+                }
+            }
+        }
+    }
+}
+
+impl<'a> FusedIterator for ReachableDefinitionsIterator<'a> {}
+
+#[newtype_index]
+struct FlowNodeId;
+
+#[derive(Debug)]
+enum FlowNode {
+    Start,
+    Definition(DefinitionFlowNode),
+}
+
+#[derive(Debug)]
+struct DefinitionFlowNode {
+    symbol_id: SymbolId,
+    definition: Definition,
+    predecessor: FlowNodeId,
+}
+
+#[derive(Debug, Default)]
+struct FlowGraph {
+    flow_nodes_by_id: IndexVec<FlowNodeId, FlowNode>,
+    ast_to_flow: FxHashMap<NodeKey, FlowNodeId>,
+}
+
+impl FlowGraph {
+    fn new() -> Self {
+        let mut graph = FlowGraph::default();
+        graph.flow_nodes_by_id.push(FlowNode::Start);
+        graph
+    }
+
+    fn start() -> FlowNodeId {
+        FlowNodeId::from_usize(0)
+    }
+}
+
 struct SymbolTableBuilder {
     table: SymbolTable,
     scopes: Vec<ScopeId>,
     /// the definition whose target(s) we are currently walking
     current_definition: Option<Definition>,
+    current_flow_node: FlowNodeId,
 }
 
 impl SymbolTableBuilder {
@@ -546,7 +627,16 @@ impl SymbolTableBuilder {
             .defs
             .entry(symbol_id)
             .or_default()
-            .push(definition);
+            .push(definition.clone());
+        self.current_flow_node = self
+            .table
+            .flow_graph
+            .flow_nodes_by_id
+            .push(FlowNode::Definition(DefinitionFlowNode {
+                definition,
+                symbol_id,
+                predecessor: self.current_flow_node,
+            }));
         symbol_id
     }
 
@@ -561,6 +651,7 @@ impl SymbolTableBuilder {
             self.table
                 .add_child_scope(self.cur_scope(), name, kind, definition, defining_symbol);
         self.scopes.push(scope_id);
+        self.current_flow_node = FlowGraph::start();
         scope_id
     }
 
@@ -624,6 +715,10 @@ impl PreorderVisitor<'_> for SymbolTableBuilder {
                 }
             }
         }
+        self.table
+            .flow_graph
+            .ast_to_flow
+            .insert(NodeKey::from_node(expr.into()), self.current_flow_node);
         ast::visitor::preorder::walk_expr(self, expr);
     }
 
@@ -766,15 +861,13 @@ impl DerefMut for SymbolTablesStorage {
 
 #[cfg(test)]
 mod tests {
-    use textwrap::dedent;
-
-    use crate::parse::Parsed;
-    use crate::symbols::ScopeKind;
-
-    use super::{SymbolFlags, SymbolId, SymbolIterator, SymbolTable};
+    use crate::symbols::{ScopeKind, SymbolFlags, SymbolTable};
 
     mod from_ast {
-        use super::*;
+        use crate::parse::Parsed;
+        use crate::symbols::{Definition, ScopeKind, SymbolId, SymbolIterator, SymbolTable};
+        use ruff_python_ast as ast;
+        use textwrap::dedent;
 
         fn parse(code: &str) -> Parsed {
             Parsed::from_text(&dedent(code))
@@ -1020,6 +1113,35 @@ mod tests {
             assert_eq!(func_scope.kind(), ScopeKind::Class);
             assert_eq!(func_scope.name(), "C");
             assert_eq!(names(table.symbols_for_scope(func_scope_id)), vec!["x"]);
+        }
+
+        #[test]
+        fn reachability_trivial() {
+            let parsed = parse("x = 1; x");
+            let ast = parsed.ast();
+            let table = SymbolTable::from_ast(ast);
+            let x_sym = table
+                .root_symbol_id_by_name("x")
+                .expect("x symbol should exist");
+            let ast::Stmt::Expr(ast::StmtExpr { value: x_use, .. }) = &ast.body[1] else {
+                panic!("should be an expr")
+            };
+            let x_defs: Vec<_> = table.reachable_definitions(x_sym, x_use).collect();
+            assert_eq!(x_defs.len(), 1);
+            let Definition::Assignment(node_key) = &x_defs[0] else {
+                panic!("def should be an assignment")
+            };
+            let Some(def_node) = node_key.resolve(ast.into()) else {
+                panic!("node key should resolve")
+            };
+            let ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
+                value: ast::Number::Int(num),
+                ..
+            }) = &*def_node.value
+            else {
+                panic!("should be a number literal")
+            };
+            assert_eq!(*num, 1);
         }
     }
 

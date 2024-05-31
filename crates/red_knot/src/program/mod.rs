@@ -42,7 +42,7 @@ impl Program {
 
         let (source, semantic, lint) = self.jars_mut();
         for change in aggregated_changes.iter() {
-            semantic.module_resolver.remove_module(change.id);
+            semantic.module_resolver.remove_module_by_file(change.id);
             semantic.symbol_tables.remove(&change.id);
             source.sources.remove(&change.id);
             source.parsed.remove(&change.id);
