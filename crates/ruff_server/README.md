@@ -60,6 +60,14 @@ See the [Neovim setup guide](docs/setup/NEOVIM.md).
 
 See the [Helix setup guide](docs/setup//HELIX.md).
 
+#### Vim
+
+See the [Vim setup guide](docs/setup/VIM.md).
+
+#### Kate
+
+See the [Kate setup guide](docs/setup/KATE.md).
+
 ### Contributing
 
 If you're interested in contributing to `ruff server` - well, first of all, thank you! Second of all, you might find the
