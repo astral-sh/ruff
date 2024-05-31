@@ -11,7 +11,7 @@ pub(crate) fn remove_import_members(
     members_to_remove: &[&str],
 ) -> String {
     let commas: Vec<TextRange> = tokens
-        .tokens_in_range(import_from_stmt.range())
+        .in_range(import_from_stmt.range())
         .iter()
         .skip_while(|token| token.kind() != TokenKind::Import)
         .filter_map(|token| {
@@ -71,8 +71,8 @@ mod tests {
     use super::remove_import_members;
 
     fn test_helper(source: &str, members_to_remove: &[&str]) -> String {
-        let program = parse_module(source).unwrap();
-        let import_from_stmt = program
+        let parsed = parse_module(source).unwrap();
+        let import_from_stmt = parsed
             .suite()
             .first()
             .expect("source should have one statement")
@@ -81,7 +81,7 @@ mod tests {
         remove_import_members(
             &Locator::new(source),
             import_from_stmt,
-            program.tokens(),
+            parsed.tokens(),
             members_to_remove,
         )
     }

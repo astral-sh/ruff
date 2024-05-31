@@ -165,13 +165,13 @@ fn remove_unused_variable(binding: &Binding, checker: &Checker) -> Option<Fix> {
                     let start = parenthesized_range(
                         target.into(),
                         statement.into(),
-                        checker.program().comment_ranges(),
+                        checker.parsed().comment_ranges(),
                         checker.locator().contents(),
                     )
                     .unwrap_or(target.range())
                     .start();
                     let end =
-                        match_token_after(checker.program().tokens(), target.end(), |token| {
+                        match_token_after(checker.parsed().tokens(), target.end(), |token| {
                             token == TokenKind::Equal
                         })?
                         .start();
@@ -206,7 +206,7 @@ fn remove_unused_variable(binding: &Binding, checker: &Checker) -> Option<Fix> {
                 // If the expression is complex (`x = foo()`), remove the assignment,
                 // but preserve the right-hand side.
                 let start = statement.start();
-                let end = match_token_after(checker.program().tokens(), start, |token| {
+                let end = match_token_after(checker.parsed().tokens(), start, |token| {
                     token == TokenKind::Equal
                 })?
                 .start();
@@ -229,7 +229,7 @@ fn remove_unused_variable(binding: &Binding, checker: &Checker) -> Option<Fix> {
                 if optional_vars.range() == binding.range() {
                     // Find the first token before the `as` keyword.
                     let start = match_token_before(
-                        checker.program().tokens(),
+                        checker.parsed().tokens(),
                         item.context_expr.start(),
                         |token| token == TokenKind::As,
                     )?
@@ -237,7 +237,7 @@ fn remove_unused_variable(binding: &Binding, checker: &Checker) -> Option<Fix> {
 
                     // Find the first colon, comma, or closing bracket after the `as` keyword.
                     let end =
-                        match_token_or_closing_brace(checker.program().tokens(), start, |token| {
+                        match_token_or_closing_brace(checker.parsed().tokens(), start, |token| {
                             token == TokenKind::Colon || token == TokenKind::Comma
                         })?
                         .start();

@@ -47,7 +47,7 @@ pub fn format_and_debug_print(source: &str, cli: &Cli, source_path: &Path) -> Re
     let source_type = PySourceType::from(source_path);
 
     // Parse the AST.
-    let program = parse(source, source_type.as_mode()).context("Syntax error in input")?;
+    let parsed = parse(source, source_type.as_mode()).context("Syntax error in input")?;
 
     let options = PyFormatOptions::from_extension(source_path)
         .with_preview(if cli.preview {
@@ -62,15 +62,14 @@ pub fn format_and_debug_print(source: &str, cli: &Cli, source_path: &Path) -> Re
         });
 
     let source_code = SourceCode::new(source);
-    let formatted =
-        format_module_ast(&program, source, options).context("Failed to format node")?;
+    let formatted = format_module_ast(&parsed, source, options).context("Failed to format node")?;
     if cli.print_ir {
         println!("{}", formatted.document().display(source_code));
     }
     if cli.print_comments {
         // Print preceding, following and enclosing nodes
         let decorated_comments =
-            collect_comments(program.syntax(), source_code, program.comment_ranges());
+            collect_comments(parsed.syntax(), source_code, parsed.comment_ranges());
         if !decorated_comments.is_empty() {
             println!("# Comment decoration: Range, Preceding, Following, Enclosing, Comment");
         }

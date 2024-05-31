@@ -169,7 +169,7 @@ pub(crate) fn repeated_keys(checker: &mut Checker, dict: &ast::ExprDict) {
                             parenthesized_range(
                                 dict.value(i - 1).into(),
                                 dict.into(),
-                                checker.program().comment_ranges(),
+                                checker.parsed().comment_ranges(),
                                 checker.locator().contents(),
                             )
                             .unwrap_or_else(|| dict.value(i - 1).range())
@@ -177,7 +177,7 @@ pub(crate) fn repeated_keys(checker: &mut Checker, dict: &ast::ExprDict) {
                             parenthesized_range(
                                 dict.value(i).into(),
                                 dict.into(),
-                                checker.program().comment_ranges(),
+                                checker.parsed().comment_ranges(),
                                 checker.locator().contents(),
                             )
                             .unwrap_or_else(|| dict.value(i).range())
@@ -201,7 +201,7 @@ pub(crate) fn repeated_keys(checker: &mut Checker, dict: &ast::ExprDict) {
                             parenthesized_range(
                                 dict.value(i - 1).into(),
                                 dict.into(),
-                                checker.program().comment_ranges(),
+                                checker.parsed().comment_ranges(),
                                 checker.locator().contents(),
                             )
                             .unwrap_or_else(|| dict.value(i - 1).range())
@@ -209,7 +209,7 @@ pub(crate) fn repeated_keys(checker: &mut Checker, dict: &ast::ExprDict) {
                             parenthesized_range(
                                 dict.value(i).into(),
                                 dict.into(),
-                                checker.program().comment_ranges(),
+                                checker.parsed().comment_ranges(),
                                 checker.locator().contents(),
                             )
                             .unwrap_or_else(|| dict.value(i).range())

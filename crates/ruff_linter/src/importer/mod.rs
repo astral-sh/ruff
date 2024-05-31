@@ -8,7 +8,7 @@ use std::error::Error;
 use anyhow::Result;
 use libcst_native::{ImportAlias, Name, NameOrAttribute};
 use ruff_python_ast::{self as ast, ModModule, Stmt};
-use ruff_python_parser::{Program, Tokens};
+use ruff_python_parser::{Parsed, Tokens};
 use ruff_text_size::{Ranged, TextSize};
 
 use ruff_diagnostics::Edit;
@@ -42,13 +42,13 @@ pub(crate) struct Importer<'a> {
 
 impl<'a> Importer<'a> {
     pub(crate) fn new(
-        program: &'a Program<ModModule>,
+        parsed: &'a Parsed<ModModule>,
         locator: &'a Locator<'a>,
         stylist: &'a Stylist<'a>,
     ) -> Self {
         Self {
-            python_ast: program.suite(),
-            tokens: program.tokens(),
+            python_ast: parsed.suite(),
+            tokens: parsed.tokens(),
             locator,
             stylist,
             runtime_imports: Vec::default(),

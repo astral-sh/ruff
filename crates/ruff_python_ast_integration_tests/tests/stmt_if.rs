@@ -9,8 +9,8 @@ fn extract_elif_else_range() -> Result<(), ParseError> {
 elif b:
     ...
 ";
-    let program = parse_module(contents)?;
-    let if_stmt = program
+    let parsed = parse_module(contents)?;
+    let if_stmt = parsed
         .suite()
         .first()
         .expect("module should contain at least one statement")
@@ -25,8 +25,8 @@ elif b:
 else:
     ...
 ";
-    let program = parse_module(contents)?;
-    let if_stmt = program
+    let parsed = parse_module(contents)?;
+    let if_stmt = parsed
         .suite()
         .first()
         .expect("module should contain at least one statement")

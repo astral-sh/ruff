@@ -68,7 +68,7 @@ pub(crate) fn zip_without_explicit_strict(checker: &mut Checker, call: &ast::Exp
                 add_argument(
                     "strict=False",
                     &call.arguments,
-                    checker.program().comment_ranges(),
+                    checker.parsed().comment_ranges(),
                     checker.locator().contents(),
                 ),
                 // If the function call contains `**kwargs`, mark the fix as unsafe.

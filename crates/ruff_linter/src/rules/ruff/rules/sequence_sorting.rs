@@ -502,7 +502,7 @@ fn collect_string_sequence_lines<'a>(
     // An iterator over the string values in the sequence.
     let mut string_items_iter = string_items.iter();
 
-    let mut token_iter = tokens.tokens_in_range(range).iter();
+    let mut token_iter = tokens.in_range(range).iter();
     let first_token = token_iter.next()?;
     if first_token.kind() != kind.opening_token_for_multiline_definition() {
         return None;

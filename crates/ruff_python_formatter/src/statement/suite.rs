@@ -858,17 +858,17 @@ def trailing_func():
     pass
 ";
 
-        let program = parse_module(source).unwrap();
+        let parsed = parse_module(source).unwrap();
 
         let context = PyFormatContext::new(
             PyFormatOptions::default(),
             source,
-            Comments::from_ranges(program.comment_ranges()),
-            program.tokens(),
+            Comments::from_ranges(parsed.comment_ranges()),
+            parsed.tokens(),
         );
 
         let test_formatter =
-            format_with(|f: &mut PyFormatter| program.suite().format().with_options(level).fmt(f));
+            format_with(|f: &mut PyFormatter| parsed.suite().format().with_options(level).fmt(f));
 
         let formatted = format!(context, [test_formatter]).unwrap();
         let printed = formatted.print().unwrap();

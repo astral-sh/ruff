@@ -103,8 +103,8 @@ mod tests {
     use super::num_returns;
 
     fn test_helper(source: &str, expected: usize) -> Result<()> {
-        let program = parse_module(source)?;
-        assert_eq!(num_returns(program.suite()), expected);
+        let parsed = parse_module(source)?;
+        assert_eq!(num_returns(parsed.suite()), expected);
         Ok(())
     }
 

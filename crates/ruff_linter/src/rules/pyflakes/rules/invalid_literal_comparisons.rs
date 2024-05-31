@@ -96,7 +96,7 @@ pub(crate) fn invalid_literal_comparison(
         {
             let mut diagnostic = Diagnostic::new(IsLiteral { cmp_op: op.into() }, expr.range());
             if lazy_located.is_none() {
-                lazy_located = Some(locate_cmp_ops(expr, checker.program().tokens()));
+                lazy_located = Some(locate_cmp_ops(expr, checker.parsed().tokens()));
             }
             if let Some(located_op) = lazy_located.as_ref().and_then(|located| located.get(index)) {
                 assert_eq!(located_op.op, *op);
@@ -144,7 +144,7 @@ impl From<&CmpOp> for IsCmpOp {
 /// with valid ranges.
 fn locate_cmp_ops(expr: &Expr, tokens: &Tokens) -> Vec<LocatedCmpOp> {
     let mut tok_iter = tokens
-        .tokens_in_range(expr.range())
+        .in_range(expr.range())
         .iter()
         .filter(|token| !token.is_trivia())
         .peekable();
@@ -248,8 +248,8 @@ mod tests {
     use super::{locate_cmp_ops, LocatedCmpOp};
 
     fn extract_cmp_op_locations(source: &str) -> Result<Vec<LocatedCmpOp>> {
-        let program = parse_expression(source)?;
-        Ok(locate_cmp_ops(program.expr(), program.tokens()))
+        let parsed = parse_expression(source)?;
+        Ok(locate_cmp_ops(parsed.expr(), parsed.tokens()))
     }
 
     #[test]
