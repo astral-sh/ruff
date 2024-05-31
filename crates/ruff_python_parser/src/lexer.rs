@@ -206,9 +206,7 @@ impl<'src> Lexer<'src> {
         let text = self.token_text();
 
         if !is_ascii {
-            self.current_value = TokenValue::Name {
-                name: text.nfkc().collect::<String>().into_boxed_str(),
-            };
+            self.current_value = TokenValue::Name(text.nfkc().collect::<String>().into_boxed_str());
             return TokenKind::Name;
         }
 
@@ -252,9 +250,7 @@ impl<'src> Lexer<'src> {
             "with" => TokenKind::With,
             "yield" => TokenKind::Yield,
             _ => {
-                self.current_value = TokenValue::Name {
-                    name: text.to_string().into_boxed_str(),
-                };
+                self.current_value = TokenValue::Name(text.to_string().into_boxed_str());
                 TokenKind::Name
             }
         }
@@ -301,7 +297,7 @@ impl<'src> Lexer<'src> {
                 ));
             }
         };
-        self.current_value = TokenValue::Int { value };
+        self.current_value = TokenValue::Int(value);
         TokenKind::Int
     }
 
@@ -369,7 +365,7 @@ impl<'src> Lexer<'src> {
                 };
                 TokenKind::Complex
             } else {
-                self.current_value = TokenValue::Float { value };
+                self.current_value = TokenValue::Float(value);
                 TokenKind::Float
             }
         } else {
@@ -401,7 +397,7 @@ impl<'src> Lexer<'src> {
                         ))
                     }
                 };
-                self.current_value = TokenValue::Int { value };
+                self.current_value = TokenValue::Int(value);
                 TokenKind::Int
             }
         }
@@ -707,11 +703,9 @@ impl<'src> Lexer<'src> {
             normalized
         };
 
-        self.current_value = TokenValue::FStringMiddle {
-            value: value.into_boxed_str(),
-        };
-
+        self.current_value = TokenValue::FStringMiddle(value.into_boxed_str());
         self.current_flags = fstring.flags();
+
         Some(TokenKind::FStringMiddle)
     }
 
@@ -817,11 +811,11 @@ impl<'src> Lexer<'src> {
             }
         };
 
-        self.current_value = TokenValue::String {
-            value: self.source[TextRange::new(value_start, value_end)]
+        self.current_value = TokenValue::String(
+            self.source[TextRange::new(value_start, value_end)]
                 .to_string()
                 .into_boxed_str(),
-        };
+        );
 
         TokenKind::String
     }
