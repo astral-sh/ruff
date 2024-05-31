@@ -13,10 +13,6 @@ use crate::symbols::Dependency;
 use crate::FxDashMap;
 
 /// ID uniquely identifying a module.
-///
-/// The advantage of using this newtype to identify modules over using paths
-/// is that instances are cheap and easily copied, avoiding many potential
-/// problems that could be caused by lifetimes.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub struct Module(u32);
 
