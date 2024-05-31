@@ -17,16 +17,17 @@ if executable('ruff')
 endif
 ```
 
-See [`vim-lsp`'s documentation](https://github.com/prabirshrestha/vim-lsp/blob/master/doc/vim-lsp.txt) for more details
-on how to configure the server from there.
+See the `vim-lsp` [documentation](https://github.com/prabirshrestha/vim-lsp/blob/master/doc/vim-lsp.txt) for more
+details on how to configure the language server.
 
 > \[!IMPORTANT\]
 >
-> If you have the older language server (`ruff-lsp`) configured in Vim, make sure to disable it to prevent any conflicts.
+> If Ruff's legacy language server (`ruff-lsp`) is configured in Vim, be sure to disable it to prevent any conflicts.
 
 #### Tips
 
-If you're using Ruff alongside another LSP (like Pyright), you may want to defer to that LSP for certain capabilities, like `textDocument/hover` by adding the following to the function `s:on_lsp_buffer_enabled()`:
+If you're using Ruff alongside another LSP (like Pyright), you may want to defer to that LSP for certain capabilities,
+like `textDocument/hover` by adding the following to the function `s:on_lsp_buffer_enabled()`:
 
 ```vim
 function! s:on_lsp_buffer_enabled() abort
