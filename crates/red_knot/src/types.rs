@@ -36,6 +36,7 @@ pub enum Type {
     Instance(ClassTypeId),
     Union(UnionTypeId),
     Intersection(IntersectionTypeId),
+    IntLiteral(i64),
     // TODO protocols, callable types, overloads, generics, type vars
 }
 
@@ -77,6 +78,10 @@ impl Type {
                 // TODO perform the get_member on each type in the intersection
                 // TODO return the intersection of those results
                 todo!("attribute lookup on Intersection type")
+            }
+            Type::IntLiteral(_) => {
+                // TODO raise error
+                Ok(Some(Type::Unknown))
             }
         }
     }
@@ -616,6 +621,7 @@ impl std::fmt::Display for DisplayType<'_> {
                 .get_module(int_id.file_id)
                 .get_intersection(int_id.intersection_id)
                 .display(f, self.store),
+            Type::IntLiteral(n) => write!(f, "Literal[{n}]"),
         }
     }
 }
