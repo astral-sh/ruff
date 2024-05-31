@@ -182,12 +182,12 @@ impl TypeStore {
             .add_class(name, scope_id, bases)
     }
 
-    fn add_union(&mut self, file_id: FileId, elems: &[Type]) -> UnionTypeId {
+    fn add_union(&self, file_id: FileId, elems: &[Type]) -> UnionTypeId {
         self.add_or_get_module(file_id).add_union(elems)
     }
 
     fn add_intersection(
-        &mut self,
+        &self,
         file_id: FileId,
         positive: &[Type],
         negative: &[Type],
@@ -777,7 +777,7 @@ mod tests {
 
     #[test]
     fn add_union() {
-        let mut store = TypeStore::default();
+        let store = TypeStore::default();
         let files = Files::default();
         let file_id = files.intern(Path::new("/foo"));
         let c1 = store.add_class(file_id, "C1", SymbolTable::root_scope_id(), Vec::new());
@@ -794,7 +794,7 @@ mod tests {
 
     #[test]
     fn add_intersection() {
-        let mut store = TypeStore::default();
+        let store = TypeStore::default();
         let files = Files::default();
         let file_id = files.intern(Path::new("/foo"));
         let c1 = store.add_class(file_id, "C1", SymbolTable::root_scope_id(), Vec::new());

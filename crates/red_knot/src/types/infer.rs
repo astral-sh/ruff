@@ -25,10 +25,15 @@ pub fn infer_symbol_public_type(db: &dyn SemanticDb, symbol: GlobalSymbolId) -> 
         return Ok(ty);
     }
 
-    // TODO handle multiple defs, conditional defs...
-    assert_eq!(defs.len(), 1);
-
-    let ty = infer_definition_type(db, symbol, defs[0].clone())?;
+    let tys = defs
+        .iter()
+        .map(|def| infer_definition_type(db, symbol, def.clone()))
+        .collect::<QueryResult<Vec<Type>>>()?;
+    let ty = match tys.len() {
+        0 => Type::Unknown,
+        1 => tys[0],
+        _ => Type::Union(jar.type_store.add_union(symbol.file_id, &tys)),
+    };
 
     jar.type_store.cache_symbol_public_type(symbol, ty);
 
@@ -386,6 +391,39 @@ mod tests {
         let jar = HasJar::<SemanticJar>::jar(db)?;
         assert!(matches!(ty, Type::IntLiteral(_)));
         assert_eq!(format!("{}", ty.display(&jar.type_store)), "Literal[1]");
+        Ok(())
+    }
+
+    #[test]
+    fn resolve_union() -> anyhow::Result<()> {
+        let case = create_test()?;
+        let db = &case.db;
+
+        let path = case.src.path().join("a.py");
+        std::fs::write(path, "if flag:\n  x = 1\nelse:\n  x = 2")?;
+        let file = resolve_module(db, ModuleName::new("a"))?
+            .expect("module should be found")
+            .path(db)?
+            .file();
+        let syms = symbol_table(db, file)?;
+        let x_sym = syms
+            .root_symbol_id_by_name("x")
+            .expect("x symbol should be found");
+
+        let ty = infer_symbol_public_type(
+            db,
+            GlobalSymbolId {
+                file_id: file,
+                symbol_id: x_sym,
+            },
+        )?;
+
+        let jar = HasJar::<SemanticJar>::jar(db)?;
+        assert!(matches!(ty, Type::Union(_)));
+        assert_eq!(
+            format!("{}", ty.display(&jar.type_store)),
+            "(Literal[1] | Literal[2])"
+        );
         Ok(())
     }
 }
