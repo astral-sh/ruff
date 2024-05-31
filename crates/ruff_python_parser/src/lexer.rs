@@ -994,6 +994,21 @@ impl<'src> Lexer<'src> {
                     )));
                 };
 
+                // The lexer might've eaten some whitespaces to calculate the `indentation`. For
+                // example:
+                //
+                // ```py
+                // if first:
+                //     if second:
+                //         pass
+                //     foo
+                // #   ^
+                // ```
+                //
+                // Here, the cursor is at `^` and the `indentation` contains the whitespaces before
+                // the `pass` token.
+                self.cursor.start_token();
+
                 Some(TokenKind::Dedent)
             }
 
@@ -2231,6 +2246,17 @@ def f(arg=%timeit a = b):
     #[test]
     fn test_double_dedent_with_tabs_windows_eol() {
         assert_snapshot!(double_dedent_with_tabs_eol(WINDOWS_EOL));
+    }
+
+    #[test]
+    fn dedent_after_whitespace() {
+        let source = "\
+if first:
+    if second:
+        pass
+    foo
+";
+        assert_snapshot!(lex_source(source));
     }
 
     fn newline_in_brackets_eol(eol: &str) -> LexerOutput {
