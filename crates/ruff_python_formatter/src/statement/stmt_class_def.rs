@@ -55,7 +55,7 @@ impl FormatNodeRule<StmtClassDef> for FormatStmtClassDef {
         // newline between the comment and the node, but we _require_ two newlines. If there are
         // _no_ newlines between the comment and the node, we don't insert _any_ newlines; if there
         // are more than two, then `leading_comments` will preserve the correct number of newlines.
-        empty_lines_after_leading_comments(f, comments.leading(item)).fmt(f)?;
+        empty_lines_after_leading_comments(comments.leading(item)).fmt(f)?;
 
         write!(
             f,
