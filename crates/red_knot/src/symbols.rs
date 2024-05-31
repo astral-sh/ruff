@@ -277,6 +277,9 @@ impl SymbolTable {
         &self.dependencies
     }
 
+    /// Return an iterator over all definitions of `symbol_id` reachable from `use_expr`. The value
+    /// of `symbol_id` in `use_expr` must originate from one of the iterated definitions (or from
+    /// an external reassignment of the name outside of this scope).
     pub(crate) fn reachable_definitions(
         &self,
         symbol_id: SymbolId,
