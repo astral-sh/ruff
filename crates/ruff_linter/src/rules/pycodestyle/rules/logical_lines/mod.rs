@@ -588,9 +588,9 @@ if False:
     }
 
     fn assert_logical_lines(contents: &str, expected: &[&str]) {
-        let program = parse_module(contents).unwrap();
+        let parsed = parse_module(contents).unwrap();
         let locator = Locator::new(contents);
-        let actual: Vec<String> = LogicalLines::from_tokens(program.tokens(), &locator)
+        let actual: Vec<String> = LogicalLines::from_tokens(parsed.tokens(), &locator)
             .into_iter()
             .map(|line| line.text_trimmed())
             .map(ToString::to_string)

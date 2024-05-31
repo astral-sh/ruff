@@ -114,12 +114,12 @@ fn should_be_fstring(
     }
 
     let fstring_expr = format!("f{}", locator.slice(literal));
-    let Ok(program) = parse_expression(&fstring_expr) else {
+    let Ok(parsed) = parse_expression(&fstring_expr) else {
         return false;
     };
 
     // Note: Range offsets for `value` are based on `fstring_expr`
-    let Some(ast::ExprFString { value, .. }) = program.expr().as_f_string_expr() else {
+    let Some(ast::ExprFString { value, .. }) = parsed.expr().as_f_string_expr() else {
         return false;
     };
 

@@ -55,12 +55,12 @@ fn benchmark_linter(mut group: BenchmarkGroup, settings: &LinterSettings) {
             &case,
             |b, case| {
                 // Parse the source.
-                let program =
+                let parsed =
                     parse_module(case.code()).expect("Input should be a valid Python code");
 
                 b.iter_batched(
-                    || program.clone(),
-                    |program| {
+                    || parsed.clone(),
+                    |parsed| {
                         let path = case.path();
                         let result = lint_only(
                             &path,
@@ -69,7 +69,7 @@ fn benchmark_linter(mut group: BenchmarkGroup, settings: &LinterSettings) {
                             flags::Noqa::Enabled,
                             &SourceKind::Python(case.code().to_string()),
                             PySourceType::from(path.as_path()),
-                            ParseSource::Precomputed(program),
+                            ParseSource::Precomputed(parsed),
                         );
 
                         // Assert that file contains no parse errors

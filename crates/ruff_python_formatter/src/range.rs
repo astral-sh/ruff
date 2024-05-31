@@ -72,19 +72,19 @@ pub fn format_range(
 
     assert_valid_char_boundaries(range, source);
 
-    let program = parse(source, options.source_type().as_mode())?;
+    let parsed = parse(source, options.source_type().as_mode())?;
     let source_code = SourceCode::new(source);
-    let comments = Comments::from_ast(program.syntax(), source_code, program.comment_ranges());
+    let comments = Comments::from_ast(parsed.syntax(), source_code, parsed.comment_ranges());
 
     let mut context = PyFormatContext::new(
         options.with_source_map_generation(SourceMapGeneration::Enabled),
         source,
         comments,
-        program.tokens(),
+        parsed.tokens(),
     );
 
     let (enclosing_node, base_indent) =
-        match find_enclosing_node(range, AnyNodeRef::from(program.syntax()), &context) {
+        match find_enclosing_node(range, AnyNodeRef::from(parsed.syntax()), &context) {
             EnclosingNode::Node { node, indent_level } => (node, indent_level),
             EnclosingNode::Suppressed => {
                 // The entire range falls into a suppressed range. There's nothing to format.

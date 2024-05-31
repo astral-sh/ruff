@@ -121,7 +121,7 @@ fn replace_with_bytes_literal(locator: &Locator, call: &ast::ExprCall, tokens: &
     // Build up a replacement string by prefixing all string tokens with `b`.
     let mut replacement = String::with_capacity(call.range().len().to_usize() + 1);
     let mut prev = call.start();
-    for token in tokens.tokens_in_range(call.range()) {
+    for token in tokens.in_range(call.range()) {
         match token.kind() {
             TokenKind::Dot => break,
             TokenKind::String => {
@@ -165,7 +165,7 @@ pub(crate) fn unnecessary_encode_utf8(checker: &mut Checker, call: &ast::ExprCal
                     diagnostic.set_fix(replace_with_bytes_literal(
                         checker.locator(),
                         call,
-                        checker.program().tokens(),
+                        checker.parsed().tokens(),
                     ));
                     checker.diagnostics.push(diagnostic);
                 } else if let EncodingArg::Keyword(kwarg) = encoding_arg {

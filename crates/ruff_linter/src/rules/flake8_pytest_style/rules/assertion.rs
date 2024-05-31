@@ -284,7 +284,7 @@ pub(crate) fn unittest_assertion(
                 // the assertion is part of a larger expression.
                 if checker.semantic().current_statement().is_expr_stmt()
                     && checker.semantic().current_expression_parent().is_none()
-                    && !checker.program().comment_ranges().intersects(expr.range())
+                    && !checker.parsed().comment_ranges().intersects(expr.range())
                 {
                     if let Ok(stmt) = unittest_assert.generate_assert(args, keywords) {
                         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
@@ -292,7 +292,7 @@ pub(crate) fn unittest_assertion(
                             parenthesized_range(
                                 expr.into(),
                                 checker.semantic().current_statement().into(),
-                                checker.program().comment_ranges(),
+                                checker.parsed().comment_ranges(),
                                 checker.locator().contents(),
                             )
                             .unwrap_or(expr.range()),
@@ -385,7 +385,7 @@ pub(crate) fn unittest_raises_assertion(
         call.func.range(),
     );
     if !checker
-        .program()
+        .parsed()
         .comment_ranges()
         .has_comments(call, checker.locator())
     {
@@ -745,7 +745,7 @@ pub(crate) fn composite_condition(
         let mut diagnostic = Diagnostic::new(PytestCompositeAssertion, stmt.range());
         if matches!(composite, CompositionKind::Simple)
             && msg.is_none()
-            && !checker.program().comment_ranges().intersects(stmt.range())
+            && !checker.parsed().comment_ranges().intersects(stmt.range())
             && !checker
                 .indexer()
                 .in_multi_statement_line(stmt, checker.locator())

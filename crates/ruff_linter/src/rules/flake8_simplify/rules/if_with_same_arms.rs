@@ -73,13 +73,13 @@ pub(crate) fn if_with_same_arms(checker: &mut Checker, stmt_if: &ast::StmtIf) {
 
         // ...and the same comments
         let first_comments = checker
-            .program()
+            .parsed()
             .comment_ranges()
             .comments_in_range(body_range(&current_branch, checker.locator()))
             .iter()
             .map(|range| checker.locator().slice(*range));
         let second_comments = checker
-            .program()
+            .parsed()
             .comment_ranges()
             .comments_in_range(body_range(following_branch, checker.locator()))
             .iter()
@@ -99,7 +99,7 @@ pub(crate) fn if_with_same_arms(checker: &mut Checker, stmt_if: &ast::StmtIf) {
                 &current_branch,
                 following_branch,
                 checker.locator(),
-                checker.program().comment_ranges(),
+                checker.parsed().comment_ranges(),
             )
         });
 

@@ -106,16 +106,16 @@ mod tests {
     fn e501_non_ascii_char() {
         let line = "'\u{4e9c}' * 2"; // 7 in UTF-32, 9 in UTF-8.
         let locator = Locator::new(line);
-        let program = parse_module(line).unwrap();
-        let indexer = Indexer::from_tokens(program.tokens(), &locator);
-        let stylist = Stylist::from_tokens(program.tokens(), &locator);
+        let parsed = parse_module(line).unwrap();
+        let indexer = Indexer::from_tokens(parsed.tokens(), &locator);
+        let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
 
         let check_with_max_line_length = |line_length: LineLength| {
             check_physical_lines(
                 &locator,
                 &stylist,
                 &indexer,
-                program.comment_ranges(),
+                parsed.comment_ranges(),
                 &[],
                 &LinterSettings {
                     pycodestyle: pycodestyle::settings::Settings {
