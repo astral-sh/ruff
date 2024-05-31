@@ -45,7 +45,7 @@ impl Module {
         Ok(modules.modules.get(self).unwrap().kind)
     }
 
-    /// Attempt to resolve a [`Dependency`] of this module to an absolute [`ModuleName`].
+    /// Attempt to resolve a dependency of this module to an absolute [`ModuleName`].
     ///
     /// A dependency could be either absolute (e.g. the `foo` dependency implied by `from foo import bar`)
     /// or relative to this module (e.g. the `.foo` dependency implied by `from .foo import bar`)
