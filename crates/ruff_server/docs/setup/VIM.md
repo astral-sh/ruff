@@ -38,5 +38,3 @@ function! s:on_lsp_buffer_enabled() abort
     endif
 endfunction
 ```
-
-If you'd like to use Ruff exclusively for linting, formatting, and import organization, you can disable those capabilities for Pyright.
