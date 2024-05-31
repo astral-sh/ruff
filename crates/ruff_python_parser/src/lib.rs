@@ -69,7 +69,7 @@ use std::ops::Deref;
 
 pub use crate::error::{FStringErrorType, ParseError, ParseErrorType};
 pub use crate::lexer::Token;
-pub use crate::token::{Tok, TokenKind};
+pub use crate::token::TokenKind;
 
 use crate::parser::Parser;
 
