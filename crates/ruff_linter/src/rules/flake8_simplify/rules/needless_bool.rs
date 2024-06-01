@@ -202,11 +202,20 @@ pub(crate) fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
     } else {
         // If the return values are inverted, wrap the condition in a `not`.
         if inverted {
-            Some(Expr::UnaryOp(ast::ExprUnaryOp {
+            if let Expr::UnaryOp(ast::ExprUnaryOp {
                 op: ast::UnaryOp::Not,
-                operand: Box::new(if_test.clone()),
-                range: TextRange::default(),
-            }))
+                operand,
+                ..
+            }) = if_test
+            {
+                Some((**operand).clone())
+            } else {
+                Some(Expr::UnaryOp(ast::ExprUnaryOp {
+                    op: ast::UnaryOp::Not,
+                    operand: Box::new(if_test.clone()),
+                    range: TextRange::default(),
+                }))
+            }
         } else if if_test.is_compare_expr() {
             // If the condition is a comparison, we can replace it with the condition, since we
             // know it's a boolean.
