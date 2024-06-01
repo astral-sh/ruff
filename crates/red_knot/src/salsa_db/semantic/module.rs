@@ -16,27 +16,57 @@ pub struct Module {
     name: ModuleName,
 }
 
-#[salsa::tracked(jar=Jar)]
+#[derive(Clone, Eq, PartialEq)]
 pub struct ResolvedModule {
-    #[id]
-    #[return_ref]
-    name: ModuleName,
+    inner: Arc<ResolveModuleInner>,
+}
+
+#[derive(Eq, PartialEq)]
+struct ResolveModuleInner {
+    module: Module,
     kind: ModuleKind,
     search_path: ModuleSearchPath,
     file: File,
 }
 
+impl std::fmt::Debug for ResolvedModule {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ResolvedModule")
+            .field("module", &self.module())
+            .field("kind", &self.kind())
+            .field("search_path", &self.search_path())
+            .field("file", &self.file())
+            .finish()
+    }
+}
+
 impl ResolvedModule {
-    pub fn resolve_dependency(self, db: &dyn Db, dependency: &Dependency) -> Option<ModuleName> {
+    pub fn module(&self) -> Module {
+        self.inner.module
+    }
+
+    pub fn kind(&self) -> ModuleKind {
+        self.inner.kind
+    }
+
+    pub fn search_path(&self) -> &ModuleSearchPath {
+        &self.inner.search_path
+    }
+
+    pub fn file(&self) -> File {
+        self.inner.file
+    }
+
+    pub fn resolve_dependency(&self, db: &dyn Db, dependency: &Dependency) -> Option<ModuleName> {
         let (level, module) = match dependency {
             // FIXME use clone here
             Dependency::Module(module) => return Some(ModuleName::new(module)),
             Dependency::Relative { level, module } => (*level, module.as_deref()),
         };
 
-        let mut components = self.name(db).components().peekable();
+        let mut components = self.module().name(db).components().peekable();
 
-        let start = match self.kind(db) {
+        let start = match self.kind() {
             // `.` resolves to the enclosing package
             ModuleKind::Module => 0,
             // `.` resolves to the current package
@@ -173,13 +203,14 @@ pub fn resolve_module(db: &dyn Db, module: Module) -> Option<ResolvedModule> {
         .map(|path| db.file(path))
         .unwrap_or_else(|_| resolved_file);
 
-    Some(ResolvedModule::new(
-        db,
-        name.clone(),
-        kind,
-        root_path,
-        normalized,
-    ))
+    Some(ResolvedModule {
+        inner: Arc::new(ResolveModuleInner {
+            module,
+            kind,
+            search_path: root_path,
+            file: normalized,
+        }),
+    })
 }
 
 /// Resolves the module id for the given path.
@@ -211,13 +242,13 @@ pub fn file_to_module(db: &dyn Db, file: File) -> Option<ResolvedModule> {
     // in which case we ignore it.
     let module = resolve_module(db, Module::new(db, module_name))?;
 
-    if module.search_path(db) == root_path {
+    if module.search_path() == &root_path {
         let normalized = path
             .canonicalize()
             .map(|path| db.file(path))
             .unwrap_or(file);
 
-        if normalized != module.file(db) {
+        if normalized != module.file() {
             // This path is for a module with the same name but with a different precedence. For example:
             // ```
             // src/foo.py
@@ -444,14 +475,14 @@ mod tests {
         let foo_module = resolve_module_name(&db, ModuleName::new("foo")).unwrap();
 
         assert_eq!(
-            Some(foo_module),
+            Some(foo_module.clone()),
             resolve_module_name(&db, ModuleName::new("foo"))
         );
 
-        assert_eq!(&ModuleName::new("foo"), foo_module.name(&db));
-        assert_eq!(src, foo_module.search_path(&db));
-        assert_eq!(ModuleKind::Module, foo_module.kind(&db));
-        assert_eq!(&foo_path, foo_module.file(&db).path(&db));
+        assert_eq!(&ModuleName::new("foo"), foo_module.module().name(&db));
+        assert_eq!(&src, foo_module.search_path());
+        assert_eq!(ModuleKind::Module, foo_module.kind());
+        assert_eq!(&foo_path, foo_module.file().path(&db));
 
         assert_eq!(Some(foo_module), path_to_module(&db, &foo_path));
 
@@ -474,9 +505,9 @@ mod tests {
 
         let foo_module = resolve_module_name(&db, ModuleName::new("foo")).unwrap();
 
-        assert_eq!(&ModuleName::new("foo"), foo_module.name(&db));
-        assert_eq!(src, foo_module.search_path(&db));
-        assert_eq!(&foo_path, foo_module.file(&db).path(&db));
+        assert_eq!(&ModuleName::new("foo"), foo_module.module().name(&db));
+        assert_eq!(&src, foo_module.search_path());
+        assert_eq!(&foo_path, foo_module.file().path(&db));
 
         assert_eq!(Some(foo_module), path_to_module(&db, &foo_path));
 
@@ -505,9 +536,9 @@ mod tests {
 
         let foo_module = resolve_module_name(&db, ModuleName::new("foo")).unwrap();
 
-        assert_eq!(src, foo_module.search_path(&db));
-        assert_eq!(&foo_init, foo_module.file(&db).path(&db));
-        assert_eq!(ModuleKind::Package, foo_module.kind(&db));
+        assert_eq!(&src, foo_module.search_path());
+        assert_eq!(&foo_init, foo_module.file().path(&db));
+        assert_eq!(ModuleKind::Package, foo_module.kind());
 
         assert_eq!(Some(foo_module), path_to_module(&db, &foo_init));
         assert_eq!(None, path_to_module(&db, &foo_py));
@@ -531,8 +562,8 @@ mod tests {
 
         let foo = resolve_module_name(&db, ModuleName::new("foo")).unwrap();
 
-        assert_eq!(src, foo.search_path(&db));
-        assert_eq!(&foo_stub, foo.file(&db).path(&db));
+        assert_eq!(&src, foo.search_path());
+        assert_eq!(&foo_stub, foo.file().path(&db));
 
         assert_eq!(Some(foo), path_to_module(&db, &foo_stub));
         assert_eq!(None, path_to_module(&db, &foo_py));
@@ -560,8 +591,8 @@ mod tests {
 
         let baz_module = resolve_module_name(&db, ModuleName::new("foo.bar.baz")).unwrap();
 
-        assert_eq!(src, baz_module.search_path(&db));
-        assert_eq!(&baz, baz_module.file(&db).path(&db));
+        assert_eq!(&src, baz_module.search_path());
+        assert_eq!(&baz, baz_module.file().path(&db));
 
         assert_eq!(Some(baz_module), path_to_module(&db, &baz));
 
@@ -679,8 +710,8 @@ mod tests {
 
         let foo_module = resolve_module_name(&db, ModuleName::new("foo")).unwrap();
 
-        assert_eq!(src, foo_module.search_path(&db));
-        assert_eq!(&foo_src, foo_module.file(&db).path(&db));
+        assert_eq!(&src, foo_module.search_path());
+        assert_eq!(&foo_src, foo_module.file().path(&db));
 
         assert_eq!(Some(foo_module), path_to_module(&db, &foo_src));
         assert_eq!(None, path_to_module(&db, &foo_site_packages));
@@ -709,14 +740,14 @@ mod tests {
 
         assert_ne!(foo_module, bar_module);
 
-        assert_eq!(src, foo_module.search_path(&db));
-        assert_eq!(&foo, foo_module.file(&db).path(&db));
+        assert_eq!(&src, foo_module.search_path());
+        assert_eq!(&foo, foo_module.file().path(&db));
 
         // Bar has a different name but it should point to the same file.
 
-        assert_eq!(src, bar_module.search_path(&db));
-        assert_eq!(foo_module.file(&db), bar_module.file(&db));
-        assert_eq!(&foo, bar_module.file(&db).path(&db));
+        assert_eq!(&src, bar_module.search_path());
+        assert_eq!(foo_module.file(), bar_module.file());
+        assert_eq!(&foo, bar_module.file().path(&db));
 
         assert_eq!(Some(foo_module), path_to_module(&db, &foo));
         assert_eq!(Some(bar_module), path_to_module(&db, &bar));
