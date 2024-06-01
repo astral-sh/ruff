@@ -451,11 +451,36 @@ mod tests {
                 elif flag2:
                     y = 4
                 else:
+                    r = y
                     y = 5
+                    s = y
                 x = y
             ",
         )?;
 
-        assert_public_type(&case, "a", "x", "(Literal[5] | Literal[4] | Literal[3])")
+        assert_public_type(&case, "a", "x", "(Literal[5] | Literal[4] | Literal[3])")?;
+        assert_public_type(&case, "a", "r", "Literal[2]")?;
+        assert_public_type(&case, "a", "s", "Literal[5]")
+    }
+
+    #[test]
+    fn if_elif() -> anyhow::Result<()> {
+        let case = create_test()?;
+
+        write_to_path(
+            &case,
+            "a.py",
+            "
+                y = 1
+                y = 2
+                if flag:
+                    y = 3
+                elif flag2:
+                    y = 4
+                x = y
+            ",
+        )?;
+
+        assert_public_type(&case, "a", "x", "(Literal[2] | Literal[4] | Literal[3])")
     }
 }
