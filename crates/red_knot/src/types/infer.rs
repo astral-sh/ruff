@@ -25,6 +25,10 @@ pub fn infer_symbol_public_type(db: &dyn SemanticDb, symbol: GlobalSymbolId) -> 
         return Ok(ty);
     }
 
+    // The public type of a symbol is the union of all of its definitions. This is the most
+    // cautious/sound approach, though it can lead to a broader-than-desired type in a case like
+    // `x = 1; x = str(x)`, where the first definition of `x` can never be visible. TODO prune
+    // definitions that we can prove can't be visible.
     let tys = defs
         .iter()
         .map(|def| infer_definition_type(db, symbol, def.clone()))
