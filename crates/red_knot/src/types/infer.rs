@@ -237,7 +237,8 @@ mod tests {
         Ok(TestCase { temp_dir, db, src })
     }
 
-    fn get_public_type(db: &TestDb, modname: &str, varname: &str) -> anyhow::Result<Type> {
+    fn get_public_type(case: &TestCase, modname: &str, varname: &str) -> anyhow::Result<Type> {
+        let db = &case.db;
         let file = resolve_module(db, ModuleName::new(modname))?
             .expect("module should be found")
             .path(db)?
@@ -257,14 +258,14 @@ mod tests {
     }
 
     fn assert_public_type(
-        db: &TestDb,
+        case: &TestCase,
         modname: &str,
         varname: &str,
         tyname: &str,
     ) -> anyhow::Result<()> {
-        let ty = get_public_type(db, modname, varname)?;
+        let ty = get_public_type(case, modname, varname)?;
 
-        let jar = HasJar::<SemanticJar>::jar(db)?;
+        let jar = HasJar::<SemanticJar>::jar(&case.db)?;
         assert_eq!(format!("{}", ty.display(&jar.type_store)), tyname);
         Ok(())
     }
@@ -272,30 +273,28 @@ mod tests {
     #[test]
     fn follow_import_to_class() -> anyhow::Result<()> {
         let case = create_test()?;
-        let db = &case.db;
 
         let a_path = case.src.path().join("a.py");
         let b_path = case.src.path().join("b.py");
         std::fs::write(a_path, "from b import C as D; E = D")?;
         std::fs::write(b_path, "class C: pass")?;
 
-        assert_public_type(db, "a", "E", "Literal[C]")
+        assert_public_type(&case, "a", "E", "Literal[C]")
     }
 
     #[test]
     fn resolve_base_class_by_name() -> anyhow::Result<()> {
         let case = create_test()?;
-        let db = &case.db;
 
         let path = case.src.path().join("mod.py");
         std::fs::write(path, "class Base: pass\nclass Sub(Base): pass")?;
 
-        let ty = get_public_type(db, "mod", "Sub")?;
+        let ty = get_public_type(&case, "mod", "Sub")?;
 
         let Type::Class(class_id) = ty else {
             panic!("Sub is not a Class")
         };
-        let jar = HasJar::<SemanticJar>::jar(db)?;
+        let jar = HasJar::<SemanticJar>::jar(&case.db)?;
         let base_names: Vec<_> = jar
             .type_store
             .get_class(class_id)
@@ -312,26 +311,25 @@ mod tests {
     #[test]
     fn resolve_method() -> anyhow::Result<()> {
         let case = create_test()?;
-        let db = &case.db;
 
         let path = case.src.path().join("mod.py");
         std::fs::write(path, "class C:\n  def f(self): pass")?;
 
-        let ty = get_public_type(db, "mod", "C")?;
+        let ty = get_public_type(&case, "mod", "C")?;
 
         let Type::Class(class_id) = ty else {
             panic!("C is not a Class");
         };
 
         let member_ty = class_id
-            .get_own_class_member(db, &Name::new("f"))
+            .get_own_class_member(&case.db, &Name::new("f"))
             .expect("C.f to resolve");
 
         let Some(Type::Function(func_id)) = member_ty else {
             panic!("C.f is not a Function");
         };
 
-        let jar = HasJar::<SemanticJar>::jar(db)?;
+        let jar = HasJar::<SemanticJar>::jar(&case.db)?;
         let function = jar.type_store.get_function(func_id);
         assert_eq!(function.name(), "f");
 
@@ -341,46 +339,42 @@ mod tests {
     #[test]
     fn resolve_module_member() -> anyhow::Result<()> {
         let case = create_test()?;
-        let db = &case.db;
 
         let a_path = case.src.path().join("a.py");
         let b_path = case.src.path().join("b.py");
         std::fs::write(a_path, "import b; D = b.C")?;
         std::fs::write(b_path, "class C: pass")?;
 
-        assert_public_type(db, "a", "D", "Literal[C]")
+        assert_public_type(&case, "a", "D", "Literal[C]")
     }
 
     #[test]
     fn resolve_literal() -> anyhow::Result<()> {
         let case = create_test()?;
-        let db = &case.db;
 
         let path = case.src.path().join("a.py");
         std::fs::write(path, "x = 1")?;
 
-        assert_public_type(db, "a", "x", "Literal[1]")
+        assert_public_type(&case, "a", "x", "Literal[1]")
     }
 
     #[test]
     fn resolve_union() -> anyhow::Result<()> {
         let case = create_test()?;
-        let db = &case.db;
 
         let path = case.src.path().join("a.py");
         std::fs::write(path, "if flag:\n  x = 1\nelse:\n  x = 2")?;
 
-        assert_public_type(db, "a", "x", "(Literal[1] | Literal[2])")
+        assert_public_type(&case, "a", "x", "(Literal[1] | Literal[2])")
     }
 
     #[test]
     fn resolve_visible_def() -> anyhow::Result<()> {
         let case = create_test()?;
-        let db = &case.db;
 
         let path = case.src.path().join("a.py");
         std::fs::write(path, "y = 1; y = 2; x = y")?;
 
-        assert_public_type(db, "a", "x", "Literal[2]")
+        assert_public_type(&case, "a", "x", "Literal[2]")
     }
 }
