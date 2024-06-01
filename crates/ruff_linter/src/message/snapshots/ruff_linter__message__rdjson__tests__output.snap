@@ -92,8 +92,7 @@ expression: content
           }
         }
       },
-      "message": "Undefined name `a`",
-      "suggestions": null
+      "message": "Undefined name `a`"
     }
   ],
   "severity": "warning",

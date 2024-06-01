@@ -60,15 +60,10 @@ impl Serialize for ExpandedMessages<'_> {
 pub(crate) fn message_to_rdjson_value(message: &Message) -> Value {
     let source_code = message.file.to_source_code();
 
-    let fix = message.fix.as_ref().map(|fix| ExpandedEdits {
-        edits: fix.edits(),
-        source_code: &source_code,
-    });
-
     let start_location = source_code.source_location(message.start());
     let end_location = source_code.source_location(message.end());
 
-    json!({
+    let mut result = json!({
         "message": message.kind.body,
         "location": {
             "path": message.filename(),
@@ -78,34 +73,32 @@ pub(crate) fn message_to_rdjson_value(message: &Message) -> Value {
             "value": message.kind.rule().noqa_code().to_string(),
             "url": message.kind.rule().url(),
         },
-        "suggestions": fix,
     })
+    .as_object()
+    .unwrap()
+    .clone();
+
+    if let Some(fix) = message.fix.as_ref() {
+        result.insert(
+            "suggestions".into(),
+            rdjson_suggestions(fix.edits(), &source_code),
+        );
+    };
+
+    return Value::Object(result);
 }
 
-struct ExpandedEdits<'a> {
-    edits: &'a [Edit],
-    source_code: &'a SourceCode<'a, 'a>,
-}
+fn rdjson_suggestions(edits: &[Edit], source_code: &SourceCode) -> Value {
+    let mut suggestions: Vec<Value> = vec![];
 
-impl Serialize for ExpandedEdits<'_> {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let mut s = serializer.serialize_seq(Some(self.edits.len()))?;
+    for edit in edits {
+        let location = source_code.source_location(edit.start());
+        let end_location = source_code.source_location(edit.end());
 
-        for edit in self.edits {
-            let location = self.source_code.source_location(edit.start());
-            let end_location = self.source_code.source_location(edit.end());
-
-            s.serialize_element(&json!({
-                "range": rdjson_range(location, end_location),
-                "text": edit.content().unwrap_or_default(),
-            }))?;
-        }
-
-        s.end()
+        suggestions.push(json!({"range": rdjson_range(location, end_location), "text": edit.content().unwrap_or_default()}));
     }
+
+    return Value::Array(suggestions);
 }
 
 fn rdjson_range(start: SourceLocation, end: SourceLocation) -> Value {
