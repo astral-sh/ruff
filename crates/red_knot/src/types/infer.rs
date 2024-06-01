@@ -163,6 +163,7 @@ fn infer_expr_type(db: &dyn SemanticDb, file_id: FileId, expr: &ast::Expr) -> Qu
         ast::Expr::Name(name) => {
             // TODO look up in the correct scope, don't assume global
             if let Some(symbol_id) = symbols.root_symbol_id_by_name(&name.id) {
+                // TODO should use only reachable definitions, not public type
                 infer_symbol_public_type(db, GlobalSymbolId { file_id, symbol_id })
             } else {
                 Ok(Type::Unknown)
