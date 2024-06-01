@@ -67,7 +67,7 @@ pub(crate) fn message_to_rdjson_value(message: &Message) -> Value {
         "message": message.kind.body,
         "location": {
             "path": message.filename(),
-            "range": rdjson_range(start_location, end_location),
+            "range": rdjson_range(&start_location, &end_location),
         },
         "code": {
             "value": message.kind.rule().noqa_code().to_string(),
@@ -85,7 +85,7 @@ pub(crate) fn message_to_rdjson_value(message: &Message) -> Value {
         );
     };
 
-    return Value::Object(result);
+    Value::Object(result)
 }
 
 fn rdjson_suggestions(edits: &[Edit], source_code: &SourceCode) -> Value {
@@ -95,13 +95,13 @@ fn rdjson_suggestions(edits: &[Edit], source_code: &SourceCode) -> Value {
         let location = source_code.source_location(edit.start());
         let end_location = source_code.source_location(edit.end());
 
-        suggestions.push(json!({"range": rdjson_range(location, end_location), "text": edit.content().unwrap_or_default()}));
+        suggestions.push(json!({"range": rdjson_range(&location, &end_location), "text": edit.content().unwrap_or_default()}));
     }
 
-    return Value::Array(suggestions);
+    Value::Array(suggestions)
 }
 
-fn rdjson_range(start: SourceLocation, end: SourceLocation) -> Value {
+fn rdjson_range(start: &SourceLocation, end: &SourceLocation) -> Value {
     json!({
         "start": {
             "line": start.row,
