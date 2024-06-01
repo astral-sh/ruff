@@ -187,6 +187,7 @@ pub(crate) enum Definition {
     FunctionDef(TypedNodeKey<ast::StmtFunctionDef>),
     Assignment(TypedNodeKey<ast::StmtAssign>),
     AnnotatedAssignment(TypedNodeKey<ast::StmtAnnAssign>),
+    None,
     // TODO with statements, except handlers, function args...
 }
 
@@ -288,8 +289,8 @@ impl SymbolTable {
         let flow_node_id = self.flow_graph.ast_to_flow[&node_key];
         ReachableDefinitionsIterator {
             table: self,
-            flow_node_id,
             symbol_id,
+            pending: vec![flow_node_id],
         }
     }
 
@@ -545,28 +546,32 @@ where
 #[derive(Debug)]
 pub(crate) struct ReachableDefinitionsIterator<'a> {
     table: &'a SymbolTable,
-    flow_node_id: FlowNodeId,
     symbol_id: SymbolId,
+    pending: Vec<FlowNodeId>,
 }
 
 impl<'a> Iterator for ReachableDefinitionsIterator<'a> {
     type Item = Definition;
 
     fn next(&mut self) -> Option<Self::Item> {
-        loop {
-            match &self.table.flow_graph.flow_nodes_by_id[self.flow_node_id] {
-                FlowNode::Start => return None,
+        while let Some(flow_node_id) = self.pending.pop() {
+            match &self.table.flow_graph.flow_nodes_by_id[flow_node_id] {
+                FlowNode::Start => return Some(Definition::None),
                 FlowNode::Definition(def_node) => {
                     if def_node.symbol_id == self.symbol_id {
-                        // we found a definition; previous definitions along this path are not
-                        // reachable
-                        self.flow_node_id = FlowGraph::start();
                         return Some(def_node.definition.clone());
                     }
-                    self.flow_node_id = def_node.predecessor;
+                    self.pending.push(def_node.predecessor);
+                }
+                FlowNode::Branch(branch_node) => {
+                    self.pending.push(branch_node.predecessor);
+                }
+                FlowNode::Phi(phi_node) => {
+                    self.pending.extend_from_slice(&phi_node.predecessors);
                 }
             }
         }
+        None
     }
 }
 
@@ -579,8 +584,11 @@ struct FlowNodeId;
 enum FlowNode {
     Start,
     Definition(DefinitionFlowNode),
+    Branch(BranchFlowNode),
+    Phi(PhiFlowNode),
 }
 
+/// A Definition node represents a point in control flow where a symbol is defined
 #[derive(Debug)]
 struct DefinitionFlowNode {
     symbol_id: SymbolId,
@@ -588,8 +596,20 @@ struct DefinitionFlowNode {
     predecessor: FlowNodeId,
 }
 
+/// A Branch node represents a branch in control flow
+#[derive(Debug)]
+struct BranchFlowNode {
+    predecessor: FlowNodeId,
+}
+
+/// A Phi node represents a join point where control flow paths come together
+#[derive(Debug)]
+struct PhiFlowNode {
+    predecessors: Vec<FlowNodeId>,
+}
+
 #[derive(Debug, Default)]
-struct FlowGraph {
+pub(crate) struct FlowGraph {
     flow_nodes_by_id: IndexVec<FlowNodeId, FlowNode>,
     ast_to_flow: FxHashMap<NodeKey, FlowNodeId>,
 }
@@ -628,6 +648,10 @@ impl SymbolTableBuilder {
             .add_or_update_symbol(self.cur_scope(), identifier, flags)
     }
 
+    fn new_flow_node(&mut self, node: FlowNode) -> FlowNodeId {
+        self.table.flow_graph.flow_nodes_by_id.push(node)
+    }
+
     fn add_or_update_symbol_with_def(
         &mut self,
         identifier: &str,
@@ -639,15 +663,11 @@ impl SymbolTableBuilder {
             .entry(symbol_id)
             .or_default()
             .push(definition.clone());
-        let new_flow_node_id = self
-            .table
-            .flow_graph
-            .flow_nodes_by_id
-            .push(FlowNode::Definition(DefinitionFlowNode {
-                definition,
-                symbol_id,
-                predecessor: self.current_flow_node(),
-            }));
+        let new_flow_node_id = self.new_flow_node(FlowNode::Definition(DefinitionFlowNode {
+            definition,
+            symbol_id,
+            predecessor: self.current_flow_node(),
+        }));
         self.set_current_flow_node(new_flow_node_id);
         symbol_id
     }
@@ -860,10 +880,76 @@ impl PreorderVisitor<'_> for SymbolTableBuilder {
                 ast::visitor::preorder::walk_stmt(self, stmt);
                 self.current_definition = None;
             }
+            ast::Stmt::If(node) => {
+                self.visit_expr(&node.test);
+                let pre_body = self.current_flow_node();
+                let if_branch = self.new_flow_node(FlowNode::Branch(BranchFlowNode {
+                    predecessor: pre_body,
+                }));
+                self.set_current_flow_node(if_branch);
+                self.visit_body(&node.body);
+                let mut phi_node = PhiFlowNode {
+                    predecessors: vec![self.current_flow_node()],
+                };
+                let mut last_branch = if_branch;
+                let mut last_branch_is_else = false;
+                for clause in &node.elif_else_clauses {
+                    let clause_branch = self.new_flow_node(FlowNode::Branch(BranchFlowNode {
+                        predecessor: last_branch,
+                    }));
+                    last_branch = clause_branch;
+                    last_branch_is_else = clause.test.is_none();
+                    self.set_current_flow_node(clause_branch);
+                    self.visit_elif_else_clause(clause);
+                    phi_node.predecessors.push(self.current_flow_node());
+                }
+                if !last_branch_is_else {
+                    phi_node.predecessors.push(last_branch);
+                }
+                let phi_node_id = self.new_flow_node(FlowNode::Phi(phi_node));
+                self.set_current_flow_node(phi_node_id);
+            }
             _ => {
                 ast::visitor::preorder::walk_stmt(self, stmt);
             }
         }
+    }
+}
+
+impl std::fmt::Display for FlowGraph {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        writeln!(f, "flowchart TD")?;
+        for (id, node) in self.flow_nodes_by_id.iter_enumerated() {
+            write!(f, "  id{}", id.as_u32())?;
+            match node {
+                FlowNode::Start => writeln!(f, r"[\Start/]")?,
+                FlowNode::Definition(def_node) => {
+                    writeln!(f, r"(Define symbol {})", def_node.symbol_id.as_u32())?;
+                    writeln!(
+                        f,
+                        r"  id{}-->id{}",
+                        def_node.predecessor.as_u32(),
+                        id.as_u32()
+                    )?;
+                }
+                FlowNode::Branch(branch_node) => {
+                    writeln!(f, r"{{Branch}}")?;
+                    writeln!(
+                        f,
+                        r"  id{}-->id{}",
+                        branch_node.predecessor.as_u32(),
+                        id.as_u32()
+                    )?;
+                }
+                FlowNode::Phi(phi_node) => {
+                    writeln!(f, r"((Phi))")?;
+                    for pred in &phi_node.predecessors {
+                        writeln!(f, r"  id{}-->id{}", pred.as_u32(), id.as_u32())?;
+                    }
+                }
+            }
+        }
+        Ok(())
     }
 }
 

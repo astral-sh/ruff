@@ -69,6 +69,7 @@ pub fn infer_definition_type(
     let file_id = symbol.file_id;
 
     match definition {
+        Definition::None => Ok(Type::Unbound),
         Definition::Import(ImportDefinition {
             module: module_name,
         }) => {
@@ -397,5 +398,64 @@ mod tests {
         write_to_path(&case, "a.py", "y = 1; y = 2; x = y")?;
 
         assert_public_type(&case, "a", "x", "Literal[2]")
+    }
+
+    #[test]
+    fn join_paths() -> anyhow::Result<()> {
+        let case = create_test()?;
+
+        write_to_path(
+            &case,
+            "a.py",
+            "
+                y = 1
+                y = 2
+                if flag:
+                    y = 3
+                x = y
+            ",
+        )?;
+
+        assert_public_type(&case, "a", "x", "(Literal[2] | Literal[3])")
+    }
+
+    #[test]
+    fn maybe_unbound() -> anyhow::Result<()> {
+        let case = create_test()?;
+
+        write_to_path(
+            &case,
+            "a.py",
+            "
+                if flag:
+                    y = 1
+                x = y
+            ",
+        )?;
+
+        assert_public_type(&case, "a", "x", "(Unbound | Literal[1])")
+    }
+
+    #[test]
+    fn if_elif_else() -> anyhow::Result<()> {
+        let case = create_test()?;
+
+        write_to_path(
+            &case,
+            "a.py",
+            "
+                y = 1
+                y = 2
+                if flag:
+                    y = 3
+                elif flag2:
+                    y = 4
+                else:
+                    y = 5
+                x = y
+            ",
+        )?;
+
+        assert_public_type(&case, "a", "x", "(Literal[5] | Literal[4] | Literal[3])")
     }
 }
