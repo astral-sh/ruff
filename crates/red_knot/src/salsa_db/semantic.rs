@@ -98,7 +98,7 @@ pub fn dependencies(db: &dyn Db, file: File) -> Arc<[ModuleName]> {
                     if let Some(level) = NonZeroU32::new(from.level) {
                         // FIXME how to handle dependencies if the current file isn't a module?
                         //  e.g. what if the current file is a jupyter notebook. We should still be able to resolve files somehow.
-                        if let Some(resolved_module) = self.resolved_module {
+                        if let Some(resolved_module) = &self.resolved_module {
                             if let Some(dependency) = resolved_module.resolve_dependency(
                                 self.db,
                                 &Dependency::Relative {
@@ -191,7 +191,6 @@ pub struct Jar(
     ModuleSearchPaths,
     Symbol,
     Module,
-    ResolvedModule,
     dependencies,
     symbol_table,
     ast_ids,
