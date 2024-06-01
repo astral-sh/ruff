@@ -211,6 +211,7 @@ mod tests {
     use crate::symbols::{symbol_table, GlobalSymbolId};
     use crate::types::{infer_symbol_public_type, Type};
     use crate::Name;
+    use textwrap::dedent;
 
     // TODO with virtual filesystem we shouldn't have to write files to disk for these
     // tests
@@ -239,7 +240,7 @@ mod tests {
 
     fn write_to_path(case: &TestCase, relpath: &str, contents: &str) -> anyhow::Result<()> {
         let path = case.src.path().join(relpath);
-        std::fs::write(path, contents)?;
+        std::fs::write(path, dedent(contents))?;
         Ok(())
     }
 
@@ -290,7 +291,14 @@ mod tests {
     fn resolve_base_class_by_name() -> anyhow::Result<()> {
         let case = create_test()?;
 
-        write_to_path(&case, "mod.py", "class Base: pass\nclass Sub(Base): pass")?;
+        write_to_path(
+            &case,
+            "mod.py",
+            "
+                class Base: pass
+                class Sub(Base): pass
+            ",
+        )?;
 
         let ty = get_public_type(&case, "mod", "Sub")?;
 
@@ -315,7 +323,14 @@ mod tests {
     fn resolve_method() -> anyhow::Result<()> {
         let case = create_test()?;
 
-        write_to_path(&case, "mod.py", "class C:\n  def f(self): pass")?;
+        write_to_path(
+            &case,
+            "mod.py",
+            "
+                class C:
+                    def f(self): pass
+            ",
+        )?;
 
         let ty = get_public_type(&case, "mod", "C")?;
 
@@ -361,7 +376,16 @@ mod tests {
     fn resolve_union() -> anyhow::Result<()> {
         let case = create_test()?;
 
-        write_to_path(&case, "a.py", "if flag:\n  x = 1\nelse:\n  x = 2")?;
+        write_to_path(
+            &case,
+            "a.py",
+            "
+                if flag:
+                    x = 1
+                else:
+                    x = 2
+            ",
+        )?;
 
         assert_public_type(&case, "a", "x", "(Literal[1] | Literal[2])")
     }
