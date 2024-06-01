@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use std::hash::{Hash, Hasher};
+use std::hash::Hash;
 use std::iter::{Copied, DoubleEndedIterator, FusedIterator};
 use std::num::NonZeroU32;
 use std::ops::{Deref, DerefMut};
@@ -8,7 +8,7 @@ use std::sync::Arc;
 
 use bitflags::bitflags;
 use hashbrown::hash_map::{Keys, RawEntryMut};
-use rustc_hash::{FxHashMap, FxHasher};
+use rustc_hash::FxHashMap;
 
 use ruff_index::{newtype_index, IndexVec};
 use ruff_python_ast as ast;
@@ -20,7 +20,7 @@ use crate::db::{QueryResult, SemanticDb, SemanticJar};
 use crate::files::FileId;
 use crate::module::{resolve_module, ModuleName};
 use crate::parse::parse;
-use crate::Name;
+use crate::{Name, NameId, Names};
 
 #[tracing::instrument(level = "debug", skip(db))]
 pub fn symbol_table(db: &dyn SemanticDb, file_id: FileId) -> QueryResult<Arc<SymbolTable>> {
@@ -141,15 +141,15 @@ bitflags! {
 
 #[derive(Debug)]
 pub(crate) struct Symbol {
-    name: Name,
+    name_id: NameId,
     flags: SymbolFlags,
     scope_id: ScopeId,
     // kind: Kind,
 }
 
 impl Symbol {
-    pub(crate) fn name(&self) -> &str {
-        self.name.as_str()
+    pub(crate) fn name<'a>(&self, names: &'a Names) -> &'a Name {
+        self.name_id.name(names)
     }
 
     pub(crate) fn scope_id(&self) -> ScopeId {
@@ -237,6 +237,8 @@ pub struct SymbolTable {
     /// dependencies of this module
     dependencies: Vec<Dependency>,
     flow_graph: FlowGraph,
+    /// interned names throughout this module
+    names: Names,
 }
 
 impl SymbolTable {
@@ -260,6 +262,7 @@ impl SymbolTable {
             scopes_by_node: FxHashMap::default(),
             dependencies: Vec::new(),
             flow_graph: FlowGraph::new(),
+            names: Names::default(),
         };
         table.scopes_by_id.push(Scope {
             name: Name::new("<module>"),
@@ -345,13 +348,13 @@ impl SymbolTable {
 
     pub(crate) fn symbol_id_by_name(&self, scope_id: ScopeId, name: &str) -> Option<SymbolId> {
         let scope = &self.scopes_by_id[scope_id];
-        let hash = SymbolTable::hash_name(name);
-        let name = Name::new(name);
+        let name_id = self.names.get(name)?;
+        let hash = Names::hash_name(name);
         Some(
             *scope
                 .symbols_by_name
                 .raw_entry()
-                .from_hash(hash, |symid| self.symbols_by_id[*symid].name == name)?
+                .from_hash(hash, |symid| self.symbols_by_id[*symid].name_id == name_id)?
                 .0,
         )
     }
@@ -413,14 +416,19 @@ impl SymbolTable {
         name: &str,
         flags: SymbolFlags,
     ) -> SymbolId {
-        let hash = SymbolTable::hash_name(name);
         let scope = &mut self.scopes_by_id[scope_id];
-        let name = Name::new(name);
+        let name_id = self
+            .names
+            .get(name)
+            // FIXME: instead of interning here, change `name: &str` arg to `name_id: NameId` and
+            // update callers
+            .unwrap_or_else(|| self.names.intern(name.into()));
+        let hash = Names::hash_name(name);
 
         let entry = scope
             .symbols_by_name
             .raw_entry_mut()
-            .from_hash(hash, |existing| self.symbols_by_id[*existing].name == name);
+            .from_hash(hash, |symid| self.symbols_by_id[*symid].name_id == name_id);
 
         match entry {
             RawEntryMut::Occupied(entry) => {
@@ -431,12 +439,14 @@ impl SymbolTable {
             }
             RawEntryMut::Vacant(entry) => {
                 let id = self.symbols_by_id.push(Symbol {
-                    name,
+                    name_id,
                     flags,
                     scope_id,
                 });
                 entry.insert_with_hasher(hash, id, (), |symid| {
-                    SymbolTable::hash_name(&self.symbols_by_id[*symid].name)
+                    // FIXME: add `Name.hash(self, Names)` to encapsulate this? or even
+                    // `NameId.hash(self, Names)`?
+                    Names::hash_name(self.symbols_by_id[*symid].name_id.name(&self.names))
                 });
                 id
             }
@@ -463,12 +473,6 @@ impl SymbolTable {
         let parent_scope = &mut self.scopes_by_id[parent_scope_id];
         parent_scope.children.push(new_scope_id);
         new_scope_id
-    }
-
-    fn hash_name(name: &str) -> u64 {
-        let mut hasher = FxHasher::default();
-        name.hash(&mut hasher);
-        hasher.finish()
     }
 }
 
@@ -873,27 +877,29 @@ mod tests {
             Parsed::from_text(&dedent(code))
         }
 
-        fn names<I>(it: SymbolIterator<I>) -> Vec<&str>
-        where
-            I: Iterator<Item = SymbolId>,
-        {
-            let mut symbols: Vec<_> = it.map(|sym| sym.name.as_str()).collect();
-            symbols.sort_unstable();
-            symbols
+        impl SymbolTable {
+            fn name_vec<I>(&self, it: SymbolIterator<I>) -> Vec<&str>
+            where
+                I: Iterator<Item = SymbolId>,
+            {
+                let mut symbols: Vec<_> = it.map(|sym| sym.name(&self.names).as_str()).collect();
+                symbols.sort_unstable();
+                symbols
+            }
         }
 
         #[test]
         fn empty() {
             let parsed = parse("");
             let table = SymbolTable::from_ast(parsed.ast());
-            assert_eq!(names(table.root_symbols()).len(), 0);
+            assert_eq!(table.name_vec(table.root_symbols()).len(), 0);
         }
 
         #[test]
         fn simple() {
             let parsed = parse("x");
             let table = SymbolTable::from_ast(parsed.ast());
-            assert_eq!(names(table.root_symbols()), vec!["x"]);
+            assert_eq!(table.name_vec(table.root_symbols()), vec!["x"]);
             assert_eq!(
                 table
                     .definitions(table.root_symbol_id_by_name("x").unwrap())
@@ -906,7 +912,7 @@ mod tests {
         fn annotation_only() {
             let parsed = parse("x: int");
             let table = SymbolTable::from_ast(parsed.ast());
-            assert_eq!(names(table.root_symbols()), vec!["int", "x"]);
+            assert_eq!(table.name_vec(table.root_symbols()), vec!["int", "x"]);
             // TODO record definition
         }
 
@@ -914,7 +920,7 @@ mod tests {
         fn import() {
             let parsed = parse("import foo");
             let table = SymbolTable::from_ast(parsed.ast());
-            assert_eq!(names(table.root_symbols()), vec!["foo"]);
+            assert_eq!(table.name_vec(table.root_symbols()), vec!["foo"]);
             assert_eq!(
                 table
                     .definitions(table.root_symbol_id_by_name("foo").unwrap())
@@ -927,21 +933,21 @@ mod tests {
         fn import_sub() {
             let parsed = parse("import foo.bar");
             let table = SymbolTable::from_ast(parsed.ast());
-            assert_eq!(names(table.root_symbols()), vec!["foo"]);
+            assert_eq!(table.name_vec(table.root_symbols()), vec!["foo"]);
         }
 
         #[test]
         fn import_as() {
             let parsed = parse("import foo.bar as baz");
             let table = SymbolTable::from_ast(parsed.ast());
-            assert_eq!(names(table.root_symbols()), vec!["baz"]);
+            assert_eq!(table.name_vec(table.root_symbols()), vec!["baz"]);
         }
 
         #[test]
         fn import_from() {
             let parsed = parse("from bar import foo");
             let table = SymbolTable::from_ast(parsed.ast());
-            assert_eq!(names(table.root_symbols()), vec!["foo"]);
+            assert_eq!(table.name_vec(table.root_symbols()), vec!["foo"]);
             assert_eq!(
                 table
                     .definitions(table.root_symbol_id_by_name("foo").unwrap())
@@ -961,7 +967,7 @@ mod tests {
         fn assign() {
             let parsed = parse("x = foo");
             let table = SymbolTable::from_ast(parsed.ast());
-            assert_eq!(names(table.root_symbols()), vec!["foo", "x"]);
+            assert_eq!(table.name_vec(table.root_symbols()), vec!["foo", "x"]);
             assert_eq!(
                 table
                     .definitions(table.root_symbol_id_by_name("x").unwrap())
@@ -987,13 +993,16 @@ mod tests {
                 ",
             );
             let table = SymbolTable::from_ast(parsed.ast());
-            assert_eq!(names(table.root_symbols()), vec!["C", "y"]);
+            assert_eq!(table.name_vec(table.root_symbols()), vec!["C", "y"]);
             let scopes = table.root_child_scope_ids();
             assert_eq!(scopes.len(), 1);
             let c_scope = scopes[0].scope(&table);
             assert_eq!(c_scope.kind(), ScopeKind::Class);
             assert_eq!(c_scope.name(), "C");
-            assert_eq!(names(table.symbols_for_scope(scopes[0])), vec!["x"]);
+            assert_eq!(
+                table.name_vec(table.symbols_for_scope(scopes[0])),
+                vec!["x"]
+            );
             assert_eq!(
                 table
                     .definitions(table.root_symbol_id_by_name("C").unwrap())
@@ -1012,13 +1021,16 @@ mod tests {
                 ",
             );
             let table = SymbolTable::from_ast(parsed.ast());
-            assert_eq!(names(table.root_symbols()), vec!["func", "y"]);
+            assert_eq!(table.name_vec(table.root_symbols()), vec!["func", "y"]);
             let scopes = table.root_child_scope_ids();
             assert_eq!(scopes.len(), 1);
             let func_scope = scopes[0].scope(&table);
             assert_eq!(func_scope.kind(), ScopeKind::Function);
             assert_eq!(func_scope.name(), "func");
-            assert_eq!(names(table.symbols_for_scope(scopes[0])), vec!["x"]);
+            assert_eq!(
+                table.name_vec(table.symbols_for_scope(scopes[0])),
+                vec!["x"]
+            );
             assert_eq!(
                 table
                     .definitions(table.root_symbol_id_by_name("func").unwrap())
@@ -1038,7 +1050,7 @@ mod tests {
                 ",
             );
             let table = SymbolTable::from_ast(parsed.ast());
-            assert_eq!(names(table.root_symbols()), vec!["func"]);
+            assert_eq!(table.name_vec(table.root_symbols()), vec!["func"]);
             let scopes = table.root_child_scope_ids();
             assert_eq!(scopes.len(), 2);
             let func_scope_1 = scopes[0].scope(&table);
@@ -1047,8 +1059,14 @@ mod tests {
             assert_eq!(func_scope_1.name(), "func");
             assert_eq!(func_scope_2.kind(), ScopeKind::Function);
             assert_eq!(func_scope_2.name(), "func");
-            assert_eq!(names(table.symbols_for_scope(scopes[0])), vec!["x"]);
-            assert_eq!(names(table.symbols_for_scope(scopes[1])), vec!["y"]);
+            assert_eq!(
+                table.name_vec(table.symbols_for_scope(scopes[0])),
+                vec!["x"]
+            );
+            assert_eq!(
+                table.name_vec(table.symbols_for_scope(scopes[1])),
+                vec!["y"]
+            );
             assert_eq!(
                 table
                     .definitions(table.root_symbol_id_by_name("func").unwrap())
@@ -1066,21 +1084,27 @@ mod tests {
                 ",
             );
             let table = SymbolTable::from_ast(parsed.ast());
-            assert_eq!(names(table.root_symbols()), vec!["func"]);
+            assert_eq!(table.name_vec(table.root_symbols()), vec!["func"]);
             let scopes = table.root_child_scope_ids();
             assert_eq!(scopes.len(), 1);
             let ann_scope_id = scopes[0];
             let ann_scope = ann_scope_id.scope(&table);
             assert_eq!(ann_scope.kind(), ScopeKind::Annotation);
             assert_eq!(ann_scope.name(), "func");
-            assert_eq!(names(table.symbols_for_scope(ann_scope_id)), vec!["T"]);
+            assert_eq!(
+                table.name_vec(table.symbols_for_scope(ann_scope_id)),
+                vec!["T"]
+            );
             let scopes = table.child_scope_ids_of(ann_scope_id);
             assert_eq!(scopes.len(), 1);
             let func_scope_id = scopes[0];
             let func_scope = func_scope_id.scope(&table);
             assert_eq!(func_scope.kind(), ScopeKind::Function);
             assert_eq!(func_scope.name(), "func");
-            assert_eq!(names(table.symbols_for_scope(func_scope_id)), vec!["x"]);
+            assert_eq!(
+                table.name_vec(table.symbols_for_scope(func_scope_id)),
+                vec!["x"]
+            );
         }
 
         #[test]
@@ -1092,14 +1116,17 @@ mod tests {
                 ",
             );
             let table = SymbolTable::from_ast(parsed.ast());
-            assert_eq!(names(table.root_symbols()), vec!["C"]);
+            assert_eq!(table.name_vec(table.root_symbols()), vec!["C"]);
             let scopes = table.root_child_scope_ids();
             assert_eq!(scopes.len(), 1);
             let ann_scope_id = scopes[0];
             let ann_scope = ann_scope_id.scope(&table);
             assert_eq!(ann_scope.kind(), ScopeKind::Annotation);
             assert_eq!(ann_scope.name(), "C");
-            assert_eq!(names(table.symbols_for_scope(ann_scope_id)), vec!["T"]);
+            assert_eq!(
+                table.name_vec(table.symbols_for_scope(ann_scope_id)),
+                vec!["T"]
+            );
             assert!(
                 table
                     .symbol_by_name(ann_scope_id, "T")
@@ -1112,7 +1139,10 @@ mod tests {
             let func_scope = func_scope_id.scope(&table);
             assert_eq!(func_scope.kind(), ScopeKind::Class);
             assert_eq!(func_scope.name(), "C");
-            assert_eq!(names(table.symbols_for_scope(func_scope_id)), vec!["x"]);
+            assert_eq!(
+                table.name_vec(table.symbols_for_scope(func_scope_id)),
+                vec!["x"]
+            );
         }
 
         #[test]
@@ -1190,7 +1220,7 @@ mod tests {
         let root_scope_id = SymbolTable::root_scope_id();
         let foo_symbol_id = table.add_or_update_symbol(root_scope_id, "foo", SymbolFlags::empty());
         let symbol = foo_symbol_id.symbol(&table);
-        assert_eq!(symbol.name.as_str(), "foo");
+        assert_eq!(symbol.name(&table.names).as_str(), "foo");
     }
 
     #[test]
