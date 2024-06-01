@@ -237,6 +237,12 @@ mod tests {
         Ok(TestCase { temp_dir, db, src })
     }
 
+    fn write_to_path(case: &TestCase, relpath: &str, contents: &str) -> anyhow::Result<()> {
+        let path = case.src.path().join(relpath);
+        std::fs::write(path, contents)?;
+        Ok(())
+    }
+
     fn get_public_type(case: &TestCase, modname: &str, varname: &str) -> anyhow::Result<Type> {
         let db = &case.db;
         let file = resolve_module(db, ModuleName::new(modname))?
@@ -274,10 +280,8 @@ mod tests {
     fn follow_import_to_class() -> anyhow::Result<()> {
         let case = create_test()?;
 
-        let a_path = case.src.path().join("a.py");
-        let b_path = case.src.path().join("b.py");
-        std::fs::write(a_path, "from b import C as D; E = D")?;
-        std::fs::write(b_path, "class C: pass")?;
+        write_to_path(&case, "a.py", "from b import C as D; E = D")?;
+        write_to_path(&case, "b.py", "class C: pass")?;
 
         assert_public_type(&case, "a", "E", "Literal[C]")
     }
@@ -286,8 +290,7 @@ mod tests {
     fn resolve_base_class_by_name() -> anyhow::Result<()> {
         let case = create_test()?;
 
-        let path = case.src.path().join("mod.py");
-        std::fs::write(path, "class Base: pass\nclass Sub(Base): pass")?;
+        write_to_path(&case, "mod.py", "class Base: pass\nclass Sub(Base): pass")?;
 
         let ty = get_public_type(&case, "mod", "Sub")?;
 
@@ -312,8 +315,7 @@ mod tests {
     fn resolve_method() -> anyhow::Result<()> {
         let case = create_test()?;
 
-        let path = case.src.path().join("mod.py");
-        std::fs::write(path, "class C:\n  def f(self): pass")?;
+        write_to_path(&case, "mod.py", "class C:\n  def f(self): pass")?;
 
         let ty = get_public_type(&case, "mod", "C")?;
 
@@ -340,10 +342,8 @@ mod tests {
     fn resolve_module_member() -> anyhow::Result<()> {
         let case = create_test()?;
 
-        let a_path = case.src.path().join("a.py");
-        let b_path = case.src.path().join("b.py");
-        std::fs::write(a_path, "import b; D = b.C")?;
-        std::fs::write(b_path, "class C: pass")?;
+        write_to_path(&case, "a.py", "import b; D = b.C")?;
+        write_to_path(&case, "b.py", "class C: pass")?;
 
         assert_public_type(&case, "a", "D", "Literal[C]")
     }
@@ -352,8 +352,7 @@ mod tests {
     fn resolve_literal() -> anyhow::Result<()> {
         let case = create_test()?;
 
-        let path = case.src.path().join("a.py");
-        std::fs::write(path, "x = 1")?;
+        write_to_path(&case, "a.py", "x = 1")?;
 
         assert_public_type(&case, "a", "x", "Literal[1]")
     }
@@ -362,8 +361,7 @@ mod tests {
     fn resolve_union() -> anyhow::Result<()> {
         let case = create_test()?;
 
-        let path = case.src.path().join("a.py");
-        std::fs::write(path, "if flag:\n  x = 1\nelse:\n  x = 2")?;
+        write_to_path(&case, "a.py", "if flag:\n  x = 1\nelse:\n  x = 2")?;
 
         assert_public_type(&case, "a", "x", "(Literal[1] | Literal[2])")
     }
@@ -372,8 +370,7 @@ mod tests {
     fn resolve_visible_def() -> anyhow::Result<()> {
         let case = create_test()?;
 
-        let path = case.src.path().join("a.py");
-        std::fs::write(path, "y = 1; y = 2; x = y")?;
+        write_to_path(&case, "a.py", "y = 1; y = 2; x = y")?;
 
         assert_public_type(&case, "a", "x", "Literal[2]")
     }
