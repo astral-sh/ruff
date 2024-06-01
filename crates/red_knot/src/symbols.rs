@@ -894,12 +894,16 @@ impl PreorderVisitor<'_> for SymbolTableBuilder {
                 let mut last_branch = if_branch;
                 let mut last_branch_is_else = false;
                 for clause in &node.elif_else_clauses {
-                    let clause_branch = self.new_flow_node(FlowNode::Branch(BranchFlowNode {
-                        predecessor: last_branch,
-                    }));
-                    last_branch = clause_branch;
-                    last_branch_is_else = clause.test.is_none();
-                    self.set_current_flow_node(clause_branch);
+                    if clause.test.is_some() {
+                        let clause_branch = self.new_flow_node(FlowNode::Branch(BranchFlowNode {
+                            predecessor: last_branch,
+                        }));
+                        last_branch = clause_branch;
+                        self.set_current_flow_node(clause_branch);
+                    } else {
+                        self.set_current_flow_node(last_branch);
+                        last_branch_is_else = true;
+                    }
                     self.visit_elif_else_clause(clause);
                     phi_node.predecessors.push(self.current_flow_node());
                 }
