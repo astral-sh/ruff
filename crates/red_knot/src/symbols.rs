@@ -609,7 +609,7 @@ struct PhiFlowNode {
 }
 
 #[derive(Debug, Default)]
-pub(crate) struct FlowGraph {
+struct FlowGraph {
     flow_nodes_by_id: IndexVec<FlowNodeId, FlowNode>,
     ast_to_flow: FxHashMap<NodeKey, FlowNodeId>,
 }
