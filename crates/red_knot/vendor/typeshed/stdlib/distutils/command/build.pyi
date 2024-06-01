@@ -1,4 +1,5 @@
-from typing import Any
+from collections.abc import Callable
+from typing import Any, ClassVar
 
 from ..cmd import Command
 
@@ -28,4 +29,5 @@ class build(Command):
     def has_c_libraries(self): ...
     def has_ext_modules(self): ...
     def has_scripts(self): ...
-    sub_commands: Any
+    # Any to work around variance issues
+    sub_commands: ClassVar[list[tuple[str, Callable[[Any], bool] | None]]]

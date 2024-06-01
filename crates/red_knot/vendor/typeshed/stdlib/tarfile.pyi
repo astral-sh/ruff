@@ -142,22 +142,43 @@ class TarFile:
     errorlevel: int | None
     offset: int  # undocumented
     extraction_filter: _FilterFunction | None
-    def __init__(
-        self,
-        name: StrOrBytesPath | None = None,
-        mode: Literal["r", "a", "w", "x"] = "r",
-        fileobj: _Fileobj | None = None,
-        format: int | None = None,
-        tarinfo: type[TarInfo] | None = None,
-        dereference: bool | None = None,
-        ignore_zeros: bool | None = None,
-        encoding: str | None = None,
-        errors: str = "surrogateescape",
-        pax_headers: Mapping[str, str] | None = None,
-        debug: int | None = None,
-        errorlevel: int | None = None,
-        copybufsize: int | None = None,  # undocumented
-    ) -> None: ...
+    if sys.version_info >= (3, 13):
+        stream: bool
+        def __init__(
+            self,
+            name: StrOrBytesPath | None = None,
+            mode: Literal["r", "a", "w", "x"] = "r",
+            fileobj: _Fileobj | None = None,
+            format: int | None = None,
+            tarinfo: type[TarInfo] | None = None,
+            dereference: bool | None = None,
+            ignore_zeros: bool | None = None,
+            encoding: str | None = None,
+            errors: str = "surrogateescape",
+            pax_headers: Mapping[str, str] | None = None,
+            debug: int | None = None,
+            errorlevel: int | None = None,
+            copybufsize: int | None = None,  # undocumented
+            stream: bool = False,
+        ) -> None: ...
+    else:
+        def __init__(
+            self,
+            name: StrOrBytesPath | None = None,
+            mode: Literal["r", "a", "w", "x"] = "r",
+            fileobj: _Fileobj | None = None,
+            format: int | None = None,
+            tarinfo: type[TarInfo] | None = None,
+            dereference: bool | None = None,
+            ignore_zeros: bool | None = None,
+            encoding: str | None = None,
+            errors: str = "surrogateescape",
+            pax_headers: Mapping[str, str] | None = None,
+            debug: int | None = None,
+            errorlevel: int | None = None,
+            copybufsize: int | None = None,  # undocumented
+        ) -> None: ...
+
     def __enter__(self) -> Self: ...
     def __exit__(
         self, type: type[BaseException] | None, value: BaseException | None, traceback: TracebackType | None

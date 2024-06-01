@@ -52,16 +52,23 @@ _T = TypeVar("_T")
 _UrlopenRet: TypeAlias = Any
 _DataType: TypeAlias = ReadableBuffer | SupportsRead[bytes] | Iterable[bytes] | None
 
-def urlopen(
-    url: str | Request,
-    data: _DataType | None = None,
-    timeout: float | None = ...,
-    *,
-    cafile: str | None = None,
-    capath: str | None = None,
-    cadefault: bool = False,
-    context: ssl.SSLContext | None = None,
-) -> _UrlopenRet: ...
+if sys.version_info >= (3, 13):
+    def urlopen(
+        url: str | Request, data: _DataType | None = None, timeout: float | None = ..., *, context: ssl.SSLContext | None = None
+    ) -> _UrlopenRet: ...
+
+else:
+    def urlopen(
+        url: str | Request,
+        data: _DataType | None = None,
+        timeout: float | None = ...,
+        *,
+        cafile: str | None = None,
+        capath: str | None = None,
+        cadefault: bool = False,
+        context: ssl.SSLContext | None = None,
+    ) -> _UrlopenRet: ...
+
 def install_opener(opener: OpenerDirector) -> None: ...
 def build_opener(*handlers: BaseHandler | Callable[[], BaseHandler]) -> OpenerDirector: ...
 

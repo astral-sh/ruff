@@ -3,10 +3,8 @@ import sys
 __all__ = [
     "AMPER",
     "AMPEREQUAL",
-    "ASYNC",
     "AT",
     "ATEQUAL",
-    "AWAIT",
     "CIRCUMFLEX",
     "CIRCUMFLEXEQUAL",
     "COLON",
@@ -71,6 +69,8 @@ __all__ = [
     "NL",
     "COMMENT",
 ]
+if sys.version_info < (3, 13):
+    __all__ += ["ASYNC", "AWAIT"]
 
 if sys.version_info >= (3, 10):
     __all__ += ["SOFT_KEYWORD"]
@@ -131,8 +131,9 @@ AT: int
 RARROW: int
 ELLIPSIS: int
 ATEQUAL: int
-AWAIT: int
-ASYNC: int
+if sys.version_info < (3, 13):
+    AWAIT: int
+    ASYNC: int
 OP: int
 ERRORTOKEN: int
 N_TOKENS: int
