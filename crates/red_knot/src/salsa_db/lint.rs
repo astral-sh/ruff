@@ -3,18 +3,53 @@ use crate::salsa_db::source::File;
 use crate::salsa_db::{semantic, source};
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::Expr;
+use std::sync::Arc;
 use tracing::warn;
 
-#[salsa::tracked(jar=Jar)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SyntaxCheck {
-    #[returned_ref]
-    pub diagnostics: Vec<String>,
+    inner: Arc<SyntaxCheckInner>,
 }
 
-#[salsa::tracked(jar=Jar)]
+impl SyntaxCheck {
+    pub fn new(diagnostics: Vec<String>) -> Self {
+        Self {
+            inner: Arc::new(SyntaxCheckInner { diagnostics }),
+        }
+    }
+
+    #[allow(unused)]
+    pub fn diagnostics(&self) -> &[String] {
+        &self.inner.diagnostics
+    }
+}
+
+#[derive(Debug, Eq, PartialEq)]
+struct SyntaxCheckInner {
+    diagnostics: Vec<String>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct PhysicalLinesCheck {
-    #[returned_ref]
-    pub diagnostics: Vec<String>,
+    inner: Arc<PhysicalLinesCheckInner>,
+}
+
+#[derive(Eq, PartialEq, Debug)]
+struct PhysicalLinesCheckInner {
+    diagnostics: Vec<String>,
+}
+
+impl PhysicalLinesCheck {
+    pub fn new(diagnostics: Vec<String>) -> Self {
+        Self {
+            inner: Arc::new(PhysicalLinesCheckInner { diagnostics }),
+        }
+    }
+
+    #[allow(unused)]
+    pub fn diagnostics(&self) -> &[String] {
+        &self.inner.diagnostics
+    }
 }
 
 #[tracing::instrument(level = "debug", skip(db))]
@@ -44,7 +79,7 @@ pub fn check_syntax(db: &dyn Db, file: File) -> SyntaxCheck {
 
     visitor.visit_body(&parsed.ast().body);
 
-    SyntaxCheck::new(db, visitor.diagnostics)
+    SyntaxCheck::new(visitor.diagnostics)
 }
 
 #[tracing::instrument(level = "debug", skip(db))]
@@ -60,15 +95,10 @@ pub fn check_physical_lines(db: &dyn Db, file: File) -> PhysicalLinesCheck {
         }
     }
 
-    PhysicalLinesCheck::new(db, diagnostics)
+    PhysicalLinesCheck::new(diagnostics)
 }
 
 #[salsa::jar(db=Db)]
-pub struct Jar(
-    PhysicalLinesCheck,
-    SyntaxCheck,
-    check_physical_lines,
-    check_syntax,
-);
+pub struct Jar(check_physical_lines, check_syntax);
 
 pub trait Db: semantic::Db + salsa::DbWithJar<Jar> + Upcast<dyn semantic::Db> {}
