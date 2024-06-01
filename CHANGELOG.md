@@ -7,7 +7,7 @@
 - \[`flake8-pyi`\] Implement `PYI064` ([#11325](https://github.com/astral-sh/ruff/pull/11325))
 - \[`flake8-pyi`\] Implement `PYI066` ([#11541](https://github.com/astral-sh/ruff/pull/11541))
 - \[`flake8-pyi`\] Implement `PYI057` ([#11486](https://github.com/astral-sh/ruff/pull/11486))
-- \[`pyflakes`\] Add option to enable F822 in `__init__.py` files ([#11370](https://github.com/astral-sh/ruff/pull/11370))
+- \[`pyflakes`\] Enable `F822` in `__init__.py` files by default ([#11370](https://github.com/astral-sh/ruff/pull/11370))
 
 ### Formatter
 
