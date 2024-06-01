@@ -1,4 +1,4 @@
-from typing import IO
+from typing import IO, Literal
 
 class TextFile:
     def __init__(
@@ -6,12 +6,12 @@ class TextFile:
         filename: str | None = None,
         file: IO[str] | None = None,
         *,
-        strip_comments: bool = ...,
-        lstrip_ws: bool = ...,
-        rstrip_ws: bool = ...,
-        skip_blanks: bool = ...,
-        join_lines: bool = ...,
-        collapse_join: bool = ...,
+        strip_comments: bool | Literal[0, 1] = ...,
+        lstrip_ws: bool | Literal[0, 1] = ...,
+        rstrip_ws: bool | Literal[0, 1] = ...,
+        skip_blanks: bool | Literal[0, 1] = ...,
+        join_lines: bool | Literal[0, 1] = ...,
+        collapse_join: bool | Literal[0, 1] = ...,
     ) -> None: ...
     def open(self, filename: str) -> None: ...
     def close(self) -> None: ...

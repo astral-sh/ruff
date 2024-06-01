@@ -30,12 +30,12 @@ if sys.platform == "win32":
 else:
     from .unix_events import *
 
-_T = TypeVar("_T")
+_T_co = TypeVar("_T_co", covariant=True)
 
 # Aliases imported by multiple submodules in typeshed
 if sys.version_info >= (3, 12):
-    _AwaitableLike: TypeAlias = Awaitable[_T]  # noqa: Y047
-    _CoroutineLike: TypeAlias = Coroutine[Any, Any, _T]  # noqa: Y047
+    _AwaitableLike: TypeAlias = Awaitable[_T_co]  # noqa: Y047
+    _CoroutineLike: TypeAlias = Coroutine[Any, Any, _T_co]  # noqa: Y047
 else:
-    _AwaitableLike: TypeAlias = Generator[Any, None, _T] | Awaitable[_T]
-    _CoroutineLike: TypeAlias = Generator[Any, None, _T] | Coroutine[Any, Any, _T]
+    _AwaitableLike: TypeAlias = Generator[Any, None, _T_co] | Awaitable[_T_co]
+    _CoroutineLike: TypeAlias = Generator[Any, None, _T_co] | Coroutine[Any, Any, _T_co]

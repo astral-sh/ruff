@@ -4,6 +4,8 @@ from collections.abc import Callable
 from typing import IO, Any
 
 __all__ = ["FileWrapper", "guess_scheme", "application_uri", "request_uri", "shift_path_info", "setup_testing_defaults"]
+if sys.version_info >= (3, 13):
+    __all__ += ["is_hop_by_hop"]
 
 class FileWrapper:
     filelike: IO[bytes]

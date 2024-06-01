@@ -1,10 +1,12 @@
-from typing import Any
+from collections.abc import Callable
+from typing import Any, ClassVar
 
 from ..config import PyPIRCCommand
 
 class register(PyPIRCCommand):
     description: str
-    sub_commands: Any
+    # Any to work around variance issues
+    sub_commands: ClassVar[list[tuple[str, Callable[[Any], bool] | None]]]
     list_classifiers: int
     strict: int
     def initialize_options(self) -> None: ...
