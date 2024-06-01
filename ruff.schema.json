@@ -3947,6 +3947,7 @@
         "github",
         "gitlab",
         "pylint",
+        "r-d-json",
         "azure",
         "sarif"
       ]

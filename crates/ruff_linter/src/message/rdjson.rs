@@ -120,3 +120,19 @@ fn rdjson_range(start: SourceLocation, end: SourceLocation) -> Value {
         },
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use insta::assert_snapshot;
+
+    use crate::message::tests::{capture_emitter_output, create_messages};
+    use crate::message::RDJsonEmitter;
+
+    #[test]
+    fn output() {
+        let mut emitter = RDJsonEmitter;
+        let content = capture_emitter_output(&mut emitter, &create_messages());
+
+        assert_snapshot!(content);
+    }
+}
