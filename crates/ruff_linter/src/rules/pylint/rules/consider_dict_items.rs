@@ -70,6 +70,14 @@ impl<'a> SubscriptVisitor<'a> {
 
 impl<'a> visitor::Visitor<'a> for SubscriptVisitor<'a> {
     fn visit_stmt(&mut self, stmt: &'a ast::Stmt) {
+        // Skip if the assignment is a subscript expression.
+        if let ast::Stmt::Assign(assign) = stmt {
+            if let Some(target) = assign.targets.first() {
+                if target.is_subscript_expr() {
+                    return;
+                }
+            }
+        }
         visitor::walk_stmt(self, stmt);
     }
 
