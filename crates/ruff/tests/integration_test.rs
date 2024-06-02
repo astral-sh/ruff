@@ -854,7 +854,7 @@ fn show_statistics() {
     success: false
     exit_code: 1
     ----- stdout -----
-    1	F401	[*] `sys` imported but unused
+    1	F401	[*] unused-import
 
     ----- stderr -----
     "###);
