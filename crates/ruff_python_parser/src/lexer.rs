@@ -1338,13 +1338,13 @@ impl<'src> Lexer<'src> {
     }
 
     /// Creates a checkpoint to which the lexer can later return to using [`Self::rewind`].
-    pub(crate) fn checkpoint(&self) -> LexerCheckpoint<'src> {
+    pub(crate) fn checkpoint(&self) -> LexerCheckpoint {
         LexerCheckpoint {
             value: self.current_value.clone(),
             current_kind: self.current_kind,
             current_range: self.current_range,
             current_flags: self.current_flags,
-            cursor: self.cursor.clone(),
+            cursor_offset: self.offset(),
             state: self.state,
             nesting: self.nesting,
             indentations_checkpoint: self.indentations.checkpoint(),
@@ -1355,13 +1355,13 @@ impl<'src> Lexer<'src> {
     }
 
     /// Restore the lexer to the given checkpoint.
-    pub(crate) fn rewind(&mut self, checkpoint: LexerCheckpoint<'src>) {
+    pub(crate) fn rewind(&mut self, checkpoint: LexerCheckpoint) {
         let LexerCheckpoint {
             value,
             current_kind,
             current_range,
             current_flags,
-            cursor,
+            cursor_offset,
             state,
             nesting,
             indentations_checkpoint,
@@ -1369,6 +1369,10 @@ impl<'src> Lexer<'src> {
             fstrings_checkpoint,
             errors_position,
         } = checkpoint;
+
+        let mut cursor = Cursor::new(self.source);
+        // We preserve the previous char using this method.
+        cursor.skip_bytes(cursor_offset.to_usize());
 
         self.current_value = value;
         self.current_kind = current_kind;
@@ -1700,12 +1704,12 @@ pub(crate) enum TokenValue {
     },
 }
 
-pub(crate) struct LexerCheckpoint<'src> {
+pub(crate) struct LexerCheckpoint {
     value: TokenValue,
     current_kind: TokenKind,
     current_range: TextRange,
     current_flags: TokenFlags,
-    cursor: Cursor<'src>,
+    cursor_offset: TextSize,
     state: State,
     nesting: u32,
     indentations_checkpoint: IndentationsCheckpoint,
