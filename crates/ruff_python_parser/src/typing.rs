@@ -1,15 +1,13 @@
 //! This module takes care of parsing a type annotation.
 
-use anyhow::Result;
-
 use ruff_python_ast::relocate::relocate_expr;
 use ruff_python_ast::str::raw_contents;
 use ruff_python_ast::{Expr, ExprStringLiteral, StringFlags, StringLiteral};
 use ruff_text_size::Ranged;
 
-use crate::{parse_expression, parse_expression_range};
+use crate::{parse_expression, parse_expression_range, ParseError};
 
-#[derive(is_macro::Is, Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug)]
 pub enum AnnotationKind {
     /// The annotation is defined as part a simple string literal,
     /// e.g. `x: "List[int]" = []`. Annotations within simple literals
@@ -24,12 +22,19 @@ pub enum AnnotationKind {
     Complex,
 }
 
+impl AnnotationKind {
+    /// Returns `true` if the annotation kind is simple.
+    pub const fn is_simple(self) -> bool {
+        matches!(self, AnnotationKind::Simple)
+    }
+}
+
 /// Parses the given string expression node as a type annotation. The given `source` is the entire
 /// source code.
 pub fn parse_type_annotation(
     string_expr: &ExprStringLiteral,
     source: &str,
-) -> Result<(Expr, AnnotationKind)> {
+) -> Result<(Expr, AnnotationKind), ParseError> {
     let expr_text = &source[string_expr.range()];
 
     if let [string_literal] = string_expr.value.as_slice() {
@@ -53,7 +58,7 @@ pub fn parse_type_annotation(
 fn parse_simple_type_annotation(
     string_literal: &StringLiteral,
     source: &str,
-) -> Result<(Expr, AnnotationKind)> {
+) -> Result<(Expr, AnnotationKind), ParseError> {
     Ok((
         parse_expression_range(
             source,
@@ -69,7 +74,7 @@ fn parse_simple_type_annotation(
 
 fn parse_complex_type_annotation(
     string_expr: &ExprStringLiteral,
-) -> Result<(Expr, AnnotationKind)> {
+) -> Result<(Expr, AnnotationKind), ParseError> {
     let mut parsed = parse_expression(string_expr.value.to_str())?.into_expr();
     relocate_expr(&mut parsed, string_expr.range());
     Ok((parsed, AnnotationKind::Complex))

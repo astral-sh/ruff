@@ -73,7 +73,6 @@ pub use crate::token::TokenKind;
 
 use crate::parser::Parser;
 
-use itertools::Itertools;
 use ruff_python_ast::{Expr, Mod, ModExpression, ModModule, PySourceType, Suite};
 use ruff_python_trivia::CommentRanges;
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -388,9 +387,8 @@ impl Tokens {
         let end = *self.first_unknown_or_len.get_or_init(|| {
             self.raw
                 .iter()
-                .find_position(|token| token.kind() == TokenKind::Unknown)
-                .map(|(idx, _)| idx)
-                .unwrap_or_else(|| self.raw.len())
+                .position(|token| token.kind() == TokenKind::Unknown)
+                .unwrap_or(self.raw.len())
         });
         &self.raw[..end]
     }
