@@ -50,6 +50,8 @@ pub enum PythonVersion {
     Py311,
     Py312,
     Py313,
+    // Remember to update the `latest()` function
+    // when adding new versions here!
 }
 
 impl From<PythonVersion> for Pep440Version {
@@ -61,8 +63,8 @@ impl From<PythonVersion> for Pep440Version {
 
 impl PythonVersion {
     /// Return the latest supported Python version.
-    pub fn latest() -> Self {
-        Self::iter().max().unwrap()
+    pub const fn latest() -> Self {
+        Self::Py313
     }
 
     pub const fn as_tuple(&self) -> (u8, u8) {
