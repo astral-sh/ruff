@@ -45,9 +45,9 @@ use crate::checkers::ast::Checker;
 /// ```
 
 #[violation]
-pub struct ConsiderDictItems;
+pub struct DictIndexMissingItems;
 
-impl Violation for ConsiderDictItems {
+impl Violation for DictIndexMissingItems {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Extracting value from dictionary in iteration without calling `.items()`")
@@ -159,7 +159,7 @@ fn is_inferred_dict(name: &ast::ExprName, checker: &Checker) -> bool {
 }
 
 /// PLC0206
-pub(crate) fn consider_dict_items(checker: &mut Checker, stmt_for: &ast::StmtFor) {
+pub(crate) fn dict_index_missing_items(checker: &mut Checker, stmt_for: &ast::StmtFor) {
     let ast::StmtFor {
         target, iter, body, ..
     } = stmt_for;
@@ -183,7 +183,7 @@ pub(crate) fn consider_dict_items(checker: &mut Checker, stmt_for: &ast::StmtFor
     }
 
     if visitor.has_violation {
-        let diagnostic = Diagnostic::new(ConsiderDictItems, stmt_for.range);
+        let diagnostic = Diagnostic::new(DictIndexMissingItems, stmt_for.range);
         checker.diagnostics.push(diagnostic);
     }
 }

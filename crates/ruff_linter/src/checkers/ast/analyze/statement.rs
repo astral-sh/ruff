@@ -1335,7 +1335,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 Rule::UnnecessaryEnumerate,
                 Rule::UnusedLoopControlVariable,
                 Rule::YieldInForLoop,
-                Rule::ConsiderDictItems,
+                Rule::DictIndexMissingItems,
             ]) {
                 checker.analyze.for_loops.push(checker.semantic.snapshot());
             }
