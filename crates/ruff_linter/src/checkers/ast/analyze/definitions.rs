@@ -32,7 +32,8 @@ pub(crate) fn definitions(checker: &mut Checker) {
         Rule::MissingTypeKwargs,
         Rule::MissingTypeSelf,
     ]);
-    let enforce_stubs = checker.source_type.is_stub() && checker.enabled(Rule::DocstringInStub);
+    let enforce_stubs = checker.source_type.is_stub()
+        && checker.any_enabled(&[Rule::DocstringInStub, Rule::OldStylePositionalOnlyArg]);
     let enforce_stubs_and_runtime = checker.enabled(Rule::IterMethodReturnIterable);
     let enforce_dunder_method = checker.enabled(Rule::BadDunderMethodName);
     let enforce_docstrings = checker.any_enabled(&[
@@ -149,23 +150,22 @@ pub(crate) fn definitions(checker: &mut Checker) {
             if checker.enabled(Rule::DocstringInStub) {
                 flake8_pyi::rules::docstring_in_stubs(checker, docstring);
             }
+            if checker.enabled(Rule::OldStylePositionalOnlyArg) {
+                flake8_pyi::rules::old_style_positional_only_arg(checker, definition);
+            }
         }
         if enforce_stubs_and_runtime {
-            if checker.enabled(Rule::IterMethodReturnIterable) {
-                flake8_pyi::rules::iter_method_return_iterable(checker, definition);
-            }
+            flake8_pyi::rules::iter_method_return_iterable(checker, definition);
         }
 
         // pylint
         if enforce_dunder_method {
-            if checker.enabled(Rule::BadDunderMethodName) {
-                if let Definition::Member(Member {
-                    kind: MemberKind::Method(method),
-                    ..
-                }) = definition
-                {
-                    pylint::rules::bad_dunder_method_name(checker, method);
-                }
+            if let Definition::Member(Member {
+                kind: MemberKind::Method(method),
+                ..
+            }) = definition
+            {
+                pylint::rules::bad_dunder_method_name(checker, method);
             }
         }
 
