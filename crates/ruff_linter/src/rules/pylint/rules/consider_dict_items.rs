@@ -4,6 +4,8 @@ use ruff_python_ast::{
     self as ast,
     visitor::{self, Visitor},
 };
+use ruff_python_semantic::analyze::type_inference::{PythonType, ResolvedPythonType};
+use ruff_python_semantic::analyze::typing::is_dict;
 
 use crate::checkers::ast::Checker;
 
@@ -144,15 +146,36 @@ fn extract_dict_name(expr: &ast::Expr) -> Option<&ast::ExprName> {
     None
 }
 
+fn is_inferred_dict(name: &ast::ExprName, checker: &Checker) -> bool {
+    let binding = checker
+        .semantic()
+        .only_binding(name)
+        .map(|id| checker.semantic().binding(id));
+    if binding.is_none() {
+        return false;
+    }
+    let binding = binding.unwrap();
+    is_dict(binding, checker.semantic())
+}
+
 /// PLC0206
 pub(crate) fn consider_dict_items(checker: &mut Checker, stmt_for: &ast::StmtFor) {
     let ast::StmtFor {
         target, iter, body, ..
     } = stmt_for;
 
-    let Some(iter_obj_name) = extract_dict_name(&iter) else {
+    // Check if the right hand side is a dict literal (i.e. `for key in (dict := {"a": 1}):`).
+    let is_dict_literal = matches!(
+        ResolvedPythonType::from(&**iter),
+        ResolvedPythonType::Atom(PythonType::Dict),
+    );
+
+    let Some(iter_obj_name) = extract_dict_name(iter) else {
         return;
     };
+    if !is_inferred_dict(iter_obj_name, checker) && !is_dict_literal {
+        return;
+    }
 
     let mut visitor = SubscriptVisitor::new(target, iter_obj_name);
     for stmt in body {

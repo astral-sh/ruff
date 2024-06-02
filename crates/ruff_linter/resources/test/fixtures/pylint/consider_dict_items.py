@@ -39,3 +39,13 @@ for instrument, section in (temp_orchestra := {"violin": "strings", "oboe": "woo
 
 for instrument in ORCHESTRA:
     ORCHESTRA[instrument] = 3
+
+
+# Shouldn't trigger for non-dict types
+items = {1, 2, 3, 4}
+for i in items:
+    items[i]
+
+items = [1, 2, 3, 4]
+for i in items:
+    items[i]
