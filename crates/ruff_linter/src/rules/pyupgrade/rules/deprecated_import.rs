@@ -154,12 +154,10 @@ const TYPING_EXTENSIONS_TO_TYPING: &[&str] = &[
     "ClassVar",
     "Collection",
     "Container",
-    "ContextManager",
     "Coroutine",
     "DefaultDict",
     "Dict",
     "FrozenSet",
-    "Generator",
     "Generic",
     "Hashable",
     "IO",
@@ -193,6 +191,8 @@ const TYPING_EXTENSIONS_TO_TYPING: &[&str] = &[
     // Introduced in Python 3.5.2, but `typing_extensions` contains backported bugfixes and
     // optimizations,
     // "NewType",
+    // "Generator",
+    // "ContextManager",
 ];
 
 // Python 3.7+
@@ -202,13 +202,16 @@ const MYPY_EXTENSIONS_TO_TYPING_37: &[&str] = &["NoReturn"];
 
 // Members of `typing_extensions` that were moved to `typing`.
 const TYPING_EXTENSIONS_TO_TYPING_37: &[&str] = &[
-    "AsyncContextManager",
-    "AsyncGenerator",
     "ChainMap",
     "Counter",
     "Deque",
     "ForwardRef",
     "NoReturn",
+    // Introduced in Python <=3.7, but `typing_extensions` backports some features
+    // from Python 3.12/3.13
+    // "AsyncContextManager",
+    // "AsyncGenerator",
+    // "NamedTuple",
 ];
 
 // Python 3.8+
@@ -220,12 +223,13 @@ const MYPY_EXTENSIONS_TO_TYPING_38: &[&str] = &["TypedDict"];
 const TYPING_EXTENSIONS_TO_TYPING_38: &[&str] = &[
     "Final",
     "OrderedDict",
-    "runtime_checkable",
     // Introduced in Python 3.8, but `typing_extensions` contains backported bugfixes and
     // optimizations.
     // "Literal",
     // "Protocol",
     // "SupportsIndex",
+    // "runtime_checkable",
+    // "TypedDict",
 ];
 
 // Python 3.9+
@@ -332,12 +336,6 @@ const BACKPORTS_STR_ENUM_TO_ENUM_311: &[&str] = &["StrEnum"];
 
 // Members of `typing_extensions` that were moved to `typing`.
 const TYPING_EXTENSIONS_TO_TYPING_312: &[&str] = &[
-    // Introduced in Python 3.12, but `typing_extensions` backports some bug fixes.
-    // "NamedTuple",
-
-    // Introduced in Python 3.12, but `typing_extensions` backports support for PEP 705.
-    // "TypedDict",
-
     // Introduced in Python 3.8, but `typing_extensions` backports a ton of optimizations that were
     // added in Python 3.12.
     "Protocol",
@@ -345,10 +343,13 @@ const TYPING_EXTENSIONS_TO_TYPING_312: &[&str] = &[
     "SupportsBytes",
     "SupportsComplex",
     "SupportsFloat",
+    "SupportsIndex",
     "SupportsInt",
     "SupportsRound",
     "TypeAliasType",
     "Unpack",
+    // Introduced in Python 3.6, but `typing_extensions` backports bugfixes and features
+    "NamedTuple",
     // Introduced in Python 3.11, but `typing_extensions` backports the `frozen_default` argument,
     // which was introduced in Python 3.12.
     "dataclass_transform",
@@ -360,6 +361,41 @@ const TYPING_EXTENSIONS_TO_COLLECTIONS_ABC_312: &[&str] = &["Buffer"];
 
 // Members of `typing_extensions` that were moved to `types`.
 const TYPING_EXTENSIONS_TO_TYPES_312: &[&str] = &["get_original_bases"];
+
+// Python 3.13+
+
+// Members of `typing_extensions` that were moved to `typing`.
+const TYPING_EXTENSIONS_TO_TYPING_313: &[&str] = &[
+    "get_protocol_members",
+    "is_protocol",
+    "NoDefault",
+    "ReadOnly",
+    "TypeIs",
+    // Introduced in Python 3.6,
+    // but typing_extensions backports features from py313:
+    "ContextManager",
+    "Generator",
+    // Introduced in Python 3.7,
+    // but typing_extensions backports features from py313:
+    "AsyncContextManager",
+    "AsyncGenerator",
+    // Introduced in Python 3.8, but typing_extensions
+    // backports features and bugfixes from py313:
+    "Protocol",
+    "TypedDict",
+    "runtime_checkable",
+    // Introduced in earlier Python versions,
+    // but typing_extensions backports PEP-696:
+    "ParamSpec",
+    "TypeVar",
+    "TypevarTuple",
+];
+
+// Members of `typing_extensions` that were moved to `types`.
+const TYPING_EXTENSIONS_TO_TYPES_313: &[&str] = &["CapsuleType"];
+
+// Members of typing_extensions that were moved to `warnings`
+const TYPING_EXTENSIONS_TO_WARNINGS_313: &[&str] = &["deprecated"];
 
 struct ImportReplacer<'a> {
     stmt: &'a Stmt,
@@ -441,10 +477,24 @@ impl<'a> ImportReplacer<'a> {
                     operations.push(operation);
                 }
 
+                // `typing_extensions` to `warnings`
+                let mut typing_extensions_to_warnings = vec![];
+                if self.version >= PythonVersion::Py313 {
+                    typing_extensions_to_warnings.extend(TYPING_EXTENSIONS_TO_WARNINGS_313);
+                }
+                if let Some(operation) =
+                    self.try_replace(&typing_extensions_to_warnings, "warnings")
+                {
+                    operations.push(operation);
+                }
+
                 // `typing_extensions` to `types`
                 let mut typing_extensions_to_types = vec![];
                 if self.version >= PythonVersion::Py312 {
                     typing_extensions_to_types.extend(TYPING_EXTENSIONS_TO_TYPES_312);
+                }
+                if self.version >= PythonVersion::Py313 {
+                    typing_extensions_to_types.extend(TYPING_EXTENSIONS_TO_TYPES_313);
                 }
                 if let Some(operation) = self.try_replace(&typing_extensions_to_types, "types") {
                     operations.push(operation);
@@ -469,6 +519,9 @@ impl<'a> ImportReplacer<'a> {
                 }
                 if self.version >= PythonVersion::Py312 {
                     typing_extensions_to_typing.extend(TYPING_EXTENSIONS_TO_TYPING_312);
+                }
+                if self.version >= PythonVersion::Py313 {
+                    typing_extensions_to_typing.extend(TYPING_EXTENSIONS_TO_TYPING_313);
                 }
                 if let Some(operation) = self.try_replace(&typing_extensions_to_typing, "typing") {
                     operations.push(operation);
