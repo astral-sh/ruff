@@ -12,9 +12,9 @@ use crate::message::{Emitter, EmitterContext, Message, SourceLocation};
 use crate::registry::AsRule;
 
 #[derive(Default)]
-pub struct RDJsonEmitter;
+pub struct RdjsonEmitter;
 
-impl Emitter for RDJsonEmitter {
+impl Emitter for RdjsonEmitter {
     fn emit(
         &mut self,
         writer: &mut dyn Write,
@@ -119,11 +119,11 @@ mod tests {
     use insta::assert_snapshot;
 
     use crate::message::tests::{capture_emitter_output, create_messages};
-    use crate::message::RDJsonEmitter;
+    use crate::message::RdjsonEmitter;
 
     #[test]
     fn output() {
-        let mut emitter = RDJsonEmitter;
+        let mut emitter = RdjsonEmitter;
         let content = capture_emitter_output(&mut emitter, &create_messages());
 
         assert_snapshot!(content);
