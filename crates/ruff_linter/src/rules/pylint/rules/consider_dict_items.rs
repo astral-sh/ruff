@@ -49,7 +49,7 @@ impl Violation for ConsiderDictItems {
     }
 }
 
-/// PLC206
+/// PLC0206
 pub(crate) fn consider_dict_items(checker: &mut Checker, stmt_for: &ast::StmtFor) {
     let ast::StmtFor {
         target,

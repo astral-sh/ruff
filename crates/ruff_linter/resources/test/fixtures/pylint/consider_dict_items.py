@@ -15,7 +15,7 @@ for instrument in ORCHESTRA.keys():
 for instrument in (temp_orchestra := {"violin": "strings", "oboe": "woodwind"}):
     print(f"{instrument}: {temp_orchestra[instrument]}")
 
-# Non errors
+# OK
 for instrument, section in ORCHESTRA.items():
     print(f"{instrument}: {section}")
 
