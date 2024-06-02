@@ -14,8 +14,8 @@ use crate::checkers::ast::Checker;
 /// through indexing the key, instead of calling `.items()` on the dictionary.
 ///
 /// ## Why is this bad?
-/// Instead of unnecsarily indexing the the dictionary, it's more semantically clear to extract the value
-/// one-per-one with the key, increasing readability.
+/// Instead of unnecsarily unnecessarily the the dictionary, it's semantically clearer to extract the value
+/// one-per-one with the key with `.items()`, increasing readability.
 ///
 ///
 /// ## Example
