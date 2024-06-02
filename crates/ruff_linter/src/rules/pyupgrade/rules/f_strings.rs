@@ -400,7 +400,7 @@ pub(crate) fn f_strings(checker: &mut Checker, call: &ast::ExprCall, summary: &F
         return;
     };
 
-    if !value.is_string_literal_expr() {
+    let Expr::StringLiteral(literal) = &**value else {
         return;
     };
 
@@ -520,10 +520,18 @@ pub(crate) fn f_strings(checker: &mut Checker, call: &ast::ExprCall, summary: &F
         .intersects(call.arguments.range());
 
     if !has_comments {
-        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-            contents,
-            call.range(),
-        )));
+        if contents.is_empty() {
+            // Ex) `''.format(self.project)`
+            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                checker.locator().slice(literal).to_string(),
+                call.range(),
+            )));
+        } else {
+            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                contents,
+                call.range(),
+            )));
+        }
     };
     checker.diagnostics.push(diagnostic);
 }
