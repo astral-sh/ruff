@@ -13,7 +13,8 @@ use ruff_linter::fs::relativize_path;
 use ruff_linter::logging::LogLevel;
 use ruff_linter::message::{
     AzureEmitter, Emitter, EmitterContext, GithubEmitter, GitlabEmitter, GroupedEmitter,
-    JsonEmitter, JsonLinesEmitter, JunitEmitter, PylintEmitter, SarifEmitter, TextEmitter,
+    JsonEmitter, JsonLinesEmitter, JunitEmitter, PylintEmitter, RdjsonEmitter, SarifEmitter,
+    TextEmitter,
 };
 use ruff_linter::notify_user;
 use ruff_linter::registry::{AsRule, Rule};
@@ -241,6 +242,9 @@ impl Printer {
         match self.format {
             SerializationFormat::Json => {
                 JsonEmitter.emit(writer, &diagnostics.messages, &context)?;
+            }
+            SerializationFormat::Rdjson => {
+                RdjsonEmitter.emit(writer, &diagnostics.messages, &context)?;
             }
             SerializationFormat::JsonLines => {
                 JsonLinesEmitter.emit(writer, &diagnostics.messages, &context)?;

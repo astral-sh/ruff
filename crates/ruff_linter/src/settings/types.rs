@@ -515,6 +515,7 @@ pub enum SerializationFormat {
     Github,
     Gitlab,
     Pylint,
+    Rdjson,
     Azure,
     Sarif,
 }
@@ -532,6 +533,7 @@ impl Display for SerializationFormat {
             Self::Github => write!(f, "github"),
             Self::Gitlab => write!(f, "gitlab"),
             Self::Pylint => write!(f, "pylint"),
+            Self::Rdjson => write!(f, "rdjson"),
             Self::Azure => write!(f, "azure"),
             Self::Sarif => write!(f, "sarif"),
         }
