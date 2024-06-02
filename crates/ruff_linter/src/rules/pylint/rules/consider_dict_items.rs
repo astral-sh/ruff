@@ -55,7 +55,7 @@ pub(crate) fn consider_dict_items(checker: &mut Checker, stmt_for: &ast::StmtFor
         target,
         iter,
         body,
-        orelse,
+        orelse: _,
         is_async: _,
         range: _,
     } = stmt_for;
@@ -65,12 +65,17 @@ pub(crate) fn consider_dict_items(checker: &mut Checker, stmt_for: &ast::StmtFor
     };
 
     for child in body {
+        // If it isn't an expression, skip it.
+        let Some(child_expr) = child.as_expr_stmt() else {
+            continue;
+        };
+        let expr_value = &child_expr.value;
         if let ast::Expr::Subscript(ast::ExprSubscript {
             value,
             slice,
             ctx: _,
             range: _,
-        }) = child
+        }) = &**expr_value
         {
             if !value.is_name_expr() && !value.is_attribute_expr() {
                 return;
@@ -99,7 +104,7 @@ pub(crate) fn consider_dict_items(checker: &mut Checker, stmt_for: &ast::StmtFor
                 return;
             }
 
-            let mut diagnostic = Diagnostic::new(ConsiderDictItems, stmt_for.range);
+            let diagnostic = Diagnostic::new(ConsiderDictItems, stmt_for.range);
             checker.diagnostics.push(diagnostic);
         } else {
             return;
