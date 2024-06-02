@@ -61,8 +61,8 @@ impl From<PythonVersion> for Pep440Version {
 
 impl PythonVersion {
     /// Return the latest supported Python version.
-    pub const fn latest() -> Self {
-        Self::Py312
+    pub fn latest() -> Self {
+        Self::iter().max().unwrap()
     }
 
     pub const fn as_tuple(&self) -> (u8, u8) {
