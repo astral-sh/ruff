@@ -10,6 +10,7 @@ use ruff_diagnostics::{Applicability, Fix};
 use ruff_source_file::{OneIndexed, SourceFile};
 
 use crate::message::Message;
+use crate::text_helpers::ShowNonprinting;
 
 /// Renders a diff that shows the code fixes.
 ///
@@ -102,9 +103,16 @@ impl Display for Diff<'_> {
 
                     for (emphasized, value) in change.iter_strings_lossy() {
                         if emphasized {
-                            write!(f, "{}", line_style.apply_to(&value).underline().on_black())?;
+                            write!(
+                                f,
+                                "{}",
+                                line_style
+                                    .apply_to(&value.show_nonprinting())
+                                    .underline()
+                                    .on_black()
+                            )?;
                         } else {
-                            write!(f, "{}", line_style.apply_to(&value))?;
+                            write!(f, "{}", line_style.apply_to(&value.show_nonprinting()))?;
                         }
                     }
                     if change.missing_newline() {

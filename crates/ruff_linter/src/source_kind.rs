@@ -14,6 +14,7 @@ use ruff_python_ast::PySourceType;
 use colored::Colorize;
 
 use crate::fs;
+use crate::text_helpers::ShowNonprinting;
 
 #[derive(Clone, Debug, PartialEq, is_macro::Is)]
 pub enum SourceKind {
@@ -220,8 +221,8 @@ impl<'a> CodeDiff<'a> {
 impl std::fmt::Display for CodeDiff<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some((original, modified)) = self.header {
-            writeln!(f, "--- {}", original.red())?;
-            writeln!(f, "+++ {}", modified.green())?;
+            writeln!(f, "--- {}", original.show_nonprinting().red())?;
+            writeln!(f, "+++ {}", modified.show_nonprinting().green())?;
         }
 
         let mut unified = self.diff.unified_diff();
@@ -234,9 +235,19 @@ impl std::fmt::Display for CodeDiff<'_> {
             // individual lines
             for change in hunk.iter_changes() {
                 match change.tag() {
-                    ChangeTag::Equal => write!(f, " {}", change.value())?,
-                    ChangeTag::Delete => write!(f, "{}{}", "-".red(), change.value().red())?,
-                    ChangeTag::Insert => write!(f, "{}{}", "+".green(), change.value().green())?,
+                    ChangeTag::Equal => write!(f, " {}", change.value().show_nonprinting())?,
+                    ChangeTag::Delete => write!(
+                        f,
+                        "{}{}",
+                        "-".red(),
+                        change.value().show_nonprinting().red()
+                    )?,
+                    ChangeTag::Insert => write!(
+                        f,
+                        "{}{}",
+                        "+".green(),
+                        change.value().show_nonprinting().green()
+                    )?,
                 }
 
                 if !self.diff.newline_terminated() {

@@ -39,6 +39,7 @@ pub mod rule_selector;
 pub mod rules;
 pub mod settings;
 pub mod source_kind;
+mod text_helpers;
 pub mod upstream_categories;
 
 #[cfg(any(test, fuzzing))]
