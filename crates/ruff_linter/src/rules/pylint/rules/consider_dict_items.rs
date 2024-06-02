@@ -92,6 +92,7 @@ impl<'a> visitor::Visitor<'a> for SubscriptVisitor<'a> {
             if slice_name.id != target_name.id {
                 return;
             }
+
             // Check that the sliced dict name is the same as the iterated object name.
             if !(value
                 .as_name_expr()
@@ -107,13 +108,41 @@ impl<'a> visitor::Visitor<'a> for SubscriptVisitor<'a> {
     }
 }
 
+/// Extracts the name of the dictionary from the expression.
+fn extract_dict_name(expr: &ast::Expr) -> Option<&ast::ExprName> {
+    if let Some(name_expr) = expr.as_name_expr() {
+        return Some(name_expr);
+    }
+
+    // Handle `dict.keys()` case.
+    if let ast::Expr::Call(ast::ExprCall { func, .. }) = expr {
+        if let ast::Expr::Attribute(ast::ExprAttribute { attr, value, .. }) = func.as_ref() {
+            if attr == "keys" {
+                if let ast::Expr::Name(var_name) = value.as_ref() {
+                    return Some(var_name);
+                }
+            }
+        }
+    }
+
+    // Handle `my_dict := {"foo": "bar"}` case.
+    if let ast::Expr::Named(ast::ExprNamed { target, value, .. }) = expr {
+        if let ast::Expr::Dict(ast::ExprDict { .. }) = value.as_ref() {
+            if let ast::Expr::Name(var_name) = target.as_ref() {
+                return Some(var_name);
+            }
+        }
+    }
+    None
+}
+
 /// PLC0206
 pub(crate) fn consider_dict_items(checker: &mut Checker, stmt_for: &ast::StmtFor) {
     let ast::StmtFor {
         target, iter, body, ..
     } = stmt_for;
 
-    let Some(iter_obj_name) = iter.as_name_expr() else {
+    let Some(iter_obj_name) = extract_dict_name(&iter) else {
         return;
     };
 
