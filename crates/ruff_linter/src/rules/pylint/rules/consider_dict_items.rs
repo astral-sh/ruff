@@ -10,8 +10,8 @@ use ruff_python_semantic::analyze::typing::is_dict;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for usages where
-/// a value is extracted through the key of dictionary in an iteration, when it simply be extracted using `.items()`
+/// Checks when iterating over keys of a dictionary and extracting the value from the dictionary
+/// through indexing the key, instead of calling `.items()` on the dictionary.
 ///
 /// ## Why is this bad?
 /// Instead of unnecsarily indexing the the dictionary, it's more semantically clear to extract the value
