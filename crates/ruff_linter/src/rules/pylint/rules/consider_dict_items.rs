@@ -1,6 +1,9 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast};
+use ruff_python_ast::{
+    self as ast,
+    visitor::{self, Visitor},
+};
 
 use crate::checkers::ast::Checker;
 
@@ -49,41 +52,35 @@ impl Violation for ConsiderDictItems {
     }
 }
 
-/// PLC0206
-pub(crate) fn consider_dict_items(checker: &mut Checker, stmt_for: &ast::StmtFor) {
-    let ast::StmtFor {
-        target,
-        iter,
-        body,
-        orelse: _,
-        is_async: _,
-        range: _,
-    } = stmt_for;
+struct SubscriptVisitor<'a> {
+    target: &'a ast::Expr,
+    iter_obj_name: &'a ast::ExprName,
+    has_violation: bool,
+}
 
-    let Some(iter_obj_name) = iter.as_name_expr() else {
-        return;
-    };
+impl<'a> SubscriptVisitor<'a> {
+    fn new(target: &'a ast::Expr, iter_obj_name: &'a ast::ExprName) -> Self {
+        Self {
+            target,
+            iter_obj_name,
+            has_violation: false,
+        }
+    }
+}
 
-    for child in body {
-        // If it isn't an expression, skip it.
-        let Some(child_expr) = child.as_expr_stmt() else {
-            continue;
-        };
-        let expr_value = &child_expr.value;
-        if let ast::Expr::Subscript(ast::ExprSubscript {
-            value,
-            slice,
-            ctx: _,
-            range: _,
-        }) = &**expr_value
-        {
+impl<'a> visitor::Visitor<'a> for SubscriptVisitor<'a> {
+    fn visit_stmt(&mut self, stmt: &'a ast::Stmt) {
+        visitor::walk_stmt(self, stmt);
+    }
+
+    fn visit_expr(&mut self, expr: &'a ast::Expr) {
+        if let ast::Expr::Subscript(ast::ExprSubscript { value, slice, .. }) = expr {
             if !value.is_name_expr() && !value.is_attribute_expr() {
                 return;
             }
-
             // Check that the sliced value is the same as the target of the for loop.
             let slice_name = slice.as_name_expr();
-            let target_name = target.as_name_expr();
+            let target_name = self.target.as_name_expr();
 
             if slice_name.is_none() || target_name.is_none() {
                 return;
@@ -95,19 +92,38 @@ pub(crate) fn consider_dict_items(checker: &mut Checker, stmt_for: &ast::StmtFor
             if slice_name.id != target_name.id {
                 return;
             }
-
             // Check that the sliced dict name is the same as the iterated object name.
-            if !(slice
+            if !(value
                 .as_name_expr()
-                .is_some_and(|name| name.id == iter_obj_name.id))
+                .is_some_and(|name| name.id == self.iter_obj_name.id))
             {
                 return;
             }
 
-            let diagnostic = Diagnostic::new(ConsiderDictItems, stmt_for.range);
-            checker.diagnostics.push(diagnostic);
+            self.has_violation = true;
         } else {
-            return;
+            visitor::walk_expr(self, expr);
         }
+    }
+}
+
+/// PLC0206
+pub(crate) fn consider_dict_items(checker: &mut Checker, stmt_for: &ast::StmtFor) {
+    let ast::StmtFor {
+        target, iter, body, ..
+    } = stmt_for;
+
+    let Some(iter_obj_name) = iter.as_name_expr() else {
+        return;
+    };
+
+    let mut visitor = SubscriptVisitor::new(target, iter_obj_name);
+    for stmt in body {
+        visitor.visit_stmt(stmt);
+    }
+
+    if visitor.has_violation {
+        let diagnostic = Diagnostic::new(ConsiderDictItems, stmt_for.range);
+        checker.diagnostics.push(diagnostic);
     }
 }
