@@ -10,7 +10,7 @@ use ruff_python_parser::Parsed;
 use crate::cache::KeyValueCache;
 use crate::db::{LintDb, LintJar, QueryResult};
 use crate::files::FileId;
-use crate::module::ModuleName;
+use crate::module::{resolve_module, ModuleName};
 use crate::parse::parse;
 use crate::source::{source_text, Source};
 use crate::symbols::{
@@ -145,9 +145,7 @@ fn lint_bad_overrides(context: &SemanticLintContext) -> QueryResult<()> {
     // TODO we should have a special marker on the real typing module (from typeshed) so if you
     // have your own "typing" module in your project, we don't consider it THE typing module (and
     // same for other stdlib modules that our lint rules care about)
-    let Some(typing_override) =
-        resolve_global_symbol(context.db.upcast(), ModuleName::new("typing"), "override")?
-    else {
+    let Some(typing_override) = context.resolve_global_symbol("typing", "override")? else {
         // TODO once we bundle typeshed, this should be unreachable!()
         return Ok(());
     };
@@ -234,6 +232,18 @@ impl<'a> SemanticLintContext<'a> {
 
     pub fn extend_diagnostics(&mut self, diagnostics: impl IntoIterator<Item = String>) {
         self.diagnostics.get_mut().extend(diagnostics);
+    }
+
+    pub fn resolve_global_symbol(
+        &self,
+        module: &str,
+        symbol_name: &str,
+    ) -> QueryResult<Option<GlobalSymbolId>> {
+        let Some(module) = resolve_module(self.db.upcast(), ModuleName::new(module))? else {
+            return Ok(None);
+        };
+
+        resolve_global_symbol(self.db.upcast(), module, symbol_name)
     }
 }
 
