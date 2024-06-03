@@ -222,9 +222,9 @@ x = (
 )
 ";
         let locator = Locator::new(contents);
-        let program = parse_module(contents).unwrap();
+        let parsed = parse_module(contents).unwrap();
         assert_eq!(
-            Stylist::from_tokens(program.tokens(), &locator).indentation(),
+            Stylist::from_tokens(parsed.tokens(), &locator).indentation(),
             &Indentation(" ".to_string())
         );
 
