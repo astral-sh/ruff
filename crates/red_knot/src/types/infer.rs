@@ -2,6 +2,7 @@
 
 use ruff_python_ast as ast;
 use ruff_python_ast::AstNode;
+use std::fmt::Debug;
 
 use crate::db::{QueryResult, SemanticDb, SemanticJar};
 
@@ -25,34 +26,46 @@ use crate::{FileId, Name};
 #[tracing::instrument(level = "trace", skip(db))]
 pub fn infer_symbol_public_type(db: &dyn SemanticDb, symbol: GlobalSymbolId) -> QueryResult<Type> {
     let symbols = symbol_table(db, symbol.file_id)?;
-    let defs = symbols.definitions(symbol.symbol_id);
+    let defs = symbols.definitions(symbol.symbol_id).to_vec();
     let jar: &SemanticJar = db.jar()?;
 
     if let Some(ty) = jar.type_store.get_cached_symbol_public_type(symbol) {
         return Ok(ty);
     }
 
-    let mut tys = defs
-        .iter()
-        .map(|def| infer_definition_type(db, symbol, def.clone()))
-        .peekable();
-    let ty = if let Some(first) = tys.next() {
-        if tys.peek().is_some() {
-            Type::Union(jar.type_store.add_union(
-                symbol.file_id,
-                &Iterator::chain([first].into_iter(), tys).collect::<QueryResult<Vec<_>>>()?,
-            ))
-        } else {
-            first?
-        }
-    } else {
-        Type::Unknown
-    };
+    let ty = infer_type_from_definitions(db, symbol, defs.iter().cloned())?;
 
     jar.type_store.cache_symbol_public_type(symbol, ty);
 
     // TODO record dependencies
     Ok(ty)
+}
+
+#[tracing::instrument(level = "trace", skip(db))]
+pub fn infer_type_from_definitions<T>(
+    db: &dyn SemanticDb,
+    symbol: GlobalSymbolId,
+    definitions: T,
+) -> QueryResult<Type>
+where
+    T: Debug + Iterator<Item = Definition>,
+{
+    let jar: &SemanticJar = db.jar()?;
+    let mut tys = definitions
+        .map(|def| infer_definition_type(db, symbol, def.clone()))
+        .peekable();
+    if let Some(first) = tys.next() {
+        if tys.peek().is_some() {
+            Ok(Type::Union(jar.type_store.add_union(
+                symbol.file_id,
+                &Iterator::chain([first].into_iter(), tys).collect::<QueryResult<Vec<_>>>()?,
+            )))
+        } else {
+            first
+        }
+    } else {
+        Ok(Type::Unknown)
+    }
 }
 
 #[tracing::instrument(level = "trace", skip(db))]
@@ -178,7 +191,11 @@ fn infer_expr_type(db: &dyn SemanticDb, file_id: FileId, expr: &ast::Expr) -> Qu
             // TODO look up in the correct scope, don't assume global
             if let Some(symbol_id) = symbols.root_symbol_id_by_name(&name.id) {
                 // TODO should use only reachable definitions, not public type
-                infer_symbol_public_type(db, GlobalSymbolId { file_id, symbol_id })
+                infer_type_from_definitions(
+                    db,
+                    GlobalSymbolId { file_id, symbol_id },
+                    symbols.reachable_definitions(symbol_id, expr),
+                )
             } else {
                 Ok(Type::Unknown)
             }
@@ -439,6 +456,36 @@ mod tests {
             format!("{}", ty.display(&jar.type_store)),
             "(Literal[1] | Literal[2])"
         );
+        Ok(())
+    }
+
+    #[test]
+    fn resolve_visible_def() -> anyhow::Result<()> {
+        let case = create_test()?;
+        let db = &case.db;
+
+        let path = case.src.path().join("a.py");
+        std::fs::write(path, "y = 1; y = 2; x = y")?;
+        let file = resolve_module(db, ModuleName::new("a"))?
+            .expect("module should be found")
+            .path(db)?
+            .file();
+        let syms = symbol_table(db, file)?;
+        let x_sym = syms
+            .root_symbol_id_by_name("x")
+            .expect("x symbol should be found");
+
+        let ty = infer_symbol_public_type(
+            db,
+            GlobalSymbolId {
+                file_id: file,
+                symbol_id: x_sym,
+            },
+        )?;
+
+        let jar = HasJar::<SemanticJar>::jar(db)?;
+        assert!(matches!(ty, Type::IntLiteral(_)));
+        assert_eq!(format!("{}", ty.display(&jar.type_store)), "Literal[2]");
         Ok(())
     }
 }
