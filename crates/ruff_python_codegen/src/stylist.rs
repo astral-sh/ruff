@@ -214,6 +214,20 @@ x = (
         let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
         assert_eq!(stylist.indentation(), &Indentation("  ".to_string()));
 
+        // formfeed indent, see `detect_indention` comment.
+        let contents = r"
+class FormFeedIndent:
+   def __init__(self, a=[]):
+        print(a)
+";
+        let locator = Locator::new(contents);
+        let parsed = parse_module(contents).unwrap();
+        let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
+        assert_eq!(stylist.indentation(), &Indentation(" ".to_string()));
+    }
+
+    #[test]
+    fn indent_non_breaking_whitespace() {
         let contents = r"
 x = (
  1,
@@ -227,17 +241,6 @@ x = (
             Stylist::from_tokens(parsed.tokens(), &locator).indentation(),
             &Indentation(" ".to_string())
         );
-
-        // formfeed indent, see `detect_indention` comment.
-        let contents = r"
-class FormFeedIndent:
-   def __init__(self, a=[]):
-        print(a)
-";
-        let locator = Locator::new(contents);
-        let parsed = parse_module(contents).unwrap();
-        let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
-        assert_eq!(stylist.indentation(), &Indentation(" ".to_string()));
     }
 
     #[test]
