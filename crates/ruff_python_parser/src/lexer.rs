@@ -6,16 +6,17 @@
 //!
 //! [Lexical analysis]: https://docs.python.org/3/reference/lexical_analysis.html
 
-use std::{char, cmp::Ordering, str::FromStr};
+use std::cmp::Ordering;
+use std::str::FromStr;
 
 use bitflags::bitflags;
+use unicode_ident::{is_xid_continue, is_xid_start};
+use unicode_normalization::UnicodeNormalization;
+
 use ruff_python_ast::str::Quote;
 use ruff_python_ast::str_prefix::{
     AnyStringPrefix, ByteStringPrefix, FStringPrefix, StringLiteralPrefix,
 };
-use unicode_ident::{is_xid_continue, is_xid_start};
-use unicode_normalization::UnicodeNormalization;
-
 use ruff_python_ast::{AnyStringFlags, Int, IpyEscapeKind, StringFlags};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
