@@ -64,7 +64,6 @@
 //! [parsing]: https://en.wikipedia.org/wiki/Parsing
 //! [lexer]: crate::lexer
 
-use std::cell::OnceCell;
 use std::ops::Deref;
 
 pub use crate::error::{FStringErrorType, ParseError, ParseErrorType};
@@ -308,7 +307,7 @@ impl Parsed<Mod> {
     /// returns [`None`].
     ///
     /// [`Some(Parsed<ModModule>)`]: Some
-    fn try_into_module(self) -> Option<Parsed<ModModule>> {
+    pub fn try_into_module(self) -> Option<Parsed<ModModule>> {
         match self.syntax {
             Mod::Module(module) => Some(Parsed {
                 syntax: module,
@@ -327,7 +326,7 @@ impl Parsed<Mod> {
     /// Otherwise, it returns [`None`].
     ///
     /// [`Some(Parsed<ModExpression>)`]: Some
-    fn try_into_expression(self) -> Option<Parsed<ModExpression>> {
+    pub fn try_into_expression(self) -> Option<Parsed<ModExpression>> {
         match self.syntax {
             Mod::Module(_) => None,
             Mod::Expression(expression) => Some(Parsed {
@@ -370,14 +369,14 @@ pub struct Tokens {
     raw: Vec<Token>,
 
     /// Index of the first [`TokenKind::Unknown`] token or the length of the token vector.
-    first_unknown_or_len: OnceCell<usize>,
+    first_unknown_or_len: std::sync::OnceLock<usize>,
 }
 
 impl Tokens {
     pub(crate) fn new(tokens: Vec<Token>) -> Tokens {
         Tokens {
             raw: tokens,
-            first_unknown_or_len: OnceCell::new(),
+            first_unknown_or_len: std::sync::OnceLock::new(),
         }
     }
 

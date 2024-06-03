@@ -107,7 +107,7 @@ pub fn infer_definition_type(
                 Ok(ty)
             } else {
                 let parsed = parse(db.upcast(), file_id)?;
-                let ast = parsed.ast();
+                let ast = parsed.syntax();
                 let table = symbol_table(db, file_id)?;
                 let node = node_key.resolve_unwrap(ast.as_any_node_ref());
 
@@ -127,7 +127,7 @@ pub fn infer_definition_type(
                 Ok(ty)
             } else {
                 let parsed = parse(db.upcast(), file_id)?;
-                let ast = parsed.ast();
+                let ast = parsed.syntax();
                 let table = symbol_table(db, file_id)?;
                 let node = node_key
                     .resolve(ast.as_any_node_ref())
@@ -154,14 +154,14 @@ pub fn infer_definition_type(
         }
         Definition::Assignment(node_key) => {
             let parsed = parse(db.upcast(), file_id)?;
-            let ast = parsed.ast();
+            let ast = parsed.syntax();
             let node = node_key.resolve_unwrap(ast.as_any_node_ref());
             // TODO handle unpacking assignment correctly (here and for AnnotatedAssignment case, below)
             infer_expr_type(db, file_id, &node.value)
         }
         Definition::AnnotatedAssignment(node_key) => {
             let parsed = parse(db.upcast(), file_id)?;
-            let ast = parsed.ast();
+            let ast = parsed.syntax();
             let node = node_key.resolve_unwrap(ast.as_any_node_ref());
             // TODO actually look at the annotation
             let Some(value) = &node.value else {
