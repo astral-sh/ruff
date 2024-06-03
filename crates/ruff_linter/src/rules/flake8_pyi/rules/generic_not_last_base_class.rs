@@ -114,7 +114,7 @@ fn generate_fix(
     let insertion = add_argument(
         locator.slice(generic_base),
         arguments,
-        checker.indexer().comment_ranges(),
+        checker.parsed().comment_ranges(),
         source,
     );
 

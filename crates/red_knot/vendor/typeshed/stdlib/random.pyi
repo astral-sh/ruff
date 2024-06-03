@@ -41,7 +41,10 @@ _T = TypeVar("_T")
 
 class Random(_random.Random):
     VERSION: ClassVar[int]
-    def __init__(self, x: Any = None) -> None: ...
+    if sys.version_info >= (3, 9):
+        def __init__(self, x: int | float | str | bytes | bytearray | None = None) -> None: ...  # noqa: Y041
+    else:
+        def __init__(self, x: Any = None) -> None: ...
     # Using other `seed` types is deprecated since 3.9 and removed in 3.11
     # Ignore Y041, since random.seed doesn't treat int like a float subtype. Having an explicit
     # int better documents conventional usage of random.seed.

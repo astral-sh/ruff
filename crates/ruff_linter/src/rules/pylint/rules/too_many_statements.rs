@@ -158,9 +158,15 @@ pub(crate) fn too_many_statements(
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
-    use ruff_python_parser::parse_suite;
+
+    use ruff_python_ast::Suite;
+    use ruff_python_parser::parse_module;
 
     use super::num_statements;
+
+    fn parse_suite(source: &str) -> Result<Suite> {
+        Ok(parse_module(source)?.into_suite())
+    }
 
     #[test]
     fn pass() -> Result<()> {

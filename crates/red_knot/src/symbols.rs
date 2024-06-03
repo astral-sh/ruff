@@ -244,7 +244,10 @@ impl SymbolTable {
         let root_scope_id = SymbolTable::root_scope_id();
         let mut builder = SymbolTableBuilder {
             table: SymbolTable::new(),
-            scopes: vec![(root_scope_id, FlowGraph::start())],
+            scopes: vec![ScopeState {
+                scope_id: root_scope_id,
+                current_flow_node_id: FlowGraph::start(),
+            }],
             current_definition: None,
         };
         builder.visit_body(&module.body);
@@ -606,21 +609,29 @@ impl FlowGraph {
     }
 }
 
+struct ScopeState {
+    scope_id: ScopeId,
+    current_flow_node_id: FlowNodeId,
+}
+
 struct SymbolTableBuilder {
     table: SymbolTable,
-    scopes: Vec<(ScopeId, FlowNodeId)>,
+    scopes: Vec<ScopeState>,
     /// the definition whose target(s) we are currently walking
     current_definition: Option<Definition>,
 }
 
 impl SymbolTableBuilder {
     fn set_current_flow_node(&mut self, new_flow_node_id: FlowNodeId) {
-        let (scope_id, _) = self.scopes.pop().expect("scope stack is never empty");
-        self.scopes.push((scope_id, new_flow_node_id));
+        let scope_state = self.scopes.last_mut().expect("scope stack is never empty");
+        scope_state.current_flow_node_id = new_flow_node_id;
     }
 
     fn current_flow_node(&self) -> FlowNodeId {
-        self.scopes.last().expect("scope stack is never empty").1
+        self.scopes
+            .last()
+            .expect("scope stack is never empty")
+            .current_flow_node_id
     }
 
     fn add_or_update_symbol(&mut self, identifier: &str, flags: SymbolFlags) -> SymbolId {
@@ -662,7 +673,10 @@ impl SymbolTableBuilder {
         let scope_id =
             self.table
                 .add_child_scope(self.cur_scope(), name, kind, definition, defining_symbol);
-        self.scopes.push((scope_id, FlowGraph::start()));
+        self.scopes.push(ScopeState {
+            scope_id,
+            current_flow_node_id: FlowGraph::start(),
+        });
         scope_id
     }
 
@@ -670,14 +684,14 @@ impl SymbolTableBuilder {
         self.scopes
             .pop()
             .expect("Scope stack should never be empty")
-            .0
+            .scope_id
     }
 
     fn cur_scope(&self) -> ScopeId {
         self.scopes
             .last()
             .expect("Scope stack should never be empty")
-            .0
+            .scope_id
     }
 
     fn record_scope_for_node(&mut self, node_key: NodeKey, scope_id: ScopeId) {

@@ -12,8 +12,8 @@ _ReadBinaryMode: TypeAlias = Literal["r", "rb"]
 _WriteBinaryMode: TypeAlias = Literal["a", "ab", "w", "wb", "x", "xb"]
 _OpenTextMode: TypeAlias = Literal["rt", "at", "wt", "xt"]
 
-READ: Literal[1]  # undocumented
-WRITE: Literal[2]  # undocumented
+READ: object  # undocumented
+WRITE: object  # undocumented
 
 FTEXT: int  # actually Literal[1] # undocumented
 FHCRC: int  # actually Literal[2] # undocumented
@@ -86,7 +86,7 @@ class BadGzipFile(OSError): ...
 
 class GzipFile(_compression.BaseStream):
     myfileobj: FileIO | None
-    mode: Literal[1, 2]
+    mode: object
     name: str
     compress: zlib._Compress
     fileobj: _ReadableFileobj | _WritableFileobj

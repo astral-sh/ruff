@@ -1,6 +1,6 @@
 import sys
 from _typeshed import SupportsRichComparisonT
-from collections.abc import Hashable, Iterable, Sequence
+from collections.abc import Callable, Hashable, Iterable, Sequence
 from decimal import Decimal
 from fractions import Fraction
 from typing import Any, Literal, NamedTuple, SupportsFloat, TypeVar
@@ -28,6 +28,8 @@ __all__ = [
 
 if sys.version_info >= (3, 10):
     __all__ += ["covariance", "correlation", "linear_regression"]
+if sys.version_info >= (3, 13):
+    __all__ += ["kde", "kde_random"]
 
 # Most functions in this module accept homogeneous collections of one of these types
 _Number: TypeAlias = float | Decimal | Fraction
@@ -130,3 +132,30 @@ if sys.version_info >= (3, 11):
 
 elif sys.version_info >= (3, 10):
     def linear_regression(regressor: Sequence[_Number], dependent_variable: Sequence[_Number], /) -> LinearRegression: ...
+
+if sys.version_info >= (3, 13):
+    _Kernel: TypeAlias = Literal[
+        "normal",
+        "gauss",
+        "logistic",
+        "sigmoid",
+        "rectangular",
+        "uniform",
+        "triangular",
+        "parabolic",
+        "epanechnikov",
+        "quartic",
+        "biweight",
+        "triweight",
+        "cosine",
+    ]
+    def kde(
+        data: Sequence[float], h: float, kernel: _Kernel = "normal", *, cumulative: bool = False
+    ) -> Callable[[float], float]: ...
+    def kde_random(
+        data: Sequence[float],
+        h: float,
+        kernel: _Kernel = "normal",
+        *,
+        seed: int | float | str | bytes | bytearray | None = None,  # noqa: Y041
+    ) -> Callable[[], float]: ...

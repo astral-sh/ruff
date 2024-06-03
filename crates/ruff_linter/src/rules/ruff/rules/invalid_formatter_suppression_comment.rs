@@ -69,9 +69,9 @@ impl AlwaysFixableViolation for InvalidFormatterSuppressionComment {
 
 /// RUF028
 pub(crate) fn ignored_formatter_suppression_comment(checker: &mut Checker, suite: &ast::Suite) {
-    let indexer = checker.indexer();
     let locator = checker.locator();
-    let comment_ranges: SmallVec<[SuppressionComment; 8]> = indexer
+    let comment_ranges: SmallVec<[SuppressionComment; 8]> = checker
+        .parsed()
         .comment_ranges()
         .into_iter()
         .filter_map(|range| {

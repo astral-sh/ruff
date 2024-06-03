@@ -2,127 +2,99 @@
 source: crates/ruff_python_parser/src/lexer.rs
 expression: lex_source(source)
 ---
+## Tokens
+```
 [
     (
-        FStringStart(
-            AnyStringFlags {
-                prefix: Format(
-                    Regular,
-                ),
-                triple_quoted: true,
-                quote_style: Double,
-            },
-        ),
+        FStringStart,
         0..4,
+        TokenFlags(
+            DOUBLE_QUOTES | TRIPLE_QUOTED_STRING | F_STRING,
+        ),
     ),
     (
-        FStringMiddle {
-            value: "\nhello\n    world\n",
-            flags: AnyStringFlags {
-                prefix: Format(
-                    Regular,
-                ),
-                triple_quoted: true,
-                quote_style: Double,
-            },
-        },
+        FStringMiddle(
+            "\nhello\n    world\n",
+        ),
         4..21,
+        TokenFlags(
+            DOUBLE_QUOTES | TRIPLE_QUOTED_STRING | F_STRING,
+        ),
     ),
     (
         FStringEnd,
         21..24,
-    ),
-    (
-        FStringStart(
-            AnyStringFlags {
-                prefix: Format(
-                    Regular,
-                ),
-                triple_quoted: true,
-                quote_style: Single,
-            },
+        TokenFlags(
+            DOUBLE_QUOTES | TRIPLE_QUOTED_STRING | F_STRING,
         ),
-        25..29,
     ),
     (
-        FStringMiddle {
-            value: "\n    world\nhello\n",
-            flags: AnyStringFlags {
-                prefix: Format(
-                    Regular,
-                ),
-                triple_quoted: true,
-                quote_style: Single,
-            },
-        },
+        FStringStart,
+        25..29,
+        TokenFlags(
+            TRIPLE_QUOTED_STRING | F_STRING,
+        ),
+    ),
+    (
+        FStringMiddle(
+            "\n    world\nhello\n",
+        ),
         29..46,
+        TokenFlags(
+            TRIPLE_QUOTED_STRING | F_STRING,
+        ),
     ),
     (
         FStringEnd,
         46..49,
-    ),
-    (
-        FStringStart(
-            AnyStringFlags {
-                prefix: Format(
-                    Regular,
-                ),
-                triple_quoted: false,
-                quote_style: Double,
-            },
+        TokenFlags(
+            TRIPLE_QUOTED_STRING | F_STRING,
         ),
-        50..52,
     ),
     (
-        FStringMiddle {
-            value: "some ",
-            flags: AnyStringFlags {
-                prefix: Format(
-                    Regular,
-                ),
-                triple_quoted: false,
-                quote_style: Double,
-            },
-        },
+        FStringStart,
+        50..52,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING,
+        ),
+    ),
+    (
+        FStringMiddle(
+            "some ",
+        ),
         52..57,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING,
+        ),
     ),
     (
         Lbrace,
         57..58,
     ),
     (
-        FStringStart(
-            AnyStringFlags {
-                prefix: Format(
-                    Regular,
-                ),
-                triple_quoted: true,
-                quote_style: Double,
-            },
-        ),
+        FStringStart,
         58..62,
+        TokenFlags(
+            DOUBLE_QUOTES | TRIPLE_QUOTED_STRING | F_STRING,
+        ),
     ),
     (
-        FStringMiddle {
-            value: "multiline\nallowed ",
-            flags: AnyStringFlags {
-                prefix: Format(
-                    Regular,
-                ),
-                triple_quoted: true,
-                quote_style: Double,
-            },
-        },
+        FStringMiddle(
+            "multiline\nallowed ",
+        ),
         62..80,
+        TokenFlags(
+            DOUBLE_QUOTES | TRIPLE_QUOTED_STRING | F_STRING,
+        ),
     ),
     (
         Lbrace,
         80..81,
     ),
     (
-        Name {
-            name: "x",
-        },
+        Name(
+            "x",
+        ),
         81..82,
     ),
     (
@@ -132,30 +104,33 @@ expression: lex_source(source)
     (
         FStringEnd,
         83..86,
+        TokenFlags(
+            DOUBLE_QUOTES | TRIPLE_QUOTED_STRING | F_STRING,
+        ),
     ),
     (
         Rbrace,
         86..87,
     ),
     (
-        FStringMiddle {
-            value: " string",
-            flags: AnyStringFlags {
-                prefix: Format(
-                    Regular,
-                ),
-                triple_quoted: false,
-                quote_style: Double,
-            },
-        },
+        FStringMiddle(
+            " string",
+        ),
         87..94,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING,
+        ),
     ),
     (
         FStringEnd,
         94..95,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING,
+        ),
     ),
     (
         Newline,
         95..95,
     ),
 ]
+```

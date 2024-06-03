@@ -2,11 +2,11 @@
 source: crates/ruff_python_parser/src/lexer.rs
 expression: lex_source(source)
 ---
+## Tokens
+```
 [
     (
-        Comment(
-            "#Hello",
-        ),
+        Comment,
         0..6,
     ),
     (
@@ -14,9 +14,7 @@ expression: lex_source(source)
         6..7,
     ),
     (
-        Comment(
-            "#World",
-        ),
+        Comment,
         7..13,
     ),
     (
@@ -24,3 +22,4 @@ expression: lex_source(source)
         13..14,
     ),
 ]
+```

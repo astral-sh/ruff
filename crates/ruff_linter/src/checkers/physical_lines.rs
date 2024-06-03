@@ -3,6 +3,7 @@
 use ruff_diagnostics::Diagnostic;
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
+use ruff_python_trivia::CommentRanges;
 use ruff_source_file::{Locator, UniversalNewlines};
 use ruff_text_size::TextSize;
 
@@ -19,6 +20,7 @@ pub(crate) fn check_physical_lines(
     locator: &Locator,
     stylist: &Stylist,
     indexer: &Indexer,
+    comment_ranges: &CommentRanges,
     doc_lines: &[TextSize],
     settings: &LinterSettings,
 ) -> Vec<Diagnostic> {
@@ -42,7 +44,7 @@ pub(crate) fn check_physical_lines(
             .is_some()
         {
             if enforce_doc_line_too_long {
-                if let Some(diagnostic) = doc_line_too_long(&line, indexer, settings) {
+                if let Some(diagnostic) = doc_line_too_long(&line, comment_ranges, settings) {
                     diagnostics.push(diagnostic);
                 }
             }
@@ -55,7 +57,7 @@ pub(crate) fn check_physical_lines(
         }
 
         if enforce_line_too_long {
-            if let Some(diagnostic) = line_too_long(&line, indexer, settings) {
+            if let Some(diagnostic) = line_too_long(&line, comment_ranges, settings) {
                 diagnostics.push(diagnostic);
             }
         }
@@ -90,8 +92,7 @@ pub(crate) fn check_physical_lines(
 mod tests {
     use ruff_python_codegen::Stylist;
     use ruff_python_index::Indexer;
-    use ruff_python_parser::lexer::lex;
-    use ruff_python_parser::Mode;
+    use ruff_python_parser::parse_module;
     use ruff_source_file::Locator;
 
     use crate::line_width::LineLength;
@@ -105,15 +106,16 @@ mod tests {
     fn e501_non_ascii_char() {
         let line = "'\u{4e9c}' * 2"; // 7 in UTF-32, 9 in UTF-8.
         let locator = Locator::new(line);
-        let tokens: Vec<_> = lex(line, Mode::Module).collect();
-        let indexer = Indexer::from_tokens(&tokens, &locator);
-        let stylist = Stylist::from_tokens(&tokens, &locator);
+        let parsed = parse_module(line).unwrap();
+        let indexer = Indexer::from_tokens(parsed.tokens(), &locator);
+        let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
 
         let check_with_max_line_length = |line_length: LineLength| {
             check_physical_lines(
                 &locator,
                 &stylist,
                 &indexer,
+                parsed.comment_ranges(),
                 &[],
                 &LinterSettings {
                     pycodestyle: pycodestyle::settings::Settings {
