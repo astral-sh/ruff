@@ -621,11 +621,19 @@ impl<'src> Parser<'src> {
 
     /// Restore the parser to the given checkpoint.
     fn rewind(&mut self, checkpoint: ParserCheckpoint<'src>) {
-        self.tokens.rewind(checkpoint.tokens);
-        self.errors.truncate(checkpoint.errors_position);
-        self.current_token_id = checkpoint.current_token_id;
-        self.prev_token_end = checkpoint.prev_token_end;
-        self.recovery_context = checkpoint.recovery_context;
+        let ParserCheckpoint {
+            tokens,
+            errors_position,
+            current_token_id,
+            prev_token_end,
+            recovery_context,
+        } = checkpoint;
+
+        self.tokens.rewind(tokens);
+        self.errors.truncate(errors_position);
+        self.current_token_id = current_token_id;
+        self.prev_token_end = prev_token_end;
+        self.recovery_context = recovery_context;
     }
 }
 
