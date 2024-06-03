@@ -1,6 +1,7 @@
+from _typeshed import StrOrBytesPath
 from collections.abc import Sequence
 from re import Pattern
-from typing import Any
+from typing import Any, Literal
 
 from ..ccompiler import CCompiler
 from ..cmd import Command
@@ -65,8 +66,8 @@ class config(Command):
         include_dirs: Sequence[str] | None = None,
         libraries: Sequence[str] | None = None,
         library_dirs: Sequence[str] | None = None,
-        decl: int = 0,
-        call: int = 0,
+        decl: bool | Literal[0, 1] = 0,
+        call: bool | Literal[0, 1] = 0,
     ) -> bool: ...
     def check_lib(
         self,
@@ -80,4 +81,4 @@ class config(Command):
         self, header: str, include_dirs: Sequence[str] | None = None, library_dirs: Sequence[str] | None = None, lang: str = "c"
     ) -> bool: ...
 
-def dump_file(filename: str, head: Any | None = None) -> None: ...
+def dump_file(filename: StrOrBytesPath, head: Any | None = None) -> None: ...

@@ -3,7 +3,7 @@ from collections.abc import Mapping
 from distutils.cmd import Command as Command
 from distutils.dist import Distribution as Distribution
 from distutils.extension import Extension as Extension
-from typing import Any
+from typing import Any, Literal
 
 USAGE: str
 
@@ -45,7 +45,7 @@ def setup(
     command_packages: list[str] = ...,
     command_options: Mapping[str, Mapping[str, tuple[Any, Any]]] = ...,
     package_data: Mapping[str, list[str]] = ...,
-    include_package_data: bool = ...,
+    include_package_data: bool | Literal[0, 1] = ...,
     libraries: list[str] = ...,
     headers: list[str] = ...,
     ext_package: str = ...,

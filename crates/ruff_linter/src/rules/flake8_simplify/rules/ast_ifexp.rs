@@ -164,7 +164,7 @@ pub(crate) fn if_expr_with_true_false(
                     parenthesized_range(
                         test.into(),
                         expr.into(),
-                        checker.indexer().comment_ranges(),
+                        checker.parsed().comment_ranges(),
                         checker.locator().contents(),
                     )
                     .unwrap_or(test.range()),

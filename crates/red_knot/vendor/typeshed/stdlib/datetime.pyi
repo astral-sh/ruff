@@ -79,6 +79,9 @@ class date:
     def isoformat(self) -> str: ...
     def timetuple(self) -> struct_time: ...
     def toordinal(self) -> int: ...
+    if sys.version_info >= (3, 13):
+        def __replace__(self, /, *, year: SupportsIndex = ..., month: SupportsIndex = ..., day: SupportsIndex = ...) -> Self: ...
+
     def replace(self, year: SupportsIndex = ..., month: SupportsIndex = ..., day: SupportsIndex = ...) -> Self: ...
     def __le__(self, value: date, /) -> bool: ...
     def __lt__(self, value: date, /) -> bool: ...
@@ -148,6 +151,19 @@ class time:
     def utcoffset(self) -> timedelta | None: ...
     def tzname(self) -> str | None: ...
     def dst(self) -> timedelta | None: ...
+    if sys.version_info >= (3, 13):
+        def __replace__(
+            self,
+            /,
+            *,
+            hour: SupportsIndex = ...,
+            minute: SupportsIndex = ...,
+            second: SupportsIndex = ...,
+            microsecond: SupportsIndex = ...,
+            tzinfo: _TzInfo | None = ...,
+            fold: int = ...,
+        ) -> Self: ...
+
     def replace(
         self,
         hour: SupportsIndex = ...,
@@ -263,6 +279,22 @@ class datetime(date):
     def date(self) -> _Date: ...
     def time(self) -> _Time: ...
     def timetz(self) -> _Time: ...
+    if sys.version_info >= (3, 13):
+        def __replace__(
+            self,
+            /,
+            *,
+            year: SupportsIndex = ...,
+            month: SupportsIndex = ...,
+            day: SupportsIndex = ...,
+            hour: SupportsIndex = ...,
+            minute: SupportsIndex = ...,
+            second: SupportsIndex = ...,
+            microsecond: SupportsIndex = ...,
+            tzinfo: _TzInfo | None = ...,
+            fold: int = ...,
+        ) -> Self: ...
+
     def replace(
         self,
         year: SupportsIndex = ...,

@@ -444,17 +444,16 @@ impl Format<PyFormatContext<'_>> for FormatEmptyParenthesized<'_> {
 mod tests {
     use ruff_python_ast::ExpressionRef;
     use ruff_python_parser::parse_expression;
-    use ruff_python_trivia::CommentRanges;
 
     use crate::expression::parentheses::is_expression_parenthesized;
 
     #[test]
     fn test_has_parentheses() {
         let expression = r#"(b().c("")).d()"#;
-        let expr = parse_expression(expression).unwrap();
+        let parsed = parse_expression(expression).unwrap();
         assert!(!is_expression_parenthesized(
-            ExpressionRef::from(&expr),
-            &CommentRanges::default(),
+            ExpressionRef::from(parsed.expr()),
+            parsed.comment_ranges(),
             expression
         ));
     }

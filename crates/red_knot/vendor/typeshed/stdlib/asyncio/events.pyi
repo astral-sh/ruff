@@ -2,7 +2,7 @@ import ssl
 import sys
 from _typeshed import FileDescriptorLike, ReadableBuffer, StrPath, Unused, WriteableBuffer
 from abc import ABCMeta, abstractmethod
-from collections.abc import Callable, Coroutine, Generator, Sequence
+from collections.abc import Callable, Sequence
 from contextvars import Context
 from socket import AddressFamily, SocketKind, _Address, _RetAddress, socket
 from typing import IO, Any, Literal, Protocol, TypeVar, overload
@@ -43,7 +43,7 @@ _ProtocolFactory: TypeAlias = Callable[[], BaseProtocol]
 _SSLContext: TypeAlias = bool | None | ssl.SSLContext
 
 class _TaskFactory(Protocol):
-    def __call__(self, loop: AbstractEventLoop, factory: Coroutine[Any, Any, _T] | Generator[Any, None, _T], /) -> Future[_T]: ...
+    def __call__(self, loop: AbstractEventLoop, factory: _CoroutineLike[_T], /) -> Future[_T]: ...
 
 class Handle:
     _cancelled: bool

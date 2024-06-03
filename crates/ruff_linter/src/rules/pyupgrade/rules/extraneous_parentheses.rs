@@ -1,5 +1,7 @@
-use ruff_python_parser::{TokenKind, TokenKindIter};
-use ruff_text_size::TextRange;
+use std::slice::Iter;
+
+use ruff_python_parser::{Token, TokenKind, Tokens};
+use ruff_text_size::{Ranged, TextRange};
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -36,17 +38,17 @@ impl AlwaysFixableViolation for ExtraneousParentheses {
 }
 
 // See: https://github.com/asottile/pyupgrade/blob/97ed6fb3cf2e650d4f762ba231c3f04c41797710/pyupgrade/_main.py#L148
-fn match_extraneous_parentheses(tokens: &mut TokenKindIter) -> Option<(TextRange, TextRange)> {
+fn match_extraneous_parentheses(tokens: &mut Iter<'_, Token>) -> Option<(TextRange, TextRange)> {
     // Store the location of the extraneous opening parenthesis.
     let start_range = loop {
-        let (token, range) = tokens.next()?;
+        let token = tokens.next()?;
 
-        match token {
+        match token.kind() {
             TokenKind::Comment | TokenKind::NonLogicalNewline => {
                 continue;
             }
             TokenKind::Lpar => {
-                break range;
+                break token.range();
             }
             _ => {
                 return None;
@@ -62,22 +64,28 @@ fn match_extraneous_parentheses(tokens: &mut TokenKindIter) -> Option<(TextRange
 
     // Store the location of the extraneous closing parenthesis.
     let end_range = loop {
-        let (token, range) = tokens.next()?;
+        let token = tokens.next()?;
 
-        // If we find a comma or a yield at depth 1 or 2, it's a tuple or coroutine.
-        if depth == 1 && matches!(token, TokenKind::Comma | TokenKind::Yield) {
-            return None;
-        } else if matches!(token, TokenKind::Lpar | TokenKind::Lbrace | TokenKind::Lsqb) {
-            depth = depth.saturating_add(1);
-        } else if matches!(token, TokenKind::Rpar | TokenKind::Rbrace | TokenKind::Rsqb) {
-            depth = depth.saturating_sub(1);
+        match token.kind() {
+            // If we find a comma or a yield at depth 1 or 2, it's a tuple or coroutine.
+            TokenKind::Comma | TokenKind::Yield if depth == 1 => return None,
+            TokenKind::Lpar | TokenKind::Lbrace | TokenKind::Lsqb => {
+                depth = depth.saturating_add(1);
+            }
+            TokenKind::Rpar | TokenKind::Rbrace | TokenKind::Rsqb => {
+                depth = depth.saturating_sub(1);
+            }
+            _ => {}
         }
 
         if depth == 0 {
-            break range;
+            break token.range();
         }
 
-        if !matches!(token, TokenKind::Comment | TokenKind::NonLogicalNewline) {
+        if !matches!(
+            token.kind(),
+            TokenKind::Comment | TokenKind::NonLogicalNewline
+        ) {
             empty_tuple = false;
         }
     };
@@ -88,9 +96,9 @@ fn match_extraneous_parentheses(tokens: &mut TokenKindIter) -> Option<(TextRange
 
     // Find the next non-coding token.
     let token = loop {
-        let (token, _) = tokens.next()?;
+        let token = tokens.next()?;
 
-        match token {
+        match token.kind() {
             TokenKind::Comment | TokenKind::NonLogicalNewline => continue,
             _ => {
                 break token;
@@ -98,7 +106,7 @@ fn match_extraneous_parentheses(tokens: &mut TokenKindIter) -> Option<(TextRange
         }
     };
 
-    if matches!(token, TokenKind::Rpar) {
+    if matches!(token.kind(), TokenKind::Rpar) {
         Some((start_range, end_range))
     } else {
         None
@@ -108,15 +116,16 @@ fn match_extraneous_parentheses(tokens: &mut TokenKindIter) -> Option<(TextRange
 /// UP034
 pub(crate) fn extraneous_parentheses(
     diagnostics: &mut Vec<Diagnostic>,
-    mut tokens: TokenKindIter,
+    tokens: &Tokens,
     locator: &Locator,
 ) {
-    while let Some((token, _)) = tokens.next() {
-        if !matches!(token, TokenKind::Lpar) {
+    let mut token_iter = tokens.up_to_first_unknown().iter();
+    while let Some(token) = token_iter.next() {
+        if !matches!(token.kind(), TokenKind::Lpar) {
             continue;
         }
 
-        let Some((start_range, end_range)) = match_extraneous_parentheses(&mut tokens) else {
+        let Some((start_range, end_range)) = match_extraneous_parentheses(&mut token_iter) else {
             continue;
         };
 

@@ -100,14 +100,14 @@ fn key_in_dict(
     let left_range = parenthesized_range(
         left.into(),
         parent,
-        checker.indexer().comment_ranges(),
+        checker.parsed().comment_ranges(),
         checker.locator().contents(),
     )
     .unwrap_or(left.range());
     let right_range = parenthesized_range(
         right.into(),
         parent,
-        checker.indexer().comment_ranges(),
+        checker.parsed().comment_ranges(),
         checker.locator().contents(),
     )
     .unwrap_or(right.range());

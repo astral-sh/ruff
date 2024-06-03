@@ -1,7 +1,7 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Arguments, Expr, Keyword, PySourceType};
-use ruff_python_parser::{lexer, AsMode, Tok};
+use ruff_python_ast::{self as ast, Arguments, Expr, Keyword};
+use ruff_python_parser::{TokenKind, Tokens};
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -117,33 +117,26 @@ fn match_encoding_arg(arguments: &Arguments) -> Option<EncodingArg> {
 }
 
 /// Return a [`Fix`] replacing the call to encode with a byte string.
-fn replace_with_bytes_literal(
-    locator: &Locator,
-    call: &ast::ExprCall,
-    source_type: PySourceType,
-) -> Fix {
+fn replace_with_bytes_literal(locator: &Locator, call: &ast::ExprCall, tokens: &Tokens) -> Fix {
     // Build up a replacement string by prefixing all string tokens with `b`.
-    let contents = locator.slice(call);
-    let mut replacement = String::with_capacity(contents.len() + 1);
+    let mut replacement = String::with_capacity(call.range().len().to_usize() + 1);
     let mut prev = call.start();
-    for (tok, range) in
-        lexer::lex_starts_at(contents, source_type.as_mode(), call.start()).flatten()
-    {
-        match tok {
-            Tok::Dot => break,
-            Tok::String { .. } => {
-                replacement.push_str(locator.slice(TextRange::new(prev, range.start())));
-                let string = locator.slice(range);
+    for token in tokens.in_range(call.range()) {
+        match token.kind() {
+            TokenKind::Dot => break,
+            TokenKind::String => {
+                replacement.push_str(locator.slice(TextRange::new(prev, token.start())));
+                let string = locator.slice(token);
                 replacement.push_str(&format!(
                     "b{}",
                     &string.trim_start_matches('u').trim_start_matches('U')
                 ));
             }
             _ => {
-                replacement.push_str(locator.slice(TextRange::new(prev, range.end())));
+                replacement.push_str(locator.slice(TextRange::new(prev, token.end())));
             }
         }
-        prev = range.end();
+        prev = token.end();
     }
 
     Fix::safe_edit(Edit::range_replacement(
@@ -172,7 +165,7 @@ pub(crate) fn unnecessary_encode_utf8(checker: &mut Checker, call: &ast::ExprCal
                     diagnostic.set_fix(replace_with_bytes_literal(
                         checker.locator(),
                         call,
-                        checker.source_type,
+                        checker.parsed().tokens(),
                     ));
                     checker.diagnostics.push(diagnostic);
                 } else if let EncodingArg::Keyword(kwarg) = encoding_arg {

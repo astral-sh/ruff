@@ -1,4 +1,5 @@
-from typing import Any
+from collections.abc import Callable
+from typing import Any, ClassVar
 
 from ..cmd import Command
 
@@ -11,7 +12,8 @@ class sdist(Command):
     boolean_options: Any
     help_options: Any
     negative_opt: Any
-    sub_commands: Any
+    # Any to work around variance issues
+    sub_commands: ClassVar[list[tuple[str, Callable[[Any], bool] | None]]]
     READMES: Any
     template: Any
     manifest: Any

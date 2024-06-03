@@ -482,13 +482,15 @@ impl<'a> Generator<'a> {
                 type_params,
                 value,
             }) => {
-                self.p("type ");
-                self.unparse_expr(name, precedence::MAX);
-                if let Some(type_params) = type_params {
-                    self.unparse_type_params(type_params);
-                }
-                self.p(" = ");
-                self.unparse_expr(value, precedence::ASSIGN);
+                statement!({
+                    self.p("type ");
+                    self.unparse_expr(name, precedence::MAX);
+                    if let Some(type_params) = type_params {
+                        self.unparse_type_params(type_params);
+                    }
+                    self.p(" = ");
+                    self.unparse_expr(value, precedence::ASSIGN);
+                });
             }
             Stmt::Raise(ast::StmtRaise {
                 exc,
@@ -1416,7 +1418,7 @@ impl<'a> Generator<'a> {
 #[cfg(test)]
 mod tests {
     use ruff_python_ast::{str::Quote, Mod, ModModule};
-    use ruff_python_parser::{self, parse_suite, Mode};
+    use ruff_python_parser::{self, parse_module, Mode};
     use ruff_source_file::LineEnding;
 
     use crate::stylist::Indentation;
@@ -1427,9 +1429,9 @@ mod tests {
         let indentation = Indentation::default();
         let quote = Quote::default();
         let line_ending = LineEnding::default();
-        let stmt = parse_suite(contents).unwrap();
+        let module = parse_module(contents).unwrap();
         let mut generator = Generator::new(&indentation, quote, line_ending);
-        generator.unparse_suite(&stmt);
+        generator.unparse_suite(module.suite());
         generator.generate()
     }
 
@@ -1439,9 +1441,9 @@ mod tests {
         line_ending: LineEnding,
         contents: &str,
     ) -> String {
-        let stmt = parse_suite(contents).unwrap();
+        let module = parse_module(contents).unwrap();
         let mut generator = Generator::new(indentation, quote, line_ending);
-        generator.unparse_suite(&stmt);
+        generator.unparse_suite(module.suite());
         generator.generate()
     }
 
@@ -1449,8 +1451,8 @@ mod tests {
         let indentation = Indentation::default();
         let quote = Quote::default();
         let line_ending = LineEnding::default();
-        let ast = ruff_python_parser::parse(contents, Mode::Ipython).unwrap();
-        let Mod::Module(ModModule { body, .. }) = ast else {
+        let parsed = ruff_python_parser::parse(contents, Mode::Ipython).unwrap();
+        let Mod::Module(ModModule { body, .. }) = parsed.into_syntax() else {
             panic!("Source code didn't return ModModule")
         };
         let [stmt] = body.as_slice() else {
@@ -1634,6 +1636,10 @@ except* Exception as e:
         return 2
     case 4 as y:
         return y"
+        );
+        assert_round_trip!(
+            r"type X = int
+type Y = str"
         );
         assert_eq!(round_trip(r"x = (1, 2, 3)"), r"x = 1, 2, 3");
         assert_eq!(round_trip(r"-(1) + ~(2) + +(3)"), r"-1 + ~2 + +3");

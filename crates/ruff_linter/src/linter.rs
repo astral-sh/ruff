@@ -10,11 +10,10 @@ use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::Diagnostic;
 use ruff_notebook::Notebook;
-use ruff_python_ast::{PySourceType, Suite};
+use ruff_python_ast::{ModModule, PySourceType};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
-use ruff_python_parser::lexer::LexResult;
-use ruff_python_parser::{AsMode, ParseError, TokenKindIter, Tokens};
+use ruff_python_parser::{ParseError, Parsed};
 use ruff_source_file::{Locator, SourceFileBuilder};
 use ruff_text_size::Ranged;
 
@@ -82,18 +81,21 @@ pub fn check_path(
     noqa: flags::Noqa,
     source_kind: &SourceKind,
     source_type: PySourceType,
-    tokens: TokenSource,
+    parsed: &Parsed<ModModule>,
 ) -> LinterResult<Vec<Diagnostic>> {
     // Aggregate all diagnostics.
     let mut diagnostics = vec![];
     let mut error = None;
+
+    let tokens = parsed.tokens();
+    let comment_ranges = parsed.comment_ranges();
 
     // Collect doc lines. This requires a rare mix of tokens (for comments) and AST
     // (for docstrings), which demands special-casing at this level.
     let use_doc_lines = settings.rules.enabled(Rule::DocLineTooLong);
     let mut doc_lines = vec![];
     if use_doc_lines {
-        doc_lines.extend(doc_lines_from_tokens(tokens.kinds()));
+        doc_lines.extend(doc_lines_from_tokens(tokens));
     }
 
     // Run the token-based rules.
@@ -103,7 +105,7 @@ pub fn check_path(
         .any(|rule_code| rule_code.lint_source().is_tokens())
     {
         diagnostics.extend(check_tokens(
-            &tokens,
+            parsed,
             path,
             locator,
             indexer,
@@ -120,7 +122,13 @@ pub fn check_path(
         .iter_enabled()
         .any(|rule_code| rule_code.lint_source().is_filesystem())
     {
-        diagnostics.extend(check_file_path(path, package, locator, indexer, settings));
+        diagnostics.extend(check_file_path(
+            path,
+            package,
+            locator,
+            comment_ranges,
+            settings,
+        ));
     }
 
     // Run the logical line-based rules.
@@ -130,7 +138,7 @@ pub fn check_path(
         .any(|rule_code| rule_code.lint_source().is_logical_lines())
     {
         diagnostics.extend(crate::checkers::logical_lines::check_logical_lines(
-            &tokens, locator, indexer, stylist, settings,
+            tokens, locator, indexer, stylist, settings,
         ));
     }
 
@@ -145,14 +153,13 @@ pub fn check_path(
             .iter_enabled()
             .any(|rule_code| rule_code.lint_source().is_imports());
     if use_ast || use_imports || use_doc_lines {
-        // Parse, if the AST wasn't pre-provided provided.
-        match tokens.into_ast(source_kind, source_type) {
-            Ok(python_ast) => {
+        match parsed.as_result() {
+            Ok(parsed) => {
                 let cell_offsets = source_kind.as_ipy_notebook().map(Notebook::cell_offsets);
                 let notebook_index = source_kind.as_ipy_notebook().map(Notebook::index);
                 if use_ast {
                     diagnostics.extend(check_ast(
-                        &python_ast,
+                        parsed,
                         locator,
                         stylist,
                         indexer,
@@ -168,7 +175,7 @@ pub fn check_path(
                 }
                 if use_imports {
                     let import_diagnostics = check_imports(
-                        &python_ast,
+                        parsed,
                         locator,
                         indexer,
                         &directives.isort,
@@ -182,7 +189,7 @@ pub fn check_path(
                     diagnostics.extend(import_diagnostics);
                 }
                 if use_doc_lines {
-                    doc_lines.extend(doc_lines_from_ast(&python_ast, locator));
+                    doc_lines.extend(doc_lines_from_ast(parsed.suite(), locator));
                 }
             }
             Err(parse_error) => {
@@ -191,8 +198,9 @@ pub fn check_path(
                 // if it's disabled via any of the usual mechanisms (e.g., `noqa`,
                 // `per-file-ignores`), and the easiest way to detect that suppression is
                 // to see if the diagnostic persists to the end of the function.
-                pycodestyle::rules::syntax_error(&mut diagnostics, &parse_error, locator);
-                error = Some(parse_error);
+                pycodestyle::rules::syntax_error(&mut diagnostics, parse_error, locator);
+                // TODO(dhruvmanila): Remove this clone
+                error = Some(parse_error.clone());
             }
         }
     }
@@ -210,7 +218,12 @@ pub fn check_path(
         .any(|rule_code| rule_code.lint_source().is_physical_lines())
     {
         diagnostics.extend(check_physical_lines(
-            locator, stylist, indexer, &doc_lines, settings,
+            locator,
+            stylist,
+            indexer,
+            comment_ranges,
+            &doc_lines,
+            settings,
         ));
     }
 
@@ -222,36 +235,44 @@ pub fn check_path(
                 continue;
             }
             let diagnostic = match test_rule {
-                Rule::StableTestRule => test_rules::StableTestRule::diagnostic(locator, indexer),
+                Rule::StableTestRule => {
+                    test_rules::StableTestRule::diagnostic(locator, comment_ranges)
+                }
                 Rule::StableTestRuleSafeFix => {
-                    test_rules::StableTestRuleSafeFix::diagnostic(locator, indexer)
+                    test_rules::StableTestRuleSafeFix::diagnostic(locator, comment_ranges)
                 }
                 Rule::StableTestRuleUnsafeFix => {
-                    test_rules::StableTestRuleUnsafeFix::diagnostic(locator, indexer)
+                    test_rules::StableTestRuleUnsafeFix::diagnostic(locator, comment_ranges)
                 }
                 Rule::StableTestRuleDisplayOnlyFix => {
-                    test_rules::StableTestRuleDisplayOnlyFix::diagnostic(locator, indexer)
+                    test_rules::StableTestRuleDisplayOnlyFix::diagnostic(locator, comment_ranges)
                 }
-                Rule::NurseryTestRule => test_rules::NurseryTestRule::diagnostic(locator, indexer),
-                Rule::PreviewTestRule => test_rules::PreviewTestRule::diagnostic(locator, indexer),
+                Rule::NurseryTestRule => {
+                    test_rules::NurseryTestRule::diagnostic(locator, comment_ranges)
+                }
+                Rule::PreviewTestRule => {
+                    test_rules::PreviewTestRule::diagnostic(locator, comment_ranges)
+                }
                 Rule::DeprecatedTestRule => {
-                    test_rules::DeprecatedTestRule::diagnostic(locator, indexer)
+                    test_rules::DeprecatedTestRule::diagnostic(locator, comment_ranges)
                 }
                 Rule::AnotherDeprecatedTestRule => {
-                    test_rules::AnotherDeprecatedTestRule::diagnostic(locator, indexer)
+                    test_rules::AnotherDeprecatedTestRule::diagnostic(locator, comment_ranges)
                 }
-                Rule::RemovedTestRule => test_rules::RemovedTestRule::diagnostic(locator, indexer),
+                Rule::RemovedTestRule => {
+                    test_rules::RemovedTestRule::diagnostic(locator, comment_ranges)
+                }
                 Rule::AnotherRemovedTestRule => {
-                    test_rules::AnotherRemovedTestRule::diagnostic(locator, indexer)
+                    test_rules::AnotherRemovedTestRule::diagnostic(locator, comment_ranges)
                 }
                 Rule::RedirectedToTestRule => {
-                    test_rules::RedirectedToTestRule::diagnostic(locator, indexer)
+                    test_rules::RedirectedToTestRule::diagnostic(locator, comment_ranges)
                 }
                 Rule::RedirectedFromTestRule => {
-                    test_rules::RedirectedFromTestRule::diagnostic(locator, indexer)
+                    test_rules::RedirectedFromTestRule::diagnostic(locator, comment_ranges)
                 }
                 Rule::RedirectedFromPrefixTestRule => {
-                    test_rules::RedirectedFromPrefixTestRule::diagnostic(locator, indexer)
+                    test_rules::RedirectedFromPrefixTestRule::diagnostic(locator, comment_ranges)
                 }
                 _ => unreachable!("All test rules must have an implementation"),
             };
@@ -288,7 +309,7 @@ pub fn check_path(
             &mut diagnostics,
             path,
             locator,
-            indexer.comment_ranges(),
+            comment_ranges,
             &directives.noqa_line_for,
             error.is_none(),
             &per_file_ignores,
@@ -350,23 +371,21 @@ pub fn add_noqa_to_path(
     source_type: PySourceType,
     settings: &LinterSettings,
 ) -> Result<usize> {
-    let contents = source_kind.source_code();
-
-    // Tokenize once.
-    let tokens = ruff_python_parser::tokenize(contents, source_type.as_mode());
+    // Parse once.
+    let parsed = ruff_python_parser::parse_unchecked_source(source_kind.source_code(), source_type);
 
     // Map row and column locations to byte slices (lazily).
-    let locator = Locator::new(contents);
+    let locator = Locator::new(source_kind.source_code());
 
     // Detect the current code style (lazily).
-    let stylist = Stylist::from_tokens(&tokens, &locator);
+    let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
 
     // Extra indices from the code.
-    let indexer = Indexer::from_tokens(&tokens, &locator);
+    let indexer = Indexer::from_tokens(parsed.tokens(), &locator);
 
     // Extract the `# noqa` and `# isort: skip` directives from the source.
     let directives = directives::extract_directives(
-        &tokens,
+        &parsed,
         directives::Flags::from_settings(settings),
         &locator,
         &indexer,
@@ -387,7 +406,7 @@ pub fn add_noqa_to_path(
         flags::Noqa::Disabled,
         source_kind,
         source_type,
-        TokenSource::Tokens(tokens),
+        &parsed,
     );
 
     // Log any parse errors.
@@ -409,7 +428,7 @@ pub fn add_noqa_to_path(
         path,
         &diagnostics,
         &locator,
-        indexer.comment_ranges(),
+        parsed.comment_ranges(),
         &settings.external,
         &directives.noqa_line_for,
         stylist.line_ending(),
@@ -425,23 +444,22 @@ pub fn lint_only(
     noqa: flags::Noqa,
     source_kind: &SourceKind,
     source_type: PySourceType,
-    data: ParseSource,
+    source: ParseSource,
 ) -> LinterResult<Vec<Message>> {
-    // Tokenize once.
-    let tokens = data.into_token_source(source_kind, source_type);
+    let parsed = source.into_parsed(source_kind, source_type);
 
     // Map row and column locations to byte slices (lazily).
     let locator = Locator::new(source_kind.source_code());
 
     // Detect the current code style (lazily).
-    let stylist = Stylist::from_tokens(&tokens, &locator);
+    let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
 
     // Extra indices from the code.
-    let indexer = Indexer::from_tokens(&tokens, &locator);
+    let indexer = Indexer::from_tokens(parsed.tokens(), &locator);
 
     // Extract the `# noqa` and `# isort: skip` directives from the source.
     let directives = directives::extract_directives(
-        &tokens,
+        &parsed,
         directives::Flags::from_settings(settings),
         &locator,
         &indexer,
@@ -459,7 +477,7 @@ pub fn lint_only(
         noqa,
         source_kind,
         source_type,
-        tokens,
+        &parsed,
     );
 
     result.map(|diagnostics| diagnostics_to_messages(diagnostics, path, &locator, &directives))
@@ -517,21 +535,22 @@ pub fn lint_fix<'a>(
 
     // Continuously fix until the source code stabilizes.
     loop {
-        // Tokenize once.
-        let tokens = ruff_python_parser::tokenize(transformed.source_code(), source_type.as_mode());
+        // Parse once.
+        let parsed =
+            ruff_python_parser::parse_unchecked_source(transformed.source_code(), source_type);
 
         // Map row and column locations to byte slices (lazily).
         let locator = Locator::new(transformed.source_code());
 
         // Detect the current code style (lazily).
-        let stylist = Stylist::from_tokens(&tokens, &locator);
+        let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
 
         // Extra indices from the code.
-        let indexer = Indexer::from_tokens(&tokens, &locator);
+        let indexer = Indexer::from_tokens(parsed.tokens(), &locator);
 
         // Extract the `# noqa` and `# isort: skip` directives from the source.
         let directives = directives::extract_directives(
-            &tokens,
+            &parsed,
             directives::Flags::from_settings(settings),
             &locator,
             &indexer,
@@ -549,7 +568,7 @@ pub fn lint_fix<'a>(
             noqa,
             &transformed,
             source_type,
-            TokenSource::Tokens(tokens),
+            &parsed,
         );
 
         if iterations == 0 {
@@ -685,70 +704,21 @@ This indicates a bug in Ruff. If you could open an issue at:
 
 #[derive(Debug, Clone)]
 pub enum ParseSource {
-    /// Extract the tokens and AST from the given source code.
+    /// Parse the [`Parsed`] from the given source code.
     None,
-    /// Use the precomputed tokens and AST.
-    Precomputed { tokens: Tokens, ast: Suite },
+    /// Use the precomputed [`Parsed`].
+    Precomputed(Parsed<ModModule>),
 }
 
 impl ParseSource {
-    /// Convert to a [`TokenSource`], tokenizing if necessary.
-    fn into_token_source(self, source_kind: &SourceKind, source_type: PySourceType) -> TokenSource {
+    /// Consumes the [`ParseSource`] and returns the parsed [`Parsed`], parsing the source code if
+    /// necessary.
+    fn into_parsed(self, source_kind: &SourceKind, source_type: PySourceType) -> Parsed<ModModule> {
         match self {
-            Self::None => TokenSource::Tokens(ruff_python_parser::tokenize(
-                source_kind.source_code(),
-                source_type.as_mode(),
-            )),
-            Self::Precomputed { tokens, ast } => TokenSource::Precomputed { tokens, ast },
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub enum TokenSource {
-    /// Use the precomputed tokens to generate the AST.
-    Tokens(Tokens),
-    /// Use the precomputed tokens and AST.
-    Precomputed { tokens: Tokens, ast: Suite },
-}
-
-impl TokenSource {
-    /// Returns an iterator over the [`TokenKind`] and the corresponding range.
-    ///
-    /// [`TokenKind`]: ruff_python_parser::TokenKind
-    pub fn kinds(&self) -> TokenKindIter {
-        match self {
-            TokenSource::Tokens(tokens) => tokens.kinds(),
-            TokenSource::Precomputed { tokens, .. } => TokenKindIter::new(tokens),
-        }
-    }
-}
-
-impl Deref for TokenSource {
-    type Target = [LexResult];
-
-    fn deref(&self) -> &Self::Target {
-        match self {
-            Self::Tokens(tokens) => tokens,
-            Self::Precomputed { tokens, .. } => tokens,
-        }
-    }
-}
-
-impl TokenSource {
-    /// Convert to an [`AstSource`], parsing if necessary.
-    fn into_ast(
-        self,
-        source_kind: &SourceKind,
-        source_type: PySourceType,
-    ) -> Result<Suite, ParseError> {
-        match self {
-            Self::Tokens(tokens) => Ok(ruff_python_parser::parse_program_tokens(
-                tokens,
-                source_kind.source_code(),
-                source_type.is_ipynb(),
-            )?),
-            Self::Precomputed { ast, .. } => Ok(ast),
+            ParseSource::None => {
+                ruff_python_parser::parse_unchecked_source(source_kind.source_code(), source_type)
+            }
+            ParseSource::Precomputed(parsed) => parsed,
         }
     }
 }
