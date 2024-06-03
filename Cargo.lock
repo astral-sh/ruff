@@ -1116,9 +1116,9 @@ dependencies = [
 
 [[package]]
 name = "itertools"
-version = "0.12.1"
+version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ba291022dbbd398a455acf126c1e341954079855bc60dfdda641363bd6922569"
+checksum = "413ee7dfc52ee1a4949ceeb7dbc8a33f2d6c088194d9f922fb8318faf1f01186"
 dependencies = [
  "either",
 ]
@@ -1920,7 +1920,7 @@ dependencies = [
  "insta",
  "insta-cmd",
  "is-macro",
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "log",
  "mimalloc",
  "notify",
@@ -1982,7 +1982,7 @@ dependencies = [
  "filetime",
  "glob",
  "globset",
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "regex",
  "ruff_macros",
  "seahash",
@@ -1998,7 +1998,7 @@ dependencies = [
  "imara-diff",
  "indicatif",
  "indoc",
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "libcst",
  "pretty_assertions",
  "rayon",
@@ -2080,7 +2080,7 @@ dependencies = [
  "insta",
  "is-macro",
  "is-wsl",
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "libcst",
  "log",
  "memchr",
@@ -2128,7 +2128,7 @@ dependencies = [
 name = "ruff_macros"
 version = "0.0.0"
 dependencies = [
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "proc-macro2",
  "quote",
  "ruff_python_trivia",
@@ -2140,7 +2140,7 @@ name = "ruff_notebook"
 version = "0.0.0"
 dependencies = [
  "anyhow",
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "once_cell",
  "rand",
  "ruff_diagnostics",
@@ -2161,7 +2161,7 @@ dependencies = [
  "aho-corasick",
  "bitflags 2.5.0",
  "is-macro",
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "once_cell",
  "ruff_python_trivia",
  "ruff_source_file",
@@ -2200,7 +2200,7 @@ dependencies = [
  "clap",
  "countme",
  "insta",
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "memchr",
  "once_cell",
  "regex",
@@ -2241,7 +2241,7 @@ name = "ruff_python_literal"
 version = "0.0.0"
 dependencies = [
  "bitflags 2.5.0",
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "ruff_python_ast",
  "unic-ucd-category",
 ]
@@ -2256,7 +2256,7 @@ dependencies = [
  "bstr",
  "insta",
  "is-macro",
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "memchr",
  "ruff_python_ast",
  "ruff_source_file",
@@ -2305,7 +2305,7 @@ dependencies = [
 name = "ruff_python_trivia"
 version = "0.0.0"
 dependencies = [
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "ruff_source_file",
  "ruff_text_size",
  "unicode-ident",
@@ -2412,7 +2412,7 @@ dependencies = [
  "globset",
  "ignore",
  "is-macro",
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "log",
  "matchit",
  "path-absolutize",
