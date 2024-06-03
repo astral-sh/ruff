@@ -111,3 +111,15 @@ def f():
     if a:
         return False
     return True
+
+
+def f():
+    if not 10 < a:
+        return False
+    return True
+
+
+def f():
+    if 10 < a:
+        return False
+    return True

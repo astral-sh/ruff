@@ -116,7 +116,7 @@ pub(crate) fn yield_in_for_loop(checker: &mut Checker, stmt_for: &ast::StmtFor) 
         parenthesized_range(
             iter.as_ref().into(),
             stmt_for.into(),
-            checker.indexer().comment_ranges(),
+            checker.parsed().comment_ranges(),
             checker.locator().contents(),
         )
         .unwrap_or(iter.range()),

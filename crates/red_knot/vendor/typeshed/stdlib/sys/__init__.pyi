@@ -1,5 +1,5 @@
 import sys
-from _typeshed import OptExcInfo, ProfileFunction, TraceFunction, structseq
+from _typeshed import MaybeNone, OptExcInfo, ProfileFunction, TraceFunction, structseq
 from _typeshed.importlib import MetaPathFinderProtocol, PathEntryFinderProtocol
 from builtins import object as _object
 from collections.abc import AsyncGenerator, Callable, Sequence
@@ -56,23 +56,24 @@ ps2: object
 
 # TextIO is used instead of more specific types for the standard streams,
 # since they are often monkeypatched at runtime. At startup, the objects
-# are initialized to instances of TextIOWrapper.
+# are initialized to instances of TextIOWrapper, but can also be None under
+# some circumstances.
 #
 # To use methods from TextIOWrapper, use an isinstance check to ensure that
 # the streams have not been overridden:
 #
 # if isinstance(sys.stdout, io.TextIOWrapper):
 #    sys.stdout.reconfigure(...)
-stdin: TextIO
-stdout: TextIO
-stderr: TextIO
+stdin: TextIO | MaybeNone
+stdout: TextIO | MaybeNone
+stderr: TextIO | MaybeNone
 
 if sys.version_info >= (3, 10):
     stdlib_module_names: frozenset[str]
 
-__stdin__: Final[TextIOWrapper]  # Contains the original value of stdin
-__stdout__: Final[TextIOWrapper]  # Contains the original value of stdout
-__stderr__: Final[TextIOWrapper]  # Contains the original value of stderr
+__stdin__: Final[TextIOWrapper | None]  # Contains the original value of stdin
+__stdout__: Final[TextIOWrapper | None]  # Contains the original value of stdout
+__stderr__: Final[TextIOWrapper | None]  # Contains the original value of stderr
 tracebacklimit: int
 version: str
 api_version: int
@@ -264,9 +265,9 @@ def getrecursionlimit() -> int: ...
 def getsizeof(obj: object, default: int = ...) -> int: ...
 def getswitchinterval() -> float: ...
 def getprofile() -> ProfileFunction | None: ...
-def setprofile(profilefunc: ProfileFunction | None) -> None: ...
+def setprofile(function: ProfileFunction | None, /) -> None: ...
 def gettrace() -> TraceFunction | None: ...
-def settrace(tracefunc: TraceFunction | None) -> None: ...
+def settrace(function: TraceFunction | None, /) -> None: ...
 
 if sys.platform == "win32":
     # A tuple of length 5, even though it has more than 5 attributes.

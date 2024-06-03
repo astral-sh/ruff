@@ -1321,6 +1321,8 @@ UP032_0.py:261:1: UP032 [*] Use f-string instead of `format` call
 260 | # The string _should_ be converted, since the function call is repeated in the arguments.
 261 | "{0} {1}".format(foo(), foo())
     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP032
+262 | 
+263 | # The call should be removed, but the string itself should remain.
     |
     = help: Convert to f-string
 
@@ -1330,3 +1332,41 @@ UP032_0.py:261:1: UP032 [*] Use f-string instead of `format` call
 260 260 | # The string _should_ be converted, since the function call is repeated in the arguments.
 261     |-"{0} {1}".format(foo(), foo())
     261 |+f"{foo()} {foo()}"
+262 262 | 
+263 263 | # The call should be removed, but the string itself should remain.
+264 264 | ''.format(self.project)
+
+UP032_0.py:264:1: UP032 [*] Use f-string instead of `format` call
+    |
+263 | # The call should be removed, but the string itself should remain.
+264 | ''.format(self.project)
+    | ^^^^^^^^^^^^^^^^^^^^^^^ UP032
+265 | 
+266 | # The call should be removed, but the string itself should remain.
+    |
+    = help: Convert to f-string
+
+ℹ Safe fix
+261 261 | "{0} {1}".format(foo(), foo())
+262 262 | 
+263 263 | # The call should be removed, but the string itself should remain.
+264     |-''.format(self.project)
+    264 |+''
+265 265 | 
+266 266 | # The call should be removed, but the string itself should remain.
+267 267 | "".format(self.project)
+
+UP032_0.py:267:1: UP032 [*] Use f-string instead of `format` call
+    |
+266 | # The call should be removed, but the string itself should remain.
+267 | "".format(self.project)
+    | ^^^^^^^^^^^^^^^^^^^^^^^ UP032
+    |
+    = help: Convert to f-string
+
+ℹ Safe fix
+264 264 | ''.format(self.project)
+265 265 | 
+266 266 | # The call should be removed, but the string itself should remain.
+267     |-"".format(self.project)
+    267 |+""

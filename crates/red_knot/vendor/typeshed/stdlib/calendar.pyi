@@ -4,7 +4,7 @@ import sys
 from _typeshed import Unused
 from collections.abc import Iterable, Sequence
 from time import struct_time
-from typing import ClassVar, Literal
+from typing import ClassVar, Final
 from typing_extensions import TypeAlias
 
 __all__ = [
@@ -154,18 +154,18 @@ month_abbr: Sequence[str]
 
 if sys.version_info >= (3, 12):
     class Month(enum.IntEnum):
-        JANUARY: Literal[1]
-        FEBRUARY: Literal[2]
-        MARCH: Literal[3]
-        APRIL: Literal[4]
-        MAY: Literal[5]
-        JUNE: Literal[6]
-        JULY: Literal[7]
-        AUGUST: Literal[8]
-        SEPTEMBER: Literal[9]
-        OCTOBER: Literal[10]
-        NOVEMBER: Literal[11]
-        DECEMBER: Literal[12]
+        JANUARY = 1
+        FEBRUARY = 2
+        MARCH = 3
+        APRIL = 4
+        MAY = 5
+        JUNE = 6
+        JULY = 7
+        AUGUST = 8
+        SEPTEMBER = 9
+        OCTOBER = 10
+        NOVEMBER = 11
+        DECEMBER = 12
 
     JANUARY = Month.JANUARY
     FEBRUARY = Month.FEBRUARY
@@ -181,13 +181,13 @@ if sys.version_info >= (3, 12):
     DECEMBER = Month.DECEMBER
 
     class Day(enum.IntEnum):
-        MONDAY: Literal[0]
-        TUESDAY: Literal[1]
-        WEDNESDAY: Literal[2]
-        THURSDAY: Literal[3]
-        FRIDAY: Literal[4]
-        SATURDAY: Literal[5]
-        SUNDAY: Literal[6]
+        MONDAY = 0
+        TUESDAY = 1
+        WEDNESDAY = 2
+        THURSDAY = 3
+        FRIDAY = 4
+        SATURDAY = 5
+        SUNDAY = 6
 
     MONDAY = Day.MONDAY
     TUESDAY = Day.TUESDAY
@@ -197,12 +197,12 @@ if sys.version_info >= (3, 12):
     SATURDAY = Day.SATURDAY
     SUNDAY = Day.SUNDAY
 else:
-    MONDAY: Literal[0]
-    TUESDAY: Literal[1]
-    WEDNESDAY: Literal[2]
-    THURSDAY: Literal[3]
-    FRIDAY: Literal[4]
-    SATURDAY: Literal[5]
-    SUNDAY: Literal[6]
+    MONDAY: Final = 0
+    TUESDAY: Final = 1
+    WEDNESDAY: Final = 2
+    THURSDAY: Final = 3
+    FRIDAY: Final = 4
+    SATURDAY: Final = 5
+    SUNDAY: Final = 6
 
-EPOCH: Literal[1970]
+EPOCH: Final = 1970

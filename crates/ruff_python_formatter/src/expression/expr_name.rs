@@ -31,15 +31,15 @@ impl NeedsParentheses for ExprName {
 
 #[cfg(test)]
 mod tests {
-    use ruff_python_parser::parse_program;
+    use ruff_python_parser::parse_module;
     use ruff_text_size::{Ranged, TextRange, TextSize};
 
     #[test]
     fn name_range_with_comments() {
-        let source = parse_program("a # comment").unwrap();
+        let module = parse_module("a # comment").unwrap();
 
-        let expression_statement = source
-            .body
+        let expression_statement = module
+            .suite()
             .first()
             .expect("Expected non-empty body")
             .as_expr_stmt()

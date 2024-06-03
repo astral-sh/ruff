@@ -80,13 +80,13 @@ from typing import cast
 # OK
 from a import b
 
-# OK: `typing_extensions` contains backported improvements.
+# UP035 on py312+ only
 from typing_extensions import SupportsIndex
 
-# OK: `typing_extensions` contains backported improvements.
+# UP035 on py312+ only
 from typing_extensions import NamedTuple
 
-# OK: `typing_extensions` supports `frozen_default` (backported from 3.12).
+# UP035 on py312+ only: `typing_extensions` supports `frozen_default` (backported from 3.12).
 from typing_extensions import dataclass_transform
 
 # UP035
@@ -100,3 +100,12 @@ from typing_extensions import Buffer
 
 # UP035
 from typing_extensions import get_original_bases
+
+# UP035 on py313+ only
+from typing_extensions import TypeVar
+
+# UP035 on py313+ only
+from typing_extensions import CapsuleType
+
+# UP035 on py313+ only
+from typing_extensions import deprecated

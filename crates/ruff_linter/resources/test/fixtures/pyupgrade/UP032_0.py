@@ -259,3 +259,9 @@ raise ValueError(
 
 # The string _should_ be converted, since the function call is repeated in the arguments.
 "{0} {1}".format(foo(), foo())
+
+# The call should be removed, but the string itself should remain.
+''.format(self.project)
+
+# The call should be removed, but the string itself should remain.
+"".format(self.project)
