@@ -216,11 +216,12 @@ mod tests {
     use crate::db::tests::TestDb;
     use crate::db::{HasJar, SemanticJar};
     use crate::module::{
-        resolve_module, set_module_search_paths, ModuleName, ModuleSearchPath, ModuleSearchPathKind,
+        set_module_search_paths, ModuleName, ModuleSearchPath, ModuleSearchPathKind,
     };
-    use crate::symbols::{symbol_table, GlobalSymbolId};
+    use crate::symbols::resolve_global_symbol;
     use crate::types::{infer_symbol_public_type, Type};
     use crate::Name;
+    use textwrap::dedent;
 
     // TODO with virtual filesystem we shouldn't have to write files to disk for these
     // tests
@@ -247,67 +248,62 @@ mod tests {
         Ok(TestCase { temp_dir, db, src })
     }
 
+    fn write_to_path(case: &TestCase, relpath: &str, contents: &str) -> anyhow::Result<()> {
+        let path = case.src.path().join(relpath);
+        std::fs::write(path, dedent(contents))?;
+        Ok(())
+    }
+
+    fn get_public_type(case: &TestCase, modname: &str, varname: &str) -> anyhow::Result<Type> {
+        let db = &case.db;
+        let symbol =
+            resolve_global_symbol(db, ModuleName::new(modname), varname)?.expect("symbol to exist");
+
+        Ok(infer_symbol_public_type(db, symbol)?)
+    }
+
+    fn assert_public_type(
+        case: &TestCase,
+        modname: &str,
+        varname: &str,
+        tyname: &str,
+    ) -> anyhow::Result<()> {
+        let ty = get_public_type(case, modname, varname)?;
+
+        let jar = HasJar::<SemanticJar>::jar(&case.db)?;
+        assert_eq!(format!("{}", ty.display(&jar.type_store)), tyname);
+        Ok(())
+    }
+
     #[test]
     fn follow_import_to_class() -> anyhow::Result<()> {
         let case = create_test()?;
-        let db = &case.db;
 
-        let a_path = case.src.path().join("a.py");
-        let b_path = case.src.path().join("b.py");
-        std::fs::write(a_path, "from b import C as D; E = D")?;
-        std::fs::write(b_path, "class C: pass")?;
-        let a_file = resolve_module(db, ModuleName::new("a"))?
-            .expect("module should be found")
-            .path(db)?
-            .file();
-        let a_syms = symbol_table(db, a_file)?;
-        let e_sym = a_syms
-            .root_symbol_id_by_name("E")
-            .expect("E symbol should be found");
+        write_to_path(&case, "a.py", "from b import C as D; E = D")?;
+        write_to_path(&case, "b.py", "class C: pass")?;
 
-        let ty = infer_symbol_public_type(
-            db,
-            GlobalSymbolId {
-                file_id: a_file,
-                symbol_id: e_sym,
-            },
-        )?;
-
-        let jar = HasJar::<SemanticJar>::jar(db)?;
-        assert!(matches!(ty, Type::Class(_)));
-        assert_eq!(format!("{}", ty.display(&jar.type_store)), "Literal[C]");
-
-        Ok(())
+        assert_public_type(&case, "a", "E", "Literal[C]")
     }
 
     #[test]
     fn resolve_base_class_by_name() -> anyhow::Result<()> {
         let case = create_test()?;
-        let db = &case.db;
 
-        let path = case.src.path().join("mod.py");
-        std::fs::write(path, "class Base: pass\nclass Sub(Base): pass")?;
-        let file = resolve_module(db, ModuleName::new("mod"))?
-            .expect("module should be found")
-            .path(db)?
-            .file();
-        let syms = symbol_table(db, file)?;
-        let sym = syms
-            .root_symbol_id_by_name("Sub")
-            .expect("Sub symbol should be found");
-
-        let ty = infer_symbol_public_type(
-            db,
-            GlobalSymbolId {
-                file_id: file,
-                symbol_id: sym,
-            },
+        write_to_path(
+            &case,
+            "mod.py",
+            "
+                class Base: pass
+                class Sub(Base): pass
+            ",
         )?;
+
+        let ty = get_public_type(&case, "mod", "Sub")?;
 
         let Type::Class(class_id) = ty else {
             panic!("Sub is not a Class")
         };
-        let jar = HasJar::<SemanticJar>::jar(db)?;
+        let jar = HasJar::<SemanticJar>::jar(&case.db)?;
         let base_names: Vec<_> = jar
             .type_store
             .get_class(class_id)
@@ -324,40 +320,31 @@ mod tests {
     #[test]
     fn resolve_method() -> anyhow::Result<()> {
         let case = create_test()?;
-        let db = &case.db;
 
-        let path = case.src.path().join("mod.py");
-        std::fs::write(path, "class C:\n  def f(self): pass")?;
-        let file = resolve_module(db, ModuleName::new("mod"))?
-            .expect("module should be found")
-            .path(db)?
-            .file();
-        let syms = symbol_table(db, file)?;
-        let sym = syms
-            .root_symbol_id_by_name("C")
-            .expect("C symbol should be found");
-
-        let ty = infer_symbol_public_type(
-            db,
-            GlobalSymbolId {
-                file_id: file,
-                symbol_id: sym,
-            },
+        write_to_path(
+            &case,
+            "mod.py",
+            "
+                class C:
+                    def f(self): pass
+            ",
         )?;
+
+        let ty = get_public_type(&case, "mod", "C")?;
 
         let Type::Class(class_id) = ty else {
             panic!("C is not a Class");
         };
 
         let member_ty = class_id
-            .get_own_class_member(db, &Name::new("f"))
+            .get_own_class_member(&case.db, &Name::new("f"))
             .expect("C.f to resolve");
 
         let Some(Type::Function(func_id)) = member_ty else {
             panic!("C.f is not a Function");
         };
 
-        let jar = HasJar::<SemanticJar>::jar(db)?;
+        let jar = HasJar::<SemanticJar>::jar(&case.db)?;
         let function = jar.type_store.get_function(func_id);
         assert_eq!(function.name(), "f");
 
@@ -367,96 +354,47 @@ mod tests {
     #[test]
     fn resolve_module_member() -> anyhow::Result<()> {
         let case = create_test()?;
-        let db = &case.db;
 
-        let a_path = case.src.path().join("a.py");
-        let b_path = case.src.path().join("b.py");
-        std::fs::write(a_path, "import b; D = b.C")?;
-        std::fs::write(b_path, "class C: pass")?;
-        let a_file = resolve_module(db, ModuleName::new("a"))?
-            .expect("module should be found")
-            .path(db)?
-            .file();
-        let a_syms = symbol_table(db, a_file)?;
-        let d_sym = a_syms
-            .root_symbol_id_by_name("D")
-            .expect("D symbol should be found");
+        write_to_path(&case, "a.py", "import b; D = b.C")?;
+        write_to_path(&case, "b.py", "class C: pass")?;
 
-        let ty = infer_symbol_public_type(
-            db,
-            GlobalSymbolId {
-                file_id: a_file,
-                symbol_id: d_sym,
-            },
-        )?;
-
-        let jar = HasJar::<SemanticJar>::jar(db)?;
-        assert!(matches!(ty, Type::Class(_)));
-        assert_eq!(format!("{}", ty.display(&jar.type_store)), "Literal[C]");
-        Ok(())
+        assert_public_type(&case, "a", "D", "Literal[C]")
     }
 
     #[test]
     fn resolve_literal() -> anyhow::Result<()> {
         let case = create_test()?;
-        let db = &case.db;
 
-        let path = case.src.path().join("a.py");
-        std::fs::write(path, "x = 1")?;
-        let file = resolve_module(db, ModuleName::new("a"))?
-            .expect("module should be found")
-            .path(db)?
-            .file();
-        let syms = symbol_table(db, file)?;
-        let x_sym = syms
-            .root_symbol_id_by_name("x")
-            .expect("x symbol should be found");
+        write_to_path(&case, "a.py", "x = 1")?;
 
-        let ty = infer_symbol_public_type(
-            db,
-            GlobalSymbolId {
-                file_id: file,
-                symbol_id: x_sym,
-            },
-        )?;
-
-        let jar = HasJar::<SemanticJar>::jar(db)?;
-        assert!(matches!(ty, Type::IntLiteral(_)));
-        assert_eq!(format!("{}", ty.display(&jar.type_store)), "Literal[1]");
-        Ok(())
+        assert_public_type(&case, "a", "x", "Literal[1]")
     }
 
     #[test]
     fn resolve_union() -> anyhow::Result<()> {
         let case = create_test()?;
-        let db = &case.db;
 
-        let path = case.src.path().join("a.py");
-        std::fs::write(path, "if flag:\n  x = 1\nelse:\n  x = 2")?;
-        let file = resolve_module(db, ModuleName::new("a"))?
-            .expect("module should be found")
-            .path(db)?
-            .file();
-        let syms = symbol_table(db, file)?;
-        let x_sym = syms
-            .root_symbol_id_by_name("x")
-            .expect("x symbol should be found");
-
-        let ty = infer_symbol_public_type(
-            db,
-            GlobalSymbolId {
-                file_id: file,
-                symbol_id: x_sym,
-            },
+        write_to_path(
+            &case,
+            "a.py",
+            "
+                if flag:
+                    x = 1
+                else:
+                    x = 2
+            ",
         )?;
 
-        let jar = HasJar::<SemanticJar>::jar(db)?;
-        assert!(matches!(ty, Type::Union(_)));
-        assert_eq!(
-            format!("{}", ty.display(&jar.type_store)),
-            "(Literal[1] | Literal[2])"
-        );
-        Ok(())
+        assert_public_type(&case, "a", "x", "(Literal[1] | Literal[2])")
+    }
+
+    #[test]
+    fn resolve_visible_def() -> anyhow::Result<()> {
+        let case = create_test()?;
+
+        write_to_path(&case, "a.py", "y = 1; y = 2; x = y")?;
+
+        assert_public_type(&case, "a", "x", "Literal[2]")
     }
 
     #[test]
