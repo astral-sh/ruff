@@ -3,8 +3,9 @@
 use anyhow::Result;
 
 use ruff_python_ast::relocate::relocate_expr;
-use ruff_python_ast::{str, Expr};
-use ruff_text_size::{TextLen, TextRange};
+use ruff_python_ast::str::raw_contents;
+use ruff_python_ast::{Expr, ExprStringLiteral, StringFlags, StringLiteral};
+use ruff_text_size::Ranged;
 
 use crate::{parse_expression, parse_expression_range};
 
@@ -16,37 +17,60 @@ pub enum AnnotationKind {
     /// expressions within the annotation and apply automatic fixes, which is
     /// not possible for complex string literals.
     Simple,
+
     /// The annotation is defined as part of a complex string literal, such as
     /// a literal containing an implicit concatenation or escaped characters,
     /// e.g. `x: "List" "[int]" = []`. These are comparatively rare, but valid.
     Complex,
 }
 
-/// Parses the value of a string literal node (`parsed_contents`) with `range` as a type
-/// annotation. The given `source` is the entire source code.
+/// Parses the given string expression node as a type annotation. The given `source` is the entire
+/// source code.
 pub fn parse_type_annotation(
-    parsed_contents: &str,
-    range: TextRange,
+    string_expr: &ExprStringLiteral,
     source: &str,
 ) -> Result<(Expr, AnnotationKind)> {
-    let expression = &source[range];
+    let expr_text = &source[string_expr.range()];
 
-    if str::raw_contents(expression).is_some_and(|raw_contents| raw_contents == parsed_contents) {
-        // The annotation is considered "simple" if and only if the raw representation (e.g.,
-        // `List[int]` within "List[int]") exactly matches the parsed representation. This
-        // isn't the case, e.g., for implicit concatenations, or for annotations that contain
-        // escaped quotes.
-        let leading_quote_len = str::leading_quote(expression).unwrap().text_len();
-        let trailing_quote_len = str::trailing_quote(expression).unwrap().text_len();
-        let range = range
-            .add_start(leading_quote_len)
-            .sub_end(trailing_quote_len);
-        let expr = parse_expression_range(source, range)?.into_expr();
-        Ok((expr, AnnotationKind::Simple))
+    if let [string_literal] = string_expr.value.as_slice() {
+        // Compare the raw contents (without quotes) of the expression with the parsed contents
+        // contained in the string literal.
+        if raw_contents(expr_text)
+            .is_some_and(|raw_contents| raw_contents == string_literal.as_str())
+        {
+            parse_simple_type_annotation(string_literal, source)
+        } else {
+            // The raw contents of the string doesn't match the parsed content. This could be the
+            // case for annotations that contain escaped quotes.
+            parse_complex_type_annotation(string_expr)
+        }
     } else {
-        // Otherwise, consider this a "complex" annotation.
-        let mut expr = parse_expression(parsed_contents)?.into_expr();
-        relocate_expr(&mut expr, range);
-        Ok((expr, AnnotationKind::Complex))
+        // String is implicitly concatenated.
+        parse_complex_type_annotation(string_expr)
     }
+}
+
+fn parse_simple_type_annotation(
+    string_literal: &StringLiteral,
+    source: &str,
+) -> Result<(Expr, AnnotationKind)> {
+    Ok((
+        parse_expression_range(
+            source,
+            string_literal
+                .range()
+                .add_start(string_literal.flags.opener_len())
+                .sub_end(string_literal.flags.closer_len()),
+        )?
+        .into_expr(),
+        AnnotationKind::Simple,
+    ))
+}
+
+fn parse_complex_type_annotation(
+    string_expr: &ExprStringLiteral,
+) -> Result<(Expr, AnnotationKind)> {
+    let mut parsed = parse_expression(string_expr.value.to_str())?.into_expr();
+    relocate_expr(&mut parsed, string_expr.range());
+    Ok((parsed, AnnotationKind::Complex))
 }
