@@ -15,7 +15,7 @@ use crate::source::{source_text, Source};
 use crate::symbols::{
     resolve_global_symbol, symbol_table, Definition, GlobalSymbolId, SymbolId, SymbolTable,
 };
-use crate::types::{infer_definition_type, infer_symbol_type, Type};
+use crate::types::{infer_definition_type, infer_symbol_public_type, Type};
 
 #[tracing::instrument(level = "debug", skip(db))]
 pub(crate) fn lint_syntax(db: &dyn LintDb, file_id: FileId) -> QueryResult<Diagnostics> {
@@ -104,14 +104,14 @@ fn lint_unresolved_imports(context: &SemanticLintContext) -> QueryResult<()> {
     for (symbol, definition) in context.symbols().all_definitions() {
         match definition {
             Definition::Import(import) => {
-                let ty = context.infer_symbol_type(symbol)?;
+                let ty = context.infer_symbol_public_type(symbol)?;
 
                 if ty.is_unknown() {
                     context.push_diagnostic(format!("Unresolved module {}", import.module));
                 }
             }
             Definition::ImportFrom(import) => {
-                let ty = context.infer_symbol_type(symbol)?;
+                let ty = context.infer_symbol_public_type(symbol)?;
 
                 if ty.is_unknown() {
                     let module_name = import.module().map(Deref::deref).unwrap_or_default();
@@ -217,8 +217,8 @@ impl<'a> SemanticLintContext<'a> {
         &self.symbols
     }
 
-    pub fn infer_symbol_type(&self, symbol_id: SymbolId) -> QueryResult<Type> {
-        infer_symbol_type(
+    pub fn infer_symbol_public_type(&self, symbol_id: SymbolId) -> QueryResult<Type> {
+        infer_symbol_public_type(
             self.db.upcast(),
             GlobalSymbolId {
                 file_id: self.file_id,

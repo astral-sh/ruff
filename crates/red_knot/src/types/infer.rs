@@ -15,22 +15,41 @@ use crate::types::{ModuleTypeId, Type};
 use crate::{FileId, Name};
 
 // FIXME: Figure out proper dead-lock free synchronisation now that this takes `&db` instead of `&mut db`.
+/// Resolve the public-facing type for a symbol (the type seen by other scopes: other modules, or
+/// nested functions). Because calls to nested functions and imports can occur anywhere in control
+/// flow, this type must be conservative and consider all definitions of the symbol that could
+/// possibly be seen by another scope. Currently we take the most conservative approach, which is
+/// the union of all definitions. We may be able to narrow this in future to eliminate definitions
+/// which can't possibly (or at least likely) be seen by any other scope, so that e.g. we could
+/// infer `Literal["1"]` instead of `Literal[1] | Literal["1"]` for `x` in `x = x; x = str(x);`.
 #[tracing::instrument(level = "trace", skip(db))]
-pub fn infer_symbol_type(db: &dyn SemanticDb, symbol: GlobalSymbolId) -> QueryResult<Type> {
+pub fn infer_symbol_public_type(db: &dyn SemanticDb, symbol: GlobalSymbolId) -> QueryResult<Type> {
     let symbols = symbol_table(db, symbol.file_id)?;
     let defs = symbols.definitions(symbol.symbol_id);
     let jar: &SemanticJar = db.jar()?;
 
-    if let Some(ty) = jar.type_store.get_cached_symbol_type(symbol) {
+    if let Some(ty) = jar.type_store.get_cached_symbol_public_type(symbol) {
         return Ok(ty);
     }
 
-    // TODO handle multiple defs, conditional defs...
-    assert_eq!(defs.len(), 1);
+    let mut tys = defs
+        .iter()
+        .map(|def| infer_definition_type(db, symbol, def.clone()))
+        .peekable();
+    let ty = if let Some(first) = tys.next() {
+        if tys.peek().is_some() {
+            Type::Union(jar.type_store.add_union(
+                symbol.file_id,
+                &Iterator::chain([first].into_iter(), tys).collect::<QueryResult<Vec<_>>>()?,
+            ))
+        } else {
+            first?
+        }
+    } else {
+        Type::Unknown
+    };
 
-    let ty = infer_definition_type(db, symbol, defs[0].clone())?;
-
-    jar.type_store.cache_symbol_type(symbol, ty);
+    jar.type_store.cache_symbol_public_type(symbol, ty);
 
     // TODO record dependencies
     Ok(ty)
@@ -65,7 +84,7 @@ pub fn infer_definition_type(
             assert!(matches!(level, 0));
             let module_name = ModuleName::new(module.as_ref().expect("TODO relative imports"));
             if let Some(remote_symbol) = resolve_global_symbol(db, module_name, &name)? {
-                infer_symbol_type(db, remote_symbol)
+                infer_symbol_public_type(db, remote_symbol)
             } else {
                 Ok(Type::Unknown)
             }
@@ -158,7 +177,8 @@ fn infer_expr_type(db: &dyn SemanticDb, file_id: FileId, expr: &ast::Expr) -> Qu
         ast::Expr::Name(name) => {
             // TODO look up in the correct scope, don't assume global
             if let Some(symbol_id) = symbols.root_symbol_id_by_name(&name.id) {
-                infer_symbol_type(db, GlobalSymbolId { file_id, symbol_id })
+                // TODO should use only reachable definitions, not public type
+                infer_symbol_public_type(db, GlobalSymbolId { file_id, symbol_id })
             } else {
                 Ok(Type::Unknown)
             }
@@ -182,7 +202,7 @@ mod tests {
         resolve_module, set_module_search_paths, ModuleName, ModuleSearchPath, ModuleSearchPathKind,
     };
     use crate::symbols::{symbol_table, GlobalSymbolId};
-    use crate::types::{infer_symbol_type, Type};
+    use crate::types::{infer_symbol_public_type, Type};
     use crate::Name;
 
     // TODO with virtual filesystem we shouldn't have to write files to disk for these
@@ -228,7 +248,7 @@ mod tests {
             .root_symbol_id_by_name("E")
             .expect("E symbol should be found");
 
-        let ty = infer_symbol_type(
+        let ty = infer_symbol_public_type(
             db,
             GlobalSymbolId {
                 file_id: a_file,
@@ -259,7 +279,7 @@ mod tests {
             .root_symbol_id_by_name("Sub")
             .expect("Sub symbol should be found");
 
-        let ty = infer_symbol_type(
+        let ty = infer_symbol_public_type(
             db,
             GlobalSymbolId {
                 file_id: file,
@@ -300,7 +320,7 @@ mod tests {
             .root_symbol_id_by_name("C")
             .expect("C symbol should be found");
 
-        let ty = infer_symbol_type(
+        let ty = infer_symbol_public_type(
             db,
             GlobalSymbolId {
                 file_id: file,
@@ -345,7 +365,7 @@ mod tests {
             .root_symbol_id_by_name("D")
             .expect("D symbol should be found");
 
-        let ty = infer_symbol_type(
+        let ty = infer_symbol_public_type(
             db,
             GlobalSymbolId {
                 file_id: a_file,
@@ -375,7 +395,7 @@ mod tests {
             .root_symbol_id_by_name("x")
             .expect("x symbol should be found");
 
-        let ty = infer_symbol_type(
+        let ty = infer_symbol_public_type(
             db,
             GlobalSymbolId {
                 file_id: file,
@@ -386,6 +406,39 @@ mod tests {
         let jar = HasJar::<SemanticJar>::jar(db)?;
         assert!(matches!(ty, Type::IntLiteral(_)));
         assert_eq!(format!("{}", ty.display(&jar.type_store)), "Literal[1]");
+        Ok(())
+    }
+
+    #[test]
+    fn resolve_union() -> anyhow::Result<()> {
+        let case = create_test()?;
+        let db = &case.db;
+
+        let path = case.src.path().join("a.py");
+        std::fs::write(path, "if flag:\n  x = 1\nelse:\n  x = 2")?;
+        let file = resolve_module(db, ModuleName::new("a"))?
+            .expect("module should be found")
+            .path(db)?
+            .file();
+        let syms = symbol_table(db, file)?;
+        let x_sym = syms
+            .root_symbol_id_by_name("x")
+            .expect("x symbol should be found");
+
+        let ty = infer_symbol_public_type(
+            db,
+            GlobalSymbolId {
+                file_id: file,
+                symbol_id: x_sym,
+            },
+        )?;
+
+        let jar = HasJar::<SemanticJar>::jar(db)?;
+        assert!(matches!(ty, Type::Union(_)));
+        assert_eq!(
+            format!("{}", ty.display(&jar.type_store)),
+            "(Literal[1] | Literal[2])"
+        );
         Ok(())
     }
 }
