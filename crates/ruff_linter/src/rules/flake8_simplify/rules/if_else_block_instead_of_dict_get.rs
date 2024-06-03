@@ -210,7 +210,7 @@ pub(crate) fn if_else_block_instead_of_dict_get(checker: &mut Checker, stmt_if: 
         stmt_if.range(),
     );
     if !checker
-        .indexer()
+        .parsed()
         .comment_ranges()
         .has_comments(stmt_if, checker.locator())
     {
@@ -300,7 +300,7 @@ pub(crate) fn if_exp_instead_of_dict_get(
         expr.range(),
     );
     if !checker
-        .indexer()
+        .parsed()
         .comment_ranges()
         .has_comments(expr, checker.locator())
     {

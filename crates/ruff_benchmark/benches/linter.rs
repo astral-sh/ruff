@@ -10,7 +10,7 @@ use ruff_linter::settings::{flags, LinterSettings};
 use ruff_linter::source_kind::SourceKind;
 use ruff_linter::{registry::Rule, RuleSelector};
 use ruff_python_ast::PySourceType;
-use ruff_python_parser::{parse_program_tokens, tokenize, Mode};
+use ruff_python_parser::parse_module;
 
 #[cfg(target_os = "windows")]
 #[global_allocator]
@@ -54,15 +54,13 @@ fn benchmark_linter(mut group: BenchmarkGroup, settings: &LinterSettings) {
             BenchmarkId::from_parameter(case.name()),
             &case,
             |b, case| {
-                // Tokenize the source.
-                let tokens = tokenize(case.code(), Mode::Module);
-
                 // Parse the source.
-                let ast = parse_program_tokens(tokens.clone(), case.code(), false).unwrap();
+                let parsed =
+                    parse_module(case.code()).expect("Input should be a valid Python code");
 
                 b.iter_batched(
-                    || (ast.clone(), tokens.clone()),
-                    |(ast, tokens)| {
+                    || parsed.clone(),
+                    |parsed| {
                         let path = case.path();
                         let result = lint_only(
                             &path,
@@ -71,7 +69,7 @@ fn benchmark_linter(mut group: BenchmarkGroup, settings: &LinterSettings) {
                             flags::Noqa::Enabled,
                             &SourceKind::Python(case.code().to_string()),
                             PySourceType::from(path.as_path()),
-                            ParseSource::Precomputed { tokens, ast },
+                            ParseSource::Precomputed(parsed),
                         );
 
                         // Assert that file contains no parse errors

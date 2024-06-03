@@ -1,5 +1,7 @@
 use itertools::Itertools;
 use ruff_notebook::CellOffsets;
+use ruff_python_parser::Token;
+use ruff_python_parser::Tokens;
 use std::cmp::Ordering;
 use std::iter::Peekable;
 use std::num::NonZeroU32;
@@ -12,7 +14,7 @@ use ruff_diagnostics::Fix;
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::PySourceType;
 use ruff_python_codegen::Stylist;
-use ruff_python_parser::{TokenKind, TokenKindIter};
+use ruff_python_parser::TokenKind;
 use ruff_source_file::{Locator, UniversalNewlines};
 use ruff_text_size::TextRange;
 use ruff_text_size::TextSize;
@@ -381,7 +383,7 @@ struct LogicalLineInfo {
 /// Iterator that processes tokens until a full logical line (or comment line) is "built".
 /// It then returns characteristics of that logical line (see `LogicalLineInfo`).
 struct LinePreprocessor<'a> {
-    tokens: TokenKindIter<'a>,
+    tokens: Peekable<Iter<'a, Token>>,
     locator: &'a Locator<'a>,
     indent_width: IndentWidth,
     /// The start position of the next logical line.
@@ -397,13 +399,13 @@ struct LinePreprocessor<'a> {
 
 impl<'a> LinePreprocessor<'a> {
     fn new(
-        tokens: TokenKindIter<'a>,
+        tokens: &'a Tokens,
         locator: &'a Locator,
         indent_width: IndentWidth,
         cell_offsets: Option<&'a CellOffsets>,
     ) -> LinePreprocessor<'a> {
         LinePreprocessor {
-            tokens,
+            tokens: tokens.up_to_first_unknown().iter().peekable(),
             locator,
             line_start: TextSize::new(0),
             max_preceding_blank_lines: BlankLines::Zero,
@@ -424,75 +426,80 @@ impl<'a> Iterator for LinePreprocessor<'a> {
         // Number of consecutive blank lines directly preceding this logical line.
         let mut blank_lines = BlankLines::Zero;
         let mut first_logical_line_token: Option<(LogicalLineKind, TextRange)> = None;
-        let mut last_token: TokenKind = TokenKind::EndOfFile;
+        let mut last_token = TokenKind::EndOfFile;
         let mut parens = 0u32;
 
-        while let Some((token, range)) = self.tokens.next() {
-            if matches!(token, TokenKind::Indent | TokenKind::Dedent) {
+        while let Some(token) = self.tokens.next() {
+            let (kind, range) = token.as_tuple();
+            if matches!(kind, TokenKind::Indent | TokenKind::Dedent) {
                 continue;
             }
 
-            let (logical_line_kind, first_token_range) = if let Some(first_token_range) =
-                first_logical_line_token
-            {
-                first_token_range
-            }
-            // At the start of the line...
-            else {
-                // Check if we are at the beginning of a cell in a notebook.
-                if let Some(ref mut cell_offsets) = self.cell_offsets {
-                    if cell_offsets
-                        .peek()
-                        .is_some_and(|offset| offset == &&self.line_start)
-                    {
-                        self.is_beginning_of_cell = true;
-                        cell_offsets.next();
-                        blank_lines = BlankLines::Zero;
-                        self.max_preceding_blank_lines = BlankLines::Zero;
-                    }
+            let (logical_line_kind, first_token_range) =
+                if let Some(first_token_range) = first_logical_line_token {
+                    first_token_range
                 }
-
-                // An empty line
-                if token == TokenKind::NonLogicalNewline {
-                    blank_lines.add(range);
-
-                    self.line_start = range.end();
-
-                    continue;
-                }
-
-                is_docstring = token == TokenKind::String;
-
-                let logical_line_kind = match token {
-                    TokenKind::Class => LogicalLineKind::Class,
-                    TokenKind::Comment => LogicalLineKind::Comment,
-                    TokenKind::At => LogicalLineKind::Decorator,
-                    TokenKind::Def => LogicalLineKind::Function,
-                    // Lookahead to distinguish `async def` from `async with`.
-                    TokenKind::Async if matches!(self.tokens.peek(), Some((TokenKind::Def, _))) => {
-                        LogicalLineKind::Function
+                // At the start of the line...
+                else {
+                    // Check if we are at the beginning of a cell in a notebook.
+                    if let Some(ref mut cell_offsets) = self.cell_offsets {
+                        if cell_offsets
+                            .peek()
+                            .is_some_and(|offset| offset == &&self.line_start)
+                        {
+                            self.is_beginning_of_cell = true;
+                            cell_offsets.next();
+                            blank_lines = BlankLines::Zero;
+                            self.max_preceding_blank_lines = BlankLines::Zero;
+                        }
                     }
-                    TokenKind::Import => LogicalLineKind::Import,
-                    TokenKind::From => LogicalLineKind::FromImport,
-                    _ => LogicalLineKind::Other,
+
+                    // An empty line
+                    if kind == TokenKind::NonLogicalNewline {
+                        blank_lines.add(range);
+
+                        self.line_start = range.end();
+
+                        continue;
+                    }
+
+                    is_docstring = kind == TokenKind::String;
+
+                    let logical_line_kind = match kind {
+                        TokenKind::Class => LogicalLineKind::Class,
+                        TokenKind::Comment => LogicalLineKind::Comment,
+                        TokenKind::At => LogicalLineKind::Decorator,
+                        TokenKind::Def => LogicalLineKind::Function,
+                        // Lookahead to distinguish `async def` from `async with`.
+                        TokenKind::Async
+                            if self
+                                .tokens
+                                .peek()
+                                .is_some_and(|token| token.kind() == TokenKind::Def) =>
+                        {
+                            LogicalLineKind::Function
+                        }
+                        TokenKind::Import => LogicalLineKind::Import,
+                        TokenKind::From => LogicalLineKind::FromImport,
+                        _ => LogicalLineKind::Other,
+                    };
+
+                    first_logical_line_token = Some((logical_line_kind, range));
+
+                    (logical_line_kind, range)
                 };
 
-                first_logical_line_token = Some((logical_line_kind, range));
-
-                (logical_line_kind, range)
-            };
-
-            if !token.is_trivia() {
+            if !kind.is_trivia() {
                 line_is_comment_only = false;
             }
 
             // A docstring line is composed only of the docstring (TokenKind::String) and trivia tokens.
             // (If a comment follows a docstring, we still count the line as a docstring)
-            if token != TokenKind::String && !token.is_trivia() {
+            if kind != TokenKind::String && !kind.is_trivia() {
                 is_docstring = false;
             }
 
-            match token {
+            match kind {
                 TokenKind::Lbrace | TokenKind::Lpar | TokenKind::Lsqb => {
                     parens = parens.saturating_add(1);
                 }
@@ -538,8 +545,8 @@ impl<'a> Iterator for LinePreprocessor<'a> {
                 _ => {}
             }
 
-            if !token.is_trivia() {
-                last_token = token;
+            if !kind.is_trivia() {
+                last_token = kind;
             }
         }
 
@@ -722,7 +729,7 @@ impl<'a> BlankLinesChecker<'a> {
     }
 
     /// E301, E302, E303, E304, E305, E306
-    pub(crate) fn check_lines(&self, tokens: TokenKindIter<'a>, diagnostics: &mut Vec<Diagnostic>) {
+    pub(crate) fn check_lines(&self, tokens: &Tokens, diagnostics: &mut Vec<Diagnostic>) {
         let mut prev_indent_length: Option<usize> = None;
         let mut state = BlankLinesState::default();
         let line_preprocessor =

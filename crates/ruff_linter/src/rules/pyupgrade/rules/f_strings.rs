@@ -11,7 +11,7 @@ use ruff_python_ast::{self as ast, Expr, Keyword};
 use ruff_python_literal::format::{
     FieldName, FieldNamePart, FieldType, FormatPart, FormatString, FromTemplate,
 };
-use ruff_python_parser::{lexer, Mode, Tok};
+use ruff_python_parser::TokenKind;
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -409,15 +409,13 @@ pub(crate) fn f_strings(checker: &mut Checker, call: &ast::ExprCall, summary: &F
     };
 
     let mut patches: Vec<(TextRange, FStringConversion)> = vec![];
-    let mut lex = lexer::lex_starts_at(
-        checker.locator().slice(call.func.range()),
-        Mode::Expression,
-        call.start(),
-    )
-    .flatten();
+    let mut tokens = checker.parsed().tokens().in_range(call.func.range()).iter();
     let end = loop {
-        match lex.next() {
-            Some((Tok::Dot, range)) => {
+        let Some(token) = tokens.next() else {
+            unreachable!("Should break from the `Tok::Dot` arm");
+        };
+        match token.kind() {
+            TokenKind::Dot => {
                 // ```
                 // (
                 //     "a"
@@ -429,10 +427,11 @@ pub(crate) fn f_strings(checker: &mut Checker, call: &ast::ExprCall, summary: &F
                 //
                 // We know that the expression is a string literal, so we can safely assume that the
                 // dot is the start of an attribute access.
-                break range.start();
+                break token.start();
             }
-            Some((Tok::String { .. }, range)) => {
-                match FStringConversion::try_convert(range, &mut summary, checker.locator()) {
+            TokenKind::String => {
+                match FStringConversion::try_convert(token.range(), &mut summary, checker.locator())
+                {
                     // If the format string contains side effects that would need to be repeated,
                     // we can't convert it to an f-string.
                     Ok(FStringConversion::SideEffects) => return,
@@ -440,11 +439,10 @@ pub(crate) fn f_strings(checker: &mut Checker, call: &ast::ExprCall, summary: &F
                     // expression.
                     Err(_) => return,
                     // Otherwise, push the conversion to be processed later.
-                    Ok(conversion) => patches.push((range, conversion)),
+                    Ok(conversion) => patches.push((token.range(), conversion)),
                 }
             }
-            Some(_) => continue,
-            None => unreachable!("Should break from the `Tok::Dot` arm"),
+            _ => {}
         }
     };
     if patches.is_empty() {
@@ -515,7 +513,7 @@ pub(crate) fn f_strings(checker: &mut Checker, call: &ast::ExprCall, summary: &F
     // )
     // ```
     let has_comments = checker
-        .indexer()
+        .parsed()
         .comment_ranges()
         .intersects(call.arguments.range());
 

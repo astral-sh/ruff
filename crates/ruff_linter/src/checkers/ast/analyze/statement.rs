@@ -765,7 +765,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 pyupgrade::rules::deprecated_c_element_tree(checker, stmt);
             }
             if checker.enabled(Rule::DeprecatedImport) {
-                pyupgrade::rules::deprecated_import(checker, stmt, names, module, level);
+                pyupgrade::rules::deprecated_import(checker, import_from);
             }
             if checker.enabled(Rule::UnnecessaryBuiltinImport) {
                 if let Some(module) = module {

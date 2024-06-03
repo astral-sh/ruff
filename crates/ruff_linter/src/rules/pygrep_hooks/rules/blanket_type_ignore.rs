@@ -5,7 +5,7 @@ use regex::Regex;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_index::Indexer;
+use ruff_python_trivia::CommentRanges;
 use ruff_source_file::Locator;
 use ruff_text_size::TextSize;
 
@@ -51,10 +51,10 @@ impl Violation for BlanketTypeIgnore {
 /// PGH003
 pub(crate) fn blanket_type_ignore(
     diagnostics: &mut Vec<Diagnostic>,
-    indexer: &Indexer,
+    comment_ranges: &CommentRanges,
     locator: &Locator,
 ) {
-    for range in indexer.comment_ranges() {
+    for range in comment_ranges {
         let line = locator.slice(*range);
 
         // Match, e.g., `# type: ignore` or `# type: ignore[attr-defined]`.

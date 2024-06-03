@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use ruff_diagnostics::Diagnostic;
-use ruff_python_index::Indexer;
+use ruff_python_trivia::CommentRanges;
 use ruff_source_file::Locator;
 
 use crate::registry::Rule;
@@ -13,7 +13,7 @@ pub(crate) fn check_file_path(
     path: &Path,
     package: Option<&Path>,
     locator: &Locator,
-    indexer: &Indexer,
+    comment_ranges: &CommentRanges,
     settings: &LinterSettings,
 ) -> Vec<Diagnostic> {
     let mut diagnostics: Vec<Diagnostic> = vec![];
@@ -24,7 +24,7 @@ pub(crate) fn check_file_path(
             path,
             package,
             locator,
-            indexer,
+            comment_ranges,
             &settings.project_root,
             &settings.src,
         ) {

@@ -1,5 +1,5 @@
 use ruff_python_ast::identifier;
-use ruff_python_parser::{parse_suite, ParseError};
+use ruff_python_parser::{parse_module, ParseError};
 use ruff_text_size::{TextRange, TextSize};
 
 #[test]
@@ -11,7 +11,7 @@ else:
     pass
 "
     .trim();
-    let stmts = parse_suite(contents)?;
+    let stmts = parse_module(contents)?.into_suite();
     let stmt = stmts.first().unwrap();
     let range = identifier::else_(stmt, contents).unwrap();
     assert_eq!(&contents[range], "else");

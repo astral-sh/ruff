@@ -2,21 +2,15 @@
 //! are omitted from the AST (e.g., commented lines).
 
 use ruff_python_ast::Stmt;
-use ruff_python_parser::lexer::LexResult;
-use ruff_python_parser::Tok;
-use ruff_python_trivia::{
-    has_leading_content, has_trailing_content, is_python_whitespace, CommentRanges,
-};
+use ruff_python_parser::{TokenKind, Tokens};
+use ruff_python_trivia::{has_leading_content, has_trailing_content, is_python_whitespace};
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::fstring_ranges::{FStringRanges, FStringRangesBuilder};
 use crate::multiline_ranges::{MultilineRanges, MultilineRangesBuilder};
-use crate::CommentRangesBuilder;
 
 pub struct Indexer {
-    comment_ranges: CommentRanges,
-
     /// Stores the start offset of continuation lines.
     continuation_lines: Vec<TextSize>,
 
@@ -28,10 +22,9 @@ pub struct Indexer {
 }
 
 impl Indexer {
-    pub fn from_tokens(tokens: &[LexResult], locator: &Locator) -> Self {
+    pub fn from_tokens(tokens: &Tokens, locator: &Locator<'_>) -> Self {
         assert!(TextSize::try_from(locator.contents().len()).is_ok());
 
-        let mut comment_ranges_builder = CommentRangesBuilder::default();
         let mut fstring_ranges_builder = FStringRangesBuilder::default();
         let mut multiline_ranges_builder = MultilineRangesBuilder::default();
         let mut continuation_lines = Vec::new();
@@ -39,8 +32,8 @@ impl Indexer {
         let mut prev_end = TextSize::default();
         let mut line_start = TextSize::default();
 
-        for (tok, range) in tokens.iter().flatten() {
-            let trivia = locator.slice(TextRange::new(prev_end, range.start()));
+        for token in tokens.up_to_first_unknown() {
+            let trivia = locator.slice(TextRange::new(prev_end, token.start()));
 
             // Get the trivia between the previous and the current token and detect any newlines.
             // This is necessary because `RustPython` doesn't emit `[Tok::Newline]` tokens
@@ -59,36 +52,29 @@ impl Indexer {
                 }
             }
 
-            comment_ranges_builder.visit_token(tok, *range);
-            fstring_ranges_builder.visit_token(tok, *range);
-            multiline_ranges_builder.visit_token(tok, *range);
+            fstring_ranges_builder.visit_token(token);
+            multiline_ranges_builder.visit_token(token);
 
-            match tok {
-                Tok::Newline | Tok::NonLogicalNewline => {
-                    line_start = range.end();
+            match token.kind() {
+                TokenKind::Newline | TokenKind::NonLogicalNewline => {
+                    line_start = token.end();
                 }
-                Tok::String { .. } => {
+                TokenKind::String => {
                     // If the previous token was a string, find the start of the line that contains
                     // the closing delimiter, since the token itself can span multiple lines.
-                    line_start = locator.line_start(range.end());
+                    line_start = locator.line_start(token.end());
                 }
                 _ => {}
             }
 
-            prev_end = range.end();
+            prev_end = token.end();
         }
 
         Self {
-            comment_ranges: comment_ranges_builder.finish(),
             continuation_lines,
             fstring_ranges: fstring_ranges_builder.finish(),
             multiline_ranges: multiline_ranges_builder.finish(),
         }
-    }
-
-    /// Returns the byte offset ranges of comments
-    pub const fn comment_ranges(&self) -> &CommentRanges {
-        &self.comment_ranges
     }
 
     /// Returns the byte offset ranges of f-strings.
@@ -225,19 +211,22 @@ impl Indexer {
 
 #[cfg(test)]
 mod tests {
-    use ruff_python_parser::lexer::LexResult;
-    use ruff_python_parser::{lexer, Mode};
+    use ruff_python_parser::parse_module;
     use ruff_source_file::Locator;
     use ruff_text_size::{TextRange, TextSize};
 
     use crate::Indexer;
 
+    fn new_indexer(contents: &str) -> Indexer {
+        let parsed = parse_module(contents).unwrap();
+        let locator = Locator::new(contents);
+        Indexer::from_tokens(parsed.tokens(), &locator)
+    }
+
     #[test]
     fn continuation() {
         let contents = r"x = 1";
-        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
-        let indexer = Indexer::from_tokens(&lxr, &Locator::new(contents));
-        assert_eq!(indexer.continuation_line_starts(), &[]);
+        assert_eq!(new_indexer(contents).continuation_line_starts(), &[]);
 
         let contents = r"
         # Hello, world!
@@ -248,9 +237,7 @@ y = 2
         "
         .trim();
 
-        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
-        let indexer = Indexer::from_tokens(&lxr, &Locator::new(contents));
-        assert_eq!(indexer.continuation_line_starts(), &[]);
+        assert_eq!(new_indexer(contents).continuation_line_starts(), &[]);
 
         let contents = r#"
 x = \
@@ -268,10 +255,8 @@ if True:
 )
 "#
         .trim();
-        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
-        let indexer = Indexer::from_tokens(lxr.as_slice(), &Locator::new(contents));
         assert_eq!(
-            indexer.continuation_line_starts(),
+            new_indexer(contents).continuation_line_starts(),
             [
                 // row 1
                 TextSize::from(0),
@@ -300,10 +285,8 @@ x = 1; \
 import os
 "
         .trim();
-        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
-        let indexer = Indexer::from_tokens(lxr.as_slice(), &Locator::new(contents));
         assert_eq!(
-            indexer.continuation_line_starts(),
+            new_indexer(contents).continuation_line_starts(),
             [
                 // row 9
                 TextSize::from(84),
@@ -323,10 +306,8 @@ f'foo { 'str1' \
 }'
 "
         .trim();
-        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
-        let indexer = Indexer::from_tokens(lxr.as_slice(), &Locator::new(contents));
         assert_eq!(
-            indexer.continuation_line_starts(),
+            new_indexer(contents).continuation_line_starts(),
             [
                 // row 1
                 TextSize::new(0),
@@ -348,10 +329,8 @@ x = (
     + 2)
 "
         .trim();
-        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
-        let indexer = Indexer::from_tokens(lxr.as_slice(), &Locator::new(contents));
         assert_eq!(
-            indexer.continuation_line_starts(),
+            new_indexer(contents).continuation_line_starts(),
             [
                 // row 3
                 TextSize::new(12),
@@ -373,10 +352,8 @@ f"start {f"inner {f"another"}"} end"
 f"implicit " f"concatenation"
 "#
         .trim();
-        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
-        let indexer = Indexer::from_tokens(lxr.as_slice(), &Locator::new(contents));
         assert_eq!(
-            indexer
+            new_indexer(contents)
                 .fstring_ranges()
                 .values()
                 .copied()
@@ -409,10 +386,8 @@ f-string"""}
 """
 "#
         .trim();
-        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
-        let indexer = Indexer::from_tokens(lxr.as_slice(), &Locator::new(contents));
         assert_eq!(
-            indexer
+            new_indexer(contents)
                 .fstring_ranges()
                 .values()
                 .copied()
@@ -447,8 +422,7 @@ f-string"""}
 the end"""
 "#
         .trim();
-        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
-        let indexer = Indexer::from_tokens(lxr.as_slice(), &Locator::new(contents));
+        let indexer = new_indexer(contents);
 
         // For reference, the ranges of the f-strings in the above code are as
         // follows where the ones inside parentheses are nested f-strings:

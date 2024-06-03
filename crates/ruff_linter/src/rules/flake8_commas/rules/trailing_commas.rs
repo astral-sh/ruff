@@ -2,7 +2,7 @@ use ruff_diagnostics::{AlwaysFixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_index::Indexer;
-use ruff_python_parser::{TokenKind, TokenKindIter};
+use ruff_python_parser::{TokenKind, Tokens};
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -27,31 +27,31 @@ enum TokenType {
 
 /// Simplified token specialized for the task.
 #[derive(Copy, Clone)]
-struct Token {
+struct SimpleToken {
     ty: TokenType,
     range: TextRange,
 }
 
-impl Ranged for Token {
+impl Ranged for SimpleToken {
     fn range(&self) -> TextRange {
         self.range
     }
 }
 
-impl Token {
+impl SimpleToken {
     fn new(ty: TokenType, range: TextRange) -> Self {
         Self { ty, range }
     }
 
-    fn irrelevant() -> Token {
-        Token {
+    fn irrelevant() -> SimpleToken {
+        SimpleToken {
             ty: TokenType::Irrelevant,
             range: TextRange::default(),
         }
     }
 }
 
-impl From<(TokenKind, TextRange)> for Token {
+impl From<(TokenKind, TextRange)> for SimpleToken {
     fn from((tok, range): (TokenKind, TextRange)) -> Self {
         let ty = match tok {
             TokenKind::Name => TokenType::Named,
@@ -226,13 +226,13 @@ impl AlwaysFixableViolation for ProhibitedTrailingComma {
 /// COM812, COM818, COM819
 pub(crate) fn trailing_commas(
     diagnostics: &mut Vec<Diagnostic>,
-    tokens: TokenKindIter,
+    tokens: &Tokens,
     locator: &Locator,
     indexer: &Indexer,
 ) {
     let mut fstrings = 0u32;
-    let tokens = tokens.filter_map(|(token, tok_range)| {
-        match token {
+    let simple_tokens = tokens.up_to_first_unknown().iter().filter_map(|token| {
+        match token.kind() {
             // Completely ignore comments -- they just interfere with the logic.
             TokenKind::Comment => None,
             // F-strings are handled as `String` token type with the complete range
@@ -247,15 +247,15 @@ pub(crate) fn trailing_commas(
                 if fstrings == 0 {
                     indexer
                         .fstring_ranges()
-                        .outermost(tok_range.start())
-                        .map(|range| Token::new(TokenType::String, range))
+                        .outermost(token.start())
+                        .map(|range| SimpleToken::new(TokenType::String, range))
                 } else {
                     None
                 }
             }
             _ => {
                 if fstrings == 0 {
-                    Some(Token::from((token, tok_range)))
+                    Some(SimpleToken::from(token.as_tuple()))
                 } else {
                     None
                 }
@@ -263,12 +263,12 @@ pub(crate) fn trailing_commas(
         }
     });
 
-    let mut prev = Token::irrelevant();
-    let mut prev_prev = Token::irrelevant();
+    let mut prev = SimpleToken::irrelevant();
+    let mut prev_prev = SimpleToken::irrelevant();
 
     let mut stack = vec![Context::new(ContextType::No)];
 
-    for token in tokens {
+    for token in simple_tokens {
         if prev.ty == TokenType::NonLogicalNewline && token.ty == TokenType::NonLogicalNewline {
             // Collapse consecutive newlines to the first one -- trailing commas are
             // added before the first newline.
@@ -301,9 +301,9 @@ pub(crate) fn trailing_commas(
 }
 
 fn check_token(
-    token: Token,
-    prev: Token,
-    prev_prev: Token,
+    token: SimpleToken,
+    prev: SimpleToken,
+    prev_prev: SimpleToken,
     context: Context,
     locator: &Locator,
 ) -> Option<Diagnostic> {
@@ -387,9 +387,9 @@ fn check_token(
 }
 
 fn update_context(
-    token: Token,
-    prev: Token,
-    prev_prev: Token,
+    token: SimpleToken,
+    prev: SimpleToken,
+    prev_prev: SimpleToken,
     stack: &mut Vec<Context>,
 ) -> Context {
     let new_context = match token.ty {

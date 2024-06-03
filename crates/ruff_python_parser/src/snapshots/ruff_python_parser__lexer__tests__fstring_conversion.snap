@@ -2,27 +2,24 @@
 source: crates/ruff_python_parser/src/lexer.rs
 expression: lex_source(source)
 ---
+## Tokens
+```
 [
     (
-        FStringStart(
-            AnyStringFlags {
-                prefix: Format(
-                    Regular,
-                ),
-                triple_quoted: false,
-                quote_style: Double,
-            },
-        ),
+        FStringStart,
         0..2,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING,
+        ),
     ),
     (
         Lbrace,
         2..3,
     ),
     (
-        Name {
-            name: "x",
-        },
+        Name(
+            "x",
+        ),
         3..4,
     ),
     (
@@ -30,9 +27,9 @@ expression: lex_source(source)
         4..5,
     ),
     (
-        Name {
-            name: "s",
-        },
+        Name(
+            "s",
+        ),
         5..6,
     ),
     (
@@ -40,26 +37,22 @@ expression: lex_source(source)
         6..7,
     ),
     (
-        FStringMiddle {
-            value: " ",
-            flags: AnyStringFlags {
-                prefix: Format(
-                    Regular,
-                ),
-                triple_quoted: false,
-                quote_style: Double,
-            },
-        },
+        FStringMiddle(
+            " ",
+        ),
         7..8,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING,
+        ),
     ),
     (
         Lbrace,
         8..9,
     ),
     (
-        Name {
-            name: "x",
-        },
+        Name(
+            "x",
+        ),
         9..10,
     ),
     (
@@ -71,9 +64,9 @@ expression: lex_source(source)
         11..12,
     ),
     (
-        Name {
-            name: "r",
-        },
+        Name(
+            "r",
+        ),
         12..13,
     ),
     (
@@ -81,26 +74,22 @@ expression: lex_source(source)
         13..14,
     ),
     (
-        FStringMiddle {
-            value: " ",
-            flags: AnyStringFlags {
-                prefix: Format(
-                    Regular,
-                ),
-                triple_quoted: false,
-                quote_style: Double,
-            },
-        },
+        FStringMiddle(
+            " ",
+        ),
         14..15,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING,
+        ),
     ),
     (
         Lbrace,
         15..16,
     ),
     (
-        Name {
-            name: "x",
-        },
+        Name(
+            "x",
+        ),
         16..17,
     ),
     (
@@ -108,41 +97,37 @@ expression: lex_source(source)
         17..18,
     ),
     (
-        FStringMiddle {
-            value: ".3f!r",
-            flags: AnyStringFlags {
-                prefix: Format(
-                    Regular,
-                ),
-                triple_quoted: false,
-                quote_style: Double,
-            },
-        },
+        FStringMiddle(
+            ".3f!r",
+        ),
         18..23,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING,
+        ),
     ),
     (
         Rbrace,
         23..24,
     ),
     (
-        FStringMiddle {
-            value: " {x!r}",
-            flags: AnyStringFlags {
-                prefix: Format(
-                    Regular,
-                ),
-                triple_quoted: false,
-                quote_style: Double,
-            },
-        },
+        FStringMiddle(
+            " {x!r}",
+        ),
         24..32,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING,
+        ),
     ),
     (
         FStringEnd,
         32..33,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING,
+        ),
     ),
     (
         Newline,
         33..33,
     ),
 ]
+```

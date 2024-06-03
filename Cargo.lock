@@ -1960,7 +1960,6 @@ dependencies = [
  "ruff_linter",
  "ruff_python_ast",
  "ruff_python_formatter",
- "ruff_python_index",
  "ruff_python_parser",
  "serde",
  "serde_json",
@@ -2008,6 +2007,7 @@ dependencies = [
  "ruff_python_parser",
  "ruff_python_stdlib",
  "ruff_python_trivia",
+ "ruff_text_size",
  "ruff_workspace",
  "schemars",
  "serde",
@@ -2184,6 +2184,7 @@ dependencies = [
  "ruff_python_literal",
  "ruff_python_parser",
  "ruff_source_file",
+ "ruff_text_size",
 ]
 
 [[package]]
@@ -2202,7 +2203,6 @@ dependencies = [
  "ruff_formatter",
  "ruff_macros",
  "ruff_python_ast",
- "ruff_python_index",
  "ruff_python_parser",
  "ruff_python_trivia",
  "ruff_source_file",
@@ -2253,6 +2253,7 @@ dependencies = [
  "itertools 0.13.0",
  "memchr",
  "ruff_python_ast",
+ "ruff_python_trivia",
  "ruff_source_file",
  "ruff_text_size",
  "rustc-hash",
@@ -2310,7 +2311,6 @@ name = "ruff_python_trivia_integration_tests"
 version = "0.0.0"
 dependencies = [
  "insta",
- "ruff_python_index",
  "ruff_python_parser",
  "ruff_python_trivia",
  "ruff_source_file",
@@ -2385,7 +2385,6 @@ dependencies = [
  "ruff_python_formatter",
  "ruff_python_index",
  "ruff_python_parser",
- "ruff_python_trivia",
  "ruff_source_file",
  "ruff_text_size",
  "ruff_workspace",

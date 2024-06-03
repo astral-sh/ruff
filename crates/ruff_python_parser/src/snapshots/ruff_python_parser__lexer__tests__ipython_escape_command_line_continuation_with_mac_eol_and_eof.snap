@@ -2,6 +2,8 @@
 source: crates/ruff_python_parser/src/lexer.rs
 expression: ipython_escape_command_line_continuation_with_eol_and_eof(MAC_EOL)
 ---
+## Tokens
+```
 [
     (
         IpyEscapeCommand {
@@ -15,3 +17,4 @@ expression: ipython_escape_command_line_continuation_with_eol_and_eof(MAC_EOL)
         14..14,
     ),
 ]
+```
