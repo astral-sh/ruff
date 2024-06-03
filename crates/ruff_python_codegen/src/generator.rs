@@ -482,13 +482,15 @@ impl<'a> Generator<'a> {
                 type_params,
                 value,
             }) => {
-                self.p("type ");
-                self.unparse_expr(name, precedence::MAX);
-                if let Some(type_params) = type_params {
-                    self.unparse_type_params(type_params);
-                }
-                self.p(" = ");
-                self.unparse_expr(value, precedence::ASSIGN);
+                statement!({
+                    self.p("type ");
+                    self.unparse_expr(name, precedence::MAX);
+                    if let Some(type_params) = type_params {
+                        self.unparse_type_params(type_params);
+                    }
+                    self.p(" = ");
+                    self.unparse_expr(value, precedence::ASSIGN);
+                });
             }
             Stmt::Raise(ast::StmtRaise {
                 exc,
@@ -1634,6 +1636,10 @@ except* Exception as e:
         return 2
     case 4 as y:
         return y"
+        );
+        assert_round_trip!(
+            r"type X = int
+type Y = str"
         );
         assert_eq!(round_trip(r"x = (1, 2, 3)"), r"x = 1, 2, 3");
         assert_eq!(round_trip(r"-(1) + ~(2) + +(3)"), r"-1 + ~2 + +3");
