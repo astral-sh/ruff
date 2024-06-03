@@ -15,6 +15,13 @@ use crate::types::{ModuleTypeId, Type};
 use crate::{FileId, Name};
 
 // FIXME: Figure out proper dead-lock free synchronisation now that this takes `&db` instead of `&mut db`.
+/// Resolve the public-facing type for a symbol (the type seen by other scopes: other modules, or
+/// nested functions). Because calls to nested functions and imports can occur anywhere in control
+/// flow, this type must be conservative and consider all definitions of the symbol that could
+/// possibly be seen by another scope. Currently we take the most conservative approach, which is
+/// the union of all definitions. We may be able to narrow this in future to eliminate definitions
+/// which can't possibly (or at least likely) be seen by any other scope, so that e.g. we could
+/// infer `Literal["1"]` instead of `Literal[1] | Literal["1"]` for `x` in `x = x; x = str(x);`.
 #[tracing::instrument(level = "trace", skip(db))]
 pub fn infer_symbol_public_type(db: &dyn SemanticDb, symbol: GlobalSymbolId) -> QueryResult<Type> {
     let symbols = symbol_table(db, symbol.file_id)?;
@@ -25,18 +32,21 @@ pub fn infer_symbol_public_type(db: &dyn SemanticDb, symbol: GlobalSymbolId) -> 
         return Ok(ty);
     }
 
-    // The public type of a symbol is the union of all of its definitions. This is the most
-    // cautious/sound approach, though it can lead to a broader-than-desired type in a case like
-    // `x = 1; x = str(x)`, where the first definition of `x` can never be visible. TODO prune
-    // definitions that we can prove can't be visible.
-    let tys = defs
+    let mut tys = defs
         .iter()
         .map(|def| infer_definition_type(db, symbol, def.clone()))
-        .collect::<QueryResult<Vec<Type>>>()?;
-    let ty = match tys.len() {
-        0 => Type::Unknown,
-        1 => tys[0],
-        _ => Type::Union(jar.type_store.add_union(symbol.file_id, &tys)),
+        .peekable();
+    let ty = if let Some(first) = tys.next() {
+        if tys.peek().is_some() {
+            Type::Union(jar.type_store.add_union(
+                symbol.file_id,
+                &Iterator::chain([first].into_iter(), tys).collect::<QueryResult<Vec<_>>>()?,
+            ))
+        } else {
+            first?
+        }
+    } else {
+        Type::Unknown
     };
 
     jar.type_store.cache_symbol_public_type(symbol, ty);
