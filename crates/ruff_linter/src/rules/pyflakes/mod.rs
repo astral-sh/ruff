@@ -17,12 +17,12 @@ mod tests {
     use ruff_python_ast::PySourceType;
     use ruff_python_codegen::Stylist;
     use ruff_python_index::Indexer;
-    use ruff_python_parser::AsMode;
+
     use ruff_python_trivia::textwrap::dedent;
     use ruff_source_file::Locator;
     use ruff_text_size::Ranged;
 
-    use crate::linter::{check_path, LinterResult, TokenSource};
+    use crate::linter::{check_path, LinterResult};
     use crate::registry::{AsRule, Linter, Rule};
     use crate::rules::pyflakes;
     use crate::settings::types::PreviewMode;
@@ -638,12 +638,13 @@ mod tests {
         let source_type = PySourceType::default();
         let source_kind = SourceKind::Python(contents.to_string());
         let settings = LinterSettings::for_rules(Linter::Pyflakes.rules());
-        let tokens = ruff_python_parser::tokenize(&contents, source_type.as_mode());
+        let parsed =
+            ruff_python_parser::parse_unchecked_source(source_kind.source_code(), source_type);
         let locator = Locator::new(&contents);
-        let stylist = Stylist::from_tokens(&tokens, &locator);
-        let indexer = Indexer::from_tokens(&tokens, &locator);
+        let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
+        let indexer = Indexer::from_tokens(parsed.tokens(), &locator);
         let directives = directives::extract_directives(
-            &tokens,
+            &parsed,
             directives::Flags::from_settings(&settings),
             &locator,
             &indexer,
@@ -662,7 +663,7 @@ mod tests {
             flags::Noqa::Enabled,
             &source_kind,
             source_type,
-            TokenSource::Tokens(tokens),
+            &parsed,
         );
         diagnostics.sort_by_key(Ranged::start);
         let actual = diagnostics

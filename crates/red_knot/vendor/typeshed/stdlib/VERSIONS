@@ -166,7 +166,7 @@ ipaddress: 3.3-
 itertools: 3.0-
 json: 3.0-
 keyword: 3.0-
-lib2to3: 3.0-
+lib2to3: 3.0-3.12
 linecache: 3.0-
 locale: 3.0-
 logging: 3.0-

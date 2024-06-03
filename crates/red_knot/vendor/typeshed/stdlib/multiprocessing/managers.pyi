@@ -58,7 +58,7 @@ class ValueProxy(BaseProxy, Generic[_T]):
     def set(self, value: _T) -> None: ...
     value: _T
     if sys.version_info >= (3, 9):
-        def __class_getitem__(cls, item: Any) -> GenericAlias: ...
+        def __class_getitem__(cls, item: Any, /) -> GenericAlias: ...
 
 class DictProxy(BaseProxy, MutableMapping[_KT, _VT]):
     __builtins__: ClassVar[dict[str, Any]]
@@ -83,6 +83,8 @@ class DictProxy(BaseProxy, MutableMapping[_KT, _VT]):
     def keys(self) -> list[_KT]: ...  # type: ignore[override]
     def items(self) -> list[tuple[_KT, _VT]]: ...  # type: ignore[override]
     def values(self) -> list[_VT]: ...  # type: ignore[override]
+    if sys.version_info >= (3, 13):
+        def __class_getitem__(cls, args: Any, /) -> Any: ...
 
 class BaseListProxy(BaseProxy, MutableSequence[_T]):
     __builtins__: ClassVar[dict[str, Any]]
@@ -117,6 +119,8 @@ class BaseListProxy(BaseProxy, MutableSequence[_T]):
 class ListProxy(BaseListProxy[_T]):
     def __iadd__(self, value: Iterable[_T], /) -> Self: ...  # type: ignore[override]
     def __imul__(self, value: SupportsIndex, /) -> Self: ...  # type: ignore[override]
+    if sys.version_info >= (3, 13):
+        def __class_getitem__(cls, args: Any, /) -> Any: ...
 
 # Returned by BaseManager.get_server()
 class Server:

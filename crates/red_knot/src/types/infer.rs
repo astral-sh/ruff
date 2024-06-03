@@ -16,6 +16,13 @@ use crate::types::{ModuleTypeId, Type};
 use crate::{FileId, Name};
 
 // FIXME: Figure out proper dead-lock free synchronisation now that this takes `&db` instead of `&mut db`.
+/// Resolve the public-facing type for a symbol (the type seen by other scopes: other modules, or
+/// nested functions). Because calls to nested functions and imports can occur anywhere in control
+/// flow, this type must be conservative and consider all definitions of the symbol that could
+/// possibly be seen by another scope. Currently we take the most conservative approach, which is
+/// the union of all definitions. We may be able to narrow this in future to eliminate definitions
+/// which can't possibly (or at least likely) be seen by any other scope, so that e.g. we could
+/// infer `Literal["1"]` instead of `Literal[1] | Literal["1"]` for `x` in `x = x; x = str(x);`.
 #[tracing::instrument(level = "trace", skip(db))]
 pub fn infer_symbol_public_type(db: &dyn SemanticDb, symbol: GlobalSymbolId) -> QueryResult<Type> {
     let symbols = symbol_table(db, symbol.file_id)?;
@@ -26,10 +33,6 @@ pub fn infer_symbol_public_type(db: &dyn SemanticDb, symbol: GlobalSymbolId) -> 
         return Ok(ty);
     }
 
-    // The public type of a symbol is the union of all of its definitions. This is the most
-    // cautious/sound approach, though it can lead to a broader-than-desired type in a case like
-    // `x = 1; x = str(x)`, where the first definition of `x` can never be visible. TODO prune
-    // definitions that we can prove can't be visible.
     let ty = infer_type_from_definitions(db, symbol, defs.iter().cloned())?;
 
     jar.type_store.cache_symbol_public_type(symbol, ty);
@@ -48,13 +51,20 @@ where
     T: Debug + Iterator<Item = Definition>,
 {
     let jar: &SemanticJar = db.jar()?;
-    let tys = definitions
+    let mut tys = definitions
         .map(|def| infer_definition_type(db, symbol, def.clone()))
-        .collect::<QueryResult<Vec<Type>>>()?;
-    match tys.len() {
-        0 => Ok(Type::Unknown),
-        1 => Ok(tys[0]),
-        _ => Ok(Type::Union(jar.type_store.add_union(symbol.file_id, &tys))),
+        .peekable();
+    if let Some(first) = tys.next() {
+        if tys.peek().is_some() {
+            Ok(Type::Union(jar.type_store.add_union(
+                symbol.file_id,
+                &Iterator::chain([first].into_iter(), tys).collect::<QueryResult<Vec<_>>>()?,
+            )))
+        } else {
+            first
+        }
+    } else {
+        Ok(Type::Unknown)
     }
 }
 
@@ -207,9 +217,9 @@ mod tests {
     use crate::db::tests::TestDb;
     use crate::db::{HasJar, SemanticJar};
     use crate::module::{
-        resolve_module, set_module_search_paths, ModuleName, ModuleSearchPath, ModuleSearchPathKind,
+        set_module_search_paths, ModuleName, ModuleSearchPath, ModuleSearchPathKind,
     };
-    use crate::symbols::{symbol_table, GlobalSymbolId};
+    use crate::symbols::resolve_global_symbol;
     use crate::types::{infer_symbol_public_type, Type};
     use crate::Name;
     use textwrap::dedent;
@@ -247,22 +257,10 @@ mod tests {
 
     fn get_public_type(case: &TestCase, modname: &str, varname: &str) -> anyhow::Result<Type> {
         let db = &case.db;
-        let file = resolve_module(db, ModuleName::new(modname))?
-            .expect("module should be found")
-            .path(db)?
-            .file();
-        let syms = symbol_table(db, file)?;
-        let sym = syms
-            .root_symbol_id_by_name(varname)
-            .expect("symbol should be found");
+        let symbol =
+            resolve_global_symbol(db, ModuleName::new(modname), varname)?.expect("symbol to exist");
 
-        Ok(infer_symbol_public_type(
-            db,
-            GlobalSymbolId {
-                file_id: file,
-                symbol_id: sym,
-            },
-        )?)
+        Ok(infer_symbol_public_type(db, symbol)?)
     }
 
     fn assert_public_type(

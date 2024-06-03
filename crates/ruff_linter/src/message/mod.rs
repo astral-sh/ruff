@@ -13,6 +13,7 @@ pub use json::JsonEmitter;
 pub use json_lines::JsonLinesEmitter;
 pub use junit::JunitEmitter;
 pub use pylint::PylintEmitter;
+pub use rdjson::RdjsonEmitter;
 use ruff_diagnostics::{Diagnostic, DiagnosticKind, Fix};
 use ruff_notebook::NotebookIndex;
 use ruff_source_file::{SourceFile, SourceLocation};
@@ -29,6 +30,7 @@ mod json;
 mod json_lines;
 mod junit;
 mod pylint;
+mod rdjson;
 mod sarif;
 mod text;
 

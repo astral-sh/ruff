@@ -12,7 +12,6 @@ license.workspace = true
 [dependencies]
 
 [dev-dependencies]
-ruff_python_index = { workspace = true }
 ruff_python_parser = { workspace = true }
 ruff_python_trivia = { workspace = true }
 ruff_source_file = { workspace = true }

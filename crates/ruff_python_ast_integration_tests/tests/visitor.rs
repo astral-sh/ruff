@@ -13,8 +13,7 @@ use ruff_python_ast::{
     Expr, FString, FStringElement, Keyword, MatchCase, Operator, Parameter, Parameters, Pattern,
     Stmt, StringLiteral, TypeParam, UnaryOp, WithItem,
 };
-use ruff_python_parser::lexer::lex;
-use ruff_python_parser::{parse_tokens, Mode};
+use ruff_python_parser::{parse, Mode};
 
 #[test]
 fn function_arguments() {
@@ -157,11 +156,10 @@ fn f_strings() {
 }
 
 fn trace_visitation(source: &str) -> String {
-    let tokens = lex(source, Mode::Module);
-    let parsed = parse_tokens(tokens.collect(), source, Mode::Module).unwrap();
+    let parsed = parse(source, Mode::Module).unwrap();
 
     let mut visitor = RecordVisitor::default();
-    walk_module(&mut visitor, &parsed);
+    walk_module(&mut visitor, parsed.syntax());
 
     visitor.output
 }
