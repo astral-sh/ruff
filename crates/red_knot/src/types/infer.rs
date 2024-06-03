@@ -216,9 +216,9 @@ mod tests {
     use crate::db::tests::TestDb;
     use crate::db::{HasJar, SemanticJar};
     use crate::module::{
-        resolve_module, set_module_search_paths, ModuleName, ModuleSearchPath, ModuleSearchPathKind,
+        set_module_search_paths, ModuleName, ModuleSearchPath, ModuleSearchPathKind,
     };
-    use crate::symbols::{symbol_table, GlobalSymbolId};
+    use crate::symbols::resolve_global_symbol;
     use crate::types::{infer_symbol_public_type, Type};
     use crate::Name;
     use textwrap::dedent;
@@ -256,22 +256,10 @@ mod tests {
 
     fn get_public_type(case: &TestCase, modname: &str, varname: &str) -> anyhow::Result<Type> {
         let db = &case.db;
-        let file = resolve_module(db, ModuleName::new(modname))?
-            .expect("module should be found")
-            .path(db)?
-            .file();
-        let syms = symbol_table(db, file)?;
-        let sym = syms
-            .root_symbol_id_by_name(varname)
-            .expect("symbol should be found");
+        let symbol =
+            resolve_global_symbol(db, ModuleName::new(modname), varname)?.expect("symbol to exist");
 
-        Ok(infer_symbol_public_type(
-            db,
-            GlobalSymbolId {
-                file_id: file,
-                symbol_id: sym,
-            },
-        )?)
+        Ok(infer_symbol_public_type(db, symbol)?)
     }
 
     fn assert_public_type(
