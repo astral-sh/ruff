@@ -125,45 +125,472 @@ impl<'src> Lexer<'src> {
         self.current_flags
     }
 
-    /// Helper function to push the given error and return the [`TokenKind::Unknown`] token.
-    fn push_error(&mut self, error: LexicalError) -> TokenKind {
-        self.errors.push(error);
-        TokenKind::Unknown
+    /// Takes the token value corresponding to the current token out of the lexer, replacing it
+    /// with the default value.
+    ///
+    /// All the subsequent call to this method without moving the lexer would always return the
+    /// default value which is [`TokenValue::None`].
+    pub(crate) fn take_value(&mut self) -> TokenValue {
+        std::mem::take(&mut self.current_value)
     }
 
-    /// Try lexing the single character string prefix, updating the token flags accordingly.
-    /// Returns `true` if it matches.
-    fn try_single_char_prefix(&mut self, first: char) -> bool {
-        match first {
-            'f' | 'F' => self.current_flags |= TokenFlags::F_STRING,
-            'u' | 'U' => self.current_flags |= TokenFlags::UNICODE_STRING,
-            'b' | 'B' => self.current_flags |= TokenFlags::BYTE_STRING,
-            'r' => self.current_flags |= TokenFlags::RAW_STRING_LOWERCASE,
-            'R' => self.current_flags |= TokenFlags::RAW_STRING_UPPERCASE,
-            _ => return false,
-        }
-        true
+    /// Lex the next token.
+    pub fn next_token(&mut self) -> TokenKind {
+        self.cursor.start_token();
+        self.current_value = TokenValue::None;
+        self.current_flags = TokenFlags::empty();
+        self.current_kind = self.lex_token();
+        self.current_range = self.token_range();
+        self.current_kind
     }
 
-    /// Try lexing the double character string prefix, updating the token flags accordingly.
-    /// Returns `true` if it matches.
-    fn try_double_char_prefix(&mut self, value: [char; 2]) -> bool {
-        match value {
-            ['r', 'f' | 'F'] | ['f' | 'F', 'r'] => {
-                self.current_flags |= TokenFlags::F_STRING | TokenFlags::RAW_STRING_LOWERCASE;
+    fn lex_token(&mut self) -> TokenKind {
+        if let Some(fstring) = self.fstrings.current() {
+            if !fstring.is_in_expression(self.nesting) {
+                if let Some(token) = self.lex_fstring_middle_or_end() {
+                    if matches!(token, TokenKind::FStringEnd) {
+                        self.fstrings.pop();
+                    }
+                    return token;
+                }
             }
-            ['R', 'f' | 'F'] | ['f' | 'F', 'R'] => {
-                self.current_flags |= TokenFlags::F_STRING | TokenFlags::RAW_STRING_UPPERCASE;
-            }
-            ['r', 'b' | 'B'] | ['b' | 'B', 'r'] => {
-                self.current_flags |= TokenFlags::BYTE_STRING | TokenFlags::RAW_STRING_LOWERCASE;
-            }
-            ['R', 'b' | 'B'] | ['b' | 'B', 'R'] => {
-                self.current_flags |= TokenFlags::BYTE_STRING | TokenFlags::RAW_STRING_UPPERCASE;
-            }
-            _ => return false,
         }
-        true
+        // Return dedent tokens until the current indentation level matches the indentation of the next token.
+        else if let Some(indentation) = self.pending_indentation.take() {
+            match self.indentations.current().try_compare(indentation) {
+                Ok(Ordering::Greater) => {
+                    self.pending_indentation = Some(indentation);
+                    if self.indentations.dedent_one(indentation).is_err() {
+                        return self.push_error(LexicalError::new(
+                            LexicalErrorType::IndentationError,
+                            self.token_range(),
+                        ));
+                    }
+                    return TokenKind::Dedent;
+                }
+                Ok(_) => {}
+                Err(_) => {
+                    return self.push_error(LexicalError::new(
+                        LexicalErrorType::IndentationError,
+                        self.token_range(),
+                    ));
+                }
+            }
+        }
+
+        if self.state.is_after_newline() {
+            if let Some(indentation) = self.eat_indentation() {
+                return indentation;
+            }
+        } else {
+            if let Err(error) = self.skip_whitespace() {
+                return self.push_error(error);
+            }
+        }
+
+        // The lexer might've skipped whitespaces, so update the start offset
+        self.cursor.start_token();
+
+        if let Some(c) = self.cursor.bump() {
+            if c.is_ascii() {
+                self.consume_ascii_character(c)
+            } else if is_unicode_identifier_start(c) {
+                let identifier = self.lex_identifier(c);
+                self.state = State::Other;
+
+                identifier
+            } else {
+                self.push_error(LexicalError::new(
+                    LexicalErrorType::UnrecognizedToken { tok: c },
+                    self.token_range(),
+                ))
+            }
+        } else {
+            // Reached the end of the file. Emit a trailing newline token if not at the beginning of a logical line,
+            // empty the dedent stack, and finally, return the EndOfFile token.
+            self.consume_end()
+        }
+    }
+
+    fn eat_indentation(&mut self) -> Option<TokenKind> {
+        let mut indentation = Indentation::root();
+
+        loop {
+            match self.cursor.first() {
+                ' ' => {
+                    self.cursor.bump();
+                    indentation = indentation.add_space();
+                }
+                '\t' => {
+                    self.cursor.bump();
+                    indentation = indentation.add_tab();
+                }
+                '\\' => {
+                    self.cursor.bump();
+                    if self.cursor.eat_char('\r') {
+                        self.cursor.eat_char('\n');
+                    } else if self.cursor.is_eof() {
+                        return Some(self.push_error(LexicalError::new(
+                            LexicalErrorType::Eof,
+                            self.token_range(),
+                        )));
+                    } else if !self.cursor.eat_char('\n') {
+                        return Some(self.push_error(LexicalError::new(
+                            LexicalErrorType::LineContinuationError,
+                            self.token_range(),
+                        )));
+                    }
+                    indentation = Indentation::root();
+                }
+                // Form feed
+                '\x0C' => {
+                    self.cursor.bump();
+                    indentation = Indentation::root();
+                }
+                _ => break,
+            }
+        }
+
+        // Handle indentation if this is a new, not all empty, logical line
+        if !matches!(self.cursor.first(), '\n' | '\r' | '#' | EOF_CHAR) {
+            self.state = State::NonEmptyLogicalLine;
+
+            // Set to false so that we don't handle indentation on the next call.
+            return self.handle_indentation(indentation);
+        }
+
+        None
+    }
+
+    fn handle_indentation(&mut self, indentation: Indentation) -> Option<TokenKind> {
+        let token = match self.indentations.current().try_compare(indentation) {
+            // Dedent
+            Ok(Ordering::Greater) => {
+                self.pending_indentation = Some(indentation);
+
+                if self.indentations.dedent_one(indentation).is_err() {
+                    return Some(self.push_error(LexicalError::new(
+                        LexicalErrorType::IndentationError,
+                        self.token_range(),
+                    )));
+                };
+
+                // The lexer might've eaten some whitespaces to calculate the `indentation`. For
+                // example:
+                //
+                // ```py
+                // if first:
+                //     if second:
+                //         pass
+                //     foo
+                // #   ^
+                // ```
+                //
+                // Here, the cursor is at `^` and the `indentation` contains the whitespaces before
+                // the `pass` token.
+                self.cursor.start_token();
+
+                Some(TokenKind::Dedent)
+            }
+
+            Ok(Ordering::Equal) => None,
+
+            // Indent
+            Ok(Ordering::Less) => {
+                self.indentations.indent(indentation);
+                Some(TokenKind::Indent)
+            }
+            Err(_) => {
+                return Some(self.push_error(LexicalError::new(
+                    LexicalErrorType::IndentationError,
+                    self.token_range(),
+                )));
+            }
+        };
+
+        token
+    }
+
+    fn skip_whitespace(&mut self) -> Result<(), LexicalError> {
+        loop {
+            match self.cursor.first() {
+                ' ' => {
+                    self.cursor.bump();
+                }
+                '\t' => {
+                    self.cursor.bump();
+                }
+                '\\' => {
+                    self.cursor.bump();
+                    if self.cursor.eat_char('\r') {
+                        self.cursor.eat_char('\n');
+                    } else if self.cursor.is_eof() {
+                        return Err(LexicalError::new(LexicalErrorType::Eof, self.token_range()));
+                    } else if !self.cursor.eat_char('\n') {
+                        return Err(LexicalError::new(
+                            LexicalErrorType::LineContinuationError,
+                            self.token_range(),
+                        ));
+                    }
+                }
+                // Form feed
+                '\x0C' => {
+                    self.cursor.bump();
+                }
+                _ => break,
+            }
+        }
+
+        Ok(())
+    }
+
+    // Dispatch based on the given character.
+    fn consume_ascii_character(&mut self, c: char) -> TokenKind {
+        let token = match c {
+            c if is_ascii_identifier_start(c) => self.lex_identifier(c),
+            '0'..='9' => self.lex_number(c),
+            '#' => return self.lex_comment(),
+            '\'' | '"' => self.lex_string(c),
+            '=' => {
+                if self.cursor.eat_char('=') {
+                    TokenKind::EqEqual
+                } else {
+                    self.state = State::AfterEqual;
+                    return TokenKind::Equal;
+                }
+            }
+            '+' => {
+                if self.cursor.eat_char('=') {
+                    TokenKind::PlusEqual
+                } else {
+                    TokenKind::Plus
+                }
+            }
+            '*' => {
+                if self.cursor.eat_char('=') {
+                    TokenKind::StarEqual
+                } else if self.cursor.eat_char('*') {
+                    if self.cursor.eat_char('=') {
+                        TokenKind::DoubleStarEqual
+                    } else {
+                        TokenKind::DoubleStar
+                    }
+                } else {
+                    TokenKind::Star
+                }
+            }
+
+            c @ ('%' | '!')
+                if self.mode == Mode::Ipython
+                    && self.state.is_after_equal()
+                    && self.nesting == 0 =>
+            {
+                // SAFETY: Safe because `c` has been matched against one of the possible escape command token
+                self.lex_ipython_escape_command(IpyEscapeKind::try_from(c).unwrap())
+            }
+
+            c @ ('%' | '!' | '?' | '/' | ';' | ',')
+                if self.mode == Mode::Ipython && self.state.is_new_logical_line() =>
+            {
+                let kind = if let Ok(kind) = IpyEscapeKind::try_from([c, self.cursor.first()]) {
+                    self.cursor.bump();
+                    kind
+                } else {
+                    // SAFETY: Safe because `c` has been matched against one of the possible escape command token
+                    IpyEscapeKind::try_from(c).unwrap()
+                };
+
+                self.lex_ipython_escape_command(kind)
+            }
+
+            '?' if self.mode == Mode::Ipython => TokenKind::Question,
+
+            '/' => {
+                if self.cursor.eat_char('=') {
+                    TokenKind::SlashEqual
+                } else if self.cursor.eat_char('/') {
+                    if self.cursor.eat_char('=') {
+                        TokenKind::DoubleSlashEqual
+                    } else {
+                        TokenKind::DoubleSlash
+                    }
+                } else {
+                    TokenKind::Slash
+                }
+            }
+            '%' => {
+                if self.cursor.eat_char('=') {
+                    TokenKind::PercentEqual
+                } else {
+                    TokenKind::Percent
+                }
+            }
+            '|' => {
+                if self.cursor.eat_char('=') {
+                    TokenKind::VbarEqual
+                } else {
+                    TokenKind::Vbar
+                }
+            }
+            '^' => {
+                if self.cursor.eat_char('=') {
+                    TokenKind::CircumflexEqual
+                } else {
+                    TokenKind::CircumFlex
+                }
+            }
+            '&' => {
+                if self.cursor.eat_char('=') {
+                    TokenKind::AmperEqual
+                } else {
+                    TokenKind::Amper
+                }
+            }
+            '-' => {
+                if self.cursor.eat_char('=') {
+                    TokenKind::MinusEqual
+                } else if self.cursor.eat_char('>') {
+                    TokenKind::Rarrow
+                } else {
+                    TokenKind::Minus
+                }
+            }
+            '@' => {
+                if self.cursor.eat_char('=') {
+                    TokenKind::AtEqual
+                } else {
+                    TokenKind::At
+                }
+            }
+            '!' => {
+                if self.cursor.eat_char('=') {
+                    TokenKind::NotEqual
+                } else {
+                    TokenKind::Exclamation
+                }
+            }
+            '~' => TokenKind::Tilde,
+            '(' => {
+                self.nesting += 1;
+                TokenKind::Lpar
+            }
+            ')' => {
+                self.nesting = self.nesting.saturating_sub(1);
+                TokenKind::Rpar
+            }
+            '[' => {
+                self.nesting += 1;
+                TokenKind::Lsqb
+            }
+            ']' => {
+                self.nesting = self.nesting.saturating_sub(1);
+                TokenKind::Rsqb
+            }
+            '{' => {
+                self.nesting += 1;
+                TokenKind::Lbrace
+            }
+            '}' => {
+                if let Some(fstring) = self.fstrings.current_mut() {
+                    if fstring.nesting() == self.nesting {
+                        return self.push_error(LexicalError::new(
+                            LexicalErrorType::FStringError(FStringErrorType::SingleRbrace),
+                            self.token_range(),
+                        ));
+                    }
+                    fstring.try_end_format_spec(self.nesting);
+                }
+                self.nesting = self.nesting.saturating_sub(1);
+                TokenKind::Rbrace
+            }
+            ':' => {
+                if self
+                    .fstrings
+                    .current_mut()
+                    .is_some_and(|fstring| fstring.try_start_format_spec(self.nesting))
+                {
+                    TokenKind::Colon
+                } else if self.cursor.eat_char('=') {
+                    TokenKind::ColonEqual
+                } else {
+                    TokenKind::Colon
+                }
+            }
+            ';' => TokenKind::Semi,
+            '<' => {
+                if self.cursor.eat_char('<') {
+                    if self.cursor.eat_char('=') {
+                        TokenKind::LeftShiftEqual
+                    } else {
+                        TokenKind::LeftShift
+                    }
+                } else if self.cursor.eat_char('=') {
+                    TokenKind::LessEqual
+                } else {
+                    TokenKind::Less
+                }
+            }
+            '>' => {
+                if self.cursor.eat_char('>') {
+                    if self.cursor.eat_char('=') {
+                        TokenKind::RightShiftEqual
+                    } else {
+                        TokenKind::RightShift
+                    }
+                } else if self.cursor.eat_char('=') {
+                    TokenKind::GreaterEqual
+                } else {
+                    TokenKind::Greater
+                }
+            }
+            ',' => TokenKind::Comma,
+            '.' => {
+                if self.cursor.first().is_ascii_digit() {
+                    self.lex_decimal_number('.')
+                } else if self.cursor.eat_char2('.', '.') {
+                    TokenKind::Ellipsis
+                } else {
+                    TokenKind::Dot
+                }
+            }
+            '\n' => {
+                return if self.nesting == 0 && !self.state.is_new_logical_line() {
+                    self.state = State::AfterNewline;
+                    TokenKind::Newline
+                } else {
+                    if let Some(fstring) = self.fstrings.current_mut() {
+                        fstring.try_end_format_spec(self.nesting);
+                    }
+                    TokenKind::NonLogicalNewline
+                }
+            }
+            '\r' => {
+                self.cursor.eat_char('\n');
+
+                return if self.nesting == 0 && !self.state.is_new_logical_line() {
+                    self.state = State::AfterNewline;
+                    TokenKind::Newline
+                } else {
+                    if let Some(fstring) = self.fstrings.current_mut() {
+                        fstring.try_end_format_spec(self.nesting);
+                    }
+                    TokenKind::NonLogicalNewline
+                };
+            }
+
+            _ => {
+                self.state = State::Other;
+
+                return self.push_error(LexicalError::new(
+                    LexicalErrorType::UnrecognizedToken { tok: c },
+                    self.token_range(),
+                ));
+            }
+        };
+
+        self.state = State::Other;
+
+        token
     }
 
     /// Lex an identifier. Also used for keywords and string/bytes literals with a prefix.
@@ -254,6 +681,309 @@ impl<'src> Lexer<'src> {
                 TokenKind::Name
             }
         }
+    }
+
+    /// Try lexing the single character string prefix, updating the token flags accordingly.
+    /// Returns `true` if it matches.
+    fn try_single_char_prefix(&mut self, first: char) -> bool {
+        match first {
+            'f' | 'F' => self.current_flags |= TokenFlags::F_STRING,
+            'u' | 'U' => self.current_flags |= TokenFlags::UNICODE_STRING,
+            'b' | 'B' => self.current_flags |= TokenFlags::BYTE_STRING,
+            'r' => self.current_flags |= TokenFlags::RAW_STRING_LOWERCASE,
+            'R' => self.current_flags |= TokenFlags::RAW_STRING_UPPERCASE,
+            _ => return false,
+        }
+        true
+    }
+
+    /// Try lexing the double character string prefix, updating the token flags accordingly.
+    /// Returns `true` if it matches.
+    fn try_double_char_prefix(&mut self, value: [char; 2]) -> bool {
+        match value {
+            ['r', 'f' | 'F'] | ['f' | 'F', 'r'] => {
+                self.current_flags |= TokenFlags::F_STRING | TokenFlags::RAW_STRING_LOWERCASE;
+            }
+            ['R', 'f' | 'F'] | ['f' | 'F', 'R'] => {
+                self.current_flags |= TokenFlags::F_STRING | TokenFlags::RAW_STRING_UPPERCASE;
+            }
+            ['r', 'b' | 'B'] | ['b' | 'B', 'r'] => {
+                self.current_flags |= TokenFlags::BYTE_STRING | TokenFlags::RAW_STRING_LOWERCASE;
+            }
+            ['R', 'b' | 'B'] | ['b' | 'B', 'R'] => {
+                self.current_flags |= TokenFlags::BYTE_STRING | TokenFlags::RAW_STRING_UPPERCASE;
+            }
+            _ => return false,
+        }
+        true
+    }
+
+    /// Lex a f-string start token.
+    fn lex_fstring_start(&mut self, quote: char) -> TokenKind {
+        #[cfg(debug_assertions)]
+        debug_assert_eq!(self.cursor.previous(), quote);
+
+        if quote == '"' {
+            self.current_flags |= TokenFlags::DOUBLE_QUOTES;
+        }
+
+        if self.cursor.eat_char2(quote, quote) {
+            self.current_flags |= TokenFlags::TRIPLE_QUOTED_STRING;
+        }
+
+        self.fstrings
+            .push(FStringContext::new(self.current_flags, self.nesting));
+
+        TokenKind::FStringStart
+    }
+
+    /// Lex a f-string middle or end token.
+    fn lex_fstring_middle_or_end(&mut self) -> Option<TokenKind> {
+        // SAFETY: Safe because the function is only called when `self.fstrings` is not empty.
+        let fstring = self.fstrings.current().unwrap();
+
+        // Check if we're at the end of the f-string.
+        if fstring.is_triple_quoted() {
+            let quote_char = fstring.quote_char();
+            if self.cursor.eat_char3(quote_char, quote_char, quote_char) {
+                self.current_flags = fstring.flags();
+                return Some(TokenKind::FStringEnd);
+            }
+        } else if self.cursor.eat_char(fstring.quote_char()) {
+            self.current_flags = fstring.flags();
+            return Some(TokenKind::FStringEnd);
+        }
+
+        // We have to decode `{{` and `}}` into `{` and `}` respectively. As an
+        // optimization, we only allocate a new string we find any escaped curly braces,
+        // otherwise this string will remain empty and we'll use a source slice instead.
+        let mut normalized = String::new();
+
+        // Tracks the last offset of token value that has been written to `normalized`.
+        let mut last_offset = self.offset();
+
+        // This isn't going to change for the duration of the loop.
+        let in_format_spec = fstring.is_in_format_spec(self.nesting);
+
+        let mut in_named_unicode = false;
+
+        loop {
+            match self.cursor.first() {
+                // The condition is to differentiate between the `NUL` (`\0`) character
+                // in the source code and the one returned by `self.cursor.first()` when
+                // we reach the end of the source code.
+                EOF_CHAR if self.cursor.is_eof() => {
+                    let error = if fstring.is_triple_quoted() {
+                        FStringErrorType::UnterminatedTripleQuotedString
+                    } else {
+                        FStringErrorType::UnterminatedString
+                    };
+                    self.fstrings.pop();
+                    return Some(self.push_error(LexicalError::new(
+                        LexicalErrorType::FStringError(error),
+                        self.token_range(),
+                    )));
+                }
+                '\n' | '\r' if !fstring.is_triple_quoted() => {
+                    // If we encounter a newline while we're in a format spec, then
+                    // we stop here and let the lexer emit the newline token.
+                    //
+                    // Relevant discussion: https://github.com/python/cpython/issues/110259
+                    if in_format_spec {
+                        break;
+                    }
+                    self.fstrings.pop();
+                    return Some(self.push_error(LexicalError::new(
+                        LexicalErrorType::FStringError(FStringErrorType::UnterminatedString),
+                        self.token_range(),
+                    )));
+                }
+                '\\' => {
+                    self.cursor.bump(); // '\'
+                    if matches!(self.cursor.first(), '{' | '}') {
+                        // Don't consume `{` or `}` as we want them to be emitted as tokens.
+                        // They will be handled in the next iteration.
+                        continue;
+                    } else if !fstring.is_raw_string() {
+                        if self.cursor.eat_char2('N', '{') {
+                            in_named_unicode = true;
+                            continue;
+                        }
+                    }
+                    // Consume the escaped character.
+                    if self.cursor.eat_char('\r') {
+                        self.cursor.eat_char('\n');
+                    } else {
+                        self.cursor.bump();
+                    }
+                }
+                quote @ ('\'' | '"') if quote == fstring.quote_char() => {
+                    if let Some(triple_quotes) = fstring.triple_quotes() {
+                        if self.cursor.rest().starts_with(triple_quotes) {
+                            break;
+                        }
+                        self.cursor.bump();
+                    } else {
+                        break;
+                    }
+                }
+                '{' => {
+                    if self.cursor.second() == '{' && !in_format_spec {
+                        self.cursor.bump();
+                        normalized
+                            .push_str(&self.source[TextRange::new(last_offset, self.offset())]);
+                        self.cursor.bump(); // Skip the second `{`
+                        last_offset = self.offset();
+                    } else {
+                        break;
+                    }
+                }
+                '}' => {
+                    if in_named_unicode {
+                        in_named_unicode = false;
+                        self.cursor.bump();
+                    } else if self.cursor.second() == '}' && !in_format_spec {
+                        self.cursor.bump();
+                        normalized
+                            .push_str(&self.source[TextRange::new(last_offset, self.offset())]);
+                        self.cursor.bump(); // Skip the second `}`
+                        last_offset = self.offset();
+                    } else {
+                        break;
+                    }
+                }
+                _ => {
+                    self.cursor.bump();
+                }
+            }
+        }
+        let range = self.token_range();
+        if range.is_empty() {
+            return None;
+        }
+
+        let value = if normalized.is_empty() {
+            self.source[range].to_string()
+        } else {
+            normalized.push_str(&self.source[TextRange::new(last_offset, self.offset())]);
+            normalized
+        };
+
+        self.current_value = TokenValue::FStringMiddle(value.into_boxed_str());
+
+        self.current_flags = fstring.flags();
+        Some(TokenKind::FStringMiddle)
+    }
+
+    /// Lex a string literal.
+    fn lex_string(&mut self, quote: char) -> TokenKind {
+        #[cfg(debug_assertions)]
+        debug_assert_eq!(self.cursor.previous(), quote);
+
+        if quote == '"' {
+            self.current_flags |= TokenFlags::DOUBLE_QUOTES;
+        }
+
+        // If the next two characters are also the quote character, then we have a triple-quoted
+        // string; consume those two characters and ensure that we require a triple-quote to close
+        if self.cursor.eat_char2(quote, quote) {
+            self.current_flags |= TokenFlags::TRIPLE_QUOTED_STRING;
+        }
+
+        let value_start = self.offset();
+
+        let quote_byte = u8::try_from(quote).expect("char that fits in u8");
+        let value_end = if self.current_flags.is_triple_quoted() {
+            // For triple-quoted strings, scan until we find the closing quote (ignoring escaped
+            // quotes) or the end of the file.
+            loop {
+                let Some(index) = memchr::memchr(quote_byte, self.cursor.rest().as_bytes()) else {
+                    self.cursor.skip_to_end();
+
+                    return self.push_error(LexicalError::new(
+                        LexicalErrorType::UnclosedStringError,
+                        self.token_range(),
+                    ));
+                };
+
+                // Rare case: if there are an odd number of backslashes before the quote, then
+                // the quote is escaped and we should continue scanning.
+                let num_backslashes = self.cursor.rest().as_bytes()[..index]
+                    .iter()
+                    .rev()
+                    .take_while(|&&c| c == b'\\')
+                    .count();
+
+                // Advance the cursor past the quote and continue scanning.
+                self.cursor.skip_bytes(index + 1);
+
+                // If the character is escaped, continue scanning.
+                if num_backslashes % 2 == 1 {
+                    continue;
+                }
+
+                // Otherwise, if it's followed by two more quotes, then we're done.
+                if self.cursor.eat_char2(quote, quote) {
+                    break self.offset() - TextSize::new(3);
+                }
+            }
+        } else {
+            // For non-triple-quoted strings, scan until we find the closing quote, but end early
+            // if we encounter a newline or the end of the file.
+            loop {
+                let Some(index) =
+                    memchr::memchr3(quote_byte, b'\r', b'\n', self.cursor.rest().as_bytes())
+                else {
+                    self.cursor.skip_to_end();
+
+                    return self.push_error(LexicalError::new(
+                        LexicalErrorType::StringError,
+                        self.token_range(),
+                    ));
+                };
+
+                // Rare case: if there are an odd number of backslashes before the quote, then
+                // the quote is escaped and we should continue scanning.
+                let num_backslashes = self.cursor.rest().as_bytes()[..index]
+                    .iter()
+                    .rev()
+                    .take_while(|&&c| c == b'\\')
+                    .count();
+
+                // Skip up to the current character.
+                self.cursor.skip_bytes(index);
+                let ch = self.cursor.bump();
+
+                // If the character is escaped, continue scanning.
+                if num_backslashes % 2 == 1 {
+                    if ch == Some('\r') {
+                        self.cursor.eat_char('\n');
+                    }
+                    continue;
+                }
+
+                match ch {
+                    Some('\r' | '\n') => {
+                        return self.push_error(LexicalError::new(
+                            LexicalErrorType::UnclosedStringError,
+                            self.token_range(),
+                        ));
+                    }
+                    Some(ch) if ch == quote => {
+                        break self.offset() - TextSize::new(1);
+                    }
+                    _ => unreachable!("memchr2 returned an index that is not a quote or a newline"),
+                }
+            }
+        };
+
+        self.current_value = TokenValue::String(
+            self.source[TextRange::new(value_start, value_end)]
+                .to_string()
+                .into_boxed_str(),
+        );
+
+        TokenKind::String
     }
 
     /// Numeric lexing. The feast can start!
@@ -552,484 +1282,6 @@ impl<'src> Lexer<'src> {
         }
     }
 
-    /// Lex a f-string start token.
-    fn lex_fstring_start(&mut self, quote: char) -> TokenKind {
-        #[cfg(debug_assertions)]
-        debug_assert_eq!(self.cursor.previous(), quote);
-
-        if quote == '"' {
-            self.current_flags |= TokenFlags::DOUBLE_QUOTES;
-        }
-
-        if self.cursor.eat_char2(quote, quote) {
-            self.current_flags |= TokenFlags::TRIPLE_QUOTED_STRING;
-        }
-
-        self.fstrings
-            .push(FStringContext::new(self.current_flags, self.nesting));
-
-        TokenKind::FStringStart
-    }
-
-    /// Lex a f-string middle or end token.
-    fn lex_fstring_middle_or_end(&mut self) -> Option<TokenKind> {
-        // SAFETY: Safe because the function is only called when `self.fstrings` is not empty.
-        let fstring = self.fstrings.current().unwrap();
-
-        // Check if we're at the end of the f-string.
-        if fstring.is_triple_quoted() {
-            let quote_char = fstring.quote_char();
-            if self.cursor.eat_char3(quote_char, quote_char, quote_char) {
-                self.current_flags = fstring.flags();
-                return Some(TokenKind::FStringEnd);
-            }
-        } else if self.cursor.eat_char(fstring.quote_char()) {
-            self.current_flags = fstring.flags();
-            return Some(TokenKind::FStringEnd);
-        }
-
-        // We have to decode `{{` and `}}` into `{` and `}` respectively. As an
-        // optimization, we only allocate a new string we find any escaped curly braces,
-        // otherwise this string will remain empty and we'll use a source slice instead.
-        let mut normalized = String::new();
-
-        // Tracks the last offset of token value that has been written to `normalized`.
-        let mut last_offset = self.offset();
-
-        // This isn't going to change for the duration of the loop.
-        let in_format_spec = fstring.is_in_format_spec(self.nesting);
-
-        let mut in_named_unicode = false;
-
-        loop {
-            match self.cursor.first() {
-                // The condition is to differentiate between the `NUL` (`\0`) character
-                // in the source code and the one returned by `self.cursor.first()` when
-                // we reach the end of the source code.
-                EOF_CHAR if self.cursor.is_eof() => {
-                    let error = if fstring.is_triple_quoted() {
-                        FStringErrorType::UnterminatedTripleQuotedString
-                    } else {
-                        FStringErrorType::UnterminatedString
-                    };
-                    self.fstrings.pop();
-                    return Some(self.push_error(LexicalError::new(
-                        LexicalErrorType::FStringError(error),
-                        self.token_range(),
-                    )));
-                }
-                '\n' | '\r' if !fstring.is_triple_quoted() => {
-                    // If we encounter a newline while we're in a format spec, then
-                    // we stop here and let the lexer emit the newline token.
-                    //
-                    // Relevant discussion: https://github.com/python/cpython/issues/110259
-                    if in_format_spec {
-                        break;
-                    }
-                    self.fstrings.pop();
-                    return Some(self.push_error(LexicalError::new(
-                        LexicalErrorType::FStringError(FStringErrorType::UnterminatedString),
-                        self.token_range(),
-                    )));
-                }
-                '\\' => {
-                    self.cursor.bump(); // '\'
-                    if matches!(self.cursor.first(), '{' | '}') {
-                        // Don't consume `{` or `}` as we want them to be emitted as tokens.
-                        // They will be handled in the next iteration.
-                        continue;
-                    } else if !fstring.is_raw_string() {
-                        if self.cursor.eat_char2('N', '{') {
-                            in_named_unicode = true;
-                            continue;
-                        }
-                    }
-                    // Consume the escaped character.
-                    if self.cursor.eat_char('\r') {
-                        self.cursor.eat_char('\n');
-                    } else {
-                        self.cursor.bump();
-                    }
-                }
-                quote @ ('\'' | '"') if quote == fstring.quote_char() => {
-                    if let Some(triple_quotes) = fstring.triple_quotes() {
-                        if self.cursor.rest().starts_with(triple_quotes) {
-                            break;
-                        }
-                        self.cursor.bump();
-                    } else {
-                        break;
-                    }
-                }
-                '{' => {
-                    if self.cursor.second() == '{' && !in_format_spec {
-                        self.cursor.bump();
-                        normalized
-                            .push_str(&self.source[TextRange::new(last_offset, self.offset())]);
-                        self.cursor.bump(); // Skip the second `{`
-                        last_offset = self.offset();
-                    } else {
-                        break;
-                    }
-                }
-                '}' => {
-                    if in_named_unicode {
-                        in_named_unicode = false;
-                        self.cursor.bump();
-                    } else if self.cursor.second() == '}' && !in_format_spec {
-                        self.cursor.bump();
-                        normalized
-                            .push_str(&self.source[TextRange::new(last_offset, self.offset())]);
-                        self.cursor.bump(); // Skip the second `}`
-                        last_offset = self.offset();
-                    } else {
-                        break;
-                    }
-                }
-                _ => {
-                    self.cursor.bump();
-                }
-            }
-        }
-        let range = self.token_range();
-        if range.is_empty() {
-            return None;
-        }
-
-        let value = if normalized.is_empty() {
-            self.source[range].to_string()
-        } else {
-            normalized.push_str(&self.source[TextRange::new(last_offset, self.offset())]);
-            normalized
-        };
-
-        self.current_value = TokenValue::FStringMiddle(value.into_boxed_str());
-        self.current_flags = fstring.flags();
-
-        Some(TokenKind::FStringMiddle)
-    }
-
-    /// Lex a string literal.
-    fn lex_string(&mut self, quote: char) -> TokenKind {
-        #[cfg(debug_assertions)]
-        debug_assert_eq!(self.cursor.previous(), quote);
-
-        if quote == '"' {
-            self.current_flags |= TokenFlags::DOUBLE_QUOTES;
-        }
-
-        // If the next two characters are also the quote character, then we have a triple-quoted
-        // string; consume those two characters and ensure that we require a triple-quote to close
-        if self.cursor.eat_char2(quote, quote) {
-            self.current_flags |= TokenFlags::TRIPLE_QUOTED_STRING;
-        }
-
-        let value_start = self.offset();
-
-        let quote_byte = u8::try_from(quote).expect("char that fits in u8");
-        let value_end = if self.current_flags.is_triple_quoted() {
-            // For triple-quoted strings, scan until we find the closing quote (ignoring escaped
-            // quotes) or the end of the file.
-            loop {
-                let Some(index) = memchr::memchr(quote_byte, self.cursor.rest().as_bytes()) else {
-                    self.cursor.skip_to_end();
-
-                    return self.push_error(LexicalError::new(
-                        LexicalErrorType::UnclosedStringError,
-                        self.token_range(),
-                    ));
-                };
-
-                // Rare case: if there are an odd number of backslashes before the quote, then
-                // the quote is escaped and we should continue scanning.
-                let num_backslashes = self.cursor.rest().as_bytes()[..index]
-                    .iter()
-                    .rev()
-                    .take_while(|&&c| c == b'\\')
-                    .count();
-
-                // Advance the cursor past the quote and continue scanning.
-                self.cursor.skip_bytes(index + 1);
-
-                // If the character is escaped, continue scanning.
-                if num_backslashes % 2 == 1 {
-                    continue;
-                }
-
-                // Otherwise, if it's followed by two more quotes, then we're done.
-                if self.cursor.eat_char2(quote, quote) {
-                    break self.offset() - TextSize::new(3);
-                }
-            }
-        } else {
-            // For non-triple-quoted strings, scan until we find the closing quote, but end early
-            // if we encounter a newline or the end of the file.
-            loop {
-                let Some(index) =
-                    memchr::memchr3(quote_byte, b'\r', b'\n', self.cursor.rest().as_bytes())
-                else {
-                    self.cursor.skip_to_end();
-
-                    return self.push_error(LexicalError::new(
-                        LexicalErrorType::StringError,
-                        self.token_range(),
-                    ));
-                };
-
-                // Rare case: if there are an odd number of backslashes before the quote, then
-                // the quote is escaped and we should continue scanning.
-                let num_backslashes = self.cursor.rest().as_bytes()[..index]
-                    .iter()
-                    .rev()
-                    .take_while(|&&c| c == b'\\')
-                    .count();
-
-                // Skip up to the current character.
-                self.cursor.skip_bytes(index);
-                let ch = self.cursor.bump();
-
-                // If the character is escaped, continue scanning.
-                if num_backslashes % 2 == 1 {
-                    if ch == Some('\r') {
-                        self.cursor.eat_char('\n');
-                    }
-                    continue;
-                }
-
-                match ch {
-                    Some('\r' | '\n') => {
-                        return self.push_error(LexicalError::new(
-                            LexicalErrorType::UnclosedStringError,
-                            self.token_range(),
-                        ));
-                    }
-                    Some(ch) if ch == quote => {
-                        break self.offset() - TextSize::new(1);
-                    }
-                    _ => unreachable!("memchr2 returned an index that is not a quote or a newline"),
-                }
-            }
-        };
-
-        self.current_value = TokenValue::String(
-            self.source[TextRange::new(value_start, value_end)]
-                .to_string()
-                .into_boxed_str(),
-        );
-
-        TokenKind::String
-    }
-
-    /// Lex the next token.
-    pub fn next_token(&mut self) -> TokenKind {
-        self.cursor.start_token();
-        self.current_value = TokenValue::None;
-        self.current_flags = TokenFlags::empty();
-        self.current_kind = self.lex_token();
-        self.current_range = self.token_range();
-        self.current_kind
-    }
-
-    fn lex_token(&mut self) -> TokenKind {
-        if let Some(fstring) = self.fstrings.current() {
-            if !fstring.is_in_expression(self.nesting) {
-                if let Some(token) = self.lex_fstring_middle_or_end() {
-                    if matches!(token, TokenKind::FStringEnd) {
-                        self.fstrings.pop();
-                    }
-                    return token;
-                }
-            }
-        }
-        // Return dedent tokens until the current indentation level matches the indentation of the next token.
-        else if let Some(indentation) = self.pending_indentation.take() {
-            match self.indentations.current().try_compare(indentation) {
-                Ok(Ordering::Greater) => {
-                    self.pending_indentation = Some(indentation);
-                    if self.indentations.dedent_one(indentation).is_err() {
-                        return self.push_error(LexicalError::new(
-                            LexicalErrorType::IndentationError,
-                            self.token_range(),
-                        ));
-                    }
-                    return TokenKind::Dedent;
-                }
-                Ok(_) => {}
-                Err(_) => {
-                    return self.push_error(LexicalError::new(
-                        LexicalErrorType::IndentationError,
-                        self.token_range(),
-                    ));
-                }
-            }
-        }
-
-        if self.state.is_after_newline() {
-            if let Some(indentation) = self.eat_indentation() {
-                return indentation;
-            }
-        } else {
-            if let Err(error) = self.skip_whitespace() {
-                return self.push_error(error);
-            }
-        }
-
-        // The lexer might've skipped whitespaces, so update the start offset
-        self.cursor.start_token();
-
-        if let Some(c) = self.cursor.bump() {
-            if c.is_ascii() {
-                self.consume_ascii_character(c)
-            } else if is_unicode_identifier_start(c) {
-                let identifier = self.lex_identifier(c);
-                self.state = State::Other;
-
-                identifier
-            } else {
-                self.push_error(LexicalError::new(
-                    LexicalErrorType::UnrecognizedToken { tok: c },
-                    self.token_range(),
-                ))
-            }
-        } else {
-            // Reached the end of the file. Emit a trailing newline token if not at the beginning of a logical line,
-            // empty the dedent stack, and finally, return the EndOfFile token.
-            self.consume_end()
-        }
-    }
-
-    fn skip_whitespace(&mut self) -> Result<(), LexicalError> {
-        loop {
-            match self.cursor.first() {
-                ' ' => {
-                    self.cursor.bump();
-                }
-                '\t' => {
-                    self.cursor.bump();
-                }
-                '\\' => {
-                    self.cursor.bump();
-                    if self.cursor.eat_char('\r') {
-                        self.cursor.eat_char('\n');
-                    } else if self.cursor.is_eof() {
-                        return Err(LexicalError::new(LexicalErrorType::Eof, self.token_range()));
-                    } else if !self.cursor.eat_char('\n') {
-                        return Err(LexicalError::new(
-                            LexicalErrorType::LineContinuationError,
-                            self.token_range(),
-                        ));
-                    }
-                }
-                // Form feed
-                '\x0C' => {
-                    self.cursor.bump();
-                }
-                _ => break,
-            }
-        }
-
-        Ok(())
-    }
-
-    fn eat_indentation(&mut self) -> Option<TokenKind> {
-        let mut indentation = Indentation::root();
-
-        loop {
-            match self.cursor.first() {
-                ' ' => {
-                    self.cursor.bump();
-                    indentation = indentation.add_space();
-                }
-                '\t' => {
-                    self.cursor.bump();
-                    indentation = indentation.add_tab();
-                }
-                '\\' => {
-                    self.cursor.bump();
-                    if self.cursor.eat_char('\r') {
-                        self.cursor.eat_char('\n');
-                    } else if self.cursor.is_eof() {
-                        return Some(self.push_error(LexicalError::new(
-                            LexicalErrorType::Eof,
-                            self.token_range(),
-                        )));
-                    } else if !self.cursor.eat_char('\n') {
-                        return Some(self.push_error(LexicalError::new(
-                            LexicalErrorType::LineContinuationError,
-                            self.token_range(),
-                        )));
-                    }
-                    indentation = Indentation::root();
-                }
-                // Form feed
-                '\x0C' => {
-                    self.cursor.bump();
-                    indentation = Indentation::root();
-                }
-                _ => break,
-            }
-        }
-
-        // Handle indentation if this is a new, not all empty, logical line
-        if !matches!(self.cursor.first(), '\n' | '\r' | '#' | EOF_CHAR) {
-            self.state = State::NonEmptyLogicalLine;
-
-            // Set to false so that we don't handle indentation on the next call.
-            return self.handle_indentation(indentation);
-        }
-
-        None
-    }
-
-    fn handle_indentation(&mut self, indentation: Indentation) -> Option<TokenKind> {
-        let token = match self.indentations.current().try_compare(indentation) {
-            // Dedent
-            Ok(Ordering::Greater) => {
-                self.pending_indentation = Some(indentation);
-
-                if self.indentations.dedent_one(indentation).is_err() {
-                    return Some(self.push_error(LexicalError::new(
-                        LexicalErrorType::IndentationError,
-                        self.token_range(),
-                    )));
-                };
-
-                // The lexer might've eaten some whitespaces to calculate the `indentation`. For
-                // example:
-                //
-                // ```py
-                // if first:
-                //     if second:
-                //         pass
-                //     foo
-                // #   ^
-                // ```
-                //
-                // Here, the cursor is at `^` and the `indentation` contains the whitespaces before
-                // the `pass` token.
-                self.cursor.start_token();
-
-                Some(TokenKind::Dedent)
-            }
-
-            Ok(Ordering::Equal) => None,
-
-            // Indent
-            Ok(Ordering::Less) => {
-                self.indentations.indent(indentation);
-                Some(TokenKind::Indent)
-            }
-            Err(_) => {
-                return Some(self.push_error(LexicalError::new(
-                    LexicalErrorType::IndentationError,
-                    self.token_range(),
-                )));
-            }
-        };
-
-        token
-    }
-
     fn consume_end(&mut self) -> TokenKind {
         // We reached end of file.
         // First of all, we need all nestings to be finished.
@@ -1050,255 +1302,6 @@ impl<'src> Lexer<'src> {
         } else {
             TokenKind::EndOfFile
         }
-    }
-
-    // Dispatch based on the given character.
-    fn consume_ascii_character(&mut self, c: char) -> TokenKind {
-        let token = match c {
-            c if is_ascii_identifier_start(c) => self.lex_identifier(c),
-            '0'..='9' => self.lex_number(c),
-            '#' => return self.lex_comment(),
-            '\'' | '"' => self.lex_string(c),
-            '=' => {
-                if self.cursor.eat_char('=') {
-                    TokenKind::EqEqual
-                } else {
-                    self.state = State::AfterEqual;
-                    return TokenKind::Equal;
-                }
-            }
-            '+' => {
-                if self.cursor.eat_char('=') {
-                    TokenKind::PlusEqual
-                } else {
-                    TokenKind::Plus
-                }
-            }
-            '*' => {
-                if self.cursor.eat_char('=') {
-                    TokenKind::StarEqual
-                } else if self.cursor.eat_char('*') {
-                    if self.cursor.eat_char('=') {
-                        TokenKind::DoubleStarEqual
-                    } else {
-                        TokenKind::DoubleStar
-                    }
-                } else {
-                    TokenKind::Star
-                }
-            }
-
-            c @ ('%' | '!')
-                if self.mode == Mode::Ipython
-                    && self.state.is_after_equal()
-                    && self.nesting == 0 =>
-            {
-                // SAFETY: Safe because `c` has been matched against one of the possible escape command token
-                self.lex_ipython_escape_command(IpyEscapeKind::try_from(c).unwrap())
-            }
-
-            c @ ('%' | '!' | '?' | '/' | ';' | ',')
-                if self.mode == Mode::Ipython && self.state.is_new_logical_line() =>
-            {
-                let kind = if let Ok(kind) = IpyEscapeKind::try_from([c, self.cursor.first()]) {
-                    self.cursor.bump();
-                    kind
-                } else {
-                    // SAFETY: Safe because `c` has been matched against one of the possible escape command token
-                    IpyEscapeKind::try_from(c).unwrap()
-                };
-
-                self.lex_ipython_escape_command(kind)
-            }
-
-            '?' if self.mode == Mode::Ipython => TokenKind::Question,
-
-            '/' => {
-                if self.cursor.eat_char('=') {
-                    TokenKind::SlashEqual
-                } else if self.cursor.eat_char('/') {
-                    if self.cursor.eat_char('=') {
-                        TokenKind::DoubleSlashEqual
-                    } else {
-                        TokenKind::DoubleSlash
-                    }
-                } else {
-                    TokenKind::Slash
-                }
-            }
-            '%' => {
-                if self.cursor.eat_char('=') {
-                    TokenKind::PercentEqual
-                } else {
-                    TokenKind::Percent
-                }
-            }
-            '|' => {
-                if self.cursor.eat_char('=') {
-                    TokenKind::VbarEqual
-                } else {
-                    TokenKind::Vbar
-                }
-            }
-            '^' => {
-                if self.cursor.eat_char('=') {
-                    TokenKind::CircumflexEqual
-                } else {
-                    TokenKind::CircumFlex
-                }
-            }
-            '&' => {
-                if self.cursor.eat_char('=') {
-                    TokenKind::AmperEqual
-                } else {
-                    TokenKind::Amper
-                }
-            }
-            '-' => {
-                if self.cursor.eat_char('=') {
-                    TokenKind::MinusEqual
-                } else if self.cursor.eat_char('>') {
-                    TokenKind::Rarrow
-                } else {
-                    TokenKind::Minus
-                }
-            }
-            '@' => {
-                if self.cursor.eat_char('=') {
-                    TokenKind::AtEqual
-                } else {
-                    TokenKind::At
-                }
-            }
-            '!' => {
-                if self.cursor.eat_char('=') {
-                    TokenKind::NotEqual
-                } else {
-                    TokenKind::Exclamation
-                }
-            }
-            '~' => TokenKind::Tilde,
-            '(' => {
-                self.nesting += 1;
-                TokenKind::Lpar
-            }
-            ')' => {
-                self.nesting = self.nesting.saturating_sub(1);
-                TokenKind::Rpar
-            }
-            '[' => {
-                self.nesting += 1;
-                TokenKind::Lsqb
-            }
-            ']' => {
-                self.nesting = self.nesting.saturating_sub(1);
-                TokenKind::Rsqb
-            }
-            '{' => {
-                self.nesting += 1;
-                TokenKind::Lbrace
-            }
-            '}' => {
-                if let Some(fstring) = self.fstrings.current_mut() {
-                    if fstring.nesting() == self.nesting {
-                        return self.push_error(LexicalError::new(
-                            LexicalErrorType::FStringError(FStringErrorType::SingleRbrace),
-                            self.token_range(),
-                        ));
-                    }
-                    fstring.try_end_format_spec(self.nesting);
-                }
-                self.nesting = self.nesting.saturating_sub(1);
-                TokenKind::Rbrace
-            }
-            ':' => {
-                if self
-                    .fstrings
-                    .current_mut()
-                    .is_some_and(|fstring| fstring.try_start_format_spec(self.nesting))
-                {
-                    TokenKind::Colon
-                } else if self.cursor.eat_char('=') {
-                    TokenKind::ColonEqual
-                } else {
-                    TokenKind::Colon
-                }
-            }
-            ';' => TokenKind::Semi,
-            '<' => {
-                if self.cursor.eat_char('<') {
-                    if self.cursor.eat_char('=') {
-                        TokenKind::LeftShiftEqual
-                    } else {
-                        TokenKind::LeftShift
-                    }
-                } else if self.cursor.eat_char('=') {
-                    TokenKind::LessEqual
-                } else {
-                    TokenKind::Less
-                }
-            }
-            '>' => {
-                if self.cursor.eat_char('>') {
-                    if self.cursor.eat_char('=') {
-                        TokenKind::RightShiftEqual
-                    } else {
-                        TokenKind::RightShift
-                    }
-                } else if self.cursor.eat_char('=') {
-                    TokenKind::GreaterEqual
-                } else {
-                    TokenKind::Greater
-                }
-            }
-            ',' => TokenKind::Comma,
-            '.' => {
-                if self.cursor.first().is_ascii_digit() {
-                    self.lex_decimal_number('.')
-                } else if self.cursor.eat_char2('.', '.') {
-                    TokenKind::Ellipsis
-                } else {
-                    TokenKind::Dot
-                }
-            }
-            '\n' => {
-                return if self.nesting == 0 && !self.state.is_new_logical_line() {
-                    self.state = State::AfterNewline;
-                    TokenKind::Newline
-                } else {
-                    if let Some(fstring) = self.fstrings.current_mut() {
-                        fstring.try_end_format_spec(self.nesting);
-                    }
-                    TokenKind::NonLogicalNewline
-                }
-            }
-            '\r' => {
-                self.cursor.eat_char('\n');
-
-                return if self.nesting == 0 && !self.state.is_new_logical_line() {
-                    self.state = State::AfterNewline;
-                    TokenKind::Newline
-                } else {
-                    if let Some(fstring) = self.fstrings.current_mut() {
-                        fstring.try_end_format_spec(self.nesting);
-                    }
-                    TokenKind::NonLogicalNewline
-                };
-            }
-
-            _ => {
-                self.state = State::Other;
-
-                return self.push_error(LexicalError::new(
-                    LexicalErrorType::UnrecognizedToken { tok: c },
-                    self.token_range(),
-                ));
-            }
-        };
-
-        self.state = State::Other;
-
-        token
     }
 
     #[inline]
@@ -1327,13 +1330,10 @@ impl<'src> Lexer<'src> {
         self.token_range().start()
     }
 
-    /// Takes the token value corresponding to the current token out of the lexer, replacing it
-    /// with the default value.
-    ///
-    /// All the subsequent call to this method without moving the lexer would always return the
-    /// default value which is [`TokenValue::None`].
-    pub(crate) fn take_value(&mut self) -> TokenValue {
-        std::mem::take(&mut self.current_value)
+    /// Helper function to push the given error and return the [`TokenKind::Unknown`] token.
+    fn push_error(&mut self, error: LexicalError) -> TokenKind {
+        self.errors.push(error);
+        TokenKind::Unknown
     }
 
     /// Creates a checkpoint to which the lexer can later return to using [`Self::rewind`].
