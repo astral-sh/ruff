@@ -160,7 +160,7 @@ impl Deref for Indentation {
 
 #[cfg(test)]
 mod tests {
-    use ruff_python_parser::parse_module;
+    use ruff_python_parser::{parse_module, parse_unchecked, Mode};
 
     use ruff_source_file::{find_newline, LineEnding};
 
@@ -222,7 +222,7 @@ x = (
 )
 ";
         let locator = Locator::new(contents);
-        let parsed = parse_module(contents).unwrap();
+        let parsed = parse_unchecked(contents, Mode::Module);
         assert_eq!(
             Stylist::from_tokens(parsed.tokens(), &locator).indentation(),
             &Indentation(" ".to_string())
