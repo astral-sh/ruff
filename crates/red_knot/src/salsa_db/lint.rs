@@ -77,7 +77,7 @@ pub fn check_syntax(db: &dyn Db, file: File) -> SyntaxCheck {
         diagnostics: Vec::new(),
     };
 
-    visitor.visit_body(&parsed.ast().body);
+    visitor.visit_body(&parsed.syntax().body);
 
     SyntaxCheck::new(visitor.diagnostics)
 }
