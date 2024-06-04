@@ -10,14 +10,14 @@ use crate::checkers::ast::Checker;
 /// Checks for deprecated NumPy type aliases.
 ///
 /// ## Why is this bad?
-/// NumPy's `np.int` has long been an alias of the builtin `int`. The same
-/// goes for `np.float`, and others. These aliases exist primarily
+/// NumPy's `np.int` has long been an alias of the builtin `int`; the same
+/// is true of `np.float` and others. These aliases exist primarily
 /// for historic reasons, and have been a cause of frequent confusion
 /// for newcomers.
 ///
 /// These aliases were deprecated in 1.20, and removed in 1.24.
-/// Note that `np.bool` and `np.long` have been reintroduced in 2.0 with
-/// a different meaning.
+/// Note, however, that `np.bool` and `np.long` were reintroduced in 2.0 with
+/// different semantics, and are thus omitted from this rule.
 ///
 /// ## Examples
 /// ```python
