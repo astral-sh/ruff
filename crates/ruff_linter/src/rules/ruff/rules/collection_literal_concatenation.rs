@@ -199,7 +199,7 @@ pub(crate) fn collection_literal_concatenation(checker: &mut Checker, expr: &Exp
         expr.range(),
     );
     if !checker
-        .indexer()
+        .parsed()
         .comment_ranges()
         .has_comments(expr, checker.locator())
     {

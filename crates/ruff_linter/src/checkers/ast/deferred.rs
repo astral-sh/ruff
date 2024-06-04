@@ -1,13 +1,12 @@
-use ruff_python_ast::Expr;
+use ruff_python_ast::{Expr, ExprStringLiteral};
 use ruff_python_semantic::{ScopeId, Snapshot};
-use ruff_text_size::TextRange;
 
 /// A collection of AST nodes that are deferred for later visitation. Used to, e.g., store
 /// functions, whose bodies shouldn't be visited until all module-level definitions have been
 /// visited.
 #[derive(Debug, Default)]
 pub(crate) struct Visit<'a> {
-    pub(crate) string_type_definitions: Vec<(TextRange, &'a str, Snapshot)>,
+    pub(crate) string_type_definitions: Vec<(&'a ExprStringLiteral, Snapshot)>,
     pub(crate) future_type_definitions: Vec<(&'a Expr, Snapshot)>,
     pub(crate) type_param_definitions: Vec<(&'a Expr, Snapshot)>,
     pub(crate) functions: Vec<Snapshot>,

@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
-use ruff_python_parser::Tok;
-use ruff_text_size::{TextRange, TextSize};
+use ruff_python_parser::{Token, TokenKind};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 /// Stores the ranges of all f-strings in a file sorted by [`TextRange::start`].
 /// There can be multiple overlapping ranges for nested f-strings.
@@ -85,14 +85,14 @@ pub(crate) struct FStringRangesBuilder {
 }
 
 impl FStringRangesBuilder {
-    pub(crate) fn visit_token(&mut self, token: &Tok, range: TextRange) {
-        match token {
-            Tok::FStringStart(_) => {
-                self.start_locations.push(range.start());
+    pub(crate) fn visit_token(&mut self, token: &Token) {
+        match token.kind() {
+            TokenKind::FStringStart => {
+                self.start_locations.push(token.start());
             }
-            Tok::FStringEnd => {
+            TokenKind::FStringEnd => {
                 if let Some(start) = self.start_locations.pop() {
-                    self.raw.insert(start, TextRange::new(start, range.end()));
+                    self.raw.insert(start, TextRange::new(start, token.end()));
                 }
             }
             _ => {}

@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use ruff_diagnostics::Diagnostic;
-use ruff_python_index::Indexer;
+use ruff_python_trivia::CommentRanges;
 use ruff_source_file::Locator;
 pub(crate) use shebang_leading_whitespace::*;
 pub(crate) use shebang_missing_executable_file::*;
@@ -21,10 +21,10 @@ pub(crate) fn from_tokens(
     diagnostics: &mut Vec<Diagnostic>,
     path: &Path,
     locator: &Locator,
-    indexer: &Indexer,
+    comment_ranges: &CommentRanges,
 ) {
     let mut has_any_shebang = false;
-    for range in indexer.comment_ranges() {
+    for range in comment_ranges {
         let comment = locator.slice(*range);
         if let Some(shebang) = ShebangDirective::try_extract(comment) {
             has_any_shebang = true;

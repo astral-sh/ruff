@@ -24,7 +24,7 @@ pub(crate) fn main(args: &Args) -> Result<()> {
             args.file.display()
         )
     })?;
-    let python_ast = parse(source_kind.source_code(), source_type.as_mode())?;
+    let python_ast = parse(source_kind.source_code(), source_type.as_mode())?.into_syntax();
     println!("{python_ast:#?}");
     Ok(())
 }

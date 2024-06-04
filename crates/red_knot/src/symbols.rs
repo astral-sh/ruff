@@ -244,9 +244,11 @@ impl SymbolTable {
         let root_scope_id = SymbolTable::root_scope_id();
         let mut builder = SymbolTableBuilder {
             table: SymbolTable::new(),
-            scopes: vec![root_scope_id],
+            scopes: vec![ScopeState {
+                scope_id: root_scope_id,
+                current_flow_node_id: FlowGraph::start(),
+            }],
             current_definition: None,
-            current_flow_node: FlowGraph::start(),
         };
         builder.visit_body(&module.body);
         builder.table
@@ -543,6 +545,7 @@ where
     }
 }
 
+#[derive(Debug)]
 pub(crate) struct ReachableDefinitionsIterator<'a> {
     table: &'a SymbolTable,
     flow_node_id: FlowNodeId,
@@ -557,10 +560,13 @@ impl<'a> Iterator for ReachableDefinitionsIterator<'a> {
             match &self.table.flow_graph.flow_nodes_by_id[self.flow_node_id] {
                 FlowNode::Start => return None,
                 FlowNode::Definition(def_node) => {
-                    self.flow_node_id = def_node.predecessor;
                     if def_node.symbol_id == self.symbol_id {
+                        // we found a definition; previous definitions along this path are not
+                        // reachable
+                        self.flow_node_id = FlowGraph::start();
                         return Some(def_node.definition.clone());
                     }
+                    self.flow_node_id = def_node.predecessor;
                 }
             }
         }
@@ -603,15 +609,31 @@ impl FlowGraph {
     }
 }
 
+struct ScopeState {
+    scope_id: ScopeId,
+    current_flow_node_id: FlowNodeId,
+}
+
 struct SymbolTableBuilder {
     table: SymbolTable,
-    scopes: Vec<ScopeId>,
+    scopes: Vec<ScopeState>,
     /// the definition whose target(s) we are currently walking
     current_definition: Option<Definition>,
-    current_flow_node: FlowNodeId,
 }
 
 impl SymbolTableBuilder {
+    fn set_current_flow_node(&mut self, new_flow_node_id: FlowNodeId) {
+        let scope_state = self.scopes.last_mut().expect("scope stack is never empty");
+        scope_state.current_flow_node_id = new_flow_node_id;
+    }
+
+    fn current_flow_node(&self) -> FlowNodeId {
+        self.scopes
+            .last()
+            .expect("scope stack is never empty")
+            .current_flow_node_id
+    }
+
     fn add_or_update_symbol(&mut self, identifier: &str, flags: SymbolFlags) -> SymbolId {
         self.table
             .add_or_update_symbol(self.cur_scope(), identifier, flags)
@@ -628,15 +650,16 @@ impl SymbolTableBuilder {
             .entry(symbol_id)
             .or_default()
             .push(definition.clone());
-        self.current_flow_node = self
+        let new_flow_node_id = self
             .table
             .flow_graph
             .flow_nodes_by_id
             .push(FlowNode::Definition(DefinitionFlowNode {
                 definition,
                 symbol_id,
-                predecessor: self.current_flow_node,
+                predecessor: self.current_flow_node(),
             }));
+        self.set_current_flow_node(new_flow_node_id);
         symbol_id
     }
 
@@ -650,8 +673,10 @@ impl SymbolTableBuilder {
         let scope_id =
             self.table
                 .add_child_scope(self.cur_scope(), name, kind, definition, defining_symbol);
-        self.scopes.push(scope_id);
-        self.current_flow_node = FlowGraph::start();
+        self.scopes.push(ScopeState {
+            scope_id,
+            current_flow_node_id: FlowGraph::start(),
+        });
         scope_id
     }
 
@@ -659,13 +684,14 @@ impl SymbolTableBuilder {
         self.scopes
             .pop()
             .expect("Scope stack should never be empty")
+            .scope_id
     }
 
     fn cur_scope(&self) -> ScopeId {
-        *self
-            .scopes
+        self.scopes
             .last()
             .expect("Scope stack should never be empty")
+            .scope_id
     }
 
     fn record_scope_for_node(&mut self, node_key: NodeKey, scope_id: ScopeId) {
@@ -718,7 +744,7 @@ impl PreorderVisitor<'_> for SymbolTableBuilder {
         self.table
             .flow_graph
             .ast_to_flow
-            .insert(NodeKey::from_node(expr.into()), self.current_flow_node);
+            .insert(NodeKey::from_node(expr.into()), self.current_flow_node());
         ast::visitor::preorder::walk_expr(self, expr);
     }
 
@@ -729,19 +755,25 @@ impl PreorderVisitor<'_> for SymbolTableBuilder {
                 let node_key = TypedNodeKey::from_node(node);
                 let def = Definition::ClassDef(node_key.clone());
                 let symbol_id = self.add_or_update_symbol_with_def(&node.name, def.clone());
+                for decorator in &node.decorator_list {
+                    self.visit_decorator(decorator);
+                }
                 let scope_id = self.with_type_params(
                     &node.name,
                     &node.type_params,
                     Some(def.clone()),
                     Some(symbol_id),
                     |builder| {
+                        if let Some(arguments) = &node.arguments {
+                            builder.visit_arguments(arguments);
+                        }
                         let scope_id = builder.push_scope(
                             &node.name,
                             ScopeKind::Class,
                             Some(def.clone()),
                             Some(symbol_id),
                         );
-                        ast::visitor::preorder::walk_stmt(builder, stmt);
+                        builder.visit_body(&node.body);
                         builder.pop_scope();
                         scope_id
                     },
@@ -752,19 +784,26 @@ impl PreorderVisitor<'_> for SymbolTableBuilder {
                 let node_key = TypedNodeKey::from_node(node);
                 let def = Definition::FunctionDef(node_key.clone());
                 let symbol_id = self.add_or_update_symbol_with_def(&node.name, def.clone());
+                for decorator in &node.decorator_list {
+                    self.visit_decorator(decorator);
+                }
                 let scope_id = self.with_type_params(
                     &node.name,
                     &node.type_params,
                     Some(def.clone()),
                     Some(symbol_id),
                     |builder| {
+                        builder.visit_parameters(&node.parameters);
+                        for expr in &node.returns {
+                            builder.visit_annotation(expr);
+                        }
                         let scope_id = builder.push_scope(
                             &node.name,
                             ScopeKind::Function,
                             Some(def.clone()),
                             Some(symbol_id),
                         );
-                        ast::visitor::preorder::walk_stmt(builder, stmt);
+                        builder.visit_body(&node.body);
                         builder.pop_scope();
                         scope_id
                     },

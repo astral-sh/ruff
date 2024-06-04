@@ -7,7 +7,7 @@ use ruff_diagnostics::{Applicability, Diagnostic, DiagnosticKind, Edit, Fix};
 use ruff_linter::{
     directives::{extract_directives, Flags},
     generate_noqa_edits,
-    linter::{check_path, LinterResult, TokenSource},
+    linter::{check_path, LinterResult},
     packaging::detect_package_root,
     registry::AsRule,
     settings::flags,
@@ -16,7 +16,6 @@ use ruff_linter::{
 use ruff_notebook::Notebook;
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
-use ruff_python_parser::AsMode;
 use ruff_source_file::{LineIndex, Locator};
 use ruff_text_size::{Ranged, TextRange};
 use ruff_workspace::resolver::match_any_exclusion;
@@ -95,8 +94,8 @@ pub(crate) fn check(query: &DocumentQuery, encoding: PositionEncoding) -> Diagno
 
     let source_type = query.source_type();
 
-    // Tokenize once.
-    let tokens = ruff_python_parser::tokenize(source_kind.source_code(), source_type.as_mode());
+    // Parse once.
+    let parsed = ruff_python_parser::parse_unchecked_source(source_kind.source_code(), source_type);
 
     let index = LineIndex::from_source_text(source_kind.source_code());
 
@@ -104,13 +103,13 @@ pub(crate) fn check(query: &DocumentQuery, encoding: PositionEncoding) -> Diagno
     let locator = Locator::with_index(source_kind.source_code(), index.clone());
 
     // Detect the current code style (lazily).
-    let stylist = Stylist::from_tokens(&tokens, &locator);
+    let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
 
     // Extra indices from the code.
-    let indexer = Indexer::from_tokens(&tokens, &locator);
+    let indexer = Indexer::from_tokens(parsed.tokens(), &locator);
 
     // Extract the `# noqa` and `# isort: skip` directives from the source.
-    let directives = extract_directives(&tokens, Flags::all(), &locator, &indexer);
+    let directives = extract_directives(&parsed, Flags::all(), &locator, &indexer);
 
     // Generate checks.
     let LinterResult { data, .. } = check_path(
@@ -124,14 +123,14 @@ pub(crate) fn check(query: &DocumentQuery, encoding: PositionEncoding) -> Diagno
         flags::Noqa::Enabled,
         &source_kind,
         source_type,
-        TokenSource::Tokens(tokens),
+        &parsed,
     );
 
     let noqa_edits = generate_noqa_edits(
         query.virtual_file_path(),
         data.as_slice(),
         &locator,
-        indexer.comment_ranges(),
+        parsed.comment_ranges(),
         &linter_settings.external,
         &directives.noqa_line_for,
         stylist.line_ending(),

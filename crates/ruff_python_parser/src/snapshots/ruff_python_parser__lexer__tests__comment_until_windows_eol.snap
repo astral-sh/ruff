@@ -2,17 +2,17 @@
 source: crates/ruff_python_parser/src/lexer.rs
 expression: comment_until_eol(WINDOWS_EOL)
 ---
+## Tokens
+```
 [
     (
-        Int {
-            value: 123,
-        },
+        Int(
+            123,
+        ),
         0..3,
     ),
     (
-        Comment(
-            "# Foo",
-        ),
+        Comment,
         5..10,
     ),
     (
@@ -20,9 +20,9 @@ expression: comment_until_eol(WINDOWS_EOL)
         10..12,
     ),
     (
-        Int {
-            value: 456,
-        },
+        Int(
+            456,
+        ),
         12..15,
     ),
     (
@@ -30,3 +30,4 @@ expression: comment_until_eol(WINDOWS_EOL)
         15..15,
     ),
 ]
+```

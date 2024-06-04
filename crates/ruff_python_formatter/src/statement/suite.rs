@@ -830,8 +830,7 @@ impl Format<PyFormatContext<'_>> for SuiteChildStatement<'_> {
 #[cfg(test)]
 mod tests {
     use ruff_formatter::format;
-    use ruff_python_parser::parse_suite;
-    use ruff_python_trivia::CommentRanges;
+    use ruff_python_parser::parse_module;
 
     use crate::comments::Comments;
     use crate::prelude::*;
@@ -860,17 +859,17 @@ def trailing_func():
     pass
 ";
 
-        let statements = parse_suite(source).unwrap();
+        let parsed = parse_module(source).unwrap();
 
-        let comment_ranges = CommentRanges::default();
         let context = PyFormatContext::new(
             PyFormatOptions::default(),
             source,
-            Comments::from_ranges(&comment_ranges),
+            Comments::from_ranges(parsed.comment_ranges()),
+            parsed.tokens(),
         );
 
         let test_formatter =
-            format_with(|f: &mut PyFormatter| statements.format().with_options(level).fmt(f));
+            format_with(|f: &mut PyFormatter| parsed.suite().format().with_options(level).fmt(f));
 
         let formatted = format!(context, [test_formatter]).unwrap();
         let printed = formatted.print().unwrap();

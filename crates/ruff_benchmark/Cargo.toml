@@ -44,7 +44,6 @@ codspeed-criterion-compat = { workspace = true, default-features = false, option
 ruff_linter = { workspace = true }
 ruff_python_ast = { workspace = true }
 ruff_python_formatter = { workspace = true }
-ruff_python_index = { workspace = true }
 ruff_python_parser = { workspace = true }
 
 [lints]

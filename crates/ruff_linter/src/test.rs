@@ -16,14 +16,13 @@ use ruff_notebook::NotebookError;
 use ruff_python_ast::PySourceType;
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
-use ruff_python_parser::AsMode;
 use ruff_python_trivia::textwrap::dedent;
 use ruff_source_file::{Locator, SourceFileBuilder};
 use ruff_text_size::Ranged;
 
 use crate::directives;
 use crate::fix::{fix_file, FixResult};
-use crate::linter::{check_path, LinterResult, TokenSource};
+use crate::linter::{check_path, LinterResult};
 use crate::message::{Emitter, EmitterContext, Message, TextEmitter};
 use crate::packaging::detect_package_root;
 use crate::registry::AsRule;
@@ -110,12 +109,12 @@ pub(crate) fn test_contents<'a>(
     settings: &LinterSettings,
 ) -> (Vec<Message>, Cow<'a, SourceKind>) {
     let source_type = PySourceType::from(path);
-    let tokens = ruff_python_parser::tokenize(source_kind.source_code(), source_type.as_mode());
+    let parsed = ruff_python_parser::parse_unchecked_source(source_kind.source_code(), source_type);
     let locator = Locator::new(source_kind.source_code());
-    let stylist = Stylist::from_tokens(&tokens, &locator);
-    let indexer = Indexer::from_tokens(&tokens, &locator);
+    let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
+    let indexer = Indexer::from_tokens(parsed.tokens(), &locator);
     let directives = directives::extract_directives(
-        &tokens,
+        &parsed,
         directives::Flags::from_settings(settings),
         &locator,
         &indexer,
@@ -135,7 +134,7 @@ pub(crate) fn test_contents<'a>(
         flags::Noqa::Enabled,
         source_kind,
         source_type,
-        TokenSource::Tokens(tokens),
+        &parsed,
     );
 
     let source_has_errors = error.is_some();
@@ -175,13 +174,13 @@ pub(crate) fn test_contents<'a>(
 
             transformed = Cow::Owned(transformed.updated(fixed_contents, &source_map));
 
-            let tokens =
-                ruff_python_parser::tokenize(transformed.source_code(), source_type.as_mode());
+            let parsed =
+                ruff_python_parser::parse_unchecked_source(transformed.source_code(), source_type);
             let locator = Locator::new(transformed.source_code());
-            let stylist = Stylist::from_tokens(&tokens, &locator);
-            let indexer = Indexer::from_tokens(&tokens, &locator);
+            let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
+            let indexer = Indexer::from_tokens(parsed.tokens(), &locator);
             let directives = directives::extract_directives(
-                &tokens,
+                &parsed,
                 directives::Flags::from_settings(settings),
                 &locator,
                 &indexer,
@@ -201,7 +200,7 @@ pub(crate) fn test_contents<'a>(
                 flags::Noqa::Enabled,
                 &transformed,
                 source_type,
-                TokenSource::Tokens(tokens),
+                &parsed,
             );
 
             if let Some(fixed_error) = fixed_error {
