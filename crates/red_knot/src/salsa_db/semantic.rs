@@ -132,7 +132,7 @@ pub fn dependencies(db: &dyn Db, file: File) -> Arc<[ModuleName]> {
     };
 
     // TODO change the visitor so that `visit_mod` accepts a `ModRef` node that we can construct from module.
-    visitor.visit_body(&parsed.ast().body);
+    visitor.visit_body(&parsed.syntax().body);
 
     Arc::from(visitor.dependencies)
 
@@ -173,7 +173,7 @@ pub fn symbol_table(db: &dyn Db, file_id: File) -> Arc<SymbolTable> {
         symbols: SymbolTable::default(),
     };
 
-    visitor.visit_body(&parsed.ast().body);
+    visitor.visit_body(&parsed.syntax().body);
 
     Arc::new(visitor.symbols)
 }
@@ -183,7 +183,7 @@ pub fn symbol_table(db: &dyn Db, file_id: File) -> Arc<SymbolTable> {
 pub fn ast_ids(db: &dyn Db, file: File) -> Arc<AstIds> {
     let parsed = source::parse(db.upcast(), file);
 
-    Arc::new(AstIds::from_module(parsed.ast()))
+    Arc::new(AstIds::from_module(parsed.syntax()))
 }
 
 #[salsa::jar(db=Db)]

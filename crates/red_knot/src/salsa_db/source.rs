@@ -1,4 +1,3 @@
-use std::fmt::Formatter;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -6,9 +5,8 @@ use countme::Count;
 use dashmap::mapref::entry::Entry;
 use filetime::FileTime;
 
-use ruff_python_ast::{Mod, ModModule, Stmt, StmtExpr};
-use ruff_python_parser::Mode;
-use ruff_text_size::{Ranged, TextRange};
+use ruff_python_ast::{ModModule, PySourceType};
+use ruff_python_parser::Parsed;
 
 use crate::FxDashMap;
 
@@ -174,75 +172,14 @@ impl SourceText {
     }
 }
 
-#[derive(Clone, PartialEq)]
-pub struct Parsed {
-    inner: Arc<ParsedInner>,
-}
-
-impl Parsed {
-    pub fn ast(&self) -> &ModModule {
-        &self.inner.ast
-    }
-
-    #[allow(unused)]
-    pub fn errors(&self) -> &[ruff_python_parser::ParseError] {
-        &self.inner.errors
-    }
-}
-
-impl std::fmt::Debug for Parsed {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Parsed")
-            .field("ast", &self.inner.ast)
-            .field("errors", &self.inner.errors)
-            .finish()
-    }
-}
-
-#[derive(Debug, PartialEq)]
-struct ParsedInner {
-    // TODO should this be an arc to avoid some lifetime awkwardness for call-sites.
-    pub ast: ModModule,
-
-    // TODO use an accumulator for this?
-    pub errors: Vec<ruff_python_parser::ParseError>,
-}
-
 #[tracing::instrument(level = "debug", skip(db))]
 #[salsa::tracked(jar=Jar, no_eq)]
-pub fn parse(db: &dyn Db, file: File) -> Parsed {
+pub fn parse(db: &dyn Db, file: File) -> Arc<Parsed<ModModule>> {
     let source = file.source(db);
-    let text = source.text();
 
-    let result = ruff_python_parser::parse(text, Mode::Module);
+    let result = ruff_python_parser::parse_unchecked_source(source.text(), PySourceType::Python);
 
-    let (module, errors) = match result {
-        Ok(Mod::Module(module)) => (module, vec![]),
-        Ok(Mod::Expression(expression)) => (
-            ModModule {
-                range: expression.range(),
-                body: vec![Stmt::Expr(StmtExpr {
-                    range: expression.range(),
-                    value: expression.body,
-                })],
-            },
-            vec![],
-        ),
-        Err(errors) => (
-            ModModule {
-                range: TextRange::default(),
-                body: Vec::new(),
-            },
-            vec![errors],
-        ),
-    };
-
-    Parsed {
-        inner: Arc::new(ParsedInner {
-            ast: module,
-            errors,
-        }),
-    }
+    Arc::new(result)
 }
 
 #[salsa::jar(db=Db)]
