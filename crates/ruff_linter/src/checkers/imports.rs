@@ -8,6 +8,7 @@ use ruff_python_ast::{ModModule, PySourceType};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 use ruff_python_parser::Parsed;
+use ruff_python_trivia::CommentRanges;
 use ruff_source_file::Locator;
 
 use crate::directives::IsortDirectives;
@@ -19,6 +20,7 @@ use crate::settings::LinterSettings;
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn check_imports(
     parsed: &Parsed<ModModule>,
+    comment_ranges: &CommentRanges,
     locator: &Locator,
     indexer: &Indexer,
     directives: &IsortDirectives,
@@ -51,7 +53,8 @@ pub(crate) fn check_imports(
                     settings,
                     package,
                     source_type,
-                    parsed,
+                    parsed.tokens(),
+                    comment_ranges,
                 ) {
                     diagnostics.push(diagnostic);
                 }

@@ -6,6 +6,7 @@ use ruff_benchmark::criterion::{
 use ruff_benchmark::{TestCase, TestFile, TestFileDownloadError};
 use ruff_python_formatter::{format_module_ast, PreviewMode, PyFormatOptions};
 use ruff_python_parser::{parse, Mode};
+use ruff_python_trivia::CommentRanges;
 
 #[cfg(target_os = "windows")]
 #[global_allocator]
@@ -54,11 +55,14 @@ fn benchmark_formatter(criterion: &mut Criterion) {
                 let parsed =
                     parse(case.code(), Mode::Module).expect("Input should be a valid Python code");
 
+                let comment_ranges = CommentRanges::from(parsed.tokens());
+
                 b.iter(|| {
                     let options = PyFormatOptions::from_extension(Path::new(case.name()))
                         .with_preview(PreviewMode::Enabled);
-                    let formatted = format_module_ast(&parsed, case.code(), options)
-                        .expect("Formatting to succeed");
+                    let formatted =
+                        format_module_ast(&parsed, &comment_ranges, case.code(), options)
+                            .expect("Formatting to succeed");
 
                     formatted.print().expect("Printing to succeed")
                 });

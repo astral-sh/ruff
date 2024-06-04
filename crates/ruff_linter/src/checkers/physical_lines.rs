@@ -93,6 +93,7 @@ mod tests {
     use ruff_python_codegen::Stylist;
     use ruff_python_index::Indexer;
     use ruff_python_parser::parse_module;
+    use ruff_python_trivia::CommentRanges;
     use ruff_source_file::Locator;
 
     use crate::line_width::LineLength;
@@ -109,13 +110,14 @@ mod tests {
         let parsed = parse_module(line).unwrap();
         let indexer = Indexer::from_tokens(parsed.tokens(), &locator);
         let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
+        let comment_ranges = CommentRanges::from(parsed.tokens());
 
         let check_with_max_line_length = |line_length: LineLength| {
             check_physical_lines(
                 &locator,
                 &stylist,
                 &indexer,
-                parsed.comment_ranges(),
+                &comment_ranges,
                 &[],
                 &LinterSettings {
                     pycodestyle: pycodestyle::settings::Settings {

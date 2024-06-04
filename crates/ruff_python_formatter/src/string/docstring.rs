@@ -9,6 +9,7 @@ use itertools::Itertools;
 
 use ruff_formatter::printer::SourceMapGeneration;
 use ruff_python_ast::{str::Quote, StringFlags};
+use ruff_python_trivia::CommentRanges;
 use {once_cell::sync::Lazy, regex::Regex};
 use {
     ruff_formatter::{write, FormatOptions, IndentStyle, LineWidth, Printed},
@@ -1552,8 +1553,9 @@ fn docstring_format_source(
 
     let source_type = options.source_type();
     let parsed = ruff_python_parser::parse(source, source_type.as_mode())?;
+    let comment_ranges = CommentRanges::from(parsed.tokens());
     let source_code = ruff_formatter::SourceCode::new(source);
-    let comments = crate::Comments::from_ast(parsed.syntax(), source_code, parsed.comment_ranges());
+    let comments = crate::Comments::from_ast(parsed.syntax(), source_code, &comment_ranges);
     let locator = Locator::new(source);
 
     let ctx = PyFormatContext::new(options, locator.contents(), comments, parsed.tokens())

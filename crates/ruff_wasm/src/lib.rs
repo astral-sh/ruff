@@ -1,6 +1,7 @@
 use std::path::Path;
 
 use js_sys::Error;
+use ruff_python_trivia::CommentRanges;
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
@@ -171,9 +172,16 @@ impl Workspace {
         // Extra indices from the code.
         let indexer = Indexer::from_tokens(parsed.tokens(), &locator);
 
+        let comment_ranges = CommentRanges::from(parsed.tokens());
+
         // Extract the `# noqa` and `# isort: skip` directives from the source.
-        let directives =
-            directives::extract_directives(&parsed, directives::Flags::empty(), &locator, &indexer);
+        let directives = directives::extract_directives(
+            parsed.tokens(),
+            &comment_ranges,
+            directives::Flags::empty(),
+            &locator,
+            &indexer,
+        );
 
         // Generate checks.
         let LinterResult {
@@ -190,6 +198,7 @@ impl Workspace {
             &source_kind,
             source_type,
             &parsed,
+            &comment_ranges,
         );
 
         let source_code = locator.to_source_code();
@@ -241,11 +250,8 @@ impl Workspace {
 
     pub fn comments(&self, contents: &str) -> Result<String, Error> {
         let parsed = ParsedModule::from_source(contents)?;
-        let comments = pretty_comments(
-            parsed.parsed.syntax(),
-            parsed.parsed.comment_ranges(),
-            contents,
-        );
+        let comment_ranges = CommentRanges::from(parsed.parsed.tokens());
+        let comments = pretty_comments(parsed.parsed.syntax(), &comment_ranges, contents);
         Ok(comments)
     }
 
@@ -270,13 +276,17 @@ pub(crate) fn into_error<E: std::fmt::Display>(err: E) -> Error {
 struct ParsedModule<'a> {
     source_code: &'a str,
     parsed: Parsed<Mod>,
+    comment_ranges: CommentRanges,
 }
 
 impl<'a> ParsedModule<'a> {
     fn from_source(source_code: &'a str) -> Result<Self, Error> {
+        let parsed = parse(source_code, Mode::Module).map_err(into_error)?;
+        let comment_ranges = CommentRanges::from(parsed.tokens());
         Ok(Self {
             source_code,
-            parsed: parse(source_code, Mode::Module).map_err(into_error)?,
+            parsed,
+            comment_ranges,
         })
     }
 
@@ -287,6 +297,11 @@ impl<'a> ParsedModule<'a> {
             .to_format_options(PySourceType::default(), self.source_code)
             .with_source_map_generation(SourceMapGeneration::Enabled);
 
-        format_module_ast(&self.parsed, self.source_code, options)
+        format_module_ast(
+            &self.parsed,
+            &self.comment_ranges,
+            self.source_code,
+            options,
+        )
     }
 }

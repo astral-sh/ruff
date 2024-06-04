@@ -12,6 +12,7 @@ mod tests {
     use anyhow::Result;
     use regex::Regex;
 
+    use ruff_python_trivia::CommentRanges;
     use test_case::test_case;
 
     use ruff_python_ast::PySourceType;
@@ -643,8 +644,10 @@ mod tests {
         let locator = Locator::new(&contents);
         let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
         let indexer = Indexer::from_tokens(parsed.tokens(), &locator);
+        let comment_ranges = CommentRanges::from(parsed.tokens());
         let directives = directives::extract_directives(
-            &parsed,
+            parsed.tokens(),
+            &comment_ranges,
             directives::Flags::from_settings(&settings),
             &locator,
             &indexer,
@@ -664,6 +667,7 @@ mod tests {
             &source_kind,
             source_type,
             &parsed,
+            &comment_ranges,
         );
         diagnostics.sort_by_key(Ranged::start);
         let actual = diagnostics

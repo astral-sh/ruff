@@ -1,4 +1,3 @@
-use ruff_python_trivia::CommentRanges;
 use ruff_text_size::{TextRange, TextSize};
 
 use crate::lexer::{Lexer, LexerCheckpoint, LexicalError, Token, TokenFlags, TokenValue};
@@ -14,9 +13,6 @@ pub(crate) struct TokenSource<'src> {
     /// is finished consuming all the tokens. Note that unlike the emitted tokens, this vector
     /// holds both the trivia and non-trivia tokens.
     tokens: Vec<Token>,
-
-    /// A vector containing the range of all the comment tokens emitted by the lexer.
-    comments: Vec<TextRange>,
 }
 
 impl<'src> TokenSource<'src> {
@@ -26,7 +22,6 @@ impl<'src> TokenSource<'src> {
         TokenSource {
             lexer,
             tokens: vec![],
-            comments: vec![],
         }
     }
 
@@ -103,9 +98,6 @@ impl<'src> TokenSource<'src> {
         loop {
             let kind = self.lexer.next_token();
             if is_trivia(kind) {
-                if kind == TokenKind::Comment {
-                    self.comments.push(self.current_range());
-                }
                 self.tokens
                     .push(Token::new(kind, self.current_range(), self.current_flags()));
                 continue;
@@ -130,7 +122,6 @@ impl<'src> TokenSource<'src> {
         TokenSourceCheckpoint {
             lexer_checkpoint: self.lexer.checkpoint(),
             tokens_position: self.tokens.len(),
-            comments_position: self.comments.len(),
         }
     }
 
@@ -139,18 +130,16 @@ impl<'src> TokenSource<'src> {
         let TokenSourceCheckpoint {
             lexer_checkpoint,
             tokens_position,
-            comments_position,
         } = checkpoint;
 
         self.lexer.rewind(lexer_checkpoint);
         self.tokens.truncate(tokens_position);
-        self.comments.truncate(comments_position);
     }
 
     /// Consumes the token source, returning the collected tokens, comment ranges, and any errors
     /// encountered during lexing. The token collection includes both the trivia and non-trivia
     /// tokens.
-    pub(crate) fn finish(mut self) -> (Vec<Token>, CommentRanges, Vec<LexicalError>) {
+    pub(crate) fn finish(mut self) -> (Vec<Token>, Vec<LexicalError>) {
         assert_eq!(
             self.current_kind(),
             TokenKind::EndOfFile,
@@ -163,15 +152,13 @@ impl<'src> TokenSource<'src> {
             assert_eq!(last.kind(), TokenKind::EndOfFile);
         }
 
-        let comment_ranges = CommentRanges::new(self.comments);
-        (self.tokens, comment_ranges, self.lexer.finish())
+        (self.tokens, self.lexer.finish())
     }
 }
 
 pub(crate) struct TokenSourceCheckpoint {
     lexer_checkpoint: LexerCheckpoint,
     tokens_position: usize,
-    comments_position: usize,
 }
 
 /// Allocates a [`Vec`] with an approximated capacity to fit all tokens
