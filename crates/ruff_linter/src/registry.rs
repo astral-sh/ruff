@@ -262,7 +262,11 @@ impl Rule {
     pub const fn lint_source(&self) -> LintSource {
         match self {
             Rule::InvalidPyprojectToml => LintSource::PyprojectToml,
-            Rule::BlanketNOQA | Rule::RedirectedNOQA | Rule::UnusedNOQA => LintSource::Noqa,
+            Rule::BlanketNOQA
+            | Rule::NOQAByCode
+            | Rule::NOQAByName
+            | Rule::RedirectedNOQA
+            | Rule::UnusedNOQA => LintSource::Noqa,
             Rule::BidirectionalUnicode
             | Rule::BlankLineWithWhitespace
             | Rule::DocLineTooLong
@@ -367,7 +371,7 @@ impl Rule {
 }
 
 /// Pairs of checks that shouldn't be enabled together.
-pub const INCOMPATIBLE_CODES: &[(Rule, Rule, &str); 2] = &[
+pub const INCOMPATIBLE_CODES: &[(Rule, Rule, &str); 3] = &[
     (
         Rule::BlankLineBeforeClass,
         Rule::OneBlankLineBeforeClass,
@@ -379,6 +383,12 @@ pub const INCOMPATIBLE_CODES: &[(Rule, Rule, &str); 2] = &[
         Rule::MultiLineSummarySecondLine,
         "`multi-line-summary-first-line` (D212) and `multi-line-summary-second-line` (D213) are \
          incompatible. Ignoring `multi-line-summary-second-line`.",
+    ),
+    (
+        Rule::NOQAByCode,
+        Rule::NOQAByName,
+        "`noqa-by-code` (RUF102) and `noqa-by-name` (RUF103) are incompatible. Ignoring \
+         `noqa-by-name`.",
     ),
 ];
 
