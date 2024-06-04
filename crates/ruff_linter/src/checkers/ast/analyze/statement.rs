@@ -178,6 +178,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::RedundantNumericUnion) {
                 flake8_pyi::rules::redundant_numeric_union(checker, parameters);
             }
+            if checker.enabled(Rule::PrePep570PositionalArgument) {
+                flake8_pyi::rules::pre_pep570_positional_argument(checker, function_def);
+            }
             if checker.enabled(Rule::DunderFunctionName) {
                 if let Some(diagnostic) = pep8_naming::rules::dunder_function_name(
                     checker.semantic.current_scope(),
