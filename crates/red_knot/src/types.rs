@@ -392,7 +392,7 @@ impl ModuleTypeId {
     }
 
     fn get_member(self, db: &dyn SemanticDb, name: &Name) -> QueryResult<Option<Type>> {
-        if let Some(symbol_id) = resolve_global_symbol(db, self.name(db)?, name)? {
+        if let Some(symbol_id) = resolve_global_symbol(db, self.module, name)? {
             Ok(Some(infer_symbol_public_type(db, symbol_id)?))
         } else {
             Ok(None)

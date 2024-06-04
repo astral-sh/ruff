@@ -18,7 +18,7 @@ use crate::ast_ids::{NodeKey, TypedNodeKey};
 use crate::cache::KeyValueCache;
 use crate::db::{QueryResult, SemanticDb, SemanticJar};
 use crate::files::FileId;
-use crate::module::{resolve_module, ModuleName};
+use crate::module::{Module, ModuleName};
 use crate::parse::parse;
 use crate::Name;
 
@@ -35,13 +35,10 @@ pub fn symbol_table(db: &dyn SemanticDb, file_id: FileId) -> QueryResult<Arc<Sym
 #[tracing::instrument(level = "debug", skip(db))]
 pub fn resolve_global_symbol(
     db: &dyn SemanticDb,
-    module: ModuleName,
+    module: Module,
     name: &str,
 ) -> QueryResult<Option<GlobalSymbolId>> {
-    let Some(typing_module) = resolve_module(db, module)? else {
-        return Ok(None);
-    };
-    let typing_file = typing_module.path(db)?.file();
+    let typing_file = module.path(db)?.file();
     let typing_table = symbol_table(db, typing_file)?;
     let Some(typing_override) = typing_table.root_symbol_id_by_name(name) else {
         return Ok(None);
