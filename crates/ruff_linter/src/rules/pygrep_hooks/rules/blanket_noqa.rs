@@ -4,7 +4,7 @@ use ruff_python_trivia::Cursor;
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::noqa::{BlanketNoqaDirectives, Directive, NoqaDirectives, ParsedFileExemption};
+use crate::noqa::{Directive, FileNoqaDirectives, NoqaDirectives, ParsedFileExemption};
 use crate::settings::types::PreviewMode;
 
 /// ## What it does
@@ -42,6 +42,7 @@ use crate::settings::types::PreviewMode;
 pub struct BlanketNOQA {
     missing_colon: bool,
     space_before_colon: bool,
+    file_exemption: bool,
 }
 
 impl Violation for BlanketNOQA {
@@ -52,12 +53,15 @@ impl Violation for BlanketNOQA {
         let BlanketNOQA {
             missing_colon,
             space_before_colon,
+            file_exemption,
         } = self;
 
         // This awkward branching is necessary to ensure that the generic message is picked up by
         // `derive_message_formats`.
-        if !missing_colon && !space_before_colon {
+        if !missing_colon && !space_before_colon && !file_exemption {
             format!("Use specific rule codes when using `noqa`")
+        } else if *file_exemption {
+            format!("Use specific rule codes when using `ruff: noqa`")
         } else if *missing_colon {
             format!("Use a colon when specifying `noqa` rule codes")
         } else {
@@ -69,6 +73,7 @@ impl Violation for BlanketNOQA {
         let BlanketNOQA {
             missing_colon,
             space_before_colon,
+            ..
         } = self;
 
         if *missing_colon {
@@ -86,18 +91,19 @@ pub(crate) fn blanket_noqa(
     diagnostics: &mut Vec<Diagnostic>,
     noqa_directives: &NoqaDirectives,
     locator: &Locator,
-    maybe_blanket_noqa_directives: &Option<BlanketNoqaDirectives>,
+    file_noqa_directives: &FileNoqaDirectives,
     preview: PreviewMode,
 ) {
-    if let (Some(blankets), PreviewMode::Enabled) = (maybe_blanket_noqa_directives, preview) {
-        for line in blankets.lines() {
+    if preview.is_enabled() {
+        for line in file_noqa_directives.lines() {
             if let ParsedFileExemption::All = line.parsed_file_exemption {
                 diagnostics.push(Diagnostic::new(
                     BlanketNOQA {
                         missing_colon: false,
                         space_before_colon: false,
+                        file_exemption: true,
                     },
-                    line.range,
+                    line.range(),
                 ));
             }
         }
@@ -121,6 +127,7 @@ pub(crate) fn blanket_noqa(
                     BlanketNOQA {
                         missing_colon: false,
                         space_before_colon: true,
+                        file_exemption: false,
                     },
                     TextRange::new(all.start(), end),
                 );
@@ -135,6 +142,7 @@ pub(crate) fn blanket_noqa(
                     BlanketNOQA {
                         missing_colon: true,
                         space_before_colon: false,
+                        file_exemption: false,
                     },
                     TextRange::new(all.start(), end),
                 );
@@ -146,6 +154,7 @@ pub(crate) fn blanket_noqa(
                     BlanketNOQA {
                         missing_colon: false,
                         space_before_colon: false,
+                        file_exemption: false,
                     },
                     all.range(),
                 ));

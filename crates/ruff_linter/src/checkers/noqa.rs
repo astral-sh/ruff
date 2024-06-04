@@ -12,7 +12,7 @@ use ruff_text_size::Ranged;
 
 use crate::fix::edits::delete_comment;
 use crate::noqa::{
-    BlanketNoqaDirectives, Code, Directive, FileExemption, NoqaDirectives, NoqaMapping,
+    Code, Directive, FileExemption, FileNoqaDirectives, NoqaDirectives, NoqaMapping,
 };
 use crate::registry::{AsRule, Rule, RuleSet};
 use crate::rule_redirects::get_redirect_target;
@@ -33,16 +33,14 @@ pub(crate) fn check_noqa(
     settings: &LinterSettings,
 ) -> Vec<usize> {
     // Identify any codes that are globally exempted (within the current file).
-    let maybe_blanket_noqa_directives = BlanketNoqaDirectives::try_extract(
+    let file_noqa_directives = FileNoqaDirectives::extract(
         locator.contents(),
         comment_ranges,
         &settings.external,
         path,
         locator,
     );
-    let exemption = maybe_blanket_noqa_directives
-        .as_ref()
-        .map(|directive| directive.exemption());
+    let exemption = FileExemption::from(&file_noqa_directives);
 
     // Extract all `noqa` directives.
     let mut noqa_directives = NoqaDirectives::from_commented_ranges(comment_ranges, path, locator);
@@ -57,19 +55,18 @@ pub(crate) fn check_noqa(
         }
 
         match &exemption {
-            Some(FileExemption::All) => {
+            FileExemption::All => {
                 // If the file is exempted, ignore all diagnostics.
                 ignored_diagnostics.push(index);
                 continue;
             }
-            Some(FileExemption::Codes(codes)) => {
+            FileExemption::Codes(codes) => {
                 // If the diagnostic is ignored by a global exemption, ignore it.
                 if codes.contains(&&diagnostic.kind.rule().noqa_code()) {
                     ignored_diagnostics.push(index);
                     continue;
                 }
             }
-            None => {}
         }
 
         let noqa_offsets = diagnostic
@@ -114,10 +111,7 @@ pub(crate) fn check_noqa(
     // suppressed.
     if settings.rules.enabled(Rule::UnusedNOQA)
         && analyze_directives
-        && !exemption.as_ref().is_some_and(|exemption| match exemption {
-            FileExemption::All => true,
-            FileExemption::Codes(codes) => codes.contains(&&Rule::UnusedNOQA.noqa_code()),
-        })
+        && !exemption.includes(Rule::UnusedNOQA)
         && !per_file_ignores.contains(Rule::UnusedNOQA)
     {
         for line in noqa_directives.lines() {
@@ -224,7 +218,7 @@ pub(crate) fn check_noqa(
             diagnostics,
             &noqa_directives,
             locator,
-            &maybe_blanket_noqa_directives,
+            &file_noqa_directives,
             settings.preview,
         );
     }
