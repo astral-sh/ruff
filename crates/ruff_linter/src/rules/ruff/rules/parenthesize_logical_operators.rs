@@ -84,7 +84,7 @@ pub(crate) fn parenthesize_chained_logical_operators(
                 if parenthesized_range(
                     bool_op.into(),
                     expr.into(),
-                    checker.parsed().comment_ranges(),
+                    checker.comment_ranges(),
                     locator.contents(),
                 )
                 .is_none()

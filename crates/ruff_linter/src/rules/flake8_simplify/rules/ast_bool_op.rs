@@ -527,7 +527,6 @@ pub(crate) fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
 
         // Avoid removing comments.
         if checker
-            .parsed()
             .comment_ranges()
             .has_comments(expr, checker.locator())
         {
@@ -779,7 +778,7 @@ fn is_short_circuit(
                     parenthesized_range(
                         furthest.into(),
                         expr.into(),
-                        checker.parsed().comment_ranges(),
+                        checker.comment_ranges(),
                         checker.locator().contents(),
                     )
                     .unwrap_or(furthest.range())
@@ -807,7 +806,7 @@ fn is_short_circuit(
                     parenthesized_range(
                         furthest.into(),
                         expr.into(),
-                        checker.parsed().comment_ranges(),
+                        checker.comment_ranges(),
                         checker.locator().contents(),
                     )
                     .unwrap_or(furthest.range())

@@ -143,7 +143,6 @@ pub(crate) fn if_else_block_instead_of_if_exp(checker: &mut Checker, stmt_if: &a
         stmt_if.range(),
     );
     if !checker
-        .parsed()
         .comment_ranges()
         .has_comments(stmt_if, checker.locator())
     {
