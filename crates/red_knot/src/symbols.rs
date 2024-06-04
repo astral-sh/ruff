@@ -570,7 +570,8 @@ impl<'a> Iterator for ReachableDefinitionsIterator<'a> {
                     self.pending.push(branch_node.predecessor);
                 }
                 FlowNode::Phi(phi_node) => {
-                    self.pending.extend_from_slice(&phi_node.predecessors);
+                    self.pending.push(phi_node.first_predecessor);
+                    self.pending.push(phi_node.second_predecessor);
                 }
             }
         }
@@ -608,7 +609,8 @@ struct BranchFlowNode {
 /// A Phi node represents a join point where control flow paths come together
 #[derive(Debug)]
 struct PhiFlowNode {
-    predecessors: Vec<FlowNodeId>,
+    first_predecessor: FlowNodeId,
+    second_predecessor: FlowNodeId,
 }
 
 #[derive(Debug, Default)]
@@ -902,9 +904,7 @@ impl PreorderVisitor<'_> for SymbolTableBuilder {
                 }));
                 self.set_current_flow_node(if_branch);
                 self.visit_body(&node.body);
-                let mut phi_node = PhiFlowNode {
-                    predecessors: vec![self.current_flow_node()],
-                };
+                let mut last_phi_pred = self.current_flow_node();
                 let mut last_branch = if_branch;
                 let mut last_branch_is_else = false;
                 for clause in &node.elif_else_clauses {
@@ -919,13 +919,18 @@ impl PreorderVisitor<'_> for SymbolTableBuilder {
                         last_branch_is_else = true;
                     }
                     self.visit_elif_else_clause(clause);
-                    phi_node.predecessors.push(self.current_flow_node());
+                    last_phi_pred = self.new_flow_node(FlowNode::Phi(PhiFlowNode {
+                        first_predecessor: self.current_flow_node(),
+                        second_predecessor: last_phi_pred,
+                    }));
                 }
                 if !last_branch_is_else {
-                    phi_node.predecessors.push(last_branch);
+                    last_phi_pred = self.new_flow_node(FlowNode::Phi(PhiFlowNode {
+                        first_predecessor: last_phi_pred,
+                        second_predecessor: last_branch,
+                    }));
                 }
-                let phi_node_id = self.new_flow_node(FlowNode::Phi(phi_node));
-                self.set_current_flow_node(phi_node_id);
+                self.set_current_flow_node(last_phi_pred);
             }
             _ => {
                 ast::visitor::preorder::walk_stmt(self, stmt);
@@ -961,9 +966,18 @@ impl std::fmt::Display for FlowGraph {
                 }
                 FlowNode::Phi(phi_node) => {
                     writeln!(f, r"((Phi))")?;
-                    for pred in &phi_node.predecessors {
-                        writeln!(f, r"  id{}-->id{}", pred.as_u32(), id.as_u32())?;
-                    }
+                    writeln!(
+                        f,
+                        r"  id{}-->id{}",
+                        phi_node.second_predecessor.as_u32(),
+                        id.as_u32()
+                    )?;
+                    writeln!(
+                        f,
+                        r"  id{}-->id{}",
+                        phi_node.first_predecessor.as_u32(),
+                        id.as_u32()
+                    )?;
                 }
             }
         }

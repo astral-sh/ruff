@@ -457,7 +457,7 @@ mod tests {
             ",
         )?;
 
-        assert_public_type(&case, "a", "x", "(Literal[5] | Literal[4] | Literal[3])")?;
+        assert_public_type(&case, "a", "x", "(Literal[3] | Literal[4] | Literal[5])")?;
         assert_public_type(&case, "a", "r", "Literal[2]")?;
         assert_public_type(&case, "a", "s", "Literal[5]")
     }
@@ -480,6 +480,6 @@ mod tests {
             ",
         )?;
 
-        assert_public_type(&case, "a", "x", "(Literal[2] | Literal[4] | Literal[3])")
+        assert_public_type(&case, "a", "x", "(Literal[2] | Literal[3] | Literal[4])")
     }
 }
