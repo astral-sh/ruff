@@ -165,7 +165,7 @@ pub(crate) fn unnecessary_encode_utf8(checker: &mut Checker, call: &ast::ExprCal
                     diagnostic.set_fix(replace_with_bytes_literal(
                         checker.locator(),
                         call,
-                        checker.parsed().tokens(),
+                        checker.tokens(),
                     ));
                     checker.diagnostics.push(diagnostic);
                 } else if let EncodingArg::Keyword(kwarg) = encoding_arg {
