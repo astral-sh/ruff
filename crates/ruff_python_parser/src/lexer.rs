@@ -30,6 +30,8 @@ mod cursor;
 mod fstring;
 mod indentation;
 
+const BOM: char = '\u{feff}';
+
 /// A lexer for Python source code.
 #[derive(Debug)]
 pub struct Lexer<'src> {
@@ -100,11 +102,10 @@ impl<'src> Lexer<'src> {
             errors: Vec::new(),
         };
 
-        // TODO: Handle possible mismatch between BOM and explicit encoding declaration.
-        // spell-checker:ignore feff
-        lexer.cursor.eat_char('\u{feff}');
-
-        if start_offset > TextSize::new(0) {
+        if start_offset == TextSize::new(0) {
+            // TODO: Handle possible mismatch between BOM and explicit encoding declaration.
+            lexer.cursor.eat_char(BOM);
+        } else {
             lexer.cursor.skip_bytes(start_offset.to_usize());
         }
 
@@ -1918,8 +1919,8 @@ mod tests {
         }
     }
 
-    fn lex(source: &str, mode: Mode) -> LexerOutput {
-        let mut lexer = Lexer::new(source, mode, TextSize::default());
+    fn lex(source: &str, mode: Mode, start_offset: TextSize) -> LexerOutput {
+        let mut lexer = Lexer::new(source, mode, start_offset);
         let mut tokens = Vec::new();
         loop {
             let kind = lexer.next_token();
@@ -1939,8 +1940,8 @@ mod tests {
         }
     }
 
-    fn lex_valid(source: &str, mode: Mode) -> LexerOutput {
-        let output = lex(source, mode);
+    fn lex_valid(source: &str, mode: Mode, start_offset: TextSize) -> LexerOutput {
+        let output = lex(source, mode, start_offset);
 
         if !output.errors.is_empty() {
             let mut message = "Unexpected lexical errors for a valid source:\n".to_string();
@@ -1955,7 +1956,7 @@ mod tests {
     }
 
     fn lex_invalid(source: &str, mode: Mode) -> LexerOutput {
-        let output = lex(source, mode);
+        let output = lex(source, mode, TextSize::default());
 
         assert!(
             !output.errors.is_empty(),
@@ -1966,11 +1967,35 @@ mod tests {
     }
 
     fn lex_source(source: &str) -> LexerOutput {
-        lex_valid(source, Mode::Module)
+        lex_valid(source, Mode::Module, TextSize::default())
+    }
+
+    fn lex_source_with_offset(source: &str, start_offset: TextSize) -> LexerOutput {
+        lex_valid(source, Mode::Module, start_offset)
     }
 
     fn lex_jupyter_source(source: &str) -> LexerOutput {
-        lex_valid(source, Mode::Ipython)
+        lex_valid(source, Mode::Ipython, TextSize::default())
+    }
+
+    #[test]
+    fn bom() {
+        let source = "\u{feff}x = 1";
+        assert_snapshot!(lex_source(source));
+    }
+
+    #[test]
+    fn bom_with_offset() {
+        let source = "\u{feff}x + y + z";
+        assert_snapshot!(lex_source_with_offset(source, TextSize::new(7)));
+    }
+
+    #[test]
+    fn bom_with_offset_edge() {
+        // BOM offsets the first token by 3, so make sure that lexing from offset 11 (variable z)
+        // doesn't panic. Refer https://github.com/astral-sh/ruff/issues/11731
+        let source = "\u{feff}x + y + z";
+        assert_snapshot!(lex_source_with_offset(source, TextSize::new(11)));
     }
 
     fn ipython_escape_command_line_continuation_eol(eol: &str) -> LexerOutput {
@@ -2114,7 +2139,7 @@ foo = ,func
 def f(arg=%timeit a = b):
     pass"
             .trim();
-        let output = lex(source, Mode::Ipython);
+        let output = lex(source, Mode::Ipython, TextSize::default());
         assert!(output.errors.is_empty());
         assert_no_ipython_escape_command(&output.tokens);
     }
@@ -2347,7 +2372,7 @@ if first:
     }
 
     fn get_tokens_only(source: &str) -> Vec<TokenKind> {
-        let output = lex(source, Mode::Module);
+        let output = lex(source, Mode::Module, TextSize::default());
         assert!(output.errors.is_empty());
         output.tokens.into_iter().map(|token| token.kind).collect()
     }
@@ -2589,7 +2614,7 @@ f"{(lambda x:{x})}"
     }
 
     fn lex_fstring_error(source: &str) -> FStringErrorType {
-        let output = lex(source, Mode::Module);
+        let output = lex(source, Mode::Module, TextSize::default());
         match output
             .errors
             .into_iter()
