@@ -609,7 +609,7 @@ impl<'src> Parser<'src> {
     }
 
     /// Creates a checkpoint to which the parser can later return to using [`Self::rewind`].
-    fn checkpoint(&self) -> ParserCheckpoint<'src> {
+    fn checkpoint(&self) -> ParserCheckpoint {
         ParserCheckpoint {
             tokens: self.tokens.checkpoint(),
             errors_position: self.errors.len(),
@@ -620,7 +620,7 @@ impl<'src> Parser<'src> {
     }
 
     /// Restore the parser to the given checkpoint.
-    fn rewind(&mut self, checkpoint: ParserCheckpoint<'src>) {
+    fn rewind(&mut self, checkpoint: ParserCheckpoint) {
         let ParserCheckpoint {
             tokens,
             errors_position,
@@ -637,8 +637,8 @@ impl<'src> Parser<'src> {
     }
 }
 
-struct ParserCheckpoint<'src> {
-    tokens: TokenSourceCheckpoint<'src>,
+struct ParserCheckpoint {
+    tokens: TokenSourceCheckpoint,
     errors_position: usize,
     current_token_id: TokenId,
     prev_token_end: TextSize,

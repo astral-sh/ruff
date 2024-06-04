@@ -126,7 +126,7 @@ impl<'src> TokenSource<'src> {
     }
 
     /// Creates a checkpoint to which the token source can later return to using [`Self::rewind`].
-    pub(crate) fn checkpoint(&self) -> TokenSourceCheckpoint<'src> {
+    pub(crate) fn checkpoint(&self) -> TokenSourceCheckpoint {
         TokenSourceCheckpoint {
             lexer_checkpoint: self.lexer.checkpoint(),
             tokens_position: self.tokens.len(),
@@ -135,7 +135,7 @@ impl<'src> TokenSource<'src> {
     }
 
     /// Restore the token source to the given checkpoint.
-    pub(crate) fn rewind(&mut self, checkpoint: TokenSourceCheckpoint<'src>) {
+    pub(crate) fn rewind(&mut self, checkpoint: TokenSourceCheckpoint) {
         let TokenSourceCheckpoint {
             lexer_checkpoint,
             tokens_position,
@@ -168,8 +168,8 @@ impl<'src> TokenSource<'src> {
     }
 }
 
-pub(crate) struct TokenSourceCheckpoint<'src> {
-    lexer_checkpoint: LexerCheckpoint<'src>,
+pub(crate) struct TokenSourceCheckpoint {
+    lexer_checkpoint: LexerCheckpoint,
     tokens_position: usize,
     comments_position: usize,
 }
