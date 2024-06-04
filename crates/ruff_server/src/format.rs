@@ -14,8 +14,8 @@ pub(crate) fn format(
     let format_options = formatter_settings.to_format_options(source_type, document.contents());
     match format_module_source(document.contents(), format_options) {
         Ok(formatted) => Ok(formatted.into_code()),
-        // Special case - syntax/parse errors should be handled here instead of
-        // being propagated to become visible server errors.
+        // Special case - syntax/parse errors are be handled here instead of
+        // being propagated as visible server errors.
         Err(FormatModuleError::ParseError(error)) => {
             tracing::warn!("Unable to format document: {error}");
             Ok(document.contents().to_string())
