@@ -18,7 +18,7 @@ use crate::ast_ids::{NodeKey, TypedNodeKey};
 use crate::cache::KeyValueCache;
 use crate::db::{QueryResult, SemanticDb, SemanticJar};
 use crate::files::FileId;
-use crate::module::{resolve_module, ModuleName};
+use crate::module::{Module, ModuleName};
 use crate::parse::parse;
 use crate::Name;
 
@@ -28,20 +28,17 @@ pub fn symbol_table(db: &dyn SemanticDb, file_id: FileId) -> QueryResult<Arc<Sym
 
     jar.symbol_tables.get(&file_id, |_| {
         let parsed = parse(db.upcast(), file_id)?;
-        Ok(Arc::from(SymbolTable::from_ast(parsed.ast())))
+        Ok(Arc::from(SymbolTable::from_ast(parsed.syntax())))
     })
 }
 
 #[tracing::instrument(level = "debug", skip(db))]
 pub fn resolve_global_symbol(
     db: &dyn SemanticDb,
-    module: ModuleName,
+    module: Module,
     name: &str,
 ) -> QueryResult<Option<GlobalSymbolId>> {
-    let Some(typing_module) = resolve_module(db, module)? else {
-        return Ok(None);
-    };
-    let typing_file = typing_module.path(db)?.file();
+    let typing_file = module.path(db)?.file();
     let typing_table = symbol_table(db, typing_file)?;
     let Some(typing_override) = typing_table.root_symbol_id_by_name(name) else {
         return Ok(None);
@@ -1039,13 +1036,16 @@ mod tests {
     use crate::symbols::{ScopeKind, SymbolFlags, SymbolTable};
 
     mod from_ast {
-        use crate::parse::Parsed;
-        use crate::symbols::{Definition, ScopeKind, SymbolId, SymbolIterator, SymbolTable};
         use ruff_python_ast as ast;
-        use textwrap::dedent;
+        use ruff_python_ast::ModModule;
+        use ruff_python_parser::{Mode, Parsed};
 
-        fn parse(code: &str) -> Parsed {
-            Parsed::from_text(&dedent(code))
+        use crate::symbols::{Definition, ScopeKind, SymbolId, SymbolIterator, SymbolTable};
+
+        fn parse(code: &str) -> Parsed<ModModule> {
+            ruff_python_parser::parse_unchecked(code, Mode::Module)
+                .try_into_module()
+                .unwrap()
         }
 
         fn names<I>(it: SymbolIterator<I>) -> Vec<&str>
@@ -1060,14 +1060,14 @@ mod tests {
         #[test]
         fn empty() {
             let parsed = parse("");
-            let table = SymbolTable::from_ast(parsed.ast());
+            let table = SymbolTable::from_ast(parsed.syntax());
             assert_eq!(names(table.root_symbols()).len(), 0);
         }
 
         #[test]
         fn simple() {
             let parsed = parse("x");
-            let table = SymbolTable::from_ast(parsed.ast());
+            let table = SymbolTable::from_ast(parsed.syntax());
             assert_eq!(names(table.root_symbols()), vec!["x"]);
             assert_eq!(
                 table
@@ -1080,7 +1080,7 @@ mod tests {
         #[test]
         fn annotation_only() {
             let parsed = parse("x: int");
-            let table = SymbolTable::from_ast(parsed.ast());
+            let table = SymbolTable::from_ast(parsed.syntax());
             assert_eq!(names(table.root_symbols()), vec!["int", "x"]);
             // TODO record definition
         }
@@ -1088,7 +1088,7 @@ mod tests {
         #[test]
         fn import() {
             let parsed = parse("import foo");
-            let table = SymbolTable::from_ast(parsed.ast());
+            let table = SymbolTable::from_ast(parsed.syntax());
             assert_eq!(names(table.root_symbols()), vec!["foo"]);
             assert_eq!(
                 table
@@ -1101,21 +1101,21 @@ mod tests {
         #[test]
         fn import_sub() {
             let parsed = parse("import foo.bar");
-            let table = SymbolTable::from_ast(parsed.ast());
+            let table = SymbolTable::from_ast(parsed.syntax());
             assert_eq!(names(table.root_symbols()), vec!["foo"]);
         }
 
         #[test]
         fn import_as() {
             let parsed = parse("import foo.bar as baz");
-            let table = SymbolTable::from_ast(parsed.ast());
+            let table = SymbolTable::from_ast(parsed.syntax());
             assert_eq!(names(table.root_symbols()), vec!["baz"]);
         }
 
         #[test]
         fn import_from() {
             let parsed = parse("from bar import foo");
-            let table = SymbolTable::from_ast(parsed.ast());
+            let table = SymbolTable::from_ast(parsed.syntax());
             assert_eq!(names(table.root_symbols()), vec!["foo"]);
             assert_eq!(
                 table
@@ -1135,7 +1135,7 @@ mod tests {
         #[test]
         fn assign() {
             let parsed = parse("x = foo");
-            let table = SymbolTable::from_ast(parsed.ast());
+            let table = SymbolTable::from_ast(parsed.syntax());
             assert_eq!(names(table.root_symbols()), vec!["foo", "x"]);
             assert_eq!(
                 table
@@ -1161,7 +1161,7 @@ mod tests {
                 y = 2
                 ",
             );
-            let table = SymbolTable::from_ast(parsed.ast());
+            let table = SymbolTable::from_ast(parsed.syntax());
             assert_eq!(names(table.root_symbols()), vec!["C", "y"]);
             let scopes = table.root_child_scope_ids();
             assert_eq!(scopes.len(), 1);
@@ -1186,7 +1186,7 @@ mod tests {
                 y = 2
                 ",
             );
-            let table = SymbolTable::from_ast(parsed.ast());
+            let table = SymbolTable::from_ast(parsed.syntax());
             assert_eq!(names(table.root_symbols()), vec!["func", "y"]);
             let scopes = table.root_child_scope_ids();
             assert_eq!(scopes.len(), 1);
@@ -1212,7 +1212,7 @@ mod tests {
                     y = 2
                 ",
             );
-            let table = SymbolTable::from_ast(parsed.ast());
+            let table = SymbolTable::from_ast(parsed.syntax());
             assert_eq!(names(table.root_symbols()), vec!["func"]);
             let scopes = table.root_child_scope_ids();
             assert_eq!(scopes.len(), 2);
@@ -1240,7 +1240,7 @@ mod tests {
                     x = 1
                 ",
             );
-            let table = SymbolTable::from_ast(parsed.ast());
+            let table = SymbolTable::from_ast(parsed.syntax());
             assert_eq!(names(table.root_symbols()), vec!["func"]);
             let scopes = table.root_child_scope_ids();
             assert_eq!(scopes.len(), 1);
@@ -1266,7 +1266,7 @@ mod tests {
                     x = 1
                 ",
             );
-            let table = SymbolTable::from_ast(parsed.ast());
+            let table = SymbolTable::from_ast(parsed.syntax());
             assert_eq!(names(table.root_symbols()), vec!["C"]);
             let scopes = table.root_child_scope_ids();
             assert_eq!(scopes.len(), 1);
@@ -1293,7 +1293,7 @@ mod tests {
         #[test]
         fn reachability_trivial() {
             let parsed = parse("x = 1; x");
-            let ast = parsed.ast();
+            let ast = parsed.syntax();
             let table = SymbolTable::from_ast(ast);
             let x_sym = table
                 .root_symbol_id_by_name("x")

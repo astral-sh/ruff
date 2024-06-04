@@ -97,7 +97,11 @@ pub fn infer_definition_type(
             // TODO relative imports
             assert!(matches!(level, 0));
             let module_name = ModuleName::new(module.as_ref().expect("TODO relative imports"));
-            if let Some(remote_symbol) = resolve_global_symbol(db, module_name, &name)? {
+            let Some(module) = resolve_module(db, module_name.clone())? else {
+                return Ok(Type::Unknown);
+            };
+
+            if let Some(remote_symbol) = resolve_global_symbol(db, module, &name)? {
                 infer_symbol_public_type(db, remote_symbol)
             } else {
                 Ok(Type::Unknown)
@@ -108,7 +112,7 @@ pub fn infer_definition_type(
                 Ok(ty)
             } else {
                 let parsed = parse(db.upcast(), file_id)?;
-                let ast = parsed.ast();
+                let ast = parsed.syntax();
                 let table = symbol_table(db, file_id)?;
                 let node = node_key.resolve_unwrap(ast.as_any_node_ref());
 
@@ -128,7 +132,7 @@ pub fn infer_definition_type(
                 Ok(ty)
             } else {
                 let parsed = parse(db.upcast(), file_id)?;
-                let ast = parsed.ast();
+                let ast = parsed.syntax();
                 let table = symbol_table(db, file_id)?;
                 let node = node_key
                     .resolve(ast.as_any_node_ref())
@@ -155,14 +159,14 @@ pub fn infer_definition_type(
         }
         Definition::Assignment(node_key) => {
             let parsed = parse(db.upcast(), file_id)?;
-            let ast = parsed.ast();
+            let ast = parsed.syntax();
             let node = node_key.resolve_unwrap(ast.as_any_node_ref());
             // TODO handle unpacking assignment correctly (here and for AnnotatedAssignment case, below)
             infer_expr_type(db, file_id, &node.value)
         }
         Definition::AnnotatedAssignment(node_key) => {
             let parsed = parse(db.upcast(), file_id)?;
-            let ast = parsed.ast();
+            let ast = parsed.syntax();
             let node = node_key.resolve_unwrap(ast.as_any_node_ref());
             // TODO actually look at the annotation
             let Some(value) = &node.value else {
@@ -214,12 +218,11 @@ fn infer_expr_type(db: &dyn SemanticDb, file_id: FileId, expr: &ast::Expr) -> Qu
 
 #[cfg(test)]
 mod tests {
-    use textwrap::dedent;
 
     use crate::db::tests::TestDb;
     use crate::db::{HasJar, SemanticJar};
     use crate::module::{
-        set_module_search_paths, ModuleName, ModuleSearchPath, ModuleSearchPathKind,
+        resolve_module, set_module_search_paths, ModuleName, ModuleSearchPath, ModuleSearchPathKind,
     };
     use crate::symbols::resolve_global_symbol;
     use crate::types::{infer_symbol_public_type, Type};
@@ -250,30 +253,34 @@ mod tests {
         Ok(TestCase { temp_dir, db, src })
     }
 
-    fn write_to_path(case: &TestCase, relpath: &str, contents: &str) -> anyhow::Result<()> {
-        let path = case.src.path().join(relpath);
-        std::fs::write(path, dedent(contents))?;
+    fn write_to_path(case: &TestCase, relative_path: &str, contents: &str) -> anyhow::Result<()> {
+        let path = case.src.path().join(relative_path);
+        std::fs::write(path, contents)?;
         Ok(())
     }
 
-    fn get_public_type(case: &TestCase, modname: &str, varname: &str) -> anyhow::Result<Type> {
+    fn get_public_type(
+        case: &TestCase,
+        module_name: &str,
+        variable_name: &str,
+    ) -> anyhow::Result<Type> {
         let db = &case.db;
-        let symbol =
-            resolve_global_symbol(db, ModuleName::new(modname), varname)?.expect("symbol to exist");
+        let module = resolve_module(db, ModuleName::new(module_name))?.expect("Module to exist");
+        let symbol = resolve_global_symbol(db, module, variable_name)?.expect("symbol to exist");
 
         Ok(infer_symbol_public_type(db, symbol)?)
     }
 
     fn assert_public_type(
         case: &TestCase,
-        modname: &str,
-        varname: &str,
-        tyname: &str,
+        module_name: &str,
+        variable_name: &str,
+        type_name: &str,
     ) -> anyhow::Result<()> {
-        let ty = get_public_type(case, modname, varname)?;
+        let ty = get_public_type(case, module_name, variable_name)?;
 
         let jar = HasJar::<SemanticJar>::jar(&case.db)?;
-        assert_eq!(format!("{}", ty.display(&jar.type_store)), tyname);
+        assert_eq!(format!("{}", ty.display(&jar.type_store)), type_name);
         Ok(())
     }
 
