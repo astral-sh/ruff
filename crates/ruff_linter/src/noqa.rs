@@ -280,7 +280,7 @@ pub(crate) fn rule_is_ignored(
 #[derive(Debug)]
 pub(crate) enum FileExemption<'a> {
     /// The file is exempt from all rules.
-    All,
+    All(Vec<&'a NoqaCode>),
     /// The file is exempt from the given rules.
     Codes(Vec<&'a NoqaCode>),
 }
@@ -290,28 +290,38 @@ impl<'a> FileExemption<'a> {
     pub(crate) fn includes(&self, needle: Rule) -> bool {
         let needle = needle.noqa_code();
         match self {
-            FileExemption::All => true,
+            FileExemption::All(_) => true,
             FileExemption::Codes(codes) => codes.iter().any(|code| needle == **code),
         }
+    }
+
+    /// Returns `true` if the file exemption lists the rule directly, rather than via a blanket
+    /// exemption.
+    pub(crate) fn enumerates(&self, needle: Rule) -> bool {
+        let needle = needle.noqa_code();
+        let codes = match self {
+            FileExemption::All(codes) => codes,
+            FileExemption::Codes(codes) => codes,
+        };
+        codes.iter().any(|code| needle == **code)
     }
 }
 
 impl<'a> From<&'a FileNoqaDirectives<'a>> for FileExemption<'a> {
     fn from(directives: &'a FileNoqaDirectives) -> Self {
+        let codes = directives
+            .lines()
+            .iter()
+            .flat_map(|line| &line.matches)
+            .collect();
         if directives
             .lines()
             .iter()
             .any(|line| ParsedFileExemption::All == line.parsed_file_exemption)
         {
-            FileExemption::All
+            FileExemption::All(codes)
         } else {
-            FileExemption::Codes(
-                directives
-                    .lines()
-                    .iter()
-                    .flat_map(|line| &line.matches)
-                    .collect(),
-            )
+            FileExemption::Codes(codes)
         }
     }
 }
@@ -717,7 +727,7 @@ fn find_noqa_comments<'a>(
     // Mark any non-ignored diagnostics.
     for diagnostic in diagnostics {
         match &exemption {
-            FileExemption::All => {
+            FileExemption::All(_) => {
                 // If the file is exempted, don't add any noqa directives.
                 comments_by_line.push(None);
                 continue;
