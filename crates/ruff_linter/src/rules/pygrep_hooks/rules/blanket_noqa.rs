@@ -4,7 +4,8 @@ use ruff_python_trivia::Cursor;
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::noqa::{Directive, NoqaDirectives};
+use crate::noqa::{Directive, FileNoqaDirectives, NoqaDirectives, ParsedFileExemption};
+use crate::settings::types::PreviewMode;
 
 /// ## What it does
 /// Check for `noqa` annotations that suppress all diagnostics, as opposed to
@@ -16,6 +17,9 @@ use crate::noqa::{Directive, NoqaDirectives};
 /// Blanket `noqa` annotations are also more difficult to interpret and
 /// maintain, as the annotation does not clarify which diagnostics are intended
 /// to be suppressed.
+///
+/// In [preview], this rule also checks for blanket file-level annotations (e.g.,
+/// `# ruff: noqa`, as opposed to `# ruff: noqa: F401`).
 ///
 /// ## Example
 /// ```python
@@ -37,10 +41,13 @@ use crate::noqa::{Directive, NoqaDirectives};
 ///
 /// ## References
 /// - [Ruff documentation](https://docs.astral.sh/ruff/configuration/#error-suppression)
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[violation]
 pub struct BlanketNOQA {
     missing_colon: bool,
     space_before_colon: bool,
+    file_exemption: bool,
 }
 
 impl Violation for BlanketNOQA {
@@ -51,12 +58,15 @@ impl Violation for BlanketNOQA {
         let BlanketNOQA {
             missing_colon,
             space_before_colon,
+            file_exemption,
         } = self;
 
         // This awkward branching is necessary to ensure that the generic message is picked up by
         // `derive_message_formats`.
-        if !missing_colon && !space_before_colon {
+        if !missing_colon && !space_before_colon && !file_exemption {
             format!("Use specific rule codes when using `noqa`")
+        } else if *file_exemption {
+            format!("Use specific rule codes when using `ruff: noqa`")
         } else if *missing_colon {
             format!("Use a colon when specifying `noqa` rule codes")
         } else {
@@ -68,6 +78,7 @@ impl Violation for BlanketNOQA {
         let BlanketNOQA {
             missing_colon,
             space_before_colon,
+            ..
         } = self;
 
         if *missing_colon {
@@ -85,7 +96,24 @@ pub(crate) fn blanket_noqa(
     diagnostics: &mut Vec<Diagnostic>,
     noqa_directives: &NoqaDirectives,
     locator: &Locator,
+    file_noqa_directives: &FileNoqaDirectives,
+    preview: PreviewMode,
 ) {
+    if preview.is_enabled() {
+        for line in file_noqa_directives.lines() {
+            if let ParsedFileExemption::All = line.parsed_file_exemption {
+                diagnostics.push(Diagnostic::new(
+                    BlanketNOQA {
+                        missing_colon: false,
+                        space_before_colon: false,
+                        file_exemption: true,
+                    },
+                    line.range(),
+                ));
+            }
+        }
+    }
+
     for directive_line in noqa_directives.lines() {
         if let Directive::All(all) = &directive_line.directive {
             let line = locator.slice(directive_line);
@@ -104,6 +132,7 @@ pub(crate) fn blanket_noqa(
                     BlanketNOQA {
                         missing_colon: false,
                         space_before_colon: true,
+                        file_exemption: false,
                     },
                     TextRange::new(all.start(), end),
                 );
@@ -118,6 +147,7 @@ pub(crate) fn blanket_noqa(
                     BlanketNOQA {
                         missing_colon: true,
                         space_before_colon: false,
+                        file_exemption: false,
                     },
                     TextRange::new(all.start(), end),
                 );
@@ -129,6 +159,7 @@ pub(crate) fn blanket_noqa(
                     BlanketNOQA {
                         missing_colon: false,
                         space_before_colon: false,
+                        file_exemption: false,
                     },
                     all.range(),
                 ));

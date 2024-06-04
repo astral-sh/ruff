@@ -1,0 +1,25 @@
+---
+source: crates/ruff_linter/src/rules/pygrep_hooks/mod.rs
+---
+PGH004_2.py:1:1: PGH004 Use specific rule codes when using `noqa`
+  |
+1 | # noqa
+  | ^^^^^^ PGH004
+2 | # ruff : noqa
+3 | # ruff: noqa: F401
+  |
+
+PGH004_2.py:2:1: PGH004 Use specific rule codes when using `ruff: noqa`
+  |
+1 | # noqa
+2 | # ruff : noqa
+  | ^^^^^^^^^^^^^ PGH004
+3 | # ruff: noqa: F401
+  |
+
+PGH004_2.py:6:1: PGH004 Use specific rule codes when using `ruff: noqa`
+  |
+6 | # flake8: noqa
+  | ^^^^^^^^^^^^^^ PGH004
+7 | import math as m
+  |
