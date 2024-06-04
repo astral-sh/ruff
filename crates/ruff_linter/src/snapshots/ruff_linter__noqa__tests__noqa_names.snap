@@ -6,19 +6,19 @@ Ok(
     Some(
         Codes(
             Codes {
-                range: 0..18,
+                range: 0..38,
                 codes: [
                     RuleIdent {
-                        identifier: Code(
-                            "F401",
+                        identifier: Name(
+                            "unused-import",
                         ),
-                        range: 8..12,
+                        range: 8..21,
                     },
                     RuleIdent {
-                        identifier: Code(
-                            "F841",
+                        identifier: Name(
+                            "unused-variable",
                         ),
-                        range: 14..18,
+                        range: 23..38,
                     },
                 ],
             },

@@ -11,7 +11,7 @@ use ruff_text_size::Ranged;
 
 use crate::fix::edits::delete_comment;
 use crate::noqa::{
-    Code, Directive, FileExemption, FileNoqaDirectives, NoqaDirectives, NoqaMapping,
+    Directive, FileExemption, FileNoqaDirectives, NoqaDirectives, NoqaIdentifier, NoqaMapping,
 };
 use crate::registry::{AsRule, Rule, RuleSet};
 use crate::rule_redirects::get_redirect_target;
@@ -129,32 +129,63 @@ pub(crate) fn check_noqa(
                     let mut valid_codes = vec![];
                     let mut seen_codes = FxHashSet::default();
                     let mut self_ignore = false;
-                    for original_code in directive.iter().map(Code::as_str) {
-                        let code = get_redirect_target(original_code).unwrap_or(original_code);
-                        if Rule::UnusedNOQA.noqa_code() == code {
-                            self_ignore = true;
-                            break;
+                    for directive in directive.iter() {
+                        let mut identifier = directive.identifier();
+
+                        let original_identifier = identifier.as_str();
+
+                        match identifier {
+                            NoqaIdentifier::Code(original_code) => {
+                                let code =
+                                    get_redirect_target(original_code).unwrap_or(original_code);
+                                identifier = NoqaIdentifier::Code(code);
+
+                                if Rule::UnusedNOQA.noqa_code() == code {
+                                    self_ignore = true;
+                                    break;
+                                }
+                            }
+                            NoqaIdentifier::Name(name) => {
+                                if Rule::UnusedNOQA.as_ref() == name {
+                                    self_ignore = true;
+                                    break;
+                                }
+                            }
                         }
 
-                        if !seen_codes.insert(original_code) {
-                            duplicated_codes.push(original_code);
-                        } else if line.matches.iter().any(|match_| *match_ == code)
-                            || settings
+                        let rule_result = match identifier {
+                            NoqaIdentifier::Code(code) => Rule::from_code(code),
+                            NoqaIdentifier::Name(name) => Rule::from_name(name),
+                        };
+
+                        if !seen_codes.insert(original_identifier) {
+                            duplicated_codes.push(original_identifier);
+                            continue;
+                        }
+
+                        let Ok(rule) = rule_result else {
+                            if settings
                                 .external
                                 .iter()
-                                .any(|external| code.starts_with(external))
-                        {
-                            valid_codes.push(original_code);
-                        } else {
-                            if let Ok(rule) = Rule::from_code(code) {
-                                if settings.rules.enabled(rule) {
-                                    unmatched_codes.push(original_code);
-                                } else {
-                                    disabled_codes.push(original_code);
-                                }
+                                .any(|external| original_identifier.starts_with(external))
+                            {
+                                valid_codes.push(original_identifier);
                             } else {
-                                unknown_codes.push(original_code);
+                                unknown_codes.push(original_identifier);
                             }
+                            continue;
+                        };
+
+                        if line
+                            .matches
+                            .iter()
+                            .any(|match_| *match_ == rule.noqa_code())
+                        {
+                            valid_codes.push(original_identifier);
+                        } else if settings.rules.enabled(rule) {
+                            unmatched_codes.push(original_identifier);
+                        } else {
+                            disabled_codes.push(original_identifier);
                         }
                     }
 

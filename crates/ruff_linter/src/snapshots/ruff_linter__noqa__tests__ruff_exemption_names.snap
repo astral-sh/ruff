@@ -6,11 +6,11 @@ Ok(
     Some(
         Codes(
             [
-                Code(
-                    "F401",
+                Name(
+                    "unused-import",
                 ),
-                Code(
-                    "F841",
+                Name(
+                    "unused-variable",
                 ),
             ],
         ),

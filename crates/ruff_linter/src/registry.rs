@@ -1,6 +1,7 @@
 //! Remnant of the registry of all [`Rule`] implementations, now it's reexporting from codes.rs
 //! with some helper symbols
 
+use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
 pub use codes::Rule;
@@ -16,19 +17,31 @@ pub trait AsRule {
 }
 
 impl Rule {
-    pub fn from_code(code: &str) -> Result<Self, FromCodeError> {
-        let (linter, code) = Linter::parse_code(code).ok_or(FromCodeError::Unknown)?;
+    pub fn from_code(code: &str) -> Result<Self, FromCodeOrNameError> {
+        let (linter, code) = Linter::parse_code(code).ok_or(FromCodeOrNameError::UnknownCode)?;
         linter
             .all_rules()
             .find(|rule| rule.noqa_code().suffix() == code)
-            .ok_or(FromCodeError::Unknown)
+            .ok_or(FromCodeOrNameError::UnknownCode)
+    }
+
+    pub fn from_name(name: &str) -> Result<Self, FromCodeOrNameError> {
+        for linter in Linter::iter() {
+            if let Some(rule) = linter.all_rules().find(|rule| rule.as_ref() == name) {
+                return Ok(rule);
+            }
+        }
+
+        Err(FromCodeOrNameError::UnknownName)
     }
 }
 
 #[derive(thiserror::Error, Debug)]
-pub enum FromCodeError {
+pub enum FromCodeOrNameError {
     #[error("unknown rule code")]
-    Unknown,
+    UnknownCode,
+    #[error("unknown rule name")]
+    UnknownName,
 }
 
 #[derive(EnumIter, Debug, PartialEq, Eq, Clone, Hash, RuleNamespace)]
