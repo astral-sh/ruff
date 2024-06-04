@@ -214,6 +214,8 @@ fn infer_expr_type(db: &dyn SemanticDb, file_id: FileId, expr: &ast::Expr) -> Qu
 
 #[cfg(test)]
 mod tests {
+    use textwrap::dedent;
+
     use crate::db::tests::TestDb;
     use crate::db::{HasJar, SemanticJar};
     use crate::module::{
@@ -222,7 +224,6 @@ mod tests {
     use crate::symbols::resolve_global_symbol;
     use crate::types::{infer_symbol_public_type, Type};
     use crate::Name;
-    use textwrap::dedent;
 
     // TODO with virtual filesystem we shouldn't have to write files to disk for these
     // tests
