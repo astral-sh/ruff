@@ -11,11 +11,12 @@ use crate::salsa_db::source::File;
 
 use self::source::Db as SourceDb;
 
+mod hir;
 pub mod lint;
 pub mod semantic;
 pub mod source;
 
-#[salsa::db(source::Jar, lint::Jar, semantic::Jar)]
+#[salsa::db(source::Jar, lint::Jar, hir::Jar, semantic::Jar)]
 pub struct Database {
     storage: Storage<Self>,
 
@@ -39,10 +40,18 @@ impl SourceDb for Database {
     }
 }
 
+impl hir::Db for Database {}
+
 impl semantic::Db for Database {}
 
 impl Upcast<dyn source::Db> for Database {
     fn upcast(&self) -> &(dyn source::Db + 'static) {
+        self
+    }
+}
+
+impl Upcast<dyn hir::Db> for Database {
+    fn upcast(&self) -> &(dyn hir::Db + 'static) {
         self
     }
 }
@@ -83,15 +92,15 @@ mod tests {
     use crate::salsa_db::semantic::{dependencies, symbol_table};
     use crate::salsa_db::source::{Db, File};
 
-    use super::lint;
     use super::semantic;
     use super::semantic::module::{
         set_module_search_paths, ModuleSearchPath, ModuleSearchPathKind,
     };
     use super::source;
     use super::Database;
+    use super::{hir, lint};
 
-    #[salsa::db(source::Jar, lint::Jar, semantic::Jar)]
+    #[salsa::db(source::Jar, lint::Jar, hir::Jar, semantic::Jar)]
     pub struct TestDb {
         storage: salsa::Storage<Self>,
 
@@ -116,10 +125,18 @@ mod tests {
         }
     }
 
+    impl hir::Db for TestDb {}
+
     impl semantic::Db for TestDb {}
 
     impl Upcast<dyn source::Db> for TestDb {
         fn upcast(&self) -> &(dyn source::Db + 'static) {
+            self
+        }
+    }
+
+    impl Upcast<dyn hir::Db> for TestDb {
+        fn upcast(&self) -> &(dyn hir::Db + 'static) {
             self
         }
     }

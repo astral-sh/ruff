@@ -18,8 +18,8 @@ use crate::module::ModuleName;
 use crate::salsa_db::semantic::module::{
     file_to_module, Module, ModuleSearchPaths, ResolvedModule,
 };
-use crate::salsa_db::source;
 use crate::salsa_db::source::File;
+use crate::salsa_db::{hir, source};
 use crate::symbols::Dependency;
 
 pub use self::module::resolve_module;
@@ -198,4 +198,4 @@ pub struct Jar(
     file_to_module,
 );
 
-pub trait Db: source::Db + salsa::DbWithJar<Jar> + Upcast<dyn source::Db> {}
+pub trait Db: hir::Db + salsa::DbWithJar<Jar> + Upcast<dyn hir::Db> {}
