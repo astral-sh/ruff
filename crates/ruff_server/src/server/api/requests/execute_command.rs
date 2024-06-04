@@ -57,14 +57,13 @@ impl super::SyncRequestHandler for ExecuteCommand {
         let mut edit_tracker = WorkspaceEditTracker::new(session.resolved_client_capabilities());
         for Argument { uri, version } in arguments {
             let snapshot = session
-                .take_snapshot(&uri)
+                .take_snapshot(uri.clone())
                 .ok_or(anyhow::anyhow!("Document snapshot not available for {uri}",))
                 .with_failure_code(ErrorCode::InternalError)?;
             match command {
                 Command::FixAll => {
                     let fixes = super::code_action_resolve::fix_all_edit(
                         snapshot.query(),
-                        snapshot.query().settings().linter(),
                         snapshot.encoding(),
                     )
                     .with_failure_code(ErrorCode::InternalError)?;
@@ -81,7 +80,6 @@ impl super::SyncRequestHandler for ExecuteCommand {
                 Command::OrganizeImports => {
                     let fixes = super::code_action_resolve::organize_imports_edit(
                         snapshot.query(),
-                        snapshot.query().settings().linter(),
                         snapshot.encoding(),
                     )
                     .with_failure_code(ErrorCode::InternalError)?;

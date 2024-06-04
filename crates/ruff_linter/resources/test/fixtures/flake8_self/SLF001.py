@@ -77,3 +77,8 @@ print(foo._asdict())
 import os
 
 os._exit()
+
+
+from enum import Enum
+
+Enum._missing_(1)  # OK

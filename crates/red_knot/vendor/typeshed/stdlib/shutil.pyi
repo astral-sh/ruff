@@ -1,6 +1,6 @@
 import os
 import sys
-from _typeshed import BytesPath, FileDescriptorOrPath, StrOrBytesPath, StrPath, SupportsRead, SupportsWrite
+from _typeshed import BytesPath, ExcInfo, FileDescriptorOrPath, StrOrBytesPath, StrPath, SupportsRead, SupportsWrite
 from collections.abc import Callable, Iterable, Sequence
 from tarfile import _TarfileFilter
 from typing import Any, AnyStr, NamedTuple, Protocol, TypeVar, overload
@@ -71,14 +71,12 @@ def copytree(
     dirs_exist_ok: bool = False,
 ) -> _PathReturn: ...
 
-_OnErrorCallback: TypeAlias = Callable[[Callable[..., Any], str, Any], object]
-_OnExcCallback: TypeAlias = Callable[[Callable[..., Any], str, Exception], object]
+_OnErrorCallback: TypeAlias = Callable[[Callable[..., Any], str, ExcInfo], object]
+_OnExcCallback: TypeAlias = Callable[[Callable[..., Any], str, BaseException], object]
 
 class _RmtreeType(Protocol):
     avoids_symlink_attacks: bool
     if sys.version_info >= (3, 12):
-        @overload
-        def __call__(self, path: StrOrBytesPath, ignore_errors: bool = False, *, dir_fd: int | None = None) -> None: ...
         @overload
         @deprecated("The `onerror` parameter is deprecated and will be removed in Python 3.14. Use `onexc` instead.")
         def __call__(
@@ -91,7 +89,12 @@ class _RmtreeType(Protocol):
         ) -> None: ...
         @overload
         def __call__(
-            self, path: StrOrBytesPath, ignore_errors: bool = False, *, onexc: _OnExcCallback, dir_fd: int | None = None
+            self,
+            path: StrOrBytesPath,
+            ignore_errors: bool = False,
+            *,
+            onexc: _OnExcCallback | None = None,
+            dir_fd: int | None = None,
         ) -> None: ...
     elif sys.version_info >= (3, 11):
         def __call__(
@@ -132,14 +135,44 @@ def disk_usage(path: FileDescriptorOrPath) -> _ntuple_diskusage: ...
 # While chown can be imported on Windows, it doesn't actually work;
 # see https://bugs.python.org/issue33140. We keep it here because it's
 # in __all__.
-@overload
-def chown(path: FileDescriptorOrPath, user: str | int, group: None = None) -> None: ...
-@overload
-def chown(path: FileDescriptorOrPath, user: None = None, *, group: str | int) -> None: ...
-@overload
-def chown(path: FileDescriptorOrPath, user: None, group: str | int) -> None: ...
-@overload
-def chown(path: FileDescriptorOrPath, user: str | int, group: str | int) -> None: ...
+if sys.version_info >= (3, 13):
+    @overload
+    def chown(
+        path: FileDescriptorOrPath,
+        user: str | int,
+        group: None = None,
+        *,
+        dir_fd: int | None = None,
+        follow_symlinks: bool = True,
+    ) -> None: ...
+    @overload
+    def chown(
+        path: FileDescriptorOrPath,
+        user: None = None,
+        *,
+        group: str | int,
+        dir_fd: int | None = None,
+        follow_symlinks: bool = True,
+    ) -> None: ...
+    @overload
+    def chown(
+        path: FileDescriptorOrPath, user: None, group: str | int, *, dir_fd: int | None = None, follow_symlinks: bool = True
+    ) -> None: ...
+    @overload
+    def chown(
+        path: FileDescriptorOrPath, user: str | int, group: str | int, *, dir_fd: int | None = None, follow_symlinks: bool = True
+    ) -> None: ...
+
+else:
+    @overload
+    def chown(path: FileDescriptorOrPath, user: str | int, group: None = None) -> None: ...
+    @overload
+    def chown(path: FileDescriptorOrPath, user: None = None, *, group: str | int) -> None: ...
+    @overload
+    def chown(path: FileDescriptorOrPath, user: None, group: str | int) -> None: ...
+    @overload
+    def chown(path: FileDescriptorOrPath, user: str | int, group: str | int) -> None: ...
+
 @overload
 def which(cmd: _StrPathT, mode: int = 1, path: StrPath | None = None) -> str | _StrPathT | None: ...
 @overload

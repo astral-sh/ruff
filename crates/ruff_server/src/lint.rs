@@ -1,23 +1,24 @@
 //! Access to the Ruff linting API for the LSP
 
+use rustc_hash::FxHashMap;
+use serde::{Deserialize, Serialize};
+
 use ruff_diagnostics::{Applicability, Diagnostic, DiagnosticKind, Edit, Fix};
 use ruff_linter::{
     directives::{extract_directives, Flags},
     generate_noqa_edits,
-    linter::{check_path, LinterResult, TokenSource},
+    linter::{check_path, LinterResult},
     packaging::detect_package_root,
     registry::AsRule,
-    settings::{flags, LinterSettings},
+    settings::flags,
     source_kind::SourceKind,
 };
 use ruff_notebook::Notebook;
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
-use ruff_python_parser::AsMode;
 use ruff_source_file::{LineIndex, Locator};
 use ruff_text_size::{Ranged, TextRange};
-use rustc_hash::FxHashMap;
-use serde::{Deserialize, Serialize};
+use ruff_workspace::resolver::match_any_exclusion;
 
 use crate::{
     edit::{NotebookRange, ToRangeExt},
@@ -58,25 +59,43 @@ pub(crate) struct DiagnosticFix {
 /// A series of diagnostics across a single text document or an arbitrary number of notebook cells.
 pub(crate) type Diagnostics = FxHashMap<lsp_types::Url, Vec<lsp_types::Diagnostic>>;
 
-pub(crate) fn check(
-    query: &DocumentQuery,
-    linter_settings: &LinterSettings,
-    encoding: PositionEncoding,
-) -> Diagnostics {
-    let document_path = query.file_path();
+pub(crate) fn check(query: &DocumentQuery, encoding: PositionEncoding) -> Diagnostics {
     let source_kind = query.make_source_kind();
+    let file_resolver_settings = query.settings().file_resolver();
+    let linter_settings = query.settings().linter();
+    let document_path = query.file_path();
 
-    let package = detect_package_root(
-        document_path
-            .parent()
-            .expect("a path to a document should have a parent path"),
-        &linter_settings.namespace_packages,
-    );
+    // If the document is excluded, return an empty list of diagnostics.
+    let package = if let Some(document_path) = document_path.as_ref() {
+        if let Some(exclusion) = match_any_exclusion(
+            document_path,
+            &file_resolver_settings.exclude,
+            &file_resolver_settings.extend_exclude,
+            Some(&linter_settings.exclude),
+            None,
+        ) {
+            tracing::debug!(
+                "Ignored path via `{}`: {}",
+                exclusion,
+                document_path.display()
+            );
+            return Diagnostics::default();
+        }
+
+        detect_package_root(
+            document_path
+                .parent()
+                .expect("a path to a document should have a parent path"),
+            &linter_settings.namespace_packages,
+        )
+    } else {
+        None
+    };
 
     let source_type = query.source_type();
 
-    // Tokenize once.
-    let tokens = ruff_python_parser::tokenize(source_kind.source_code(), source_type.as_mode());
+    // Parse once.
+    let parsed = ruff_python_parser::parse_unchecked_source(source_kind.source_code(), source_type);
 
     let index = LineIndex::from_source_text(source_kind.source_code());
 
@@ -84,17 +103,17 @@ pub(crate) fn check(
     let locator = Locator::with_index(source_kind.source_code(), index.clone());
 
     // Detect the current code style (lazily).
-    let stylist = Stylist::from_tokens(&tokens, &locator);
+    let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
 
     // Extra indices from the code.
-    let indexer = Indexer::from_tokens(&tokens, &locator);
+    let indexer = Indexer::from_tokens(parsed.tokens(), &locator);
 
     // Extract the `# noqa` and `# isort: skip` directives from the source.
-    let directives = extract_directives(&tokens, Flags::all(), &locator, &indexer);
+    let directives = extract_directives(&parsed, Flags::all(), &locator, &indexer);
 
     // Generate checks.
     let LinterResult { data, .. } = check_path(
-        document_path,
+        query.virtual_file_path(),
         package,
         &locator,
         &stylist,
@@ -104,14 +123,14 @@ pub(crate) fn check(
         flags::Noqa::Enabled,
         &source_kind,
         source_type,
-        TokenSource::Tokens(tokens),
+        &parsed,
     );
 
     let noqa_edits = generate_noqa_edits(
-        document_path,
+        query.virtual_file_path(),
         data.as_slice(),
         &locator,
-        indexer.comment_ranges(),
+        parsed.comment_ranges(),
         &linter_settings.external,
         &directives.noqa_line_for,
         stylist.line_ending(),

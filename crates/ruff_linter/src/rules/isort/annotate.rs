@@ -1,4 +1,5 @@
-use ruff_python_ast::{self as ast, PySourceType, Stmt};
+use ruff_python_ast::{self as ast, Stmt};
+use ruff_python_parser::Tokens;
 use ruff_text_size::{Ranged, TextRange};
 
 use ruff_source_file::Locator;
@@ -13,7 +14,7 @@ pub(crate) fn annotate_imports<'a>(
     comments: Vec<Comment<'a>>,
     locator: &Locator<'a>,
     split_on_trailing_comma: bool,
-    source_type: PySourceType,
+    tokens: &Tokens,
 ) -> Vec<AnnotatedImport<'a>> {
     let mut comments_iter = comments.into_iter().peekable();
 
@@ -120,7 +121,7 @@ pub(crate) fn annotate_imports<'a>(
                         names: aliases,
                         level: *level,
                         trailing_comma: if split_on_trailing_comma {
-                            trailing_comma(import, locator, source_type)
+                            trailing_comma(import, tokens)
                         } else {
                             TrailingComma::default()
                         },

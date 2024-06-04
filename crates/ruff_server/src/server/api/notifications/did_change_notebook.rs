@@ -23,16 +23,14 @@ impl super::SyncNotificationHandler for DidChangeNotebook {
             change: types::NotebookDocumentChangeEvent { cells, metadata },
         }: types::DidChangeNotebookDocumentParams,
     ) -> Result<()> {
-        let key = session
-            .key_from_url(&uri)
-            .with_failure_code(ErrorCode::InternalError)?;
+        let key = session.key_from_url(uri);
         session
             .update_notebook_document(&key, cells, metadata, version)
             .with_failure_code(ErrorCode::InternalError)?;
 
         // publish new diagnostics
         let snapshot = session
-            .take_snapshot(&uri)
+            .take_snapshot(key.into_url())
             .expect("snapshot should be available");
         publish_diagnostics_for_document(&snapshot, &notifier)?;
 

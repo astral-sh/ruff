@@ -3,13 +3,12 @@ use std::str::FromStr;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::whitespace::indentation;
-use ruff_python_ast::{self as ast, AnyStringFlags, Expr};
+use ruff_python_ast::{self as ast, whitespace::indentation, AnyStringFlags, Expr, StringFlags};
 use ruff_python_codegen::Stylist;
 use ruff_python_literal::cformat::{
     CConversionFlags, CFormatPart, CFormatPrecision, CFormatQuantity, CFormatString,
 };
-use ruff_python_parser::{lexer, AsMode, Tok};
+use ruff_python_parser::TokenKind;
 use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
@@ -345,38 +344,22 @@ fn convertible(format_string: &CFormatString, params: &Expr) -> bool {
 }
 
 /// UP031
-pub(crate) fn printf_string_formatting(checker: &mut Checker, expr: &Expr, right: &Expr) {
-    // Grab each string segment (in case there's an implicit concatenation).
-    let mut strings: Vec<(TextRange, AnyStringFlags)> = vec![];
-    let mut extension = None;
-    for (tok, range) in lexer::lex_starts_at(
-        checker.locator().slice(expr),
-        checker.source_type.as_mode(),
-        expr.start(),
-    )
-    .flatten()
-    {
-        match tok {
-            Tok::String { flags, .. } => strings.push((range, flags)),
-            // If we hit a right paren, we have to preserve it.
-            Tok::Rpar => extension = Some(range),
-            // Break as soon as we find the modulo symbol.
-            Tok::Percent => break,
-            _ => continue,
-        }
-    }
+pub(crate) fn printf_string_formatting(
+    checker: &mut Checker,
+    bin_op: &ast::ExprBinOp,
+    string_expr: &ast::ExprStringLiteral,
+) {
+    let right = &*bin_op.right;
 
-    // If there are no string segments, abort.
-    if strings.is_empty() {
-        return;
-    }
-
-    // Parse each string segment.
     let mut num_positional_arguments = 0;
     let mut num_keyword_arguments = 0;
-    let mut format_strings = Vec::with_capacity(strings.len());
-    for (range, flags) in &strings {
-        let string = checker.locator().slice(*range);
+    let mut format_strings: Vec<(TextRange, String)> =
+        Vec::with_capacity(string_expr.value.as_slice().len());
+
+    // Parse each string segment.
+    for string_literal in &string_expr.value {
+        let string = checker.locator().slice(string_literal);
+        let flags = AnyStringFlags::from(string_literal.flags);
         let string = &string
             [usize::from(flags.opener_len())..(string.len() - usize::from(flags.closer_len()))];
 
@@ -401,7 +384,10 @@ pub(crate) fn printf_string_formatting(checker: &mut Checker, expr: &Expr, right
         }
 
         // Convert the `%`-format string to a `.format` string.
-        format_strings.push(flags.format_string_contents(&percent_to_format(&format_string)));
+        format_strings.push((
+            string_literal.range(),
+            flags.format_string_contents(&percent_to_format(&format_string)),
+        ));
     }
 
     // Parse the parameters.
@@ -449,41 +435,55 @@ pub(crate) fn printf_string_formatting(checker: &mut Checker, expr: &Expr, right
 
     // Reconstruct the string.
     let mut contents = String::new();
-    let mut prev = None;
-    for ((range, _), format_string) in strings.iter().zip(format_strings) {
+    let mut prev_end = None;
+    for (range, format_string) in format_strings {
         // Add the content before the string segment.
-        match prev {
+        match prev_end {
             None => {
                 contents.push_str(
                     checker
                         .locator()
-                        .slice(TextRange::new(expr.start(), range.start())),
+                        .slice(TextRange::new(bin_op.start(), range.start())),
                 );
             }
-            Some(prev) => {
-                contents.push_str(checker.locator().slice(TextRange::new(prev, range.start())));
+            Some(prev_end) => {
+                contents.push_str(
+                    checker
+                        .locator()
+                        .slice(TextRange::new(prev_end, range.start())),
+                );
             }
         }
         // Add the string itself.
         contents.push_str(&format_string);
-        prev = Some(range.end());
+        prev_end = Some(range.end());
     }
 
-    if let Some(range) = extension {
-        contents.push_str(
-            checker
-                .locator()
-                .slice(TextRange::new(prev.unwrap(), range.end())),
-        );
+    if let Some(prev_end) = prev_end {
+        for token in checker.parsed().tokens().after(prev_end) {
+            match token.kind() {
+                // If we hit a right paren, we have to preserve it.
+                TokenKind::Rpar => {
+                    contents.push_str(
+                        checker
+                            .locator()
+                            .slice(TextRange::new(prev_end, token.end())),
+                    );
+                }
+                // Break as soon as we find the modulo symbol.
+                TokenKind::Percent => break,
+                _ => {}
+            }
+        }
     }
 
     // Add the `.format` call.
     contents.push_str(&format!(".format{params_string}"));
 
-    let mut diagnostic = Diagnostic::new(PrintfStringFormatting, expr.range());
+    let mut diagnostic = Diagnostic::new(PrintfStringFormatting, bin_op.range());
     diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
         contents,
-        expr.range(),
+        bin_op.range(),
     )));
     checker.diagnostics.push(diagnostic);
 }

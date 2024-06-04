@@ -40,7 +40,6 @@ __all__ = [
     "QUOTE_NONE",
     "Error",
     "Dialect",
-    "__doc__",
     "excel",
     "excel_tab",
     "field_size_limit",
@@ -51,13 +50,14 @@ __all__ = [
     "list_dialects",
     "Sniffer",
     "unregister_dialect",
-    "__version__",
     "DictReader",
     "DictWriter",
     "unix_dialect",
 ]
 if sys.version_info >= (3, 12):
     __all__ += ["QUOTE_STRINGS", "QUOTE_NOTNULL"]
+if sys.version_info < (3, 13):
+    __all__ += ["__doc__", "__version__"]
 
 _T = TypeVar("_T")
 
@@ -111,7 +111,7 @@ class DictReader(Iterator[dict[_T | Any, str | Any]], Generic[_T]):
     def __iter__(self) -> Self: ...
     def __next__(self) -> dict[_T | Any, str | Any]: ...
     if sys.version_info >= (3, 12):
-        def __class_getitem__(cls, item: Any) -> GenericAlias: ...
+        def __class_getitem__(cls, item: Any, /) -> GenericAlias: ...
 
 class DictWriter(Generic[_T]):
     fieldnames: Collection[_T]
@@ -139,7 +139,7 @@ class DictWriter(Generic[_T]):
     def writerow(self, rowdict: Mapping[_T, Any]) -> Any: ...
     def writerows(self, rowdicts: Iterable[Mapping[_T, Any]]) -> None: ...
     if sys.version_info >= (3, 12):
-        def __class_getitem__(cls, item: Any) -> GenericAlias: ...
+        def __class_getitem__(cls, item: Any, /) -> GenericAlias: ...
 
 class Sniffer:
     preferred: list[str]

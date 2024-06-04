@@ -2,6 +2,8 @@
 source: crates/ruff_python_parser/src/lexer.rs
 expression: lex_source(source)
 ---
+## Tokens
+```
 [
     (
         DoubleSlash,
@@ -28,3 +30,4 @@ expression: lex_source(source)
         10..10,
     ),
 ]
+```

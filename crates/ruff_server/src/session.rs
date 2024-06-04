@@ -1,13 +1,7 @@
 //! Data model, state management, and configuration resolution.
 
-mod capabilities;
-mod index;
-mod settings;
-
-use std::path::PathBuf;
 use std::sync::Arc;
 
-use anyhow::anyhow;
 use lsp_types::{ClientCapabilities, NotebookDocumentCellChange, Url};
 
 use crate::edit::{DocumentKey, DocumentVersion, NotebookDocument};
@@ -16,6 +10,10 @@ use crate::{PositionEncoding, TextDocument};
 pub(crate) use self::capabilities::ResolvedClientCapabilities;
 pub(crate) use self::index::DocumentQuery;
 pub(crate) use self::settings::{AllSettings, ClientSettings};
+
+mod capabilities;
+mod index;
+mod settings;
 
 /// The global state for the LSP
 pub(crate) struct Session {
@@ -43,27 +41,25 @@ impl Session {
         client_capabilities: &ClientCapabilities,
         position_encoding: PositionEncoding,
         global_settings: ClientSettings,
-        workspace_folders: Vec<(PathBuf, ClientSettings)>,
-    ) -> Self {
-        Self {
+        workspace_folders: Vec<(Url, ClientSettings)>,
+    ) -> crate::Result<Self> {
+        Ok(Self {
             position_encoding,
-            index: index::Index::new(workspace_folders, &global_settings),
+            index: index::Index::new(workspace_folders, &global_settings)?,
             global_settings,
             resolved_client_capabilities: Arc::new(ResolvedClientCapabilities::new(
                 client_capabilities,
             )),
-        }
+        })
     }
 
-    pub(crate) fn key_from_url(&self, url: &lsp_types::Url) -> crate::Result<DocumentKey> {
-        self.index
-            .key_from_url(url)
-            .ok_or_else(|| anyhow!("No document found for {url}"))
+    pub(crate) fn key_from_url(&self, url: Url) -> DocumentKey {
+        self.index.key_from_url(url)
     }
 
     /// Creates a document snapshot with the URL referencing the document to snapshot.
-    pub(crate) fn take_snapshot(&self, url: &Url) -> Option<DocumentSnapshot> {
-        let key = self.key_from_url(url).ok()?;
+    pub(crate) fn take_snapshot(&self, url: Url) -> Option<DocumentSnapshot> {
+        let key = self.key_from_url(url);
         Some(DocumentSnapshot {
             resolved_client_capabilities: self.resolved_client_capabilities.clone(),
             client_settings: self.index.client_settings(&key, &self.global_settings),
@@ -73,12 +69,12 @@ impl Session {
     }
 
     /// Iterates over the LSP URLs for all open text documents. These URLs are valid file paths.
-    pub(super) fn text_document_urls(&self) -> impl Iterator<Item = lsp_types::Url> + '_ {
+    pub(super) fn text_document_urls(&self) -> impl Iterator<Item = &lsp_types::Url> + '_ {
         self.index.text_document_urls()
     }
 
     /// Iterates over the LSP URLs for all open notebook documents. These URLs are valid file paths.
-    pub(super) fn notebook_document_urls(&self) -> impl Iterator<Item = lsp_types::Url> + '_ {
+    pub(super) fn notebook_document_urls(&self) -> impl Iterator<Item = &lsp_types::Url> + '_ {
         self.index.notebook_document_urls()
     }
 
@@ -114,16 +110,16 @@ impl Session {
             .update_notebook_document(key, cells, metadata, version, encoding)
     }
 
-    /// Registers a notebook document at the provided `path`.
+    /// Registers a notebook document at the provided `url`.
     /// If a document is already open here, it will be overwritten.
-    pub(crate) fn open_notebook_document(&mut self, path: PathBuf, document: NotebookDocument) {
-        self.index.open_notebook_document(path, document);
+    pub(crate) fn open_notebook_document(&mut self, url: Url, document: NotebookDocument) {
+        self.index.open_notebook_document(url, document);
     }
 
-    /// Registers a text document at the provided `path`.
+    /// Registers a text document at the provided `url`.
     /// If a document is already open here, it will be overwritten.
-    pub(crate) fn open_text_document(&mut self, path: PathBuf, document: TextDocument) {
-        self.index.open_text_document(path, document);
+    pub(crate) fn open_text_document(&mut self, url: Url, document: TextDocument) {
+        self.index.open_text_document(url, document);
     }
 
     /// De-registers a document, specified by its key.
@@ -134,19 +130,18 @@ impl Session {
     }
 
     /// Reloads the settings index
-    pub(crate) fn reload_settings(&mut self, changed_path: &PathBuf) {
-        self.index.reload_settings(changed_path);
+    pub(crate) fn reload_settings(&mut self, changed_url: &Url) {
+        self.index.reload_settings(changed_url);
     }
 
-    /// Open a workspace folder at the given `path`.
-    pub(crate) fn open_workspace_folder(&mut self, path: PathBuf) {
-        self.index
-            .open_workspace_folder(path, &self.global_settings);
+    /// Open a workspace folder at the given `url`.
+    pub(crate) fn open_workspace_folder(&mut self, url: &Url) -> crate::Result<()> {
+        self.index.open_workspace_folder(url, &self.global_settings)
     }
 
-    /// Close a workspace folder at the given `path`.
-    pub(crate) fn close_workspace_folder(&mut self, path: &PathBuf) -> crate::Result<()> {
-        self.index.close_workspace_folder(path)?;
+    /// Close a workspace folder at the given `url`.
+    pub(crate) fn close_workspace_folder(&mut self, url: &Url) -> crate::Result<()> {
+        self.index.close_workspace_folder(url)?;
         Ok(())
     }
 

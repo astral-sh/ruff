@@ -32,8 +32,10 @@ use itertools::Itertools;
 use log::debug;
 use ruff_python_ast::{
     self as ast, AnyParameterRef, Comprehension, ElifElseClause, ExceptHandler, Expr, ExprContext,
-    FStringElement, Keyword, MatchCase, Parameter, Parameters, Pattern, Stmt, Suite, UnaryOp,
+    FStringElement, Keyword, MatchCase, ModModule, Parameter, Parameters, Pattern, Stmt, Suite,
+    UnaryOp,
 };
+use ruff_python_parser::Parsed;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use ruff_diagnostics::{Diagnostic, IsolationLevel};
@@ -174,6 +176,8 @@ impl ExpectedDocstringKind {
 }
 
 pub(crate) struct Checker<'a> {
+    /// The parsed [`Parsed`].
+    parsed: &'a Parsed<ModModule>,
     /// The [`Path`] to the file under analysis.
     path: &'a Path,
     /// The [`Path`] to the package containing the current file.
@@ -223,6 +227,7 @@ pub(crate) struct Checker<'a> {
 impl<'a> Checker<'a> {
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn new(
+        parsed: &'a Parsed<ModModule>,
         settings: &'a LinterSettings,
         noqa_line_for: &'a NoqaMapping,
         noqa: flags::Noqa,
@@ -232,12 +237,12 @@ impl<'a> Checker<'a> {
         locator: &'a Locator,
         stylist: &'a Stylist,
         indexer: &'a Indexer,
-        importer: Importer<'a>,
         source_type: PySourceType,
         cell_offsets: Option<&'a CellOffsets>,
         notebook_index: Option<&'a NotebookIndex>,
     ) -> Checker<'a> {
         Checker {
+            parsed,
             settings,
             noqa_line_for,
             noqa,
@@ -248,7 +253,7 @@ impl<'a> Checker<'a> {
             locator,
             stylist,
             indexer,
-            importer,
+            importer: Importer::new(parsed, locator, stylist),
             semantic: SemanticModel::new(&settings.typing_modules, path, module),
             visit: deferred::Visit::default(),
             analyze: deferred::Analyze::default(),
@@ -316,6 +321,11 @@ impl<'a> Checker<'a> {
         } else {
             SourceRow::SourceFile { line }
         }
+    }
+
+    /// The [`Parsed`] output for the current file, which contains the tokens, AST, and more.
+    pub(crate) const fn parsed(&self) -> &'a Parsed<ModModule> {
+        self.parsed
     }
 
     /// The [`Locator`] for the current file, which enables extraction of source code from byte
@@ -588,8 +598,10 @@ impl<'a> Visitor<'a> for Checker<'a> {
             Stmt::Global(ast::StmtGlobal { names, range: _ }) => {
                 if !self.semantic.scope_id.is_global() {
                     for name in names {
-                        if let Some(binding_id) = self.semantic.global_scope().get(name) {
-                            // Mark the binding in the global scope as "rebound" in the current scope.
+                        let binding_id = self.semantic.global_scope().get(name);
+
+                        // Mark the binding in the global scope as "rebound" in the current scope.
+                        if let Some(binding_id) = binding_id {
                             self.semantic
                                 .add_rebinding_scope(binding_id, self.semantic.scope_id);
                         }
@@ -597,7 +609,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                         // Add a binding to the current scope.
                         let binding_id = self.semantic.push_binding(
                             name.range(),
-                            BindingKind::Global,
+                            BindingKind::Global(binding_id),
                             BindingFlags::GLOBAL,
                         );
                         let scope = self.semantic.current_scope_mut();
@@ -609,7 +621,8 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 if !self.semantic.scope_id.is_global() {
                     for name in names {
                         if let Some((scope_id, binding_id)) = self.semantic.nonlocal(name) {
-                            // Mark the binding as "used".
+                            // Mark the binding as "used", since the `nonlocal` requires an existing
+                            // binding.
                             self.semantic.add_local_reference(
                                 binding_id,
                                 ExprContext::Load,
@@ -624,7 +637,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                             // Add a binding to the current scope.
                             let binding_id = self.semantic.push_binding(
                                 name.range(),
-                                BindingKind::Nonlocal(scope_id),
+                                BindingKind::Nonlocal(binding_id, scope_id),
                                 BindingFlags::NONLOCAL,
                             );
                             let scope = self.semantic.current_scope_mut();
@@ -998,12 +1011,10 @@ impl<'a> Visitor<'a> for Checker<'a> {
             && self.semantic.future_annotations_or_stub()
             && (self.semantic.in_annotation() || self.source_type.is_stub())
         {
-            if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = expr {
-                self.visit.string_type_definitions.push((
-                    expr.range(),
-                    value.to_str(),
-                    self.semantic.snapshot(),
-                ));
+            if let Expr::StringLiteral(string_literal) = expr {
+                self.visit
+                    .string_type_definitions
+                    .push((string_literal, self.semantic.snapshot()));
             } else {
                 self.visit
                     .future_type_definitions
@@ -1413,13 +1424,11 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     }
                 }
             }
-            Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
+            Expr::StringLiteral(string_literal) => {
                 if self.semantic.in_type_definition() && !self.semantic.in_typing_literal() {
-                    self.visit.string_type_definitions.push((
-                        expr.range(),
-                        value.to_str(),
-                        self.semantic.snapshot(),
-                    ));
+                    self.visit
+                        .string_type_definitions
+                        .push((string_literal, self.semantic.snapshot()));
                 }
             }
             Expr::FString(_) => {
@@ -2143,22 +2152,25 @@ impl<'a> Checker<'a> {
         let snapshot = self.semantic.snapshot();
         while !self.visit.string_type_definitions.is_empty() {
             let type_definitions = std::mem::take(&mut self.visit.string_type_definitions);
-            for (range, value, snapshot) in type_definitions {
-                if let Ok((expr, kind)) =
-                    parse_type_annotation(value, range, self.locator.contents())
+            for (string_expr, snapshot) in type_definitions {
+                if let Ok((parsed_annotation, kind)) =
+                    parse_type_annotation(string_expr, self.locator.contents())
                 {
-                    let expr = allocator.alloc(expr);
+                    let parsed_annotation = allocator.alloc(parsed_annotation);
+
+                    let annotation = string_expr.value.to_str();
+                    let range = string_expr.range();
 
                     self.semantic.restore(snapshot);
 
                     if self.semantic.in_annotation() && self.semantic.in_typing_only_annotation() {
                         if self.enabled(Rule::QuotedAnnotation) {
-                            pyupgrade::rules::quoted_annotation(self, value, range);
+                            pyupgrade::rules::quoted_annotation(self, annotation, range);
                         }
                     }
                     if self.source_type.is_stub() {
                         if self.enabled(Rule::QuotedAnnotationInStub) {
-                            flake8_pyi::rules::quoted_annotation_in_stub(self, value, range);
+                            flake8_pyi::rules::quoted_annotation_in_stub(self, annotation, range);
                         }
                     }
 
@@ -2171,14 +2183,14 @@ impl<'a> Checker<'a> {
 
                     self.semantic.flags |=
                         SemanticModelFlags::TYPE_DEFINITION | type_definition_flag;
-                    self.visit_expr(expr);
+                    self.visit_expr(parsed_annotation);
                 } else {
                     if self.enabled(Rule::ForwardAnnotationSyntaxError) {
                         self.diagnostics.push(Diagnostic::new(
                             pyflakes::rules::ForwardAnnotationSyntaxError {
-                                body: value.to_string(),
+                                body: string_expr.value.to_string(),
                             },
-                            range,
+                            string_expr.range(),
                         ));
                     }
                 }
@@ -2298,7 +2310,9 @@ impl<'a> Checker<'a> {
                         }
                     } else {
                         if self.enabled(Rule::UndefinedExport) {
-                            if !self.path.ends_with("__init__.py") {
+                            if self.settings.preview.is_enabled()
+                                || !self.path.ends_with("__init__.py")
+                            {
                                 self.diagnostics.push(
                                     Diagnostic::new(
                                         pyflakes::rules::UndefinedExport {
@@ -2321,7 +2335,7 @@ impl<'a> Checker<'a> {
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn check_ast(
-    python_ast: &Suite,
+    parsed: &Parsed<ModModule>,
     locator: &Locator,
     stylist: &Stylist,
     indexer: &Indexer,
@@ -2351,10 +2365,11 @@ pub(crate) fn check_ast(
         } else {
             ModuleSource::File(path)
         },
-        python_ast,
+        python_ast: parsed.suite(),
     };
 
     let mut checker = Checker::new(
+        parsed,
         settings,
         noqa_line_for,
         noqa,
@@ -2364,7 +2379,6 @@ pub(crate) fn check_ast(
         locator,
         stylist,
         indexer,
-        Importer::new(python_ast, locator, stylist),
         source_type,
         cell_offsets,
         notebook_index,
@@ -2372,8 +2386,8 @@ pub(crate) fn check_ast(
     checker.bind_builtins();
 
     // Iterate over the AST.
-    checker.visit_module(python_ast);
-    checker.visit_body(python_ast);
+    checker.visit_module(parsed.suite());
+    checker.visit_body(parsed.suite());
 
     // Visit any deferred syntax nodes. Take care to visit in order, such that we avoid adding
     // new deferred nodes after visiting nodes of that kind. For example, visiting a deferred

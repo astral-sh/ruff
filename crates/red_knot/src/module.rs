@@ -12,11 +12,15 @@ use crate::files::FileId;
 use crate::symbols::Dependency;
 use crate::FxDashMap;
 
-/// ID uniquely identifying a module.
+/// Representation of a Python module.
+///
+/// The inner type wrapped by this struct is a unique identifier for the module
+/// that is used by the struct's methods to lazily query information about the module.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub struct Module(u32);
 
 impl Module {
+    /// Return the absolute name of the module (e.g. `foo.bar`)
     pub fn name(&self, db: &dyn SemanticDb) -> QueryResult<ModuleName> {
         let jar: &SemanticJar = db.jar()?;
         let modules = &jar.module_resolver;
@@ -24,6 +28,7 @@ impl Module {
         Ok(modules.modules.get(self).unwrap().name.clone())
     }
 
+    /// Return the path to the source code that defines this module
     pub fn path(&self, db: &dyn SemanticDb) -> QueryResult<ModulePath> {
         let jar: &SemanticJar = db.jar()?;
         let modules = &jar.module_resolver;
@@ -31,6 +36,7 @@ impl Module {
         Ok(modules.modules.get(self).unwrap().path.clone())
     }
 
+    /// Determine whether this module is a single-file module or a package
     pub fn kind(&self, db: &dyn SemanticDb) -> QueryResult<ModuleKind> {
         let jar: &SemanticJar = db.jar()?;
         let modules = &jar.module_resolver;
@@ -38,6 +44,16 @@ impl Module {
         Ok(modules.modules.get(self).unwrap().kind)
     }
 
+    /// Attempt to resolve a dependency of this module to an absolute [`ModuleName`].
+    ///
+    /// A dependency could be either absolute (e.g. the `foo` dependency implied by `from foo import bar`)
+    /// or relative to this module (e.g. the `.foo` dependency implied by `from .foo import bar`)
+    ///
+    /// - Returns an error if the query failed.
+    /// - Returns `Ok(None)` if the query succeeded,
+    ///   but the dependency refers to a module that does not exist.
+    /// - Returns `Ok(Some(ModuleName))` if the query succeeded,
+    ///   and the dependency refers to a module that exists.
     pub fn resolve_dependency(
         &self,
         db: &dyn SemanticDb,
@@ -87,7 +103,8 @@ impl Module {
 
 /// A module name, e.g. `foo.bar`.
 ///
-/// Always normalized to the absolute form (never a relative module name).
+/// Always normalized to the absolute form
+/// (never a relative module name, i.e., never `.foo`).
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct ModuleName(smol_str::SmolStr);
 
@@ -124,10 +141,13 @@ impl ModuleName {
         Some(Self(name))
     }
 
+    /// An iterator over the components of the module name:
+    /// `foo.bar.baz` -> `foo`, `bar`, `baz`
     pub fn components(&self) -> impl DoubleEndedIterator<Item = &str> {
         self.0.split('.')
     }
 
+    /// The name of this module's immediate parent, if it has a parent
     pub fn parent(&self) -> Option<ModuleName> {
         let (_, parent) = self.0.rsplit_once('.')?;
 
@@ -159,9 +179,10 @@ impl std::fmt::Display for ModuleName {
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub enum ModuleKind {
+    /// A single-file module (e.g. `foo.py` or `foo.pyi`)
     Module,
 
-    /// A python package (a `__init__.py` or `__init__.pyi` file)
+    /// A python package (`foo/__init__.py` or `foo/__init__.pyi`)
     Package,
 }
 
@@ -181,10 +202,12 @@ impl ModuleSearchPath {
         }
     }
 
+    /// Determine whether this is a first-party, third-party or standard-library search path
     pub fn kind(&self) -> ModuleSearchPathKind {
         self.inner.kind
     }
 
+    /// Return the location of the search path on the file system
     pub fn path(&self) -> &Path {
         &self.inner.path
     }
@@ -231,9 +254,11 @@ pub struct ModuleData {
 // Queries
 //////////////////////////////////////////////////////
 
-/// Resolves a module name to a module id
-/// TODO: This would not work with Salsa because `ModuleName` isn't an ingredient and, therefore, cannot be used as part of a query.
-///  For this to work with salsa, it would be necessary to intern all `ModuleName`s.
+/// Resolves a module name to a module.
+///
+/// TODO: This would not work with Salsa because `ModuleName` isn't an ingredient
+/// and, therefore, cannot be used as part of a query.
+/// For this to work with salsa, it would be necessary to intern all `ModuleName`s.
 #[tracing::instrument(level = "debug", skip(db))]
 pub fn resolve_module(db: &dyn SemanticDb, name: ModuleName) -> QueryResult<Option<Module>> {
     let jar: &SemanticJar = db.jar()?;
@@ -255,7 +280,7 @@ pub fn resolve_module(db: &dyn SemanticDb, name: ModuleName) -> QueryResult<Opti
             let file_id = db.file_id(&normalized);
             let path = ModulePath::new(root_path.clone(), file_id);
 
-            let id = Module(
+            let module = Module(
                 modules
                     .next_module_id
                     .fetch_add(1, std::sync::atomic::Ordering::Relaxed),
@@ -263,7 +288,7 @@ pub fn resolve_module(db: &dyn SemanticDb, name: ModuleName) -> QueryResult<Opti
 
             modules
                 .modules
-                .insert(id, Arc::from(ModuleData { name, path, kind }));
+                .insert(module, Arc::from(ModuleData { name, path, kind }));
 
             // A path can map to multiple modules because of symlinks:
             // ```
@@ -272,33 +297,33 @@ pub fn resolve_module(db: &dyn SemanticDb, name: ModuleName) -> QueryResult<Opti
             // ```
             // Here, both `foo` and `bar` resolve to the same module but through different paths.
             // That's why we need to insert the absolute path and not the normalized path here.
-            let absolute_id = if absolute_path == normalized {
+            let absolute_file_id = if absolute_path == normalized {
                 file_id
             } else {
                 db.file_id(&absolute_path)
             };
 
-            modules.by_file.insert(absolute_id, id);
+            modules.by_file.insert(absolute_file_id, module);
 
-            entry.insert_entry(id);
+            entry.insert_entry(module);
 
-            Ok(Some(id))
+            Ok(Some(module))
         }
     }
 }
 
-/// Resolves the module id for the given path.
+/// Resolves the module for the given path.
 ///
-/// Returns `None` if the path is not a module in `sys.path`.
+/// Returns `None` if the path is not a module locatable via `sys.path`.
 #[tracing::instrument(level = "debug", skip(db))]
 pub fn path_to_module(db: &dyn SemanticDb, path: &Path) -> QueryResult<Option<Module>> {
     let file = db.file_id(path);
     file_to_module(db, file)
 }
 
-/// Resolves the module id for the file with the given id.
+/// Resolves the module for the file with the given id.
 ///
-/// Returns `None` if the file is not a module in `sys.path`.
+/// Returns `None` if the file is not a module locatable via `sys.path`.
 #[tracing::instrument(level = "debug", skip(db))]
 pub fn file_to_module(db: &dyn SemanticDb, file: FileId) -> QueryResult<Option<Module>> {
     let jar: &SemanticJar = db.jar()?;
@@ -325,12 +350,12 @@ pub fn file_to_module(db: &dyn SemanticDb, file: FileId) -> QueryResult<Option<M
 
     // Resolve the module name to see if Python would resolve the name to the same path.
     // If it doesn't, then that means that multiple modules have the same in different
-    // root paths, but that the module corresponding to the past path is in a lower priority path,
+    // root paths, but that the module corresponding to the past path is in a lower priority search path,
     // in which case we ignore it.
-    let Some(module_id) = resolve_module(db, module_name)? else {
+    let Some(module) = resolve_module(db, module_name)? else {
         return Ok(None);
     };
-    let module_path = module_id.path(db)?;
+    let module_path = module.path(db)?;
 
     if module_path.root() == &root_path {
         let Ok(normalized) = path.canonicalize() else {
@@ -350,7 +375,7 @@ pub fn file_to_module(db: &dyn SemanticDb, file: FileId) -> QueryResult<Option<M
         }
 
         // Path has been inserted by `resolved`
-        Ok(Some(module_id))
+        Ok(Some(module))
     } else {
         // This path is for a module with the same name but in a module search path with a lower priority.
         // Ignore it.
@@ -369,19 +394,22 @@ pub fn set_module_search_paths(db: &mut dyn SemanticDb, search_paths: Vec<Module
     jar.module_resolver = ModuleResolver::new(search_paths);
 }
 
-/// Adds a module to the resolver.
+/// Adds a module located at `path` to the resolver.
 ///
 /// Returns `None` if the path doesn't resolve to a module.
 ///
-/// Returns `Some` with the id of the module and the ids of the modules that need re-resolving
-/// because they were part of a namespace package and might now resolve differently.
+/// Returns `Some(module, other_modules)`, where `module` is the resolved module
+/// with file location `path`, and `other_modules` is a `Vec` of `ModuleData` instances.
+/// Each element in `other_modules` provides information regarding a single module that needs
+/// re-resolving because it was part of a namespace package and might now resolve differently.
+///
 /// Note: This won't work with salsa because `Path` is not an ingredient.
 pub fn add_module(db: &mut dyn SemanticDb, path: &Path) -> Option<(Module, Vec<Arc<ModuleData>>)> {
     // No locking is required because we're holding a mutable reference to `modules`.
 
     // TODO This needs tests
 
-    // Note: Intentionally by-pass caching here. Module should not be in the cache yet.
+    // Note: Intentionally bypass caching here. Module should not be in the cache yet.
     let module = path_to_module(db, path).ok()??;
 
     // The code below is to handle the addition of `__init__.py` files.
@@ -405,15 +433,15 @@ pub fn add_module(db: &mut dyn SemanticDb, path: &Path) -> Option<(Module, Vec<A
     let jar: &mut SemanticJar = db.jar_mut();
     let modules = &mut jar.module_resolver;
 
-    modules.by_file.retain(|_, id| {
+    modules.by_file.retain(|_, module| {
         if modules
             .modules
-            .get(id)
+            .get(module)
             .unwrap()
             .name
             .starts_with(&parent_name)
         {
-            to_remove.push(*id);
+            to_remove.push(*module);
             false
         } else {
             true
@@ -422,8 +450,8 @@ pub fn add_module(db: &mut dyn SemanticDb, path: &Path) -> Option<(Module, Vec<A
 
     // TODO remove need for this vec
     let mut removed = Vec::with_capacity(to_remove.len());
-    for id in &to_remove {
-        removed.push(modules.remove_module_by_id(*id));
+    for module in &to_remove {
+        removed.push(modules.remove_module(*module));
     }
 
     Some((module, removed))
@@ -436,10 +464,10 @@ pub struct ModuleResolver {
 
     // Locking: Locking is done by acquiring a (write) lock on `by_name`. This is because `by_name` is the primary
     // lookup method. Acquiring locks in any other ordering can result in deadlocks.
-    /// Resolves a module name to it's module id.
+    /// Looks up a module by name
     by_name: FxDashMap<ModuleName, Module>,
 
-    /// All known modules, indexed by the module id.
+    /// A map of all known modules to data about those modules
     modules: FxDashMap<Module, Arc<ModuleData>>,
 
     /// Lookup from absolute path to module.
@@ -459,24 +487,27 @@ impl ModuleResolver {
         }
     }
 
-    pub(crate) fn remove_module(&mut self, file_id: FileId) {
+    /// Remove a module from the inner cache
+    pub(crate) fn remove_module_by_file(&mut self, file_id: FileId) {
         // No locking is required because we're holding a mutable reference to `self`.
-        let Some((_, id)) = self.by_file.remove(&file_id) else {
+        let Some((_, module)) = self.by_file.remove(&file_id) else {
             return;
         };
 
-        self.remove_module_by_id(id);
+        self.remove_module(module);
     }
 
-    fn remove_module_by_id(&mut self, id: Module) -> Arc<ModuleData> {
-        let (_, module) = self.modules.remove(&id).unwrap();
+    fn remove_module(&mut self, module: Module) -> Arc<ModuleData> {
+        let (_, module_data) = self.modules.remove(&module).unwrap();
 
-        self.by_name.remove(&module.name).unwrap();
+        self.by_name.remove(&module_data.name).unwrap();
 
-        // It's possible that multiple paths map to the same id. Search all other paths referencing the same module id.
-        self.by_file.retain(|_, current_id| *current_id != id);
+        // It's possible that multiple paths map to the same module.
+        // Search all other paths referencing the same module.
+        self.by_file
+            .retain(|_, current_module| *current_module != module);
 
-        module
+        module_data
     }
 }
 
@@ -505,15 +536,19 @@ impl ModulePath {
         Self { root, file_id }
     }
 
+    /// The search path that was used to locate the module
     pub fn root(&self) -> &ModuleSearchPath {
         &self.root
     }
 
+    /// The file containing the source code for the module
     pub fn file(&self) -> FileId {
         self.file_id
     }
 }
 
+/// Given a module name and a list of search paths in which to lookup modules,
+/// attempt to resolve the module name
 fn resolve_name(
     name: &ModuleName,
     search_paths: &[ModuleSearchPath],
@@ -635,7 +670,9 @@ enum PackageKind {
     /// A root package or module. E.g. `foo` in `foo.bar.baz` or just `foo`.
     Root,
 
-    /// A regular sub-package where the parent contains an `__init__.py`. For example `bar` in `foo.bar` when the `foo` directory contains an `__init__.py`.
+    /// A regular sub-package where the parent contains an `__init__.py`.
+    ///
+    /// For example, `bar` in `foo.bar` when the `foo` directory contains an `__init__.py`.
     Regular,
 
     /// A sub-package in a namespace package. A namespace package is a package without an `__init__.py`.

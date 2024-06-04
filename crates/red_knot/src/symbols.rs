@@ -236,6 +236,7 @@ pub struct SymbolTable {
     scopes_by_node: FxHashMap<NodeKey, ScopeId>,
     /// dependencies of this module
     dependencies: Vec<Dependency>,
+    flow_graph: FlowGraph,
 }
 
 impl SymbolTable {
@@ -243,7 +244,10 @@ impl SymbolTable {
         let root_scope_id = SymbolTable::root_scope_id();
         let mut builder = SymbolTableBuilder {
             table: SymbolTable::new(),
-            scopes: vec![root_scope_id],
+            scopes: vec![ScopeState {
+                scope_id: root_scope_id,
+                current_flow_node_id: FlowGraph::start(),
+            }],
             current_definition: None,
         };
         builder.visit_body(&module.body);
@@ -257,6 +261,7 @@ impl SymbolTable {
             defs: FxHashMap::default(),
             scopes_by_node: FxHashMap::default(),
             dependencies: Vec::new(),
+            flow_graph: FlowGraph::new(),
         };
         table.scopes_by_id.push(Scope {
             name: Name::new("<module>"),
@@ -272,6 +277,23 @@ impl SymbolTable {
 
     pub(crate) fn dependencies(&self) -> &[Dependency] {
         &self.dependencies
+    }
+
+    /// Return an iterator over all definitions of `symbol_id` reachable from `use_expr`. The value
+    /// of `symbol_id` in `use_expr` must originate from one of the iterated definitions (or from
+    /// an external reassignment of the name outside of this scope).
+    pub(crate) fn reachable_definitions(
+        &self,
+        symbol_id: SymbolId,
+        use_expr: &ast::Expr,
+    ) -> ReachableDefinitionsIterator {
+        let node_key = NodeKey::from_node(use_expr.into());
+        let flow_node_id = self.flow_graph.ast_to_flow[&node_key];
+        ReachableDefinitionsIterator {
+            table: self,
+            flow_node_id,
+            symbol_id,
+        }
     }
 
     pub(crate) const fn root_scope_id() -> ScopeId {
@@ -523,14 +545,95 @@ where
     }
 }
 
+#[derive(Debug)]
+pub(crate) struct ReachableDefinitionsIterator<'a> {
+    table: &'a SymbolTable,
+    flow_node_id: FlowNodeId,
+    symbol_id: SymbolId,
+}
+
+impl<'a> Iterator for ReachableDefinitionsIterator<'a> {
+    type Item = Definition;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            match &self.table.flow_graph.flow_nodes_by_id[self.flow_node_id] {
+                FlowNode::Start => return None,
+                FlowNode::Definition(def_node) => {
+                    if def_node.symbol_id == self.symbol_id {
+                        // we found a definition; previous definitions along this path are not
+                        // reachable
+                        self.flow_node_id = FlowGraph::start();
+                        return Some(def_node.definition.clone());
+                    }
+                    self.flow_node_id = def_node.predecessor;
+                }
+            }
+        }
+    }
+}
+
+impl<'a> FusedIterator for ReachableDefinitionsIterator<'a> {}
+
+#[newtype_index]
+struct FlowNodeId;
+
+#[derive(Debug)]
+enum FlowNode {
+    Start,
+    Definition(DefinitionFlowNode),
+}
+
+#[derive(Debug)]
+struct DefinitionFlowNode {
+    symbol_id: SymbolId,
+    definition: Definition,
+    predecessor: FlowNodeId,
+}
+
+#[derive(Debug, Default)]
+struct FlowGraph {
+    flow_nodes_by_id: IndexVec<FlowNodeId, FlowNode>,
+    ast_to_flow: FxHashMap<NodeKey, FlowNodeId>,
+}
+
+impl FlowGraph {
+    fn new() -> Self {
+        let mut graph = FlowGraph::default();
+        graph.flow_nodes_by_id.push(FlowNode::Start);
+        graph
+    }
+
+    fn start() -> FlowNodeId {
+        FlowNodeId::from_usize(0)
+    }
+}
+
+struct ScopeState {
+    scope_id: ScopeId,
+    current_flow_node_id: FlowNodeId,
+}
+
 struct SymbolTableBuilder {
     table: SymbolTable,
-    scopes: Vec<ScopeId>,
+    scopes: Vec<ScopeState>,
     /// the definition whose target(s) we are currently walking
     current_definition: Option<Definition>,
 }
 
 impl SymbolTableBuilder {
+    fn set_current_flow_node(&mut self, new_flow_node_id: FlowNodeId) {
+        let scope_state = self.scopes.last_mut().expect("scope stack is never empty");
+        scope_state.current_flow_node_id = new_flow_node_id;
+    }
+
+    fn current_flow_node(&self) -> FlowNodeId {
+        self.scopes
+            .last()
+            .expect("scope stack is never empty")
+            .current_flow_node_id
+    }
+
     fn add_or_update_symbol(&mut self, identifier: &str, flags: SymbolFlags) -> SymbolId {
         self.table
             .add_or_update_symbol(self.cur_scope(), identifier, flags)
@@ -546,7 +649,17 @@ impl SymbolTableBuilder {
             .defs
             .entry(symbol_id)
             .or_default()
-            .push(definition);
+            .push(definition.clone());
+        let new_flow_node_id = self
+            .table
+            .flow_graph
+            .flow_nodes_by_id
+            .push(FlowNode::Definition(DefinitionFlowNode {
+                definition,
+                symbol_id,
+                predecessor: self.current_flow_node(),
+            }));
+        self.set_current_flow_node(new_flow_node_id);
         symbol_id
     }
 
@@ -560,7 +673,10 @@ impl SymbolTableBuilder {
         let scope_id =
             self.table
                 .add_child_scope(self.cur_scope(), name, kind, definition, defining_symbol);
-        self.scopes.push(scope_id);
+        self.scopes.push(ScopeState {
+            scope_id,
+            current_flow_node_id: FlowGraph::start(),
+        });
         scope_id
     }
 
@@ -568,13 +684,14 @@ impl SymbolTableBuilder {
         self.scopes
             .pop()
             .expect("Scope stack should never be empty")
+            .scope_id
     }
 
     fn cur_scope(&self) -> ScopeId {
-        *self
-            .scopes
+        self.scopes
             .last()
             .expect("Scope stack should never be empty")
+            .scope_id
     }
 
     fn record_scope_for_node(&mut self, node_key: NodeKey, scope_id: ScopeId) {
@@ -624,6 +741,10 @@ impl PreorderVisitor<'_> for SymbolTableBuilder {
                 }
             }
         }
+        self.table
+            .flow_graph
+            .ast_to_flow
+            .insert(NodeKey::from_node(expr.into()), self.current_flow_node());
         ast::visitor::preorder::walk_expr(self, expr);
     }
 
@@ -634,19 +755,25 @@ impl PreorderVisitor<'_> for SymbolTableBuilder {
                 let node_key = TypedNodeKey::from_node(node);
                 let def = Definition::ClassDef(node_key.clone());
                 let symbol_id = self.add_or_update_symbol_with_def(&node.name, def.clone());
+                for decorator in &node.decorator_list {
+                    self.visit_decorator(decorator);
+                }
                 let scope_id = self.with_type_params(
                     &node.name,
                     &node.type_params,
                     Some(def.clone()),
                     Some(symbol_id),
                     |builder| {
+                        if let Some(arguments) = &node.arguments {
+                            builder.visit_arguments(arguments);
+                        }
                         let scope_id = builder.push_scope(
                             &node.name,
                             ScopeKind::Class,
                             Some(def.clone()),
                             Some(symbol_id),
                         );
-                        ast::visitor::preorder::walk_stmt(builder, stmt);
+                        builder.visit_body(&node.body);
                         builder.pop_scope();
                         scope_id
                     },
@@ -657,19 +784,26 @@ impl PreorderVisitor<'_> for SymbolTableBuilder {
                 let node_key = TypedNodeKey::from_node(node);
                 let def = Definition::FunctionDef(node_key.clone());
                 let symbol_id = self.add_or_update_symbol_with_def(&node.name, def.clone());
+                for decorator in &node.decorator_list {
+                    self.visit_decorator(decorator);
+                }
                 let scope_id = self.with_type_params(
                     &node.name,
                     &node.type_params,
                     Some(def.clone()),
                     Some(symbol_id),
                     |builder| {
+                        builder.visit_parameters(&node.parameters);
+                        for expr in &node.returns {
+                            builder.visit_annotation(expr);
+                        }
                         let scope_id = builder.push_scope(
                             &node.name,
                             ScopeKind::Function,
                             Some(def.clone()),
                             Some(symbol_id),
                         );
-                        ast::visitor::preorder::walk_stmt(builder, stmt);
+                        builder.visit_body(&node.body);
                         builder.pop_scope();
                         scope_id
                     },
@@ -766,15 +900,13 @@ impl DerefMut for SymbolTablesStorage {
 
 #[cfg(test)]
 mod tests {
-    use textwrap::dedent;
-
-    use crate::parse::Parsed;
-    use crate::symbols::ScopeKind;
-
-    use super::{SymbolFlags, SymbolId, SymbolIterator, SymbolTable};
+    use crate::symbols::{ScopeKind, SymbolFlags, SymbolTable};
 
     mod from_ast {
-        use super::*;
+        use crate::parse::Parsed;
+        use crate::symbols::{Definition, ScopeKind, SymbolId, SymbolIterator, SymbolTable};
+        use ruff_python_ast as ast;
+        use textwrap::dedent;
 
         fn parse(code: &str) -> Parsed {
             Parsed::from_text(&dedent(code))
@@ -1020,6 +1152,35 @@ mod tests {
             assert_eq!(func_scope.kind(), ScopeKind::Class);
             assert_eq!(func_scope.name(), "C");
             assert_eq!(names(table.symbols_for_scope(func_scope_id)), vec!["x"]);
+        }
+
+        #[test]
+        fn reachability_trivial() {
+            let parsed = parse("x = 1; x");
+            let ast = parsed.ast();
+            let table = SymbolTable::from_ast(ast);
+            let x_sym = table
+                .root_symbol_id_by_name("x")
+                .expect("x symbol should exist");
+            let ast::Stmt::Expr(ast::StmtExpr { value: x_use, .. }) = &ast.body[1] else {
+                panic!("should be an expr")
+            };
+            let x_defs: Vec<_> = table.reachable_definitions(x_sym, x_use).collect();
+            assert_eq!(x_defs.len(), 1);
+            let Definition::Assignment(node_key) = &x_defs[0] else {
+                panic!("def should be an assignment")
+            };
+            let Some(def_node) = node_key.resolve(ast.into()) else {
+                panic!("node key should resolve")
+            };
+            let ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
+                value: ast::Number::Int(num),
+                ..
+            }) = &*def_node.value
+            else {
+                panic!("should be a number literal")
+            };
+            assert_eq!(*num, 1);
         }
     }
 

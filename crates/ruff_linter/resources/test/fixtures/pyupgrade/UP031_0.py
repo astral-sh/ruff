@@ -29,6 +29,11 @@ print("%#o" % (123,))
 
 print("brace {} %s" % (1,))
 
+print((
+    "foo %s "
+    "bar %s" % (x, y)
+))
+
 print(
   "%s" % (
     "trailing comma",
@@ -52,10 +57,6 @@ print("%(ab)s" % {"a" "b": 1})
 
 print("%(a)s" % {"a"  :  1})
 
-print((
-    "foo %s "
-    "bar %s" % (x, y)
-))
 
 print(
     "foo %(foo)s "

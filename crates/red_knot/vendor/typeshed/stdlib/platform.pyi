@@ -40,3 +40,28 @@ def platform(aliased: bool = ..., terse: bool = ...) -> str: ...
 
 if sys.version_info >= (3, 10):
     def freedesktop_os_release() -> dict[str, str]: ...
+
+if sys.version_info >= (3, 13):
+    class AndroidVer(NamedTuple):
+        release: str
+        api_level: int
+        manufacturer: str
+        model: str
+        device: str
+        is_emulator: bool
+
+    class IOSVersionInfo(NamedTuple):
+        system: str
+        release: str
+        model: str
+        is_simulator: bool
+
+    def android_ver(
+        release: str = "",
+        api_level: int = 0,
+        manufacturer: str = "",
+        model: str = "",
+        device: str = "",
+        is_emulator: bool = False,
+    ) -> AndroidVer: ...
+    def ios_ver(system: str = "", release: str = "", model: str = "", is_simulator: bool = False) -> IOSVersionInfo: ...

@@ -1,3 +1,7 @@
+use std::borrow::Cow;
+
+use rustc_hash::FxHashMap;
+
 use ruff_linter::{
     linter::{FixerResult, LinterResult},
     packaging::detect_package_root,
@@ -5,8 +9,7 @@ use ruff_linter::{
 };
 use ruff_notebook::SourceValue;
 use ruff_source_file::LineIndex;
-use rustc_hash::FxHashMap;
-use std::borrow::Cow;
+use ruff_workspace::resolver::match_any_exclusion;
 
 use crate::{
     edit::{Replacement, ToRangeExt},
@@ -23,15 +26,37 @@ pub(crate) fn fix_all(
     linter_settings: &LinterSettings,
     encoding: PositionEncoding,
 ) -> crate::Result<Fixes> {
-    let document_path = query.file_path();
     let source_kind = query.make_source_kind();
 
-    let package = detect_package_root(
-        document_path
-            .parent()
-            .expect("a path to a document should have a parent path"),
-        &linter_settings.namespace_packages,
-    );
+    let file_resolver_settings = query.settings().file_resolver();
+    let document_path = query.file_path();
+
+    // If the document is excluded, return an empty list of fixes.
+    let package = if let Some(document_path) = document_path.as_ref() {
+        if let Some(exclusion) = match_any_exclusion(
+            document_path,
+            &file_resolver_settings.exclude,
+            &file_resolver_settings.extend_exclude,
+            Some(&linter_settings.exclude),
+            None,
+        ) {
+            tracing::debug!(
+                "Ignored path via `{}`: {}",
+                exclusion,
+                document_path.display()
+            );
+            return Ok(Fixes::default());
+        }
+
+        detect_package_root(
+            document_path
+                .parent()
+                .expect("a path to a document should have a parent path"),
+            &linter_settings.namespace_packages,
+        )
+    } else {
+        None
+    };
 
     let source_type = query.source_type();
 
@@ -46,7 +71,7 @@ pub(crate) fn fix_all(
         result: LinterResult { error, .. },
         ..
     } = ruff_linter::linter::lint_fix(
-        document_path,
+        query.virtual_file_path(),
         package,
         flags::Noqa::Enabled,
         UnsafeFixes::Disabled,

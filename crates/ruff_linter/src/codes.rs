@@ -383,6 +383,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Bugbear, "033") => (RuleGroup::Stable, rules::flake8_bugbear::rules::DuplicateValue),
         (Flake8Bugbear, "034") => (RuleGroup::Stable, rules::flake8_bugbear::rules::ReSubPositionalArgs),
         (Flake8Bugbear, "035") => (RuleGroup::Stable, rules::flake8_bugbear::rules::StaticKeyDictComprehension),
+        (Flake8Bugbear, "901") => (RuleGroup::Preview, rules::flake8_bugbear::rules::ReturnInGenerator),
         (Flake8Bugbear, "904") => (RuleGroup::Stable, rules::flake8_bugbear::rules::RaiseWithoutFromInsideExcept),
         (Flake8Bugbear, "905") => (RuleGroup::Stable, rules::flake8_bugbear::rules::ZipWithoutExplicitStrict),
         (Flake8Bugbear, "909") => (RuleGroup::Preview, rules::flake8_bugbear::rules::LoopIteratorMutation),
@@ -809,8 +810,11 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Pyi, "055") => (RuleGroup::Stable, rules::flake8_pyi::rules::UnnecessaryTypeUnion),
         (Flake8Pyi, "056") => (RuleGroup::Stable, rules::flake8_pyi::rules::UnsupportedMethodCallOnAll),
         (Flake8Pyi, "058") => (RuleGroup::Stable, rules::flake8_pyi::rules::GeneratorReturnFromIterMethod),
+        (Flake8Pyi, "057") => (RuleGroup::Preview, rules::flake8_pyi::rules::ByteStringUsage),
         (Flake8Pyi, "059") => (RuleGroup::Preview, rules::flake8_pyi::rules::GenericNotLastBaseClass),
         (Flake8Pyi, "062") => (RuleGroup::Preview, rules::flake8_pyi::rules::DuplicateLiteralMember),
+        (Flake8Pyi, "064") => (RuleGroup::Preview, rules::flake8_pyi::rules::RedundantFinalLiteral),
+        (Flake8Pyi, "066") => (RuleGroup::Preview, rules::flake8_pyi::rules::BadVersionInfoOrder),
 
         // flake8-pytest-style
         (Flake8PytestStyle, "001") => (RuleGroup::Stable, rules::flake8_pytest_style::rules::PytestFixtureIncorrectParenthesesStyle),

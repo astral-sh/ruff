@@ -326,6 +326,8 @@ class structseq(Generic[_T_co]):
     # but only has any meaning if you supply it a dict where the keys are strings.
     # https://github.com/python/typeshed/pull/6560#discussion_r767149830
     def __new__(cls: type[Self], sequence: Iterable[_T_co], dict: dict[str, Any] = ...) -> Self: ...
+    if sys.version_info >= (3, 13):
+        def __replace__(self: Self, **kwargs: Any) -> Self: ...
 
 # Superset of typing.AnyStr that also includes LiteralString
 AnyOrLiteralStr = TypeVar("AnyOrLiteralStr", str, bytes, LiteralString)  # noqa: Y001

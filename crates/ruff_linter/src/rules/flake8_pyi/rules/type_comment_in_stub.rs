@@ -1,6 +1,6 @@
 use once_cell::sync::Lazy;
 use regex::Regex;
-use ruff_python_index::Indexer;
+use ruff_python_trivia::CommentRanges;
 use ruff_source_file::Locator;
 
 use ruff_diagnostics::{Diagnostic, Violation};
@@ -38,9 +38,9 @@ impl Violation for TypeCommentInStub {
 pub(crate) fn type_comment_in_stub(
     diagnostics: &mut Vec<Diagnostic>,
     locator: &Locator,
-    indexer: &Indexer,
+    comment_ranges: &CommentRanges,
 ) {
-    for range in indexer.comment_ranges() {
+    for range in comment_ranges {
         let comment = locator.slice(*range);
 
         if TYPE_COMMENT_REGEX.is_match(comment) && !TYPE_IGNORE_REGEX.is_match(comment) {

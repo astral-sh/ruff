@@ -1,14 +1,15 @@
+use lsp_types::{self as types, request as req};
+use types::TextEdit;
+
+use ruff_source_file::LineIndex;
+use ruff_workspace::resolver::match_any_exclusion;
+
 use crate::edit::{Replacement, ToRangeExt};
 use crate::fix::Fixes;
 use crate::server::api::LSPResult;
 use crate::server::{client::Notifier, Result};
-use crate::session::DocumentSnapshot;
+use crate::session::{DocumentQuery, DocumentSnapshot};
 use crate::{PositionEncoding, TextDocument};
-use lsp_types::{self as types, request as req};
-use ruff_python_ast::PySourceType;
-use ruff_source_file::LineIndex;
-use ruff_workspace::FormatterSettings;
-use types::TextEdit;
 
 pub(crate) struct Format;
 
@@ -30,31 +31,27 @@ impl super::BackgroundDocumentRequestHandler for Format {
 /// Formats either a full text document or each individual cell in a single notebook document.
 pub(super) fn format_full_document(snapshot: &DocumentSnapshot) -> Result<Fixes> {
     let mut fixes = Fixes::default();
+    let query = snapshot.query();
 
-    if let Some(notebook) = snapshot.query().as_notebook() {
-        for (url, text_document) in notebook
-            .urls()
-            .map(|url| (url.clone(), notebook.cell_document_by_uri(url).unwrap()))
-        {
-            if let Some(changes) = format_text_document(
-                text_document,
-                snapshot.query().source_type(),
-                snapshot.query().settings().formatter(),
-                snapshot.encoding(),
-                true,
-            )? {
-                fixes.insert(url, changes);
+    match snapshot.query() {
+        DocumentQuery::Notebook { notebook, .. } => {
+            for (url, text_document) in notebook
+                .urls()
+                .map(|url| (url.clone(), notebook.cell_document_by_uri(url).unwrap()))
+            {
+                if let Some(changes) =
+                    format_text_document(text_document, query, snapshot.encoding(), true)?
+                {
+                    fixes.insert(url, changes);
+                }
             }
         }
-    } else {
-        if let Some(changes) = format_text_document(
-            snapshot.query().as_single_document().unwrap(),
-            snapshot.query().source_type(),
-            snapshot.query().settings().formatter(),
-            snapshot.encoding(),
-            false,
-        )? {
-            fixes.insert(snapshot.query().make_key().into_url(), changes);
+        DocumentQuery::Text { document, .. } => {
+            if let Some(changes) =
+                format_text_document(document, query, snapshot.encoding(), false)?
+            {
+                fixes.insert(snapshot.query().make_key().into_url(), changes);
+            }
         }
     }
 
@@ -68,25 +65,42 @@ pub(super) fn format_document(snapshot: &DocumentSnapshot) -> Result<super::Form
         .query()
         .as_single_document()
         .expect("format should only be called on text documents or notebook cells");
+    let query = snapshot.query();
     format_text_document(
         text_document,
-        snapshot.query().source_type(),
-        snapshot.query().settings().formatter(),
+        query,
         snapshot.encoding(),
-        snapshot.query().as_notebook().is_some(),
+        query.as_notebook().is_some(),
     )
 }
 
 fn format_text_document(
     text_document: &TextDocument,
-    source_type: PySourceType,
-    formatter_settings: &FormatterSettings,
+    query: &DocumentQuery,
     encoding: PositionEncoding,
     is_notebook: bool,
 ) -> Result<super::FormatResponse> {
+    let file_resolver_settings = query.settings().file_resolver();
+    let formatter_settings = query.settings().formatter();
+
+    // If the document is excluded, return early.
+    if let Some(file_path) = query.file_path() {
+        if let Some(exclusion) = match_any_exclusion(
+            &file_path,
+            &file_resolver_settings.exclude,
+            &file_resolver_settings.extend_exclude,
+            None,
+            Some(&formatter_settings.exclude),
+        ) {
+            tracing::debug!("Ignored path via `{}`: {}", exclusion, file_path.display());
+            return Ok(None);
+        }
+    }
+
     let source = text_document.contents();
-    let mut formatted = crate::format::format(text_document, source_type, formatter_settings)
-        .with_failure_code(lsp_server::ErrorCode::InternalError)?;
+    let mut formatted =
+        crate::format::format(text_document, query.source_type(), formatter_settings)
+            .with_failure_code(lsp_server::ErrorCode::InternalError)?;
     // fast path - if the code is the same, return early
     if formatted == source {
         return Ok(None);

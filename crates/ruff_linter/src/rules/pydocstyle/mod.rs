@@ -46,6 +46,7 @@ mod tests {
     #[test_case(Rule::BlankLineBeforeClass, Path::new("D.py"))]
     #[test_case(Rule::NoBlankLineBeforeFunction, Path::new("D.py"))]
     #[test_case(Rule::BlankLinesBetweenHeaderAndContent, Path::new("sections.py"))]
+    #[test_case(Rule::BlankLinesBetweenHeaderAndContent, Path::new("sphinx.py"))]
     #[test_case(Rule::OverIndentation, Path::new("D.py"))]
     #[test_case(Rule::OverIndentation, Path::new("D208.py"))]
     #[test_case(Rule::NoSignature, Path::new("D.py"))]

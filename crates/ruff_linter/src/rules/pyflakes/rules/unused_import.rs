@@ -2,7 +2,7 @@ use std::borrow::Cow;
 use std::iter;
 
 use anyhow::{anyhow, bail, Result};
-use rustc_hash::FxHashMap;
+use std::collections::BTreeMap;
 
 use ruff_diagnostics::{Applicability, Diagnostic, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -54,7 +54,7 @@ enum UnusedImportContext {
 /// # __init__.py
 /// import some_module
 ///
-/// __all__ = [ "some_module"]
+/// __all__ = ["some_module"]
 /// ```
 ///
 /// ## Fix safety
@@ -220,8 +220,8 @@ fn find_dunder_all_exprs<'a>(semantic: &'a SemanticModel) -> Vec<&'a ast::Expr> 
 ///
 pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut Vec<Diagnostic>) {
     // Collect all unused imports by statement.
-    let mut unused: FxHashMap<(NodeId, Exceptions), Vec<ImportBinding>> = FxHashMap::default();
-    let mut ignored: FxHashMap<(NodeId, Exceptions), Vec<ImportBinding>> = FxHashMap::default();
+    let mut unused: BTreeMap<(NodeId, Exceptions), Vec<ImportBinding>> = BTreeMap::default();
+    let mut ignored: BTreeMap<(NodeId, Exceptions), Vec<ImportBinding>> = BTreeMap::default();
 
     for binding_id in scope.binding_ids() {
         let binding = checker.semantic().binding(binding_id);
@@ -330,7 +330,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
                     fix_by_reexporting(
                         checker,
                         import_statement,
-                        &to_reexport.iter().map(|(b, _)| b).collect::<Vec<_>>(),
+                        to_reexport.iter().map(|(b, _)| b).collect::<Vec<_>>(),
                         &dunder_all_exprs,
                     )
                     .ok(),
@@ -450,13 +450,15 @@ fn fix_by_removing_imports<'a>(
 fn fix_by_reexporting(
     checker: &Checker,
     node_id: NodeId,
-    imports: &[&ImportBinding],
+    mut imports: Vec<&ImportBinding>,
     dunder_all_exprs: &[&ast::Expr],
 ) -> Result<Fix> {
     let statement = checker.semantic().statement(node_id);
     if imports.is_empty() {
         bail!("Expected import bindings");
     }
+
+    imports.sort_by_key(|b| b.name);
 
     let edits = match dunder_all_exprs {
         [] => fix::edits::make_redundant_alias(

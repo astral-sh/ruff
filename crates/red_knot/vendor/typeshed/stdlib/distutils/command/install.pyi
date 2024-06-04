@@ -1,4 +1,5 @@
-from typing import Any
+from collections.abc import Callable
+from typing import Any, ClassVar
 
 from ..cmd import Command
 
@@ -60,4 +61,5 @@ class install(Command):
     def has_headers(self): ...
     def has_scripts(self): ...
     def has_data(self): ...
-    sub_commands: Any
+    # Any to work around variance issues
+    sub_commands: ClassVar[list[tuple[str, Callable[[Any], bool] | None]]]

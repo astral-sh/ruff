@@ -4,7 +4,6 @@ use crate::server::api::LSPResult;
 use crate::server::client::{Notifier, Requester};
 use crate::server::Result;
 use crate::session::Session;
-use anyhow::anyhow;
 use lsp_server::ErrorCode;
 use lsp_types as types;
 use lsp_types::notification as notif;
@@ -40,16 +39,11 @@ impl super::SyncNotificationHandler for DidOpenNotebook {
         )
         .with_failure_code(ErrorCode::InternalError)?;
 
-        let notebook_path = uri
-            .to_file_path()
-            .map_err(|()| anyhow!("expected notebook URI {uri} to be a valid file path"))
-            .with_failure_code(ErrorCode::InvalidParams)?;
-
-        session.open_notebook_document(notebook_path, notebook);
+        session.open_notebook_document(uri.clone(), notebook);
 
         // publish diagnostics
         let snapshot = session
-            .take_snapshot(&uri)
+            .take_snapshot(uri)
             .expect("snapshot should be available");
         publish_diagnostics_for_document(&snapshot, &notifier)?;
 

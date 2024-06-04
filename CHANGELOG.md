@@ -1,5 +1,70 @@
 # Changelog
 
+## 0.4.7
+
+### Preview features
+
+- \[`flake8-pyi`\] Implement `PYI064` ([#11325](https://github.com/astral-sh/ruff/pull/11325))
+- \[`flake8-pyi`\] Implement `PYI066` ([#11541](https://github.com/astral-sh/ruff/pull/11541))
+- \[`flake8-pyi`\] Implement `PYI057` ([#11486](https://github.com/astral-sh/ruff/pull/11486))
+- \[`pyflakes`\] Enable `F822` in `__init__.py` files by default ([#11370](https://github.com/astral-sh/ruff/pull/11370))
+
+### Formatter
+
+- Fix incorrect placement of trailing stub function comments ([#11632](https://github.com/astral-sh/ruff/pull/11632))
+
+### Server
+
+- Respect file exclusions in `ruff server` ([#11590](https://github.com/astral-sh/ruff/pull/11590))
+- Add support for documents not exist on disk ([#11588](https://github.com/astral-sh/ruff/pull/11588))
+- Add Vim and Kate setup guide for `ruff server` ([#11615](https://github.com/astral-sh/ruff/pull/11615))
+
+### Bug fixes
+
+- Avoid removing newlines between docstring headers and rST blocks ([#11609](https://github.com/astral-sh/ruff/pull/11609))
+- Infer indentation with imports when logical indent is absent ([#11608](https://github.com/astral-sh/ruff/pull/11608))
+- Use char index rather than position for indent slice ([#11645](https://github.com/astral-sh/ruff/pull/11645))
+- \[`flake8-comprehension`\] Strip parentheses around generators in `C400` ([#11607](https://github.com/astral-sh/ruff/pull/11607))
+- Mark `repeated-isinstance-calls` as unsafe on Python 3.10 and later ([#11622](https://github.com/astral-sh/ruff/pull/11622))
+
+## 0.4.6
+
+### Breaking changes
+
+- Use project-relative paths when calculating GitLab fingerprints ([#11532](https://github.com/astral-sh/ruff/pull/11532))
+- Bump minimum supported Windows version to Windows 10 ([#11613](https://github.com/astral-sh/ruff/pull/11613))
+
+### Preview features
+
+- \[`flake8-async`\] Sleep with >24 hour interval should usually sleep forever (`ASYNC116`) ([#11498](https://github.com/astral-sh/ruff/pull/11498))
+
+### Rule changes
+
+- \[`numpy`\] Add missing functions to NumPy 2.0 migration rule ([#11528](https://github.com/astral-sh/ruff/pull/11528))
+- \[`mccabe`\] Consider irrefutable pattern similar to `if .. else` for `C901` ([#11565](https://github.com/astral-sh/ruff/pull/11565))
+- Consider `match`-`case` statements for `C901`, `PLR0912`, and `PLR0915` ([#11521](https://github.com/astral-sh/ruff/pull/11521))
+- Remove empty strings when converting to f-string (`UP032`) ([#11524](https://github.com/astral-sh/ruff/pull/11524))
+- \[`flake8-bandit`\] `request-without-timeout` should warn for `requests.request` ([#11548](https://github.com/astral-sh/ruff/pull/11548))
+- \[`flake8-self`\] Ignore sunder accesses in `flake8-self` rules ([#11546](https://github.com/astral-sh/ruff/pull/11546))
+- \[`pyupgrade`\] Lint for `TypeAliasType` usages (`UP040`) ([#11530](https://github.com/astral-sh/ruff/pull/11530))
+
+### Server
+
+- Respect excludes in `ruff server` configuration discovery ([#11551](https://github.com/astral-sh/ruff/pull/11551))
+- Use default settings if initialization options is empty or not provided ([#11566](https://github.com/astral-sh/ruff/pull/11566))
+- `ruff server` correctly treats `.pyi` files as stub files ([#11535](https://github.com/astral-sh/ruff/pull/11535))
+- `ruff server` searches for configuration in parent directories ([#11537](https://github.com/astral-sh/ruff/pull/11537))
+- `ruff server`: An empty code action filter no longer returns notebook source actions ([#11526](https://github.com/astral-sh/ruff/pull/11526))
+
+### Bug fixes
+
+- \[`flake8-logging-format`\] Fix autofix title in `logging-warn` (`G010`) ([#11514](https://github.com/astral-sh/ruff/pull/11514))
+- \[`refurb`\] Avoid recommending `operator.itemgetter` with dependence on lambda arguments ([#11574](https://github.com/astral-sh/ruff/pull/11574))
+- \[`flake8-simplify`\] Avoid recommending context manager in `__enter__` implementations ([#11575](https://github.com/astral-sh/ruff/pull/11575))
+- Create intermediary directories for `--output-file` ([#11550](https://github.com/astral-sh/ruff/pull/11550))
+- Propagate reads on global variables ([#11584](https://github.com/astral-sh/ruff/pull/11584))
+- Treat all `singledispatch` arguments as runtime-required ([#11523](https://github.com/astral-sh/ruff/pull/11523))
+
 ## 0.4.5
 
 ### Ruff's language server is now in Beta
@@ -133,6 +198,10 @@ To read more about this exciting milestone, check out our [blog post](https://as
 
 - Avoid allocations for isort module names ([#11251](https://github.com/astral-sh/ruff/pull/11251))
 - Build a separate ARM wheel for macOS ([#11149](https://github.com/astral-sh/ruff/pull/11149))
+
+### Windows
+
+- Increase the minimum requirement to Windows 10.
 
 ## 0.4.2
 

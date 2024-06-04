@@ -210,6 +210,8 @@ impl<'a> StringLiteralDisplay<'a> {
                     self.range(),
                     *sequence_kind,
                     locator,
+                    checker.parsed().tokens(),
+                    elements,
                 )?;
                 assert_eq!(analyzed_sequence.len(), self.elts.len());
                 analyzed_sequence.into_sorted_source_code(SORTING_STYLE, locator, checker.stylist())

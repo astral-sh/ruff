@@ -152,7 +152,7 @@ Ruff can also be used as a [pre-commit](https://pre-commit.com/) hook via [`ruff
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.4.5
+  rev: v0.4.7
   hooks:
     # Run the linter.
     - id: ruff
@@ -408,6 +408,7 @@ Ruff is used by a number of major open-source projects and companies, including:
 - [Dagster](https://github.com/dagster-io/dagster)
 - Databricks ([MLflow](https://github.com/mlflow/mlflow))
 - [FastAPI](https://github.com/tiangolo/fastapi)
+- [Godot](https://github.com/godotengine/godot)
 - [Gradio](https://github.com/gradio-app/gradio)
 - [Great Expectations](https://github.com/great-expectations/great_expectations)
 - [HTTPX](https://github.com/encode/httpx)

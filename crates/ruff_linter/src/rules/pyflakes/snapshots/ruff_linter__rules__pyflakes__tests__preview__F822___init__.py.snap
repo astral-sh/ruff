@@ -1,0 +1,26 @@
+---
+source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+---
+__init__.py:5:12: F822 Undefined name `a` in `__all__`
+  |
+3 | print(__path__)
+4 | 
+5 | __all__ = ["a", "b", "c"]
+  |            ^^^ F822
+  |
+
+__init__.py:5:17: F822 Undefined name `b` in `__all__`
+  |
+3 | print(__path__)
+4 | 
+5 | __all__ = ["a", "b", "c"]
+  |                 ^^^ F822
+  |
+
+__init__.py:5:22: F822 Undefined name `c` in `__all__`
+  |
+3 | print(__path__)
+4 | 
+5 | __all__ = ["a", "b", "c"]
+  |                      ^^^ F822
+  |

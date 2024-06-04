@@ -2,14 +2,17 @@
 use crate::ast_ids::NodeKey;
 use crate::db::{QueryResult, SemanticDb, SemanticJar};
 use crate::files::FileId;
-use crate::symbols::{symbol_table, GlobalSymbolId, ScopeId, ScopeKind, SymbolId};
+use crate::module::{Module, ModuleName};
+use crate::symbols::{
+    resolve_global_symbol, symbol_table, GlobalSymbolId, ScopeId, ScopeKind, SymbolId,
+};
 use crate::{FxDashMap, FxIndexSet, Name};
 use ruff_index::{newtype_index, IndexVec};
 use rustc_hash::FxHashMap;
 
 pub(crate) mod infer;
 
-pub(crate) use infer::{infer_definition_type, infer_symbol_type};
+pub(crate) use infer::{infer_definition_type, infer_symbol_public_type};
 
 /// unique ID for a type
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
@@ -25,12 +28,15 @@ pub enum Type {
     Unbound,
     /// a specific function object
     Function(FunctionTypeId),
+    /// a specific module object
+    Module(ModuleTypeId),
     /// a specific class object
     Class(ClassTypeId),
     /// the set of Python objects with the given class in their __class__'s method resolution order
     Instance(ClassTypeId),
     Union(UnionTypeId),
     Intersection(IntersectionTypeId),
+    IntLiteral(i64),
     // TODO protocols, callable types, overloads, generics, type vars
 }
 
@@ -45,6 +51,39 @@ impl Type {
 
     pub const fn is_unknown(&self) -> bool {
         matches!(self, Type::Unknown)
+    }
+
+    pub fn get_member(&self, db: &dyn SemanticDb, name: &Name) -> QueryResult<Option<Type>> {
+        match self {
+            Type::Any => todo!("attribute lookup on Any type"),
+            Type::Never => todo!("attribute lookup on Never type"),
+            Type::Unknown => todo!("attribute lookup on Unknown type"),
+            Type::Unbound => todo!("attribute lookup on Unbound type"),
+            Type::Function(_) => todo!("attribute lookup on Function type"),
+            Type::Module(module_id) => module_id.get_member(db, name),
+            Type::Class(class_id) => class_id.get_class_member(db, name),
+            Type::Instance(_) => {
+                // TODO MRO? get_own_instance_member, get_instance_member
+                todo!("attribute lookup on Instance type")
+            }
+            Type::Union(union_id) => {
+                let jar: &SemanticJar = db.jar()?;
+                let _todo_union_ref = jar.type_store.get_union(*union_id);
+                // TODO perform the get_member on each type in the union
+                // TODO return the union of those results
+                // TODO if any of those results is `None` then include Unknown in the result union
+                todo!("attribute lookup on Union type")
+            }
+            Type::Intersection(_) => {
+                // TODO perform the get_member on each type in the intersection
+                // TODO return the intersection of those results
+                todo!("attribute lookup on Intersection type")
+            }
+            Type::IntLiteral(_) => {
+                // TODO raise error
+                Ok(Some(Type::Unknown))
+            }
+        }
     }
 }
 
@@ -80,7 +119,7 @@ impl TypeStore {
         self.modules.remove(&file_id);
     }
 
-    pub fn cache_symbol_type(&self, symbol: GlobalSymbolId, ty: Type) {
+    pub fn cache_symbol_public_type(&self, symbol: GlobalSymbolId, ty: Type) {
         self.add_or_get_module(symbol.file_id)
             .symbol_types
             .insert(symbol.symbol_id, ty);
@@ -92,7 +131,7 @@ impl TypeStore {
             .insert(node_key, ty);
     }
 
-    pub fn get_cached_symbol_type(&self, symbol: GlobalSymbolId) -> Option<Type> {
+    pub fn get_cached_symbol_public_type(&self, symbol: GlobalSymbolId) -> Option<Type> {
         self.try_get_module(symbol.file_id)?
             .symbol_types
             .get(&symbol.symbol_id)
@@ -143,12 +182,12 @@ impl TypeStore {
             .add_class(name, scope_id, bases)
     }
 
-    fn add_union(&mut self, file_id: FileId, elems: &[Type]) -> UnionTypeId {
+    fn add_union(&self, file_id: FileId, elems: &[Type]) -> UnionTypeId {
         self.add_or_get_module(file_id).add_union(elems)
     }
 
     fn add_intersection(
-        &mut self,
+        &self,
         file_id: FileId,
         positive: &[Type],
         negative: &[Type],
@@ -337,6 +376,31 @@ impl FunctionTypeId {
 }
 
 #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
+pub struct ModuleTypeId {
+    module: Module,
+    file_id: FileId,
+}
+
+impl ModuleTypeId {
+    fn module(self, db: &dyn SemanticDb) -> QueryResult<ModuleStoreRef> {
+        let jar: &SemanticJar = db.jar()?;
+        Ok(jar.type_store.add_or_get_module(self.file_id).downgrade())
+    }
+
+    pub(crate) fn name(self, db: &dyn SemanticDb) -> QueryResult<ModuleName> {
+        self.module.name(db)
+    }
+
+    fn get_member(self, db: &dyn SemanticDb, name: &Name) -> QueryResult<Option<Type>> {
+        if let Some(symbol_id) = resolve_global_symbol(db, self.name(db)?, name)? {
+            Ok(Some(infer_symbol_public_type(db, symbol_id)?))
+        } else {
+            Ok(None)
+        }
+    }
+}
+
+#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
 pub struct ClassTypeId {
     file_id: FileId,
     class_id: ModuleClassTypeId,
@@ -377,7 +441,7 @@ impl ClassTypeId {
         let ClassType { scope_id, .. } = *self.class(db)?;
         let table = symbol_table(db, self.file_id)?;
         if let Some(symbol_id) = table.symbol_id_by_name(scope_id, name) {
-            Ok(Some(infer_symbol_type(
+            Ok(Some(infer_symbol_public_type(
                 db,
                 GlobalSymbolId {
                     file_id: self.file_id,
@@ -389,7 +453,13 @@ impl ClassTypeId {
         }
     }
 
-    // TODO: get_own_instance_member, get_class_member, get_instance_member
+    /// Get own class member or fall back to super-class member.
+    fn get_class_member(self, db: &dyn SemanticDb, name: &Name) -> QueryResult<Option<Type>> {
+        self.get_own_class_member(db, name)
+            .or_else(|_| self.get_super_class_member(db, name))
+    }
+
+    // TODO: get_own_instance_member, get_instance_member
 }
 
 #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
@@ -427,7 +497,7 @@ struct ModuleTypeStore {
     unions: IndexVec<ModuleUnionTypeId, UnionType>,
     /// arena of all intersection types created in this module
     intersections: IndexVec<ModuleIntersectionTypeId, IntersectionType>,
-    /// cached types of symbols in this module
+    /// cached public types of symbols in this module
     symbol_types: FxHashMap<SymbolId, Type>,
     /// cached types of AST nodes in this module
     node_types: FxHashMap<NodeKey, Type>,
@@ -529,6 +599,10 @@ impl std::fmt::Display for DisplayType<'_> {
             Type::Never => f.write_str("Never"),
             Type::Unknown => f.write_str("Unknown"),
             Type::Unbound => f.write_str("Unbound"),
+            Type::Module(module_id) => {
+                // NOTE: something like this?: "<module 'module-name' from 'path-from-fileid'>"
+                todo!("{module_id:?}")
+            }
             // TODO functions and classes should display using a fully qualified name
             Type::Class(class_id) => {
                 f.write_str("Literal[")?;
@@ -547,6 +621,7 @@ impl std::fmt::Display for DisplayType<'_> {
                 .get_module(int_id.file_id)
                 .get_intersection(int_id.intersection_id)
                 .display(f, self.store),
+            Type::IntLiteral(n) => write!(f, "Literal[{n}]"),
         }
     }
 }
@@ -702,7 +777,7 @@ mod tests {
 
     #[test]
     fn add_union() {
-        let mut store = TypeStore::default();
+        let store = TypeStore::default();
         let files = Files::default();
         let file_id = files.intern(Path::new("/foo"));
         let c1 = store.add_class(file_id, "C1", SymbolTable::root_scope_id(), Vec::new());
@@ -719,7 +794,7 @@ mod tests {
 
     #[test]
     fn add_intersection() {
-        let mut store = TypeStore::default();
+        let store = TypeStore::default();
         let files = Files::default();
         let file_id = files.intern(Path::new("/foo"));
         let c1 = store.add_class(file_id, "C1", SymbolTable::root_scope_id(), Vec::new());

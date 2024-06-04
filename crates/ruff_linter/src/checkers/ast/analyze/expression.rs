@@ -346,6 +346,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::PandasUseOfDotValues) {
                 pandas_vet::rules::attr(checker, attribute);
             }
+            if checker.enabled(Rule::ByteStringUsage) {
+                flake8_pyi::rules::bytestring_attribute(checker, expr);
+            }
         }
         Expr::Call(
             call @ ast::ExprCall {
@@ -1157,7 +1160,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                     }
                 }
                 if checker.enabled(Rule::PrintfStringFormatting) {
-                    pyupgrade::rules::printf_string_formatting(checker, expr, right);
+                    pyupgrade::rules::printf_string_formatting(checker, bin_op, format_string);
                 }
                 if checker.enabled(Rule::BadStringFormatCharacter) {
                     pylint::rules::bad_string_format_character::percent(
