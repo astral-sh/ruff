@@ -16,13 +16,17 @@ use crate::settings::types::PythonVersion;
 /// syntax for positional-only arguments, which should be preferred.
 ///
 /// ## Example
+///
 /// ```python
-/// def foo(__x: int) -> None: ...
+/// def foo(__x: int) -> None:
+///     ...
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
-/// def foo(x: int, /) -> None: ...
+/// def foo(x: int, /) -> None:
+///     ...
 /// ```
 ///
 /// [PEP 484]: https://peps.python.org/pep-0484/#positional-only-arguments
