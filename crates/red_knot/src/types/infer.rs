@@ -213,7 +213,6 @@ fn infer_expr_type(db: &dyn SemanticDb, file_id: FileId, expr: &ast::Expr) -> Qu
 
 #[cfg(test)]
 mod tests {
-    use textwrap::dedent;
 
     use crate::db::tests::TestDb;
     use crate::db::{HasJar, SemanticJar};
@@ -251,7 +250,7 @@ mod tests {
 
     fn write_to_path(case: &TestCase, relpath: &str, contents: &str) -> anyhow::Result<()> {
         let path = case.src.path().join(relpath);
-        std::fs::write(path, dedent(contents))?;
+        std::fs::write(path, contents)?;
         Ok(())
     }
 
