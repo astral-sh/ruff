@@ -17,7 +17,7 @@ use crate::settings::types::PythonVersion;
 ///
 /// ## Example
 /// ```python
-/// def foo(__x: int) -> None:
+/// def foo(__x: int) -> None: ...
 /// ```
 ///
 /// Use instead:
