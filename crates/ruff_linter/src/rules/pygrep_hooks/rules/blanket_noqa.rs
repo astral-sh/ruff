@@ -18,6 +18,9 @@ use crate::settings::types::PreviewMode;
 /// maintain, as the annotation does not clarify which diagnostics are intended
 /// to be suppressed.
 ///
+/// In [preview], this rule also checks for blanket file-level annotations (e.g.,
+/// `# ruff: noqa`, as opposed to `# ruff: noqa: F401`).
+///
 /// ## Example
 /// ```python
 /// from .base import *  # noqa
@@ -38,6 +41,8 @@ use crate::settings::types::PreviewMode;
 ///
 /// ## References
 /// - [Ruff documentation](https://docs.astral.sh/ruff/configuration/#error-suppression)
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[violation]
 pub struct BlanketNOQA {
     missing_colon: bool,
