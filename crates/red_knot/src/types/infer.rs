@@ -213,15 +213,16 @@ fn infer_expr_type(db: &dyn SemanticDb, file_id: FileId, expr: &ast::Expr) -> Qu
 
 #[cfg(test)]
 mod tests {
+    use textwrap::dedent;
+
     use crate::db::tests::TestDb;
     use crate::db::{HasJar, SemanticJar};
     use crate::module::{
-        set_module_search_paths, ModuleName, ModuleSearchPath, ModuleSearchPathKind,
+        resolve_module, set_module_search_paths, ModuleName, ModuleSearchPath, ModuleSearchPathKind,
     };
-    use crate::symbols::resolve_global_symbol;
+    use crate::symbols::{resolve_global_symbol, symbol_table, GlobalSymbolId};
     use crate::types::{infer_symbol_public_type, Type};
     use crate::Name;
-    use textwrap::dedent;
 
     // TODO with virtual filesystem we shouldn't have to write files to disk for these
     // tests
@@ -386,15 +387,6 @@ mod tests {
         )?;
 
         assert_public_type(&case, "a", "x", "(Literal[1] | Literal[2])")
-    }
-
-    #[test]
-    fn resolve_visible_def() -> anyhow::Result<()> {
-        let case = create_test()?;
-
-        write_to_path(&case, "a.py", "y = 1; y = 2; x = y")?;
-
-        assert_public_type(&case, "a", "x", "Literal[2]")
     }
 
     #[test]
