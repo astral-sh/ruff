@@ -53,6 +53,16 @@ pub enum SourceKind {
     IpyNotebook(Arc<Notebook>),
 }
 
+impl<'a> From<&'a SourceKind> for PySourceType {
+    fn from(value: &'a SourceKind) -> Self {
+        match value {
+            SourceKind::Python(_) => PySourceType::Python,
+            SourceKind::Stub(_) => PySourceType::Stub,
+            SourceKind::IpyNotebook(_) => PySourceType::Ipynb,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Source {
     kind: SourceKind,

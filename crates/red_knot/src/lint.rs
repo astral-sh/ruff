@@ -87,7 +87,7 @@ pub(crate) fn lint_semantic(db: &dyn LintDb, file_id: FileId) -> QueryResult<Dia
         let context = SemanticLintContext {
             file_id: *file_id,
             source,
-            parsed: &*parsed,
+            parsed: &parsed,
             symbols,
             db,
             diagnostics: RefCell::new(Vec::new()),
