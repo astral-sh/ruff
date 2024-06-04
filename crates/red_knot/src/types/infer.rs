@@ -79,6 +79,7 @@ pub fn infer_definition_type(
     let file_id = symbol.file_id;
 
     match definition {
+        Definition::None => Ok(Type::Unbound),
         Definition::Import(ImportDefinition {
             module: module_name,
         }) => {
@@ -223,7 +224,7 @@ mod tests {
     use crate::module::{
         resolve_module, set_module_search_paths, ModuleName, ModuleSearchPath, ModuleSearchPathKind,
     };
-    use crate::symbols::{resolve_global_symbol, symbol_table, GlobalSymbolId};
+    use crate::symbols::resolve_global_symbol;
     use crate::types::{infer_symbol_public_type, Type};
     use crate::Name;
 
@@ -399,30 +400,93 @@ mod tests {
     #[test]
     fn resolve_visible_def() -> anyhow::Result<()> {
         let case = create_test()?;
-        let db = &case.db;
 
-        let path = case.src.path().join("a.py");
-        std::fs::write(path, "y = 1; y = 2; x = y")?;
-        let file = resolve_module(db, ModuleName::new("a"))?
-            .expect("module should be found")
-            .path(db)?
-            .file();
-        let symbols = symbol_table(db, file)?;
-        let x_sym = symbols
-            .root_symbol_id_by_name("x")
-            .expect("x symbol should be found");
+        write_to_path(&case, "a.py", "y = 1; y = 2; x = y")?;
 
-        let ty = infer_symbol_public_type(
-            db,
-            GlobalSymbolId {
-                file_id: file,
-                symbol_id: x_sym,
-            },
+        assert_public_type(&case, "a", "x", "Literal[2]")
+    }
+
+    #[test]
+    fn join_paths() -> anyhow::Result<()> {
+        let case = create_test()?;
+
+        write_to_path(
+            &case,
+            "a.py",
+            "
+                y = 1
+                y = 2
+                if flag:
+                    y = 3
+                x = y
+            ",
         )?;
 
-        let jar = HasJar::<SemanticJar>::jar(db)?;
-        assert!(matches!(ty, Type::IntLiteral(_)));
-        assert_eq!(format!("{}", ty.display(&jar.type_store)), "Literal[2]");
-        Ok(())
+        assert_public_type(&case, "a", "x", "(Literal[2] | Literal[3])")
+    }
+
+    #[test]
+    fn maybe_unbound() -> anyhow::Result<()> {
+        let case = create_test()?;
+
+        write_to_path(
+            &case,
+            "a.py",
+            "
+                if flag:
+                    y = 1
+                x = y
+            ",
+        )?;
+
+        assert_public_type(&case, "a", "x", "(Unbound | Literal[1])")
+    }
+
+    #[test]
+    fn if_elif_else() -> anyhow::Result<()> {
+        let case = create_test()?;
+
+        write_to_path(
+            &case,
+            "a.py",
+            "
+                y = 1
+                y = 2
+                if flag:
+                    y = 3
+                elif flag2:
+                    y = 4
+                else:
+                    r = y
+                    y = 5
+                    s = y
+                x = y
+            ",
+        )?;
+
+        assert_public_type(&case, "a", "x", "(Literal[3] | Literal[4] | Literal[5])")?;
+        assert_public_type(&case, "a", "r", "Literal[2]")?;
+        assert_public_type(&case, "a", "s", "Literal[5]")
+    }
+
+    #[test]
+    fn if_elif() -> anyhow::Result<()> {
+        let case = create_test()?;
+
+        write_to_path(
+            &case,
+            "a.py",
+            "
+                y = 1
+                y = 2
+                if flag:
+                    y = 3
+                elif flag2:
+                    y = 4
+                x = y
+            ",
+        )?;
+
+        assert_public_type(&case, "a", "x", "(Literal[2] | Literal[3] | Literal[4])")
     }
 }
