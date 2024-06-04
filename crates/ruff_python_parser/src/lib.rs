@@ -357,6 +357,11 @@ impl Parsed<ModExpression> {
         &self.syntax.body
     }
 
+    /// Returns a mutable reference to the expression contained in this parsed output.
+    pub fn expr_mut(&mut self) -> &mut Expr {
+        &mut self.syntax.body
+    }
+
     /// Consumes the [`Parsed`] output and returns the contained [`Expr`].
     pub fn into_expr(self) -> Expr {
         *self.syntax.body

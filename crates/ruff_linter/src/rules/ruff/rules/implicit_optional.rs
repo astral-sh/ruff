@@ -183,7 +183,7 @@ pub(crate) fn implicit_optional(checker: &mut Checker, parameters: &Parameters) 
                 parse_type_annotation(string_expr, checker.locator().contents())
             {
                 let Some(expr) = type_hint_explicitly_allows_none(
-                    &parsed_annotation,
+                    parsed_annotation.expr(),
                     checker.semantic(),
                     checker.locator(),
                     checker.settings.target_version.minor(),
