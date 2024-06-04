@@ -557,7 +557,8 @@ impl<'a> Iterator for ReachableDefinitionsIterator<'a> {
     type Item = Definition;
 
     fn next(&mut self) -> Option<Self::Item> {
-        while let Some(flow_node_id) = self.pending.pop() {
+        loop {
+            let flow_node_id = self.pending.pop()?;
             match &self.table.flow_graph.flow_nodes_by_id[flow_node_id] {
                 FlowNode::Start => return Some(Definition::None),
                 FlowNode::Definition(def_node) => {
@@ -575,7 +576,6 @@ impl<'a> Iterator for ReachableDefinitionsIterator<'a> {
                 }
             }
         }
-        None
     }
 }
 
@@ -897,40 +897,72 @@ impl PreorderVisitor<'_> for SymbolTableBuilder {
                 self.current_definition = None;
             }
             ast::Stmt::If(node) => {
+                // we visit the if "test" condition first regardless
                 self.visit_expr(&node.test);
-                let pre_body = self.current_flow_node();
+
+                // create branch node: does the if test pass or not?
                 let if_branch = self.new_flow_node(FlowNode::Branch(BranchFlowNode {
-                    predecessor: pre_body,
+                    predecessor: self.current_flow_node(),
                 }));
+
+                // visit the body of the `if` clause
                 self.set_current_flow_node(if_branch);
                 self.visit_body(&node.body);
-                let mut last_phi_pred = self.current_flow_node();
-                let mut last_branch = if_branch;
+
+                // Flow node for the last if/elif condition branch; represents the "no branch
+                // taken yet" possibility (where "taking a branch" means that the condition in an
+                // if or elif evaluated to true and control flow went into that clause).
+                let mut prior_branch = if_branch;
+
+                // Flow node for the state after the prior if/elif/else clause; represents "we have
+                // taken one of the branches up to this point." Initially set to the post-if-clause
+                // state, later will be set to the phi node joining that possible path with the
+                // possibility that we took a later if/elif/else clause instead.
+                let mut post_prior_clause = self.current_flow_node();
+
+                // Flag to mark if the final clause is an "else" -- if so, that means the "match no
+                // clauses" path is not possible, we have to go through one of the clauses.
                 let mut last_branch_is_else = false;
+
                 for clause in &node.elif_else_clauses {
                     if clause.test.is_some() {
-                        let clause_branch = self.new_flow_node(FlowNode::Branch(BranchFlowNode {
-                            predecessor: last_branch,
+                        // This is an elif clause. Create a new branch node. Its predecessor is the
+                        // previous branch node, because we can only take one branch in an entire
+                        // if/elif/else chain, so if we take this branch, it can only be because we
+                        // didn't take the previous one.
+                        prior_branch = self.new_flow_node(FlowNode::Branch(BranchFlowNode {
+                            predecessor: prior_branch,
                         }));
-                        last_branch = clause_branch;
-                        self.set_current_flow_node(clause_branch);
+                        self.set_current_flow_node(prior_branch);
                     } else {
-                        self.set_current_flow_node(last_branch);
+                        // This is an else clause. No need to create a branch node; there's no
+                        // branch here, if we haven't taken any previous branch, we definitely go
+                        // into the "else" clause.
+                        self.set_current_flow_node(prior_branch);
                         last_branch_is_else = true;
                     }
                     self.visit_elif_else_clause(clause);
-                    last_phi_pred = self.new_flow_node(FlowNode::Phi(PhiFlowNode {
+                    // Update `post_prior_clause` to a new phi node joining the possibility that we
+                    // took any of the previous branches with the possibility that we took the one
+                    // just visited.
+                    post_prior_clause = self.new_flow_node(FlowNode::Phi(PhiFlowNode {
                         first_predecessor: self.current_flow_node(),
-                        second_predecessor: last_phi_pred,
+                        second_predecessor: post_prior_clause,
                     }));
                 }
+
                 if !last_branch_is_else {
-                    last_phi_pred = self.new_flow_node(FlowNode::Phi(PhiFlowNode {
-                        first_predecessor: last_phi_pred,
-                        second_predecessor: last_branch,
+                    // Final branch was not an "else", which means it's possible we took zero
+                    // branches in the entire if/elif chain, so we need one more phi node to join
+                    // the "no branches taken" possibility.
+                    post_prior_clause = self.new_flow_node(FlowNode::Phi(PhiFlowNode {
+                        first_predecessor: post_prior_clause,
+                        second_predecessor: prior_branch,
                     }));
                 }
-                self.set_current_flow_node(last_phi_pred);
+
+                // Onward, with current flow node set to our final Phi node.
+                self.set_current_flow_node(post_prior_clause);
             }
             _ => {
                 ast::visitor::preorder::walk_stmt(self, stmt);
