@@ -76,7 +76,7 @@ pub(crate) fn control_var_used_after_block(
     scope: &Scope,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
-    // Find for-loop, with-statement variable bindings
+    // Find for-loop and with-statement variable bindings
     for (name, binding) in scope
         .bindings()
         .map(|(name, binding_id)| (name, checker.semantic().binding(binding_id)))
@@ -104,20 +104,21 @@ pub(crate) fn control_var_used_after_block(
                 .parent_statement_ids(reference_node_id)
                 .collect();
 
-            let mut found_match = false;
+            let mut is_used_in_block = false;
             for ancestor_node_id in statement_hierarchy {
                 if binding_statement_id == ancestor_node_id {
-                    found_match = true;
+                    is_used_in_block = true;
                     break;
                 }
             }
 
-            if !found_match {
+            // If the reference wasn't used in the same block, report a violation/diagnostic
+            if !is_used_in_block {
                 let block_kind = match binding_statement {
                     Stmt::For(_) => BlockKind::For,
                     Stmt::With(_) => BlockKind::With,
                     _ => {
-                        panic!("unexpected block item")
+                        panic!("Unexpected block item. This is a problem with ruff itself. Fix the `filter_map` above.")
                     }
                 };
 
