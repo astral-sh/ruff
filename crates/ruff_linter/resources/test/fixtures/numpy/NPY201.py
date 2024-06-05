@@ -106,3 +106,11 @@ def func():
     np.who()
 
     np.row_stack(([1,2], [3,4]))
+
+    np.alltrue([True, True])
+
+    np.anytrue([True, False])
+
+    np.cumproduct([1, 2, 3])
+
+    np.product([1, 2, 3])

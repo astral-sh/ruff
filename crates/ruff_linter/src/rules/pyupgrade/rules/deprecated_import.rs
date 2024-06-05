@@ -1,10 +1,11 @@
 use itertools::Itertools;
-use ruff_python_ast::{Alias, Stmt};
+use ruff_python_ast::{Alias, StmtImportFrom};
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::whitespace::indentation;
 use ruff_python_codegen::Stylist;
+use ruff_python_parser::Tokens;
 use ruff_source_file::Locator;
 use ruff_text_size::Ranged;
 
@@ -154,12 +155,10 @@ const TYPING_EXTENSIONS_TO_TYPING: &[&str] = &[
     "ClassVar",
     "Collection",
     "Container",
-    "ContextManager",
     "Coroutine",
     "DefaultDict",
     "Dict",
     "FrozenSet",
-    "Generator",
     "Generic",
     "Hashable",
     "IO",
@@ -193,6 +192,8 @@ const TYPING_EXTENSIONS_TO_TYPING: &[&str] = &[
     // Introduced in Python 3.5.2, but `typing_extensions` contains backported bugfixes and
     // optimizations,
     // "NewType",
+    // "Generator",
+    // "ContextManager",
 ];
 
 // Python 3.7+
@@ -202,13 +203,16 @@ const MYPY_EXTENSIONS_TO_TYPING_37: &[&str] = &["NoReturn"];
 
 // Members of `typing_extensions` that were moved to `typing`.
 const TYPING_EXTENSIONS_TO_TYPING_37: &[&str] = &[
-    "AsyncContextManager",
-    "AsyncGenerator",
     "ChainMap",
     "Counter",
     "Deque",
     "ForwardRef",
     "NoReturn",
+    // Introduced in Python <=3.7, but `typing_extensions` backports some features
+    // from Python 3.12/3.13
+    // "AsyncContextManager",
+    // "AsyncGenerator",
+    // "NamedTuple",
 ];
 
 // Python 3.8+
@@ -220,12 +224,13 @@ const MYPY_EXTENSIONS_TO_TYPING_38: &[&str] = &["TypedDict"];
 const TYPING_EXTENSIONS_TO_TYPING_38: &[&str] = &[
     "Final",
     "OrderedDict",
-    "runtime_checkable",
     // Introduced in Python 3.8, but `typing_extensions` contains backported bugfixes and
     // optimizations.
     // "Literal",
     // "Protocol",
     // "SupportsIndex",
+    // "runtime_checkable",
+    // "TypedDict",
 ];
 
 // Python 3.9+
@@ -332,12 +337,6 @@ const BACKPORTS_STR_ENUM_TO_ENUM_311: &[&str] = &["StrEnum"];
 
 // Members of `typing_extensions` that were moved to `typing`.
 const TYPING_EXTENSIONS_TO_TYPING_312: &[&str] = &[
-    // Introduced in Python 3.12, but `typing_extensions` backports some bug fixes.
-    // "NamedTuple",
-
-    // Introduced in Python 3.12, but `typing_extensions` backports support for PEP 705.
-    // "TypedDict",
-
     // Introduced in Python 3.8, but `typing_extensions` backports a ton of optimizations that were
     // added in Python 3.12.
     "Protocol",
@@ -345,10 +344,13 @@ const TYPING_EXTENSIONS_TO_TYPING_312: &[&str] = &[
     "SupportsBytes",
     "SupportsComplex",
     "SupportsFloat",
+    "SupportsIndex",
     "SupportsInt",
     "SupportsRound",
     "TypeAliasType",
     "Unpack",
+    // Introduced in Python 3.6, but `typing_extensions` backports bugfixes and features
+    "NamedTuple",
     // Introduced in Python 3.11, but `typing_extensions` backports the `frozen_default` argument,
     // which was introduced in Python 3.12.
     "dataclass_transform",
@@ -361,30 +363,65 @@ const TYPING_EXTENSIONS_TO_COLLECTIONS_ABC_312: &[&str] = &["Buffer"];
 // Members of `typing_extensions` that were moved to `types`.
 const TYPING_EXTENSIONS_TO_TYPES_312: &[&str] = &["get_original_bases"];
 
+// Python 3.13+
+
+// Members of `typing_extensions` that were moved to `typing`.
+const TYPING_EXTENSIONS_TO_TYPING_313: &[&str] = &[
+    "get_protocol_members",
+    "is_protocol",
+    "NoDefault",
+    "ReadOnly",
+    "TypeIs",
+    // Introduced in Python 3.6,
+    // but typing_extensions backports features from py313:
+    "ContextManager",
+    "Generator",
+    // Introduced in Python 3.7,
+    // but typing_extensions backports features from py313:
+    "AsyncContextManager",
+    "AsyncGenerator",
+    // Introduced in Python 3.8, but typing_extensions
+    // backports features and bugfixes from py313:
+    "Protocol",
+    "TypedDict",
+    "runtime_checkable",
+    // Introduced in earlier Python versions,
+    // but typing_extensions backports PEP-696:
+    "ParamSpec",
+    "TypeVar",
+    "TypevarTuple",
+];
+
+// Members of `typing_extensions` that were moved to `types`.
+const TYPING_EXTENSIONS_TO_TYPES_313: &[&str] = &["CapsuleType"];
+
+// Members of typing_extensions that were moved to `warnings`
+const TYPING_EXTENSIONS_TO_WARNINGS_313: &[&str] = &["deprecated"];
+
 struct ImportReplacer<'a> {
-    stmt: &'a Stmt,
+    import_from_stmt: &'a StmtImportFrom,
     module: &'a str,
-    members: &'a [Alias],
     locator: &'a Locator<'a>,
     stylist: &'a Stylist<'a>,
+    tokens: &'a Tokens,
     version: PythonVersion,
 }
 
 impl<'a> ImportReplacer<'a> {
     const fn new(
-        stmt: &'a Stmt,
+        import_from_stmt: &'a StmtImportFrom,
         module: &'a str,
-        members: &'a [Alias],
         locator: &'a Locator<'a>,
         stylist: &'a Stylist<'a>,
+        tokens: &'a Tokens,
         version: PythonVersion,
     ) -> Self {
         Self {
-            stmt,
+            import_from_stmt,
             module,
-            members,
             locator,
             stylist,
+            tokens,
             version,
         }
     }
@@ -394,7 +431,7 @@ impl<'a> ImportReplacer<'a> {
         let mut operations = vec![];
         if self.module == "typing" {
             if self.version >= PythonVersion::Py39 {
-                for member in self.members {
+                for member in &self.import_from_stmt.names {
                     if let Some(target) = TYPING_TO_RENAME_PY39.iter().find_map(|(name, target)| {
                         if &member.name == *name {
                             Some(*target)
@@ -441,10 +478,24 @@ impl<'a> ImportReplacer<'a> {
                     operations.push(operation);
                 }
 
+                // `typing_extensions` to `warnings`
+                let mut typing_extensions_to_warnings = vec![];
+                if self.version >= PythonVersion::Py313 {
+                    typing_extensions_to_warnings.extend(TYPING_EXTENSIONS_TO_WARNINGS_313);
+                }
+                if let Some(operation) =
+                    self.try_replace(&typing_extensions_to_warnings, "warnings")
+                {
+                    operations.push(operation);
+                }
+
                 // `typing_extensions` to `types`
                 let mut typing_extensions_to_types = vec![];
                 if self.version >= PythonVersion::Py312 {
                     typing_extensions_to_types.extend(TYPING_EXTENSIONS_TO_TYPES_312);
+                }
+                if self.version >= PythonVersion::Py313 {
+                    typing_extensions_to_types.extend(TYPING_EXTENSIONS_TO_TYPES_313);
                 }
                 if let Some(operation) = self.try_replace(&typing_extensions_to_types, "types") {
                     operations.push(operation);
@@ -469,6 +520,9 @@ impl<'a> ImportReplacer<'a> {
                 }
                 if self.version >= PythonVersion::Py312 {
                     typing_extensions_to_typing.extend(TYPING_EXTENSIONS_TO_TYPING_312);
+                }
+                if self.version >= PythonVersion::Py313 {
+                    typing_extensions_to_typing.extend(TYPING_EXTENSIONS_TO_TYPING_313);
                 }
                 if let Some(operation) = self.try_replace(&typing_extensions_to_typing, "typing") {
                     operations.push(operation);
@@ -563,7 +617,7 @@ impl<'a> ImportReplacer<'a> {
             let fix = Some(matched);
             Some((operation, fix))
         } else {
-            let indentation = indentation(self.locator, self.stmt);
+            let indentation = indentation(self.locator, self.import_from_stmt);
 
             // If we have matched _and_ unmatched names, but the import is not on its own
             // line, we can't add a statement after it. For example, if we have
@@ -583,7 +637,9 @@ impl<'a> ImportReplacer<'a> {
 
             let matched = ImportReplacer::format_import_from(&matched_names, target);
             let unmatched = fixes::remove_import_members(
-                self.locator.slice(self.stmt.range()),
+                self.locator,
+                self.import_from_stmt,
+                self.tokens,
                 &matched_names
                     .iter()
                     .map(|name| name.name.as_str())
@@ -611,7 +667,7 @@ impl<'a> ImportReplacer<'a> {
     fn partition_imports(&self, candidates: &[&str]) -> (Vec<&Alias>, Vec<&Alias>) {
         let mut matched_names = vec![];
         let mut unmatched_names = vec![];
-        for name in self.members {
+        for name in &self.import_from_stmt.names {
             if candidates.contains(&name.name.as_str()) {
                 matched_names.push(name);
             } else {
@@ -638,21 +694,19 @@ impl<'a> ImportReplacer<'a> {
 }
 
 /// UP035
-pub(crate) fn deprecated_import(
-    checker: &mut Checker,
-    stmt: &Stmt,
-    names: &[Alias],
-    module: Option<&str>,
-    level: u32,
-) {
+pub(crate) fn deprecated_import(checker: &mut Checker, import_from_stmt: &StmtImportFrom) {
     // Avoid relative and star imports.
-    if level > 0 {
+    if import_from_stmt.level > 0 {
         return;
     }
-    if names.first().is_some_and(|name| &name.name == "*") {
+    if import_from_stmt
+        .names
+        .first()
+        .is_some_and(|name| &name.name == "*")
+    {
         return;
     }
-    let Some(module) = module else {
+    let Some(module) = import_from_stmt.module.as_deref() else {
         return;
     };
 
@@ -660,13 +714,12 @@ pub(crate) fn deprecated_import(
         return;
     }
 
-    let members: Vec<Alias> = names.iter().map(Clone::clone).collect();
     let fixer = ImportReplacer::new(
-        stmt,
+        import_from_stmt,
         module,
-        &members,
         checker.locator(),
         checker.stylist(),
+        checker.tokens(),
         checker.settings.target_version,
     );
 
@@ -675,12 +728,12 @@ pub(crate) fn deprecated_import(
             DeprecatedImport {
                 deprecation: Deprecation::WithoutRename(operation),
             },
-            stmt.range(),
+            import_from_stmt.range(),
         );
         if let Some(content) = fix {
             diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                 content,
-                stmt.range(),
+                import_from_stmt.range(),
             )));
         }
         checker.diagnostics.push(diagnostic);
@@ -691,7 +744,7 @@ pub(crate) fn deprecated_import(
             DeprecatedImport {
                 deprecation: Deprecation::WithRename(operation),
             },
-            stmt.range(),
+            import_from_stmt.range(),
         );
         checker.diagnostics.push(diagnostic);
     }

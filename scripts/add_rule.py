@@ -137,7 +137,8 @@ pub(crate) fn {rule_name_snake}(checker: &mut Checker) {{}}
             lines.append(line)
 
         variant = pascal_case(linter)
-        rule = f"""rules::{linter.split(" ")[0]}::rules::{name}"""
+        linter_name = linter.split(" ")[0].replace("-", "_")
+        rule = f"""rules::{linter_name}::rules::{name}"""
         lines.append(
             " " * 8 + f"""({variant}, "{code}") => (RuleGroup::Preview, {rule}),\n""",
         )

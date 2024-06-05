@@ -101,6 +101,8 @@ pre-commit run --all-files --show-diff-on-failure  # Rust and Python formatting,
 These checks will run on GitHub Actions when you open your pull request, but running them locally
 will save you time and expedite the merge process.
 
+If you're using VS Code, you can also install the recommended [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer) extension to get these checks while editing.
+
 Note that many code changes also require updating the snapshot tests, which is done interactively
 after running `cargo test` like so:
 

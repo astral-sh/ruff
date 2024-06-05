@@ -2,124 +2,70 @@
 source: crates/ruff_python_parser/src/lexer.rs
 expression: lex_source(source)
 ---
+## Tokens
+```
 [
     (
-        String {
-            value: "double",
-            flags: AnyStringFlags {
-                prefix: Regular(
-                    Empty,
-                ),
-                triple_quoted: false,
-                quote_style: Double,
-            },
-        },
+        String(
+            "double",
+        ),
         0..8,
+        TokenFlags(
+            DOUBLE_QUOTES,
+        ),
     ),
     (
-        String {
-            value: "single",
-            flags: AnyStringFlags {
-                prefix: Regular(
-                    Empty,
-                ),
-                triple_quoted: false,
-                quote_style: Single,
-            },
-        },
+        String(
+            "single",
+        ),
         9..17,
     ),
     (
-        String {
-            value: "can\\'t",
-            flags: AnyStringFlags {
-                prefix: Regular(
-                    Empty,
-                ),
-                triple_quoted: false,
-                quote_style: Single,
-            },
-        },
+        String(
+            "can\\'t",
+        ),
         18..26,
     ),
     (
-        String {
-            value: "\\\\\\\"",
-            flags: AnyStringFlags {
-                prefix: Regular(
-                    Empty,
-                ),
-                triple_quoted: false,
-                quote_style: Double,
-            },
-        },
+        String(
+            "\\\\\\\"",
+        ),
         27..33,
+        TokenFlags(
+            DOUBLE_QUOTES,
+        ),
     ),
     (
-        String {
-            value: "\\t\\r\\n",
-            flags: AnyStringFlags {
-                prefix: Regular(
-                    Empty,
-                ),
-                triple_quoted: false,
-                quote_style: Single,
-            },
-        },
+        String(
+            "\\t\\r\\n",
+        ),
         34..42,
     ),
     (
-        String {
-            value: "\\g",
-            flags: AnyStringFlags {
-                prefix: Regular(
-                    Empty,
-                ),
-                triple_quoted: false,
-                quote_style: Single,
-            },
-        },
+        String(
+            "\\g",
+        ),
         43..47,
     ),
     (
-        String {
-            value: "raw\\'",
-            flags: AnyStringFlags {
-                prefix: Regular(
-                    Raw {
-                        uppercase: false,
-                    },
-                ),
-                triple_quoted: false,
-                quote_style: Single,
-            },
-        },
+        String(
+            "raw\\'",
+        ),
         48..56,
+        TokenFlags(
+            RAW_STRING_LOWERCASE,
+        ),
     ),
     (
-        String {
-            value: "\\420",
-            flags: AnyStringFlags {
-                prefix: Regular(
-                    Empty,
-                ),
-                triple_quoted: false,
-                quote_style: Single,
-            },
-        },
+        String(
+            "\\420",
+        ),
         57..63,
     ),
     (
-        String {
-            value: "\\200\\0a",
-            flags: AnyStringFlags {
-                prefix: Regular(
-                    Empty,
-                ),
-                triple_quoted: false,
-                quote_style: Single,
-            },
-        },
+        String(
+            "\\200\\0a",
+        ),
         64..73,
     ),
     (
@@ -127,3 +73,4 @@ expression: lex_source(source)
         73..73,
     ),
 ]
+```

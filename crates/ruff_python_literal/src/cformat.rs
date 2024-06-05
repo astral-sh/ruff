@@ -1,11 +1,12 @@
 //! Implementation of Printf-Style string formatting
 //! as per the [Python Docs](https://docs.python.org/3/library/stdtypes.html#printf-style-string-formatting).
-use bitflags::bitflags;
 use std::{
     fmt,
     iter::{Enumerate, Peekable},
     str::FromStr,
 };
+
+use bitflags::bitflags;
 
 use crate::Case;
 
@@ -93,19 +94,6 @@ bitflags! {
         const LEFT_ADJUST = 0b0000_0100;
         const BLANK_SIGN = 0b0000_1000;
         const SIGN_CHAR = 0b0001_0000;
-    }
-}
-
-impl CConversionFlags {
-    #[inline]
-    pub fn sign_string(&self) -> &'static str {
-        if self.contains(CConversionFlags::SIGN_CHAR) {
-            "+"
-        } else if self.contains(CConversionFlags::BLANK_SIGN) {
-            " "
-        } else {
-            ""
-        }
     }
 }
 
@@ -337,44 +325,12 @@ pub enum CFormatPart<T> {
     Spec(CFormatSpec),
 }
 
-impl<T> CFormatPart<T> {
-    #[inline]
-    pub fn is_specifier(&self) -> bool {
-        matches!(self, CFormatPart::Spec(_))
-    }
-
-    #[inline]
-    pub fn has_key(&self) -> bool {
-        match self {
-            CFormatPart::Spec(s) => s.mapping_key.is_some(),
-            CFormatPart::Literal(_) => false,
-        }
-    }
-}
-
 #[derive(Debug, PartialEq)]
 pub struct CFormatStrOrBytes<S> {
     parts: Vec<(usize, CFormatPart<S>)>,
 }
 
 impl<S> CFormatStrOrBytes<S> {
-    pub fn check_specifiers(&self) -> Option<(usize, bool)> {
-        let mut count = 0;
-        let mut mapping_required = false;
-        for (_, part) in &self.parts {
-            if part.is_specifier() {
-                let has_key = part.has_key();
-                if count == 0 {
-                    mapping_required = has_key;
-                } else if mapping_required != has_key {
-                    return None;
-                }
-                count += 1;
-            }
-        }
-        Some((count, mapping_required))
-    }
-
     #[inline]
     pub fn iter(&self) -> impl Iterator<Item = &(usize, CFormatPart<S>)> {
         self.parts.iter()
@@ -429,11 +385,6 @@ impl CFormatBytes {
             parts.push((part_index, CFormatPart::Literal(literal)));
         }
         Ok(Self { parts })
-    }
-
-    pub fn parse_from_bytes(bytes: &[u8]) -> Result<Self, CFormatError> {
-        let mut iter = bytes.iter().copied().enumerate().peekable();
-        Self::parse(&mut iter)
     }
 }
 

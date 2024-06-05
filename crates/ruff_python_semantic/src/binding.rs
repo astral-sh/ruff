@@ -470,14 +470,14 @@ pub enum BindingKind<'a> {
     /// def foo():
     ///     global x
     /// ```
-    Global,
+    Global(Option<BindingId>),
 
     /// A binding for a nonlocal variable, like `x` in:
     /// ```python
     /// def foo():
     ///     nonlocal x
     /// ```
-    Nonlocal(ScopeId),
+    Nonlocal(BindingId, ScopeId),
 
     /// A binding for a builtin, like `print` or `bool`.
     Builtin,
@@ -565,7 +565,7 @@ pub enum BindingKind<'a> {
 }
 
 bitflags! {
-    #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
+    #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
     pub struct Exceptions: u8 {
         const NAME_ERROR = 0b0000_0001;
         const MODULE_NOT_FOUND_ERROR = 0b0000_0010;
@@ -668,5 +668,16 @@ impl<'a, 'ast> Imported<'ast> for AnyImport<'a, 'ast> {
             Self::SubmoduleImport(import) => import.member_name(),
             Self::FromImport(import) => import.member_name(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::BindingKind;
+
+    #[test]
+    #[cfg(target_pointer_width = "64")]
+    fn size() {
+        assert!(std::mem::size_of::<BindingKind>() <= 24);
     }
 }

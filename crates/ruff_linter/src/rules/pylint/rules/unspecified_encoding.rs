@@ -175,7 +175,7 @@ fn generate_keyword_fix(checker: &Checker, call: &ast::ExprCall) -> Fix {
                 }))
         ),
         &call.arguments,
-        checker.indexer().comment_ranges(),
+        checker.comment_ranges(),
         checker.locator().contents(),
     ))
 }
@@ -190,7 +190,7 @@ fn generate_import_fix(checker: &Checker, call: &ast::ExprCall) -> Result<Fix> {
     let argument_edit = add_argument(
         &format!("encoding={binding}(False)"),
         &call.arguments,
-        checker.indexer().comment_ranges(),
+        checker.comment_ranges(),
         checker.locator().contents(),
     );
     Ok(Fix::unsafe_edits(import_edit, [argument_edit]))

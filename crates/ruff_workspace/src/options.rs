@@ -703,6 +703,10 @@ pub struct LintCommonOptions {
             ignore-init-module-imports = false
         "#
     )]
+    #[deprecated(
+        since = "0.4.4",
+        note = "`ignore-init-module-imports` will be removed in a future version because F401 now recommends appropriate fixes for unused imports in `__init__.py` (currently in preview mode). See documentation for more information and please update your configuration."
+    )]
     pub ignore_init_module_imports: Option<bool>,
 
     /// A list of objects that should be treated equivalently to a

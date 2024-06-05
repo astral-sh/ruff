@@ -17,9 +17,8 @@ pub mod lint;
 pub mod module;
 mod parse;
 pub mod program;
+mod semantic;
 pub mod source;
-mod symbols;
-mod types;
 pub mod watch;
 
 pub(crate) type FxDashMap<K, V> = dashmap::DashMap<K, V, BuildHasherDefault<FxHasher>>;

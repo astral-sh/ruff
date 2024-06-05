@@ -59,10 +59,6 @@ impl<'a> QualifiedName<'a> {
         matches!(self.segments(), ["", ..])
     }
 
-    pub fn is_user_defined(&self) -> bool {
-        !self.is_builtin()
-    }
-
     /// If the call path is dot-prefixed, it's an unresolved relative import.
     /// Ex) `[".foo", "bar"]` -> `".foo.bar"`
     pub fn is_unresolved_import(&self) -> bool {

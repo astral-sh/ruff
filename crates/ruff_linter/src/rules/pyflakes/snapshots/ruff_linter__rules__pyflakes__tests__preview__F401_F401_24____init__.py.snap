@@ -39,4 +39,4 @@ __init__.py:36:26: F401 `.renamed` imported but unused; consider removing, addin
 36 | from . import renamed as bees  # F401: no fix
    |                          ^^^^ F401
    |
-   = help: Use an explicit re-export: `bees as bees`
+   = help: Use an explicit re-export: `renamed as renamed`

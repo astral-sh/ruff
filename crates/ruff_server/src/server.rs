@@ -10,6 +10,9 @@ use types::CodeActionOptions;
 use types::DiagnosticOptions;
 use types::DidChangeWatchedFilesRegistrationOptions;
 use types::FileSystemWatcher;
+use types::NotebookCellSelector;
+use types::NotebookDocumentSyncOptions;
+use types::NotebookSelector;
 use types::OneOf;
 use types::TextDocumentSyncCapability;
 use types::TextDocumentSyncKind;
@@ -65,28 +68,33 @@ impl Server {
         let AllSettings {
             global_settings,
             mut workspace_settings,
-        } = AllSettings::from_value(init_params.initialization_options.unwrap_or_default());
+        } = AllSettings::from_value(
+            init_params
+                .initialization_options
+                .unwrap_or_else(|| serde_json::Value::Object(serde_json::Map::default())),
+        );
 
-        let mut workspace_for_uri = |uri| {
+        let mut workspace_for_url = |url: lsp_types::Url| {
             let Some(workspace_settings) = workspace_settings.as_mut() else {
-                return (uri, ClientSettings::default());
+                return (url, ClientSettings::default());
             };
-            let settings = workspace_settings.remove(&uri).unwrap_or_else(|| {
-                tracing::warn!("No workspace settings found for {uri}");
+            let settings = workspace_settings.remove(&url).unwrap_or_else(|| {
+                tracing::warn!("No workspace settings found for {}", url);
                 ClientSettings::default()
             });
-            (uri, settings)
+            (url, settings)
         };
 
         let workspaces = init_params
             .workspace_folders
+            .filter(|folders| !folders.is_empty())
             .map(|folders| folders.into_iter().map(|folder| {
-                workspace_for_uri(folder.uri)
+                workspace_for_url(folder.uri)
             }).collect())
             .or_else(|| {
-                tracing::debug!("No workspace(s) were provided during initialization. Using the current working directory as a default workspace...");
+                tracing::warn!("No workspace(s) were provided during initialization. Using the current working directory as a default workspace...");
                 let uri = types::Url::from_file_path(std::env::current_dir().ok()?).ok()?;
-                Some(vec![workspace_for_uri(uri)])
+                Some(vec![workspace_for_url(uri)])
             })
             .ok_or_else(|| {
                 anyhow::anyhow!("Failed to get the current working directory while creating a default workspace.")
@@ -169,8 +177,12 @@ impl Server {
                             watchers: vec![
                                 FileSystemWatcher {
                                     glob_pattern: types::GlobPattern::String(
-                                        "**/.?ruff.toml".into(),
+                                        "**/.ruff.toml".into(),
                                     ),
+                                    kind: None,
+                                },
+                                FileSystemWatcher {
+                                    glob_pattern: types::GlobPattern::String("**/ruff.toml".into()),
                                     kind: None,
                                 },
                                 FileSystemWatcher {
@@ -252,6 +264,16 @@ impl Server {
                 },
             )),
             hover_provider: Some(types::HoverProviderCapability::Simple(true)),
+            notebook_document_sync: Some(types::OneOf::Left(NotebookDocumentSyncOptions {
+                save: Some(false),
+                notebook_selector: [NotebookSelector::ByCells {
+                    notebook: None,
+                    cells: vec![NotebookCellSelector {
+                        language: "python".to_string(),
+                    }],
+                }]
+                .to_vec(),
+            })),
             text_document_sync: Some(TextDocumentSyncCapability::Options(
                 TextDocumentSyncOptions {
                     open_close: Some(true),
@@ -278,8 +300,15 @@ pub(crate) enum SupportedCodeAction {
     SourceFixAll,
     /// Maps to `source.organizeImports` and `source.organizeImports.ruff` code action kinds.
     /// This is a source action that applies import sorting fixes to the currently open document.
-    #[allow(dead_code)] // TODO: remove
     SourceOrganizeImports,
+    /// Maps to the `notebook.source.fixAll` and `notebook.source.fixAll.ruff` code action kinds.
+    /// This is a source action, specifically for notebooks, that applies all safe fixes
+    /// to the currently open document.
+    NotebookSourceFixAll,
+    /// Maps to `source.organizeImports` and `source.organizeImports.ruff` code action kinds.
+    /// This is a source action, specifically for notebooks, that applies import sorting fixes
+    /// to the currently open document.
+    NotebookSourceOrganizeImports,
 }
 
 impl SupportedCodeAction {
@@ -289,6 +318,8 @@ impl SupportedCodeAction {
             Self::QuickFix => CodeActionKind::QUICKFIX,
             Self::SourceFixAll => crate::SOURCE_FIX_ALL_RUFF,
             Self::SourceOrganizeImports => crate::SOURCE_ORGANIZE_IMPORTS_RUFF,
+            Self::NotebookSourceFixAll => crate::NOTEBOOK_SOURCE_FIX_ALL_RUFF,
+            Self::NotebookSourceOrganizeImports => crate::NOTEBOOK_SOURCE_ORGANIZE_IMPORTS_RUFF,
         }
     }
 
@@ -304,6 +335,8 @@ impl SupportedCodeAction {
             Self::QuickFix,
             Self::SourceFixAll,
             Self::SourceOrganizeImports,
+            Self::NotebookSourceFixAll,
+            Self::NotebookSourceOrganizeImports,
         ]
         .into_iter()
     }

@@ -35,7 +35,6 @@ tracing-subscriber = { workspace = true }
 tracing-tree = { workspace = true }
 
 [dev-dependencies]
-textwrap = { version = "0.16.1" }
 tempfile = { workspace = true }
 
 [lints]

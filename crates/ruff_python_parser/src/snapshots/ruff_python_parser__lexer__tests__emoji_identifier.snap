@@ -1,0 +1,24 @@
+---
+source: crates/ruff_python_parser/src/lexer.rs
+expression: "lex_invalid(source, Mode::Module)"
+---
+## Tokens
+```
+[
+    (
+        Unknown,
+        0..4,
+    ),
+]
+```
+## Errors
+```
+[
+    LexicalError {
+        error: UnrecognizedToken {
+            tok: '🐦',
+        },
+        location: 0..4,
+    },
+]
+```

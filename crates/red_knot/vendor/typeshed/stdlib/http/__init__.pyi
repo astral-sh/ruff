@@ -1,6 +1,5 @@
 import sys
 from enum import IntEnum
-from typing import Literal
 
 if sys.version_info >= (3, 11):
     from enum import StrEnum
@@ -49,11 +48,19 @@ class HTTPStatus(IntEnum):
     GONE = 410
     LENGTH_REQUIRED = 411
     PRECONDITION_FAILED = 412
+    if sys.version_info >= (3, 13):
+        CONTENT_TOO_LARGE = 413
     REQUEST_ENTITY_TOO_LARGE = 413
+    if sys.version_info >= (3, 13):
+        URI_TOO_LONG = 414
     REQUEST_URI_TOO_LONG = 414
     UNSUPPORTED_MEDIA_TYPE = 415
+    if sys.version_info >= (3, 13):
+        RANGE_NOT_SATISFIABLE = 416
     REQUESTED_RANGE_NOT_SATISFIABLE = 416
     EXPECTATION_FAILED = 417
+    if sys.version_info >= (3, 13):
+        UNPROCESSABLE_CONTENT = 422
     UNPROCESSABLE_ENTITY = 422
     LOCKED = 423
     FAILED_DEPENDENCY = 424
@@ -75,9 +82,9 @@ class HTTPStatus(IntEnum):
     MISDIRECTED_REQUEST = 421
     UNAVAILABLE_FOR_LEGAL_REASONS = 451
     if sys.version_info >= (3, 9):
-        EARLY_HINTS: Literal[103]
-        IM_A_TEAPOT: Literal[418]
-        TOO_EARLY: Literal[425]
+        EARLY_HINTS = 103
+        IM_A_TEAPOT = 418
+        TOO_EARLY = 425
     if sys.version_info >= (3, 12):
         @property
         def is_informational(self) -> bool: ...

@@ -7,7 +7,6 @@ use ruff_python_ast::Expr;
 use ruff_text_size::{Ranged, TextSize};
 
 use crate::checkers::ast::Checker;
-use crate::importer::Importer;
 
 /// ## What it does
 /// Checks for uses of PEP 585- and PEP 604-style type annotations in Python
@@ -87,13 +86,11 @@ impl AlwaysFixableViolation for FutureRequiredTypeAnnotation {
 /// FA102
 pub(crate) fn future_required_type_annotation(checker: &mut Checker, expr: &Expr, reason: Reason) {
     let mut diagnostic = Diagnostic::new(FutureRequiredTypeAnnotation { reason }, expr.range());
-    if let Some(python_ast) = checker.semantic().definitions.python_ast() {
-        let required_import =
-            AnyImport::ImportFrom(ImportFrom::member("__future__", "annotations"));
-        diagnostic.set_fix(Fix::unsafe_edit(
-            Importer::new(python_ast, checker.locator(), checker.stylist())
-                .add_import(&required_import, TextSize::default()),
-        ));
-    }
+    let required_import = AnyImport::ImportFrom(ImportFrom::member("__future__", "annotations"));
+    diagnostic.set_fix(Fix::unsafe_edit(
+        checker
+            .importer()
+            .add_import(&required_import, TextSize::default()),
+    ));
     checker.diagnostics.push(diagnostic);
 }

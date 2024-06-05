@@ -1,9 +1,11 @@
-use ruff_python_ast::AnyStringFlags;
+use ruff_python_ast::StringFlags;
+
+use super::TokenFlags;
 
 /// The context representing the current f-string that the lexer is in.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub(crate) struct FStringContext {
-    flags: AnyStringFlags,
+    flags: TokenFlags,
 
     /// The level of nesting for the lexer when it entered the current f-string.
     /// The nesting level includes all kinds of parentheses i.e., round, square,
@@ -17,8 +19,9 @@ pub(crate) struct FStringContext {
 }
 
 impl FStringContext {
-    pub(crate) const fn new(flags: AnyStringFlags, nesting: u32) -> Self {
-        debug_assert!(flags.is_f_string());
+    pub(crate) const fn new(flags: TokenFlags, nesting: u32) -> Self {
+        assert!(flags.is_f_string());
+
         Self {
             flags,
             nesting,
@@ -26,8 +29,7 @@ impl FStringContext {
         }
     }
 
-    pub(crate) const fn flags(&self) -> AnyStringFlags {
-        debug_assert!(self.flags.is_f_string());
+    pub(crate) const fn flags(&self) -> TokenFlags {
         self.flags
     }
 
@@ -36,13 +38,13 @@ impl FStringContext {
     }
 
     /// Returns the quote character for the current f-string.
-    pub(crate) const fn quote_char(&self) -> char {
+    pub(crate) fn quote_char(&self) -> char {
         self.flags.quote_style().as_char()
     }
 
     /// Returns the triple quotes for the current f-string if it is a triple-quoted
     /// f-string, `None` otherwise.
-    pub(crate) const fn triple_quotes(&self) -> Option<&'static str> {
+    pub(crate) fn triple_quotes(&self) -> Option<&'static str> {
         if self.is_triple_quoted() {
             Some(self.flags.quote_str())
         } else {
@@ -56,7 +58,7 @@ impl FStringContext {
     }
 
     /// Returns `true` if the current f-string is a triple-quoted f-string.
-    pub(crate) const fn is_triple_quoted(&self) -> bool {
+    pub(crate) fn is_triple_quoted(&self) -> bool {
         self.flags.is_triple_quoted()
     }
 
@@ -127,4 +129,15 @@ impl FStrings {
     pub(crate) fn current_mut(&mut self) -> Option<&mut FStringContext> {
         self.stack.last_mut()
     }
+
+    pub(crate) fn checkpoint(&self) -> FStringsCheckpoint {
+        FStringsCheckpoint(self.stack.clone())
+    }
+
+    pub(crate) fn rewind(&mut self, checkpoint: FStringsCheckpoint) {
+        self.stack = checkpoint.0;
+    }
 }
+
+#[derive(Debug, Clone)]
+pub(crate) struct FStringsCheckpoint(Vec<FStringContext>);

@@ -2119,6 +2119,7 @@
         },
         "ignore-init-module-imports": {
           "description": "Avoid automatically removing unused imports in `__init__.py` files. Such imports will still be flagged, but with a dedicated message suggesting that the import is either added to the module's `__all__` symbol, or re-exported with a redundant alias (e.g., `import os as os`).\n\nThis option is enabled by default, but you can opt-in to removal of imports via an unsafe fix.",
+          "deprecated": true,
           "type": [
             "boolean",
             "null"
@@ -2684,6 +2685,8 @@
         "ASYNC100",
         "ASYNC101",
         "ASYNC102",
+        "ASYNC11",
+        "ASYNC116",
         "B",
         "B0",
         "B00",
@@ -2726,6 +2729,7 @@
         "B035",
         "B9",
         "B90",
+        "B901",
         "B904",
         "B905",
         "B909",
@@ -3575,10 +3579,14 @@
         "PYI054",
         "PYI055",
         "PYI056",
+        "PYI057",
         "PYI058",
         "PYI059",
         "PYI06",
         "PYI062",
+        "PYI063",
+        "PYI064",
+        "PYI066",
         "Q",
         "Q0",
         "Q00",
@@ -3942,6 +3950,7 @@
         "github",
         "gitlab",
         "pylint",
+        "rdjson",
         "azure",
         "sarif"
       ]

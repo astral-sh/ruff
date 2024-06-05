@@ -2,8 +2,7 @@ use crate::registry::Rule;
 use ruff_diagnostics::Diagnostic;
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
-use ruff_python_parser::lexer::LexResult;
-use ruff_python_parser::TokenKind;
+use ruff_python_parser::{TokenKind, Tokens};
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -19,7 +18,7 @@ use crate::rules::pycodestyle::rules::logical_lines::{
 use crate::settings::LinterSettings;
 
 pub(crate) fn check_logical_lines(
-    tokens: &[LexResult],
+    tokens: &Tokens,
     locator: &Locator,
     indexer: &Indexer,
     stylist: &Stylist,

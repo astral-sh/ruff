@@ -4,7 +4,7 @@ resolver = "2"
 
 [workspace.package]
 edition = "2021"
-rust-version = "1.71"
+rust-version = "1.74"
 homepage = "https://docs.astral.sh/ruff"
 documentation = "https://docs.astral.sh/ruff"
 repository = "https://github.com/astral-sh/ruff"
@@ -62,7 +62,6 @@ filetime = { version = "0.2.23" }
 glob = { version = "0.3.1" }
 globset = { version = "0.4.14" }
 hashbrown = "0.14.3"
-hexf-parse = { version = "0.2.1" }
 ignore = { version = "0.4.22" }
 imara-diff = { version = "0.1.5" }
 imperative = { version = "1.0.4" }
@@ -73,15 +72,14 @@ insta = { version = "1.35.1", feature = ["filters", "glob"] }
 insta-cmd = { version = "0.6.0" }
 is-macro = { version = "0.3.5" }
 is-wsl = { version = "0.4.0" }
-itertools = { version = "0.12.1" }
+itertools = { version = "0.13.0" }
 js-sys = { version = "0.3.69" }
 jod-thread = { version = "0.1.2" }
-lexical-parse-float = { version = "0.8.0", features = ["format"] }
 libc = { version = "0.2.153" }
 libcst = { version = "1.1.0", default-features = false }
 log = { version = "0.4.17" }
 lsp-server = { version = "0.7.6" }
-lsp-types = { version = "0.95.0", features = ["proposed"] }
+lsp-types = { git = "https://github.com/astral-sh/lsp-types.git", rev = "3512a9f", features = ["proposed"] }
 matchit = { version = "0.8.1" }
 memchr = { version = "2.7.1" }
 mimalloc = { version = "0.1.39" }

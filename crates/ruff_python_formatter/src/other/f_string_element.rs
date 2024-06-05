@@ -3,6 +3,7 @@ use std::borrow::Cow;
 use ruff_formatter::{format_args, write, Buffer, RemoveSoftLinesBuffer};
 use ruff_python_ast::{
     ConversionFlag, Expr, FStringElement, FStringExpressionElement, FStringLiteralElement,
+    StringFlags,
 };
 use ruff_text_size::Ranged;
 

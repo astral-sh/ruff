@@ -106,4 +106,39 @@ E27.py:54:5: E275 [*] Missing whitespace after keyword
 56 56 | def f():
 57 57 |     print((yield))
 
+E27.py:76:1: E275 [*] Missing whitespace after keyword
+   |
+75 | #: E275
+76 | match(foo):
+   | ^^^^^ E275
+77 |     case(1):
+78 |         pass
+   |
+   = help: Added missing whitespace after keyword
 
+ℹ Safe fix
+73 73 | type	Number = int
+74 74 | 
+75 75 | #: E275
+76    |-match(foo):
+   76 |+match (foo):
+77 77 |     case(1):
+78 78 |         pass
+
+E27.py:77:5: E275 [*] Missing whitespace after keyword
+   |
+75 | #: E275
+76 | match(foo):
+77 |     case(1):
+   |     ^^^^ E275
+78 |         pass
+   |
+   = help: Added missing whitespace after keyword
+
+ℹ Safe fix
+74 74 | 
+75 75 | #: E275
+76 76 | match(foo):
+77    |-    case(1):
+   77 |+    case (1):
+78 78 |         pass

@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Literal
 from typing_extensions import TypeAlias
 
 from ..cmd import Command
@@ -16,7 +16,7 @@ class SilentReporter(_Reporter):
         report_level,
         halt_level,
         stream: Any | None = ...,
-        debug: int = ...,
+        debug: bool | Literal[0, 1] = 0,
         encoding: str = ...,
         error_handler: str = ...,
     ) -> None: ...

@@ -51,11 +51,6 @@ pub struct UnicodeEscape<'a> {
 
 impl<'a> UnicodeEscape<'a> {
     #[inline]
-    pub fn with_forced_quote(source: &'a str, quote: Quote) -> Self {
-        let layout = EscapeLayout { quote, len: None };
-        Self { source, layout }
-    }
-    #[inline]
     pub fn with_preferred_quote(source: &'a str, quote: Quote) -> Self {
         let layout = Self::repr_layout(source, quote);
         Self { source, layout }
@@ -240,11 +235,6 @@ impl<'a> AsciiEscape<'a> {
         Self { source, layout }
     }
     #[inline]
-    pub fn with_forced_quote(source: &'a [u8], quote: Quote) -> Self {
-        let layout = EscapeLayout { quote, len: None };
-        Self { source, layout }
-    }
-    #[inline]
     pub fn with_preferred_quote(source: &'a [u8], quote: Quote) -> Self {
         let layout = Self::repr_layout(source, quote);
         Self { source, layout }
@@ -267,17 +257,6 @@ impl AsciiEscape<'_> {
     )]
     pub fn repr_layout(source: &[u8], preferred_quote: Quote) -> EscapeLayout {
         Self::output_layout_with_checker(source, preferred_quote, 3, |a, b| {
-            Some((a as isize).checked_add(b as isize)? as usize)
-        })
-    }
-
-    #[allow(
-        clippy::cast_possible_wrap,
-        clippy::cast_possible_truncation,
-        clippy::cast_sign_loss
-    )]
-    pub fn named_repr_layout(source: &[u8], name: &str) -> EscapeLayout {
-        Self::output_layout_with_checker(source, Quote::Single, name.len() + 2 + 3, |a, b| {
             Some((a as isize).checked_add(b as isize)? as usize)
         })
     }

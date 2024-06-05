@@ -62,6 +62,8 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 if !checker.semantic.future_annotations_or_stub()
                     && checker.settings.target_version < PythonVersion::Py39
                     && checker.semantic.in_annotation()
+                    && checker.semantic.in_runtime_evaluated_annotation()
+                    && !checker.semantic.in_string_type_definition()
                     && typing::is_pep585_generic(value, &checker.semantic)
                 {
                     flake8_future_annotations::rules::future_required_type_annotation(
@@ -344,6 +346,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::PandasUseOfDotValues) {
                 pandas_vet::rules::attr(checker, attribute);
             }
+            if checker.enabled(Rule::ByteStringUsage) {
+                flake8_pyi::rules::bytestring_attribute(checker, expr);
+            }
         }
         Expr::Call(
             call @ ast::ExprCall {
@@ -505,6 +510,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             }
             if checker.enabled(Rule::BlockingOsCallInAsyncFunction) {
                 flake8_async::rules::blocking_os_call(checker, call);
+            }
+            if checker.enabled(Rule::SleepForeverCall) {
+                flake8_async::rules::sleep_forever_call(checker, call);
             }
             if checker.any_enabled(&[Rule::Print, Rule::PPrint]) {
                 flake8_print::rules::print_call(checker, call);
@@ -1152,7 +1160,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                     }
                 }
                 if checker.enabled(Rule::PrintfStringFormatting) {
-                    pyupgrade::rules::printf_string_formatting(checker, expr, right);
+                    pyupgrade::rules::printf_string_formatting(checker, bin_op, format_string);
                 }
                 if checker.enabled(Rule::BadStringFormatCharacter) {
                     pylint::rules::bad_string_format_character::percent(
@@ -1195,6 +1203,8 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 if !checker.semantic.future_annotations_or_stub()
                     && checker.settings.target_version < PythonVersion::Py310
                     && checker.semantic.in_annotation()
+                    && checker.semantic.in_runtime_evaluated_annotation()
+                    && !checker.semantic.in_string_type_definition()
                 {
                     flake8_future_annotations::rules::future_required_type_annotation(
                         checker,

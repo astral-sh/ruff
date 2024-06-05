@@ -4,7 +4,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::fix::edits::pad;
 use crate::fix::snippet::SourceCodeSnippet;
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::hashable::HashableExpr;
 use ruff_text_size::Ranged;
@@ -19,6 +19,15 @@ use crate::settings::types::PythonVersion;
 /// ## Why is this bad?
 /// Repeated `isinstance` calls on the same object can be merged into a
 /// single call.
+///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe on Python 3.10 and later, as combining
+/// multiple `isinstance` calls with a binary operator (`|`) will fail at
+/// runtime if any of the operands are themselves tuples.
+///
+/// For example, given `TYPES = (dict, list)`, then
+/// `isinstance(None, TYPES | set | float)` will raise a `TypeError` at runtime,
+/// while `isinstance(None, set | float)` will not.
 ///
 /// ## Example
 /// ```python
@@ -130,10 +139,14 @@ pub(crate) fn repeated_isinstance_calls(
                 },
                 expr.range(),
             );
-            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                pad(call, expr.range(), checker.locator()),
-                expr.range(),
-            )));
+            diagnostic.set_fix(Fix::applicable_edit(
+                Edit::range_replacement(pad(call, expr.range(), checker.locator()), expr.range()),
+                if checker.settings.target_version >= PythonVersion::Py310 {
+                    Applicability::Unsafe
+                } else {
+                    Applicability::Safe
+                },
+            ));
             checker.diagnostics.push(diagnostic);
         }
     }

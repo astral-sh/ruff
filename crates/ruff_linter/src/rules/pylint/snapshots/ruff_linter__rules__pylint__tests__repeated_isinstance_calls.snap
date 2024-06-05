@@ -140,5 +140,3 @@ repeated_isinstance_calls.py:42:3: PLR1701 [*] Merge `isinstance` calls: `isinst
 42    |-if(isinstance(self.k, int)) or (isinstance(self.k, float)):
    42 |+if isinstance(self.k, (float, int)):
 43 43 |     ...
-
-
