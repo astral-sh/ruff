@@ -1943,7 +1943,6 @@ dependencies = [
  "toml",
  "tracing",
  "tracing-subscriber",
- "tracing-tree",
  "walkdir",
  "wild",
 ]
@@ -2344,6 +2343,7 @@ dependencies = [
  "serde_json",
  "shellexpand",
  "tracing",
+ "tracing-subscriber",
  "walkdir",
 ]
 
