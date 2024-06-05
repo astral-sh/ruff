@@ -518,7 +518,7 @@ fn check_dynamically_typed<F>(
             parse_type_annotation(string_expr, checker.locator().contents())
         {
             if type_hint_resolves_to_any(
-                &parsed_annotation,
+                parsed_annotation.expr(),
                 checker.semantic(),
                 checker.locator(),
                 checker.settings.target_version.minor(),

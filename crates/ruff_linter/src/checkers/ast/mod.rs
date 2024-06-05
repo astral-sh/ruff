@@ -30,13 +30,6 @@ use std::path::Path;
 
 use itertools::Itertools;
 use log::debug;
-use ruff_python_ast::{
-    self as ast, AnyParameterRef, Comprehension, ElifElseClause, ExceptHandler, Expr, ExprContext,
-    FStringElement, Keyword, MatchCase, ModModule, Parameter, Parameters, Pattern, Stmt, Suite,
-    UnaryOp,
-};
-use ruff_python_parser::Parsed;
-use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use ruff_diagnostics::{Diagnostic, IsolationLevel};
 use ruff_notebook::{CellOffsets, NotebookIndex};
@@ -47,10 +40,16 @@ use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::str::Quote;
 use ruff_python_ast::visitor::{walk_except_handler, walk_pattern, Visitor};
+use ruff_python_ast::{
+    self as ast, AnyParameterRef, Comprehension, ElifElseClause, ExceptHandler, Expr, ExprContext,
+    FStringElement, Keyword, MatchCase, ModExpression, ModModule, Parameter, Parameters, Pattern,
+    Stmt, Suite, UnaryOp,
+};
 use ruff_python_ast::{helpers, str, visitor, PySourceType};
 use ruff_python_codegen::{Generator, Stylist};
 use ruff_python_index::Indexer;
 use ruff_python_parser::typing::{parse_type_annotation, AnnotationKind};
+use ruff_python_parser::Parsed;
 use ruff_python_semantic::all::{DunderAllDefinition, DunderAllFlags};
 use ruff_python_semantic::analyze::{imports, typing};
 use ruff_python_semantic::{
@@ -60,6 +59,7 @@ use ruff_python_semantic::{
 };
 use ruff_python_stdlib::builtins::{IPYTHON_BUILTINS, MAGIC_GLOBALS, PYTHON_BUILTINS};
 use ruff_source_file::{Locator, OneIndexed, SourceRow};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::annotation::AnnotationContext;
 use crate::docstrings::extraction::ExtractionTarget;
@@ -2148,7 +2148,10 @@ impl<'a> Checker<'a> {
     ///
     /// class Bar: pass
     /// ```
-    fn visit_deferred_string_type_definitions(&mut self, allocator: &'a typed_arena::Arena<Expr>) {
+    fn visit_deferred_string_type_definitions(
+        &mut self,
+        allocator: &'a typed_arena::Arena<Parsed<ModExpression>>,
+    ) {
         let snapshot = self.semantic.snapshot();
         while !self.visit.string_type_definitions.is_empty() {
             let type_definitions = std::mem::take(&mut self.visit.string_type_definitions);
@@ -2183,7 +2186,7 @@ impl<'a> Checker<'a> {
 
                     self.semantic.flags |=
                         SemanticModelFlags::TYPE_DEFINITION | type_definition_flag;
-                    self.visit_expr(parsed_annotation);
+                    self.visit_expr(parsed_annotation.expr());
                 } else {
                     if self.enabled(Rule::ForwardAnnotationSyntaxError) {
                         self.diagnostics.push(Diagnostic::new(
@@ -2258,7 +2261,7 @@ impl<'a> Checker<'a> {
     /// After initial traversal of the source tree has been completed,
     /// recursively visit all AST nodes that were deferred on the first pass.
     /// This includes lambdas, functions, type parameters, and type annotations.
-    fn visit_deferred(&mut self, allocator: &'a typed_arena::Arena<Expr>) {
+    fn visit_deferred(&mut self, allocator: &'a typed_arena::Arena<Parsed<ModExpression>>) {
         while !self.visit.is_empty() {
             self.visit_deferred_class_bases();
             self.visit_deferred_functions();
