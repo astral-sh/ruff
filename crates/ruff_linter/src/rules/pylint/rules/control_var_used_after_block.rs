@@ -109,33 +109,20 @@ pub(crate) fn control_var_used_after_block(
     //     return;
     // }
 
-    println!("nodes {:#?}", checker.semantic().nodes());
+    // println!("nodes {:#?}", checker.semantic().nodes());
 
     for (name, binding) in scope
         .bindings()
         .map(|(name, binding_id)| (name, checker.semantic().binding(binding_id)))
-    // .filter_map(|(name, binding)| {
-    //     if (binding.kind.is_assignment()
-    //         || binding.kind.is_named_expr_assignment()
-    //         || binding.kind.is_with_item_var())
-    //         && (!binding.is_unpacked_assignment() || checker.settings.preview.is_enabled())
-    //         && !binding.is_nonlocal()
-    //         && !binding.is_global()
-    //         && !binding.is_used()
-    //         && !checker.settings.dummy_variable_rgx.is_match(name)
-    //         && !matches!(
-    //             name,
-    //             "__tracebackhide__"
-    //                 | "__traceback_info__"
-    //                 | "__traceback_supplement__"
-    //                 | "__debuggerskip__"
-    //         )
-    //     {
-    //         return Some((name, binding));
-    //     }
+        .filter_map(|(name, binding)| {
+            println!("name={:?} kind={:?}", name, binding.kind);
 
-    //     None
-    // })
+            if binding.kind.is_loop_var() || binding.kind.is_with_item_var() {
+                return Some((name, binding));
+            }
+
+            None
+        })
     {
         println!("Binding {:?} {:?}", name, binding);
         // Find for-loop variable bindings
@@ -175,7 +162,7 @@ pub(crate) fn control_var_used_after_block(
                     "\t\tbinding_source_node_id={:?} binding_statement_id={:?} ancestor_node_id={:?}",
                     binding_source_node_id, binding_statement_id, ancestor_node_id
                 );
-                if (binding_statement_id == ancestor_node_id) {
+                if binding_statement_id == ancestor_node_id {
                     println!("\t\to");
                     found_match = true;
                     break;
@@ -184,7 +171,7 @@ pub(crate) fn control_var_used_after_block(
                 }
             }
 
-            if (!found_match) {
+            if !found_match {
                 println!("\t\temits error={:?}", reference_node_id);
                 let block_kind = match binding_statement {
                     Stmt::For(_) => BlockKind::For,
@@ -197,7 +184,7 @@ pub(crate) fn control_var_used_after_block(
                 diagnostics.push(Diagnostic::new(
                     ControlVarUsedAfterBlock {
                         control_var_name: name.to_owned(),
-                        block_kind: block_kind,
+                        block_kind,
                     },
                     reference.range(),
                 ))

@@ -1,12 +1,11 @@
 import typing
 from typing import cast
 
-# TODO: Figure this out
-# for global_var in []:
-#     _ = global_var
-#     pass
+for global_var in []:
+    _ = global_var
+    pass
 
-# _ = global_var
+_ = global_var
 
 def foo():
     # For control var used outside block
@@ -16,7 +15,7 @@ def foo():
 
     _ = event
 
-    # # Tuple destructuring
+    # Tuple destructuring
     for a, b, c in []:
         pass
 
@@ -25,7 +24,7 @@ def foo():
     _ = c
 
 
-    # # Array destructuring
+    # Array destructuring
     for [d, e, f] in []:
         pass
 
