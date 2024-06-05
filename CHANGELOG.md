@@ -4,7 +4,7 @@
 
 ### Performance
 
-- Maintain synchronicity between the lexer and the parser ([#11457](https://github.com/astral-sh/ruff/pull/11457))
+- Linter performance has been improved by around 10% on some microbenchmarks by refactoring the lexer and parser to maintain synchronicity between them ([#11457](https://github.com/astral-sh/ruff/pull/11457))
 
 ### Preview features
 
@@ -29,10 +29,8 @@
 
 - \[`pyupgrade`\] Write empty string in lieu of panic when fixing `UP032` ([#11696](https://github.com/astral-sh/ruff/pull/11696))
 - \[`flake8-simplify`\] Simplify double negatives in `SIM103` ([#11684](https://github.com/astral-sh/ruff/pull/11684))
-- Ensure the expression generator adds a newline before ``type`` statements ([#11720](https://github.com/astral-sh/ruff/pull/11720))
-- Lexer should consider BOM for the start offset ([#11732](https://github.com/astral-sh/ruff/pull/11732))
+- Ensure the expression generator adds a newline before `type` statements ([#11720](https://github.com/astral-sh/ruff/pull/11720))
 - Respect per-file ignores for blanket and redirected noqa rules ([#11728](https://github.com/astral-sh/ruff/pull/11728))
-- Use `Tokens` from parsed type annotation or parsed source ([#11740](https://github.com/astral-sh/ruff/pull/11740))
 
 ## 0.4.7
 
