@@ -2,8 +2,6 @@ use std::borrow::Cow;
 use std::iter::FusedIterator;
 use std::slice::Iter;
 
-use unicode_width::UnicodeWidthStr;
-
 use ruff_formatter::{write, FormatError};
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::Stmt;
@@ -760,17 +758,7 @@ impl Format<PyFormatContext<'_>> for FormatVerbatimStatementRange {
 
                 // Write the line separator that terminates the line, except if it is the last line (that isn't separated by a hard line break).
                 if logical_line.has_trailing_newline {
-                    // Insert an empty line if the text is non-empty but all characters have a width of zero.
-                    // This is necessary to work around the fact that the Printer omits hard line breaks if the line width is 0.
-                    // The alternative is to "fix" the printer and explicitly track the width and whether the line is empty.
-                    // There's currently no use case for zero-width content outside of the verbatim context (and, form feeds are a Python specific speciality).
-                    // It, therefore, feels wrong to add additional complexity to the very hot `Printer::print_char` function,
-                    // to work around this special case. Therefore, work around the Printer behavior here, in the cold verbatim-formatting.
-                    if f.context().source()[trimmed_line_range].width() == 0 {
-                        empty_line().fmt(f)?;
-                    } else {
-                        hard_line_break().fmt(f)?;
-                    }
+                    hard_line_break().fmt(f)?;
                 }
             }
 
