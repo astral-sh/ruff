@@ -88,27 +88,21 @@ impl Connection {
             lsp::Message::Request(lsp::Request { id, method, .. })
                 if method == lsp_types::request::Shutdown::METHOD =>
             {
-                tracing::subscriber::with_default(crate::trace::stderr_subscriber(), || {
-                    self.sender
-                        .send(lsp::Response::new_ok(id.clone(), ()).into())?;
-                    tracing::info!(
-                        "Shutdown request received. Waiting for an exit notification..."
-                    );
-                    match self.receiver.recv_timeout(std::time::Duration::from_secs(30))? {
+                self.sender
+                    .send(lsp::Response::new_ok(id.clone(), ()).into())?;
+                tracing::info!("Shutdown request received. Waiting for an exit notification...");
+                match self.receiver.recv_timeout(std::time::Duration::from_secs(30))? {
                     lsp::Message::Notification(lsp::Notification { method, .. }) if method == lsp_types::notification::Exit::METHOD => {
                         tracing::info!("Exit notification received. Server shutting down...");
                         Ok(true)
                     },
                     message => anyhow::bail!("Server received unexpected message {message:?} while waiting for exit notification")
                 }
-                })
             }
             lsp::Message::Notification(lsp::Notification { method, .. })
                 if method == lsp_types::notification::Exit::METHOD =>
             {
-                tracing::subscriber::with_default(crate::trace::stderr_subscriber(), || {
-                    tracing::error!("Server received an exit notification before a shutdown request was sent. Exiting...");
-                });
+                tracing::error!("Server received an exit notification before a shutdown request was sent. Exiting...");
                 Ok(true)
             }
             _ => Ok(false),

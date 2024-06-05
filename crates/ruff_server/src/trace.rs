@@ -10,11 +10,6 @@ static LOGGING_SENDER: OnceLock<ClientSender> = OnceLock::new();
 
 static TRACE_VALUE: Mutex<lsp_types::TraceValue> = Mutex::new(lsp_types::TraceValue::Off);
 
-pub(crate) fn stderr_subscriber() -> impl tracing::Subscriber {
-    tracing_subscriber::registry()
-        .with(tracing_subscriber::fmt::layer().with_writer(|| Box::new(std::io::stderr())))
-}
-
 pub(crate) fn set_trace_value(trace_value: TraceValue) {
     let mut global_trace_value = TRACE_VALUE
         .lock()
