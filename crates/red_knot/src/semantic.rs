@@ -240,21 +240,6 @@ impl SemanticIndexer {
 
 impl PreorderVisitor<'_> for SemanticIndexer {
     fn visit_expr(&mut self, expr: &ast::Expr) {
-        if let ast::Expr::Name(ast::ExprName { id, ctx, .. }) = expr {
-            let flags = match ctx {
-                ast::ExprContext::Load => SymbolFlags::IS_USED,
-                ast::ExprContext::Store => SymbolFlags::IS_DEFINED,
-                ast::ExprContext::Del => SymbolFlags::IS_DEFINED,
-                ast::ExprContext::Invalid => SymbolFlags::empty(),
-            };
-            self.add_or_update_symbol(id, flags);
-            if flags.contains(SymbolFlags::IS_DEFINED) {
-                if let Some(curdef) = self.current_definition.clone() {
-                    self.add_or_update_symbol_with_def(id, curdef);
-                }
-            }
-        }
-
         let expression_id = self
             .flow_graph_builder
             .record_expr(self.current_flow_node());
@@ -267,7 +252,35 @@ impl PreorderVisitor<'_> for SemanticIndexer {
 
         self.expressions
             .insert(NodeKey::from_node(expr.into()), expression_id);
-        ast::visitor::preorder::walk_expr(self, expr);
+
+        match expr {
+            ast::Expr::Name(ast::ExprName { id, ctx, .. }) => {
+                let flags = match ctx {
+                    ast::ExprContext::Load => SymbolFlags::IS_USED,
+                    ast::ExprContext::Store => SymbolFlags::IS_DEFINED,
+                    ast::ExprContext::Del => SymbolFlags::IS_DEFINED,
+                    ast::ExprContext::Invalid => SymbolFlags::empty(),
+                };
+                self.add_or_update_symbol(id, flags);
+                if flags.contains(SymbolFlags::IS_DEFINED) {
+                    if let Some(curdef) = self.current_definition.clone() {
+                        self.add_or_update_symbol_with_def(id, curdef);
+                    }
+                }
+                ast::visitor::preorder::walk_expr(self, expr);
+            }
+            ast::Expr::Named(node) => {
+                debug_assert!(self.current_definition.is_none());
+                self.current_definition =
+                    Some(Definition::NamedExpr(TypedNodeKey::from_node(node)));
+                self.visit_expr(&node.target);
+                self.current_definition = None;
+                self.visit_expr(&node.value);
+            }
+            _ => {
+                ast::visitor::preorder::walk_expr(self, expr);
+            }
+        }
     }
 
     fn visit_stmt(&mut self, stmt: &ast::Stmt) {
@@ -394,8 +407,12 @@ impl PreorderVisitor<'_> for SemanticIndexer {
                 debug_assert!(self.current_definition.is_none());
                 self.current_definition =
                     Some(Definition::Assignment(TypedNodeKey::from_node(node)));
-                ast::visitor::preorder::walk_stmt(self, stmt);
+                for expr in &node.targets {
+                    self.visit_expr(expr);
+                }
+
                 self.current_definition = None;
+                self.visit_expr(&node.value);
             }
             ast::Stmt::If(node) => {
                 // we visit the if "test" condition first regardless
