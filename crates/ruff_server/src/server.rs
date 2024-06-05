@@ -64,9 +64,11 @@ impl Server {
             crate::version(),
         )?;
 
-        // TODO(jane): Support a log level setting
-        let log_level = crate::trace::LogLevel::Info;
-        let tracing_guard = crate::trace::init_tracing(connection.make_sender(), log_level);
+        if let Some(trace) = init_params.trace {
+            crate::trace::set_trace_value(trace);
+        }
+
+        let tracing_guard = crate::trace::init_tracing(connection.make_sender());
         crate::message::init_messenger(connection.make_sender());
 
         let AllSettings {

@@ -1,22 +1,29 @@
-use lsp_types::notification::Notification;
+use lsp_types::{notification::Notification, TraceValue};
 use serde::Deserialize;
-use std::sync::OnceLock;
+use std::sync::{Mutex, OnceLock};
 use tracing::{level_filters::LevelFilter, Event};
-use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::{layer::SubscriberExt, Layer};
 
 use crate::server::ClientSender;
 
 static LOGGING_SENDER: OnceLock<ClientSender> = OnceLock::new();
 
-pub(crate) fn init_tracing(
-    sender: ClientSender,
-    filter: LogLevel,
-) -> tracing::subscriber::DefaultGuard {
+static TRACE_VALUE: Mutex<lsp_types::TraceValue> = Mutex::new(lsp_types::TraceValue::Messages);
+
+pub(crate) fn set_trace_value(trace_value: TraceValue) {
+    let mut global_trace_value = TRACE_VALUE
+        .lock()
+        .expect("trace value mutex should be available");
+    *global_trace_value = trace_value;
+}
+
+pub(crate) fn init_tracing(sender: ClientSender) -> tracing::subscriber::DefaultGuard {
     LOGGING_SENDER
         .set(sender)
         .expect("logging sender should only be initialized once");
 
-    let subscriber = tracing_subscriber::Registry::default().with(LogLayer { filter });
+    let subscriber =
+        tracing_subscriber::Registry::default().with(LogLayer.with_filter(TraceValueFilter));
 
     tracing::subscriber::set_default(subscriber)
 }
@@ -51,40 +58,59 @@ impl LogLevel {
             Self::Debug => lsp_types::MessageType::LOG,
         }
     }
+}
 
-    fn trace_level(self) -> tracing::Level {
-        match self {
-            Self::Error => tracing::Level::ERROR,
-            Self::Warn => tracing::Level::WARN,
-            Self::Info => tracing::Level::INFO,
-            Self::Debug => tracing::Level::DEBUG,
+struct LogLayer;
+
+struct TraceValueFilter;
+
+impl TraceValueFilter {
+    fn ruff_tracing_level() -> tracing::Level {
+        match trace_value() {
+            lsp_types::TraceValue::Verbose => tracing::Level::TRACE,
+            lsp_types::TraceValue::Messages => tracing::Level::INFO,
+            lsp_types::TraceValue::Off => tracing::Level::ERROR,
+        }
+    }
+
+    fn default_tracing_level() -> tracing::Level {
+        match trace_value() {
+            lsp_types::TraceValue::Off => tracing::Level::ERROR,
+            _ => tracing::Level::INFO,
         }
     }
 }
 
-struct LogLayer {
-    filter: LogLevel,
+impl<S> tracing_subscriber::layer::Filter<S> for TraceValueFilter {
+    fn enabled(
+        &self,
+        meta: &tracing::Metadata<'_>,
+        _: &tracing_subscriber::layer::Context<'_, S>,
+    ) -> bool {
+        let filter = if meta.target().starts_with("ruff") {
+            Self::ruff_tracing_level()
+        } else {
+            Self::default_tracing_level()
+        };
+
+        meta.level() <= &filter
+    }
+
+    fn max_level_hint(&self) -> Option<tracing::level_filters::LevelFilter> {
+        Some(LevelFilter::from_level(Self::ruff_tracing_level()))
+    }
 }
 
 impl tracing_subscriber::Layer<tracing_subscriber::Registry> for LogLayer {
     fn register_callsite(
         &self,
-        metadata: &'static tracing::Metadata<'static>,
+        meta: &'static tracing::Metadata<'static>,
     ) -> tracing::subscriber::Interest {
-        if metadata.is_event()
-            && metadata
-                .fields()
-                .iter()
-                .any(|field| field.name() == "message")
-        {
+        if meta.is_event() && meta.fields().iter().any(|field| field.name() == "message") {
             tracing::subscriber::Interest::always()
         } else {
             tracing::subscriber::Interest::never()
         }
-    }
-
-    fn max_level_hint(&self) -> Option<tracing::level_filters::LevelFilter> {
-        Some(LevelFilter::from_level(self.filter.trace_level()))
     }
 
     fn on_event(
@@ -124,4 +150,11 @@ fn log(message: String, level: LogLevel) {
                 .expect("log notification should serialize"),
             },
         ));
+}
+
+#[inline]
+fn trace_value() -> TraceValue {
+    *TRACE_VALUE
+        .lock()
+        .expect("trace value mutex should be available")
 }
