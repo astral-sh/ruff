@@ -27,9 +27,9 @@
 
 ### Bug fixes
 
-- \[`pyupgrade`\] Write empty string in lieu of panic ([#11696](https://github.com/astral-sh/ruff/pull/11696))
+- \[`pyupgrade`\] Write empty string in lieu of panic when fixing `UP032` ([#11696](https://github.com/astral-sh/ruff/pull/11696))
 - \[`flake8-simplify`\] Simplify double negatives in `SIM103` ([#11684](https://github.com/astral-sh/ruff/pull/11684))
-- Generator should add a newline before type statement ([#11720](https://github.com/astral-sh/ruff/pull/11720))
+- Ensure the expression generator adds a newline before ``type`` statements ([#11720](https://github.com/astral-sh/ruff/pull/11720))
 - Lexer should consider BOM for the start offset ([#11732](https://github.com/astral-sh/ruff/pull/11732))
 - Respect per-file ignores for blanket and redirected noqa rules ([#11728](https://github.com/astral-sh/ruff/pull/11728))
 - Use `Tokens` from parsed type annotation or parsed source ([#11740](https://github.com/astral-sh/ruff/pull/11740))
