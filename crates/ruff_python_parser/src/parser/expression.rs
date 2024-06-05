@@ -689,7 +689,8 @@ impl<'src> Parser<'src> {
 
                         parsed_expr = Expr::Generator(parser.parse_generator_expression(
                             parsed_expr.expr,
-                            GeneratorExpressionInParentheses::No(start),
+                            start,
+                            Parenthesized::No,
                         ))
                         .into();
                     }
@@ -1705,7 +1706,8 @@ impl<'src> Parser<'src> {
 
                 let generator = Expr::Generator(self.parse_generator_expression(
                     parsed_expr.expr,
-                    GeneratorExpressionInParentheses::Yes(start),
+                    start,
+                    Parenthesized::Yes,
                 ));
 
                 ParsedExpr {
@@ -1942,33 +1944,20 @@ impl<'src> Parser<'src> {
     pub(super) fn parse_generator_expression(
         &mut self,
         element: Expr,
-        in_parentheses: GeneratorExpressionInParentheses,
+        start: TextSize,
+        parenthesized: Parenthesized,
     ) -> ast::ExprGenerator {
         let generators = self.parse_generators();
 
-        let (parenthesized, start) = match in_parentheses {
-            GeneratorExpressionInParentheses::Yes(lpar_start) => {
-                self.expect(TokenKind::Rpar);
-                (true, lpar_start)
-            }
-            GeneratorExpressionInParentheses::No(expr_start) => (false, expr_start),
-            GeneratorExpressionInParentheses::Maybe {
-                lpar_start,
-                expr_start,
-            } => {
-                if self.eat(TokenKind::Rpar) {
-                    (true, lpar_start)
-                } else {
-                    (false, expr_start)
-                }
-            }
-        };
+        if parenthesized.is_yes() {
+            self.expect(TokenKind::Rpar);
+        }
 
         ast::ExprGenerator {
             elt: Box::new(element),
             generators,
             range: self.node_range(start),
-            parenthesized,
+            parenthesized: parenthesized.is_yes(),
         }
     }
 
@@ -2470,26 +2459,6 @@ impl From<Operator> for OperatorPrecedence {
             Operator::Pow => OperatorPrecedence::Exponent,
         }
     }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum GeneratorExpressionInParentheses {
-    /// The generator expression is in parentheses. The given [`TextSize`] is the
-    /// start of the left parenthesis. E.g., `(x for x in range(10))`.
-    Yes(TextSize),
-
-    /// The generator expression is not in parentheses. The given [`TextSize`] is the
-    /// start of the expression. E.g., `x for x in range(10)`.
-    No(TextSize),
-
-    /// The generator expression may or may not be in parentheses. The given [`TextSize`]s
-    /// are the start of the left parenthesis and the start of the expression, respectively.
-    Maybe {
-        /// The start of the left parenthesis.
-        lpar_start: TextSize,
-        /// The start of the expression.
-        expr_start: TextSize,
-    },
 }
 
 /// Represents the precedence used for parsing the value part of a starred expression.
