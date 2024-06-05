@@ -588,7 +588,7 @@ mod tests {
     }
 
     #[test]
-    fn ifexpr_walrus_order() -> anyhow::Result<()> {
+    fn ifexpr_walrus_2() -> anyhow::Result<()> {
         let case = create_test()?;
 
         write_to_path(
