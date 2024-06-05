@@ -8,7 +8,7 @@ use crate::codes::Rule;
 use crate::fix;
 use crate::rules::{
     flake8_builtins, flake8_pyi, flake8_type_checking, flake8_unused_arguments, pep8_naming,
-    pyflakes, pylint, ruff,
+    pyflakes, pylint, ruff, wemake_python_styleguide,
 };
 
 /// Run lint rules over all deferred scopes in the [`SemanticModel`].
@@ -87,10 +87,12 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
     for scope_id in checker.analyze.scopes.iter().rev().copied() {
         let scope = &checker.semantic.scopes[scope_id];
 
-        // TODO: Put in the right place
-        // TODO: How to make this run with the global scope outside of a function?
         if checker.enabled(Rule::ControlVarUsedAfterBlock) {
-            pylint::rules::control_var_used_after_block(checker, scope, &mut diagnostics);
+            wemake_python_styleguide::rules::control_var_used_after_block(
+                checker,
+                scope,
+                &mut diagnostics,
+            );
         }
 
         if checker.enabled(Rule::UndefinedLocal) {

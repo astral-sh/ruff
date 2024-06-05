@@ -59,8 +59,6 @@ pub(crate) use potential_index_error::*;
 pub(crate) use property_with_parameters::*;
 pub(crate) use redeclared_assigned_name::*;
 pub(crate) use redefined_argument_from_local::*;
-// TODO: Put this in the right spot
-pub(crate) use control_var_used_after_block::*;
 pub(crate) use redefined_loop_name::*;
 pub(crate) use repeated_equality_comparison::*;
 pub(crate) use repeated_isinstance_calls::*;
@@ -163,8 +161,6 @@ mod potential_index_error;
 mod property_with_parameters;
 mod redeclared_assigned_name;
 mod redefined_argument_from_local;
-// TODO: Put this in the right spot
-mod control_var_used_after_block;
 mod redefined_loop_name;
 mod repeated_equality_comparison;
 mod repeated_isinstance_calls;
