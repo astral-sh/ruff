@@ -2215,7 +2215,6 @@ dependencies = [
  "static_assertions",
  "thiserror",
  "tracing",
- "unicode-width",
 ]
 
 [[package]]
