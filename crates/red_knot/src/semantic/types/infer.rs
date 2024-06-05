@@ -227,6 +227,15 @@ fn infer_expr_type(db: &dyn SemanticDb, file_id: FileId, expr: &ast::Expr) -> Qu
             left_ty.resolve_bin_op(db, *op, right_ty)
         }
         ast::Expr::Named(ast::ExprNamed { value, .. }) => infer_expr_type(db, file_id, value),
+        ast::Expr::If(ast::ExprIf { body, orelse, .. }) => {
+            // TODO detect statically known truthy or falsy test
+            let body_ty = infer_expr_type(db, file_id, body)?;
+            let else_ty = infer_expr_type(db, file_id, orelse)?;
+            let jar: &SemanticJar = db.jar()?;
+            Ok(Type::Union(
+                jar.type_store.add_union(file_id, &[body_ty, else_ty]),
+            ))
+        }
         _ => todo!("expression type resolution for {:?}", expr),
     }
 }
@@ -541,5 +550,57 @@ mod tests {
 
         assert_public_type(&case, "a", "x", "Literal[2]")?;
         assert_public_type(&case, "a", "y", "Literal[1]")
+    }
+
+    #[test]
+    fn ifexpr() -> anyhow::Result<()> {
+        let case = create_test()?;
+
+        write_to_path(
+            &case,
+            "a.py",
+            "
+                x = 1 if flag else 2
+            ",
+        )?;
+
+        assert_public_type(&case, "a", "x", "(Literal[1] | Literal[2])")
+    }
+
+    #[test]
+    fn ifexpr_walrus() -> anyhow::Result<()> {
+        let case = create_test()?;
+
+        write_to_path(
+            &case,
+            "a.py",
+            "
+                y = z = 0
+                x = (y := 1) if flag else (z := 2)
+                a = y
+                b = z
+            ",
+        )?;
+
+        assert_public_type(&case, "a", "x", "(Literal[1] | Literal[2])")?;
+        assert_public_type(&case, "a", "a", "(Literal[1] | Literal[0])")?;
+        assert_public_type(&case, "a", "b", "(Literal[0] | Literal[2])")
+    }
+
+    #[test]
+    fn ifexpr_walrus_order() -> anyhow::Result<()> {
+        let case = create_test()?;
+
+        write_to_path(
+            &case,
+            "a.py",
+            "
+                y = 0
+                (y := 1) if flag else (y := 2)
+                a = y
+            ",
+        )?;
+
+        assert_public_type(&case, "a", "a", "(Literal[1] | Literal[2])")
     }
 }

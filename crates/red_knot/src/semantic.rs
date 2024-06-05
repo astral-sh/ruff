@@ -278,6 +278,31 @@ impl PreorderVisitor<'_> for SemanticIndexer {
                 self.current_definition = None;
                 self.visit_expr(&node.value);
             }
+            ast::Expr::If(ast::ExprIf {
+                body, test, orelse, ..
+            }) => {
+                // TODO detect statically known truthy or falsy test (via type inference, not naive
+                // AST inspection, so we can't simplify here, need to record test expression in CFG
+                // for later checking)
+
+                self.visit_expr(test);
+
+                let if_branch = self.flow_graph_builder.add_branch(self.current_flow_node());
+
+                self.set_current_flow_node(if_branch);
+                self.visit_expr(body);
+
+                let post_body = self.current_flow_node();
+
+                self.set_current_flow_node(if_branch);
+                self.visit_expr(orelse);
+
+                let post_else = self
+                    .flow_graph_builder
+                    .add_phi(self.current_flow_node(), post_body);
+
+                self.set_current_flow_node(post_else);
+            }
             _ => {
                 ast::visitor::preorder::walk_expr(self, expr);
             }
@@ -416,6 +441,10 @@ impl PreorderVisitor<'_> for SemanticIndexer {
                 self.visit_expr(&node.value);
             }
             ast::Stmt::If(node) => {
+                // TODO detect statically known truthy or falsy test (via type inference, not naive
+                // AST inspection, so we can't simplify here, need to record test expression in CFG
+                // for later checking)
+
                 // we visit the if "test" condition first regardless
                 self.visit_expr(&node.test);
 
