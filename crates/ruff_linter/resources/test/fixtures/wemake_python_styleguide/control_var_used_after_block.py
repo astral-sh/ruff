@@ -35,7 +35,6 @@ def foo():
     _ = b
     _ = c
 
-
     # Array destructuring
     for [d, e, f] in []:
         _ = d
@@ -48,20 +47,24 @@ def foo():
     _ = f
 
     # with statement
-    with None as i:
-        _ = i
+    with None as w:
+        _ = w
         pass
 
-    _ = i
+    _ = w
 
     # Nested blocks
-    with None as i:
+    with None as q:
+        _ = q
+        
         for n in []:
             _ = n
+            _ = q
             pass
 
         _ = n
 
+    _ = q
     _ = n
 
 
