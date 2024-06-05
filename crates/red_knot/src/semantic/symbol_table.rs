@@ -145,7 +145,8 @@ pub enum Definition {
     FunctionDef(TypedNodeKey<ast::StmtFunctionDef>),
     Assignment(TypedNodeKey<ast::StmtAssign>),
     AnnotatedAssignment(TypedNodeKey<ast::StmtAnnAssign>),
-    None,
+    /// represents the implicit initial definition of every name as "unbound"
+    Unbound,
     // TODO with statements, except handlers, function args...
 }
 
