@@ -1,8 +1,6 @@
 use super::symbol_table::{Definition, SymbolId};
-use crate::ast_ids::NodeKey;
+use crate::semantic::ExpressionId;
 use ruff_index::{newtype_index, IndexVec};
-use ruff_python_ast as ast;
-use rustc_hash::FxHashMap;
 use std::iter::FusedIterator;
 
 #[newtype_index]
@@ -40,7 +38,7 @@ pub(crate) struct PhiFlowNode {
 #[derive(Debug)]
 pub struct FlowGraph {
     flow_nodes_by_id: IndexVec<FlowNodeId, FlowNode>,
-    ast_to_flow: FxHashMap<NodeKey, FlowNodeId>,
+    expression_map: IndexVec<ExpressionId, FlowNodeId>,
 }
 
 impl FlowGraph {
@@ -48,9 +46,8 @@ impl FlowGraph {
         FlowNodeId::from_usize(0)
     }
 
-    pub fn for_expr(&self, expr: &ast::Expr) -> FlowNodeId {
-        let node_key = NodeKey::from_node(expr.into());
-        self.ast_to_flow[&node_key]
+    pub fn for_expr(&self, expr: ExpressionId) -> FlowNodeId {
+        self.expression_map[expr]
     }
 }
 
@@ -63,7 +60,7 @@ impl FlowGraphBuilder {
     pub(crate) fn new() -> Self {
         let mut graph = FlowGraph {
             flow_nodes_by_id: IndexVec::default(),
-            ast_to_flow: FxHashMap::default(),
+            expression_map: IndexVec::default(),
         };
         graph.flow_nodes_by_id.push(FlowNode::Start);
         Self { flow_graph: graph }
@@ -101,13 +98,13 @@ impl FlowGraphBuilder {
         }))
     }
 
-    pub(crate) fn record_expr(&mut self, expr: &ast::Expr, node_id: FlowNodeId) {
-        self.flow_graph
-            .ast_to_flow
-            .insert(NodeKey::from_node(expr.into()), node_id);
+    pub(super) fn record_expr(&mut self, node_id: FlowNodeId) -> ExpressionId {
+        self.flow_graph.expression_map.push(node_id)
     }
 
-    pub(crate) fn finish(self) -> FlowGraph {
+    pub(super) fn finish(mut self) -> FlowGraph {
+        self.flow_graph.flow_nodes_by_id.shrink_to_fit();
+        self.flow_graph.expression_map.shrink_to_fit();
         self.flow_graph
     }
 }

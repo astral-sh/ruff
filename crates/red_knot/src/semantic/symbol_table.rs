@@ -13,6 +13,7 @@ use ruff_python_ast as ast;
 
 use crate::ast_ids::{NodeKey, TypedNodeKey};
 use crate::module::ModuleName;
+use crate::semantic::ExpressionId;
 use crate::Name;
 
 type Map<K, V> = hashbrown::HashMap<K, V, ()>;
@@ -192,6 +193,8 @@ pub struct SymbolTable {
     defs: FxHashMap<SymbolId, Vec<Definition>>,
     /// map of AST node (e.g. class/function def) to sub-scope it creates
     scopes_by_node: FxHashMap<NodeKey, ScopeId>,
+    /// Maps expressions to their enclosing scope.
+    expression_scopes: IndexVec<ExpressionId, ScopeId>,
     /// dependencies of this module
     dependencies: Vec<Dependency>,
 }
@@ -281,6 +284,14 @@ impl SymbolTable {
 
     pub fn scope_of_symbol(&self, symbol_id: SymbolId) -> &Scope {
         &self.scopes_by_id[self.scope_id_of_symbol(symbol_id)]
+    }
+
+    pub fn scope_id_of_expression(&self, expression: ExpressionId) -> ScopeId {
+        self.expression_scopes[expression]
+    }
+
+    pub fn scope_of_expression(&self, expr_id: ExpressionId) -> &Scope {
+        &self.scopes_by_id[self.scope_id_of_expression(expr_id)]
     }
 
     pub fn parent_scopes(
@@ -393,17 +404,18 @@ where
 }
 
 #[derive(Debug)]
-pub(crate) struct SymbolTableBuilder {
+pub(super) struct SymbolTableBuilder {
     symbol_table: SymbolTable,
 }
 
 impl SymbolTableBuilder {
-    pub(crate) fn new() -> Self {
+    pub(super) fn new() -> Self {
         let mut table = SymbolTable {
             scopes_by_id: IndexVec::new(),
             symbols_by_id: IndexVec::new(),
             defs: FxHashMap::default(),
             scopes_by_node: FxHashMap::default(),
+            expression_scopes: IndexVec::new(),
             dependencies: Vec::new(),
         };
         table.scopes_by_id.push(Scope {
@@ -420,11 +432,18 @@ impl SymbolTableBuilder {
         }
     }
 
-    pub(crate) fn finish(self) -> SymbolTable {
-        self.symbol_table
+    pub(super) fn finish(self) -> SymbolTable {
+        let mut symbol_table = self.symbol_table;
+        symbol_table.scopes_by_id.shrink_to_fit();
+        symbol_table.symbols_by_id.shrink_to_fit();
+        symbol_table.defs.shrink_to_fit();
+        symbol_table.scopes_by_node.shrink_to_fit();
+        symbol_table.expression_scopes.shrink_to_fit();
+        symbol_table.dependencies.shrink_to_fit();
+        symbol_table
     }
 
-    pub(crate) fn add_or_update_symbol(
+    pub(super) fn add_or_update_symbol(
         &mut self,
         scope_id: ScopeId,
         name: &str,
@@ -462,7 +481,7 @@ impl SymbolTableBuilder {
         }
     }
 
-    pub(crate) fn add_definition(&mut self, symbol_id: SymbolId, definition: Definition) {
+    pub(super) fn add_definition(&mut self, symbol_id: SymbolId, definition: Definition) {
         self.symbol_table
             .defs
             .entry(symbol_id)
@@ -470,7 +489,7 @@ impl SymbolTableBuilder {
             .push(definition);
     }
 
-    pub(crate) fn add_child_scope(
+    pub(super) fn add_child_scope(
         &mut self,
         parent_scope_id: ScopeId,
         name: &str,
@@ -492,12 +511,17 @@ impl SymbolTableBuilder {
         new_scope_id
     }
 
-    pub(crate) fn record_scope_for_node(&mut self, node_key: NodeKey, scope_id: ScopeId) {
+    pub(super) fn record_scope_for_node(&mut self, node_key: NodeKey, scope_id: ScopeId) {
         self.symbol_table.scopes_by_node.insert(node_key, scope_id);
     }
 
-    pub(crate) fn add_dependency(&mut self, dependency: Dependency) {
+    pub(super) fn add_dependency(&mut self, dependency: Dependency) {
         self.symbol_table.dependencies.push(dependency);
+    }
+
+    /// Records the scope for the current expression
+    pub(super) fn record_expression(&mut self, scope: ScopeId) -> ExpressionId {
+        self.symbol_table.expression_scopes.push(scope)
     }
 }
 
