@@ -1896,7 +1896,7 @@ dependencies = [
 
 [[package]]
 name = "ruff"
-version = "0.4.7"
+version = "0.4.8"
 dependencies = [
  "anyhow",
  "argfile",
@@ -2057,7 +2057,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_linter"
-version = "0.4.7"
+version = "0.4.8"
 dependencies = [
  "aho-corasick",
  "annotate-snippets 0.9.2",
