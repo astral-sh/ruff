@@ -460,7 +460,7 @@ pub(crate) fn printf_string_formatting(
     }
 
     if let Some(prev_end) = prev_end {
-        for token in checker.parsed().tokens().after(prev_end) {
+        for token in checker.tokens().after(prev_end) {
             match token.kind() {
                 // If we hit a right paren, we have to preserve it.
                 TokenKind::Rpar => {

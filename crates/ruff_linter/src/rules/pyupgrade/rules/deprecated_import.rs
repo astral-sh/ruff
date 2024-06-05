@@ -719,7 +719,7 @@ pub(crate) fn deprecated_import(checker: &mut Checker, import_from_stmt: &StmtIm
         module,
         checker.locator(),
         checker.stylist(),
-        checker.parsed().tokens(),
+        checker.tokens(),
         checker.settings.target_version,
     );
 

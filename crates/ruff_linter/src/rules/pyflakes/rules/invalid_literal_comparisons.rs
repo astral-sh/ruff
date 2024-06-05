@@ -96,7 +96,7 @@ pub(crate) fn invalid_literal_comparison(
         {
             let mut diagnostic = Diagnostic::new(IsLiteral { cmp_op: op.into() }, expr.range());
             if lazy_located.is_none() {
-                lazy_located = Some(locate_cmp_ops(expr, checker.parsed().tokens()));
+                lazy_located = Some(locate_cmp_ops(expr, checker.tokens()));
             }
             if let Some(located_op) = lazy_located.as_ref().and_then(|located| located.get(index)) {
                 assert_eq!(located_op.op, *op);

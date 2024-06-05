@@ -79,7 +79,7 @@ pub(crate) fn redundant_open_modes(checker: &mut Checker, call: &ast::ExprCall) 
                                 call,
                                 &keyword.value,
                                 mode.replacement_value(),
-                                checker.parsed().tokens(),
+                                checker.tokens(),
                             ));
                         }
                     }
@@ -93,7 +93,7 @@ pub(crate) fn redundant_open_modes(checker: &mut Checker, call: &ast::ExprCall) 
                         call,
                         mode_param,
                         mode.replacement_value(),
-                        checker.parsed().tokens(),
+                        checker.tokens(),
                     ));
                 }
             }

@@ -49,7 +49,7 @@ use ruff_python_ast::{helpers, str, visitor, PySourceType};
 use ruff_python_codegen::{Generator, Stylist};
 use ruff_python_index::Indexer;
 use ruff_python_parser::typing::{parse_type_annotation, AnnotationKind};
-use ruff_python_parser::Parsed;
+use ruff_python_parser::{Parsed, Tokens};
 use ruff_python_semantic::all::{DunderAllDefinition, DunderAllFlags};
 use ruff_python_semantic::analyze::{imports, typing};
 use ruff_python_semantic::{
@@ -176,8 +176,10 @@ impl ExpectedDocstringKind {
 }
 
 pub(crate) struct Checker<'a> {
-    /// The parsed [`Parsed`].
+    /// The [`Parsed`] output for the source code.
     parsed: &'a Parsed<ModModule>,
+    /// The [`Parsed`] output for the type annotation the checker is currently in.
+    parsed_type_annotation: Option<&'a Parsed<ModExpression>>,
     /// The [`Path`] to the file under analysis.
     path: &'a Path,
     /// The [`Path`] to the package containing the current file.
@@ -243,6 +245,7 @@ impl<'a> Checker<'a> {
     ) -> Checker<'a> {
         Checker {
             parsed,
+            parsed_type_annotation: None,
             settings,
             noqa_line_for,
             noqa,
@@ -326,6 +329,16 @@ impl<'a> Checker<'a> {
     /// The [`Parsed`] output for the current file, which contains the tokens, AST, and more.
     pub(crate) const fn parsed(&self) -> &'a Parsed<ModModule> {
         self.parsed
+    }
+
+    /// Returns the [`Tokens`] for the parsed type annotation if the checker is in a typing context
+    /// or the parsed source code.
+    pub(crate) fn tokens(&self) -> &'a Tokens {
+        if let Some(parsed_type_annotation) = self.parsed_type_annotation {
+            parsed_type_annotation.tokens()
+        } else {
+            self.parsed.tokens()
+        }
     }
 
     /// The [`Locator`] for the current file, which enables extraction of source code from byte
@@ -2160,6 +2173,7 @@ impl<'a> Checker<'a> {
                     parse_type_annotation(string_expr, self.locator.contents())
                 {
                     let parsed_annotation = allocator.alloc(parsed_annotation);
+                    self.parsed_type_annotation = Some(parsed_annotation);
 
                     let annotation = string_expr.value.to_str();
                     let range = string_expr.range();
@@ -2187,6 +2201,7 @@ impl<'a> Checker<'a> {
                     self.semantic.flags |=
                         SemanticModelFlags::TYPE_DEFINITION | type_definition_flag;
                     self.visit_expr(parsed_annotation.expr());
+                    self.parsed_type_annotation = None;
                 } else {
                     if self.enabled(Rule::ForwardAnnotationSyntaxError) {
                         self.diagnostics.push(Diagnostic::new(

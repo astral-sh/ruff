@@ -978,6 +978,7 @@ UP031_0.py:125:1: UP031 [*] Use format specifiers instead of percent format
     125 |+'Hello {}'.format(bar.baz)
 126 126 | 
 127 127 | 'Hello %s' % bar['bop']
+128 128 | 
 
 UP031_0.py:127:1: UP031 [*] Use format specifiers instead of percent format
     |
@@ -985,6 +986,8 @@ UP031_0.py:127:1: UP031 [*] Use format specifiers instead of percent format
 126 | 
 127 | 'Hello %s' % bar['bop']
     | ^^^^^^^^^^^^^^^^^^^^^^^ UP031
+128 | 
+129 | # Not a valid type annotation but this test shouldn't result in a panic.
     |
     = help: Replace with format specifiers
 
@@ -994,3 +997,22 @@ UP031_0.py:127:1: UP031 [*] Use format specifiers instead of percent format
 126 126 | 
 127     |-'Hello %s' % bar['bop']
     127 |+'Hello {}'.format(bar['bop'])
+128 128 | 
+129 129 | # Not a valid type annotation but this test shouldn't result in a panic.
+130 130 | # Refer: https://github.com/astral-sh/ruff/issues/11736
+
+UP031_0.py:131:5: UP031 [*] Use format specifiers instead of percent format
+    |
+129 | # Not a valid type annotation but this test shouldn't result in a panic.
+130 | # Refer: https://github.com/astral-sh/ruff/issues/11736
+131 | x: "'%s + %s' % (1, 2)"
+    |     ^^^^^^^^^^^^^^^^^^ UP031
+    |
+    = help: Replace with format specifiers
+
+ℹ Unsafe fix
+128 128 | 
+129 129 | # Not a valid type annotation but this test shouldn't result in a panic.
+130 130 | # Refer: https://github.com/astral-sh/ruff/issues/11736
+131     |-x: "'%s + %s' % (1, 2)"
+    131 |+x: "'{} + {}'.format(1, 2)"

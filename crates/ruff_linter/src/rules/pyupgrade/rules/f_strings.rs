@@ -409,7 +409,7 @@ pub(crate) fn f_strings(checker: &mut Checker, call: &ast::ExprCall, summary: &F
     };
 
     let mut patches: Vec<(TextRange, FStringConversion)> = vec![];
-    let mut tokens = checker.parsed().tokens().in_range(call.func.range()).iter();
+    let mut tokens = checker.tokens().in_range(call.func.range()).iter();
     let end = loop {
         let Some(token) = tokens.next() else {
             unreachable!("Should break from the `Tok::Dot` arm");

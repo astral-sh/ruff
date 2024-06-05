@@ -265,3 +265,7 @@ raise ValueError(
 
 # The call should be removed, but the string itself should remain.
 "".format(self.project)
+
+# Not a valid type annotation but this test shouldn't result in a panic.
+# Refer: https://github.com/astral-sh/ruff/issues/11736
+x: "'{} + {}'.format(x, y)"

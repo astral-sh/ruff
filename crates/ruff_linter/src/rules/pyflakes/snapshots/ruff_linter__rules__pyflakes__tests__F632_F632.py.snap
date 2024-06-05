@@ -203,6 +203,8 @@ F632.py:30:4: F632 [*] Use `!=` to compare constant literals
 30    |-if values[1is not None ] is not '-':
    30 |+if values[1is not None ] != '-':
 31 31 |     pass
+32 32 | 
+33 33 | # Regression test for https://github.com/astral-sh/ruff/issues/11736
 
 F632.py:30:11: F632 [*] Use `!=` to compare constant literals
    |
@@ -220,5 +222,20 @@ F632.py:30:11: F632 [*] Use `!=` to compare constant literals
 30    |-if values[1is not None ] is not '-':
    30 |+if values[1!= None ] is not '-':
 31 31 |     pass
+32 32 | 
+33 33 | # Regression test for https://github.com/astral-sh/ruff/issues/11736
 
+F632.py:34:12: F632 [*] Use `!=` to compare constant literals
+   |
+33 | # Regression test for https://github.com/astral-sh/ruff/issues/11736
+34 | variable: "123 is not y"
+   |            ^^^^^^^^^^^^ F632
+   |
+   = help: Replace `is not` with `!=`
 
+ℹ Safe fix
+31 31 |     pass
+32 32 | 
+33 33 | # Regression test for https://github.com/astral-sh/ruff/issues/11736
+34    |-variable: "123 is not y"
+   34 |+variable: "123 != y"
