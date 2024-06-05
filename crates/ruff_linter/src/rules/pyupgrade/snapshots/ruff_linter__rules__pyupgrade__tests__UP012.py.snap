@@ -557,6 +557,8 @@ UP012.py:82:17: UP012 [*] Unnecessary call to `encode` as UTF-8
 81 | def _match_ignore(line):
 82 |     input=stdin and'\n'.encode()or None
    |                    ^^^^^^^^^^^^^ UP012
+83 | 
+84 | # Not a valid type annotation but this test shouldn't result in a panic.
    |
    = help: Rewrite as bytes literal
 
@@ -566,5 +568,22 @@ UP012.py:82:17: UP012 [*] Unnecessary call to `encode` as UTF-8
 81 81 | def _match_ignore(line):
 82    |-	input=stdin and'\n'.encode()or None
    82 |+	input=stdin and b'\n' or None
+83 83 | 
+84 84 | # Not a valid type annotation but this test shouldn't result in a panic.
+85 85 | # Refer: https://github.com/astral-sh/ruff/issues/11736
 
+UP012.py:86:5: UP012 [*] Unnecessary call to `encode` as UTF-8
+   |
+84 | # Not a valid type annotation but this test shouldn't result in a panic.
+85 | # Refer: https://github.com/astral-sh/ruff/issues/11736
+86 | x: '"foo".encode("utf-8")'
+   |     ^^^^^^^^^^^^^^^^^^^^^ UP012
+   |
+   = help: Rewrite as bytes literal
 
+ℹ Safe fix
+83 83 | 
+84 84 | # Not a valid type annotation but this test shouldn't result in a panic.
+85 85 | # Refer: https://github.com/astral-sh/ruff/issues/11736
+86    |-x: '"foo".encode("utf-8")'
+   86 |+x: 'b"foo"'

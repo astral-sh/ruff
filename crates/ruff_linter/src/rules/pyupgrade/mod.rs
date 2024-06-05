@@ -58,6 +58,7 @@ mod tests {
     #[test_case(Rule::QuotedAnnotation, Path::new("UP037_0.py"))]
     #[test_case(Rule::QuotedAnnotation, Path::new("UP037_1.py"))]
     #[test_case(Rule::RedundantOpenModes, Path::new("UP015.py"))]
+    #[test_case(Rule::RedundantOpenModes, Path::new("UP015_1.py"))]
     #[test_case(Rule::ReplaceStdoutStderr, Path::new("UP022.py"))]
     #[test_case(Rule::ReplaceUniversalNewlines, Path::new("UP021.py"))]
     #[test_case(Rule::SuperCallWithParameters, Path::new("UP008.py"))]

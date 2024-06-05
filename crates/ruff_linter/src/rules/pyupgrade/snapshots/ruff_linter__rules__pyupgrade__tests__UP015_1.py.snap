@@ -1,0 +1,18 @@
+---
+source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+---
+UP015_1.py:3:5: UP015 [*] Unnecessary open mode parameters
+  |
+1 | # Not a valid type annotation but this test shouldn't result in a panic.
+2 | # Refer: https://github.com/astral-sh/ruff/issues/11736
+3 | x: 'open("foo", "r")'
+  |     ^^^^^^^^^^^^^^^^ UP015
+  |
+  = help: Remove open mode parameters
+
+ℹ Safe fix
+1 1 | # Not a valid type annotation but this test shouldn't result in a panic.
+2 2 | # Refer: https://github.com/astral-sh/ruff/issues/11736
+3   |-x: 'open("foo", "r")'
+  3 |+x: 'open("foo")'
+4 4 |

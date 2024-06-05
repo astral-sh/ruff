@@ -1361,6 +1361,8 @@ UP032_0.py:267:1: UP032 [*] Use f-string instead of `format` call
 266 | # The call should be removed, but the string itself should remain.
 267 | "".format(self.project)
     | ^^^^^^^^^^^^^^^^^^^^^^^ UP032
+268 | 
+269 | # Not a valid type annotation but this test shouldn't result in a panic.
     |
     = help: Convert to f-string
 
@@ -1370,3 +1372,22 @@ UP032_0.py:267:1: UP032 [*] Use f-string instead of `format` call
 266 266 | # The call should be removed, but the string itself should remain.
 267     |-"".format(self.project)
     267 |+""
+268 268 | 
+269 269 | # Not a valid type annotation but this test shouldn't result in a panic.
+270 270 | # Refer: https://github.com/astral-sh/ruff/issues/11736
+
+UP032_0.py:271:5: UP032 [*] Use f-string instead of `format` call
+    |
+269 | # Not a valid type annotation but this test shouldn't result in a panic.
+270 | # Refer: https://github.com/astral-sh/ruff/issues/11736
+271 | x: "'{} + {}'.format(x, y)"
+    |     ^^^^^^^^^^^^^^^^^^^^^^ UP032
+    |
+    = help: Convert to f-string
+
+ℹ Safe fix
+268 268 | 
+269 269 | # Not a valid type annotation but this test shouldn't result in a panic.
+270 270 | # Refer: https://github.com/astral-sh/ruff/issues/11736
+271     |-x: "'{} + {}'.format(x, y)"
+    271 |+x: "f'{x} + {y}'"
