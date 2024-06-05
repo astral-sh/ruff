@@ -8,11 +8,11 @@ use crate::db::{QueryResult, SemanticDb, SemanticJar};
 
 use crate::module::{resolve_module, ModuleName};
 use crate::parse::parse;
-use crate::symbols::{
-    resolve_global_symbol, symbol_table, Definition, GlobalSymbolId, ImportDefinition,
+use crate::semantic::types::{ModuleTypeId, Type};
+use crate::semantic::{
+    resolve_global_symbol, semantic_index, Definition, GlobalSymbolId, ImportDefinition,
     ImportFromDefinition,
 };
-use crate::types::{ModuleTypeId, Type};
 use crate::{FileId, Name};
 
 // FIXME: Figure out proper dead-lock free synchronisation now that this takes `&db` instead of `&mut db`.
@@ -25,8 +25,8 @@ use crate::{FileId, Name};
 /// infer `Literal["1"]` instead of `Literal[1] | Literal["1"]` for `x` in `x = x; x = str(x);`.
 #[tracing::instrument(level = "trace", skip(db))]
 pub fn infer_symbol_public_type(db: &dyn SemanticDb, symbol: GlobalSymbolId) -> QueryResult<Type> {
-    let symbols = symbol_table(db, symbol.file_id)?;
-    let defs = symbols.definitions(symbol.symbol_id).to_vec();
+    let index = semantic_index(db, symbol.file_id)?;
+    let defs = index.symbol_table().definitions(symbol.symbol_id).to_vec();
     let jar: &SemanticJar = db.jar()?;
 
     if let Some(ty) = jar.type_store.get_cached_symbol_public_type(symbol) {
@@ -113,7 +113,7 @@ pub fn infer_definition_type(
             } else {
                 let parsed = parse(db.upcast(), file_id)?;
                 let ast = parsed.syntax();
-                let table = symbol_table(db, file_id)?;
+                let index = semantic_index(db, file_id)?;
                 let node = node_key.resolve_unwrap(ast.as_any_node_ref());
 
                 let mut bases = Vec::with_capacity(node.bases().len());
@@ -121,7 +121,7 @@ pub fn infer_definition_type(
                 for base in node.bases() {
                     bases.push(infer_expr_type(db, file_id, base)?);
                 }
-                let scope_id = table.scope_id_for_node(node_key.erased());
+                let scope_id = index.symbol_table().scope_id_for_node(node_key.erased());
                 let ty = Type::Class(type_store.add_class(file_id, &node.name.id, scope_id, bases));
                 type_store.cache_node_type(file_id, *node_key.erased(), ty);
                 Ok(ty)
@@ -133,7 +133,7 @@ pub fn infer_definition_type(
             } else {
                 let parsed = parse(db.upcast(), file_id)?;
                 let ast = parsed.syntax();
-                let table = symbol_table(db, file_id)?;
+                let index = semantic_index(db, file_id)?;
                 let node = node_key
                     .resolve(ast.as_any_node_ref())
                     .expect("node key should resolve");
@@ -143,7 +143,7 @@ pub fn infer_definition_type(
                     .iter()
                     .map(|decorator| infer_expr_type(db, file_id, &decorator.expression))
                     .collect::<QueryResult<_>>()?;
-                let scope_id = table.scope_id_for_node(node_key.erased());
+                let scope_id = index.symbol_table().scope_id_for_node(node_key.erased());
                 let ty = type_store
                     .add_function(
                         file_id,
@@ -180,7 +180,7 @@ pub fn infer_definition_type(
 
 fn infer_expr_type(db: &dyn SemanticDb, file_id: FileId, expr: &ast::Expr) -> QueryResult<Type> {
     // TODO cache the resolution of the type on the node
-    let symbols = symbol_table(db, file_id)?;
+    let index = semantic_index(db, file_id)?;
     match expr {
         ast::Expr::NumberLiteral(ast::ExprNumberLiteral { value, .. }) => {
             match value {
@@ -194,12 +194,12 @@ fn infer_expr_type(db: &dyn SemanticDb, file_id: FileId, expr: &ast::Expr) -> Qu
         }
         ast::Expr::Name(name) => {
             // TODO look up in the correct scope, don't assume global
-            if let Some(symbol_id) = symbols.root_symbol_id_by_name(&name.id) {
+            if let Some(symbol_id) = index.symbol_table().root_symbol_id_by_name(&name.id) {
                 // TODO should use only reachable definitions, not public type
                 infer_type_from_definitions(
                     db,
                     GlobalSymbolId { file_id, symbol_id },
-                    symbols.reachable_definitions(symbol_id, expr),
+                    index.reachable_definitions(symbol_id, expr),
                 )
             } else {
                 Ok(Type::Unknown)
@@ -224,8 +224,7 @@ mod tests {
     use crate::module::{
         resolve_module, set_module_search_paths, ModuleName, ModuleSearchPath, ModuleSearchPathKind,
     };
-    use crate::symbols::resolve_global_symbol;
-    use crate::types::{infer_symbol_public_type, Type};
+    use crate::semantic::{infer_symbol_public_type, resolve_global_symbol, Type};
     use crate::Name;
 
     // TODO with virtual filesystem we shouldn't have to write files to disk for these

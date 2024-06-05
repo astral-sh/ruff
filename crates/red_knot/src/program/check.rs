@@ -6,7 +6,7 @@ use crate::files::FileId;
 use crate::lint::{lint_semantic, lint_syntax, Diagnostics};
 use crate::module::{file_to_module, resolve_module};
 use crate::program::Program;
-use crate::symbols::{symbol_table, Dependency};
+use crate::semantic::{semantic_index, Dependency};
 
 impl Program {
     /// Checks all open files in the workspace and its dependencies.
@@ -28,8 +28,8 @@ impl Program {
     fn check_file(&self, file: FileId, context: &CheckFileContext) -> QueryResult<Diagnostics> {
         self.cancelled()?;
 
-        let symbol_table = symbol_table(self, file)?;
-        let dependencies = symbol_table.dependencies();
+        let index = semantic_index(self, file)?;
+        let dependencies = index.symbol_table().dependencies();
 
         if !dependencies.is_empty() {
             let module = file_to_module(self, file)?;
