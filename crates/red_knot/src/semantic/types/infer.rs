@@ -161,7 +161,7 @@ pub fn infer_definition_type(
             let parsed = parse(db.upcast(), file_id)?;
             let ast = parsed.syntax();
             let node = node_key.resolve_unwrap(ast.as_any_node_ref());
-            // TODO handle unpacking assignment correctly (here and for AnnotatedAssignment case, below)
+            // TODO handle unpacking assignment
             infer_expr_type(db, file_id, &node.value)
         }
         Definition::AnnotatedAssignment(node_key) => {
@@ -172,8 +172,14 @@ pub fn infer_definition_type(
             let Some(value) = &node.value else {
                 return Ok(Type::Unknown);
             };
-            // TODO handle unpacking assignment correctly (here and for Assignment case, above)
+            // TODO handle unpacking assignment
             infer_expr_type(db, file_id, value)
+        }
+        Definition::NamedExpr(node_key) => {
+            let parsed = parse(db.upcast(), file_id)?;
+            let ast = parsed.syntax();
+            let node = node_key.resolve_unwrap(ast.as_any_node_ref());
+            infer_expr_type(db, file_id, &node.value)
         }
     }
 }
@@ -220,6 +226,7 @@ fn infer_expr_type(db: &dyn SemanticDb, file_id: FileId, expr: &ast::Expr) -> Qu
             // TODO add reverse bin op support if right <: left
             left_ty.resolve_bin_op(db, *op, right_ty)
         }
+        ast::Expr::Named(ast::ExprNamed { value, .. }) => infer_expr_type(db, file_id, value),
         _ => todo!("expression type resolution for {:?}", expr),
     }
 }
@@ -518,5 +525,21 @@ mod tests {
         assert_public_type(&case, "a", "c", "Literal[-3]")?;
         assert_public_type(&case, "a", "d", "Literal[-1]")?;
         assert_public_type(&case, "a", "e", "Literal[2]")
+    }
+
+    #[test]
+    fn walrus() -> anyhow::Result<()> {
+        let case = create_test()?;
+
+        write_to_path(
+            &case,
+            "a.py",
+            "
+                x = (y := 1) + 1
+            ",
+        )?;
+
+        assert_public_type(&case, "a", "x", "Literal[2]")?;
+        assert_public_type(&case, "a", "y", "Literal[1]")
     }
 }
