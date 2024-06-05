@@ -93,7 +93,7 @@ pub(crate) fn inplace_argument(checker: &mut Checker, call: &ast::ExprCall) {
                         call,
                         keyword,
                         statement,
-                        checker.parsed().comment_ranges(),
+                        checker.comment_ranges(),
                         checker.locator(),
                     ) {
                         diagnostic.set_fix(fix);

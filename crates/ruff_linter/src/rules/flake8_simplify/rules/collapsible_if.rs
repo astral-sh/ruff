@@ -113,7 +113,7 @@ pub(crate) fn nested_if_statements(
     );
     // The fixer preserves comments in the nested body, but removes comments between
     // the outer and inner if statements.
-    if !checker.parsed().comment_ranges().intersects(TextRange::new(
+    if !checker.comment_ranges().intersects(TextRange::new(
         nested_if.start(),
         nested_if.body()[0].start(),
     )) {

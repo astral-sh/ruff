@@ -110,7 +110,7 @@ pub(crate) fn unnecessary_key_check(checker: &mut Checker, expr: &Expr) {
                 parenthesized_range(
                     obj_right.into(),
                     right.into(),
-                    checker.parsed().comment_ranges(),
+                    checker.comment_ranges(),
                     checker.locator().contents(),
                 )
                 .unwrap_or(obj_right.range())
@@ -119,7 +119,7 @@ pub(crate) fn unnecessary_key_check(checker: &mut Checker, expr: &Expr) {
                 parenthesized_range(
                     key_right.into(),
                     right.into(),
-                    checker.parsed().comment_ranges(),
+                    checker.comment_ranges(),
                     checker.locator().contents(),
                 )
                 .unwrap_or(key_right.range())

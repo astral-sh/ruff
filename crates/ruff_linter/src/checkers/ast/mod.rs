@@ -58,6 +58,7 @@ use ruff_python_semantic::{
     StarImport, SubmoduleImport,
 };
 use ruff_python_stdlib::builtins::{IPYTHON_BUILTINS, MAGIC_GLOBALS, PYTHON_BUILTINS};
+use ruff_python_trivia::CommentRanges;
 use ruff_source_file::{Locator, OneIndexed, SourceRow};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -326,9 +327,9 @@ impl<'a> Checker<'a> {
         }
     }
 
-    /// The [`Parsed`] output for the current file, which contains the tokens, AST, and more.
-    pub(crate) const fn parsed(&self) -> &'a Parsed<ModModule> {
-        self.parsed
+    /// Returns the [`CommentRanges`] for the parsed source code.
+    pub(crate) fn comment_ranges(&self) -> &'a CommentRanges {
+        self.parsed.comment_ranges()
     }
 
     /// Returns the [`Tokens`] for the parsed type annotation if the checker is in a typing context

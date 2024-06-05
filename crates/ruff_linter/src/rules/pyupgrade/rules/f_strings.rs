@@ -512,10 +512,7 @@ pub(crate) fn f_strings(checker: &mut Checker, call: &ast::ExprCall, summary: &F
     //     0,  # 0
     // )
     // ```
-    let has_comments = checker
-        .parsed()
-        .comment_ranges()
-        .intersects(call.arguments.range());
+    let has_comments = checker.comment_ranges().intersects(call.arguments.range());
 
     if !has_comments {
         if contents.is_empty() {

@@ -160,7 +160,7 @@ pub(crate) fn if_stmt_min_max(checker: &mut Checker, stmt_if: &ast::StmtIf) {
             parenthesized_range(
                 body_target.into(),
                 body.into(),
-                checker.parsed().comment_ranges(),
+                checker.comment_ranges(),
                 checker.locator().contents()
             )
             .unwrap_or(body_target.range())
