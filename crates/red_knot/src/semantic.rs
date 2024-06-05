@@ -273,6 +273,7 @@ impl PreorderVisitor<'_> for SemanticIndexer {
                 debug_assert!(self.current_definition.is_none());
                 self.current_definition =
                     Some(Definition::NamedExpr(TypedNodeKey::from_node(node)));
+                // TODO walrus in comprehensions is implicitly nonlocal
                 self.visit_expr(&node.target);
                 self.current_definition = None;
                 self.visit_expr(&node.value);
