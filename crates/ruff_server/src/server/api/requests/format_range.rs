@@ -73,10 +73,12 @@ fn format_text_document_range(
     )
     .with_failure_code(lsp_server::ErrorCode::InternalError)?;
 
-    Ok(Some(vec![types::TextEdit {
-        range: formatted_range
-            .source_range()
-            .to_range(text, index, encoding),
-        new_text: formatted_range.into_code(),
-    }]))
+    Ok(formatted_range.map(|formatted_range| {
+        vec![types::TextEdit {
+            range: formatted_range
+                .source_range()
+                .to_range(text, index, encoding),
+            new_text: formatted_range.into_code(),
+        }]
+    }))
 }

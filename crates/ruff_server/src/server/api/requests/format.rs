@@ -98,13 +98,11 @@ fn format_text_document(
     }
 
     let source = text_document.contents();
-    let mut formatted =
-        crate::format::format(text_document, query.source_type(), formatter_settings)
-            .with_failure_code(lsp_server::ErrorCode::InternalError)?;
-    // fast path - if the code is the same, return early
-    if formatted == source {
+    let formatted = crate::format::format(text_document, query.source_type(), formatter_settings)
+        .with_failure_code(lsp_server::ErrorCode::InternalError)?;
+    let Some(mut formatted) = formatted else {
         return Ok(None);
-    }
+    };
 
     // special case - avoid adding a newline to a notebook cell if it didn't already exist
     if is_notebook {
