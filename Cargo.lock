@@ -1942,7 +1942,6 @@ dependencies = [
  "tikv-jemallocator",
  "toml",
  "tracing",
- "tracing-subscriber",
  "walkdir",
  "wild",
 ]
