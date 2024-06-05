@@ -8,7 +8,7 @@ use crate::server::ClientSender;
 
 static LOGGING_SENDER: OnceLock<ClientSender> = OnceLock::new();
 
-static TRACE_VALUE: Mutex<lsp_types::TraceValue> = Mutex::new(lsp_types::TraceValue::Messages);
+static TRACE_VALUE: Mutex<lsp_types::TraceValue> = Mutex::new(lsp_types::TraceValue::Off);
 
 pub(crate) fn set_trace_value(trace_value: TraceValue) {
     let mut global_trace_value = TRACE_VALUE
