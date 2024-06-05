@@ -85,7 +85,7 @@ impl salsa::ParallelDatabase for Database {
 mod tests {
     use salsa::{DebugWithDb, Event, Storage};
     use std::path::PathBuf;
-    use tracing::{debug, Level};
+    use tracing::{info, Level};
     use tracing_subscriber::fmt::time;
 
     use crate::db::Upcast;
@@ -166,7 +166,7 @@ mod tests {
         let foo = tempdir.path().join("foo.py");
 
         std::fs::write(&main, "import foo;\nx = 1").unwrap();
-        std::fs::write(foo, "x = 10").unwrap();
+        std::fs::write(&foo, "x = True\n def foo(): pass").unwrap();
 
         let mut db = Database::new();
         set_module_search_paths(
@@ -177,26 +177,33 @@ mod tests {
             )],
         );
 
-        let main_file = db.file(main.clone());
+        // let main_file = db.file(main.clone());
+        let foo_file = db.file(foo.clone());
 
-        dependencies(&db, main_file);
-        debug!("{:#?}", &symbol_table(&db, main_file).debug(&db));
+        dependencies(&db, foo_file);
+        info!("{:#?}", &symbol_table(&db, foo_file).debug(&db));
 
-        std::fs::write(&main, "print('Hello, Micha!')").unwrap();
+        // Make a whitespace only change to `foo.py`.
+        // It should not invalidate the symbol table.
+        std::fs::write(&foo, "# comment\nx = True\ndef foo(): pass").unwrap();
+        foo_file.touch(&mut db);
 
-        main_file.touch(&mut db);
+        info!("{:#?}", &symbol_table(&db, foo_file).debug(&db));
 
-        // let (source_jar, _): (&mut SourceJar, _) = db.jar_mut();
-        // source_jar.0.reset()
-
-        assert_eq!("print('Hello, Micha!')", main_file.source(&db).text());
-
-        debug!("{:#?}", &symbol_table(&db, main_file).debug(&db));
-
-        // The file never gets collected.
-        main_file.touch(&mut db);
-
-        // TODO: Is there a way to remove a file?
+        //
+        // main_file.touch(&mut db);
+        //
+        // // let (source_jar, _): (&mut SourceJar, _) = db.jar_mut();
+        // // source_jar.0.reset()
+        //
+        // assert_eq!("print('Hello, Micha!')", main_file.source(&db).text());
+        //
+        // debug!("{:#?}", &symbol_table(&db, main_file).debug(&db));
+        //
+        // // The file never gets collected.
+        // main_file.touch(&mut db);
+        //
+        // // TODO: Is there a way to remove a file?
 
         // There's only one source alive. I guess that makes sense because we never read the content of `foo.py`.
 

@@ -2,7 +2,7 @@ use crate::vec::IndexVec;
 use crate::Idx;
 use std::fmt::{Debug, Formatter};
 use std::marker::PhantomData;
-use std::ops::{Index, IndexMut};
+use std::ops::{Index, IndexMut, Range};
 
 /// A view into contiguous `T`s, indexed by `I` rather than by `usize`.
 #[derive(PartialEq, Eq, Hash)]
@@ -128,6 +128,15 @@ impl<I: Idx, T> Index<I> for IndexSlice<I, T> {
     #[inline]
     fn index(&self, index: I) -> &T {
         &self.raw[index.index()]
+    }
+}
+
+impl<I: Idx, T> Index<Range<I>> for IndexSlice<I, T> {
+    type Output = [T];
+
+    #[inline]
+    fn index(&self, index: Range<I>) -> &[T] {
+        &self.raw[index.start.index()..index.end.index()]
     }
 }
 

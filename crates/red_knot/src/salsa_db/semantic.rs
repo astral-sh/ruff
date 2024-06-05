@@ -10,17 +10,19 @@ use tracing::warn;
 
 use ruff_python_ast::visitor::preorder;
 use ruff_python_ast::visitor::preorder::{PreorderVisitor, TraversalSignal};
-use ruff_python_ast::{AnyNodeRef, Expr, Stmt};
+use ruff_python_ast::{AnyNodeRef, Stmt};
 
 use crate::ast_ids::AstIds;
 use crate::db::Upcast;
 use crate::module::ModuleName;
+use crate::salsa_db::hir::{module_body, Expression, Statement};
 use crate::salsa_db::semantic::module::{
     file_to_module, Module, ModuleSearchPaths, ResolvedModule,
 };
 use crate::salsa_db::source::File;
 use crate::salsa_db::{hir, source};
 use crate::symbols::Dependency;
+use crate::Name;
 
 pub use self::module::resolve_module;
 
@@ -30,18 +32,18 @@ pub mod module;
 pub struct Symbol {
     #[id]
     #[returned_ref]
-    pub name: smol_str::SmolStr,
+    pub name: Name,
 
     count: Count<Symbol>,
 }
 
 #[derive(Eq, PartialEq, Default)]
 pub struct SymbolTable {
-    symbols: FxHashMap<smol_str::SmolStr, Symbol>,
+    symbols: FxHashMap<Name, Symbol>,
 }
 
 impl SymbolTable {
-    fn insert(&mut self, name: smol_str::SmolStr, symbol: Symbol) {
+    fn insert(&mut self, name: Name, symbol: Symbol) {
         self.symbols.insert(name, symbol);
     }
 }
@@ -142,40 +144,28 @@ pub fn dependencies(db: &dyn Db, file: File) -> Arc<[ModuleName]> {
 #[tracing::instrument(level = "debug", skip(db))]
 #[salsa::tracked(jar=Jar)]
 pub fn symbol_table(db: &dyn Db, file_id: File) -> Arc<SymbolTable> {
-    struct SymbolTableVisitor<'db> {
-        symbols: SymbolTable,
-        db: &'db dyn Db,
-    }
+    let module_body = module_body(db.upcast(), file_id);
 
-    impl PreorderVisitor<'_> for SymbolTableVisitor<'_> {
-        fn visit_stmt(&mut self, stmt: &'_ Stmt) {
-            #[allow(clippy::single_match)]
-            match stmt {
-                Stmt::Assign(assign) => {
-                    for target in &assign.targets {
-                        if let Expr::Name(name) = &target {
-                            let name = smol_str::SmolStr::new(&name.id);
-                            self.symbols
-                                .insert(name.clone(), Symbol::new(self.db, name, Count::default()));
-                        }
+    let module_ast = module_body.ast(db.upcast());
+    let mut symbol_table = SymbolTable::default();
+
+    for statement in module_ast.statements() {
+        match statement {
+            Statement::Assignment { targets, .. } => {
+                for target in &module_ast[targets.clone()] {
+                    if let Expression::Name(name) = target {
+                        symbol_table.insert(
+                            name.clone(),
+                            Symbol::new(db, name.clone(), Count::default()),
+                        );
                     }
                 }
-                _ => {}
             }
-
-            preorder::walk_stmt(self, stmt);
+            _ => {}
         }
     }
 
-    let parsed = source::parse(db.upcast(), file_id);
-    let mut visitor = SymbolTableVisitor {
-        db,
-        symbols: SymbolTable::default(),
-    };
-
-    visitor.visit_body(&parsed.syntax().body);
-
-    Arc::new(visitor.symbols)
+    Arc::new(symbol_table)
 }
 
 #[tracing::instrument(level = "debug", skip(db))]

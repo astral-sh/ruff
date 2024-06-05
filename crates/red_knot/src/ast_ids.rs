@@ -266,7 +266,7 @@ enum DeferredNode<'a> {
     ClassDefinition(&'a StmtClassDef),
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+#[derive(Copy, Clone, Debug, Hash)]
 pub struct TypedNodeKey<N: AstNode> {
     /// The type erased node key.
     inner: NodeKey,
@@ -303,6 +303,14 @@ impl<N: AstNode> TypedNodeKey<N> {
         &self.inner
     }
 }
+
+impl<N: AstNode> PartialEq<Self> for TypedNodeKey<N> {
+    fn eq(&self, other: &Self) -> bool {
+        self.inner == other.inner
+    }
+}
+
+impl<N: AstNode> Eq for TypedNodeKey<N> {}
 
 struct FindNodeKeyVisitor<'a> {
     key: NodeKey,
