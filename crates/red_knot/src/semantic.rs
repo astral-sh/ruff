@@ -12,6 +12,8 @@ use crate::module::ModuleName;
 use crate::parse::parse;
 use crate::Name;
 use flow_graph::{FlowGraph, FlowGraphBuilder, FlowNodeId, ReachableDefinitionsIterator};
+use ruff_index::newtype_index;
+use rustc_hash::FxHashMap;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 pub(crate) use symbol_table::{Definition, Dependency, SymbolId};
@@ -49,6 +51,9 @@ pub fn resolve_global_symbol(
     Ok(Some(GlobalSymbolId { file_id, symbol_id }))
 }
 
+#[newtype_index]
+pub struct ExpressionId;
+
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct GlobalSymbolId {
     pub(crate) file_id: FileId,
@@ -59,6 +64,7 @@ pub struct GlobalSymbolId {
 pub struct SemanticIndex {
     symbol_table: SymbolTable,
     flow_graph: FlowGraph,
+    expressions: FxHashMap<NodeKey, ExpressionId>,
 }
 
 impl SemanticIndex {
@@ -71,6 +77,7 @@ impl SemanticIndex {
                 scope_id: root_scope_id,
                 current_flow_node_id: FlowGraph::start(),
             }],
+            expressions: FxHashMap::default(),
             current_definition: None,
         };
         indexer.visit_body(&module.body);
@@ -85,11 +92,16 @@ impl SemanticIndex {
         symbol_id: SymbolId,
         use_expr: &ast::Expr,
     ) -> ReachableDefinitionsIterator {
+        let expression_id = self.expression_id(use_expr);
         ReachableDefinitionsIterator::new(
             &self.flow_graph,
             symbol_id,
-            self.flow_graph.for_expr(use_expr),
+            self.flow_graph.for_expr(expression_id),
         )
+    }
+
+    pub fn expression_id(&self, expression: &ast::Expr) -> ExpressionId {
+        self.expressions[&NodeKey::from_node(expression.into())]
     }
 
     pub fn symbol_table(&self) -> &SymbolTable {
@@ -110,6 +122,7 @@ struct SemanticIndexer {
     scopes: Vec<ScopeState>,
     /// the definition whose target(s) we are currently walking
     current_definition: Option<Definition>,
+    expressions: FxHashMap<NodeKey, ExpressionId>,
 }
 
 impl SemanticIndexer {
@@ -122,6 +135,7 @@ impl SemanticIndexer {
         SemanticIndex {
             flow_graph: flow_graph_builder.finish(),
             symbol_table: symbol_table_builder.finish(),
+            expressions: self.expressions,
         }
     }
 
@@ -240,8 +254,19 @@ impl PreorderVisitor<'_> for SemanticIndexer {
                 }
             }
         }
-        self.flow_graph_builder
-            .record_expr(expr, self.current_flow_node());
+
+        let expression_id = self
+            .flow_graph_builder
+            .record_expr(self.current_flow_node());
+
+        debug_assert_eq!(
+            expression_id,
+            self.symbol_table_builder
+                .record_expression(self.cur_scope())
+        );
+
+        self.expressions
+            .insert(NodeKey::from_node(expr.into()), expression_id);
         ast::visitor::preorder::walk_expr(self, expr);
     }
 
@@ -743,5 +768,30 @@ mod tests {
             panic!("should be a number literal")
         };
         assert_eq!(*num, 1);
+    }
+
+    #[test]
+    fn expression_scope() {
+        let parsed = parse("x = 1;\ndef test():\n  y = 4");
+        let ast = parsed.syntax();
+        let index = SemanticIndex::from_ast(ast);
+        let table = &index.symbol_table;
+
+        let x_sym = table
+            .root_symbol_by_name("x")
+            .expect("x symbol should exist");
+
+        let x_stmt = ast.body[0].as_assign_stmt().unwrap();
+
+        let x_id = index.expression_id(&x_stmt.targets[0]);
+
+        assert_eq!(table.scope_of_expression(x_id).kind(), ScopeKind::Module);
+        assert_eq!(table.scope_id_of_expression(x_id), x_sym.scope_id());
+
+        let def = ast.body[1].as_function_def_stmt().unwrap();
+        let y_stmt = def.body[0].as_assign_stmt().unwrap();
+        let y_id = index.expression_id(&y_stmt.targets[0]);
+
+        assert_eq!(table.scope_of_expression(y_id).kind(), ScopeKind::Function);
     }
 }
