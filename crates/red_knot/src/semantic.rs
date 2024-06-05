@@ -11,18 +11,18 @@ use crate::module::Module;
 use crate::module::ModuleName;
 use crate::parse::parse;
 use crate::Name;
+pub(crate) use definitions::Definition;
+use definitions::{ImportDefinition, ImportFromDefinition};
 use flow_graph::{FlowGraph, FlowGraphBuilder, FlowNodeId, ReachableDefinitionsIterator};
 use ruff_index::newtype_index;
 use rustc_hash::FxHashMap;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
-pub(crate) use symbol_table::{Definition, Dependency, SymbolId};
-use symbol_table::{
-    ImportDefinition, ImportFromDefinition, ScopeId, ScopeKind, SymbolFlags, SymbolTable,
-    SymbolTableBuilder,
-};
+pub(crate) use symbol_table::{Dependency, SymbolId};
+use symbol_table::{ScopeId, ScopeKind, SymbolFlags, SymbolTable, SymbolTableBuilder};
 pub(crate) use types::{infer_definition_type, infer_symbol_public_type, Type, TypeStore};
 
+mod definitions;
 mod flow_graph;
 mod symbol_table;
 mod types;

@@ -1,5 +1,5 @@
-use super::symbol_table::{Definition, SymbolId};
-use crate::semantic::ExpressionId;
+use super::symbol_table::SymbolId;
+use crate::semantic::{Definition, ExpressionId};
 use ruff_index::{newtype_index, IndexVec};
 use std::iter::FusedIterator;
 
