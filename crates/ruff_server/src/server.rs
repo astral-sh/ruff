@@ -41,7 +41,6 @@ pub(crate) type Result<T> = std::result::Result<T, api::Error>;
 
 pub struct Server {
     connection: Connection,
-    tracing_guard: tracing::subscriber::DefaultGuard,
     client_capabilities: ClientCapabilities,
     worker_threads: NonZeroUsize,
     session: Session,
@@ -68,8 +67,8 @@ impl Server {
             crate::trace::set_trace_value(trace);
         }
 
-        let tracing_guard = crate::trace::init_tracing(connection.make_sender());
         crate::message::init_messenger(connection.make_sender());
+        crate::trace::init_tracing(connection.make_sender());
 
         let AllSettings {
             global_settings,
@@ -108,7 +107,6 @@ impl Server {
 
         Ok(Self {
             connection,
-            tracing_guard,
             worker_threads,
             session: Session::new(
                 &client_capabilities,
@@ -128,9 +126,7 @@ impl Server {
                 self.session,
                 self.worker_threads,
             )?;
-            std::mem::drop(self.tracing_guard);
             self.connection.close()?;
-            tracing::info!("Client connection has been closed");
             Ok(())
         })?
         .join()

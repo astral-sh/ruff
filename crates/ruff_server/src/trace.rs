@@ -17,15 +17,19 @@ pub(crate) fn set_trace_value(trace_value: TraceValue) {
     *global_trace_value = trace_value;
 }
 
-pub(crate) fn init_tracing(sender: ClientSender) -> tracing::subscriber::DefaultGuard {
+pub(crate) fn init_tracing(sender: ClientSender) {
     LOGGING_SENDER
         .set(sender)
         .expect("logging sender should only be initialized once");
 
+    // TODO(jane): Provide a way to set the log level
     let subscriber =
-        tracing_subscriber::Registry::default().with(LogLayer.with_filter(TraceValueFilter));
+        tracing_subscriber::Registry::default().with(LogLayer.with_filter(LogFilter {
+            filter: LogLevel::Info,
+        }));
 
-    tracing::subscriber::set_default(subscriber)
+    tracing::subscriber::set_global_default(subscriber)
+        .expect("should be able to set global default subscriber");
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Default, PartialEq, Eq, PartialOrd, Ord)]
@@ -58,46 +62,40 @@ impl LogLevel {
             Self::Debug => lsp_types::MessageType::LOG,
         }
     }
+
+    fn trace_level(self) -> tracing::Level {
+        match self {
+            Self::Error => tracing::Level::ERROR,
+            Self::Warn => tracing::Level::WARN,
+            Self::Info => tracing::Level::INFO,
+            Self::Debug => tracing::Level::DEBUG,
+        }
+    }
 }
 
 struct LogLayer;
 
-struct TraceValueFilter;
-
-impl TraceValueFilter {
-    fn ruff_tracing_level() -> tracing::Level {
-        match trace_value() {
-            lsp_types::TraceValue::Verbose => tracing::Level::TRACE,
-            lsp_types::TraceValue::Messages => tracing::Level::INFO,
-            lsp_types::TraceValue::Off => tracing::Level::ERROR,
-        }
-    }
-
-    fn default_tracing_level() -> tracing::Level {
-        match trace_value() {
-            lsp_types::TraceValue::Off => tracing::Level::ERROR,
-            _ => tracing::Level::INFO,
-        }
-    }
+struct LogFilter {
+    filter: LogLevel,
 }
 
-impl<S> tracing_subscriber::layer::Filter<S> for TraceValueFilter {
+impl<S> tracing_subscriber::layer::Filter<S> for LogFilter {
     fn enabled(
         &self,
         meta: &tracing::Metadata<'_>,
         _: &tracing_subscriber::layer::Context<'_, S>,
     ) -> bool {
         let filter = if meta.target().starts_with("ruff") {
-            Self::ruff_tracing_level()
+            self.filter.trace_level()
         } else {
-            Self::default_tracing_level()
+            tracing::Level::INFO
         };
 
         meta.level() <= &filter
     }
 
     fn max_level_hint(&self) -> Option<tracing::level_filters::LevelFilter> {
-        Some(LevelFilter::from_level(Self::ruff_tracing_level()))
+        Some(LevelFilter::from_level(self.filter.trace_level()))
     }
 }
 
@@ -150,11 +148,4 @@ fn log(message: String, level: LogLevel) {
                 .expect("log notification should serialize"),
             },
         ));
-}
-
-#[inline]
-fn trace_value() -> TraceValue {
-    *TRACE_VALUE
-        .lock()
-        .expect("trace value mutex should be available")
 }
