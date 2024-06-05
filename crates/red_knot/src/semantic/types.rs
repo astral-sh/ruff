@@ -8,6 +8,7 @@ use crate::semantic::{
 };
 use crate::{FxDashMap, FxIndexSet, Name};
 use ruff_index::{newtype_index, IndexVec};
+use ruff_python_ast as ast;
 use rustc_hash::FxHashMap;
 
 pub(crate) mod infer;
@@ -55,9 +56,9 @@ impl Type {
 
     pub fn get_member(&self, db: &dyn SemanticDb, name: &Name) -> QueryResult<Option<Type>> {
         match self {
-            Type::Any => todo!("attribute lookup on Any type"),
+            Type::Any => Ok(Some(Type::Any)),
             Type::Never => todo!("attribute lookup on Never type"),
-            Type::Unknown => todo!("attribute lookup on Unknown type"),
+            Type::Unknown => Ok(Some(Type::Unknown)),
             Type::Unbound => todo!("attribute lookup on Unbound type"),
             Type::Function(_) => todo!("attribute lookup on Function type"),
             Type::Module(module_id) => module_id.get_member(db, name),
@@ -83,6 +84,56 @@ impl Type {
                 // TODO raise error
                 Ok(Some(Type::Unknown))
             }
+        }
+    }
+
+    // when this is fully fleshed out, it will use the db arg and may return QueryError
+    #[allow(clippy::unnecessary_wraps)]
+    pub fn resolve_bin_op(
+        &self,
+        _db: &dyn SemanticDb,
+        op: ast::Operator,
+        right_ty: Type,
+    ) -> QueryResult<Type> {
+        match self {
+            Type::Any => Ok(Type::Any),
+            Type::Unknown => Ok(Type::Unknown),
+            Type::IntLiteral(n) => {
+                match right_ty {
+                    Type::IntLiteral(m) => {
+                        match op {
+                            ast::Operator::Add => Ok(n
+                                .checked_add(m)
+                                .map(Type::IntLiteral)
+                                // TODO builtins.int
+                                .unwrap_or(Type::Unknown)),
+                            ast::Operator::Sub => Ok(n
+                                .checked_sub(m)
+                                .map(Type::IntLiteral)
+                                // TODO builtins.int
+                                .unwrap_or(Type::Unknown)),
+                            ast::Operator::Mult => Ok(n
+                                .checked_mul(m)
+                                .map(Type::IntLiteral)
+                                // TODO builtins.int
+                                .unwrap_or(Type::Unknown)),
+                            ast::Operator::Div => Ok(n
+                                .checked_div(m)
+                                .map(Type::IntLiteral)
+                                // TODO builtins.int
+                                .unwrap_or(Type::Unknown)),
+                            ast::Operator::Mod => Ok(n
+                                .checked_rem(m)
+                                .map(Type::IntLiteral)
+                                // TODO division by zero error
+                                .unwrap_or(Type::Unknown)),
+                            _ => todo!("complete binop op support for IntLiteral"),
+                        }
+                    }
+                    _ => todo!("complete binop right_ty support for IntLiteral"),
+                }
+            }
+            _ => todo!("complete binop support"),
         }
     }
 }

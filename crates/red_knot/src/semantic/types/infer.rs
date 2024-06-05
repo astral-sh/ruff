@@ -212,7 +212,15 @@ fn infer_expr_type(db: &dyn SemanticDb, file_id: FileId, expr: &ast::Expr) -> Qu
                 .get_member(db, attr_name)
                 .map(|ty| ty.unwrap_or(Type::Unknown))
         }
-        _ => todo!("full expression type resolution"),
+        ast::Expr::BinOp(ast::ExprBinOp {
+            left, op, right, ..
+        }) => {
+            let left_ty = infer_expr_type(db, file_id, left)?;
+            let right_ty = infer_expr_type(db, file_id, right)?;
+            // TODO add reverse bin op support if right <: left
+            left_ty.resolve_bin_op(db, *op, right_ty)
+        }
+        _ => todo!("expression type resolution for {:?}", expr),
     }
 }
 
@@ -487,5 +495,28 @@ mod tests {
         )?;
 
         assert_public_type(&case, "a", "x", "(Literal[2] | Literal[3] | Literal[4])")
+    }
+
+    #[test]
+    fn literal_int_arithmetic() -> anyhow::Result<()> {
+        let case = create_test()?;
+
+        write_to_path(
+            &case,
+            "a.py",
+            "
+                a = 2 + 1
+                b = a - 4
+                c = a * b
+                d = c / 3
+                e = 5 % 3
+            ",
+        )?;
+
+        assert_public_type(&case, "a", "a", "Literal[3]")?;
+        assert_public_type(&case, "a", "b", "Literal[-1]")?;
+        assert_public_type(&case, "a", "c", "Literal[-3]")?;
+        assert_public_type(&case, "a", "d", "Literal[-1]")?;
+        assert_public_type(&case, "a", "e", "Literal[2]")
     }
 }
