@@ -70,6 +70,7 @@ pub(crate) struct ClientSettings {
     exclude: Option<Vec<String>>,
     line_length: Option<LineLength>,
     configuration_preference: Option<ConfigurationPreference>,
+    pub(crate) log_level: Option<crate::trace::LogLevel>,
 }
 
 /// This is a direct representation of the workspace settings schema,
@@ -174,6 +175,15 @@ impl AllSettings {
                     .collect()
             }),
         }
+    }
+}
+
+impl ClientSettings {
+    /// Log level is taken directly from client settings, since we need it before
+    /// we resolve workspace settings. Additionally, this setting should only be set in global settings,
+    /// and any log level set in workspace settings will be ignored.
+    pub(crate) fn log_level(&self) -> Option<crate::trace::LogLevel> {
+        self.log_level
     }
 }
 
@@ -424,6 +434,7 @@ mod tests {
                 exclude: None,
                 line_length: None,
                 configuration_preference: None,
+                log_level: None,
             },
             workspace_settings: [
                 WorkspaceSettings {
@@ -472,6 +483,7 @@ mod tests {
                         exclude: None,
                         line_length: None,
                         configuration_preference: None,
+                        log_level: None,
                     },
                     workspace: Url {
                         scheme: "file",
@@ -533,6 +545,7 @@ mod tests {
                         exclude: None,
                         line_length: None,
                         configuration_preference: None,
+                        log_level: None,
                     },
                     workspace: Url {
                         scheme: "file",
@@ -588,7 +601,7 @@ mod tests {
                     exclude: None,
                     line_length: None,
                     configuration_preference: ConfigurationPreference::default(),
-                }
+                },
             }
         );
         let path =
@@ -619,7 +632,7 @@ mod tests {
                     exclude: None,
                     line_length: None,
                     configuration_preference: ConfigurationPreference::EditorFirst,
-                }
+                },
             }
         );
     }
@@ -673,6 +686,9 @@ mod tests {
                     ),
                 ),
                 configuration_preference: None,
+                log_level: Some(
+                    Warn,
+                ),
             },
         }
         "###);
@@ -703,7 +719,7 @@ mod tests {
                     exclude: Some(vec!["third_party".into()]),
                     line_length: Some(LineLength::try_from(80).unwrap()),
                     configuration_preference: ConfigurationPreference::EditorFirst,
-                }
+                },
             }
         );
     }

@@ -17,16 +17,13 @@ pub(crate) fn set_trace_value(trace_value: TraceValue) {
     *global_trace_value = trace_value;
 }
 
-pub(crate) fn init_tracing(sender: ClientSender) {
+pub(crate) fn init_tracing(sender: ClientSender, log_level: LogLevel) {
     LOGGING_SENDER
         .set(sender)
         .expect("logging sender should only be initialized once");
 
-    // TODO(jane): Provide a way to set the log level
-    let subscriber =
-        tracing_subscriber::Registry::default().with(LogLayer.with_filter(LogFilter {
-            filter: LogLevel::Info,
-        }));
+    let subscriber = tracing_subscriber::Registry::default()
+        .with(LogLayer.with_filter(LogFilter { filter: log_level }));
 
     tracing::subscriber::set_global_default(subscriber)
         .expect("should be able to set global default subscriber");

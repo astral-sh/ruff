@@ -68,7 +68,6 @@ impl Server {
         }
 
         crate::message::init_messenger(connection.make_sender());
-        crate::trace::init_tracing(connection.make_sender());
 
         let AllSettings {
             global_settings,
@@ -77,6 +76,13 @@ impl Server {
             init_params
                 .initialization_options
                 .unwrap_or_else(|| serde_json::Value::Object(serde_json::Map::default())),
+        );
+
+        crate::trace::init_tracing(
+            connection.make_sender(),
+            global_settings
+                .log_level()
+                .unwrap_or(crate::trace::LogLevel::Info),
         );
 
         let mut workspace_for_url = |url: lsp_types::Url| {
