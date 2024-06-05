@@ -58,7 +58,7 @@ where
         if tys.peek().is_some() {
             Ok(Type::Union(jar.type_store.add_union(
                 symbol.file_id,
-                &Iterator::chain([first].into_iter(), tys).collect::<QueryResult<Vec<_>>>()?,
+                &Iterator::chain(std::iter::once(first), tys).collect::<QueryResult<Vec<_>>>()?,
             )))
         } else {
             first
@@ -79,7 +79,7 @@ pub fn infer_definition_type(
     let file_id = symbol.file_id;
 
     match definition {
-        Definition::None => Ok(Type::Unbound),
+        Definition::Unbound => Ok(Type::Unbound),
         Definition::Import(ImportDefinition {
             module: module_name,
         }) => {

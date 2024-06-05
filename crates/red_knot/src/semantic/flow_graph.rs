@@ -133,7 +133,7 @@ impl<'a> Iterator for ReachableDefinitionsIterator<'a> {
         loop {
             let flow_node_id = self.pending.pop()?;
             match &self.flow_graph.flow_nodes_by_id[flow_node_id] {
-                FlowNode::Start => return Some(Definition::None),
+                FlowNode::Start => return Some(Definition::Unbound),
                 FlowNode::Definition(def_node) => {
                     if def_node.symbol_id == self.symbol_id {
                         return Some(def_node.definition.clone());
