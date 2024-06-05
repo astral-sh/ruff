@@ -3,8 +3,8 @@ use crate::ast_ids::NodeKey;
 use crate::db::{QueryResult, SemanticDb, SemanticJar};
 use crate::files::FileId;
 use crate::module::{Module, ModuleName};
-use crate::symbols::{
-    resolve_global_symbol, symbol_table, GlobalSymbolId, ScopeId, ScopeKind, SymbolId,
+use crate::semantic::{
+    resolve_global_symbol, semantic_index, GlobalSymbolId, ScopeId, ScopeKind, SymbolId,
 };
 use crate::{FxDashMap, FxIndexSet, Name};
 use ruff_index::{newtype_index, IndexVec};
@@ -331,10 +331,11 @@ impl FunctionTypeId {
         self,
         db: &dyn SemanticDb,
     ) -> QueryResult<Option<ClassTypeId>> {
-        let table = symbol_table(db, self.file_id)?;
+        let index = semantic_index(db, self.file_id)?;
+        let table = index.symbol_table();
         let FunctionType { symbol_id, .. } = *self.function(db)?;
-        let scope_id = symbol_id.symbol(&table).scope_id();
-        let scope = scope_id.scope(&table);
+        let scope_id = symbol_id.symbol(table).scope_id();
+        let scope = scope_id.scope(table);
         if !matches!(scope.kind(), ScopeKind::Class) {
             return Ok(None);
         };
@@ -439,8 +440,8 @@ impl ClassTypeId {
     fn get_own_class_member(self, db: &dyn SemanticDb, name: &Name) -> QueryResult<Option<Type>> {
         // TODO: this should distinguish instance-only members (e.g. `x: int`) and not return them
         let ClassType { scope_id, .. } = *self.class(db)?;
-        let table = symbol_table(db, self.file_id)?;
-        if let Some(symbol_id) = table.symbol_id_by_name(scope_id, name) {
+        let index = semantic_index(db, self.file_id)?;
+        if let Some(symbol_id) = index.symbol_table().symbol_id_by_name(scope_id, name) {
             Ok(Some(infer_symbol_public_type(
                 db,
                 GlobalSymbolId {
@@ -732,11 +733,12 @@ impl IntersectionType {
 
 #[cfg(test)]
 mod tests {
+    use super::Type;
     use std::path::Path;
 
     use crate::files::Files;
-    use crate::symbols::{SymbolFlags, SymbolTable};
-    use crate::types::{Type, TypeStore};
+    use crate::semantic::symbol_table::SymbolTableBuilder;
+    use crate::semantic::{SymbolFlags, SymbolTable, TypeStore};
     use crate::FxIndexSet;
 
     #[test]
@@ -755,12 +757,13 @@ mod tests {
         let store = TypeStore::default();
         let files = Files::default();
         let file_id = files.intern(Path::new("/foo"));
-        let mut table = SymbolTable::new();
-        let func_symbol = table.add_or_update_symbol(
+        let mut builder = SymbolTableBuilder::new();
+        let func_symbol = builder.add_or_update_symbol(
             SymbolTable::root_scope_id(),
             "func",
             SymbolFlags::IS_DEFINED,
         );
+        builder.finish();
 
         let id = store.add_function(
             file_id,

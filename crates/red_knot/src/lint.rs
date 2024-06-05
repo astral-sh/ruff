@@ -12,11 +12,11 @@ use crate::db::{LintDb, LintJar, QueryResult};
 use crate::files::FileId;
 use crate::module::{resolve_module, ModuleName};
 use crate::parse::parse;
-use crate::source::{source_text, Source};
-use crate::symbols::{
-    resolve_global_symbol, symbol_table, Definition, GlobalSymbolId, SymbolId, SymbolTable,
+use crate::semantic::{infer_definition_type, infer_symbol_public_type, Type};
+use crate::semantic::{
+    resolve_global_symbol, semantic_index, Definition, GlobalSymbolId, SemanticIndex, SymbolId,
 };
-use crate::types::{infer_definition_type, infer_symbol_public_type, Type};
+use crate::source::{source_text, Source};
 
 #[tracing::instrument(level = "debug", skip(db))]
 pub(crate) fn lint_syntax(db: &dyn LintDb, file_id: FileId) -> QueryResult<Diagnostics> {
@@ -82,13 +82,13 @@ pub(crate) fn lint_semantic(db: &dyn LintDb, file_id: FileId) -> QueryResult<Dia
     storage.get(&file_id, |file_id| {
         let source = source_text(db.upcast(), *file_id)?;
         let parsed = parse(db.upcast(), *file_id)?;
-        let symbols = symbol_table(db.upcast(), *file_id)?;
+        let semantic_index = semantic_index(db.upcast(), *file_id)?;
 
         let context = SemanticLintContext {
             file_id: *file_id,
             source,
             parsed: &parsed,
-            symbols,
+            semantic_index,
             db,
             diagnostics: RefCell::new(Vec::new()),
         };
@@ -102,7 +102,7 @@ pub(crate) fn lint_semantic(db: &dyn LintDb, file_id: FileId) -> QueryResult<Dia
 
 fn lint_unresolved_imports(context: &SemanticLintContext) -> QueryResult<()> {
     // TODO: Consider iterating over the dependencies (imports) only instead of all definitions.
-    for (symbol, definition) in context.symbols().all_definitions() {
+    for (symbol, definition) in context.semantic_index().symbol_table().all_definitions() {
         match definition {
             Definition::Import(import) => {
                 let ty = context.infer_symbol_public_type(symbol)?;
@@ -152,7 +152,7 @@ fn lint_bad_overrides(context: &SemanticLintContext) -> QueryResult<()> {
 
     // TODO we should maybe index definitions by type instead of iterating all, or else iterate all
     // just once, match, and branch to all lint rules that care about a type of definition
-    for (symbol, definition) in context.symbols().all_definitions() {
+    for (symbol, definition) in context.semantic_index().symbol_table().all_definitions() {
         if !matches!(definition, Definition::FunctionDef(_)) {
             continue;
         }
@@ -194,7 +194,7 @@ pub struct SemanticLintContext<'a> {
     file_id: FileId,
     source: Source,
     parsed: &'a Parsed<ModModule>,
-    symbols: Arc<SymbolTable>,
+    semantic_index: Arc<SemanticIndex>,
     db: &'a dyn LintDb,
     diagnostics: RefCell<Vec<String>>,
 }
@@ -212,8 +212,8 @@ impl<'a> SemanticLintContext<'a> {
         self.parsed.syntax()
     }
 
-    pub fn symbols(&self) -> &SymbolTable {
-        &self.symbols
+    pub fn semantic_index(&self) -> &SemanticIndex {
+        &self.semantic_index
     }
 
     pub fn infer_symbol_public_type(&self, symbol_id: SymbolId) -> QueryResult<Type> {

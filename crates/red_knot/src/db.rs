@@ -9,9 +9,9 @@ use crate::files::FileId;
 use crate::lint::{LintSemanticStorage, LintSyntaxStorage};
 use crate::module::ModuleResolver;
 use crate::parse::ParsedStorage;
+use crate::semantic::SemanticIndexStorage;
+use crate::semantic::TypeStore;
 use crate::source::SourceStorage;
-use crate::symbols::SymbolTablesStorage;
-use crate::types::TypeStore;
 
 mod jars;
 mod query;
@@ -125,7 +125,7 @@ pub struct SourceJar {
 #[derive(Debug, Default)]
 pub struct SemanticJar {
     pub module_resolver: ModuleResolver,
-    pub symbol_tables: SymbolTablesStorage,
+    pub semantic_indices: SemanticIndexStorage,
     pub type_store: TypeStore,
 }
 
