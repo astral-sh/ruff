@@ -15,8 +15,20 @@ def foo():
 
     _ = event
 
+    for x in range(10):
+        pass
+
+    # Usage in another block
+    for y in range(10):
+        # x is used outside of the loop it was defined in (meant to use y)
+        if x == 5:
+            pass
+
     # Tuple destructuring
     for a, b, c in []:
+        _ = a
+        _ = b
+        _ = c
         pass
 
     _ = a
@@ -26,19 +38,26 @@ def foo():
 
     # Array destructuring
     for [d, e, f] in []:
+        _ = d
+        _ = e
+        _ = f
         pass
 
     _ = d
     _ = e
     _ = f
 
+    # with statement
     with None as i:
+        _ = i
         pass
 
     _ = i
 
+    # Nested blocks
     with None as i:
         for n in []:
+            _ = n
             pass
 
         _ = n
