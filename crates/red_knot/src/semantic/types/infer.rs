@@ -179,7 +179,6 @@ pub fn infer_definition_type(
             let parsed = parse(db.upcast(), file_id)?;
             let ast = parsed.syntax();
             let node = node_key.resolve_unwrap(ast.as_any_node_ref());
-            // TODO handle unpacking assignment
             infer_expr_type(db, file_id, &node.value)
         }
     }
