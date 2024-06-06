@@ -73,7 +73,7 @@ pub(crate) fn dict_iter_missing_items(checker: &mut Checker, target: &Expr, iter
     }
 
     // If we can reliably determine that a dictionary has keys that are tuples of two we don't warn
-    if is_dict_key_tuple_with_two_elements(checker.semantic(), binding) {
+    if is_dict_key_tuple_with_two_elements(binding, checker.semantic()) {
         return;
     }
 
@@ -86,7 +86,7 @@ pub(crate) fn dict_iter_missing_items(checker: &mut Checker, target: &Expr, iter
 }
 
 /// Returns true if the binding is a dictionary where each key is a tuple with two elements.
-fn is_dict_key_tuple_with_two_elements(semantic: &SemanticModel, binding: &Binding) -> bool {
+fn is_dict_key_tuple_with_two_elements(binding: &Binding, semantic: &SemanticModel) -> bool {
     let Some(statement) = binding.statement(semantic) else {
         return false;
     };

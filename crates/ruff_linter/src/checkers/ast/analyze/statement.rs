@@ -1332,6 +1332,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 pylint::rules::too_many_nested_blocks(checker, stmt);
             }
             if checker.any_enabled(&[
+                Rule::DictIndexMissingItems,
                 Rule::EnumerateForLoop,
                 Rule::IncorrectDictIterator,
                 Rule::LoopIteratorMutation,
