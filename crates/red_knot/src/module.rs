@@ -779,7 +779,7 @@ impl PackageKind {
 mod tests {
     use std::io::{Cursor, Read};
     use std::num::NonZeroU32;
-    use std::path::PathBuf;
+    use std::path::{Path, PathBuf};
 
     use zip::ZipArchive;
 
@@ -938,9 +938,8 @@ mod tests {
         assert!(!TYPESHED_ZIP_BYTES.is_empty());
         let mut typeshed_zip_archive = ZipArchive::new(Cursor::new(TYPESHED_ZIP_BYTES))?;
 
-        let mut functools_module_stub = typeshed_zip_archive
-            .by_name("stdlib/functools.pyi")
-            .unwrap();
+        let path_to_functools = Path::new("stdlib/functools.pyi").to_str().unwrap();
+        let mut functools_module_stub = typeshed_zip_archive.by_name(path_to_functools).unwrap();
         assert!(functools_module_stub.is_file());
 
         let mut functools_module_stub_source = String::new();
