@@ -746,16 +746,42 @@ pub(crate) struct UnionType {
 
 impl UnionType {
     fn display(&self, f: &mut std::fmt::Formatter<'_>, store: &TypeStore) -> std::fmt::Result {
-        f.write_str("(")?;
+        let (int_literals, other_types): (Vec<Type>, Vec<Type>) = self
+            .elements
+            .iter()
+            .copied()
+            .partition(|ty| matches!(ty, Type::IntLiteral(_)));
         let mut first = true;
-        for ty in &self.elements {
+        if !int_literals.is_empty() {
+            f.write_str("Literal[")?;
+            let mut nums: Vec<i64> = int_literals
+                .into_iter()
+                .filter_map(|ty| {
+                    if let Type::IntLiteral(n) = ty {
+                        Some(n)
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+            nums.sort_unstable();
+            for num in nums {
+                if !first {
+                    f.write_str(", ")?;
+                }
+                write!(f, "{num}")?;
+                first = false;
+            }
+            f.write_str("]")?;
+        }
+        for ty in other_types {
             if !first {
                 f.write_str(" | ")?;
             };
             first = false;
             write!(f, "{}", ty.display(store))?;
         }
-        f.write_str(")")
+        Ok(())
     }
 }
 
@@ -775,7 +801,6 @@ pub(crate) struct IntersectionType {
 
 impl IntersectionType {
     fn display(&self, f: &mut std::fmt::Formatter<'_>, store: &TypeStore) -> std::fmt::Result {
-        f.write_str("(")?;
         let mut first = true;
         for (neg, ty) in self
             .positive
@@ -792,7 +817,7 @@ impl IntersectionType {
             };
             write!(f, "{}", ty.display(store))?;
         }
-        f.write_str(")")
+        Ok(())
     }
 }
 
@@ -857,7 +882,7 @@ mod tests {
             elems.into_iter().collect::<FxIndexSet<_>>()
         );
         let union = Type::Union(id);
-        assert_eq!(format!("{}", union.display(&store)), "(C1 | C2)");
+        assert_eq!(format!("{}", union.display(&store)), "C1 | C2");
     }
 
     #[test]
@@ -880,9 +905,6 @@ mod tests {
             neg.into_iter().collect::<FxIndexSet<_>>()
         );
         let intersection = Type::Intersection(id);
-        assert_eq!(
-            format!("{}", intersection.display(&store)),
-            "(C1 & C2 & ~C3)"
-        );
+        assert_eq!(format!("{}", intersection.display(&store)), "C1 & C2 & ~C3");
     }
 }

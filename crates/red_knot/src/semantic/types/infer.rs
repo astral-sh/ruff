@@ -424,7 +424,7 @@ mod tests {
             ",
         )?;
 
-        assert_public_type(&case, "a", "x", "(Literal[1] | Literal[2])")
+        assert_public_type(&case, "a", "x", "Literal[1, 2]")
     }
 
     #[test]
@@ -450,7 +450,7 @@ mod tests {
             ",
         )?;
 
-        assert_public_type(&case, "a", "x", "(Literal[2] | Literal[3])")
+        assert_public_type(&case, "a", "x", "Literal[2, 3]")
     }
 
     #[test]
@@ -467,7 +467,7 @@ mod tests {
             ",
         )?;
 
-        assert_public_type(&case, "a", "x", "(Unbound | Literal[1])")
+        assert_public_type(&case, "a", "x", "Literal[1] | Unbound")
     }
 
     #[test]
@@ -492,7 +492,7 @@ mod tests {
             ",
         )?;
 
-        assert_public_type(&case, "a", "x", "(Literal[3] | Literal[4] | Literal[5])")?;
+        assert_public_type(&case, "a", "x", "Literal[3, 4, 5]")?;
         assert_public_type(&case, "a", "r", "Literal[2]")?;
         assert_public_type(&case, "a", "s", "Literal[5]")
     }
@@ -515,7 +515,7 @@ mod tests {
             ",
         )?;
 
-        assert_public_type(&case, "a", "x", "(Literal[2] | Literal[3] | Literal[4])")
+        assert_public_type(&case, "a", "x", "Literal[2, 3, 4]")
     }
 
     #[test]
@@ -569,7 +569,7 @@ mod tests {
             ",
         )?;
 
-        assert_public_type(&case, "a", "x", "(Literal[1] | Literal[2])")
+        assert_public_type(&case, "a", "x", "Literal[1, 2]")
     }
 
     #[test]
@@ -587,9 +587,9 @@ mod tests {
             ",
         )?;
 
-        assert_public_type(&case, "a", "x", "(Literal[1] | Literal[2])")?;
-        assert_public_type(&case, "a", "a", "(Literal[1] | Literal[0])")?;
-        assert_public_type(&case, "a", "b", "(Literal[0] | Literal[2])")
+        assert_public_type(&case, "a", "x", "Literal[1, 2]")?;
+        assert_public_type(&case, "a", "a", "Literal[0, 1]")?;
+        assert_public_type(&case, "a", "b", "Literal[0, 2]")
     }
 
     #[test]
@@ -606,7 +606,25 @@ mod tests {
             ",
         )?;
 
-        assert_public_type(&case, "a", "a", "(Literal[1] | Literal[2])")
+        assert_public_type(&case, "a", "a", "Literal[1, 2]")
+    }
+
+    #[test]
+    fn ifexpr_nested() -> anyhow::Result<()> {
+        let case = create_test()?;
+
+        write_to_path(
+            &case,
+            "a.py",
+            "
+                class C1: pass
+                class C2: pass
+                class C3: pass
+                x = C1 if flag else C2 if flag2 else C3
+            ",
+        )?;
+
+        assert_public_type(&case, "a", "x", "Literal[C1] | Literal[C2] | Literal[C3]")
     }
 
     #[test]
