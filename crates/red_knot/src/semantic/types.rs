@@ -751,10 +751,6 @@ impl UnionType {
             .iter()
             .copied()
             .partition(|ty| matches!(ty, Type::IntLiteral(_)));
-        let num_types = usize::from(!int_literals.is_empty()) + other_types.len();
-        if num_types > 1 {
-            f.write_str("(")?;
-        }
         let mut first = true;
         if !int_literals.is_empty() {
             f.write_str("Literal[")?;
@@ -785,9 +781,6 @@ impl UnionType {
             first = false;
             write!(f, "{}", ty.display(store))?;
         }
-        if num_types > 1 {
-            f.write_str(")")?;
-        }
         Ok(())
     }
 }
@@ -808,7 +801,6 @@ pub(crate) struct IntersectionType {
 
 impl IntersectionType {
     fn display(&self, f: &mut std::fmt::Formatter<'_>, store: &TypeStore) -> std::fmt::Result {
-        f.write_str("(")?;
         let mut first = true;
         for (neg, ty) in self
             .positive
@@ -825,7 +817,7 @@ impl IntersectionType {
             };
             write!(f, "{}", ty.display(store))?;
         }
-        f.write_str(")")
+        Ok(())
     }
 }
 
@@ -890,7 +882,7 @@ mod tests {
             elems.into_iter().collect::<FxIndexSet<_>>()
         );
         let union = Type::Union(id);
-        assert_eq!(format!("{}", union.display(&store)), "(C1 | C2)");
+        assert_eq!(format!("{}", union.display(&store)), "C1 | C2");
     }
 
     #[test]
@@ -913,9 +905,6 @@ mod tests {
             neg.into_iter().collect::<FxIndexSet<_>>()
         );
         let intersection = Type::Intersection(id);
-        assert_eq!(
-            format!("{}", intersection.display(&store)),
-            "(C1 & C2 & ~C3)"
-        );
+        assert_eq!(format!("{}", intersection.display(&store)), "C1 & C2 & ~C3");
     }
 }

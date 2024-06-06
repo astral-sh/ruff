@@ -467,7 +467,7 @@ mod tests {
             ",
         )?;
 
-        assert_public_type(&case, "a", "x", "(Literal[1] | Unbound)")
+        assert_public_type(&case, "a", "x", "Literal[1] | Unbound")
     }
 
     #[test]
@@ -624,6 +624,6 @@ mod tests {
             ",
         )?;
 
-        assert_public_type(&case, "a", "x", "(Literal[C1] | Literal[C2] | Literal[C3])")
+        assert_public_type(&case, "a", "x", "Literal[C1] | Literal[C2] | Literal[C3]")
     }
 }
