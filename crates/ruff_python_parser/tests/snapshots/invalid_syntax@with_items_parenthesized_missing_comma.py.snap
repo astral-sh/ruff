@@ -239,42 +239,49 @@ Module(
             ),
             With(
                 StmtWith {
-                    range: 136..160,
+                    range: 136..159,
                     is_async: false,
                     items: [
                         WithItem {
-                            range: 142..147,
-                            context_expr: Name(
-                                ExprName {
-                                    range: 142..147,
-                                    id: "item1",
+                            range: 141..154,
+                            context_expr: Tuple(
+                                ExprTuple {
+                                    range: 141..154,
+                                    elts: [
+                                        Name(
+                                            ExprName {
+                                                range: 142..147,
+                                                id: "item1",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        Name(
+                                            ExprName {
+                                                range: 149..154,
+                                                id: "item2",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ],
                                     ctx: Load,
-                                },
-                            ),
-                            optional_vars: None,
-                        },
-                        WithItem {
-                            range: 149..154,
-                            context_expr: Name(
-                                ExprName {
-                                    range: 149..154,
-                                    id: "item2",
-                                    ctx: Load,
-                                },
-                            ),
-                            optional_vars: None,
-                        },
-                        WithItem {
-                            range: 156..159,
-                            context_expr: EllipsisLiteral(
-                                ExprEllipsisLiteral {
-                                    range: 156..159,
+                                    parenthesized: true,
                                 },
                             ),
                             optional_vars: None,
                         },
                     ],
-                    body: [],
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 156..159,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 156..159,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
                 },
             ),
         ],
