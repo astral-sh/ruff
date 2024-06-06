@@ -12,6 +12,13 @@ use crate::files::FileId;
 use crate::semantic::Dependency;
 use crate::FxDashMap;
 
+// The file path here is hardcoded in this crate's `build.rs` script.
+// Luckily this crate will fail to build if this file isn't available at build time.
+//
+// Allow dead code for now; actually resolving modules to vendored typeshed stubs will come soon!
+#[allow(dead_code)]
+const TYPESHED_ZIP_BYTES: &[u8] = include_bytes!("../vendor/zipped_typeshed.zip");
+
 /// Representation of a Python module.
 ///
 /// The inner type wrapped by this struct is a unique identifier for the module
@@ -770,14 +777,17 @@ impl PackageKind {
 
 #[cfg(test)]
 mod tests {
+    use std::io::{Cursor, Read};
     use std::num::NonZeroU32;
     use std::path::PathBuf;
+
+    use zip::ZipArchive;
 
     use crate::db::tests::TestDb;
     use crate::db::SourceDb;
     use crate::module::{
         path_to_module, resolve_module, set_module_search_paths, ModuleKind, ModuleName,
-        ModuleResolutionInputs, TYPESHED_STDLIB_DIRECTORY,
+        ModuleResolutionInputs, TYPESHED_STDLIB_DIRECTORY, TYPESHED_ZIP_BYTES,
     };
     use crate::semantic::Dependency;
 
@@ -920,6 +930,23 @@ mod tests {
             path_to_module(&db, &first_party_functools_path)?
         );
 
+        Ok(())
+    }
+
+    #[test]
+    fn typeshed_zip_created_at_build_time() -> anyhow::Result<()> {
+        assert!(!TYPESHED_ZIP_BYTES.is_empty());
+        let mut typeshed_zip_archive = ZipArchive::new(Cursor::new(TYPESHED_ZIP_BYTES))?;
+
+        let mut functools_module_stub = typeshed_zip_archive
+            .by_name("stdlib/functools.pyi")
+            .unwrap();
+        assert!(functools_module_stub.is_file());
+
+        let mut functools_module_stub_source = String::new();
+        functools_module_stub.read_to_string(&mut functools_module_stub_source)?;
+
+        assert!(functools_module_stub_source.contains("def update_wrapper("));
         Ok(())
     }
 
