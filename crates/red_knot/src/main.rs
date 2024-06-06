@@ -12,7 +12,7 @@ use tracing_subscriber::{Layer, Registry};
 use tracing_tree::time::Uptime;
 
 use red_knot::db::{HasJar, ParallelDatabase, QueryError, SourceDb, SourceJar};
-use red_knot::module::{set_module_search_paths, ResolvedSearchPathOrder};
+use red_knot::module::{set_module_search_paths, OrderedSearchPaths};
 use red_knot::program::check::ExecutionMode;
 use red_knot::program::{FileWatcherChange, Program};
 use red_knot::watch::FileWatcher;
@@ -45,8 +45,7 @@ fn main() -> anyhow::Result<()> {
     let workspace = Workspace::new(workspace_folder.to_path_buf());
 
     let workspace_search_path = workspace.root().to_path_buf();
-    let resolved_search_paths =
-        ResolvedSearchPathOrder::new(vec![], workspace_search_path, None, None);
+    let resolved_search_paths = OrderedSearchPaths::new(vec![], workspace_search_path, None, None);
 
     let mut program = Program::new(workspace);
     set_module_search_paths(&mut program, resolved_search_paths);

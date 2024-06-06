@@ -389,7 +389,7 @@ pub fn file_to_module(db: &dyn SemanticDb, file: FileId) -> QueryResult<Option<M
 //////////////////////////////////////////////////////
 
 /// Changes the module search paths to `search_paths`.
-pub fn set_module_search_paths(db: &mut dyn SemanticDb, search_paths: ResolvedSearchPathOrder) {
+pub fn set_module_search_paths(db: &mut dyn SemanticDb, search_paths: OrderedSearchPaths) {
     let jar: &mut SemanticJar = db.jar_mut();
 
     jar.module_resolver = ModuleResolver::new(search_paths);
@@ -400,9 +400,9 @@ const TYPESHED_STDLIB_DIRECTORY: &str = "stdlib";
 /// A resolved module resolution order, implementing PEP 561
 /// (with some small, deliberate differences)
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub struct ResolvedSearchPathOrder(Vec<ModuleSearchPath>);
+pub struct OrderedSearchPaths(Vec<ModuleSearchPath>);
 
-impl Deref for ResolvedSearchPathOrder {
+impl Deref for OrderedSearchPaths {
     type Target = [ModuleSearchPath];
 
     fn deref(&self) -> &Self::Target {
@@ -410,20 +410,20 @@ impl Deref for ResolvedSearchPathOrder {
     }
 }
 
-/// Implementation of the module resolution order from PEP-561.
-///
-/// - `extra_paths` is a list of user-provided paths
-///   that should take first priority in the module resolution.
-///   Examples in other type checkers are mypy's MYPYPATH environment variable,
-///   or pyright's stubPath configuration setting.
-/// - `workspace_root` is the root of the workspace,
-///   used for finding first-party modules
-/// - `site-packages` is the path to the user's `site-packages` directory,
-///   where third-party packages from ``PyPI`` are installed
-/// - `custom_typeshed` is a path to standard-library typeshed stubs.
-///   Currently this has to be a directory that exists on disk.
-///   (TODO: fall back to vendored stubs if no custom directory is provided.)
-impl ResolvedSearchPathOrder {
+impl OrderedSearchPaths {
+    /// Implementation of the module resolution order from PEP-561.
+    ///
+    /// - `extra_paths` is a list of user-provided paths
+    ///   that should take first priority in the module resolution.
+    ///   Examples in other type checkers are mypy's MYPYPATH environment variable,
+    ///   or pyright's stubPath configuration setting.
+    /// - `workspace_root` is the root of the workspace,
+    ///   used for finding first-party modules
+    /// - `site-packages` is the path to the user's `site-packages` directory,
+    ///   where third-party packages from ``PyPI`` are installed
+    /// - `custom_typeshed` is a path to standard-library typeshed stubs.
+    ///   Currently this has to be a directory that exists on disk.
+    ///   (TODO: fall back to vendored stubs if no custom directory is provided.)
     pub fn new(
         extra_paths: Vec<PathBuf>,
         workspace_root: PathBuf,
@@ -519,7 +519,7 @@ pub fn add_module(db: &mut dyn SemanticDb, path: &Path) -> Option<(Module, Vec<A
 #[derive(Default)]
 pub struct ModuleResolver {
     /// The search paths where modules are located (and searched). Corresponds to `sys.path` at runtime.
-    search_paths: ResolvedSearchPathOrder,
+    search_paths: OrderedSearchPaths,
 
     // Locking: Locking is done by acquiring a (write) lock on `by_name`. This is because `by_name` is the primary
     // lookup method. Acquiring locks in any other ordering can result in deadlocks.
@@ -536,7 +536,7 @@ pub struct ModuleResolver {
 }
 
 impl ModuleResolver {
-    pub fn new(search_paths: ResolvedSearchPathOrder) -> Self {
+    pub fn new(search_paths: OrderedSearchPaths) -> Self {
         Self {
             search_paths,
             modules: FxDashMap::default(),
@@ -759,7 +759,7 @@ mod tests {
     use crate::db::SourceDb;
     use crate::module::{
         path_to_module, resolve_module, set_module_search_paths, ModuleKind, ModuleName,
-        ResolvedSearchPathOrder, TYPESHED_STDLIB_DIRECTORY,
+        OrderedSearchPaths, TYPESHED_STDLIB_DIRECTORY,
     };
     use crate::semantic::Dependency;
 
@@ -787,7 +787,7 @@ mod tests {
         let site_packages = site_packages.canonicalize()?;
         let custom_typeshed = custom_typeshed.canonicalize()?;
 
-        let resolved_search_paths = ResolvedSearchPathOrder::new(
+        let resolved_search_paths = OrderedSearchPaths::new(
             vec![],
             src.clone(),
             Some(site_packages.clone()),
