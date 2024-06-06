@@ -31,13 +31,12 @@ def foo():
     # Assign a variable before the loop
     room_id = 3
     _ = room_id
-
     # Use the same variable name in a loop
     for room_id in []:
         _ = room_id
         pass
 
-    # ❌ After the loop is not ok
+    # ❌ After the loop is not ok because the value is probably not what you expect
     _ = room_id
 
     # Tuple destructuring

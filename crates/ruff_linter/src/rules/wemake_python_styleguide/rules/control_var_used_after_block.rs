@@ -106,9 +106,9 @@ pub(crate) fn control_var_used_after_block(
             let reference = checker.semantic().reference(reference);
             let reference_node_id = reference.expression_id().unwrap();
 
-            // If the reference comes before the binding in the source order, skip it.
-            // FIXME: Maybe we should also check that there is an assignment somewhere
-            // above as well.
+            // Skip any reference that come before the control var binding in the source
+            // order, skip it because people can assign and use the same variable name
+            // above the block.
             if reference.range().end() < binding_statement.range().start() {
                 continue;
             }
