@@ -718,16 +718,6 @@ enum WithItemKind {
 }
 
 impl WithItemKind {
-    /// Returns the token that terminates a list of `with` items.
-    const fn list_terminator(self) -> TokenKind {
-        match self {
-            WithItemKind::Parenthesized => TokenKind::Rpar,
-            WithItemKind::Unparenthesized | WithItemKind::ParenthesizedExpression => {
-                TokenKind::Colon
-            }
-        }
-    }
-
     /// Returns `true` if the with items are parenthesized.
     const fn is_parenthesized(self) -> bool {
         matches!(self, WithItemKind::Parenthesized)
@@ -958,9 +948,14 @@ impl RecoveryContextKind {
                     || p.at(TokenKind::Rarrow)
                     || p.at_compound_stmt()
             }
-            RecoveryContextKind::WithItems(with_item_kind) => {
-                p.at(with_item_kind.list_terminator())
-            }
+            RecoveryContextKind::WithItems(with_item_kind) => match with_item_kind {
+                WithItemKind::Parenthesized => {
+                    matches!(p.current_token_kind(), TokenKind::Rpar | TokenKind::Colon)
+                }
+                WithItemKind::Unparenthesized | WithItemKind::ParenthesizedExpression => {
+                    p.at(TokenKind::Colon)
+                }
+            },
             RecoveryContextKind::FStringElements => {
                 // Tokens other than `FStringEnd` and `}` are for better error recovery
                 p.at_ts(TokenSet::new([
