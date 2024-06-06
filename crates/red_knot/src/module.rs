@@ -938,8 +938,10 @@ mod tests {
         assert!(!TYPESHED_ZIP_BYTES.is_empty());
         let mut typeshed_zip_archive = ZipArchive::new(Cursor::new(TYPESHED_ZIP_BYTES))?;
 
-        let path_to_functools = Path::new("stdlib/functools.pyi").to_str().unwrap();
-        let mut functools_module_stub = typeshed_zip_archive.by_name(path_to_functools).unwrap();
+        let path_to_functools = Path::new("stdlib").join("functools.pyi");
+        let mut functools_module_stub = typeshed_zip_archive
+            .by_name(path_to_functools.to_str().unwrap())
+            .unwrap();
         assert!(functools_module_stub.is_file());
 
         let mut functools_module_stub_source = String::new();
