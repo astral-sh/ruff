@@ -225,7 +225,7 @@ struct ModuleSearchPathInner {
     kind: ModuleSearchPathKind,
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, is_macro::Is)]
 pub enum ModuleSearchPathKind {
     /// "Extra" paths provided by the user in a config file, env var or CLI flag.
     /// E.g. mypy's `MYPYPATH` env var, or pyright's `stubPath` configuration setting
@@ -242,12 +242,6 @@ pub enum ModuleSearchPathKind {
 
     /// Vendored third-party stubs from typeshed
     VendoredThirdParty,
-}
-
-impl ModuleSearchPathKind {
-    pub const fn is_first_party(self) -> bool {
-        matches!(self, Self::FirstParty)
-    }
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -400,6 +394,8 @@ pub fn set_module_search_paths(db: &mut dyn SemanticDb, search_paths: ResolvedSe
 
     jar.module_resolver = ModuleResolver::new(search_paths);
 }
+
+const TYPESHED_STDLIB_DIRECTORY: &str = "stdlib";
 
 /// A resolved module resolution order, implementing PEP 561
 /// (with some small, deliberate differences)
@@ -670,6 +666,10 @@ where
 {
     let mut package_path = module_search_path.path().to_path_buf();
 
+    if module_search_path.kind().is_standard_library() {
+        package_path = package_path.join(TYPESHED_STDLIB_DIRECTORY);
+    }
+
     // `true` if inside a folder that is a namespace package (has no `__init__.py`).
     // Namespace packages are special because they can be spread across multiple search paths.
     // https://peps.python.org/pep-0420/
@@ -755,7 +755,7 @@ mod tests {
     use crate::db::SourceDb;
     use crate::module::{
         path_to_module, resolve_module, set_module_search_paths, ModuleKind, ModuleName,
-        ResolvedSearchPathOrder,
+        ResolvedSearchPathOrder, TYPESHED_STDLIB_DIRECTORY,
     };
     use crate::semantic::Dependency;
 
@@ -764,6 +764,7 @@ mod tests {
         db: TestDb,
 
         src: PathBuf,
+        custom_typeshed: PathBuf,
         site_packages: PathBuf,
     }
 
@@ -772,15 +773,22 @@ mod tests {
 
         let src = temp_dir.path().join("src");
         let site_packages = temp_dir.path().join("site_packages");
+        let custom_typeshed = temp_dir.path().join("typeshed");
 
         std::fs::create_dir(&src)?;
         std::fs::create_dir(&site_packages)?;
+        std::fs::create_dir(&custom_typeshed)?;
 
         let src = src.canonicalize()?;
         let site_packages = site_packages.canonicalize()?;
+        let custom_typeshed = custom_typeshed.canonicalize()?;
 
-        let resolved_search_paths =
-            ResolvedSearchPathOrder::new(vec![], src.clone(), Some(site_packages.clone()), None);
+        let resolved_search_paths = ResolvedSearchPathOrder::new(
+            vec![],
+            src.clone(),
+            Some(site_packages.clone()),
+            Some(custom_typeshed.clone()),
+        );
 
         let mut db = TestDb::default();
         set_module_search_paths(&mut db, resolved_search_paths);
@@ -789,6 +797,7 @@ mod tests {
             temp_dir,
             db,
             src,
+            custom_typeshed,
             site_packages,
         })
     }
@@ -818,6 +827,76 @@ mod tests {
         assert_eq!(&foo_path, &*db.file_path(foo_module.path(&db)?.file()));
 
         assert_eq!(Some(foo_module), path_to_module(&db, &foo_path)?);
+
+        Ok(())
+    }
+
+    #[test]
+    fn stdlib() -> anyhow::Result<()> {
+        let TestCase {
+            db,
+            custom_typeshed,
+            ..
+        } = create_resolver()?;
+        let stdlib_dir = custom_typeshed.join(TYPESHED_STDLIB_DIRECTORY);
+        std::fs::create_dir_all(&stdlib_dir).unwrap();
+        let functools_path = stdlib_dir.join("functools.py");
+        std::fs::write(&functools_path, "def update_wrapper(): ...").unwrap();
+        let functools_module = resolve_module(&db, ModuleName::new("functools"))?.unwrap();
+
+        assert_eq!(
+            Some(functools_module),
+            resolve_module(&db, ModuleName::new("functools"))?
+        );
+        assert_eq!(&custom_typeshed, functools_module.path(&db)?.root().path());
+        assert_eq!(ModuleKind::Module, functools_module.kind(&db)?);
+        assert_eq!(
+            &functools_path,
+            &*db.file_path(functools_module.path(&db)?.file())
+        );
+
+        assert_eq!(
+            Some(functools_module),
+            path_to_module(&db, &functools_path)?
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn first_party_precedence_over_stdlib() -> anyhow::Result<()> {
+        let TestCase {
+            db,
+            src,
+            custom_typeshed,
+            ..
+        } = create_resolver()?;
+
+        let stdlib_dir = custom_typeshed.join(TYPESHED_STDLIB_DIRECTORY);
+        std::fs::create_dir_all(&stdlib_dir).unwrap();
+        std::fs::create_dir_all(&src).unwrap();
+
+        let stdlib_functools_path = stdlib_dir.join("functools.py");
+        let first_party_functools_path = src.join("functools.py");
+        std::fs::write(stdlib_functools_path, "def update_wrapper(): ...").unwrap();
+        std::fs::write(&first_party_functools_path, "def update_wrapper(): ...").unwrap();
+        let functools_module = resolve_module(&db, ModuleName::new("functools"))?.unwrap();
+
+        assert_eq!(
+            Some(functools_module),
+            resolve_module(&db, ModuleName::new("functools"))?
+        );
+        assert_eq!(&src, functools_module.path(&db).unwrap().root().path());
+        assert_eq!(ModuleKind::Module, functools_module.kind(&db)?);
+        assert_eq!(
+            &first_party_functools_path,
+            &*db.file_path(functools_module.path(&db)?.file())
+        );
+
+        assert_eq!(
+            Some(functools_module),
+            path_to_module(&db, &first_party_functools_path)?
+        );
 
         Ok(())
     }
@@ -939,6 +1018,7 @@ mod tests {
             temp_dir: _,
             src,
             site_packages,
+            ..
         } = create_resolver()?;
 
         // From [PEP420](https://peps.python.org/pep-0420/#nested-namespace-packages).
@@ -985,6 +1065,7 @@ mod tests {
             temp_dir: _,
             src,
             site_packages,
+            ..
         } = create_resolver()?;
 
         // Adopted test case from the [PEP420 examples](https://peps.python.org/pep-0420/#nested-namespace-packages).
@@ -1033,6 +1114,7 @@ mod tests {
             src,
             site_packages,
             temp_dir: _temp_dir,
+            ..
         } = create_resolver()?;
 
         let foo_src = src.join("foo.py");
