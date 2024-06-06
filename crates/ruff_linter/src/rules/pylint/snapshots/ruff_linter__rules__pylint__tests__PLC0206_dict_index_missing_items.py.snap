@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-dict_index_missing_items.py:9:1: PLC0206 Extracting value from dictionary in iteration without calling `.items()`
+dict_index_missing_items.py:9:1: PLC0206 Extracting value from dictionary without calling `.items()`
    |
  8 |   # Errors
  9 | / for instrument in ORCHESTRA:
@@ -11,7 +11,7 @@ dict_index_missing_items.py:9:1: PLC0206 Extracting value from dictionary in ite
 12 |   for instrument in ORCHESTRA:
    |
 
-dict_index_missing_items.py:12:1: PLC0206 Extracting value from dictionary in iteration without calling `.items()`
+dict_index_missing_items.py:12:1: PLC0206 Extracting value from dictionary without calling `.items()`
    |
 10 |       print(f"{instrument}: {ORCHESTRA[instrument]}")
 11 |   
@@ -22,7 +22,7 @@ dict_index_missing_items.py:12:1: PLC0206 Extracting value from dictionary in it
 15 |   for instrument in ORCHESTRA.keys():
    |
 
-dict_index_missing_items.py:15:1: PLC0206 Extracting value from dictionary in iteration without calling `.items()`
+dict_index_missing_items.py:15:1: PLC0206 Extracting value from dictionary without calling `.items()`
    |
 13 |       ORCHESTRA[instrument]
 14 |   
@@ -33,7 +33,7 @@ dict_index_missing_items.py:15:1: PLC0206 Extracting value from dictionary in it
 18 |   for instrument in ORCHESTRA.keys():
    |
 
-dict_index_missing_items.py:18:1: PLC0206 Extracting value from dictionary in iteration without calling `.items()`
+dict_index_missing_items.py:18:1: PLC0206 Extracting value from dictionary without calling `.items()`
    |
 16 |       print(f"{instrument}: {ORCHESTRA[instrument]}")
 17 |   
@@ -44,7 +44,7 @@ dict_index_missing_items.py:18:1: PLC0206 Extracting value from dictionary in it
 21 |   for instrument in (temp_orchestra := {"violin": "strings", "oboe": "woodwind"}):
    |
 
-dict_index_missing_items.py:21:1: PLC0206 Extracting value from dictionary in iteration without calling `.items()`
+dict_index_missing_items.py:21:1: PLC0206 Extracting value from dictionary without calling `.items()`
    |
 19 |       ORCHESTRA[instrument]
 20 |   
@@ -55,7 +55,7 @@ dict_index_missing_items.py:21:1: PLC0206 Extracting value from dictionary in it
 24 |   for instrument in (temp_orchestra := {"violin": "strings", "oboe": "woodwind"}):
    |
 
-dict_index_missing_items.py:24:1: PLC0206 Extracting value from dictionary in iteration without calling `.items()`
+dict_index_missing_items.py:24:1: PLC0206 Extracting value from dictionary without calling `.items()`
    |
 22 |       print(f"{instrument}: {temp_orchestra[instrument]}")
 23 |   
