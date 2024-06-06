@@ -1,123 +1,123 @@
 ---
 source: crates/ruff_linter/src/rules/wemake_python_styleguide/mod.rs
 ---
-control_var_used_after_block.py:8:5: WPS441 `for` loop variable global_var is used outside of block
-   |
- 6 |     pass
- 7 | 
- 8 | _ = global_var
-   |     ^^^^^^^^^^ WPS441
- 9 | 
-10 | def foo():
-   |
+control_var_used_after_block.py:5:5: WPS441 `for` loop variable global_var is used outside of block
+  |
+3 |     pass
+4 | 
+5 | _ = global_var
+  |     ^^^^^^^^^^ WPS441
+6 | 
+7 | def foo():
+  |
 
-control_var_used_after_block.py:16:9: WPS441 `for` loop variable event is used outside of block
+control_var_used_after_block.py:13:9: WPS441 `for` loop variable event is used outside of block
    |
-14 |         pass
-15 | 
-16 |     _ = event
+11 |         pass
+12 | 
+13 |     _ = event
    |         ^^^^^ WPS441
-17 | 
-18 |     for x in range(10):
+14 | 
+15 |     for x in []:
    |
 
-control_var_used_after_block.py:24:12: WPS441 `for` loop variable x is used outside of block
+control_var_used_after_block.py:26:12: WPS441 `for` loop variable x is used outside of block
    |
-22 |     for y in range(10):
-23 |         # x is used outside of the loop it was defined in (meant to use y)
-24 |         if x == 5:
+24 |     for y in []:
+25 |         # x is used outside of the loop it was defined in (meant to use y)
+26 |         if x == 5:
    |            ^ WPS441
-25 |             pass
+27 |             pass
    |
 
-control_var_used_after_block.py:34:9: WPS441 `for` loop variable a is used outside of block
+control_var_used_after_block.py:36:9: WPS441 `for` loop variable a is used outside of block
    |
-32 |         pass
-33 | 
-34 |     _ = a
+34 |         pass
+35 | 
+36 |     _ = a
    |         ^ WPS441
-35 |     _ = b
-36 |     _ = c
+37 |     _ = b
+38 |     _ = c
    |
 
-control_var_used_after_block.py:35:9: WPS441 `for` loop variable b is used outside of block
+control_var_used_after_block.py:37:9: WPS441 `for` loop variable b is used outside of block
    |
-34 |     _ = a
-35 |     _ = b
+36 |     _ = a
+37 |     _ = b
    |         ^ WPS441
-36 |     _ = c
+38 |     _ = c
    |
 
-control_var_used_after_block.py:36:9: WPS441 `for` loop variable c is used outside of block
+control_var_used_after_block.py:38:9: WPS441 `for` loop variable c is used outside of block
    |
-34 |     _ = a
-35 |     _ = b
-36 |     _ = c
+36 |     _ = a
+37 |     _ = b
+38 |     _ = c
    |         ^ WPS441
-37 | 
-38 |     # Array destructuring
+39 | 
+40 |     # Array destructuring
    |
 
-control_var_used_after_block.py:45:9: WPS441 `for` loop variable d is used outside of block
+control_var_used_after_block.py:47:9: WPS441 `for` loop variable d is used outside of block
    |
-43 |         pass
-44 | 
-45 |     _ = d
+45 |         pass
+46 | 
+47 |     _ = d
    |         ^ WPS441
-46 |     _ = e
-47 |     _ = f
+48 |     _ = e
+49 |     _ = f
    |
 
-control_var_used_after_block.py:46:9: WPS441 `for` loop variable e is used outside of block
+control_var_used_after_block.py:48:9: WPS441 `for` loop variable e is used outside of block
    |
-45 |     _ = d
-46 |     _ = e
+47 |     _ = d
+48 |     _ = e
    |         ^ WPS441
-47 |     _ = f
+49 |     _ = f
    |
 
-control_var_used_after_block.py:47:9: WPS441 `for` loop variable f is used outside of block
+control_var_used_after_block.py:49:9: WPS441 `for` loop variable f is used outside of block
    |
-45 |     _ = d
-46 |     _ = e
-47 |     _ = f
+47 |     _ = d
+48 |     _ = e
+49 |     _ = f
    |         ^ WPS441
-48 | 
-49 |     # with statement
+50 | 
+51 |     # with statement
    |
 
-control_var_used_after_block.py:54:9: WPS441 `with` statement variable w is used outside of block
+control_var_used_after_block.py:56:9: WPS441 `with` statement variable w is used outside of block
    |
-52 |         pass
-53 | 
-54 |     _ = w
-   |         ^ WPS441
+54 |         pass
 55 | 
-56 |     # Nested blocks
-   |
-
-control_var_used_after_block.py:65:13: WPS441 `for` loop variable n is used outside of block
-   |
-63 |             pass
-64 | 
-65 |         _ = n
-   |             ^ WPS441
-66 | 
-67 |     _ = q
-   |
-
-control_var_used_after_block.py:67:9: WPS441 `with` statement variable q is used outside of block
-   |
-65 |         _ = n
-66 | 
-67 |     _ = q
+56 |     _ = w
    |         ^ WPS441
-68 |     _ = n
+57 | 
+58 |     # Nested blocks
    |
 
-control_var_used_after_block.py:68:9: WPS441 `for` loop variable n is used outside of block
+control_var_used_after_block.py:67:13: WPS441 `for` loop variable n is used outside of block
    |
-67 |     _ = q
-68 |     _ = n
+65 |             pass
+66 | 
+67 |         _ = n
+   |             ^ WPS441
+68 | 
+69 |     _ = q
+   |
+
+control_var_used_after_block.py:69:9: WPS441 `with` statement variable q is used outside of block
+   |
+67 |         _ = n
+68 | 
+69 |     _ = q
+   |         ^ WPS441
+70 |     _ = n
+   |
+
+control_var_used_after_block.py:70:9: WPS441 `for` loop variable n is used outside of block
+   |
+69 |     _ = q
+70 |     _ = n
    |         ^ WPS441
    |
