@@ -106,6 +106,13 @@ pub(crate) fn control_var_used_after_block(
             let reference = checker.semantic().reference(reference);
             let reference_node_id = reference.expression_id().unwrap();
 
+            // If the reference comes before the binding in the source order, skip it.
+            // FIXME: Maybe we should also check that there is an assignment somewhere
+            // above as well.
+            if reference.range().end() < binding_statement.range().start() {
+                continue;
+            }
+
             // Traverse the hierarchy and look for a block match
             let statement_hierarchy: Vec<NodeId> = checker
                 .semantic()

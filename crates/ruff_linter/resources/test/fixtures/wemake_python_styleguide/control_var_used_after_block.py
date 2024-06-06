@@ -2,6 +2,7 @@ for global_var in []:
     _ = global_var
     pass
 
+# ❌
 _ = global_var
 
 def foo():
@@ -10,6 +11,7 @@ def foo():
         _ = event
         pass
 
+    # ❌
     _ = event
 
     for x in []:
@@ -22,9 +24,21 @@ def foo():
         pass
 
     for y in []:
-        # x is used outside of the loop it was defined in (meant to use y)
+        # ❌ x is used outside of the loop it was defined in (meant to use y)
         if x == 5:
             pass
+
+    # Assign a variable before the loop
+    room_id = 3
+    _ = room_id
+
+    # Use the same variable name in a loop
+    for room_id in []:
+        _ = room_id
+        pass
+
+    # ❌ After the loop is not ok
+    _ = room_id
 
     # Tuple destructuring
     for a, b, c in []:
@@ -33,6 +47,7 @@ def foo():
         _ = c
         pass
 
+    # ❌
     _ = a
     _ = b
     _ = c
@@ -44,6 +59,7 @@ def foo():
         _ = f
         pass
 
+    # ❌
     _ = d
     _ = e
     _ = f
@@ -53,6 +69,7 @@ def foo():
         _ = w
         pass
 
+    # ❌
     _ = w
 
     # Nested blocks
@@ -64,8 +81,10 @@ def foo():
             _ = q
             pass
 
+        # ❌
         _ = n
 
+    # ❌
     _ = q
     _ = n
 
