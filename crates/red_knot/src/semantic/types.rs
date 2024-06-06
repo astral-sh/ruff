@@ -790,7 +790,7 @@ impl UnionType {
 // directly in intersections rather than as a separate type. This sacrifices some efficiency in the
 // case where a Not appears outside an intersection (unclear when that could even happen, but we'd
 // have to represent it as a single-element intersection if it did) in exchange for better
-// efficiency in the within-intersection case.{
+// efficiency in the within-intersection case.
 #[derive(Debug)]
 pub(crate) struct IntersectionType {
     // the intersection type includes only values in all of these types
