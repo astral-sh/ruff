@@ -1931,14 +1931,8 @@ impl<'src> Parser<'src> {
 
     /// Parses a generator expression.
     ///
-    /// The given `in_parentheses` parameter is used to determine whether the generator
-    /// expression is enclosed in parentheses or not:
-    /// - `Yes`, expect the `)` token after the generator expression.
-    /// - `No`, no parentheses are expected.
-    /// - `Maybe`, consume the `)` token if it's present.
-    ///
-    /// The contained start position in each variant is used to determine the range
-    /// of the generator expression.
+    /// The given `start` offset is the start of either the opening parenthesis if the generator is
+    /// parenthesized or the first token of the expression.
     ///
     /// See: <https://docs.python.org/3/reference/expressions.html#generator-expressions>
     pub(super) fn parse_generator_expression(
