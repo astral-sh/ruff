@@ -599,7 +599,7 @@ Options:
           format is "concise". In preview mode, the default serialization
           format is "full" [env: RUFF_OUTPUT_FORMAT=] [possible values: text,
           concise, full, json, json-lines, junit, grouped, github, gitlab,
-          pylint, azure, sarif]
+          pylint, rdjson, azure, sarif]
   -o, --output-file <OUTPUT_FILE>
           Specify file to write the linter output to (default: stdout) [env:
           RUFF_OUTPUT_FILE=]

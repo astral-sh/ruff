@@ -126,7 +126,6 @@ pub(crate) fn suppressible_exception(
         stmt.range(),
     );
     if !checker
-        .indexer()
         .comment_ranges()
         .has_comments(stmt, checker.locator())
     {

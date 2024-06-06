@@ -30,11 +30,6 @@ use std::path::Path;
 
 use itertools::Itertools;
 use log::debug;
-use ruff_python_ast::{
-    self as ast, AnyParameterRef, Comprehension, ElifElseClause, ExceptHandler, Expr, ExprContext,
-    FStringElement, Keyword, MatchCase, Parameter, Parameters, Pattern, Stmt, Suite, UnaryOp,
-};
-use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use ruff_diagnostics::{Diagnostic, IsolationLevel};
 use ruff_notebook::{CellOffsets, NotebookIndex};
@@ -45,10 +40,16 @@ use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::str::Quote;
 use ruff_python_ast::visitor::{walk_except_handler, walk_pattern, Visitor};
+use ruff_python_ast::{
+    self as ast, AnyParameterRef, Comprehension, ElifElseClause, ExceptHandler, Expr, ExprContext,
+    FStringElement, Keyword, MatchCase, ModExpression, ModModule, Parameter, Parameters, Pattern,
+    Stmt, Suite, UnaryOp,
+};
 use ruff_python_ast::{helpers, str, visitor, PySourceType};
 use ruff_python_codegen::{Generator, Stylist};
 use ruff_python_index::Indexer;
 use ruff_python_parser::typing::{parse_type_annotation, AnnotationKind};
+use ruff_python_parser::{Parsed, Tokens};
 use ruff_python_semantic::all::{DunderAllDefinition, DunderAllFlags};
 use ruff_python_semantic::analyze::{imports, typing};
 use ruff_python_semantic::{
@@ -57,7 +58,9 @@ use ruff_python_semantic::{
     StarImport, SubmoduleImport,
 };
 use ruff_python_stdlib::builtins::{IPYTHON_BUILTINS, MAGIC_GLOBALS, PYTHON_BUILTINS};
+use ruff_python_trivia::CommentRanges;
 use ruff_source_file::{Locator, OneIndexed, SourceRow};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::annotation::AnnotationContext;
 use crate::docstrings::extraction::ExtractionTarget;
@@ -174,6 +177,10 @@ impl ExpectedDocstringKind {
 }
 
 pub(crate) struct Checker<'a> {
+    /// The [`Parsed`] output for the source code.
+    parsed: &'a Parsed<ModModule>,
+    /// The [`Parsed`] output for the type annotation the checker is currently in.
+    parsed_type_annotation: Option<&'a Parsed<ModExpression>>,
     /// The [`Path`] to the file under analysis.
     path: &'a Path,
     /// The [`Path`] to the package containing the current file.
@@ -223,6 +230,7 @@ pub(crate) struct Checker<'a> {
 impl<'a> Checker<'a> {
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn new(
+        parsed: &'a Parsed<ModModule>,
         settings: &'a LinterSettings,
         noqa_line_for: &'a NoqaMapping,
         noqa: flags::Noqa,
@@ -232,12 +240,13 @@ impl<'a> Checker<'a> {
         locator: &'a Locator,
         stylist: &'a Stylist,
         indexer: &'a Indexer,
-        importer: Importer<'a>,
         source_type: PySourceType,
         cell_offsets: Option<&'a CellOffsets>,
         notebook_index: Option<&'a NotebookIndex>,
     ) -> Checker<'a> {
         Checker {
+            parsed,
+            parsed_type_annotation: None,
             settings,
             noqa_line_for,
             noqa,
@@ -248,7 +257,7 @@ impl<'a> Checker<'a> {
             locator,
             stylist,
             indexer,
-            importer,
+            importer: Importer::new(parsed, locator, stylist),
             semantic: SemanticModel::new(&settings.typing_modules, path, module),
             visit: deferred::Visit::default(),
             analyze: deferred::Analyze::default(),
@@ -315,6 +324,21 @@ impl<'a> Checker<'a> {
             SourceRow::Notebook { cell, line }
         } else {
             SourceRow::SourceFile { line }
+        }
+    }
+
+    /// Returns the [`CommentRanges`] for the parsed source code.
+    pub(crate) fn comment_ranges(&self) -> &'a CommentRanges {
+        self.parsed.comment_ranges()
+    }
+
+    /// Returns the [`Tokens`] for the parsed type annotation if the checker is in a typing context
+    /// or the parsed source code.
+    pub(crate) fn tokens(&self) -> &'a Tokens {
+        if let Some(parsed_type_annotation) = self.parsed_type_annotation {
+            parsed_type_annotation.tokens()
+        } else {
+            self.parsed.tokens()
         }
     }
 
@@ -1001,12 +1025,10 @@ impl<'a> Visitor<'a> for Checker<'a> {
             && self.semantic.future_annotations_or_stub()
             && (self.semantic.in_annotation() || self.source_type.is_stub())
         {
-            if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = expr {
-                self.visit.string_type_definitions.push((
-                    expr.range(),
-                    value.to_str(),
-                    self.semantic.snapshot(),
-                ));
+            if let Expr::StringLiteral(string_literal) = expr {
+                self.visit
+                    .string_type_definitions
+                    .push((string_literal, self.semantic.snapshot()));
             } else {
                 self.visit
                     .future_type_definitions
@@ -1416,13 +1438,11 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     }
                 }
             }
-            Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
+            Expr::StringLiteral(string_literal) => {
                 if self.semantic.in_type_definition() && !self.semantic.in_typing_literal() {
-                    self.visit.string_type_definitions.push((
-                        expr.range(),
-                        value.to_str(),
-                        self.semantic.snapshot(),
-                    ));
+                    self.visit
+                        .string_type_definitions
+                        .push((string_literal, self.semantic.snapshot()));
                 }
             }
             Expr::FString(_) => {
@@ -2142,26 +2162,33 @@ impl<'a> Checker<'a> {
     ///
     /// class Bar: pass
     /// ```
-    fn visit_deferred_string_type_definitions(&mut self, allocator: &'a typed_arena::Arena<Expr>) {
+    fn visit_deferred_string_type_definitions(
+        &mut self,
+        allocator: &'a typed_arena::Arena<Parsed<ModExpression>>,
+    ) {
         let snapshot = self.semantic.snapshot();
         while !self.visit.string_type_definitions.is_empty() {
             let type_definitions = std::mem::take(&mut self.visit.string_type_definitions);
-            for (range, value, snapshot) in type_definitions {
-                if let Ok((expr, kind)) =
-                    parse_type_annotation(value, range, self.locator.contents())
+            for (string_expr, snapshot) in type_definitions {
+                if let Ok((parsed_annotation, kind)) =
+                    parse_type_annotation(string_expr, self.locator.contents())
                 {
-                    let expr = allocator.alloc(expr);
+                    let parsed_annotation = allocator.alloc(parsed_annotation);
+                    self.parsed_type_annotation = Some(parsed_annotation);
+
+                    let annotation = string_expr.value.to_str();
+                    let range = string_expr.range();
 
                     self.semantic.restore(snapshot);
 
                     if self.semantic.in_annotation() && self.semantic.in_typing_only_annotation() {
                         if self.enabled(Rule::QuotedAnnotation) {
-                            pyupgrade::rules::quoted_annotation(self, value, range);
+                            pyupgrade::rules::quoted_annotation(self, annotation, range);
                         }
                     }
                     if self.source_type.is_stub() {
                         if self.enabled(Rule::QuotedAnnotationInStub) {
-                            flake8_pyi::rules::quoted_annotation_in_stub(self, value, range);
+                            flake8_pyi::rules::quoted_annotation_in_stub(self, annotation, range);
                         }
                     }
 
@@ -2174,14 +2201,15 @@ impl<'a> Checker<'a> {
 
                     self.semantic.flags |=
                         SemanticModelFlags::TYPE_DEFINITION | type_definition_flag;
-                    self.visit_expr(expr);
+                    self.visit_expr(parsed_annotation.expr());
+                    self.parsed_type_annotation = None;
                 } else {
                     if self.enabled(Rule::ForwardAnnotationSyntaxError) {
                         self.diagnostics.push(Diagnostic::new(
                             pyflakes::rules::ForwardAnnotationSyntaxError {
-                                body: value.to_string(),
+                                body: string_expr.value.to_string(),
                             },
-                            range,
+                            string_expr.range(),
                         ));
                     }
                 }
@@ -2249,7 +2277,7 @@ impl<'a> Checker<'a> {
     /// After initial traversal of the source tree has been completed,
     /// recursively visit all AST nodes that were deferred on the first pass.
     /// This includes lambdas, functions, type parameters, and type annotations.
-    fn visit_deferred(&mut self, allocator: &'a typed_arena::Arena<Expr>) {
+    fn visit_deferred(&mut self, allocator: &'a typed_arena::Arena<Parsed<ModExpression>>) {
         while !self.visit.is_empty() {
             self.visit_deferred_class_bases();
             self.visit_deferred_functions();
@@ -2326,7 +2354,7 @@ impl<'a> Checker<'a> {
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn check_ast(
-    python_ast: &Suite,
+    parsed: &Parsed<ModModule>,
     locator: &Locator,
     stylist: &Stylist,
     indexer: &Indexer,
@@ -2356,10 +2384,11 @@ pub(crate) fn check_ast(
         } else {
             ModuleSource::File(path)
         },
-        python_ast,
+        python_ast: parsed.suite(),
     };
 
     let mut checker = Checker::new(
+        parsed,
         settings,
         noqa_line_for,
         noqa,
@@ -2369,7 +2398,6 @@ pub(crate) fn check_ast(
         locator,
         stylist,
         indexer,
-        Importer::new(python_ast, locator, stylist),
         source_type,
         cell_offsets,
         notebook_index,
@@ -2377,8 +2405,8 @@ pub(crate) fn check_ast(
     checker.bind_builtins();
 
     // Iterate over the AST.
-    checker.visit_module(python_ast);
-    checker.visit_body(python_ast);
+    checker.visit_module(parsed.suite());
+    checker.visit_body(parsed.suite());
 
     // Visit any deferred syntax nodes. Take care to visit in order, such that we avoid adding
     // new deferred nodes after visiting nodes of that kind. For example, visiting a deferred

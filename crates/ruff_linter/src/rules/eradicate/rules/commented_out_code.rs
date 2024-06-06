@@ -1,6 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_index::Indexer;
+use ruff_python_trivia::CommentRanges;
 use ruff_source_file::Locator;
 
 use crate::settings::LinterSettings;
@@ -47,14 +47,14 @@ impl Violation for CommentedOutCode {
 pub(crate) fn commented_out_code(
     diagnostics: &mut Vec<Diagnostic>,
     locator: &Locator,
-    indexer: &Indexer,
+    comment_ranges: &CommentRanges,
     settings: &LinterSettings,
 ) {
     // Skip comments within `/// script` tags.
     let mut in_script_tag = false;
 
     // Iterate over all comments in the document.
-    for range in indexer.comment_ranges() {
+    for range in comment_ranges {
         let line = locator.lines(*range);
 
         // Detect `/// script` tags.

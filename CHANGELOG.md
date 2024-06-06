@@ -1,5 +1,37 @@
 # Changelog
 
+## 0.4.8
+
+### Performance
+
+- Linter performance has been improved by around 10% on some microbenchmarks by refactoring the lexer and parser to maintain synchronicity between them ([#11457](https://github.com/astral-sh/ruff/pull/11457))
+
+### Preview features
+
+- \[`flake8-bugbear`\] Implement `return-in-generator` (`B901`) ([#11644](https://github.com/astral-sh/ruff/pull/11644))
+- \[`flake8-pyi`\] Implement `PYI063` ([#11699](https://github.com/astral-sh/ruff/pull/11699))
+- \[`pygrep_hooks`\] Check blanket ignores via file-level pragmas (`PGH004`) ([#11540](https://github.com/astral-sh/ruff/pull/11540))
+
+### Rule changes
+
+- \[`pyupgrade`\] Update `UP035` for Python 3.13 and the latest version of `typing_extensions` ([#11693](https://github.com/astral-sh/ruff/pull/11693))
+- \[`numpy`\] Update `NPY001` rule for NumPy 2.0 ([#11735](https://github.com/astral-sh/ruff/pull/11735))
+
+### Server
+
+- Formatting a document with syntax problems no longer spams a visible error popup ([#11745](https://github.com/astral-sh/ruff/pull/11745))
+
+### CLI
+
+- Add RDJson support for `--output-format` flag ([#11682](https://github.com/astral-sh/ruff/pull/11682))
+
+### Bug fixes
+
+- \[`pyupgrade`\] Write empty string in lieu of panic when fixing `UP032` ([#11696](https://github.com/astral-sh/ruff/pull/11696))
+- \[`flake8-simplify`\] Simplify double negatives in `SIM103` ([#11684](https://github.com/astral-sh/ruff/pull/11684))
+- Ensure the expression generator adds a newline before `type` statements ([#11720](https://github.com/astral-sh/ruff/pull/11720))
+- Respect per-file ignores for blanket and redirected noqa rules ([#11728](https://github.com/astral-sh/ruff/pull/11728))
+
 ## 0.4.7
 
 ### Preview features

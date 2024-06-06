@@ -69,6 +69,11 @@ impl<I: Idx, T> IndexVec<I, T> {
     pub fn next_index(&self) -> I {
         I::new(self.raw.len())
     }
+
+    #[inline]
+    pub fn shrink_to_fit(&mut self) {
+        self.raw.shrink_to_fit();
+    }
 }
 
 impl<I, T> Debug for IndexVec<I, T>

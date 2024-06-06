@@ -1,7 +1,9 @@
+use std::slice::Iter;
+
 use ruff_notebook::CellOffsets;
 use ruff_python_ast::PySourceType;
-use ruff_python_parser::{TokenKind, TokenKindIter};
-use ruff_text_size::{TextRange, TextSize};
+use ruff_python_parser::{Token, TokenKind, Tokens};
+use ruff_text_size::{Ranged, TextSize};
 
 use ruff_diagnostics::{AlwaysFixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
@@ -99,7 +101,7 @@ impl AlwaysFixableViolation for UselessSemicolon {
 /// E701, E702, E703
 pub(crate) fn compound_statements(
     diagnostics: &mut Vec<Diagnostic>,
-    mut tokens: TokenKindIter,
+    tokens: &Tokens,
     locator: &Locator,
     indexer: &Indexer,
     source_type: PySourceType,
@@ -125,33 +127,26 @@ pub(crate) fn compound_statements(
     // This is used to allow `class C: ...`-style definitions in stubs.
     let mut allow_ellipsis = false;
 
-    // Track the bracket depth.
-    let mut par_count = 0u32;
-    let mut sqb_count = 0u32;
-    let mut brace_count = 0u32;
+    // Track the nesting level.
+    let mut nesting = 0u32;
 
     // Track indentation.
     let mut indent = 0u32;
 
-    while let Some((token, range)) = tokens.next() {
-        match token {
-            TokenKind::Lpar => {
-                par_count = par_count.saturating_add(1);
+    // Use an iterator to allow passing it around.
+    let mut token_iter = tokens.up_to_first_unknown().iter();
+
+    loop {
+        let Some(token) = token_iter.next() else {
+            break;
+        };
+
+        match token.kind() {
+            TokenKind::Lpar | TokenKind::Lsqb | TokenKind::Lbrace => {
+                nesting = nesting.saturating_add(1);
             }
-            TokenKind::Rpar => {
-                par_count = par_count.saturating_sub(1);
-            }
-            TokenKind::Lsqb => {
-                sqb_count = sqb_count.saturating_add(1);
-            }
-            TokenKind::Rsqb => {
-                sqb_count = sqb_count.saturating_sub(1);
-            }
-            TokenKind::Lbrace => {
-                brace_count = brace_count.saturating_add(1);
-            }
-            TokenKind::Rbrace => {
-                brace_count = brace_count.saturating_sub(1);
+            TokenKind::Rpar | TokenKind::Rsqb | TokenKind::Rbrace => {
+                nesting = nesting.saturating_sub(1);
             }
             TokenKind::Ellipsis => {
                 if allow_ellipsis {
@@ -168,28 +163,27 @@ pub(crate) fn compound_statements(
             _ => {}
         }
 
-        if par_count > 0 || sqb_count > 0 || brace_count > 0 {
+        if nesting > 0 {
             continue;
         }
 
-        match token {
+        match token.kind() {
             TokenKind::Newline => {
-                if let Some((start, end)) = semi {
+                if let Some(range) = semi {
                     if !(source_type.is_ipynb()
                         && indent == 0
                         && cell_offsets
-                            .and_then(|cell_offsets| cell_offsets.containing_range(range.start()))
+                            .and_then(|cell_offsets| cell_offsets.containing_range(token.start()))
                             .is_some_and(|cell_range| {
-                                !has_non_trivia_tokens_till(tokens.clone(), cell_range.end())
+                                !has_non_trivia_tokens_till(token_iter.clone(), cell_range.end())
                             }))
                     {
-                        let mut diagnostic =
-                            Diagnostic::new(UselessSemicolon, TextRange::new(start, end));
+                        let mut diagnostic = Diagnostic::new(UselessSemicolon, range);
                         diagnostic.set_fix(Fix::safe_edit(Edit::deletion(
                             indexer
-                                .preceded_by_continuations(start, locator)
-                                .unwrap_or(start),
-                            end,
+                                .preceded_by_continuations(range.start(), locator)
+                                .unwrap_or(range.start()),
+                            range.end(),
                         )));
                         diagnostics.push(diagnostic);
                     }
@@ -225,14 +219,14 @@ pub(crate) fn compound_statements(
                     || while_.is_some()
                     || with.is_some()
                 {
-                    colon = Some((range.start(), range.end()));
+                    colon = Some(token.range());
 
                     // Allow `class C: ...`-style definitions.
                     allow_ellipsis = true;
                 }
             }
             TokenKind::Semi => {
-                semi = Some((range.start(), range.end()));
+                semi = Some(token.range());
                 allow_ellipsis = false;
             }
             TokenKind::Comment
@@ -240,22 +234,16 @@ pub(crate) fn compound_statements(
             | TokenKind::Dedent
             | TokenKind::NonLogicalNewline => {}
             _ => {
-                if let Some((start, end)) = semi {
-                    diagnostics.push(Diagnostic::new(
-                        MultipleStatementsOnOneLineSemicolon,
-                        TextRange::new(start, end),
-                    ));
+                if let Some(range) = semi {
+                    diagnostics.push(Diagnostic::new(MultipleStatementsOnOneLineSemicolon, range));
 
                     // Reset.
                     semi = None;
                     allow_ellipsis = false;
                 }
 
-                if let Some((start, end)) = colon {
-                    diagnostics.push(Diagnostic::new(
-                        MultipleStatementsOnOneLineColon,
-                        TextRange::new(start, end),
-                    ));
+                if let Some(range) = colon {
+                    diagnostics.push(Diagnostic::new(MultipleStatementsOnOneLineColon, range));
 
                     // Reset.
                     colon = None;
@@ -276,7 +264,7 @@ pub(crate) fn compound_statements(
             }
         }
 
-        match token {
+        match token.kind() {
             TokenKind::Lambda => {
                 // Reset.
                 colon = None;
@@ -294,40 +282,40 @@ pub(crate) fn compound_statements(
                 with = None;
             }
             TokenKind::Case => {
-                case = Some((range.start(), range.end()));
+                case = Some(token.range());
             }
             TokenKind::If => {
-                if_ = Some((range.start(), range.end()));
+                if_ = Some(token.range());
             }
             TokenKind::While => {
-                while_ = Some((range.start(), range.end()));
+                while_ = Some(token.range());
             }
             TokenKind::For => {
-                for_ = Some((range.start(), range.end()));
+                for_ = Some(token.range());
             }
             TokenKind::Try => {
-                try_ = Some((range.start(), range.end()));
+                try_ = Some(token.range());
             }
             TokenKind::Except => {
-                except = Some((range.start(), range.end()));
+                except = Some(token.range());
             }
             TokenKind::Finally => {
-                finally = Some((range.start(), range.end()));
+                finally = Some(token.range());
             }
             TokenKind::Elif => {
-                elif = Some((range.start(), range.end()));
+                elif = Some(token.range());
             }
             TokenKind::Else => {
-                else_ = Some((range.start(), range.end()));
+                else_ = Some(token.range());
             }
             TokenKind::Class => {
-                class = Some((range.start(), range.end()));
+                class = Some(token.range());
             }
             TokenKind::With => {
-                with = Some((range.start(), range.end()));
+                with = Some(token.range());
             }
             TokenKind::Match => {
-                match_ = Some((range.start(), range.end()));
+                match_ = Some(token.range());
             }
             _ => {}
         };
@@ -336,13 +324,13 @@ pub(crate) fn compound_statements(
 
 /// Returns `true` if there are any non-trivia tokens from the given token
 /// iterator till the given end offset.
-fn has_non_trivia_tokens_till(tokens: TokenKindIter, cell_end: TextSize) -> bool {
-    for (token, tok_range) in tokens {
-        if tok_range.start() >= cell_end {
+fn has_non_trivia_tokens_till(tokens: Iter<'_, Token>, cell_end: TextSize) -> bool {
+    for token in tokens {
+        if token.start() >= cell_end {
             return false;
         }
         if !matches!(
-            token,
+            token.kind(),
             TokenKind::Newline
                 | TokenKind::Comment
                 | TokenKind::EndOfFile

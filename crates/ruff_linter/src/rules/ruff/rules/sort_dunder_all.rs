@@ -216,6 +216,7 @@ fn create_fix(
                 range,
                 kind,
                 locator,
+                checker.tokens(),
                 string_items,
             )?;
             assert_eq!(value.len(), elts.len());

@@ -210,6 +210,7 @@ impl<'a> StringLiteralDisplay<'a> {
                     self.range(),
                     *sequence_kind,
                     locator,
+                    checker.tokens(),
                     elements,
                 )?;
                 assert_eq!(analyzed_sequence.len(), self.elts.len());

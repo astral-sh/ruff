@@ -194,7 +194,6 @@ pub(crate) fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
 
     // Generate the replacement condition.
     let condition = if checker
-        .indexer()
         .comment_ranges()
         .has_comments(&range, checker.locator())
     {

@@ -42,14 +42,14 @@ Module(
                                         ),
                                     ],
                                     patterns: [
-                                        MatchValue(
-                                            PatternMatchValue {
+                                        MatchAs(
+                                            PatternMatchAs {
                                                 range: 164..166,
-                                                value: Name(
-                                                    ExprName {
-                                                        range: 164..166,
+                                                pattern: None,
+                                                name: Some(
+                                                    Identifier {
                                                         id: "as",
-                                                        ctx: Load,
+                                                        range: 164..166,
                                                     },
                                                 ),
                                             },

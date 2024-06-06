@@ -3583,6 +3583,7 @@
         "PYI059",
         "PYI06",
         "PYI062",
+        "PYI063",
         "PYI064",
         "PYI066",
         "Q",
@@ -3948,6 +3949,7 @@
         "github",
         "gitlab",
         "pylint",
+        "rdjson",
         "azure",
         "sarif"
       ]

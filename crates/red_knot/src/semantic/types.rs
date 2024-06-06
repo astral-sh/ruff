@@ -3,8 +3,8 @@ use crate::ast_ids::NodeKey;
 use crate::db::{QueryResult, SemanticDb, SemanticJar};
 use crate::files::FileId;
 use crate::module::{Module, ModuleName};
-use crate::symbols::{
-    resolve_global_symbol, symbol_table, GlobalSymbolId, ScopeId, ScopeKind, SymbolId,
+use crate::semantic::{
+    resolve_global_symbol, semantic_index, GlobalSymbolId, ScopeId, ScopeKind, SymbolId,
 };
 use crate::{FxDashMap, FxIndexSet, Name};
 use ruff_index::{newtype_index, IndexVec};
@@ -12,7 +12,7 @@ use rustc_hash::FxHashMap;
 
 pub(crate) mod infer;
 
-pub(crate) use infer::{infer_definition_type, infer_symbol_type};
+pub(crate) use infer::{infer_definition_type, infer_symbol_public_type};
 
 /// unique ID for a type
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
@@ -119,7 +119,7 @@ impl TypeStore {
         self.modules.remove(&file_id);
     }
 
-    pub fn cache_symbol_type(&self, symbol: GlobalSymbolId, ty: Type) {
+    pub fn cache_symbol_public_type(&self, symbol: GlobalSymbolId, ty: Type) {
         self.add_or_get_module(symbol.file_id)
             .symbol_types
             .insert(symbol.symbol_id, ty);
@@ -131,7 +131,7 @@ impl TypeStore {
             .insert(node_key, ty);
     }
 
-    pub fn get_cached_symbol_type(&self, symbol: GlobalSymbolId) -> Option<Type> {
+    pub fn get_cached_symbol_public_type(&self, symbol: GlobalSymbolId) -> Option<Type> {
         self.try_get_module(symbol.file_id)?
             .symbol_types
             .get(&symbol.symbol_id)
@@ -182,12 +182,12 @@ impl TypeStore {
             .add_class(name, scope_id, bases)
     }
 
-    fn add_union(&mut self, file_id: FileId, elems: &[Type]) -> UnionTypeId {
+    fn add_union(&self, file_id: FileId, elems: &[Type]) -> UnionTypeId {
         self.add_or_get_module(file_id).add_union(elems)
     }
 
     fn add_intersection(
-        &mut self,
+        &self,
         file_id: FileId,
         positive: &[Type],
         negative: &[Type],
@@ -331,10 +331,11 @@ impl FunctionTypeId {
         self,
         db: &dyn SemanticDb,
     ) -> QueryResult<Option<ClassTypeId>> {
-        let table = symbol_table(db, self.file_id)?;
+        let index = semantic_index(db, self.file_id)?;
+        let table = index.symbol_table();
         let FunctionType { symbol_id, .. } = *self.function(db)?;
-        let scope_id = symbol_id.symbol(&table).scope_id();
-        let scope = scope_id.scope(&table);
+        let scope_id = symbol_id.symbol(table).scope_id();
+        let scope = scope_id.scope(table);
         if !matches!(scope.kind(), ScopeKind::Class) {
             return Ok(None);
         };
@@ -392,8 +393,8 @@ impl ModuleTypeId {
     }
 
     fn get_member(self, db: &dyn SemanticDb, name: &Name) -> QueryResult<Option<Type>> {
-        if let Some(symbol_id) = resolve_global_symbol(db, self.name(db)?, name)? {
-            Ok(Some(infer_symbol_type(db, symbol_id)?))
+        if let Some(symbol_id) = resolve_global_symbol(db, self.module, name)? {
+            Ok(Some(infer_symbol_public_type(db, symbol_id)?))
         } else {
             Ok(None)
         }
@@ -439,9 +440,9 @@ impl ClassTypeId {
     fn get_own_class_member(self, db: &dyn SemanticDb, name: &Name) -> QueryResult<Option<Type>> {
         // TODO: this should distinguish instance-only members (e.g. `x: int`) and not return them
         let ClassType { scope_id, .. } = *self.class(db)?;
-        let table = symbol_table(db, self.file_id)?;
-        if let Some(symbol_id) = table.symbol_id_by_name(scope_id, name) {
-            Ok(Some(infer_symbol_type(
+        let index = semantic_index(db, self.file_id)?;
+        if let Some(symbol_id) = index.symbol_table().symbol_id_by_name(scope_id, name) {
+            Ok(Some(infer_symbol_public_type(
                 db,
                 GlobalSymbolId {
                     file_id: self.file_id,
@@ -497,7 +498,7 @@ struct ModuleTypeStore {
     unions: IndexVec<ModuleUnionTypeId, UnionType>,
     /// arena of all intersection types created in this module
     intersections: IndexVec<ModuleIntersectionTypeId, IntersectionType>,
-    /// cached types of symbols in this module
+    /// cached public types of symbols in this module
     symbol_types: FxHashMap<SymbolId, Type>,
     /// cached types of AST nodes in this module
     node_types: FxHashMap<NodeKey, Type>,
@@ -732,11 +733,12 @@ impl IntersectionType {
 
 #[cfg(test)]
 mod tests {
+    use super::Type;
     use std::path::Path;
 
     use crate::files::Files;
-    use crate::symbols::{SymbolFlags, SymbolTable};
-    use crate::types::{Type, TypeStore};
+    use crate::semantic::symbol_table::SymbolTableBuilder;
+    use crate::semantic::{SymbolFlags, SymbolTable, TypeStore};
     use crate::FxIndexSet;
 
     #[test]
@@ -755,12 +757,13 @@ mod tests {
         let store = TypeStore::default();
         let files = Files::default();
         let file_id = files.intern(Path::new("/foo"));
-        let mut table = SymbolTable::new();
-        let func_symbol = table.add_or_update_symbol(
+        let mut builder = SymbolTableBuilder::new();
+        let func_symbol = builder.add_or_update_symbol(
             SymbolTable::root_scope_id(),
             "func",
             SymbolFlags::IS_DEFINED,
         );
+        builder.finish();
 
         let id = store.add_function(
             file_id,
@@ -777,7 +780,7 @@ mod tests {
 
     #[test]
     fn add_union() {
-        let mut store = TypeStore::default();
+        let store = TypeStore::default();
         let files = Files::default();
         let file_id = files.intern(Path::new("/foo"));
         let c1 = store.add_class(file_id, "C1", SymbolTable::root_scope_id(), Vec::new());
@@ -794,7 +797,7 @@ mod tests {
 
     #[test]
     fn add_intersection() {
-        let mut store = TypeStore::default();
+        let store = TypeStore::default();
         let files = Files::default();
         let file_id = files.intern(Path::new("/foo"));
         let c1 = store.add_class(file_id, "C1", SymbolTable::root_scope_id(), Vec::new());

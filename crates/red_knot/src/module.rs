@@ -9,7 +9,7 @@ use smol_str::SmolStr;
 
 use crate::db::{QueryResult, SemanticDb, SemanticJar};
 use crate::files::FileId;
-use crate::symbols::Dependency;
+use crate::semantic::Dependency;
 use crate::FxDashMap;
 
 /// Representation of a Python module.
@@ -697,7 +697,7 @@ mod tests {
         path_to_module, resolve_module, set_module_search_paths, ModuleKind, ModuleName,
         ModuleSearchPath, ModuleSearchPathKind,
     };
-    use crate::symbols::Dependency;
+    use crate::semantic::Dependency;
 
     struct TestCase {
         temp_dir: tempfile::TempDir,

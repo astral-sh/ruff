@@ -1,7 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_index::Indexer;
-use ruff_python_trivia::is_python_whitespace;
+use ruff_python_trivia::{is_python_whitespace, CommentRanges};
 use ruff_source_file::Locator;
 use ruff_text_size::{TextRange, TextSize};
 
@@ -45,12 +44,12 @@ impl Violation for EmptyComment {
 /// PLR2044
 pub(crate) fn empty_comments(
     diagnostics: &mut Vec<Diagnostic>,
-    indexer: &Indexer,
+    comment_ranges: &CommentRanges,
     locator: &Locator,
 ) {
-    let block_comments = indexer.comment_ranges().block_comments(locator);
+    let block_comments = comment_ranges.block_comments(locator);
 
-    for range in indexer.comment_ranges() {
+    for range in comment_ranges {
         // Ignore comments that are part of multi-line "comment blocks".
         if block_comments.binary_search(&range.start()).is_ok() {
             continue;

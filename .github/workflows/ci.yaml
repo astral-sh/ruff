@@ -212,6 +212,38 @@ jobs:
       - name: "Build"
         run: cargo build --release --locked
 
+  cargo-build-msrv:
+    name: "cargo build (msrv)"
+    runs-on: ubuntu-latest
+    needs: determine_changes
+    if: ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: SebRollen/toml-action@v1.2.0
+        id: msrv
+        with:
+          file: "Cargo.toml"
+          field: "workspace.package.rust-version"
+      - name: "Install Rust toolchain"
+        run: rustup default ${{ steps.msrv.outputs.value }}
+      - name: "Install mold"
+        uses: rui314/setup-mold@v1
+      - name: "Install cargo nextest"
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest
+      - name: "Install cargo insta"
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-insta
+      - uses: Swatinem/rust-cache@v2
+      - name: "Run tests"
+        shell: bash
+        env:
+          NEXTEST_PROFILE: "ci"
+        run: cargo +${{ steps.msrv.outputs.value }} insta test --all-features --unreferenced reject --test-runner nextest
+
   cargo-fuzz:
     name: "cargo fuzz"
     runs-on: ubuntu-latest

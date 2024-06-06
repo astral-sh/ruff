@@ -350,7 +350,7 @@ version = "4.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "528131438037fd55894f62d6e9f068b8f45ac57ffa77517819645d10aed04f64"
 dependencies = [
- "heck 0.5.0",
+ "heck",
  "proc-macro2",
  "quote",
  "syn",
@@ -870,12 +870,6 @@ dependencies = [
 
 [[package]]
 name = "heck"
-version = "0.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "95505c38b4572b2d910cecb0281560f54b440a19336cbbcb27bf6ce6adc6f5a8"
-
-[[package]]
-name = "heck"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
@@ -1029,9 +1023,9 @@ dependencies = [
 
 [[package]]
 name = "insta"
-version = "1.38.0"
+version = "1.39.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3eab73f58e59ca6526037208f0e98851159ec1633cf17b6cd2e1f2c3fd5d53cc"
+checksum = "810ae6042d48e2c9e9215043563a58a80b877bc863228a74cf10c49d4620a6f5"
 dependencies = [
  "console",
  "globset",
@@ -1116,9 +1110,9 @@ dependencies = [
 
 [[package]]
 name = "itertools"
-version = "0.12.1"
+version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ba291022dbbd398a455acf126c1e341954079855bc60dfdda641363bd6922569"
+checksum = "413ee7dfc52ee1a4949ceeb7dbc8a33f2d6c088194d9f922fb8318faf1f01186"
 dependencies = [
  "either",
 ]
@@ -1178,9 +1172,9 @@ checksum = "97b3888a4aecf77e811145cadf6eef5901f4782c53886191b2f693f24761847c"
 
 [[package]]
 name = "libcst"
-version = "1.3.1"
+version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6f1e25d1b119ab5c2f15a6e081bb94a8d547c5c2ad065f5fd0dbb683f31ced91"
+checksum = "10293a04a48e8b0cb2cc825a93b83090e527bffd3c897a0255ad7bc96079e920"
 dependencies = [
  "chic",
  "libcst_derive",
@@ -1193,9 +1187,9 @@ dependencies = [
 
 [[package]]
 name = "libcst_derive"
-version = "1.3.1"
+version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4a5011f2d59093de14a4a90e01b9d85dee9276e58a25f0107dcee167dd601be0"
+checksum = "a2ae40017ac09cd2c6a53504cb3c871c7f2b41466eac5bc66ba63f39073b467b"
 dependencies = [
  "quote",
  "syn",
@@ -1404,9 +1398,9 @@ dependencies = [
 
 [[package]]
 name = "nu-ansi-term"
-version = "0.49.0"
+version = "0.50.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c073d3c1930d0751774acf49e66653acecb416c3a54c6ec095a9b11caddb5a68"
+checksum = "dd2800e1520bdc966782168a627aa5d1ad92e33b984bf7c7615d31280c83ff14"
 dependencies = [
  "windows-sys 0.48.0",
 ]
@@ -1670,9 +1664,9 @@ dependencies = [
 
 [[package]]
 name = "proc-macro2"
-version = "1.0.84"
+version = "1.0.85"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ec96c6a92621310b51366f1e28d05ef11489516e93be030060e5fc12024a49d6"
+checksum = "22244ce15aa966053a896d1accb3a6e68469b97c7f33f284b99f0d576879fc23"
 dependencies = [
  "unicode-ident",
 ]
@@ -1795,7 +1789,6 @@ dependencies = [
  "rustc-hash",
  "smol_str",
  "tempfile",
- "textwrap",
  "tracing",
  "tracing-subscriber",
  "tracing-tree",
@@ -1903,7 +1896,7 @@ dependencies = [
 
 [[package]]
 name = "ruff"
-version = "0.4.7"
+version = "0.4.8"
 dependencies = [
  "anyhow",
  "argfile",
@@ -1920,7 +1913,7 @@ dependencies = [
  "insta",
  "insta-cmd",
  "is-macro",
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "log",
  "mimalloc",
  "notify",
@@ -1966,7 +1959,6 @@ dependencies = [
  "ruff_linter",
  "ruff_python_ast",
  "ruff_python_formatter",
- "ruff_python_index",
  "ruff_python_parser",
  "serde",
  "serde_json",
@@ -1982,7 +1974,7 @@ dependencies = [
  "filetime",
  "glob",
  "globset",
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "regex",
  "ruff_macros",
  "seahash",
@@ -1998,7 +1990,7 @@ dependencies = [
  "imara-diff",
  "indicatif",
  "indoc",
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "libcst",
  "pretty_assertions",
  "rayon",
@@ -2014,6 +2006,7 @@ dependencies = [
  "ruff_python_parser",
  "ruff_python_stdlib",
  "ruff_python_trivia",
+ "ruff_text_size",
  "ruff_workspace",
  "schemars",
  "serde",
@@ -2064,7 +2057,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_linter"
-version = "0.4.7"
+version = "0.4.8"
 dependencies = [
  "aho-corasick",
  "annotate-snippets 0.9.2",
@@ -2080,7 +2073,7 @@ dependencies = [
  "insta",
  "is-macro",
  "is-wsl",
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "libcst",
  "log",
  "memchr",
@@ -2128,7 +2121,7 @@ dependencies = [
 name = "ruff_macros"
 version = "0.0.0"
 dependencies = [
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "proc-macro2",
  "quote",
  "ruff_python_trivia",
@@ -2140,7 +2133,7 @@ name = "ruff_notebook"
 version = "0.0.0"
 dependencies = [
  "anyhow",
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "once_cell",
  "rand",
  "ruff_diagnostics",
@@ -2161,7 +2154,7 @@ dependencies = [
  "aho-corasick",
  "bitflags 2.5.0",
  "is-macro",
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "once_cell",
  "ruff_python_trivia",
  "ruff_source_file",
@@ -2190,6 +2183,7 @@ dependencies = [
  "ruff_python_literal",
  "ruff_python_parser",
  "ruff_source_file",
+ "ruff_text_size",
 ]
 
 [[package]]
@@ -2200,7 +2194,7 @@ dependencies = [
  "clap",
  "countme",
  "insta",
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "memchr",
  "once_cell",
  "regex",
@@ -2208,7 +2202,6 @@ dependencies = [
  "ruff_formatter",
  "ruff_macros",
  "ruff_python_ast",
- "ruff_python_index",
  "ruff_python_parser",
  "ruff_python_trivia",
  "ruff_source_file",
@@ -2222,7 +2215,6 @@ dependencies = [
  "static_assertions",
  "thiserror",
  "tracing",
- "unicode-width",
 ]
 
 [[package]]
@@ -2241,7 +2233,7 @@ name = "ruff_python_literal"
 version = "0.0.0"
 dependencies = [
  "bitflags 2.5.0",
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "ruff_python_ast",
  "unic-ucd-category",
 ]
@@ -2255,10 +2247,9 @@ dependencies = [
  "bitflags 2.5.0",
  "bstr",
  "insta",
- "is-macro",
- "itertools 0.12.1",
  "memchr",
  "ruff_python_ast",
+ "ruff_python_trivia",
  "ruff_source_file",
  "ruff_text_size",
  "rustc-hash",
@@ -2305,7 +2296,7 @@ dependencies = [
 name = "ruff_python_trivia"
 version = "0.0.0"
 dependencies = [
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "ruff_source_file",
  "ruff_text_size",
  "unicode-ident",
@@ -2316,7 +2307,6 @@ name = "ruff_python_trivia_integration_tests"
 version = "0.0.0"
 dependencies = [
  "insta",
- "ruff_python_index",
  "ruff_python_parser",
  "ruff_python_trivia",
  "ruff_source_file",
@@ -2391,7 +2381,6 @@ dependencies = [
  "ruff_python_formatter",
  "ruff_python_index",
  "ruff_python_parser",
- "ruff_python_trivia",
  "ruff_source_file",
  "ruff_text_size",
  "ruff_workspace",
@@ -2412,7 +2401,7 @@ dependencies = [
  "globset",
  "ignore",
  "is-macro",
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "log",
  "matchit",
  "path-absolutize",
@@ -2624,9 +2613,9 @@ dependencies = [
 
 [[package]]
 name = "serde_spanned"
-version = "0.6.5"
+version = "0.6.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eb3622f419d1296904700073ea6cc23ad690adbd66f13ea683df73298736f0c1"
+checksum = "79e674e01f999af37c49f70a6ede167a8a60b2503e56c5599532a65baa5969a0"
 dependencies = [
  "serde",
 ]
@@ -2700,12 +2689,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3c5e1a9a646d36c3599cd173a41282daf47c44583ad367b8e6837255952e5c67"
 
 [[package]]
-name = "smawk"
-version = "0.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b7c388c1b5e93756d0c740965c41e8822f866621d41acbdf6336a6a168f8840c"
-
-[[package]]
 name = "smol_str"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2758,11 +2741,11 @@ dependencies = [
 
 [[package]]
 name = "strum_macros"
-version = "0.26.2"
+version = "0.26.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c6cf59daf282c0a494ba14fd21610a0325f9f90ec9d1231dea26bcb1d696c946"
+checksum = "f7993a8e3a9e88a00351486baae9522c91b123a088f76469e5bd5cc17198ea87"
 dependencies = [
- "heck 0.4.1",
+ "heck",
  "proc-macro2",
  "quote",
  "rustversion",
@@ -2855,17 +2838,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "textwrap"
-version = "0.16.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "23d434d3f8967a09480fb04132ebe0a3e088c173e6d0ee7897abbdf4eab0f8b9"
-dependencies = [
- "smawk",
- "unicode-linebreak",
- "unicode-width",
-]
-
-[[package]]
 name = "thiserror"
 version = "1.0.61"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2942,9 +2914,9 @@ checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
 
 [[package]]
 name = "toml"
-version = "0.8.12"
+version = "0.8.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e9dd1545e8208b4a5af1aa9bbd0b4cf7e9ea08fabc5d0a5c67fcaafa17433aa3"
+checksum = "a4e43f8cc456c9704c851ae29c67e17ef65d2c30017c17a9765b89c382dc8bba"
 dependencies = [
  "serde",
  "serde_spanned",
@@ -2954,18 +2926,18 @@ dependencies = [
 
 [[package]]
 name = "toml_datetime"
-version = "0.6.5"
+version = "0.6.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3550f4e9685620ac18a50ed434eb3aec30db8ba93b0287467bca5826ea25baf1"
+checksum = "4badfd56924ae69bcc9039335b2e017639ce3f9b001c393c1b2d1ef846ce2cbf"
 dependencies = [
  "serde",
 ]
 
 [[package]]
 name = "toml_edit"
-version = "0.22.12"
+version = "0.22.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d3328d4f68a705b2a4498da1d580585d39a6510f98318a2cec3018a7ec61ddef"
+checksum = "c127785850e8c20836d49732ae6abfa47616e60bf9d9f57c43c250361a9db96c"
 dependencies = [
  "indexmap",
  "serde",
@@ -3050,11 +3022,11 @@ dependencies = [
 
 [[package]]
 name = "tracing-tree"
-version = "0.3.0"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "65139ecd2c3f6484c3b99bc01c77afe21e95473630747c7aca525e78b0666675"
+checksum = "b56c62d2c80033cb36fae448730a2f2ef99410fe3ecbffc916681a32f6807dbe"
 dependencies = [
- "nu-ansi-term 0.49.0",
+ "nu-ansi-term 0.50.0",
  "tracing-core",
  "tracing-log",
  "tracing-subscriber",
@@ -3119,12 +3091,6 @@ name = "unicode-ident"
 version = "1.0.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3354b9ac3fae1ff6755cb6db53683adb661634f67557942dea4facebec0fee4b"
-
-[[package]]
-name = "unicode-linebreak"
-version = "0.1.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3b09c83c3c29d37506a3e260c08c03743a6bb66a9cd432c6934ab501a190571f"
 
 [[package]]
 name = "unicode-normalization"

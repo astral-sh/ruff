@@ -50,6 +50,8 @@ pub enum PythonVersion {
     Py311,
     Py312,
     Py313,
+    // Remember to update the `latest()` function
+    // when adding new versions here!
 }
 
 impl From<PythonVersion> for Pep440Version {
@@ -62,7 +64,7 @@ impl From<PythonVersion> for Pep440Version {
 impl PythonVersion {
     /// Return the latest supported Python version.
     pub const fn latest() -> Self {
-        Self::Py312
+        Self::Py313
     }
 
     pub const fn as_tuple(&self) -> (u8, u8) {
@@ -513,6 +515,7 @@ pub enum SerializationFormat {
     Github,
     Gitlab,
     Pylint,
+    Rdjson,
     Azure,
     Sarif,
 }
@@ -530,6 +533,7 @@ impl Display for SerializationFormat {
             Self::Github => write!(f, "github"),
             Self::Gitlab => write!(f, "gitlab"),
             Self::Pylint => write!(f, "pylint"),
+            Self::Rdjson => write!(f, "rdjson"),
             Self::Azure => write!(f, "azure"),
             Self::Sarif => write!(f, "sarif"),
         }
