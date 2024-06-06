@@ -31,10 +31,14 @@ for instrument, section in ORCHESTRA.items():
 for instrument, section in ORCHESTRA.items():
     section
 
-for instrument, section in (temp_orchestra := {"violin": "strings", "oboe": "woodwind"}).items():
+for instrument, section in (
+    temp_orchestra := {"violin": "strings", "oboe": "woodwind"}
+).items():
     print(f"{instrument}: {section}")
 
-for instrument, section in (temp_orchestra := {"violin": "strings", "oboe": "woodwind"}).items():
+for instrument, section in (
+    temp_orchestra := {"violin": "strings", "oboe": "woodwind"}
+).items():
     section
 
 for instrument in ORCHESTRA:
