@@ -56,6 +56,7 @@ crossbeam = { version = "0.8.4" }
 dashmap = { version = "5.5.3" }
 dirs = { version = "5.0.0" }
 drop_bomb = { version = "0.1.5" }
+either = { version = "1.12.0" }
 env_logger = { version = "0.11.0" }
 fern = { version = "0.6.1" }
 filetime = { version = "0.2.23" }

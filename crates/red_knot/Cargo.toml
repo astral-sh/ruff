@@ -23,6 +23,7 @@ bitflags = { workspace = true }
 crossbeam = { workspace = true }
 ctrlc = { version = "3.4.4" }
 dashmap = { workspace = true }
+either = { workspace = true }
 hashbrown = { workspace = true }
 indexmap = { workspace = true }
 is-macro = { workspace = true }

@@ -7,9 +7,11 @@ use crate::semantic::{
     resolve_global_symbol, semantic_index, GlobalSymbolId, ScopeId, ScopeKind, SymbolId,
 };
 use crate::{FxDashMap, FxIndexSet, Name};
+use either::{Left, Right};
 use ruff_index::{newtype_index, IndexVec};
 use ruff_python_ast as ast;
 use rustc_hash::FxHashMap;
+use std::iter::FusedIterator;
 
 pub(crate) mod infer;
 
@@ -234,7 +236,14 @@ impl TypeStore {
     }
 
     fn add_union(&self, file_id: FileId, elems: &[Type]) -> UnionTypeId {
-        self.add_or_get_module(file_id).add_union(elems)
+        let flattened: Vec<Type> = elems
+            .iter()
+            .flat_map(|ty| match ty {
+                Type::Union(union_id) => Left(union_id.elements(self)),
+                _ => Right(std::iter::once(*ty)),
+            })
+            .collect();
+        self.add_or_get_module(file_id).add_union(&flattened)
     }
 
     fn add_intersection(
@@ -519,6 +528,29 @@ pub struct UnionTypeId {
     file_id: FileId,
     union_id: ModuleUnionTypeId,
 }
+
+impl UnionTypeId {
+    pub fn elements(self, type_store: &TypeStore) -> ElementsIterator {
+        let union = type_store.get_union(self);
+        ElementsIterator {
+            elements: union.elements.iter().rev().copied().collect(),
+        }
+    }
+}
+
+pub struct ElementsIterator {
+    elements: Vec<Type>,
+}
+
+impl Iterator for ElementsIterator {
+    type Item = Type;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.elements.pop()
+    }
+}
+
+impl FusedIterator for ElementsIterator {}
 
 #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
 pub struct IntersectionTypeId {
