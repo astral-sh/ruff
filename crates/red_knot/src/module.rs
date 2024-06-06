@@ -225,16 +225,24 @@ struct ModuleSearchPathInner {
     kind: ModuleSearchPathKind,
 }
 
+/// Enumeration of the different kinds of search paths type checkers are expected to support.
+///
+/// N.B. Although we don't implement `Ord` for this enum, they are ordered in terms of the
+/// priority that we want to give these modules when resolving them.
+/// This is roughly [the order given in the typing spec], but typeshed's stubs
+/// for the standard library are moved higher up to match Python's semantics at runtime.
+///
+/// [the order given in the typing spec]: https://typing.readthedocs.io/en/latest/spec/distributing.html#import-resolution-ordering
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, is_macro::Is)]
 pub enum ModuleSearchPathKind {
     /// "Extra" paths provided by the user in a config file, env var or CLI flag.
     /// E.g. mypy's `MYPYPATH` env var, or pyright's `stubPath` configuration setting
     Extra,
 
-    /// Project dependency
+    /// Files in the project we're directly being invoked on
     FirstParty,
 
-    /// e.g. built-in modules, typeshed
+    /// The `stdlib` directory of typeshed (either vendored or custom)
     StandardLibrary,
 
     /// Stubs or runtime modules installed in site-packages
@@ -389,48 +397,46 @@ pub fn file_to_module(db: &dyn SemanticDb, file: FileId) -> QueryResult<Option<M
 //////////////////////////////////////////////////////
 
 /// Changes the module search paths to `search_paths`.
-pub fn set_module_search_paths(db: &mut dyn SemanticDb, search_paths: OrderedSearchPaths) {
+pub fn set_module_search_paths(db: &mut dyn SemanticDb, search_paths: ModuleResolutionInputs) {
     let jar: &mut SemanticJar = db.jar_mut();
 
-    jar.module_resolver = ModuleResolver::new(search_paths);
+    jar.module_resolver = ModuleResolver::new(search_paths.into_ordered_search_paths());
 }
 
-const TYPESHED_STDLIB_DIRECTORY: &str = "stdlib";
-
-/// A resolved module resolution order, implementing PEP 561
-/// (with some small, deliberate differences)
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub struct OrderedSearchPaths(Vec<ModuleSearchPath>);
-
-impl Deref for OrderedSearchPaths {
-    type Target = [ModuleSearchPath];
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
+/// Struct for holding the various paths that are put together
+/// to create an `OrderedSearchPatsh` instance
+///
+/// - `extra_paths` is a list of user-provided paths
+///   that should take first priority in the module resolution.
+///   Examples in other type checkers are mypy's MYPYPATH environment variable,
+///   or pyright's stubPath configuration setting.
+/// - `workspace_root` is the root of the workspace,
+///   used for finding first-party modules
+/// - `site-packages` is the path to the user's `site-packages` directory,
+///   where third-party packages from ``PyPI`` are installed
+/// - `custom_typeshed` is a path to standard-library typeshed stubs.
+///   Currently this has to be a directory that exists on disk.
+///   (TODO: fall back to vendored stubs if no custom directory is provided.)
+#[derive(Debug)]
+pub struct ModuleResolutionInputs {
+    pub extra_paths: Vec<PathBuf>,
+    pub workspace_root: PathBuf,
+    pub site_packages: Option<PathBuf>,
+    pub custom_typeshed: Option<PathBuf>,
 }
 
-impl OrderedSearchPaths {
-    /// Implementation of the module resolution order from PEP-561.
-    ///
-    /// - `extra_paths` is a list of user-provided paths
-    ///   that should take first priority in the module resolution.
-    ///   Examples in other type checkers are mypy's MYPYPATH environment variable,
-    ///   or pyright's stubPath configuration setting.
-    /// - `workspace_root` is the root of the workspace,
-    ///   used for finding first-party modules
-    /// - `site-packages` is the path to the user's `site-packages` directory,
-    ///   where third-party packages from ``PyPI`` are installed
-    /// - `custom_typeshed` is a path to standard-library typeshed stubs.
-    ///   Currently this has to be a directory that exists on disk.
-    ///   (TODO: fall back to vendored stubs if no custom directory is provided.)
-    pub fn new(
-        extra_paths: Vec<PathBuf>,
-        workspace_root: PathBuf,
-        site_packages: Option<PathBuf>,
-        custom_typeshed: Option<PathBuf>,
-    ) -> Self {
-        Self(
+impl ModuleResolutionInputs {
+    /// Implementation of PEP 561's module resolution order
+    /// (with some small, deliberate, differences)
+    fn into_ordered_search_paths(self) -> OrderedSearchPaths {
+        let ModuleResolutionInputs {
+            extra_paths,
+            workspace_root,
+            site_packages,
+            custom_typeshed,
+        } = self;
+
+        OrderedSearchPaths(
             extra_paths
                 .into_iter()
                 .map(|path| ModuleSearchPath::new(path, ModuleSearchPathKind::Extra))
@@ -439,17 +445,33 @@ impl OrderedSearchPaths {
                     ModuleSearchPathKind::FirstParty,
                 )))
                 // TODO fallback to vendored typeshed stubs if no custom typeshed directory is provided by the user
-                .chain(
-                    custom_typeshed.into_iter().map(|path| {
-                        ModuleSearchPath::new(path, ModuleSearchPathKind::StandardLibrary)
-                    }),
-                )
+                .chain(custom_typeshed.into_iter().map(|path| {
+                    ModuleSearchPath::new(
+                        path.join(TYPESHED_STDLIB_DIRECTORY),
+                        ModuleSearchPathKind::StandardLibrary,
+                    )
+                }))
                 .chain(site_packages.into_iter().map(|path| {
                     ModuleSearchPath::new(path, ModuleSearchPathKind::SitePackagesThirdParty)
                 }))
                 // TODO vendor typeshed's third-party stubs as well as the stdlib and fallback to them as a final step
                 .collect(),
         )
+    }
+}
+
+const TYPESHED_STDLIB_DIRECTORY: &str = "stdlib";
+
+/// A resolved module resolution order, implementing PEP 561
+/// (with some small, deliberate differences)
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+struct OrderedSearchPaths(Vec<ModuleSearchPath>);
+
+impl Deref for OrderedSearchPaths {
+    type Target = [ModuleSearchPath];
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }
 
@@ -536,7 +558,7 @@ pub struct ModuleResolver {
 }
 
 impl ModuleResolver {
-    pub fn new(search_paths: OrderedSearchPaths) -> Self {
+    fn new(search_paths: OrderedSearchPaths) -> Self {
         Self {
             search_paths,
             modules: FxDashMap::default(),
@@ -670,10 +692,6 @@ where
 {
     let mut package_path = module_search_path.path().to_path_buf();
 
-    if module_search_path.kind().is_standard_library() {
-        package_path = package_path.join(TYPESHED_STDLIB_DIRECTORY);
-    }
-
     // `true` if inside a folder that is a namespace package (has no `__init__.py`).
     // Namespace packages are special because they can be spread across multiple search paths.
     // https://peps.python.org/pep-0420/
@@ -759,7 +777,7 @@ mod tests {
     use crate::db::SourceDb;
     use crate::module::{
         path_to_module, resolve_module, set_module_search_paths, ModuleKind, ModuleName,
-        OrderedSearchPaths, TYPESHED_STDLIB_DIRECTORY,
+        ModuleResolutionInputs, TYPESHED_STDLIB_DIRECTORY,
     };
     use crate::semantic::Dependency;
 
@@ -787,15 +805,15 @@ mod tests {
         let site_packages = site_packages.canonicalize()?;
         let custom_typeshed = custom_typeshed.canonicalize()?;
 
-        let resolved_search_paths = OrderedSearchPaths::new(
-            vec![],
-            src.clone(),
-            Some(site_packages.clone()),
-            Some(custom_typeshed.clone()),
-        );
+        let search_paths = ModuleResolutionInputs {
+            extra_paths: vec![],
+            workspace_root: src.clone(),
+            site_packages: Some(site_packages.clone()),
+            custom_typeshed: Some(custom_typeshed.clone()),
+        };
 
         let mut db = TestDb::default();
-        set_module_search_paths(&mut db, resolved_search_paths);
+        set_module_search_paths(&mut db, search_paths);
 
         Ok(TestCase {
             temp_dir,
@@ -852,7 +870,7 @@ mod tests {
             Some(functools_module),
             resolve_module(&db, ModuleName::new("functools"))?
         );
-        assert_eq!(&custom_typeshed, functools_module.path(&db)?.root().path());
+        assert_eq!(&stdlib_dir, functools_module.path(&db)?.root().path());
         assert_eq!(ModuleKind::Module, functools_module.kind(&db)?);
         assert_eq!(
             &functools_path,

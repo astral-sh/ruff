@@ -247,7 +247,9 @@ mod tests {
 
     use crate::db::tests::TestDb;
     use crate::db::{HasJar, SemanticJar};
-    use crate::module::{resolve_module, set_module_search_paths, ModuleName, OrderedSearchPaths};
+    use crate::module::{
+        resolve_module, set_module_search_paths, ModuleName, ModuleResolutionInputs,
+    };
     use crate::semantic::{infer_symbol_public_type, resolve_global_symbol, Type};
     use crate::Name;
 
@@ -268,10 +270,15 @@ mod tests {
         std::fs::create_dir(&src)?;
         let src = src.canonicalize()?;
 
-        let resolved_search_path = OrderedSearchPaths::new(vec![], src.clone(), None, None);
+        let search_paths = ModuleResolutionInputs {
+            extra_paths: vec![],
+            workspace_root: src.clone(),
+            site_packages: None,
+            custom_typeshed: None,
+        };
 
         let mut db = TestDb::default();
-        set_module_search_paths(&mut db, resolved_search_path);
+        set_module_search_paths(&mut db, search_paths);
 
         Ok(TestCase { temp_dir, db, src })
     }
