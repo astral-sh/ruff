@@ -234,7 +234,14 @@ impl TypeStore {
     }
 
     fn add_union(&self, file_id: FileId, elems: &[Type]) -> UnionTypeId {
-        self.add_or_get_module(file_id).add_union(elems)
+        let mut flattened = Vec::with_capacity(elems.len());
+        for ty in elems {
+            match ty {
+                Type::Union(union_id) => flattened.extend(union_id.elements(self)),
+                _ => flattened.push(*ty),
+            }
+        }
+        self.add_or_get_module(file_id).add_union(&flattened)
     }
 
     fn add_intersection(
@@ -518,6 +525,13 @@ impl ClassTypeId {
 pub struct UnionTypeId {
     file_id: FileId,
     union_id: ModuleUnionTypeId,
+}
+
+impl UnionTypeId {
+    pub fn elements(self, type_store: &TypeStore) -> Vec<Type> {
+        let union = type_store.get_union(self);
+        union.elements.iter().copied().collect()
+    }
 }
 
 #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]

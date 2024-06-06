@@ -608,4 +608,22 @@ mod tests {
 
         assert_public_type(&case, "a", "a", "(Literal[1] | Literal[2])")
     }
+
+    #[test]
+    fn ifexpr_nested() -> anyhow::Result<()> {
+        let case = create_test()?;
+
+        write_to_path(
+            &case,
+            "a.py",
+            "
+                class C1: pass
+                class C2: pass
+                class C3: pass
+                x = C1 if flag else C2 if flag2 else C3
+            ",
+        )?;
+
+        assert_public_type(&case, "a", "x", "(Literal[C1] | Literal[C2] | Literal[C3])")
+    }
 }
