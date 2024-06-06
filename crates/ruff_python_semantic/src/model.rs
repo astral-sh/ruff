@@ -1144,6 +1144,12 @@ impl<'a> SemanticModel<'a> {
         None
     }
 
+    /// TODO
+    #[inline]
+    pub fn nodes(&self) -> &Nodes<'a> {
+        &self.nodes
+    }
+
     /// Return the [`Stmt`] corresponding to the given [`NodeId`].
     #[inline]
     pub fn node(&self, node_id: NodeId) -> &NodeRef<'a> {

@@ -3,7 +3,7 @@ use std::fmt;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::Stmt;
-use ruff_python_semantic::{NodeId, Scope};
+use ruff_python_semantic::{BindingId, NodeId, Scope};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -76,11 +76,22 @@ pub(crate) fn control_var_used_after_block(
     scope: &Scope,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
+    println!("nodes {:#?}", checker.semantic().nodes());
+
+    // Keep track of node_ids we know are used in the same block. This helps us when
+    // people use the same variable name in multiple blocks.
+    let mut known_good_reference_node_ids: Vec<NodeId> = Vec::new();
+
+    let all_bindings: Vec<(&str, BindingId)> = scope.all_bindings().collect();
+    let reversed_bindings = all_bindings.iter().rev();
+
     // Find for-loop and with-statement variable bindings
-    for (name, binding) in scope
-        .bindings()
-        .map(|(name, binding_id)| (name, checker.semantic().binding(binding_id)))
+    for (&name, binding) in reversed_bindings
+        .map(|(name, binding_id)| (name, checker.semantic().binding(*binding_id)))
         .filter_map(|(name, binding)| {
+            if !binding.kind.is_builtin() {
+                println!("name {:?} binding.kind {:?}", name, binding.kind);
+            }
             if binding.kind.is_loop_var() || binding.kind.is_with_item_var() {
                 return Some((name, binding));
             }
@@ -108,12 +119,18 @@ pub(crate) fn control_var_used_after_block(
             for ancestor_node_id in statement_hierarchy {
                 if binding_statement_id == ancestor_node_id {
                     is_used_in_block = true;
+                    known_good_reference_node_ids.push(reference_node_id);
                     break;
                 }
             }
 
+            println!(
+                "is_used_in_block {:?} binding_source_node_id {:?} binding_statement_id {:?} current_reference_node_id {:?} known_good_reference_node_ids {:?}",
+                is_used_in_block, binding_source_node_id, binding_statement_id, reference_node_id, known_good_reference_node_ids
+            );
+
             // If the reference wasn't used in the same block, report a violation/diagnostic
-            if !is_used_in_block {
+            if !is_used_in_block && !known_good_reference_node_ids.contains(&reference_node_id) {
                 let block_kind = match binding_statement {
                     Stmt::For(_) => BlockKind::For,
                     Stmt::With(_) => BlockKind::With,

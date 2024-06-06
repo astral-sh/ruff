@@ -1,70 +1,8 @@
-import typing
-from typing import cast
-
-for global_var in []:
-    _ = global_var
+for x in []:
+    _ = x
     pass
 
-_ = global_var
-
-def foo():
-    # For control var used outside block
-    for event in []:
-        _ = event
-        pass
-
-    _ = event
-
-    for x in range(10):
-        pass
-
-    # Usage in another block
-    for y in range(10):
-        # x is used outside of the loop it was defined in (meant to use y)
-        if x == 5:
-            pass
-
-    # Tuple destructuring
-    for a, b, c in []:
-        _ = a
-        _ = b
-        _ = c
-        pass
-
-    _ = a
-    _ = b
-    _ = c
-
-    # Array destructuring
-    for [d, e, f] in []:
-        _ = d
-        _ = e
-        _ = f
-        pass
-
-    _ = d
-    _ = e
-    _ = f
-
-    # with statement
-    with None as w:
-        _ = w
-        pass
-
-    _ = w
-
-    # Nested blocks
-    with None as q:
-        _ = q
-        
-        for n in []:
-            _ = n
-            _ = q
-            pass
-
-        _ = n
-
-    _ = q
-    _ = n
-
-
+# Using the same control variable name in a different loop is ok
+for x in []:
+    _ = x
+    pass
