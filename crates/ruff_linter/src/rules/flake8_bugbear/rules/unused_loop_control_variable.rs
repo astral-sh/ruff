@@ -8,12 +8,6 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, result_like::BoolLike)]
-enum Certainty {
-    Certain,
-    Uncertain,
-}
-
 /// ## What it does
 /// Checks for unused variables in loops (e.g., `for` and `while` statements).
 ///
@@ -61,10 +55,13 @@ impl Violation for UnusedLoopControlVariable {
         let UnusedLoopControlVariable {
             name, certainty, ..
         } = self;
-        if certainty.to_bool() {
-            format!("Loop control variable `{name}` not used within loop body")
-        } else {
-            format!("Loop control variable `{name}` may not be used within loop body")
+        match certainty {
+            Certainty::Certain => {
+                format!("Loop control variable `{name}` not used within loop body")
+            }
+            Certainty::Uncertain => {
+                format!("Loop control variable `{name}` may not be used within loop body")
+            }
         }
     }
 
@@ -105,10 +102,13 @@ pub(crate) fn unused_loop_control_variable(checker: &mut Checker, stmt_for: &ast
         }
 
         // Avoid fixing any variables that _may_ be used, but undetectably so.
-        let certainty =
-            Certainty::from(!helpers::uses_magic_variable_access(&stmt_for.body, |id| {
-                checker.semantic().has_builtin_binding(id)
-            }));
+        let certainty = if helpers::uses_magic_variable_access(&stmt_for.body, |id| {
+            checker.semantic().has_builtin_binding(id)
+        }) {
+            Certainty::Uncertain
+        } else {
+            Certainty::Certain
+        };
 
         // Attempt to rename the variable by prepending an underscore, but avoid
         // applying the fix if doing so wouldn't actually cause us to ignore the
@@ -129,7 +129,7 @@ pub(crate) fn unused_loop_control_variable(checker: &mut Checker, stmt_for: &ast
             expr.range(),
         );
         if let Some(rename) = rename {
-            if certainty.into() {
+            if certainty == Certainty::Certain {
                 // Avoid fixing if the variable, or any future bindings to the variable, are
                 // used _after_ the loop.
                 let scope = checker.semantic().current_scope();
@@ -148,4 +148,10 @@ pub(crate) fn unused_loop_control_variable(checker: &mut Checker, stmt_for: &ast
         }
         checker.diagnostics.push(diagnostic);
     }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+enum Certainty {
+    Certain,
+    Uncertain,
 }

@@ -186,7 +186,7 @@ pub(crate) fn lint_path(
 ) -> Result<Diagnostics> {
     // Check the cache.
     let caching = match cache {
-        Some(cache) if noqa.into() => {
+        Some(cache) if noqa.is_enabled() => {
             let relative_path = cache
                 .relative_path(path)
                 .expect("wrong package cache for file");

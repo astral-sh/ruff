@@ -299,7 +299,7 @@ pub fn check_path(
     }
 
     // Enforce `noqa` directives.
-    if (noqa.into() && !diagnostics.is_empty())
+    if (noqa.is_enabled() && !diagnostics.is_empty())
         || settings
             .rules
             .iter_enabled()
@@ -315,7 +315,7 @@ pub fn check_path(
             &per_file_ignores,
             settings,
         );
-        if noqa.into() {
+        if noqa.is_enabled() {
             for index in ignored.iter().rev() {
                 diagnostics.swap_remove(*index);
             }
