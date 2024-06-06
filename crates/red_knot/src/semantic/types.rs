@@ -18,7 +18,7 @@ pub(crate) use infer::{infer_definition_type, infer_symbol_public_type};
 /// unique ID for a type
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Type {
-    /// the dynamic or gradual type: a statically-unknown set of values
+    /// the dynamic type: a statically-unknown set of values
     Any,
     /// the empty set of values
     Never,
@@ -27,6 +27,8 @@ pub enum Type {
     Unknown,
     /// name is not bound to any value
     Unbound,
+    /// the None object
+    None,
     /// a specific function object
     Function(FunctionTypeId),
     /// a specific module object
@@ -60,6 +62,7 @@ impl Type {
             Type::Never => todo!("attribute lookup on Never type"),
             Type::Unknown => Ok(Some(Type::Unknown)),
             Type::Unbound => todo!("attribute lookup on Unbound type"),
+            Type::None => todo!("attribute lookup on None type"),
             Type::Function(_) => todo!("attribute lookup on Function type"),
             Type::Module(module_id) => module_id.get_member(db, name),
             Type::Class(class_id) => class_id.get_class_member(db, name),
@@ -665,6 +668,7 @@ impl std::fmt::Display for DisplayType<'_> {
             Type::Never => f.write_str("Never"),
             Type::Unknown => f.write_str("Unknown"),
             Type::Unbound => f.write_str("Unbound"),
+            Type::None => f.write_str("None"),
             Type::Module(module_id) => {
                 // NOTE: something like this?: "<module 'module-name' from 'path-from-fileid'>"
                 todo!("{module_id:?}")
