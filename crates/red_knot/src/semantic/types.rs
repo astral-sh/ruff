@@ -746,16 +746,49 @@ pub(crate) struct UnionType {
 
 impl UnionType {
     fn display(&self, f: &mut std::fmt::Formatter<'_>, store: &TypeStore) -> std::fmt::Result {
-        f.write_str("(")?;
+        let (int_literals, other_types): (Vec<Type>, Vec<Type>) = self
+            .elements
+            .iter()
+            .copied()
+            .partition(|ty| matches!(ty, Type::IntLiteral(_)));
+        let num_types = usize::from(!int_literals.is_empty()) + other_types.len();
+        if num_types > 1 {
+            f.write_str("(")?;
+        }
         let mut first = true;
-        for ty in &self.elements {
+        if !int_literals.is_empty() {
+            f.write_str("Literal[")?;
+            let mut nums: Vec<i64> = int_literals
+                .into_iter()
+                .filter_map(|ty| {
+                    if let Type::IntLiteral(n) = ty {
+                        Some(n)
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+            nums.sort_unstable();
+            for num in nums {
+                if !first {
+                    f.write_str(", ")?;
+                }
+                write!(f, "{num}")?;
+                first = false;
+            }
+            f.write_str("]")?;
+        }
+        for ty in other_types {
             if !first {
                 f.write_str(" | ")?;
             };
             first = false;
             write!(f, "{}", ty.display(store))?;
         }
-        f.write_str(")")
+        if num_types > 1 {
+            f.write_str(")")?;
+        }
+        Ok(())
     }
 }
 
@@ -764,7 +797,7 @@ impl UnionType {
 // directly in intersections rather than as a separate type. This sacrifices some efficiency in the
 // case where a Not appears outside an intersection (unclear when that could even happen, but we'd
 // have to represent it as a single-element intersection if it did) in exchange for better
-// efficiency in the within-intersection case.
+// efficiency in the within-intersection case.{
 #[derive(Debug)]
 pub(crate) struct IntersectionType {
     // the intersection type includes only values in all of these types
