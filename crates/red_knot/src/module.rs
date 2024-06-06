@@ -418,7 +418,11 @@ impl Deref for ResolvedSearchPathOrder {
 ///   or pyright's stubPath configuration setting.
 /// - `workspace_root` is the root of the workspace,
 ///   used for finding first-party modules
-/// - `custom_typeshed`
+/// - `site-packages` is the path to the user's `site-packages` directory,
+///   where third-party packages from ``PyPI`` are installed
+/// - `custom_typeshed` is a path to standard-library typeshed stubs.
+///   Currently this has to be a directory that exists on disk.
+///   (TODO: fall back to vendored stubs if no custom directory is provided.)
 impl ResolvedSearchPathOrder {
     pub fn new(
         extra_paths: Vec<PathBuf>,
