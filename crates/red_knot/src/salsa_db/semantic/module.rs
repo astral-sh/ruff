@@ -3,8 +3,8 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use crate::module::ModuleName;
+use crate::salsa_db::semantic::symbol_table::Dependency;
 use crate::salsa_db::source::File;
-use crate::symbols::Dependency;
 
 use super::Db;
 use super::Jar;
@@ -412,12 +412,12 @@ impl PackageKind {
 
 #[cfg(test)]
 mod tests {
+    use crate::salsa_db::semantic::symbol_table::Dependency;
     use crate::salsa_db::source::Db;
     use salsa::DebugWithDb;
     use std::num::NonZeroU32;
 
     use crate::salsa_db::tests::TestDb;
-    use crate::symbols::Dependency;
 
     use super::{
         path_to_module, resolve_module_name, set_module_search_paths, ModuleKind, ModuleName,

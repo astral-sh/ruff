@@ -74,13 +74,14 @@ impl salsa::ParallelDatabase for Database {
 
 #[cfg(test)]
 mod tests {
-    use salsa::{DebugWithDb, Event, Storage};
+    use salsa::{Event, Storage};
     use std::path::PathBuf;
-    use tracing::{debug, Level};
+    use tracing::Level;
     use tracing_subscriber::fmt::time;
 
     use crate::db::Upcast;
-    use crate::salsa_db::semantic::{dependencies, symbol_table};
+    use crate::salsa_db::semantic::module::file_to_module;
+    use crate::salsa_db::semantic::{dependencies, resolve_global_symbol};
     use crate::salsa_db::source::{Db, File};
 
     use super::lint;
@@ -163,25 +164,18 @@ mod tests {
         let main_file = db.file(main.clone());
 
         dependencies(&db, main_file);
-        debug!("{:#?}", &symbol_table(&db, main_file).debug(&db));
+        let main_module = file_to_module(&db, main_file).unwrap();
+        let foo = resolve_global_symbol(&db, &main_module, "foo").unwrap();
 
-        std::fs::write(&main, "print('Hello, Micha!')").unwrap();
+        tracing::debug!("{:?}", foo);
 
+        // Make a change that doesn't impact the symbol table
+        std::fs::write(&main, "import foo;\n\n\nx = 3").unwrap();
         main_file.touch(&mut db);
 
-        // let (source_jar, _): (&mut SourceJar, _) = db.jar_mut();
-        // source_jar.0.reset()
+        let foo = resolve_global_symbol(&db, &main_module, "foo").unwrap();
 
-        assert_eq!("print('Hello, Micha!')", main_file.source(&db).text());
-
-        debug!("{:#?}", &symbol_table(&db, main_file).debug(&db));
-
-        // The file never gets collected.
-        main_file.touch(&mut db);
-
-        // TODO: Is there a way to remove a file?
-
-        // There's only one source alive. I guess that makes sense because we never read the content of `foo.py`.
+        tracing::debug!("{:?}", foo);
 
         eprintln!("{}", countme::get_all());
     }
