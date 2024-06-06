@@ -1776,7 +1776,6 @@ dependencies = [
  "crossbeam",
  "ctrlc",
  "dashmap",
- "either",
  "hashbrown 0.14.5",
  "indexmap",
  "is-macro",
