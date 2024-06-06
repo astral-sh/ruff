@@ -243,11 +243,11 @@ fn infer_expr_type(db: &dyn SemanticDb, file_id: FileId, expr: &ast::Expr) -> Qu
 #[cfg(test)]
 mod tests {
 
+    use std::path::PathBuf;
+
     use crate::db::tests::TestDb;
     use crate::db::{HasJar, SemanticJar};
-    use crate::module::{
-        resolve_module, set_module_search_paths, ModuleName, ModuleSearchPath, ModuleSearchPathKind,
-    };
+    use crate::module::{resolve_module, set_module_search_paths, ModuleName, OrderedSearchPaths};
     use crate::semantic::{infer_symbol_public_type, resolve_global_symbol, Type};
     use crate::Name;
 
@@ -258,7 +258,7 @@ mod tests {
         temp_dir: tempfile::TempDir,
         db: TestDb,
 
-        src: ModuleSearchPath,
+        src: PathBuf,
     }
 
     fn create_test() -> std::io::Result<TestCase> {
@@ -266,18 +266,18 @@ mod tests {
 
         let src = temp_dir.path().join("src");
         std::fs::create_dir(&src)?;
-        let src = ModuleSearchPath::new(src.canonicalize()?, ModuleSearchPathKind::FirstParty);
+        let src = src.canonicalize()?;
 
-        let roots = vec![src.clone()];
+        let resolved_search_path = OrderedSearchPaths::new(vec![], src.clone(), None, None);
 
         let mut db = TestDb::default();
-        set_module_search_paths(&mut db, roots);
+        set_module_search_paths(&mut db, resolved_search_path);
 
         Ok(TestCase { temp_dir, db, src })
     }
 
     fn write_to_path(case: &TestCase, relative_path: &str, contents: &str) -> anyhow::Result<()> {
-        let path = case.src.path().join(relative_path);
+        let path = case.src.join(relative_path);
         std::fs::write(path, contents)?;
         Ok(())
     }
@@ -423,9 +423,7 @@ mod tests {
     #[test]
     fn resolve_visible_def() -> anyhow::Result<()> {
         let case = create_test()?;
-
         write_to_path(&case, "a.py", "y = 1; y = 2; x = y")?;
-
         assert_public_type(&case, "a", "x", "Literal[2]")
     }
 
