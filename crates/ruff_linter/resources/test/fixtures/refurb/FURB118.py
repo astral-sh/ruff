@@ -31,6 +31,8 @@ op_itemgetter = lambda x: x[0]
 op_itemgetter = lambda x: (x[0], x[1], x[2])
 op_itemgetter = lambda x: (x[1:], x[2])
 op_itemgetter = lambda x: x[:]
+op_itemgetter = lambda x: x[0, 1]
+op_itemgetter = lambda x: x[(0, 1)]
 
 
 def op_not2(x):
