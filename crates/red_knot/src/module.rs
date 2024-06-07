@@ -928,10 +928,9 @@ mod tests {
 
     #[test]
     fn typeshed_zip_created_at_build_time() -> anyhow::Result<()> {
-        // The file path here is hardcoded in this crate's `build.rs` script.
-        // Luckily this crate will fail to build if this file isn't available at build time.
+        // The RUFF_VENDORED_TYPESHED_ZIP environment variable is set in `.cargo/config.toml`
         const TYPESHED_ZIP_BYTES: &[u8] =
-            include_bytes!(concat!(env!("OUT_DIR"), "/zipped_typeshed.zip"));
+            include_bytes!(concat!(env!("OUT_DIR"), env!("RUFF_VENDORED_TYPESHED_ZIP")));
         assert!(!TYPESHED_ZIP_BYTES.is_empty());
         let mut typeshed_zip_archive = ZipArchive::new(Cursor::new(TYPESHED_ZIP_BYTES))?;
 

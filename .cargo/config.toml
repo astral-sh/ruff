@@ -8,3 +8,9 @@ benchmark = "bench -p ruff_benchmark --bench linter --bench formatter --"
 # See: https://github.com/astral-sh/ruff/issues/11503
 [target.'cfg(all(target_env="msvc", target_os = "windows"))']
 rustflags = ["-C", "target-feature=+crt-static"]
+
+[env]
+# Location for where to put the zip containing our vendored typeshed stubs
+# that the red-knot crate creates at build time.
+# The location is relative to the `OUT_DIR` environment variable that cargo sets.
+RUFF_VENDORED_TYPESHED_ZIP = "/vendored_typeshed.zip"
