@@ -80,9 +80,11 @@ mod tests {
     use tracing_subscriber::fmt::time;
 
     use crate::db::Upcast;
+    use crate::salsa_db::semantic::ast_ids::AstIdNode;
     use crate::salsa_db::semantic::module::file_to_module;
-    use crate::salsa_db::semantic::{dependencies, resolve_global_symbol};
-    use crate::salsa_db::source::{Db, File};
+    use crate::salsa_db::semantic::types::infer::infer_expression_type;
+    use crate::salsa_db::semantic::{dependencies, resolve_global_symbol, GlobalId};
+    use crate::salsa_db::source::{parse, Db, File};
 
     use super::lint;
     use super::semantic;
@@ -149,7 +151,22 @@ mod tests {
         let main = tempdir.path().join("main.py");
         let foo = tempdir.path().join("foo.py");
 
-        std::fs::write(&main, "import foo;\nx = 1").unwrap();
+        std::fs::write(
+            &main,
+            r#"
+import foo;
+
+x = 1
+
+
+def test():
+    return x;
+
+def test():
+    return y
+"#,
+        )
+        .unwrap();
         std::fs::write(foo, "x = 10").unwrap();
 
         let mut db = Database::new();
@@ -163,18 +180,25 @@ mod tests {
 
         let main_file = db.file(main.clone());
 
+        let parsed = parse(&db, main_file);
+        let x = &parsed.syntax().body[1].as_assign_stmt().unwrap().targets[0];
+        let x_id = x.ast_id(&db, main_file);
+
         dependencies(&db, main_file);
         let main_module = file_to_module(&db, main_file).unwrap();
-        let foo = resolve_global_symbol(&db, &main_module, "foo").unwrap();
-
-        tracing::debug!("{:?}", foo);
+        // let foo = resolve_global_symbol(&db, main_module.file(), "foo").unwrap();
+        //
+        // tracing::debug!("{:?}", foo);
 
         // Make a change that doesn't impact the symbol table
-        std::fs::write(&main, "import foo;\n\n\nx = 3").unwrap();
-        main_file.touch(&mut db);
+        // std::fs::write(&main, "import foo;\n\n\nx = 3").unwrap();
+        // main_file.touch(&mut db);
 
-        let foo = resolve_global_symbol(&db, &main_module, "foo").unwrap();
-
+        let foo = resolve_global_symbol(&db, main_module.file(), "foo").unwrap();
+        dbg!(infer_expression_type(
+            &db,
+            GlobalId::new(main_module.file(), x_id)
+        ));
         tracing::debug!("{:?}", foo);
 
         eprintln!("{}", countme::get_all());

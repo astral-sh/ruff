@@ -11,11 +11,9 @@ use ruff_python_ast::{AnyNodeRef, Stmt};
 
 use crate::db::Upcast;
 use crate::module::ModuleName;
-use crate::salsa_db::semantic::ast_ids::{AstIdNode, ExpressionId};
+use crate::salsa_db::semantic::ast_ids::AstIdNode;
 use crate::salsa_db::semantic::definition::{Definition, ImportDefinition, ImportFromDefinition};
-use crate::salsa_db::semantic::flow_graph::{
-    FlowGraph, FlowGraphBuilder, FlowNodeId, ReachableDefinitionsIterator,
-};
+use crate::salsa_db::semantic::flow_graph::{FlowGraph, FlowGraphBuilder, FlowNodeId};
 use crate::salsa_db::semantic::module::{
     file_to_module, Module, ModuleSearchPaths, ResolvedModule,
 };
@@ -23,17 +21,51 @@ use crate::salsa_db::semantic::symbol_table::{
     symbol_table as symbol_table_query, Dependency, NodeWithScopeId, ScopeId, ScopeKind,
     SymbolFlags, SymbolId, SymbolTable, SymbolTableBuilder,
 };
+use crate::salsa_db::semantic::types::infer::{
+    infer_class_body, infer_function_body, infer_module_body, infer_types,
+};
+use crate::salsa_db::semantic::types::{
+    typing_scopes, ClassTypingScope, FunctionTypingScope, Type, TypingScope,
+};
 use crate::salsa_db::source;
 use crate::salsa_db::source::{parse, File};
-use crate::Name;
 
 pub use self::module::resolve_module;
 
-mod ast_ids;
+pub mod ast_ids;
 mod definition;
 pub mod flow_graph;
 pub mod module;
 pub mod symbol_table;
+pub mod types;
+
+#[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
+pub struct GlobalId<I>
+where
+    I: Copy,
+{
+    file: File,
+    local: I,
+}
+
+impl<I> GlobalId<I>
+where
+    I: Copy,
+{
+    pub fn new(file: File, local: I) -> Self {
+        GlobalId { file, local }
+    }
+
+    pub fn file(&self) -> File {
+        self.file
+    }
+
+    pub fn local(&self) -> I {
+        self.local
+    }
+}
+
+pub type GlobalSymbolId = GlobalId<SymbolId>;
 
 #[derive(Debug, Eq, PartialEq)]
 pub struct SemanticIndex {
@@ -45,22 +77,27 @@ pub struct SemanticIndex {
 }
 
 #[tracing::instrument(level = "debug", skip(db))]
-pub fn resolve_global_symbol(
-    db: &dyn Db,
-    module: &ResolvedModule,
-    name: &str,
-) -> Option<GlobalSymbolId> {
-    let file_id = module.file();
-    let symbol_table = symbol_table_query(db, file_id);
+pub fn resolve_global_symbol(db: &dyn Db, file: File, name: &str) -> Option<GlobalSymbolId> {
+    let symbol_table = symbol_table_query(db, file);
     let symbol_id = symbol_table.root_symbol_id_by_name(name)?;
 
-    Some(GlobalSymbolId { file_id, symbol_id })
+    Some(GlobalSymbolId::new(file, symbol_id))
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub struct GlobalSymbolId {
-    pub(crate) file_id: File,
-    pub(crate) symbol_id: SymbolId,
+#[tracing::instrument(level = "debug", skip(db))]
+pub fn global_symbol_type(db: &dyn Db, symbol: GlobalSymbolId) -> Type {
+    let typing_scope = TypingScope::for_symbol(db, symbol);
+    let types = infer_types(db, typing_scope);
+
+    types.symbol_ty(symbol.local())
+}
+
+#[tracing::instrument(level = "debug", skip(db))]
+pub fn global_symbol_type_by_name(db: &dyn Db, module: File, name: &str) -> Option<Type> {
+    let symbols = symbol_table_query(db, module);
+    let symbol = symbols.root_symbol_id_by_name(name)?;
+
+    Some(global_symbol_type(db, GlobalSymbolId::new(module, symbol)))
 }
 
 #[tracing::instrument(level = "debug", skip(db))]
@@ -83,21 +120,6 @@ pub fn semantic_index(db: &dyn Db, file: File) -> SemanticIndex {
 
     indexer.visit_body(&parsed.syntax().body);
     indexer.finish()
-}
-
-impl SemanticIndex {
-    /// Return an iterator over all definitions of `symbol_id` reachable from `use_expr`. The value
-    /// of `symbol_id` in `use_expr` must originate from one of the iterated definitions (or from
-    /// an external reassignment of the name outside of this scope).
-    #[allow(unused)]
-    pub fn reachable_definitions(
-        &self,
-        symbol_id: SymbolId,
-        use_expr: ExpressionId,
-    ) -> ReachableDefinitionsIterator {
-        let flow_graph = &*self.flow_graph;
-        ReachableDefinitionsIterator::new(flow_graph, symbol_id, flow_graph.for_expr(use_expr))
-    }
 }
 
 #[derive(Debug)]
@@ -154,7 +176,7 @@ impl SemanticIndexer<'_> {
     ) -> SymbolId {
         let symbol_id = self.add_or_update_symbol(identifier, SymbolFlags::IS_DEFINED);
         self.symbol_table_builder
-            .add_definition(symbol_id, definition.clone());
+            .add_definition(symbol_id, definition);
         let new_flow_node_id =
             self.flow_graph_builder
                 .add_definition(symbol_id, definition, self.current_flow_node());
@@ -242,14 +264,21 @@ impl PreorderVisitor<'_> for SemanticIndexer<'_> {
             };
             self.add_or_update_symbol(id, flags);
             if flags.contains(SymbolFlags::IS_DEFINED) {
-                if let Some(curdef) = self.current_definition.clone() {
+                if let Some(curdef) = self.current_definition {
                     self.add_or_update_symbol_with_def(id, curdef);
                 }
             }
         }
-        self.flow_graph_builder
-            .record_expr(expression_id, self.current_flow_node());
-        ast::visitor::preorder::walk_expr(self, expr);
+        let flow_expression_id = self
+            .flow_graph_builder
+            .record_expr(self.current_flow_node());
+        debug_assert_eq!(flow_expression_id, expression_id);
+        let scope_expression_id = self
+            .symbol_table_builder
+            .record_expression(self.cur_scope());
+        debug_assert_eq!(scope_expression_id, expression_id);
+
+        preorder::walk_expr(self, expr);
     }
 
     fn visit_stmt(&mut self, stmt: &ast::Stmt) {
@@ -259,15 +288,14 @@ impl PreorderVisitor<'_> for SemanticIndexer<'_> {
                 let class_id = node.ast_id(self.db, self.file);
                 let class_definition = Definition::Class(class_id);
 
-                let symbol_id =
-                    self.add_or_update_symbol_with_def(&node.name, class_definition.clone());
+                let symbol_id = self.add_or_update_symbol_with_def(&node.name, class_definition);
                 for decorator in &node.decorator_list {
                     self.visit_decorator(decorator);
                 }
                 let scope_id = self.with_type_params(
                     &node.name,
                     &node.type_params,
-                    Some(class_definition.clone()),
+                    Some(class_definition),
                     Some(symbol_id),
                     |indexer| {
                         if let Some(arguments) = &node.arguments {
@@ -290,14 +318,14 @@ impl PreorderVisitor<'_> for SemanticIndexer<'_> {
                 let function_id = node.ast_id(self.db, self.file);
 
                 let def = Definition::Function(function_id);
-                let symbol_id = self.add_or_update_symbol_with_def(&node.name, def.clone());
+                let symbol_id = self.add_or_update_symbol_with_def(&node.name, def);
                 for decorator in &node.decorator_list {
                     self.visit_decorator(decorator);
                 }
                 let scope_id = self.with_type_params(
                     &node.name,
                     &node.type_params,
-                    Some(def.clone()),
+                    Some(def),
                     Some(symbol_id),
                     |indexer| {
                         indexer.visit_parameters(&node.parameters);
@@ -307,7 +335,7 @@ impl PreorderVisitor<'_> for SemanticIndexer<'_> {
                         let scope_id = indexer.push_scope(
                             &node.name,
                             ScopeKind::Function,
-                            Some(def.clone()),
+                            Some(def),
                             Some(symbol_id),
                         );
                         indexer.visit_body(&node.body);
@@ -317,8 +345,8 @@ impl PreorderVisitor<'_> for SemanticIndexer<'_> {
                 );
                 self.record_scope_for_node(NodeWithScopeId::Function(function_id), scope_id);
             }
-            ast::Stmt::Import(ast::StmtImport { names, .. }) => {
-                for alias in names {
+            Stmt::Import(import @ ast::StmtImport { names, .. }) => {
+                for (i, alias) in names.iter().enumerate() {
                     let symbol_name = if let Some(asname) = &alias.asname {
                         asname.id.as_str()
                     } else {
@@ -328,31 +356,33 @@ impl PreorderVisitor<'_> for SemanticIndexer<'_> {
                     let module = ModuleName::new(&alias.name.id);
 
                     let def = Definition::Import(ImportDefinition {
-                        module: module.clone(),
+                        import: import.ast_id(self.db, self.file),
+                        name: u32::try_from(i).unwrap(),
                     });
                     self.add_or_update_symbol_with_def(symbol_name, def);
                     self.symbol_table_builder
                         .add_dependency(Dependency::Module(module));
                 }
             }
-            ast::Stmt::ImportFrom(ast::StmtImportFrom {
-                module,
-                names,
-                level,
-                ..
-            }) => {
+            Stmt::ImportFrom(
+                import_from @ ast::StmtImportFrom {
+                    module,
+                    names,
+                    level,
+                    ..
+                },
+            ) => {
                 let module = module.as_ref().map(|m| ModuleName::new(&m.id));
 
-                for alias in names {
+                for (i, alias) in names.iter().enumerate() {
                     let symbol_name = if let Some(asname) = &alias.asname {
                         asname.id.as_str()
                     } else {
                         alias.name.id.as_str()
                     };
                     let def = Definition::ImportFrom(ImportFromDefinition {
-                        module: module.clone(),
-                        name: Name::new(&alias.name.id),
-                        level: *level,
+                        import: import_from.ast_id(self.db, self.file),
+                        name: u32::try_from(i).unwrap(),
                     });
                     self.add_or_update_symbol_with_def(symbol_name, def);
                 }
@@ -528,6 +558,8 @@ pub fn dependencies(db: &dyn Db, file: File) -> Arc<[ModuleName]> {
 #[salsa::jar(db=Db)]
 pub struct Jar(
     ModuleSearchPaths,
+    FunctionTypingScope,
+    ClassTypingScope,
     Module,
     ast_ids::ast_ids,
     semantic_index,
@@ -536,6 +568,10 @@ pub struct Jar(
     dependencies,
     resolve_module,
     file_to_module,
+    typing_scopes,
+    infer_function_body,
+    infer_class_body,
+    infer_module_body,
 );
 
 pub trait Db: source::Db + salsa::DbWithJar<Jar> + Upcast<dyn source::Db> {}

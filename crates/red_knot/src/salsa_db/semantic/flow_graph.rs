@@ -63,6 +63,18 @@ impl FlowGraph {
     pub fn for_expr(&self, expr: ExpressionId) -> FlowNodeId {
         self.expressions_to_flow[expr]
     }
+
+    /// Return an iterator over all definitions of `symbol_id` reachable from `use_expr`. The value
+    /// of `symbol_id` in `use_expr` must originate from one of the iterated definitions (or from
+    /// an external reassignment of the name outside of this scope).
+    #[allow(unused)]
+    pub fn reachable_definitions(
+        &self,
+        symbol_id: SymbolId,
+        use_expr: ExpressionId,
+    ) -> ReachableDefinitionsIterator {
+        ReachableDefinitionsIterator::new(self, symbol_id, self.for_expr(use_expr))
+    }
 }
 
 #[derive(Debug)]
@@ -112,11 +124,8 @@ impl FlowGraphBuilder {
         }))
     }
 
-    pub(crate) fn record_expr(&mut self, expression_id: ExpressionId, node_id: FlowNodeId) {
-        debug_assert_eq!(
-            self.flow_graph.expressions_to_flow.push(node_id),
-            expression_id
-        );
+    pub(crate) fn record_expr(&mut self, node_id: FlowNodeId) -> ExpressionId {
+        self.flow_graph.expressions_to_flow.push(node_id)
     }
 
     pub(crate) fn finish(self) -> FlowGraph {
@@ -124,6 +133,7 @@ impl FlowGraphBuilder {
     }
 }
 
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum ReachableDefinition {
     Definition(Definition),
     Undefined,
@@ -157,7 +167,7 @@ impl Iterator for ReachableDefinitionsIterator<'_> {
                 FlowNode::Start => return Some(ReachableDefinition::Undefined),
                 FlowNode::Definition(def_node) => {
                     if def_node.symbol_id == self.symbol_id {
-                        return Some(ReachableDefinition::Definition(def_node.definition.clone()));
+                        return Some(ReachableDefinition::Definition(def_node.definition));
                     }
                     self.pending.push(def_node.predecessor);
                 }

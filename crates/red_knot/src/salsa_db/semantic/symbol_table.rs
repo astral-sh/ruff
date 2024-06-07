@@ -12,7 +12,7 @@ use rustc_hash::{FxHashMap, FxHasher};
 use ruff_index::{newtype_index, IndexVec};
 
 use crate::module::ModuleName;
-use crate::salsa_db::semantic::ast_ids::{ClassId, FunctionId};
+use crate::salsa_db::semantic::ast_ids::{ClassId, ExpressionId, FunctionId};
 use crate::salsa_db::semantic::definition::Definition;
 use crate::salsa_db::semantic::{semantic_index, Db, Jar};
 use crate::salsa_db::source::File;
@@ -165,6 +165,8 @@ pub struct SymbolTable {
     scopes_by_node: FxHashMap<NodeWithScopeId, ScopeId>,
     /// dependencies of this module
     dependencies: Vec<Dependency>,
+
+    expression_scopes: IndexVec<ExpressionId, ScopeId>,
 }
 
 impl SymbolTable {
@@ -250,6 +252,15 @@ impl SymbolTable {
         &self.scopes_by_id[self.scope_id_of_symbol(symbol_id)]
     }
 
+    pub fn scope_id_of_expression(&self, expression_id: ExpressionId) -> ScopeId {
+        self.expression_scopes[expression_id]
+    }
+
+    pub fn scope_of_expression(&self, expression: ExpressionId) -> &Scope {
+        let scope_id = self.scope_id_of_expression(expression);
+        &self.scopes_by_id[scope_id]
+    }
+
     pub fn parent_scopes(
         &self,
         scope_id: ScopeId,
@@ -268,6 +279,10 @@ impl SymbolTable {
         self.scopes_by_node[&node]
     }
 
+    pub fn ancestors(&self, scope_id: ScopeId) -> impl Iterator<Item = (ScopeId, &Scope)> + '_ {
+        std::iter::once((scope_id, self.scope(scope_id))).chain(self.parent_scopes(scope_id))
+    }
+
     pub fn definitions(&self, symbol_id: SymbolId) -> &[Definition] {
         self.defs
             .get(&symbol_id)
@@ -279,6 +294,10 @@ impl SymbolTable {
         self.defs
             .iter()
             .flat_map(|(sym_id, defs)| defs.iter().map(move |def| (*sym_id, def)))
+    }
+
+    pub fn scope(&self, id: ScopeId) -> &Scope {
+        &self.scopes_by_id[id]
     }
 
     fn hash_name(name: &str) -> u64 {
@@ -372,6 +391,7 @@ impl SymbolTableBuilder {
             defs: FxHashMap::default(),
             scopes_by_node: FxHashMap::default(),
             dependencies: Vec::new(),
+            expression_scopes: IndexVec::default(),
         };
         table.scopes_by_id.push(Scope {
             name: Name::new("<module>"),
@@ -457,6 +477,10 @@ impl SymbolTableBuilder {
 
     pub(crate) fn add_dependency(&mut self, dependency: Dependency) {
         self.symbol_table.dependencies.push(dependency);
+    }
+
+    pub(super) fn record_expression(&mut self, scope_id: ScopeId) -> ExpressionId {
+        self.symbol_table.expression_scopes.push(scope_id)
     }
 }
 

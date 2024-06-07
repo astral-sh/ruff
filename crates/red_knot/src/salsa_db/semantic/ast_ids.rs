@@ -4,7 +4,8 @@ use ruff_index::{newtype_index, IndexVec};
 use ruff_python_ast::visitor::preorder;
 use ruff_python_ast::visitor::preorder::PreorderVisitor;
 use ruff_python_ast::{
-    Expr, ModModule, Stmt, StmtAnnAssign, StmtAssign, StmtClassDef, StmtFunctionDef,
+    Expr, ModModule, Stmt, StmtAnnAssign, StmtAssign, StmtClassDef, StmtFunctionDef, StmtImport,
+    StmtImportFrom,
 };
 use ruff_python_parser::Parsed;
 use rustc_hash::FxHashMap;
@@ -186,7 +187,7 @@ impl AstIdNode for StmtAssign {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+#[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
 pub struct AnnotatedAssignmentId(StatementId);
 
 impl AstIdNode for StmtAnnAssign {
@@ -200,6 +201,40 @@ impl AstIdNode for StmtAnnAssign {
     fn lookup(db: &dyn Db, file: File, id: Self::Id) -> &Self {
         let ast_ids = ast_ids(db, file);
         ast_ids.statements[id.0].as_ann_assign_stmt().unwrap()
+    }
+}
+
+#[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
+pub struct ImportId(StatementId);
+
+impl AstIdNode for StmtImport {
+    type Id = ImportId;
+
+    fn ast_id(&self, db: &dyn Db, file: File) -> Self::Id {
+        let ast_ids = ast_ids(db, file);
+        ImportId(ast_ids.statements_map[&NodeKey::from_node(self.into())])
+    }
+
+    fn lookup(db: &dyn Db, file: File, id: Self::Id) -> &Self {
+        let ast_ids = ast_ids(db, file);
+        ast_ids.statements[id.0].as_import_stmt().unwrap()
+    }
+}
+
+#[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
+pub struct ImportFromId(StatementId);
+
+impl AstIdNode for StmtImportFrom {
+    type Id = ImportFromId;
+
+    fn ast_id(&self, db: &dyn Db, file: File) -> Self::Id {
+        let ast_ids = ast_ids(db, file);
+        ImportFromId(ast_ids.statements_map[&NodeKey::from_node(self.into())])
+    }
+
+    fn lookup(db: &dyn Db, file: File, id: Self::Id) -> &Self {
+        let ast_ids = ast_ids(db, file);
+        ast_ids.statements[id.0].as_import_from_stmt().unwrap()
     }
 }
 

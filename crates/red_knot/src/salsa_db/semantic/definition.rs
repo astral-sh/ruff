@@ -1,13 +1,10 @@
-use crate::module::ModuleName;
 use crate::salsa_db::semantic::ast_ids::{
-    AnnotatedAssignmentId, AssignmentId, ClassId, FunctionId,
+    AnnotatedAssignmentId, AssignmentId, ClassId, FunctionId, ImportFromId, ImportId,
 };
-
-use crate::Name;
 
 // TODO: I think we should instead reference the node for `ImportDefinition` and `ImportFromDefinition` too
 // or it will be impossible to render nice diagnostics in an error message.
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
 pub enum Definition {
     // For the import cases, we don't need reference to any arbitrary AST subtrees (annotations,
     // RHS), and referencing just the import statement node is imprecise (a single import statement
@@ -57,28 +54,14 @@ impl From<AnnotatedAssignmentId> for Definition {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct ImportDefinition {
-    pub module: ModuleName,
+    pub import: ImportId,
+    pub name: u32,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct ImportFromDefinition {
-    pub module: Option<ModuleName>,
-    pub name: Name,
-    pub level: u32,
-}
-
-impl ImportFromDefinition {
-    pub fn module(&self) -> Option<&ModuleName> {
-        self.module.as_ref()
-    }
-
-    pub fn name(&self) -> &Name {
-        &self.name
-    }
-
-    pub fn level(&self) -> u32 {
-        self.level
-    }
+    pub import: ImportFromId,
+    pub name: u32,
 }
