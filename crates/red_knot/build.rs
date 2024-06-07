@@ -13,10 +13,7 @@ use zip::write::{FileOptions, ZipWriter};
 use zip::CompressionMethod;
 
 const TYPESHED_SOURCE_DIR: &str = "vendor/typeshed";
-
-// NB: This is .gitignored; make sure to change the .gitignore entry
-// if you change this location
-const TYPESHED_ZIP_LOCATION: &str = "vendor/zipped_typeshed.zip";
+const TYPESHED_ZIP_LOCATION: &str = "zipped_typeshed.zip";
 
 /// Recursively zip the contents of an entire directory.
 ///
@@ -61,6 +58,16 @@ fn main() {
         Path::new(TYPESHED_SOURCE_DIR).is_dir(),
         "Where is typeshed?"
     );
-    let zipped_typeshed = File::create(Path::new(TYPESHED_ZIP_LOCATION)).unwrap();
+    let out_dir = std::env::var("OUT_DIR").unwrap();
+
+    // N.B. Deliberately using `format!()` instead of `Path::join()` here,
+    // so that we use `/` as a path separator on all platforms.
+    // That enables us to load the typeshed zip at compile time in `module.rs`
+    // (otherwise we'd have to dynamically determine the exact path to the typeshed zip
+    // based on the default path separator for the specific platform we're on,
+    // which can't be done at compile time.)
+    let zipped_typeshed_location = format!("{out_dir}/{TYPESHED_ZIP_LOCATION}");
+
+    let zipped_typeshed = File::create(zipped_typeshed_location).unwrap();
     zip_dir(TYPESHED_SOURCE_DIR, zipped_typeshed).unwrap();
 }
