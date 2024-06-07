@@ -188,6 +188,7 @@ fn infer_expr_type(db: &dyn SemanticDb, file_id: FileId, expr: &ast::Expr) -> Qu
     // TODO cache the resolution of the type on the node
     let index = semantic_index(db, file_id)?;
     match expr {
+        ast::Expr::NoneLiteral(_) => Ok(Type::None),
         ast::Expr::NumberLiteral(ast::ExprNumberLiteral { value, .. }) => {
             match value {
                 ast::Number::Int(n) => {
@@ -617,13 +618,25 @@ mod tests {
             &case,
             "a.py",
             "
-                class C1: pass
-                class C2: pass
-                class C3: pass
-                x = C1 if flag else C2 if flag2 else C3
+                x = 1 if flag else 2 if flag2 else 3
             ",
         )?;
 
-        assert_public_type(&case, "a", "x", "Literal[C1] | Literal[C2] | Literal[C3]")
+        assert_public_type(&case, "a", "x", "Literal[1, 2, 3]")
+    }
+
+    #[test]
+    fn none() -> anyhow::Result<()> {
+        let case = create_test()?;
+
+        write_to_path(
+            &case,
+            "a.py",
+            "
+                x = 1 if flag else None
+            ",
+        )?;
+
+        assert_public_type(&case, "a", "x", "Literal[1] | None")
     }
 }
