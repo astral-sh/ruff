@@ -705,16 +705,6 @@ enum WithItemKind {
     /// The parentheses belongs to the context expression.
     ParenthesizedExpression,
 
-    /// A list of `with` items that has only one item which is a parenthesized
-    /// generator expression.
-    ///
-    /// ```python
-    /// with (x for x in range(10)): ...
-    /// ```
-    ///
-    /// The parentheses belongs to the generator expression.
-    SingleParenthesizedGeneratorExpression,
-
     /// The `with` items aren't parenthesized in any way.
     ///
     /// ```python
@@ -728,24 +718,9 @@ enum WithItemKind {
 }
 
 impl WithItemKind {
-    /// Returns the token that terminates a list of `with` items.
-    const fn list_terminator(self) -> TokenKind {
-        match self {
-            WithItemKind::Parenthesized => TokenKind::Rpar,
-            WithItemKind::Unparenthesized
-            | WithItemKind::ParenthesizedExpression
-            | WithItemKind::SingleParenthesizedGeneratorExpression => TokenKind::Colon,
-        }
-    }
-
-    /// Returns `true` if the `with` item is a parenthesized expression i.e., the
-    /// parentheses belong to the context expression.
-    const fn is_parenthesized_expression(self) -> bool {
-        matches!(
-            self,
-            WithItemKind::ParenthesizedExpression
-                | WithItemKind::SingleParenthesizedGeneratorExpression
-        )
+    /// Returns `true` if the with items are parenthesized.
+    const fn is_parenthesized(self) -> bool {
+        matches!(self, WithItemKind::Parenthesized)
     }
 }
 
@@ -973,9 +948,14 @@ impl RecoveryContextKind {
                     || p.at(TokenKind::Rarrow)
                     || p.at_compound_stmt()
             }
-            RecoveryContextKind::WithItems(with_item_kind) => {
-                p.at(with_item_kind.list_terminator())
-            }
+            RecoveryContextKind::WithItems(with_item_kind) => match with_item_kind {
+                WithItemKind::Parenthesized => {
+                    matches!(p.current_token_kind(), TokenKind::Rpar | TokenKind::Colon)
+                }
+                WithItemKind::Unparenthesized | WithItemKind::ParenthesizedExpression => {
+                    p.at(TokenKind::Colon)
+                }
+            },
             RecoveryContextKind::FStringElements => {
                 // Tokens other than `FStringEnd` and `}` are for better error recovery
                 p.at_ts(TokenSet::new([
@@ -1172,7 +1152,6 @@ bitflags! {
         const LAMBDA_PARAMETERS = 1 << 24;
         const WITH_ITEMS_PARENTHESIZED = 1 << 25;
         const WITH_ITEMS_PARENTHESIZED_EXPRESSION = 1 << 26;
-        const WITH_ITEMS_SINGLE_PARENTHESIZED_GENERATOR_EXPRESSION = 1 << 27;
         const WITH_ITEMS_UNPARENTHESIZED = 1 << 28;
         const F_STRING_ELEMENTS = 1 << 29;
     }
@@ -1224,9 +1203,6 @@ impl RecoveryContext {
                 WithItemKind::Parenthesized => RecoveryContext::WITH_ITEMS_PARENTHESIZED,
                 WithItemKind::ParenthesizedExpression => {
                     RecoveryContext::WITH_ITEMS_PARENTHESIZED_EXPRESSION
-                }
-                WithItemKind::SingleParenthesizedGeneratorExpression => {
-                    RecoveryContext::WITH_ITEMS_SINGLE_PARENTHESIZED_GENERATOR_EXPRESSION
                 }
                 WithItemKind::Unparenthesized => RecoveryContext::WITH_ITEMS_UNPARENTHESIZED,
             },
@@ -1293,9 +1269,6 @@ impl RecoveryContext {
             }
             RecoveryContext::WITH_ITEMS_PARENTHESIZED_EXPRESSION => {
                 RecoveryContextKind::WithItems(WithItemKind::ParenthesizedExpression)
-            }
-            RecoveryContext::WITH_ITEMS_SINGLE_PARENTHESIZED_GENERATOR_EXPRESSION => {
-                RecoveryContextKind::WithItems(WithItemKind::SingleParenthesizedGeneratorExpression)
             }
             RecoveryContext::WITH_ITEMS_UNPARENTHESIZED => {
                 RecoveryContextKind::WithItems(WithItemKind::Unparenthesized)
