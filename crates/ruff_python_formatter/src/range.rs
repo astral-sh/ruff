@@ -4,7 +4,7 @@ use ruff_formatter::printer::SourceMapGeneration;
 use ruff_formatter::{
     format, FormatContext, FormatError, FormatOptions, IndentStyle, PrintedRange, SourceCode,
 };
-use ruff_python_ast::visitor::preorder::{walk_body, PreorderVisitor, TraversalSignal};
+use ruff_python_ast::visitor::source_order::{walk_body, SourceOrderVisitor, TraversalSignal};
 use ruff_python_ast::{AnyNodeRef, Stmt, StmtMatch, StmtTry};
 use ruff_python_parser::{parse, AsMode};
 use ruff_python_trivia::{indentation_at_offset, BackwardsTokenizer, SimpleToken, SimpleTokenKind};
@@ -181,7 +181,7 @@ impl<'a, 'ast> FindEnclosingNode<'a, 'ast> {
     }
 }
 
-impl<'ast> PreorderVisitor<'ast> for FindEnclosingNode<'_, 'ast> {
+impl<'ast> SourceOrderVisitor<'ast> for FindEnclosingNode<'_, 'ast> {
     fn enter_node(&mut self, node: AnyNodeRef<'ast>) -> TraversalSignal {
         if !(is_logical_line(node) || node.is_mod_module()) {
             return TraversalSignal::Skip;
@@ -336,7 +336,7 @@ struct NarrowRange<'a> {
     level: usize,
 }
 
-impl PreorderVisitor<'_> for NarrowRange<'_> {
+impl SourceOrderVisitor<'_> for NarrowRange<'_> {
     fn enter_node(&mut self, node: AnyNodeRef<'_>) -> TraversalSignal {
         if !(is_logical_line(node) || node.is_mod_module()) {
             return TraversalSignal::Skip;

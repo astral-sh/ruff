@@ -406,11 +406,11 @@ impl<'a> Comments<'a> {
     /// normally if `node` is the first or last node of a suppression range.
     #[cfg(debug_assertions)]
     pub(crate) fn mark_verbatim_node_comments_formatted(&self, node: AnyNodeRef) {
-        use ruff_python_ast::visitor::preorder::{PreorderVisitor, TraversalSignal};
+        use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, TraversalSignal};
 
         struct MarkVerbatimCommentsAsFormattedVisitor<'a>(&'a Comments<'a>);
 
-        impl<'a> PreorderVisitor<'a> for MarkVerbatimCommentsAsFormattedVisitor<'a> {
+        impl<'a> SourceOrderVisitor<'a> for MarkVerbatimCommentsAsFormattedVisitor<'a> {
             fn enter_node(&mut self, node: AnyNodeRef<'a>) -> TraversalSignal {
                 for comment in self.0.leading_dangling_trailing(node) {
                     comment.mark_formatted();

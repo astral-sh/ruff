@@ -6,8 +6,8 @@ use std::marker::PhantomData;
 use rustc_hash::FxHashMap;
 
 use ruff_index::{Idx, IndexVec};
-use ruff_python_ast::visitor::preorder;
-use ruff_python_ast::visitor::preorder::{PreorderVisitor, TraversalSignal};
+use ruff_python_ast::visitor::source_order;
+use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, TraversalSignal};
 use ruff_python_ast::{
     AnyNodeRef, AstNode, ExceptHandler, ExceptHandlerExceptHandler, Expr, MatchCase, ModModule,
     NodeKind, Parameter, Stmt, StmtAnnAssign, StmtAssign, StmtAugAssign, StmtClassDef,
@@ -91,9 +91,9 @@ impl AstIds {
         while let Some(deferred) = visitor.deferred.pop() {
             match deferred {
                 DeferredNode::FunctionDefinition(def) => {
-                    def.visit_preorder(&mut visitor);
+                    def.visit_source_order(&mut visitor);
                 }
-                DeferredNode::ClassDefinition(def) => def.visit_preorder(&mut visitor),
+                DeferredNode::ClassDefinition(def) => def.visit_source_order(&mut visitor),
             }
         }
 
@@ -182,7 +182,7 @@ impl<'a> AstIdsVisitor<'a> {
     }
 }
 
-impl<'a> PreorderVisitor<'a> for AstIdsVisitor<'a> {
+impl<'a> SourceOrderVisitor<'a> for AstIdsVisitor<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
         match stmt {
             Stmt::FunctionDef(def) => {
@@ -226,14 +226,14 @@ impl<'a> PreorderVisitor<'a> for AstIdsVisitor<'a> {
             Stmt::IpyEscapeCommand(_) => {}
         }
 
-        preorder::walk_stmt(self, stmt);
+        source_order::walk_stmt(self, stmt);
     }
 
     fn visit_expr(&mut self, _expr: &'a Expr) {}
 
     fn visit_parameter(&mut self, parameter: &'a Parameter) {
         self.create_id(parameter);
-        preorder::walk_parameter(self, parameter);
+        source_order::walk_parameter(self, parameter);
     }
 
     fn visit_except_handler(&mut self, except_handler: &'a ExceptHandler) {
@@ -243,17 +243,17 @@ impl<'a> PreorderVisitor<'a> for AstIdsVisitor<'a> {
             }
         }
 
-        preorder::walk_except_handler(self, except_handler);
+        source_order::walk_except_handler(self, except_handler);
     }
 
     fn visit_with_item(&mut self, with_item: &'a WithItem) {
         self.create_id(with_item);
-        preorder::walk_with_item(self, with_item);
+        source_order::walk_with_item(self, with_item);
     }
 
     fn visit_match_case(&mut self, match_case: &'a MatchCase) {
         self.create_id(match_case);
-        preorder::walk_match_case(self, match_case);
+        source_order::walk_match_case(self, match_case);
     }
 
     fn visit_type_param(&mut self, type_param: &'a TypeParam) {
@@ -309,7 +309,7 @@ struct FindNodeKeyVisitor<'a> {
     result: Option<AnyNodeRef<'a>>,
 }
 
-impl<'a> PreorderVisitor<'a> for FindNodeKeyVisitor<'a> {
+impl<'a> SourceOrderVisitor<'a> for FindNodeKeyVisitor<'a> {
     fn enter_node(&mut self, node: AnyNodeRef<'a>) -> TraversalSignal {
         if self.result.is_some() {
             return TraversalSignal::Skip;

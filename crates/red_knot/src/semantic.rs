@@ -1,7 +1,7 @@
 use std::num::NonZeroU32;
 
 use ruff_python_ast as ast;
-use ruff_python_ast::visitor::preorder::PreorderVisitor;
+use ruff_python_ast::visitor::source_order::SourceOrderVisitor;
 
 use crate::ast_ids::{NodeKey, TypedNodeKey};
 use crate::cache::KeyValueCache;
@@ -238,7 +238,7 @@ impl SemanticIndexer {
     }
 }
 
-impl PreorderVisitor<'_> for SemanticIndexer {
+impl SourceOrderVisitor<'_> for SemanticIndexer {
     fn visit_expr(&mut self, expr: &ast::Expr) {
         let expression_id = self
             .flow_graph_builder
@@ -267,7 +267,7 @@ impl PreorderVisitor<'_> for SemanticIndexer {
                         self.add_or_update_symbol_with_def(id, curdef);
                     }
                 }
-                ast::visitor::preorder::walk_expr(self, expr);
+                ast::visitor::source_order::walk_expr(self, expr);
             }
             ast::Expr::Named(node) => {
                 debug_assert!(self.current_definition.is_none());
@@ -304,7 +304,7 @@ impl PreorderVisitor<'_> for SemanticIndexer {
                 self.set_current_flow_node(post_else);
             }
             _ => {
-                ast::visitor::preorder::walk_expr(self, expr);
+                ast::visitor::source_order::walk_expr(self, expr);
             }
         }
     }
@@ -507,7 +507,7 @@ impl PreorderVisitor<'_> for SemanticIndexer {
                 self.set_current_flow_node(post_prior_clause);
             }
             _ => {
-                ast::visitor::preorder::walk_stmt(self, stmt);
+                ast::visitor::source_order::walk_stmt(self, stmt);
             }
         }
     }
