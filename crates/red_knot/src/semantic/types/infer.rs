@@ -756,11 +756,6 @@ mod tests {
 
         // TODO normalization of unions and intersections: this type is technically correct but
         // begging for normalization
-        assert_public_type(
-            &case,
-            "a",
-            "z",
-            "Literal[0] | Literal[1] | None & ~None | Literal[1] | None & ~None",
-        )
+        assert_public_type(&case, "a", "z", "Literal[0] | Literal[1] | None & ~None")
     }
 }

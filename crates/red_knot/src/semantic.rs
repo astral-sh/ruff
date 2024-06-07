@@ -464,6 +464,7 @@ impl SourceOrderVisitor<'_> for SemanticIndexer {
             }
             ast::Stmt::Assign(node) => {
                 debug_assert!(self.current_definition.is_none());
+                self.visit_expr(&node.value);
                 self.current_definition =
                     Some(Definition::Assignment(TypedNodeKey::from_node(node)));
                 for expr in &node.targets {
@@ -471,7 +472,6 @@ impl SourceOrderVisitor<'_> for SemanticIndexer {
                 }
 
                 self.current_definition = None;
-                self.visit_expr(&node.value);
             }
             ast::Stmt::If(node) => {
                 // TODO detect statically known truthy or falsy test (via type inference, not naive
