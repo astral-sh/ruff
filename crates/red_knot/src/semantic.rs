@@ -67,6 +67,7 @@ pub struct SemanticIndex {
     symbol_table: SymbolTable,
     flow_graph: FlowGraph,
     expressions: FxHashMap<NodeKey, ExpressionId>,
+    expressions_by_id: IndexVec<ExpressionId, NodeKey>,
 }
 
 impl SemanticIndex {
@@ -85,6 +86,17 @@ impl SemanticIndex {
         };
         indexer.visit_body(&module.body);
         indexer.finish()
+    }
+
+    fn resolve_expression_id<'a>(
+        &self,
+        ast: &'a ast::ModModule,
+        expression_id: ExpressionId,
+    ) -> ast::AnyNodeRef<'a> {
+        let node_key = self.expressions_by_id[expression_id];
+        node_key
+            .resolve(ast.as_any_node_ref())
+            .expect("node to resolve")
     }
 
     /// Return an iterator over all definitions of `symbol_id` reachable from `use_expr`. The value
@@ -130,16 +142,19 @@ struct SemanticIndexer {
 }
 
 impl SemanticIndexer {
-    pub(crate) fn finish(self) -> SemanticIndex {
+    pub(crate) fn finish(mut self) -> SemanticIndex {
         let SemanticIndexer {
             flow_graph_builder,
             symbol_table_builder,
             ..
         } = self;
+        self.expressions.shrink_to_fit();
+        self.expressions_by_id.shrink_to_fit();
         SemanticIndex {
             flow_graph: flow_graph_builder.finish(),
             symbol_table: symbol_table_builder.finish(),
             expressions: self.expressions,
+            expressions_by_id: self.expressions_by_id,
         }
     }
 
@@ -222,17 +237,6 @@ impl SemanticIndexer {
             .flow_graph_builder
             .add_constraint(self.current_flow_node(), expression_id);
         self.set_current_flow_node(constraint);
-    }
-
-    fn resolve_expression_id(
-        &self,
-        ast: &ast::ModModule,
-        expression_id: ExpressionId,
-    ) -> &ast::Expr {
-        let node_key = self.expressions_by_id[expression_id];
-        let node = node_key
-            .resolve(ast.as_any_node_ref())
-            .expect("node to resolve");
     }
 
     fn with_type_params(
@@ -502,7 +506,7 @@ impl SourceOrderVisitor<'_> for SemanticIndexer {
 
                 for clause in &node.elif_else_clauses {
                     if let Some(test) = &clause.test {
-                        self.visit_expr(&test);
+                        self.visit_expr(test);
                         // This is an elif clause. Create a new branch node. Its predecessor is the
                         // previous branch node, because we can only take one branch in an entire
                         // if/elif/else chain, so if we take this branch, it can only be because we

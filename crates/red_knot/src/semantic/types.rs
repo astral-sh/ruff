@@ -256,7 +256,7 @@ impl TypeStore {
         self.add_or_get_module(file_id).add_union(elems)
     }
 
-    /// add union with normalization; may not return a UnionType
+    /// add union with normalization; may not return a `UnionType`
     fn add_union(&self, file_id: FileId, elems: &[Type]) -> Type {
         let mut flattened = Vec::with_capacity(elems.len());
         for ty in elems {
@@ -284,7 +284,7 @@ impl TypeStore {
             .add_intersection(positive, negative)
     }
 
-    /// add intersection with normalization; may not return an IntersectionType
+    /// add intersection with normalization; may not return an `IntersectionType`
     fn add_intersection(&self, file_id: FileId, positive: &[Type], negative: &[Type]) -> Type {
         let mut pos_flattened = Vec::with_capacity(positive.len());
         let mut neg_flattened = Vec::with_capacity(negative.len());

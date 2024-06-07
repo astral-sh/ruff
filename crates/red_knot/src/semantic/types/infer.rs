@@ -10,8 +10,8 @@ use crate::module::{resolve_module, ModuleName};
 use crate::parse::parse;
 use crate::semantic::types::{ModuleTypeId, Type};
 use crate::semantic::{
-    resolve_global_symbol, semantic_index, ConstrainedDefinition, Definition, ExpressionId,
-    GlobalSymbolId, ImportDefinition, ImportFromDefinition,
+    resolve_global_symbol, semantic_index, ConstrainedDefinition, Definition, GlobalSymbolId,
+    ImportDefinition, ImportFromDefinition,
 };
 use crate::{FileId, Name};
 
@@ -101,9 +101,15 @@ pub fn infer_constrained_definition_type(
         definition,
         constraints,
     } = constrained_definition;
+    let index = semantic_index(db, symbol.file_id)?;
+    let parsed = parse(db.upcast(), symbol.file_id)?;
     let mut intersected_types = vec![infer_definition_type(db, symbol, definition)?];
     for constraint in constraints {
-        if let Some(constraint_type) = infer_constraint_type(db, symbol, constraint)? {
+        if let Some(constraint_type) = infer_constraint_type(
+            db,
+            symbol,
+            index.resolve_expression_id(parsed.syntax(), constraint),
+        )? {
             intersected_types.push(constraint_type);
         }
     }
@@ -190,15 +196,13 @@ pub fn infer_definition_type(
                     .map(|decorator| infer_expr_type(db, file_id, &decorator.expression))
                     .collect::<QueryResult<_>>()?;
                 let scope_id = index.symbol_table().scope_id_for_node(node_key.erased());
-                let ty = type_store
-                    .add_function(
-                        file_id,
-                        &node.name.id,
-                        symbol.symbol_id,
-                        scope_id,
-                        decorator_tys,
-                    )
-                    .into();
+                let ty = type_store.add_function(
+                    file_id,
+                    &node.name.id,
+                    symbol.symbol_id,
+                    scope_id,
+                    decorator_tys,
+                );
                 type_store.cache_node_type(file_id, *node_key.erased(), ty);
                 Ok(ty)
             }
@@ -238,11 +242,46 @@ pub fn infer_definition_type(
 fn infer_constraint_type(
     db: &dyn SemanticDb,
     symbol_id: GlobalSymbolId,
-    constraint: ExpressionId,
+    // TODO this should preferably take an &ast::Expr instead of AnyNodeRef
+    expression: ast::AnyNodeRef,
 ) -> QueryResult<Option<Type>> {
-    let index = semantic_index(db, symbol_id.file_id)?;
-    // TODO actually infer constraints
-    Ok(None)
+    let file_id = symbol_id.file_id;
+    let index = semantic_index(db, file_id)?;
+    let jar: &SemanticJar = db.jar()?;
+    let symbol_name = symbol_id.symbol_id.symbol(&index.symbol_table).name();
+    // TODO narrowing attributes
+    // TODO narrowing dict keys
+    // TODO isinstance, ==/!=, type(...), literals, bools...
+    match expression {
+        ast::AnyNodeRef::ExprCompare(ast::ExprCompare {
+            left,
+            ops,
+            comparators,
+            ..
+        }) => {
+            // TODO chained comparisons
+            match left.as_ref() {
+                ast::Expr::Name(ast::ExprName { id, .. }) if id == symbol_name => match ops[0] {
+                    ast::CmpOp::Is | ast::CmpOp::IsNot => {
+                        Ok(match infer_expr_type(db, file_id, &comparators[0])? {
+                            Type::None => Some(Type::None),
+                            _ => None,
+                        }
+                        .map(|ty| {
+                            if matches!(ops[0], ast::CmpOp::IsNot) {
+                                jar.type_store.add_intersection(file_id, &[], &[ty])
+                            } else {
+                                ty
+                            }
+                        }))
+                    }
+                    _ => Ok(None),
+                },
+                _ => Ok(None),
+            }
+        }
+        _ => Ok(None),
+    }
 }
 
 /// Infer type of the given expression.
@@ -715,7 +754,13 @@ mod tests {
             ",
         )?;
 
-        // TODO normalization of unions and intersections
-        assert_public_type(&case, "a", "z", "Literal[0] | Literal[1] | None & ~None")
+        // TODO normalization of unions and intersections: this type is technically correct but
+        // begging for normalization
+        assert_public_type(
+            &case,
+            "a",
+            "z",
+            "Literal[0] | Literal[1] | None & ~None | Literal[1] | None & ~None",
+        )
     }
 }
