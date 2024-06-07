@@ -266,7 +266,7 @@ impl<'src> Lexer<'src> {
     }
 
     fn handle_indentation(&mut self, indentation: Indentation) -> Option<TokenKind> {
-        let token = match self.indentations.current().try_compare(indentation) {
+        match self.indentations.current().try_compare(indentation) {
             // Dedent
             Ok(Ordering::Greater) => {
                 self.pending_indentation = Some(indentation);
@@ -303,15 +303,12 @@ impl<'src> Lexer<'src> {
                 self.indentations.indent(indentation);
                 Some(TokenKind::Indent)
             }
-            Err(_) => {
-                return Some(self.push_error(LexicalError::new(
-                    LexicalErrorType::IndentationError,
-                    self.token_range(),
-                )));
-            }
-        };
 
-        token
+            Err(_) => Some(self.push_error(LexicalError::new(
+                LexicalErrorType::IndentationError,
+                self.token_range(),
+            ))),
+        }
     }
 
     fn skip_whitespace(&mut self) -> Result<(), LexicalError> {
