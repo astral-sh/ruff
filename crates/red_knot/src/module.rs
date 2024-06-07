@@ -12,13 +12,6 @@ use crate::files::FileId;
 use crate::semantic::Dependency;
 use crate::FxDashMap;
 
-// The file path here is hardcoded in this crate's `build.rs` script.
-// Luckily this crate will fail to build if this file isn't available at build time.
-//
-// Allow dead code for now; actually resolving modules to vendored typeshed stubs will come soon!
-#[allow(dead_code)]
-const TYPESHED_ZIP_BYTES: &[u8] = include_bytes!("../vendor/zipped_typeshed.zip");
-
 /// Representation of a Python module.
 ///
 /// The inner type wrapped by this struct is a unique identifier for the module
@@ -787,7 +780,7 @@ mod tests {
     use crate::db::SourceDb;
     use crate::module::{
         path_to_module, resolve_module, set_module_search_paths, ModuleKind, ModuleName,
-        ModuleResolutionInputs, TYPESHED_STDLIB_DIRECTORY, TYPESHED_ZIP_BYTES,
+        ModuleResolutionInputs, TYPESHED_STDLIB_DIRECTORY,
     };
     use crate::semantic::Dependency;
 
@@ -935,6 +928,9 @@ mod tests {
 
     #[test]
     fn typeshed_zip_created_at_build_time() -> anyhow::Result<()> {
+        // The file path here is hardcoded in this crate's `build.rs` script.
+        // Luckily this crate will fail to build if this file isn't available at build time.
+        const TYPESHED_ZIP_BYTES: &[u8] = include_bytes!("../vendor/zipped_typeshed.zip");
         assert!(!TYPESHED_ZIP_BYTES.is_empty());
         let mut typeshed_zip_archive = ZipArchive::new(Cursor::new(TYPESHED_ZIP_BYTES))?;
 
