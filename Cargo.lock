@@ -1630,17 +1630,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bda66fc9667c18cb2758a2ac84d1167245054bcf85d5d1aaa6923f45801bdd02"
 
 [[package]]
-name = "pmutil"
-version = "0.6.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "52a40bc70c2c58040d2d8b167ba9a5ff59fc9dab7ad44771cfde3dcfde7a09c6"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
 name = "portable-atomic"
 version = "1.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1860,27 +1849,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "adad44e29e4c806119491a7f06f03de4d1af22c3a680dd47f1e6e179439d1f56"
 
 [[package]]
-name = "result-like"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "abf7172fef6a7d056b5c26bf6c826570267562d51697f4982ff3ba4aec68a9df"
-dependencies = [
- "result-like-derive",
-]
-
-[[package]]
-name = "result-like-derive"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a8d6574c02e894d66370cfc681e5d68fedbc9a548fb55b30a96b3f0ae22d0fe5"
-dependencies = [
- "pmutil",
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
 name = "ring"
 version = "0.17.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2086,7 +2054,6 @@ dependencies = [
  "pyproject-toml",
  "quick-junit",
  "regex",
- "result-like",
  "ruff_cache",
  "ruff_diagnostics",
  "ruff_macros",

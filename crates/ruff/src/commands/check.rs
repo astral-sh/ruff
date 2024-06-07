@@ -59,7 +59,7 @@ pub(crate) fn check(
     );
 
     // Load the caches.
-    let caches = if bool::from(cache) {
+    let caches = if cache.is_enabled() {
         Some(PackageCacheMap::init(&package_roots, &resolver))
     } else {
         None

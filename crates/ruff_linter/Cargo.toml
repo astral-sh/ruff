@@ -56,7 +56,6 @@ pep440_rs = { workspace = true, features = ["serde"] }
 pyproject-toml = { workspace = true }
 quick-junit = { workspace = true }
 regex = { workspace = true }
-result-like = { workspace = true }
 rustc-hash = { workspace = true }
 schemars = { workspace = true, optional = true }
 serde = { workspace = true }

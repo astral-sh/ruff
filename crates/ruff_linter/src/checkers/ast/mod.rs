@@ -281,7 +281,7 @@ impl<'a> Checker<'a> {
         // members from the fix that will eventually be excluded by a `noqa`.
         // Unfortunately, we _do_ want to register a `Diagnostic` for each
         // eventually-ignored import, so that our `noqa` counts are accurate.
-        if !self.noqa.to_bool() {
+        if !self.noqa.is_enabled() {
             return false;
         }
         noqa::rule_is_ignored(code, offset, self.noqa_line_for, self.locator)
