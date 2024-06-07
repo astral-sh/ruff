@@ -1,6 +1,5 @@
 //! Access to the Ruff linting API for the LSP
 
-use ruff_python_trivia::CommentRanges;
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 
@@ -109,16 +108,8 @@ pub(crate) fn check(query: &DocumentQuery, encoding: PositionEncoding) -> Diagno
     // Extra indices from the code.
     let indexer = Indexer::from_tokens(parsed.tokens(), &locator);
 
-    let comment_ranges = CommentRanges::from(parsed.tokens());
-
     // Extract the `# noqa` and `# isort: skip` directives from the source.
-    let directives = extract_directives(
-        parsed.tokens(),
-        &comment_ranges,
-        Flags::all(),
-        &locator,
-        &indexer,
-    );
+    let directives = extract_directives(parsed.tokens(), Flags::all(), &locator, &indexer);
 
     // Generate checks.
     let LinterResult { data, .. } = check_path(
@@ -133,14 +124,13 @@ pub(crate) fn check(query: &DocumentQuery, encoding: PositionEncoding) -> Diagno
         &source_kind,
         source_type,
         &parsed,
-        &comment_ranges,
     );
 
     let noqa_edits = generate_noqa_edits(
         query.virtual_file_path(),
         data.as_slice(),
         &locator,
-        &comment_ranges,
+        indexer.comment_ranges(),
         &linter_settings.external,
         &directives.noqa_line_for,
         stylist.line_ending(),

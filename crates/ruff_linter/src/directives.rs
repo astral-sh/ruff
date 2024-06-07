@@ -52,7 +52,6 @@ pub struct Directives {
 
 pub fn extract_directives(
     tokens: &Tokens,
-    comment_ranges: &CommentRanges,
     flags: Flags,
     locator: &Locator,
     indexer: &Indexer,
@@ -64,7 +63,7 @@ pub fn extract_directives(
             NoqaMapping::default()
         },
         isort: if flags.intersects(Flags::ISORT) {
-            extract_isort_directives(locator, comment_ranges)
+            extract_isort_directives(locator, indexer.comment_ranges())
         } else {
             IsortDirectives::default()
         },

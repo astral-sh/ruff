@@ -6,7 +6,6 @@ use anyhow::{anyhow, Result};
 use colored::Colorize;
 use itertools::Itertools;
 use log::error;
-use ruff_python_trivia::CommentRanges;
 use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::Diagnostic;
@@ -83,13 +82,13 @@ pub fn check_path(
     source_kind: &SourceKind,
     source_type: PySourceType,
     parsed: &Parsed<ModModule>,
-    comment_ranges: &CommentRanges,
 ) -> LinterResult<Vec<Diagnostic>> {
     // Aggregate all diagnostics.
     let mut diagnostics = vec![];
     let mut error = None;
 
     let tokens = parsed.tokens();
+    let comment_ranges = indexer.comment_ranges();
 
     // Collect doc lines. This requires a rare mix of tokens (for comments) and AST
     // (for docstrings), which demands special-casing at this level.
@@ -107,7 +106,6 @@ pub fn check_path(
     {
         diagnostics.extend(check_tokens(
             tokens,
-            comment_ranges,
             path,
             locator,
             indexer,
@@ -162,7 +160,6 @@ pub fn check_path(
                 if use_ast {
                     diagnostics.extend(check_ast(
                         parsed,
-                        comment_ranges,
                         locator,
                         stylist,
                         indexer,
@@ -179,7 +176,6 @@ pub fn check_path(
                 if use_imports {
                     let import_diagnostics = check_imports(
                         parsed,
-                        comment_ranges,
                         locator,
                         indexer,
                         &directives.isort,
@@ -222,12 +218,7 @@ pub fn check_path(
         .any(|rule_code| rule_code.lint_source().is_physical_lines())
     {
         diagnostics.extend(check_physical_lines(
-            locator,
-            stylist,
-            indexer,
-            comment_ranges,
-            &doc_lines,
-            settings,
+            locator, stylist, indexer, &doc_lines, settings,
         ));
     }
 
@@ -387,12 +378,9 @@ pub fn add_noqa_to_path(
     // Extra indices from the code.
     let indexer = Indexer::from_tokens(parsed.tokens(), &locator);
 
-    let comment_ranges = CommentRanges::from(parsed.tokens());
-
     // Extract the `# noqa` and `# isort: skip` directives from the source.
     let directives = directives::extract_directives(
         parsed.tokens(),
-        &comment_ranges,
         directives::Flags::from_settings(settings),
         &locator,
         &indexer,
@@ -414,7 +402,6 @@ pub fn add_noqa_to_path(
         source_kind,
         source_type,
         &parsed,
-        &comment_ranges,
     );
 
     // Log any parse errors.
@@ -436,7 +423,7 @@ pub fn add_noqa_to_path(
         path,
         &diagnostics,
         &locator,
-        &comment_ranges,
+        indexer.comment_ranges(),
         &settings.external,
         &directives.noqa_line_for,
         stylist.line_ending(),
@@ -465,12 +452,9 @@ pub fn lint_only(
     // Extra indices from the code.
     let indexer = Indexer::from_tokens(parsed.tokens(), &locator);
 
-    let comment_ranges = CommentRanges::from(parsed.tokens());
-
     // Extract the `# noqa` and `# isort: skip` directives from the source.
     let directives = directives::extract_directives(
         parsed.tokens(),
-        &comment_ranges,
         directives::Flags::from_settings(settings),
         &locator,
         &indexer,
@@ -489,7 +473,6 @@ pub fn lint_only(
         source_kind,
         source_type,
         &parsed,
-        &comment_ranges,
     );
 
     result.map(|diagnostics| diagnostics_to_messages(diagnostics, path, &locator, &directives))
@@ -560,12 +543,9 @@ pub fn lint_fix<'a>(
         // Extra indices from the code.
         let indexer = Indexer::from_tokens(parsed.tokens(), &locator);
 
-        let comment_ranges = CommentRanges::from(parsed.tokens());
-
         // Extract the `# noqa` and `# isort: skip` directives from the source.
         let directives = directives::extract_directives(
             parsed.tokens(),
-            &comment_ranges,
             directives::Flags::from_settings(settings),
             &locator,
             &indexer,
@@ -584,7 +564,6 @@ pub fn lint_fix<'a>(
             &transformed,
             source_type,
             &parsed,
-            &comment_ranges,
         );
 
         if iterations == 0 {

@@ -9,7 +9,6 @@ use ruff_python_codegen::Stylist;
 use ruff_diagnostics::Diagnostic;
 use ruff_python_index::Indexer;
 use ruff_python_parser::Tokens;
-use ruff_python_trivia::CommentRanges;
 use ruff_source_file::Locator;
 use ruff_text_size::Ranged;
 
@@ -25,7 +24,6 @@ use crate::settings::LinterSettings;
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn check_tokens(
     tokens: &Tokens,
-    comment_ranges: &CommentRanges,
     path: &Path,
     locator: &Locator,
     indexer: &Indexer,
@@ -35,6 +33,7 @@ pub(crate) fn check_tokens(
     cell_offsets: Option<&CellOffsets>,
 ) -> Vec<Diagnostic> {
     let mut diagnostics: Vec<Diagnostic> = vec![];
+    let comment_ranges = indexer.comment_ranges();
 
     if settings.rules.any_enabled(&[
         Rule::BlankLineBetweenMethods,

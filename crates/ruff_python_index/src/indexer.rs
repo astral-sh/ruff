@@ -3,10 +3,13 @@
 
 use ruff_python_ast::Stmt;
 use ruff_python_parser::{TokenKind, Tokens};
-use ruff_python_trivia::{has_leading_content, has_trailing_content, is_python_whitespace};
+use ruff_python_trivia::{
+    has_leading_content, has_trailing_content, is_python_whitespace, CommentRanges,
+};
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
+use crate::comment_ranges::CommentRangesBuilder;
 use crate::fstring_ranges::{FStringRanges, FStringRangesBuilder};
 use crate::multiline_ranges::{MultilineRanges, MultilineRangesBuilder};
 
@@ -19,12 +22,15 @@ pub struct Indexer {
 
     /// The range of all multiline strings in the source document.
     multiline_ranges: MultilineRanges,
+
+    comment_ranges: CommentRanges,
 }
 
 impl Indexer {
     pub fn from_tokens(tokens: &Tokens, locator: &Locator<'_>) -> Self {
         assert!(TextSize::try_from(locator.contents().len()).is_ok());
 
+        let mut comment_ranges_builder = CommentRangesBuilder::default();
         let mut fstring_ranges_builder = FStringRangesBuilder::default();
         let mut multiline_ranges_builder = MultilineRangesBuilder::default();
         let mut continuation_lines = Vec::new();
@@ -52,6 +58,7 @@ impl Indexer {
                 }
             }
 
+            comment_ranges_builder.visit_token(token);
             fstring_ranges_builder.visit_token(token);
             multiline_ranges_builder.visit_token(token);
 
@@ -74,7 +81,12 @@ impl Indexer {
             continuation_lines,
             fstring_ranges: fstring_ranges_builder.finish(),
             multiline_ranges: multiline_ranges_builder.finish(),
+            comment_ranges: comment_ranges_builder.finish(),
         }
+    }
+
+    pub const fn comment_ranges(&self) -> &CommentRanges {
+        &self.comment_ranges
     }
 
     /// Returns the byte offset ranges of f-strings.

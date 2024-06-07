@@ -181,8 +181,6 @@ pub(crate) struct Checker<'a> {
     parsed: &'a Parsed<ModModule>,
     /// The [`Parsed`] output for the type annotation the checker is currently in.
     parsed_type_annotation: Option<&'a Parsed<ModExpression>>,
-    /// The [`CommentRanges`] for the source code.
-    comment_ranges: &'a CommentRanges,
     /// The [`Path`] to the file under analysis.
     path: &'a Path,
     /// The [`Path`] to the package containing the current file.
@@ -233,7 +231,6 @@ impl<'a> Checker<'a> {
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn new(
         parsed: &'a Parsed<ModModule>,
-        comment_ranges: &'a CommentRanges,
         settings: &'a LinterSettings,
         noqa_line_for: &'a NoqaMapping,
         noqa: flags::Noqa,
@@ -250,7 +247,6 @@ impl<'a> Checker<'a> {
         Checker {
             parsed,
             parsed_type_annotation: None,
-            comment_ranges,
             settings,
             noqa_line_for,
             noqa,
@@ -333,7 +329,7 @@ impl<'a> Checker<'a> {
 
     /// Returns the [`CommentRanges`] for the parsed source code.
     pub(crate) fn comment_ranges(&self) -> &'a CommentRanges {
-        self.comment_ranges
+        self.indexer.comment_ranges()
     }
 
     /// Returns the [`Tokens`] for the parsed type annotation if the checker is in a typing context
@@ -2359,7 +2355,6 @@ impl<'a> Checker<'a> {
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn check_ast(
     parsed: &Parsed<ModModule>,
-    comment_ranges: &CommentRanges,
     locator: &Locator,
     stylist: &Stylist,
     indexer: &Indexer,
@@ -2394,7 +2389,6 @@ pub(crate) fn check_ast(
 
     let mut checker = Checker::new(
         parsed,
-        comment_ranges,
         settings,
         noqa_line_for,
         noqa,

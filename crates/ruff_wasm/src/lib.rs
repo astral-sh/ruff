@@ -172,12 +172,9 @@ impl Workspace {
         // Extra indices from the code.
         let indexer = Indexer::from_tokens(parsed.tokens(), &locator);
 
-        let comment_ranges = CommentRanges::from(parsed.tokens());
-
         // Extract the `# noqa` and `# isort: skip` directives from the source.
         let directives = directives::extract_directives(
             parsed.tokens(),
-            &comment_ranges,
             directives::Flags::empty(),
             &locator,
             &indexer,
@@ -198,7 +195,6 @@ impl Workspace {
             &source_kind,
             source_type,
             &parsed,
-            &comment_ranges,
         );
 
         let source_code = locator.to_source_code();

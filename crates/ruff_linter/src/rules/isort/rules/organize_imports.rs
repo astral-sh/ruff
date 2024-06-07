@@ -9,7 +9,6 @@ use ruff_python_ast::{PySourceType, Stmt};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 use ruff_python_parser::Tokens;
-use ruff_python_trivia::CommentRanges;
 use ruff_python_trivia::{leading_indentation, textwrap::indent, PythonWhitespace};
 use ruff_source_file::{Locator, UniversalNewlines};
 use ruff_text_size::{Ranged, TextRange};
@@ -91,7 +90,6 @@ pub(crate) fn organize_imports(
     package: Option<&Path>,
     source_type: PySourceType,
     tokens: &Tokens,
-    comment_ranges: &CommentRanges,
 ) -> Option<Diagnostic> {
     let indentation = locator.slice(extract_indentation_range(&block.imports, locator));
     let indentation = leading_indentation(indentation);
@@ -110,7 +108,7 @@ pub(crate) fn organize_imports(
     let comments = comments::collect_comments(
         TextRange::new(range.start(), locator.full_line_end(range.end())),
         locator,
-        comment_ranges,
+        indexer.comment_ranges(),
     );
 
     let trailing_line_end = if block.trailer.is_none() {

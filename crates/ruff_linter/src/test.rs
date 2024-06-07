@@ -7,7 +7,6 @@ use std::path::Path;
 #[cfg(not(fuzzing))]
 use anyhow::Result;
 use itertools::Itertools;
-use ruff_python_trivia::CommentRanges;
 use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{Applicability, Diagnostic, FixAvailability};
@@ -114,10 +113,8 @@ pub(crate) fn test_contents<'a>(
     let locator = Locator::new(source_kind.source_code());
     let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
     let indexer = Indexer::from_tokens(parsed.tokens(), &locator);
-    let comment_ranges = CommentRanges::from(parsed.tokens());
     let directives = directives::extract_directives(
         parsed.tokens(),
-        &comment_ranges,
         directives::Flags::from_settings(settings),
         &locator,
         &indexer,
@@ -138,7 +135,6 @@ pub(crate) fn test_contents<'a>(
         source_kind,
         source_type,
         &parsed,
-        &comment_ranges,
     );
 
     let source_has_errors = error.is_some();
@@ -183,10 +179,8 @@ pub(crate) fn test_contents<'a>(
             let locator = Locator::new(transformed.source_code());
             let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
             let indexer = Indexer::from_tokens(parsed.tokens(), &locator);
-            let comment_ranges = CommentRanges::from(parsed.tokens());
             let directives = directives::extract_directives(
                 parsed.tokens(),
-                &comment_ranges,
                 directives::Flags::from_settings(settings),
                 &locator,
                 &indexer,
@@ -207,7 +201,6 @@ pub(crate) fn test_contents<'a>(
                 &transformed,
                 source_type,
                 &parsed,
-                &comment_ranges,
             );
 
             if let Some(fixed_error) = fixed_error {
