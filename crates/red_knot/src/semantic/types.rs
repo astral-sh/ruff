@@ -213,7 +213,7 @@ impl TypeStore {
         self.modules.get(&file_id)
     }
 
-    fn add_function(
+    fn add_function_type(
         &self,
         file_id: FileId,
         name: &str,
@@ -225,7 +225,18 @@ impl TypeStore {
             .add_function(name, symbol_id, scope_id, decorators)
     }
 
-    fn add_class(
+    fn add_function(
+        &self,
+        file_id: FileId,
+        name: &str,
+        symbol_id: SymbolId,
+        scope_id: ScopeId,
+        decorators: Vec<Type>,
+    ) -> Type {
+        Type::Function(self.add_function_type(file_id, name, symbol_id, scope_id, decorators))
+    }
+
+    fn add_class_type(
         &self,
         file_id: FileId,
         name: &str,
@@ -236,7 +247,17 @@ impl TypeStore {
             .add_class(name, scope_id, bases)
     }
 
-    fn add_union(&self, file_id: FileId, elems: &[Type]) -> UnionTypeId {
+    fn add_class(&self, file_id: FileId, name: &str, scope_id: ScopeId, bases: Vec<Type>) -> Type {
+        Type::Class(self.add_class_type(file_id, name, scope_id, bases))
+    }
+
+    /// add "raw" union type with exactly given elements
+    fn add_union_type(&self, file_id: FileId, elems: &[Type]) -> UnionTypeId {
+        self.add_or_get_module(file_id).add_union(elems)
+    }
+
+    /// add union with normalization; may not return a UnionType
+    fn add_union(&self, file_id: FileId, elems: &[Type]) -> Type {
         let mut flattened = Vec::with_capacity(elems.len());
         for ty in elems {
             match ty {
@@ -244,10 +265,16 @@ impl TypeStore {
                 _ => flattened.push(*ty),
             }
         }
-        self.add_or_get_module(file_id).add_union(&flattened)
+        // TODO de-duplicate union elements
+        match flattened[..] {
+            [] => Type::Never,
+            [ty] => ty,
+            _ => Type::Union(self.add_union_type(file_id, &flattened)),
+        }
     }
 
-    fn add_intersection(
+    /// add "raw" intersection type with exactly given elements
+    fn add_intersection_type(
         &self,
         file_id: FileId,
         positive: &[Type],
@@ -255,6 +282,37 @@ impl TypeStore {
     ) -> IntersectionTypeId {
         self.add_or_get_module(file_id)
             .add_intersection(positive, negative)
+    }
+
+    /// add intersection with normalization; may not return an IntersectionType
+    fn add_intersection(&self, file_id: FileId, positive: &[Type], negative: &[Type]) -> Type {
+        let mut pos_flattened = Vec::with_capacity(positive.len());
+        let mut neg_flattened = Vec::with_capacity(negative.len());
+        for ty in positive {
+            match ty {
+                Type::Intersection(intersection_id) => {
+                    pos_flattened.extend(intersection_id.positive(self));
+                    neg_flattened.extend(intersection_id.negative(self));
+                }
+                _ => pos_flattened.push(*ty),
+            }
+        }
+        for ty in negative {
+            match ty {
+                Type::Intersection(intersection_id) => {
+                    pos_flattened.extend(intersection_id.negative(self));
+                    neg_flattened.extend(intersection_id.positive(self));
+                }
+                _ => neg_flattened.push(*ty),
+            }
+        }
+        // TODO deduplicate intersection elements
+        // TODO maintain DNF form (union of intersections)
+        match (&pos_flattened[..], &neg_flattened[..]) {
+            ([], []) => Type::Any, // TODO should be object
+            ([ty], []) => *ty,
+            (pos, neg) => Type::Intersection(self.add_intersection_type(file_id, pos, neg)),
+        }
     }
 
     fn get_function(&self, id: FunctionTypeId) -> FunctionTypeRef {
@@ -541,6 +599,18 @@ impl UnionTypeId {
 pub struct IntersectionTypeId {
     file_id: FileId,
     intersection_id: ModuleIntersectionTypeId,
+}
+
+impl IntersectionTypeId {
+    pub fn positive(self, type_store: &TypeStore) -> Vec<Type> {
+        let intersection = type_store.get_intersection(self);
+        intersection.positive.iter().copied().collect()
+    }
+
+    pub fn negative(self, type_store: &TypeStore) -> Vec<Type> {
+        let intersection = type_store.get_intersection(self);
+        intersection.negative.iter().copied().collect()
+    }
 }
 
 #[newtype_index]
@@ -832,15 +902,68 @@ mod tests {
 
     use crate::files::Files;
     use crate::semantic::symbol_table::SymbolTableBuilder;
-    use crate::semantic::{SymbolFlags, SymbolTable, TypeStore};
+    use crate::semantic::{FileId, ScopeId, SymbolFlags, SymbolTable, TypeStore};
     use crate::FxIndexSet;
+
+    struct TestCase {
+        store: TypeStore,
+        files: Files,
+        file_id: FileId,
+        root_scope: ScopeId,
+    }
+
+    fn create_test() -> TestCase {
+        let files = Files::default();
+        let file_id = files.intern(Path::new("/foo"));
+        TestCase {
+            store: TypeStore::default(),
+            files,
+            file_id,
+            root_scope: SymbolTable::root_scope_id(),
+        }
+    }
+
+    fn assert_union_elements(store: &TypeStore, union: Type, elements: &[Type]) {
+        let Type::Union(union_id) = union else {
+            panic!("should be a union")
+        };
+
+        assert_eq!(
+            store.get_union(union_id).elements,
+            elements.iter().copied().collect::<FxIndexSet<_>>()
+        );
+    }
+
+    fn assert_intersection_elements(
+        store: &TypeStore,
+        intersection: Type,
+        positive: &[Type],
+        negative: &[Type],
+    ) {
+        let Type::Intersection(intersection_id) = intersection else {
+            panic!("should be a intersection")
+        };
+
+        assert_eq!(
+            store.get_intersection(intersection_id).positive,
+            positive.iter().copied().collect::<FxIndexSet<_>>()
+        );
+        assert_eq!(
+            store.get_intersection(intersection_id).negative,
+            negative.iter().copied().collect::<FxIndexSet<_>>()
+        );
+    }
 
     #[test]
     fn add_class() {
-        let store = TypeStore::default();
-        let files = Files::default();
-        let file_id = files.intern(Path::new("/foo"));
-        let id = store.add_class(file_id, "C", SymbolTable::root_scope_id(), Vec::new());
+        let TestCase {
+            store,
+            file_id,
+            root_scope,
+            ..
+        } = create_test();
+
+        let id = store.add_class_type(file_id, "C", root_scope, Vec::new());
         assert_eq!(store.get_class(id).name(), "C");
         let inst = Type::Instance(id);
         assert_eq!(format!("{}", inst.display(&store)), "C");
@@ -848,9 +971,13 @@ mod tests {
 
     #[test]
     fn add_function() {
-        let store = TypeStore::default();
-        let files = Files::default();
-        let file_id = files.intern(Path::new("/foo"));
+        let TestCase {
+            store,
+            file_id,
+            root_scope,
+            ..
+        } = create_test();
+
         let mut builder = SymbolTableBuilder::new();
         let func_symbol = builder.add_or_update_symbol(
             SymbolTable::root_scope_id(),
@@ -859,11 +986,11 @@ mod tests {
         );
         builder.finish();
 
-        let id = store.add_function(
+        let id = store.add_function_type(
             file_id,
             "func",
             func_symbol,
-            SymbolTable::root_scope_id(),
+            root_scope,
             vec![Type::Unknown],
         );
         assert_eq!(store.get_function(id).name(), "func");
@@ -874,41 +1001,117 @@ mod tests {
 
     #[test]
     fn add_union() {
-        let store = TypeStore::default();
-        let files = Files::default();
-        let file_id = files.intern(Path::new("/foo"));
-        let c1 = store.add_class(file_id, "C1", SymbolTable::root_scope_id(), Vec::new());
-        let c2 = store.add_class(file_id, "C2", SymbolTable::root_scope_id(), Vec::new());
+        let TestCase {
+            store,
+            file_id,
+            root_scope,
+            ..
+        } = create_test();
+
+        let c1 = store.add_class_type(file_id, "C1", root_scope, Vec::new());
+        let c2 = store.add_class_type(file_id, "C2", root_scope, Vec::new());
         let elems = vec![Type::Instance(c1), Type::Instance(c2)];
-        let id = store.add_union(file_id, &elems);
-        assert_eq!(
-            store.get_union(id).elements,
-            elems.into_iter().collect::<FxIndexSet<_>>()
-        );
+        let id = store.add_union_type(file_id, &elems);
         let union = Type::Union(id);
+
+        assert_union_elements(&store, union, &elems);
         assert_eq!(format!("{}", union.display(&store)), "C1 | C2");
     }
 
     #[test]
     fn add_intersection() {
-        let store = TypeStore::default();
-        let files = Files::default();
-        let file_id = files.intern(Path::new("/foo"));
-        let c1 = store.add_class(file_id, "C1", SymbolTable::root_scope_id(), Vec::new());
-        let c2 = store.add_class(file_id, "C2", SymbolTable::root_scope_id(), Vec::new());
-        let c3 = store.add_class(file_id, "C3", SymbolTable::root_scope_id(), Vec::new());
+        let TestCase {
+            store,
+            file_id,
+            root_scope,
+            ..
+        } = create_test();
+
+        let c1 = store.add_class_type(file_id, "C1", root_scope, Vec::new());
+        let c2 = store.add_class_type(file_id, "C2", root_scope, Vec::new());
+        let c3 = store.add_class_type(file_id, "C3", root_scope, Vec::new());
         let pos = vec![Type::Instance(c1), Type::Instance(c2)];
         let neg = vec![Type::Instance(c3)];
-        let id = store.add_intersection(file_id, &pos, &neg);
-        assert_eq!(
-            store.get_intersection(id).positive,
-            pos.into_iter().collect::<FxIndexSet<_>>()
-        );
-        assert_eq!(
-            store.get_intersection(id).negative,
-            neg.into_iter().collect::<FxIndexSet<_>>()
-        );
+        let id = store.add_intersection_type(file_id, &pos, &neg);
         let intersection = Type::Intersection(id);
+
+        assert_intersection_elements(&store, intersection, &pos, &neg);
         assert_eq!(format!("{}", intersection.display(&store)), "C1 & C2 & ~C3");
+    }
+
+    #[test]
+    fn flatten_union_zero_elements() {
+        let TestCase { store, file_id, .. } = create_test();
+
+        let ty = store.add_union(file_id, &[]);
+
+        assert!(matches!(ty, Type::Never), "{ty:?} should be Never");
+    }
+
+    #[test]
+    fn flatten_union_one_element() {
+        let TestCase { store, file_id, .. } = create_test();
+
+        let ty = store.add_union(file_id, &[Type::None]);
+
+        assert!(matches!(ty, Type::None), "{ty:?} should be None");
+    }
+
+    #[test]
+    fn flatten_nested_union() {
+        let TestCase { store, file_id, .. } = create_test();
+
+        let l1 = Type::IntLiteral(1);
+        let l2 = Type::IntLiteral(2);
+        let u1 = store.add_union(file_id, &[l1, l2]);
+        let u2 = store.add_union(file_id, &[u1, Type::None]);
+
+        assert_union_elements(&store, u2, &[l1, l2, Type::None]);
+    }
+
+    #[test]
+    fn flatten_intersection_zero_elements() {
+        let TestCase { store, file_id, .. } = create_test();
+
+        let ty = store.add_intersection(file_id, &[], &[]);
+
+        // TODO should be object, not Any
+        assert!(matches!(ty, Type::Any), "{ty:?} should be object");
+    }
+
+    #[test]
+    fn flatten_intersection_one_positive_element() {
+        let TestCase { store, file_id, .. } = create_test();
+
+        let ty = store.add_intersection(file_id, &[Type::None], &[]);
+
+        assert!(matches!(ty, Type::None), "{ty:?} should be None");
+    }
+
+    #[test]
+    fn flatten_intersection_one_negative_element() {
+        let TestCase { store, file_id, .. } = create_test();
+
+        let ty = store.add_intersection(file_id, &[], &[Type::None]);
+
+        assert_intersection_elements(&store, ty, &[], &[Type::None]);
+    }
+
+    #[test]
+    fn flatten_nested_intersection() {
+        let TestCase {
+            store,
+            file_id,
+            root_scope,
+            ..
+        } = create_test();
+
+        let c1 = Type::Instance(store.add_class_type(file_id, "C1", root_scope, vec![]));
+        let c2 = Type::Instance(store.add_class_type(file_id, "C2", root_scope, vec![]));
+        let c1sub = Type::Instance(store.add_class_type(file_id, "C1sub", root_scope, vec![c1]));
+        let i1 = store.add_intersection(file_id, &[c1, c2], &[c1sub]);
+        let i2 = store.add_intersection(file_id, &[i1, Type::None], &[]);
+
+        assert_intersection_elements(&store, i2, &[c1, c2, Type::None], &[c1sub]);
     }
 }

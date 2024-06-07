@@ -10,8 +10,8 @@ use crate::module::{resolve_module, ModuleName};
 use crate::parse::parse;
 use crate::semantic::types::{ModuleTypeId, Type};
 use crate::semantic::{
-    resolve_global_symbol, semantic_index, Definition, GlobalSymbolId, ImportDefinition,
-    ImportFromDefinition,
+    resolve_global_symbol, semantic_index, ConstrainedDefinition, Definition, ExpressionId,
+    GlobalSymbolId, ImportDefinition, ImportFromDefinition,
 };
 use crate::{FileId, Name};
 
@@ -41,6 +41,7 @@ pub fn infer_symbol_public_type(db: &dyn SemanticDb, symbol: GlobalSymbolId) -> 
     Ok(ty)
 }
 
+/// Infer type of a symbol as union of the given Definitions.
 #[tracing::instrument(level = "trace", skip(db))]
 pub fn infer_type_from_definitions<T>(
     db: &dyn SemanticDb,
@@ -50,16 +51,36 @@ pub fn infer_type_from_definitions<T>(
 where
     T: Debug + Iterator<Item = Definition>,
 {
+    infer_type_from_constrained_definitions(
+        db,
+        symbol,
+        definitions.map(|definition| ConstrainedDefinition {
+            definition,
+            constraints: vec![],
+        }),
+    )
+}
+
+/// Infer type of a symbol as union of the given ConstrainedDefinitions.
+#[tracing::instrument(level = "trace", skip(db))]
+pub fn infer_type_from_constrained_definitions<T>(
+    db: &dyn SemanticDb,
+    symbol: GlobalSymbolId,
+    constrained_definitions: T,
+) -> QueryResult<Type>
+where
+    T: Debug + Iterator<Item = ConstrainedDefinition>,
+{
     let jar: &SemanticJar = db.jar()?;
-    let mut tys = definitions
-        .map(|def| infer_definition_type(db, symbol, def.clone()))
+    let mut tys = constrained_definitions
+        .map(|def| infer_constrained_definition_type(db, symbol, def.clone()))
         .peekable();
     if let Some(first) = tys.next() {
         if tys.peek().is_some() {
-            Ok(Type::Union(jar.type_store.add_union(
+            Ok(jar.type_store.add_union(
                 symbol.file_id,
                 &Iterator::chain(std::iter::once(first), tys).collect::<QueryResult<Vec<_>>>()?,
-            )))
+            ))
         } else {
             first
         }
@@ -68,6 +89,33 @@ where
     }
 }
 
+/// Infer type for a ConstrainedDefinition (intersection of the definition type and the
+/// constraints)
+#[tracing::instrument(level = "trace", skip(db))]
+pub fn infer_constrained_definition_type(
+    db: &dyn SemanticDb,
+    symbol: GlobalSymbolId,
+    constrained_definition: ConstrainedDefinition,
+) -> QueryResult<Type> {
+    let ConstrainedDefinition {
+        definition,
+        constraints,
+    } = constrained_definition;
+    let definition_type = infer_definition_type(db, symbol, definition)?;
+    let constraint_types: Vec<Option<Type>> = constraints
+        .into_iter()
+        .map(|constraint| infer_constraint_type(db, symbol, constraint))
+        .collect::<QueryResult<Vec<_>>>()?;
+    let intersected_types: Vec<Type> = std::iter::once(definition_type)
+        .chain(constraint_types.into_iter().flatten())
+        .collect();
+    let jar: &SemanticJar = db.jar()?;
+    Ok(jar
+        .type_store
+        .add_intersection(symbol.file_id, &intersected_types, &[]))
+}
+
+/// Infer a type for a Definition
 #[tracing::instrument(level = "trace", skip(db))]
 pub fn infer_definition_type(
     db: &dyn SemanticDb,
@@ -122,7 +170,7 @@ pub fn infer_definition_type(
                     bases.push(infer_expr_type(db, file_id, base)?);
                 }
                 let scope_id = index.symbol_table().scope_id_for_node(node_key.erased());
-                let ty = Type::Class(type_store.add_class(file_id, &node.name.id, scope_id, bases));
+                let ty = type_store.add_class(file_id, &node.name.id, scope_id, bases);
                 type_store.cache_node_type(file_id, *node_key.erased(), ty);
                 Ok(ty)
             }
@@ -184,6 +232,21 @@ pub fn infer_definition_type(
     }
 }
 
+/// Return the type that the given constraint (an expression from a control-flow test) requires the
+/// given symbol to have. For example, returns ~None as the constraint type if given the symbol ID
+/// for x and the expression ID for `x is not None`. Returns None if the given expression applies
+/// no constraints on the given symbol.
+#[tracing::instrument(level = "trace", skip(db))]
+fn infer_constraint_type(
+    db: &dyn SemanticDb,
+    symbol_id: GlobalSymbolId,
+    constraint: ExpressionId,
+) -> QueryResult<Option<Type>> {
+    let index = semantic_index(db, symbol_id.file_id)?;
+    Ok(None)
+}
+
+/// Infer type of the given expression.
 fn infer_expr_type(db: &dyn SemanticDb, file_id: FileId, expr: &ast::Expr) -> QueryResult<Type> {
     // TODO cache the resolution of the type on the node
     let index = semantic_index(db, file_id)?;
@@ -202,8 +265,7 @@ fn infer_expr_type(db: &dyn SemanticDb, file_id: FileId, expr: &ast::Expr) -> Qu
         ast::Expr::Name(name) => {
             // TODO look up in the correct scope, don't assume global
             if let Some(symbol_id) = index.symbol_table().root_symbol_id_by_name(&name.id) {
-                // TODO should use only reachable definitions, not public type
-                infer_type_from_definitions(
+                infer_type_from_constrained_definitions(
                     db,
                     GlobalSymbolId { file_id, symbol_id },
                     index.reachable_definitions(symbol_id, expr),
@@ -233,9 +295,7 @@ fn infer_expr_type(db: &dyn SemanticDb, file_id: FileId, expr: &ast::Expr) -> Qu
             let body_ty = infer_expr_type(db, file_id, body)?;
             let else_ty = infer_expr_type(db, file_id, orelse)?;
             let jar: &SemanticJar = db.jar()?;
-            Ok(Type::Union(
-                jar.type_store.add_union(file_id, &[body_ty, else_ty]),
-            ))
+            Ok(jar.type_store.add_union(file_id, &[body_ty, else_ty]))
         }
         _ => todo!("expression type resolution for {:?}", expr),
     }
@@ -638,5 +698,25 @@ mod tests {
         )?;
 
         assert_public_type(&case, "a", "x", "Literal[1] | None")
+    }
+
+    #[test]
+    fn narrow_none() -> anyhow::Result<()> {
+        let case = create_test()?;
+
+        write_to_path(
+            &case,
+            "a.py",
+            "
+                x = 1 if flag else None
+                y = 0
+                if x is not None:
+                    y = x
+                z = y
+            ",
+        )?;
+
+        // TODO normalization of unions and intersections
+        assert_public_type(&case, "a", "z", "Literal[0] | Literal[1] | None & ~None")
     }
 }
