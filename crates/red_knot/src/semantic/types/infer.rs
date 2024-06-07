@@ -101,14 +101,12 @@ pub fn infer_constrained_definition_type(
         definition,
         constraints,
     } = constrained_definition;
-    let definition_type = infer_definition_type(db, symbol, definition)?;
-    let constraint_types: Vec<Option<Type>> = constraints
-        .into_iter()
-        .map(|constraint| infer_constraint_type(db, symbol, constraint))
-        .collect::<QueryResult<Vec<_>>>()?;
-    let intersected_types: Vec<Type> = std::iter::once(definition_type)
-        .chain(constraint_types.into_iter().flatten())
-        .collect();
+    let mut intersected_types = vec![infer_definition_type(db, symbol, definition)?];
+    for constraint in constraints {
+        if let Some(constraint_type) = infer_constraint_type(db, symbol, constraint)? {
+            intersected_types.push(constraint_type);
+        }
+    }
     let jar: &SemanticJar = db.jar()?;
     Ok(jar
         .type_store
@@ -243,6 +241,7 @@ fn infer_constraint_type(
     constraint: ExpressionId,
 ) -> QueryResult<Option<Type>> {
     let index = semantic_index(db, symbol_id.file_id)?;
+    // TODO actually infer constraints
     Ok(None)
 }
 

@@ -224,12 +224,15 @@ impl SemanticIndexer {
         self.set_current_flow_node(constraint);
     }
 
-    fn expression(&self, ast: &ast::ModModule, expression_id: ExpressionId) -> &ast::Expr {
+    fn resolve_expression_id(
+        &self,
+        ast: &ast::ModModule,
+        expression_id: ExpressionId,
+    ) -> &ast::Expr {
         let node_key = self.expressions_by_id[expression_id];
         let node = node_key
             .resolve(ast.as_any_node_ref())
             .expect("node to resolve");
-        // TODO how to get an Expr out of a NodeKey?
     }
 
     fn with_type_params(

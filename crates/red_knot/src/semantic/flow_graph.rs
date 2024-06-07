@@ -174,6 +174,9 @@ impl<'a> Iterator for ReachableDefinitionsIterator<'a> {
                             definition: def_node.definition.clone(),
                             constraints: vec![],
                         };
+                        // TODO this isn't correct, some constraints will still apply to the
+                        // next pending flow node; need to record constraints with each pending
+                        // node
                         std::mem::swap(&mut constrained_def.constraints, &mut self.constraints);
                         return Some(constrained_def);
                     }
