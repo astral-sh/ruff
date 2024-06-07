@@ -6,7 +6,7 @@ use std::path::Path;
 use annotate_snippets::display_list::{DisplayList, FormatOptions};
 use annotate_snippets::snippet::{AnnotationType, Slice, Snippet, SourceAnnotation};
 
-use ruff_python_ast::visitor::preorder::{walk_module, PreorderVisitor, TraversalSignal};
+use ruff_python_ast::visitor::source_order::{walk_module, SourceOrderVisitor, TraversalSignal};
 use ruff_python_ast::{AnyNodeRef, Mod};
 use ruff_python_parser::{parse_unchecked, Mode, ParseErrorType};
 use ruff_source_file::{LineIndex, OneIndexed, SourceCode};
@@ -258,7 +258,7 @@ impl<'a> ValidateAstVisitor<'a> {
     }
 }
 
-impl<'ast> PreorderVisitor<'ast> for ValidateAstVisitor<'ast> {
+impl<'ast> SourceOrderVisitor<'ast> for ValidateAstVisitor<'ast> {
     fn enter_node(&mut self, node: AnyNodeRef<'ast>) -> TraversalSignal {
         assert!(
             node.end() <= self.source_length,
