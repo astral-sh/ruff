@@ -1,6 +1,7 @@
-use static_assertions::assert_eq_size;
 use std::cmp::Ordering;
 use std::fmt::Debug;
+
+use static_assertions::assert_eq_size;
 
 /// The column index of an indentation.
 ///
@@ -9,21 +10,9 @@ use std::fmt::Debug;
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default)]
 pub(super) struct Column(u32);
 
-impl Column {
-    pub(super) const fn new(column: u32) -> Self {
-        Self(column)
-    }
-}
-
 /// The number of characters in an indentation. Each character accounts for 1.
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default)]
 pub(super) struct Character(u32);
-
-impl Character {
-    pub(super) const fn new(characters: u32) -> Self {
-        Self(characters)
-    }
-}
 
 /// The [Indentation](https://docs.python.org/3/reference/lexical_analysis.html#indentation) of a logical line.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Default)]
@@ -37,8 +26,8 @@ impl Indentation {
 
     pub(super) const fn root() -> Self {
         Self {
-            column: Column::new(0),
-            character: Character::new(0),
+            column: Column(0),
+            character: Character(0),
         }
     }
 
@@ -77,6 +66,13 @@ impl Indentation {
             Err(UnexpectedIndentation)
         }
     }
+
+    fn by(self, amount: u32) -> Self {
+        Self {
+            character: Character(self.character.0 * amount),
+            column: Column(self.column.0 * amount),
+        }
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -84,16 +80,38 @@ pub(super) struct UnexpectedIndentation;
 
 /// The indentations stack is used to keep track of the current indentation level
 /// [See Indentation](docs.python.org/3/reference/lexical_analysis.html#indentation).
-#[derive(Debug, Clone, Default)]
+#[derive(Debug)]
 pub(super) struct Indentations {
-    stack: Vec<Indentation>,
+    inner: IndentationsInner,
+}
+
+#[derive(Debug, Clone)]
+enum IndentationsInner {
+    Stack(Vec<Indentation>),
+    Counter(IndentationCounter),
+}
+
+impl Default for Indentations {
+    fn default() -> Self {
+        Indentations {
+            inner: IndentationsInner::Counter(IndentationCounter::default()),
+        }
+    }
 }
 
 impl Indentations {
     pub(super) fn indent(&mut self, indent: Indentation) {
         debug_assert_eq!(self.current().try_compare(indent), Ok(Ordering::Less));
 
-        self.stack.push(indent);
+        match &mut self.inner {
+            IndentationsInner::Stack(stack) => stack.push(indent),
+            IndentationsInner::Counter(inner) => {
+                if inner.indent(indent) {
+                    return;
+                }
+                self.make_stack().push(indent);
+            }
+        }
     }
 
     /// Dedent one level to eventually reach `new_indentation`.
@@ -105,7 +123,7 @@ impl Indentations {
     ) -> Result<Option<Indentation>, UnexpectedIndentation> {
         let previous = self.dedent();
 
-        match new_indentation.try_compare(*self.current())? {
+        match new_indentation.try_compare(self.current())? {
             Ordering::Less | Ordering::Equal => Ok(previous),
             // ```python
             // if True:
@@ -117,40 +135,95 @@ impl Indentations {
     }
 
     pub(super) fn dedent(&mut self) -> Option<Indentation> {
-        self.stack.pop()
+        match &mut self.inner {
+            IndentationsInner::Stack(stack) => stack.pop(),
+            IndentationsInner::Counter(inner) => inner.dedent(),
+        }
     }
 
-    pub(super) fn current(&self) -> &Indentation {
+    pub(super) fn current(&self) -> Indentation {
         static ROOT: Indentation = Indentation::root();
-        self.stack.last().unwrap_or(&ROOT)
+
+        match &self.inner {
+            IndentationsInner::Stack(stack) => *stack.last().unwrap_or(&ROOT),
+            IndentationsInner::Counter(inner) => inner.current().unwrap_or(ROOT),
+        }
     }
 
     pub(crate) fn checkpoint(&self) -> IndentationsCheckpoint {
-        IndentationsCheckpoint(self.stack.clone())
+        IndentationsCheckpoint(self.inner.clone())
     }
 
     pub(crate) fn rewind(&mut self, checkpoint: IndentationsCheckpoint) {
-        self.stack = checkpoint.0;
+        self.inner = checkpoint.0;
+    }
+
+    fn make_stack(&mut self) -> &mut Vec<Indentation> {
+        if let IndentationsInner::Counter(IndentationCounter { first, level }) = self.inner {
+            *self = Indentations {
+                inner: IndentationsInner::Stack(first.map_or_else(Vec::new, |first_indent| {
+                    (1..=level).map(|level| first_indent.by(level)).collect()
+                })),
+            };
+        }
+        match &mut self.inner {
+            IndentationsInner::Stack(stack) => stack,
+            IndentationsInner::Counter(_) => unreachable!(),
+        }
     }
 }
 
-#[derive(Debug, Clone)]
-pub(crate) struct IndentationsCheckpoint(Vec<Indentation>);
+#[derive(Debug, Default, Clone)]
+struct IndentationCounter {
+    /// The first [`Indentation`] in the source code.
+    first: Option<Indentation>,
+    /// The current level of indentation.
+    level: u32,
+}
+
+impl IndentationCounter {
+    fn indent(&mut self, indent: Indentation) -> bool {
+        let first_indent = self.first.get_or_insert(indent);
+        if first_indent.by(self.level + 1) == indent {
+            self.level += 1;
+            true
+        } else {
+            false
+        }
+    }
+
+    fn dedent(&mut self) -> Option<Indentation> {
+        if self.level == 0 {
+            None
+        } else {
+            let current = self.current();
+            self.level -= 1;
+            current
+        }
+    }
+
+    fn current(&self) -> Option<Indentation> {
+        self.first.map(|indent| indent.by(self.level))
+    }
+}
+
+pub(super) struct IndentationsCheckpoint(IndentationsInner);
 
 assert_eq_size!(Indentation, u64);
 
 #[cfg(test)]
 mod tests {
-    use super::{Character, Column, Indentation};
     use std::cmp::Ordering;
+
+    use super::{Character, Column, Indentation};
 
     #[test]
     fn indentation_try_compare() {
-        let tab = Indentation::new(Column::new(8), Character::new(1));
+        let tab = Indentation::new(Column(8), Character(1));
 
         assert_eq!(tab.try_compare(tab), Ok(Ordering::Equal));
 
-        let two_tabs = Indentation::new(Column::new(16), Character::new(2));
+        let two_tabs = Indentation::new(Column(16), Character(2));
         assert_eq!(two_tabs.try_compare(tab), Ok(Ordering::Greater));
         assert_eq!(tab.try_compare(two_tabs), Ok(Ordering::Less));
     }
