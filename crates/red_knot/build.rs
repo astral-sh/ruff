@@ -13,7 +13,7 @@ use zip::write::{FileOptions, ZipWriter};
 use zip::CompressionMethod;
 
 const TYPESHED_SOURCE_DIR: &str = "vendor/typeshed";
-const TYPESHED_ZIP_LOCATION: &str = "zipped_typeshed.zip";
+const TYPESHED_ZIP_LOCATION: &str = "/zipped_typeshed.zip";
 
 /// Recursively zip the contents of an entire directory.
 ///
@@ -66,7 +66,7 @@ fn main() {
     // (otherwise we'd have to dynamically determine the exact path to the typeshed zip
     // based on the default path separator for the specific platform we're on,
     // which can't be done at compile time.)
-    let zipped_typeshed_location = format!("{out_dir}/{TYPESHED_ZIP_LOCATION}");
+    let zipped_typeshed_location = format!("{out_dir}{TYPESHED_ZIP_LOCATION}");
 
     let zipped_typeshed = File::create(zipped_typeshed_location).unwrap();
     zip_dir(TYPESHED_SOURCE_DIR, zipped_typeshed).unwrap();
