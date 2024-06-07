@@ -8,7 +8,8 @@ use crate::{AnyNodeRef, AstNode};
 
 /// Visitor that traverses all nodes recursively in the order they appear in the source.
 ///
-/// If you need a visitor that visits the nodes in their semantic order, use [`Visitor`](super::Visitor) instead.
+/// If you need a visitor that visits the nodes in the order they're evaluated at runtime,
+/// use [`Visitor`](super::Visitor) instead.
 pub trait SourceOrderVisitor<'a> {
     #[inline]
     fn enter_node(&mut self, _node: AnyNodeRef<'a>) -> TraversalSignal {
