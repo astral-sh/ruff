@@ -2,6 +2,7 @@ use super::symbol_table::SymbolId;
 use crate::semantic::{Definition, ExpressionId};
 use ruff_index::{newtype_index, IndexVec};
 use std::iter::FusedIterator;
+use std::ops::Range;
 
 #[newtype_index]
 pub struct FlowNodeId;
@@ -139,7 +140,7 @@ pub struct ConstrainedDefinition {
 #[derive(Debug)]
 struct FlowState {
     node_id: FlowNodeId,
-    constraints: Vec<ExpressionId>,
+    constraints_range: Range<usize>,
 }
 
 #[derive(Debug)]
@@ -147,6 +148,7 @@ pub struct ReachableDefinitionsIterator<'a> {
     flow_graph: &'a FlowGraph,
     symbol_id: SymbolId,
     pending: Vec<FlowState>,
+    constraints: Vec<ExpressionId>,
 }
 
 impl<'a> ReachableDefinitionsIterator<'a> {
@@ -156,8 +158,9 @@ impl<'a> ReachableDefinitionsIterator<'a> {
             symbol_id,
             pending: vec![FlowState {
                 node_id: start_node_id,
-                constraints: vec![],
+                constraints_range: 0..0,
             }],
+            constraints: vec![],
         }
     }
 }
@@ -168,8 +171,9 @@ impl<'a> Iterator for ReachableDefinitionsIterator<'a> {
     fn next(&mut self) -> Option<Self::Item> {
         let FlowState {
             mut node_id,
-            mut constraints,
+            mut constraints_range,
         } = self.pending.pop()?;
+        self.constraints.truncate(constraints_range.end + 1);
         loop {
             match &self.flow_graph.flow_nodes_by_id[node_id] {
                 FlowNode::Start => {
@@ -183,7 +187,7 @@ impl<'a> Iterator for ReachableDefinitionsIterator<'a> {
                     if def_node.symbol_id == self.symbol_id {
                         return Some(ConstrainedDefinition {
                             definition: def_node.definition.clone(),
-                            constraints,
+                            constraints: self.constraints[constraints_range].to_vec(),
                         });
                     }
                     node_id = def_node.predecessor;
@@ -194,13 +198,14 @@ impl<'a> Iterator for ReachableDefinitionsIterator<'a> {
                 FlowNode::Phi(phi_node) => {
                     self.pending.push(FlowState {
                         node_id: phi_node.first_predecessor,
-                        constraints: constraints.clone(),
+                        constraints_range: constraints_range.clone(),
                     });
                     node_id = phi_node.second_predecessor;
                 }
                 FlowNode::Constraint(constraint_node) => {
                     node_id = constraint_node.predecessor;
-                    constraints.push(constraint_node.test_expression);
+                    self.constraints.push(constraint_node.test_expression);
+                    constraints_range.end += 1;
                 }
             }
         }

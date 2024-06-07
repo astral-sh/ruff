@@ -265,6 +265,7 @@ impl TypeStore {
                 _ => flattened.push(*ty),
             }
         }
+        // TODO don't add identical unions
         // TODO de-duplicate union elements
         match flattened[..] {
             [] => Type::Never,
@@ -306,6 +307,7 @@ impl TypeStore {
                 _ => neg_flattened.push(*ty),
             }
         }
+        // TODO don't add identical intersections
         // TODO deduplicate intersection elements
         // TODO maintain DNF form (union of intersections)
         match (&pos_flattened[..], &neg_flattened[..]) {

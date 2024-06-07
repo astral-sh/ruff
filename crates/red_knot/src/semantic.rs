@@ -837,7 +837,7 @@ mod tests {
         };
         let x_defs: Vec<_> = index
             .reachable_definitions(x_sym, x_use)
-            .map(|cd| cd.definition)
+            .map(|constrained_definition| constrained_definition.definition)
             .collect();
         assert_eq!(x_defs.len(), 1);
         let Definition::Assignment(node_key) = &x_defs[0] else {
