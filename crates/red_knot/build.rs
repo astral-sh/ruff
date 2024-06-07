@@ -63,8 +63,7 @@ fn zip_dir(
             zip.add_directory(name, options)?;
         }
     }
-    zip.finish()?;
-    Result::Ok(())
+    zip.finish()
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
