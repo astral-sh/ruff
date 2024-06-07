@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+use tracing::debug;
+
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{
     visitor, Expr, ExprAttribute, ExprNumberLiteral, ModModule, Number, Stmt, StmtAnnAssign,
@@ -7,17 +9,20 @@ use ruff_python_ast::{
 };
 
 use crate::ast_ids::NodeKey;
+use crate::module::ModuleName;
 use crate::salsa_db::semantic::ast_ids::{AstIdNode, ExpressionId};
+use crate::salsa_db::semantic::definition::{ImportDefinition, ImportFromDefinition};
 use crate::salsa_db::semantic::flow_graph::{flow_graph, FlowGraph, ReachableDefinition};
+use crate::salsa_db::semantic::module::resolve_module_name;
 use crate::salsa_db::semantic::symbol_table::{
     symbol_table, NodeWithScopeId, ScopeId, SymbolTable,
 };
 use crate::salsa_db::semantic::types::{
     typing_scopes, ClassType, ClassTypeId, ClassTypingScope, FunctionType, FunctionTypeId,
-    FunctionTypingScope, GlobalTypeId, LocalTypeId, ModuleType, Type, TypeInference, TypingContext,
-    TypingScope, TypingScopes,
+    FunctionTypingScope, GlobalTypeId, LocalTypeId, ModuleType, ModuleTypeId, Type, TypeInference,
+    TypingContext, TypingScope, TypingScopes,
 };
-use crate::salsa_db::semantic::{Db, GlobalId, Jar};
+use crate::salsa_db::semantic::{global_symbol_type_by_name, Db, GlobalId, Jar};
 use crate::salsa_db::source::{parse, File};
 use crate::Name;
 
@@ -28,6 +33,7 @@ pub fn infer_expression_type(db: &dyn Db, expression_id: GlobalId<ExpressionId>)
     types.expression_ty(expression_id.local())
 }
 
+#[tracing::instrument(level = "debug", skip(db))]
 pub fn infer_types(db: &dyn Db, scope: TypingScope) -> &TypeInference {
     match scope {
         TypingScope::Function(function) => infer_function_body(db, function),
@@ -36,6 +42,7 @@ pub fn infer_types(db: &dyn Db, scope: TypingScope) -> &TypeInference {
     }
 }
 
+#[tracing::instrument(level = "debug", skip(db))]
 #[salsa::tracked(jar=Jar, return_ref)]
 pub fn infer_function_body(db: &dyn Db, scope: FunctionTypingScope) -> TypeInference {
     let function = scope.node(db);
@@ -45,6 +52,7 @@ pub fn infer_function_body(db: &dyn Db, scope: FunctionTypingScope) -> TypeInfer
     builder.finish()
 }
 
+#[tracing::instrument(level = "debug", skip(db))]
 #[salsa::tracked(jar=Jar, return_ref)]
 pub fn infer_class_body(db: &dyn Db, scope: ClassTypingScope) -> TypeInference {
     let class = scope.node(db);
@@ -54,13 +62,15 @@ pub fn infer_class_body(db: &dyn Db, scope: ClassTypingScope) -> TypeInference {
     builder.finish()
 }
 
+#[tracing::instrument(level = "debug", skip(db))]
 #[salsa::tracked(jar=Jar, return_ref)]
 pub fn infer_module_body(db: &dyn Db, file: File) -> TypeInference {
+    debug!("before parse");
     let parsed = parse(db.upcast(), file);
 
     let mut builder = TypeInferenceBuilder::new(db, file.into());
     builder.lower_module(&parsed.syntax());
-    dbg!(builder.finish())
+    builder.finish()
 }
 
 struct TypeInferenceBuilder<'a> {
@@ -129,13 +139,56 @@ impl<'a> TypeInferenceBuilder<'a> {
         self.visit_body(&function.body);
     }
 
-    fn lower_import(&mut self, _import: &StmtImport) {
+    fn lower_import(&mut self, import: &StmtImport) {
+        let import_id = import.ast_id(self.db, self.file);
 
-        // No op, handled inside of `infer_definition`
+        for (i, name) in import.names.iter().enumerate() {
+            let ty = if let Some(module) = resolve_module_name(self.db, ModuleName::new(&name.name))
+            {
+                // TODO: It feels hacky to resolve the module ID out of the blue like this.
+                Type::Module(GlobalTypeId::new(
+                    TypingScope::Module(module.file()),
+                    ModuleTypeId,
+                ))
+            } else {
+                Type::Unknown
+            };
+
+            self.result.local_definitions.insert(
+                ImportDefinition {
+                    import: import_id,
+                    name: u32::try_from(i).unwrap(),
+                }
+                .into(),
+                ty,
+            );
+        }
     }
 
-    fn lower_import_from(&mut self, _import_from: &StmtImportFrom) {
-        // no-op handled inside of `infer_definition`
+    fn lower_import_from(&mut self, import: &StmtImportFrom) {
+        assert!(matches!(import.level, 0));
+
+        let import_id = import.ast_id(self.db, self.file);
+        let module_name = import.module.as_ref().expect("TODO relative imports");
+        let module = resolve_module_name(self.db, ModuleName::new(module_name));
+
+        for (i, name) in import.names.iter().enumerate() {
+            let ty = if let Some(module) = &module {
+                global_symbol_type_by_name(self.db, module.file(), &name.name)
+                    .unwrap_or(Type::Unknown)
+            } else {
+                Type::Unknown
+            };
+
+            self.result.local_definitions.insert(
+                ImportFromDefinition {
+                    import: import_id,
+                    name: u32::try_from(i).unwrap(),
+                }
+                .into(),
+                ty,
+            );
+        }
     }
 
     fn lower_class_definition(&mut self, class_def: &StmtClassDef) {

@@ -2,7 +2,7 @@ use std::num::NonZeroU32;
 use std::sync::Arc;
 
 use countme::Count;
-use tracing::warn;
+use tracing::{debug, warn};
 
 use ruff_python_ast as ast;
 use ruff_python_ast::visitor::preorder;
@@ -101,7 +101,7 @@ pub fn global_symbol_type_by_name(db: &dyn Db, module: File, name: &str) -> Opti
 }
 
 #[tracing::instrument(level = "debug", skip(db))]
-#[salsa::tracked(jar=Jar, return_ref)]
+#[salsa::tracked(jar=Jar, return_ref, no_eq)]
 pub fn semantic_index(db: &dyn Db, file: File) -> SemanticIndex {
     let root_scope_id = SymbolTable::root_scope_id();
     let mut indexer = SemanticIndexer {

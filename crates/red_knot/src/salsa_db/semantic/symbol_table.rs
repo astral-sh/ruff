@@ -21,7 +21,7 @@ use crate::Name;
 #[tracing::instrument(level = "debug", skip(db))]
 #[salsa::tracked(jar=Jar)]
 pub fn symbol_table(db: &dyn Db, file: File) -> Arc<SymbolTable> {
-    semantic_index(db, file).symbol_table.clone()
+    dbg!(semantic_index(db, file).symbol_table.clone())
 }
 
 type Map<K, V> = hashbrown::HashMap<K, V, ()>;

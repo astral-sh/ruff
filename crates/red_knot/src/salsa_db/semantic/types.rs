@@ -571,7 +571,7 @@ impl<'a> TypingContext<'a> {
             let elements: FxIndexSet<_> = [first, second]
                 .into_iter()
                 .chain(definitions)
-                .map(|definition| self.infer_definition(definition, types, symbol_scope.file()))
+                .map(|definition| self.infer_definition(definition, types))
                 .collect();
 
             // The fact that the interner is local to a body means that we can't reuse the same union type
@@ -582,7 +582,7 @@ impl<'a> TypingContext<'a> {
                 scope: typing_scope,
             }
         } else {
-            DefinitionType::Type(self.infer_definition(first, types, symbol_scope.file()))
+            DefinitionType::Type(self.infer_definition(first, types))
         }
     }
 
@@ -591,56 +591,14 @@ impl<'a> TypingContext<'a> {
         &self,
         definition: ReachableDefinition,
         definition_types: &TypeInference,
-        file: File,
     ) -> Type {
         let ReachableDefinition::Definition(definition) = definition else {
             return Type::Unbound;
         };
 
-        // FIXME
-        //   Uff, how to get back to the type inference scope from a definition?
-        //   because the definition could be from the outside scope
-        let node = match definition {
-            Definition::Import(ImportDefinition { import, name }) => {
-                let import = StmtImport::lookup(self.db, file, import);
-                let name = &import.names[name as usize];
-
-                return if let Some(module) =
-                    resolve_module_name(self.db, ModuleName::new(&name.name))
-                {
-                    // TODO: It feels hacky to resolve the module ID out of the blue like this.
-                    Type::Module(GlobalTypeId::new(
-                        TypingScope::Module(module.file()),
-                        ModuleTypeId,
-                    ))
-                } else {
-                    Type::Unknown
-                };
-            }
-            Definition::ImportFrom(ImportFromDefinition { import, name }) => {
-                let import = StmtImportFrom::lookup(self.db, file, import);
-                let name = &import.names[name as usize];
-
-                // TODO relative imports
-                assert!(matches!(import.level, 0));
-                let module_name = import.module.as_ref().expect("TODO relative imports");
-                let Some(module) = resolve_module_name(self.db, ModuleName::new(module_name))
-                else {
-                    return Type::Unknown;
-                };
-
-                return global_symbol_type_by_name(self.db, module.file(), &name.name)
-                    .unwrap_or(Type::Unknown);
-            }
-            Definition::Function(function) => function.into(),
-            Definition::Class(class) => class.into(),
-            Definition::Assignment(assignment) => assignment.into(),
-            Definition::AnnotatedAssignment(assignment) => assignment.into(),
-        };
-
         definition_types
             .local_definitions
-            .get(&node)
+            .get(&definition)
             .copied()
             .unwrap_or(Type::Unbound)
     }
@@ -654,7 +612,7 @@ pub struct TypeInference {
     unions: IndexVec<UnionTypeId, UnionType>,
     intersections: IndexVec<IntersectionTypeId, IntersectionType>,
 
-    local_definitions: FxHashMap<LocalDefinitionKey, Type>,
+    local_definitions: FxHashMap<Definition, Type>,
     public_symbol_types: FxHashMap<SymbolId, Type>,
     expression_types: FxHashMap<ExpressionId, Type>,
 }
@@ -700,37 +658,5 @@ impl DefinitionType {
             }
             DefinitionType::Type(ty) => ty,
         }
-    }
-}
-
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
-enum LocalDefinitionKey {
-    Function(FunctionId),
-    Class(ClassId),
-    Assignment(AssignmentId),
-    AnnotatedAssignmentId(AnnotatedAssignmentId),
-}
-
-impl From<FunctionId> for LocalDefinitionKey {
-    fn from(value: FunctionId) -> Self {
-        Self::Function(value)
-    }
-}
-
-impl From<ClassId> for LocalDefinitionKey {
-    fn from(value: ClassId) -> Self {
-        Self::Class(value)
-    }
-}
-
-impl From<AssignmentId> for LocalDefinitionKey {
-    fn from(value: AssignmentId) -> Self {
-        Self::Assignment(value)
-    }
-}
-
-impl From<AnnotatedAssignmentId> for LocalDefinitionKey {
-    fn from(value: AnnotatedAssignmentId) -> Self {
-        Self::AnnotatedAssignmentId(value)
     }
 }

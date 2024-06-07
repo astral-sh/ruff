@@ -3,8 +3,8 @@
 
 use std::path::PathBuf;
 
-use salsa::{DebugWithDb, Event, Storage};
-use tracing::{debug_span, warn};
+use salsa::{DebugWithDb, Event, EventKind, Storage};
+use tracing::{debug, debug_span, trace, warn};
 
 use crate::db::Upcast;
 use crate::salsa_db::source::File;
@@ -57,7 +57,11 @@ impl lint::Db for Database {}
 
 impl salsa::Database for Database {
     fn salsa_event(&self, event: Event) {
-        let _ = debug_span!("event", "{:?}", event.debug(self));
+        if matches!(event.kind, EventKind::WillCheckCancellation) {
+            return;
+        }
+
+        trace!("event: {:?}", event.debug(self));
     }
 }
 
@@ -76,14 +80,16 @@ impl salsa::ParallelDatabase for Database {
 mod tests {
     use salsa::{Event, Storage};
     use std::path::PathBuf;
-    use tracing::Level;
+    use tracing::{debug, Level};
     use tracing_subscriber::fmt::time;
 
     use crate::db::Upcast;
     use crate::salsa_db::semantic::ast_ids::AstIdNode;
     use crate::salsa_db::semantic::module::file_to_module;
     use crate::salsa_db::semantic::types::infer::infer_expression_type;
-    use crate::salsa_db::semantic::{dependencies, resolve_global_symbol, GlobalId};
+    use crate::salsa_db::semantic::{
+        dependencies, global_symbol_type, resolve_global_symbol, GlobalId,
+    };
     use crate::salsa_db::source::{parse, Db, File};
 
     use super::lint;
@@ -156,7 +162,7 @@ mod tests {
             r#"
 import foo;
 
-x = 1
+x = foo.x
 
 
 def test():
@@ -167,7 +173,7 @@ def test():
 "#,
         )
         .unwrap();
-        std::fs::write(foo, "x = 10").unwrap();
+        std::fs::write(&foo, "x = 10\ndef foo(): y = 10").unwrap();
 
         let mut db = Database::new();
         set_module_search_paths(
@@ -179,27 +185,33 @@ def test():
         );
 
         let main_file = db.file(main.clone());
+        let mut foo_file = db.file(foo.clone());
 
         let parsed = parse(&db, main_file);
-        let x = &parsed.syntax().body[1].as_assign_stmt().unwrap().targets[0];
-        let x_id = x.ast_id(&db, main_file);
 
         dependencies(&db, main_file);
         let main_module = file_to_module(&db, main_file).unwrap();
+        let x = resolve_global_symbol(&db, main_module.file(), "x").unwrap();
+        debug!("{:#?}", global_symbol_type(&db, x));
+
+        std::fs::write(&foo, "x = 10\ndef foo():\n  y = x").unwrap();
+        foo_file.touch(&mut db);
+
+        let x = resolve_global_symbol(&db, main_module.file(), "x").unwrap();
+        debug!("{:#?}", global_symbol_type(&db, x));
+
         // let foo = resolve_global_symbol(&db, main_module.file(), "foo").unwrap();
         //
         // tracing::debug!("{:?}", foo);
 
         // Make a change that doesn't impact the symbol table
-        // std::fs::write(&main, "import foo;\n\n\nx = 3").unwrap();
         // main_file.touch(&mut db);
 
-        let foo = resolve_global_symbol(&db, main_module.file(), "foo").unwrap();
-        dbg!(infer_expression_type(
-            &db,
-            GlobalId::new(main_module.file(), x_id)
-        ));
-        tracing::debug!("{:?}", foo);
+        // dbg!(infer_expression_type(
+        //     &db,
+        //     GlobalId::new(main_module.file(), x_id)
+        // ));
+        // tracing::debug!("{:?}", foo);
 
         eprintln!("{}", countme::get_all());
     }
@@ -221,7 +233,7 @@ def test():
             .with_timer(time())
             // Don't display the event's target (module path)
             .with_target(true)
-            .with_max_level(Level::TRACE)
+            .with_max_level(Level::DEBUG)
             .with_writer(std::io::stderr)
             // Build the subscriber
             .finish();
