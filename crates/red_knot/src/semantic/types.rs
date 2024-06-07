@@ -27,7 +27,7 @@ pub enum Type {
     Unknown,
     /// name is not bound to any value
     Unbound,
-    /// the None object
+    /// the None object (TODO remove this in favor of Instance(types.NoneType)
     None,
     /// a specific function object
     Function(FunctionTypeId),
