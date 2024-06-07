@@ -210,6 +210,9 @@ cython_debug/
 .*.sw?
 .sw?
 
+# Finder adds these files on MacOS
+.DS_STORE
+
 # Custom re-inclusions for the resolver test cases
 !crates/ruff_python_resolver/resources/test/airflow/venv/
 !crates/ruff_python_resolver/resources/test/airflow/venv/lib
