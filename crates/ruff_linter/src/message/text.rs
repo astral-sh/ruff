@@ -17,6 +17,7 @@ use crate::message::diff::Diff;
 use crate::message::{Emitter, EmitterContext, Message};
 use crate::registry::AsRule;
 use crate::settings::types::UnsafeFixes;
+use crate::text_helpers::ShowNonprinting;
 
 bitflags! {
     #[derive(Default)]
@@ -251,6 +252,8 @@ impl Display for MessageCodeFrame<'_> {
             range - start_offset,
         );
 
+        let source_text = source.text.show_nonprinting();
+
         let start_char = source.text[TextRange::up_to(source.annotation_range.start())]
             .chars()
             .count();
@@ -262,7 +265,7 @@ impl Display for MessageCodeFrame<'_> {
         let snippet = Snippet {
             title: None,
             slices: vec![Slice {
-                source: &source.text,
+                source: &source_text,
                 line_start: self.notebook_index.map_or_else(
                     || start_index.get(),
                     |notebook_index| {
