@@ -234,20 +234,11 @@ impl std::fmt::Display for CodeDiff<'_> {
 
             // individual lines
             for change in hunk.iter_changes() {
+                let value = change.value().show_nonprinting();
                 match change.tag() {
-                    ChangeTag::Equal => write!(f, " {}", change.value().show_nonprinting())?,
-                    ChangeTag::Delete => write!(
-                        f,
-                        "{}{}",
-                        "-".red(),
-                        change.value().show_nonprinting().red()
-                    )?,
-                    ChangeTag::Insert => write!(
-                        f,
-                        "{}{}",
-                        "+".green(),
-                        change.value().show_nonprinting().green()
-                    )?,
+                    ChangeTag::Equal => write!(f, " {value}")?,
+                    ChangeTag::Delete => write!(f, "{}{}", "-".red(), value.red())?,
+                    ChangeTag::Insert => write!(f, "{}{}", "+".green(), value.green())?,
                 }
 
                 if !self.diff.newline_terminated() {

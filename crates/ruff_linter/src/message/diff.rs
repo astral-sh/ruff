@@ -102,17 +102,11 @@ impl Display for Diff<'_> {
                     )?;
 
                     for (emphasized, value) in change.iter_strings_lossy() {
+                        let value = value.show_nonprinting();
                         if emphasized {
-                            write!(
-                                f,
-                                "{}",
-                                line_style
-                                    .apply_to(&value.show_nonprinting())
-                                    .underline()
-                                    .on_black()
-                            )?;
+                            write!(f, "{}", line_style.apply_to(&value).underline().on_black())?;
                         } else {
-                            write!(f, "{}", line_style.apply_to(&value.show_nonprinting()))?;
+                            write!(f, "{}", line_style.apply_to(&value))?;
                         }
                     }
                     if change.missing_newline() {
