@@ -71,7 +71,7 @@ pub(crate) fn fix_all(
         result: LinterResult { error, .. },
         ..
     } = ruff_linter::linter::lint_fix(
-        query.virtual_file_path(),
+        &query.virtual_file_path(),
         package,
         flags::Noqa::Enabled,
         UnsafeFixes::Disabled,
