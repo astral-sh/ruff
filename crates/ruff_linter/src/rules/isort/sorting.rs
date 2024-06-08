@@ -97,7 +97,7 @@ impl<'a> ModuleKey<'a> {
     pub(crate) fn from_module(
         name: Option<&'a str>,
         asname: Option<&'a str>,
-        level: Option<u32>,
+        level: u32,
         first_alias: Option<(&'a str, Option<&'a str>)>,
         style: ImportStyle,
         settings: &Settings,
@@ -106,13 +106,11 @@ impl<'a> ModuleKey<'a> {
 
         let maybe_length = (settings.length_sort
             || (settings.length_sort_straight && style == ImportStyle::Straight))
-            .then_some(
-                name.map(str::width).unwrap_or_default() + level.unwrap_or_default() as usize,
-            );
+            .then_some(name.map(str::width).unwrap_or_default() + level as usize);
 
         let distance = match level {
-            None | Some(0) => Distance::None,
-            Some(level) => match settings.relative_imports_order {
+            0 => Distance::None,
+            _ => match settings.relative_imports_order {
                 RelativeImportsOrder::ClosestToFurthest => Distance::Nearest(level),
                 RelativeImportsOrder::FurthestToClosest => Distance::Furthest(Reverse(level)),
             },

@@ -23,7 +23,6 @@ use ruff_linter::message::Message;
 use ruff_linter::{warn_user, VERSION};
 use ruff_macros::CacheKey;
 use ruff_notebook::NotebookIndex;
-use ruff_python_ast::imports::ImportMap;
 use ruff_source_file::SourceFileBuilder;
 use ruff_text_size::{TextRange, TextSize};
 use ruff_workspace::resolver::Resolver;
@@ -348,7 +347,7 @@ impl FileCache {
             } else {
                 FxHashMap::default()
             };
-            Diagnostics::new(messages, lint.imports.clone(), notebook_indexes)
+            Diagnostics::new(messages, notebook_indexes)
         })
     }
 }
@@ -394,7 +393,7 @@ pub(crate) fn init(path: &Path) -> Result<()> {
 #[derive(Deserialize, Debug, Serialize, PartialEq)]
 pub(crate) struct LintCacheData {
     /// Imports made.
-    pub(super) imports: ImportMap,
+    // pub(super) imports: ImportMap,
     /// Diagnostic messages.
     pub(super) messages: Vec<CacheMessage>,
     /// Source code of the file.
@@ -410,7 +409,6 @@ pub(crate) struct LintCacheData {
 impl LintCacheData {
     pub(crate) fn from_messages(
         messages: &[Message],
-        imports: ImportMap,
         notebook_index: Option<NotebookIndex>,
     ) -> Self {
         let source = if let Some(msg) = messages.first() {
@@ -438,7 +436,6 @@ impl LintCacheData {
             .collect();
 
         Self {
-            imports,
             messages,
             source,
             notebook_index,

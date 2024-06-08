@@ -113,7 +113,7 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt) {
                 },
                 TextRange::new(stmt.start(), terminal.stmt.end()),
             );
-            if checker.semantic().is_builtin("any") {
+            if checker.semantic().has_builtin_binding("any") {
                 diagnostic.set_fix(Fix::unsafe_edit(Edit::replacement(
                     contents,
                     stmt.start(),
@@ -199,7 +199,7 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt) {
                 },
                 TextRange::new(stmt.start(), terminal.stmt.end()),
             );
-            if checker.semantic().is_builtin("all") {
+            if checker.semantic().has_builtin_binding("all") {
                 diagnostic.set_fix(Fix::unsafe_edit(Edit::replacement(
                     contents,
                     stmt.start(),

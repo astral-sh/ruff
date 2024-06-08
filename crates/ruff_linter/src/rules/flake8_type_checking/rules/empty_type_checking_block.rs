@@ -2,6 +2,7 @@ use ruff_python_ast as ast;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_semantic::analyze::typing;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -47,6 +48,14 @@ impl AlwaysFixableViolation for EmptyTypeCheckingBlock {
 
 /// TCH005
 pub(crate) fn empty_type_checking_block(checker: &mut Checker, stmt: &ast::StmtIf) {
+    if !typing::is_type_checking_block(stmt, checker.semantic()) {
+        return;
+    }
+
+    if !stmt.elif_else_clauses.is_empty() {
+        return;
+    }
+
     let [stmt] = stmt.body.as_slice() else {
         return;
     };

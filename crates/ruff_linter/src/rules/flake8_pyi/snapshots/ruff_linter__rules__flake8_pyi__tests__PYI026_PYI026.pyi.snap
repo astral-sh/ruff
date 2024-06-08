@@ -114,4 +114,28 @@ PYI026.pyi:7:1: PYI026 [*] Use `typing.TypeAlias` for type alias, e.g., `AliasNo
 9 9 | NewAny: typing.TypeAlias = Any
 10 10 | OptionalStr: TypeAlias = typing.Optional[str]
 
+PYI026.pyi:17:5: PYI026 [*] Use `typing.TypeAlias` for type alias, e.g., `FLAG_THIS: TypeAlias = None`
+   |
+16 | class NotAnEnum:
+17 |     FLAG_THIS = None
+   |     ^^^^^^^^^ PYI026
+18 | 
+19 | # these are ok
+   |
+   = help: Add `TypeAlias` annotation
 
+ℹ Safe fix
+1     |-from typing import Literal, Any
+   1  |+from typing import Literal, Any, TypeAlias
+2  2  | 
+3  3  | NewAny = Any
+4  4  | OptionalStr = typing.Optional[str]
+--------------------------------------------------------------------------------
+14 14 | AliasNone: typing.TypeAlias = None
+15 15 | 
+16 16 | class NotAnEnum:
+17    |-    FLAG_THIS = None
+   17 |+    FLAG_THIS: TypeAlias = None
+18 18 | 
+19 19 | # these are ok
+20 20 | from enum import Enum

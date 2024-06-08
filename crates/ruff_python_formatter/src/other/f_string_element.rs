@@ -3,6 +3,7 @@ use std::borrow::Cow;
 use ruff_formatter::{format_args, write, Buffer, RemoveSoftLinesBuffer};
 use ruff_python_ast::{
     ConversionFlag, Expr, FStringElement, FStringExpressionElement, FStringLiteralElement,
+    StringFlags,
 };
 use ruff_text_size::Ranged;
 
@@ -56,7 +57,7 @@ impl<'a> FormatFStringLiteralElement<'a> {
 impl Format<PyFormatContext<'_>> for FormatFStringLiteralElement<'_> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
         let literal_content = f.context().locator().slice(self.element.range());
-        let normalized = normalize_string(literal_content, 0, self.context.kind(), true);
+        let normalized = normalize_string(literal_content, 0, self.context.flags(), true);
         match &normalized {
             Cow::Borrowed(_) => source_text_slice(self.element.range()).fmt(f),
             Cow::Owned(normalized) => text(normalized).fmt(f),
@@ -64,15 +65,63 @@ impl Format<PyFormatContext<'_>> for FormatFStringLiteralElement<'_> {
     }
 }
 
+/// Context representing an f-string expression element.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct FStringExpressionElementContext {
+    /// The context of the parent f-string containing this expression element.
+    parent_context: FStringContext,
+    /// Indicates whether this expression element has format specifier or not.
+    has_format_spec: bool,
+}
+
+impl FStringExpressionElementContext {
+    /// Returns the [`FStringContext`] containing this expression element.
+    pub(crate) fn f_string(self) -> FStringContext {
+        self.parent_context
+    }
+
+    /// Returns `true` if the expression element can contain line breaks.
+    pub(crate) fn can_contain_line_breaks(self) -> bool {
+        self.parent_context.layout().is_multiline()
+            // For a triple-quoted f-string, the element can't be formatted into multiline if it
+            // has a format specifier because otherwise the newline would be treated as part of the
+            // format specifier.
+            //
+            // Given the following f-string:
+            // ```python
+            // f"""aaaaaaaaaaaaaaaa bbbbbbbbbbbbbbbbbb ccccccccccc {variable:.3f} ddddddddddddddd eeeeeeee"""
+            // ```
+            //
+            // We can't format it as:
+            // ```python
+            // f"""aaaaaaaaaaaaaaaa bbbbbbbbbbbbbbbbbb ccccccccccc {
+            //     variable:.3f
+            // } ddddddddddddddd eeeeeeee"""
+            // ```
+            //
+            // Here, the format specifier string would become ".3f\n", which is not what we want.
+            // But, if the original source code already contained a newline, they'll be preserved.
+            //
+            // The Python version is irrelevant in this case.
+            && !(self.parent_context.flags().is_triple_quoted() && self.has_format_spec)
+    }
+}
+
 /// Formats an f-string expression element.
 pub(crate) struct FormatFStringExpressionElement<'a> {
     element: &'a FStringExpressionElement,
-    context: FStringContext,
+    context: FStringExpressionElementContext,
 }
 
 impl<'a> FormatFStringExpressionElement<'a> {
     pub(crate) fn new(element: &'a FStringExpressionElement, context: FStringContext) -> Self {
-        Self { element, context }
+        Self {
+            element,
+            context: FStringExpressionElementContext {
+                parent_context: context,
+                has_format_spec: element.format_spec.is_some(),
+            },
+        }
     }
 }
 
@@ -153,10 +202,10 @@ impl Format<PyFormatContext<'_>> for FormatFStringExpressionElement<'_> {
                     // added to maintain consistency.
                     Expr::Dict(_) | Expr::DictComp(_) | Expr::Set(_) | Expr::SetComp(_) => {
                         Some(format_with(|f| {
-                            if self.context.layout().is_flat() {
-                                space().fmt(f)
-                            } else {
+                            if self.context.can_contain_line_breaks() {
                                 soft_line_break_or_space().fmt(f)
+                            } else {
+                                space().fmt(f)
                             }
                         }))
                     }
@@ -183,12 +232,9 @@ impl Format<PyFormatContext<'_>> for FormatFStringExpressionElement<'_> {
                     token(":").fmt(f)?;
 
                     f.join()
-                        .entries(
-                            format_spec
-                                .elements
-                                .iter()
-                                .map(|element| FormatFStringElement::new(element, self.context)),
-                        )
+                        .entries(format_spec.elements.iter().map(|element| {
+                            FormatFStringElement::new(element, self.context.f_string())
+                        }))
                         .finish()?;
 
                     // These trailing comments can only occur if the format specifier is
@@ -205,7 +251,11 @@ impl Format<PyFormatContext<'_>> for FormatFStringExpressionElement<'_> {
                     trailing_comments(comments.trailing(self.element)).fmt(f)?;
                 }
 
-                bracket_spacing.fmt(f)
+                if conversion.is_none() && format_spec.is_none() {
+                    bracket_spacing.fmt(f)?;
+                }
+
+                Ok(())
             });
 
             let open_parenthesis_comments = if dangling_item_comments.is_empty() {
@@ -219,16 +269,16 @@ impl Format<PyFormatContext<'_>> for FormatFStringExpressionElement<'_> {
             {
                 let mut f = WithNodeLevel::new(NodeLevel::ParenthesizedExpression, f);
 
-                if self.context.layout().is_flat() {
-                    let mut buffer = RemoveSoftLinesBuffer::new(&mut *f);
-
-                    write!(buffer, [open_parenthesis_comments, item])?;
-                } else {
+                if self.context.can_contain_line_breaks() {
                     group(&format_args![
                         open_parenthesis_comments,
                         soft_block_indent(&item)
                     ])
                     .fmt(&mut f)?;
+                } else {
+                    let mut buffer = RemoveSoftLinesBuffer::new(&mut *f);
+
+                    write!(buffer, [open_parenthesis_comments, item])?;
                 }
             }
 

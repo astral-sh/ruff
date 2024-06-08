@@ -3,7 +3,7 @@ use ruff_python_ast::{Comprehension, Expr};
 use ruff_python_trivia::{find_only_token_in_range, SimpleTokenKind};
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::comments::{leading_comments, trailing_comments, SourceComment};
+use crate::comments::{leading_comments, trailing_comments};
 use crate::expression::expr_tuple::TupleParentheses;
 use crate::prelude::*;
 
@@ -113,15 +113,6 @@ impl FormatNodeRule<Comprehension> for FormatComprehension {
 
             write!(f, [soft_line_break_or_space(), joined])?;
         }
-        Ok(())
-    }
-
-    fn fmt_dangling_comments(
-        &self,
-        _dangling_comments: &[SourceComment],
-        _f: &mut PyFormatter,
-    ) -> FormatResult<()> {
-        // dangling comments are formatted as part of fmt_fields
         Ok(())
     }
 }

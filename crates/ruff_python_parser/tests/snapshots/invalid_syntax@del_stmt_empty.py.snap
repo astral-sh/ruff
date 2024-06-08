@@ -1,0 +1,27 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/del_stmt_empty.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..4,
+        body: [
+            Delete(
+                StmtDelete {
+                    range: 0..3,
+                    targets: [],
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | del
+  |    ^ Syntax Error: Delete statement must have at least one target
+  |

@@ -133,21 +133,6 @@ python scripts/check_ecosystem.py --checkouts target/checkouts --projects github
 cargo run --bin ruff_dev -- format-dev --stability-check --error-file target/formatter-ecosystem-errors.txt --multi-project target/checkouts
 ```
 
-**Shrinking** To shrink a formatter error from an entire file to a minimal reproducible example,
-you can use `ruff_shrinking`:
-
-```shell
-cargo run --bin ruff_shrinking -- <your_file> target/shrinking.py "Unstable formatting" "target/debug/ruff_dev format-dev --stability-check target/shrinking.py"
-```
-
-The first argument is the input file, the second is the output file where the candidates
-and the eventual minimized version will be written to. The third argument is a regex matching the
-error message, e.g. "Unstable formatting" or "Formatter error". The last argument is the command
-with the error, e.g. running the stability check on the candidate file. The script will try various
-strategies to remove parts of the code. If the output of the command still matches, it will use that
-slightly smaller code as starting point for the next iteration, otherwise it will revert and try
-a different strategy until all strategies are exhausted.
-
 ## Helper structs
 
 To abstract formatting something into a helper, create a new struct with the data you want to

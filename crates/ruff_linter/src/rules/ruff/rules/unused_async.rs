@@ -1,8 +1,9 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::identifier::Identifier;
-use ruff_python_ast::visitor::preorder;
+use ruff_python_ast::visitor::source_order;
 use ruff_python_ast::{self as ast, AnyNodeRef, Expr, Stmt};
+use ruff_python_semantic::analyze::function_type::is_stub;
 
 use crate::checkers::ast::Checker;
 
@@ -49,20 +50,12 @@ struct AsyncExprVisitor {
 /// Traverse a function's body to find whether it contains an await-expr, an async-with, or an
 /// async-for. Stop traversing after one is found. The bodies of inner-functions and inner-classes
 /// aren't traversed.
-impl<'a> preorder::PreorderVisitor<'a> for AsyncExprVisitor {
-    fn enter_node(&mut self, _node: AnyNodeRef<'a>) -> preorder::TraversalSignal {
+impl<'a> source_order::SourceOrderVisitor<'a> for AsyncExprVisitor {
+    fn enter_node(&mut self, _node: AnyNodeRef<'a>) -> source_order::TraversalSignal {
         if self.found_await_or_async {
-            preorder::TraversalSignal::Skip
+            source_order::TraversalSignal::Skip
         } else {
-            preorder::TraversalSignal::Traverse
-        }
-    }
-    fn visit_expr(&mut self, expr: &'a Expr) {
-        match expr {
-            Expr::Await(_) => {
-                self.found_await_or_async = true;
-            }
-            _ => preorder::walk_expr(self, expr),
+            source_order::TraversalSignal::Traverse
         }
     }
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
@@ -80,7 +73,22 @@ impl<'a> preorder::PreorderVisitor<'a> for AsyncExprVisitor {
             Stmt::ClassDef(class_def) => {
                 class_def_visit_preorder_except_body(class_def, self);
             }
-            _ => preorder::walk_stmt(self, stmt),
+            _ => source_order::walk_stmt(self, stmt),
+        }
+    }
+    fn visit_expr(&mut self, expr: &'a Expr) {
+        match expr {
+            Expr::Await(_) => {
+                self.found_await_or_async = true;
+            }
+            _ => source_order::walk_expr(self, expr),
+        }
+    }
+    fn visit_comprehension(&mut self, comprehension: &'a ast::Comprehension) {
+        if comprehension.is_async {
+            self.found_await_or_async = true;
+        } else {
+            source_order::walk_comprehension(self, comprehension);
         }
     }
 }
@@ -91,7 +99,7 @@ fn function_def_visit_preorder_except_body<'a, V>(
     function_def: &'a ast::StmtFunctionDef,
     visitor: &mut V,
 ) where
-    V: preorder::PreorderVisitor<'a>,
+    V: source_order::SourceOrderVisitor<'a>,
 {
     let ast::StmtFunctionDef {
         parameters,
@@ -120,7 +128,7 @@ fn function_def_visit_preorder_except_body<'a, V>(
 /// crucially, doesn't traverse the body.
 fn class_def_visit_preorder_except_body<'a, V>(class_def: &'a ast::StmtClassDef, visitor: &mut V)
 where
-    V: preorder::PreorderVisitor<'a>,
+    V: source_order::SourceOrderVisitor<'a>,
 {
     let ast::StmtClassDef {
         arguments,
@@ -160,9 +168,14 @@ pub(crate) fn unused_async(
         return;
     }
 
+    // Ignore stubs (e.g., `...`).
+    if is_stub(function_def, checker.semantic()) {
+        return;
+    }
+
     let found_await_or_async = {
         let mut visitor = AsyncExprVisitor::default();
-        preorder::walk_body(&mut visitor, body);
+        source_order::walk_body(&mut visitor, body);
         visitor.found_await_or_async
     };
 

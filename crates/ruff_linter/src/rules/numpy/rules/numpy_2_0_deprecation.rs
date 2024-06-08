@@ -184,6 +184,12 @@ pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
                     guideline: Some("`add_newdoc_ufunc` is an internal function."),
                 },
             }),
+            ["numpy", "alltrue"] => Some(Replacement {
+                existing: "alltrue",
+                details: Details::AutoPurePython {
+                    python_expr: "all",
+                },
+            }),
             ["numpy", "asfarray"] => Some(Replacement {
                 existing: "asfarray",
                 details: Details::Manual {
@@ -231,6 +237,14 @@ pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
                 details: Details::AutoImport {
                     path: "numpy",
                     name: "complex128",
+                    compatibility: Compatibility::BackwardsCompatible,
+                },
+            }),
+            ["numpy", "cumproduct"] => Some(Replacement {
+                existing: "cumproduct",
+                details: Details::AutoImport {
+                    path: "numpy",
+                    name: "cumprod",
                     compatibility: Compatibility::BackwardsCompatible,
                 },
             }),
@@ -420,6 +434,14 @@ pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
                     compatibility: Compatibility::BackwardsCompatible,
                 },
             }),
+            ["numpy", "product"] => Some(Replacement {
+                existing: "product",
+                details: Details::AutoImport {
+                    path: "numpy",
+                    name: "prod",
+                    compatibility: Compatibility::BackwardsCompatible,
+                },
+            }),
             ["numpy", "PZERO"] => Some(Replacement {
                 existing: "PZERO",
                 details: Details::AutoPurePython { python_expr: "0.0" },
@@ -490,6 +512,12 @@ pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
                     path: "numpy",
                     name: "bytes_",
                     compatibility: Compatibility::BackwardsCompatible,
+                },
+            }),
+            ["numpy", "sometrue"] => Some(Replacement {
+                existing: "sometrue",
+                details: Details::AutoPurePython {
+                    python_expr: "any",
                 },
             }),
             ["numpy", "source"] => Some(Replacement {

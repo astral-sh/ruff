@@ -28,7 +28,7 @@ impl FormatNodeRule<StmtImportFrom> for FormatStmtImportFrom {
                 token("from"),
                 space(),
                 format_with(|f| {
-                    for _ in 0..level.unwrap_or(0) {
+                    for _ in 0..*level {
                         token(".").fmt(f)?;
                     }
                     Ok(())
@@ -71,15 +71,6 @@ impl FormatNodeRule<StmtImportFrom> for FormatStmtImportFrom {
                 .with_dangling_comments(parenthesized_comments)
                 .fmt(f)
         }
-    }
-
-    fn fmt_dangling_comments(
-        &self,
-        _dangling_comments: &[SourceComment],
-        _f: &mut PyFormatter,
-    ) -> FormatResult<()> {
-        // Handled in `fmt_fields`
-        Ok(())
     }
 
     fn is_suppressed(

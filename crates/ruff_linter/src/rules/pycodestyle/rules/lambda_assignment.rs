@@ -196,13 +196,11 @@ fn function(
         value: Some(Box::new(body.clone())),
         range: TextRange::default(),
     });
-    let parameters = parameters
-        .cloned()
-        .unwrap_or_else(|| Parameters::empty(TextRange::default()));
+    let parameters = parameters.cloned().unwrap_or_default();
     if let Some(annotation) = annotation {
         if let Some((arg_types, return_type)) = extract_types(annotation, semantic) {
-            // A `lambda` expression can only have positional and positional-only
-            // arguments. The order is always positional-only first, then positional.
+            // A `lambda` expression can only have positional-only and positional-or-keyword
+            // arguments. The order is always positional-only first, then positional-or-keyword.
             let new_posonlyargs = parameters
                 .posonlyargs
                 .iter()

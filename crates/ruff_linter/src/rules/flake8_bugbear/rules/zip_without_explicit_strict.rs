@@ -17,7 +17,8 @@ use crate::fix::edits::add_argument;
 /// iterable. This can lead to subtle bugs.
 ///
 /// Use the `strict` parameter to raise a `ValueError` if the iterables are of
-/// non-uniform length.
+/// non-uniform length. If the iterables are intentionally different lengths, the
+/// parameter should be explicitly set to `False`.
 ///
 /// ## Example
 /// ```python
@@ -67,7 +68,7 @@ pub(crate) fn zip_without_explicit_strict(checker: &mut Checker, call: &ast::Exp
                 add_argument(
                     "strict=False",
                     &call.arguments,
-                    checker.indexer().comment_ranges(),
+                    checker.comment_ranges(),
                     checker.locator().contents(),
                 ),
                 // If the function call contains `**kwargs`, mark the fix as unsafe.

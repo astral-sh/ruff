@@ -42,6 +42,8 @@ mod tests {
     #[test_case(Rule::HashlibDigestHex, Path::new("FURB181.py"))]
     #[test_case(Rule::ListReverseCopy, Path::new("FURB187.py"))]
     #[test_case(Rule::WriteWholeFile, Path::new("FURB103.py"))]
+    #[test_case(Rule::FStringNumberFormat, Path::new("FURB116.py"))]
+    #[test_case(Rule::SortedMinMax, Path::new("FURB192.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(

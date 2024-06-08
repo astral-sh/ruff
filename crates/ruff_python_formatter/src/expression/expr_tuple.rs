@@ -1,13 +1,13 @@
-use ruff_formatter::{format_args, write, FormatRuleWithOptions};
+use ruff_formatter::{format_args, FormatRuleWithOptions};
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::ExprTuple;
-use ruff_text_size::Ranged;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::builders::parenthesize_if_expands;
-use crate::comments::SourceComment;
 use crate::expression::parentheses::{
     empty_parenthesized, optional_parentheses, parenthesized, NeedsParentheses, OptionalParentheses,
 };
+use crate::other::commas::has_trailing_comma;
 use crate::prelude::*;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Default)]
@@ -138,7 +138,27 @@ impl FormatNodeRule<ExprTuple> for FormatExprTuple {
             }
             [single] => match self.parentheses {
                 TupleParentheses::Preserve if !is_parenthesized => {
-                    write!(f, [single.format(), token(",")])
+                    single.format().fmt(f)?;
+                    // The `TupleParentheses::Preserve` is only set by subscript expression
+                    // formatting. With PEP 646, a single element starred expression in the slice
+                    // position of a subscript expression is actually a tuple expression. For
+                    // example:
+                    //
+                    // ```python
+                    // data[*x]
+                    // #    ^^ single element tuple expression without a trailing comma
+                    //
+                    // data[*x,]
+                    // #    ^^^ single element tuple expression with a trailing comma
+                    // ```
+                    //
+                    //
+                    // This means that the formatter should only add a trailing comma if there is
+                    // one already.
+                    if has_trailing_comma(TextRange::new(single.end(), item.end()), f.context()) {
+                        token(",").fmt(f)?;
+                    }
+                    Ok(())
                 }
                 _ =>
                 // A single element tuple always needs parentheses and a trailing comma, except when inside of a subscript
@@ -181,15 +201,6 @@ impl FormatNodeRule<ExprTuple> for FormatExprTuple {
                 }
             },
         }
-    }
-
-    fn fmt_dangling_comments(
-        &self,
-        _dangling_comments: &[SourceComment],
-        _f: &mut PyFormatter,
-    ) -> FormatResult<()> {
-        // Handled in `fmt_fields`
-        Ok(())
     }
 }
 

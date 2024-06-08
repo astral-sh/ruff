@@ -8,4 +8,9 @@ B008_extended.py:24:51: B008 Do not perform function call `Depends` in argument 
 25 |     ...
    |
 
-
+B008_extended.py:36:15: B008 Do not perform function call `OtherClass` in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable
+   |
+36 | def error(obj=OtherClass()):
+   |               ^^^^^^^^^^^^ B008
+37 |     ...
+   |

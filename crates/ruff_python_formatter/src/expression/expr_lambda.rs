@@ -3,7 +3,7 @@ use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::ExprLambda;
 use ruff_text_size::Ranged;
 
-use crate::comments::{dangling_comments, SourceComment};
+use crate::comments::dangling_comments;
 use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
 use crate::other::parameters::ParametersParentheses;
 use crate::prelude::*;
@@ -62,15 +62,6 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
         }
 
         write!(f, [body.format()])
-    }
-
-    fn fmt_dangling_comments(
-        &self,
-        _dangling_comments: &[SourceComment],
-        _f: &mut PyFormatter,
-    ) -> FormatResult<()> {
-        // Override. Dangling comments are handled in `fmt_fields`.
-        Ok(())
     }
 }
 

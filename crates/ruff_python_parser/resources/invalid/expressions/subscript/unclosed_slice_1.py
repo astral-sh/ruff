@@ -1,0 +1,4 @@
+x[::
+
+def foo():
+    pass

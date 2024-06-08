@@ -1284,3 +1284,337 @@ fn negated_per_file_ignores_overlap() -> Result<()> {
     "###);
     Ok(())
 }
+
+#[test]
+fn unused_interaction() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+[lint]
+select = ["F"]
+"#,
+    )?;
+
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
+    }, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+            .args(STDIN_BASE_OPTIONS)
+            .arg("--config")
+            .arg(&ruff_toml)
+            .args(["--stdin-filename", "test.py"])
+            .arg("--fix")
+            .arg("-")
+            .pass_stdin(r#"
+import os  # F401
+
+def function():
+    import os  # F811
+    print(os.name)
+"#), @r###"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+
+        import os  # F401
+
+        def function():
+            print(os.name)
+
+        ----- stderr -----
+        Found 1 error (1 fixed, 0 remaining).
+        "###);
+    });
+
+    Ok(())
+}
+
+#[test]
+fn add_noqa() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+[lint]
+select = ["RUF015"]
+"#,
+    )?;
+
+    let test_path = tempdir.path().join("noqa.py");
+
+    fs::write(
+        &test_path,
+        r#"
+def first_square():
+    return [x * x for x in range(20)][0]
+"#,
+    )?;
+
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
+    }, {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .current_dir(tempdir.path())
+        .args(STDIN_BASE_OPTIONS)
+        .args(["--config", &ruff_toml.file_name().unwrap().to_string_lossy()])
+        .arg(&test_path)
+        .args(["--add-noqa"])
+        .arg("-")
+        .pass_stdin(r#"
+
+"#), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Added 1 noqa directive.
+    "###);
+    });
+
+    let test_code = std::fs::read_to_string(&test_path).expect("should read test file");
+
+    insta::assert_snapshot!(test_code, @r###"
+    def first_square():
+        return [x * x for x in range(20)][0]  # noqa: RUF015
+    "###);
+
+    Ok(())
+}
+
+#[test]
+fn add_noqa_multiple_codes() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+[lint]
+select = ["ANN001", "ANN201", "ARG001", "D103"]
+"#,
+    )?;
+
+    let test_path = tempdir.path().join("noqa.py");
+
+    fs::write(
+        &test_path,
+        r#"
+def unused(x):
+    pass
+"#,
+    )?;
+
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
+    }, {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .current_dir(tempdir.path())
+        .args(STDIN_BASE_OPTIONS)
+        .args(["--config", &ruff_toml.file_name().unwrap().to_string_lossy()])
+        .arg(&test_path)
+        .arg("--preview")
+        .args(["--add-noqa"])
+        .arg("-")
+        .pass_stdin(r#"
+
+"#), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Added 1 noqa directive.
+    "###);
+    });
+
+    let test_code = std::fs::read_to_string(&test_path).expect("should read test file");
+
+    insta::assert_snapshot!(test_code, @r###"
+
+    def unused(x):  # noqa: ANN001, ANN201, ARG001, D103
+        pass
+    "###);
+
+    Ok(())
+}
+
+#[test]
+fn add_noqa_multiline_diagnostic() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+[lint]
+select = ["I"]
+"#,
+    )?;
+
+    let test_path = tempdir.path().join("noqa.py");
+
+    fs::write(
+        &test_path,
+        r#"
+import z
+import c
+import a
+"#,
+    )?;
+
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
+    }, {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .current_dir(tempdir.path())
+        .args(STDIN_BASE_OPTIONS)
+        .args(["--config", &ruff_toml.file_name().unwrap().to_string_lossy()])
+        .arg(&test_path)
+        .args(["--add-noqa"])
+        .arg("-")
+        .pass_stdin(r#"
+
+"#), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Added 1 noqa directive.
+    "###);
+    });
+
+    let test_code = std::fs::read_to_string(&test_path).expect("should read test file");
+
+    insta::assert_snapshot!(test_code, @r###"
+
+    import z  # noqa: I001
+    import c
+    import a
+    "###);
+
+    Ok(())
+}
+
+#[test]
+fn add_noqa_existing_noqa() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+[lint]
+select = ["ANN001", "ANN201", "ARG001", "D103"]
+"#,
+    )?;
+
+    let test_path = tempdir.path().join("noqa.py");
+
+    fs::write(
+        &test_path,
+        r#"
+def unused(x):  # noqa: ANN001, ARG001, D103
+    pass
+"#,
+    )?;
+
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
+    }, {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .current_dir(tempdir.path())
+        .args(STDIN_BASE_OPTIONS)
+        .args(["--config", &ruff_toml.file_name().unwrap().to_string_lossy()])
+        .arg(&test_path)
+        .arg("--preview")
+        .args(["--add-noqa"])
+        .arg("-")
+        .pass_stdin(r#"
+
+"#), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Added 1 noqa directive.
+    "###);
+    });
+
+    let test_code = std::fs::read_to_string(&test_path).expect("should read test file");
+
+    insta::assert_snapshot!(test_code, @r###"
+
+    def unused(x):  # noqa: ANN001, ANN201, ARG001, D103
+        pass
+    "###);
+
+    Ok(())
+}
+
+#[test]
+fn add_noqa_multiline_comment() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+[lint]
+select = ["UP031"]
+"#,
+    )?;
+
+    let test_path = tempdir.path().join("noqa.py");
+
+    fs::write(
+        &test_path,
+        r#"
+print(
+    """First line
+    second line
+    third line
+      %s"""
+    % name
+)
+"#,
+    )?;
+
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
+    }, {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .current_dir(tempdir.path())
+        .args(STDIN_BASE_OPTIONS)
+        .args(["--config", &ruff_toml.file_name().unwrap().to_string_lossy()])
+        .arg(&test_path)
+        .arg("--preview")
+        .args(["--add-noqa"])
+        .arg("-")
+        .pass_stdin(r#"
+
+"#), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Added 1 noqa directive.
+    "###);
+    });
+
+    let test_code = std::fs::read_to_string(&test_path).expect("should read test file");
+
+    insta::assert_snapshot!(test_code, @r###"
+    print(
+        """First line
+        second line
+        third line
+          %s"""  # noqa: UP031
+        % name
+    )
+    "###);
+
+    Ok(())
+}

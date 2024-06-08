@@ -73,7 +73,7 @@ pub(crate) fn order_imports<'a>(
                         ModuleKey::from_module(
                             Some(alias.name),
                             alias.asname,
-                            None,
+                            0,
                             None,
                             ImportStyle::Straight,
                             settings,
@@ -90,7 +90,7 @@ pub(crate) fn order_imports<'a>(
                 Import((alias, _)) => ModuleKey::from_module(
                     Some(alias.name),
                     alias.asname,
-                    None,
+                    0,
                     None,
                     ImportStyle::Straight,
                     settings,
@@ -110,7 +110,7 @@ pub(crate) fn order_imports<'a>(
             ModuleKey::from_module(
                 Some(alias.name),
                 alias.asname,
-                None,
+                0,
                 None,
                 ImportStyle::Straight,
                 settings,

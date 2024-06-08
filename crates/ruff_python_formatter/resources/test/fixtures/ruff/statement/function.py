@@ -427,3 +427,12 @@ def function_with_one_argument_and_a_keyword_separator(
     *, argument: str
 ) -> ReallyReallyReallyReallyReallyReallyReallyReallyLongName:
     pass
+
+
+# PEP 646 introduced type var tuple in parameter annotation
+# https://peps.python.org/pep-0646/#change-2-args-as-a-typevartuple
+def function_with_variadic_generics(*args: *tuple[int]): ...
+def function_with_variadic_generics(*args: *tuple[int],): ...
+
+# Generic arguments (PEP 695)
+def func[T](lotsoflongargs: T, lotsoflongargs2: T, lotsoflongargs3: T, lotsoflongargs4: T, lotsoflongargs5: T) -> T: ...

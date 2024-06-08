@@ -1,6 +1,6 @@
 [package]
 name = "ruff_linter"
-version = "0.3.7"
+version = "0.4.8"
 publish = false
 authors = { workspace = true }
 edition = { workspace = true }
@@ -13,20 +13,20 @@ license = { workspace = true }
 [lib]
 
 [dependencies]
-ruff_cache = { path = "../ruff_cache" }
-ruff_diagnostics = { path = "../ruff_diagnostics", features = ["serde"] }
-ruff_notebook = { path = "../ruff_notebook" }
-ruff_macros = { path = "../ruff_macros" }
-ruff_python_ast = { path = "../ruff_python_ast", features = ["serde"] }
-ruff_python_codegen = { path = "../ruff_python_codegen" }
-ruff_python_index = { path = "../ruff_python_index" }
-ruff_python_literal = { path = "../ruff_python_literal" }
-ruff_python_semantic = { path = "../ruff_python_semantic" }
-ruff_python_stdlib = { path = "../ruff_python_stdlib" }
-ruff_python_trivia = { path = "../ruff_python_trivia" }
-ruff_python_parser = { path = "../ruff_python_parser" }
-ruff_source_file = { path = "../ruff_source_file", features = ["serde"] }
-ruff_text_size = { path = "../ruff_text_size" }
+ruff_cache = { workspace = true }
+ruff_diagnostics = { workspace = true, features = ["serde"] }
+ruff_notebook = { workspace = true }
+ruff_macros = { workspace = true }
+ruff_python_ast = { workspace = true, features = ["serde"] }
+ruff_python_codegen = { workspace = true }
+ruff_python_index = { workspace = true }
+ruff_python_literal = { workspace = true }
+ruff_python_semantic = { workspace = true }
+ruff_python_stdlib = { workspace = true }
+ruff_python_trivia = { workspace = true }
+ruff_python_parser = { workspace = true }
+ruff_source_file = { workspace = true, features = ["serde"] }
+ruff_text_size = { workspace = true }
 
 aho-corasick = { workspace = true }
 annotate-snippets = { workspace = true, features = ["color"] }
@@ -56,7 +56,6 @@ pep440_rs = { workspace = true, features = ["serde"] }
 pyproject-toml = { workspace = true }
 quick-junit = { workspace = true }
 regex = { workspace = true }
-result-like = { workspace = true }
 rustc-hash = { workspace = true }
 schemars = { workspace = true, optional = true }
 serde = { workspace = true }

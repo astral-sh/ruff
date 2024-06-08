@@ -108,7 +108,7 @@ impl<'a> ClauseHeader<'a> {
                 returns,
                 body: _,
             }) => {
-                if let Some(type_params) = type_params.as_ref() {
+                if let Some(type_params) = type_params.as_deref() {
                     visit(type_params, visitor);
                 }
                 visit(parameters.as_ref(), visitor);

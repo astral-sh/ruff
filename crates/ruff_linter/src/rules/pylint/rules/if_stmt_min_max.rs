@@ -160,7 +160,7 @@ pub(crate) fn if_stmt_min_max(checker: &mut Checker, stmt_if: &ast::StmtIf) {
             parenthesized_range(
                 body_target.into(),
                 body.into(),
-                checker.indexer().comment_ranges(),
+                checker.comment_ranges(),
                 checker.locator().contents()
             )
             .unwrap_or(body_target.range())
@@ -177,7 +177,7 @@ pub(crate) fn if_stmt_min_max(checker: &mut Checker, stmt_if: &ast::StmtIf) {
         stmt_if.range(),
     );
 
-    if checker.semantic().is_builtin(min_max.as_str()) {
+    if checker.semantic().has_builtin_binding(min_max.as_str()) {
         diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
             replacement,
             stmt_if.range(),

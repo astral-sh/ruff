@@ -14,7 +14,7 @@ use crate::rules::pycodestyle::rules::logical_lines::LogicalLine;
 /// ## Why is this bad?
 /// An inline comment is a comment on the same line as a statement.
 ///
-/// Per PEP8, inline comments should be separated by at least two spaces from
+/// Per [PEP 8], inline comments should be separated by at least two spaces from
 /// the preceding statement.
 ///
 /// ## Example
@@ -27,6 +27,8 @@ use crate::rules::pycodestyle::rules::logical_lines::LogicalLine;
 /// x = x + 1  # Increment x
 /// x = x + 1    # Increment x
 /// ```
+///
+/// [PEP 8]: https://peps.python.org/pep-0008/#comments
 #[violation]
 pub struct TooFewSpacesBeforeInlineComment;
 
@@ -47,7 +49,7 @@ impl AlwaysFixableViolation for TooFewSpacesBeforeInlineComment {
 /// ## Why is this bad?
 /// An inline comment is a comment on the same line as a statement.
 ///
-/// Per PEP8, inline comments should start with a # and a single space.
+/// Per [PEP 8], inline comments should start with a # and a single space.
 ///
 /// ## Example
 /// ```python
@@ -78,13 +80,16 @@ impl AlwaysFixableViolation for NoSpaceAfterInlineComment {
 }
 
 /// ## What it does
-/// Checks if one space is used after block comments.
+/// Checks for block comments that lack a single space after the leading `#` character.
 ///
 /// ## Why is this bad?
-/// Per PEP8, "Block comments generally consist of one or more paragraphs built
+/// Per [PEP 8], "Block comments generally consist of one or more paragraphs built
 /// out of complete sentences, with each sentence ending in a period."
 ///
-/// Block comments should start with a # and a single space.
+/// Block comments should start with a `#` followed by a single space.
+///
+/// Shebangs (lines starting with `#!`, at the top of a file) are exempt from this
+/// rule.
 ///
 /// ## Example
 /// ```python
@@ -93,9 +98,7 @@ impl AlwaysFixableViolation for NoSpaceAfterInlineComment {
 ///
 /// Use instead:
 /// ```python
-/// # Block comments:
-/// #  - Block comment list
-/// # \xa0- Block comment list
+/// # Block comment
 /// ```
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#comments
@@ -114,13 +117,16 @@ impl AlwaysFixableViolation for NoSpaceAfterBlockComment {
 }
 
 /// ## What it does
-/// Checks if block comments start with a single "#".
+/// Checks for block comments that start with multiple leading `#` characters.
 ///
 /// ## Why is this bad?
-/// Per PEP8, "Block comments generally consist of one or more paragraphs built
+/// Per [PEP 8], "Block comments generally consist of one or more paragraphs built
 /// out of complete sentences, with each sentence ending in a period."
 ///
-/// Each line of a block comment should start with a # and a single space.
+/// Each line of a block comment should start with a `#` followed by a single space.
+///
+/// Shebangs (lines starting with `#!`, at the top of a file) are exempt from this
+/// rule.
 ///
 /// ## Example
 /// ```python
@@ -129,9 +135,16 @@ impl AlwaysFixableViolation for NoSpaceAfterBlockComment {
 ///
 /// Use instead:
 /// ```python
-/// # Block comments:
-/// #  - Block comment list
-/// # \xa0- Block comment list
+/// # Block comment
+/// ```
+///
+/// Alternatively, this rule makes an exception for comments that consist
+/// solely of `#` characters, as in:
+///
+/// ```python
+/// ##############
+/// # Block header
+/// ##############
 /// ```
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#comments

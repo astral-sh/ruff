@@ -193,21 +193,33 @@ pub(crate) fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
     }
 
     // Generate the replacement condition.
-    let condition = if checker.indexer().has_comments(&range, checker.locator()) {
+    let condition = if checker
+        .comment_ranges()
+        .has_comments(&range, checker.locator())
+    {
         None
     } else {
         // If the return values are inverted, wrap the condition in a `not`.
         if inverted {
-            Some(Expr::UnaryOp(ast::ExprUnaryOp {
+            if let Expr::UnaryOp(ast::ExprUnaryOp {
                 op: ast::UnaryOp::Not,
-                operand: Box::new(if_test.clone()),
-                range: TextRange::default(),
-            }))
+                operand,
+                ..
+            }) = if_test
+            {
+                Some((**operand).clone())
+            } else {
+                Some(Expr::UnaryOp(ast::ExprUnaryOp {
+                    op: ast::UnaryOp::Not,
+                    operand: Box::new(if_test.clone()),
+                    range: TextRange::default(),
+                }))
+            }
         } else if if_test.is_compare_expr() {
             // If the condition is a comparison, we can replace it with the condition, since we
             // know it's a boolean.
             Some(if_test.clone())
-        } else if checker.semantic().is_builtin("bool") {
+        } else if checker.semantic().has_builtin_binding("bool") {
             // Otherwise, we need to wrap the condition in a call to `bool`.
             let func_node = ast::ExprName {
                 id: "bool".into(),

@@ -58,7 +58,7 @@ jobs:
           path: dist
 
   macos-x86_64:
-    runs-on: macos-latest
+    runs-on: macos-12
     steps:
       - uses: actions/checkout@v4
         with:
@@ -97,8 +97,8 @@ jobs:
             *.tar.gz
             *.sha256
 
-  macos-universal:
-    runs-on: macos-latest
+  macos-aarch64:
+    runs-on: macos-14
     steps:
       - uses: actions/checkout@v4
         with:
@@ -106,16 +106,17 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-          architecture: x64
+          architecture: arm64
       - name: "Prep README.md"
         run: python scripts/transform_readme.py --target pypi
-      - name: "Build wheels - universal2"
+      - name: "Build wheels - aarch64"
         uses: PyO3/maturin-action@v1
         with:
-          args: --release --locked --target universal2-apple-darwin --out dist
-      - name: "Test wheel - universal2"
+          target: aarch64
+          args: --release --locked --out dist
+      - name: "Test wheel - aarch64"
         run: |
-          pip install dist/${{ env.PACKAGE_NAME }}-*universal2.whl --force-reinstall
+          pip install dist/${{ env.PACKAGE_NAME }}-*.whl --force-reinstall
           ruff --help
           python -m ruff --help
       - name: "Upload wheels"
@@ -451,7 +452,7 @@ jobs:
     name: Upload to PyPI
     runs-on: ubuntu-latest
     needs:
-      - macos-universal
+      - macos-aarch64
       - macos-x86_64
       - windows
       - linux

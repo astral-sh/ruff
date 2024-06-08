@@ -1,8 +1,10 @@
-use std::ops::Deref;
+use std::{ops::Deref, path::PathBuf, str::FromStr};
 
 use lsp_types::Url;
 use rustc_hash::FxHashMap;
 use serde::Deserialize;
+
+use ruff_linter::{line_width::LineLength, RuleSelector};
 
 /// Maps a workspace URI to its associated client settings. Used during server initialization.
 pub(crate) type WorkspaceSettingsMap = FxHashMap<Url, ClientSettings>;
@@ -10,17 +12,48 @@ pub(crate) type WorkspaceSettingsMap = FxHashMap<Url, ClientSettings>;
 /// Resolved client settings for a specific document. These settings are meant to be
 /// used directly by the server, and are *not* a 1:1 representation with how the client
 /// sends them.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 #[allow(clippy::struct_excessive_bools)]
 pub(crate) struct ResolvedClientSettings {
     fix_all: bool,
     organize_imports: bool,
     lint_enable: bool,
-    // TODO(jane): Remove once noqa auto-fix is implemented
-    #[allow(dead_code)]
     disable_rule_comment_enable: bool,
     fix_violation_enable: bool,
+    editor_settings: ResolvedEditorSettings,
+}
+
+/// Contains the resolved values of 'editor settings' - Ruff configuration for the linter/formatter that was passed in via
+/// LSP client settings. These fields are optional because we don't want to override file-based linter/formatting settings
+/// if these were un-set.
+#[derive(Clone, Debug)]
+#[cfg_attr(test, derive(PartialEq, Eq))]
+pub(crate) struct ResolvedEditorSettings {
+    pub(super) configuration: Option<PathBuf>,
+    pub(super) lint_preview: Option<bool>,
+    pub(super) format_preview: Option<bool>,
+    pub(super) select: Option<Vec<RuleSelector>>,
+    pub(super) extend_select: Option<Vec<RuleSelector>>,
+    pub(super) ignore: Option<Vec<RuleSelector>>,
+    pub(super) exclude: Option<Vec<String>>,
+    pub(super) line_length: Option<LineLength>,
+    pub(super) configuration_preference: ConfigurationPreference,
+}
+
+/// Determines how multiple conflicting configurations should be resolved - in this
+/// case, the configuration from the client settings and configuration from local
+/// `.toml` files (aka 'workspace' configuration).
+#[derive(Clone, Copy, Debug, Deserialize, Default, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub(crate) enum ConfigurationPreference {
+    /// Configuration set in the editor takes priority over configuration set in `.toml` files.
+    #[default]
+    EditorFirst,
+    /// Configuration set in `.toml` files takes priority over configuration set in the editor.
+    FilesystemFirst,
+    /// `.toml` files are ignored completely, and only the editor configuration is used.
+    EditorOnly,
 }
 
 /// This is a direct representation of the settings schema sent by the client.
@@ -28,10 +61,15 @@ pub(crate) struct ResolvedClientSettings {
 #[cfg_attr(test, derive(PartialEq, Eq))]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ClientSettings {
+    configuration: Option<String>,
     fix_all: Option<bool>,
     organize_imports: Option<bool>,
-    lint: Option<Lint>,
-    code_action: Option<CodeAction>,
+    lint: Option<LintOptions>,
+    format: Option<FormatOptions>,
+    code_action: Option<CodeActionOptions>,
+    exclude: Option<Vec<String>>,
+    line_length: Option<LineLength>,
+    configuration_preference: Option<ConfigurationPreference>,
 }
 
 /// This is a direct representation of the workspace settings schema,
@@ -49,22 +87,33 @@ struct WorkspaceSettings {
 #[derive(Debug, Deserialize)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 #[serde(rename_all = "camelCase")]
-struct Lint {
+struct LintOptions {
     enable: Option<bool>,
+    preview: Option<bool>,
+    select: Option<Vec<String>>,
+    extend_select: Option<Vec<String>>,
+    ignore: Option<Vec<String>>,
 }
 
 #[derive(Debug, Default, Deserialize)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 #[serde(rename_all = "camelCase")]
-struct CodeAction {
-    disable_rule_comment: Option<CodeActionSettings>,
-    fix_violation: Option<CodeActionSettings>,
+struct FormatOptions {
+    preview: Option<bool>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[cfg_attr(test, derive(PartialEq, Eq))]
+#[serde(rename_all = "camelCase")]
+struct CodeActionOptions {
+    disable_rule_comment: Option<CodeActionParameters>,
+    fix_violation: Option<CodeActionParameters>,
 }
 
 #[derive(Debug, Deserialize)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 #[serde(rename_all = "camelCase")]
-struct CodeActionSettings {
+struct CodeActionParameters {
     enable: Option<bool>,
 }
 
@@ -81,7 +130,8 @@ enum InitializationOptions {
         workspace_settings: Vec<WorkspaceSettings>,
     },
     GlobalOnly {
-        settings: Option<ClientSettings>,
+        #[serde(default)]
+        settings: ClientSettings,
     },
 }
 
@@ -108,7 +158,7 @@ impl AllSettings {
 
     fn from_init_options(options: InitializationOptions) -> Self {
         let (global_settings, workspace_settings) = match options {
-            InitializationOptions::GlobalOnly { settings } => (settings.unwrap_or_default(), None),
+            InitializationOptions::GlobalOnly { settings } => (settings, None),
             InitializationOptions::HasWorkspaces {
                 global_settings,
                 workspace_settings,
@@ -179,22 +229,83 @@ impl ResolvedClientSettings {
                 },
                 true,
             ),
+            editor_settings: ResolvedEditorSettings {
+                configuration: Self::resolve_optional(all_settings, |settings| {
+                    settings
+                        .configuration
+                        .as_ref()
+                        .and_then(|config_path| shellexpand::full(config_path).ok())
+                        .map(|config_path| PathBuf::from(config_path.as_ref()))
+                }),
+                lint_preview: Self::resolve_optional(all_settings, |settings| {
+                    settings.lint.as_ref()?.preview
+                }),
+                format_preview: Self::resolve_optional(all_settings, |settings| {
+                    settings.format.as_ref()?.preview
+                }),
+                select: Self::resolve_optional(all_settings, |settings| {
+                    settings
+                        .lint
+                        .as_ref()?
+                        .select
+                        .as_ref()?
+                        .iter()
+                        .map(|rule| RuleSelector::from_str(rule).ok())
+                        .collect()
+                }),
+                extend_select: Self::resolve_optional(all_settings, |settings| {
+                    settings
+                        .lint
+                        .as_ref()?
+                        .extend_select
+                        .as_ref()?
+                        .iter()
+                        .map(|rule| RuleSelector::from_str(rule).ok())
+                        .collect()
+                }),
+                ignore: Self::resolve_optional(all_settings, |settings| {
+                    settings
+                        .lint
+                        .as_ref()?
+                        .ignore
+                        .as_ref()?
+                        .iter()
+                        .map(|rule| RuleSelector::from_str(rule).ok())
+                        .collect()
+                }),
+                exclude: Self::resolve_optional(all_settings, |settings| settings.exclude.clone()),
+                line_length: Self::resolve_optional(all_settings, |settings| settings.line_length),
+                configuration_preference: Self::resolve_or(
+                    all_settings,
+                    |settings| settings.configuration_preference,
+                    ConfigurationPreference::EditorFirst,
+                ),
+            },
         }
+    }
+
+    /// Attempts to resolve a setting using a list of available client settings as sources.
+    /// Client settings that come earlier in the list take priority. This function is for fields
+    /// that do not have a default value and should be left unset.
+    /// Use [`ResolvedClientSettings::resolve_or`] for settings that should have default values.
+    fn resolve_optional<T>(
+        all_settings: &[&ClientSettings],
+        get: impl Fn(&ClientSettings) -> Option<T>,
+    ) -> Option<T> {
+        all_settings.iter().map(Deref::deref).find_map(get)
     }
 
     /// Attempts to resolve a setting using a list of available client settings as sources.
     /// Client settings that come earlier in the list take priority. `default` will be returned
     /// if none of the settings specify the requested setting.
+    /// Use [`ResolvedClientSettings::resolve_optional`] if the setting should be optional instead
+    /// of having a default value.
     fn resolve_or<T>(
         all_settings: &[&ClientSettings],
         get: impl Fn(&ClientSettings) -> Option<T>,
         default: T,
     ) -> T {
-        all_settings
-            .iter()
-            .map(Deref::deref)
-            .find_map(get)
-            .unwrap_or(default)
+        Self::resolve_optional(all_settings, get).unwrap_or(default)
     }
 }
 
@@ -211,14 +322,24 @@ impl ResolvedClientSettings {
         self.lint_enable
     }
 
+    pub(crate) fn noqa_comments(&self) -> bool {
+        self.disable_rule_comment_enable
+    }
+
     pub(crate) fn fix_violation(&self) -> bool {
         self.fix_violation_enable
+    }
+
+    pub(crate) fn editor_settings(&self) -> &ResolvedEditorSettings {
+        &self.editor_settings
     }
 }
 
 impl Default for InitializationOptions {
     fn default() -> Self {
-        Self::GlobalOnly { settings: None }
+        Self::GlobalOnly {
+            settings: ClientSettings::default(),
+        }
     }
 }
 
@@ -227,8 +348,12 @@ mod tests {
     use insta::assert_debug_snapshot;
     use serde::de::DeserializeOwned;
 
+    #[cfg(not(windows))]
+    use ruff_linter::registry::Linter;
+
     use super::*;
 
+    #[cfg(not(windows))]
     const VS_CODE_INIT_OPTIONS_FIXTURE: &str =
         include_str!("../../resources/test/fixtures/settings/vs_code_initialization_options.json");
     const GLOBAL_ONLY_INIT_OPTIONS_FIXTURE: &str =
@@ -240,6 +365,7 @@ mod tests {
         serde_json::from_str(content).expect("test fixture JSON should deserialize")
     }
 
+    #[cfg(not(windows))]
     #[test]
     fn test_vs_code_init_options_deserialize() {
         let options: InitializationOptions = deserialize_fixture(VS_CODE_INIT_OPTIONS_FIXTURE);
@@ -247,6 +373,7 @@ mod tests {
         assert_debug_snapshot!(options, @r###"
         HasWorkspaces {
             global_settings: ClientSettings {
+                configuration: None,
                 fix_all: Some(
                     false,
                 ),
@@ -254,23 +381,39 @@ mod tests {
                     true,
                 ),
                 lint: Some(
-                    Lint {
+                    LintOptions {
                         enable: Some(
                             true,
                         ),
+                        preview: Some(
+                            true,
+                        ),
+                        select: Some(
+                            [
+                                "F",
+                                "I",
+                            ],
+                        ),
+                        extend_select: None,
+                        ignore: None,
+                    },
+                ),
+                format: Some(
+                    FormatOptions {
+                        preview: None,
                     },
                 ),
                 code_action: Some(
-                    CodeAction {
+                    CodeActionOptions {
                         disable_rule_comment: Some(
-                            CodeActionSettings {
+                            CodeActionParameters {
                                 enable: Some(
                                     false,
                                 ),
                             },
                         ),
                         fix_violation: Some(
-                            CodeActionSettings {
+                            CodeActionParameters {
                                 enable: Some(
                                     false,
                                 ),
@@ -278,10 +421,14 @@ mod tests {
                         ),
                     },
                 ),
+                exclude: None,
+                line_length: None,
+                configuration_preference: None,
             },
             workspace_settings: [
                 WorkspaceSettings {
                     settings: ClientSettings {
+                        configuration: None,
                         fix_all: Some(
                             true,
                         ),
@@ -289,23 +436,32 @@ mod tests {
                             true,
                         ),
                         lint: Some(
-                            Lint {
+                            LintOptions {
                                 enable: Some(
                                     true,
                                 ),
+                                preview: None,
+                                select: None,
+                                extend_select: None,
+                                ignore: None,
+                            },
+                        ),
+                        format: Some(
+                            FormatOptions {
+                                preview: None,
                             },
                         ),
                         code_action: Some(
-                            CodeAction {
+                            CodeActionOptions {
                                 disable_rule_comment: Some(
-                                    CodeActionSettings {
+                                    CodeActionParameters {
                                         enable: Some(
                                             false,
                                         ),
                                     },
                                 ),
                                 fix_violation: Some(
-                                    CodeActionSettings {
+                                    CodeActionParameters {
                                         enable: Some(
                                             false,
                                         ),
@@ -313,6 +469,9 @@ mod tests {
                                 ),
                             },
                         ),
+                        exclude: None,
+                        line_length: None,
+                        configuration_preference: None,
                     },
                     workspace: Url {
                         scheme: "file",
@@ -328,6 +487,7 @@ mod tests {
                 },
                 WorkspaceSettings {
                     settings: ClientSettings {
+                        configuration: None,
                         fix_all: Some(
                             true,
                         ),
@@ -335,23 +495,34 @@ mod tests {
                             true,
                         ),
                         lint: Some(
-                            Lint {
+                            LintOptions {
                                 enable: Some(
                                     true,
                                 ),
+                                preview: Some(
+                                    false,
+                                ),
+                                select: None,
+                                extend_select: None,
+                                ignore: None,
+                            },
+                        ),
+                        format: Some(
+                            FormatOptions {
+                                preview: None,
                             },
                         ),
                         code_action: Some(
-                            CodeAction {
+                            CodeActionOptions {
                                 disable_rule_comment: Some(
-                                    CodeActionSettings {
+                                    CodeActionParameters {
                                         enable: Some(
                                             true,
                                         ),
                                     },
                                 ),
                                 fix_violation: Some(
-                                    CodeActionSettings {
+                                    CodeActionParameters {
                                         enable: Some(
                                             false,
                                         ),
@@ -359,6 +530,9 @@ mod tests {
                                 ),
                             },
                         ),
+                        exclude: None,
+                        line_length: None,
+                        configuration_preference: None,
                     },
                     workspace: Url {
                         scheme: "file",
@@ -377,6 +551,7 @@ mod tests {
         "###);
     }
 
+    #[cfg(not(windows))]
     #[test]
     fn test_vs_code_workspace_settings_resolve() {
         let options = deserialize_fixture(VS_CODE_INIT_OPTIONS_FIXTURE);
@@ -384,12 +559,13 @@ mod tests {
             global_settings,
             workspace_settings,
         } = AllSettings::from_init_options(options);
-        let url = Url::parse("file:///Users/test/projects/pandas").expect("url should parse");
+        let path =
+            Url::from_str("file:///Users/test/projects/pandas").expect("path should be valid");
         let workspace_settings = workspace_settings.expect("workspace settings should exist");
         assert_eq!(
             ResolvedClientSettings::with_workspace(
                 workspace_settings
-                    .get(&url)
+                    .get(&path)
                     .expect("workspace setting should exist"),
                 &global_settings
             ),
@@ -399,13 +575,28 @@ mod tests {
                 lint_enable: true,
                 disable_rule_comment_enable: false,
                 fix_violation_enable: false,
+                editor_settings: ResolvedEditorSettings {
+                    configuration: None,
+                    lint_preview: Some(true),
+                    format_preview: None,
+                    select: Some(vec![
+                        RuleSelector::Linter(Linter::Pyflakes),
+                        RuleSelector::Linter(Linter::Isort)
+                    ]),
+                    extend_select: None,
+                    ignore: None,
+                    exclude: None,
+                    line_length: None,
+                    configuration_preference: ConfigurationPreference::default(),
+                }
             }
         );
-        let url = Url::parse("file:///Users/test/projects/scipy").expect("url should parse");
+        let path =
+            Url::from_str("file:///Users/test/projects/scipy").expect("path should be valid");
         assert_eq!(
             ResolvedClientSettings::with_workspace(
                 workspace_settings
-                    .get(&url)
+                    .get(&path)
                     .expect("workspace setting should exist"),
                 &global_settings
             ),
@@ -415,6 +606,20 @@ mod tests {
                 lint_enable: true,
                 disable_rule_comment_enable: true,
                 fix_violation_enable: false,
+                editor_settings: ResolvedEditorSettings {
+                    configuration: None,
+                    lint_preview: Some(false),
+                    format_preview: None,
+                    select: Some(vec![
+                        RuleSelector::Linter(Linter::Pyflakes),
+                        RuleSelector::Linter(Linter::Isort)
+                    ]),
+                    extend_select: None,
+                    ignore: None,
+                    exclude: None,
+                    line_length: None,
+                    configuration_preference: ConfigurationPreference::EditorFirst,
+                }
             }
         );
     }
@@ -425,31 +630,50 @@ mod tests {
 
         assert_debug_snapshot!(options, @r###"
         GlobalOnly {
-            settings: Some(
-                ClientSettings {
-                    fix_all: Some(
-                        false,
+            settings: ClientSettings {
+                configuration: None,
+                fix_all: Some(
+                    false,
+                ),
+                organize_imports: None,
+                lint: Some(
+                    LintOptions {
+                        enable: None,
+                        preview: None,
+                        select: None,
+                        extend_select: None,
+                        ignore: Some(
+                            [
+                                "RUF001",
+                            ],
+                        ),
+                    },
+                ),
+                format: None,
+                code_action: Some(
+                    CodeActionOptions {
+                        disable_rule_comment: Some(
+                            CodeActionParameters {
+                                enable: Some(
+                                    false,
+                                ),
+                            },
+                        ),
+                        fix_violation: None,
+                    },
+                ),
+                exclude: Some(
+                    [
+                        "third_party",
+                    ],
+                ),
+                line_length: Some(
+                    LineLength(
+                        80,
                     ),
-                    organize_imports: None,
-                    lint: Some(
-                        Lint {
-                            enable: None,
-                        },
-                    ),
-                    code_action: Some(
-                        CodeAction {
-                            disable_rule_comment: Some(
-                                CodeActionSettings {
-                                    enable: Some(
-                                        false,
-                                    ),
-                                },
-                            ),
-                            fix_violation: None,
-                        },
-                    ),
-                },
-            ),
+                ),
+                configuration_preference: None,
+            },
         }
         "###);
     }
@@ -469,6 +693,17 @@ mod tests {
                 lint_enable: true,
                 disable_rule_comment_enable: false,
                 fix_violation_enable: true,
+                editor_settings: ResolvedEditorSettings {
+                    configuration: None,
+                    lint_preview: None,
+                    format_preview: None,
+                    select: None,
+                    extend_select: None,
+                    ignore: Some(vec![RuleSelector::from_str("RUF001").unwrap()]),
+                    exclude: Some(vec!["third_party".into()]),
+                    line_length: Some(LineLength::try_from(80).unwrap()),
+                    configuration_preference: ConfigurationPreference::EditorFirst,
+                }
             }
         );
     }

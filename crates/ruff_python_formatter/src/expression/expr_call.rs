@@ -2,7 +2,7 @@ use ruff_formatter::FormatRuleWithOptions;
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::{Expr, ExprCall};
 
-use crate::comments::{dangling_comments, SourceComment};
+use crate::comments::dangling_comments;
 use crate::expression::parentheses::{
     is_expression_parenthesized, NeedsParentheses, OptionalParentheses, Parentheses,
 };
@@ -73,14 +73,6 @@ impl FormatNodeRule<ExprCall> for FormatExprCall {
         } else {
             fmt_func.fmt(f)
         }
-    }
-
-    fn fmt_dangling_comments(
-        &self,
-        _dangling_comments: &[SourceComment],
-        _f: &mut PyFormatter,
-    ) -> FormatResult<()> {
-        Ok(())
     }
 }
 

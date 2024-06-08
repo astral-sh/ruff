@@ -1,6 +1,6 @@
 [package]
 name = "ruff"
-version = "0.3.7"
+version = "0.4.8"
 publish = false
 authors = { workspace = true }
 edition = { workspace = true }
@@ -13,17 +13,17 @@ readme = "../../README.md"
 default-run = "ruff"
 
 [dependencies]
-ruff_cache = { path = "../ruff_cache" }
-ruff_diagnostics = { path = "../ruff_diagnostics" }
-ruff_linter = { path = "../ruff_linter", features = ["clap"] }
-ruff_macros = { path = "../ruff_macros" }
-ruff_notebook = { path = "../ruff_notebook" }
-ruff_python_ast = { path = "../ruff_python_ast" }
-ruff_python_formatter = { path = "../ruff_python_formatter" }
-ruff_server = { path = "../ruff_server" }
-ruff_source_file = { path = "../ruff_source_file" }
-ruff_text_size = { path = "../ruff_text_size" }
-ruff_workspace = { path = "../ruff_workspace" }
+ruff_cache = { workspace = true }
+ruff_diagnostics = { workspace = true }
+ruff_linter = { workspace = true, features = ["clap"] }
+ruff_macros = { workspace = true }
+ruff_notebook = { workspace = true }
+ruff_python_ast = { workspace = true }
+ruff_python_formatter = { workspace = true }
+ruff_server = { workspace = true }
+ruff_source_file = { workspace = true }
+ruff_text_size = { workspace = true }
+ruff_workspace = { workspace = true }
 
 anyhow = { workspace = true }
 argfile = { workspace = true }
@@ -41,7 +41,6 @@ is-macro = { workspace = true }
 itertools = { workspace = true }
 log = { workspace = true }
 notify = { workspace = true }
-num_cpus = { workspace = true }
 path-absolutize = { workspace = true, features = ["once_cell_cache"] }
 rayon = { workspace = true }
 regex = { workspace = true }
@@ -61,13 +60,17 @@ wild = { workspace = true }
 
 [dev-dependencies]
 # Enable test rules during development
-ruff_linter = { path = "../ruff_linter", features = ["clap", "test-rules"] }
+ruff_linter = { workspace = true, features = ["clap", "test-rules"] }
 # Avoid writing colored snapshots when running tests from the terminal
 colored = { workspace = true, features = ["no-color"] }
 insta = { workspace = true, features = ["filters", "json"] }
 insta-cmd = { workspace = true }
 tempfile = { workspace = true }
 test-case = { workspace = true }
+
+[package.metadata.cargo-shear]
+# Used via macro expansion.
+ignored = ["chrono"]
 
 [target.'cfg(target_os = "windows")'.dependencies]
 mimalloc = { workspace = true }

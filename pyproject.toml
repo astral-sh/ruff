@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "ruff"
-version = "0.3.7"
+version = "0.4.8"
 description = "An extremely fast Python linter and code formatter, written in Rust."
 authors = [{ name = "Astral Software Inc.", email = "hey@astral.sh" }]
 readme = "README.md"
@@ -31,6 +31,7 @@ classifiers = [
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
   "Programming Language :: Python :: 3 :: Only",
   "Programming Language :: Rust",
   "Topic :: Software Development :: Libraries :: Python Modules",
@@ -58,9 +59,11 @@ include = [
 
 [tool.ruff]
 extend-exclude = [
+  "crates/red_knot/vendor/",
   "crates/ruff/resources/",
   "crates/ruff_linter/resources/",
-  "crates/ruff_python_formatter/resources/"
+  "crates/ruff_python_formatter/resources/",
+  "crates/ruff_python_parser/resources/"
 ]
 
 [tool.ruff.lint]
@@ -72,8 +75,10 @@ ignore = [
 [tool.black]
 force-exclude = '''
 /(
+  | crates/red_knot/vendor
   | crates/ruff_linter/resources
   | crates/ruff_python_formatter/resources
+  | crates/ruff_python_parser/resources
 )/
 '''
 
@@ -82,7 +87,7 @@ major_labels = []  # Ruff never uses the major version number
 minor_labels = ["breaking"]   # Bump the minor version on breaking changes
 version_tag_prefix = "v"
 
-changelog_ignore_labels = ["internal", "ci"]
+changelog_ignore_labels = ["internal", "ci", "red-knot"]
 
 changelog_sections.breaking = "Breaking changes"
 changelog_sections.preview = "Preview features"
@@ -104,6 +109,5 @@ version_files = [
   "docs/integrations.md",
   "crates/ruff/Cargo.toml",
   "crates/ruff_linter/Cargo.toml",
-  "crates/ruff_shrinking/Cargo.toml",
   "scripts/benchmarks/pyproject.toml",
 ]

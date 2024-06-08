@@ -1,9 +1,14 @@
+use std::borrow::Cow;
+
 use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::contains_effect;
 use ruff_python_ast::parenthesize::parenthesized_range;
+use ruff_python_ast::Expr;
+use ruff_python_trivia::CommentRanges;
+use ruff_source_file::Locator;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -64,33 +69,17 @@ pub(crate) fn if_exp_instead_of_or_operator(checker: &mut Checker, if_expr: &ast
 
     let mut diagnostic = Diagnostic::new(IfExpInsteadOfOrOperator, *range);
 
-    // Grab the range of the `test` and `orelse` expressions.
-    let left = parenthesized_range(
-        test.into(),
-        if_expr.into(),
-        checker.indexer().comment_ranges(),
-        checker.locator().contents(),
-    )
-    .unwrap_or(test.range());
-    let right = parenthesized_range(
-        orelse.into(),
-        if_expr.into(),
-        checker.indexer().comment_ranges(),
-        checker.locator().contents(),
-    )
-    .unwrap_or(orelse.range());
-
     // Replace with `{test} or {orelse}`.
     diagnostic.set_fix(Fix::applicable_edit(
         Edit::range_replacement(
             format!(
                 "{} or {}",
-                checker.locator().slice(left),
-                checker.locator().slice(right),
+                parenthesize_test(test, if_expr, checker.comment_ranges(), checker.locator()),
+                parenthesize_test(orelse, if_expr, checker.comment_ranges(), checker.locator()),
             ),
             if_expr.range(),
         ),
-        if contains_effect(body, |id| checker.semantic().is_builtin(id)) {
+        if contains_effect(body, |id| checker.semantic().has_builtin_binding(id)) {
             Applicability::Unsafe
         } else {
             Applicability::Safe
@@ -98,4 +87,31 @@ pub(crate) fn if_exp_instead_of_or_operator(checker: &mut Checker, if_expr: &ast
     ));
 
     checker.diagnostics.push(diagnostic);
+}
+
+/// Parenthesize an expression for use in an `or` operator (e.g., parenthesize `x` in `x or y`),
+/// if it's required to maintain the correct order of operations.
+///
+/// If the expression is already parenthesized, it will be returned as-is regardless of whether
+/// the parentheses are required.
+///
+/// See: <https://docs.python.org/3/reference/expressions.html#operator-precedence>
+fn parenthesize_test<'a>(
+    expr: &Expr,
+    if_expr: &ast::ExprIf,
+    comment_ranges: &CommentRanges,
+    locator: &Locator<'a>,
+) -> Cow<'a, str> {
+    if let Some(range) = parenthesized_range(
+        expr.into(),
+        if_expr.into(),
+        comment_ranges,
+        locator.contents(),
+    ) {
+        Cow::Borrowed(locator.slice(range))
+    } else if matches!(expr, Expr::If(_) | Expr::Lambda(_) | Expr::Named(_)) {
+        Cow::Owned(format!("({})", locator.slice(expr.range())))
+    } else {
+        Cow::Borrowed(locator.slice(expr.range()))
+    }
 }

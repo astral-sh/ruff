@@ -270,7 +270,7 @@ pub(crate) fn double_negation(checker: &mut Checker, expr: &Expr, op: UnaryOp, o
             checker.locator().slice(operand.as_ref()).to_string(),
             expr.range(),
         )));
-    } else if checker.semantic().is_builtin("bool") {
+    } else if checker.semantic().has_builtin_binding("bool") {
         let node = ast::ExprName {
             id: "bool".into(),
             ctx: ExprContext::Load,

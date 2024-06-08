@@ -148,7 +148,7 @@ pub(crate) fn boolean_type_hint_positional_argument(
         }
 
         // If `bool` isn't actually a reference to the `bool` built-in, return.
-        if !checker.semantic().is_builtin("bool") {
+        if !checker.semantic().has_builtin_binding("bool") {
             return;
         }
 

@@ -114,10 +114,12 @@ fn should_be_fstring(
     }
 
     let fstring_expr = format!("f{}", locator.slice(literal));
+    let Ok(parsed) = parse_expression(&fstring_expr) else {
+        return false;
+    };
 
     // Note: Range offsets for `value` are based on `fstring_expr`
-    let Ok(ast::Expr::FString(ast::ExprFString { value, .. })) = parse_expression(&fstring_expr)
-    else {
+    let Some(ast::ExprFString { value, .. }) = parsed.expr().as_f_string_expr() else {
         return false;
     };
 
@@ -168,7 +170,7 @@ fn should_be_fstring(
 
     for f_string in value.f_strings() {
         let mut has_name = false;
-        for element in f_string.expressions() {
+        for element in f_string.elements.expressions() {
             if let ast::Expr::Name(ast::ExprName { id, .. }) = element.expression.as_ref() {
                 if arg_names.contains(id.as_str()) {
                     return false;

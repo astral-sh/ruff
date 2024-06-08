@@ -96,8 +96,8 @@ pub(crate) fn unnecessary_key_check(checker: &mut Checker, expr: &Expr) {
         return;
     }
 
-    if contains_effect(obj_left, |id| checker.semantic().is_builtin(id))
-        || contains_effect(key_left, |id| checker.semantic().is_builtin(id))
+    if contains_effect(obj_left, |id| checker.semantic().has_builtin_binding(id))
+        || contains_effect(key_left, |id| checker.semantic().has_builtin_binding(id))
     {
         return;
     }
@@ -110,7 +110,7 @@ pub(crate) fn unnecessary_key_check(checker: &mut Checker, expr: &Expr) {
                 parenthesized_range(
                     obj_right.into(),
                     right.into(),
-                    checker.indexer().comment_ranges(),
+                    checker.comment_ranges(),
                     checker.locator().contents(),
                 )
                 .unwrap_or(obj_right.range())
@@ -119,7 +119,7 @@ pub(crate) fn unnecessary_key_check(checker: &mut Checker, expr: &Expr) {
                 parenthesized_range(
                     key_right.into(),
                     right.into(),
-                    checker.indexer().comment_ranges(),
+                    checker.comment_ranges(),
                     checker.locator().contents(),
                 )
                 .unwrap_or(key_right.range())

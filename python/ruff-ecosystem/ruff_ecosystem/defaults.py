@@ -30,7 +30,6 @@ DEFAULT_TARGETS = [
         repo=Repository(owner="bokeh", name="bokeh", ref="branch-3.3"),
         check_options=CheckOptions(select="ALL"),
     ),
-    Project(repo=Repository(owner="commaai", name="openpilot", ref="master")),
     Project(
         repo=Repository(owner="demisto", name="content", ref="master"),
         format_options=FormatOptions(
@@ -117,4 +116,11 @@ DEFAULT_TARGETS = [
             ],
         },
     ),
+    Project(repo=Repository(owner="agronholm", name="anyio", ref="master")),
+    Project(repo=Repository(owner="python-trio", name="trio", ref="master")),
+    Project(repo=Repository(owner="wntrblm", name="nox", ref="main")),
+    Project(repo=Repository(owner="pytest-dev", name="pytest", ref="main")),
+    Project(repo=Repository(owner="encode", name="httpx", ref="master")),
+    Project(repo=Repository(owner="mesonbuild", name="meson-python", ref="main")),
+    Project(repo=Repository(owner="pdm-project", name="pdm", ref="main")),
 ]

@@ -12,6 +12,7 @@ use normalize::normalize_imports;
 use order::order_imports;
 use ruff_python_ast::PySourceType;
 use ruff_python_codegen::Stylist;
+use ruff_python_parser::Tokens;
 use ruff_source_file::Locator;
 use settings::Settings;
 use types::EitherImport::{Import, ImportFrom};
@@ -52,7 +53,7 @@ pub(crate) enum AnnotatedImport<'a> {
     ImportFrom {
         module: Option<&'a str>,
         names: Vec<AnnotatedAliasData<'a>>,
-        level: Option<u32>,
+        level: u32,
         atop: Vec<Comment<'a>>,
         inline: Vec<Comment<'a>>,
         trailing_comma: TrailingComma,
@@ -72,6 +73,7 @@ pub(crate) fn format_imports(
     source_type: PySourceType,
     target_version: PythonVersion,
     settings: &Settings,
+    tokens: &Tokens,
 ) -> String {
     let trailer = &block.trailer;
     let block = annotate_imports(
@@ -79,7 +81,7 @@ pub(crate) fn format_imports(
         comments,
         locator,
         settings.split_on_trailing_comma,
-        source_type,
+        tokens,
     );
 
     // Normalize imports (i.e., deduplicate, aggregate `from` imports).
@@ -341,6 +343,7 @@ mod tests {
     #[test_case(Path::new("split.py"))]
     #[test_case(Path::new("star_before_others.py"))]
     #[test_case(Path::new("trailing_suffix.py"))]
+    #[test_case(Path::new("two_space.py"))]
     #[test_case(Path::new("type_comments.py"))]
     #[test_case(Path::new("unicode.py"))]
     fn default(path: &Path) -> Result<()> {

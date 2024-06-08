@@ -2,8 +2,7 @@ use ruff_diagnostics::{AlwaysFixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_index::Indexer;
-use ruff_python_parser::lexer::LexResult;
-use ruff_python_parser::Tok;
+use ruff_python_parser::{TokenKind, Tokens};
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -28,50 +27,50 @@ enum TokenType {
 
 /// Simplified token specialized for the task.
 #[derive(Copy, Clone)]
-struct Token {
+struct SimpleToken {
     ty: TokenType,
     range: TextRange,
 }
 
-impl Ranged for Token {
+impl Ranged for SimpleToken {
     fn range(&self) -> TextRange {
         self.range
     }
 }
 
-impl Token {
+impl SimpleToken {
     fn new(ty: TokenType, range: TextRange) -> Self {
         Self { ty, range }
     }
 
-    fn irrelevant() -> Token {
-        Token {
+    fn irrelevant() -> SimpleToken {
+        SimpleToken {
             ty: TokenType::Irrelevant,
             range: TextRange::default(),
         }
     }
 }
 
-impl From<(&Tok, TextRange)> for Token {
-    fn from((tok, range): (&Tok, TextRange)) -> Self {
+impl From<(TokenKind, TextRange)> for SimpleToken {
+    fn from((tok, range): (TokenKind, TextRange)) -> Self {
         let ty = match tok {
-            Tok::Name { .. } => TokenType::Named,
-            Tok::String { .. } => TokenType::String,
-            Tok::Newline => TokenType::Newline,
-            Tok::NonLogicalNewline => TokenType::NonLogicalNewline,
-            Tok::Lpar => TokenType::OpeningBracket,
-            Tok::Rpar => TokenType::ClosingBracket,
-            Tok::Lsqb => TokenType::OpeningSquareBracket,
-            Tok::Rsqb => TokenType::ClosingBracket,
-            Tok::Colon => TokenType::Colon,
-            Tok::Comma => TokenType::Comma,
-            Tok::Lbrace => TokenType::OpeningCurlyBracket,
-            Tok::Rbrace => TokenType::ClosingBracket,
-            Tok::Def => TokenType::Def,
-            Tok::For => TokenType::For,
-            Tok::Lambda => TokenType::Lambda,
+            TokenKind::Name => TokenType::Named,
+            TokenKind::String => TokenType::String,
+            TokenKind::Newline => TokenType::Newline,
+            TokenKind::NonLogicalNewline => TokenType::NonLogicalNewline,
+            TokenKind::Lpar => TokenType::OpeningBracket,
+            TokenKind::Rpar => TokenType::ClosingBracket,
+            TokenKind::Lsqb => TokenType::OpeningSquareBracket,
+            TokenKind::Rsqb => TokenType::ClosingBracket,
+            TokenKind::Colon => TokenType::Colon,
+            TokenKind::Comma => TokenType::Comma,
+            TokenKind::Lbrace => TokenType::OpeningCurlyBracket,
+            TokenKind::Rbrace => TokenType::ClosingBracket,
+            TokenKind::Def => TokenType::Def,
+            TokenKind::For => TokenType::For,
+            TokenKind::Lambda => TokenType::Lambda,
             // Import treated like a function.
-            Tok::Import => TokenType::Named,
+            TokenKind::Import => TokenType::Named,
             _ => TokenType::Irrelevant,
         };
         #[allow(clippy::inconsistent_struct_constructor)]
@@ -227,40 +226,36 @@ impl AlwaysFixableViolation for ProhibitedTrailingComma {
 /// COM812, COM818, COM819
 pub(crate) fn trailing_commas(
     diagnostics: &mut Vec<Diagnostic>,
-    tokens: &[LexResult],
+    tokens: &Tokens,
     locator: &Locator,
     indexer: &Indexer,
 ) {
     let mut fstrings = 0u32;
-    let tokens = tokens.iter().filter_map(|result| {
-        let Ok((tok, tok_range)) = result else {
-            return None;
-        };
-
-        match tok {
+    let simple_tokens = tokens.up_to_first_unknown().iter().filter_map(|token| {
+        match token.kind() {
             // Completely ignore comments -- they just interfere with the logic.
-            Tok::Comment(_) => None,
+            TokenKind::Comment => None,
             // F-strings are handled as `String` token type with the complete range
             // of the outermost f-string. This means that the expression inside the
             // f-string is not checked for trailing commas.
-            Tok::FStringStart(_) => {
+            TokenKind::FStringStart => {
                 fstrings = fstrings.saturating_add(1);
                 None
             }
-            Tok::FStringEnd => {
+            TokenKind::FStringEnd => {
                 fstrings = fstrings.saturating_sub(1);
                 if fstrings == 0 {
                     indexer
                         .fstring_ranges()
-                        .outermost(tok_range.start())
-                        .map(|range| Token::new(TokenType::String, range))
+                        .outermost(token.start())
+                        .map(|range| SimpleToken::new(TokenType::String, range))
                 } else {
                     None
                 }
             }
             _ => {
                 if fstrings == 0 {
-                    Some(Token::from((tok, *tok_range)))
+                    Some(SimpleToken::from(token.as_tuple()))
                 } else {
                     None
                 }
@@ -268,12 +263,12 @@ pub(crate) fn trailing_commas(
         }
     });
 
-    let mut prev = Token::irrelevant();
-    let mut prev_prev = Token::irrelevant();
+    let mut prev = SimpleToken::irrelevant();
+    let mut prev_prev = SimpleToken::irrelevant();
 
     let mut stack = vec![Context::new(ContextType::No)];
 
-    for token in tokens {
+    for token in simple_tokens {
         if prev.ty == TokenType::NonLogicalNewline && token.ty == TokenType::NonLogicalNewline {
             // Collapse consecutive newlines to the first one -- trailing commas are
             // added before the first newline.
@@ -306,9 +301,9 @@ pub(crate) fn trailing_commas(
 }
 
 fn check_token(
-    token: Token,
-    prev: Token,
-    prev_prev: Token,
+    token: SimpleToken,
+    prev: SimpleToken,
+    prev_prev: SimpleToken,
     context: Context,
     locator: &Locator,
 ) -> Option<Diagnostic> {
@@ -392,9 +387,9 @@ fn check_token(
 }
 
 fn update_context(
-    token: Token,
-    prev: Token,
-    prev_prev: Token,
+    token: SimpleToken,
+    prev: SimpleToken,
+    prev_prev: SimpleToken,
     stack: &mut Vec<Context>,
 ) -> Context {
     let new_context = match token.ty {

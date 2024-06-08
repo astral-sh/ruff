@@ -8,8 +8,7 @@ use std::{borrow::Cow, collections::VecDeque};
 use itertools::Itertools;
 
 use ruff_formatter::printer::SourceMapGeneration;
-use ruff_python_ast::str::Quote;
-use ruff_python_parser::ParseError;
+use ruff_python_ast::{str::Quote, StringFlags};
 use {once_cell::sync::Lazy, regex::Regex};
 use {
     ruff_formatter::{write, FormatOptions, IndentStyle, LineWidth, Printed},
@@ -127,7 +126,7 @@ pub(crate) fn format(normalized: &NormalizedString, f: &mut PyFormatter) -> Form
     let mut lines = docstring.split('\n').peekable();
 
     // Start the string
-    let kind = normalized.kind();
+    let kind = normalized.flags();
     let quotes = StringQuotes::from(kind);
     write!(f, [kind.prefix(), quotes])?;
     // We track where in the source docstring we are (in source code byte offsets)
@@ -218,7 +217,7 @@ fn contains_unescaped_newline(haystack: &str) -> bool {
     let mut rest = haystack;
 
     while let Some(index) = memchr::memchr(b'\\', rest.as_bytes()) {
-        rest = &rest[index + 1..].trim_whitespace_start();
+        rest = rest[index + 1..].trim_whitespace_start();
 
         if rest.starts_with('\n') {
             return true;
@@ -1552,16 +1551,14 @@ fn docstring_format_source(
     use ruff_python_parser::AsMode;
 
     let source_type = options.source_type();
-    let (tokens, comment_ranges) =
-        ruff_python_index::tokens_and_ranges(source, source_type).map_err(ParseError::from)?;
-    let module = ruff_python_parser::parse_tokens(tokens, source, source_type.as_mode())?;
+    let parsed = ruff_python_parser::parse(source, source_type.as_mode())?;
     let source_code = ruff_formatter::SourceCode::new(source);
-    let comments = crate::Comments::from_ast(&module, source_code, &comment_ranges);
+    let comments = crate::Comments::from_ast(parsed.syntax(), source_code, parsed.comment_ranges());
     let locator = Locator::new(source);
 
-    let ctx = PyFormatContext::new(options, locator.contents(), comments)
+    let ctx = PyFormatContext::new(options, locator.contents(), comments, parsed.tokens())
         .in_docstring(docstring_quote_style);
-    let formatted = crate::format!(ctx, [module.format()])?;
+    let formatted = crate::format!(ctx, [parsed.syntax().format()])?;
     formatted
         .context()
         .comments()
@@ -1573,7 +1570,7 @@ fn docstring_format_source(
 /// that avoids `content""""` and `content\"""`. This does only applies to un-escaped backslashes,
 /// so `content\\ """` doesn't need a space while `content\\\ """` does.
 fn needs_chaperone_space(normalized: &NormalizedString, trim_end: &str) -> bool {
-    trim_end.ends_with(normalized.kind().quote_style().as_char())
+    trim_end.ends_with(normalized.flags().quote_style().as_char())
         || trim_end.chars().rev().take_while(|c| *c == '\\').count() % 2 == 1
 }
 

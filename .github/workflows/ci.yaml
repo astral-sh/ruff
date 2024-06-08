@@ -23,6 +23,8 @@ jobs:
     name: "Determine changes"
     runs-on: ubuntu-latest
     outputs:
+      # Flag that is raised when any code that affects parser is changed
+      parser: ${{ steps.changed.outputs.parser_any_changed }}
       # Flag that is raised when any code that affects linter is changed
       linter: ${{ steps.changed.outputs.linter_any_changed }}
       # Flag that is raised when any code that affects formatter is changed
@@ -39,6 +41,17 @@ jobs:
         id: changed
         with:
           files_yaml: |
+            parser:
+              - Cargo.toml
+              - Cargo.lock
+              - crates/ruff_python_trivia/**
+              - crates/ruff_source_file/**
+              - crates/ruff_text_size/**
+              - crates/ruff_python_ast/**
+              - crates/ruff_python_parser/**
+              - scripts/fuzz-parser/**
+              - .github/workflows/ci.yaml
+
             linter:
               - Cargo.toml
               - Cargo.lock
@@ -46,7 +59,6 @@ jobs:
               - "!crates/ruff_python_formatter/**"
               - "!crates/ruff_formatter/**"
               - "!crates/ruff_dev/**"
-              - "!crates/ruff_shrinking/**"
               - scripts/*
               - python/**
               - .github/workflows/ci.yaml
@@ -155,6 +167,9 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: "Run tests"
         shell: bash
+        env:
+          # Workaround for <https://github.com/nextest-rs/nextest/issues/1493>.
+          RUSTUP_WINDOWS_PATH_ADD_BIN: 1
         run: |
           cargo nextest run --all-features --profile ci
           cargo test --all-features --doc
@@ -181,6 +196,54 @@ jobs:
           cd crates/ruff_wasm
           wasm-pack test --node
 
+  cargo-build-release:
+    name: "cargo build (release)"
+    runs-on: macos-latest
+    needs: determine_changes
+    if: ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: "Install Rust toolchain"
+        run: rustup show
+      - name: "Install mold"
+        uses: rui314/setup-mold@v1
+      - uses: Swatinem/rust-cache@v2
+      - name: "Build"
+        run: cargo build --release --locked
+
+  cargo-build-msrv:
+    name: "cargo build (msrv)"
+    runs-on: ubuntu-latest
+    needs: determine_changes
+    if: ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: SebRollen/toml-action@v1.2.0
+        id: msrv
+        with:
+          file: "Cargo.toml"
+          field: "workspace.package.rust-version"
+      - name: "Install Rust toolchain"
+        run: rustup default ${{ steps.msrv.outputs.value }}
+      - name: "Install mold"
+        uses: rui314/setup-mold@v1
+      - name: "Install cargo nextest"
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest
+      - name: "Install cargo insta"
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-insta
+      - uses: Swatinem/rust-cache@v2
+      - name: "Run tests"
+        shell: bash
+        env:
+          NEXTEST_PROFILE: "ci"
+        run: cargo +${{ steps.msrv.outputs.value }} insta test --all-features --unreferenced reject --test-runner nextest
+
   cargo-fuzz:
     name: "cargo fuzz"
     runs-on: ubuntu-latest
@@ -199,6 +262,38 @@ jobs:
         with:
           tool: cargo-fuzz@0.11.2
       - run: cargo fuzz build -s none
+
+  fuzz-parser:
+    name: "Fuzz the parser"
+    runs-on: ubuntu-latest
+    needs:
+      - cargo-test-linux
+      - determine_changes
+    if: ${{ needs.determine_changes.outputs.parser == 'true' }}
+    timeout-minutes: 20
+    env:
+      FORCE_COLOR: 1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Install uv
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+      - name: Install Python requirements
+        run: uv pip install -r scripts/fuzz-parser/requirements.txt --system
+      - uses: actions/download-artifact@v4
+        name: Download Ruff binary to test
+        id: download-cached-binary
+        with:
+          name: ruff
+          path: ruff-to-test
+      - name: Fuzz
+        run: |
+          # Make executable, since artifact download doesn't preserve this
+          chmod +x ${{ steps.download-cached-binary.outputs.download-path }}/ruff
+
+          python scripts/fuzz-parser/fuzz.py 0-500 --test-executable ${{ steps.download-cached-binary.outputs.download-path }}/ruff
 
   scripts:
     name: "test scripts"
@@ -228,9 +323,7 @@ jobs:
       - determine_changes
     # Only runs on pull requests, since that is the only we way we can find the base version for comparison.
     # Ecosystem check needs linter and/or formatter changes.
-    if: github.event_name == 'pull_request' && ${{
-      needs.determine_changes.outputs.code == 'true'
-      }}
+    if: ${{ github.event_name == 'pull_request' && needs.determine_changes.outputs.code == 'true' }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
@@ -337,22 +430,16 @@ jobs:
           name: ecosystem-result
           path: ecosystem-result
 
-  cargo-udeps:
-    name: "cargo udeps"
+  cargo-shear:
+    name: "cargo shear"
     runs-on: ubuntu-latest
     needs: determine_changes
     if: ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
-    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-      - name: "Install nightly Rust toolchain"
-        # Only pinned to make caching work, update freely
-        run: rustup toolchain install nightly-2023-10-15
-      - uses: Swatinem/rust-cache@v2
-      - name: "Install cargo-udeps"
-        uses: taiki-e/install-action@cargo-udeps
-      - name: "Run cargo-udeps"
-        run: cargo +nightly-2023-10-15 udeps
+      - uses: cargo-bins/cargo-binstall@main
+      - run: cargo binstall --no-confirm cargo-shear
+      - run: cargo shear
 
   python-package:
     name: "python package"
@@ -509,7 +596,7 @@ jobs:
   benchmarks:
     runs-on: ubuntu-latest
     needs: determine_changes
-    if: ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
+    if: ${{ github.repository == 'astral-sh/ruff' && (needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main') }}
     timeout-minutes: 20
     steps:
       - name: "Checkout Branch"
@@ -525,23 +612,8 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
-      # Codspeed comes with a very ancient cargo version (1.66) that resolves features flags differently than what we use now.
-      # This can result in build failures; see https://github.com/astral-sh/ruff/pull/10700.
-      # There's a pending codspeed PR to upgrade to a newer cargo version, but until that's merged, we need to use the workaround below.
-      # https://github.com/CodSpeedHQ/codspeed-rust/pull/31
-      # What we do is to call cargo build manually with the correct feature flags and RUSTC settings. We'll have to
-      # manually maintain the list of benchmarks to run with codspeed (the benefit is that we could detect which benchmarks to run and build based on the changes).
-      # This is inspired by https://github.com/oxc-project/oxc/blob/a0532adc654039a0c7ead7b35216dfa0b0cb8e8f/.github/workflows/benchmark.yml
       - name: "Build benchmarks"
-        env:
-          RUSTFLAGS: "-C debuginfo=2 -C strip=none -g --cfg codspeed"
-        shell: bash
-        # Build all benchmarks, copy the binary to the codspeed directory, remove any `*.d` files that might have been created.
-        run: |
-          cargo build --release -p ruff_benchmark --bench parser --bench linter --bench formatter --bench lexer --features=codspeed
-          mkdir -p ./target/codspeed/ruff_benchmark
-          cp ./target/release/deps/{lexer,parser,linter,formatter}* target/codspeed/ruff_benchmark/
-          rm -rf ./target/codspeed/ruff_benchmark/*.d
+        run: cargo codspeed build --features codspeed -p ruff_benchmark
 
       - name: "Run benchmarks"
         uses: CodSpeedHQ/action@v2

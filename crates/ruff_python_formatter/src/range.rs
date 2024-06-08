@@ -4,10 +4,9 @@ use ruff_formatter::printer::SourceMapGeneration;
 use ruff_formatter::{
     format, FormatContext, FormatError, FormatOptions, IndentStyle, PrintedRange, SourceCode,
 };
-use ruff_python_ast::visitor::preorder::{walk_body, PreorderVisitor, TraversalSignal};
-use ruff_python_ast::{AnyNode, AnyNodeRef, Stmt, StmtMatch, StmtTry};
-use ruff_python_index::tokens_and_ranges;
-use ruff_python_parser::{parse_tokens, AsMode, ParseError, ParseErrorType};
+use ruff_python_ast::visitor::source_order::{walk_body, SourceOrderVisitor, TraversalSignal};
+use ruff_python_ast::{AnyNodeRef, Stmt, StmtMatch, StmtTry};
+use ruff_python_parser::{parse, AsMode};
 use ruff_python_trivia::{indentation_at_offset, BackwardsTokenizer, SimpleToken, SimpleTokenKind};
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
@@ -71,32 +70,27 @@ pub fn format_range(
         return Ok(PrintedRange::new(formatted.into_code(), range));
     }
 
-    let (tokens, comment_ranges) =
-        tokens_and_ranges(source, options.source_type()).map_err(|err| ParseError {
-            offset: err.location(),
-            error: ParseErrorType::Lexical(err.into_error()),
-        })?;
-
     assert_valid_char_boundaries(range, source);
 
-    let module = parse_tokens(tokens, source, options.source_type().as_mode())?;
-    let root = AnyNode::from(module);
+    let parsed = parse(source, options.source_type().as_mode())?;
     let source_code = SourceCode::new(source);
-    let comments = Comments::from_ast(root.as_ref(), source_code, &comment_ranges);
+    let comments = Comments::from_ast(parsed.syntax(), source_code, parsed.comment_ranges());
 
     let mut context = PyFormatContext::new(
         options.with_source_map_generation(SourceMapGeneration::Enabled),
         source,
         comments,
+        parsed.tokens(),
     );
 
-    let (enclosing_node, base_indent) = match find_enclosing_node(range, root.as_ref(), &context) {
-        EnclosingNode::Node { node, indent_level } => (node, indent_level),
-        EnclosingNode::Suppressed => {
-            // The entire range falls into a suppressed range. There's nothing to format.
-            return Ok(PrintedRange::empty());
-        }
-    };
+    let (enclosing_node, base_indent) =
+        match find_enclosing_node(range, AnyNodeRef::from(parsed.syntax()), &context) {
+            EnclosingNode::Node { node, indent_level } => (node, indent_level),
+            EnclosingNode::Suppressed => {
+                // The entire range falls into a suppressed range. There's nothing to format.
+                return Ok(PrintedRange::empty());
+            }
+        };
 
     let narrowed_range = narrow_range(range, enclosing_node, &context);
     assert_valid_char_boundaries(narrowed_range, source);
@@ -187,7 +181,7 @@ impl<'a, 'ast> FindEnclosingNode<'a, 'ast> {
     }
 }
 
-impl<'ast> PreorderVisitor<'ast> for FindEnclosingNode<'_, 'ast> {
+impl<'ast> SourceOrderVisitor<'ast> for FindEnclosingNode<'_, 'ast> {
     fn enter_node(&mut self, node: AnyNodeRef<'ast>) -> TraversalSignal {
         if !(is_logical_line(node) || node.is_mod_module()) {
             return TraversalSignal::Skip;
@@ -342,7 +336,7 @@ struct NarrowRange<'a> {
     level: usize,
 }
 
-impl PreorderVisitor<'_> for NarrowRange<'_> {
+impl SourceOrderVisitor<'_> for NarrowRange<'_> {
     fn enter_node(&mut self, node: AnyNodeRef<'_>) -> TraversalSignal {
         if !(is_logical_line(node) || node.is_mod_module()) {
             return TraversalSignal::Skip;

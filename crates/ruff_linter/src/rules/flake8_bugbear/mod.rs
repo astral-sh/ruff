@@ -41,6 +41,7 @@ mod tests {
     #[test_case(Rule::MutableArgumentDefault, Path::new("B006_5.py"))]
     #[test_case(Rule::MutableArgumentDefault, Path::new("B006_6.py"))]
     #[test_case(Rule::MutableArgumentDefault, Path::new("B006_7.py"))]
+    #[test_case(Rule::MutableArgumentDefault, Path::new("B006_8.py"))]
     #[test_case(Rule::MutableArgumentDefault, Path::new("B006_B008.py"))]
     #[test_case(Rule::NoExplicitStacklevel, Path::new("B028.py"))]
     #[test_case(Rule::RaiseLiteral, Path::new("B016.py"))]
@@ -61,6 +62,7 @@ mod tests {
     #[test_case(Rule::UselessContextlibSuppress, Path::new("B022.py"))]
     #[test_case(Rule::UselessExpression, Path::new("B018.ipynb"))]
     #[test_case(Rule::UselessExpression, Path::new("B018.py"))]
+    #[test_case(Rule::ReturnInGenerator, Path::new("B901.py"))]
     #[test_case(Rule::LoopIteratorMutation, Path::new("B909.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
@@ -113,6 +115,7 @@ mod tests {
                         "fastapi.Depends".to_string(),
                         "fastapi.Query".to_string(),
                         "custom.ImmutableTypeA".to_string(),
+                        "B008_extended.Class".to_string(),
                     ],
                 },
                 ..LinterSettings::for_rule(Rule::FunctionCallInDefaultArgument)

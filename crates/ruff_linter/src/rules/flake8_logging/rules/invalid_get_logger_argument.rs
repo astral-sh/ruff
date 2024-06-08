@@ -71,7 +71,7 @@ pub(crate) fn invalid_get_logger_argument(checker: &mut Checker, call: &ast::Exp
         return;
     }
 
-    if !checker.semantic().is_builtin(id) {
+    if !checker.semantic().has_builtin_binding(id) {
         return;
     }
 
@@ -84,7 +84,7 @@ pub(crate) fn invalid_get_logger_argument(checker: &mut Checker, call: &ast::Exp
     }
 
     let mut diagnostic = Diagnostic::new(InvalidGetLoggerArgument, expr.range());
-    if checker.semantic().is_builtin("__name__") {
+    if checker.semantic().has_builtin_binding("__name__") {
         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
             "__name__".to_string(),
             expr.range(),

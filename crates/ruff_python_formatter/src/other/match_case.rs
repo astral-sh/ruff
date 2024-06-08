@@ -3,7 +3,6 @@ use ruff_python_ast::AstNode;
 use ruff_python_ast::MatchCase;
 
 use crate::builders::parenthesize_if_expands;
-use crate::comments::SourceComment;
 use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses, Parentheses};
 use crate::prelude::*;
 use crate::statement::clause::{clause_body, clause_header, ClauseHeader};
@@ -67,14 +66,5 @@ impl FormatNodeRule<MatchCase> for FormatMatchCase {
                 clause_body(body, dangling_item_comments),
             ]
         )
-    }
-
-    fn fmt_dangling_comments(
-        &self,
-        _dangling_comments: &[SourceComment],
-        _f: &mut PyFormatter,
-    ) -> FormatResult<()> {
-        // Handled as part of `fmt_fields`
-        Ok(())
     }
 }

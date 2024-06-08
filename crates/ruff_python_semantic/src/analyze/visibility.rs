@@ -1,11 +1,10 @@
-use std::path::Path;
-
 use ruff_python_ast::{self as ast, Decorator};
 
 use ruff_python_ast::helpers::map_callable;
 use ruff_python_ast::name::{QualifiedName, UnqualifiedName};
 
 use crate::model::SemanticModel;
+use crate::{Module, ModuleSource};
 
 #[derive(Debug, Clone, Copy, is_macro::Is)]
 pub enum Visibility {
@@ -134,44 +133,31 @@ fn stem(path: &str) -> &str {
     }
 }
 
-/// A Python module can either be defined as a module path (i.e., the dot-separated path to the
-/// module) or, if the module can't be resolved, as a file path (i.e., the path to the file defining
-/// the module).
-#[derive(Debug)]
-pub enum ModuleSource<'a> {
-    /// A module path is a dot-separated path to the module.
-    Path(&'a [String]),
-    /// A file path is the path to the file defining the module, often a script outside of a
-    /// package.
-    File(&'a Path),
-}
-
-impl ModuleSource<'_> {
-    /// Return the `Visibility` of the module.
-    pub(crate) fn to_visibility(&self) -> Visibility {
-        match self {
-            Self::Path(path) => {
-                if path.iter().any(|m| is_private_module(m)) {
+/// Infer the [`Visibility`] of a module from its path.
+pub(crate) fn module_visibility(module: &Module) -> Visibility {
+    match &module.source {
+        ModuleSource::Path(path) => {
+            if path.iter().any(|m| is_private_module(m)) {
+                return Visibility::Private;
+            }
+        }
+        ModuleSource::File(path) => {
+            // Check to see if the filename itself indicates private visibility.
+            // Ex) `_foo.py` (but not `__init__.py`)
+            let mut components = path.iter().rev();
+            if let Some(filename) = components.next() {
+                let module_name = filename.to_string_lossy();
+                let module_name = stem(&module_name);
+                if is_private_module(module_name) {
                     return Visibility::Private;
                 }
             }
-            Self::File(path) => {
-                // Check to see if the filename itself indicates private visibility.
-                // Ex) `_foo.py` (but not `__init__.py`)
-                let mut components = path.iter().rev();
-                if let Some(filename) = components.next() {
-                    let module_name = filename.to_string_lossy();
-                    let module_name = stem(&module_name);
-                    if is_private_module(module_name) {
-                        return Visibility::Private;
-                    }
-                }
-            }
         }
-        Visibility::Public
     }
+    Visibility::Public
 }
 
+/// Infer the [`Visibility`] of a function from its name.
 pub(crate) fn function_visibility(function: &ast::StmtFunctionDef) -> Visibility {
     if function.name.starts_with('_') {
         Visibility::Private
@@ -180,6 +166,7 @@ pub(crate) fn function_visibility(function: &ast::StmtFunctionDef) -> Visibility
     }
 }
 
+/// Infer the [`Visibility`] of a method from its name and decorators.
 pub fn method_visibility(function: &ast::StmtFunctionDef) -> Visibility {
     // Is this a setter or deleter?
     if function.decorator_list.iter().any(|decorator| {
@@ -204,6 +191,7 @@ pub fn method_visibility(function: &ast::StmtFunctionDef) -> Visibility {
     Visibility::Private
 }
 
+/// Infer the [`Visibility`] of a class from its name.
 pub(crate) fn class_visibility(class: &ast::StmtClassDef) -> Visibility {
     if class.name.starts_with('_') {
         Visibility::Private

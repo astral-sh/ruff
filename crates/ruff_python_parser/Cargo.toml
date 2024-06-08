@@ -9,19 +9,16 @@ homepage = { workspace = true }
 documentation = { workspace = true }
 repository = { workspace = true }
 license = { workspace = true }
-build = "build.rs"
 
 [lib]
 
 [dependencies]
-ruff_python_ast = { path = "../ruff_python_ast" }
-ruff_text_size = { path = "../ruff_text_size" }
+ruff_python_ast = { workspace = true }
+ruff_python_trivia = { workspace = true }
+ruff_text_size = { workspace = true }
 
-anyhow = { workspace = true }
+bitflags = { workspace = true }
 bstr = { workspace = true }
-is-macro = { workspace = true }
-itertools = { workspace = true }
-lalrpop-util = { workspace = true, default-features = false }
 memchr = { workspace = true }
 rustc-hash = { workspace = true }
 static_assertions = { workspace = true }
@@ -30,12 +27,12 @@ unicode_names2 = { workspace = true }
 unicode-normalization = { workspace = true }
 
 [dev-dependencies]
-insta = { workspace = true }
+ruff_source_file = { workspace = true }
 
-[build-dependencies]
+annotate-snippets = { workspace = true }
 anyhow = { workspace = true }
-lalrpop = { version = "0.20.0", default-features = false, optional = true }
-tiny-keccak = { version = "2", features = ["sha3"] }
+insta = { workspace = true, features = ["glob"] }
+walkdir = { workspace = true }
 
 [lints]
 workspace = true

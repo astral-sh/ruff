@@ -56,6 +56,7 @@ pub(super) trait SyncNotificationHandler: NotificationHandler {
     fn run(
         session: &mut Session,
         notifier: Notifier,
+        requester: &mut Requester,
         params: <<Self as NotificationHandler>::NotificationType as LSPNotification>::Params,
     ) -> super::Result<()>;
 }

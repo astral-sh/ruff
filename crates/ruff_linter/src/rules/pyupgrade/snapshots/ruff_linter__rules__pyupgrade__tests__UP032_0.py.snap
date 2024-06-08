@@ -767,16 +767,16 @@ UP032_0.py:86:1: UP032 [*] Use f-string instead of `format` call
 85 85 | 
 86 86 | (
 87    |-    "{a}"
-   87 |+    f"{1}"
-88 88 |     ""
+88    |-    ""
 89    |-    "{b}"
-   89 |+    f"{1}"
-90 90 |     ""
+90    |-    ""
 91    |-).format(a=1, b=1)
-   91 |+)
-92 92 | 
-93 93 | (
-94 94 |     (
+   87 |+    f"{1}"
+   88 |+    f"{1}"
+   89 |+)
+92 90 | 
+93 91 | (
+94 92 |     (
 
 UP032_0.py:94:5: UP032 [*] Use f-string instead of `format` call
     |
@@ -1089,11 +1089,10 @@ UP032_0.py:212:18: UP032 [*] Use f-string instead of `format` call
 211 211 | # When fixing, trim the trailing empty string.
 212     |-raise ValueError("Conflicting configuration dicts: {!r} {!r}"
 213     |-                 "".format(new_dict, d))
-    212 |+raise ValueError(f"Conflicting configuration dicts: {new_dict!r} {d!r}"
-    213 |+                 "")
-214 214 | 
-215 215 | # When fixing, trim the trailing empty string.
-216 216 | raise ValueError("Conflicting configuration dicts: {!r} {!r}"
+    212 |+raise ValueError(f"Conflicting configuration dicts: {new_dict!r} {d!r}")
+214 213 | 
+215 214 | # When fixing, trim the trailing empty string.
+216 215 | raise ValueError("Conflicting configuration dicts: {!r} {!r}"
 
 UP032_0.py:216:18: UP032 [*] Use f-string instead of `format` call
     |
@@ -1113,10 +1112,11 @@ UP032_0.py:216:18: UP032 [*] Use f-string instead of `format` call
 215 215 | # When fixing, trim the trailing empty string.
 216     |-raise ValueError("Conflicting configuration dicts: {!r} {!r}"
 217     |-                 .format(new_dict, d))
-    216 |+raise ValueError(f"Conflicting configuration dicts: {new_dict!r} {d!r}")
-218 217 | 
-219 218 | raise ValueError(
-220 219 |     "Conflicting configuration dicts: {!r} {!r}"
+    216 |+raise ValueError(f"Conflicting configuration dicts: {new_dict!r} {d!r}"
+    217 |+                 )
+218 218 | 
+219 219 | raise ValueError(
+220 220 |     "Conflicting configuration dicts: {!r} {!r}"
 
 UP032_0.py:220:5: UP032 [*] Use f-string instead of `format` call
     |
@@ -1136,10 +1136,9 @@ UP032_0.py:220:5: UP032 [*] Use f-string instead of `format` call
 220     |-    "Conflicting configuration dicts: {!r} {!r}"
 221     |-    "".format(new_dict, d)
     220 |+    f"Conflicting configuration dicts: {new_dict!r} {d!r}"
-    221 |+    ""
-222 222 | )
-223 223 | 
-224 224 | raise ValueError(
+222 221 | )
+223 222 | 
+224 223 | raise ValueError(
 
 UP032_0.py:225:5: UP032 [*] Use f-string instead of `format` call
     |
@@ -1160,10 +1159,9 @@ UP032_0.py:225:5: UP032 [*] Use f-string instead of `format` call
 225     |-    "Conflicting configuration dicts: {!r} {!r}"
 226     |-    "".format(new_dict, d)
     225 |+    f"Conflicting configuration dicts: {new_dict!r} {d!r}"
-    226 |+    ""
-227 227 | 
-228 228 | )
-229 229 | 
+227 226 | 
+228 227 | )
+229 228 | 
 
 UP032_0.py:231:1: UP032 [*] Use f-string instead of `format` call
     |
@@ -1323,6 +1321,8 @@ UP032_0.py:261:1: UP032 [*] Use f-string instead of `format` call
 260 | # The string _should_ be converted, since the function call is repeated in the arguments.
 261 | "{0} {1}".format(foo(), foo())
     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP032
+262 | 
+263 | # The call should be removed, but the string itself should remain.
     |
     = help: Convert to f-string
 
@@ -1332,3 +1332,62 @@ UP032_0.py:261:1: UP032 [*] Use f-string instead of `format` call
 260 260 | # The string _should_ be converted, since the function call is repeated in the arguments.
 261     |-"{0} {1}".format(foo(), foo())
     261 |+f"{foo()} {foo()}"
+262 262 | 
+263 263 | # The call should be removed, but the string itself should remain.
+264 264 | ''.format(self.project)
+
+UP032_0.py:264:1: UP032 [*] Use f-string instead of `format` call
+    |
+263 | # The call should be removed, but the string itself should remain.
+264 | ''.format(self.project)
+    | ^^^^^^^^^^^^^^^^^^^^^^^ UP032
+265 | 
+266 | # The call should be removed, but the string itself should remain.
+    |
+    = help: Convert to f-string
+
+ℹ Safe fix
+261 261 | "{0} {1}".format(foo(), foo())
+262 262 | 
+263 263 | # The call should be removed, but the string itself should remain.
+264     |-''.format(self.project)
+    264 |+''
+265 265 | 
+266 266 | # The call should be removed, but the string itself should remain.
+267 267 | "".format(self.project)
+
+UP032_0.py:267:1: UP032 [*] Use f-string instead of `format` call
+    |
+266 | # The call should be removed, but the string itself should remain.
+267 | "".format(self.project)
+    | ^^^^^^^^^^^^^^^^^^^^^^^ UP032
+268 | 
+269 | # Not a valid type annotation but this test shouldn't result in a panic.
+    |
+    = help: Convert to f-string
+
+ℹ Safe fix
+264 264 | ''.format(self.project)
+265 265 | 
+266 266 | # The call should be removed, but the string itself should remain.
+267     |-"".format(self.project)
+    267 |+""
+268 268 | 
+269 269 | # Not a valid type annotation but this test shouldn't result in a panic.
+270 270 | # Refer: https://github.com/astral-sh/ruff/issues/11736
+
+UP032_0.py:271:5: UP032 [*] Use f-string instead of `format` call
+    |
+269 | # Not a valid type annotation but this test shouldn't result in a panic.
+270 | # Refer: https://github.com/astral-sh/ruff/issues/11736
+271 | x: "'{} + {}'.format(x, y)"
+    |     ^^^^^^^^^^^^^^^^^^^^^^ UP032
+    |
+    = help: Convert to f-string
+
+ℹ Safe fix
+268 268 | 
+269 269 | # Not a valid type annotation but this test shouldn't result in a panic.
+270 270 | # Refer: https://github.com/astral-sh/ruff/issues/11736
+271     |-x: "'{} + {}'.format(x, y)"
+    271 |+x: "f'{x} + {y}'"

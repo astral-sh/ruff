@@ -4,8 +4,7 @@ use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::str::{leading_quote, trailing_quote};
 use ruff_python_index::Indexer;
-use ruff_python_parser::lexer::LexResult;
-use ruff_python_parser::Tok;
+use ruff_python_parser::{TokenKind, Tokens};
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -93,39 +92,39 @@ impl Violation for MultiLineImplicitStringConcatenation {
 /// ISC001, ISC002
 pub(crate) fn implicit(
     diagnostics: &mut Vec<Diagnostic>,
-    tokens: &[LexResult],
+    tokens: &Tokens,
     settings: &LinterSettings,
     locator: &Locator,
     indexer: &Indexer,
 ) {
-    for ((a_tok, a_range), (b_tok, b_range)) in tokens
+    for (a_token, b_token) in tokens
+        .up_to_first_unknown()
         .iter()
-        .flatten()
-        .filter(|(tok, _)| {
-            !tok.is_comment()
+        .filter(|token| {
+            token.kind() != TokenKind::Comment
                 && (settings.flake8_implicit_str_concat.allow_multiline
-                    || !tok.is_non_logical_newline())
+                    || token.kind() != TokenKind::NonLogicalNewline)
         })
         .tuple_windows()
     {
-        let (a_range, b_range) = match (a_tok, b_tok) {
-            (Tok::String { .. }, Tok::String { .. }) => (*a_range, *b_range),
-            (Tok::String { .. }, Tok::FStringStart(_)) => {
-                match indexer.fstring_ranges().innermost(b_range.start()) {
-                    Some(b_range) => (*a_range, b_range),
+        let (a_range, b_range) = match (a_token.kind(), b_token.kind()) {
+            (TokenKind::String, TokenKind::String) => (a_token.range(), b_token.range()),
+            (TokenKind::String, TokenKind::FStringStart) => {
+                match indexer.fstring_ranges().innermost(b_token.start()) {
+                    Some(b_range) => (a_token.range(), b_range),
                     None => continue,
                 }
             }
-            (Tok::FStringEnd, Tok::String { .. }) => {
-                match indexer.fstring_ranges().innermost(a_range.start()) {
-                    Some(a_range) => (a_range, *b_range),
+            (TokenKind::FStringEnd, TokenKind::String) => {
+                match indexer.fstring_ranges().innermost(a_token.start()) {
+                    Some(a_range) => (a_range, b_token.range()),
                     None => continue,
                 }
             }
-            (Tok::FStringEnd, Tok::FStringStart(_)) => {
+            (TokenKind::FStringEnd, TokenKind::FStringStart) => {
                 match (
-                    indexer.fstring_ranges().innermost(a_range.start()),
-                    indexer.fstring_ranges().innermost(b_range.start()),
+                    indexer.fstring_ranges().innermost(a_token.start()),
+                    indexer.fstring_ranges().innermost(b_token.start()),
                 ) {
                     (Some(a_range), Some(b_range)) => (a_range, b_range),
                     _ => continue,

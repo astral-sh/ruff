@@ -11,7 +11,7 @@ repeated_isinstance_calls.py:15:8: PLR1701 [*] Merge `isinstance` calls: `isinst
    |
    = help: Replace with `isinstance(var[3], float | int)`
 
-ℹ Safe fix
+ℹ Unsafe fix
 12 12 |     result = isinstance(var[2], (int, float))
 13 13 | 
 14 14 |     # not merged
@@ -32,7 +32,7 @@ repeated_isinstance_calls.py:17:14: PLR1701 [*] Merge `isinstance` calls: `isins
    |
    = help: Replace with `isinstance(var[4], float | int)`
 
-ℹ Safe fix
+ℹ Unsafe fix
 14 14 |     # not merged
 15 15 |     if isinstance(var[3], int) or isinstance(var[3], float) or isinstance(var[3], list) and True:  # [consider-merging-isinstance]
 16 16 |         pass
@@ -53,7 +53,7 @@ repeated_isinstance_calls.py:19:14: PLR1701 [*] Merge `isinstance` calls: `isins
    |
    = help: Replace with `isinstance(var[5], float | int)`
 
-ℹ Safe fix
+ℹ Unsafe fix
 16 16 |         pass
 17 17 |     result = isinstance(var[4], int) or isinstance(var[4], float) or isinstance(var[5], list) and False  # [consider-merging-isinstance]
 18 18 | 
@@ -73,7 +73,7 @@ repeated_isinstance_calls.py:23:14: PLR1701 [*] Merge `isinstance` calls: `isins
    |
    = help: Replace with `isinstance(var[10], list | str)`
 
-ℹ Safe fix
+ℹ Unsafe fix
 20 20 | 
 21 21 |     inferred_isinstance = isinstance
 22 22 |     result = inferred_isinstance(var[6], int) or inferred_isinstance(var[6], float) or inferred_isinstance(var[6], list) and False   # [consider-merging-isinstance]
@@ -94,7 +94,7 @@ repeated_isinstance_calls.py:24:14: PLR1701 [*] Merge `isinstance` calls: `isins
    |
    = help: Replace with `isinstance(var[11], float | int)`
 
-ℹ Safe fix
+ℹ Unsafe fix
 21 21 |     inferred_isinstance = isinstance
 22 22 |     result = inferred_isinstance(var[6], int) or inferred_isinstance(var[6], float) or inferred_isinstance(var[6], list) and False   # [consider-merging-isinstance]
 23 23 |     result = isinstance(var[10], str) or isinstance(var[10], int) and var[8] * 14 or isinstance(var[10], float) and var[5] * 14.4 or isinstance(var[10], list)   # [consider-merging-isinstance]
@@ -114,7 +114,7 @@ repeated_isinstance_calls.py:30:14: PLR1701 [*] Merge `isinstance` calls: `isins
    |
    = help: Replace with `isinstance(var[12], float | int | list)`
 
-ℹ Safe fix
+ℹ Unsafe fix
 27 27 |     result = isinstance()
 28 28 | 
 29 29 |     # Combination merged and not merged
@@ -133,12 +133,10 @@ repeated_isinstance_calls.py:42:3: PLR1701 [*] Merge `isinstance` calls: `isinst
    |
    = help: Replace with `isinstance(self.k, float | int)`
 
-ℹ Safe fix
+ℹ Unsafe fix
 39 39 | 
 40 40 | 
 41 41 | # Regression test for: https://github.com/astral-sh/ruff/issues/7455#issuecomment-1722460483
 42    |-if(isinstance(self.k, int)) or (isinstance(self.k, float)):
    42 |+if isinstance(self.k, float | int):
 43 43 |     ...
-
-

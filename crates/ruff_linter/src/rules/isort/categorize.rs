@@ -92,7 +92,7 @@ enum Reason<'a> {
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn categorize<'a>(
     module_name: &str,
-    level: Option<u32>,
+    level: u32,
     src: &[PathBuf],
     package: Option<&Path>,
     detect_same_package: bool,
@@ -104,14 +104,14 @@ pub(crate) fn categorize<'a>(
 ) -> &'a ImportSection {
     let module_base = module_name.split('.').next().unwrap();
     let (mut import_type, mut reason) = {
-        if matches!(level, None | Some(0)) && module_base == "__future__" {
+        if level == 0 && module_base == "__future__" {
             (&ImportSection::Known(ImportType::Future), Reason::Future)
         } else if no_sections {
             (
                 &ImportSection::Known(ImportType::FirstParty),
                 Reason::NoSections,
             )
-        } else if level.is_some_and(|level| level > 0) {
+        } else if level > 0 {
             (
                 &ImportSection::Known(ImportType::LocalFolder),
                 Reason::NonZeroLevel,
@@ -133,7 +133,7 @@ pub(crate) fn categorize<'a>(
                 &ImportSection::Known(ImportType::FirstParty),
                 Reason::SourceMatch(src),
             )
-        } else if matches!(level, None | Some(0)) && module_name == "__main__" {
+        } else if level == 0 && module_name == "__main__" {
             (
                 &ImportSection::Known(ImportType::FirstParty),
                 Reason::KnownFirstParty,
@@ -191,7 +191,7 @@ pub(crate) fn categorize_imports<'a>(
     for (alias, comments) in block.import {
         let import_type = categorize(
             &alias.module_name(),
-            None,
+            0,
             src,
             package,
             detect_same_package,
@@ -381,26 +381,6 @@ impl KnownModules {
             }
         };
         Some((section, reason))
-    }
-
-    /// Return the list of modules that are known to be of a given type.
-    pub fn modules_for_known_type(
-        &self,
-        import_type: ImportType,
-    ) -> impl Iterator<Item = &glob::Pattern> {
-        self.known
-            .iter()
-            .filter_map(move |(module, known_section)| {
-                if let ImportSection::Known(section) = known_section {
-                    if *section == import_type {
-                        Some(module)
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                }
-            })
     }
 
     /// Return the list of user-defined modules, indexed by section.

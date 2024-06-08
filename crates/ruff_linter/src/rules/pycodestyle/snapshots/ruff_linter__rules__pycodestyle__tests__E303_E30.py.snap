@@ -13,8 +13,8 @@ E30.py:625:2: E303 [*] Too many blank lines (2)
 ℹ Safe fix
 621 621 | 	def method1():
 622 622 | 		return 1
-623 623 | 		
-624     |-		
+623 623 | 
+624     |-
 625 624 | 	def method2():
 626 625 | 		return 22
 627 626 | # end
@@ -242,7 +242,7 @@ E30.py:766:5: E303 [*] Too many blank lines (2)
 762 762 | def fn():
 763 763 |     pass
 764 764 | 
-765     |- 
+765     |-
 766 765 |     pass
 767 766 | # end
 768 767 |

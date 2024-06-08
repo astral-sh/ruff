@@ -1,6 +1,9 @@
-use crate::server::client::Notifier;
+use crate::server::api::diagnostics::publish_diagnostics_for_document;
+use crate::server::api::LSPResult;
+use crate::server::client::{Notifier, Requester};
 use crate::server::Result;
 use crate::session::Session;
+use crate::TextDocument;
 use lsp_types as types;
 use lsp_types::notification as notif;
 
@@ -11,21 +14,32 @@ impl super::NotificationHandler for DidOpen {
 }
 
 impl super::SyncNotificationHandler for DidOpen {
-    #[tracing::instrument(skip_all, fields(file=%url))]
     fn run(
         session: &mut Session,
-        _notifier: Notifier,
+        notifier: Notifier,
+        _requester: &mut Requester,
         types::DidOpenTextDocumentParams {
             text_document:
                 types::TextDocumentItem {
-                    uri: ref url,
-                    text,
-                    version,
-                    ..
+                    uri, text, version, ..
                 },
         }: types::DidOpenTextDocumentParams,
     ) -> Result<()> {
-        session.open_document(url, text, version);
+        let document = TextDocument::new(text, version);
+
+        session.open_text_document(uri.clone(), document);
+
+        // Publish diagnostics if the client doesnt support pull diagnostics
+        if !session.resolved_client_capabilities().pull_diagnostics {
+            let snapshot = session
+                .take_snapshot(uri.clone())
+                .ok_or_else(|| {
+                    anyhow::anyhow!("Unable to take snapshot for document with URL {uri}")
+                })
+                .with_failure_code(lsp_server::ErrorCode::InternalError)?;
+            publish_diagnostics_for_document(&snapshot, &notifier)?;
+        }
+
         Ok(())
     }
 }

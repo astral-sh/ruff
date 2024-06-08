@@ -52,7 +52,7 @@ pub(crate) fn unnecessary_list_comprehension_set(checker: &mut Checker, call: &a
     ) else {
         return;
     };
-    if !checker.semantic().is_builtin("set") {
+    if !checker.semantic().has_builtin_binding("set") {
         return;
     }
     if argument.is_list_comp_expr() {

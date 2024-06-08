@@ -111,7 +111,13 @@ pub enum Command {
         output_format: HelpFormat,
     },
     /// List or describe the available configuration options.
-    Config { option: Option<String> },
+    Config {
+        /// Config key to show
+        option: Option<String>,
+        /// Output format
+        #[arg(long, value_enum, default_value = "text")]
+        output_format: HelpFormat,
+    },
     /// List all supported upstream linters.
     Linter {
         /// Output format
@@ -190,7 +196,7 @@ pub struct CheckCommand {
     pub output_format: Option<SerializationFormat>,
 
     /// Specify file to write the linter output to (default: stdout).
-    #[arg(short, long)]
+    #[arg(short, long, env = "RUFF_OUTPUT_FILE")]
     pub output_file: Option<PathBuf>,
     /// The minimum Python version that should be supported.
     #[arg(long, value_enum)]
@@ -338,7 +344,7 @@ pub struct CheckCommand {
     /// The name of the file when passing it through stdin.
     #[arg(long, help_heading = "Miscellaneous")]
     pub stdin_filename: Option<PathBuf>,
-    /// List of mappings from file extension to language (one of ["python", "ipynb", "pyi"]). For
+    /// List of mappings from file extension to language (one of `python`, `ipynb`, `pyi`). For
     /// example, to treat `.ipy` files as IPython notebooks, use `--extension ipy:ipynb`.
     #[arg(long, value_delimiter = ',')]
     pub extension: Option<Vec<ExtensionPair>>,
@@ -466,7 +472,7 @@ pub struct FormatCommand {
     /// The name of the file when passing it through stdin.
     #[arg(long, help_heading = "Miscellaneous")]
     pub stdin_filename: Option<PathBuf>,
-    /// List of mappings from file extension to language (one of ["python", "ipynb", "pyi"]). For
+    /// List of mappings from file extension to language (one of `python`, `ipynb`, `pyi`). For
     /// example, to treat `.ipy` files as IPython notebooks, use `--extension ipy:ipynb`.
     #[arg(long, value_delimiter = ',')]
     pub extension: Option<Vec<ExtensionPair>>,

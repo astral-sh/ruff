@@ -97,3 +97,16 @@ pub fn any_super_class(
 
     inner(class_def, semantic, func, &mut FxHashSet::default())
 }
+
+/// Return `true` if `class_def` is a class that has one or more enum classes in its mro
+pub fn is_enumeration(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> bool {
+    any_qualified_name(class_def, semantic, &|qualified_name| {
+        matches!(
+            qualified_name.segments(),
+            [
+                "enum",
+                "Enum" | "Flag" | "IntEnum" | "IntFlag" | "StrEnum" | "ReprEnum" | "CheckEnum"
+            ]
+        )
+    })
+}

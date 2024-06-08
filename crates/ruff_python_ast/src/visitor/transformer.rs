@@ -2,7 +2,8 @@ use crate::{
     self as ast, Alias, Arguments, BoolOp, BytesLiteral, CmpOp, Comprehension, Decorator,
     ElifElseClause, ExceptHandler, Expr, ExprContext, FString, FStringElement, Keyword, MatchCase,
     Operator, Parameter, Parameters, Pattern, PatternArguments, PatternKeyword, Stmt,
-    StringLiteral, TypeParam, TypeParamTypeVar, TypeParams, UnaryOp, WithItem,
+    StringLiteral, TypeParam, TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple,
+    TypeParams, UnaryOp, WithItem,
 };
 
 /// A trait for transforming ASTs. Visits all nodes in the AST recursively in evaluation-order.
@@ -375,16 +376,12 @@ pub fn walk_expr<V: Transformer + ?Sized>(visitor: &V, expr: &mut Expr) {
             visitor.visit_expr(body);
             visitor.visit_expr(orelse);
         }
-        Expr::Dict(ast::ExprDict {
-            keys,
-            values,
-            range: _,
-        }) => {
-            for expr in keys.iter_mut().flatten() {
-                visitor.visit_expr(expr);
-            }
-            for expr in values {
-                visitor.visit_expr(expr);
+        Expr::Dict(ast::ExprDict { items, range: _ }) => {
+            for ast::DictItem { key, value } in items {
+                if let Some(key) = key {
+                    visitor.visit_expr(key);
+                }
+                visitor.visit_expr(value);
             }
         }
         Expr::Set(ast::ExprSet { elts, range: _ }) => {
@@ -652,14 +649,35 @@ pub fn walk_type_param<V: Transformer + ?Sized>(visitor: &V, type_param: &mut Ty
     match type_param {
         TypeParam::TypeVar(TypeParamTypeVar {
             bound,
+            default,
             name: _,
             range: _,
         }) => {
             if let Some(expr) = bound {
                 visitor.visit_expr(expr);
             }
+            if let Some(expr) = default {
+                visitor.visit_expr(expr);
+            }
         }
-        TypeParam::TypeVarTuple(_) | TypeParam::ParamSpec(_) => {}
+        TypeParam::TypeVarTuple(TypeParamTypeVarTuple {
+            default,
+            name: _,
+            range: _,
+        }) => {
+            if let Some(expr) = default {
+                visitor.visit_expr(expr);
+            }
+        }
+        TypeParam::ParamSpec(TypeParamParamSpec {
+            default,
+            name: _,
+            range: _,
+        }) => {
+            if let Some(expr) = default {
+                visitor.visit_expr(expr);
+            }
+        }
     }
 }
 

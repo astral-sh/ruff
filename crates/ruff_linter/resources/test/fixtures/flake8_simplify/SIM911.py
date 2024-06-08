@@ -21,3 +21,5 @@ for k, v in zip(d2.keys(), d2.values()):  # SIM911
     ...
 
 items = zip(x.keys(), x.values())  # OK
+
+items.bar = zip(x.keys(), x.values())  # OK

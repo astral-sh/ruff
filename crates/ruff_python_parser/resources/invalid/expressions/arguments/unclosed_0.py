@@ -1,0 +1,4 @@
+call(
+
+def foo():
+    pass

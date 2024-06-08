@@ -80,7 +80,7 @@ pub(crate) fn unnecessary_literal_within_tuple_call(checker: &mut Checker, call:
     ) else {
         return;
     };
-    if !checker.semantic().is_builtin("tuple") {
+    if !checker.semantic().has_builtin_binding("tuple") {
         return;
     }
     let argument_kind = match argument {

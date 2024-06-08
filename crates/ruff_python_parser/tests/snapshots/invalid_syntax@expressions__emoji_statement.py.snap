@@ -1,0 +1,20 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/expressions/emoji_statement.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..5,
+        body: [],
+    },
+)
+```
+## Errors
+
+  |
+1 | 👍
+  | ^^ Syntax Error: Got unexpected token 👍
+  |

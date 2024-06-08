@@ -1,0 +1,53 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/clause_expect_single_statement.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..23,
+        body: [
+            If(
+                StmtIf {
+                    range: 0..8,
+                    test: BooleanLiteral(
+                        ExprBooleanLiteral {
+                            range: 3..7,
+                            value: true,
+                        },
+                    ),
+                    body: [],
+                    elif_else_clauses: [],
+                },
+            ),
+            If(
+                StmtIf {
+                    range: 9..22,
+                    test: BooleanLiteral(
+                        ExprBooleanLiteral {
+                            range: 12..16,
+                            value: true,
+                        },
+                    ),
+                    body: [
+                        Pass(
+                            StmtPass {
+                                range: 18..22,
+                            },
+                        ),
+                    ],
+                    elif_else_clauses: [],
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | if True: if True: pass
+  |          ^^ Syntax Error: Expected a simple statement
+  |

@@ -54,11 +54,12 @@ fn is_call_insecure(call: &ast::ExprCall) -> bool {
         if let Some(argument) = call.arguments.find_argument(argument_name, position) {
             match argument_name {
                 "select" => match argument {
-                    Expr::Dict(ExprDict { keys, values, .. }) => {
-                        if !keys.iter().flatten().all(Expr::is_string_literal_expr) {
-                            return true;
-                        }
-                        if !values.iter().all(Expr::is_string_literal_expr) {
+                    Expr::Dict(ExprDict { items, .. }) => {
+                        if items.iter().any(|ast::DictItem { key, value }| {
+                            key.as_ref()
+                                .is_some_and(|key| !key.is_string_literal_expr())
+                                || !value.is_string_literal_expr()
+                        }) {
                             return true;
                         }
                     }

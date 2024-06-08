@@ -76,7 +76,7 @@ pub(crate) fn subprocess_run_without_check(checker: &mut Checker, call: &ast::Ex
                 add_argument(
                     "check=False",
                     &call.arguments,
-                    checker.indexer().comment_ranges(),
+                    checker.comment_ranges(),
                     checker.locator().contents(),
                 ),
                 // If the function call contains `**kwargs`, mark the fix as unsafe.

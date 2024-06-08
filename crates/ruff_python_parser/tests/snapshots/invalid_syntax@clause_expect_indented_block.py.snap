@@ -1,0 +1,64 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/clause_expect_indented_block.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..171,
+        body: [
+            If(
+                StmtIf {
+                    range: 53..61,
+                    test: BooleanLiteral(
+                        ExprBooleanLiteral {
+                            range: 56..60,
+                            value: true,
+                        },
+                    ),
+                    body: [],
+                    elif_else_clauses: [],
+                },
+            ),
+            Pass(
+                StmtPass {
+                    range: 62..66,
+                },
+            ),
+            If(
+                StmtIf {
+                    range: 162..170,
+                    test: BooleanLiteral(
+                        ExprBooleanLiteral {
+                            range: 165..169,
+                            value: true,
+                        },
+                    ),
+                    body: [],
+                    elif_else_clauses: [],
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | # Here, the error is highlighted at the `pass` token
+2 | if True:
+3 | pass
+  | ^^^^ Syntax Error: Expected an indented block after `if` statement
+4 | # The parser is at the end of the program, so let's highlight
+5 | # at the newline token after `:`
+  |
+
+
+  |
+4 | # The parser is at the end of the program, so let's highlight
+5 | # at the newline token after `:`
+6 | if True:
+  |         ^ Syntax Error: Expected an indented block after `if` statement
+  |

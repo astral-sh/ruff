@@ -67,6 +67,7 @@ use crate::rules::isort::{categorize, ImportSection, ImportType};
 /// - `lint.flake8-type-checking.quote-annotations`
 /// - `lint.flake8-type-checking.runtime-evaluated-base-classes`
 /// - `lint.flake8-type-checking.runtime-evaluated-decorators`
+/// - `lint.typing-modules`
 ///
 /// ## References
 /// - [PEP 536](https://peps.python.org/pep-0563/#runtime-annotation-resolution-and-type-checking)
@@ -140,6 +141,7 @@ impl Violation for TypingOnlyFirstPartyImport {
 /// - `lint.flake8-type-checking.quote-annotations`
 /// - `lint.flake8-type-checking.runtime-evaluated-base-classes`
 /// - `lint.flake8-type-checking.runtime-evaluated-decorators`
+/// - `lint.typing-modules`
 ///
 /// ## References
 /// - [PEP 536](https://peps.python.org/pep-0563/#runtime-annotation-resolution-and-type-checking)
@@ -213,6 +215,7 @@ impl Violation for TypingOnlyThirdPartyImport {
 /// - `lint.flake8-type-checking.quote-annotations`
 /// - `lint.flake8-type-checking.runtime-evaluated-base-classes`
 /// - `lint.flake8-type-checking.runtime-evaluated-decorators`
+/// - `lint.typing-modules`
 ///
 /// ## References
 /// - [PEP 536](https://peps.python.org/pep-0563/#runtime-annotation-resolution-and-type-checking)
@@ -297,7 +300,7 @@ pub(crate) fn typing_only_runtime_import(
             // Categorize the import, using coarse-grained categorization.
             let import_type = match categorize(
                 &qualified_name.to_string(),
-                None,
+                0,
                 &checker.settings.src,
                 checker.package(),
                 checker.settings.isort.detect_same_package,
@@ -488,7 +491,6 @@ fn fix_imports(checker: &Checker, node_id: NodeId, imports: &[ImportBinding]) ->
             },
             at,
             checker.semantic(),
-            checker.source_type,
         )?
         .into_edits();
 

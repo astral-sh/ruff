@@ -10,7 +10,7 @@ use ruff_linter::settings::{flags, LinterSettings};
 use ruff_linter::source_kind::SourceKind;
 use ruff_linter::{registry::Rule, RuleSelector};
 use ruff_python_ast::PySourceType;
-use ruff_python_parser::{lexer, parse_program_tokens, Mode};
+use ruff_python_parser::parse_module;
 
 #[cfg(target_os = "windows")]
 #[global_allocator]
@@ -54,30 +54,29 @@ fn benchmark_linter(mut group: BenchmarkGroup, settings: &LinterSettings) {
             BenchmarkId::from_parameter(case.name()),
             &case,
             |b, case| {
-                // Tokenize the source.
-                let tokens: Vec<_> = lexer::lex(case.code(), Mode::Module).collect();
-
                 // Parse the source.
-                let ast = parse_program_tokens(tokens.clone(), case.code(), false).unwrap();
+                let parsed =
+                    parse_module(case.code()).expect("Input should be a valid Python code");
 
-                b.iter(|| {
-                    let path = case.path();
-                    let result = lint_only(
-                        &path,
-                        None,
-                        settings,
-                        flags::Noqa::Enabled,
-                        &SourceKind::Python(case.code().to_string()),
-                        PySourceType::from(path.as_path()),
-                        ParseSource::Precomputed {
-                            tokens: &tokens,
-                            ast: &ast,
-                        },
-                    );
+                b.iter_batched(
+                    || parsed.clone(),
+                    |parsed| {
+                        let path = case.path();
+                        let result = lint_only(
+                            &path,
+                            None,
+                            settings,
+                            flags::Noqa::Enabled,
+                            &SourceKind::Python(case.code().to_string()),
+                            PySourceType::from(path.as_path()),
+                            ParseSource::Precomputed(parsed),
+                        );
 
-                    // Assert that file contains no parse errors
-                    assert_eq!(result.error, None);
-                });
+                        // Assert that file contains no parse errors
+                        assert_eq!(result.error, None);
+                    },
+                    criterion::BatchSize::SmallInput,
+                );
             },
         );
     }

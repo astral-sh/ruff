@@ -53,6 +53,7 @@
             },
             "lint": {
                 "enable": true,
+                "preview": false,
                 "run": "onType",
                 "args": [
                     "--preview"
@@ -85,6 +86,8 @@
         },
         "lint": {
             "enable": true,
+            "preview": true,
+            "select": ["F", "I"],
             "run": "onType",
             "args": [
                 "--preview"

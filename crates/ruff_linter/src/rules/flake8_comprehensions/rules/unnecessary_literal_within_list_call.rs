@@ -77,7 +77,7 @@ pub(crate) fn unnecessary_literal_within_list_call(checker: &mut Checker, call: 
     else {
         return;
     };
-    if !checker.semantic().is_builtin("list") {
+    if !checker.semantic().has_builtin_binding("list") {
         return;
     }
     let argument_kind = match argument {

@@ -118,7 +118,11 @@ pub(crate) fn call_datetime_strptime_without_zone(checker: &mut Checker, call: &
                             }
                         }
                         ast::FStringPart::FString(f_string) => {
-                            if f_string.literals().any(|literal| literal.contains("%z")) {
+                            if f_string
+                                .elements
+                                .literals()
+                                .any(|literal| literal.contains("%z"))
+                            {
                                 return;
                             }
                         }

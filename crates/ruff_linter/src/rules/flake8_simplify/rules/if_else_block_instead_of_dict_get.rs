@@ -161,7 +161,9 @@ pub(crate) fn if_else_block_instead_of_dict_get(checker: &mut Checker, stmt_if: 
     }
 
     // Check that the default value is not "complex".
-    if contains_effect(default_value, |id| checker.semantic().is_builtin(id)) {
+    if contains_effect(default_value, |id| {
+        checker.semantic().has_builtin_binding(id)
+    }) {
         return;
     }
 
@@ -207,7 +209,10 @@ pub(crate) fn if_else_block_instead_of_dict_get(checker: &mut Checker, stmt_if: 
         },
         stmt_if.range(),
     );
-    if !checker.indexer().has_comments(stmt_if, checker.locator()) {
+    if !checker
+        .comment_ranges()
+        .has_comments(stmt_if, checker.locator())
+    {
         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
             contents,
             stmt_if.range(),
@@ -261,7 +266,9 @@ pub(crate) fn if_exp_instead_of_dict_get(
     }
 
     // Check that the default value is not "complex".
-    if contains_effect(default_value, |id| checker.semantic().is_builtin(id)) {
+    if contains_effect(default_value, |id| {
+        checker.semantic().has_builtin_binding(id)
+    }) {
         return;
     }
 
@@ -291,7 +298,10 @@ pub(crate) fn if_exp_instead_of_dict_get(
         },
         expr.range(),
     );
-    if !checker.indexer().has_comments(expr, checker.locator()) {
+    if !checker
+        .comment_ranges()
+        .has_comments(expr, checker.locator())
+    {
         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
             contents,
             expr.range(),

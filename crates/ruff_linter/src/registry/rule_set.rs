@@ -207,6 +207,15 @@ impl RuleSet {
         *self = set.union(&RuleSet::from_rule(rule));
     }
 
+    #[inline]
+    pub fn set(&mut self, rule: Rule, enabled: bool) {
+        if enabled {
+            self.insert(rule);
+        } else {
+            self.remove(rule);
+        }
+    }
+
     /// Removes `rule` from the set.
     ///
     /// ## Examples
@@ -291,7 +300,9 @@ impl Display for RuleSet {
         } else {
             writeln!(f, "[")?;
             for rule in self {
-                writeln!(f, "\t{rule:?},")?;
+                let name = rule.as_ref();
+                let code = rule.noqa_code();
+                writeln!(f, "\t{name} ({code}),")?;
             }
             write!(f, "]")?;
         }

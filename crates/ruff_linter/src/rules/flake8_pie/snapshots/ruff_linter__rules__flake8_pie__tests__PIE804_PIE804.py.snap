@@ -166,6 +166,8 @@ PIE804.py:26:10: PIE804 Unnecessary `dict` kwargs
 25 | abc(**{'a': b}, **{'a': c})  # PIE804
 26 | abc(a=1, **{'a': c}, **{'b': c})  # PIE804
    |          ^^^^^^^^^^ PIE804
+27 | 
+28 | # Some values need to be parenthesized.
    |
    = help: Remove unnecessary kwargs
 
@@ -175,6 +177,8 @@ PIE804.py:26:22: PIE804 [*] Unnecessary `dict` kwargs
 25 | abc(**{'a': b}, **{'a': c})  # PIE804
 26 | abc(a=1, **{'a': c}, **{'b': c})  # PIE804
    |                      ^^^^^^^^^^ PIE804
+27 | 
+28 | # Some values need to be parenthesized.
    |
    = help: Remove unnecessary kwargs
 
@@ -184,5 +188,39 @@ PIE804.py:26:22: PIE804 [*] Unnecessary `dict` kwargs
 25 25 | abc(**{'a': b}, **{'a': c})  # PIE804
 26    |-abc(a=1, **{'a': c}, **{'b': c})  # PIE804
    26 |+abc(a=1, **{'a': c}, b=c)  # PIE804
+27 27 | 
+28 28 | # Some values need to be parenthesized.
+29 29 | abc(foo=1, **{'bar': (bar := 1)})  # PIE804
 
+PIE804.py:29:12: PIE804 [*] Unnecessary `dict` kwargs
+   |
+28 | # Some values need to be parenthesized.
+29 | abc(foo=1, **{'bar': (bar := 1)})  # PIE804
+   |            ^^^^^^^^^^^^^^^^^^^^^ PIE804
+30 | abc(foo=1, **{'bar': (yield 1)})  # PIE804
+   |
+   = help: Remove unnecessary kwargs
 
+ℹ Safe fix
+26 26 | abc(a=1, **{'a': c}, **{'b': c})  # PIE804
+27 27 | 
+28 28 | # Some values need to be parenthesized.
+29    |-abc(foo=1, **{'bar': (bar := 1)})  # PIE804
+   29 |+abc(foo=1, bar=(bar := 1))  # PIE804
+30 30 | abc(foo=1, **{'bar': (yield 1)})  # PIE804
+
+PIE804.py:30:12: PIE804 [*] Unnecessary `dict` kwargs
+   |
+28 | # Some values need to be parenthesized.
+29 | abc(foo=1, **{'bar': (bar := 1)})  # PIE804
+30 | abc(foo=1, **{'bar': (yield 1)})  # PIE804
+   |            ^^^^^^^^^^^^^^^^^^^^ PIE804
+   |
+   = help: Remove unnecessary kwargs
+
+ℹ Safe fix
+27 27 | 
+28 28 | # Some values need to be parenthesized.
+29 29 | abc(foo=1, **{'bar': (bar := 1)})  # PIE804
+30    |-abc(foo=1, **{'bar': (yield 1)})  # PIE804
+   30 |+abc(foo=1, bar=(yield 1))  # PIE804

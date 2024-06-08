@@ -211,7 +211,7 @@ impl<'fmt, 'ast, 'buf> JoinCommaSeparatedBuilder<'fmt, 'ast, 'buf> {
             if let FStringState::InsideExpressionElement(context) =
                 self.fmt.context().f_string_state()
             {
-                if context.layout().is_flat() {
+                if !context.can_contain_line_breaks() {
                     return Ok(());
                 }
             }

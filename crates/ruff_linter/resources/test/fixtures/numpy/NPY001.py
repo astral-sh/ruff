@@ -3,13 +3,13 @@ import numpy as np
 import numpy
 
 # Error
-npy.bool
+npy.float
 npy.int
 
 if dtype == np.object:
     ...
 
-result = result.select_dtypes([np.byte, np.ubyte, np.short, np.ushort, np.int, np.long])
+result = result.select_dtypes([np.byte, np.ubyte, np.short, np.ushort, np.int, np.complex])
 
 pdf = pd.DataFrame(
     data=[[1, 2, 3]],

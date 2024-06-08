@@ -43,6 +43,7 @@ mod tests {
     #[test_case(Path::new("no_future_import_uses_union_inner.py"))]
     #[test_case(Path::new("ok_no_types.py"))]
     #[test_case(Path::new("ok_uses_future.py"))]
+    #[test_case(Path::new("ok_quoted_type.py"))]
     fn fa102(path: &Path) -> Result<()> {
         let snapshot = format!("fa102_{}", path.to_string_lossy());
         let diagnostics = test_path(

@@ -2,10 +2,12 @@ use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_docstring_stmt;
 use ruff_python_ast::name::QualifiedName;
-use ruff_python_ast::{self as ast, Expr, Parameter, ParameterWithDefault, Stmt};
+use ruff_python_ast::{self as ast, Expr, Parameter, ParameterWithDefault};
 use ruff_python_codegen::{Generator, Stylist};
 use ruff_python_index::Indexer;
+use ruff_python_semantic::analyze::function_type::is_stub;
 use ruff_python_semantic::analyze::typing::{is_immutable_annotation, is_mutable_expr};
+use ruff_python_semantic::SemanticModel;
 use ruff_python_trivia::{indentation_at_offset, textwrap};
 use ruff_source_file::Locator;
 use ruff_text_size::Ranged;
@@ -87,12 +89,7 @@ pub(crate) fn mutable_argument_default(checker: &mut Checker, function_def: &ast
         parameter,
         default,
         range: _,
-    } in function_def
-        .parameters
-        .posonlyargs
-        .iter()
-        .chain(&function_def.parameters.args)
-        .chain(&function_def.parameters.kwonlyargs)
+    } in function_def.parameters.iter_non_variadic_params()
     {
         let Some(default) = default else {
             continue;
@@ -118,6 +115,7 @@ pub(crate) fn mutable_argument_default(checker: &mut Checker, function_def: &ast
                 function_def,
                 parameter,
                 default,
+                checker.semantic(),
                 checker.locator(),
                 checker.stylist(),
                 checker.indexer(),
@@ -132,10 +130,12 @@ pub(crate) fn mutable_argument_default(checker: &mut Checker, function_def: &ast
 
 /// Generate a [`Fix`] to move a mutable argument default initialization
 /// into the function body.
+#[allow(clippy::too_many_arguments)]
 fn move_initialization(
     function_def: &ast::StmtFunctionDef,
     parameter: &Parameter,
     default: &Expr,
+    semantic: &SemanticModel,
     locator: &Locator,
     stylist: &Stylist,
     indexer: &Indexer,
@@ -153,7 +153,7 @@ fn move_initialization(
     let default_edit = Edit::range_replacement("None".to_string(), default.range());
 
     // If the function is a stub, this is the only necessary edit.
-    if is_stub(function_def) {
+    if is_stub(function_def, semantic) {
         return Some(Fix::unsafe_edit(default_edit));
     }
 
@@ -208,21 +208,4 @@ fn move_initialization(
 
     let initialization_edit = Edit::insertion(content, pos);
     Some(Fix::unsafe_edits(default_edit, [initialization_edit]))
-}
-
-/// Returns `true` if a function has an empty body, and is therefore a stub.
-///
-/// A function body is considered to be empty if it contains only `pass` statements, `...` literals,
-/// and docstrings.
-fn is_stub(function_def: &ast::StmtFunctionDef) -> bool {
-    function_def.body.iter().all(|stmt| match stmt {
-        Stmt::Pass(_) => true,
-        Stmt::Expr(ast::StmtExpr { value, range: _ }) => {
-            matches!(
-                value.as_ref(),
-                Expr::StringLiteral(_) | Expr::EllipsisLiteral(_)
-            )
-        }
-        _ => false,
-    })
 }

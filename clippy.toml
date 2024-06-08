@@ -1,7 +1,13 @@
 doc-valid-idents = [
-  "StackOverflow",
-  "CodeQL",
-  "IPython",
-  "NumPy",
   "..",
+  "CodeQL",
+  "FastAPI",
+  "IPython",
+  "LangChain",
+  "LibCST",
+  "McCabe",
+  "NumPy",
+  "SCREAMING_SNAKE_CASE",
+  "SQLAlchemy",
+  "StackOverflow",
 ]

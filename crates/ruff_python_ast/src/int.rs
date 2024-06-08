@@ -10,7 +10,7 @@ impl FromStr for Int {
 
     /// Parse an [`Int`] from a string.
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.parse::<i64>() {
+        match s.parse::<u64>() {
             Ok(value) => Ok(Int::small(value)),
             Err(err) => {
                 if matches!(
@@ -31,7 +31,7 @@ impl Int {
     pub const ONE: Int = Int(Number::Small(1));
 
     /// Create an [`Int`] to represent a value that can be represented as an `i64`.
-    fn small(value: i64) -> Self {
+    fn small(value: u64) -> Self {
         Self(Number::Small(value))
     }
 
@@ -49,7 +49,7 @@ impl Int {
         radix: u32,
         token: &str,
     ) -> Result<Self, std::num::ParseIntError> {
-        match i64::from_str_radix(number, radix) {
+        match u64::from_str_radix(number, radix) {
             Ok(value) => Ok(Int::small(value)),
             Err(err) => {
                 if matches!(
@@ -88,6 +88,14 @@ impl Int {
         }
     }
 
+    /// Return the [`Int`] as an u64, if it can be represented as that data type.
+    pub const fn as_u64(&self) -> Option<u64> {
+        match &self.0 {
+            Number::Small(small) => Some(*small),
+            Number::Big(_) => None,
+        }
+    }
+
     /// Return the [`Int`] as an i8, if it can be represented as that data type.
     pub fn as_i8(&self) -> Option<i8> {
         match &self.0 {
@@ -113,9 +121,9 @@ impl Int {
     }
 
     /// Return the [`Int`] as an i64, if it can be represented as that data type.
-    pub const fn as_i64(&self) -> Option<i64> {
+    pub fn as_i64(&self) -> Option<i64> {
         match &self.0 {
-            Number::Small(small) => Some(*small),
+            Number::Small(small) => i64::try_from(*small).ok(),
             Number::Big(_) => None,
         }
     }
@@ -177,51 +185,33 @@ impl PartialEq<i64> for Int {
 
 impl From<u8> for Int {
     fn from(value: u8) -> Self {
-        Self::small(i64::from(value))
+        Self::small(u64::from(value))
     }
 }
 
 impl From<u16> for Int {
     fn from(value: u16) -> Self {
-        Self::small(i64::from(value))
+        Self::small(u64::from(value))
     }
 }
 
 impl From<u32> for Int {
     fn from(value: u32) -> Self {
-        Self::small(i64::from(value))
+        Self::small(u64::from(value))
     }
 }
 
-impl From<i8> for Int {
-    fn from(value: i8) -> Self {
-        Self::small(i64::from(value))
-    }
-}
-
-impl From<i16> for Int {
-    fn from(value: i16) -> Self {
-        Self::small(i64::from(value))
-    }
-}
-
-impl From<i32> for Int {
-    fn from(value: i32) -> Self {
-        Self::small(i64::from(value))
-    }
-}
-
-impl From<i64> for Int {
-    fn from(value: i64) -> Self {
+impl From<u64> for Int {
+    fn from(value: u64) -> Self {
         Self::small(value)
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 enum Number {
-    /// A "small" number that can be represented as an `i64`.
-    Small(i64),
-    /// A "large" number that cannot be represented as an `i64`.
+    /// A "small" number that can be represented as an `u64`.
+    Small(u64),
+    /// A "large" number that cannot be represented as an `u64`.
     Big(Box<str>),
 }
 

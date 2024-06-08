@@ -4,7 +4,7 @@
 
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 [![image](https://img.shields.io/pypi/v/ruff.svg)](https://pypi.python.org/pypi/ruff)
-[![image](https://img.shields.io/pypi/l/ruff.svg)](https://pypi.python.org/pypi/ruff)
+[![image](https://img.shields.io/pypi/l/ruff.svg)](https://github.com/astral-sh/ruff/blob/main/LICENSE)
 [![image](https://img.shields.io/pypi/pyversions/ruff.svg)](https://pypi.python.org/pypi/ruff)
 [![Actions status](https://github.com/astral-sh/ruff/workflows/CI/badge.svg)](https://github.com/astral-sh/ruff/actions)
 [![Discord](https://img.shields.io/badge/Discord-%235865F2.svg?logo=discord&logoColor=white)](https://discord.com/invite/astral-sh)
@@ -50,6 +50,7 @@ times faster than any individual tool.
 Ruff is extremely actively developed and used in major open-source projects like:
 
 - [Apache Airflow](https://github.com/apache/airflow)
+- [Apache Superset](https://github.com/apache/superset)
 - [FastAPI](https://github.com/tiangolo/fastapi)
 - [Hugging Face](https://github.com/huggingface/transformers)
 - [Pandas](https://github.com/pandas-dev/pandas)
@@ -151,7 +152,7 @@ Ruff can also be used as a [pre-commit](https://pre-commit.com/) hook via [`ruff
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.3.7
+  rev: v0.4.8
   hooks:
     # Run the linter.
     - id: ruff
@@ -264,6 +265,11 @@ The remaining configuration options can be provided through a catch-all `--confi
 ```shell
 ruff check --config "lint.per-file-ignores = {'some_file.py' = ['F841']}"
 ```
+
+To opt in to the latest lint rules, formatter style changes, interface updates, and more, enable
+[preview mode](https://docs.astral.sh/ruff/rules/) by setting `preview = true` in your configuration
+file or passing `--preview` on the command line. Preview mode enables a collection of unstable
+features that may change prior to stabilization.
 
 See `ruff help` for more on Ruff's top-level commands, or `ruff help check` and `ruff help format`
 for more on the linting and formatting commands, respectively.
@@ -402,6 +408,7 @@ Ruff is used by a number of major open-source projects and companies, including:
 - [Dagster](https://github.com/dagster-io/dagster)
 - Databricks ([MLflow](https://github.com/mlflow/mlflow))
 - [FastAPI](https://github.com/tiangolo/fastapi)
+- [Godot](https://github.com/godotengine/godot)
 - [Gradio](https://github.com/gradio-app/gradio)
 - [Great Expectations](https://github.com/great-expectations/great_expectations)
 - [HTTPX](https://github.com/encode/httpx)
@@ -424,9 +431,10 @@ Ruff is used by a number of major open-source projects and companies, including:
 - Microsoft ([Semantic Kernel](https://github.com/microsoft/semantic-kernel),
     [ONNX Runtime](https://github.com/microsoft/onnxruntime),
     [LightGBM](https://github.com/microsoft/LightGBM))
-- Modern Treasury ([Python SDK](https://github.com/Modern-Treasury/modern-treasury-python-sdk))
+- Modern Treasury ([Python SDK](https://github.com/Modern-Treasury/modern-treasury-python))
 - Mozilla ([Firefox](https://github.com/mozilla/gecko-dev))
 - [Mypy](https://github.com/python/mypy)
+- [Nautobot](https://github.com/nautobot/nautobot)
 - Netflix ([Dispatch](https://github.com/Netflix/dispatch))
 - [Neon](https://github.com/neondatabase/neon)
 - [Nokia](https://nokia.com/)
@@ -498,7 +506,7 @@ If you're using Ruff, consider adding the Ruff badge to your project's `README.m
 
 ## License
 
-MIT
+This repository is licensed under the [MIT License](https://github.com/astral-sh/ruff/blob/main/LICENSE)
 
 <div align="center">
   <a target="_blank" href="https://astral.sh" style="background:none">

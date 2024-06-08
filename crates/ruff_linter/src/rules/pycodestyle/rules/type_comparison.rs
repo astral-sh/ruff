@@ -134,7 +134,7 @@ fn deprecated_type_comparison(checker: &mut Checker, compare: &ast::ExprCompare)
                         | "dict"
                         | "set"
                         | "memoryview"
-                ) && semantic.is_builtin(id)
+                ) && semantic.has_builtin_binding(id)
                 {
                     checker.diagnostics.push(Diagnostic::new(
                         TypeComparison {
@@ -289,7 +289,7 @@ fn is_type(expr: &Expr, semantic: &SemanticModel) -> bool {
                     | "ValueError"
                     | "Warning"
                     | "ZeroDivisionError"
-            ) && semantic.is_builtin(id)
+            ) && semantic.has_builtin_binding(id)
         }
         _ => false,
     }

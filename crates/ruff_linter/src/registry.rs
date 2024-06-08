@@ -246,7 +246,7 @@ impl Rule {
     pub const fn lint_source(&self) -> LintSource {
         match self {
             Rule::InvalidPyprojectToml => LintSource::PyprojectToml,
-            Rule::UnusedNOQA => LintSource::Noqa,
+            Rule::BlanketNOQA | Rule::RedirectedNOQA | Rule::UnusedNOQA => LintSource::Noqa,
             Rule::BidirectionalUnicode
             | Rule::BlankLineWithWhitespace
             | Rule::DocLineTooLong
@@ -256,7 +256,6 @@ impl Rule {
             | Rule::MixedSpacesAndTabs
             | Rule::TrailingWhitespace => LintSource::PhysicalLines,
             Rule::AmbiguousUnicodeCharacterComment
-            | Rule::BlanketNOQA
             | Rule::BlanketTypeIgnore
             | Rule::BlankLineAfterDecorator
             | Rule::BlankLineBetweenMethods
@@ -271,7 +270,6 @@ impl Rule {
             | Rule::InvalidCharacterNul
             | Rule::InvalidCharacterSub
             | Rule::InvalidCharacterZeroWidthSpace
-            | Rule::InvalidEscapeSequence
             | Rule::InvalidTodoCapitalization
             | Rule::InvalidTodoTag
             | Rule::LineContainsFixme

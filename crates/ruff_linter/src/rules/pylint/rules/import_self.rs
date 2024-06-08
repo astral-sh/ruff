@@ -51,7 +51,7 @@ pub(crate) fn import_self(alias: &Alias, module_path: Option<&[String]>) -> Opti
 
 /// PLW0406
 pub(crate) fn import_from_self(
-    level: Option<u32>,
+    level: u32,
     module: Option<&str>,
     names: &[Alias],
     module_path: Option<&[String]>,

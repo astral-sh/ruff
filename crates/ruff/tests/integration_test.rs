@@ -731,11 +731,11 @@ fn stdin_parse_error() {
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:17: E999 SyntaxError: Unexpected token '='
+    -:1:17: E999 SyntaxError: Expected an import name
     Found 1 error.
 
     ----- stderr -----
-    error: Failed to parse at 1:17: Unexpected token '='
+    error: Failed to parse at 1:17: Expected an import name
     "###);
 }
 
@@ -1414,7 +1414,7 @@ fn check_input_from_argfile() -> Result<()> {
     fs::write(&file_a_path, b"import os")?;
     fs::write(&file_b_path, b"print('hello, world!')")?;
 
-    // Create a the input file for argfile to expand
+    // Create the input file for argfile to expand
     let input_file_path = tempdir.path().join("file_paths.txt");
     fs::write(
         &input_file_path,

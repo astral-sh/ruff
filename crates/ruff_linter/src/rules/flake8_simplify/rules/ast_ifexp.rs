@@ -164,7 +164,7 @@ pub(crate) fn if_expr_with_true_false(
                     parenthesized_range(
                         test.into(),
                         expr.into(),
-                        checker.indexer().comment_ranges(),
+                        checker.comment_ranges(),
                         checker.locator().contents(),
                     )
                     .unwrap_or(test.range()),
@@ -172,7 +172,7 @@ pub(crate) fn if_expr_with_true_false(
                 .to_string(),
             expr.range(),
         )));
-    } else if checker.semantic().is_builtin("bool") {
+    } else if checker.semantic().has_builtin_binding("bool") {
         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
             checker.generator().expr(
                 &ast::ExprCall {

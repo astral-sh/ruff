@@ -1,13 +1,10 @@
-use rustc_hash::FxHashSet;
-
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{
     self as ast, Expr, Operator, ParameterWithDefault, Parameters, Stmt, UnaryOp,
 };
-use ruff_python_semantic::{BindingId, ScopeKind, SemanticModel};
+use ruff_python_semantic::{analyze::class::is_enumeration, ScopeKind, SemanticModel};
 use ruff_source_file::Locator;
 use ruff_text_size::Ranged;
 
@@ -301,17 +298,13 @@ fn is_valid_default_value_with_annotation(
                     .iter()
                     .all(|e| is_valid_default_value_with_annotation(e, false, locator, semantic));
         }
-        Expr::Dict(ast::ExprDict {
-            keys,
-            values,
-            range: _,
-        }) => {
+        Expr::Dict(ast::ExprDict { items, range: _ }) => {
             return allow_container
-                && keys.len() <= 10
-                && keys.iter().zip(values).all(|(k, v)| {
-                    k.as_ref().is_some_and(|k| {
-                        is_valid_default_value_with_annotation(k, false, locator, semantic)
-                    }) && is_valid_default_value_with_annotation(v, false, locator, semantic)
+                && items.len() <= 10
+                && items.iter().all(|ast::DictItem { key, value }| {
+                    key.as_ref().is_some_and(|key| {
+                        is_valid_default_value_with_annotation(key, false, locator, semantic)
+                    }) && is_valid_default_value_with_annotation(value, false, locator, semantic)
                 });
         }
         Expr::UnaryOp(ast::ExprUnaryOp {
@@ -473,62 +466,23 @@ fn is_final_assignment(annotation: &Expr, value: &Expr, semantic: &SemanticModel
     false
 }
 
-/// Returns `true` if the a class is an enum, based on its base classes.
-fn is_enum(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> bool {
-    fn inner(
-        class_def: &ast::StmtClassDef,
-        semantic: &SemanticModel,
-        seen: &mut FxHashSet<BindingId>,
-    ) -> bool {
-        class_def.bases().iter().any(|expr| {
-            // If the base class is `enum.Enum`, `enum.Flag`, etc., then this is an enum.
-            if semantic
-                .resolve_qualified_name(map_subscript(expr))
-                .is_some_and(|qualified_name| {
-                    matches!(
-                        qualified_name.segments(),
-                        [
-                            "enum",
-                            "Enum" | "Flag" | "IntEnum" | "IntFlag" | "StrEnum" | "ReprEnum"
-                        ]
-                    )
-                })
-            {
-                return true;
-            }
-
-            // If the base class extends `enum.Enum`, `enum.Flag`, etc., then this is an enum.
-            if let Some(id) = semantic.lookup_attribute(map_subscript(expr)) {
-                if seen.insert(id) {
-                    let binding = semantic.binding(id);
-                    if let Some(base_class) = binding
-                        .kind
-                        .as_class_definition()
-                        .map(|id| &semantic.scopes[*id])
-                        .and_then(|scope| scope.kind.as_class())
-                    {
-                        if inner(base_class, semantic, seen) {
-                            return true;
-                        }
-                    }
-                }
-            }
-            false
-        })
-    }
-
-    inner(class_def, semantic, &mut FxHashSet::default())
-}
-
 /// Returns `true` if an [`Expr`] is a value that should be annotated with `typing.TypeAlias`.
 ///
 /// This is relatively conservative, as it's hard to reliably detect whether a right-hand side is a
 /// valid type alias. In particular, this function checks for uses of `typing.Any`, `None`,
 /// parameterized generics, and PEP 604-style unions.
 fn is_annotatable_type_alias(value: &Expr, semantic: &SemanticModel) -> bool {
-    matches!(value, Expr::Subscript(_) | Expr::NoneLiteral(_))
-        || is_valid_pep_604_union(value)
-        || semantic.match_typing_expr(value, "Any")
+    if value.is_none_literal_expr() {
+        if let ScopeKind::Class(class_def) = semantic.current_scope().kind {
+            !is_enumeration(class_def, semantic)
+        } else {
+            true
+        }
+    } else {
+        value.is_subscript_expr()
+            || is_valid_pep_604_union(value)
+            || semantic.match_typing_expr(value, "Any")
+    }
 }
 
 /// PYI011
@@ -537,11 +491,7 @@ pub(crate) fn typed_argument_simple_defaults(checker: &mut Checker, parameters: 
         parameter,
         default,
         range: _,
-    } in parameters
-        .posonlyargs
-        .iter()
-        .chain(&parameters.args)
-        .chain(&parameters.kwonlyargs)
+    } in parameters.iter_non_variadic_params()
     {
         let Some(default) = default else {
             continue;
@@ -572,11 +522,7 @@ pub(crate) fn argument_simple_defaults(checker: &mut Checker, parameters: &Param
         parameter,
         default,
         range: _,
-    } in parameters
-        .posonlyargs
-        .iter()
-        .chain(&parameters.args)
-        .chain(&parameters.kwonlyargs)
+    } in parameters.iter_non_variadic_params()
     {
         let Some(default) = default else {
             continue;
@@ -676,21 +622,22 @@ pub(crate) fn unannotated_assignment_in_stub(
     let Expr::Name(ast::ExprName { id, .. }) = target else {
         return;
     };
-    if is_special_assignment(target, checker.semantic()) {
+    let semantic = checker.semantic();
+    if is_special_assignment(target, semantic) {
         return;
     }
-    if is_type_var_like_call(value, checker.semantic()) {
+    if is_type_var_like_call(value, semantic) {
         return;
     }
     if is_valid_default_value_without_annotation(value) {
         return;
     }
-    if !is_valid_default_value_with_annotation(value, true, checker.locator(), checker.semantic()) {
+    if !is_valid_default_value_with_annotation(value, true, checker.locator(), semantic) {
         return;
     }
 
-    if let ScopeKind::Class(class_def) = checker.semantic().current_scope().kind {
-        if is_enum(class_def, checker.semantic()) {
+    if let ScopeKind::Class(class_def) = semantic.current_scope().kind {
+        if is_enumeration(class_def, semantic) {
             return;
         }
     }

@@ -14,7 +14,7 @@ license = { workspace = true }
 doctest = false
 
 [dependencies]
-ruff_text_size = { path = "../ruff_text_size" }
+ruff_text_size = { workspace = true }
 
 anyhow = { workspace = true }
 log = { workspace = true }

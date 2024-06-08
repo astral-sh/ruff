@@ -97,7 +97,7 @@ pub(crate) fn unnecessary_type_union<'a>(checker: &mut Checker, union: &'a Expr)
             union.range(),
         );
 
-        if semantic.is_builtin("type") {
+        if semantic.has_builtin_binding("type") {
             let content = if let Some(subscript) = subscript {
                 let types = &Expr::Subscript(ast::ExprSubscript {
                     value: Box::new(Expr::Name(ast::ExprName {

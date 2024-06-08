@@ -1,13 +1,14 @@
 //! AST visitor trait and walk functions.
 
-pub mod preorder;
+pub mod source_order;
 pub mod transformer;
 
 use crate::{
-    self as ast, Alias, Arguments, BoolOp, BytesLiteral, CmpOp, Comprehension, Decorator,
-    ElifElseClause, ExceptHandler, Expr, ExprContext, FString, FStringElement, FStringPart,
-    Keyword, MatchCase, Operator, Parameter, Parameters, Pattern, PatternArguments, PatternKeyword,
-    Stmt, StringLiteral, TypeParam, TypeParamTypeVar, TypeParams, UnaryOp, WithItem,
+    self as ast, Alias, AnyParameterRef, Arguments, BoolOp, BytesLiteral, CmpOp, Comprehension,
+    Decorator, ElifElseClause, ExceptHandler, Expr, ExprContext, FString, FStringElement,
+    FStringPart, Keyword, MatchCase, Operator, Parameter, Parameters, Pattern, PatternArguments,
+    PatternKeyword, Stmt, StringLiteral, TypeParam, TypeParamParamSpec, TypeParamTypeVar,
+    TypeParamTypeVarTuple, TypeParams, UnaryOp, WithItem,
 };
 
 /// A trait for AST visitors. Visits all nodes in the AST recursively in evaluation-order.
@@ -15,8 +16,8 @@ use crate::{
 /// Prefer [`crate::statement_visitor::StatementVisitor`] for visitors that only need to visit
 /// statements.
 ///
-/// Use the [`PreorderVisitor`](preorder::PreorderVisitor) if you want to visit the nodes
-/// in pre-order rather than evaluation order.
+/// Use the [`PreorderVisitor`](source_order::SourceOrderVisitor) if you want to visit the nodes
+/// in source-order rather than evaluation order.
 ///
 /// Use the [`Transformer`](transformer::Transformer) if you want to modify the nodes.
 pub trait Visitor<'a> {
@@ -388,16 +389,12 @@ pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a Expr) {
             visitor.visit_expr(body);
             visitor.visit_expr(orelse);
         }
-        Expr::Dict(ast::ExprDict {
-            keys,
-            values,
-            range: _,
-        }) => {
-            for expr in keys.iter().flatten() {
-                visitor.visit_expr(expr);
-            }
-            for expr in values {
-                visitor.visit_expr(expr);
+        Expr::Dict(ast::ExprDict { items, range: _ }) => {
+            for ast::DictItem { key, value } in items {
+                if let Some(key) = key {
+                    visitor.visit_expr(key);
+                }
+                visitor.visit_expr(value);
             }
         }
         Expr::Set(ast::ExprSet { elts, range: _ }) => {
@@ -606,36 +603,15 @@ pub fn walk_arguments<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, arguments: &
 
 pub fn walk_parameters<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, parameters: &'a Parameters) {
     // Defaults are evaluated before annotations.
-    for arg in &parameters.posonlyargs {
-        if let Some(default) = &arg.default {
-            visitor.visit_expr(default);
-        }
-    }
-    for arg in &parameters.args {
-        if let Some(default) = &arg.default {
-            visitor.visit_expr(default);
-        }
-    }
-    for arg in &parameters.kwonlyargs {
-        if let Some(default) = &arg.default {
-            visitor.visit_expr(default);
-        }
+    for default in parameters
+        .iter_non_variadic_params()
+        .filter_map(|param| param.default.as_deref())
+    {
+        visitor.visit_expr(default);
     }
 
-    for arg in &parameters.posonlyargs {
-        visitor.visit_parameter(&arg.parameter);
-    }
-    for arg in &parameters.args {
-        visitor.visit_parameter(&arg.parameter);
-    }
-    if let Some(arg) = &parameters.vararg {
-        visitor.visit_parameter(arg);
-    }
-    for arg in &parameters.kwonlyargs {
-        visitor.visit_parameter(&arg.parameter);
-    }
-    if let Some(arg) = &parameters.kwarg {
-        visitor.visit_parameter(arg);
+    for parameter in parameters.iter().map(AnyParameterRef::as_parameter) {
+        visitor.visit_parameter(parameter);
     }
 }
 
@@ -666,14 +642,35 @@ pub fn walk_type_param<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, type_param:
     match type_param {
         TypeParam::TypeVar(TypeParamTypeVar {
             bound,
+            default,
             name: _,
             range: _,
         }) => {
             if let Some(expr) = bound {
                 visitor.visit_expr(expr);
             }
+            if let Some(expr) = default {
+                visitor.visit_expr(expr);
+            }
         }
-        TypeParam::TypeVarTuple(_) | TypeParam::ParamSpec(_) => {}
+        TypeParam::TypeVarTuple(TypeParamTypeVarTuple {
+            default,
+            name: _,
+            range: _,
+        }) => {
+            if let Some(expr) = default {
+                visitor.visit_expr(expr);
+            }
+        }
+        TypeParam::ParamSpec(TypeParamParamSpec {
+            default,
+            name: _,
+            range: _,
+        }) => {
+            if let Some(expr) = default {
+                visitor.visit_expr(expr);
+            }
+        }
     }
 }
 

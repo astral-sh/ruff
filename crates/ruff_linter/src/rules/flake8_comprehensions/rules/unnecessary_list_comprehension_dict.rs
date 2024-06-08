@@ -56,7 +56,7 @@ pub(crate) fn unnecessary_list_comprehension_dict(
     else {
         return;
     };
-    if !checker.semantic().is_builtin("dict") {
+    if !checker.semantic().has_builtin_binding("dict") {
         return;
     }
     let Expr::ListComp(ast::ExprListComp { elt, .. }) = argument else {

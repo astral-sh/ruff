@@ -180,8 +180,11 @@ pub fn run(
             }
             Ok(ExitStatus::Success)
         }
-        Command::Config { option } => {
-            commands::config::config(option.as_deref())?;
+        Command::Config {
+            option,
+            output_format,
+        } => {
+            commands::config::config(option.as_deref(), output_format)?;
             Ok(ExitStatus::Success)
         }
         Command::Linter { output_format } => {
@@ -214,13 +217,14 @@ fn format(args: FormatCommand, global_options: GlobalConfigArgs) -> Result<ExitS
 
 fn server(args: ServerCommand, log_level: LogLevel) -> Result<ExitStatus> {
     let ServerCommand { preview } = args;
+
+    let four = NonZeroUsize::new(4).unwrap();
+
     // by default, we set the number of worker threads to `num_cpus`, with a maximum of 4.
-    let worker_threads = num_cpus::get().max(4);
-    commands::server::run_server(
-        preview,
-        NonZeroUsize::try_from(worker_threads).expect("a non-zero worker thread count"),
-        log_level,
-    )
+    let worker_threads = std::thread::available_parallelism()
+        .unwrap_or(four)
+        .max(four);
+    commands::server::run_server(preview, worker_threads, log_level)
 }
 
 pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<ExitStatus> {
@@ -233,6 +237,9 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
     let mut writer: Box<dyn Write> = match cli.output_file {
         Some(path) if !cli.watch => {
             colored::control::set_override(false);
+            if let Some(parent) = path.parent() {
+                std::fs::create_dir_all(parent)?;
+            }
             let file = File::create(path)?;
             Box::new(BufWriter::new(file))
         }

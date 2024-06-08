@@ -189,27 +189,6 @@ impl<'a, 'print> Queue<'a> for FitsQueue<'a, 'print> {
     }
 }
 
-/// Iterator that calls [`Queue::pop`] until it reaches the end of the document.
-///
-/// The iterator traverses into the content of any [`FormatElement::Interned`].
-pub(super) struct QueueIterator<'a, 'q, Q: Queue<'a>> {
-    queue: &'q mut Q,
-    lifetime: PhantomData<&'a ()>,
-}
-
-impl<'a, Q> Iterator for QueueIterator<'a, '_, Q>
-where
-    Q: Queue<'a>,
-{
-    type Item = &'a FormatElement;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.queue.pop()
-    }
-}
-
-impl<'a, Q> FusedIterator for QueueIterator<'a, '_, Q> where Q: Queue<'a> {}
-
 pub(super) struct QueueContentIterator<'a, 'q, Q: Queue<'a>> {
     queue: &'q mut Q,
     kind: TagKind,

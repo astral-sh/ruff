@@ -54,6 +54,7 @@ mod tests {
     #[test_case(Rule::MissingFStringSyntax, Path::new("RUF027_2.py"))]
     #[test_case(Rule::InvalidFormatterSuppressionComment, Path::new("RUF028.py"))]
     #[test_case(Rule::UnusedAsync, Path::new("RUF029.py"))]
+    #[test_case(Rule::RedirectedNOQA, Path::new("RUF101.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
@@ -141,6 +142,8 @@ mod tests {
                     Rule::UnusedImport,
                     Rule::UnusedVariable,
                     Rule::TabIndentation,
+                    Rule::YodaConditions,
+                    Rule::SuspiciousEvalUsage,
                 ])
             },
         )?;
@@ -160,6 +163,8 @@ mod tests {
                     Rule::UnusedImport,
                     Rule::UnusedVariable,
                     Rule::TabIndentation,
+                    Rule::YodaConditions,
+                    Rule::SuspiciousEvalUsage,
                 ])
             },
         )?;
@@ -246,6 +251,24 @@ mod tests {
                 )])
                 .unwrap(),
                 ..settings::LinterSettings::for_rules(vec![Rule::UnusedImport, Rule::UnusedNOQA])
+            },
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn ruff_per_file_ignores_empty() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("ruff/ruff_per_file_ignores.py"),
+            &settings::LinterSettings {
+                per_file_ignores: CompiledPerFileIgnoreList::resolve(vec![PerFileIgnore::new(
+                    "ruff_per_file_ignores.py".to_string(),
+                    &["RUF100".parse().unwrap()],
+                    None,
+                )])
+                .unwrap(),
+                ..settings::LinterSettings::for_rules(vec![Rule::UnusedNOQA])
             },
         )?;
         assert_messages!(diagnostics);

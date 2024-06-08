@@ -2,7 +2,6 @@
 //! filesystem.
 
 use std::cmp::Ordering;
-use std::collections::BTreeMap;
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use std::sync::RwLock;
@@ -13,7 +12,9 @@ use globset::{Candidate, GlobSet};
 use ignore::{WalkBuilder, WalkState};
 use itertools::Itertools;
 use log::debug;
+use matchit::{InsertError, Match, Router};
 use path_absolutize::path_dedot;
+use path_slash::PathExt;
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use ruff_linter::fs;
@@ -86,13 +87,12 @@ pub enum Relativity {
 }
 
 impl Relativity {
-    pub fn resolve(self, path: &Path) -> PathBuf {
+    pub fn resolve(self, path: &Path) -> &Path {
         match self {
             Relativity::Parent => path
                 .parent()
-                .expect("Expected pyproject.toml file to be in parent directory")
-                .to_path_buf(),
-            Relativity::Cwd => path_dedot::CWD.clone(),
+                .expect("Expected pyproject.toml file to be in parent directory"),
+            Relativity::Cwd => &path_dedot::CWD,
         }
     }
 }
@@ -100,7 +100,10 @@ impl Relativity {
 #[derive(Debug)]
 pub struct Resolver<'a> {
     pyproject_config: &'a PyprojectConfig,
-    settings: BTreeMap<PathBuf, Settings>,
+    /// All [`Settings`] that have been added to the resolver.
+    settings: Vec<Settings>,
+    /// A router from path to index into the `settings` vector.
+    router: Router<usize>,
 }
 
 impl<'a> Resolver<'a> {
@@ -108,7 +111,8 @@ impl<'a> Resolver<'a> {
     pub fn new(pyproject_config: &'a PyprojectConfig) -> Self {
         Self {
             pyproject_config,
-            settings: BTreeMap::new(),
+            settings: Vec::new(),
+            router: Router::new(),
         }
     }
 
@@ -140,8 +144,21 @@ impl<'a> Resolver<'a> {
     }
 
     /// Add a resolved [`Settings`] under a given [`PathBuf`] scope.
-    fn add(&mut self, path: PathBuf, settings: Settings) {
-        self.settings.insert(path, settings);
+    fn add(&mut self, path: &Path, settings: Settings) {
+        self.settings.push(settings);
+
+        // normalize the path to use `/` separators and escape the '{' and '}' characters,
+        // which matchit uses for routing parameters
+        let path = path.to_slash_lossy().replace('{', "{{").replace('}', "}}");
+
+        match self
+            .router
+            .insert(format!("{path}/{{*filepath}}"), self.settings.len() - 1)
+        {
+            Ok(()) => {}
+            Err(InsertError::Conflict { .. }) => {}
+            Err(_) => unreachable!("file paths are escaped before being inserted in the router"),
+        }
     }
 
     /// Return the appropriate [`Settings`] for a given [`Path`].
@@ -149,10 +166,9 @@ impl<'a> Resolver<'a> {
         match self.pyproject_config.strategy {
             PyprojectDiscoveryStrategy::Fixed => &self.pyproject_config.settings,
             PyprojectDiscoveryStrategy::Hierarchical => self
-                .settings
-                .iter()
-                .rev()
-                .find_map(|(root, settings)| path.starts_with(root).then_some(settings))
+                .router
+                .at(path.to_slash_lossy().as_ref())
+                .map(|Match { value, .. }| &self.settings[*value])
                 .unwrap_or(&self.pyproject_config.settings),
         }
     }
@@ -196,7 +212,7 @@ impl<'a> Resolver<'a> {
 
     /// Return an iterator over the resolved [`Settings`] in this [`Resolver`].
     pub fn settings(&self) -> impl Iterator<Item = &Settings> {
-        std::iter::once(&self.pyproject_config.settings).chain(self.settings.values())
+        std::iter::once(&self.pyproject_config.settings).chain(self.settings.iter())
     }
 }
 
@@ -257,7 +273,7 @@ fn resolve_configuration(
         let options = pyproject::load_options(&path)?;
 
         let project_root = relativity.resolve(&path);
-        let configuration = Configuration::from_options(options, Some(&path), &project_root)?;
+        let configuration = Configuration::from_options(options, Some(&path), project_root)?;
 
         // If extending, continue to collect.
         next = configuration.extend.as_ref().map(|extend| {
@@ -285,14 +301,14 @@ fn resolve_configuration(
 
 /// Extract the project root (scope) and [`Settings`] from a given
 /// `pyproject.toml`.
-fn resolve_scoped_settings(
-    pyproject: &Path,
+fn resolve_scoped_settings<'a>(
+    pyproject: &'a Path,
     relativity: Relativity,
     transformer: &dyn ConfigurationTransformer,
-) -> Result<(PathBuf, Settings)> {
+) -> Result<(&'a Path, Settings)> {
     let configuration = resolve_configuration(pyproject, relativity, transformer)?;
     let project_root = relativity.resolve(pyproject);
-    let settings = configuration.into_settings(&project_root)?;
+    let settings = configuration.into_settings(project_root)?;
     Ok((project_root, settings))
 }
 
@@ -319,6 +335,12 @@ pub fn python_files_in_path<'a>(
     // Search for `pyproject.toml` files in all parent directories.
     let mut resolver = Resolver::new(pyproject_config);
     let mut seen = FxHashSet::default();
+
+    // Insert the path to the root configuration to avoid parsing the configuration a second time.
+    if let Some(config_path) = &pyproject_config.path {
+        seen.insert(config_path.parent().unwrap());
+    }
+
     if resolver.is_hierarchical() {
         for path in &paths {
             for ancestor in path.ancestors() {
@@ -327,8 +349,12 @@ pub fn python_files_in_path<'a>(
                         let (root, settings) =
                             resolve_scoped_settings(&pyproject, Relativity::Parent, transformer)?;
                         resolver.add(root, settings);
+                        // We found the closest configuration.
                         break;
                     }
+                } else {
+                    // We already visited this ancestor, we can stop here.
+                    break;
                 }
             }
         }
@@ -598,6 +624,63 @@ pub fn match_candidate_exclusion(
         return false;
     }
     exclusion.is_match_candidate(file_path) || exclusion.is_match_candidate(file_basename)
+}
+
+#[derive(Debug, Copy, Clone)]
+pub enum ExclusionKind {
+    /// The exclusion came from the `exclude` setting.
+    Exclude,
+    /// The exclusion came from the `extend-exclude` setting.
+    ExtendExclude,
+    /// The exclusion came from the `lint.exclude` setting.
+    LintExclude,
+    /// The exclusion came from the `lint.extend-exclude` setting.
+    FormatExclude,
+}
+
+impl std::fmt::Display for ExclusionKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ExclusionKind::Exclude => write!(f, "exclude"),
+            ExclusionKind::ExtendExclude => write!(f, "extend-exclude"),
+            ExclusionKind::LintExclude => write!(f, "lint.exclude"),
+            ExclusionKind::FormatExclude => write!(f, "lint.extend-exclude"),
+        }
+    }
+}
+
+/// Return the [`ExclusionKind`] for a given [`Path`], if the path or any of its ancestors match
+/// any of the exclusion criteria.
+pub fn match_any_exclusion(
+    path: &Path,
+    exclude: &GlobSet,
+    extend_exclude: &GlobSet,
+    lint_exclude: Option<&GlobSet>,
+    format_exclude: Option<&GlobSet>,
+) -> Option<ExclusionKind> {
+    for path in path.ancestors() {
+        if let Some(basename) = path.file_name() {
+            let path = Candidate::new(path);
+            let basename = Candidate::new(basename);
+            if match_candidate_exclusion(&path, &basename, exclude) {
+                return Some(ExclusionKind::Exclude);
+            }
+            if match_candidate_exclusion(&path, &basename, extend_exclude) {
+                return Some(ExclusionKind::ExtendExclude);
+            }
+            if let Some(lint_exclude) = lint_exclude {
+                if match_candidate_exclusion(&path, &basename, lint_exclude) {
+                    return Some(ExclusionKind::LintExclude);
+                }
+            }
+            if let Some(format_exclude) = format_exclude {
+                if match_candidate_exclusion(&path, &basename, format_exclude) {
+                    return Some(ExclusionKind::FormatExclude);
+                }
+            }
+        }
+    }
+    None
 }
 
 #[cfg(test)]

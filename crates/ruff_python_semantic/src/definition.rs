@@ -3,14 +3,16 @@
 
 use std::fmt::Debug;
 use std::ops::Deref;
+use std::path::Path;
 
 use ruff_index::{newtype_index, IndexSlice, IndexVec};
-use ruff_python_ast::{self as ast, all::DunderAllName, Stmt};
+use ruff_python_ast::{self as ast, Stmt};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::analyze::visibility::{
-    class_visibility, function_visibility, method_visibility, ModuleSource, Visibility,
+    class_visibility, function_visibility, method_visibility, module_visibility, Visibility,
 };
+use crate::model::all::DunderAllName;
 
 /// Id uniquely identifying a definition in a program.
 #[newtype_index]
@@ -24,7 +26,19 @@ impl DefinitionId {
     }
 }
 
-#[derive(Debug, is_macro::Is)]
+/// A Python module can either be defined as a module path (i.e., the dot-separated path to the
+/// module) or, if the module can't be resolved, as a file path (i.e., the path to the file defining
+/// the module).
+#[derive(Debug, Copy, Clone)]
+pub enum ModuleSource<'a> {
+    /// A module path is a dot-separated path to the module.
+    Path(&'a [String]),
+    /// A file path is the path to the file defining the module, often a script outside of a
+    /// package.
+    File(&'a Path),
+}
+
+#[derive(Debug, Copy, Clone, is_macro::Is)]
 pub enum ModuleKind {
     /// A Python file that represents a module within a package.
     Module,
@@ -33,15 +47,17 @@ pub enum ModuleKind {
 }
 
 /// A Python module.
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct Module<'a> {
     pub kind: ModuleKind,
     pub source: ModuleSource<'a>,
     pub python_ast: &'a [Stmt],
+    pub name: Option<&'a str>,
 }
 
 impl<'a> Module<'a> {
-    pub fn path(&self) -> Option<&'a [String]> {
+    /// Return the fully-qualified path of the module.
+    pub const fn qualified_name(&self) -> Option<&'a [String]> {
         if let ModuleSource::Path(path) = self.source {
             Some(path)
         } else {
@@ -50,11 +66,8 @@ impl<'a> Module<'a> {
     }
 
     /// Return the name of the module.
-    pub fn name(&self) -> Option<&'a str> {
-        match self.source {
-            ModuleSource::Path(path) => path.last().map(Deref::deref),
-            ModuleSource::File(file) => file.file_stem().and_then(std::ffi::OsStr::to_str),
-        }
+    pub const fn name(&self) -> Option<&'a str> {
+        self.name
     }
 }
 
@@ -196,7 +209,7 @@ impl<'a> Definitions<'a> {
             // visibility.
             let visibility = {
                 match &definition {
-                    Definition::Module(module) => module.source.to_visibility(),
+                    Definition::Module(module) => module_visibility(module),
                     Definition::Member(member) => match member.kind {
                         MemberKind::Class(class) => {
                             let parent = &definitions[member.parent];

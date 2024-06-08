@@ -3,13 +3,14 @@
 use std::path::Path;
 
 use ruff_notebook::CellOffsets;
-use ruff_python_ast::PySourceType;
+use ruff_python_ast::{ModModule, PySourceType};
 use ruff_python_codegen::Stylist;
-use ruff_python_parser::lexer::LexResult;
 
 use ruff_diagnostics::Diagnostic;
 use ruff_python_index::Indexer;
+use ruff_python_parser::Parsed;
 use ruff_source_file::Locator;
+use ruff_text_size::Ranged;
 
 use crate::directives::TodoComment;
 use crate::registry::{AsRule, Rule};
@@ -22,7 +23,7 @@ use crate::settings::LinterSettings;
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn check_tokens(
-    tokens: &[LexResult],
+    parsed: &Parsed<ModModule>,
     path: &Path,
     locator: &Locator,
     indexer: &Indexer,
@@ -32,6 +33,9 @@ pub(crate) fn check_tokens(
     cell_offsets: Option<&CellOffsets>,
 ) -> Vec<Diagnostic> {
     let mut diagnostics: Vec<Diagnostic> = vec![];
+
+    let tokens = parsed.tokens();
+    let comment_ranges = parsed.comment_ranges();
 
     if settings.rules.any_enabled(&[
         Rule::BlankLineBetweenMethods,
@@ -45,23 +49,19 @@ pub(crate) fn check_tokens(
             .check_lines(tokens, &mut diagnostics);
     }
 
-    if settings.rules.enabled(Rule::BlanketNOQA) {
-        pygrep_hooks::rules::blanket_noqa(&mut diagnostics, indexer, locator);
-    }
-
     if settings.rules.enabled(Rule::BlanketTypeIgnore) {
-        pygrep_hooks::rules::blanket_type_ignore(&mut diagnostics, indexer, locator);
+        pygrep_hooks::rules::blanket_type_ignore(&mut diagnostics, comment_ranges, locator);
     }
 
     if settings.rules.enabled(Rule::EmptyComment) {
-        pylint::rules::empty_comments(&mut diagnostics, indexer, locator);
+        pylint::rules::empty_comments(&mut diagnostics, comment_ranges, locator);
     }
 
     if settings
         .rules
         .enabled(Rule::AmbiguousUnicodeCharacterComment)
     {
-        for range in indexer.comment_ranges() {
+        for range in comment_ranges {
             ruff::rules::ambiguous_unicode_character_comment(
                 &mut diagnostics,
                 locator,
@@ -72,23 +72,16 @@ pub(crate) fn check_tokens(
     }
 
     if settings.rules.enabled(Rule::CommentedOutCode) {
-        eradicate::rules::commented_out_code(&mut diagnostics, locator, indexer, settings);
+        eradicate::rules::commented_out_code(&mut diagnostics, locator, comment_ranges, settings);
     }
 
     if settings.rules.enabled(Rule::UTF8EncodingDeclaration) {
-        pyupgrade::rules::unnecessary_coding_comment(&mut diagnostics, locator, indexer);
-    }
-
-    if settings.rules.enabled(Rule::InvalidEscapeSequence) {
-        for (tok, range) in tokens.iter().flatten() {
-            pycodestyle::rules::invalid_escape_sequence(
-                &mut diagnostics,
-                locator,
-                indexer,
-                tok,
-                *range,
-            );
-        }
+        pyupgrade::rules::unnecessary_coding_comment(
+            &mut diagnostics,
+            locator,
+            indexer,
+            comment_ranges,
+        );
     }
 
     if settings.rules.enabled(Rule::TabIndentation) {
@@ -102,8 +95,13 @@ pub(crate) fn check_tokens(
         Rule::InvalidCharacterNul,
         Rule::InvalidCharacterZeroWidthSpace,
     ]) {
-        for (tok, range) in tokens.iter().flatten() {
-            pylint::rules::invalid_string_characters(&mut diagnostics, tok, *range, locator);
+        for token in tokens.up_to_first_unknown() {
+            pylint::rules::invalid_string_characters(
+                &mut diagnostics,
+                token.kind(),
+                token.range(),
+                locator,
+            );
         }
     }
 
@@ -148,7 +146,7 @@ pub(crate) fn check_tokens(
     }
 
     if source_type.is_stub() && settings.rules.enabled(Rule::TypeCommentInStub) {
-        flake8_pyi::rules::type_comment_in_stub(&mut diagnostics, locator, indexer);
+        flake8_pyi::rules::type_comment_in_stub(&mut diagnostics, locator, comment_ranges);
     }
 
     if settings.rules.any_enabled(&[
@@ -158,7 +156,7 @@ pub(crate) fn check_tokens(
         Rule::ShebangNotFirstLine,
         Rule::ShebangMissingPython,
     ]) {
-        flake8_executable::rules::from_tokens(&mut diagnostics, path, locator, indexer);
+        flake8_executable::rules::from_tokens(&mut diagnostics, path, locator, comment_ranges);
     }
 
     if settings.rules.any_enabled(&[
@@ -174,8 +172,7 @@ pub(crate) fn check_tokens(
         Rule::LineContainsTodo,
         Rule::LineContainsHack,
     ]) {
-        let todo_comments: Vec<TodoComment> = indexer
-            .comment_ranges()
+        let todo_comments: Vec<TodoComment> = comment_ranges
             .iter()
             .enumerate()
             .filter_map(|(i, comment_range)| {
@@ -183,7 +180,7 @@ pub(crate) fn check_tokens(
                 TodoComment::from_comment(comment, *comment_range, i)
             })
             .collect();
-        flake8_todos::rules::todos(&mut diagnostics, &todo_comments, locator, indexer);
+        flake8_todos::rules::todos(&mut diagnostics, &todo_comments, locator, comment_ranges);
         flake8_fixme::rules::todos(&mut diagnostics, &todo_comments);
     }
 

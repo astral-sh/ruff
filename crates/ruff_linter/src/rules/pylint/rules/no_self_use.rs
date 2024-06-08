@@ -1,14 +1,14 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast as ast;
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::name::QualifiedName;
-use ruff_python_ast::{self as ast, ParameterWithDefault};
 use ruff_python_semantic::{
     analyze::{function_type, visibility},
     Scope, ScopeId, ScopeKind,
 };
 
-use crate::{checkers::ast::Checker, rules::flake8_unused_arguments::helpers};
+use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for the presence of unused `self` parameter in methods definitions.
@@ -49,7 +49,7 @@ pub(crate) fn no_self_use(
     scope: &Scope,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
-    let Some(parent) = &checker.semantic().first_non_type_parent_scope(scope) else {
+    let Some(parent) = checker.semantic().first_non_type_parent_scope(scope) else {
         return;
     };
 
@@ -60,7 +60,6 @@ pub(crate) fn no_self_use(
     let ast::StmtFunctionDef {
         name,
         parameters,
-        body,
         decorator_list,
         ..
     } = func;
@@ -87,7 +86,7 @@ pub(crate) fn no_self_use(
         .map(|decorator| QualifiedName::from_dotted_name(decorator))
         .collect::<Vec<QualifiedName>>();
 
-    if helpers::is_empty(body)
+    if function_type::is_stub(func, checker.semantic())
         || visibility::is_magic(name)
         || visibility::is_abstract(decorator_list, checker.semantic())
         || visibility::is_override(decorator_list, checker.semantic())
@@ -102,9 +101,8 @@ pub(crate) fn no_self_use(
         .posonlyargs
         .iter()
         .chain(&parameters.args)
-        .chain(&parameters.kwonlyargs)
         .next()
-        .map(ParameterWithDefault::as_parameter)
+        .map(|param| &param.parameter)
     else {
         return;
     };

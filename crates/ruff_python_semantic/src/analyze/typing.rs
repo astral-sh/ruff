@@ -418,6 +418,49 @@ where
     inner(func, semantic, expr, None);
 }
 
+/// Traverse a "literal" type annotation, applying `func` to each literal member.
+///
+/// The function is called with each expression in the literal (excluding declarations of nested
+/// literals) and the parent expression.
+pub fn traverse_literal<'a, F>(func: &mut F, semantic: &SemanticModel, expr: &'a Expr)
+where
+    F: FnMut(&'a Expr, &'a Expr),
+{
+    fn inner<'a, F>(
+        func: &mut F,
+        semantic: &SemanticModel,
+        expr: &'a Expr,
+        parent: Option<&'a Expr>,
+    ) where
+        F: FnMut(&'a Expr, &'a Expr),
+    {
+        // Ex) Literal[x, y]
+        if let Expr::Subscript(ast::ExprSubscript { value, slice, .. }) = expr {
+            if semantic.match_typing_expr(value, "Literal") {
+                match &**slice {
+                    Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+                        // Traverse each element of the tuple within the literal recursively to handle cases
+                        // such as `Literal[..., Literal[...]]
+                        for elt in elts {
+                            inner(func, semantic, elt, Some(expr));
+                        }
+                    }
+                    other => {
+                        inner(func, semantic, other, Some(expr));
+                    }
+                }
+            }
+        } else {
+            // Otherwise, call the function on expression, if it's not the top-level expression.
+            if let Some(parent) = parent {
+                func(expr, parent);
+            }
+        }
+    }
+
+    inner(func, semantic, expr, None);
+}
+
 /// Abstraction for a type checker, conservatively checks for the intended type(s).
 pub trait TypeChecker {
     /// Check annotation expression to match the intended type(s).
@@ -736,10 +779,7 @@ fn find_parameter<'a>(
     binding: &Binding,
 ) -> Option<&'a ParameterWithDefault> {
     parameters
-        .args
-        .iter()
-        .chain(parameters.posonlyargs.iter())
-        .chain(parameters.kwonlyargs.iter())
+        .iter_non_variadic_params()
         .find(|arg| arg.parameter.name.range() == binding.range())
 }
 

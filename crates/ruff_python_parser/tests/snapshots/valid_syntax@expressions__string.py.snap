@@ -1,0 +1,315 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/valid/expressions/string.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..163,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 0..13,
+                    value: StringLiteral(
+                        ExprStringLiteral {
+                            range: 0..13,
+                            value: StringLiteralValue {
+                                inner: Single(
+                                    StringLiteral {
+                                        range: 0..13,
+                                        value: "Hello World",
+                                        flags: StringLiteralFlags {
+                                            quote_style: Single,
+                                            prefix: Empty,
+                                            triple_quoted: false,
+                                        },
+                                    },
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 14..20,
+                    value: StringLiteral(
+                        ExprStringLiteral {
+                            range: 14..20,
+                            value: StringLiteralValue {
+                                inner: Single(
+                                    StringLiteral {
+                                        range: 14..20,
+                                        value: "😎",
+                                        flags: StringLiteralFlags {
+                                            quote_style: Double,
+                                            prefix: Empty,
+                                            triple_quoted: false,
+                                        },
+                                    },
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 21..32,
+                    value: StringLiteral(
+                        ExprStringLiteral {
+                            range: 21..32,
+                            value: StringLiteralValue {
+                                inner: Concatenated(
+                                    ConcatenatedStringLiteral {
+                                        strings: [
+                                            StringLiteral {
+                                                range: 21..26,
+                                                value: "Foo",
+                                                flags: StringLiteralFlags {
+                                                    quote_style: Single,
+                                                    prefix: Empty,
+                                                    triple_quoted: false,
+                                                },
+                                            },
+                                            StringLiteral {
+                                                range: 27..32,
+                                                value: "Bar",
+                                                flags: StringLiteralFlags {
+                                                    quote_style: Single,
+                                                    prefix: Empty,
+                                                    triple_quoted: false,
+                                                },
+                                            },
+                                        ],
+                                        value: "FooBar",
+                                    },
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 33..60,
+                    value: StringLiteral(
+                        ExprStringLiteral {
+                            range: 39..58,
+                            value: StringLiteralValue {
+                                inner: Concatenated(
+                                    ConcatenatedStringLiteral {
+                                        strings: [
+                                            StringLiteral {
+                                                range: 39..42,
+                                                value: "A",
+                                                flags: StringLiteralFlags {
+                                                    quote_style: Single,
+                                                    prefix: Empty,
+                                                    triple_quoted: false,
+                                                },
+                                            },
+                                            StringLiteral {
+                                                range: 47..50,
+                                                value: "B",
+                                                flags: StringLiteralFlags {
+                                                    quote_style: Single,
+                                                    prefix: Empty,
+                                                    triple_quoted: false,
+                                                },
+                                            },
+                                            StringLiteral {
+                                                range: 55..58,
+                                                value: "C",
+                                                flags: StringLiteralFlags {
+                                                    quote_style: Single,
+                                                    prefix: Empty,
+                                                    triple_quoted: false,
+                                                },
+                                            },
+                                        ],
+                                        value: "ABC",
+                                    },
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 61..79,
+                    value: StringLiteral(
+                        ExprStringLiteral {
+                            range: 61..79,
+                            value: StringLiteralValue {
+                                inner: Single(
+                                    StringLiteral {
+                                        range: 61..79,
+                                        value: "Olá, Mundo!",
+                                        flags: StringLiteralFlags {
+                                            quote_style: Single,
+                                            prefix: Empty,
+                                            triple_quoted: true,
+                                        },
+                                    },
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 80..91,
+                    value: StringLiteral(
+                        ExprStringLiteral {
+                            range: 80..91,
+                            value: StringLiteralValue {
+                                inner: Single(
+                                    StringLiteral {
+                                        range: 80..91,
+                                        value: "ABCDE",
+                                        flags: StringLiteralFlags {
+                                            quote_style: Double,
+                                            prefix: Empty,
+                                            triple_quoted: true,
+                                        },
+                                    },
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 92..121,
+                    value: StringLiteral(
+                        ExprStringLiteral {
+                            range: 98..119,
+                            value: StringLiteralValue {
+                                inner: Concatenated(
+                                    ConcatenatedStringLiteral {
+                                        strings: [
+                                            StringLiteral {
+                                                range: 98..106,
+                                                value: "aB",
+                                                flags: StringLiteralFlags {
+                                                    quote_style: Single,
+                                                    prefix: Empty,
+                                                    triple_quoted: true,
+                                                },
+                                            },
+                                            StringLiteral {
+                                                range: 111..119,
+                                                value: "cD",
+                                                flags: StringLiteralFlags {
+                                                    quote_style: Single,
+                                                    prefix: Empty,
+                                                    triple_quoted: true,
+                                                },
+                                            },
+                                        ],
+                                        value: "aBcD",
+                                    },
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 122..136,
+                    value: BytesLiteral(
+                        ExprBytesLiteral {
+                            range: 122..136,
+                            value: BytesLiteralValue {
+                                inner: Single(
+                                    BytesLiteral {
+                                        range: 122..136,
+                                        value: [
+                                            104,
+                                            101,
+                                            108,
+                                            108,
+                                            111,
+                                            32,
+                                            119,
+                                            111,
+                                            114,
+                                            108,
+                                            100,
+                                        ],
+                                        flags: BytesLiteralFlags {
+                                            quote_style: Single,
+                                            prefix: Regular,
+                                            triple_quoted: false,
+                                        },
+                                    },
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 137..161,
+                    value: BytesLiteral(
+                        ExprBytesLiteral {
+                            range: 137..161,
+                            value: BytesLiteralValue {
+                                inner: Concatenated(
+                                    [
+                                        BytesLiteral {
+                                            range: 137..145,
+                                            value: [
+                                                98,
+                                                121,
+                                                116,
+                                                101,
+                                                115,
+                                            ],
+                                            flags: BytesLiteralFlags {
+                                                quote_style: Single,
+                                                prefix: Regular,
+                                                triple_quoted: false,
+                                            },
+                                        },
+                                        BytesLiteral {
+                                            range: 146..161,
+                                            value: [
+                                                99,
+                                                111,
+                                                110,
+                                                99,
+                                                97,
+                                                116,
+                                                101,
+                                                110,
+                                                97,
+                                                116,
+                                                101,
+                                                100,
+                                            ],
+                                            flags: BytesLiteralFlags {
+                                                quote_style: Single,
+                                                prefix: Regular,
+                                                triple_quoted: false,
+                                            },
+                                        },
+                                    ],
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
