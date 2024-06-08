@@ -28,9 +28,11 @@
             "format": {
                 "args": []
             },
+            "sourceAction": {
+                "organizeImports": true,
+                "fixAll": true
+            },
             "enable": true,
-            "organizeImports": true,
-            "fixAll": true,
             "showNotifications": "off"
         },
         {
@@ -62,9 +64,11 @@
             "format": {
                 "args": []
             },
+            "sourceAction": {
+                "organizeImports": true,
+                "fixAll": true
+            },
             "enable": true,
-            "organizeImports": true,
-            "fixAll": true,
             "showNotifications": "off"
         }
     ],
@@ -87,7 +91,10 @@
         "lint": {
             "enable": true,
             "preview": true,
-            "select": ["F", "I"],
+            "select": [
+                "F",
+                "I"
+            ],
             "run": "onType",
             "args": [
                 "--preview"
@@ -96,9 +103,11 @@
         "format": {
             "args": []
         },
+        "sourceAction": {
+            "organizeImports": true,
+            "fixAll": false
+        },
         "enable": true,
-        "organizeImports": true,
-        "fixAll": false,
         "showNotifications": "off"
     }
 }

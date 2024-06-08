@@ -9,7 +9,9 @@
             "ignore": ["RUF001"],
             "run": "onSave"
         },
-        "fixAll": false,
+        "sourceAction": {
+            "fixAll": false
+        },
         "logLevel": "warn",
         "lineLength": 80,
         "exclude": ["third_party"]

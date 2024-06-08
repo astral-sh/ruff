@@ -16,12 +16,21 @@ pub(crate) type WorkspaceSettingsMap = FxHashMap<Url, ClientSettings>;
 #[cfg_attr(test, derive(PartialEq, Eq))]
 #[allow(clippy::struct_excessive_bools)]
 pub(crate) struct ResolvedClientSettings {
+    format_action: ResolvedFormatAction,
     fix_all: bool,
     organize_imports: bool,
     lint_enable: bool,
     disable_rule_comment_enable: bool,
     fix_violation_enable: bool,
     editor_settings: ResolvedEditorSettings,
+}
+
+#[derive(Clone, Debug)]
+#[cfg_attr(test, derive(PartialEq, Eq))]
+pub(crate) struct ResolvedFormatAction {
+    pub(crate) fix: bool,
+    pub(crate) isort: bool,
+    pub(crate) style: bool,
 }
 
 /// Contains the resolved values of 'editor settings' - Ruff configuration for the linter/formatter that was passed in via
@@ -62,11 +71,10 @@ pub(crate) enum ConfigurationPreference {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ClientSettings {
     configuration: Option<String>,
-    fix_all: Option<bool>,
-    organize_imports: Option<bool>,
     lint: Option<LintOptions>,
     format: Option<FormatOptions>,
     code_action: Option<CodeActionOptions>,
+    source_action: Option<SourceActionOptions>,
     exclude: Option<Vec<String>>,
     line_length: Option<LineLength>,
     configuration_preference: Option<ConfigurationPreference>,
@@ -100,6 +108,7 @@ struct LintOptions {
 #[serde(rename_all = "camelCase")]
 struct FormatOptions {
     preview: Option<bool>,
+    action: Option<FormatActionParameters>,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -115,6 +124,23 @@ struct CodeActionOptions {
 #[serde(rename_all = "camelCase")]
 struct CodeActionParameters {
     enable: Option<bool>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[cfg_attr(test, derive(PartialEq, Eq))]
+#[serde(rename_all = "camelCase")]
+struct SourceActionOptions {
+    fix_all: Option<bool>,
+    organize_imports: Option<bool>,
+}
+
+#[derive(Debug, Deserialize)]
+#[cfg_attr(test, derive(PartialEq, Eq))]
+#[serde(rename_all = "camelCase")]
+struct FormatActionParameters {
+    fix: Option<bool>,
+    isort: Option<bool>,
+    style: Option<bool>,
 }
 
 /// This is the exact schema for initialization options sent in by the client
@@ -194,10 +220,31 @@ impl ResolvedClientSettings {
 
     fn new_impl(all_settings: &[&ClientSettings]) -> Self {
         Self {
-            fix_all: Self::resolve_or(all_settings, |settings| settings.fix_all, true),
+            format_action: ResolvedFormatAction {
+                fix: Self::resolve_or(
+                    all_settings,
+                    |settings| settings.format.as_ref()?.action.as_ref()?.fix,
+                    false,
+                ),
+                isort: Self::resolve_or(
+                    all_settings,
+                    |settings| settings.format.as_ref()?.action.as_ref()?.isort,
+                    false,
+                ),
+                style: Self::resolve_or(
+                    all_settings,
+                    |settings| settings.format.as_ref()?.action.as_ref()?.style,
+                    true,
+                ),
+            },
+            fix_all: Self::resolve_or(
+                all_settings,
+                |settings| settings.source_action.as_ref()?.fix_all,
+                true,
+            ),
             organize_imports: Self::resolve_or(
                 all_settings,
-                |settings| settings.organize_imports,
+                |settings| settings.source_action.as_ref()?.organize_imports,
                 true,
             ),
             lint_enable: Self::resolve_or(
@@ -310,6 +357,10 @@ impl ResolvedClientSettings {
 }
 
 impl ResolvedClientSettings {
+    pub(crate) fn format_action(&self) -> &ResolvedFormatAction {
+        &self.format_action
+    }
+
     pub(crate) fn fix_all(&self) -> bool {
         self.fix_all
     }
@@ -374,12 +425,6 @@ mod tests {
         HasWorkspaces {
             global_settings: ClientSettings {
                 configuration: None,
-                fix_all: Some(
-                    false,
-                ),
-                organize_imports: Some(
-                    true,
-                ),
                 lint: Some(
                     LintOptions {
                         enable: Some(
@@ -401,6 +446,7 @@ mod tests {
                 format: Some(
                     FormatOptions {
                         preview: None,
+                        action: None,
                     },
                 ),
                 code_action: Some(
@@ -421,6 +467,16 @@ mod tests {
                         ),
                     },
                 ),
+                source_action: Some(
+                    SourceActionOptions {
+                        fix_all: Some(
+                            false,
+                        ),
+                        organize_imports: Some(
+                            true,
+                        ),
+                    },
+                ),
                 exclude: None,
                 line_length: None,
                 configuration_preference: None,
@@ -429,12 +485,6 @@ mod tests {
                 WorkspaceSettings {
                     settings: ClientSettings {
                         configuration: None,
-                        fix_all: Some(
-                            true,
-                        ),
-                        organize_imports: Some(
-                            true,
-                        ),
                         lint: Some(
                             LintOptions {
                                 enable: Some(
@@ -449,6 +499,7 @@ mod tests {
                         format: Some(
                             FormatOptions {
                                 preview: None,
+                                action: None,
                             },
                         ),
                         code_action: Some(
@@ -466,6 +517,16 @@ mod tests {
                                             false,
                                         ),
                                     },
+                                ),
+                            },
+                        ),
+                        source_action: Some(
+                            SourceActionOptions {
+                                fix_all: Some(
+                                    true,
+                                ),
+                                organize_imports: Some(
+                                    true,
                                 ),
                             },
                         ),
@@ -488,12 +549,6 @@ mod tests {
                 WorkspaceSettings {
                     settings: ClientSettings {
                         configuration: None,
-                        fix_all: Some(
-                            true,
-                        ),
-                        organize_imports: Some(
-                            true,
-                        ),
                         lint: Some(
                             LintOptions {
                                 enable: Some(
@@ -510,6 +565,7 @@ mod tests {
                         format: Some(
                             FormatOptions {
                                 preview: None,
+                                action: None,
                             },
                         ),
                         code_action: Some(
@@ -527,6 +583,16 @@ mod tests {
                                             false,
                                         ),
                                     },
+                                ),
+                            },
+                        ),
+                        source_action: Some(
+                            SourceActionOptions {
+                                fix_all: Some(
+                                    true,
+                                ),
+                                organize_imports: Some(
+                                    true,
                                 ),
                             },
                         ),
@@ -570,6 +636,11 @@ mod tests {
                 &global_settings
             ),
             ResolvedClientSettings {
+                format_action: ResolvedFormatAction {
+                    fix: false,
+                    isort: false,
+                    style: true,
+                },
                 fix_all: true,
                 organize_imports: true,
                 lint_enable: true,
@@ -601,6 +672,11 @@ mod tests {
                 &global_settings
             ),
             ResolvedClientSettings {
+                format_action: ResolvedFormatAction {
+                    fix: false,
+                    isort: false,
+                    style: true,
+                },
                 fix_all: true,
                 organize_imports: true,
                 lint_enable: true,
@@ -632,10 +708,6 @@ mod tests {
         GlobalOnly {
             settings: ClientSettings {
                 configuration: None,
-                fix_all: Some(
-                    false,
-                ),
-                organize_imports: None,
                 lint: Some(
                     LintOptions {
                         enable: None,
@@ -660,6 +732,14 @@ mod tests {
                             },
                         ),
                         fix_violation: None,
+                    },
+                ),
+                source_action: Some(
+                    SourceActionOptions {
+                        fix_all: Some(
+                            false,
+                        ),
+                        organize_imports: None,
                     },
                 ),
                 exclude: Some(
@@ -688,6 +768,11 @@ mod tests {
         assert_eq!(
             ResolvedClientSettings::global(&global_settings),
             ResolvedClientSettings {
+                format_action: ResolvedFormatAction {
+                    fix: false,
+                    isort: false,
+                    style: true,
+                },
                 fix_all: false,
                 organize_imports: true,
                 lint_enable: true,

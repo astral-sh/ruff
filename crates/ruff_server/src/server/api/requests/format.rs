@@ -1,3 +1,4 @@
+use lsp_server::ErrorCode;
 use lsp_types::{self as types, request as req};
 use types::TextEdit;
 
@@ -10,6 +11,8 @@ use crate::server::api::LSPResult;
 use crate::server::{client::Notifier, Result};
 use crate::session::{DocumentQuery, DocumentSnapshot};
 use crate::{PositionEncoding, TextDocument};
+
+use super::code_action_resolve::{fix_all_edit, organize_imports_edit};
 
 pub(crate) struct Format;
 
@@ -24,7 +27,37 @@ impl super::BackgroundDocumentRequestHandler for Format {
         _notifier: Notifier,
         _params: types::DocumentFormattingParams,
     ) -> Result<super::FormatResponse> {
-        format_document(&snapshot)
+        match snapshot.query() {
+            DocumentQuery::Text { .. } => {
+                let mut query = snapshot.query().to_owned();
+                let mut response = None;
+
+                if snapshot.client_settings().organize_imports()
+                    && snapshot.client_settings().format_action().isort
+                {
+                    let fixes = organize_imports_edit(&query, snapshot.encoding())
+                        .with_failure_code(ErrorCode::InternalError)?;
+                    query = crate::fix::parse_all(&query, fixes.clone());
+                    response = fixes.values().next().map(std::borrow::ToOwned::to_owned);
+                }
+                if snapshot.client_settings().fix_all()
+                    && snapshot.client_settings().format_action().fix
+                {
+                    let fixes = fix_all_edit(&query, snapshot.encoding())
+                        .with_failure_code(ErrorCode::InternalError)?;
+                    query = crate::fix::parse_all(&query, fixes.clone());
+                    response = fixes.values().next().map(std::borrow::ToOwned::to_owned);
+                }
+                if snapshot.client_settings().format_action().style {
+                    response = format_document(&query, snapshot.encoding())?;
+                }
+                Ok(response)
+            }
+            DocumentQuery::Notebook { .. } => {
+                format_document(snapshot.query(), snapshot.encoding())
+            } // TODO
+        }
+        // if snapshot.client_settings().format_action().style {}
     }
 }
 
@@ -60,16 +93,17 @@ pub(super) fn format_full_document(snapshot: &DocumentSnapshot) -> Result<Fixes>
 
 /// Formats either a full text document or an specific notebook cell. If the query within the snapshot is a notebook document
 /// with no selected cell, this will throw an error.
-pub(super) fn format_document(snapshot: &DocumentSnapshot) -> Result<super::FormatResponse> {
-    let text_document = snapshot
-        .query()
+pub(super) fn format_document(
+    query: &DocumentQuery,
+    encoding: PositionEncoding,
+) -> Result<super::FormatResponse> {
+    let text_document = query
         .as_single_document()
         .expect("format should only be called on text documents or notebook cells");
-    let query = snapshot.query();
     format_text_document(
         text_document,
         query,
-        snapshot.encoding(),
+        encoding,
         query.as_notebook().is_some(),
     )
 }

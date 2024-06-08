@@ -1,4 +1,4 @@
-use std::borrow::Cow;
+use std::{borrow::Cow, sync::Arc};
 
 use rustc_hash::FxHashMap;
 
@@ -8,13 +8,13 @@ use ruff_linter::{
     settings::{flags, types::UnsafeFixes, LinterSettings},
 };
 use ruff_notebook::SourceValue;
-use ruff_source_file::LineIndex;
+use ruff_source_file::{LineIndex, OneIndexed};
 use ruff_workspace::resolver::match_any_exclusion;
 
 use crate::{
     edit::{Replacement, ToRangeExt},
     session::DocumentQuery,
-    PositionEncoding,
+    PositionEncoding, TextDocument,
 };
 
 /// A simultaneous fix made across a single text document or among an arbitrary
@@ -163,5 +163,46 @@ pub(crate) fn fix_all(
         )]
         .into_iter()
         .collect())
+    }
+}
+
+pub(crate) fn parse_all(query: &DocumentQuery, fixes: Fixes) -> DocumentQuery {
+    match query {
+        DocumentQuery::Text {
+            file_url,
+            document,
+            settings,
+        } => {
+            let mut contents = document.contents().to_owned();
+            for (url, edits) in fixes {
+                if url == *file_url {
+                    let text_edit = edits.first().unwrap();
+                    let source_index = LineIndex::from_source_text(&contents);
+                    let start_offset = source_index
+                        .line_start(
+                            OneIndexed::from_zero_indexed(text_edit.range.start.line as usize),
+                            &contents,
+                        )
+                        .to_usize();
+                    let end_offset = source_index
+                        .line_start(
+                            OneIndexed::from_zero_indexed(text_edit.range.end.line as usize),
+                            &contents,
+                        )
+                        .to_usize();
+                    let mut new_contents = String::new();
+                    new_contents.push_str(&contents[..start_offset]);
+                    new_contents.push_str(&text_edit.new_text);
+                    new_contents.push_str(&contents[end_offset..]);
+                    contents = new_contents;
+                }
+            }
+            DocumentQuery::Text {
+                file_url: file_url.clone(),
+                document: Arc::new(TextDocument::new(contents, document.version())),
+                settings: settings.clone(),
+            }
+        }
+        DocumentQuery::Notebook { .. } => query.clone(), // TODO
     }
 }
