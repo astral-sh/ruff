@@ -1,0 +1,19 @@
+[package]
+name = "ruff_db"
+version = "0.0.0"
+publish = false
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+
+[dependencies]
+camino = { workspace = true }
+countme = { workspace = true }
+dashmap = { workspace = true }
+filetime = { workspace = true }
+salsa = { workspace = true }
+rustc-hash = { workspace = true }
