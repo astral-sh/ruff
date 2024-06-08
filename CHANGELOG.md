@@ -113,6 +113,7 @@ To read more about this exciting milestone, check out our [blog post](https://as
 ### Rule changes
 
 - \[`flake8-future-annotations`\] Reword `future-rewritable-type-annotation` (`FA100`) message ([#11381](https://github.com/astral-sh/ruff/pull/11381))
+- \[`isort`\] Expanded the set of standard-library modules to include `_string`, etc. ([#11374](https://github.com/astral-sh/ruff/pull/11374))
 - \[`pycodestyle`\] Consider soft keywords for `E27` rules ([#11446](https://github.com/astral-sh/ruff/pull/11446))
 - \[`pyflakes`\] Recommend adding unused import bindings to `__all__` ([#11314](https://github.com/astral-sh/ruff/pull/11314))
 - \[`pyflakes`\] Update documentation and deprecate `ignore_init_module_imports` ([#11436](https://github.com/astral-sh/ruff/pull/11436))
