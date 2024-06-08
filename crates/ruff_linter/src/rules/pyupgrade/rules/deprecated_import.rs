@@ -389,7 +389,7 @@ const TYPING_EXTENSIONS_TO_TYPING_313: &[&str] = &[
     // but typing_extensions backports PEP-696:
     "ParamSpec",
     "TypeVar",
-    "TypevarTuple",
+    "TypeVarTuple",
 ];
 
 // Members of `typing_extensions` that were moved to `types`.
