@@ -113,7 +113,7 @@ pub(crate) fn check(query: &DocumentQuery, encoding: PositionEncoding) -> Diagno
 
     // Generate checks.
     let LinterResult { data, .. } = check_path(
-        query.virtual_file_path(),
+        &query.virtual_file_path(),
         package,
         &locator,
         &stylist,
@@ -127,7 +127,7 @@ pub(crate) fn check(query: &DocumentQuery, encoding: PositionEncoding) -> Diagno
     );
 
     let noqa_edits = generate_noqa_edits(
-        query.virtual_file_path(),
+        &query.virtual_file_path(),
         data.as_slice(),
         &locator,
         parsed.comment_ranges(),
