@@ -287,7 +287,7 @@ RUF100_0.py:93:92: RUF100 [*] Unused `noqa` directive (unused: `F401`)
 RUF100_0.py:107:12: RUF100 [*] Unused `noqa` directive (unknown: `E50`)
     |
 105 | def f():
-106 |     # Invalid - nonexistant error code with multibyte character
+106 |     # Invalid - nonexistent error code with multibyte character
 107 |     d = 1  # noqa: F841, E50
     |            ^^^^^^^^^^^^^^^^^ RUF100
 108 |     e = 1  # noqa: E50
@@ -297,7 +297,7 @@ RUF100_0.py:107:12: RUF100 [*] Unused `noqa` directive (unknown: `E50`)
 ℹ Safe fix
 104 104 | 
 105 105 | def f():
-106 106 |     # Invalid - nonexistant error code with multibyte character
+106 106 |     # Invalid - nonexistent error code with multibyte character
 107     |-    d = 1  # noqa: F841, E50
     107 |+    d = 1  # noqa: F841
 108 108 |     e = 1  # noqa: E50
@@ -306,7 +306,7 @@ RUF100_0.py:107:12: RUF100 [*] Unused `noqa` directive (unknown: `E50`)
 
 RUF100_0.py:108:5: F841 [*] Local variable `e` is assigned to but never used
     |
-106 |     # Invalid - nonexistant error code with multibyte character
+106 |     # Invalid - nonexistent error code with multibyte character
 107 |     d = 1  # noqa: F841, E50
 108 |     e = 1  # noqa: E50
     |     ^ F841
@@ -315,7 +315,7 @@ RUF100_0.py:108:5: F841 [*] Local variable `e` is assigned to but never used
 
 ℹ Unsafe fix
 105 105 | def f():
-106 106 |     # Invalid - nonexistant error code with multibyte character
+106 106 |     # Invalid - nonexistent error code with multibyte character
 107 107 |     d = 1  # noqa: F841, E50
 108     |-    e = 1  # noqa: E50
 109 108 | 
@@ -324,7 +324,7 @@ RUF100_0.py:108:5: F841 [*] Local variable `e` is assigned to but never used
 
 RUF100_0.py:108:12: RUF100 [*] Unused `noqa` directive (unknown: `E50`)
     |
-106 |     # Invalid - nonexistant error code with multibyte character
+106 |     # Invalid - nonexistent error code with multibyte character
 107 |     d = 1  # noqa: F841, E50
 108 |     e = 1  # noqa: E50
     |            ^^^^^^^^^^^ RUF100
@@ -333,7 +333,7 @@ RUF100_0.py:108:12: RUF100 [*] Unused `noqa` directive (unknown: `E50`)
 
 ℹ Safe fix
 105 105 | def f():
-106 106 |     # Invalid - nonexistant error code with multibyte character
+106 106 |     # Invalid - nonexistent error code with multibyte character
 107 107 |     d = 1  # noqa: F841, E50
 108     |-    e = 1  # noqa: E50
     108 |+    e = 1

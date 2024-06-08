@@ -98,7 +98,7 @@ impl Notebook {
             reader.read_exact(&mut buf).is_ok_and(|()| buf[0] == b'\n')
         });
         reader.rewind()?;
-        let mut raw_notebook: RawNotebook = match serde_json::from_reader(reader.by_ref()) {
+        let raw_notebook: RawNotebook = match serde_json::from_reader(reader.by_ref()) {
             Ok(notebook) => notebook,
             Err(err) => {
                 // Translate the error into a diagnostic
@@ -113,7 +113,13 @@ impl Notebook {
                 });
             }
         };
+        Self::from_raw_notebook(raw_notebook, trailing_newline)
+    }
 
+    pub fn from_raw_notebook(
+        mut raw_notebook: RawNotebook,
+        trailing_newline: bool,
+    ) -> Result<Self, NotebookError> {
         // v4 is what everybody uses
         if raw_notebook.nbformat != 4 {
             // bail because we should have already failed at the json schema stage

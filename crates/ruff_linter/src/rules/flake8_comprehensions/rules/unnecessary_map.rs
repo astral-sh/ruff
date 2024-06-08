@@ -107,10 +107,7 @@ pub(crate) fn unnecessary_map(
             if parameters.as_ref().is_some_and(|parameters| {
                 late_binding(parameters, body)
                     || parameters
-                        .posonlyargs
-                        .iter()
-                        .chain(&parameters.args)
-                        .chain(&parameters.kwonlyargs)
+                        .iter_non_variadic_params()
                         .any(|param| param.default.is_some())
                     || parameters.vararg.is_some()
                     || parameters.kwarg.is_some()
@@ -152,10 +149,7 @@ pub(crate) fn unnecessary_map(
             if parameters.as_ref().is_some_and(|parameters| {
                 late_binding(parameters, body)
                     || parameters
-                        .posonlyargs
-                        .iter()
-                        .chain(&parameters.args)
-                        .chain(&parameters.kwonlyargs)
+                        .iter_non_variadic_params()
                         .any(|param| param.default.is_some())
                     || parameters.vararg.is_some()
                     || parameters.kwarg.is_some()
@@ -207,10 +201,7 @@ pub(crate) fn unnecessary_map(
             if parameters.as_ref().is_some_and(|parameters| {
                 late_binding(parameters, body)
                     || parameters
-                        .posonlyargs
-                        .iter()
-                        .chain(&parameters.args)
-                        .chain(&parameters.kwonlyargs)
+                        .iter_non_variadic_params()
                         .any(|param| param.default.is_some())
                     || parameters.vararg.is_some()
                     || parameters.kwarg.is_some()

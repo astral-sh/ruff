@@ -296,6 +296,8 @@ quote.py:78:24: TCH002 [*] Move third-party import `pandas.DataFrame` into a typ
 91    |-    def func() -> DataFrame[[DataFrame[_P, _R]], DataFrame[_P, _R]]:
    91 |+    def func() -> "DataFrame[[DataFrame[_P, _R]], DataFrame[_P, _R]]":
 92 92 |         ...
+93 93 | 
+94 94 | 
 
 quote.py:78:35: TCH002 [*] Move third-party import `pandas.Series` into a type-checking block
    |
@@ -337,5 +339,61 @@ quote.py:78:35: TCH002 [*] Move third-party import `pandas.Series` into a type-c
 91    |-    def func() -> DataFrame[[DataFrame[_P, _R]], DataFrame[_P, _R]]:
    91 |+    def func() -> "DataFrame[[DataFrame[_P, _R]], DataFrame[_P, _R]]":
 92 92 |         ...
+93 93 | 
+94 94 | 
 
+quote.py:96:24: TCH002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
+   |
+95 | def f():
+96 |     from pandas import DataFrame, Series
+   |                        ^^^^^^^^^ TCH002
+97 | 
+98 |     def func(self) -> DataFrame | list[Series]:
+   |
+   = help: Move into type-checking block
 
+ℹ Unsafe fix
+    1   |+from typing import TYPE_CHECKING
+    2   |+
+    3   |+if TYPE_CHECKING:
+    4   |+    from pandas import DataFrame, Series
+1   5   | def f():
+2   6   |     from pandas import DataFrame
+3   7   | 
+--------------------------------------------------------------------------------
+93  97  | 
+94  98  | 
+95  99  | def f():
+96      |-    from pandas import DataFrame, Series
+97  100 | 
+98      |-    def func(self) -> DataFrame | list[Series]:
+    101 |+    def func(self) -> "DataFrame | list[Series]":
+99  102 |         pass
+
+quote.py:96:35: TCH002 [*] Move third-party import `pandas.Series` into a type-checking block
+   |
+95 | def f():
+96 |     from pandas import DataFrame, Series
+   |                                   ^^^^^^ TCH002
+97 | 
+98 |     def func(self) -> DataFrame | list[Series]:
+   |
+   = help: Move into type-checking block
+
+ℹ Unsafe fix
+    1   |+from typing import TYPE_CHECKING
+    2   |+
+    3   |+if TYPE_CHECKING:
+    4   |+    from pandas import DataFrame, Series
+1   5   | def f():
+2   6   |     from pandas import DataFrame
+3   7   | 
+--------------------------------------------------------------------------------
+93  97  | 
+94  98  | 
+95  99  | def f():
+96      |-    from pandas import DataFrame, Series
+97  100 | 
+98      |-    def func(self) -> DataFrame | list[Series]:
+    101 |+    def func(self) -> "DataFrame | list[Series]":
+99  102 |         pass

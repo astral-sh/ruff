@@ -3,8 +3,8 @@ use std::iter::FusedIterator;
 use memchr::memchr2;
 
 use ruff_python_ast::{
-    self as ast, AnyNodeRef, AnyStringKind, Expr, ExprBytesLiteral, ExprFString, ExprStringLiteral,
-    ExpressionRef, StringLiteral,
+    self as ast, AnyNodeRef, AnyStringFlags, Expr, ExprBytesLiteral, ExprFString,
+    ExprStringLiteral, ExpressionRef, StringFlags, StringLiteral,
 };
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
@@ -72,7 +72,7 @@ impl<'a> AnyString<'a> {
             AnyString::String(_) | AnyString::Bytes(_) => {
                 self.parts(Quoting::default())
                     .next()
-                    .is_some_and(|part| part.kind().is_triple_quoted())
+                    .is_some_and(|part| part.flags().is_triple_quoted())
                     && memchr2(b'\n', b'\r', source[self.range()].as_bytes()).is_some()
             }
             AnyString::FString(fstring) => {
@@ -176,7 +176,7 @@ pub(super) enum AnyStringPart<'a> {
 }
 
 impl AnyStringPart<'_> {
-    fn kind(&self) -> AnyStringKind {
+    fn flags(&self) -> AnyStringFlags {
         match self {
             Self::String { part, .. } => part.flags.into(),
             Self::Bytes(bytes_literal) => bytes_literal.flags.into(),

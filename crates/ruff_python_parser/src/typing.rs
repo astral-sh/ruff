@@ -1,11 +1,13 @@
-use crate::{parse_expression, parse_expression_starts_at};
-use anyhow::Result;
-use ruff_python_ast::relocate::relocate_expr;
-use ruff_python_ast::str;
-use ruff_python_ast::Expr;
-use ruff_text_size::{TextLen, TextRange};
+//! This module takes care of parsing a type annotation.
 
-#[derive(is_macro::Is, Copy, Clone, Debug)]
+use ruff_python_ast::relocate::relocate_expr;
+use ruff_python_ast::str::raw_contents;
+use ruff_python_ast::{ExprStringLiteral, ModExpression, StringFlags, StringLiteral};
+use ruff_text_size::Ranged;
+
+use crate::{parse_expression, parse_expression_range, ParseError, Parsed};
+
+#[derive(Copy, Clone, Debug)]
 pub enum AnnotationKind {
     /// The annotation is defined as part a simple string literal,
     /// e.g. `x: "List[int]" = []`. Annotations within simple literals
@@ -13,32 +15,66 @@ pub enum AnnotationKind {
     /// expressions within the annotation and apply automatic fixes, which is
     /// not possible for complex string literals.
     Simple,
+
     /// The annotation is defined as part of a complex string literal, such as
     /// a literal containing an implicit concatenation or escaped characters,
     /// e.g. `x: "List" "[int]" = []`. These are comparatively rare, but valid.
     Complex,
 }
 
-/// Parse a type annotation from a string.
-pub fn parse_type_annotation(
-    value: &str,
-    range: TextRange,
-    source: &str,
-) -> Result<(Expr, AnnotationKind)> {
-    let expression = &source[range];
-
-    if str::raw_contents(expression).is_some_and(|body| body == value) {
-        // The annotation is considered "simple" if and only if the raw representation (e.g.,
-        // `List[int]` within "List[int]") exactly matches the parsed representation. This
-        // isn't the case, e.g., for implicit concatenations, or for annotations that contain
-        // escaped quotes.
-        let leading_quote = str::leading_quote(expression).unwrap();
-        let expr = parse_expression_starts_at(value, range.start() + leading_quote.text_len())?;
-        Ok((expr, AnnotationKind::Simple))
-    } else {
-        // Otherwise, consider this a "complex" annotation.
-        let mut expr = parse_expression(value)?;
-        relocate_expr(&mut expr, range);
-        Ok((expr, AnnotationKind::Complex))
+impl AnnotationKind {
+    /// Returns `true` if the annotation kind is simple.
+    pub const fn is_simple(self) -> bool {
+        matches!(self, AnnotationKind::Simple)
     }
+}
+
+/// Parses the given string expression node as a type annotation. The given `source` is the entire
+/// source code.
+pub fn parse_type_annotation(
+    string_expr: &ExprStringLiteral,
+    source: &str,
+) -> Result<(Parsed<ModExpression>, AnnotationKind), ParseError> {
+    let expr_text = &source[string_expr.range()];
+
+    if let [string_literal] = string_expr.value.as_slice() {
+        // Compare the raw contents (without quotes) of the expression with the parsed contents
+        // contained in the string literal.
+        if raw_contents(expr_text)
+            .is_some_and(|raw_contents| raw_contents == string_literal.as_str())
+        {
+            parse_simple_type_annotation(string_literal, source)
+        } else {
+            // The raw contents of the string doesn't match the parsed content. This could be the
+            // case for annotations that contain escaped quotes.
+            parse_complex_type_annotation(string_expr)
+        }
+    } else {
+        // String is implicitly concatenated.
+        parse_complex_type_annotation(string_expr)
+    }
+}
+
+fn parse_simple_type_annotation(
+    string_literal: &StringLiteral,
+    source: &str,
+) -> Result<(Parsed<ModExpression>, AnnotationKind), ParseError> {
+    Ok((
+        parse_expression_range(
+            source,
+            string_literal
+                .range()
+                .add_start(string_literal.flags.opener_len())
+                .sub_end(string_literal.flags.closer_len()),
+        )?,
+        AnnotationKind::Simple,
+    ))
+}
+
+fn parse_complex_type_annotation(
+    string_expr: &ExprStringLiteral,
+) -> Result<(Parsed<ModExpression>, AnnotationKind), ParseError> {
+    let mut parsed = parse_expression(string_expr.value.to_str())?;
+    relocate_expr(parsed.expr_mut(), string_expr.range());
+    Ok((parsed, AnnotationKind::Complex))
 }

@@ -1698,7 +1698,7 @@
           }
         },
         "sections": {
-          "description": "A list of mappings from section names to modules.\n\nBy default, imports are categorized according to their type (e.g., `future`, `third-party`, and so on). This setting allows you to group modules into custom sections, to augment or override the built-in sections.\n\nFor example, to group all testing utilities, you could create a `testing` section: ```toml testing = [\"pytest\", \"hypothesis\"] ```\n\nCustom sections should typically be inserted into the `section-order` list to ensure that they're displayed as a standalone group and in the intended order, as in: ```toml section-order = [ \"future\", \"standard-library\", \"third-party\", \"first-party\", \"local-folder\", \"testing\" ] ```\n\nIf a custom section is omitted from `section-order`, imports in that section will be assigned to the `default-section` (which defaults to `third-party`).",
+          "description": "A list of mappings from section names to modules.\n\nBy default, imports are categorized according to their type (e.g., `future`, `third-party`, and so on). This setting allows you to group modules into custom sections, to augment or override the built-in sections.\n\nFor example, to group all testing utilities, you could create a `testing` section: ```toml testing = [\"pytest\", \"hypothesis\"] ```\n\nThe values in the list are treated as glob patterns. For example, to match all packages in the LangChain ecosystem (`langchain-core`, `langchain-openai`, etc.): ```toml langchain = [\"langchain-*\"] ```\n\nCustom sections should typically be inserted into the `section-order` list to ensure that they're displayed as a standalone group and in the intended order, as in: ```toml section-order = [ \"future\", \"standard-library\", \"third-party\", \"first-party\", \"local-folder\", \"testing\" ] ```\n\nIf a custom section is omitted from `section-order`, imports in that section will be assigned to the `default-section` (which defaults to `third-party`).",
           "type": [
             "object",
             "null"
@@ -2119,6 +2119,7 @@
         },
         "ignore-init-module-imports": {
           "description": "Avoid automatically removing unused imports in `__init__.py` files. Such imports will still be flagged, but with a dedicated message suggesting that the import is either added to the module's `__all__` symbol, or re-exported with a redundant alias (e.g., `import os as os`).\n\nThis option is enabled by default, but you can opt-in to removal of imports via an unsafe fix.",
+          "deprecated": true,
           "type": [
             "boolean",
             "null"
@@ -2585,7 +2586,8 @@
         "py39",
         "py310",
         "py311",
-        "py312"
+        "py312",
+        "py313"
       ]
     },
     "Quote": {
@@ -2683,6 +2685,8 @@
         "ASYNC100",
         "ASYNC101",
         "ASYNC102",
+        "ASYNC11",
+        "ASYNC116",
         "B",
         "B0",
         "B00",
@@ -2725,6 +2729,7 @@
         "B035",
         "B9",
         "B90",
+        "B901",
         "B904",
         "B905",
         "B909",
@@ -3228,6 +3233,7 @@
         "PLC02",
         "PLC020",
         "PLC0205",
+        "PLC0206",
         "PLC0208",
         "PLC04",
         "PLC041",
@@ -3573,7 +3579,14 @@
         "PYI054",
         "PYI055",
         "PYI056",
+        "PYI057",
         "PYI058",
+        "PYI059",
+        "PYI06",
+        "PYI062",
+        "PYI063",
+        "PYI064",
+        "PYI066",
         "Q",
         "Q0",
         "Q00",
@@ -3937,6 +3950,7 @@
         "github",
         "gitlab",
         "pylint",
+        "rdjson",
         "azure",
         "sarif"
       ]

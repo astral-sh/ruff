@@ -103,7 +103,7 @@ def f():
 
 
 def f():
-    # Invalid - nonexistant error code with multibyte character
+    # Invalid - nonexistent error code with multibyte character
     d = 1  # noqa: F841, E50
     e = 1  # noqa: E50
 

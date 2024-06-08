@@ -124,7 +124,7 @@ impl<'a> Printer<'a> {
                     self.flush_line_suffixes(queue, stack, Some(element));
                 } else {
                     // Only print a newline if the current line isn't already empty
-                    if self.state.line_width > 0 {
+                    if !self.state.buffer[self.state.line_start..].is_empty() {
                         self.push_marker();
                         self.print_char('\n');
                     }
@@ -830,6 +830,7 @@ impl<'a> Printer<'a> {
                 .push_str(self.options.line_ending.as_str());
 
             self.state.line_width = 0;
+            self.state.line_start = self.state.buffer.len();
 
             // Fit's only tests if groups up to the first line break fit.
             // The next group must re-measure if it still fits.
@@ -872,12 +873,29 @@ enum FillPairLayout {
 /// position the printer currently is.
 #[derive(Default, Debug)]
 struct PrinterState<'a> {
+    /// The formatted output.
     buffer: String,
+
+    /// The source markers that map source positions to formatted positions.
     source_markers: Vec<SourceMarker>,
+
+    /// The next source position that should be flushed when writing the next text.
     pending_source_position: Option<TextSize>,
+
+    /// The current indentation that should be written before the next text.
     pending_indent: Indention,
+
+    /// Caches if the code up to the next newline has been measured to fit on a single line.
+    /// This is used to avoid re-measuring the same content multiple times.
     measured_group_fits: bool,
+
+    /// The offset at which the current line in `buffer` starts.
+    line_start: usize,
+
+    /// The accumulated unicode-width of all characters on the current line.
     line_width: u32,
+
+    /// The line suffixes that should be printed at the end of the line.
     line_suffixes: LineSuffixes<'a>,
     verbatim_markers: Vec<TextRange>,
     group_modes: GroupModes,

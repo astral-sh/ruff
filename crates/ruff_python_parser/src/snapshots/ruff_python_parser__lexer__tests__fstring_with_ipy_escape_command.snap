@@ -2,31 +2,24 @@
 source: crates/ruff_python_parser/src/lexer.rs
 expression: lex_source(source)
 ---
+## Tokens
+```
 [
     (
-        FStringStart(
-            StringKind {
-                prefix: Format(
-                    Regular,
-                ),
-                triple_quoted: false,
-                quote_style: Double,
-            },
-        ),
+        FStringStart,
         0..2,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING,
+        ),
     ),
     (
-        FStringMiddle {
-            value: "foo ",
-            kind: StringKind {
-                prefix: Format(
-                    Regular,
-                ),
-                triple_quoted: false,
-                quote_style: Double,
-            },
-        },
+        FStringMiddle(
+            "foo ",
+        ),
         2..6,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING,
+        ),
     ),
     (
         Lbrace,
@@ -37,9 +30,9 @@ expression: lex_source(source)
         7..8,
     ),
     (
-        Name {
-            name: "pwd",
-        },
+        Name(
+            "pwd",
+        ),
         8..11,
     ),
     (
@@ -47,24 +40,24 @@ expression: lex_source(source)
         11..12,
     ),
     (
-        FStringMiddle {
-            value: " bar",
-            kind: StringKind {
-                prefix: Format(
-                    Regular,
-                ),
-                triple_quoted: false,
-                quote_style: Double,
-            },
-        },
+        FStringMiddle(
+            " bar",
+        ),
         12..16,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING,
+        ),
     ),
     (
         FStringEnd,
         16..17,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING,
+        ),
     ),
     (
         Newline,
         17..17,
     ),
 ]
+```

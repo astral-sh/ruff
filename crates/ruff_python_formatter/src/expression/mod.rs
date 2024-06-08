@@ -6,7 +6,7 @@ use ruff_formatter::{
 };
 use ruff_python_ast as ast;
 use ruff_python_ast::parenthesize::parentheses_iterator;
-use ruff_python_ast::visitor::preorder::{walk_expr, PreorderVisitor};
+use ruff_python_ast::visitor::source_order::{walk_expr, SourceOrderVisitor};
 use ruff_python_ast::{AnyNodeRef, Expr, ExpressionRef, Operator};
 use ruff_python_trivia::CommentRanges;
 use ruff_text_size::Ranged;
@@ -806,7 +806,7 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
     }
 }
 
-impl<'input> PreorderVisitor<'input> for CanOmitOptionalParenthesesVisitor<'input> {
+impl<'input> SourceOrderVisitor<'input> for CanOmitOptionalParenthesesVisitor<'input> {
     fn visit_expr(&mut self, expr: &'input Expr) {
         self.last = Some(expr);
 
@@ -1059,8 +1059,8 @@ pub(crate) fn has_own_parentheses(
             }
         }
 
-        Expr::Dict(ast::ExprDict { keys, .. }) => {
-            if !keys.is_empty() || context.comments().has_dangling(AnyNodeRef::from(expr)) {
+        Expr::Dict(ast::ExprDict { items, .. }) => {
+            if !items.is_empty() || context.comments().has_dangling(AnyNodeRef::from(expr)) {
                 Some(OwnParentheses::NonEmpty)
             } else {
                 Some(OwnParentheses::Empty)
@@ -1217,7 +1217,7 @@ pub(crate) fn is_splittable_expression(expr: &Expr, context: &PyFormatContext) -
 
         // Sequence types can split if they contain at least one element.
         Expr::Tuple(tuple) => !tuple.elts.is_empty(),
-        Expr::Dict(dict) => !dict.values.is_empty(),
+        Expr::Dict(dict) => !dict.items.is_empty(),
         Expr::Set(set) => !set.elts.is_empty(),
         Expr::List(list) => !list.elts.is_empty(),
 

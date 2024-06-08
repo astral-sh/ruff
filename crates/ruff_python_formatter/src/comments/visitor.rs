@@ -7,7 +7,7 @@ use ruff_python_ast::{Mod, Stmt};
 // The interface is designed to only export the members relevant for iterating nodes in
 // pre-order.
 #[allow(clippy::wildcard_imports)]
-use ruff_python_ast::visitor::preorder::*;
+use ruff_python_ast::visitor::source_order::*;
 use ruff_python_trivia::{CommentLinePosition, CommentRanges};
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -70,7 +70,7 @@ impl<'a, 'builder> CommentsVisitor<'a, 'builder> {
     }
 }
 
-impl<'ast> PreorderVisitor<'ast> for CommentsVisitor<'ast, '_> {
+impl<'ast> SourceOrderVisitor<'ast> for CommentsVisitor<'ast, '_> {
     fn enter_node(&mut self, node: AnyNodeRef<'ast>) -> TraversalSignal {
         let node_range = node.range();
 

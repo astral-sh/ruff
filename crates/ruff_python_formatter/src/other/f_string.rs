@@ -1,5 +1,5 @@
 use ruff_formatter::write;
-use ruff_python_ast::{AnyStringKind, FString};
+use ruff_python_ast::{AnyStringFlags, FString, StringFlags};
 use ruff_source_file::Locator;
 
 use crate::prelude::*;
@@ -56,7 +56,9 @@ impl Format<PyFormatContext<'_>> for FormatFString<'_> {
             return result;
         }
 
-        let string_kind = normalizer.choose_quotes(self.value.into(), &locator).kind();
+        let string_kind = normalizer
+            .choose_quotes(self.value.into(), &locator)
+            .flags();
 
         let context = FStringContext::new(
             string_kind,
@@ -83,17 +85,17 @@ impl Format<PyFormatContext<'_>> for FormatFString<'_> {
 
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct FStringContext {
-    kind: AnyStringKind,
+    flags: AnyStringFlags,
     layout: FStringLayout,
 }
 
 impl FStringContext {
-    const fn new(kind: AnyStringKind, layout: FStringLayout) -> Self {
-        Self { kind, layout }
+    const fn new(flags: AnyStringFlags, layout: FStringLayout) -> Self {
+        Self { flags, layout }
     }
 
-    pub(crate) fn kind(self) -> AnyStringKind {
-        self.kind
+    pub(crate) fn flags(self) -> AnyStringFlags {
+        self.flags
     }
 
     pub(crate) const fn layout(self) -> FStringLayout {
@@ -126,6 +128,7 @@ impl FStringLayout {
         //
         // Reference: https://prettier.io/docs/en/next/rationale.html#template-literals
         if f_string
+            .elements
             .expressions()
             .any(|expr| memchr::memchr2(b'\n', b'\r', locator.slice(expr).as_bytes()).is_some())
         {

@@ -1,15 +1,17 @@
 use std::borrow::Cow;
 
-use crate::edit::{DocumentVersion, WorkspaceEditTracker};
+use lsp_server::ErrorCode;
+use lsp_types::{self as types, request as req};
+
+use ruff_linter::codes::Rule;
+
+use crate::edit::WorkspaceEditTracker;
+use crate::fix::Fixes;
 use crate::server::api::LSPResult;
 use crate::server::SupportedCodeAction;
 use crate::server::{client::Notifier, Result};
-use crate::session::{DocumentSnapshot, ResolvedClientCapabilities};
+use crate::session::{DocumentQuery, DocumentSnapshot, ResolvedClientCapabilities};
 use crate::PositionEncoding;
-use lsp_server::ErrorCode;
-use lsp_types::{self as types, request as req};
-use ruff_linter::codes::Rule;
-use ruff_linter::settings::LinterSettings;
 
 pub(crate) struct CodeActionResolve;
 
@@ -21,14 +23,14 @@ impl super::BackgroundDocumentRequestHandler for CodeActionResolve {
     fn document_url(params: &types::CodeAction) -> Cow<types::Url> {
         let uri: lsp_types::Url = serde_json::from_value(params.data.clone().unwrap_or_default())
             .expect("code actions should have a URI in their data fields");
-        std::borrow::Cow::Owned(uri)
+        Cow::Owned(uri)
     }
     fn run_with_snapshot(
         snapshot: DocumentSnapshot,
         _notifier: Notifier,
         mut action: types::CodeAction,
     ) -> Result<types::CodeAction> {
-        let document = snapshot.document();
+        let query = snapshot.query();
 
         let code_actions = SupportedCodeAction::from_kind(
             action
@@ -49,25 +51,20 @@ impl super::BackgroundDocumentRequestHandler for CodeActionResolve {
         };
 
         action.edit = match action_kind {
-            SupportedCodeAction::SourceFixAll => Some(
+            SupportedCodeAction::SourceFixAll | SupportedCodeAction::NotebookSourceFixAll => Some(
                 resolve_edit_for_fix_all(
-                    document,
+                    query,
                     snapshot.resolved_client_capabilities(),
-                    snapshot.url(),
-                    snapshot.settings().linter(),
                     snapshot.encoding(),
-                    document.version(),
                 )
                 .with_failure_code(ErrorCode::InternalError)?,
             ),
-            SupportedCodeAction::SourceOrganizeImports => Some(
+            SupportedCodeAction::SourceOrganizeImports
+            | SupportedCodeAction::NotebookSourceOrganizeImports => Some(
                 resolve_edit_for_organize_imports(
-                    document,
+                    query,
                     snapshot.resolved_client_capabilities(),
-                    snapshot.url(),
-                    snapshot.settings().linter(),
                     snapshot.encoding(),
-                    document.version(),
                 )
                 .with_failure_code(ErrorCode::InternalError)?,
             ),
@@ -84,53 +81,37 @@ impl super::BackgroundDocumentRequestHandler for CodeActionResolve {
 }
 
 pub(super) fn resolve_edit_for_fix_all(
-    document: &crate::edit::Document,
+    query: &DocumentQuery,
     client_capabilities: &ResolvedClientCapabilities,
-    url: &types::Url,
-    linter_settings: &LinterSettings,
     encoding: PositionEncoding,
-    version: DocumentVersion,
 ) -> crate::Result<types::WorkspaceEdit> {
     let mut tracker = WorkspaceEditTracker::new(client_capabilities);
-    tracker.set_edits_for_document(
-        url.clone(),
-        version,
-        fix_all_edit(document, linter_settings, encoding)?,
-    )?;
+    tracker.set_fixes_for_document(fix_all_edit(query, encoding)?, query.version())?;
     Ok(tracker.into_workspace_edit())
 }
 
 pub(super) fn fix_all_edit(
-    document: &crate::edit::Document,
-    linter_settings: &LinterSettings,
+    query: &DocumentQuery,
     encoding: PositionEncoding,
-) -> crate::Result<Vec<types::TextEdit>> {
-    crate::fix::fix_all(document, linter_settings, encoding)
+) -> crate::Result<Fixes> {
+    crate::fix::fix_all(query, query.settings().linter(), encoding)
 }
 
 pub(super) fn resolve_edit_for_organize_imports(
-    document: &crate::edit::Document,
+    query: &DocumentQuery,
     client_capabilities: &ResolvedClientCapabilities,
-    url: &types::Url,
-    linter_settings: &ruff_linter::settings::LinterSettings,
     encoding: PositionEncoding,
-    version: DocumentVersion,
 ) -> crate::Result<types::WorkspaceEdit> {
     let mut tracker = WorkspaceEditTracker::new(client_capabilities);
-    tracker.set_edits_for_document(
-        url.clone(),
-        version,
-        organize_imports_edit(document, linter_settings, encoding)?,
-    )?;
+    tracker.set_fixes_for_document(organize_imports_edit(query, encoding)?, query.version())?;
     Ok(tracker.into_workspace_edit())
 }
 
 pub(super) fn organize_imports_edit(
-    document: &crate::edit::Document,
-    linter_settings: &LinterSettings,
+    query: &DocumentQuery,
     encoding: PositionEncoding,
-) -> crate::Result<Vec<types::TextEdit>> {
-    let mut linter_settings = linter_settings.clone();
+) -> crate::Result<Fixes> {
+    let mut linter_settings = query.settings().linter().clone();
     linter_settings.rules = [
         Rule::UnsortedImports,       // I001
         Rule::MissingRequiredImport, // I002
@@ -138,5 +119,5 @@ pub(super) fn organize_imports_edit(
     .into_iter()
     .collect();
 
-    crate::fix::fix_all(document, &linter_settings, encoding)
+    crate::fix::fix_all(query, &linter_settings, encoding)
 }

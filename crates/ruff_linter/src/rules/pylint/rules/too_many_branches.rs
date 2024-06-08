@@ -5,7 +5,9 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::identifier::Identifier;
 
 /// ## What it does
-/// Checks for functions or methods with too many branches.
+/// Checks for functions or methods with too many branches, including (nested)
+/// `if`, `elif`, and `else` branches, `for` loops, `try`-`except` clauses, and
+/// `match` and `case` statements.
 ///
 /// By default, this rule allows up to 12 branches. This can be configured
 /// using the [`lint.pylint.max-branches`] option.
@@ -15,6 +17,7 @@ use ruff_python_ast::identifier::Identifier;
 /// and maintain than functions or methods with fewer branches.
 ///
 /// ## Example
+/// Given:
 /// ```python
 /// def capital(country):
 ///     if country == "Australia":
@@ -66,6 +69,77 @@ use ruff_python_ast::identifier::Identifier;
 ///     return city
 /// ```
 ///
+/// Given:
+/// ```python
+/// def grades_to_average_number(grades):
+///     numbers = []
+///     for grade in grades:  # 1st branch
+///         if len(grade) not in {1, 2}:
+///             raise ValueError(f"Invalid grade: {grade}")
+///
+///         if len(grade) == 2 and grade[1] not in {"+", "-"}:
+///             raise ValueError(f"Invalid grade: {grade}")
+///
+///         letter = grade[0]
+///
+///         if letter in {"F", "E"}:
+///             number = 0.0
+///         elif letter == "D":
+///             number = 1.0
+///         elif letter == "C":
+///             number = 2.0
+///         elif letter == "B":
+///             number = 3.0
+///         elif letter == "A":
+///             number = 4.0
+///         else:
+///             raise ValueError(f"Invalid grade: {grade}")
+///
+///         modifier = 0.0
+///         if letter != "F" and grade[-1] == "+":
+///             modifier = 0.3
+///         elif letter != "F" and grade[-1] == "-":
+///             modifier = -0.3
+///
+///         numbers.append(max(0.0, min(number + modifier, 4.0)))
+///
+///     try:
+///         return sum(numbers) / len(numbers)
+///     except ZeroDivisionError:  # 13th branch
+///         return 0
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def grades_to_average_number(grades):
+///     grade_values = {"F": 0.0, "E": 0.0, "D": 1.0, "C": 2.0, "B": 3.0, "A": 4.0}
+///     modifier_values = {"+": 0.3, "-": -0.3}
+///
+///     numbers = []
+///     for grade in grades:
+///         if len(grade) not in {1, 2}:
+///             raise ValueError(f"Invalid grade: {grade}")
+///
+///         letter = grade[0]
+///         if letter not in grade_values:
+///             raise ValueError(f"Invalid grade: {grade}")
+///         number = grade_values[letter]
+///
+///         if len(grade) == 2 and grade[1] not in modifier_values:
+///             raise ValueError(f"Invalid grade: {grade}")
+///         modifier = modifier_values.get(grade[-1], 0.0)
+///
+///         if letter == "F":
+///             numbers.append(0.0)
+///         else:
+///             numbers.append(max(0.0, min(number + modifier, 4.0)))
+///
+///     try:
+///         return sum(numbers) / len(numbers)
+///     except ZeroDivisionError:
+///         return 0
+/// ```
+///
 /// ## Options
 /// - `lint.pylint.max-branches`
 #[violation]
@@ -102,11 +176,14 @@ fn num_branches(stmts: &[Stmt]) -> usize {
                         .sum::<usize>()
             }
             Stmt::Match(ast::StmtMatch { cases, .. }) => {
-                1 + cases
-                    .iter()
-                    .map(|case| num_branches(&case.body))
-                    .sum::<usize>()
+                cases.len()
+                    + cases
+                        .iter()
+                        .map(|case| num_branches(&case.body))
+                        .sum::<usize>()
             }
+            // The `with` statement is not considered a branch but the statements inside the `with` should be counted.
+            Stmt::With(ast::StmtWith { body, .. }) => num_branches(body),
             Stmt::For(ast::StmtFor { body, orelse, .. })
             | Stmt::While(ast::StmtWhile { body, orelse, .. }) => {
                 1 + num_branches(body)
@@ -123,7 +200,9 @@ fn num_branches(stmts: &[Stmt]) -> usize {
                 finalbody,
                 ..
             }) => {
-                1 + num_branches(body)
+                // Count each `except` clause as a branch; the `else` and `finally` clauses also
+                // count, but the `try` clause itself does not.
+                num_branches(body)
                     + (if orelse.is_empty() {
                         0
                     } else {
@@ -175,13 +254,13 @@ pub(crate) fn too_many_branches(
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
-    use ruff_python_parser::parse_suite;
+    use ruff_python_parser::parse_module;
 
     use super::num_branches;
 
     fn test_helper(source: &str, expected_num_branches: usize) -> Result<()> {
-        let branches = parse_suite(source)?;
-        assert_eq!(num_branches(&branches), expected_num_branches);
+        let parsed = parse_module(source)?;
+        assert_eq!(num_branches(parsed.suite()), expected_num_branches);
         Ok(())
     }
 
@@ -197,6 +276,19 @@ else:
         pass
 ";
         test_helper(source, 4)?;
+        Ok(())
+    }
+
+    #[test]
+    fn match_case() -> Result<()> {
+        let source: &str = r"
+match x: # 2
+    case 0:
+        pass
+    case 1:
+        pass
+";
+        test_helper(source, 2)?;
         Ok(())
     }
 
@@ -248,6 +340,47 @@ return 1
     }
 
     #[test]
+    fn try_except() -> Result<()> {
+        let source: &str = r"
+try:
+    pass
+except:
+    pass
+";
+
+        test_helper(source, 1)?;
+        Ok(())
+    }
+
+    #[test]
+    fn try_except_else() -> Result<()> {
+        let source: &str = r"
+try:
+    pass
+except:
+    pass
+else:
+    pass
+";
+
+        test_helper(source, 2)?;
+        Ok(())
+    }
+
+    #[test]
+    fn try_finally() -> Result<()> {
+        let source: &str = r"
+try:
+    pass
+finally:
+    pass
+";
+
+        test_helper(source, 1)?;
+        Ok(())
+    }
+
+    #[test]
     fn try_except_except_else_finally() -> Result<()> {
         let source: &str = r"
 try:
@@ -262,7 +395,21 @@ finally:
     pass
 ";
 
-        test_helper(source, 5)?;
+        test_helper(source, 4)?;
+        Ok(())
+    }
+
+    #[test]
+    fn with_statement() -> Result<()> {
+        let source: &str = r"
+with suppress(Exception):
+    if x == 0:  # 2
+        return
+    else:
+        return
+";
+
+        test_helper(source, 2)?;
         Ok(())
     }
 }

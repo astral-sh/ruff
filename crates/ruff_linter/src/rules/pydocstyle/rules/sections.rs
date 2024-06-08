@@ -1393,14 +1393,14 @@ fn blanks_and_section_underline(
     docstring: &Docstring,
     context: &SectionContext,
 ) {
-    let mut blank_lines_after_header = 0;
+    let mut num_blank_lines_after_header = 0u32;
     let mut blank_lines_end = context.following_range().start();
     let mut following_lines = context.following_lines().peekable();
 
     while let Some(line) = following_lines.peek() {
         if line.trim().is_empty() {
             blank_lines_end = line.full_end();
-            blank_lines_after_header += 1;
+            num_blank_lines_after_header += 1;
             following_lines.next();
         } else {
             break;
@@ -1409,7 +1409,7 @@ fn blanks_and_section_underline(
 
     if let Some(non_blank_line) = following_lines.next() {
         if let Some(dashed_line) = find_underline(&non_blank_line, '-') {
-            if blank_lines_after_header > 0 {
+            if num_blank_lines_after_header > 0 {
                 if checker.enabled(Rule::SectionUnderlineAfterName) {
                     let mut diagnostic = Diagnostic::new(
                         SectionUnderlineAfterName {
@@ -1475,10 +1475,12 @@ fn blanks_and_section_underline(
 
             if let Some(line_after_dashes) = following_lines.next() {
                 if line_after_dashes.trim().is_empty() {
+                    let mut num_blank_lines_dashes_end = 1u32;
                     let mut blank_lines_after_dashes_end = line_after_dashes.full_end();
                     while let Some(line) = following_lines.peek() {
                         if line.trim().is_empty() {
                             blank_lines_after_dashes_end = line.full_end();
+                            num_blank_lines_dashes_end += 1;
                             following_lines.next();
                         } else {
                             break;
@@ -1495,18 +1497,57 @@ fn blanks_and_section_underline(
                             ));
                         }
                     } else if checker.enabled(Rule::BlankLinesBetweenHeaderAndContent) {
-                        let mut diagnostic = Diagnostic::new(
-                            BlankLinesBetweenHeaderAndContent {
-                                name: context.section_name().to_string(),
-                            },
-                            context.section_name_range(),
-                        );
-                        // Delete any blank lines between the header and content.
-                        diagnostic.set_fix(Fix::safe_edit(Edit::deletion(
-                            line_after_dashes.start(),
-                            blank_lines_after_dashes_end,
-                        )));
-                        checker.diagnostics.push(diagnostic);
+                        // If the section is followed by exactly one line, and then a
+                        // reStructuredText directive, the blank lines should be preserved, as in:
+                        //
+                        // ```python
+                        // """
+                        // Example
+                        // -------
+                        //
+                        // .. code-block:: python
+                        //
+                        //     import foo
+                        // """
+                        // ```
+                        //
+                        // Otherwise, documentation generators will not recognize the directive.
+                        let is_sphinx = checker
+                            .locator()
+                            .line(blank_lines_after_dashes_end)
+                            .trim_start()
+                            .starts_with(".. ");
+
+                        if is_sphinx {
+                            if num_blank_lines_dashes_end > 1 {
+                                let mut diagnostic = Diagnostic::new(
+                                    BlankLinesBetweenHeaderAndContent {
+                                        name: context.section_name().to_string(),
+                                    },
+                                    context.section_name_range(),
+                                );
+                                // Preserve a single blank line between the header and content.
+                                diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
+                                    checker.stylist().line_ending().to_string(),
+                                    line_after_dashes.start(),
+                                    blank_lines_after_dashes_end,
+                                )));
+                                checker.diagnostics.push(diagnostic);
+                            }
+                        } else {
+                            let mut diagnostic = Diagnostic::new(
+                                BlankLinesBetweenHeaderAndContent {
+                                    name: context.section_name().to_string(),
+                                },
+                                context.section_name_range(),
+                            );
+                            // Delete any blank lines between the header and content.
+                            diagnostic.set_fix(Fix::safe_edit(Edit::deletion(
+                                line_after_dashes.start(),
+                                blank_lines_after_dashes_end,
+                            )));
+                            checker.diagnostics.push(diagnostic);
+                        }
                     }
                 }
             } else {
@@ -1560,18 +1601,59 @@ fn blanks_and_section_underline(
                     checker.diagnostics.push(diagnostic);
                 }
             }
-            if blank_lines_after_header > 0 {
+            if num_blank_lines_after_header > 0 {
                 if checker.enabled(Rule::BlankLinesBetweenHeaderAndContent) {
-                    let mut diagnostic = Diagnostic::new(
-                        BlankLinesBetweenHeaderAndContent {
-                            name: context.section_name().to_string(),
-                        },
-                        context.section_name_range(),
-                    );
-                    let range = TextRange::new(context.following_range().start(), blank_lines_end);
-                    // Delete any blank lines between the header and content.
-                    diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(range)));
-                    checker.diagnostics.push(diagnostic);
+                    // If the section is followed by exactly one line, and then a
+                    // reStructuredText directive, the blank lines should be preserved, as in:
+                    //
+                    // ```python
+                    // """
+                    // Example:
+                    //
+                    // .. code-block:: python
+                    //
+                    //     import foo
+                    // """
+                    // ```
+                    //
+                    // Otherwise, documentation generators will not recognize the directive.
+                    let is_sphinx = checker
+                        .locator()
+                        .line(blank_lines_end)
+                        .trim_start()
+                        .starts_with(".. ");
+
+                    if is_sphinx {
+                        if num_blank_lines_after_header > 1 {
+                            let mut diagnostic = Diagnostic::new(
+                                BlankLinesBetweenHeaderAndContent {
+                                    name: context.section_name().to_string(),
+                                },
+                                context.section_name_range(),
+                            );
+
+                            // Preserve a single blank line between the header and content.
+                            diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
+                                checker.stylist().line_ending().to_string(),
+                                context.following_range().start(),
+                                blank_lines_end,
+                            )));
+                            checker.diagnostics.push(diagnostic);
+                        }
+                    } else {
+                        let mut diagnostic = Diagnostic::new(
+                            BlankLinesBetweenHeaderAndContent {
+                                name: context.section_name().to_string(),
+                            },
+                            context.section_name_range(),
+                        );
+
+                        let range =
+                            TextRange::new(context.following_range().start(), blank_lines_end);
+                        // Delete any blank lines between the header and content.
+                        diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(range)));
+                        checker.diagnostics.push(diagnostic);
+                    }
                 }
             }
         }
@@ -1755,23 +1837,19 @@ fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &
 
     // Look for arguments that weren't included in the docstring.
     let mut missing_arg_names: FxHashSet<String> = FxHashSet::default();
+
+    // If this is a non-static method, skip `cls` or `self`.
     for ParameterWithDefault {
         parameter,
         default: _,
         range: _,
     } in function
         .parameters
-        .posonlyargs
-        .iter()
-        .chain(&function.parameters.args)
-        .chain(&function.parameters.kwonlyargs)
-        .skip(
-            // If this is a non-static method, skip `cls` or `self`.
-            usize::from(
-                docstring.definition.is_method()
-                    && !is_staticmethod(&function.decorator_list, checker.semantic()),
-            ),
-        )
+        .iter_non_variadic_params()
+        .skip(usize::from(
+            docstring.definition.is_method()
+                && !is_staticmethod(&function.decorator_list, checker.semantic()),
+        ))
     {
         let arg_name = parameter.name.as_str();
         if !arg_name.starts_with('_') && !docstrings_args.contains(arg_name) {

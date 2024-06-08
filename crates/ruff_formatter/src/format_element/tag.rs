@@ -9,14 +9,14 @@ use std::num::NonZeroU8;
 /// will be applied to all elements in between the start/end tags.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Tag {
-    /// Indents the content one level deeper, see [crate::builders::indent] for documentation and examples.
+    /// Indents the content one level deeper, see [`crate::builders::indent`] for documentation and examples.
     StartIndent,
     EndIndent,
 
-    /// Variant of [TagKind::Indent] that indents content by a number of spaces. For example, `Align(2)`
+    /// Variant of [`TagKind::Indent`] that indents content by a number of spaces. For example, `Align(2)`
     /// indents any content following a line break by an additional two spaces.
     ///
-    /// Nesting (Aligns)[TagKind::Align] has the effect that all except the most inner align are handled as (Indent)[TagKind::Indent].
+    /// Nesting (Aligns)[`TagKind::Align`] has the effect that all except the most inner align are handled as (Indent)[`TagKind::Indent`].
     StartAlign(Align),
     EndAlign,
 
@@ -29,7 +29,7 @@ pub enum Tag {
     /// - on a single line: Omitting `LineMode::Soft` line breaks and printing spaces for `LineMode::SoftOrSpace`
     /// - on multiple lines: Printing all line breaks
     ///
-    /// See [crate::builders::group] for documentation and examples.
+    /// See [`crate::builders::group`] for documentation and examples.
     StartGroup(Group),
     EndGroup,
 
@@ -44,22 +44,22 @@ pub enum Tag {
     EndConditionalGroup,
 
     /// Allows to specify content that gets printed depending on whatever the enclosing group
-    /// is printed on a single line or multiple lines. See [crate::builders::if_group_breaks] for examples.
+    /// is printed on a single line or multiple lines. See [`crate::builders::if_group_breaks`] for examples.
     StartConditionalContent(Condition),
     EndConditionalContent,
 
-    /// Optimized version of [Tag::StartConditionalContent] for the case where some content
+    /// Optimized version of [`Tag::StartConditionalContent`] for the case where some content
     /// should be indented if the specified group breaks.
     StartIndentIfGroupBreaks(GroupId),
     EndIndentIfGroupBreaks,
 
     /// Concatenates multiple elements together with a given separator printed in either
     /// flat or expanded mode to fill the print width. Expect that the content is a list of alternating
-    /// [element, separator] See [crate::Formatter::fill].
+    /// [element, separator] See [`crate::Formatter::fill`].
     StartFill,
     EndFill,
 
-    /// Entry inside of a [Tag::StartFill]
+    /// Entry inside of a [`Tag::StartFill`]
     StartEntry,
     EndEntry,
 
@@ -77,7 +77,7 @@ pub enum Tag {
     /// Special semantic element marking the content with a label.
     /// This does not directly influence how the content will be printed.
     ///
-    /// See [crate::builders::labelled] for documentation.
+    /// See [`crate::builders::labelled`] for documentation.
     StartLabelled(LabelId),
     EndLabelled,
 

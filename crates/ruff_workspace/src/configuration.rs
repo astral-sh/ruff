@@ -181,6 +181,7 @@ impl Configuration {
                 PythonVersion::Py310 => ruff_python_formatter::PythonVersion::Py310,
                 PythonVersion::Py311 => ruff_python_formatter::PythonVersion::Py311,
                 PythonVersion::Py312 => ruff_python_formatter::PythonVersion::Py312,
+                PythonVersion::Py313 => ruff_python_formatter::PythonVersion::Py313,
             },
             line_width: self
                 .line_length
@@ -659,7 +660,12 @@ impl LintConfiguration {
             .collect();
 
         #[allow(deprecated)]
-        let ignore_init_module_imports = options.common.ignore_init_module_imports;
+        let ignore_init_module_imports = {
+            if options.common.ignore_init_module_imports.is_some() {
+                warn_user_once!("The `ignore-init-module-imports` option is deprecated and will be removed in a future release. Ruff's handling of imports in `__init__.py` files has been improved (in preview) and unused imports will always be flagged.");
+            }
+            options.common.ignore_init_module_imports
+        };
 
         Ok(LintConfiguration {
             exclude: options.exclude.map(|paths| {
@@ -867,11 +873,7 @@ impl LintConfiguration {
             } else {
                 // Otherwise we apply the updates on top of the existing select_set.
                 for (rule, enabled) in select_map_updates {
-                    if enabled {
-                        select_set.insert(rule);
-                    } else {
-                        select_set.remove(rule);
-                    }
+                    select_set.set(rule, enabled);
                 }
 
                 for rule in docstring_override_updates {
@@ -894,11 +896,7 @@ impl LintConfiguration {
                 }
             } else {
                 for (rule, enabled) in fixable_map_updates {
-                    if enabled {
-                        fixable_set.insert(rule);
-                    } else {
-                        fixable_set.remove(rule);
-                    }
+                    fixable_set.set(rule, enabled);
                 }
             }
 
@@ -1095,31 +1093,27 @@ impl LintConfiguration {
 
     #[must_use]
     pub fn combine(self, config: Self) -> Self {
+        let mut rule_selections = config.rule_selections;
+        rule_selections.extend(self.rule_selections);
+
+        let mut extend_safe_fixes = config.extend_safe_fixes;
+        extend_safe_fixes.extend(self.extend_safe_fixes);
+
+        let mut extend_unsafe_fixes = config.extend_unsafe_fixes;
+        extend_unsafe_fixes.extend(self.extend_unsafe_fixes);
+
+        let mut extend_per_file_ignores = config.extend_per_file_ignores;
+        extend_per_file_ignores.extend(self.extend_per_file_ignores);
+
         Self {
             exclude: self.exclude.or(config.exclude),
             preview: self.preview.or(config.preview),
-            rule_selections: config
-                .rule_selections
-                .into_iter()
-                .chain(self.rule_selections)
-                .collect(),
-            extend_safe_fixes: config
-                .extend_safe_fixes
-                .into_iter()
-                .chain(self.extend_safe_fixes)
-                .collect(),
-            extend_unsafe_fixes: config
-                .extend_unsafe_fixes
-                .into_iter()
-                .chain(self.extend_unsafe_fixes)
-                .collect(),
+            rule_selections,
+            extend_safe_fixes,
+            extend_unsafe_fixes,
             allowed_confusables: self.allowed_confusables.or(config.allowed_confusables),
             dummy_variable_rgx: self.dummy_variable_rgx.or(config.dummy_variable_rgx),
-            extend_per_file_ignores: config
-                .extend_per_file_ignores
-                .into_iter()
-                .chain(self.extend_per_file_ignores)
-                .collect(),
+            extend_per_file_ignores,
             external: self.external.or(config.external),
             ignore_init_module_imports: self
                 .ignore_init_module_imports

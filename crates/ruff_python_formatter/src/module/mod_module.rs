@@ -2,7 +2,6 @@ use ruff_formatter::write;
 use ruff_python_ast::ModModule;
 use ruff_python_trivia::lines_after;
 
-use crate::comments::SourceComment;
 use crate::prelude::*;
 use crate::statement::suite::SuiteKind;
 use crate::FormatNodeRule;
@@ -33,15 +32,5 @@ impl FormatNodeRule<ModModule> for FormatModModule {
                 ]
             )
         }
-    }
-
-    fn fmt_dangling_comments(
-        &self,
-        dangling_comments: &[SourceComment],
-        _f: &mut PyFormatter,
-    ) -> FormatResult<()> {
-        // Node can't have dangling comments.
-        debug_assert!(dangling_comments.is_empty());
-        Ok(())
     }
 }

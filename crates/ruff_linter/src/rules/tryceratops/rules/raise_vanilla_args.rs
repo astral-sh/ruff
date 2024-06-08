@@ -97,7 +97,7 @@ fn contains_message(expr: &Expr) -> bool {
                         }
                     }
                     ast::FStringPart::FString(f_string) => {
-                        for literal in f_string.literals() {
+                        for literal in f_string.elements.literals() {
                             if literal.chars().any(char::is_whitespace) {
                                 return true;
                             }

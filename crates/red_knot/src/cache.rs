@@ -2,6 +2,7 @@ use std::fmt::Formatter;
 use std::hash::Hash;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
+use crate::db::QueryResult;
 use dashmap::mapref::entry::Entry;
 
 use crate::FxDashMap;
@@ -27,11 +28,11 @@ where
         }
     }
 
-    pub fn get<F>(&self, key: &K, compute: F) -> V
+    pub fn get<F>(&self, key: &K, compute: F) -> QueryResult<V>
     where
-        F: FnOnce(&K) -> V,
+        F: FnOnce(&K) -> QueryResult<V>,
     {
-        match self.map.entry(key.clone()) {
+        Ok(match self.map.entry(key.clone()) {
             Entry::Occupied(cached) => {
                 self.statistics.hit();
 
@@ -40,11 +41,11 @@ where
             Entry::Vacant(vacant) => {
                 self.statistics.miss();
 
-                let value = compute(key);
+                let value = compute(key)?;
                 vacant.insert(value.clone());
                 value
             }
-        }
+        })
     }
 
     pub fn set(&mut self, key: K, value: V) {
@@ -117,23 +118,29 @@ pub type CacheStatistics = DebugStatistics;
 #[cfg(not(debug_assertions))]
 pub type CacheStatistics = ReleaseStatistics;
 
+pub trait StatisticsRecorder {
+    fn hit(&self);
+    fn miss(&self);
+    fn to_statistics(&self) -> Option<Statistics>;
+}
+
 #[derive(Debug, Default)]
 pub struct DebugStatistics {
     hits: AtomicUsize,
     misses: AtomicUsize,
 }
 
-impl DebugStatistics {
+impl StatisticsRecorder for DebugStatistics {
     // TODO figure out appropriate Ordering
-    pub fn hit(&self) {
+    fn hit(&self) {
         self.hits.fetch_add(1, Ordering::SeqCst);
     }
 
-    pub fn miss(&self) {
+    fn miss(&self) {
         self.misses.fetch_add(1, Ordering::SeqCst);
     }
 
-    pub fn to_statistics(&self) -> Option<Statistics> {
+    fn to_statistics(&self) -> Option<Statistics> {
         let hits = self.hits.load(Ordering::SeqCst);
         let misses = self.misses.load(Ordering::SeqCst);
 
@@ -144,15 +151,15 @@ impl DebugStatistics {
 #[derive(Debug, Default)]
 pub struct ReleaseStatistics;
 
-impl ReleaseStatistics {
+impl StatisticsRecorder for ReleaseStatistics {
     #[inline]
-    pub const fn hit(&self) {}
+    fn hit(&self) {}
 
     #[inline]
-    pub const fn miss(&self) {}
+    fn miss(&self) {}
 
     #[inline]
-    pub const fn to_statistics(&self) -> Option<Statistics> {
+    fn to_statistics(&self) -> Option<Statistics> {
         None
     }
 }

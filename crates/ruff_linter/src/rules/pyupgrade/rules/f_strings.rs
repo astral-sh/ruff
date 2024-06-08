@@ -11,7 +11,7 @@ use ruff_python_ast::{self as ast, Expr, Keyword};
 use ruff_python_literal::format::{
     FieldName, FieldNamePart, FieldType, FormatPart, FormatString, FromTemplate,
 };
-use ruff_python_parser::{lexer, Mode, Tok};
+use ruff_python_parser::TokenKind;
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -216,8 +216,10 @@ fn formatted_expr<'a>(expr: &Expr, context: FormatContext, locator: &Locator<'a>
 
 #[derive(Debug, Clone)]
 enum FStringConversion {
-    /// The format string only contains literal parts.
-    Literal,
+    /// The format string only contains literal parts and is empty.
+    EmptyLiteral,
+    /// The format string only contains literal parts and is non-empty.
+    NonEmptyLiteral,
     /// The format call uses arguments with side effects which are repeated within the
     /// format string. For example: `"{x} {x}".format(x=foo())`.
     SideEffects,
@@ -263,7 +265,7 @@ impl FStringConversion {
 
         // If the format string is empty, it doesn't need to be converted.
         if contents.is_empty() {
-            return Ok(Self::Literal);
+            return Ok(Self::EmptyLiteral);
         }
 
         // Parse the format string.
@@ -275,7 +277,7 @@ impl FStringConversion {
             .iter()
             .all(|part| matches!(part, FormatPart::Literal(..)))
         {
-            return Ok(Self::Literal);
+            return Ok(Self::NonEmptyLiteral);
         }
 
         let mut converted = String::with_capacity(contents.len());
@@ -398,7 +400,7 @@ pub(crate) fn f_strings(checker: &mut Checker, call: &ast::ExprCall, summary: &F
         return;
     };
 
-    if !value.is_string_literal_expr() {
+    let Expr::StringLiteral(literal) = &**value else {
         return;
     };
 
@@ -406,16 +408,14 @@ pub(crate) fn f_strings(checker: &mut Checker, call: &ast::ExprCall, summary: &F
         return;
     };
 
-    let mut patches: Vec<(TextRange, String)> = vec![];
-    let mut lex = lexer::lex_starts_at(
-        checker.locator().slice(call.func.range()),
-        Mode::Expression,
-        call.start(),
-    )
-    .flatten();
+    let mut patches: Vec<(TextRange, FStringConversion)> = vec![];
+    let mut tokens = checker.tokens().in_range(call.func.range()).iter();
     let end = loop {
-        match lex.next() {
-            Some((Tok::Dot, range)) => {
+        let Some(token) = tokens.next() else {
+            unreachable!("Should break from the `Tok::Dot` arm");
+        };
+        match token.kind() {
+            TokenKind::Dot => {
                 // ```
                 // (
                 //     "a"
@@ -427,26 +427,22 @@ pub(crate) fn f_strings(checker: &mut Checker, call: &ast::ExprCall, summary: &F
                 //
                 // We know that the expression is a string literal, so we can safely assume that the
                 // dot is the start of an attribute access.
-                break range.start();
+                break token.start();
             }
-            Some((Tok::String { .. }, range)) => {
-                match FStringConversion::try_convert(range, &mut summary, checker.locator()) {
-                    Ok(FStringConversion::Convert(fstring)) => patches.push((range, fstring)),
-                    // Convert escaped curly brackets e.g. `{{` to `{` in literal string parts
-                    Ok(FStringConversion::Literal) => patches.push((
-                        range,
-                        curly_unescape(checker.locator().slice(range)).to_string(),
-                    )),
+            TokenKind::String => {
+                match FStringConversion::try_convert(token.range(), &mut summary, checker.locator())
+                {
                     // If the format string contains side effects that would need to be repeated,
                     // we can't convert it to an f-string.
                     Ok(FStringConversion::SideEffects) => return,
                     // If any of the segments fail to convert, then we can't convert the entire
                     // expression.
                     Err(_) => return,
+                    // Otherwise, push the conversion to be processed later.
+                    Ok(conversion) => patches.push((token.range(), conversion)),
                 }
             }
-            Some(_) => continue,
-            None => unreachable!("Should break from the `Tok::Dot` arm"),
+            _ => {}
         }
     };
     if patches.is_empty() {
@@ -455,30 +451,28 @@ pub(crate) fn f_strings(checker: &mut Checker, call: &ast::ExprCall, summary: &F
 
     let mut contents = String::with_capacity(checker.locator().slice(call).len());
     let mut prev_end = call.start();
-    for (range, fstring) in patches {
-        contents.push_str(
-            checker
-                .locator()
-                .slice(TextRange::new(prev_end, range.start())),
-        );
-        contents.push_str(&fstring);
+    for (range, conversion) in patches {
+        let fstring = match conversion {
+            FStringConversion::Convert(fstring) => Some(fstring),
+            FStringConversion::EmptyLiteral => None,
+            FStringConversion::NonEmptyLiteral => {
+                // Convert escaped curly brackets e.g. `{{` to `{` in literal string parts
+                Some(curly_unescape(checker.locator().slice(range)).to_string())
+            }
+            // We handled this in the previous loop.
+            FStringConversion::SideEffects => unreachable!(),
+        };
+        if let Some(fstring) = fstring {
+            contents.push_str(
+                checker
+                    .locator()
+                    .slice(TextRange::new(prev_end, range.start())),
+            );
+            contents.push_str(&fstring);
+        }
         prev_end = range.end();
     }
-
-    // If the remainder is non-empty, add it to the contents.
-    let rest = checker.locator().slice(TextRange::new(prev_end, end));
-    if !lexer::lex_starts_at(rest, Mode::Expression, prev_end)
-        .flatten()
-        .all(|(token, _)| match token {
-            Tok::Comment(_) | Tok::Newline | Tok::NonLogicalNewline | Tok::Indent | Tok::Dedent => {
-                true
-            }
-            Tok::String { value, .. } => value.is_empty(),
-            _ => false,
-        })
-    {
-        contents.push_str(rest);
-    }
+    contents.push_str(checker.locator().slice(TextRange::new(prev_end, end)));
 
     // If necessary, add a space between any leading keyword (`return`, `yield`, `assert`, etc.)
     // and the string. For example, `return"foo"` is valid, but `returnf"foo"` is not.
@@ -518,16 +512,21 @@ pub(crate) fn f_strings(checker: &mut Checker, call: &ast::ExprCall, summary: &F
     //     0,  # 0
     // )
     // ```
-    let has_comments = checker
-        .indexer()
-        .comment_ranges()
-        .intersects(call.arguments.range());
+    let has_comments = checker.comment_ranges().intersects(call.arguments.range());
 
     if !has_comments {
-        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-            contents,
-            call.range(),
-        )));
+        if contents.is_empty() {
+            // Ex) `''.format(self.project)`
+            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                checker.locator().slice(literal).to_string(),
+                call.range(),
+            )));
+        } else {
+            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                contents,
+                call.range(),
+            )));
+        }
     };
     checker.diagnostics.push(diagnostic);
 }

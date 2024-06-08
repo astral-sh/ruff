@@ -1,4 +1,5 @@
 use anyhow::Result;
+use std::cmp::Reverse;
 
 use ruff_diagnostics::Edit;
 use ruff_python_ast::helpers::{map_callable, map_subscript};
@@ -286,11 +287,17 @@ pub(crate) fn quote_annotation(
 
 /// Filter out any [`Edit`]s that are completely contained by any other [`Edit`].
 pub(crate) fn filter_contained(edits: Vec<Edit>) -> Vec<Edit> {
+    let mut edits = edits;
+
+    // Sort such that the largest edits are prioritized.
+    edits.sort_unstable_by_key(|edit| (edit.start(), Reverse(edit.end())));
+
+    // Remove any edits that are completely contained by another edit.
     let mut filtered: Vec<Edit> = Vec::with_capacity(edits.len());
     for edit in edits {
-        if filtered
+        if !filtered
             .iter()
-            .all(|filtered_edit| !filtered_edit.range().contains_range(edit.range()))
+            .any(|filtered_edit| filtered_edit.range().contains_range(edit.range()))
         {
             filtered.push(edit);
         }

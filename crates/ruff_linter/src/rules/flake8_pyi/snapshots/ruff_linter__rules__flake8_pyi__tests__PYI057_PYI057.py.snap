@@ -1,0 +1,39 @@
+---
+source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
+---
+PYI057.py:4:20: PYI057 Do not use `typing.ByteString`, which has unclear semantics and is deprecated
+  |
+2 | import collections.abc
+3 | import foo
+4 | from typing import ByteString
+  |                    ^^^^^^^^^^ PYI057
+5 | from collections.abc import ByteString
+6 | from foo import ByteString
+  |
+
+PYI057.py:5:29: PYI057 Do not use `collections.abc.ByteString`, which has unclear semantics and is deprecated
+  |
+3 | import foo
+4 | from typing import ByteString
+5 | from collections.abc import ByteString
+  |                             ^^^^^^^^^^ PYI057
+6 | from foo import ByteString
+  |
+
+PYI057.py:8:4: PYI057 Do not use `typing.ByteString`, which has unclear semantics and is deprecated
+   |
+ 6 | from foo import ByteString
+ 7 | 
+ 8 | a: typing.ByteString
+   |    ^^^^^^^^^^^^^^^^^ PYI057
+ 9 | b: collections.abc.ByteString
+10 | c: foo.ByteString
+   |
+
+PYI057.py:9:4: PYI057 Do not use `collections.abc.ByteString`, which has unclear semantics and is deprecated
+   |
+ 8 | a: typing.ByteString
+ 9 | b: collections.abc.ByteString
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI057
+10 | c: foo.ByteString
+   |

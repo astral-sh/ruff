@@ -83,7 +83,7 @@ pub(crate) fn super_without_brackets(checker: &mut Checker, func: &Expr) {
         return;
     };
 
-    let Some(parent) = &checker.semantic().first_non_type_parent_scope(scope) else {
+    let Some(parent) = checker.semantic().first_non_type_parent_scope(scope) else {
         return;
     };
 

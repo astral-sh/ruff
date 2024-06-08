@@ -7,54 +7,65 @@ use std::sync::Arc;
 use dashmap::mapref::entry::Entry;
 use smol_str::SmolStr;
 
-use crate::db::{HasJar, SemanticDb, SemanticJar};
+use crate::db::{QueryResult, SemanticDb, SemanticJar};
 use crate::files::FileId;
-use crate::symbols::Dependency;
+use crate::semantic::Dependency;
 use crate::FxDashMap;
 
-/// ID uniquely identifying a module.
+/// Representation of a Python module.
+///
+/// The inner type wrapped by this struct is a unique identifier for the module
+/// that is used by the struct's methods to lazily query information about the module.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub struct Module(u32);
 
 impl Module {
-    pub fn name<Db>(&self, db: &Db) -> ModuleName
-    where
-        Db: HasJar<SemanticJar>,
-    {
-        let modules = &db.jar().module_resolver;
+    /// Return the absolute name of the module (e.g. `foo.bar`)
+    pub fn name(&self, db: &dyn SemanticDb) -> QueryResult<ModuleName> {
+        let jar: &SemanticJar = db.jar()?;
+        let modules = &jar.module_resolver;
 
-        modules.modules.get(self).unwrap().name.clone()
+        Ok(modules.modules.get(self).unwrap().name.clone())
     }
 
-    pub fn path<Db>(&self, db: &Db) -> ModulePath
-    where
-        Db: HasJar<SemanticJar>,
-    {
-        let modules = &db.jar().module_resolver;
+    /// Return the path to the source code that defines this module
+    pub fn path(&self, db: &dyn SemanticDb) -> QueryResult<ModulePath> {
+        let jar: &SemanticJar = db.jar()?;
+        let modules = &jar.module_resolver;
 
-        modules.modules.get(self).unwrap().path.clone()
+        Ok(modules.modules.get(self).unwrap().path.clone())
     }
 
-    pub fn kind<Db>(&self, db: &Db) -> ModuleKind
-    where
-        Db: HasJar<SemanticJar>,
-    {
-        let modules = &db.jar().module_resolver;
+    /// Determine whether this module is a single-file module or a package
+    pub fn kind(&self, db: &dyn SemanticDb) -> QueryResult<ModuleKind> {
+        let jar: &SemanticJar = db.jar()?;
+        let modules = &jar.module_resolver;
 
-        modules.modules.get(self).unwrap().kind
+        Ok(modules.modules.get(self).unwrap().kind)
     }
 
-    pub fn resolve_dependency<Db>(&self, db: &Db, dependency: &Dependency) -> Option<ModuleName>
-    where
-        Db: HasJar<SemanticJar>,
-    {
+    /// Attempt to resolve a dependency of this module to an absolute [`ModuleName`].
+    ///
+    /// A dependency could be either absolute (e.g. the `foo` dependency implied by `from foo import bar`)
+    /// or relative to this module (e.g. the `.foo` dependency implied by `from .foo import bar`)
+    ///
+    /// - Returns an error if the query failed.
+    /// - Returns `Ok(None)` if the query succeeded,
+    ///   but the dependency refers to a module that does not exist.
+    /// - Returns `Ok(Some(ModuleName))` if the query succeeded,
+    ///   and the dependency refers to a module that exists.
+    pub fn resolve_dependency(
+        &self,
+        db: &dyn SemanticDb,
+        dependency: &Dependency,
+    ) -> QueryResult<Option<ModuleName>> {
         let (level, module) = match dependency {
-            Dependency::Module(module) => return Some(module.clone()),
+            Dependency::Module(module) => return Ok(Some(module.clone())),
             Dependency::Relative { level, module } => (*level, module.as_deref()),
         };
 
-        let name = self.name(db);
-        let kind = self.kind(db);
+        let name = self.name(db)?;
+        let kind = self.kind(db)?;
 
         let mut components = name.components().peekable();
 
@@ -67,7 +78,9 @@ impl Module {
 
         // Skip over the relative parts.
         for _ in start..level.get() {
-            components.next_back()?;
+            if components.next_back().is_none() {
+                return Ok(None);
+            }
         }
 
         let mut name = String::new();
@@ -80,17 +93,18 @@ impl Module {
             name.push_str(part);
         }
 
-        if name.is_empty() {
+        Ok(if name.is_empty() {
             None
         } else {
             Some(ModuleName(SmolStr::new(name)))
-        }
+        })
     }
 }
 
 /// A module name, e.g. `foo.bar`.
 ///
-/// Always normalized to the absolute form (never a relative module name).
+/// Always normalized to the absolute form
+/// (never a relative module name, i.e., never `.foo`).
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct ModuleName(smol_str::SmolStr);
 
@@ -127,10 +141,13 @@ impl ModuleName {
         Some(Self(name))
     }
 
+    /// An iterator over the components of the module name:
+    /// `foo.bar.baz` -> `foo`, `bar`, `baz`
     pub fn components(&self) -> impl DoubleEndedIterator<Item = &str> {
         self.0.split('.')
     }
 
+    /// The name of this module's immediate parent, if it has a parent
     pub fn parent(&self) -> Option<ModuleName> {
         let (_, parent) = self.0.rsplit_once('.')?;
 
@@ -162,9 +179,10 @@ impl std::fmt::Display for ModuleName {
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub enum ModuleKind {
+    /// A single-file module (e.g. `foo.py` or `foo.pyi`)
     Module,
 
-    /// A python package (a `__init__.py` or `__init__.pyi` file)
+    /// A python package (`foo/__init__.py` or `foo/__init__.pyi`)
     Package,
 }
 
@@ -184,10 +202,12 @@ impl ModuleSearchPath {
         }
     }
 
+    /// Determine whether this is a first-party, third-party or standard-library search path
     pub fn kind(&self) -> ModuleSearchPathKind {
         self.inner.kind
     }
 
+    /// Return the location of the search path on the file system
     pub fn path(&self) -> &Path {
         &self.inner.path
     }
@@ -205,22 +225,31 @@ struct ModuleSearchPathInner {
     kind: ModuleSearchPathKind,
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+/// Enumeration of the different kinds of search paths type checkers are expected to support.
+///
+/// N.B. Although we don't implement `Ord` for this enum, they are ordered in terms of the
+/// priority that we want to give these modules when resolving them.
+/// This is roughly [the order given in the typing spec], but typeshed's stubs
+/// for the standard library are moved higher up to match Python's semantics at runtime.
+///
+/// [the order given in the typing spec]: https://typing.readthedocs.io/en/latest/spec/distributing.html#import-resolution-ordering
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, is_macro::Is)]
 pub enum ModuleSearchPathKind {
-    // Project dependency
+    /// "Extra" paths provided by the user in a config file, env var or CLI flag.
+    /// E.g. mypy's `MYPYPATH` env var, or pyright's `stubPath` configuration setting
+    Extra,
+
+    /// Files in the project we're directly being invoked on
     FirstParty,
 
-    // e.g. site packages
-    ThirdParty,
-
-    // e.g. built-in modules, typeshed
+    /// The `stdlib` directory of typeshed (either vendored or custom)
     StandardLibrary,
-}
 
-impl ModuleSearchPathKind {
-    pub const fn is_first_party(self) -> bool {
-        matches!(self, Self::FirstParty)
-    }
+    /// Stubs or runtime modules installed in site-packages
+    SitePackagesThirdParty,
+
+    /// Vendored third-party stubs from typeshed
+    VendoredThirdParty,
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -234,29 +263,33 @@ pub struct ModuleData {
 // Queries
 //////////////////////////////////////////////////////
 
-/// Resolves a module name to a module id
-/// TODO: This would not work with Salsa because `ModuleName` isn't an ingredient and, therefore, cannot be used as part of a query.
-///  For this to work with salsa, it would be necessary to intern all `ModuleName`s.
+/// Resolves a module name to a module.
+///
+/// TODO: This would not work with Salsa because `ModuleName` isn't an ingredient
+/// and, therefore, cannot be used as part of a query.
+/// For this to work with salsa, it would be necessary to intern all `ModuleName`s.
 #[tracing::instrument(level = "debug", skip(db))]
-pub fn resolve_module<Db>(db: &Db, name: ModuleName) -> Option<Module>
-where
-    Db: SemanticDb + HasJar<SemanticJar>,
-{
-    let jar = db.jar();
+pub fn resolve_module(db: &dyn SemanticDb, name: ModuleName) -> QueryResult<Option<Module>> {
+    let jar: &SemanticJar = db.jar()?;
     let modules = &jar.module_resolver;
 
     let entry = modules.by_name.entry(name.clone());
 
     match entry {
-        Entry::Occupied(entry) => Some(*entry.get()),
+        Entry::Occupied(entry) => Ok(Some(*entry.get())),
         Entry::Vacant(entry) => {
-            let (root_path, absolute_path, kind) = resolve_name(&name, &modules.search_paths)?;
-            let normalized = absolute_path.canonicalize().ok()?;
+            let Some((root_path, absolute_path, kind)) = resolve_name(&name, &modules.search_paths)
+            else {
+                return Ok(None);
+            };
+            let Ok(normalized) = absolute_path.canonicalize() else {
+                return Ok(None);
+            };
 
             let file_id = db.file_id(&normalized);
             let path = ModulePath::new(root_path.clone(), file_id);
 
-            let id = Module(
+            let module = Module(
                 modules
                     .next_module_id
                     .fetch_add(1, std::sync::atomic::Ordering::Relaxed),
@@ -264,7 +297,7 @@ where
 
             modules
                 .modules
-                .insert(id, Arc::from(ModuleData { name, path, kind }));
+                .insert(module, Arc::from(ModuleData { name, path, kind }));
 
             // A path can map to multiple modules because of symlinks:
             // ```
@@ -273,59 +306,70 @@ where
             // ```
             // Here, both `foo` and `bar` resolve to the same module but through different paths.
             // That's why we need to insert the absolute path and not the normalized path here.
-            modules.by_path.insert(absolute_path, id);
+            let absolute_file_id = if absolute_path == normalized {
+                file_id
+            } else {
+                db.file_id(&absolute_path)
+            };
 
-            entry.insert_entry(id);
+            modules.by_file.insert(absolute_file_id, module);
 
-            Some(id)
+            entry.insert_entry(module);
+
+            Ok(Some(module))
         }
     }
 }
 
-/// Resolves the module id for the file with the given id.
+/// Resolves the module for the given path.
 ///
-/// Returns `None` if the file is not a module in `sys.path`.
+/// Returns `None` if the path is not a module locatable via `sys.path`.
 #[tracing::instrument(level = "debug", skip(db))]
-pub fn file_to_module<Db>(db: &Db, file: FileId) -> Option<Module>
-where
-    Db: SemanticDb + HasJar<SemanticJar>,
-{
-    let path = db.file_path(file);
-    path_to_module(db, &path)
+pub fn path_to_module(db: &dyn SemanticDb, path: &Path) -> QueryResult<Option<Module>> {
+    let file = db.file_id(path);
+    file_to_module(db, file)
 }
 
-/// Resolves the module id for the given path.
+/// Resolves the module for the file with the given id.
 ///
-/// Returns `None` if the path is not a module in `sys.path`.
+/// Returns `None` if the file is not a module locatable via `sys.path`.
 #[tracing::instrument(level = "debug", skip(db))]
-pub fn path_to_module<Db>(db: &Db, path: &Path) -> Option<Module>
-where
-    Db: SemanticDb + HasJar<SemanticJar>,
-{
-    let jar = db.jar();
+pub fn file_to_module(db: &dyn SemanticDb, file: FileId) -> QueryResult<Option<Module>> {
+    let jar: &SemanticJar = db.jar()?;
     let modules = &jar.module_resolver;
-    debug_assert!(path.is_absolute());
 
-    if let Some(existing) = modules.by_path.get(path) {
-        return Some(*existing);
+    if let Some(existing) = modules.by_file.get(&file) {
+        return Ok(Some(*existing));
     }
 
-    let (root_path, relative_path) = modules.search_paths.iter().find_map(|root| {
+    let path = db.file_path(file);
+
+    debug_assert!(path.is_absolute());
+
+    let Some((root_path, relative_path)) = modules.search_paths.iter().find_map(|root| {
         let relative_path = path.strip_prefix(root.path()).ok()?;
         Some((root.clone(), relative_path))
-    })?;
+    }) else {
+        return Ok(None);
+    };
 
-    let module_name = ModuleName::from_relative_path(relative_path)?;
+    let Some(module_name) = ModuleName::from_relative_path(relative_path) else {
+        return Ok(None);
+    };
 
     // Resolve the module name to see if Python would resolve the name to the same path.
     // If it doesn't, then that means that multiple modules have the same in different
-    // root paths, but that the module corresponding to the past path is in a lower priority path,
+    // root paths, but that the module corresponding to the past path is in a lower priority search path,
     // in which case we ignore it.
-    let module_id = resolve_module(db, module_name)?;
-    let module_path = module_id.path(db);
+    let Some(module) = resolve_module(db, module_name)? else {
+        return Ok(None);
+    };
+    let module_path = module.path(db)?;
 
     if module_path.root() == &root_path {
-        let normalized = path.canonicalize().ok()?;
+        let Ok(normalized) = path.canonicalize() else {
+            return Ok(None);
+        };
         let interned_normalized = db.file_id(&normalized);
 
         if interned_normalized != module_path.file() {
@@ -336,15 +380,15 @@ where
             // ```
             // The module name of `src/foo.py` is `foo`, but the module loaded by Python is `src/foo/__init__.py`.
             // That means we need to ignore `src/foo.py` even though it resolves to the same module name.
-            return None;
+            return Ok(None);
         }
 
         // Path has been inserted by `resolved`
-        Some(module_id)
+        Ok(Some(module))
     } else {
         // This path is for a module with the same name but in a module search path with a lower priority.
         // Ignore it.
-        None
+        Ok(None)
     }
 }
 
@@ -353,32 +397,101 @@ where
 //////////////////////////////////////////////////////
 
 /// Changes the module search paths to `search_paths`.
-pub fn set_module_search_paths<Db>(db: &mut Db, search_paths: Vec<ModuleSearchPath>)
-where
-    Db: SemanticDb + HasJar<SemanticJar>,
-{
-    let jar = db.jar_mut();
+pub fn set_module_search_paths(db: &mut dyn SemanticDb, search_paths: ModuleResolutionInputs) {
+    let jar: &mut SemanticJar = db.jar_mut();
 
-    jar.module_resolver = ModuleResolver::new(search_paths);
+    jar.module_resolver = ModuleResolver::new(search_paths.into_ordered_search_paths());
 }
 
-/// Adds a module to the resolver.
+/// Struct for holding the various paths that are put together
+/// to create an `OrderedSearchPatsh` instance
+///
+/// - `extra_paths` is a list of user-provided paths
+///   that should take first priority in the module resolution.
+///   Examples in other type checkers are mypy's MYPYPATH environment variable,
+///   or pyright's stubPath configuration setting.
+/// - `workspace_root` is the root of the workspace,
+///   used for finding first-party modules
+/// - `site-packages` is the path to the user's `site-packages` directory,
+///   where third-party packages from ``PyPI`` are installed
+/// - `custom_typeshed` is a path to standard-library typeshed stubs.
+///   Currently this has to be a directory that exists on disk.
+///   (TODO: fall back to vendored stubs if no custom directory is provided.)
+#[derive(Debug)]
+pub struct ModuleResolutionInputs {
+    pub extra_paths: Vec<PathBuf>,
+    pub workspace_root: PathBuf,
+    pub site_packages: Option<PathBuf>,
+    pub custom_typeshed: Option<PathBuf>,
+}
+
+impl ModuleResolutionInputs {
+    /// Implementation of PEP 561's module resolution order
+    /// (with some small, deliberate, differences)
+    fn into_ordered_search_paths(self) -> OrderedSearchPaths {
+        let ModuleResolutionInputs {
+            extra_paths,
+            workspace_root,
+            site_packages,
+            custom_typeshed,
+        } = self;
+
+        OrderedSearchPaths(
+            extra_paths
+                .into_iter()
+                .map(|path| ModuleSearchPath::new(path, ModuleSearchPathKind::Extra))
+                .chain(std::iter::once(ModuleSearchPath::new(
+                    workspace_root,
+                    ModuleSearchPathKind::FirstParty,
+                )))
+                // TODO fallback to vendored typeshed stubs if no custom typeshed directory is provided by the user
+                .chain(custom_typeshed.into_iter().map(|path| {
+                    ModuleSearchPath::new(
+                        path.join(TYPESHED_STDLIB_DIRECTORY),
+                        ModuleSearchPathKind::StandardLibrary,
+                    )
+                }))
+                .chain(site_packages.into_iter().map(|path| {
+                    ModuleSearchPath::new(path, ModuleSearchPathKind::SitePackagesThirdParty)
+                }))
+                // TODO vendor typeshed's third-party stubs as well as the stdlib and fallback to them as a final step
+                .collect(),
+        )
+    }
+}
+
+const TYPESHED_STDLIB_DIRECTORY: &str = "stdlib";
+
+/// A resolved module resolution order, implementing PEP 561
+/// (with some small, deliberate differences)
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+struct OrderedSearchPaths(Vec<ModuleSearchPath>);
+
+impl Deref for OrderedSearchPaths {
+    type Target = [ModuleSearchPath];
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+/// Adds a module located at `path` to the resolver.
 ///
 /// Returns `None` if the path doesn't resolve to a module.
 ///
-/// Returns `Some` with the id of the module and the ids of the modules that need re-resolving
-/// because they were part of a namespace package and might now resolve differently.
+/// Returns `Some(module, other_modules)`, where `module` is the resolved module
+/// with file location `path`, and `other_modules` is a `Vec` of `ModuleData` instances.
+/// Each element in `other_modules` provides information regarding a single module that needs
+/// re-resolving because it was part of a namespace package and might now resolve differently.
+///
 /// Note: This won't work with salsa because `Path` is not an ingredient.
-pub fn add_module<Db>(db: &mut Db, path: &Path) -> Option<(Module, Vec<Arc<ModuleData>>)>
-where
-    Db: SemanticDb + HasJar<SemanticJar>,
-{
+pub fn add_module(db: &mut dyn SemanticDb, path: &Path) -> Option<(Module, Vec<Arc<ModuleData>>)> {
     // No locking is required because we're holding a mutable reference to `modules`.
 
     // TODO This needs tests
 
-    // Note: Intentionally by-pass caching here. Module should not be in the cache yet.
-    let module = path_to_module(db, path)?;
+    // Note: Intentionally bypass caching here. Module should not be in the cache yet.
+    let module = path_to_module(db, path).ok()??;
 
     // The code below is to handle the addition of `__init__.py` files.
     // When an `__init__.py` file is added, we need to remove all modules that are part of the same package.
@@ -392,24 +505,24 @@ where
         return Some((module, Vec::new()));
     }
 
-    let Some(parent_name) = module.name(db).parent() else {
+    let Some(parent_name) = module.name(db).ok()?.parent() else {
         return Some((module, Vec::new()));
     };
 
     let mut to_remove = Vec::new();
 
-    let jar = db.jar_mut();
+    let jar: &mut SemanticJar = db.jar_mut();
     let modules = &mut jar.module_resolver;
 
-    modules.by_path.retain(|_, id| {
+    modules.by_file.retain(|_, module| {
         if modules
             .modules
-            .get(id)
+            .get(module)
             .unwrap()
             .name
             .starts_with(&parent_name)
         {
-            to_remove.push(*id);
+            to_remove.push(*module);
             false
         } else {
             true
@@ -418,8 +531,8 @@ where
 
     // TODO remove need for this vec
     let mut removed = Vec::with_capacity(to_remove.len());
-    for id in &to_remove {
-        removed.push(modules.remove_module_by_id(*id));
+    for module in &to_remove {
+        removed.push(modules.remove_module(*module));
     }
 
     Some((module, removed))
@@ -428,51 +541,54 @@ where
 #[derive(Default)]
 pub struct ModuleResolver {
     /// The search paths where modules are located (and searched). Corresponds to `sys.path` at runtime.
-    search_paths: Vec<ModuleSearchPath>,
+    search_paths: OrderedSearchPaths,
 
     // Locking: Locking is done by acquiring a (write) lock on `by_name`. This is because `by_name` is the primary
     // lookup method. Acquiring locks in any other ordering can result in deadlocks.
-    /// Resolves a module name to it's module id.
+    /// Looks up a module by name
     by_name: FxDashMap<ModuleName, Module>,
 
-    /// All known modules, indexed by the module id.
+    /// A map of all known modules to data about those modules
     modules: FxDashMap<Module, Arc<ModuleData>>,
 
     /// Lookup from absolute path to module.
     /// The same module might be reachable from different paths when symlinks are involved.
-    by_path: FxDashMap<PathBuf, Module>,
+    by_file: FxDashMap<FileId, Module>,
     next_module_id: AtomicU32,
 }
 
 impl ModuleResolver {
-    pub fn new(search_paths: Vec<ModuleSearchPath>) -> Self {
+    fn new(search_paths: OrderedSearchPaths) -> Self {
         Self {
             search_paths,
             modules: FxDashMap::default(),
             by_name: FxDashMap::default(),
-            by_path: FxDashMap::default(),
+            by_file: FxDashMap::default(),
             next_module_id: AtomicU32::new(0),
         }
     }
 
-    pub fn remove_module(&mut self, path: &Path) {
+    /// Remove a module from the inner cache
+    pub(crate) fn remove_module_by_file(&mut self, file_id: FileId) {
         // No locking is required because we're holding a mutable reference to `self`.
-        let Some((_, id)) = self.by_path.remove(path) else {
+        let Some((_, module)) = self.by_file.remove(&file_id) else {
             return;
         };
 
-        self.remove_module_by_id(id);
+        self.remove_module(module);
     }
 
-    fn remove_module_by_id(&mut self, id: Module) -> Arc<ModuleData> {
-        let (_, module) = self.modules.remove(&id).unwrap();
+    fn remove_module(&mut self, module: Module) -> Arc<ModuleData> {
+        let (_, module_data) = self.modules.remove(&module).unwrap();
 
-        self.by_name.remove(&module.name).unwrap();
+        self.by_name.remove(&module_data.name).unwrap();
 
-        // It's possible that multiple paths map to the same id. Search all other paths referencing the same module id.
-        self.by_path.retain(|_, current_id| *current_id != id);
+        // It's possible that multiple paths map to the same module.
+        // Search all other paths referencing the same module.
+        self.by_file
+            .retain(|_, current_module| *current_module != module);
 
-        module
+        module_data
     }
 }
 
@@ -501,15 +617,19 @@ impl ModulePath {
         Self { root, file_id }
     }
 
+    /// The search path that was used to locate the module
     pub fn root(&self) -> &ModuleSearchPath {
         &self.root
     }
 
+    /// The file containing the source code for the module
     pub fn file(&self) -> FileId {
         self.file_id
     }
 }
 
+/// Given a module name and a list of search paths in which to lookup modules,
+/// attempt to resolve the module name
 fn resolve_name(
     name: &ModuleName,
     search_paths: &[ModuleSearchPath],
@@ -631,7 +751,9 @@ enum PackageKind {
     /// A root package or module. E.g. `foo` in `foo.bar.baz` or just `foo`.
     Root,
 
-    /// A regular sub-package where the parent contains an `__init__.py`. For example `bar` in `foo.bar` when the `foo` directory contains an `__init__.py`.
+    /// A regular sub-package where the parent contains an `__init__.py`.
+    ///
+    /// For example, `bar` in `foo.bar` when the `foo` directory contains an `__init__.py`.
     Regular,
 
     /// A sub-package in a namespace package. A namespace package is a package without an `__init__.py`.
@@ -648,18 +770,27 @@ impl PackageKind {
 
 #[cfg(test)]
 mod tests {
-    use crate::db::tests::TestDb;
-    use crate::db::{SemanticDb, SourceDb};
-    use crate::module::{ModuleKind, ModuleName, ModuleSearchPath, ModuleSearchPathKind};
-    use crate::symbols::Dependency;
+    use std::io::{Cursor, Read};
     use std::num::NonZeroU32;
+    use std::path::{Path, PathBuf};
+
+    use zip::ZipArchive;
+
+    use crate::db::tests::TestDb;
+    use crate::db::SourceDb;
+    use crate::module::{
+        path_to_module, resolve_module, set_module_search_paths, ModuleKind, ModuleName,
+        ModuleResolutionInputs, TYPESHED_STDLIB_DIRECTORY,
+    };
+    use crate::semantic::Dependency;
 
     struct TestCase {
         temp_dir: tempfile::TempDir,
         db: TestDb,
 
-        src: ModuleSearchPath,
-        site_packages: ModuleSearchPath,
+        src: PathBuf,
+        custom_typeshed: PathBuf,
+        site_packages: PathBuf,
     }
 
     fn create_resolver() -> std::io::Result<TestCase> {
@@ -667,31 +798,37 @@ mod tests {
 
         let src = temp_dir.path().join("src");
         let site_packages = temp_dir.path().join("site_packages");
+        let custom_typeshed = temp_dir.path().join("typeshed");
 
         std::fs::create_dir(&src)?;
         std::fs::create_dir(&site_packages)?;
+        std::fs::create_dir(&custom_typeshed)?;
 
-        let src = ModuleSearchPath::new(src.canonicalize()?, ModuleSearchPathKind::FirstParty);
-        let site_packages = ModuleSearchPath::new(
-            site_packages.canonicalize()?,
-            ModuleSearchPathKind::ThirdParty,
-        );
+        let src = src.canonicalize()?;
+        let site_packages = site_packages.canonicalize()?;
+        let custom_typeshed = custom_typeshed.canonicalize()?;
 
-        let roots = vec![src.clone(), site_packages.clone()];
+        let search_paths = ModuleResolutionInputs {
+            extra_paths: vec![],
+            workspace_root: src.clone(),
+            site_packages: Some(site_packages.clone()),
+            custom_typeshed: Some(custom_typeshed.clone()),
+        };
 
         let mut db = TestDb::default();
-        db.set_module_search_paths(roots);
+        set_module_search_paths(&mut db, search_paths);
 
         Ok(TestCase {
             temp_dir,
             db,
             src,
+            custom_typeshed,
             site_packages,
         })
     }
 
     #[test]
-    fn first_party_module() -> std::io::Result<()> {
+    fn first_party_module() -> anyhow::Result<()> {
         let TestCase {
             db,
             src,
@@ -699,25 +836,120 @@ mod tests {
             ..
         } = create_resolver()?;
 
-        let foo_path = src.path().join("foo.py");
+        let foo_path = src.join("foo.py");
         std::fs::write(&foo_path, "print('Hello, world!')")?;
 
-        let foo_module = db.resolve_module(ModuleName::new("foo")).unwrap();
+        let foo_module = resolve_module(&db, ModuleName::new("foo"))?.unwrap();
 
-        assert_eq!(Some(foo_module), db.resolve_module(ModuleName::new("foo")));
+        assert_eq!(
+            Some(foo_module),
+            resolve_module(&db, ModuleName::new("foo"))?
+        );
 
-        assert_eq!(ModuleName::new("foo"), foo_module.name(&db));
-        assert_eq!(&src, foo_module.path(&db).root());
-        assert_eq!(ModuleKind::Module, foo_module.kind(&db));
-        assert_eq!(&foo_path, &*db.file_path(foo_module.path(&db).file()));
+        assert_eq!(ModuleName::new("foo"), foo_module.name(&db)?);
+        assert_eq!(&src, foo_module.path(&db)?.root().path());
+        assert_eq!(ModuleKind::Module, foo_module.kind(&db)?);
+        assert_eq!(&foo_path, &*db.file_path(foo_module.path(&db)?.file()));
 
-        assert_eq!(Some(foo_module), db.path_to_module(&foo_path));
+        assert_eq!(Some(foo_module), path_to_module(&db, &foo_path)?);
 
         Ok(())
     }
 
     #[test]
-    fn resolve_package() -> std::io::Result<()> {
+    fn stdlib() -> anyhow::Result<()> {
+        let TestCase {
+            db,
+            custom_typeshed,
+            ..
+        } = create_resolver()?;
+        let stdlib_dir = custom_typeshed.join(TYPESHED_STDLIB_DIRECTORY);
+        std::fs::create_dir_all(&stdlib_dir).unwrap();
+        let functools_path = stdlib_dir.join("functools.py");
+        std::fs::write(&functools_path, "def update_wrapper(): ...").unwrap();
+        let functools_module = resolve_module(&db, ModuleName::new("functools"))?.unwrap();
+
+        assert_eq!(
+            Some(functools_module),
+            resolve_module(&db, ModuleName::new("functools"))?
+        );
+        assert_eq!(&stdlib_dir, functools_module.path(&db)?.root().path());
+        assert_eq!(ModuleKind::Module, functools_module.kind(&db)?);
+        assert_eq!(
+            &functools_path,
+            &*db.file_path(functools_module.path(&db)?.file())
+        );
+
+        assert_eq!(
+            Some(functools_module),
+            path_to_module(&db, &functools_path)?
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn first_party_precedence_over_stdlib() -> anyhow::Result<()> {
+        let TestCase {
+            db,
+            src,
+            custom_typeshed,
+            ..
+        } = create_resolver()?;
+
+        let stdlib_dir = custom_typeshed.join(TYPESHED_STDLIB_DIRECTORY);
+        std::fs::create_dir_all(&stdlib_dir).unwrap();
+        std::fs::create_dir_all(&src).unwrap();
+
+        let stdlib_functools_path = stdlib_dir.join("functools.py");
+        let first_party_functools_path = src.join("functools.py");
+        std::fs::write(stdlib_functools_path, "def update_wrapper(): ...").unwrap();
+        std::fs::write(&first_party_functools_path, "def update_wrapper(): ...").unwrap();
+        let functools_module = resolve_module(&db, ModuleName::new("functools"))?.unwrap();
+
+        assert_eq!(
+            Some(functools_module),
+            resolve_module(&db, ModuleName::new("functools"))?
+        );
+        assert_eq!(&src, functools_module.path(&db).unwrap().root().path());
+        assert_eq!(ModuleKind::Module, functools_module.kind(&db)?);
+        assert_eq!(
+            &first_party_functools_path,
+            &*db.file_path(functools_module.path(&db)?.file())
+        );
+
+        assert_eq!(
+            Some(functools_module),
+            path_to_module(&db, &first_party_functools_path)?
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn typeshed_zip_created_at_build_time() -> anyhow::Result<()> {
+        // The file path here is hardcoded in this crate's `build.rs` script.
+        // Luckily this crate will fail to build if this file isn't available at build time.
+        const TYPESHED_ZIP_BYTES: &[u8] =
+            include_bytes!(concat!(env!("OUT_DIR"), "/zipped_typeshed.zip"));
+        assert!(!TYPESHED_ZIP_BYTES.is_empty());
+        let mut typeshed_zip_archive = ZipArchive::new(Cursor::new(TYPESHED_ZIP_BYTES))?;
+
+        let path_to_functools = Path::new("stdlib").join("functools.pyi");
+        let mut functools_module_stub = typeshed_zip_archive
+            .by_name(path_to_functools.to_str().unwrap())
+            .unwrap();
+        assert!(functools_module_stub.is_file());
+
+        let mut functools_module_stub_source = String::new();
+        functools_module_stub.read_to_string(&mut functools_module_stub_source)?;
+
+        assert!(functools_module_stub_source.contains("def update_wrapper("));
+        Ok(())
+    }
+
+    #[test]
+    fn resolve_package() -> anyhow::Result<()> {
         let TestCase {
             src,
             db,
@@ -725,27 +957,27 @@ mod tests {
             ..
         } = create_resolver()?;
 
-        let foo_dir = src.path().join("foo");
+        let foo_dir = src.join("foo");
         let foo_path = foo_dir.join("__init__.py");
         std::fs::create_dir(&foo_dir)?;
         std::fs::write(&foo_path, "print('Hello, world!')")?;
 
-        let foo_module = db.resolve_module(ModuleName::new("foo")).unwrap();
+        let foo_module = resolve_module(&db, ModuleName::new("foo"))?.unwrap();
 
-        assert_eq!(ModuleName::new("foo"), foo_module.name(&db));
-        assert_eq!(&src, foo_module.path(&db).root());
-        assert_eq!(&foo_path, &*db.file_path(foo_module.path(&db).file()));
+        assert_eq!(ModuleName::new("foo"), foo_module.name(&db)?);
+        assert_eq!(&src, foo_module.path(&db)?.root().path());
+        assert_eq!(&foo_path, &*db.file_path(foo_module.path(&db)?.file()));
 
-        assert_eq!(Some(foo_module), db.path_to_module(&foo_path));
+        assert_eq!(Some(foo_module), path_to_module(&db, &foo_path)?);
 
         // Resolving by directory doesn't resolve to the init file.
-        assert_eq!(None, db.path_to_module(&foo_dir));
+        assert_eq!(None, path_to_module(&db, &foo_dir)?);
 
         Ok(())
     }
 
     #[test]
-    fn package_priority_over_module() -> std::io::Result<()> {
+    fn package_priority_over_module() -> anyhow::Result<()> {
         let TestCase {
             db,
             temp_dir: _temp_dir,
@@ -753,28 +985,28 @@ mod tests {
             ..
         } = create_resolver()?;
 
-        let foo_dir = src.path().join("foo");
+        let foo_dir = src.join("foo");
         let foo_init = foo_dir.join("__init__.py");
         std::fs::create_dir(&foo_dir)?;
         std::fs::write(&foo_init, "print('Hello, world!')")?;
 
-        let foo_py = src.path().join("foo.py");
+        let foo_py = src.join("foo.py");
         std::fs::write(&foo_py, "print('Hello, world!')")?;
 
-        let foo_module = db.resolve_module(ModuleName::new("foo")).unwrap();
+        let foo_module = resolve_module(&db, ModuleName::new("foo"))?.unwrap();
 
-        assert_eq!(&src, foo_module.path(&db).root());
-        assert_eq!(&foo_init, &*db.file_path(foo_module.path(&db).file()));
-        assert_eq!(ModuleKind::Package, foo_module.kind(&db));
+        assert_eq!(&src, foo_module.path(&db)?.root().path());
+        assert_eq!(&foo_init, &*db.file_path(foo_module.path(&db)?.file()));
+        assert_eq!(ModuleKind::Package, foo_module.kind(&db)?);
 
-        assert_eq!(Some(foo_module), db.path_to_module(&foo_init));
-        assert_eq!(None, db.path_to_module(&foo_py));
+        assert_eq!(Some(foo_module), path_to_module(&db, &foo_init)?);
+        assert_eq!(None, path_to_module(&db, &foo_py)?);
 
         Ok(())
     }
 
     #[test]
-    fn typing_stub_over_module() -> std::io::Result<()> {
+    fn typing_stub_over_module() -> anyhow::Result<()> {
         let TestCase {
             db,
             src,
@@ -782,24 +1014,24 @@ mod tests {
             ..
         } = create_resolver()?;
 
-        let foo_stub = src.path().join("foo.pyi");
-        let foo_py = src.path().join("foo.py");
+        let foo_stub = src.join("foo.pyi");
+        let foo_py = src.join("foo.py");
         std::fs::write(&foo_stub, "x: int")?;
         std::fs::write(&foo_py, "print('Hello, world!')")?;
 
-        let foo = db.resolve_module(ModuleName::new("foo")).unwrap();
+        let foo = resolve_module(&db, ModuleName::new("foo"))?.unwrap();
 
-        assert_eq!(&src, foo.path(&db).root());
-        assert_eq!(&foo_stub, &*db.file_path(foo.path(&db).file()));
+        assert_eq!(&src, foo.path(&db)?.root().path());
+        assert_eq!(&foo_stub, &*db.file_path(foo.path(&db)?.file()));
 
-        assert_eq!(Some(foo), db.path_to_module(&foo_stub));
-        assert_eq!(None, db.path_to_module(&foo_py));
+        assert_eq!(Some(foo), path_to_module(&db, &foo_stub)?);
+        assert_eq!(None, path_to_module(&db, &foo_py)?);
 
         Ok(())
     }
 
     #[test]
-    fn sub_packages() -> std::io::Result<()> {
+    fn sub_packages() -> anyhow::Result<()> {
         let TestCase {
             db,
             src,
@@ -807,7 +1039,7 @@ mod tests {
             ..
         } = create_resolver()?;
 
-        let foo = src.path().join("foo");
+        let foo = src.join("foo");
         let bar = foo.join("bar");
         let baz = bar.join("baz.py");
 
@@ -816,23 +1048,24 @@ mod tests {
         std::fs::write(bar.join("__init__.py"), "")?;
         std::fs::write(&baz, "print('Hello, world!')")?;
 
-        let baz_module = db.resolve_module(ModuleName::new("foo.bar.baz")).unwrap();
+        let baz_module = resolve_module(&db, ModuleName::new("foo.bar.baz"))?.unwrap();
 
-        assert_eq!(&src, baz_module.path(&db).root());
-        assert_eq!(&baz, &*db.file_path(baz_module.path(&db).file()));
+        assert_eq!(&src, baz_module.path(&db)?.root().path());
+        assert_eq!(&baz, &*db.file_path(baz_module.path(&db)?.file()));
 
-        assert_eq!(Some(baz_module), db.path_to_module(&baz));
+        assert_eq!(Some(baz_module), path_to_module(&db, &baz)?);
 
         Ok(())
     }
 
     #[test]
-    fn namespace_package() -> std::io::Result<()> {
+    fn namespace_package() -> anyhow::Result<()> {
         let TestCase {
             db,
             temp_dir: _,
             src,
             site_packages,
+            ..
         } = create_resolver()?;
 
         // From [PEP420](https://peps.python.org/pep-0420/#nested-namespace-packages).
@@ -848,41 +1081,38 @@ mod tests {
         //       two.py
         // ```
 
-        let parent1 = src.path().join("parent");
+        let parent1 = src.join("parent");
         let child1 = parent1.join("child");
         let one = child1.join("one.py");
 
         std::fs::create_dir_all(child1)?;
         std::fs::write(&one, "print('Hello, world!')")?;
 
-        let parent2 = site_packages.path().join("parent");
+        let parent2 = site_packages.join("parent");
         let child2 = parent2.join("child");
         let two = child2.join("two.py");
 
         std::fs::create_dir_all(&child2)?;
         std::fs::write(&two, "print('Hello, world!')")?;
 
-        let one_module = db
-            .resolve_module(ModuleName::new("parent.child.one"))
-            .unwrap();
+        let one_module = resolve_module(&db, ModuleName::new("parent.child.one"))?.unwrap();
 
-        assert_eq!(Some(one_module), db.path_to_module(&one));
+        assert_eq!(Some(one_module), path_to_module(&db, &one)?);
 
-        let two_module = db
-            .resolve_module(ModuleName::new("parent.child.two"))
-            .unwrap();
-        assert_eq!(Some(two_module), db.path_to_module(&two));
+        let two_module = resolve_module(&db, ModuleName::new("parent.child.two"))?.unwrap();
+        assert_eq!(Some(two_module), path_to_module(&db, &two)?);
 
         Ok(())
     }
 
     #[test]
-    fn regular_package_in_namespace_package() -> std::io::Result<()> {
+    fn regular_package_in_namespace_package() -> anyhow::Result<()> {
         let TestCase {
             db,
             temp_dir: _,
             src,
             site_packages,
+            ..
         } = create_resolver()?;
 
         // Adopted test case from the [PEP420 examples](https://peps.python.org/pep-0420/#nested-namespace-packages).
@@ -898,7 +1128,7 @@ mod tests {
         //       two.py
         // ```
 
-        let parent1 = src.path().join("parent");
+        let parent1 = src.join("parent");
         let child1 = parent1.join("child");
         let one = child1.join("one.py");
 
@@ -906,52 +1136,54 @@ mod tests {
         std::fs::write(child1.join("__init__.py"), "print('Hello, world!')")?;
         std::fs::write(&one, "print('Hello, world!')")?;
 
-        let parent2 = site_packages.path().join("parent");
+        let parent2 = site_packages.join("parent");
         let child2 = parent2.join("child");
         let two = child2.join("two.py");
 
         std::fs::create_dir_all(&child2)?;
         std::fs::write(two, "print('Hello, world!')")?;
 
-        let one_module = db
-            .resolve_module(ModuleName::new("parent.child.one"))
-            .unwrap();
+        let one_module = resolve_module(&db, ModuleName::new("parent.child.one"))?.unwrap();
 
-        assert_eq!(Some(one_module), db.path_to_module(&one));
+        assert_eq!(Some(one_module), path_to_module(&db, &one)?);
 
-        assert_eq!(None, db.resolve_module(ModuleName::new("parent.child.two")));
+        assert_eq!(
+            None,
+            resolve_module(&db, ModuleName::new("parent.child.two"))?
+        );
         Ok(())
     }
 
     #[test]
-    fn module_search_path_priority() -> std::io::Result<()> {
+    fn module_search_path_priority() -> anyhow::Result<()> {
         let TestCase {
             db,
             src,
             site_packages,
             temp_dir: _temp_dir,
+            ..
         } = create_resolver()?;
 
-        let foo_src = src.path().join("foo.py");
-        let foo_site_packages = site_packages.path().join("foo.py");
+        let foo_src = src.join("foo.py");
+        let foo_site_packages = site_packages.join("foo.py");
 
         std::fs::write(&foo_src, "")?;
         std::fs::write(&foo_site_packages, "")?;
 
-        let foo_module = db.resolve_module(ModuleName::new("foo")).unwrap();
+        let foo_module = resolve_module(&db, ModuleName::new("foo"))?.unwrap();
 
-        assert_eq!(&src, foo_module.path(&db).root());
-        assert_eq!(&foo_src, &*db.file_path(foo_module.path(&db).file()));
+        assert_eq!(&src, foo_module.path(&db)?.root().path());
+        assert_eq!(&foo_src, &*db.file_path(foo_module.path(&db)?.file()));
 
-        assert_eq!(Some(foo_module), db.path_to_module(&foo_src));
-        assert_eq!(None, db.path_to_module(&foo_site_packages));
+        assert_eq!(Some(foo_module), path_to_module(&db, &foo_src)?);
+        assert_eq!(None, path_to_module(&db, &foo_site_packages)?);
 
         Ok(())
     }
 
     #[test]
     #[cfg(target_family = "unix")]
-    fn symlink() -> std::io::Result<()> {
+    fn symlink() -> anyhow::Result<()> {
         let TestCase {
             db,
             src,
@@ -959,34 +1191,34 @@ mod tests {
             ..
         } = create_resolver()?;
 
-        let foo = src.path().join("foo.py");
-        let bar = src.path().join("bar.py");
+        let foo = src.join("foo.py");
+        let bar = src.join("bar.py");
 
         std::fs::write(&foo, "")?;
         std::os::unix::fs::symlink(&foo, &bar)?;
 
-        let foo_module = db.resolve_module(ModuleName::new("foo")).unwrap();
-        let bar_module = db.resolve_module(ModuleName::new("bar")).unwrap();
+        let foo_module = resolve_module(&db, ModuleName::new("foo"))?.unwrap();
+        let bar_module = resolve_module(&db, ModuleName::new("bar"))?.unwrap();
 
         assert_ne!(foo_module, bar_module);
 
-        assert_eq!(&src, foo_module.path(&db).root());
-        assert_eq!(&foo, &*db.file_path(foo_module.path(&db).file()));
+        assert_eq!(&src, foo_module.path(&db)?.root().path());
+        assert_eq!(&foo, &*db.file_path(foo_module.path(&db)?.file()));
 
         // Bar has a different name but it should point to the same file.
 
-        assert_eq!(&src, bar_module.path(&db).root());
-        assert_eq!(foo_module.path(&db).file(), bar_module.path(&db).file());
-        assert_eq!(&foo, &*db.file_path(bar_module.path(&db).file()));
+        assert_eq!(&src, bar_module.path(&db)?.root().path());
+        assert_eq!(foo_module.path(&db)?.file(), bar_module.path(&db)?.file());
+        assert_eq!(&foo, &*db.file_path(bar_module.path(&db)?.file()));
 
-        assert_eq!(Some(foo_module), db.path_to_module(&foo));
-        assert_eq!(Some(bar_module), db.path_to_module(&bar));
+        assert_eq!(Some(foo_module), path_to_module(&db, &foo)?);
+        assert_eq!(Some(bar_module), path_to_module(&db, &bar)?);
 
         Ok(())
     }
 
     #[test]
-    fn resolve_dependency() -> std::io::Result<()> {
+    fn resolve_dependency() -> anyhow::Result<()> {
         let TestCase {
             src,
             db,
@@ -994,7 +1226,7 @@ mod tests {
             ..
         } = create_resolver()?;
 
-        let foo_dir = src.path().join("foo");
+        let foo_dir = src.join("foo");
         let foo_path = foo_dir.join("__init__.py");
         let bar_path = foo_dir.join("bar.py");
 
@@ -1002,8 +1234,8 @@ mod tests {
         std::fs::write(foo_path, "from .bar import test")?;
         std::fs::write(bar_path, "test = 'Hello world'")?;
 
-        let foo_module = db.resolve_module(ModuleName::new("foo")).unwrap();
-        let bar_module = db.resolve_module(ModuleName::new("foo.bar")).unwrap();
+        let foo_module = resolve_module(&db, ModuleName::new("foo"))?.unwrap();
+        let bar_module = resolve_module(&db, ModuleName::new("foo.bar"))?.unwrap();
 
         // `from . import bar` in `foo/__init__.py` resolves to `foo`
         assert_eq!(
@@ -1014,13 +1246,13 @@ mod tests {
                     level: NonZeroU32::new(1).unwrap(),
                     module: None,
                 }
-            )
+            )?
         );
 
         // `from baz import bar` in `foo/__init__.py` should resolve to `baz.py`
         assert_eq!(
             Some(ModuleName::new("baz")),
-            foo_module.resolve_dependency(&db, &Dependency::Module(ModuleName::new("baz")))
+            foo_module.resolve_dependency(&db, &Dependency::Module(ModuleName::new("baz")))?
         );
 
         // from .bar import test in `foo/__init__.py` should resolve to `foo/bar.py`
@@ -1032,7 +1264,7 @@ mod tests {
                     level: NonZeroU32::new(1).unwrap(),
                     module: Some(ModuleName::new("bar"))
                 }
-            )
+            )?
         );
 
         // from .. import test in `foo/__init__.py` resolves to `` which is not a module
@@ -1044,7 +1276,7 @@ mod tests {
                     level: NonZeroU32::new(2).unwrap(),
                     module: None
                 }
-            )
+            )?
         );
 
         // `from . import test` in `foo/bar.py` resolves to `foo`
@@ -1056,13 +1288,13 @@ mod tests {
                     level: NonZeroU32::new(1).unwrap(),
                     module: None
                 }
-            )
+            )?
         );
 
         // `from baz import test` in `foo/bar.py` resolves to `baz`
         assert_eq!(
             Some(ModuleName::new("baz")),
-            bar_module.resolve_dependency(&db, &Dependency::Module(ModuleName::new("baz")))
+            bar_module.resolve_dependency(&db, &Dependency::Module(ModuleName::new("baz")))?
         );
 
         // `from .baz import test` in `foo/bar.py` resolves to `foo.baz`.
@@ -1074,7 +1306,7 @@ mod tests {
                     level: NonZeroU32::new(1).unwrap(),
                     module: Some(ModuleName::new("baz"))
                 }
-            )
+            )?
         );
 
         Ok(())

@@ -1,5 +1,5 @@
-use ruff_python_parser::Tok;
-use ruff_text_size::TextRange;
+use ruff_python_parser::{Token, TokenKind};
+use ruff_text_size::{Ranged, TextRange};
 
 /// Stores the range of all multiline strings in a file sorted by
 /// [`TextRange::start`].
@@ -45,10 +45,10 @@ pub(crate) struct MultilineRangesBuilder {
 }
 
 impl MultilineRangesBuilder {
-    pub(crate) fn visit_token(&mut self, token: &Tok, range: TextRange) {
-        if let Tok::String { kind, .. } | Tok::FStringMiddle { kind, .. } = token {
-            if kind.is_triple_quoted() {
-                self.ranges.push(range);
+    pub(crate) fn visit_token(&mut self, token: &Token) {
+        if matches!(token.kind(), TokenKind::String | TokenKind::FStringMiddle) {
+            if token.is_triple_quoted_string() {
+                self.ranges.push(token.range());
             }
         }
     }

@@ -531,7 +531,7 @@ pub(crate) fn fix_unnecessary_double_cast_or_process(
                 .find(|argument| argument.keyword.is_none())
             {
                 let mut arg = arg.clone();
-                arg.comma = first.comma.clone();
+                arg.comma.clone_from(&first.comma);
                 arg.whitespace_after_arg = first.whitespace_after_arg.clone();
                 iter::once(arg)
                     .chain(rest.iter().cloned())

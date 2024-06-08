@@ -1,0 +1,22 @@
+---
+source: crates/ruff_python_trivia_integration_tests/tests/simple_tokenizer.rs
+expression: test_case.tokenize_reverse()
+---
+[
+    SimpleToken {
+        kind: Comment,
+        range: 35..54,
+    },
+    SimpleToken {
+        kind: Whitespace,
+        range: 34..35,
+    },
+    SimpleToken {
+        kind: Other,
+        range: 33..34,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 0..33,
+    },
+]

@@ -1,7 +1,6 @@
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::ExprBinOp;
 
-use crate::comments::SourceComment;
 use crate::expression::binary_like::BinaryLike;
 use crate::expression::has_parentheses;
 use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
@@ -15,15 +14,6 @@ impl FormatNodeRule<ExprBinOp> for FormatExprBinOp {
     #[inline]
     fn fmt_fields(&self, item: &ExprBinOp, f: &mut PyFormatter) -> FormatResult<()> {
         BinaryLike::Binary(item).fmt(f)
-    }
-
-    fn fmt_dangling_comments(
-        &self,
-        _dangling_comments: &[SourceComment],
-        _f: &mut PyFormatter,
-    ) -> FormatResult<()> {
-        // Handled inside of `fmt_fields`
-        Ok(())
     }
 }
 

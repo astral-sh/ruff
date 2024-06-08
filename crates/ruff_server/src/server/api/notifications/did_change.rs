@@ -3,6 +3,7 @@ use crate::server::api::LSPResult;
 use crate::server::client::{Notifier, Requester};
 use crate::server::Result;
 use crate::session::Session;
+use lsp_server::ErrorCode;
 use lsp_types as types;
 use lsp_types::notification as notif;
 
@@ -13,7 +14,6 @@ impl super::NotificationHandler for DidChange {
 }
 
 impl super::SyncNotificationHandler for DidChange {
-    #[tracing::instrument(skip_all, fields(file=%uri))]
     fn run(
         session: &mut Session,
         notifier: Notifier,
@@ -27,23 +27,15 @@ impl super::SyncNotificationHandler for DidChange {
             content_changes,
         }: types::DidChangeTextDocumentParams,
     ) -> Result<()> {
-        let encoding = session.encoding();
-        let document = session
-            .document_controller(&uri)
-            .with_failure_code(lsp_server::ErrorCode::InvalidParams)?;
+        let key = session.key_from_url(uri);
 
-        if content_changes.is_empty() {
-            document.make_mut().update_version(new_version);
-            return Ok(());
-        }
-
-        document
-            .make_mut()
-            .apply_changes(content_changes, new_version, encoding);
+        session
+            .update_text_document(&key, content_changes, new_version)
+            .with_failure_code(ErrorCode::InternalError)?;
 
         // Publish diagnostics if the client doesnt support pull diagnostics
         if !session.resolved_client_capabilities().pull_diagnostics {
-            let snapshot = session.take_snapshot(&uri).unwrap();
+            let snapshot = session.take_snapshot(key.into_url()).unwrap();
             publish_diagnostics_for_document(&snapshot, &notifier)?;
         }
 

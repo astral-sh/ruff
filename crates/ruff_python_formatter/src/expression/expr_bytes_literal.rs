@@ -1,7 +1,6 @@
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::ExprBytesLiteral;
 
-use crate::comments::SourceComment;
 use crate::expression::parentheses::{
     in_parentheses_only_group, NeedsParentheses, OptionalParentheses,
 };
@@ -20,15 +19,6 @@ impl FormatNodeRule<ExprBytesLiteral> for FormatExprBytesLiteral {
             _ => in_parentheses_only_group(&FormatStringContinuation::new(&AnyString::Bytes(item)))
                 .fmt(f),
         }
-    }
-
-    fn fmt_dangling_comments(
-        &self,
-        _dangling_comments: &[SourceComment],
-        _f: &mut PyFormatter,
-    ) -> FormatResult<()> {
-        // Handled as part of `fmt_fields`
-        Ok(())
     }
 }
 

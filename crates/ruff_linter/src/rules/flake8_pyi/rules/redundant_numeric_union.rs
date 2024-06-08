@@ -1,6 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{Expr, Parameters};
+use ruff_python_ast::{AnyParameterRef, Expr, Parameters};
 use ruff_python_semantic::analyze::typing::traverse_union;
 use ruff_text_size::Ranged;
 
@@ -61,25 +61,7 @@ impl Violation for RedundantNumericUnion {
 
 /// PYI041
 pub(crate) fn redundant_numeric_union(checker: &mut Checker, parameters: &Parameters) {
-    for annotation in parameters
-        .args
-        .iter()
-        .chain(parameters.posonlyargs.iter())
-        .chain(parameters.kwonlyargs.iter())
-        .filter_map(|arg| arg.parameter.annotation.as_ref())
-    {
-        check_annotation(checker, annotation);
-    }
-
-    // If annotations on `args` or `kwargs` are flagged by this rule, the annotations themselves
-    // are not accurate, but check them anyway. It's possible that flagging them will help the user
-    // realize they're incorrect.
-    for annotation in parameters
-        .vararg
-        .iter()
-        .chain(parameters.kwarg.iter())
-        .filter_map(|arg| arg.annotation.as_ref())
-    {
+    for annotation in parameters.iter().filter_map(AnyParameterRef::annotation) {
         check_annotation(checker, annotation);
     }
 }

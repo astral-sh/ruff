@@ -19,17 +19,16 @@ doctest = false
 default = ["console_error_panic_hook"]
 
 [dependencies]
-ruff_linter = { path = "../ruff_linter" }
-ruff_python_ast = { path = "../ruff_python_ast" }
-ruff_python_codegen = { path = "../ruff_python_codegen" }
-ruff_formatter = { path = "../ruff_formatter" }
-ruff_python_formatter = { path = "../ruff_python_formatter" }
-ruff_python_index = { path = "../ruff_python_index" }
-ruff_python_parser = { path = "../ruff_python_parser" }
-ruff_source_file = { path = "../ruff_source_file" }
-ruff_text_size = { path = "../ruff_text_size" }
-ruff_python_trivia = { path = "../ruff_python_trivia" }
-ruff_workspace = { path = "../ruff_workspace" }
+ruff_linter = { workspace = true }
+ruff_python_ast = { workspace = true }
+ruff_python_codegen = { workspace = true }
+ruff_formatter = { workspace = true }
+ruff_python_formatter = { workspace = true }
+ruff_python_index = { workspace = true }
+ruff_python_parser = { workspace = true }
+ruff_source_file = { workspace = true }
+ruff_text_size = { workspace = true }
+ruff_workspace = { workspace = true }
 
 console_error_panic_hook = { workspace = true, optional = true }
 console_log = { workspace = true }

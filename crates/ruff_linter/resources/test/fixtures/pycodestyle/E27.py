@@ -63,3 +63,16 @@ if (a and
 #: Okay
 def f():
 	return 1
+
+# Soft keywords
+
+#: E271
+type  Number = int
+
+#: E273
+type	Number = int
+
+#: E275
+match(foo):
+    case(1):
+        pass

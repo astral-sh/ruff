@@ -703,6 +703,10 @@ pub struct LintCommonOptions {
             ignore-init-module-imports = false
         "#
     )]
+    #[deprecated(
+        since = "0.4.4",
+        note = "`ignore-init-module-imports` will be removed in a future version because F401 now recommends appropriate fixes for unused imports in `__init__.py` (currently in preview mode). See documentation for more information and please update your configuration."
+    )]
     pub ignore_init_module_imports: Option<bool>,
 
     /// A list of objects that should be treated equivalently to a
@@ -1024,7 +1028,7 @@ pub struct Flake8BanditOptions {
     #[option(
         default = "[]",
         value_type = "list[str]",
-        example = "extend-hardcoded-tmp-directory = [\"/foo/bar\"]"
+        example = "hardcoded-tmp-directory-extend = [\"/foo/bar\"]"
     )]
     pub hardcoded_tmp_directory_extend: Option<Vec<String>>,
 
@@ -2265,6 +2269,12 @@ pub struct IsortOptions {
     /// For example, to group all testing utilities, you could create a `testing` section:
     /// ```toml
     /// testing = ["pytest", "hypothesis"]
+    /// ```
+    ///
+    /// The values in the list are treated as glob patterns. For example, to match all packages in
+    /// the LangChain ecosystem (`langchain-core`, `langchain-openai`, etc.):
+    /// ```toml
+    /// langchain = ["langchain-*"]
     /// ```
     ///
     /// Custom sections should typically be inserted into the `section-order` list to ensure that

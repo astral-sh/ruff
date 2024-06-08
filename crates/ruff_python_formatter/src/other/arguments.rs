@@ -3,7 +3,6 @@ use ruff_python_ast::{ArgOrKeyword, Arguments, Expr};
 use ruff_python_trivia::{PythonWhitespace, SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
-use crate::comments::SourceComment;
 use crate::expression::expr_generator::GeneratorExpParentheses;
 use crate::expression::is_expression_huggable;
 use crate::expression::parentheses::{empty_parenthesized, parenthesized, Parentheses};
@@ -111,15 +110,6 @@ impl FormatNodeRule<Arguments> for FormatArguments {
                     .with_dangling_comments(dangling_comments)
             ]
         )
-    }
-
-    fn fmt_dangling_comments(
-        &self,
-        _dangling_comments: &[SourceComment],
-        _f: &mut PyFormatter,
-    ) -> FormatResult<()> {
-        // Handled in `fmt_fields`
-        Ok(())
     }
 }
 

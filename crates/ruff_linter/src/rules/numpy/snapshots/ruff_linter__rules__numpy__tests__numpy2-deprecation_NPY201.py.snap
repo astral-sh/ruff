@@ -854,6 +854,8 @@ NPY201.py:108:5: NPY201 [*] `np.row_stack` will be removed in NumPy 2.0. Use `nu
 107 | 
 108 |     np.row_stack(([1,2], [3,4]))
     |     ^^^^^^^^^^^^ NPY201
+109 | 
+110 |     np.alltrue([True, True])
     |
     = help: Replace with `numpy.vstack`
 
@@ -863,5 +865,65 @@ NPY201.py:108:5: NPY201 [*] `np.row_stack` will be removed in NumPy 2.0. Use `nu
 107 107 | 
 108     |-    np.row_stack(([1,2], [3,4]))
     108 |+    np.vstack(([1,2], [3,4]))
+109 109 | 
+110 110 |     np.alltrue([True, True])
+111 111 | 
+
+NPY201.py:110:5: NPY201 [*] `np.alltrue` will be removed in NumPy 2.0. Use `all` instead.
+    |
+108 |     np.row_stack(([1,2], [3,4]))
+109 | 
+110 |     np.alltrue([True, True])
+    |     ^^^^^^^^^^ NPY201
+111 | 
+112 |     np.anytrue([True, False])
+    |
+    = help: Replace with `all`
+
+ℹ Safe fix
+107 107 | 
+108 108 |     np.row_stack(([1,2], [3,4]))
+109 109 | 
+110     |-    np.alltrue([True, True])
+    110 |+    all([True, True])
+111 111 | 
+112 112 |     np.anytrue([True, False])
+113 113 | 
+
+NPY201.py:114:5: NPY201 [*] `np.cumproduct` will be removed in NumPy 2.0. Use `numpy.cumprod` instead.
+    |
+112 |     np.anytrue([True, False])
+113 | 
+114 |     np.cumproduct([1, 2, 3])
+    |     ^^^^^^^^^^^^^ NPY201
+115 | 
+116 |     np.product([1, 2, 3])
+    |
+    = help: Replace with `numpy.cumprod`
+
+ℹ Safe fix
+111 111 | 
+112 112 |     np.anytrue([True, False])
+113 113 | 
+114     |-    np.cumproduct([1, 2, 3])
+    114 |+    np.cumprod([1, 2, 3])
+115 115 | 
+116 116 |     np.product([1, 2, 3])
+
+NPY201.py:116:5: NPY201 [*] `np.product` will be removed in NumPy 2.0. Use `numpy.prod` instead.
+    |
+114 |     np.cumproduct([1, 2, 3])
+115 | 
+116 |     np.product([1, 2, 3])
+    |     ^^^^^^^^^^ NPY201
+    |
+    = help: Replace with `numpy.prod`
+
+ℹ Safe fix
+113 113 | 
+114 114 |     np.cumproduct([1, 2, 3])
+115 115 | 
+116     |-    np.product([1, 2, 3])
+    116 |+    np.prod([1, 2, 3])
 
 

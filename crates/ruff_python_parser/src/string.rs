@@ -2,7 +2,7 @@
 
 use bstr::ByteSlice;
 
-use ruff_python_ast::{self as ast, AnyStringKind, Expr};
+use ruff_python_ast::{self as ast, AnyStringFlags, Expr, StringFlags};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::lexer::{LexicalError, LexicalErrorType};
@@ -44,8 +44,8 @@ struct StringParser {
     source: Box<str>,
     /// Current position of the parser in the source.
     cursor: usize,
-    /// The kind of string.
-    kind: AnyStringKind,
+    /// Flags that can be used to query information about the string.
+    flags: AnyStringFlags,
     /// The location of the first character in the source from the start of the file.
     offset: TextSize,
     /// The range of the string literal.
@@ -53,11 +53,11 @@ struct StringParser {
 }
 
 impl StringParser {
-    fn new(source: Box<str>, kind: AnyStringKind, offset: TextSize, range: TextRange) -> Self {
+    fn new(source: Box<str>, flags: AnyStringFlags, offset: TextSize, range: TextRange) -> Self {
         Self {
             source,
             cursor: 0,
-            kind,
+            flags,
             offset,
             range,
         }
@@ -214,9 +214,9 @@ impl StringParser {
             'v' => '\x0b',
             o @ '0'..='7' => self.parse_octet(o as u8),
             'x' => self.parse_unicode_literal(2)?,
-            'u' if !self.kind.is_byte_string() => self.parse_unicode_literal(4)?,
-            'U' if !self.kind.is_byte_string() => self.parse_unicode_literal(8)?,
-            'N' if !self.kind.is_byte_string() => self.parse_unicode_name()?,
+            'u' if !self.flags.is_byte_string() => self.parse_unicode_literal(4)?,
+            'U' if !self.flags.is_byte_string() => self.parse_unicode_literal(8)?,
+            'N' if !self.flags.is_byte_string() => self.parse_unicode_name()?,
             // Special cases where the escape sequence is not a single character
             '\n' => return Ok(None),
             '\r' => {
@@ -282,7 +282,7 @@ impl StringParser {
                 // raise a syntax error as is done by the CPython parser. It might
                 // be supported in the future, refer to point 3: https://peps.python.org/pep-0701/#rejected-ideas
                 b'\\' => {
-                    if !self.kind.is_raw_string() && self.peek_byte().is_some() {
+                    if !self.flags.is_raw_string() && self.peek_byte().is_some() {
                         match self.parse_escaped_char()? {
                             None => {}
                             Some(EscapedChar::Literal(c)) => value.push(c),
@@ -330,12 +330,12 @@ impl StringParser {
             ));
         }
 
-        if self.kind.is_raw_string() {
+        if self.flags.is_raw_string() {
             // For raw strings, no escaping is necessary.
             return Ok(StringType::Bytes(ast::BytesLiteral {
                 value: self.source.into_boxed_bytes(),
                 range: self.range,
-                flags: self.kind.into(),
+                flags: self.flags.into(),
             }));
         }
 
@@ -344,7 +344,7 @@ impl StringParser {
             return Ok(StringType::Bytes(ast::BytesLiteral {
                 value: self.source.into_boxed_bytes(),
                 range: self.range,
-                flags: self.kind.into(),
+                flags: self.flags.into(),
             }));
         };
 
@@ -381,17 +381,17 @@ impl StringParser {
         Ok(StringType::Bytes(ast::BytesLiteral {
             value: value.into_boxed_slice(),
             range: self.range,
-            flags: self.kind.into(),
+            flags: self.flags.into(),
         }))
     }
 
     fn parse_string(mut self) -> Result<StringType, LexicalError> {
-        if self.kind.is_raw_string() {
+        if self.flags.is_raw_string() {
             // For raw strings, no escaping is necessary.
             return Ok(StringType::Str(ast::StringLiteral {
                 value: self.source,
                 range: self.range,
-                flags: self.kind.into(),
+                flags: self.flags.into(),
             }));
         }
 
@@ -400,7 +400,7 @@ impl StringParser {
             return Ok(StringType::Str(ast::StringLiteral {
                 value: self.source,
                 range: self.range,
-                flags: self.kind.into(),
+                flags: self.flags.into(),
             }));
         };
 
@@ -437,12 +437,12 @@ impl StringParser {
         Ok(StringType::Str(ast::StringLiteral {
             value: value.into_boxed_str(),
             range: self.range,
-            flags: self.kind.into(),
+            flags: self.flags.into(),
         }))
     }
 
     fn parse(self) -> Result<StringType, LexicalError> {
-        if self.kind.is_byte_string() {
+        if self.flags.is_byte_string() {
             self.parse_bytes()
         } else {
             self.parse_string()
@@ -452,29 +452,35 @@ impl StringParser {
 
 pub(crate) fn parse_string_literal(
     source: Box<str>,
-    kind: AnyStringKind,
+    flags: AnyStringFlags,
     range: TextRange,
 ) -> Result<StringType, LexicalError> {
-    StringParser::new(source, kind, range.start() + kind.opener_len(), range).parse()
+    StringParser::new(source, flags, range.start() + flags.opener_len(), range).parse()
 }
 
 // TODO(dhruvmanila): Move this to the new parser
 pub(crate) fn parse_fstring_literal_element(
     source: Box<str>,
-    kind: AnyStringKind,
+    flags: AnyStringFlags,
     range: TextRange,
 ) -> Result<ast::FStringLiteralElement, LexicalError> {
-    StringParser::new(source, kind, range.start(), range).parse_fstring_middle()
+    StringParser::new(source, flags, range.start(), range).parse_fstring_middle()
 }
 
 #[cfg(test)]
 mod tests {
+    use ruff_python_ast::Suite;
+
     use crate::lexer::LexicalErrorType;
-    use crate::{parse_suite, FStringErrorType, ParseErrorType, Suite};
+    use crate::{parse_module, FStringErrorType, ParseError, ParseErrorType, Parsed};
 
     const WINDOWS_EOL: &str = "\r\n";
     const MAC_EOL: &str = "\r";
     const UNIX_EOL: &str = "\n";
+
+    fn parse_suite(source: &str) -> Result<Suite, ParseError> {
+        parse_module(source).map(Parsed::into_suite)
+    }
 
     fn string_parser_escaped_eol(eol: &str) -> Suite {
         let source = format!(r"'text \{eol}more text'");
@@ -483,73 +489,69 @@ mod tests {
 
     #[test]
     fn test_string_parser_escaped_unix_eol() {
-        let parse_ast = string_parser_escaped_eol(UNIX_EOL);
-        insta::assert_debug_snapshot!(parse_ast);
+        let suite = string_parser_escaped_eol(UNIX_EOL);
+        insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_string_parser_escaped_mac_eol() {
-        let parse_ast = string_parser_escaped_eol(MAC_EOL);
-        insta::assert_debug_snapshot!(parse_ast);
+        let suite = string_parser_escaped_eol(MAC_EOL);
+        insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_string_parser_escaped_windows_eol() {
-        let parse_ast = string_parser_escaped_eol(WINDOWS_EOL);
-        insta::assert_debug_snapshot!(parse_ast);
+        let suite = string_parser_escaped_eol(WINDOWS_EOL);
+        insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_parse_fstring() {
         let source = r#"f"{a}{ b }{{foo}}""#;
-        let parse_ast = parse_suite(source).unwrap();
-
-        insta::assert_debug_snapshot!(parse_ast);
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_parse_fstring_nested_spec() {
         let source = r#"f"{foo:{spec}}""#;
-        let parse_ast = parse_suite(source).unwrap();
-
-        insta::assert_debug_snapshot!(parse_ast);
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_parse_fstring_not_nested_spec() {
         let source = r#"f"{foo:spec}""#;
-        let parse_ast = parse_suite(source).unwrap();
-
-        insta::assert_debug_snapshot!(parse_ast);
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_parse_empty_fstring() {
-        insta::assert_debug_snapshot!(parse_suite(r#"f"""#,).unwrap());
+        let source = r#"f"""#;
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_fstring_parse_self_documenting_base() {
         let source = r#"f"{user=}""#;
-        let parse_ast = parse_suite(source).unwrap();
-
-        insta::assert_debug_snapshot!(parse_ast);
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_fstring_parse_self_documenting_base_more() {
         let source = r#"f"mix {user=} with text and {second=}""#;
-        let parse_ast = parse_suite(source).unwrap();
-
-        insta::assert_debug_snapshot!(parse_ast);
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_fstring_parse_self_documenting_format() {
         let source = r#"f"{user=:>10}""#;
-        let parse_ast = parse_suite(source).unwrap();
-
-        insta::assert_debug_snapshot!(parse_ast);
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
     }
 
     fn parse_fstring_error(source: &str) -> FStringErrorType {
@@ -577,240 +579,236 @@ mod tests {
         // error appears after the unexpected `FStringMiddle` token, which is between the
         // `:` and the `{`.
         // assert_eq!(parse_fstring_error("f'{lambda x: {x}}'"), LambdaWithoutParentheses);
-        assert!(parse_suite(r#"f"{class}""#,).is_err());
+        assert!(parse_suite(r#"f"{class}""#).is_err());
     }
 
     #[test]
     fn test_parse_fstring_not_equals() {
         let source = r#"f"{1 != 2}""#;
-        let parse_ast = parse_suite(source).unwrap();
-        insta::assert_debug_snapshot!(parse_ast);
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_parse_fstring_equals() {
         let source = r#"f"{42 == 42}""#;
-        let parse_ast = parse_suite(source).unwrap();
-        insta::assert_debug_snapshot!(parse_ast);
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_parse_fstring_self_doc_prec_space() {
         let source = r#"f"{x   =}""#;
-        let parse_ast = parse_suite(source).unwrap();
-        insta::assert_debug_snapshot!(parse_ast);
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_parse_fstring_self_doc_trailing_space() {
         let source = r#"f"{x=   }""#;
-        let parse_ast = parse_suite(source).unwrap();
-        insta::assert_debug_snapshot!(parse_ast);
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_parse_fstring_yield_expr() {
         let source = r#"f"{yield}""#;
-        let parse_ast = parse_suite(source).unwrap();
-        insta::assert_debug_snapshot!(parse_ast);
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_parse_string_concat() {
         let source = "'Hello ' 'world'";
-        let parse_ast = parse_suite(source).unwrap();
-        insta::assert_debug_snapshot!(parse_ast);
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_parse_u_string_concat_1() {
         let source = "'Hello ' u'world'";
-        let parse_ast = parse_suite(source).unwrap();
-        insta::assert_debug_snapshot!(parse_ast);
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_parse_u_string_concat_2() {
         let source = "u'Hello ' 'world'";
-        let parse_ast = parse_suite(source).unwrap();
-        insta::assert_debug_snapshot!(parse_ast);
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_parse_f_string_concat_1() {
         let source = "'Hello ' f'world'";
-        let parse_ast = parse_suite(source).unwrap();
-        insta::assert_debug_snapshot!(parse_ast);
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_parse_f_string_concat_2() {
         let source = "'Hello ' f'world'";
-        let parse_ast = parse_suite(source).unwrap();
-        insta::assert_debug_snapshot!(parse_ast);
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_parse_f_string_concat_3() {
         let source = "'Hello ' f'world{\"!\"}'";
-        let parse_ast = parse_suite(source).unwrap();
-        insta::assert_debug_snapshot!(parse_ast);
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_parse_f_string_concat_4() {
         let source = "'Hello ' f'world{\"!\"}' 'again!'";
-        let parse_ast = parse_suite(source).unwrap();
-        insta::assert_debug_snapshot!(parse_ast);
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_parse_u_f_string_concat_1() {
         let source = "u'Hello ' f'world'";
-        let parse_ast = parse_suite(source).unwrap();
-        insta::assert_debug_snapshot!(parse_ast);
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_parse_u_f_string_concat_2() {
         let source = "u'Hello ' f'world' '!'";
-        let parse_ast = parse_suite(source).unwrap();
-        insta::assert_debug_snapshot!(parse_ast);
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_parse_string_triple_quotes_with_kind() {
         let source = "u'''Hello, world!'''";
-        let parse_ast = parse_suite(source).unwrap();
-        insta::assert_debug_snapshot!(parse_ast);
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_single_quoted_byte() {
         // single quote
         let source = r##"b'\x00\x01\x02\x03\x04\x05\x06\x07\x08\t\n\x0b\x0c\r\x0e\x0f\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1a\x1b\x1c\x1d\x1e\x1f !"#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~\x7f\x80\x81\x82\x83\x84\x85\x86\x87\x88\x89\x8a\x8b\x8c\x8d\x8e\x8f\x90\x91\x92\x93\x94\x95\x96\x97\x98\x99\x9a\x9b\x9c\x9d\x9e\x9f\xa0\xa1\xa2\xa3\xa4\xa5\xa6\xa7\xa8\xa9\xaa\xab\xac\xad\xae\xaf\xb0\xb1\xb2\xb3\xb4\xb5\xb6\xb7\xb8\xb9\xba\xbb\xbc\xbd\xbe\xbf\xc0\xc1\xc2\xc3\xc4\xc5\xc6\xc7\xc8\xc9\xca\xcb\xcc\xcd\xce\xcf\xd0\xd1\xd2\xd3\xd4\xd5\xd6\xd7\xd8\xd9\xda\xdb\xdc\xdd\xde\xdf\xe0\xe1\xe2\xe3\xe4\xe5\xe6\xe7\xe8\xe9\xea\xeb\xec\xed\xee\xef\xf0\xf1\xf2\xf3\xf4\xf5\xf6\xf7\xf8\xf9\xfa\xfb\xfc\xfd\xfe\xff'"##;
-        let parse_ast = parse_suite(source).unwrap();
-        insta::assert_debug_snapshot!(parse_ast);
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_double_quoted_byte() {
         // double quote
         let source = r##"b"\x00\x01\x02\x03\x04\x05\x06\x07\x08\t\n\x0b\x0c\r\x0e\x0f\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1a\x1b\x1c\x1d\x1e\x1f !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~\x7f\x80\x81\x82\x83\x84\x85\x86\x87\x88\x89\x8a\x8b\x8c\x8d\x8e\x8f\x90\x91\x92\x93\x94\x95\x96\x97\x98\x99\x9a\x9b\x9c\x9d\x9e\x9f\xa0\xa1\xa2\xa3\xa4\xa5\xa6\xa7\xa8\xa9\xaa\xab\xac\xad\xae\xaf\xb0\xb1\xb2\xb3\xb4\xb5\xb6\xb7\xb8\xb9\xba\xbb\xbc\xbd\xbe\xbf\xc0\xc1\xc2\xc3\xc4\xc5\xc6\xc7\xc8\xc9\xca\xcb\xcc\xcd\xce\xcf\xd0\xd1\xd2\xd3\xd4\xd5\xd6\xd7\xd8\xd9\xda\xdb\xdc\xdd\xde\xdf\xe0\xe1\xe2\xe3\xe4\xe5\xe6\xe7\xe8\xe9\xea\xeb\xec\xed\xee\xef\xf0\xf1\xf2\xf3\xf4\xf5\xf6\xf7\xf8\xf9\xfa\xfb\xfc\xfd\xfe\xff""##;
-        let parse_ast = parse_suite(source).unwrap();
-        insta::assert_debug_snapshot!(parse_ast);
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_escape_char_in_byte_literal() {
         // backslash does not escape
         let source = r#"b"omkmok\Xaa""#; // spell-checker:ignore omkmok
-        let parse_ast = parse_suite(source).unwrap();
-        insta::assert_debug_snapshot!(parse_ast);
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_raw_byte_literal_1() {
         let source = r"rb'\x1z'";
-        let parse_ast = parse_suite(source).unwrap();
-        insta::assert_debug_snapshot!(parse_ast);
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_raw_byte_literal_2() {
         let source = r"rb'\\'";
-        let parse_ast = parse_suite(source).unwrap();
-        insta::assert_debug_snapshot!(parse_ast);
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_escape_octet() {
         let source = r"b'\43a\4\1234'";
-        let parse_ast = parse_suite(source).unwrap();
-        insta::assert_debug_snapshot!(parse_ast);
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_fstring_escaped_newline() {
         let source = r#"f"\n{x}""#;
-        let parse_ast = parse_suite(source).unwrap();
-        insta::assert_debug_snapshot!(parse_ast);
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_fstring_constant_range() {
         let source = r#"f"aaa{bbb}ccc{ddd}eee""#;
-        let parse_ast = parse_suite(source).unwrap();
-        insta::assert_debug_snapshot!(parse_ast);
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_fstring_unescaped_newline() {
         let source = r#"f"""
 {x}""""#;
-        let parse_ast = parse_suite(source).unwrap();
-        insta::assert_debug_snapshot!(parse_ast);
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_fstring_escaped_character() {
         let source = r#"f"\\{x}""#;
-        let parse_ast = parse_suite(source).unwrap();
-        insta::assert_debug_snapshot!(parse_ast);
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_raw_fstring() {
         let source = r#"rf"{x}""#;
-        let parse_ast = parse_suite(source).unwrap();
-        insta::assert_debug_snapshot!(parse_ast);
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_triple_quoted_raw_fstring() {
         let source = r#"rf"""{x}""""#;
-        let parse_ast = parse_suite(source).unwrap();
-        insta::assert_debug_snapshot!(parse_ast);
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_fstring_line_continuation() {
         let source = r#"rf"\
 {x}""#;
-        let parse_ast = parse_suite(source).unwrap();
-        insta::assert_debug_snapshot!(parse_ast);
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_parse_fstring_nested_string_spec() {
         let source = r#"f"{foo:{''}}""#;
-        let parse_ast = parse_suite(source).unwrap();
-
-        insta::assert_debug_snapshot!(parse_ast);
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_parse_fstring_nested_concatenation_string_spec() {
         let source = r#"f"{foo:{'' ''}}""#;
-        let parse_ast = parse_suite(source).unwrap();
-
-        insta::assert_debug_snapshot!(parse_ast);
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
     }
 
     /// <https://github.com/astral-sh/ruff/issues/8355>
     #[test]
     fn test_dont_panic_on_8_in_octal_escape() {
         let source = r"bold = '\038[1m'";
-        let parse_ast = parse_suite(source).unwrap();
-
-        insta::assert_debug_snapshot!(parse_ast);
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
     fn test_invalid_unicode_literal() {
         let source = r"'\x1ó34'";
         let error = parse_suite(source).unwrap_err();
-
         insta::assert_debug_snapshot!(error);
     }
 
@@ -818,7 +816,6 @@ mod tests {
     fn test_missing_unicode_lbrace_error() {
         let source = r"'\N '";
         let error = parse_suite(source).unwrap_err();
-
         insta::assert_debug_snapshot!(error);
     }
 
@@ -826,7 +823,6 @@ mod tests {
     fn test_missing_unicode_rbrace_error() {
         let source = r"'\N{SPACE'";
         let error = parse_suite(source).unwrap_err();
-
         insta::assert_debug_snapshot!(error);
     }
 
@@ -834,7 +830,6 @@ mod tests {
     fn test_invalid_unicode_name_error() {
         let source = r"'\N{INVALID}'";
         let error = parse_suite(source).unwrap_err();
-
         insta::assert_debug_snapshot!(error);
     }
 
@@ -842,7 +837,6 @@ mod tests {
     fn test_invalid_byte_literal_error() {
         let source = r"b'123a𝐁c'";
         let error = parse_suite(source).unwrap_err();
-
         insta::assert_debug_snapshot!(error);
     }
 
@@ -852,8 +846,8 @@ mod tests {
             #[test]
             fn $name() {
                 let source = format!(r#""\N{{{0}}}""#, $alias);
-                let parse_ast = parse_suite(&source).unwrap();
-                insta::assert_debug_snapshot!(parse_ast);
+                let suite = parse_suite(&source).unwrap();
+                insta::assert_debug_snapshot!(suite);
             }
         )*
         }

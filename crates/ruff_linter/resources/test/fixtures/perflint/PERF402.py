@@ -43,3 +43,10 @@ def f():
 
     for path in ("foo", "bar"):
         sys.path.append(path)  # OK
+
+
+def f():
+    items = [1, 2, 3, 4]
+    result = []
+    async for i in items:
+        result.append(i)  # PERF402

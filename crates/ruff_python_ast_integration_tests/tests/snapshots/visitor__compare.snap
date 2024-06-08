@@ -1,0 +1,11 @@
+---
+source: crates/ruff_python_ast_integration_tests/tests/visitor.rs
+expression: trace
+---
+- StmtExpr
+  - ExprCompare
+    - ExprNumberLiteral
+    - Lt
+    - Lt
+    - ExprName
+    - ExprNumberLiteral

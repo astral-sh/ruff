@@ -1,35 +1,47 @@
 use std::cell::RefCell;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
+use std::time::Duration;
 
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{ModModule, StringLiteral};
+use ruff_python_parser::Parsed;
 
 use crate::cache::KeyValueCache;
-use crate::db::{HasJar, SemanticDb, SemanticJar, SourceDb, SourceJar};
+use crate::db::{LintDb, LintJar, QueryResult};
 use crate::files::FileId;
-use crate::parse::Parsed;
-use crate::source::Source;
-use crate::symbols::{Definition, SymbolId, SymbolTable};
-use crate::types::Type;
+use crate::module::{resolve_module, ModuleName};
+use crate::parse::parse;
+use crate::semantic::{infer_definition_type, infer_symbol_public_type, Type};
+use crate::semantic::{
+    resolve_global_symbol, semantic_index, Definition, GlobalSymbolId, SemanticIndex, SymbolId,
+};
+use crate::source::{source_text, Source};
 
 #[tracing::instrument(level = "debug", skip(db))]
-pub(crate) fn lint_syntax<Db>(db: &Db, file_id: FileId) -> Diagnostics
-where
-    Db: SourceDb + HasJar<SourceJar>,
-{
-    let storage = &db.jar().lint_syntax;
+pub(crate) fn lint_syntax(db: &dyn LintDb, file_id: FileId) -> QueryResult<Diagnostics> {
+    let lint_jar: &LintJar = db.jar()?;
+    let storage = &lint_jar.lint_syntax;
+
+    #[allow(clippy::print_stdout)]
+    if std::env::var("RED_KNOT_SLOW_LINT").is_ok() {
+        for i in 0..10 {
+            db.cancelled()?;
+            println!("RED_KNOT_SLOW_LINT is set, sleeping for {i}/10 seconds");
+            std::thread::sleep(Duration::from_secs(1));
+        }
+    }
 
     storage.get(&file_id, |file_id| {
         let mut diagnostics = Vec::new();
 
-        let source = db.source(*file_id);
+        let source = source_text(db.upcast(), *file_id)?;
         lint_lines(source.text(), &mut diagnostics);
 
-        let parsed = db.parse(*file_id);
+        let parsed = parse(db.upcast(), *file_id)?;
 
         if parsed.errors().is_empty() {
-            let ast = parsed.ast();
+            let ast = parsed.syntax();
 
             let mut visitor = SyntaxLintVisitor {
                 diagnostics,
@@ -41,7 +53,7 @@ where
             diagnostics.extend(parsed.errors().iter().map(std::string::ToString::to_string));
         }
 
-        Diagnostics::from(diagnostics)
+        Ok(Diagnostics::from(diagnostics))
     })
 }
 
@@ -63,45 +75,44 @@ fn lint_lines(source: &str, diagnostics: &mut Vec<String>) {
 }
 
 #[tracing::instrument(level = "debug", skip(db))]
-pub(crate) fn lint_semantic<Db>(db: &Db, file_id: FileId) -> Diagnostics
-where
-    Db: SemanticDb + HasJar<SemanticJar>,
-{
-    let storage = &db.jar().lint_semantic;
+pub(crate) fn lint_semantic(db: &dyn LintDb, file_id: FileId) -> QueryResult<Diagnostics> {
+    let lint_jar: &LintJar = db.jar()?;
+    let storage = &lint_jar.lint_semantic;
 
     storage.get(&file_id, |file_id| {
-        let source = db.source(*file_id);
-        let parsed = db.parse(*file_id);
-        let symbols = db.symbol_table(*file_id);
+        let source = source_text(db.upcast(), *file_id)?;
+        let parsed = parse(db.upcast(), *file_id)?;
+        let semantic_index = semantic_index(db.upcast(), *file_id)?;
 
         let context = SemanticLintContext {
             file_id: *file_id,
             source,
-            parsed,
-            symbols,
+            parsed: &parsed,
+            semantic_index,
             db,
             diagnostics: RefCell::new(Vec::new()),
         };
 
-        lint_unresolved_imports(&context);
+        lint_unresolved_imports(&context)?;
+        lint_bad_overrides(&context)?;
 
-        Diagnostics::from(context.diagnostics.take())
+        Ok(Diagnostics::from(context.diagnostics.take()))
     })
 }
 
-fn lint_unresolved_imports(context: &SemanticLintContext) {
+fn lint_unresolved_imports(context: &SemanticLintContext) -> QueryResult<()> {
     // TODO: Consider iterating over the dependencies (imports) only instead of all definitions.
-    for (symbol, definition) in context.symbols().all_definitions() {
+    for (symbol, definition) in context.semantic_index().symbol_table().all_definitions() {
         match definition {
             Definition::Import(import) => {
-                let ty = context.eval_symbol(symbol);
+                let ty = context.infer_symbol_public_type(symbol)?;
 
                 if ty.is_unknown() {
                     context.push_diagnostic(format!("Unresolved module {}", import.module));
                 }
             }
             Definition::ImportFrom(import) => {
-                let ty = context.eval_symbol(symbol);
+                let ty = context.infer_symbol_public_type(symbol)?;
 
                 if ty.is_unknown() {
                     let module_name = import.module().map(Deref::deref).unwrap_or_default();
@@ -126,14 +137,65 @@ fn lint_unresolved_imports(context: &SemanticLintContext) {
             _ => {}
         }
     }
+
+    Ok(())
+}
+
+fn lint_bad_overrides(context: &SemanticLintContext) -> QueryResult<()> {
+    // TODO we should have a special marker on the real typing module (from typeshed) so if you
+    // have your own "typing" module in your project, we don't consider it THE typing module (and
+    // same for other stdlib modules that our lint rules care about)
+    let Some(typing_override) = context.resolve_global_symbol("typing", "override")? else {
+        // TODO once we bundle typeshed, this should be unreachable!()
+        return Ok(());
+    };
+
+    // TODO we should maybe index definitions by type instead of iterating all, or else iterate all
+    // just once, match, and branch to all lint rules that care about a type of definition
+    for (symbol, definition) in context.semantic_index().symbol_table().all_definitions() {
+        if !matches!(definition, Definition::FunctionDef(_)) {
+            continue;
+        }
+        let ty = infer_definition_type(
+            context.db.upcast(),
+            GlobalSymbolId {
+                file_id: context.file_id,
+                symbol_id: symbol,
+            },
+            definition.clone(),
+        )?;
+        let Type::Function(func) = ty else {
+            unreachable!("type of a FunctionDef should always be a Function");
+        };
+        let Some(class) = func.get_containing_class(context.db.upcast())? else {
+            // not a method of a class
+            continue;
+        };
+        if func.has_decorator(context.db.upcast(), typing_override)? {
+            let method_name = func.name(context.db.upcast())?;
+            if class
+                .get_super_class_member(context.db.upcast(), &method_name)?
+                .is_none()
+            {
+                // TODO should have a qualname() method to support nested classes
+                context.push_diagnostic(
+                    format!(
+                        "Method {}.{} is decorated with `typing.override` but does not override any base class method",
+                        class.name(context.db.upcast())?,
+                        method_name,
+                    ));
+            }
+        }
+    }
+    Ok(())
 }
 
 pub struct SemanticLintContext<'a> {
     file_id: FileId,
     source: Source,
-    parsed: Parsed,
-    symbols: Arc<SymbolTable>,
-    db: &'a dyn SemanticDb,
+    parsed: &'a Parsed<ModModule>,
+    semantic_index: Arc<SemanticIndex>,
+    db: &'a dyn LintDb,
     diagnostics: RefCell<Vec<String>>,
 }
 
@@ -146,16 +208,22 @@ impl<'a> SemanticLintContext<'a> {
         self.file_id
     }
 
-    pub fn ast(&self) -> &ModModule {
-        self.parsed.ast()
+    pub fn ast(&self) -> &'a ModModule {
+        self.parsed.syntax()
     }
 
-    pub fn symbols(&self) -> &SymbolTable {
-        &self.symbols
+    pub fn semantic_index(&self) -> &SemanticIndex {
+        &self.semantic_index
     }
 
-    pub fn eval_symbol(&self, symbol_id: SymbolId) -> Type {
-        self.db.infer_symbol_type(self.file_id, symbol_id)
+    pub fn infer_symbol_public_type(&self, symbol_id: SymbolId) -> QueryResult<Type> {
+        infer_symbol_public_type(
+            self.db.upcast(),
+            GlobalSymbolId {
+                file_id: self.file_id,
+                symbol_id,
+            },
+        )
     }
 
     pub fn push_diagnostic(&self, diagnostic: String) {
@@ -164,6 +232,18 @@ impl<'a> SemanticLintContext<'a> {
 
     pub fn extend_diagnostics(&mut self, diagnostics: impl IntoIterator<Item = String>) {
         self.diagnostics.get_mut().extend(diagnostics);
+    }
+
+    pub fn resolve_global_symbol(
+        &self,
+        module: &str,
+        symbol_name: &str,
+    ) -> QueryResult<Option<GlobalSymbolId>> {
+        let Some(module) = resolve_module(self.db.upcast(), ModuleName::new(module))? else {
+            return Ok(None);
+        };
+
+        resolve_global_symbol(self.db.upcast(), module, symbol_name)
     }
 }
 

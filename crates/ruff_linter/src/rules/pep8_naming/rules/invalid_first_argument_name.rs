@@ -190,7 +190,7 @@ pub(crate) fn invalid_first_argument_name(
         panic!("Expected ScopeKind::Function")
     };
 
-    let Some(parent) = &checker.semantic().first_non_type_parent_scope(scope) else {
+    let Some(parent) = checker.semantic().first_non_type_parent_scope(scope) else {
         return;
     };
 
@@ -257,15 +257,9 @@ fn rename_parameter(
 ) -> Result<Option<Fix>> {
     // Don't fix if another parameter has the valid name.
     if parameters
-        .posonlyargs
         .iter()
-        .chain(&parameters.args)
-        .chain(&parameters.kwonlyargs)
         .skip(1)
-        .map(|parameter_with_default| &parameter_with_default.parameter)
-        .chain(parameters.vararg.as_deref())
-        .chain(parameters.kwarg.as_deref())
-        .any(|parameter| &parameter.name == function_type.valid_first_argument_name())
+        .any(|parameter| parameter.name() == function_type.valid_first_argument_name())
     {
         return Ok(None);
     }

@@ -51,20 +51,13 @@ pub(crate) fn property_with_parameters(
     decorator_list: &[Decorator],
     parameters: &Parameters,
 ) {
-    let semantic = checker.semantic();
-    if !decorator_list
-        .iter()
-        .any(|decorator| semantic.match_builtin_expr(&decorator.expression, "property"))
-    {
+    if parameters.len() <= 1 {
         return;
     }
-    if parameters
-        .posonlyargs
+    let semantic = checker.semantic();
+    if decorator_list
         .iter()
-        .chain(&parameters.args)
-        .chain(&parameters.kwonlyargs)
-        .count()
-        > 1
+        .any(|decorator| semantic.match_builtin_expr(&decorator.expression, "property"))
     {
         checker
             .diagnostics

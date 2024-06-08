@@ -93,7 +93,7 @@ impl Violation for SysVersion2 {
 /// ## Why is this bad?
 /// If the current major or minor version consists of multiple digits,
 /// `sys.version[0]` will select the first digit of the major version number
-/// only (e.g., `"3.10"` would evaluate to `"1"`). This is likely unintended,
+/// only (e.g., `"10.2"` would evaluate to `"1"`). This is likely unintended,
 /// and can lead to subtle bugs if the version string is used to test against a
 /// major version number.
 ///

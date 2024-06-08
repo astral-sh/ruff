@@ -2,7 +2,6 @@
 
 use std::num::NonZeroUsize;
 
-use lsp::Connection;
 use lsp_server as lsp;
 use lsp_types as types;
 use types::ClientCapabilities;
@@ -11,6 +10,9 @@ use types::CodeActionOptions;
 use types::DiagnosticOptions;
 use types::DidChangeWatchedFilesRegistrationOptions;
 use types::FileSystemWatcher;
+use types::NotebookCellSelector;
+use types::NotebookDocumentSyncOptions;
+use types::NotebookSelector;
 use types::OneOf;
 use types::TextDocumentSyncCapability;
 use types::TextDocumentSyncKind;
@@ -18,6 +20,8 @@ use types::TextDocumentSyncOptions;
 use types::WorkDoneProgressOptions;
 use types::WorkspaceFoldersServerCapabilities;
 
+use self::connection::Connection;
+use self::connection::ConnectionInitializer;
 use self::schedule::event_loop_thread;
 use self::schedule::Scheduler;
 use self::schedule::Task;
@@ -28,77 +32,76 @@ use crate::PositionEncoding;
 
 mod api;
 mod client;
+mod connection;
 mod schedule;
 
-pub(crate) use client::ClientSender;
+pub(crate) use connection::ClientSender;
 
 pub(crate) type Result<T> = std::result::Result<T, api::Error>;
 
 pub struct Server {
-    conn: lsp::Connection,
+    connection: Connection,
     client_capabilities: ClientCapabilities,
-    threads: lsp::IoThreads,
     worker_threads: NonZeroUsize,
     session: Session,
 }
 
 impl Server {
     pub fn new(worker_threads: NonZeroUsize) -> crate::Result<Self> {
-        let (conn, threads) = lsp::Connection::stdio();
+        let connection = ConnectionInitializer::stdio();
 
-        crate::message::init_messenger(&conn.sender);
-
-        let (id, params) = conn.initialize_start()?;
-
-        let init_params: types::InitializeParams = serde_json::from_value(params)?;
+        let (id, init_params) = connection.initialize_start()?;
 
         let client_capabilities = init_params.capabilities;
         let position_encoding = Self::find_best_position_encoding(&client_capabilities);
         let server_capabilities = Self::server_capabilities(position_encoding);
 
+        let connection = connection.initialize_finish(
+            id,
+            &server_capabilities,
+            crate::SERVER_NAME,
+            crate::version(),
+        )?;
+
+        crate::message::init_messenger(connection.make_sender());
+
         let AllSettings {
             global_settings,
             mut workspace_settings,
-        } = AllSettings::from_value(init_params.initialization_options.unwrap_or_default());
+        } = AllSettings::from_value(
+            init_params
+                .initialization_options
+                .unwrap_or_else(|| serde_json::Value::Object(serde_json::Map::default())),
+        );
 
-        let mut workspace_for_uri = |uri| {
+        let mut workspace_for_url = |url: lsp_types::Url| {
             let Some(workspace_settings) = workspace_settings.as_mut() else {
-                return (uri, ClientSettings::default());
+                return (url, ClientSettings::default());
             };
-            let settings = workspace_settings.remove(&uri).unwrap_or_else(|| {
-                tracing::warn!("No workspace settings found for {uri}");
+            let settings = workspace_settings.remove(&url).unwrap_or_else(|| {
+                tracing::warn!("No workspace settings found for {}", url);
                 ClientSettings::default()
             });
-            (uri, settings)
+            (url, settings)
         };
 
         let workspaces = init_params
             .workspace_folders
+            .filter(|folders| !folders.is_empty())
             .map(|folders| folders.into_iter().map(|folder| {
-                workspace_for_uri(folder.uri)
+                workspace_for_url(folder.uri)
             }).collect())
             .or_else(|| {
-                tracing::debug!("No workspace(s) were provided during initialization. Using the current working directory as a default workspace...");
+                tracing::warn!("No workspace(s) were provided during initialization. Using the current working directory as a default workspace...");
                 let uri = types::Url::from_file_path(std::env::current_dir().ok()?).ok()?;
-                Some(vec![workspace_for_uri(uri)])
+                Some(vec![workspace_for_url(uri)])
             })
             .ok_or_else(|| {
                 anyhow::anyhow!("Failed to get the current working directory while creating a default workspace.")
             })?;
 
-        let initialize_data = serde_json::json!({
-            "capabilities": server_capabilities,
-            "serverInfo": {
-                "name": crate::SERVER_NAME,
-                "version": crate::version()
-            }
-        });
-
-        conn.initialize_finish(id, initialize_data)?;
-
         Ok(Self {
-            conn,
-            threads,
+            connection,
             worker_threads,
             session: Session::new(
                 &client_capabilities,
@@ -111,17 +114,17 @@ impl Server {
     }
 
     pub fn run(self) -> crate::Result<()> {
-        let result = event_loop_thread(move || {
+        event_loop_thread(move || {
             Self::event_loop(
-                &self.conn,
+                &self.connection,
                 &self.client_capabilities,
                 self.session,
                 self.worker_threads,
-            )
+            )?;
+            self.connection.close()?;
+            Ok(())
         })?
-        .join();
-        self.threads.join()?;
-        result
+        .join()
     }
 
     #[allow(clippy::needless_pass_by_value)] // this is because we aren't using `next_request_id` yet.
@@ -132,22 +135,21 @@ impl Server {
         worker_threads: NonZeroUsize,
     ) -> crate::Result<()> {
         let mut scheduler =
-            schedule::Scheduler::new(&mut session, worker_threads, &connection.sender);
+            schedule::Scheduler::new(&mut session, worker_threads, connection.make_sender());
 
         Self::try_register_capabilities(client_capabilities, &mut scheduler);
-        for msg in &connection.receiver {
+        for msg in connection.incoming() {
+            if connection.handle_shutdown(&msg)? {
+                break;
+            }
             let task = match msg {
-                lsp::Message::Request(req) => {
-                    if connection.handle_shutdown(&req)? {
-                        return Ok(());
-                    }
-                    api::request(req)
-                }
+                lsp::Message::Request(req) => api::request(req),
                 lsp::Message::Notification(notification) => api::notification(notification),
                 lsp::Message::Response(response) => scheduler.response(response),
             };
             scheduler.dispatch(task);
         }
+
         Ok(())
     }
 
@@ -175,8 +177,12 @@ impl Server {
                             watchers: vec![
                                 FileSystemWatcher {
                                     glob_pattern: types::GlobPattern::String(
-                                        "**/.?ruff.toml".into(),
+                                        "**/.ruff.toml".into(),
                                     ),
+                                    kind: None,
+                                },
+                                FileSystemWatcher {
+                                    glob_pattern: types::GlobPattern::String("**/ruff.toml".into()),
                                     kind: None,
                                 },
                                 FileSystemWatcher {
@@ -258,6 +264,16 @@ impl Server {
                 },
             )),
             hover_provider: Some(types::HoverProviderCapability::Simple(true)),
+            notebook_document_sync: Some(types::OneOf::Left(NotebookDocumentSyncOptions {
+                save: Some(false),
+                notebook_selector: [NotebookSelector::ByCells {
+                    notebook: None,
+                    cells: vec![NotebookCellSelector {
+                        language: "python".to_string(),
+                    }],
+                }]
+                .to_vec(),
+            })),
             text_document_sync: Some(TextDocumentSyncCapability::Options(
                 TextDocumentSyncOptions {
                     open_close: Some(true),
@@ -284,8 +300,15 @@ pub(crate) enum SupportedCodeAction {
     SourceFixAll,
     /// Maps to `source.organizeImports` and `source.organizeImports.ruff` code action kinds.
     /// This is a source action that applies import sorting fixes to the currently open document.
-    #[allow(dead_code)] // TODO: remove
     SourceOrganizeImports,
+    /// Maps to the `notebook.source.fixAll` and `notebook.source.fixAll.ruff` code action kinds.
+    /// This is a source action, specifically for notebooks, that applies all safe fixes
+    /// to the currently open document.
+    NotebookSourceFixAll,
+    /// Maps to `source.organizeImports` and `source.organizeImports.ruff` code action kinds.
+    /// This is a source action, specifically for notebooks, that applies import sorting fixes
+    /// to the currently open document.
+    NotebookSourceOrganizeImports,
 }
 
 impl SupportedCodeAction {
@@ -295,6 +318,8 @@ impl SupportedCodeAction {
             Self::QuickFix => CodeActionKind::QUICKFIX,
             Self::SourceFixAll => crate::SOURCE_FIX_ALL_RUFF,
             Self::SourceOrganizeImports => crate::SOURCE_ORGANIZE_IMPORTS_RUFF,
+            Self::NotebookSourceFixAll => crate::NOTEBOOK_SOURCE_FIX_ALL_RUFF,
+            Self::NotebookSourceOrganizeImports => crate::NOTEBOOK_SOURCE_ORGANIZE_IMPORTS_RUFF,
         }
     }
 
@@ -310,6 +335,8 @@ impl SupportedCodeAction {
             Self::QuickFix,
             Self::SourceFixAll,
             Self::SourceOrganizeImports,
+            Self::NotebookSourceFixAll,
+            Self::NotebookSourceOrganizeImports,
         ]
         .into_iter()
     }

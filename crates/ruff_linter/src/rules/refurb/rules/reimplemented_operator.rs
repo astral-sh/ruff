@@ -5,6 +5,8 @@ use anyhow::Result;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::any_over_expr;
+use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::{self as ast, Expr, ExprSlice, ExprSubscript, ExprTuple, Parameters, Stmt};
 use ruff_python_semantic::SemanticModel;
 use ruff_source_file::Locator;
@@ -28,7 +30,7 @@ use crate::importer::{ImportRequest, Importer};
 /// import functools
 ///
 /// nums = [1, 2, 3]
-/// sum = functools.reduce(lambda x, y: x + y, nums)
+/// total = functools.reduce(lambda x, y: x + y, nums)
 /// ```
 ///
 /// Use instead:
@@ -37,10 +39,8 @@ use crate::importer::{ImportRequest, Importer};
 /// import operator
 ///
 /// nums = [1, 2, 3]
-/// sum = functools.reduce(operator.add, nums)
+/// total = functools.reduce(operator.add, nums)
 /// ```
-///
-/// ## References
 #[violation]
 pub struct ReimplementedOperator {
     operator: Operator,
@@ -71,6 +71,13 @@ impl Violation for ReimplementedOperator {
 
 /// FURB118
 pub(crate) fn reimplemented_operator(checker: &mut Checker, target: &FunctionLike) {
+    // Ignore methods.
+    if target.kind() == FunctionLikeKind::Function {
+        if checker.semantic().current_scope().kind.is_class() {
+            return;
+        }
+    }
+
     let Some(params) = target.parameters() else {
         return;
     };
@@ -113,7 +120,7 @@ impl Ranged for FunctionLike<'_> {
     fn range(&self) -> TextRange {
         match self {
             Self::Lambda(expr) => expr.range(),
-            Self::Function(stmt) => stmt.range(),
+            Self::Function(stmt) => stmt.identifier(),
         }
     }
 }
@@ -205,6 +212,12 @@ fn slice_expr_to_slice_call(slice: &ExprSlice, locator: &Locator) -> String {
 fn subscript_slice_to_string<'a>(expr: &Expr, locator: &Locator<'a>) -> Cow<'a, str> {
     if let Expr::Slice(expr_slice) = expr {
         Cow::Owned(slice_expr_to_slice_call(expr_slice, locator))
+    } else if let Expr::Tuple(tuple) = expr {
+        if tuple.parenthesized {
+            Cow::Borrowed(locator.slice(expr))
+        } else {
+            Cow::Owned(format!("({})", locator.slice(tuple)))
+        }
     } else {
         Cow::Borrowed(locator.slice(expr))
     }
@@ -215,9 +228,17 @@ fn itemgetter_op(expr: &ExprSubscript, params: &Parameters, locator: &Locator) -
     let [arg] = params.args.as_slice() else {
         return None;
     };
+
+    // The argument to the lambda must match the subscripted value, as in: `lambda x: x[1]`.
     if !is_same_expression(arg, &expr.value) {
         return None;
     };
+
+    // The subscripted expression can't contain references to the argument, as in: `lambda x: x[x]`.
+    if any_over_expr(expr.slice.as_ref(), &|expr| is_same_expression(arg, expr)) {
+        return None;
+    }
+
     Some(Operator {
         name: "itemgetter",
         args: vec![subscript_slice_to_string(expr.slice.as_ref(), locator).to_string()],

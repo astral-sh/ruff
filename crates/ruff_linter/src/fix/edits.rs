@@ -1,10 +1,12 @@
 //! Interface for generating fix edits from higher-level actions (e.g., "remove an argument").
 
+use std::borrow::Cow;
+
 use anyhow::{Context, Result};
 
 use ruff_diagnostics::Edit;
 use ruff_python_ast::parenthesize::parenthesized_range;
-use ruff_python_ast::{self as ast, Arguments, ExceptHandler, Stmt};
+use ruff_python_ast::{self as ast, Arguments, ExceptHandler, Expr, ExprList, Stmt};
 use ruff_python_ast::{AnyNodeRef, ArgOrKeyword};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
@@ -120,6 +122,75 @@ pub(crate) fn remove_unused_imports<'a>(
         None => Ok(delete_stmt(stmt, parent, locator, indexer)),
         Some(content) => Ok(Edit::range_replacement(content, stmt.range())),
     }
+}
+
+/// Edits to make the specified imports explicit, e.g. change `import x` to `import x as x`.
+pub(crate) fn make_redundant_alias<'a>(
+    member_names: impl Iterator<Item = Cow<'a, str>>,
+    stmt: &Stmt,
+) -> Vec<Edit> {
+    let aliases = match stmt {
+        Stmt::Import(ast::StmtImport { names, .. }) => names,
+        Stmt::ImportFrom(ast::StmtImportFrom { names, .. }) => names,
+        _ => {
+            return Vec::new();
+        }
+    };
+    member_names
+        .filter_map(|name| {
+            aliases
+                .iter()
+                .find(|alias| alias.asname.is_none() && name == alias.name.id)
+                .map(|alias| Edit::range_replacement(format!("{name} as {name}"), alias.range))
+        })
+        .collect()
+}
+
+/// Fix to add the specified imports to the `__all__` export list.
+pub(crate) fn add_to_dunder_all<'a>(
+    names: impl Iterator<Item = &'a str>,
+    expr: &Expr,
+    stylist: &Stylist,
+) -> Vec<Edit> {
+    let (insertion_point, export_prefix_length) = match expr {
+        Expr::List(ExprList { elts, range, .. }) => (
+            elts.last()
+                .map_or(range.end() - "]".text_len(), Ranged::end),
+            elts.len(),
+        ),
+        Expr::Tuple(tup) if tup.parenthesized => (
+            tup.elts
+                .last()
+                .map_or(tup.end() - ")".text_len(), Ranged::end),
+            tup.elts.len(),
+        ),
+        Expr::Tuple(tup) if !tup.parenthesized => (
+            tup.elts
+                .last()
+                .expect("unparenthesized empty tuple is not possible")
+                .range()
+                .end(),
+            tup.elts.len(),
+        ),
+        _ => {
+            // we don't know how to insert into this expression
+            return vec![];
+        }
+    };
+    let quote = stylist.quote();
+    let mut edits: Vec<_> = names
+        .enumerate()
+        .map(|(offset, name)| match export_prefix_length + offset {
+            0 => Edit::insertion(format!("{quote}{name}{quote}"), insertion_point),
+            _ => Edit::insertion(format!(", {quote}{name}{quote}"), insertion_point),
+        })
+        .collect();
+    if let Expr::Tuple(tup) = expr {
+        if tup.parenthesized && export_prefix_length + edits.len() == 1 {
+            edits.push(Edit::insertion(",".to_string(), insertion_point));
+        }
+    }
+    edits
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -455,25 +526,37 @@ fn all_lines_fit(
 
 #[cfg(test)]
 mod tests {
-    use anyhow::Result;
+    use anyhow::{anyhow, Result};
+    use std::borrow::Cow;
+    use test_case::test_case;
 
-    use ruff_python_parser::parse_suite;
+    use ruff_diagnostics::{Diagnostic, Edit, Fix};
+    use ruff_python_ast::Stmt;
+    use ruff_python_codegen::Stylist;
+    use ruff_python_parser::{parse_expression, parse_module};
     use ruff_source_file::Locator;
-    use ruff_text_size::{Ranged, TextSize};
+    use ruff_text_size::{Ranged, TextRange, TextSize};
 
-    use crate::fix::edits::{next_stmt_break, trailing_semicolon};
+    use crate::fix::apply_fixes;
+    use crate::fix::edits::{
+        add_to_dunder_all, make_redundant_alias, next_stmt_break, trailing_semicolon,
+    };
+
+    /// Parse the given source using [`Mode::Module`] and return the first statement.
+    fn parse_first_stmt(source: &str) -> Result<Stmt> {
+        let suite = parse_module(source)?.into_suite();
+        Ok(suite.into_iter().next().unwrap())
+    }
 
     #[test]
     fn find_semicolon() -> Result<()> {
         let contents = "x = 1";
-        let program = parse_suite(contents)?;
-        let stmt = program.first().unwrap();
+        let stmt = parse_first_stmt(contents)?;
         let locator = Locator::new(contents);
         assert_eq!(trailing_semicolon(stmt.end(), &locator), None);
 
         let contents = "x = 1; y = 1";
-        let program = parse_suite(contents)?;
-        let stmt = program.first().unwrap();
+        let stmt = parse_first_stmt(contents)?;
         let locator = Locator::new(contents);
         assert_eq!(
             trailing_semicolon(stmt.end(), &locator),
@@ -481,8 +564,7 @@ mod tests {
         );
 
         let contents = "x = 1 ; y = 1";
-        let program = parse_suite(contents)?;
-        let stmt = program.first().unwrap();
+        let stmt = parse_first_stmt(contents)?;
         let locator = Locator::new(contents);
         assert_eq!(
             trailing_semicolon(stmt.end(), &locator),
@@ -494,8 +576,7 @@ x = 1 \
   ; y = 1
 "
         .trim();
-        let program = parse_suite(contents)?;
-        let stmt = program.first().unwrap();
+        let stmt = parse_first_stmt(contents)?;
         let locator = Locator::new(contents);
         assert_eq!(
             trailing_semicolon(stmt.end(), &locator),
@@ -531,5 +612,75 @@ x = 1 \
             next_stmt_break(TextSize::from(10), &locator),
             TextSize::from(12)
         );
+    }
+
+    #[test]
+    fn redundant_alias() -> Result<()> {
+        let contents = "import x, y as y, z as bees";
+        let stmt = parse_first_stmt(contents)?;
+        assert_eq!(
+            make_redundant_alias(["x"].into_iter().map(Cow::from), &stmt),
+            vec![Edit::range_replacement(
+                String::from("x as x"),
+                TextRange::new(TextSize::new(7), TextSize::new(8)),
+            )],
+            "make just one item redundant"
+        );
+        assert_eq!(
+            make_redundant_alias(vec!["x", "y"].into_iter().map(Cow::from), &stmt),
+            vec![Edit::range_replacement(
+                String::from("x as x"),
+                TextRange::new(TextSize::new(7), TextSize::new(8)),
+            )],
+            "the second item is already a redundant alias"
+        );
+        assert_eq!(
+            make_redundant_alias(vec!["x", "z"].into_iter().map(Cow::from), &stmt),
+            vec![Edit::range_replacement(
+                String::from("x as x"),
+                TextRange::new(TextSize::new(7), TextSize::new(8)),
+            )],
+            "the third item is already aliased to something else"
+        );
+        Ok(())
+    }
+
+    #[test_case("()",             &["x", "y"], r#"("x", "y")"#             ; "2 into empty tuple")]
+    #[test_case("()",             &["x"],      r#"("x",)"#                 ; "1 into empty tuple adding a trailing comma")]
+    #[test_case("[]",             &["x", "y"], r#"["x", "y"]"#             ; "2 into empty list")]
+    #[test_case("[]",             &["x"],      r#"["x"]"#                  ; "1 into empty list")]
+    #[test_case(r#""a", "b""#,    &["x", "y"], r#""a", "b", "x", "y""#     ; "2 into unparenthesized tuple")]
+    #[test_case(r#""a", "b""#,    &["x"],      r#""a", "b", "x""#          ; "1 into unparenthesized tuple")]
+    #[test_case(r#""a", "b","#,   &["x", "y"], r#""a", "b", "x", "y","#    ; "2 into unparenthesized tuple w/trailing comma")]
+    #[test_case(r#""a", "b","#,   &["x"],      r#""a", "b", "x","#         ; "1 into unparenthesized tuple w/trailing comma")]
+    #[test_case(r#"("a", "b")"#,  &["x", "y"], r#"("a", "b", "x", "y")"#   ; "2 into nonempty tuple")]
+    #[test_case(r#"("a", "b")"#,  &["x"],      r#"("a", "b", "x")"#        ; "1 into nonempty tuple")]
+    #[test_case(r#"("a", "b",)"#, &["x", "y"], r#"("a", "b", "x", "y",)"#  ; "2 into nonempty tuple w/trailing comma")]
+    #[test_case(r#"("a", "b",)"#, &["x"],      r#"("a", "b", "x",)"#       ; "1 into nonempty tuple w/trailing comma")]
+    #[test_case(r#"["a", "b",]"#, &["x", "y"], r#"["a", "b", "x", "y",]"#  ; "2 into nonempty list w/trailing comma")]
+    #[test_case(r#"["a", "b",]"#, &["x"],      r#"["a", "b", "x",]"#       ; "1 into nonempty list w/trailing comma")]
+    #[test_case(r#"["a", "b"]"#,  &["x", "y"], r#"["a", "b", "x", "y"]"#   ; "2 into nonempty list")]
+    #[test_case(r#"["a", "b"]"#,  &["x"],      r#"["a", "b", "x"]"#        ; "1 into nonempty list")]
+    fn add_to_dunder_all_test(raw: &str, names: &[&str], expect: &str) -> Result<()> {
+        let locator = Locator::new(raw);
+        let edits = {
+            let parsed = parse_expression(raw)?;
+            let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
+            add_to_dunder_all(names.iter().copied(), parsed.expr(), &stylist)
+        };
+        let diag = {
+            use crate::rules::pycodestyle::rules::MissingNewlineAtEndOfFile;
+            let mut iter = edits.into_iter();
+            Diagnostic::new(
+                MissingNewlineAtEndOfFile, // The choice of rule here is arbitrary.
+                TextRange::default(),
+            )
+            .with_fix(Fix::safe_edits(
+                iter.next().ok_or(anyhow!("expected edits nonempty"))?,
+                iter,
+            ))
+        };
+        assert_eq!(apply_fixes([diag].iter(), &locator).code, expect);
+        Ok(())
     }
 }

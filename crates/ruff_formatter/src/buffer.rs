@@ -344,7 +344,7 @@ pub struct RemoveSoftLinesBuffer<'a, Context> {
 
     /// Caches the interned elements after the soft line breaks have been removed.
     ///
-    /// The `key` is the [Interned] element as it has been passed to [Self::write_element] or the child of another
+    /// The `key` is the [Interned] element as it has been passed to [`Self::write_element`] or the child of another
     /// [Interned] element. The `value` is the matching document of the key where all soft line breaks have been removed.
     ///
     /// It's fine to not snapshot the cache. The worst that can happen is that it holds on interned elements

@@ -107,14 +107,6 @@ impl<'a> Scope<'a> {
         })
     }
 
-    /// Like [`Scope::binding_ids`], but returns all bindings that were added to the scope,
-    /// including those that were shadowed by later bindings.
-    pub fn all_binding_ids(&self) -> impl Iterator<Item = BindingId> + '_ {
-        self.bindings.values().copied().flat_map(|id| {
-            std::iter::successors(Some(id), |id| self.shadowed_bindings.get(id).copied())
-        })
-    }
-
     /// Like [`Scope::bindings`], but returns all bindings added to the scope, including those that
     /// were shadowed by later bindings.
     pub fn all_bindings(&self) -> impl Iterator<Item = (&str, BindingId)> + '_ {
@@ -142,11 +134,6 @@ impl<'a> Scope<'a> {
     /// Returns `true` if this scope contains a star import (e.g., `from sys import *`).
     pub fn uses_star_imports(&self) -> bool {
         !self.star_imports.is_empty()
-    }
-
-    /// Returns an iterator over all star imports (e.g., `from sys import *`) in this scope.
-    pub fn star_imports(&self) -> impl Iterator<Item = &StarImport<'a>> {
-        self.star_imports.iter()
     }
 
     /// Set the globals pointer for this scope.
@@ -185,7 +172,7 @@ pub enum ScopeKind<'a> {
     Function(&'a ast::StmtFunctionDef),
     Generator,
     Module,
-    /// A Python 3.12+ ["annotation scope"](https://docs.python.org/3/reference/executionmodel.html#annotation-scopes)
+    /// A Python 3.12+ [annotation scope](https://docs.python.org/3/reference/executionmodel.html#annotation-scopes)
     Type,
     Lambda(&'a ast::ExprLambda),
 }

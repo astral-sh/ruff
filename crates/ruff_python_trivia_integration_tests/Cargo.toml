@@ -1,0 +1,23 @@
+[package]
+name = "ruff_python_trivia_integration_tests"
+version = "0.0.0"
+edition.workspace = true
+rust-version.workspace = true
+homepage.workspace = true
+documentation.workspace = true
+repository.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+
+[dev-dependencies]
+ruff_python_parser = { workspace = true }
+ruff_python_trivia = { workspace = true }
+ruff_source_file = { workspace = true }
+ruff_text_size = { workspace = true }
+
+insta = { workspace = true }
+
+[lints]
+workspace = true

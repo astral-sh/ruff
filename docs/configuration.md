@@ -599,19 +599,19 @@ Options:
           format is "concise". In preview mode, the default serialization
           format is "full" [env: RUFF_OUTPUT_FORMAT=] [possible values: text,
           concise, full, json, json-lines, junit, grouped, github, gitlab,
-          pylint, azure, sarif]
+          pylint, rdjson, azure, sarif]
   -o, --output-file <OUTPUT_FILE>
           Specify file to write the linter output to (default: stdout) [env:
           RUFF_OUTPUT_FILE=]
       --target-version <TARGET_VERSION>
           The minimum Python version that should be supported [possible values:
-          py37, py38, py39, py310, py311, py312]
+          py37, py38, py39, py310, py311, py312, py313]
       --preview
           Enable preview mode; checks will include unstable rules and fixes.
           Use `--no-preview` to disable
       --extension <EXTENSION>
-          List of mappings from file extension to language (one of ["python",
-          "ipynb", "pyi"]). For example, to treat `.ipy` files as IPython
+          List of mappings from file extension to language (one of `python`,
+          `ipynb`, `pyi`). For example, to treat `.ipy` files as IPython
           notebooks, use `--extension ipy:ipynb`
       --statistics
           Show counts for every rule with at least one violation
@@ -715,12 +715,12 @@ Options:
           status code and the difference between the current file and how the
           formatted file would look like
       --extension <EXTENSION>
-          List of mappings from file extension to language (one of ["python",
-          "ipynb", "pyi"]). For example, to treat `.ipy` files as IPython
+          List of mappings from file extension to language (one of `python`,
+          `ipynb`, `pyi`). For example, to treat `.ipy` files as IPython
           notebooks, use `--extension ipy:ipynb`
       --target-version <TARGET_VERSION>
           The minimum Python version that should be supported [possible values:
-          py37, py38, py39, py310, py311, py312]
+          py37, py38, py39, py310, py311, py312, py313]
       --preview
           Enable preview mode; enables unstable formatting. Use `--no-preview`
           to disable

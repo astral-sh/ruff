@@ -7,7 +7,7 @@ use crate::TokenKind;
 
 /// Represents represent errors that occur during parsing and are
 /// returned by the `parse_*` functions.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct ParseError {
     pub error: ParseErrorType,
     pub location: TextRange,
@@ -85,7 +85,7 @@ impl std::fmt::Display for FStringErrorType {
 }
 
 /// Represents the different types of errors that can occur during parsing.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum ParseErrorType {
     /// An unexpected error occurred.
     OtherError(String),

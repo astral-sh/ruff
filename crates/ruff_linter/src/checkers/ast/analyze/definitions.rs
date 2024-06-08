@@ -1,6 +1,7 @@
-use ruff_python_ast::{all::DunderAllName, str::raw_contents_range};
+use ruff_python_ast::str::raw_contents_range;
 use ruff_text_size::{Ranged, TextRange};
 
+use ruff_python_semantic::all::DunderAllName;
 use ruff_python_semantic::{
     BindingKind, ContextualizedDefinition, Definition, Export, Member, MemberKind,
 };
@@ -109,7 +110,7 @@ pub(crate) fn definitions(checker: &mut Checker) {
     };
 
     let definitions = std::mem::take(&mut checker.semantic.definitions);
-    let mut overloaded_name: Option<String> = None;
+    let mut overloaded_name: Option<&str> = None;
     for ContextualizedDefinition {
         definition,
         visibility,
@@ -127,7 +128,7 @@ pub(crate) fn definitions(checker: &mut Checker) {
             if !overloaded_name.is_some_and(|overloaded_name| {
                 flake8_annotations::helpers::is_overload_impl(
                     definition,
-                    &overloaded_name,
+                    overloaded_name,
                     &checker.semantic,
                 )
             }) {
@@ -145,26 +146,20 @@ pub(crate) fn definitions(checker: &mut Checker) {
 
         // flake8-pyi
         if enforce_stubs {
-            if checker.enabled(Rule::DocstringInStub) {
-                flake8_pyi::rules::docstring_in_stubs(checker, docstring);
-            }
+            flake8_pyi::rules::docstring_in_stubs(checker, docstring);
         }
         if enforce_stubs_and_runtime {
-            if checker.enabled(Rule::IterMethodReturnIterable) {
-                flake8_pyi::rules::iter_method_return_iterable(checker, definition);
-            }
+            flake8_pyi::rules::iter_method_return_iterable(checker, definition);
         }
 
         // pylint
         if enforce_dunder_method {
-            if checker.enabled(Rule::BadDunderMethodName) {
-                if let Definition::Member(Member {
-                    kind: MemberKind::Method(method),
-                    ..
-                }) = definition
-                {
-                    pylint::rules::bad_dunder_method_name(checker, method);
-                }
+            if let Definition::Member(Member {
+                kind: MemberKind::Method(method),
+                ..
+            }) = definition
+            {
+                pylint::rules::bad_dunder_method_name(checker, method);
             }
         }
 

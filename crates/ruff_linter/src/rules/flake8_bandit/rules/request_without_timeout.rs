@@ -58,7 +58,7 @@ pub(crate) fn request_without_timeout(checker: &mut Checker, call: &ast::ExprCal
                 qualified_name.segments(),
                 [
                     "requests",
-                    "get" | "options" | "head" | "post" | "put" | "patch" | "delete"
+                    "get" | "options" | "head" | "post" | "put" | "patch" | "delete" | "request"
                 ]
             )
         })

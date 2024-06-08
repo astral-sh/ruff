@@ -1,18 +1,17 @@
-use crate::cache::KeyValueCache;
-use crate::db::{HasJar, SourceDb, SourceJar};
-use ruff_notebook::Notebook;
-use ruff_python_ast::PySourceType;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 
+use ruff_notebook::Notebook;
+use ruff_python_ast::PySourceType;
+
+use crate::cache::KeyValueCache;
+use crate::db::{QueryResult, SourceDb};
 use crate::files::FileId;
 
 #[tracing::instrument(level = "debug", skip(db))]
-pub(crate) fn source_text<Db>(db: &Db, file_id: FileId) -> Source
-where
-    Db: SourceDb + HasJar<SourceJar>,
-{
-    let sources = &db.jar().sources;
+pub(crate) fn source_text(db: &dyn SourceDb, file_id: FileId) -> QueryResult<Source> {
+    let jar = db.jar()?;
+    let sources = &jar.sources;
 
     sources.get(&file_id, |file_id| {
         let path = db.file_path(*file_id);
@@ -43,7 +42,7 @@ where
             }
         };
 
-        Source { kind }
+        Ok(Source { kind })
     })
 }
 
@@ -52,6 +51,16 @@ pub enum SourceKind {
     Python(Arc<str>),
     Stub(Arc<str>),
     IpyNotebook(Arc<Notebook>),
+}
+
+impl<'a> From<&'a SourceKind> for PySourceType {
+    fn from(value: &'a SourceKind) -> Self {
+        match value {
+            SourceKind::Python(_) => PySourceType::Python,
+            SourceKind::Stub(_) => PySourceType::Stub,
+            SourceKind::IpyNotebook(_) => PySourceType::Ipynb,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]

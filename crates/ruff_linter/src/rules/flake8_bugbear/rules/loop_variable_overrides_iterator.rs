@@ -105,11 +105,7 @@ impl<'a> Visitor<'a> for NameFinder<'a> {
                         parameter,
                         default: _,
                         range: _,
-                    } in parameters
-                        .posonlyargs
-                        .iter()
-                        .chain(&parameters.args)
-                        .chain(&parameters.kwonlyargs)
+                    } in parameters.iter_non_variadic_params()
                     {
                         self.names.remove(parameter.name.as_str());
                     }

@@ -14,12 +14,12 @@ use crate::registry::Rule;
 /// Checks for abstract classes without abstract methods.
 ///
 /// ## Why is this bad?
-/// Abstract base classes are used to define interfaces. If they have no abstract
-/// methods, they are not useful.
+/// Abstract base classes are used to define interfaces. If an abstract base
+/// class has no abstract methods, you may have forgotten to add an abstract
+/// method to the class or omitted an `@abstractmethod` decorator.
 ///
-/// If the class is not meant to be used as an interface, it should not be an
-/// abstract base class. Remove the `ABC` base class from the class definition,
-/// or add an abstract method to the class.
+/// If the class is _not_ meant to be used as an interface, consider removing
+/// the `ABC` base class from the class definition.
 ///
 /// ## Example
 /// ```python
@@ -56,16 +56,15 @@ impl Violation for AbstractBaseClassWithoutAbstractMethod {
         format!("`{name}` is an abstract base class, but it has no abstract methods")
     }
 }
+
 /// ## What it does
 /// Checks for empty methods in abstract base classes without an abstract
 /// decorator.
 ///
 /// ## Why is this bad?
-/// Empty methods in abstract base classes without an abstract decorator are
-/// indicative of unfinished code or a mistake.
-///
-/// Instead, add an abstract method decorated to indicate that it is abstract,
-/// or implement the method.
+/// Empty methods in abstract base classes without an abstract decorator may be
+/// be indicative of a mistake. If the method is meant to be abstract, add an
+/// `@abstractmethod` decorator to the method.
 ///
 /// ## Example
 /// ```python
@@ -156,8 +155,13 @@ pub(crate) fn abstract_base_class(
     let mut has_abstract_method = false;
     for stmt in body {
         // https://github.com/PyCQA/flake8-bugbear/issues/293
-        // Ignore abc's that declares a class attribute that must be set
-        if let Stmt::AnnAssign(_) | Stmt::Assign(_) = stmt {
+        // If an ABC declares an attribute by providing a type annotation
+        // but does not actually assign a value for that attribute,
+        // assume it is intended to be an "abstract attribute"
+        if matches!(
+            stmt,
+            Stmt::AnnAssign(ast::StmtAnnAssign { value: None, .. })
+        ) {
             has_abstract_method = true;
             continue;
         }

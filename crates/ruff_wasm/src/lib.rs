@@ -8,7 +8,7 @@ use ruff_formatter::printer::SourceMapGeneration;
 use ruff_formatter::{FormatResult, Formatted, IndentStyle};
 use ruff_linter::directives;
 use ruff_linter::line_width::{IndentWidth, LineLength};
-use ruff_linter::linter::{check_path, LinterResult, TokenSource};
+use ruff_linter::linter::{check_path, LinterResult};
 use ruff_linter::registry::AsRule;
 use ruff_linter::settings::types::PythonVersion;
 use ruff_linter::settings::{flags, DEFAULT_SELECTORS, DUMMY_VARIABLE_RGX};
@@ -16,10 +16,8 @@ use ruff_linter::source_kind::SourceKind;
 use ruff_python_ast::{Mod, PySourceType};
 use ruff_python_codegen::Stylist;
 use ruff_python_formatter::{format_module_ast, pretty_comments, PyFormatContext, QuoteStyle};
-use ruff_python_index::{CommentRangesBuilder, Indexer};
-use ruff_python_parser::lexer::LexResult;
-use ruff_python_parser::{parse_tokens, tokenize_all, AsMode, Mode, Program};
-use ruff_python_trivia::CommentRanges;
+use ruff_python_index::Indexer;
+use ruff_python_parser::{parse, parse_unchecked, parse_unchecked_source, Mode, Parsed};
 use ruff_source_file::{Locator, SourceLocation};
 use ruff_text_size::Ranged;
 use ruff_workspace::configuration::Configuration;
@@ -161,26 +159,25 @@ impl Workspace {
         // TODO(dhruvmanila): Support Jupyter Notebooks
         let source_kind = SourceKind::Python(contents.to_string());
 
-        // Tokenize once.
-        let tokens: Vec<LexResult> = ruff_python_parser::tokenize(contents, source_type.as_mode());
+        // Parse once.
+        let parsed = parse_unchecked_source(source_kind.source_code(), source_type);
 
         // Map row and column locations to byte slices (lazily).
         let locator = Locator::new(contents);
 
         // Detect the current code style (lazily).
-        let stylist = Stylist::from_tokens(&tokens, &locator);
+        let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
 
         // Extra indices from the code.
-        let indexer = Indexer::from_tokens(&tokens, &locator);
+        let indexer = Indexer::from_tokens(parsed.tokens(), &locator);
 
         // Extract the `# noqa` and `# isort: skip` directives from the source.
         let directives =
-            directives::extract_directives(&tokens, directives::Flags::empty(), &locator, &indexer);
+            directives::extract_directives(&parsed, directives::Flags::empty(), &locator, &indexer);
 
         // Generate checks.
         let LinterResult {
-            data: (diagnostics, _imports),
-            ..
+            data: diagnostics, ..
         } = check_path(
             Path::new("<filename>"),
             None,
@@ -192,7 +189,7 @@ impl Workspace {
             flags::Noqa::Enabled,
             &source_kind,
             source_type,
-            TokenSource::Tokens(tokens),
+            &parsed,
         );
 
         let source_code = locator.to_source_code();
@@ -244,21 +241,25 @@ impl Workspace {
 
     pub fn comments(&self, contents: &str) -> Result<String, Error> {
         let parsed = ParsedModule::from_source(contents)?;
-        let comments = pretty_comments(&parsed.module, &parsed.comment_ranges, contents);
+        let comments = pretty_comments(
+            parsed.parsed.syntax(),
+            parsed.parsed.comment_ranges(),
+            contents,
+        );
         Ok(comments)
     }
 
     /// Parses the content and returns its AST
     pub fn parse(&self, contents: &str) -> Result<String, Error> {
-        let program = Program::parse_str(contents, Mode::Module);
+        let parsed = parse_unchecked(contents, Mode::Module);
 
-        Ok(format!("{:#?}", program.into_ast()))
+        Ok(format!("{:#?}", parsed.into_syntax()))
     }
 
     pub fn tokens(&self, contents: &str) -> Result<String, Error> {
-        let tokens: Vec<_> = ruff_python_parser::lexer::lex(contents, Mode::Module).collect();
+        let parsed = parse_unchecked(contents, Mode::Module);
 
-        Ok(format!("{tokens:#?}"))
+        Ok(format!("{:#?}", parsed.tokens()))
     }
 }
 
@@ -268,25 +269,14 @@ pub(crate) fn into_error<E: std::fmt::Display>(err: E) -> Error {
 
 struct ParsedModule<'a> {
     source_code: &'a str,
-    module: Mod,
-    comment_ranges: CommentRanges,
+    parsed: Parsed<Mod>,
 }
 
 impl<'a> ParsedModule<'a> {
     fn from_source(source_code: &'a str) -> Result<Self, Error> {
-        let tokens: Vec<_> = tokenize_all(source_code, Mode::Module);
-        let mut comment_ranges = CommentRangesBuilder::default();
-
-        for (token, range) in tokens.iter().flatten() {
-            comment_ranges.visit_token(token, *range);
-        }
-        let comment_ranges = comment_ranges.finish();
-        let module = parse_tokens(tokens, source_code, Mode::Module).map_err(into_error)?;
-
         Ok(Self {
             source_code,
-            module,
-            comment_ranges,
+            parsed: parse(source_code, Mode::Module).map_err(into_error)?,
         })
     }
 
@@ -297,11 +287,6 @@ impl<'a> ParsedModule<'a> {
             .to_format_options(PySourceType::default(), self.source_code)
             .with_source_map_generation(SourceMapGeneration::Enabled);
 
-        format_module_ast(
-            &self.module,
-            &self.comment_ranges,
-            self.source_code,
-            options,
-        )
+        format_module_ast(&self.parsed, self.source_code, options)
     }
 }

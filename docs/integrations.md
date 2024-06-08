@@ -14,7 +14,7 @@ Ruff can be used as a [pre-commit](https://pre-commit.com) hook via [`ruff-pre-c
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.4.2
+  rev: v0.4.8
   hooks:
     # Run the linter.
     - id: ruff
@@ -27,7 +27,7 @@ To enable lint fixes, add the `--fix` argument to the lint hook:
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.4.2
+  rev: v0.4.8
   hooks:
     # Run the linter.
     - id: ruff
@@ -41,7 +41,7 @@ To run the hooks over Jupyter Notebooks too, add `jupyter` to the list of allowe
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.4.2
+  rev: v0.4.8
   hooks:
     # Run the linter.
     - id: ruff
@@ -73,61 +73,21 @@ supports the Language Server Protocol, including [Neovim](https://github.com/ast
 [Sublime Text](https://github.com/astral-sh/ruff-lsp#example-sublime-text), Emacs, and more.
 
 For example, to use `ruff-lsp` with Neovim, install `ruff-lsp` from PyPI along with
-[`nvim-lspconfig`](https://github.com/neovim/nvim-lspconfig). Then, add something like the following
-to your `init.lua`:
+[`nvim-lspconfig`](https://github.com/neovim/nvim-lspconfig). Then, set up the Neovim LSP client
+using the [suggested configuration](https://github.com/neovim/nvim-lspconfig/tree/master#configuration)
+(`:h lspconfig-keybindings`). Finally, configure `ruff-lsp` in your `init.lua`:
 
 ```lua
--- See: https://github.com/neovim/nvim-lspconfig/tree/54eb2a070a4f389b1be0f98070f81d23e2b1a715#suggested-configuration
-local opts = { noremap=true, silent=true }
-vim.keymap.set('n', '<space>e', vim.diagnostic.open_float, opts)
-vim.keymap.set('n', '[d', vim.diagnostic.goto_prev, opts)
-vim.keymap.set('n', ']d', vim.diagnostic.goto_next, opts)
-vim.keymap.set('n', '<space>q', vim.diagnostic.setloclist, opts)
-
--- Use an on_attach function to only map the following keys
--- after the language server attaches to the current buffer
-local on_attach = function(client, bufnr)
-  -- Enable completion triggered by <c-x><c-o>
-  vim.api.nvim_buf_set_option(bufnr, 'omnifunc', 'v:lua.vim.lsp.omnifunc')
-
-  -- Mappings.
-  -- See `:help vim.lsp.*` for documentation on any of the below functions
-  local bufopts = { noremap=true, silent=true, buffer=bufnr }
-  vim.keymap.set('n', 'gD', vim.lsp.buf.declaration, bufopts)
-  vim.keymap.set('n', 'gd', vim.lsp.buf.definition, bufopts)
-  vim.keymap.set('n', 'K', vim.lsp.buf.hover, bufopts)
-  vim.keymap.set('n', 'gi', vim.lsp.buf.implementation, bufopts)
-  vim.keymap.set('n', '<C-k>', vim.lsp.buf.signature_help, bufopts)
-  vim.keymap.set('n', '<space>wa', vim.lsp.buf.add_workspace_folder, bufopts)
-  vim.keymap.set('n', '<space>wr', vim.lsp.buf.remove_workspace_folder, bufopts)
-  vim.keymap.set('n', '<space>wl', function()
-    print(vim.inspect(vim.lsp.buf.list_workspace_folders()))
-  end, bufopts)
-  vim.keymap.set('n', '<space>D', vim.lsp.buf.type_definition, bufopts)
-  vim.keymap.set('n', '<space>rn', vim.lsp.buf.rename, bufopts)
-  vim.keymap.set('n', '<space>ca', vim.lsp.buf.code_action, bufopts)
-  vim.keymap.set('n', 'gr', vim.lsp.buf.references, bufopts)
-  vim.keymap.set('n', '<space>f', function() vim.lsp.buf.format { async = true } end, bufopts)
-end
-
 -- Configure `ruff-lsp`.
-local configs = require 'lspconfig.configs'
-if not configs.ruff_lsp then
-  configs.ruff_lsp = {
-    default_config = {
-      cmd = { 'ruff-lsp' },
-      filetypes = { 'python' },
-      root_dir = require('lspconfig').util.find_git_ancestor,
-      init_options = {
-        settings = {
-          args = {}
-        }
-      }
+-- See: https://github.com/neovim/nvim-lspconfig/blob/master/doc/server_configurations.md#ruff_lsp
+-- For the default config, along with instructions on how to customize the settings
+require('lspconfig').ruff_lsp.setup {
+  init_options = {
+    settings = {
+      -- Any extra CLI arguments for `ruff` go here.
+      args = {},
     }
   }
-end
-require('lspconfig').ruff_lsp.setup {
-  on_attach = on_attach,
 }
 ```
 

@@ -1,7 +1,7 @@
 [project]
 name = "scripts"
 version = "0.0.1"
-dependencies = ["sphinx"]
+dependencies = ["stdlibs"]
 requires-python = ">=3.8"
 
 [tool.black]
@@ -24,6 +24,12 @@ select = [
   "PGH", # pygrep-hooks
   "PYI", # flake8-pyi
   "RUF",
+]
+
+ignore = [
+  # only relevant if you run a script with `python -0`,
+  # which seems unlikely for any of the scripts in this directory
+  "B011"
 ]
 
 [tool.ruff.lint.isort]

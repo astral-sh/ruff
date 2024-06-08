@@ -3,7 +3,6 @@ use ruff_python_ast::AstNode;
 use ruff_python_ast::{Stmt, StmtWhile};
 use ruff_text_size::Ranged;
 
-use crate::comments::SourceComment;
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::Parenthesize;
 use crate::prelude::*;
@@ -68,15 +67,6 @@ impl FormatNodeRule<StmtWhile> for FormatStmtWhile {
             )?;
         }
 
-        Ok(())
-    }
-
-    fn fmt_dangling_comments(
-        &self,
-        _dangling_comments: &[SourceComment],
-        _f: &mut PyFormatter,
-    ) -> FormatResult<()> {
-        // Handled in `fmt_fields`
         Ok(())
     }
 }

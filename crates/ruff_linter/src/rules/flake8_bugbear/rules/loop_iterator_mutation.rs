@@ -114,9 +114,9 @@ fn is_mutating_function(function_name: &str) -> bool {
 struct LoopMutationsVisitor<'a> {
     iter: &'a Expr,
     target: &'a Expr,
-    mutations: HashMap<u8, Vec<TextRange>>,
-    branches: Vec<u8>,
-    branch: u8,
+    mutations: HashMap<u32, Vec<TextRange>>,
+    branches: Vec<u32>,
+    branch: u32,
 }
 
 impl<'a> LoopMutationsVisitor<'a> {

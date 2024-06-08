@@ -8,15 +8,16 @@ use ruff_python_ast::{
 };
 use ruff_text_size::{Ranged, TextSize};
 
-use crate::parser::expression::{GeneratorExpressionInParentheses, ParsedExpr, EXPR_SET};
+use crate::lexer::TokenValue;
+use crate::parser::expression::{ParsedExpr, EXPR_SET};
 use crate::parser::progress::ParserProgress;
 use crate::parser::{
     helpers, FunctionKind, Parser, RecoveryContext, RecoveryContextKind, WithItemKind,
 };
 use crate::token_set::TokenSet;
-use crate::{Mode, ParseErrorType, Tok, TokenKind};
+use crate::{Mode, ParseErrorType, TokenKind};
 
-use super::expression::{ExpressionContext, OperatorPrecedence};
+use super::expression::ExpressionContext;
 use super::Parenthesized;
 
 /// Tokens that represent compound statements.
@@ -84,13 +85,13 @@ impl<'src> Parser<'src> {
     /// Returns `true` if the current token is the start of a simple statement,
     /// including expressions.
     fn at_simple_stmt(&self) -> bool {
-        self.at_ts(SIMPLE_STMT_WITH_EXPR_SET)
+        self.at_ts(SIMPLE_STMT_WITH_EXPR_SET) || self.at_soft_keyword()
     }
 
     /// Returns `true` if the current token is the start of a simple, compound or expression
     /// statement.
     pub(super) fn at_stmt(&self) -> bool {
-        self.at_ts(STMTS_SET)
+        self.at_ts(STMTS_SET) || self.at_soft_keyword()
     }
 
     /// Checks if the parser is currently positioned at the start of a type parameter.
@@ -120,8 +121,26 @@ impl<'src> Parser<'src> {
             TokenKind::With => Stmt::With(self.parse_with_statement(start)),
             TokenKind::At => self.parse_decorators(),
             TokenKind::Async => self.parse_async_statement(),
-            TokenKind::Match => Stmt::Match(self.parse_match_statement()),
-            _ => self.parse_single_simple_statement(),
+            token => {
+                if token == TokenKind::Match {
+                    // Match is considered a soft keyword, so we will treat it as an identifier if
+                    // it's followed by an unexpected token.
+
+                    match self.classify_match_token() {
+                        MatchTokenKind::Keyword => {
+                            return Stmt::Match(self.parse_match_statement());
+                        }
+                        MatchTokenKind::KeywordOrIdentifier => {
+                            if let Some(match_stmt) = self.try_parse_match_statement() {
+                                return Stmt::Match(match_stmt);
+                            }
+                        }
+                        MatchTokenKind::Identifier => {}
+                    }
+                }
+
+                self.parse_single_simple_statement()
+            }
         }
     }
 
@@ -252,11 +271,22 @@ impl<'src> Parser<'src> {
             TokenKind::Assert => Stmt::Assert(self.parse_assert_statement()),
             TokenKind::Global => Stmt::Global(self.parse_global_statement()),
             TokenKind::Nonlocal => Stmt::Nonlocal(self.parse_nonlocal_statement()),
-            TokenKind::Type => Stmt::TypeAlias(self.parse_type_alias_statement()),
             TokenKind::IpyEscapeCommand => {
                 Stmt::IpyEscapeCommand(self.parse_ipython_escape_command_statement())
             }
-            _ => {
+            token => {
+                if token == TokenKind::Type {
+                    // Type is considered a soft keyword, so we will treat it as an identifier if
+                    // it's followed by an unexpected token.
+                    let (first, second) = self.peek2();
+
+                    if (first == TokenKind::Name || first.is_soft_keyword())
+                        && matches!(second, TokenKind::Lsqb | TokenKind::Equal)
+                    {
+                        return Stmt::TypeAlias(self.parse_type_alias_statement());
+                    }
+                }
+
                 let start = self.node_start();
 
                 // simple_stmt: `... | yield_stmt | star_expressions | ...`
@@ -498,7 +528,12 @@ impl<'src> Parser<'src> {
             }
         }
 
-        let module = if self.at(TokenKind::Name) {
+        let module = if self.at_name_or_soft_keyword() {
+            // test_ok from_import_soft_keyword_module_name
+            // from match import pattern
+            // from type import bar
+            // from case import pattern
+            // from match.type.case import foo
             Some(self.parse_dotted_name())
         } else {
             if leading_dots == 0 {
@@ -603,7 +638,11 @@ impl<'src> Parser<'src> {
         };
 
         let asname = if self.eat(TokenKind::As) {
-            if self.at(TokenKind::Name) {
+            if self.at_name_or_soft_keyword() {
+                // test_ok import_as_name_soft_keyword
+                // import foo as match
+                // import bar as case
+                // import baz as type
                 Some(self.parse_identifier())
             } else {
                 // test_err import_alias_missing_asname
@@ -872,7 +911,8 @@ impl<'src> Parser<'src> {
     fn parse_ipython_escape_command_statement(&mut self) -> ast::StmtIpyEscapeCommand {
         let start = self.node_start();
 
-        let (Tok::IpyEscapeCommand { value, kind }, _) = self.bump(TokenKind::IpyEscapeCommand)
+        let TokenValue::IpyEscapeCommand { value, kind } =
+            self.bump_value(TokenKind::IpyEscapeCommand)
         else {
             unreachable!()
         };
@@ -1469,7 +1509,12 @@ impl<'src> Parser<'src> {
         };
 
         let name = if self.eat(TokenKind::As) {
-            if self.at(TokenKind::Name) {
+            if self.at_name_or_soft_keyword() {
+                // test_ok except_stmt_as_name_soft_keyword
+                // try: ...
+                // except Exception as match: ...
+                // except Exception as case: ...
+                // except Exception as type: ...
                 Some(self.parse_identifier())
             } else {
                 // test_err except_stmt_missing_as_name
@@ -1841,11 +1886,8 @@ impl<'src> Parser<'src> {
 
     /// Parses a list of with items.
     ///
-    /// See: <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-with_stmt_contents>
+    /// See: <https://docs.python.org/3/reference/compound_stmts.html#the-with-statement>
     fn parse_with_items(&mut self) -> Vec<WithItem> {
-        let start = self.node_start();
-        let mut items = vec![];
-
         if !self.at_expr() {
             self.add_error(
                 ParseErrorType::OtherError(
@@ -1853,315 +1895,20 @@ impl<'src> Parser<'src> {
                 ),
                 self.current_token_range(),
             );
-            return items;
+            return vec![];
         }
 
-        let with_item_kind = if self.eat(TokenKind::Lpar) {
-            self.parse_parenthesized_with_items(start, &mut items)
-        } else {
-            WithItemKind::Unparenthesized
-        };
-
-        if with_item_kind.is_parenthesized_expression() {
-            // The trailing comma is optional because (1) they aren't allowed in parenthesized
-            // expression context and, (2) We need to raise the correct error if they're present.
-            //
-            // Consider the following three examples:
-            //
-            // ```python
-            // with (item1, item2): ...  # (1)
-            // with (item1, item2),: ...  # (2)
-            // with (item1, item2), item3,: ...  # (3)
-            // ```
-            //
-            // Here, (1) is valid and represents a parenthesized with items while (2) and (3)
-            // are invalid as they are parenthesized expression. Example (3) will raise an error
-            // stating that a trailing comma isn't allowed, while (2) will raise an "expected an
-            // expression" error.
-            //
-            // The reason that (2) expects an expression is because if it raised an error
-            // similar to (3), we would be suggesting to remove the trailing comma, which would
-            // make it a parenthesized with items. This would contradict our original assumption
-            // that it's a parenthesized expression.
-            //
-            // However, for (3), the error is being raised by the list parsing logic and if the
-            // trailing comma is removed, it still remains a parenthesized expression, so it's
-            // fine to raise the error.
-            if self.eat(TokenKind::Comma) && !self.at_expr() {
-                self.add_error(
-                    ParseErrorType::ExpectedExpression,
-                    self.current_token_range(),
-                );
-            }
-        }
-
-        // This call is a no-op if the with items are parenthesized as all of them
-        // have already been parsed.
-        self.parse_comma_separated_list(RecoveryContextKind::WithItems(with_item_kind), |parser| {
-            items.push(parser.parse_with_item(WithItemParsingState::Regular).item);
-        });
-
-        if with_item_kind == WithItemKind::Parenthesized {
-            self.expect(TokenKind::Rpar);
-        }
-
-        items
-    }
-
-    /// Parse the with items coming after an ambiguous `(` token.
-    ///
-    /// To understand the ambiguity, consider the following example:
-    ///
-    /// ```python
-    /// with (item1, item2): ...       # (1)
-    /// with (item1, item2) as f: ...  # (2)
-    /// ```
-    ///
-    /// When the parser is at the `(` token after the `with` keyword, it doesn't
-    /// know if it's used to parenthesize the with items or if it's part of a
-    /// parenthesized expression of the first with item. The challenge here is
-    /// that until the parser sees the matching `)` token, it can't resolve the
-    /// ambiguity. This requires infinite lookahead.
-    ///
-    /// This method resolves the ambiguity by parsing the with items assuming that
-    /// it's a parenthesized with items. Then, once it finds the matching `)`, it
-    /// checks if the assumption still holds true. If it doesn't, then it combines
-    /// the parsed with items into a single with item with an appropriate expression.
-    ///
-    /// The return value is the kind of with items parsed. Note that there could
-    /// still be other with items which needs to be parsed as this method stops
-    /// when the matching `)` is found.
-    fn parse_parenthesized_with_items(
-        &mut self,
-        start: TextSize,
-        items: &mut Vec<WithItem>,
-    ) -> WithItemKind {
-        // We'll start with the assumption that the with items are parenthesized.
-        let mut with_item_kind = WithItemKind::Parenthesized;
-
-        // Keep track of certain properties to determine if the with items are
-        // parenthesized or if it's a parenthesized expression. Refer to their
-        // usage for examples and explanation.
-        let mut has_trailing_comma = false;
-        let mut has_optional_vars = false;
-
-        // Start with parsing the first with item after an ambiguous `(` token
-        // with the start offset.
-        let mut state = WithItemParsingState::AmbiguousLparFirstItem(start);
-
-        let mut parsed_with_items = vec![];
-        let mut progress = ParserProgress::default();
-
-        loop {
-            progress.assert_progressing(self);
-
-            // We stop at the first `)` found. Any nested parentheses will be
-            // consumed by the with item parsing. This check needs to be done
-            // first in case there are no with items. For example,
-            //
-            // ```python
-            // with (): ...
-            // with () as x: ...
-            // ```
-            if self.at(TokenKind::Rpar) {
-                break;
-            }
-
-            let parsed_with_item = self.parse_with_item(state);
-
-            if parsed_with_item.item.context_expr.is_generator_expr()
-                && parsed_with_item.used_ambiguous_lpar
-            {
-                // For generator expressions, it's a bit tricky. We need to check if parsing
-                // a generator expression has used the ambiguous `(` token. This is the case
-                // for a parenthesized generator expression which is using the ambiguous `(`
-                // as the start of the generator expression. For example:
-                //
-                // ```python
-                // with (x for x in range(10)): ...
-                // #                         ^
-                // #                         Consumed by `parse_with_item`
-                // ```
-                //
-                // This is only allowed if it's the first with item which is made sure by the
-                // `with_item_parsing` state.
-                with_item_kind = WithItemKind::SingleParenthesizedGeneratorExpression;
-                parsed_with_items.push(parsed_with_item);
-                break;
-            }
-
-            has_optional_vars |= parsed_with_item.item.optional_vars.is_some();
-
-            parsed_with_items.push(parsed_with_item);
-
-            has_trailing_comma = self.eat(TokenKind::Comma);
-            if !has_trailing_comma {
-                break;
-            }
-
-            // Update the with item parsing to indicate that we're no longer
-            // parsing the first with item, but we haven't yet found the `)` to
-            // the corresponding ambiguous `(`.
-            state = WithItemParsingState::AmbiguousLparRest;
-        }
-
-        // Check if our assumption is incorrect and it's actually a parenthesized
-        // expression.
-        if !with_item_kind.is_parenthesized_expression() && self.at(TokenKind::Rpar) {
-            if has_optional_vars {
-                // If any of the with item has optional variables, then our assumption is
-                // correct and it is a parenthesized with items. Now, we need to restrict
-                // the grammar for a with item's context expression which is:
-                //
-                //     with_item: expression ...
-                //
-                // So, named, starred and yield expressions not allowed.
-                for parsed_with_item in &parsed_with_items {
-                    // Parentheses resets the precedence.
-                    if parsed_with_item.is_parenthesized {
-                        continue;
-                    }
-                    let err = match parsed_with_item.item.context_expr {
-                        Expr::Named(_) => ParseErrorType::UnparenthesizedNamedExpression,
-                        Expr::Starred(_) => ParseErrorType::InvalidStarredExpressionUsage,
-                        Expr::Yield(_) | Expr::YieldFrom(_) => {
-                            ParseErrorType::InvalidYieldExpressionUsage
-                        }
-                        _ => continue,
-                    };
-                    self.add_error(err, &parsed_with_item.item.context_expr);
-                }
-            } else if self.peek() == TokenKind::Colon {
-                // Here, the parser is at a `)` followed by a `:`.
-                if parsed_with_items.is_empty() {
-                    // No with items, treat it as a parenthesized expression to
-                    // create an empty tuple expression.
-                    with_item_kind = WithItemKind::ParenthesizedExpression;
-                } else {
-                    // These expressions, if unparenthesized, are only allowed if it's
-                    // a parenthesized expression and none of the with items have an
-                    // optional variable.
-                    if parsed_with_items.iter().any(|parsed_with_item| {
-                        !parsed_with_item.is_parenthesized
-                            && matches!(
-                                parsed_with_item.item.context_expr,
-                                Expr::Named(_)
-                                    | Expr::Starred(_)
-                                    | Expr::Yield(_)
-                                    | Expr::YieldFrom(_)
-                            )
-                    }) {
-                        with_item_kind = WithItemKind::ParenthesizedExpression;
-                    }
-                }
-            } else {
-                // For any other token followed by `)`, if any of the items has
-                // an optional variables (`as ...`), then our assumption is correct.
-                // Otherwise, treat it as a parenthesized expression. For example:
-                //
-                // ```python
-                // with (item1, item2 as f): ...
-                // ```
-                //
-                // This also helps in raising the correct syntax error for the
-                // following case:
-                // ```python
-                // with (item1, item2 as f) as x: ...
-                // #                        ^^
-                // #                        Expecting `:` but got `as`
-                // ```
-                with_item_kind = WithItemKind::ParenthesizedExpression;
-            }
-        }
-
-        if with_item_kind == WithItemKind::Parenthesized && !self.at(TokenKind::Rpar) {
-            // test_err with_items_parenthesized_missing_comma
-            // with (item1 item2): ...
-            // with (item1 as f1 item2): ...
-            // with (item1, item2 item3, item4): ...
-            // with (item1, item2 as f1 item3, item4): ...
-            // with (item1, item2: ...
-            self.expect(TokenKind::Comma);
-        }
-
-        // Transform the items if it's a parenthesized expression.
-        if with_item_kind.is_parenthesized_expression() {
-            // The generator expression has already consumed the `)`, so avoid
-            // expecting it again.
-            if with_item_kind != WithItemKind::SingleParenthesizedGeneratorExpression {
+        if self.at(TokenKind::Lpar) {
+            if let Some(items) = self.try_parse_parenthesized_with_items() {
                 self.expect(TokenKind::Rpar);
-            }
-
-            let mut lhs = if parsed_with_items.len() == 1 && !has_trailing_comma {
-                // SAFETY: We've checked that `items` has only one item.
-                let expr = parsed_with_items.pop().unwrap().item.context_expr;
-
-                // Here, we know that it's a parenthesized expression so the expression
-                // should be checked against the grammar rule which is:
-                //
-                //     group: (yield_expr | named_expression)
-                //
-                // So, no starred expression allowed.
-                if expr.is_starred_expr() {
-                    self.add_error(ParseErrorType::InvalidStarredExpressionUsage, &expr);
-                }
-                expr
+                items
             } else {
-                let mut elts = Vec::with_capacity(parsed_with_items.len());
-
-                // Here, we know that it's a tuple expression so each expression should
-                // be checked against the tuple element grammar rule which:
-                //
-                //     tuple: '(' [ star_named_expression ',' [star_named_expressions] ] ')'
-                //
-                // So, no yield expressions allowed.
-                for expr in parsed_with_items
-                    .drain(..)
-                    .map(|parsed_with_item| parsed_with_item.item.context_expr)
-                {
-                    if matches!(expr, Expr::Yield(_) | Expr::YieldFrom(_)) {
-                        self.add_error(ParseErrorType::InvalidYieldExpressionUsage, &expr);
-                    }
-                    elts.push(expr);
-                }
-
-                Expr::Tuple(ast::ExprTuple {
-                    range: self.node_range(start),
-                    elts,
-                    ctx: ExprContext::Load,
-                    parenthesized: true,
-                })
-            };
-
-            // Remember that the expression is parenthesized and the parser has just
-            // consumed the `)` token. We need to check for any possible postfix
-            // expressions. For example:
-            //
-            // ```python
-            // with (foo)(): ...
-            // #         ^
-            //
-            // with (1, 2)[0]: ...
-            // #          ^
-            //
-            // with (foo.bar).baz: ...
-            // #             ^
-            // ```
-            //
-            // The reason being that the opening parenthesis is ambiguous and isn't
-            // considered when parsing the with item in the case. So, the parser
-            // stops when it sees the `)` token and doesn't check for any postfix
-            // expressions.
-            lhs = self.parse_postfix_expression(lhs, start);
-
-            let context_expr = if self.at(TokenKind::If) {
                 // test_ok ambiguous_lpar_with_items_if_expr
                 // with (x) if True else y: ...
                 // with (x for x in iter) if True else y: ...
                 // with (x async for x in iter) if True else y: ...
                 // with (x)[0] if True else y: ...
-                Expr::If(self.parse_if_expression(lhs, start))
-            } else {
+
                 // test_ok ambiguous_lpar_with_items_binary_expr
                 // # It doesn't matter what's inside the parentheses, these tests need to make sure
                 // # all binary expressions parses correctly.
@@ -2173,29 +1920,147 @@ impl<'src> Parser<'src> {
                 // with (a | b) << c | d: ...
                 // # Postfix should still be parsed first
                 // with (a)[0] + b * c: ...
-                self.parse_binary_expression_or_higher_recursive(
-                    lhs.into(),
-                    OperatorPrecedence::Initial,
-                    ExpressionContext::default(),
-                    start,
+                self.parse_comma_separated_list_into_vec(
+                    RecoveryContextKind::WithItems(WithItemKind::ParenthesizedExpression),
+                    |p| p.parse_with_item(WithItemParsingState::Regular).item,
                 )
-                .expr
-            };
-
-            let optional_vars = self
-                .at(TokenKind::As)
-                .then(|| Box::new(self.parse_with_item_optional_vars().expr));
-
-            items.push(ast::WithItem {
-                range: self.node_range(start),
-                context_expr,
-                optional_vars,
-            });
+            }
         } else {
-            items.extend(parsed_with_items.drain(..).map(|item| item.item));
+            self.parse_comma_separated_list_into_vec(
+                RecoveryContextKind::WithItems(WithItemKind::Unparenthesized),
+                |p| p.parse_with_item(WithItemParsingState::Regular).item,
+            )
+        }
+    }
+
+    /// Try parsing with-items coming after an ambiguous `(` token.
+    ///
+    /// To understand the ambiguity, consider the following example:
+    ///
+    /// ```python
+    /// with (item1, item2): ...       # Parenthesized with items
+    /// with (item1, item2) as f: ...  # Parenthesized expression
+    /// ```
+    ///
+    /// When the parser is at the `(` token after the `with` keyword, it doesn't know if `(` is
+    /// used to parenthesize the with items or if it's part of a parenthesized expression of the
+    /// first with item. The challenge here is that until the parser sees the matching `)` token,
+    /// it can't resolve the ambiguity.
+    ///
+    /// This method resolves the ambiguity using speculative parsing. It starts with an assumption
+    /// that it's a parenthesized with items. Then, once it finds the matching `)`, it checks if
+    /// the assumption still holds true. If the initial assumption was correct, this will return
+    /// the parsed with items. Otherwise, rewind the parser back to the starting `(` token,
+    /// returning [`None`].
+    ///
+    /// # Panics
+    ///
+    /// If the parser isn't positioned at a `(` token.
+    ///
+    /// See: <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-with_stmt_contents>
+    fn try_parse_parenthesized_with_items(&mut self) -> Option<Vec<WithItem>> {
+        let checkpoint = self.checkpoint();
+
+        // We'll start with the assumption that the with items are parenthesized.
+        let mut with_item_kind = WithItemKind::Parenthesized;
+
+        self.bump(TokenKind::Lpar);
+
+        let mut parsed_with_items = vec![];
+        let mut has_optional_vars = false;
+
+        // test_err with_items_parenthesized_missing_comma
+        // with (item1 item2): ...
+        // with (item1 as f1 item2): ...
+        // with (item1, item2 item3, item4): ...
+        // with (item1, item2 as f1 item3, item4): ...
+        // with (item1, item2: ...
+        self.parse_comma_separated_list(RecoveryContextKind::WithItems(with_item_kind), |p| {
+            let parsed_with_item = p.parse_with_item(WithItemParsingState::Speculative);
+            has_optional_vars |= parsed_with_item.item.optional_vars.is_some();
+            parsed_with_items.push(parsed_with_item);
+        });
+
+        // Check if our assumption is incorrect and it's actually a parenthesized expression.
+        if has_optional_vars {
+            // If any of the with item has optional variables, then our assumption is correct
+            // and it is a parenthesized with items. Now, we need to restrict the grammar for a
+            // with item's context expression which is:
+            //
+            //     with_item: expression ...
+            //
+            // So, named, starred and yield expressions not allowed.
+            for parsed_with_item in &parsed_with_items {
+                if parsed_with_item.is_parenthesized {
+                    // Parentheses resets the precedence.
+                    continue;
+                }
+                let error = match parsed_with_item.item.context_expr {
+                    Expr::Named(_) => ParseErrorType::UnparenthesizedNamedExpression,
+                    Expr::Starred(_) => ParseErrorType::InvalidStarredExpressionUsage,
+                    Expr::Yield(_) | Expr::YieldFrom(_) => {
+                        ParseErrorType::InvalidYieldExpressionUsage
+                    }
+                    _ => continue,
+                };
+                self.add_error(error, &parsed_with_item.item.context_expr);
+            }
+        } else if self.at(TokenKind::Rpar)
+            // test_err with_items_parenthesized_missing_colon
+            // # `)` followed by a newline
+            // with (item1, item2)
+            //     pass
+            && matches!(self.peek(), TokenKind::Colon | TokenKind::Newline)
+        {
+            if parsed_with_items.is_empty() {
+                // No with items, treat it as a parenthesized expression to create an empty
+                // tuple expression.
+                with_item_kind = WithItemKind::ParenthesizedExpression;
+            } else {
+                // These expressions, if unparenthesized, are only allowed if it's a
+                // parenthesized expression and none of the with items have an optional
+                // variable.
+                if parsed_with_items.iter().any(|parsed_with_item| {
+                    !parsed_with_item.is_parenthesized
+                        && matches!(
+                            parsed_with_item.item.context_expr,
+                            Expr::Named(_) | Expr::Starred(_) | Expr::Yield(_) | Expr::YieldFrom(_)
+                        )
+                }) {
+                    with_item_kind = WithItemKind::ParenthesizedExpression;
+                }
+            }
+        } else {
+            // For any other token followed by `)`, if any of the items has an optional
+            // variables (`as ...`), then our assumption is correct. Otherwise, treat
+            // it as a parenthesized expression. For example:
+            //
+            // ```python
+            // with (item1, item2 as f): ...
+            // ```
+            //
+            // This also helps in raising the correct syntax error for the following
+            // case:
+            // ```python
+            // with (item1, item2 as f) as x: ...
+            // #                        ^^
+            // #                        Expecting `:` but got `as`
+            // ```
+            with_item_kind = WithItemKind::ParenthesizedExpression;
         }
 
-        with_item_kind
+        if with_item_kind.is_parenthesized() {
+            Some(
+                parsed_with_items
+                    .into_iter()
+                    .map(|parsed_with_item| parsed_with_item.item)
+                    .collect(),
+            )
+        } else {
+            self.rewind(checkpoint);
+
+            None
+        }
     }
 
     /// Parses a single `with` item.
@@ -2204,93 +2069,33 @@ impl<'src> Parser<'src> {
     fn parse_with_item(&mut self, state: WithItemParsingState) -> ParsedWithItem {
         let start = self.node_start();
 
-        let mut used_ambiguous_lpar = false;
-
         // The grammar for the context expression of a with item depends on the state
         // of with item parsing.
-        let context_expr = if state.is_ambiguous_lpar() {
-            // If it's in an ambiguous state, the parenthesis (`(`) could be part of any
-            // of the following expression:
-            //
-            // Tuple expression          -  star_named_expression
-            // Generator expression      -  named_expression
-            // Parenthesized expression  -  (yield_expr | named_expression)
-            // Parenthesized with items  -  expression
-            //
-            // Here, the right side specifies the grammar for an element corresponding
-            // to the expression mentioned in the left side.
-            //
-            // So, the grammar used should be able to parse an element belonging to any
-            // of the above expression. At a later point, once the parser understands
-            // where the parenthesis belongs to, it'll validate and report errors for
-            // any invalid expression usage.
-            //
-            // Thus, we can conclude that the grammar used should be:
-            //      (yield_expr | star_named_expression)
-            let parsed_expr = self
-                .parse_named_expression_or_higher(ExpressionContext::yield_or_starred_bitwise_or());
-
-            if matches!(self.current_token_kind(), TokenKind::Async | TokenKind::For) {
-                if parsed_expr.is_unparenthesized_starred_expr() {
-                    self.add_error(
-                        ParseErrorType::IterableUnpackingInComprehension,
-                        &parsed_expr,
-                    );
-                }
-
-                let generator_expr =
-                    if let WithItemParsingState::AmbiguousLparFirstItem(lpar_start) = state {
-                        // The parser is at the first with item after the ambiguous `(` token.
-                        // For example:
-                        //
-                        // ```python
-                        // with (x for x in range(10)): ...
-                        // with (x for x in range(10)), item: ...
-                        // ```
-                        let generator_expr = self.parse_generator_expression(
-                            parsed_expr.expr,
-                            GeneratorExpressionInParentheses::Maybe {
-                                lpar_start,
-                                expr_start: start,
-                            },
-                        );
-                        used_ambiguous_lpar = generator_expr.parenthesized;
-                        generator_expr
-                    } else {
-                        // For better error recovery. We would not take this path if the
-                        // expression was parenthesized as it would be parsed as a generator
-                        // expression by `parse_conditional_expression_or_higher`.
-                        //
-                        // ```python
-                        // # This path will be taken for
-                        // with (item, x for x in range(10)): ...
-                        //
-                        // # This path will not be taken for
-                        // with (item, (x for x in range(10))): ...
-                        // ```
-                        self.parse_generator_expression(
-                            parsed_expr.expr,
-                            GeneratorExpressionInParentheses::No(start),
-                        )
-                    };
-
-                if !generator_expr.parenthesized {
-                    self.add_error(
-                        ParseErrorType::OtherError(
-                            "Unparenthesized generator expression cannot be used here".to_string(),
-                        ),
-                        generator_expr.range(),
-                    );
-                }
-
-                Expr::Generator(generator_expr).into()
-            } else {
-                parsed_expr
+        let context_expr = match state {
+            WithItemParsingState::Speculative => {
+                // If it's in a speculative state, the parenthesis (`(`) could be part of any of the
+                // following expression:
+                //
+                // Tuple expression          -  star_named_expression
+                // Generator expression      -  named_expression
+                // Parenthesized expression  -  (yield_expr | named_expression)
+                // Parenthesized with items  -  expression
+                //
+                // Here, the right side specifies the grammar for an element corresponding to the
+                // expression mentioned in the left side.
+                //
+                // So, the grammar used should be able to parse an element belonging to any of the
+                // above expression. At a later point, once the parser understands where the
+                // parenthesis belongs to, it'll validate and report errors for any invalid expression
+                // usage.
+                //
+                // Thus, we can conclude that the grammar used should be:
+                //      (yield_expr | star_named_expression)
+                self.parse_named_expression_or_higher(
+                    ExpressionContext::yield_or_starred_bitwise_or(),
+                )
             }
-        } else {
-            // If it's not in an ambiguous state, then the grammar of the with item
-            // should be used which is `expression`.
-            self.parse_conditional_expression_or_higher()
+            WithItemParsingState::Regular => self.parse_conditional_expression_or_higher(),
         };
 
         let optional_vars = self
@@ -2299,7 +2104,6 @@ impl<'src> Parser<'src> {
 
         ParsedWithItem {
             is_parenthesized: context_expr.is_parenthesized,
-            used_ambiguous_lpar,
             item: ast::WithItem {
                 range: self.node_range(start),
                 context_expr: context_expr.expr,
@@ -2327,6 +2131,84 @@ impl<'src> Parser<'src> {
         target
     }
 
+    /// Try parsing a `match` statement.
+    ///
+    /// This uses speculative parsing to remove the ambiguity of whether the `match` token is used
+    /// as a keyword or an identifier. This ambiguity arises only in if the `match` token is
+    /// followed by certain tokens. For example, if `match` is followed by `[`, we can't know if
+    /// it's used in the context of a subscript expression or as a list expression:
+    ///
+    /// ```python
+    /// # Subcript expression; `match` is an identifier
+    /// match[x]
+    ///
+    /// # List expression; `match` is a keyword
+    /// match [x, y]:
+    ///     case [1, 2]:
+    ///         pass
+    /// ```
+    ///
+    /// This is done by parsing the subject expression considering `match` as a keyword token.
+    /// Then, based on certain heuristics we'll determine if our assumption is true. If so, we'll
+    /// continue parsing the entire match statement. Otherwise, return `None`.
+    ///
+    /// # Panics
+    ///
+    /// If the parser isn't positioned at a `match` token.
+    ///
+    /// See: <https://docs.python.org/3/reference/compound_stmts.html#the-match-statement>
+    fn try_parse_match_statement(&mut self) -> Option<ast::StmtMatch> {
+        let checkpoint = self.checkpoint();
+
+        let start = self.node_start();
+        self.bump(TokenKind::Match);
+
+        let subject = self.parse_match_subject_expression();
+
+        match self.current_token_kind() {
+            TokenKind::Colon => {
+                // `match` is a keyword
+                self.bump(TokenKind::Colon);
+
+                let cases = self.parse_match_body();
+
+                Some(ast::StmtMatch {
+                    subject: Box::new(subject),
+                    cases,
+                    range: self.node_range(start),
+                })
+            }
+            TokenKind::Newline if matches!(self.peek2(), (TokenKind::Indent, TokenKind::Case)) => {
+                // `match` is a keyword
+
+                // test_err match_expected_colon
+                // match [1, 2]
+                //     case _: ...
+                self.add_error(
+                    ParseErrorType::ExpectedToken {
+                        found: self.current_token_kind(),
+                        expected: TokenKind::Colon,
+                    },
+                    self.current_token_range(),
+                );
+
+                let cases = self.parse_match_body();
+
+                Some(ast::StmtMatch {
+                    subject: Box::new(subject),
+                    cases,
+                    range: self.node_range(start),
+                })
+            }
+            _ => {
+                // `match` is an identifier
+                self.rewind(checkpoint);
+
+                None
+            }
+        }
+    }
+
     /// Parses a match statement.
     ///
     /// # Panics
@@ -2338,7 +2220,21 @@ impl<'src> Parser<'src> {
         let start = self.node_start();
         self.bump(TokenKind::Match);
 
-        let subject_start = self.node_start();
+        let subject = self.parse_match_subject_expression();
+        self.expect(TokenKind::Colon);
+
+        let cases = self.parse_match_body();
+
+        ast::StmtMatch {
+            subject: Box::new(subject),
+            cases,
+            range: self.node_range(start),
+        }
+    }
+
+    /// Parses the subject expression for a `match` statement.
+    fn parse_match_subject_expression(&mut self) -> Expr {
+        let start = self.node_start();
 
         // Subject expression grammar is:
         //
@@ -2370,13 +2266,12 @@ impl<'src> Parser<'src> {
         //     case _: ...
         // match yield x:
         //     case _: ...
-        let subject = if self.at(TokenKind::Comma) {
-            let tuple =
-                self.parse_tuple_expression(subject.expr, subject_start, Parenthesized::No, |p| {
-                    p.parse_named_expression_or_higher(ExpressionContext::starred_bitwise_or())
-                });
+        if self.at(TokenKind::Comma) {
+            let tuple = self.parse_tuple_expression(subject.expr, start, Parenthesized::No, |p| {
+                p.parse_named_expression_or_higher(ExpressionContext::starred_bitwise_or())
+            });
 
-            Expr::Tuple(tuple).into()
+            Expr::Tuple(tuple)
         } else {
             if subject.is_unparenthesized_starred_expr() {
                 // test_err match_stmt_single_starred_subject
@@ -2384,11 +2279,15 @@ impl<'src> Parser<'src> {
                 //     case _: ...
                 self.add_error(ParseErrorType::InvalidStarredExpressionUsage, &subject);
             }
-            subject
-        };
+            subject.expr
+        }
+    }
 
-        self.expect(TokenKind::Colon);
-
+    /// Parses the body of a `match` statement.
+    ///
+    /// This method expects that the parser is positioned at a `Newline` token. If not, it adds a
+    /// syntax error and continues parsing.
+    fn parse_match_body(&mut self) -> Vec<ast::MatchCase> {
         // test_err match_stmt_no_newline_before_case
         // match foo: case _: ...
         self.expect(TokenKind::Newline);
@@ -2411,11 +2310,7 @@ impl<'src> Parser<'src> {
         // TODO(dhruvmanila): Should we expect `Dedent` only if there was an `Indent` present?
         self.expect(TokenKind::Dedent);
 
-        ast::StmtMatch {
-            subject: Box::new(subject.expr),
-            cases,
-            range: self.node_range(start),
-        }
+        cases
     }
 
     /// Parses a list of match case blocks.
@@ -2458,7 +2353,6 @@ impl<'src> Parser<'src> {
         self.bump(TokenKind::Case);
 
         // test_err match_stmt_missing_pattern
-        // # TODO(dhruvmanila): Here, `case` is a name token because of soft keyword transformer
         // match x:
         //     case : ...
         let pattern = self.parse_match_patterns();
@@ -2557,8 +2451,6 @@ impl<'src> Parser<'src> {
                 // async while test: ...
                 // async x = 1
                 // async async def foo(): ...
-                // # TODO(dhruvmanila): Here, `match` is actually a Name token because
-                // # of the soft keyword # transformer
                 // async match test:
                 //     case _: ...
                 self.add_error(
@@ -2890,7 +2782,7 @@ impl<'src> Parser<'src> {
                     let star_range = parser.current_token_range();
                     parser.bump(TokenKind::Star);
 
-                    if parser.at(TokenKind::Name) {
+                    if parser.at_name_or_soft_keyword() {
                         let param = parser.parse_parameter(param_start, function_kind, AllowStarAnnotation::Yes);
                         let param_star_range = parser.node_range(star_range.start());
 
@@ -3049,7 +2941,7 @@ impl<'src> Parser<'src> {
 
                     last_keyword_only_separator_range = None;
                 }
-                TokenKind::Name => {
+                _ if parser.at_name_or_soft_keyword() => {
                     let param = parser.parse_parameter_with_default(param_start, function_kind);
 
                     // TODO(dhruvmanila): Pyright seems to only highlight the first non-default argument
@@ -3371,36 +3263,133 @@ impl<'src> Parser<'src> {
     ///
     /// Report errors for all the duplicate names found.
     fn validate_parameters(&mut self, parameters: &ast::Parameters) {
-        let mut all_arg_names = FxHashSet::with_capacity_and_hasher(
-            parameters.posonlyargs.len()
-                + parameters.args.len()
-                + usize::from(parameters.vararg.is_some())
-                + parameters.kwonlyargs.len()
-                + usize::from(parameters.kwarg.is_some()),
-            BuildHasherDefault::default(),
-        );
+        let mut all_arg_names =
+            FxHashSet::with_capacity_and_hasher(parameters.len(), BuildHasherDefault::default());
 
-        let posonlyargs = parameters.posonlyargs.iter();
-        let args = parameters.args.iter();
-        let kwonlyargs = parameters.kwonlyargs.iter();
-
-        let vararg = parameters.vararg.as_deref();
-        let kwarg = parameters.kwarg.as_deref();
-
-        for arg in posonlyargs
-            .chain(args)
-            .chain(kwonlyargs)
-            .map(|arg| &arg.parameter)
-            .chain(vararg)
-            .chain(kwarg)
-        {
-            let range = arg.name.range;
-            let arg_name = arg.name.as_str();
-            if !all_arg_names.insert(arg_name) {
+        for parameter in parameters {
+            let range = parameter.name().range();
+            let param_name = parameter.name().as_str();
+            if !all_arg_names.insert(param_name) {
                 self.add_error(
-                    ParseErrorType::DuplicateParameter(arg_name.to_string()),
+                    ParseErrorType::DuplicateParameter(param_name.to_string()),
                     range,
                 );
+            }
+        }
+    }
+
+    /// Classify the `match` soft keyword token.
+    ///
+    /// # Panics
+    ///
+    /// If the parser isn't positioned at a `match` token.
+    fn classify_match_token(&mut self) -> MatchTokenKind {
+        assert_eq!(self.current_token_kind(), TokenKind::Match);
+
+        let (first, second) = self.peek2();
+
+        match first {
+            // test_ok match_classify_as_identifier_1
+            // match not in case
+            TokenKind::Not if second == TokenKind::In => MatchTokenKind::Identifier,
+
+            // test_ok match_classify_as_keyword_1
+            // match foo:
+            //     case _: ...
+            // match 1:
+            //     case _: ...
+            // match 1.0:
+            //     case _: ...
+            // match 1j:
+            //     case _: ...
+            // match "foo":
+            //     case _: ...
+            // match f"foo {x}":
+            //     case _: ...
+            // match {1, 2}:
+            //     case _: ...
+            // match ~foo:
+            //     case _: ...
+            // match ...:
+            //     case _: ...
+            // match not foo:
+            //     case _: ...
+            // match await foo():
+            //     case _: ...
+            // match lambda foo: foo:
+            //     case _: ...
+
+            // test_err match_classify_as_keyword
+            // match yield foo:
+            //     case _: ...
+            TokenKind::Name
+            | TokenKind::Int
+            | TokenKind::Float
+            | TokenKind::Complex
+            | TokenKind::String
+            | TokenKind::FStringStart
+            | TokenKind::Lbrace
+            | TokenKind::Tilde
+            | TokenKind::Ellipsis
+            | TokenKind::Not
+            | TokenKind::Await
+            | TokenKind::Yield
+            | TokenKind::Lambda => MatchTokenKind::Keyword,
+
+            // test_ok match_classify_as_keyword_or_identifier
+            // match (1, 2)  # Identifier
+            // match (1, 2):  # Keyword
+            //     case _: ...
+            // match [1:]  # Identifier
+            // match [1, 2]:  # Keyword
+            //     case _: ...
+            // match * foo  # Identifier
+            // match - foo  # Identifier
+            // match -foo:  # Keyword
+            //     case _: ...
+
+            // test_err match_classify_as_keyword_or_identifier
+            // match *foo:  # Keyword
+            //     case _: ...
+            TokenKind::Lpar
+            | TokenKind::Lsqb
+            | TokenKind::Star
+            | TokenKind::Plus
+            | TokenKind::Minus => MatchTokenKind::KeywordOrIdentifier,
+
+            _ => {
+                if first.is_soft_keyword() || first.is_singleton() {
+                    // test_ok match_classify_as_keyword_2
+                    // match match:
+                    //     case _: ...
+                    // match case:
+                    //     case _: ...
+                    // match type:
+                    //     case _: ...
+                    // match None:
+                    //     case _: ...
+                    // match True:
+                    //     case _: ...
+                    // match False:
+                    //     case _: ...
+                    MatchTokenKind::Keyword
+                } else {
+                    // test_ok match_classify_as_identifier_2
+                    // match
+                    // match != foo
+                    // (foo, match)
+                    // [foo, match]
+                    // {foo, match}
+                    // match;
+                    // match: int
+                    // match,
+                    // match.foo
+                    // match / foo
+                    // match << foo
+                    // match and foo
+                    // match is not foo
+                    MatchTokenKind::Identifier
+                }
             }
         }
     }
@@ -3496,48 +3485,61 @@ impl Display for Clause {
     }
 }
 
+/// The classification of the `match` token.
+///
+/// The `match` token is a soft keyword which means, depending on the context, it can be used as a
+/// keyword or an identifier.
+#[derive(Debug, Clone, Copy)]
+enum MatchTokenKind {
+    /// The `match` token is used as a keyword.
+    ///
+    /// For example:
+    /// ```python
+    /// match foo:
+    ///     case _:
+    ///         pass
+    /// ```
+    Keyword,
+
+    /// The `match` token is used as an identifier.
+    ///
+    /// For example:
+    /// ```python
+    /// match.values()
+    /// match is None
+    /// ````
+    Identifier,
+
+    /// The `match` token is used as either a keyword or an identifier.
+    ///
+    /// For example:
+    /// ```python
+    /// # Used as a keyword
+    /// match [x, y]:
+    ///     case [1, 2]:
+    ///         pass
+    ///
+    /// # Used as an identifier
+    /// match[x]
+    /// ```
+    KeywordOrIdentifier,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum WithItemParsingState {
-    /// The parser is currently parsing a with item without any ambiguity.
+    /// Parsing the with items without any ambiguity.
     Regular,
 
-    /// The parser is currently parsing the first with item after an ambiguous
-    /// left parenthesis. The contained offset is the start of the left parenthesis.
-    ///
-    /// ```python
-    /// with (item1, item2): ...
-    /// ```
-    ///
-    /// The parser is at the start of `item1`.
-    AmbiguousLparFirstItem(TextSize),
-
-    /// The parser is currently parsing one of the with items after an ambiguous
-    /// left parenthesis, but not the first one.
-    ///
-    /// ```python
-    /// with (item1, item2, item3): ...
-    /// ```
-    ///
-    /// The parser could be at the start of `item2` or `item3`, but not `item1`.
-    AmbiguousLparRest,
+    /// Parsing the with items in a speculative mode.
+    Speculative,
 }
 
-impl WithItemParsingState {
-    const fn is_ambiguous_lpar(self) -> bool {
-        matches!(
-            self,
-            Self::AmbiguousLparFirstItem(_) | Self::AmbiguousLparRest
-        )
-    }
-}
-
+#[derive(Debug)]
 struct ParsedWithItem {
     /// The contained with item.
     item: WithItem,
     /// If the context expression of the item is parenthesized.
     is_parenthesized: bool,
-    /// If the parsing used the ambiguous left parenthesis.
-    used_ambiguous_lpar: bool,
 }
 
 #[derive(Debug, Copy, Clone)]

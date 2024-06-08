@@ -1,45 +1,29 @@
-pub mod check;
-
-use std::path::Path;
+use std::collections::hash_map::Entry;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use crate::db::{Db, HasJar, SemanticDb, SemanticJar, SourceDb, SourceJar};
+use rustc_hash::FxHashMap;
+
+use crate::db::{
+    Database, Db, DbRuntime, DbWithJar, HasJar, HasJars, JarsStorage, LintDb, LintJar,
+    ParallelDatabase, QueryResult, SemanticDb, SemanticJar, Snapshot, SourceDb, SourceJar, Upcast,
+};
 use crate::files::{FileId, Files};
-use crate::lint::{
-    lint_semantic, lint_syntax, Diagnostics, LintSemanticStorage, LintSyntaxStorage,
-};
-use crate::module::{
-    add_module, file_to_module, path_to_module, resolve_module, set_module_search_paths, Module,
-    ModuleData, ModuleName, ModuleResolver, ModuleSearchPath,
-};
-use crate::parse::{parse, Parsed, ParsedStorage};
-use crate::source::{source_text, Source, SourceStorage};
-use crate::symbols::{symbol_table, SymbolId, SymbolTable, SymbolTablesStorage};
-use crate::types::{infer_symbol_type, Type, TypeStore};
 use crate::Workspace;
+
+pub mod check;
 
 #[derive(Debug)]
 pub struct Program {
+    jars: JarsStorage<Program>,
     files: Files,
-    source: SourceJar,
-    semantic: SemanticJar,
     workspace: Workspace,
 }
 
 impl Program {
-    pub fn new(workspace: Workspace, module_search_paths: Vec<ModuleSearchPath>) -> Self {
+    pub fn new(workspace: Workspace) -> Self {
         Self {
-            source: SourceJar {
-                sources: SourceStorage::default(),
-                parsed: ParsedStorage::default(),
-                lint_syntax: LintSyntaxStorage::default(),
-            },
-            semantic: SemanticJar {
-                module_resolver: ModuleResolver::new(module_search_paths),
-                symbol_tables: SymbolTablesStorage::default(),
-                type_store: TypeStore::default(),
-                lint_semantic: LintSemanticStorage::default(),
-            },
+            jars: JarsStorage::default(),
             files: Files::default(),
             workspace,
         }
@@ -47,19 +31,25 @@ impl Program {
 
     pub fn apply_changes<I>(&mut self, changes: I)
     where
-        I: IntoIterator<Item = FileChange>,
+        I: IntoIterator<Item = FileWatcherChange>,
     {
-        for change in changes {
-            self.semantic
-                .module_resolver
-                .remove_module(&self.file_path(change.id));
-            self.semantic.symbol_tables.remove(&change.id);
-            self.source.sources.remove(&change.id);
-            self.source.parsed.remove(&change.id);
-            self.source.lint_syntax.remove(&change.id);
+        let mut aggregated_changes = AggregatedChanges::default();
+
+        aggregated_changes.extend(changes.into_iter().map(|change| FileChange {
+            id: self.files.intern(&change.path),
+            kind: change.kind,
+        }));
+
+        let (source, semantic, lint) = self.jars_mut();
+        for change in aggregated_changes.iter() {
+            semantic.module_resolver.remove_module_by_file(change.id);
+            semantic.semantic_indices.remove(&change.id);
+            source.sources.remove(&change.id);
+            source.parsed.remove(&change.id);
             // TODO: remove all dependent modules as well
-            self.semantic.type_store.remove_module(change.id);
-            self.semantic.lint_semantic.remove(&change.id);
+            semantic.type_store.remove_module(change.id);
+            lint.lint_syntax.remove(&change.id);
+            lint.lint_semantic.remove(&change.id);
         }
     }
 
@@ -84,93 +74,124 @@ impl SourceDb for Program {
     fn file_path(&self, file_id: FileId) -> Arc<Path> {
         self.files.path(file_id)
     }
+}
 
-    fn source(&self, file_id: FileId) -> Source {
-        source_text(self, file_id)
-    }
+impl DbWithJar<SourceJar> for Program {}
 
-    fn parse(&self, file_id: FileId) -> Parsed {
-        parse(self, file_id)
-    }
+impl SemanticDb for Program {}
 
-    fn lint_syntax(&self, file_id: FileId) -> Diagnostics {
-        lint_syntax(self, file_id)
+impl DbWithJar<SemanticJar> for Program {}
+
+impl LintDb for Program {}
+
+impl DbWithJar<LintJar> for Program {}
+
+impl Upcast<dyn SemanticDb> for Program {
+    fn upcast(&self) -> &(dyn SemanticDb + 'static) {
+        self
     }
 }
 
-impl SemanticDb for Program {
-    fn resolve_module(&self, name: ModuleName) -> Option<Module> {
-        resolve_module(self, name)
+impl Upcast<dyn SourceDb> for Program {
+    fn upcast(&self) -> &(dyn SourceDb + 'static) {
+        self
     }
+}
 
-    fn file_to_module(&self, file_id: FileId) -> Option<Module> {
-        file_to_module(self, file_id)
-    }
-
-    fn path_to_module(&self, path: &Path) -> Option<Module> {
-        path_to_module(self, path)
-    }
-
-    fn symbol_table(&self, file_id: FileId) -> Arc<SymbolTable> {
-        symbol_table(self, file_id)
-    }
-
-    fn infer_symbol_type(&self, file_id: FileId, symbol_id: SymbolId) -> Type {
-        infer_symbol_type(self, file_id, symbol_id)
-    }
-
-    fn lint_semantic(&self, file_id: FileId) -> Diagnostics {
-        lint_semantic(self, file_id)
-    }
-
-    // Mutations
-    fn add_module(&mut self, path: &Path) -> Option<(Module, Vec<Arc<ModuleData>>)> {
-        add_module(self, path)
-    }
-
-    fn set_module_search_paths(&mut self, paths: Vec<ModuleSearchPath>) {
-        set_module_search_paths(self, paths);
+impl Upcast<dyn LintDb> for Program {
+    fn upcast(&self) -> &(dyn LintDb + 'static) {
+        self
     }
 }
 
 impl Db for Program {}
 
+impl Database for Program {
+    fn runtime(&self) -> &DbRuntime {
+        self.jars.runtime()
+    }
+
+    fn runtime_mut(&mut self) -> &mut DbRuntime {
+        self.jars.runtime_mut()
+    }
+}
+
+impl ParallelDatabase for Program {
+    fn snapshot(&self) -> Snapshot<Self> {
+        Snapshot::new(Self {
+            jars: self.jars.snapshot(),
+            files: self.files.snapshot(),
+            workspace: self.workspace.clone(),
+        })
+    }
+}
+
+impl HasJars for Program {
+    type Jars = (SourceJar, SemanticJar, LintJar);
+
+    fn jars(&self) -> QueryResult<&Self::Jars> {
+        self.jars.jars()
+    }
+
+    fn jars_mut(&mut self) -> &mut Self::Jars {
+        self.jars.jars_mut()
+    }
+}
+
 impl HasJar<SourceJar> for Program {
-    fn jar(&self) -> &SourceJar {
-        &self.source
+    fn jar(&self) -> QueryResult<&SourceJar> {
+        Ok(&self.jars()?.0)
     }
 
     fn jar_mut(&mut self) -> &mut SourceJar {
-        &mut self.source
+        &mut self.jars_mut().0
     }
 }
 
 impl HasJar<SemanticJar> for Program {
-    fn jar(&self) -> &SemanticJar {
-        &self.semantic
+    fn jar(&self) -> QueryResult<&SemanticJar> {
+        Ok(&self.jars()?.1)
     }
 
     fn jar_mut(&mut self) -> &mut SemanticJar {
-        &mut self.semantic
+        &mut self.jars_mut().1
+    }
+}
+
+impl HasJar<LintJar> for Program {
+    fn jar(&self) -> QueryResult<&LintJar> {
+        Ok(&self.jars()?.2)
+    }
+
+    fn jar_mut(&mut self) -> &mut LintJar {
+        &mut self.jars_mut().2
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct FileWatcherChange {
+    path: PathBuf,
+    kind: FileChangeKind,
+}
+
+impl FileWatcherChange {
+    pub fn new(path: PathBuf, kind: FileChangeKind) -> Self {
+        Self { path, kind }
     }
 }
 
 #[derive(Copy, Clone, Debug)]
-pub struct FileChange {
+struct FileChange {
     id: FileId,
     kind: FileChangeKind,
 }
 
 impl FileChange {
-    pub fn new(file_id: FileId, kind: FileChangeKind) -> Self {
-        Self { id: file_id, kind }
-    }
-
-    pub fn file_id(&self) -> FileId {
+    fn file_id(self) -> FileId {
         self.id
     }
 
-    pub fn kind(&self) -> FileChangeKind {
+    fn kind(self) -> FileChangeKind {
         self.kind
     }
 }
@@ -180,4 +201,75 @@ pub enum FileChangeKind {
     Created,
     Modified,
     Deleted,
+}
+
+#[derive(Default, Debug)]
+struct AggregatedChanges {
+    changes: FxHashMap<FileId, FileChangeKind>,
+}
+
+impl AggregatedChanges {
+    fn add(&mut self, change: FileChange) {
+        match self.changes.entry(change.file_id()) {
+            Entry::Occupied(mut entry) => {
+                let merged = entry.get_mut();
+
+                match (merged, change.kind()) {
+                    (FileChangeKind::Created, FileChangeKind::Deleted) => {
+                        // Deletion after creations means that ruff never saw the file.
+                        entry.remove();
+                    }
+                    (FileChangeKind::Created, FileChangeKind::Modified) => {
+                        // No-op, for ruff, modifying a file that it doesn't yet know that it exists is still considered a creation.
+                    }
+
+                    (FileChangeKind::Modified, FileChangeKind::Created) => {
+                        // Uhh, that should probably not happen. Continue considering it a modification.
+                    }
+
+                    (FileChangeKind::Modified, FileChangeKind::Deleted) => {
+                        *entry.get_mut() = FileChangeKind::Deleted;
+                    }
+
+                    (FileChangeKind::Deleted, FileChangeKind::Created) => {
+                        *entry.get_mut() = FileChangeKind::Modified;
+                    }
+
+                    (FileChangeKind::Deleted, FileChangeKind::Modified) => {
+                        // That's weird, but let's consider it a modification.
+                        *entry.get_mut() = FileChangeKind::Modified;
+                    }
+
+                    (FileChangeKind::Created, FileChangeKind::Created)
+                    | (FileChangeKind::Modified, FileChangeKind::Modified)
+                    | (FileChangeKind::Deleted, FileChangeKind::Deleted) => {
+                        // No-op transitions. Some of them should be impossible but we handle them anyway.
+                    }
+                }
+            }
+            Entry::Vacant(entry) => {
+                entry.insert(change.kind());
+            }
+        }
+    }
+
+    fn extend<I>(&mut self, changes: I)
+    where
+        I: IntoIterator<Item = FileChange>,
+    {
+        let iter = changes.into_iter();
+        let (lower, _) = iter.size_hint();
+        self.changes.reserve(lower);
+
+        for change in iter {
+            self.add(change);
+        }
+    }
+
+    fn iter(&self) -> impl Iterator<Item = FileChange> + '_ {
+        self.changes.iter().map(|(id, kind)| FileChange {
+            id: *id,
+            kind: *kind,
+        })
+    }
 }

@@ -129,3 +129,12 @@ try:
     ...
 except Exception as e:
     raise ValueError from e
+
+
+try:
+    pass
+except Exception:
+    if True:
+        exception("An error occurred")
+    else:
+        exception("An error occurred")

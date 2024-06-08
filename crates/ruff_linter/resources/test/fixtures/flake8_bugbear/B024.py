@@ -115,25 +115,25 @@ class non_keyword_abcmeta_2(abc.ABCMeta):  # safe
 
 
 # very invalid code, but that's up to mypy et al to check
-class keyword_abc_1(metaclass=ABC):  # safe
+class keyword_abc_1(metaclass=ABC):  # incorrect but outside scope of this check
     def method(self):
         foo()
 
 
-class keyword_abc_2(metaclass=abc.ABC):  # safe
+class keyword_abc_2(metaclass=abc.ABC):  # incorrect but outside scope of this check
     def method(self):
         foo()
 
 
-class abc_set_class_variable_1(ABC):  # safe
+class abc_set_class_variable_1(ABC):  # safe (abstract attribute)
     foo: int
 
 
-class abc_set_class_variable_2(ABC):  # safe
+class abc_set_class_variable_2(ABC):  # error (not an abstract attribute)
     foo = 2
 
 
-class abc_set_class_variable_3(ABC):  # safe
+class abc_set_class_variable_3(ABC):  # error (not an abstract attribute)
     foo: int = 2
 
 

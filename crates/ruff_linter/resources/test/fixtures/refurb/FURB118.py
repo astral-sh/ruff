@@ -31,6 +31,8 @@ op_itemgetter = lambda x: x[0]
 op_itemgetter = lambda x: (x[0], x[1], x[2])
 op_itemgetter = lambda x: (x[1:], x[2])
 op_itemgetter = lambda x: x[:]
+op_itemgetter = lambda x: x[0, 1]
+op_itemgetter = lambda x: x[(0, 1)]
 
 
 def op_not2(x):
@@ -60,6 +62,7 @@ op_itemgetter = lambda x, y: (x[0], y[0])
 op_itemgetter = lambda x: ()
 op_itemgetter = lambda x: (*x[0], x[1])
 op_itemgetter = lambda x: (x[0],)
+op_itemgetter = lambda x: x[x]
 
 
 def op_neg3(x, y):
@@ -73,3 +76,10 @@ def op_add4(x, y=1):
 def op_add5(x, y):
     print("op_add5")
     return x + y
+
+
+# OK
+class Class:
+    @staticmethod
+    def add(x, y):
+        return x + y

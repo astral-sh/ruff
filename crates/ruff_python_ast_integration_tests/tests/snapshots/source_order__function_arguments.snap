@@ -1,0 +1,25 @@
+---
+source: crates/ruff_python_ast_integration_tests/tests/preorder.rs
+expression: trace
+---
+- ModModule
+  - StmtFunctionDef
+    - Parameters
+      - ParameterWithDefault
+        - Parameter
+      - ParameterWithDefault
+        - Parameter
+      - ParameterWithDefault
+        - Parameter
+      - ParameterWithDefault
+        - Parameter
+        - ExprNumberLiteral
+      - Parameter
+      - ParameterWithDefault
+        - Parameter
+        - ExprNumberLiteral
+      - ParameterWithDefault
+        - Parameter
+        - ExprNumberLiteral
+      - Parameter
+    - StmtPass

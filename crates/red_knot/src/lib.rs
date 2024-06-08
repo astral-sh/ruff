@@ -17,9 +17,8 @@ pub mod lint;
 pub mod module;
 mod parse;
 pub mod program;
+mod semantic;
 pub mod source;
-mod symbols;
-mod types;
 pub mod watch;
 
 pub(crate) type FxDashMap<K, V> = dashmap::DashMap<K, V, BuildHasherDefault<FxHasher>>;
@@ -27,7 +26,7 @@ pub(crate) type FxDashMap<K, V> = dashmap::DashMap<K, V, BuildHasherDefault<FxHa
 pub(crate) type FxDashSet<V> = dashmap::DashSet<V, BuildHasherDefault<FxHasher>>;
 pub(crate) type FxIndexSet<V> = indexmap::set::IndexSet<V, BuildHasherDefault<FxHasher>>;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Workspace {
     /// TODO this should be a resolved path. We should probably use a newtype wrapper that guarantees that
     /// PATH is a UTF-8 path and is normalized.

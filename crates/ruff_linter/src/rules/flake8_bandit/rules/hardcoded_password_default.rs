@@ -74,11 +74,7 @@ pub(crate) fn hardcoded_password_default(checker: &mut Checker, parameters: &Par
         parameter,
         default,
         range: _,
-    } in parameters
-        .posonlyargs
-        .iter()
-        .chain(&parameters.args)
-        .chain(&parameters.kwonlyargs)
+    } in parameters.iter_non_variadic_params()
     {
         let Some(default) = default else {
             continue;

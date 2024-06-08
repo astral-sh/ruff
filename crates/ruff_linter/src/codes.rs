@@ -222,6 +222,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "C0131") => (RuleGroup::Stable, rules::pylint::rules::TypeBivariance),
         (Pylint, "C0132") => (RuleGroup::Stable, rules::pylint::rules::TypeParamNameMismatch),
         (Pylint, "C0205") => (RuleGroup::Stable, rules::pylint::rules::SingleStringSlots),
+        (Pylint, "C0206") => (RuleGroup::Preview, rules::pylint::rules::DictIndexMissingItems),
         (Pylint, "C0208") => (RuleGroup::Stable, rules::pylint::rules::IterationOverSet),
         (Pylint, "C0414") => (RuleGroup::Stable, rules::pylint::rules::UselessImportAlias),
         (Pylint, "C0415") => (RuleGroup::Preview, rules::pylint::rules::ImportOutsideTopLevel),
@@ -334,6 +335,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Async, "100") => (RuleGroup::Stable, rules::flake8_async::rules::BlockingHttpCallInAsyncFunction),
         (Flake8Async, "101") => (RuleGroup::Stable, rules::flake8_async::rules::OpenSleepOrSubprocessInAsyncFunction),
         (Flake8Async, "102") => (RuleGroup::Stable, rules::flake8_async::rules::BlockingOsCallInAsyncFunction),
+        (Flake8Async, "116") => (RuleGroup::Preview, rules::flake8_async::rules::SleepForeverCall),
 
         // flake8-trio
         (Flake8Trio, "100") => (RuleGroup::Stable, rules::flake8_trio::rules::TrioTimeoutWithoutAwait),
@@ -382,6 +384,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Bugbear, "033") => (RuleGroup::Stable, rules::flake8_bugbear::rules::DuplicateValue),
         (Flake8Bugbear, "034") => (RuleGroup::Stable, rules::flake8_bugbear::rules::ReSubPositionalArgs),
         (Flake8Bugbear, "035") => (RuleGroup::Stable, rules::flake8_bugbear::rules::StaticKeyDictComprehension),
+        (Flake8Bugbear, "901") => (RuleGroup::Preview, rules::flake8_bugbear::rules::ReturnInGenerator),
         (Flake8Bugbear, "904") => (RuleGroup::Stable, rules::flake8_bugbear::rules::RaiseWithoutFromInsideExcept),
         (Flake8Bugbear, "905") => (RuleGroup::Stable, rules::flake8_bugbear::rules::ZipWithoutExplicitStrict),
         (Flake8Bugbear, "909") => (RuleGroup::Preview, rules::flake8_bugbear::rules::LoopIteratorMutation),
@@ -808,6 +811,12 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Pyi, "055") => (RuleGroup::Stable, rules::flake8_pyi::rules::UnnecessaryTypeUnion),
         (Flake8Pyi, "056") => (RuleGroup::Stable, rules::flake8_pyi::rules::UnsupportedMethodCallOnAll),
         (Flake8Pyi, "058") => (RuleGroup::Stable, rules::flake8_pyi::rules::GeneratorReturnFromIterMethod),
+        (Flake8Pyi, "057") => (RuleGroup::Preview, rules::flake8_pyi::rules::ByteStringUsage),
+        (Flake8Pyi, "059") => (RuleGroup::Preview, rules::flake8_pyi::rules::GenericNotLastBaseClass),
+        (Flake8Pyi, "062") => (RuleGroup::Preview, rules::flake8_pyi::rules::DuplicateLiteralMember),
+        (Flake8Pyi, "063") => (RuleGroup::Preview, rules::flake8_pyi::rules::PrePep570PositionalArgument),
+        (Flake8Pyi, "064") => (RuleGroup::Preview, rules::flake8_pyi::rules::RedundantFinalLiteral),
+        (Flake8Pyi, "066") => (RuleGroup::Preview, rules::flake8_pyi::rules::BadVersionInfoOrder),
 
         // flake8-pytest-style
         (Flake8PytestStyle, "001") => (RuleGroup::Stable, rules::flake8_pytest_style::rules::PytestFixtureIncorrectParenthesesStyle),
@@ -971,32 +980,32 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "100") => (RuleGroup::Stable, rules::ruff::rules::UnusedNOQA),
         (Ruff, "101") => (RuleGroup::Preview, rules::ruff::rules::RedirectedNOQA),
         (Ruff, "200") => (RuleGroup::Stable, rules::ruff::rules::InvalidPyprojectToml),
-        #[cfg(feature = "test-rules")]
+        #[cfg(any(feature = "test-rules", test))]
         (Ruff, "900") => (RuleGroup::Stable, rules::ruff::rules::StableTestRule),
-        #[cfg(feature = "test-rules")]
+        #[cfg(any(feature = "test-rules", test))]
         (Ruff, "901") => (RuleGroup::Stable, rules::ruff::rules::StableTestRuleSafeFix),
-        #[cfg(feature = "test-rules")]
+        #[cfg(any(feature = "test-rules", test))]
         (Ruff, "902") => (RuleGroup::Stable, rules::ruff::rules::StableTestRuleUnsafeFix),
-        #[cfg(feature = "test-rules")]
+        #[cfg(any(feature = "test-rules", test))]
         (Ruff, "903") => (RuleGroup::Stable, rules::ruff::rules::StableTestRuleDisplayOnlyFix),
-        #[cfg(feature = "test-rules")]
+        #[cfg(any(feature = "test-rules", test))]
         (Ruff, "911") => (RuleGroup::Preview, rules::ruff::rules::PreviewTestRule),
-        #[cfg(feature = "test-rules")]
+        #[cfg(any(feature = "test-rules", test))]
         #[allow(deprecated)]
         (Ruff, "912") => (RuleGroup::Nursery, rules::ruff::rules::NurseryTestRule),
-        #[cfg(feature = "test-rules")]
+        #[cfg(any(feature = "test-rules", test))]
         (Ruff, "920") => (RuleGroup::Deprecated, rules::ruff::rules::DeprecatedTestRule),
-        #[cfg(feature = "test-rules")]
+        #[cfg(any(feature = "test-rules", test))]
         (Ruff, "921") => (RuleGroup::Deprecated, rules::ruff::rules::AnotherDeprecatedTestRule),
-        #[cfg(feature = "test-rules")]
+        #[cfg(any(feature = "test-rules", test))]
         (Ruff, "930") => (RuleGroup::Removed, rules::ruff::rules::RemovedTestRule),
-        #[cfg(feature = "test-rules")]
+        #[cfg(any(feature = "test-rules", test))]
         (Ruff, "931") => (RuleGroup::Removed, rules::ruff::rules::AnotherRemovedTestRule),
-        #[cfg(feature = "test-rules")]
+        #[cfg(any(feature = "test-rules", test))]
         (Ruff, "940") => (RuleGroup::Removed, rules::ruff::rules::RedirectedFromTestRule),
-        #[cfg(feature = "test-rules")]
+        #[cfg(any(feature = "test-rules", test))]
         (Ruff, "950") => (RuleGroup::Stable, rules::ruff::rules::RedirectedToTestRule),
-        #[cfg(feature = "test-rules")]
+        #[cfg(any(feature = "test-rules", test))]
         (Ruff, "960") => (RuleGroup::Removed, rules::ruff::rules::RedirectedFromPrefixTestRule),
 
 

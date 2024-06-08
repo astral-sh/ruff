@@ -6,16 +6,17 @@ use bitflags::bitflags;
 use rustc_hash::FxHashSet;
 
 use ruff_python_ast::{
-    self as ast, BoolOp, CmpOp, ConversionFlag, Expr, ExprContext, FStringElement, IpyEscapeKind,
-    Number, Operator, UnaryOp,
+    self as ast, BoolOp, CmpOp, ConversionFlag, Expr, ExprContext, FStringElement, FStringElements,
+    IpyEscapeKind, Number, Operator, UnaryOp,
 };
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
+use crate::lexer::TokenValue;
 use crate::parser::progress::ParserProgress;
 use crate::parser::{helpers, FunctionKind, Parser};
 use crate::string::{parse_fstring_literal_element, parse_string_literal, StringType};
 use crate::token_set::TokenSet;
-use crate::{FStringErrorType, Mode, ParseErrorType, Tok, TokenKind};
+use crate::{FStringErrorType, Mode, ParseErrorType, TokenKind};
 
 use super::{Parenthesized, RecoveryContextKind};
 
@@ -106,9 +107,24 @@ pub(super) const END_EXPR_SET: TokenSet = TokenSet::new([
 const END_SEQUENCE_SET: TokenSet = END_EXPR_SET.remove(TokenKind::Comma);
 
 impl<'src> Parser<'src> {
+    /// Returns `true` if the parser is at a name or keyword (including soft keyword) token.
+    pub(super) fn at_name_or_keyword(&self) -> bool {
+        self.at(TokenKind::Name) || self.current_token_kind().is_keyword()
+    }
+
+    /// Returns `true` if the parser is at a name or soft keyword token.
+    pub(super) fn at_name_or_soft_keyword(&self) -> bool {
+        self.at(TokenKind::Name) || self.at_soft_keyword()
+    }
+
+    /// Returns `true` if the parser is at a soft keyword token.
+    pub(super) fn at_soft_keyword(&self) -> bool {
+        self.current_token_kind().is_soft_keyword()
+    }
+
     /// Returns `true` if the current token is the start of an expression.
     pub(super) fn at_expr(&self) -> bool {
-        self.at_ts(EXPR_SET)
+        self.at_ts(EXPR_SET) || self.at_soft_keyword()
     }
 
     /// Returns `true` if the current token ends a sequence.
@@ -459,36 +475,43 @@ impl<'src> Parser<'src> {
         let range = self.current_token_range();
 
         if self.at(TokenKind::Name) {
-            let (Tok::Name { name }, _) = self.bump(TokenKind::Name) else {
+            let TokenValue::Name(name) = self.bump_value(TokenKind::Name) else {
                 unreachable!();
             };
-            ast::Identifier {
+            return ast::Identifier {
                 id: name.to_string(),
                 range,
-            }
-        } else {
-            if self.current_token_kind().is_keyword() {
-                let (tok, range) = self.next_token();
-                self.add_error(
-                    ParseErrorType::OtherError(format!(
-                        "Expected an identifier, but found a keyword '{tok}' that cannot be used here"
-                    )),
-                    range,
-                );
+            };
+        }
 
-                ast::Identifier {
-                    id: tok.to_string(),
-                    range,
-                }
-            } else {
-                self.add_error(
-                    ParseErrorType::OtherError("Expected an identifier".into()),
-                    range,
-                );
-                ast::Identifier {
-                    id: String::new(),
-                    range: self.missing_node_range(),
-                }
+        if self.current_token_kind().is_soft_keyword() {
+            let id = self.src_text(range).to_string();
+            self.bump_soft_keyword_as_name();
+            return ast::Identifier { id, range };
+        }
+
+        if self.current_token_kind().is_keyword() {
+            // Non-soft keyword
+            self.add_error(
+                ParseErrorType::OtherError(format!(
+                    "Expected an identifier, but found a keyword {} that cannot be used here",
+                    self.current_token_kind()
+                )),
+                range,
+            );
+
+            let id = self.src_text(range).to_string();
+            self.bump_any();
+            ast::Identifier { id, range }
+        } else {
+            self.add_error(
+                ParseErrorType::OtherError("Expected an identifier".into()),
+                range,
+            );
+
+            ast::Identifier {
+                id: String::new(),
+                range: self.missing_node_range(),
             }
         }
     }
@@ -501,7 +524,7 @@ impl<'src> Parser<'src> {
 
         let lhs = match self.current_token_kind() {
             TokenKind::Float => {
-                let (Tok::Float { value }, _) = self.bump(TokenKind::Float) else {
+                let TokenValue::Float(value) = self.bump_value(TokenKind::Float) else {
                     unreachable!()
                 };
 
@@ -511,7 +534,7 @@ impl<'src> Parser<'src> {
                 })
             }
             TokenKind::Complex => {
-                let (Tok::Complex { real, imag }, _) = self.bump(TokenKind::Complex) else {
+                let TokenValue::Complex { real, imag } = self.bump_value(TokenKind::Complex) else {
                     unreachable!()
                 };
                 Expr::NumberLiteral(ast::ExprNumberLiteral {
@@ -520,7 +543,7 @@ impl<'src> Parser<'src> {
                 })
             }
             TokenKind::Int => {
-                let (Tok::Int { value }, _) = self.bump(TokenKind::Int) else {
+                let TokenValue::Int(value) = self.bump_value(TokenKind::Int) else {
                     unreachable!()
                 };
                 Expr::NumberLiteral(ast::ExprNumberLiteral {
@@ -666,7 +689,8 @@ impl<'src> Parser<'src> {
 
                         parsed_expr = Expr::Generator(parser.parse_generator_expression(
                             parsed_expr.expr,
-                            GeneratorExpressionInParentheses::No(start),
+                            start,
+                            Parenthesized::No,
                         ))
                         .into();
                     }
@@ -1231,17 +1255,20 @@ impl<'src> Parser<'src> {
     ///
     /// See: <https://docs.python.org/3.13/reference/lexical_analysis.html#string-and-bytes-literals>
     fn parse_string_or_byte_literal(&mut self) -> StringType {
-        let (Tok::String { value, kind }, range) = self.bump(TokenKind::String) else {
+        let range = self.current_token_range();
+        let flags = self.tokens.current_flags().as_any_string_flags();
+
+        let TokenValue::String(value) = self.bump_value(TokenKind::String) else {
             unreachable!()
         };
 
-        match parse_string_literal(value, kind, range) {
+        match parse_string_literal(value, flags, range) {
             Ok(string) => string,
             Err(error) => {
                 let location = error.location();
                 self.add_error(ParseErrorType::Lexical(error.into_error()), location);
 
-                if kind.is_byte_string() {
+                if flags.is_byte_string() {
                     // test_err invalid_byte_literal
                     // b'123a𝐁c'
                     // rb"a𝐁c123"
@@ -1249,7 +1276,7 @@ impl<'src> Parser<'src> {
                     StringType::Bytes(ast::BytesLiteral {
                         value: Box::new([]),
                         range,
-                        flags: ast::BytesLiteralFlags::from(kind).with_invalid(),
+                        flags: ast::BytesLiteralFlags::from(flags).with_invalid(),
                     })
                 } else {
                     // test_err invalid_string_literal
@@ -1258,7 +1285,7 @@ impl<'src> Parser<'src> {
                     StringType::Str(ast::StringLiteral {
                         value: "".into(),
                         range,
-                        flags: ast::StringLiteralFlags::from(kind).with_invalid(),
+                        flags: ast::StringLiteralFlags::from(flags).with_invalid(),
                     })
                 }
             }
@@ -1277,18 +1304,17 @@ impl<'src> Parser<'src> {
     /// See: <https://docs.python.org/3/reference/lexical_analysis.html#formatted-string-literals>
     fn parse_fstring(&mut self) -> ast::FString {
         let start = self.node_start();
+        let flags = self.tokens.current_flags().as_any_string_flags();
 
-        let (Tok::FStringStart(kind), _) = self.bump(TokenKind::FStringStart) else {
-            unreachable!()
-        };
-        let elements = self.parse_fstring_elements();
+        self.bump(TokenKind::FStringStart);
+        let elements = self.parse_fstring_elements(flags);
 
         self.expect(TokenKind::FStringEnd);
 
         ast::FString {
             elements,
             range: self.node_range(start),
-            flags: kind.into(),
+            flags: ast::FStringFlags::from(flags),
         }
     }
 
@@ -1297,21 +1323,23 @@ impl<'src> Parser<'src> {
     /// # Panics
     ///
     /// If the parser isn't positioned at a `{` or `FStringMiddle` token.
-    fn parse_fstring_elements(&mut self) -> Vec<FStringElement> {
+    fn parse_fstring_elements(&mut self, flags: ast::AnyStringFlags) -> FStringElements {
         let mut elements = vec![];
 
         self.parse_list(RecoveryContextKind::FStringElements, |parser| {
             let element = match parser.current_token_kind() {
                 TokenKind::Lbrace => {
-                    FStringElement::Expression(parser.parse_fstring_expression_element())
+                    FStringElement::Expression(parser.parse_fstring_expression_element(flags))
                 }
                 TokenKind::FStringMiddle => {
-                    let (Tok::FStringMiddle { value, kind, .. }, range) = parser.next_token()
+                    let range = parser.current_token_range();
+                    let TokenValue::FStringMiddle(value) =
+                        parser.bump_value(TokenKind::FStringMiddle)
                     else {
                         unreachable!()
                     };
                     FStringElement::Literal(
-                        parse_fstring_literal_element(value, kind, range).unwrap_or_else(
+                        parse_fstring_literal_element(value, flags, range).unwrap_or_else(
                             |lex_error| {
                                 // test_err invalid_fstring_literal_element
                                 // f'hello \N{INVALID} world'
@@ -1332,7 +1360,7 @@ impl<'src> Parser<'src> {
                 // `Invalid` tokens are created when there's a lexical error, so
                 // we ignore it here to avoid creating unexpected token errors
                 TokenKind::Unknown => {
-                    parser.next_token();
+                    parser.bump_any();
                     return;
                 }
                 tok => {
@@ -1348,7 +1376,7 @@ impl<'src> Parser<'src> {
             elements.push(element);
         });
 
-        elements
+        FStringElements::from(elements)
     }
 
     /// Parses a f-string expression element.
@@ -1356,7 +1384,10 @@ impl<'src> Parser<'src> {
     /// # Panics
     ///
     /// If the parser isn't positioned at a `{` token.
-    fn parse_fstring_expression_element(&mut self) -> ast::FStringExpressionElement {
+    fn parse_fstring_expression_element(
+        &mut self,
+        flags: ast::AnyStringFlags,
+    ) -> ast::FStringExpressionElement {
         let start = self.node_start();
         self.bump(TokenKind::Lbrace);
 
@@ -1396,7 +1427,10 @@ impl<'src> Parser<'src> {
 
         let conversion = if self.eat(TokenKind::Exclamation) {
             let conversion_flag_range = self.current_token_range();
-            if let Tok::Name { name } = self.next_token().0 {
+            if self.at(TokenKind::Name) {
+                let TokenValue::Name(name) = self.bump_value(TokenKind::Name) else {
+                    unreachable!();
+                };
                 match &*name {
                     "s" => ConversionFlag::Str,
                     "r" => ConversionFlag::Repr,
@@ -1419,6 +1453,8 @@ impl<'src> Parser<'src> {
                     ParseErrorType::FStringError(FStringErrorType::InvalidConversionFlag),
                     conversion_flag_range,
                 );
+                // TODO(dhruvmanila): Avoid dropping this token
+                self.bump_any();
                 ConversionFlag::None
             }
         } else {
@@ -1427,7 +1463,7 @@ impl<'src> Parser<'src> {
 
         let format_spec = if self.eat(TokenKind::Colon) {
             let spec_start = self.node_start();
-            let elements = self.parse_fstring_elements();
+            let elements = self.parse_fstring_elements(flags);
             Some(Box::new(ast::FStringFormatSpec {
                 range: self.node_range(spec_start),
                 elements,
@@ -1544,8 +1580,7 @@ impl<'src> Parser<'src> {
         // Return an empty `DictExpr` when finding a `}` right after the `{`
         if self.eat(TokenKind::Rbrace) {
             return Expr::Dict(ast::ExprDict {
-                keys: vec![],
-                values: vec![],
+                items: vec![],
                 range: self.node_range(start),
             });
         }
@@ -1671,7 +1706,8 @@ impl<'src> Parser<'src> {
 
                 let generator = Expr::Generator(self.parse_generator_expression(
                     parsed_expr.expr,
-                    GeneratorExpressionInParentheses::Yes(start),
+                    start,
+                    Parenthesized::Yes,
                 ));
 
                 ParsedExpr {
@@ -1794,21 +1830,24 @@ impl<'src> Parser<'src> {
             self.expect(TokenKind::Comma);
         }
 
-        let mut keys = vec![key];
-        let mut values = vec![value];
+        let mut items = vec![ast::DictItem { key, value }];
 
         self.parse_comma_separated_list(RecoveryContextKind::DictElements, |parser| {
             if parser.eat(TokenKind::DoubleStar) {
-                keys.push(None);
-
                 // Handle dictionary unpacking. Here, the grammar is `'**' bitwise_or`
                 // which requires limiting the expression.
-                values.push(parser.parse_expression_with_bitwise_or_precedence().expr);
+                items.push(ast::DictItem {
+                    key: None,
+                    value: parser.parse_expression_with_bitwise_or_precedence().expr,
+                });
             } else {
-                keys.push(Some(parser.parse_conditional_expression_or_higher().expr));
+                let key = parser.parse_conditional_expression_or_higher().expr;
                 parser.expect(TokenKind::Colon);
 
-                values.push(parser.parse_conditional_expression_or_higher().expr);
+                items.push(ast::DictItem {
+                    key: Some(key),
+                    value: parser.parse_conditional_expression_or_higher().expr,
+                });
             }
         });
 
@@ -1816,8 +1855,7 @@ impl<'src> Parser<'src> {
 
         ast::ExprDict {
             range: self.node_range(start),
-            keys,
-            values,
+            items,
         }
     }
 
@@ -1893,46 +1931,27 @@ impl<'src> Parser<'src> {
 
     /// Parses a generator expression.
     ///
-    /// The given `in_parentheses` parameter is used to determine whether the generator
-    /// expression is enclosed in parentheses or not:
-    /// - `Yes`, expect the `)` token after the generator expression.
-    /// - `No`, no parentheses are expected.
-    /// - `Maybe`, consume the `)` token if it's present.
-    ///
-    /// The contained start position in each variant is used to determine the range
-    /// of the generator expression.
+    /// The given `start` offset is the start of either the opening parenthesis if the generator is
+    /// parenthesized or the first token of the expression.
     ///
     /// See: <https://docs.python.org/3/reference/expressions.html#generator-expressions>
     pub(super) fn parse_generator_expression(
         &mut self,
         element: Expr,
-        in_parentheses: GeneratorExpressionInParentheses,
+        start: TextSize,
+        parenthesized: Parenthesized,
     ) -> ast::ExprGenerator {
         let generators = self.parse_generators();
 
-        let (parenthesized, start) = match in_parentheses {
-            GeneratorExpressionInParentheses::Yes(lpar_start) => {
-                self.expect(TokenKind::Rpar);
-                (true, lpar_start)
-            }
-            GeneratorExpressionInParentheses::No(expr_start) => (false, expr_start),
-            GeneratorExpressionInParentheses::Maybe {
-                lpar_start,
-                expr_start,
-            } => {
-                if self.eat(TokenKind::Rpar) {
-                    (true, lpar_start)
-                } else {
-                    (false, expr_start)
-                }
-            }
-        };
+        if parenthesized.is_yes() {
+            self.expect(TokenKind::Rpar);
+        }
 
         ast::ExprGenerator {
             elt: Box::new(element),
             generators,
             range: self.node_range(start),
-            parenthesized,
+            parenthesized: parenthesized.is_yes(),
         }
     }
 
@@ -2228,7 +2247,8 @@ impl<'src> Parser<'src> {
     fn parse_ipython_escape_command_expression(&mut self) -> ast::ExprIpyEscapeCommand {
         let start = self.node_start();
 
-        let (Tok::IpyEscapeCommand { value, kind }, _) = self.bump(TokenKind::IpyEscapeCommand)
+        let TokenValue::IpyEscapeCommand { value, kind } =
+            self.bump_value(TokenKind::IpyEscapeCommand)
         else {
             unreachable!()
         };
@@ -2325,7 +2345,7 @@ impl Ranged for ParsedExpr {
 /// See: <https://docs.python.org/3/reference/expressions.html#operator-precedence>
 #[derive(Debug, Ord, Eq, PartialEq, PartialOrd, Copy, Clone)]
 pub(super) enum OperatorPrecedence {
-    /// The initital precedence when parsing an expression.
+    /// The initial precedence when parsing an expression.
     Initial,
     /// Precedence of boolean `or` operator.
     Or,
@@ -2433,26 +2453,6 @@ impl From<Operator> for OperatorPrecedence {
             Operator::Pow => OperatorPrecedence::Exponent,
         }
     }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum GeneratorExpressionInParentheses {
-    /// The generator expression is in parentheses. The given [`TextSize`] is the
-    /// start of the left parenthesis. E.g., `(x for x in range(10))`.
-    Yes(TextSize),
-
-    /// The generator expression is not in parentheses. The given [`TextSize`] is the
-    /// start of the expression. E.g., `x for x in range(10)`.
-    No(TextSize),
-
-    /// The generator expression may or may not be in parentheses. The given [`TextSize`]s
-    /// are the start of the left parenthesis and the start of the expression, respectively.
-    Maybe {
-        /// The start of the left parenthesis.
-        lpar_start: TextSize,
-        /// The start of the expression.
-        expr_start: TextSize,
-    },
 }
 
 /// Represents the precedence used for parsing the value part of a starred expression.

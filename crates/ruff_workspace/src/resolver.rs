@@ -335,6 +335,12 @@ pub fn python_files_in_path<'a>(
     // Search for `pyproject.toml` files in all parent directories.
     let mut resolver = Resolver::new(pyproject_config);
     let mut seen = FxHashSet::default();
+
+    // Insert the path to the root configuration to avoid parsing the configuration a second time.
+    if let Some(config_path) = &pyproject_config.path {
+        seen.insert(config_path.parent().unwrap());
+    }
+
     if resolver.is_hierarchical() {
         for path in &paths {
             for ancestor in path.ancestors() {
@@ -343,8 +349,12 @@ pub fn python_files_in_path<'a>(
                         let (root, settings) =
                             resolve_scoped_settings(&pyproject, Relativity::Parent, transformer)?;
                         resolver.add(root, settings);
+                        // We found the closest configuration.
                         break;
                     }
+                } else {
+                    // We already visited this ancestor, we can stop here.
+                    break;
                 }
             }
         }
@@ -614,6 +624,63 @@ pub fn match_candidate_exclusion(
         return false;
     }
     exclusion.is_match_candidate(file_path) || exclusion.is_match_candidate(file_basename)
+}
+
+#[derive(Debug, Copy, Clone)]
+pub enum ExclusionKind {
+    /// The exclusion came from the `exclude` setting.
+    Exclude,
+    /// The exclusion came from the `extend-exclude` setting.
+    ExtendExclude,
+    /// The exclusion came from the `lint.exclude` setting.
+    LintExclude,
+    /// The exclusion came from the `lint.extend-exclude` setting.
+    FormatExclude,
+}
+
+impl std::fmt::Display for ExclusionKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ExclusionKind::Exclude => write!(f, "exclude"),
+            ExclusionKind::ExtendExclude => write!(f, "extend-exclude"),
+            ExclusionKind::LintExclude => write!(f, "lint.exclude"),
+            ExclusionKind::FormatExclude => write!(f, "lint.extend-exclude"),
+        }
+    }
+}
+
+/// Return the [`ExclusionKind`] for a given [`Path`], if the path or any of its ancestors match
+/// any of the exclusion criteria.
+pub fn match_any_exclusion(
+    path: &Path,
+    exclude: &GlobSet,
+    extend_exclude: &GlobSet,
+    lint_exclude: Option<&GlobSet>,
+    format_exclude: Option<&GlobSet>,
+) -> Option<ExclusionKind> {
+    for path in path.ancestors() {
+        if let Some(basename) = path.file_name() {
+            let path = Candidate::new(path);
+            let basename = Candidate::new(basename);
+            if match_candidate_exclusion(&path, &basename, exclude) {
+                return Some(ExclusionKind::Exclude);
+            }
+            if match_candidate_exclusion(&path, &basename, extend_exclude) {
+                return Some(ExclusionKind::ExtendExclude);
+            }
+            if let Some(lint_exclude) = lint_exclude {
+                if match_candidate_exclusion(&path, &basename, lint_exclude) {
+                    return Some(ExclusionKind::LintExclude);
+                }
+            }
+            if let Some(format_exclude) = format_exclude {
+                if match_candidate_exclusion(&path, &basename, format_exclude) {
+                    return Some(ExclusionKind::FormatExclude);
+                }
+            }
+        }
+    }
+    None
 }
 
 #[cfg(test)]

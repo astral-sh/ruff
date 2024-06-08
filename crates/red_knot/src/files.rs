@@ -15,9 +15,9 @@ type Map<K, V> = hashbrown::HashMap<K, V, ()>;
 pub struct FileId;
 
 // TODO we'll need a higher level virtual file system abstraction that allows testing if a file exists
-// or retrieving its content (ideally lazily and in a way that the memory can be retained later)
-// I suspect that we'll end up with a FileSystem trait and our own Path abstraction.
-#[derive(Clone, Default)]
+//  or retrieving its content (ideally lazily and in a way that the memory can be retained later)
+//  I suspect that we'll end up with a FileSystem trait and our own Path abstraction.
+#[derive(Default)]
 pub struct Files {
     inner: Arc<RwLock<FilesInner>>,
 }
@@ -35,6 +35,16 @@ impl Files {
     #[tracing::instrument(level = "debug", skip(self))]
     pub fn path(&self, id: FileId) -> Arc<Path> {
         self.inner.read().path(id)
+    }
+
+    /// Snapshots files for a new database snapshot.
+    ///
+    /// This method should not be used outside a database snapshot.
+    #[must_use]
+    pub fn snapshot(&self) -> Files {
+        Files {
+            inner: self.inner.clone(),
+        }
     }
 }
 
@@ -63,7 +73,7 @@ struct FilesInner {
     by_path: Map<FileId, ()>,
     // TODO should we use a map here to reclaim the space for removed files?
     // TODO I think we should use our own path abstraction here to avoid having to normalize paths
-    // and dealing with non-utf paths everywhere.
+    //  and dealing with non-utf paths everywhere.
     by_id: IndexVec<FileId, Arc<Path>>,
 }
 
@@ -71,9 +81,7 @@ impl FilesInner {
     /// Inserts the path and returns a new id for it or returns the id if it is an existing path.
     // TODO should this accept Path or PathBuf?
     pub(crate) fn intern(&mut self, path: &Path) -> FileId {
-        let mut hasher = FxHasher::default();
-        path.hash(&mut hasher);
-        let hash = hasher.finish();
+        let hash = FilesInner::hash_path(path);
 
         let entry = self
             .by_path
@@ -84,10 +92,18 @@ impl FilesInner {
             RawEntryMut::Occupied(entry) => *entry.key(),
             RawEntryMut::Vacant(entry) => {
                 let id = self.by_id.push(Arc::from(path));
-                entry.insert_with_hasher(hash, id, (), |_| hash);
+                entry.insert_with_hasher(hash, id, (), |file| {
+                    FilesInner::hash_path(&self.by_id[*file])
+                });
                 id
             }
         }
+    }
+
+    fn hash_path(path: &Path) -> u64 {
+        let mut hasher = FxHasher::default();
+        path.hash(&mut hasher);
+        hasher.finish()
     }
 
     pub(crate) fn try_get(&self, path: &Path) -> Option<FileId> {
@@ -144,5 +160,21 @@ mod tests {
         let id1 = files.intern(&path1);
         let id2 = files.intern(&path2);
         assert_ne!(id1, id2);
+    }
+
+    #[test]
+    fn four_files() {
+        let files = Files::default();
+        let foo_path = PathBuf::from("foo");
+        let foo_id = files.intern(&foo_path);
+        let bar_path = PathBuf::from("bar");
+        files.intern(&bar_path);
+        let baz_path = PathBuf::from("baz");
+        files.intern(&baz_path);
+        let qux_path = PathBuf::from("qux");
+        files.intern(&qux_path);
+
+        let foo_id_2 = files.try_get(&foo_path).expect("foo_path to be found");
+        assert_eq!(foo_id_2, foo_id);
     }
 }

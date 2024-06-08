@@ -6,7 +6,7 @@ use itertools::Itertools;
 use ruff_diagnostics::Edit;
 use ruff_python_codegen::Stylist;
 use ruff_python_semantic::{Binding, BindingKind, Scope, ScopeId, SemanticModel};
-use ruff_text_size::{Ranged, TextSize};
+use ruff_text_size::Ranged;
 
 pub(crate) struct Renamer;
 
@@ -125,8 +125,8 @@ impl Renamer {
         let scope_id = scope.get_all(name).find_map(|binding_id| {
             let binding = semantic.binding(binding_id);
             match binding.kind {
-                BindingKind::Global => Some(ScopeId::global()),
-                BindingKind::Nonlocal(symbol_id) => Some(symbol_id),
+                BindingKind::Global(_) => Some(ScopeId::global()),
+                BindingKind::Nonlocal(_, scope_id) => Some(scope_id),
                 _ => None,
             }
         });
@@ -215,7 +215,6 @@ impl Renamer {
                             let quote = stylist.quote();
                             format!("{quote}{target}{quote}")
                         } else {
-                            debug_assert_eq!(TextSize::of(name), reference.range().len());
                             target.to_string()
                         }
                     };
@@ -267,8 +266,8 @@ impl Renamer {
             | BindingKind::LoopVar
             | BindingKind::ComprehensionVar
             | BindingKind::WithItemVar
-            | BindingKind::Global
-            | BindingKind::Nonlocal(_)
+            | BindingKind::Global(_)
+            | BindingKind::Nonlocal(_, _)
             | BindingKind::ClassDefinition(_)
             | BindingKind::FunctionDefinition(_)
             | BindingKind::Deletion

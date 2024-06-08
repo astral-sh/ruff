@@ -1,35 +1,25 @@
-use std::sync::{Arc, Condvar, Mutex};
+use std::sync::atomic::AtomicBool;
+use std::sync::Arc;
 
-#[derive(Debug, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct CancellationTokenSource {
-    signal: Arc<(Mutex<bool>, Condvar)>,
+    signal: Arc<AtomicBool>,
 }
 
 impl CancellationTokenSource {
     pub fn new() -> Self {
         Self {
-            signal: Arc::new((Mutex::new(false), Condvar::default())),
+            signal: Arc::new(AtomicBool::new(false)),
         }
     }
 
     #[tracing::instrument(level = "trace", skip_all)]
     pub fn cancel(&self) {
-        let (cancelled, condvar) = &*self.signal;
-
-        let mut cancelled = cancelled.lock().unwrap();
-
-        if *cancelled {
-            return;
-        }
-
-        *cancelled = true;
-        condvar.notify_all();
+        self.signal.store(true, std::sync::atomic::Ordering::SeqCst);
     }
 
     pub fn is_cancelled(&self) -> bool {
-        let (cancelled, _) = &*self.signal;
-
-        *cancelled.lock().unwrap()
+        self.signal.load(std::sync::atomic::Ordering::SeqCst)
     }
 
     pub fn token(&self) -> CancellationToken {
@@ -41,26 +31,12 @@ impl CancellationTokenSource {
 
 #[derive(Clone, Debug)]
 pub struct CancellationToken {
-    signal: Arc<(Mutex<bool>, Condvar)>,
+    signal: Arc<AtomicBool>,
 }
 
 impl CancellationToken {
     /// Returns `true` if cancellation has been requested.
     pub fn is_cancelled(&self) -> bool {
-        let (cancelled, _) = &*self.signal;
-
-        *cancelled.lock().unwrap()
-    }
-
-    pub fn wait(&self) {
-        let (bool, condvar) = &*self.signal;
-
-        let lock = condvar
-            .wait_while(bool.lock().unwrap(), |bool| !*bool)
-            .unwrap();
-
-        debug_assert!(*lock);
-
-        drop(lock);
+        self.signal.load(std::sync::atomic::Ordering::SeqCst)
     }
 }

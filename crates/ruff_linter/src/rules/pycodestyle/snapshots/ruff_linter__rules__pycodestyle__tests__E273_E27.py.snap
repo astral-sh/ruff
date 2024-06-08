@@ -106,4 +106,22 @@ E27.py:30:10: E273 [*] Tab after keyword
 32 32 | from u import (a, b)
 33 33 | from v import c, d
 
+E27.py:73:5: E273 [*] Tab after keyword
+   |
+72 | #: E273
+73 | type    Number = int
+   |     ^^^^ E273
+74 | 
+75 | #: E275
+   |
+   = help: Replace with single space
 
+ℹ Safe fix
+70 70 | type  Number = int
+71 71 | 
+72 72 | #: E273
+73    |-type	Number = int
+   73 |+type Number = int
+74 74 | 
+75 75 | #: E275
+76 76 | match(foo):

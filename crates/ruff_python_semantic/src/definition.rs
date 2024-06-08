@@ -6,12 +6,13 @@ use std::ops::Deref;
 use std::path::Path;
 
 use ruff_index::{newtype_index, IndexSlice, IndexVec};
-use ruff_python_ast::{self as ast, all::DunderAllName, Stmt};
+use ruff_python_ast::{self as ast, Stmt};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::analyze::visibility::{
     class_visibility, function_visibility, method_visibility, module_visibility, Visibility,
 };
+use crate::model::all::DunderAllName;
 
 /// Id uniquely identifying a definition in a program.
 #[newtype_index]

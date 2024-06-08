@@ -652,26 +652,26 @@ Module(
                                 Dict(
                                     ExprDict {
                                         range: 319..325,
-                                        keys: [
-                                            Some(
-                                                Name(
-                                                    ExprName {
-                                                        range: 320..321,
-                                                        id: "a",
-                                                        ctx: Load,
+                                        items: [
+                                            DictItem {
+                                                key: Some(
+                                                    Name(
+                                                        ExprName {
+                                                            range: 320..321,
+                                                            id: "a",
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                ),
+                                                value: NumberLiteral(
+                                                    ExprNumberLiteral {
+                                                        range: 323..324,
+                                                        value: Int(
+                                                            1,
+                                                        ),
                                                     },
                                                 ),
-                                            ),
-                                        ],
-                                        values: [
-                                            NumberLiteral(
-                                                ExprNumberLiteral {
-                                                    range: 323..324,
-                                                    value: Int(
-                                                        1,
-                                                    ),
-                                                },
-                                            ),
+                                            },
                                         ],
                                     },
                                 ),
