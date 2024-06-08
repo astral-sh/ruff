@@ -1,0 +1,276 @@
+---
+source: crates/ruff_linter/src/rules/refurb/mod.rs
+---
+FURB154.py:4:5: FURB154 [*] Use of repeated consecutive `global`
+  |
+3 |   def f1():
+4 |       global x
+  |  _____^
+5 | |     global y
+  | |____________^ FURB154
+  |
+  = help: Merge `global` statements
+
+ℹ Safe fix
+1 1 | # Errors
+2 2 | 
+3 3 | def f1():
+4   |-    global x
+5   |-    global y
+  4 |+    global x, y
+6 5 | 
+7 6 | 
+8 7 | def f3():
+
+FURB154.py:9:5: FURB154 [*] Use of repeated consecutive `global`
+   |
+ 8 |   def f3():
+ 9 |       global x
+   |  _____^
+10 | |     global y
+11 | |     global z
+   | |____________^ FURB154
+   |
+   = help: Merge `global` statements
+
+ℹ Safe fix
+6  6  | 
+7  7  | 
+8  8  | def f3():
+9     |-    global x
+10    |-    global y
+11    |-    global z
+   9  |+    global x, y, z
+12 10 | 
+13 11 | 
+14 12 | def f4():
+
+FURB154.py:15:5: FURB154 [*] Use of repeated consecutive `global`
+   |
+14 |   def f4():
+15 |       global x
+   |  _____^
+16 | |     global y
+   | |____________^ FURB154
+17 |       pass
+18 |       global x
+   |
+   = help: Merge `global` statements
+
+ℹ Safe fix
+12 12 | 
+13 13 | 
+14 14 | def f4():
+15    |-    global x
+16    |-    global y
+   15 |+    global x, y
+17 16 |     pass
+18 17 |     global x
+19 18 |     global y
+
+FURB154.py:18:5: FURB154 [*] Use of repeated consecutive `global`
+   |
+16 |       global y
+17 |       pass
+18 |       global x
+   |  _____^
+19 | |     global y
+   | |____________^ FURB154
+   |
+   = help: Merge `global` statements
+
+ℹ Safe fix
+15 15 |     global x
+16 16 |     global y
+17 17 |     pass
+18    |-    global x
+19    |-    global y
+   18 |+    global x, y
+20 19 | 
+21 20 | 
+22 21 | def f2():
+
+FURB154.py:26:9: FURB154 [*] Use of repeated consecutive `nonlocal`
+   |
+25 |       def inner():
+26 |           nonlocal x
+   |  _________^
+27 | |         nonlocal y
+   | |__________________^ FURB154
+28 |   
+29 |       def inner2():
+   |
+   = help: Merge `nonlocal` statements
+
+ℹ Safe fix
+23 23 |     x = y = z = 1
+24 24 | 
+25 25 |     def inner():
+26    |-        nonlocal x
+27    |-        nonlocal y
+   26 |+        nonlocal x, y
+28 27 | 
+29 28 |     def inner2():
+30 29 |         nonlocal x
+
+FURB154.py:30:9: FURB154 [*] Use of repeated consecutive `nonlocal`
+   |
+29 |       def inner2():
+30 |           nonlocal x
+   |  _________^
+31 | |         nonlocal y
+32 | |         nonlocal z
+   | |__________________^ FURB154
+33 |   
+34 |       def inner3():
+   |
+   = help: Merge `nonlocal` statements
+
+ℹ Safe fix
+27 27 |         nonlocal y
+28 28 | 
+29 29 |     def inner2():
+30    |-        nonlocal x
+31    |-        nonlocal y
+32    |-        nonlocal z
+   30 |+        nonlocal x, y, z
+33 31 | 
+34 32 |     def inner3():
+35 33 |         nonlocal x
+
+FURB154.py:35:9: FURB154 [*] Use of repeated consecutive `nonlocal`
+   |
+34 |       def inner3():
+35 |           nonlocal x
+   |  _________^
+36 | |         nonlocal y
+   | |__________________^ FURB154
+37 |           pass
+38 |           nonlocal x
+   |
+   = help: Merge `nonlocal` statements
+
+ℹ Safe fix
+32 32 |         nonlocal z
+33 33 | 
+34 34 |     def inner3():
+35    |-        nonlocal x
+36    |-        nonlocal y
+   35 |+        nonlocal x, y
+37 36 |         pass
+38 37 |         nonlocal x
+39 38 |         nonlocal y
+
+FURB154.py:38:9: FURB154 [*] Use of repeated consecutive `nonlocal`
+   |
+36 |           nonlocal y
+37 |           pass
+38 |           nonlocal x
+   |  _________^
+39 | |         nonlocal y
+   | |__________________^ FURB154
+   |
+   = help: Merge `nonlocal` statements
+
+ℹ Safe fix
+35 35 |         nonlocal x
+36 36 |         nonlocal y
+37 37 |         pass
+38    |-        nonlocal x
+39    |-        nonlocal y
+   38 |+        nonlocal x, y
+40 39 | 
+41 40 | 
+42 41 | def f5():
+
+FURB154.py:46:9: FURB154 [*] Use of repeated consecutive `global`
+   |
+45 |       def inner():
+46 |           global w
+   |  _________^
+47 | |         global x
+   | |________________^ FURB154
+48 |           nonlocal y
+49 |           nonlocal z
+   |
+   = help: Merge `global` statements
+
+ℹ Safe fix
+43 43 |     w = x = y = z = 1
+44 44 | 
+45 45 |     def inner():
+46    |-        global w
+47    |-        global x
+   46 |+        global w, x
+48 47 |         nonlocal y
+49 48 |         nonlocal z
+50 49 | 
+
+FURB154.py:48:9: FURB154 [*] Use of repeated consecutive `nonlocal`
+   |
+46 |           global w
+47 |           global x
+48 |           nonlocal y
+   |  _________^
+49 | |         nonlocal z
+   | |__________________^ FURB154
+50 |   
+51 |       def inner2():
+   |
+   = help: Merge `nonlocal` statements
+
+ℹ Safe fix
+45 45 |     def inner():
+46 46 |         global w
+47 47 |         global x
+48    |-        nonlocal y
+49    |-        nonlocal z
+   48 |+        nonlocal y, z
+50 49 | 
+51 50 |     def inner2():
+52 51 |         global x
+
+FURB154.py:53:9: FURB154 [*] Use of repeated consecutive `nonlocal`
+   |
+51 |       def inner2():
+52 |           global x
+53 |           nonlocal y
+   |  _________^
+54 | |         nonlocal z
+   | |__________________^ FURB154
+   |
+   = help: Merge `nonlocal` statements
+
+ℹ Safe fix
+50 50 | 
+51 51 |     def inner2():
+52 52 |         global x
+53    |-        nonlocal y
+54    |-        nonlocal z
+   53 |+        nonlocal y, z
+55 54 | 
+56 55 | 
+57 56 | def f6():
+
+FURB154.py:58:5: FURB154 [*] Use of repeated consecutive `global`
+   |
+57 |   def f6():
+58 |       global x, y, z
+   |  _____^
+59 | |     global a, b, c
+60 | |     global d, e, f
+   | |__________________^ FURB154
+   |
+   = help: Merge `global` statements
+
+ℹ Safe fix
+55 55 | 
+56 56 | 
+57 57 | def f6():
+58    |-    global x, y, z
+59    |-    global a, b, c
+60    |-    global d, e, f
+   58 |+    global x, y, z, a, b, c, d, e, f
+61 59 | 
+62 60 | 
+63 61 | # Ok
