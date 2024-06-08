@@ -9,7 +9,7 @@ FURB154.py:4:5: FURB154 [*] Use of repeated consecutive `global`
 5 | |     global y
   | |____________^ FURB154
   |
-  = help: Merge to one `global`
+  = help: Merge `global` statements
 
 ℹ Safe fix
 1 1 | # Errors
@@ -31,7 +31,7 @@ FURB154.py:9:5: FURB154 [*] Use of repeated consecutive `global`
 11 | |     global z
    | |____________^ FURB154
    |
-   = help: Merge to one `global`
+   = help: Merge `global` statements
 
 ℹ Safe fix
 6  6  | 
@@ -55,7 +55,7 @@ FURB154.py:15:5: FURB154 [*] Use of repeated consecutive `global`
 17 |       pass
 18 |       global x
    |
-   = help: Merge to one `global`
+   = help: Merge `global` statements
 
 ℹ Safe fix
 12 12 | 
@@ -77,7 +77,7 @@ FURB154.py:18:5: FURB154 [*] Use of repeated consecutive `global`
 19 | |     global y
    | |____________^ FURB154
    |
-   = help: Merge to one `global`
+   = help: Merge `global` statements
 
 ℹ Safe fix
 15 15 |     global x
@@ -100,7 +100,7 @@ FURB154.py:26:9: FURB154 [*] Use of repeated consecutive `nonlocal`
 28 |   
 29 |       def inner2():
    |
-   = help: Merge to one `nonlocal`
+   = help: Merge `nonlocal` statements
 
 ℹ Safe fix
 23 23 |     x = y = z = 1
@@ -124,7 +124,7 @@ FURB154.py:30:9: FURB154 [*] Use of repeated consecutive `nonlocal`
 33 |   
 34 |       def inner3():
    |
-   = help: Merge to one `nonlocal`
+   = help: Merge `nonlocal` statements
 
 ℹ Safe fix
 27 27 |         nonlocal y
@@ -148,7 +148,7 @@ FURB154.py:35:9: FURB154 [*] Use of repeated consecutive `nonlocal`
 37 |           pass
 38 |           nonlocal x
    |
-   = help: Merge to one `nonlocal`
+   = help: Merge `nonlocal` statements
 
 ℹ Safe fix
 32 32 |         nonlocal z
@@ -170,7 +170,7 @@ FURB154.py:38:9: FURB154 [*] Use of repeated consecutive `nonlocal`
 39 | |         nonlocal y
    | |__________________^ FURB154
    |
-   = help: Merge to one `nonlocal`
+   = help: Merge `nonlocal` statements
 
 ℹ Safe fix
 35 35 |         nonlocal x
@@ -193,7 +193,7 @@ FURB154.py:46:9: FURB154 [*] Use of repeated consecutive `global`
 48 |           nonlocal y
 49 |           nonlocal z
    |
-   = help: Merge to one `global`
+   = help: Merge `global` statements
 
 ℹ Safe fix
 43 43 |     w = x = y = z = 1
@@ -217,7 +217,7 @@ FURB154.py:48:9: FURB154 [*] Use of repeated consecutive `nonlocal`
 50 |   
 51 |       def inner2():
    |
-   = help: Merge to one `nonlocal`
+   = help: Merge `nonlocal` statements
 
 ℹ Safe fix
 45 45 |     def inner():
@@ -239,7 +239,7 @@ FURB154.py:53:9: FURB154 [*] Use of repeated consecutive `nonlocal`
 54 | |         nonlocal z
    | |__________________^ FURB154
    |
-   = help: Merge to one `nonlocal`
+   = help: Merge `nonlocal` statements
 
 ℹ Safe fix
 50 50 | 
@@ -261,7 +261,7 @@ FURB154.py:58:5: FURB154 [*] Use of repeated consecutive `global`
 60 | |     global d, e, f
    | |__________________^ FURB154
    |
-   = help: Merge to one `global`
+   = help: Merge `global` statements
 
 ℹ Safe fix
 55 55 | 
