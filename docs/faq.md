@@ -266,6 +266,9 @@ from numpy import sin as np_sin
 from numpy import tan, uint8, uint16, uint32, uint64
 ```
 
+Ruff also correctly classifies some modules as standard-library that aren't recognized
+by isort, like `_string` and `idlelib`.
+
 Like isort, Ruff's import sorting is compatible with Black.
 
 Ruff does not yet support all of isort's configuration options, though it does support many of
