@@ -75,6 +75,32 @@ if x == 4:
     x, y = y, x
 a[b1, :] == a[b1, ...]
 b = a[:, b1]
+
+#: E203 linebreak before ]
+predictions = predictions[
+    len(past_covariates) // datamodule.hparams["downsample"] :
+]
+
+#: E203 multi whitespace before :
+predictions = predictions[
+    len(past_covariates) // datamodule.hparams["downsample"]  :
+]
+
+#: E203 tab before :
+predictions = predictions[
+    len(past_covariates) // datamodule.hparams["downsample"]	:
+]
+
+#: E203 single whitespace before : with line a comment
+predictions = predictions[
+    len(past_covariates) // datamodule.hparams["downsample"] :  # Just some comment
+]
+
+#: E203 multi whitespace before : with line a comment
+predictions = predictions[
+    len(past_covariates) // datamodule.hparams["downsample"]  :  # Just some comment
+]
+
 #:
 
 #: E201:1:6

@@ -124,64 +124,62 @@ E20.py:12:15: E201 [*] Whitespace after '{'
 14 14 | spam(ham[1], {eggs: 2})
 15 15 | #:
 
-E20.py:81:6: E201 [*] Whitespace after '['
-   |
-80 | #: E201:1:6
-81 | spam[ ~ham]
-   |      ^ E201
-82 | 
-83 | #: Okay
-   |
-   = help: Remove whitespace before '['
-
-ℹ Safe fix
-78 78 | #:
-79 79 | 
-80 80 | #: E201:1:6
-81    |-spam[ ~ham]
-   81 |+spam[~ham]
-82 82 | 
-83 83 | #: Okay
-84 84 | x = [  #
-
-E20.py:90:5: E201 [*] Whitespace after '['
-   |
-88 | # F-strings
-89 | f"{ {'a': 1} }"
-90 | f"{[ { {'a': 1} } ]}"
-   |     ^ E201
-91 | f"normal { {f"{ { [1, 2] } }" } } normal"
-   |
-   = help: Remove whitespace before '['
-
-ℹ Safe fix
-87 87 | 
-88 88 | # F-strings
-89 89 | f"{ {'a': 1} }"
-90    |-f"{[ { {'a': 1} } ]}"
-   90 |+f"{[{ {'a': 1} } ]}"
-91 91 | f"normal { {f"{ { [1, 2] } }" } } normal"
-92 92 | 
-93 93 | #: Okay
-
-E20.py:119:5: E201 [*] Whitespace after '['
+E20.py:107:6: E201 [*] Whitespace after '['
     |
-118 | #: E201:1:5
-119 | ham[ : upper]
-    |     ^ E201
-120 | 
-121 | #: Okay
+106 | #: E201:1:6
+107 | spam[ ~ham]
+    |      ^ E201
+108 | 
+109 | #: Okay
     |
     = help: Remove whitespace before '['
 
 ℹ Safe fix
-116 116 | ham[lower + offset : upper + offset]
-117 117 | 
-118 118 | #: E201:1:5
-119     |-ham[ : upper]
-    119 |+ham[: upper]
-120 120 | 
-121 121 | #: Okay
-122 122 | ham[lower + offset :: upper + offset]
+104 104 | #:
+105 105 | 
+106 106 | #: E201:1:6
+107     |-spam[ ~ham]
+    107 |+spam[~ham]
+108 108 | 
+109 109 | #: Okay
+110 110 | x = [  #
 
+E20.py:116:5: E201 [*] Whitespace after '['
+    |
+114 | # F-strings
+115 | f"{ {'a': 1} }"
+116 | f"{[ { {'a': 1} } ]}"
+    |     ^ E201
+117 | f"normal { {f"{ { [1, 2] } }" } } normal"
+    |
+    = help: Remove whitespace before '['
 
+ℹ Safe fix
+113 113 | 
+114 114 | # F-strings
+115 115 | f"{ {'a': 1} }"
+116     |-f"{[ { {'a': 1} } ]}"
+    116 |+f"{[{ {'a': 1} } ]}"
+117 117 | f"normal { {f"{ { [1, 2] } }" } } normal"
+118 118 | 
+119 119 | #: Okay
+
+E20.py:145:5: E201 [*] Whitespace after '['
+    |
+144 | #: E201:1:5
+145 | ham[ : upper]
+    |     ^ E201
+146 | 
+147 | #: Okay
+    |
+    = help: Remove whitespace before '['
+
+ℹ Safe fix
+142 142 | ham[lower + offset : upper + offset]
+143 143 | 
+144 144 | #: E201:1:5
+145     |-ham[ : upper]
+    145 |+ham[: upper]
+146 146 | 
+147 147 | #: Okay
+148 148 | ham[lower + offset :: upper + offset]
