@@ -2031,7 +2031,6 @@ dependencies = [
  "filetime",
  "rustc-hash",
  "salsa-2022",
- "tempfile",
 ]
 
 [[package]]

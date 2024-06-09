@@ -3,27 +3,24 @@ use std::hash::BuildHasherDefault;
 use rustc_hash::FxHasher;
 use salsa::DbWithJar;
 
-pub use file::{File, FileStatus, Files};
+use crate::vfs::VfsFile;
 
-use crate::vfs::{Vfs, VfsPath};
-
-mod file;
 pub mod vfs;
 
 pub(crate) type FxDashMap<K, V> = dashmap::DashMap<K, V, BuildHasherDefault<FxHasher>>;
 
 #[salsa::jar(db=Db)]
-pub struct Jar(File);
+pub struct Jar(VfsFile);
 
 pub trait Db: DbWithJar<Jar> {
-    /// Returns the virtual filesystem used by the database to read files.
-    fn vfs(&self) -> &dyn Vfs;
-
     /// Interns a file path and returns a salsa `File` ingredient.
     ///
     /// The operation is guaranteed to always succeed, even if the path doesn't exist, isn't accessible, or if the path points to a directory.
     /// In these cases, a file with status [`FileStatus::Deleted`] is returned.
-    fn file(&self, path: VfsPath) -> File;
+    fn file(&self, path: &camino::Utf8Path) -> VfsFile;
+
+    /// Interns a path to a vendored file and returns a salsa `File` ingredient.
+    fn vendored_file(&self, path: &camino::Utf8Path) -> Option<VfsFile>;
 }
 
 /// Trait for upcasting a reference to a base trait object.
@@ -33,8 +30,8 @@ pub trait Upcast<T: ?Sized> {
 
 #[cfg(test)]
 mod tests {
-    use crate::vfs::{MemoryFs, Vfs, VfsPath};
-    use crate::{Db, File, Files, Jar};
+    use crate::vfs::Vfs;
+    use crate::{Db, Jar, VfsFile};
 
     /// Database that can be used for testing.
     ///
@@ -42,8 +39,7 @@ mod tests {
     #[salsa::db(Jar)]
     pub struct TestDb {
         storage: salsa::Storage<Self>,
-        files: Files,
-        vfs: MemoryFs,
+        vfs: Vfs,
     }
 
     impl TestDb {
@@ -51,25 +47,18 @@ mod tests {
         pub fn new() -> Self {
             Self {
                 storage: salsa::Storage::default(),
-                files: Files::default(),
-                vfs: MemoryFs::default(),
+                vfs: Vfs::default(),
             }
-        }
-
-        /// Gives mutable access to the in memory filesystem.
-        #[allow(unused)]
-        pub fn vfs_mut(&mut self) -> &mut MemoryFs {
-            &mut self.vfs
         }
     }
 
     impl Db for TestDb {
-        fn vfs(&self) -> &dyn Vfs {
-            &self.vfs
+        fn file(&self, path: &camino::Utf8Path) -> VfsFile {
+            self.vfs.fs(self, path)
         }
 
-        fn file(&self, path: VfsPath) -> File {
-            self.files.lookup(self, path)
+        fn vendored_file(&self, path: &camino::Utf8Path) -> Option<VfsFile> {
+            self.vfs.vendored(self, path)
         }
     }
 
@@ -79,7 +68,6 @@ mod tests {
         fn snapshot(&self) -> salsa::Snapshot<Self> {
             salsa::Snapshot::new(Self {
                 storage: self.storage.snapshot(),
-                files: self.files.snapshot(),
                 vfs: self.vfs.snapshot(),
             })
         }

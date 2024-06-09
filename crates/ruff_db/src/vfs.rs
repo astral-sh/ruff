@@ -1,69 +1,48 @@
-use std::error::Error;
-use std::fmt::Display;
-
-use filetime::FileTime;
-
-pub use memory::MemoryFs;
-pub use path::VfsPath;
-
-mod memory;
 mod path;
 
-/// A virtual filesystem.
-///
-/// The filesystem only abstracts file operations. It doesn't abstract directory traversal.
-/// While abstracting directory traversal might be desired, it would prevent us from using many popular
-/// crates that don't support virtual filesystems (e.g. `walkdir`).
-pub trait Vfs {
-    /// Returns the metadata for the file at the given path or `Err` if the file doesn't exist or is a directory.
-    fn metadata(&self, path: &VfsPath) -> VfsResult<VfsMetadata>;
+use std::sync::Arc;
 
-    /// Returns `true` if the file at the given path exists.
-    fn exists(&self, path: &VfsPath) -> bool;
+use countme::Count;
+use dashmap::mapref::entry::Entry;
+use filetime::FileTime;
 
-    /// Reads the file at the given path.
-    fn read(&self, path: &VfsPath) -> VfsResult<String>;
+use crate::{Db, FxDashMap};
+
+pub use path::VfsPath;
+
+#[salsa::input]
+pub struct VfsFile {
+    /// The path of the file.
+    #[id]
+    #[return_ref]
+    pub path: VfsPath,
+
+    /// The unix permissions of the file. Only supported on unix systems. Always 0 on Windows
+    /// or when the file has been deleted.
+    pub permissions: Option<u32>,
+
+    /// The file revision. A file has changed if the revisions don't compare equal.
+    pub revision: FileRevision,
+
+    /// The status of the file.
+    ///
+    /// Salsa doesn't support deleting inputs. The only way to signal to the depending queries that
+    /// the file has been deleted is to change the status to `Deleted`.
+    pub status: FileStatus,
+
+    /// Counter that counts the number of created file instances and active file instances.
+    /// Only enabled in debug builds.
+    #[allow(unused)]
+    count: Count<VfsFile>,
 }
 
-pub type VfsResult<T> = Result<T, VfsError>;
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum FileStatus {
+    /// The file exists.
+    Exists,
 
-#[derive(Debug)]
-pub enum VfsError {
-    Io(std::io::Error),
-    IsADirectory,
-}
-
-impl Display for VfsError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            VfsError::Io(error) => error.fmt(f),
-            VfsError::IsADirectory => f.write_str("is a directory"),
-        }
-    }
-}
-
-impl Error for VfsError {}
-
-impl From<std::io::Error> for VfsError {
-    fn from(error: std::io::Error) -> Self {
-        VfsError::Io(error)
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct VfsMetadata {
-    revision: FileRevision,
-    permission: u32,
-}
-
-impl VfsMetadata {
-    pub const fn permission(&self) -> u32 {
-        self.permission
-    }
-
-    pub const fn revision(&self) -> FileRevision {
-        self.revision
-    }
+    /// The file was deleted, didn't exist to begin with or the path isn't a file.
+    Deleted,
 }
 
 /// A number representing the revision of a file.
@@ -115,56 +94,87 @@ impl From<FileTime> for FileRevision {
     }
 }
 
-/// Filesystem that reads files from the OS filesystem.
-pub struct OsFs;
-
-impl OsFs {
-    pub fn snapshot(&self) -> Self {
-        Self
-    }
+/// Virtual file system that tracks the metadata of files.
+#[derive(Default)]
+pub struct Vfs {
+    /// Lookup table that maps the path to a salsa interned [`VfsFile`] instance.
+    ///
+    /// The map also stores entries for files that don't exist on the file system. This is necessary
+    /// so that queries that depend on the existence of a file are re-executed when the file is created.
+    files_by_path: Arc<FxDashMap<VfsPath, VfsFile>>,
 }
 
-impl Vfs for OsFs {
-    fn metadata(&self, path: &VfsPath) -> VfsResult<VfsMetadata> {
-        match path {
-            VfsPath::Fs(path) => {
-                let metadata = std::fs::metadata(path)?;
+impl Vfs {
+    /// Looks up a file by its path.
+    ///
+    /// For a non-existing file, creates a new salsa `File` ingredient and stores it for future lookups.
+    ///
+    /// The operation always succeeds even if the path doesn't exist on disk, isn't accessible or if the path points to a directory.
+    /// In these cases, a file with status [`FileStatus::Deleted`] is returned.
+    pub fn fs(&self, db: &dyn Db, path: &camino::Utf8Path) -> VfsFile {
+        match self.files_by_path.entry(VfsPath::Fs(path.to_path_buf())) {
+            Entry::Occupied(entry) => *entry.get(),
+            Entry::Vacant(vacant) => {
+                let metadata = std::fs::metadata(path);
+                let file_path = VfsPath::fs(path.to_path_buf());
 
-                if metadata.is_dir() {
-                    return Err(VfsError::IsADirectory);
-                }
+                let file = match metadata {
+                    Ok(metadata) if metadata.file_type().is_file() => {
+                        let last_modified = FileTime::from_last_modification_time(&metadata);
+                        let permission = if cfg!(unix) {
+                            use std::os::unix::fs::PermissionsExt;
 
-                let last_modified = FileTime::from_last_modification_time(&metadata);
-                let permission = if cfg!(unix) {
-                    use std::os::unix::fs::PermissionsExt;
+                            Some(metadata.permissions().mode())
+                        } else {
+                            None
+                        };
 
-                    metadata.permissions().mode()
-                } else {
-                    0
+                        VfsFile::new(
+                            db,
+                            file_path,
+                            permission,
+                            last_modified.into(),
+                            FileStatus::Exists,
+                            Count::default(),
+                        )
+                    }
+                    _ => VfsFile::new(
+                        db,
+                        file_path,
+                        None,
+                        FileRevision::zero(),
+                        FileStatus::Deleted,
+                        Count::default(),
+                    ),
                 };
 
-                Ok(VfsMetadata {
-                    revision: FileRevision::from(last_modified),
-                    permission,
-                })
+                vacant.insert(file);
+                file
             }
-            VfsPath::Vendored(_) => todo!(),
         }
     }
 
-    fn exists(&self, path: &VfsPath) -> bool {
-        match path {
-            VfsPath::Fs(path) => path.is_file(),
-            VfsPath::Vendored(_) => todo!(),
-        }
+    pub fn vendored(&self, _db: &dyn Db, _path: &camino::Utf8Path) -> Option<VfsFile> {
+        // TODO: Lookup the path in the vendored file system
+        None
     }
 
-    fn read(&self, path: &VfsPath) -> VfsResult<String> {
-        match path {
-            VfsPath::Fs(path) => Ok(std::fs::read_to_string(path)?),
-            VfsPath::Vendored(_) => todo!(),
+    /// Creates a salsa like snapshot of the files. The instances share
+    /// the same path to file mapping.
+    pub fn snapshot(&self) -> Self {
+        Self {
+            files_by_path: self.files_by_path.clone(),
         }
     }
 }
 
-mod tests {}
+impl std::fmt::Debug for Vfs {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut map = f.debug_map();
+
+        for entry in self.files_by_path.iter() {
+            map.entry(entry.key(), entry.value());
+        }
+        map.finish()
+    }
+}
