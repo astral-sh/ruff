@@ -196,6 +196,10 @@ mod tests {
     #[test_case(Rule::SelfOrClsAssignment, Path::new("self_or_cls_assignment.py"))]
     #[test_case(Rule::TooManyNestedBlocks, Path::new("too_many_nested_blocks.py"))]
     #[test_case(Rule::DictIndexMissingItems, Path::new("dict_index_missing_items.py"))]
+    #[test_case(
+        Rule::UnnecessaryChainedComprehension,
+        Path::new("unnecessary_chained_comprehension.py")
+    )]
     #[test_case(Rule::DictIterMissingItems, Path::new("dict_iter_missing_items.py"))]
     #[test_case(
         Rule::UnnecessaryDictIndexLookup,
