@@ -1,8 +1,8 @@
-use lsp_types::{notification::Notification, TraceValue};
+use lsp_types::TraceValue;
 use serde::Deserialize;
 use std::sync::{Mutex, OnceLock};
-use tracing::{level_filters::LevelFilter, Event};
-use tracing_subscriber::{layer::SubscriberExt, Layer};
+use tracing::level_filters::LevelFilter;
+use tracing_subscriber::{fmt::time::Uptime, layer::SubscriberExt, Layer};
 
 use crate::server::ClientSender;
 
@@ -22,8 +22,15 @@ pub(crate) fn init_tracing(sender: ClientSender, log_level: LogLevel) {
         .set(sender)
         .expect("logging sender should only be initialized once");
 
-    let subscriber = tracing_subscriber::Registry::default()
-        .with(LogLayer.with_filter(LogFilter { filter: log_level }));
+    let subscriber = tracing_subscriber::Registry::default().with(
+        tracing_subscriber::fmt::layer()
+            .with_timer(Uptime::default())
+            .with_thread_names(true)
+            .with_ansi(false)
+            .with_writer(|| Box::new(std::io::stderr()))
+            .with_filter(TraceLevelFilter)
+            .with_filter(LogLevelFilter { filter: log_level }),
+    );
 
     tracing::subscriber::set_global_default(subscriber)
         .expect("should be able to set global default subscriber");
@@ -37,46 +44,28 @@ pub(crate) enum LogLevel {
     Warn,
     Info,
     Debug,
+    Trace,
 }
 
 impl LogLevel {
-    fn from_trace_level(level: tracing::Level) -> Self {
-        match level {
-            tracing::Level::ERROR => Self::Error,
-            tracing::Level::WARN => Self::Warn,
-            tracing::Level::INFO => Self::Info,
-            _ => Self::Debug,
-        }
-    }
-
-    fn message_type(self) -> lsp_types::MessageType {
-        match self {
-            Self::Error => lsp_types::MessageType::ERROR,
-            Self::Warn => lsp_types::MessageType::WARNING,
-            Self::Info => lsp_types::MessageType::INFO,
-            // TODO(jane): LSP `0.3.18` will introduce `MessageType::DEBUG`,
-            // and we should consider using that.
-            Self::Debug => lsp_types::MessageType::LOG,
-        }
-    }
-
     fn trace_level(self) -> tracing::Level {
         match self {
             Self::Error => tracing::Level::ERROR,
             Self::Warn => tracing::Level::WARN,
             Self::Info => tracing::Level::INFO,
             Self::Debug => tracing::Level::DEBUG,
+            Self::Trace => tracing::Level::TRACE,
         }
     }
 }
 
-struct LogLayer;
-
-struct LogFilter {
+struct LogLevelFilter {
     filter: LogLevel,
 }
 
-impl<S> tracing_subscriber::layer::Filter<S> for LogFilter {
+struct TraceLevelFilter;
+
+impl<S> tracing_subscriber::layer::Filter<S> for LogLevelFilter {
     fn enabled(
         &self,
         meta: &tracing::Metadata<'_>,
@@ -96,53 +85,24 @@ impl<S> tracing_subscriber::layer::Filter<S> for LogFilter {
     }
 }
 
-impl tracing_subscriber::Layer<tracing_subscriber::Registry> for LogLayer {
-    fn register_callsite(
+impl<S> tracing_subscriber::layer::Filter<S> for TraceLevelFilter {
+    fn enabled(
         &self,
-        meta: &'static tracing::Metadata<'static>,
-    ) -> tracing::subscriber::Interest {
-        if meta.is_event() && meta.fields().iter().any(|field| field.name() == "message") {
-            tracing::subscriber::Interest::always()
-        } else {
-            tracing::subscriber::Interest::never()
-        }
-    }
-
-    fn on_event(
-        &self,
-        event: &Event<'_>,
-        _ctx: tracing_subscriber::layer::Context<'_, tracing_subscriber::Registry>,
-    ) {
-        let mut message_visitor =
-            LogMessageVisitor(LogLevel::from_trace_level(*event.metadata().level()));
-        event.record(&mut message_visitor);
-    }
-}
-
-#[derive(Default)]
-struct LogMessageVisitor(LogLevel);
-
-impl tracing::field::Visit for LogMessageVisitor {
-    fn record_debug(&mut self, field: &tracing::field::Field, value: &dyn std::fmt::Debug) {
-        if field.name() == "message" {
-            log(format!("{value:?}"), self.0);
-        }
+        _: &tracing::Metadata<'_>,
+        _: &tracing_subscriber::layer::Context<'_, S>,
+    ) -> bool {
+        trace_value() != lsp_types::TraceValue::Off
     }
 }
 
 #[inline]
-fn log(message: String, level: LogLevel) {
-    let _ = LOGGING_SENDER
-        .get()
-        .expect("logging channel should be initialized")
-        .send(lsp_server::Message::Notification(
-            lsp_server::Notification {
-                method: lsp_types::notification::LogMessage::METHOD.into(),
-                params: serde_json::to_value(lsp_types::LogMessageParams {
-                    typ: level.message_type(),
-                    message,
-                })
-                .expect("log notification should serialize"),
-            },
-        ));
+fn trace_value() -> lsp_types::TraceValue {
+    std::env::var("RUFF_TRACE")
+        .ok()
+        .and_then(|trace| serde_json::from_value(serde_json::Value::String(trace)).ok())
+        .unwrap_or_else(|| {
+            *TRACE_VALUE
+                .lock()
+                .expect("trace value mutex should be available")
+        })
 }
