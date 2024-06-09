@@ -40,8 +40,7 @@ impl Violation for UnnecessaryChainedComparison {
     }
 }
 
-// Bounds struct to store the lower and upper bounds of the operands.
-// Each integer in the set represents the id of the operand.
+// Each integer is a unique identifier for the node.
 #[derive(Default)]
 struct Bounds {
     lower_bound: HashSet<i32>,
