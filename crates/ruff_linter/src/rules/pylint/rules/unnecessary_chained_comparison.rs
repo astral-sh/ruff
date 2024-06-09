@@ -48,49 +48,42 @@ struct Bounds {
     upper_bound: HashSet<i32>,
 }
 
+fn update_bounds(
+    operator: ast::CmpOp,
+    id: String,
+    node_id: i32,
+    is_left: bool,
+    uses: &mut HashMap<String, Bounds>,
+) {
+    match operator {
+        ast::CmpOp::Lt | ast::CmpOp::LtE if is_left => {
+            uses.entry(id).or_default().lower_bound.insert(node_id);
+        }
+        ast::CmpOp::Gt | ast::CmpOp::GtE if is_left => {
+            uses.entry(id).or_default().upper_bound.insert(node_id);
+        }
+        ast::CmpOp::Lt | ast::CmpOp::LtE if !is_left => {
+            uses.entry(id).or_default().upper_bound.insert(node_id);
+        }
+        ast::CmpOp::Gt | ast::CmpOp::GtE if !is_left => {
+            uses.entry(id).or_default().lower_bound.insert(node_id);
+        }
+        _ => {}
+    }
+}
+
 fn set_lower_upper_bounds(node: &ast::ExprCompare, uses: &mut HashMap<String, Bounds>) {
     let mut left_operand: &ast::Expr = &node.left;
     let node_id = node as *const _ as i32;
     for (right_operand, operator) in node.comparators.iter().zip(node.ops.iter()) {
-        let Some(left_name_expr) = left_operand.as_name_expr() else {
-            continue;
-        };
-
-        match operator {
-            ast::CmpOp::Lt | ast::CmpOp::LtE => {
-                uses.entry(left_name_expr.id.clone())
-                    .or_default()
-                    .lower_bound
-                    .insert(node_id);
-            }
-            ast::CmpOp::Gt | ast::CmpOp::GtE => {
-                uses.entry(left_name_expr.id.clone())
-                    .or_default()
-                    .upper_bound
-                    .insert(node_id);
-            }
-            _ => {}
+        if let Some(left_name_expr) = left_operand.as_name_expr() {
+            update_bounds(*operator, left_name_expr.id.clone(), node_id, true, uses);
         }
 
-        let Some(right_name_expr) = right_operand.as_name_expr() else {
-            continue;
-        };
-
-        match operator {
-            ast::CmpOp::Lt | ast::CmpOp::LtE => {
-                uses.entry(right_name_expr.id.clone())
-                    .or_default()
-                    .upper_bound
-                    .insert(node_id);
-            }
-            ast::CmpOp::Gt | ast::CmpOp::GtE => {
-                uses.entry(right_name_expr.id.clone())
-                    .or_default()
-                    .lower_bound
-                    .insert(node_id);
-            }
-            _ => {}
+        if let Some(right_name_expr) = right_operand.as_name_expr() {
+            update_bounds(*operator, right_name_expr.id.clone(), node_id, false, uses);
         }
+
         left_operand = right_operand;
     }
 }
