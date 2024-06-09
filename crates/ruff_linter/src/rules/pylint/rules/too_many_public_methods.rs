@@ -19,7 +19,7 @@ use crate::checkers::ast::Checker;
 /// Instead, consider refactoring the class into separate classes.
 ///
 /// ## Example
-/// Assuming that `pylint.max-public-settings` is set to 5:
+/// Assuming that `lint.pylint.max-public-methods` is set to 5:
 /// ```python
 /// class Linter:
 ///     def __init__(self):
