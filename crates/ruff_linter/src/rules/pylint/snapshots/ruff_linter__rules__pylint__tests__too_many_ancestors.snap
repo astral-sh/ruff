@@ -1,0 +1,19 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+too_many_ancestors.py:38:1: PLR0901 Too many ancestors (8 > 7)
+   |
+37 |   # Too many ancestors.
+38 | / class PlatypusBad(
+39 | |     BeakyAnimal,
+40 | |     FurryAnimal,
+41 | |     Swimmer,
+42 | |     EggLayer,
+43 | |     VenomousAnimal,
+44 | |     ProtectedSpecies,
+45 | |     BeaverTailedAnimal,
+46 | |     VertebrateBad,
+47 | | ):
+48 | |     ...
+   | |_______^ PLR0901
+   |

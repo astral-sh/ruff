@@ -2494,6 +2494,15 @@
             "$ref": "#/definitions/ConstantType"
           }
         },
+        "max-ancestors": {
+          "description": "Maximum number of ancestors allowed for a class (see: `PLR0901`).",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0.0
+        },
         "max-args": {
           "description": "Maximum number of arguments allowed for a function or method definition (see: `PLR0913`).",
           "type": [
@@ -3350,6 +3359,7 @@
         "PLR0402",
         "PLR09",
         "PLR090",
+        "PLR0901",
         "PLR0904",
         "PLR091",
         "PLR0911",

@@ -1502,7 +1502,7 @@ mod tests {
         Rule::ReimplementedStarmap,
         Rule::SliceCopy,
         Rule::TooManyPublicMethods,
-        Rule::TooManyPublicMethods,
+        Rule::TooManyAncestors,
         Rule::UnnecessaryEnumerate,
         Rule::MathConstant,
         Rule::PreviewTestRule,

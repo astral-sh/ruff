@@ -393,6 +393,22 @@ mod tests {
     }
 
     #[test]
+    fn too_many_ancestors() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pylint/too_many_ancestors.py"),
+            &LinterSettings {
+                pylint: pylint::settings::Settings {
+                    max_ancestors: 7,
+                    ..pylint::settings::Settings::default()
+                },
+                ..LinterSettings::for_rules(vec![Rule::TooManyAncestors])
+            },
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
     fn too_many_locals() -> Result<()> {
         let diagnostics = test_path(
             Path::new("pylint/too_many_locals.py"),

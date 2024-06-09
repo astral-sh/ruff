@@ -420,6 +420,13 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     checker.settings.pylint.max_public_methods,
                 );
             }
+            if checker.enabled(Rule::TooManyAncestors) {
+                pylint::rules::too_many_ancestors(
+                    checker,
+                    class_def,
+                    checker.settings.pylint.max_ancestors,
+                );
+            }
             if checker.enabled(Rule::GlobalStatement) {
                 pylint::rules::global_statement(checker, name);
             }

@@ -2876,6 +2876,10 @@ pub struct PylintOptions {
     /// (see: `PLR1702`).
     #[option(default = r"5", value_type = "int", example = r"max-nested-blocks = 5")]
     pub max_nested_blocks: Option<usize>,
+
+    /// Maximum number of ancestors allowed for a class (see: `PLR0901`).
+    #[option(default = r"7", value_type = "int", example = r"max-ancestors = 7")]
+    pub max_ancestors: Option<usize>,
 }
 
 impl PylintOptions {
@@ -2900,6 +2904,7 @@ impl PylintOptions {
                 .unwrap_or(defaults.max_public_methods),
             max_locals: self.max_locals.unwrap_or(defaults.max_locals),
             max_nested_blocks: self.max_nested_blocks.unwrap_or(defaults.max_nested_blocks),
+            max_ancestors: self.max_public_methods.unwrap_or(defaults.max_ancestors),
         }
     }
 }
