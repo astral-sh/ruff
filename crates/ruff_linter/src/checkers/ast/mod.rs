@@ -1172,7 +1172,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                                     bit_flags,
                                 );
                             }
-                            ExprContext::Del => todo!(),
+                            ExprContext::Del => {}
                         };
                     };
                 };

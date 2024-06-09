@@ -45,7 +45,6 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
         Rule::UnusedPrivateTypeVar,
         Rule::UnusedStaticMethodArgument,
         Rule::UnusedVariable,
-        Rule::SingledispatchMethod,
         Rule::AccessMemberBeforeDefinition,
     ]) {
         return;

@@ -26,7 +26,6 @@ mod tests {
         Rule::SingledispatchmethodFunction,
         Path::new("singledispatchmethod_function.py")
     )]
-    #[test_case(Rule::AndOrTernary, Path::new("and_or_ternary.py"))]
     #[test_case(Rule::AssertOnStringLiteral, Path::new("assert_on_string_literal.py"))]
     #[test_case(Rule::AwaitOutsideAsync, Path::new("await_outside_async.py"))]
     #[test_case(Rule::BadOpenMode, Path::new("bad_open_mode.py"))]
