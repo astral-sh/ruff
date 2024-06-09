@@ -3,8 +3,10 @@ use std::hash::BuildHasherDefault;
 use rustc_hash::FxHasher;
 use salsa::DbWithJar;
 
-use crate::vfs::VfsFile;
+use crate::file_system::{FileSystem, FileSystemPath};
+use crate::vfs::{VendoredPath, Vfs, VfsFile};
 
+pub mod file_system;
 pub mod vfs;
 
 pub(crate) type FxDashMap<K, V> = dashmap::DashMap<K, V, BuildHasherDefault<FxHasher>>;
@@ -12,15 +14,30 @@ pub(crate) type FxDashMap<K, V> = dashmap::DashMap<K, V, BuildHasherDefault<FxHa
 #[salsa::jar(db=Db)]
 pub struct Jar(VfsFile);
 
+/// Database (or cupboard) that gives access to the virtual filesystem, source code, and parsed AST.
 pub trait Db: DbWithJar<Jar> {
-    /// Interns a file path and returns a salsa `File` ingredient.
+    /// Interns a file system path and returns a salsa `File` ingredient.
     ///
     /// The operation is guaranteed to always succeed, even if the path doesn't exist, isn't accessible, or if the path points to a directory.
-    /// In these cases, a file with status [`FileStatus::Deleted`] is returned.
-    fn file(&self, path: &camino::Utf8Path) -> VfsFile;
+    /// In these cases, a file with status [`FileStatus::Deleted`](vfs::FileStatus::Deleted) is returned.
+    fn file(&self, path: &FileSystemPath) -> VfsFile
+    where
+        Self: Sized,
+    {
+        self.vfs().file(self, path)
+    }
 
-    /// Interns a path to a vendored file and returns a salsa `File` ingredient.
-    fn vendored_file(&self, path: &camino::Utf8Path) -> Option<VfsFile>;
+    /// Interns a vendored file path. Returns `None` if no such vendored file exists and `Some` otherwise.
+    fn vendored_file(&self, path: &VendoredPath) -> Option<VfsFile>
+    where
+        Self: Sized,
+    {
+        self.vfs().vendored(self, path)
+    }
+
+    fn file_system(&self) -> &dyn FileSystem;
+
+    fn vfs(&self) -> &Vfs;
 }
 
 /// Trait for upcasting a reference to a base trait object.
@@ -30,45 +47,79 @@ pub trait Upcast<T: ?Sized> {
 
 #[cfg(test)]
 mod tests {
-    use crate::vfs::Vfs;
-    use crate::{Db, Jar, VfsFile};
+    use crate::file_system::{FileSystem, MemoryFileSystem};
+    use crate::vfs::{VendoredPathBuf, Vfs};
+    use crate::{Db, Jar};
 
     /// Database that can be used for testing.
     ///
-    /// Uses an in memory filesystem.
+    /// Uses an in memory filesystem and it stubs out the vendored files by default.
     #[salsa::db(Jar)]
     pub struct TestDb {
         storage: salsa::Storage<Self>,
         vfs: Vfs,
+        file_system: MemoryFileSystem,
+        events: std::sync::Arc<std::sync::Mutex<Vec<salsa::Event>>>,
     }
 
     impl TestDb {
         #[allow(unused)]
         pub fn new() -> Self {
+            let mut vfs = Vfs::default();
+            vfs.stub_vendored::<VendoredPathBuf, String>([]);
+
             Self {
                 storage: salsa::Storage::default(),
-                vfs: Vfs::default(),
+                file_system: MemoryFileSystem::default(),
+                events: std::sync::Arc::default(),
+                vfs,
             }
+        }
+
+        #[allow(unused)]
+        pub fn file_system(&self) -> &MemoryFileSystem {
+            &self.file_system
+        }
+
+        #[allow(unused)]
+        pub fn events(&self) -> std::sync::Arc<std::sync::Mutex<Vec<salsa::Event>>> {
+            self.events.clone()
+        }
+
+        pub fn file_system_mut(&mut self) -> &mut MemoryFileSystem {
+            &mut self.file_system
+        }
+
+        pub fn vfs_mut(&mut self) -> &mut Vfs {
+            &mut self.vfs
         }
     }
 
     impl Db for TestDb {
-        fn file(&self, path: &camino::Utf8Path) -> VfsFile {
-            self.vfs.fs(self, path)
+        fn file_system(&self) -> &dyn FileSystem {
+            &self.file_system
         }
 
-        fn vendored_file(&self, path: &camino::Utf8Path) -> Option<VfsFile> {
-            self.vfs.vendored(self, path)
+        fn vfs(&self) -> &Vfs {
+            &self.vfs
         }
     }
 
-    impl salsa::Database for TestDb {}
+    impl salsa::Database for TestDb {
+        fn salsa_event(&self, event: salsa::Event) {
+            tracing::trace!("event: {:?}", event);
+            let mut events = self.events.lock().unwrap();
+            events.push(event);
+        }
+    }
 
     impl salsa::ParallelDatabase for TestDb {
         fn snapshot(&self) -> salsa::Snapshot<Self> {
             salsa::Snapshot::new(Self {
                 storage: self.storage.snapshot(),
+                file_system: self.file_system.snapshot(),
                 vfs: self.vfs.snapshot(),
+                events: self.events.clone(),
             })
         }
     }
