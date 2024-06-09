@@ -329,7 +329,7 @@ impl<'a> Checker<'a> {
 
     /// Returns the [`CommentRanges`] for the parsed source code.
     pub(crate) fn comment_ranges(&self) -> &'a CommentRanges {
-        self.parsed.comment_ranges()
+        self.indexer.comment_ranges()
     }
 
     /// Returns the [`Tokens`] for the parsed type annotation if the checker is in a typing context

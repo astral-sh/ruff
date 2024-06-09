@@ -3,7 +3,6 @@
 use ruff_diagnostics::Diagnostic;
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
-use ruff_python_trivia::CommentRanges;
 use ruff_source_file::{Locator, UniversalNewlines};
 use ruff_text_size::TextSize;
 
@@ -20,7 +19,6 @@ pub(crate) fn check_physical_lines(
     locator: &Locator,
     stylist: &Stylist,
     indexer: &Indexer,
-    comment_ranges: &CommentRanges,
     doc_lines: &[TextSize],
     settings: &LinterSettings,
 ) -> Vec<Diagnostic> {
@@ -37,6 +35,7 @@ pub(crate) fn check_physical_lines(
     let enforce_copyright_notice = settings.rules.enabled(Rule::MissingCopyrightNotice);
 
     let mut doc_lines_iter = doc_lines.iter().peekable();
+    let comment_ranges = indexer.comment_ranges();
 
     for line in locator.contents().universal_newlines() {
         while doc_lines_iter
@@ -115,7 +114,6 @@ mod tests {
                 &locator,
                 &stylist,
                 &indexer,
-                parsed.comment_ranges(),
                 &[],
                 &LinterSettings {
                     pycodestyle: pycodestyle::settings::Settings {

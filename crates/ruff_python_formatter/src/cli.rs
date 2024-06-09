@@ -8,6 +8,7 @@ use clap::{command, Parser, ValueEnum};
 use ruff_formatter::SourceCode;
 use ruff_python_ast::PySourceType;
 use ruff_python_parser::{parse, AsMode};
+use ruff_python_trivia::CommentRanges;
 use ruff_text_size::Ranged;
 
 use crate::comments::collect_comments;
@@ -62,14 +63,15 @@ pub fn format_and_debug_print(source: &str, cli: &Cli, source_path: &Path) -> Re
         });
 
     let source_code = SourceCode::new(source);
-    let formatted = format_module_ast(&parsed, source, options).context("Failed to format node")?;
+    let comment_ranges = CommentRanges::from(parsed.tokens());
+    let formatted = format_module_ast(&parsed, &comment_ranges, source, options)
+        .context("Failed to format node")?;
     if cli.print_ir {
         println!("{}", formatted.document().display(source_code));
     }
     if cli.print_comments {
         // Print preceding, following and enclosing nodes
-        let decorated_comments =
-            collect_comments(parsed.syntax(), source_code, parsed.comment_ranges());
+        let decorated_comments = collect_comments(parsed.syntax(), source_code, &comment_ranges);
         if !decorated_comments.is_empty() {
             println!("# Comment decoration: Range, Preceding, Following, Enclosing, Comment");
         }

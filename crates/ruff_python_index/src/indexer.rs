@@ -3,7 +3,9 @@
 
 use ruff_python_ast::Stmt;
 use ruff_python_parser::{TokenKind, Tokens};
-use ruff_python_trivia::{has_leading_content, has_trailing_content, is_python_whitespace};
+use ruff_python_trivia::{
+    has_leading_content, has_trailing_content, is_python_whitespace, CommentRanges,
+};
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -19,6 +21,9 @@ pub struct Indexer {
 
     /// The range of all multiline strings in the source document.
     multiline_ranges: MultilineRanges,
+
+    /// The range of all comments in the source document.
+    comment_ranges: CommentRanges,
 }
 
 impl Indexer {
@@ -28,6 +33,8 @@ impl Indexer {
         let mut fstring_ranges_builder = FStringRangesBuilder::default();
         let mut multiline_ranges_builder = MultilineRangesBuilder::default();
         let mut continuation_lines = Vec::new();
+        let mut comment_ranges = Vec::new();
+
         // Token, end
         let mut prev_end = TextSize::default();
         let mut line_start = TextSize::default();
@@ -64,17 +71,36 @@ impl Indexer {
                     // the closing delimiter, since the token itself can span multiple lines.
                     line_start = locator.line_start(token.end());
                 }
+                TokenKind::Comment => {
+                    comment_ranges.push(token.range());
+                }
                 _ => {}
             }
 
             prev_end = token.end();
         }
 
+        // TODO(dhruvmanila): This is temporary until Ruff becomes error resilient. To understand
+        // why this is required, refer to https://github.com/astral-sh/ruff/pull/11457#issuecomment-2144990269
+        // which was released at the time of this writing. Now we can't just revert that behavior,
+        // so we need to visit the remaining tokens if there are any for the comment ranges.
+        for token in tokens.after(prev_end) {
+            if token.kind() == TokenKind::Comment {
+                comment_ranges.push(token.range());
+            }
+        }
+
         Self {
             continuation_lines,
             fstring_ranges: fstring_ranges_builder.finish(),
             multiline_ranges: multiline_ranges_builder.finish(),
+            comment_ranges: CommentRanges::new(comment_ranges),
         }
+    }
+
+    /// Returns the byte offset ranges of comments.
+    pub const fn comment_ranges(&self) -> &CommentRanges {
+        &self.comment_ranges
     }
 
     /// Returns the byte offset ranges of f-strings.

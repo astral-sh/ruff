@@ -88,7 +88,7 @@ pub fn check_path(
     let mut error = None;
 
     let tokens = parsed.tokens();
-    let comment_ranges = parsed.comment_ranges();
+    let comment_ranges = indexer.comment_ranges();
 
     // Collect doc lines. This requires a rare mix of tokens (for comments) and AST
     // (for docstrings), which demands special-casing at this level.
@@ -105,7 +105,7 @@ pub fn check_path(
         .any(|rule_code| rule_code.lint_source().is_tokens())
     {
         diagnostics.extend(check_tokens(
-            parsed,
+            tokens,
             path,
             locator,
             indexer,
@@ -218,12 +218,7 @@ pub fn check_path(
         .any(|rule_code| rule_code.lint_source().is_physical_lines())
     {
         diagnostics.extend(check_physical_lines(
-            locator,
-            stylist,
-            indexer,
-            comment_ranges,
-            &doc_lines,
-            settings,
+            locator, stylist, indexer, &doc_lines, settings,
         ));
     }
 
@@ -385,7 +380,7 @@ pub fn add_noqa_to_path(
 
     // Extract the `# noqa` and `# isort: skip` directives from the source.
     let directives = directives::extract_directives(
-        &parsed,
+        parsed.tokens(),
         directives::Flags::from_settings(settings),
         &locator,
         &indexer,
@@ -428,7 +423,7 @@ pub fn add_noqa_to_path(
         path,
         &diagnostics,
         &locator,
-        parsed.comment_ranges(),
+        indexer.comment_ranges(),
         &settings.external,
         &directives.noqa_line_for,
         stylist.line_ending(),
@@ -459,7 +454,7 @@ pub fn lint_only(
 
     // Extract the `# noqa` and `# isort: skip` directives from the source.
     let directives = directives::extract_directives(
-        &parsed,
+        parsed.tokens(),
         directives::Flags::from_settings(settings),
         &locator,
         &indexer,
@@ -550,7 +545,7 @@ pub fn lint_fix<'a>(
 
         // Extract the `# noqa` and `# isort: skip` directives from the source.
         let directives = directives::extract_directives(
-            &parsed,
+            parsed.tokens(),
             directives::Flags::from_settings(settings),
             &locator,
             &indexer,

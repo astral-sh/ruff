@@ -147,7 +147,7 @@ impl<'src> Parser<'src> {
 
         // TODO consider re-integrating lexical error handling into the parser?
         let parse_errors = self.errors;
-        let (tokens, comment_ranges, lex_errors) = self.tokens.finish();
+        let (tokens, lex_errors) = self.tokens.finish();
 
         // Fast path for when there are no lex errors.
         // There's no fast path for when there are no parse errors because a lex error
@@ -156,7 +156,6 @@ impl<'src> Parser<'src> {
             return Parsed {
                 syntax,
                 tokens: Tokens::new(tokens),
-                comment_ranges,
                 errors: parse_errors,
             };
         }
@@ -188,7 +187,6 @@ impl<'src> Parser<'src> {
         Parsed {
             syntax,
             tokens: Tokens::new(tokens),
-            comment_ranges,
             errors: merged,
         }
     }

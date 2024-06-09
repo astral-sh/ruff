@@ -3,12 +3,12 @@
 use std::path::Path;
 
 use ruff_notebook::CellOffsets;
-use ruff_python_ast::{ModModule, PySourceType};
+use ruff_python_ast::PySourceType;
 use ruff_python_codegen::Stylist;
 
 use ruff_diagnostics::Diagnostic;
 use ruff_python_index::Indexer;
-use ruff_python_parser::Parsed;
+use ruff_python_parser::Tokens;
 use ruff_source_file::Locator;
 use ruff_text_size::Ranged;
 
@@ -23,7 +23,7 @@ use crate::settings::LinterSettings;
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn check_tokens(
-    parsed: &Parsed<ModModule>,
+    tokens: &Tokens,
     path: &Path,
     locator: &Locator,
     indexer: &Indexer,
@@ -33,9 +33,7 @@ pub(crate) fn check_tokens(
     cell_offsets: Option<&CellOffsets>,
 ) -> Vec<Diagnostic> {
     let mut diagnostics: Vec<Diagnostic> = vec![];
-
-    let tokens = parsed.tokens();
-    let comment_ranges = parsed.comment_ranges();
+    let comment_ranges = indexer.comment_ranges();
 
     if settings.rules.any_enabled(&[
         Rule::BlankLineBetweenMethods,

@@ -1,7 +1,7 @@
 use insta::assert_debug_snapshot;
 
 use ruff_python_parser::{parse_unchecked, Mode};
-use ruff_python_trivia::{lines_after, lines_before, SimpleToken, SimpleTokenizer};
+use ruff_python_trivia::{lines_after, lines_before, CommentRanges, SimpleToken, SimpleTokenizer};
 use ruff_python_trivia::{BackwardsTokenizer, SimpleTokenKind};
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
@@ -23,7 +23,8 @@ impl TokenizationTestCase {
 
     fn tokenize_reverse(&self) -> Vec<SimpleToken> {
         let parsed = parse_unchecked(self.source, Mode::Module);
-        BackwardsTokenizer::new(self.source, self.range, parsed.comment_ranges()).collect()
+        let comment_ranges = CommentRanges::from(parsed.tokens());
+        BackwardsTokenizer::new(self.source, self.range, &comment_ranges).collect()
     }
 
     fn tokens(&self) -> &[SimpleToken] {

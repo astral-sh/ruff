@@ -831,6 +831,7 @@ impl Format<PyFormatContext<'_>> for SuiteChildStatement<'_> {
 mod tests {
     use ruff_formatter::format;
     use ruff_python_parser::parse_module;
+    use ruff_python_trivia::CommentRanges;
 
     use crate::comments::Comments;
     use crate::prelude::*;
@@ -860,11 +861,12 @@ def trailing_func():
 ";
 
         let parsed = parse_module(source).unwrap();
+        let comment_ranges = CommentRanges::from(parsed.tokens());
 
         let context = PyFormatContext::new(
             PyFormatOptions::default(),
             source,
-            Comments::from_ranges(parsed.comment_ranges()),
+            Comments::from_ranges(&comment_ranges),
             parsed.tokens(),
         );
 

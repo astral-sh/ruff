@@ -482,11 +482,13 @@ mod tests {
     use ruff_formatter::SourceCode;
     use ruff_python_ast::{Mod, PySourceType};
     use ruff_python_parser::{parse, AsMode, Parsed};
+    use ruff_python_trivia::CommentRanges;
 
     use crate::comments::Comments;
 
     struct CommentsTestCase<'a> {
         parsed: Parsed<Mod>,
+        comment_ranges: CommentRanges,
         source_code: SourceCode<'a>,
     }
 
@@ -496,19 +498,17 @@ mod tests {
             let source_type = PySourceType::Python;
             let parsed =
                 parse(source, source_type.as_mode()).expect("Expect source to be valid Python");
+            let comment_ranges = CommentRanges::from(parsed.tokens());
 
             CommentsTestCase {
                 parsed,
+                comment_ranges,
                 source_code,
             }
         }
 
         fn to_comments(&self) -> Comments {
-            Comments::from_ast(
-                self.parsed.syntax(),
-                self.source_code,
-                self.parsed.comment_ranges(),
-            )
+            Comments::from_ast(self.parsed.syntax(), self.source_code, &self.comment_ranges)
         }
     }
 

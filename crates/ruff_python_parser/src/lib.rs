@@ -239,7 +239,6 @@ pub struct Parsed<T> {
     syntax: T,
     tokens: Tokens,
     errors: Vec<ParseError>,
-    comment_ranges: CommentRanges,
 }
 
 impl<T> Parsed<T> {
@@ -256,11 +255,6 @@ impl<T> Parsed<T> {
     /// Returns a list of syntax errors found during parsing.
     pub fn errors(&self) -> &[ParseError] {
         &self.errors
-    }
-
-    /// Returns the comment ranges for the parsed output.
-    pub fn comment_ranges(&self) -> &CommentRanges {
-        &self.comment_ranges
     }
 
     /// Consumes the [`Parsed`] output and returns the contained syntax node.
@@ -313,7 +307,6 @@ impl Parsed<Mod> {
                 syntax: module,
                 tokens: self.tokens,
                 errors: self.errors,
-                comment_ranges: self.comment_ranges,
             }),
             Mod::Expression(_) => None,
         }
@@ -333,7 +326,6 @@ impl Parsed<Mod> {
                 syntax: expression,
                 tokens: self.tokens,
                 errors: self.errors,
-                comment_ranges: self.comment_ranges,
             }),
         }
     }
@@ -515,6 +507,18 @@ impl Deref for Tokens {
 
     fn deref(&self) -> &Self::Target {
         &self.raw
+    }
+}
+
+impl From<&Tokens> for CommentRanges {
+    fn from(tokens: &Tokens) -> Self {
+        let mut ranges = vec![];
+        for token in tokens {
+            if token.kind() == TokenKind::Comment {
+                ranges.push(token.range());
+            }
+        }
+        CommentRanges::new(ranges)
     }
 }
 

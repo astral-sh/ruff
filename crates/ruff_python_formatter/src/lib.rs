@@ -114,17 +114,19 @@ pub fn format_module_source(
 ) -> Result<Printed, FormatModuleError> {
     let source_type = options.source_type();
     let parsed = parse(source, source_type.as_mode())?;
-    let formatted = format_module_ast(&parsed, source, options)?;
+    let comment_ranges = CommentRanges::from(parsed.tokens());
+    let formatted = format_module_ast(&parsed, &comment_ranges, source, options)?;
     Ok(formatted.print()?)
 }
 
 pub fn format_module_ast<'a>(
     parsed: &'a Parsed<Mod>,
+    comment_ranges: &'a CommentRanges,
     source: &'a str,
     options: PyFormatOptions,
 ) -> FormatResult<Formatted<PyFormatContext<'a>>> {
     let source_code = SourceCode::new(source);
-    let comments = Comments::from_ast(parsed.syntax(), source_code, parsed.comment_ranges());
+    let comments = Comments::from_ast(parsed.syntax(), source_code, comment_ranges);
     let locator = Locator::new(source);
 
     let formatted = format!(
@@ -155,6 +157,7 @@ mod tests {
 
     use ruff_python_ast::PySourceType;
     use ruff_python_parser::{parse, AsMode};
+    use ruff_python_trivia::CommentRanges;
     use ruff_text_size::{TextRange, TextSize};
 
     use crate::{format_module_ast, format_module_source, format_range, PyFormatOptions};
@@ -199,8 +202,9 @@ def main() -> None:
         // Parse the AST.
         let source_path = "code_inline.py";
         let parsed = parse(source, source_type.as_mode()).unwrap();
+        let comment_ranges = CommentRanges::from(parsed.tokens());
         let options = PyFormatOptions::from_extension(Path::new(source_path));
-        let formatted = format_module_ast(&parsed, source, options).unwrap();
+        let formatted = format_module_ast(&parsed, &comment_ranges, source, options).unwrap();
 
         // Uncomment the `dbg` to print the IR.
         // Use `dbg_write!(f, []) instead of `write!(f, [])` in your formatting code to print some IR

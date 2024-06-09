@@ -114,7 +114,7 @@ pub(crate) fn test_contents<'a>(
     let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
     let indexer = Indexer::from_tokens(parsed.tokens(), &locator);
     let directives = directives::extract_directives(
-        &parsed,
+        parsed.tokens(),
         directives::Flags::from_settings(settings),
         &locator,
         &indexer,
@@ -180,7 +180,7 @@ pub(crate) fn test_contents<'a>(
             let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
             let indexer = Indexer::from_tokens(parsed.tokens(), &locator);
             let directives = directives::extract_directives(
-                &parsed,
+                parsed.tokens(),
                 directives::Flags::from_settings(settings),
                 &locator,
                 &indexer,

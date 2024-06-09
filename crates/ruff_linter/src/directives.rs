@@ -4,8 +4,7 @@ use std::iter::Peekable;
 use std::str::FromStr;
 
 use bitflags::bitflags;
-use ruff_python_ast::ModModule;
-use ruff_python_parser::{Parsed, TokenKind, Tokens};
+use ruff_python_parser::{TokenKind, Tokens};
 use ruff_python_trivia::CommentRanges;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
@@ -52,19 +51,19 @@ pub struct Directives {
 }
 
 pub fn extract_directives(
-    parsed: &Parsed<ModModule>,
+    tokens: &Tokens,
     flags: Flags,
     locator: &Locator,
     indexer: &Indexer,
 ) -> Directives {
     Directives {
         noqa_line_for: if flags.intersects(Flags::NOQA) {
-            extract_noqa_line_for(parsed.tokens(), locator, indexer)
+            extract_noqa_line_for(tokens, locator, indexer)
         } else {
             NoqaMapping::default()
         },
         isort: if flags.intersects(Flags::ISORT) {
-            extract_isort_directives(locator, parsed.comment_ranges())
+            extract_isort_directives(locator, indexer.comment_ranges())
         } else {
             IsortDirectives::default()
         },
@@ -380,6 +379,7 @@ impl TodoDirectiveKind {
 #[cfg(test)]
 mod tests {
     use ruff_python_parser::parse_module;
+    use ruff_python_trivia::CommentRanges;
     use ruff_text_size::{TextLen, TextRange, TextSize};
 
     use ruff_python_index::Indexer;
@@ -570,7 +570,8 @@ assert foo, \
     fn isort_directives(contents: &str) -> IsortDirectives {
         let parsed = parse_module(contents).unwrap();
         let locator = Locator::new(contents);
-        extract_isort_directives(&locator, parsed.comment_ranges())
+        let comment_ranges = CommentRanges::from(parsed.tokens());
+        extract_isort_directives(&locator, &comment_ranges)
     }
 
     #[test]
