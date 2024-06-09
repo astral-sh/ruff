@@ -53,3 +53,15 @@ if i > j > k:
 
 while i > j > k:
     print("Descending order")
+
+
+a = int(input())
+b = int(input())
+c = int(input())
+d = int(input())
+
+if a < b and c < d:
+    pass
+
+while a < b and c < d:
+    pass

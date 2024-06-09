@@ -51,17 +51,10 @@ struct Bounds {
 
 fn set_lower_upper_bounds(node: &ast::ExprCompare, uses: &mut HashMap<String, Bounds>) {
     let mut left_operand: &ast::Expr = &node.left;
+    let node_id = node as *const _ as i32;
     for (right_operand, operator) in node.comparators.iter().zip(node.ops.iter()) {
         let Some(left_name_expr) = left_operand.as_name_expr() else {
             continue;
-        };
-
-        let opererator_id = match operator {
-            ast::CmpOp::Lt => 1,
-            ast::CmpOp::LtE => 2,
-            ast::CmpOp::Gt => 3,
-            ast::CmpOp::GtE => 4,
-            _ => panic!("Invalid operator"),
         };
 
         match operator {
@@ -69,13 +62,13 @@ fn set_lower_upper_bounds(node: &ast::ExprCompare, uses: &mut HashMap<String, Bo
                 uses.entry(left_name_expr.id.clone())
                     .or_default()
                     .lower_bound
-                    .insert(opererator_id);
+                    .insert(node_id);
             }
             ast::CmpOp::Gt | ast::CmpOp::GtE => {
                 uses.entry(left_name_expr.id.clone())
                     .or_default()
                     .upper_bound
-                    .insert(opererator_id);
+                    .insert(node_id);
             }
             _ => {}
         }
@@ -83,18 +76,19 @@ fn set_lower_upper_bounds(node: &ast::ExprCompare, uses: &mut HashMap<String, Bo
         let Some(right_name_expr) = right_operand.as_name_expr() else {
             continue;
         };
+
         match operator {
             ast::CmpOp::Lt | ast::CmpOp::LtE => {
                 uses.entry(right_name_expr.id.clone())
                     .or_default()
                     .upper_bound
-                    .insert(opererator_id);
+                    .insert(node_id);
             }
             ast::CmpOp::Gt | ast::CmpOp::GtE => {
                 uses.entry(right_name_expr.id.clone())
                     .or_default()
                     .lower_bound
-                    .insert(opererator_id);
+                    .insert(node_id);
             }
             _ => {}
         }
@@ -120,10 +114,9 @@ pub(crate) fn unnecessary_chained_comparison(checker: &mut Checker, bool_op: &as
 
     for bound in uses.values() {
         let num_shared = bound.lower_bound.intersection(&bound.upper_bound).count();
-        if num_shared != bound.lower_bound.len() + bound.upper_bound.len() {
+        if num_shared < bound.lower_bound.len() && num_shared < bound.upper_bound.len() {
             let diagnositic = Diagnostic::new(UnnecessaryChainedComparison, *range);
             checker.diagnostics.push(diagnositic);
-            break;
         }
     }
 }
