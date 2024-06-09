@@ -97,3 +97,10 @@ def f():
 
     def func(self) -> DataFrame | list[Series]:
         pass
+
+def f():
+    from django.contrib.auth.models import AbstractBaseUser
+
+    def foo(self, user: AbstractBaseUser["int"], view: "type[CondorBaseViewSet]"):
+        pass
+
