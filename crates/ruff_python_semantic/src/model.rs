@@ -1,6 +1,5 @@
 pub mod all;
 
-use std::ops::Deref;
 use std::path::Path;
 
 use bitflags::bitflags;

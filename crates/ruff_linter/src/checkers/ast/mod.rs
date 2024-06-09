@@ -52,8 +52,7 @@ use ruff_python_index::Indexer;
 use ruff_python_parser::typing::{parse_type_annotation, AnnotationKind};
 use ruff_python_parser::{Parsed, Tokens};
 use ruff_python_semantic::all::{DunderAllDefinition, DunderAllFlags};
-use ruff_python_semantic::analyze::{imports, typing};
-use ruff_python_semantic::analyze::{function_type, imports, typing, visibility};
+use ruff_python_semantic::analyze::{function_type, imports, typing};
 use ruff_python_semantic::{
     BindingFlags, BindingId, BindingKind, Exceptions, Export, FromImport, Globals, Import, Module,
     ModuleKind, ModuleSource, NodeId, ScopeId, ScopeKind, SemanticModel, SemanticModelFlags,
@@ -276,43 +275,27 @@ impl<'a> Checker<'a> {
     // member of a class (either a class or instance member). This will
     // typically take the form "self.x" or "cls.x".
     fn get_member_access_info(&self, value: &Expr) -> Option<(bool, ScopeId)> {
-        let Some(value_name) = value.as_name_expr() else {
-            return None;
-        };
-
+        let value_name = value.as_name_expr()?;
         let current_scope = &self.semantic.scopes[self.semantic.scope_id];
 
-        let Some(StmtFunctionDef {
+        let StmtFunctionDef {
             decorator_list,
             name,
             parameters,
             ..
-        }) = current_scope.kind.as_function()
-        else {
-            return None;
-        };
+        } = current_scope.kind.as_function()?;
 
-        let Some(parent_scope_id) = self
+        let parent_scope_id = self
             .semantic
-            .first_non_type_parent_scope_id(self.semantic.scope_id)
-        else {
-            return None;
-        };
-        let Some(parent) = self.semantic.scopes.get(parent_scope_id) else {
-            return None;
-        };
+            .first_non_type_parent_scope_id(self.semantic.scope_id)?;
+        let parent = self.semantic.scopes.get(parent_scope_id)?;
 
-        let Some(enclosing_class) = parent.kind.as_class() else {
-            return None;
-        };
+        let enclosing_class = parent.kind.as_class()?;
 
-        let Some(first_parameter_name) = parameters
+        let first_parameter_name = parameters
             .args
             .first()
-            .map(|parameter| parameter.parameter.name.as_str())
-        else {
-            return None;
-        };
+            .map(|parameter| parameter.parameter.name.as_str())?;
 
         let is_class_method = match function_type::classify(
             name,
@@ -1172,7 +1155,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                                     bit_flags,
                                 );
                             }
-                            ExprContext::Del => {}
+                            ExprContext::Invalid | ExprContext::Del => {}
                         };
                     };
                 };
