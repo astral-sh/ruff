@@ -108,6 +108,7 @@ pub(crate) fn unnecessary_chained_comparison(checker: &mut Checker, bool_op: &as
         if num_shared < bound.lower_bound.len() && num_shared < bound.upper_bound.len() {
             let diagnostic = Diagnostic::new(UnnecessaryChainedComparison, *range);
             checker.diagnostics.push(diagnostic);
+            break;
         }
     }
 }
