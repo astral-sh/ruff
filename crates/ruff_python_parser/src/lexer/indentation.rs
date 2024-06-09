@@ -24,6 +24,11 @@ pub(super) struct Indentation {
 impl Indentation {
     const TAB_SIZE: u32 = 2;
 
+    const ROOT: Indentation = Indentation {
+        column: Column(0),
+        character: Character(0),
+    };
+
     pub(super) const fn root() -> Self {
         Self {
             column: Column(0),
@@ -67,10 +72,11 @@ impl Indentation {
         }
     }
 
-    fn by(self, amount: u32) -> Self {
+    /// Computes the indentation at the given level based on the current indentation.
+    const fn at(self, level: u32) -> Self {
         Self {
-            character: Character(self.character.0 * amount),
-            column: Column(self.column.0 * amount),
+            character: Character(self.character.0 * level),
+            column: Column(self.column.0 * level),
         }
     }
 }
@@ -104,9 +110,9 @@ impl Indentations {
         debug_assert_eq!(self.current().try_compare(indent), Ok(Ordering::Less));
 
         match &mut self.inner {
-            IndentationsInner::Stack(stack) => stack.push(indent),
-            IndentationsInner::Counter(inner) => {
-                if inner.indent(indent) {
+            IndentationsInner::Stack(indentations) => indentations.push(indent),
+            IndentationsInner::Counter(indentations) => {
+                if indentations.indent(indent) {
                     return;
                 }
                 self.make_stack().push(indent);
@@ -136,17 +142,17 @@ impl Indentations {
 
     pub(super) fn dedent(&mut self) -> Option<Indentation> {
         match &mut self.inner {
-            IndentationsInner::Stack(stack) => stack.pop(),
-            IndentationsInner::Counter(inner) => inner.dedent(),
+            IndentationsInner::Stack(indentations) => indentations.pop(),
+            IndentationsInner::Counter(indentations) => indentations.dedent(),
         }
     }
 
     pub(super) fn current(&self) -> Indentation {
-        static ROOT: Indentation = Indentation::root();
-
         match &self.inner {
-            IndentationsInner::Stack(stack) => *stack.last().unwrap_or(&ROOT),
-            IndentationsInner::Counter(inner) => inner.current().unwrap_or(ROOT),
+            IndentationsInner::Stack(indentations) => {
+                *indentations.last().unwrap_or(&Indentation::ROOT)
+            }
+            IndentationsInner::Counter(indentations) => indentations.current(),
         }
     }
 
@@ -159,12 +165,18 @@ impl Indentations {
     }
 
     fn make_stack(&mut self) -> &mut Vec<Indentation> {
-        if let IndentationsInner::Counter(IndentationCounter { first, level }) = self.inner {
-            *self = Indentations {
-                inner: IndentationsInner::Stack(first.map_or_else(Vec::new, |first_indent| {
-                    (1..=level).map(|level| first_indent.by(level)).collect()
-                })),
-            };
+        if let IndentationsInner::Counter(IndentationCounter { first, level, .. }) = self.inner {
+            if level == 0 {
+                *self = Indentations {
+                    inner: IndentationsInner::Stack(vec![]),
+                };
+            } else {
+                *self = Indentations {
+                    inner: IndentationsInner::Stack(first.map_or_else(Vec::new, |first| {
+                        (1..=level).map(|level| first.at(level)).collect()
+                    })),
+                };
+            }
         }
         match &mut self.inner {
             IndentationsInner::Stack(stack) => stack,
@@ -175,35 +187,47 @@ impl Indentations {
 
 #[derive(Debug, Default, Clone)]
 struct IndentationCounter {
-    /// The first [`Indentation`] in the source code.
+    /// The current indentation.
+    current: Indentation,
+    /// The first indentation in the source code.
     first: Option<Indentation>,
-    /// The current level of indentation.
+    /// The current indentation level.
     level: u32,
 }
 
 impl IndentationCounter {
     fn indent(&mut self, indent: Indentation) -> bool {
-        let first_indent = self.first.get_or_insert(indent);
-        if first_indent.by(self.level + 1) == indent {
-            self.level += 1;
-            true
+        if let Some(first) = self.first {
+            if first.at(self.level + 1) == indent {
+                self.current = indent;
+                self.level += 1;
+                true
+            } else {
+                false
+            }
         } else {
-            false
+            self.first = Some(indent);
+            self.current = indent;
+            self.level = 1;
+            true
         }
     }
 
     fn dedent(&mut self) -> Option<Indentation> {
         if self.level == 0 {
             None
-        } else {
-            let current = self.current();
+        } else if let Some(first) = self.first {
+            let current = self.current;
             self.level -= 1;
-            current
+            self.current = first.at(self.level);
+            Some(current)
+        } else {
+            unreachable!()
         }
     }
 
-    fn current(&self) -> Option<Indentation> {
-        self.first.map(|indent| indent.by(self.level))
+    fn current(&self) -> Indentation {
+        self.current
     }
 }
 
