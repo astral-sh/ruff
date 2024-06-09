@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-unnecessary_chained_comparison.py:5:4: PLR1716 Simplified chain comparision exists between the operands.
+unnecessary_chained_comparison.py:5:4: PLR1716 Simplified chain comparison exists between the operands.
   |
 3 | b = int(input())
 4 | c = int(input())
@@ -10,7 +10,7 @@ unnecessary_chained_comparison.py:5:4: PLR1716 Simplified chain comparision exis
 6 |     pass
   |
 
-unnecessary_chained_comparison.py:8:7: PLR1716 Simplified chain comparision exists between the operands.
+unnecessary_chained_comparison.py:8:7: PLR1716 Simplified chain comparison exists between the operands.
   |
 6 |     pass
 7 | 
@@ -19,7 +19,7 @@ unnecessary_chained_comparison.py:8:7: PLR1716 Simplified chain comparision exis
 9 |     pass
   |
 
-unnecessary_chained_comparison.py:14:4: PLR1716 Simplified chain comparision exists between the operands.
+unnecessary_chained_comparison.py:14:4: PLR1716 Simplified chain comparison exists between the operands.
    |
 12 | y = int(input())
 13 | z = int(input())
@@ -28,7 +28,7 @@ unnecessary_chained_comparison.py:14:4: PLR1716 Simplified chain comparision exi
 15 |     print("In mixed order")
    |
 
-unnecessary_chained_comparison.py:17:7: PLR1716 Simplified chain comparision exists between the operands.
+unnecessary_chained_comparison.py:17:7: PLR1716 Simplified chain comparison exists between the operands.
    |
 15 |     print("In mixed order")
 16 | 
@@ -37,7 +37,7 @@ unnecessary_chained_comparison.py:17:7: PLR1716 Simplified chain comparision exi
 18 |     print("In mixed order")
    |
 
-unnecessary_chained_comparison.py:23:4: PLR1716 Simplified chain comparision exists between the operands.
+unnecessary_chained_comparison.py:23:4: PLR1716 Simplified chain comparison exists between the operands.
    |
 21 | j = int(input())
 22 | k = int(input())
@@ -46,7 +46,7 @@ unnecessary_chained_comparison.py:23:4: PLR1716 Simplified chain comparision exi
 24 |     print("Descending order")
    |
 
-unnecessary_chained_comparison.py:26:7: PLR1716 Simplified chain comparision exists between the operands.
+unnecessary_chained_comparison.py:26:7: PLR1716 Simplified chain comparison exists between the operands.
    |
 24 |     print("Descending order")
 25 | 
