@@ -264,23 +264,17 @@ pub(crate) fn quote_annotation(
         }
     }
 
-    // If the annotation already contains a quote, avoid attempting to re-quote it. For example:
-    // ```python
-    // from typing import Literal
-    //
-    // Set[Literal["Foo"]]
-    // ```
-    let text = locator.slice(expr);
-    if text.contains('\'') || text.contains('"') {
-        return Err(anyhow::anyhow!("Annotation already contains a quote"));
-    }
-
-    // Quote the entire expression.
     let quote = stylist.quote();
     let annotation = generator.expr(expr);
 
+    let annotation_new = if annotation.contains(stylist.quote().as_char()) {
+        annotation.replace(stylist.quote().as_char(), &stylist.quote().opposite().as_char().to_string())
+    } else {
+        annotation
+    };
+
     Ok(Edit::range_replacement(
-        format!("{quote}{annotation}{quote}"),
+        format!("{quote}{annotation_new}{quote}"),
         expr.range(),
     ))
 }
