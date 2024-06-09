@@ -6,6 +6,8 @@ use tracing_subscriber::{fmt::time::Uptime, layer::SubscriberExt, Layer};
 
 use crate::server::ClientSender;
 
+const TRACE_ENV_KEY: &str = "RUFF_TRACE";
+
 static LOGGING_SENDER: OnceLock<ClientSender> = OnceLock::new();
 
 static TRACE_VALUE: Mutex<lsp_types::TraceValue> = Mutex::new(lsp_types::TraceValue::Off);
@@ -97,7 +99,7 @@ impl<S> tracing_subscriber::layer::Filter<S> for TraceLevelFilter {
 
 #[inline]
 fn trace_value() -> lsp_types::TraceValue {
-    std::env::var("RUFF_TRACE")
+    std::env::var(TRACE_ENV_KEY)
         .ok()
         .and_then(|trace| serde_json::from_value(serde_json::Value::String(trace)).ok())
         .unwrap_or_else(|| {
