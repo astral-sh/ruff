@@ -70,7 +70,10 @@ pub(crate) struct ClientSettings {
     exclude: Option<Vec<String>>,
     line_length: Option<LineLength>,
     configuration_preference: Option<ConfigurationPreference>,
-    pub(crate) log_level: Option<crate::trace::LogLevel>,
+    // These settings are only needed for tracing, and are only read from the global configuration.
+    // These will not be in the resolved settings.
+    log_level: Option<crate::trace::LogLevel>,
+    log_file: Option<PathBuf>,
 }
 
 /// This is a direct representation of the workspace settings schema,
@@ -179,11 +182,18 @@ impl AllSettings {
 }
 
 impl ClientSettings {
-    /// Log level is taken directly from client settings, since we need it before
+    /// `logLevel` is taken directly from client settings, since we need it before
     /// we resolve workspace settings. Additionally, this setting should only be set in global settings,
     /// and any log level set in workspace settings will be ignored.
     pub(crate) fn log_level(&self) -> Option<crate::trace::LogLevel> {
         self.log_level
+    }
+
+    /// `logFile` is taken directly from client settings, since we need it before
+    /// we resolve workspace settings. Additionally, this setting should only be set in global settings,
+    /// and any log level set in workspace settings will be ignored.
+    pub(crate) fn log_file(&self) -> Option<&std::path::Path> {
+        self.log_file.as_deref()
     }
 }
 

@@ -83,6 +83,7 @@ impl Server {
             global_settings
                 .log_level()
                 .unwrap_or(crate::trace::LogLevel::Info),
+            global_settings.log_file(),
         );
 
         let mut workspace_for_url = |url: lsp_types::Url| {
