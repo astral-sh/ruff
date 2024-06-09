@@ -37,7 +37,7 @@ pub struct UnnecessaryChainedComparison;
 impl Violation for UnnecessaryChainedComparison {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Simplified chain comparision exists between the operands.")
+        format!("Simplified chain comparison exists between the operands.")
     }
 }
 
@@ -115,8 +115,8 @@ pub(crate) fn unnecessary_chained_comparison(checker: &mut Checker, bool_op: &as
     for bound in uses.values() {
         let num_shared = bound.lower_bound.intersection(&bound.upper_bound).count();
         if num_shared < bound.lower_bound.len() && num_shared < bound.upper_bound.len() {
-            let diagnositic = Diagnostic::new(UnnecessaryChainedComparison, *range);
-            checker.diagnostics.push(diagnositic);
+            let diagnostic = Diagnostic::new(UnnecessaryChainedComparison, *range);
+            checker.diagnostics.push(diagnostic);
         }
     }
 }
