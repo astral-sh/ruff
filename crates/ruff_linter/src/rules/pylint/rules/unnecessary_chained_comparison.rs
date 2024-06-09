@@ -10,8 +10,7 @@ use ruff_python_ast::{self as ast};
 /// that can be refactored into a single comparison `a < b < c`.
 ///
 /// ## Why is this bad?
-/// A single comparison is semantically clearer and reduces the total
-/// number of expressions.
+/// A single comparison is semantically clearer and more concise.
 ///
 /// ## Example
 /// ```python
