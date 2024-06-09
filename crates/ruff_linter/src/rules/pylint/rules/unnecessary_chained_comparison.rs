@@ -102,7 +102,7 @@ fn set_lower_upper_bounds(node: &ast::ExprCompare, uses: &mut HashMap<String, Bo
     }
 }
 
-/// PLC1716
+/// PLR1716
 pub(crate) fn unnecessary_chained_comparison(checker: &mut Checker, bool_op: &ast::ExprBoolOp) {
     let ast::ExprBoolOp { op, values, range } = bool_op;
 
