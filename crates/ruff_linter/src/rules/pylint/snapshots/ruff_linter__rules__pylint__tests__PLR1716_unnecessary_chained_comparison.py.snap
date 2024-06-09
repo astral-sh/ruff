@@ -1,0 +1,56 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+unnecessary_chained_comparison.py:5:4: PLR1716 Simplified chain comparision exists between the operands.
+  |
+3 | b = int(input())
+4 | c = int(input())
+5 | if a < b and b < c:
+  |    ^^^^^^^^^^^^^^^ PLR1716
+6 |     pass
+  |
+
+unnecessary_chained_comparison.py:8:7: PLR1716 Simplified chain comparision exists between the operands.
+  |
+6 |     pass
+7 | 
+8 | while a < b and b < c:
+  |       ^^^^^^^^^^^^^^^ PLR1716
+9 |     pass
+  |
+
+unnecessary_chained_comparison.py:14:4: PLR1716 Simplified chain comparision exists between the operands.
+   |
+12 | y = int(input())
+13 | z = int(input())
+14 | if x <= y and y < z:
+   |    ^^^^^^^^^^^^^^^^ PLR1716
+15 |     print("In mixed order")
+   |
+
+unnecessary_chained_comparison.py:17:7: PLR1716 Simplified chain comparision exists between the operands.
+   |
+15 |     print("In mixed order")
+16 | 
+17 | while x <= y and y < z:
+   |       ^^^^^^^^^^^^^^^^ PLR1716
+18 |     print("In mixed order")
+   |
+
+unnecessary_chained_comparison.py:23:4: PLR1716 Simplified chain comparision exists between the operands.
+   |
+21 | j = int(input())
+22 | k = int(input())
+23 | if i > j and j > k:
+   |    ^^^^^^^^^^^^^^^ PLR1716
+24 |     print("Descending order")
+   |
+
+unnecessary_chained_comparison.py:26:7: PLR1716 Simplified chain comparision exists between the operands.
+   |
+24 |     print("Descending order")
+25 | 
+26 | while i > j and j > k:
+   |       ^^^^^^^^^^^^^^^ PLR1716
+27 |     print("Descending order")
+   |
