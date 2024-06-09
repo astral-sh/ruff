@@ -11,14 +11,14 @@ use ruff_python_ast::{self as ast};
 ///
 /// ## Why is this bad?
 /// A single comparison is semantically clearer and reduces the total
-/// amount of expressions.
+/// number of expressions.
 ///
 /// ## Example
 /// ```python
 /// a = int(input())
 /// b = int(input())
 /// c = int(input())
-/// if a < b and b < c
+/// if a < b and b < c:
 ///     pass
 /// ```
 ///
@@ -27,7 +27,7 @@ use ruff_python_ast::{self as ast};
 /// a = int(input())
 /// b = int(input())
 /// c = int(input())
-/// if a < b < c
+/// if a < b < c:
 ///     pass
 /// ```
 
