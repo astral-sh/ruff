@@ -438,8 +438,10 @@ mod tests {
                 exclude: None,
                 line_length: None,
                 configuration_preference: None,
-                log_level: None,
-                log_file: None,
+                tracing: TracingSettings {
+                    log_level: None,
+                    log_file: None,
+                },
             },
             workspace_settings: [
                 WorkspaceSettings {
@@ -488,8 +490,10 @@ mod tests {
                         exclude: None,
                         line_length: None,
                         configuration_preference: None,
-                        log_level: None,
-                        log_file: None,
+                        tracing: TracingSettings {
+                            log_level: None,
+                            log_file: None,
+                        },
                     },
                     workspace: Url {
                         scheme: "file",
@@ -551,8 +555,10 @@ mod tests {
                         exclude: None,
                         line_length: None,
                         configuration_preference: None,
-                        log_level: None,
-                        log_file: None,
+                        tracing: TracingSettings {
+                            log_level: None,
+                            log_file: None,
+                        },
                     },
                     workspace: Url {
                         scheme: "file",
@@ -693,10 +699,12 @@ mod tests {
                     ),
                 ),
                 configuration_preference: None,
-                log_level: Some(
-                    Warn,
-                ),
-                log_file: None,
+                tracing: TracingSettings {
+                    log_level: Some(
+                        Warn,
+                    ),
+                    log_file: None,
+                },
             },
         }
         "###);
