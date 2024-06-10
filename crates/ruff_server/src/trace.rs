@@ -16,12 +16,13 @@
 //! A `logFile` path can also be specified in the settings, and output will be directed there instead.
 use lsp_types::TraceValue;
 use serde::Deserialize;
-use std::{
-    path::PathBuf,
-    sync::{Mutex, OnceLock},
-};
+use std::sync::{Arc, Mutex, OnceLock};
 use tracing::level_filters::LevelFilter;
-use tracing_subscriber::{fmt::time::Uptime, layer::SubscriberExt, Layer};
+use tracing_subscriber::{
+    fmt::{time::Uptime, writer::BoxMakeWriter},
+    layer::SubscriberExt,
+    Layer,
+};
 
 use crate::server::ClientSender;
 
@@ -47,12 +48,23 @@ pub(crate) fn init_tracing(
         .set(sender)
         .expect("logging sender should only be initialized once");
 
+    let log_file = log_file.and_then(|path| {
+        std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(path)
+            .ok()
+    });
+
     let subscriber = tracing_subscriber::Registry::default().with(
         tracing_subscriber::fmt::layer()
             .with_timer(Uptime::default())
             .with_thread_names(true)
             .with_ansi(false)
-            .with_writer(TracingWriter::new(log_file))
+            .with_writer(match log_file {
+                Some(file) => BoxMakeWriter::new(Arc::new(file)),
+                None => BoxMakeWriter::new(std::io::stderr),
+            })
             .with_filter(TraceLevelFilter)
             .with_filter(LogLevelFilter { filter: log_level }),
     );
@@ -119,32 +131,6 @@ impl<S> tracing_subscriber::layer::Filter<S> for TraceLevelFilter {
         _: &tracing_subscriber::layer::Context<'_, S>,
     ) -> bool {
         trace_value() != lsp_types::TraceValue::Off
-    }
-}
-
-struct TracingWriter(Option<PathBuf>);
-
-impl TracingWriter {
-    fn new(file: Option<&std::path::Path>) -> TracingWriter {
-        Self(file.map(std::path::Path::to_path_buf))
-    }
-}
-
-impl tracing_subscriber::fmt::MakeWriter<'_> for TracingWriter {
-    type Writer = Box<dyn std::io::Write>;
-
-    fn make_writer(&self) -> Self::Writer {
-        if let Some(file) = self.0.as_ref().and_then(|path| {
-            std::fs::OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open(path)
-                .ok()
-        }) {
-            Box::new(file)
-        } else {
-            Box::new(std::io::stderr())
-        }
     }
 }
 
