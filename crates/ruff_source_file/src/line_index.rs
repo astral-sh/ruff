@@ -14,11 +14,12 @@ use crate::SourceLocation;
 /// Index for fast [byte offset](TextSize) to [`SourceLocation`] conversions.
 ///
 /// Cloning a [`LineIndex`] is cheap because it only requires bumping a reference count.
-#[derive(Clone)]
+#[derive(Clone, Eq, PartialEq)]
 pub struct LineIndex {
     inner: Arc<LineIndexInner>,
 }
 
+#[derive(Eq, PartialEq)]
 struct LineIndexInner {
     line_starts: Vec<TextSize>,
     kind: IndexKind,
@@ -268,7 +269,7 @@ impl Debug for LineIndex {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
 enum IndexKind {
     /// Optimized index for an ASCII only document
     Ascii,

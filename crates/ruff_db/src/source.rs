@@ -1,3 +1,4 @@
+use ruff_source_file::LineIndex;
 use std::ops::Deref;
 use std::sync::Arc;
 
@@ -65,6 +66,8 @@ mod tests {
     use crate::tests::TestDb;
     use crate::Db;
     use filetime::FileTime;
+    use ruff_source_file::OneIndexed;
+    use ruff_text_size::TextSize;
     use salsa::EventKind;
 
     #[test]
