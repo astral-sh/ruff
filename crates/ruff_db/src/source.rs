@@ -1,6 +1,7 @@
-use ruff_source_file::LineIndex;
 use std::ops::Deref;
 use std::sync::Arc;
+
+use ruff_source_file::LineIndex;
 
 use crate::vfs::VfsFile;
 use crate::Db;
@@ -24,6 +25,8 @@ pub fn line_index(db: &dyn Db, file: VfsFile) -> LineIndex {
 }
 
 /// The source text of a [`VfsFile`](crate::File)
+///
+/// Cheap cloneable in `O(1)`.
 #[derive(Clone, Eq, PartialEq)]
 pub struct SourceText {
     inner: Arc<str>,
@@ -51,14 +54,16 @@ impl std::fmt::Debug for SourceText {
 
 #[cfg(test)]
 mod tests {
+    use filetime::FileTime;
+    use salsa::EventKind;
+
+    use ruff_source_file::OneIndexed;
+    use ruff_text_size::TextSize;
+
     use crate::file_system::FileSystemPath;
     use crate::source::{line_index, source_text};
     use crate::tests::TestDb;
     use crate::Db;
-    use filetime::FileTime;
-    use ruff_source_file::OneIndexed;
-    use ruff_text_size::TextSize;
-    use salsa::EventKind;
 
     #[test]
     fn re_runs_query_when_file_revision_changes() {

@@ -4,17 +4,19 @@ use rustc_hash::FxHasher;
 use salsa::DbWithJar;
 
 use crate::file_system::{FileSystem, FileSystemPath};
+use crate::parsed::parsed_module;
 use crate::source::{line_index, source_text};
 use crate::vfs::{VendoredPath, Vfs, VfsFile};
 
 pub mod file_system;
+pub mod parsed;
 pub mod source;
 pub mod vfs;
 
 pub(crate) type FxDashMap<K, V> = dashmap::DashMap<K, V, BuildHasherDefault<FxHasher>>;
 
 #[salsa::jar(db=Db)]
-pub struct Jar(VfsFile, source_text, line_index);
+pub struct Jar(VfsFile, source_text, line_index, parsed_module);
 
 /// Database (or cupboard) that gives access to the virtual filesystem, source code, and parsed AST.
 pub trait Db: DbWithJar<Jar> {

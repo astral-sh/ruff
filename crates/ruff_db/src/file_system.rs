@@ -46,6 +46,31 @@ impl FileSystemPath {
         unsafe { &*(path as *const Utf8Path as *const FileSystemPath) }
     }
 
+    /// Extracts the file extension, if possible.
+    ///
+    /// The extension is:
+    ///
+    /// * [`None`], if there is no file name;
+    /// * [`None`], if there is no embedded `.`;
+    /// * [`None`], if the file name begins with `.` and has no other `.`s within;
+    /// * Otherwise, the portion of the file name after the final `.`
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ruff_db::file_system::FileSystemPath;
+    ///
+    /// assert_eq!("rs", FileSystemPath::new("foo.rs").extension().unwrap());
+    /// assert_eq!("gz", FileSystemPath::new("foo.tar.gz").extension().unwrap());
+    /// ```
+    ///
+    /// See [`Path::extension`] for more details.
+    #[inline]
+    #[must_use]
+    pub fn extension(&self) -> Option<&str> {
+        self.0.extension()
+    }
+
     /// Converts the path to an owned [`FileSystemPathBuf`].
     pub fn to_path_buf(&self) -> FileSystemPathBuf {
         FileSystemPathBuf(self.0.to_path_buf())
@@ -93,6 +118,14 @@ impl AsRef<FileSystemPath> for FileSystemPathBuf {
     }
 }
 
+impl Deref for FileSystemPathBuf {
+    type Target = FileSystemPath;
+
+    fn deref(&self) -> &Self::Target {
+        self.as_path()
+    }
+}
+
 impl AsRef<FileSystemPath> for FileSystemPath {
     #[inline]
     fn as_ref(&self) -> &FileSystemPath {
@@ -118,14 +151,6 @@ impl AsRef<Path> for FileSystemPath {
     #[inline]
     fn as_ref(&self) -> &Path {
         self.0.as_std_path()
-    }
-}
-
-impl Deref for FileSystemPathBuf {
-    type Target = FileSystemPath;
-
-    fn deref(&self) -> &Self::Target {
-        self.as_path()
     }
 }
 
@@ -246,8 +271,9 @@ impl FileType {
 
 #[cfg(test)]
 mod tests {
-    use crate::file_system::FileRevision;
     use filetime::FileTime;
+
+    use crate::file_system::FileRevision;
 
     #[test]
     fn revision_from_file_time() {
