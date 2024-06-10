@@ -117,6 +117,7 @@ serde_with = { version = "3.6.0", default-features = false, features = [
 shellexpand = { version = "3.0.0" }
 similar = { version = "2.4.0", features = ["inline"] }
 smallvec = { version = "1.13.2" }
+smol_str = { version = "0.2.2" }
 static_assertions = "1.1.0"
 strum = { version = "0.26.0", features = ["strum_macros"] }
 strum_macros = { version = "0.26.0" }
