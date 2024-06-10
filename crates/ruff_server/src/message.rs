@@ -32,8 +32,11 @@ pub(crate) fn init_messenger(client_sender: ClientSender) {
         }
 
         let backtrace = std::backtrace::Backtrace::force_capture();
+        tracing::error!("{panic_info}\n{backtrace}");
         #[allow(clippy::print_stderr)]
         {
+            // we also need to print to stderr directly in case tracing hasn't
+            // been initialized.
             eprintln!("{panic_info}\n{backtrace}");
         }
     }));
