@@ -73,7 +73,7 @@ mod tests {
         db.file_system_mut()
             .write_file(path, "x = 10".to_string())?;
 
-        let file = file_system_path_to_file(&db, path);
+        let file = file_system_path_to_file(&db, path).unwrap();
 
         assert_eq!(&*source_text(&db, file), "x = 10");
 
@@ -95,7 +95,7 @@ mod tests {
         db.file_system_mut()
             .write_file(path, "x = 10".to_string())?;
 
-        let file = file_system_path_to_file(&db, path);
+        let file = file_system_path_to_file(&db, path).unwrap();
 
         assert_eq!(&*source_text(&db, file), "x = 10");
 
@@ -122,7 +122,7 @@ mod tests {
         db.file_system_mut()
             .write_file(path, "x = 10\ny = 20".to_string())?;
 
-        let file = file_system_path_to_file(&db, path);
+        let file = file_system_path_to_file(&db, path).unwrap();
         let index = line_index(&db, file);
         let text = source_text(&db, file);
 
