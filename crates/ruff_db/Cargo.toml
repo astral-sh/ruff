@@ -11,6 +11,9 @@ repository = { workspace = true }
 license = { workspace = true }
 
 [dependencies]
+ruff_source_file = { workspace = true }
+ruff_text_size = { workspace = true }
+
 camino = { workspace = true }
 countme = { workspace = true }
 dashmap = { workspace = true }

@@ -1,3 +1,4 @@
+use ruff_source_file::LineIndex;
 use std::ops::Deref;
 use std::sync::Arc;
 
@@ -12,6 +13,14 @@ pub fn source_text(db: &dyn Db, file: VfsFile) -> SourceText {
     SourceText {
         inner: Arc::from(content),
     }
+}
+
+/// Computes the [`LineIndex`] for `file`.
+#[salsa::tracked]
+pub fn line_index(db: &dyn Db, file: VfsFile) -> LineIndex {
+    let source = source_text(db, file);
+
+    LineIndex::from_source_text(&source)
 }
 
 /// The source text of a [`VfsFile`](crate::File)
@@ -43,10 +52,12 @@ impl std::fmt::Debug for SourceText {
 #[cfg(test)]
 mod tests {
     use crate::file_system::FileSystemPath;
-    use crate::source::source_text;
+    use crate::source::{line_index, source_text};
     use crate::tests::TestDb;
     use crate::Db;
     use filetime::FileTime;
+    use ruff_source_file::OneIndexed;
+    use ruff_text_size::TextSize;
     use salsa::EventKind;
 
     #[test]
@@ -89,5 +100,24 @@ mod tests {
         assert!(!events
             .iter()
             .any(|event| matches!(event.kind, EventKind::WillExecute { .. })));
+    }
+
+    #[test]
+    fn line_index_for_source() {
+        let mut db = TestDb::new();
+        let path = FileSystemPath::new("test.py");
+
+        db.file_system_mut()
+            .write_file(path, "x = 10\ny = 20".to_string());
+
+        let file = db.file(path);
+        let index = line_index(&db, file);
+        let text = source_text(&db, file);
+
+        assert_eq!(index.line_count(), 2);
+        assert_eq!(
+            index.line_start(OneIndexed::from_zero_indexed(0), &text),
+            TextSize::new(0)
+        );
     }
 }

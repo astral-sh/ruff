@@ -2029,6 +2029,8 @@ dependencies = [
  "countme",
  "dashmap",
  "filetime",
+ "ruff_source_file",
+ "ruff_text_size",
  "rustc-hash",
  "salsa-2022",
  "tracing",
