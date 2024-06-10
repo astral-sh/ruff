@@ -68,10 +68,10 @@ impl super::SyncRequestHandler for ExecuteCommand {
 
         let mut edit_tracker = WorkspaceEditTracker::new(session.resolved_client_capabilities());
         for Argument { uri, version } in arguments {
-            let snapshot = session
-                .take_snapshot(uri.clone())
-                .ok_or(anyhow::anyhow!("Document snapshot not available for {uri}",))
-                .with_failure_code(ErrorCode::InternalError)?;
+            let Some(snapshot) = session.take_snapshot(uri.clone()) else {
+                tracing::warn!("Document at {uri} could not be opened");
+                return Ok(None);
+            };
             match command {
                 Command::FixAll => {
                     let fixes = super::code_action_resolve::fix_all_edit(
