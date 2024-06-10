@@ -10,9 +10,6 @@ documentation = { workspace = true }
 repository = { workspace = true }
 license = { workspace = true }
 
-[lib]
-doctest = false
-
 [dependencies]
 ruff_db = { workspace = true, optional = true }
 ruff_index = { workspace = true }
@@ -22,6 +19,7 @@ ruff_source_file = { workspace = true }
 ruff_text_size = { workspace = true }
 
 bitflags = { workspace = true }
+camino = { workspace = true }
 is-macro = { workspace = true }
 salsa = { workspace = true, optional = true }
 tracing = { workspace = true, optional = true }
