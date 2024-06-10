@@ -64,6 +64,8 @@ mod tests {
     use crate::source::{line_index, source_text};
     use crate::tests::TestDb;
     use crate::Db;
+    use filetime::FileTime;
+    use salsa::EventKind;
 
     #[test]
     fn re_runs_query_when_file_revision_changes() {
