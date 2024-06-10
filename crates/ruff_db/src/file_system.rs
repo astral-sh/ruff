@@ -85,6 +85,142 @@ impl FileSystemPath {
         self.0.extension()
     }
 
+    /// Determines whether `child` is a suffix of `self`.
+    ///
+    /// Only considers whole path components to match.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ruff_db::file_system::FileSystemPath;
+    ///
+    /// let path = FileSystemPath::new("/etc/resolv.conf");
+    ///
+    /// assert!(path.ends_with("resolv.conf"));
+    /// assert!(path.ends_with("etc/resolv.conf"));
+    /// assert!(path.ends_with("/etc/resolv.conf"));
+    ///
+    /// assert!(!path.ends_with("/resolv.conf"));
+    /// assert!(!path.ends_with("conf")); // use .extension() instead
+    /// ```
+    #[inline]
+    #[must_use]
+    pub fn ends_with(&self, child: impl AsRef<FileSystemPath>) -> bool {
+        self.0.ends_with(child.as_ref())
+    }
+
+    /// Returns the `FileSystemPath` without its final component, if there is one.
+    ///
+    /// Returns [`None`] if the path terminates in a root or prefix.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ruff_db::file_system::FileSystemPath;
+    ///
+    /// let path = FileSystemPath::new("/foo/bar");
+    /// let parent = path.parent().unwrap();
+    /// assert_eq!(parent, FileSystemPath::new("/foo"));
+    ///
+    /// let grand_parent = parent.parent().unwrap();
+    /// assert_eq!(grand_parent, FileSystemPath::new("/"));
+    /// assert_eq!(grand_parent.parent(), None);
+    /// ```
+    #[inline]
+    #[must_use]
+    pub fn parent(&self) -> Option<&FileSystemPath> {
+        self.0.parent().map(FileSystemPath::new)
+    }
+
+    /// Produces an iterator over the [`Utf8Component`]s of the path.
+    ///
+    /// When parsing the path, there is a small amount of normalization:
+    ///
+    /// * Repeated separators are ignored, so `a/b` and `a//b` both have
+    ///   `a` and `b` as components.
+    ///
+    /// * Occurrences of `.` are normalized away, except if they are at the
+    ///   beginning of the path. For example, `a/./b`, `a/b/`, `a/b/.` and
+    ///   `a/b` all have `a` and `b` as components, but `./a/b` starts with
+    ///   an additional [`CurDir`] component.
+    ///
+    /// * A trailing slash is normalized away, `/a/b` and `/a/b/` are equivalent.
+    ///
+    /// Note that no other normalization takes place; in particular, `a/c`
+    /// and `a/b/../c` are distinct, to account for the possibility that `b`
+    /// is a symbolic link (so its parent isn't `a`).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use camino::{Utf8Component};
+    /// use ruff_db::file_system::FileSystemPath;
+    ///
+    /// let mut components = FileSystemPath::new("/tmp/foo.txt").components();
+    ///
+    /// assert_eq!(components.next(), Some(Utf8Component::RootDir));
+    /// assert_eq!(components.next(), Some(Utf8Component::Normal("tmp")));
+    /// assert_eq!(components.next(), Some(Utf8Component::Normal("foo.txt")));
+    /// assert_eq!(components.next(), None)
+    /// ```
+    ///
+    /// [`CurDir`]: Utf8Component::CurDir
+    #[inline]
+    pub fn components(&self) -> camino::Utf8Components {
+        self.0.components()
+    }
+
+    /// Returns the final component of the `FileSystemPath`, if there is one.
+    ///
+    /// If the path is a normal file, this is the file name. If it's the path of a directory, this
+    /// is the directory name.
+    ///
+    /// Returns [`None`] if the path terminates in `..`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use camino::Utf8Path;
+    /// use ruff_db::file_system::FileSystemPath;
+    ///
+    /// assert_eq!(Some("bin"), FileSystemPath::new("/usr/bin/").file_name());
+    /// assert_eq!(Some("foo.txt"), FileSystemPath::new("tmp/foo.txt").file_name());
+    /// assert_eq!(Some("foo.txt"), FileSystemPath::new("foo.txt/.").file_name());
+    /// assert_eq!(Some("foo.txt"), FileSystemPath::new("foo.txt/.//").file_name());
+    /// assert_eq!(None, FileSystemPath::new("foo.txt/..").file_name());
+    /// assert_eq!(None, FileSystemPath::new("/").file_name());
+    /// ```
+    #[inline]
+    #[must_use]
+    pub fn file_name(&self) -> Option<&str> {
+        self.0.file_name()
+    }
+
+    /// Extracts the stem (non-extension) portion of [`self.file_name`].
+    ///
+    /// [`self.file_name`]: FileSystemPath::file_name
+    ///
+    /// The stem is:
+    ///
+    /// * [`None`], if there is no file name;
+    /// * The entire file name if there is no embedded `.`;
+    /// * The entire file name if the file name begins with `.` and has no other `.`s within;
+    /// * Otherwise, the portion of the file name before the final `.`
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ruff_db::file_system::FileSystemPath;
+    ///
+    /// assert_eq!("foo", FileSystemPath::new("foo.rs").file_stem().unwrap());
+    /// assert_eq!("foo.tar", FileSystemPath::new("foo.tar.gz").file_stem().unwrap());
+    /// ```
+    #[inline]
+    #[must_use]
+    pub fn file_stem(&self) -> Option<&str> {
+        self.0.file_stem()
+    }
+
     /// Converts the path to an owned [`FileSystemPathBuf`].
     pub fn to_path_buf(&self) -> FileSystemPathBuf {
         FileSystemPathBuf(self.0.to_path_buf())
