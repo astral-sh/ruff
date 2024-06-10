@@ -70,17 +70,17 @@ mod tests {
     use crate::parsed::parsed_module;
     use crate::tests::TestDb;
     use crate::vfs::VendoredPath;
-    use crate::Db;
+    use crate::vfs::{file_system_path_to_file, vendored_path_to_file};
 
     #[test]
     fn python_file() -> crate::file_system::Result<()> {
         let mut db = TestDb::new();
-        let path = FileSystemPath::new("test.py");
+        let path = "test.py";
 
         db.file_system_mut()
             .write_file(path, "x = 10".to_string())?;
 
-        let file = db.file(path);
+        let file = file_system_path_to_file(&db, path);
 
         let parsed = parsed_module(&db, file);
 
@@ -97,7 +97,7 @@ mod tests {
         db.file_system_mut()
             .write_file(path, "%timeit a = b".to_string())?;
 
-        let file = db.file(path);
+        let file = file_system_path_to_file(&db, path);
 
         let parsed = parsed_module(&db, file);
 
@@ -122,7 +122,7 @@ else:
     from posixpath import __all__ as __all__"#,
         )]);
 
-        let file = db.vendored_file(VendoredPath::new("path.pyi")).unwrap();
+        let file = vendored_path_to_file(&db, VendoredPath::new("path.pyi")).unwrap();
 
         let parsed = parsed_module(&db, file);
 

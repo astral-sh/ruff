@@ -63,7 +63,7 @@ mod tests {
     use crate::file_system::FileSystemPath;
     use crate::source::{line_index, source_text};
     use crate::tests::TestDb;
-    use crate::Db;
+    use crate::vfs::file_system_path_to_file;
 
     #[test]
     fn re_runs_query_when_file_revision_changes() -> crate::file_system::Result<()> {
@@ -73,7 +73,7 @@ mod tests {
         db.file_system_mut()
             .write_file(path, "x = 10".to_string())?;
 
-        let file = db.file(path);
+        let file = file_system_path_to_file(&db, path);
 
         assert_eq!(&*source_text(&db, file), "x = 10");
 
@@ -95,7 +95,7 @@ mod tests {
         db.file_system_mut()
             .write_file(path, "x = 10".to_string())?;
 
-        let file = db.file(path);
+        let file = file_system_path_to_file(&db, path);
 
         assert_eq!(&*source_text(&db, file), "x = 10");
 
@@ -122,7 +122,7 @@ mod tests {
         db.file_system_mut()
             .write_file(path, "x = 10\ny = 20".to_string())?;
 
-        let file = db.file(path);
+        let file = file_system_path_to_file(&db, path);
         let index = line_index(&db, file);
         let text = source_text(&db, file);
 
