@@ -2,6 +2,7 @@ use anyhow::{bail, Result};
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
+use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::{Ranged, TextRange};
 
@@ -122,6 +123,13 @@ pub(crate) fn reimplemented_starmap(checker: &mut Checker, target: &StarmapCandi
             if ComparableExpr::from(value.as_ref()) != ComparableExpr::from(name) {
                 return;
             }
+
+            // If the argument is used outside the function call, we can't replace it.
+            if any_over_expr(func, &|expr| {
+                expr.as_name_expr().is_some_and(|expr| expr.id == name.id)
+            }) {
+                return;
+            }
         }
         // Ex) `f(x, y, z) for x, y, z in iter`
         ComprehensionTarget::Tuple(tuple) => {
@@ -131,23 +139,28 @@ pub(crate) fn reimplemented_starmap(checker: &mut Checker, target: &StarmapCandi
             {
                 return;
             }
+
+            // If any of the members are used outside the function call, we can't replace it.
+            if any_over_expr(func, &|expr| {
+                tuple
+                    .elts
+                    .iter()
+                    .any(|elt| ComparableExpr::from(expr) == ComparableExpr::from(elt))
+            }) {
+                return;
+            }
         }
     }
 
     let mut diagnostic = Diagnostic::new(ReimplementedStarmap, target.range());
     diagnostic.try_set_fix(|| {
-        // Try importing `starmap` from `itertools`.
-        //
-        // It is not required to be `itertools.starmap`, though. The user might've already
-        // imported it. Maybe even under a different name. So, we should use that name
-        // for fix construction.
+        // Import `starmap` from `itertools`.
         let (import_edit, starmap_name) = checker.importer().get_or_import_symbol(
             &ImportRequest::import_from("itertools", "starmap"),
             target.start(),
             checker.semantic(),
         )?;
-        // The actual fix suggestion depends on what type of expression we were looking at.
-        //
+        // The actual fix suggestion depends on what type of expression we were looking at:
         // - For generator expressions, we use `starmap` call directly.
         // - For list and set comprehensions, we'd want to wrap it with `list` and `set`
         //   correspondingly.
