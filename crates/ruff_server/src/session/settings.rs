@@ -445,6 +445,7 @@ mod tests {
                 line_length: None,
                 configuration_preference: None,
                 log_level: None,
+                log_file: None,
             },
             workspace_settings: [
                 WorkspaceSettings {
@@ -494,6 +495,7 @@ mod tests {
                         line_length: None,
                         configuration_preference: None,
                         log_level: None,
+                        log_file: None,
                     },
                     workspace: Url {
                         scheme: "file",
@@ -556,6 +558,7 @@ mod tests {
                         line_length: None,
                         configuration_preference: None,
                         log_level: None,
+                        log_file: None,
                     },
                     workspace: Url {
                         scheme: "file",
@@ -699,6 +702,7 @@ mod tests {
                 log_level: Some(
                     Warn,
                 ),
+                log_file: None,
             },
         }
         "###);
