@@ -9,7 +9,6 @@ use ruff_python_codegen::{Generator, Stylist};
 use ruff_python_semantic::{
     analyze, Binding, BindingKind, Modules, NodeId, ResolvedReference, ScopeKind, SemanticModel,
 };
-use ruff_source_file::Locator;
 use ruff_text_size::Ranged;
 
 use crate::rules::flake8_type_checking::settings::Settings;
@@ -221,7 +220,6 @@ pub(crate) fn is_singledispatch_implementation(
 pub(crate) fn quote_annotation(
     node_id: NodeId,
     semantic: &SemanticModel,
-    locator: &Locator,
     stylist: &Stylist,
     generator: Generator,
 ) -> Result<Edit> {
@@ -233,7 +231,7 @@ pub(crate) fn quote_annotation(
                     // If we're quoting the value of a subscript, we need to quote the entire
                     // expression. For example, when quoting `DataFrame` in `DataFrame[int]`, we
                     // should generate `"DataFrame[int]"`.
-                    return quote_annotation(parent_id, semantic, locator, stylist, generator);
+                    return quote_annotation(parent_id, semantic, stylist, generator);
                 }
             }
             Some(Expr::Attribute(parent)) => {
@@ -241,7 +239,7 @@ pub(crate) fn quote_annotation(
                     // If we're quoting the value of an attribute, we need to quote the entire
                     // expression. For example, when quoting `DataFrame` in `pd.DataFrame`, we
                     // should generate `"pd.DataFrame"`.
-                    return quote_annotation(parent_id, semantic, locator, stylist, generator);
+                    return quote_annotation(parent_id, semantic, stylist, generator);
                 }
             }
             Some(Expr::Call(parent)) => {
@@ -249,7 +247,7 @@ pub(crate) fn quote_annotation(
                     // If we're quoting the function of a call, we need to quote the entire
                     // expression. For example, when quoting `DataFrame` in `DataFrame()`, we
                     // should generate `"DataFrame()"`.
-                    return quote_annotation(parent_id, semantic, locator, stylist, generator);
+                    return quote_annotation(parent_id, semantic, stylist, generator);
                 }
             }
             Some(Expr::BinOp(parent)) => {
@@ -257,7 +255,7 @@ pub(crate) fn quote_annotation(
                     // If we're quoting the left or right side of a binary operation, we need to
                     // quote the entire expression. For example, when quoting `DataFrame` in
                     // `DataFrame | Series`, we should generate `"DataFrame | Series"`.
-                    return quote_annotation(parent_id, semantic, locator, stylist, generator);
+                    return quote_annotation(parent_id, semantic, stylist, generator);
                 }
             }
             _ => {}
