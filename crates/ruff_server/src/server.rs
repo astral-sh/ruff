@@ -81,9 +81,10 @@ impl Server {
         crate::trace::init_tracing(
             connection.make_sender(),
             global_settings
-                .log_level()
+                .tracing
+                .log_level
                 .unwrap_or(crate::trace::LogLevel::Info),
-            global_settings.log_file(),
+            global_settings.tracing.log_file.as_deref(),
         );
 
         let mut workspace_for_url = |url: lsp_types::Url| {
