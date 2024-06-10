@@ -27,6 +27,18 @@ pub trait FileSystem {
 
     /// Returns `true` if `path` exists.
     fn exists(&self, path: &FileSystemPath) -> bool;
+
+    /// Returns `true` if `path` exists and is a directory.
+    fn is_directory(&self, path: &FileSystemPath) -> bool {
+        self.metadata(path)
+            .map_or(false, |metadata| metadata.file_type.is_directory())
+    }
+
+    /// Returns `true` if `path` exists and is a file.
+    fn is_file(&self, path: &FileSystemPath) -> bool {
+        self.metadata(path)
+            .map_or(false, |metadata| metadata.file_type.is_file())
+    }
 }
 
 // TODO support untitled files for the LSP use case. Wrap a `str` and `String`
@@ -37,7 +49,7 @@ pub trait FileSystem {
 ///
 /// The path is guaranteed to be valid UTF-8.
 #[repr(transparent)]
-#[derive(Eq, PartialEq, Hash)]
+#[derive(Eq, PartialEq, Hash, PartialOrd, Ord)]
 pub struct FileSystemPath(Utf8Path);
 
 impl FileSystemPath {
@@ -95,7 +107,7 @@ impl FileSystemPath {
 ///
 /// The path is guaranteed to be valid UTF-8.
 #[repr(transparent)]
-#[derive(Eq, PartialEq, Clone, Hash)]
+#[derive(Eq, PartialEq, Clone, Hash, PartialOrd, Ord)]
 pub struct FileSystemPathBuf(Utf8PathBuf);
 
 impl Default for FileSystemPathBuf {
@@ -107,6 +119,10 @@ impl Default for FileSystemPathBuf {
 impl FileSystemPathBuf {
     pub fn new() -> Self {
         Self(Utf8PathBuf::new())
+    }
+
+    pub fn from_utf8_path_buf(path: Utf8PathBuf) -> Self {
+        Self(path)
     }
 
     #[inline]

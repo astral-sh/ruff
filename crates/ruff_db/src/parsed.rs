@@ -73,32 +73,37 @@ mod tests {
     use crate::Db;
 
     #[test]
-    fn python_file() {
+    fn python_file() -> crate::file_system::Result<()> {
         let mut db = TestDb::new();
         let path = FileSystemPath::new("test.py");
 
-        db.file_system_mut().write_file(path, "x = 10".to_string());
+        db.file_system_mut()
+            .write_file(path, "x = 10".to_string())?;
 
         let file = db.file(path);
 
         let parsed = parsed_module(&db, file);
 
         assert!(parsed.is_valid());
+
+        Ok(())
     }
 
     #[test]
-    fn python_ipynb_file() {
+    fn python_ipynb_file() -> crate::file_system::Result<()> {
         let mut db = TestDb::new();
         let path = FileSystemPath::new("test.ipynb");
 
         db.file_system_mut()
-            .write_file(path, "%timeit a = b".to_string());
+            .write_file(path, "%timeit a = b".to_string())?;
 
         let file = db.file(path);
 
         let parsed = parsed_module(&db, file);
 
         assert!(parsed.is_valid());
+
+        Ok(())
     }
 
     #[test]
