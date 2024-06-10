@@ -2,6 +2,7 @@ pub mod analyze;
 mod binding;
 mod branches;
 mod context;
+mod db;
 mod definition;
 mod globals;
 mod model;
@@ -20,3 +21,5 @@ pub use nodes::*;
 pub use reference::*;
 pub use scope::*;
 pub use star_import::*;
+
+pub use db::{Db, Jar};
