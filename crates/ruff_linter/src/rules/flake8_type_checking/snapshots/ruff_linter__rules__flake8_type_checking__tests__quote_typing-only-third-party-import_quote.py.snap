@@ -55,7 +55,7 @@ quote.py:9:24: TCH002 [*] Move third-party import `pandas.DataFrame` into a type
 13 16 | 
 14 17 | 
 
-quote.py:16:24: TCH002 Move third-party import `pandas.DataFrame` into a type-checking block
+quote.py:16:24: TCH002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
    |
 15 | def f():
 16 |     from pandas import DataFrame
@@ -64,6 +64,26 @@ quote.py:16:24: TCH002 Move third-party import `pandas.DataFrame` into a type-ch
 18 |     def baz() -> DataFrame["int"]:
    |
    = help: Move into type-checking block
+
+ℹ Unsafe fix
+   1  |+from typing import TYPE_CHECKING
+   2  |+
+   3  |+if TYPE_CHECKING:
+   4  |+    from pandas import DataFrame
+1  5  | def f():
+2  6  |     from pandas import DataFrame
+3  7  | 
+--------------------------------------------------------------------------------
+13 17 | 
+14 18 | 
+15 19 | def f():
+16    |-    from pandas import DataFrame
+17 20 | 
+18    |-    def baz() -> DataFrame["int"]:
+   21 |+    def baz() -> "DataFrame['int']":
+19 22 |         ...
+20 23 | 
+21 24 | 
 
 quote.py:23:22: TCH002 [*] Move third-party import `pandas` into a type-checking block
    |
@@ -185,7 +205,7 @@ quote.py:45:24: TCH002 [*] Move third-party import `pandas.DataFrame` into a typ
 49 52 | 
 50 53 | 
 
-quote.py:54:24: TCH002 Move third-party import `pandas.DataFrame` into a type-checking block
+quote.py:54:24: TCH002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
    |
 52 |     from typing import Literal
 53 | 
@@ -195,6 +215,26 @@ quote.py:54:24: TCH002 Move third-party import `pandas.DataFrame` into a type-ch
 56 |     def baz() -> DataFrame[Literal["int"]]:
    |
    = help: Move into type-checking block
+
+ℹ Unsafe fix
+   1  |+from typing import TYPE_CHECKING
+   2  |+
+   3  |+if TYPE_CHECKING:
+   4  |+    from pandas import DataFrame
+1  5  | def f():
+2  6  |     from pandas import DataFrame
+3  7  | 
+--------------------------------------------------------------------------------
+51 55 | def f():
+52 56 |     from typing import Literal
+53 57 | 
+54    |-    from pandas import DataFrame
+55 58 | 
+56    |-    def baz() -> DataFrame[Literal["int"]]:
+   59 |+    def baz() -> "DataFrame[Literal['int']]":
+57 60 |         ...
+58 61 | 
+59 62 | 
 
 quote.py:71:24: TCH002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
    |
@@ -369,6 +409,8 @@ quote.py:96:24: TCH002 [*] Move third-party import `pandas.DataFrame` into a typ
 98      |-    def func(self) -> DataFrame | list[Series]:
     101 |+    def func(self) -> "DataFrame | list[Series]":
 99  102 |         pass
+100 103 | 
+101 104 | def f():
 
 quote.py:96:35: TCH002 [*] Move third-party import `pandas.Series` into a type-checking block
    |
@@ -397,3 +439,34 @@ quote.py:96:35: TCH002 [*] Move third-party import `pandas.Series` into a type-c
 98      |-    def func(self) -> DataFrame | list[Series]:
     101 |+    def func(self) -> "DataFrame | list[Series]":
 99  102 |         pass
+100 103 | 
+101 104 | def f():
+
+quote.py:102:44: TCH002 [*] Move third-party import `django.contrib.auth.models.AbstractBaseUser` into a type-checking block
+    |
+101 | def f():
+102 |     from django.contrib.auth.models import AbstractBaseUser
+    |                                            ^^^^^^^^^^^^^^^^ TCH002
+103 | 
+104 |     def foo(self, user: AbstractBaseUser["int"], view: "type[CondorBaseViewSet]"):
+    |
+    = help: Move into type-checking block
+
+ℹ Unsafe fix
+    1   |+from typing import TYPE_CHECKING
+    2   |+
+    3   |+if TYPE_CHECKING:
+    4   |+    from django.contrib.auth.models import AbstractBaseUser
+1   5   | def f():
+2   6   |     from pandas import DataFrame
+3   7   | 
+--------------------------------------------------------------------------------
+99  103 |         pass
+100 104 | 
+101 105 | def f():
+102     |-    from django.contrib.auth.models import AbstractBaseUser
+103 106 | 
+104     |-    def foo(self, user: AbstractBaseUser["int"], view: "type[CondorBaseViewSet]"):
+    107 |+    def foo(self, user: "AbstractBaseUser['int']", view: "type[CondorBaseViewSet]"):
+105 108 |         pass
+106 109 |
