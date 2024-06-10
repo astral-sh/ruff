@@ -1,10 +1,9 @@
+use crate::module::resolver::{file_to_module, resolve_module_query, ModuleNameIngredient};
 use ruff_db::{Db as SourceDb, Upcast};
 use salsa::DbWithJar;
 
-// Salsa doesn't support a struct without fields, so allow the clippy lint for now.
-#[allow(clippy::empty_structs_with_brackets)]
 #[salsa::jar(db=Db)]
-pub struct Jar();
+pub struct Jar(ModuleNameIngredient, resolve_module_query, file_to_module);
 
 /// Database giving access to semantic information about a Python program.
 pub trait Db: SourceDb + DbWithJar<Jar> + Upcast<dyn SourceDb> {}
