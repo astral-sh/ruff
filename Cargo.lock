@@ -2333,6 +2333,7 @@ version = "0.0.0"
 dependencies = [
  "bitflags 2.5.0",
  "is-macro",
+ "ruff_db",
  "ruff_index",
  "ruff_python_ast",
  "ruff_python_parser",
@@ -2340,6 +2341,8 @@ dependencies = [
  "ruff_source_file",
  "ruff_text_size",
  "rustc-hash",
+ "salsa-2022",
+ "tracing",
 ]
 
 [[package]]
