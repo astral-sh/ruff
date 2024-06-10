@@ -1,4 +1,3 @@
-use ruff_source_file::LineIndex;
 use std::ops::Deref;
 use std::sync::Arc;
 
@@ -65,10 +64,6 @@ mod tests {
     use crate::source::{line_index, source_text};
     use crate::tests::TestDb;
     use crate::Db;
-    use filetime::FileTime;
-    use ruff_source_file::OneIndexed;
-    use ruff_text_size::TextSize;
-    use salsa::EventKind;
 
     #[test]
     fn re_runs_query_when_file_revision_changes() {
