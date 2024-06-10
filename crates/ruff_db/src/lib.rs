@@ -3,10 +3,10 @@ use std::hash::BuildHasherDefault;
 use rustc_hash::FxHasher;
 use salsa::DbWithJar;
 
-use crate::file_system::{FileSystem, FileSystemPath};
+use crate::file_system::FileSystem;
 use crate::parsed::parsed_module;
 use crate::source::{line_index, source_text};
-use crate::vfs::{VendoredPath, Vfs, VfsFile};
+use crate::vfs::{Vfs, VfsFile};
 
 pub mod file_system;
 pub mod parsed;
@@ -20,25 +20,6 @@ pub struct Jar(VfsFile, source_text, line_index, parsed_module);
 
 /// Database that gives access to the virtual filesystem, source code, and parsed AST.
 pub trait Db: DbWithJar<Jar> {
-    /// Interns a file system path and returns a salsa `File` ingredient.
-    ///
-    /// The operation is guaranteed to always succeed, even if the path doesn't exist, isn't accessible, or if the path points to a directory.
-    /// In these cases, a file with status [`FileStatus::Deleted`](vfs::FileStatus::Deleted) is returned.
-    fn file(&self, path: &FileSystemPath) -> VfsFile
-    where
-        Self: Sized,
-    {
-        self.vfs().file(self, path)
-    }
-
-    /// Interns a vendored file path. Returns `None` if no such vendored file exists and `Some` otherwise.
-    fn vendored_file(&self, path: &VendoredPath) -> Option<VfsFile>
-    where
-        Self: Sized,
-    {
-        self.vfs().vendored(self, path)
-    }
-
     fn file_system(&self) -> &dyn FileSystem;
 
     fn vfs(&self) -> &Vfs;
@@ -51,11 +32,13 @@ pub trait Upcast<T: ?Sized> {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
+    use salsa::DebugWithDb;
+
     use crate::file_system::{FileSystem, MemoryFileSystem};
     use crate::vfs::{VendoredPathBuf, Vfs};
     use crate::{Db, Jar};
-    use salsa::DebugWithDb;
-    use std::sync::Arc;
 
     /// Database that can be used for testing.
     ///
