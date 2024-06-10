@@ -84,10 +84,12 @@ impl LogLevel {
     }
 }
 
+/// Filters out traces which have a log level lower than the `logLevel` set by the client.
 struct LogLevelFilter {
     filter: LogLevel,
 }
 
+/// Filters out traces if the trace value set by the client is `off`.
 struct TraceLevelFilter;
 
 impl<S> tracing_subscriber::layer::Filter<S> for LogLevelFilter {
