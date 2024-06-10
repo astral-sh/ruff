@@ -271,53 +271,6 @@ by isort, like `_string` and `idlelib`.
 
 Like isort, Ruff's import sorting is compatible with Black.
 
-Ruff does not yet support all of isort's configuration options, though it does support many of
-them. You can find the supported settings in the [API reference](settings.md#lintisort).
-For example, you can set [`known-first-party`](settings.md#lint_isort_known-first-party)
-like so:
-
-=== "pyproject.toml"
-
-    ```toml
-    [tool.ruff.lint]
-    select = [
-        # Pyflakes
-        "F",
-        # Pycodestyle
-        "E",
-        "W",
-        # isort
-        "I001"
-    ]
-
-    # Note: Ruff supports a top-level `src` option in lieu of isort's `src_paths` setting.
-    src = ["src", "tests"]
-
-    [tool.ruff.lint.isort]
-    known-first-party = ["my_module1", "my_module2"]
-    ```
-
-=== "ruff.toml"
-
-    ```toml
-    [lint]
-    select = [
-        # Pyflakes
-        "F",
-        # Pycodestyle
-        "E",
-        "W",
-        # isort
-        "I001"
-    ]
-
-    # Note: Ruff supports a top-level `src` option in lieu of isort's `src_paths` setting.
-    src = ["src", "tests"]
-
-    [lint.isort]
-    known-first-party = ["my_module1", "my_module2"]
-    ```
-
 ## How does Ruff determine which of my imports are first-party, third-party, etc.?
 
 Ruff accepts a `src` option that in your `pyproject.toml`, `ruff.toml`, or `.ruff.toml` file, which
@@ -353,6 +306,7 @@ consider `src` as a first-party source like so:
 
     ```toml
     [tool.ruff]
+    # Ruff supports a top-level `src` option in lieu of isort's `src_paths` setting.
     # All paths are relative to the project root, which is the directory containing the pyproject.toml.
     src = ["src"]
     ```
@@ -360,6 +314,7 @@ consider `src` as a first-party source like so:
 === "ruff.toml"
 
     ```toml
+    # Ruff supports a top-level `src` option in lieu of isort's `src_paths` setting.
     # All paths are relative to the project root, which is the directory containing the pyproject.toml.
     src = ["src"]
     ```
@@ -392,7 +347,55 @@ above, `baz.py` would be identified as part of the Python package beginning at
 `./my_project/src/foo`, and so any imports in `baz.py` that begin with `foo` (like `import foo.bar`)
 would be considered first-party based on this same-package heuristic.
 
-For a detailed explanation, see the [contributing guide](contributing.md).
+For a detailed explanation of `src` resolution, see the [contributing guide](contributing.md).
+
+Ruff can also be configured to treat certain modules as (e.g.) always first-party, regardless of
+their location on the filesystem. For example, you can set [`known-first-party`](settings.md#lint_isort_known-first-party)
+like so:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ruff]
+    src = ["src", "tests"]
+
+    [tool.ruff.lint]
+    select = [
+        # Pyflakes
+        "F",
+        # Pycodestyle
+        "E",
+        "W",
+        # isort
+        "I001"
+    ]
+
+    [tool.ruff.lint.isort]
+    known-first-party = ["my_module1", "my_module2"]
+    ```
+
+=== "ruff.toml"
+
+    ```toml
+    src = ["src", "tests"]
+
+    [lint]
+    select = [
+        # Pyflakes
+        "F",
+        # Pycodestyle
+        "E",
+        "W",
+        # isort
+        "I001"
+    ]
+
+    [lint.isort]
+    known-first-party = ["my_module1", "my_module2"]
+    ```
+
+Ruff does not yet support all of isort's configuration options, though it does support many of
+them. You can find the supported settings in the [API reference](settings.md#lintisort).
 
 ## Does Ruff support Jupyter Notebooks?
 
