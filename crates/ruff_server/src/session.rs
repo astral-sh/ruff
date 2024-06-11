@@ -145,12 +145,12 @@ impl Session {
         Ok(())
     }
 
-    pub(crate) fn count_documents(&self) -> usize {
-        self.index.count_documents()
+    pub(crate) fn num_documents(&self) -> usize {
+        self.index.num_documents()
     }
 
-    pub(crate) fn count_workspaces(&self) -> usize {
-        self.index.count_workspaces()
+    pub(crate) fn num_workspaces(&self) -> usize {
+        self.index.num_workspaces()
     }
 
     pub(crate) fn list_config_files(&self) -> Vec<&std::path::Path> {

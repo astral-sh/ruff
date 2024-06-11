@@ -187,11 +187,11 @@ impl Index {
         Self::register_workspace_settings(&mut self.settings, url, None, global_settings)
     }
 
-    pub(super) fn count_documents(&self) -> usize {
+    pub(super) fn num_documents(&self) -> usize {
         self.documents.len()
     }
 
-    pub(super) fn count_workspaces(&self) -> usize {
+    pub(super) fn num_workspaces(&self) -> usize {
         self.settings.len()
     }
 

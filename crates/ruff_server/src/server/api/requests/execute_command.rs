@@ -11,7 +11,7 @@ use lsp_server::ErrorCode;
 use lsp_types::{self as types, request as req};
 use serde::Deserialize;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 enum Command {
     Debug,
     Format,
@@ -34,19 +34,21 @@ impl super::RequestHandler for ExecuteCommand {
 impl super::SyncRequestHandler for ExecuteCommand {
     fn run(
         session: &mut Session,
-        _notifier: client::Notifier,
+        notifier: client::Notifier,
         requester: &mut client::Requester,
         params: types::ExecuteCommandParams,
     ) -> server::Result<Option<serde_json::Value>> {
         let command =
             Command::from_str(&params.command).with_failure_code(ErrorCode::InvalidParams)?;
 
-        if let Command::Debug = command {
+        if command == Command::Debug {
             let output = debug_information(session);
-            #[allow(clippy::print_stderr)]
-            {
-                eprintln!("Debug information:\n{output}");
-            }
+            notifier
+                .notify::<types::notification::LogMessage>(types::LogMessageParams {
+                    message: output,
+                    typ: types::MessageType::INFO,
+                })
+                .with_failure_code(ErrorCode::InternalError)?;
             return Ok(None);
         }
 
@@ -165,11 +167,11 @@ fn apply_edit(
 }
 
 fn debug_information(session: &Session) -> String {
-    let path = std::env::current_exe()
+    let executable = std::env::current_exe()
         .map(|path| format!("{}", path.display()))
         .unwrap_or_else(|_| "<unavailable>".to_string());
     format!(
-        r#"path = {path}
+        r#"executable = {executable}
 version = {version}
 encoding = {encoding:?}
 open_document_count = {doc_count}
@@ -180,8 +182,8 @@ configuration_files = {config_files:?}
         version = crate::version(),
         encoding = session.encoding(),
         client_capabilities = session.resolved_client_capabilities(),
-        doc_count = session.count_documents(),
-        workspace_count = session.count_workspaces(),
+        doc_count = session.num_documents(),
+        workspace_count = session.num_workspaces(),
         config_files = session.list_config_files()
     )
 }
