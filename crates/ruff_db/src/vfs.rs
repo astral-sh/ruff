@@ -259,6 +259,40 @@ impl VfsFile {
 
         db.vfs().read(db, path)
     }
+
+    /// Refreshes the file metadata by querying the file system if needed.
+    /// TODO: The API should instead take all observed changes from the file system directly
+    ///   and then apply the VfsFile status accordingly. But for now, this is sufficient.
+    pub fn touch_path(db: &mut dyn Db, path: &VfsPath) {
+        Self::touch_impl(db, path, None);
+    }
+
+    pub fn touch(self, db: &mut dyn Db) {
+        let path = self.path(db).clone();
+        Self::touch_impl(db, &path, Some(self));
+    }
+
+    fn touch_impl(db: &mut dyn Db, path: &VfsPath, file: Option<VfsFile>) {
+        match path {
+            VfsPath::FileSystem(path) => {
+                let metadata = db.file_system().metadata(path);
+
+                let (status, revision) = match metadata {
+                    Ok(metadata) if metadata.file_type().is_file() => {
+                        (FileStatus::Exists, metadata.revision())
+                    }
+                    _ => (FileStatus::Deleted, FileRevision::zero()),
+                };
+
+                let file = file.unwrap_or_else(|| db.vfs().file_system(db, path));
+                file.set_status(db).to(status);
+                file.set_revision(db).to(revision);
+            }
+            VfsPath::Vendored(_) => {
+                // Readonly, can never be out of date.
+            }
+        }
+    }
 }
 
 #[derive(Default, Debug)]

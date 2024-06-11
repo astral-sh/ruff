@@ -2,6 +2,7 @@ use std::fmt::Formatter;
 use std::ops::Deref;
 use std::sync::Arc;
 
+use ruff_db::file_system::FileSystemPath;
 use ruff_db::vfs::{VfsFile, VfsPath};
 
 use crate::Db;
@@ -70,9 +71,9 @@ impl ModuleName {
     /// ```
     pub fn starts_with(&self, other: &ModuleName) -> bool {
         let mut self_components = self.components();
-        let mut other_components = other.components();
+        let other_components = other.components();
 
-        while let Some(other_component) = other_components.next() {
+        for other_component in other_components {
             if self_components.next() != Some(other_component) {
                 return false;
             }
@@ -85,6 +86,32 @@ impl ModuleName {
     pub fn as_str(&self) -> &str {
         &self.0
     }
+
+    fn from_relative_path(path: &FileSystemPath) -> Option<Self> {
+        let path = if path.ends_with("__init__.py") || path.ends_with("__init__.pyi") {
+            path.parent()?
+        } else {
+            path
+        };
+
+        let name = if let Some(parent) = path.parent() {
+            let mut name = String::with_capacity(path.as_str().len());
+
+            for component in parent.components() {
+                name.push_str(component.as_os_str().to_str()?);
+                name.push('.');
+            }
+
+            // SAFETY: Unwrap is safe here or `parent` would have returned `None`.
+            name.push_str(path.file_stem().unwrap());
+
+            smol_str::SmolStr::from(name)
+        } else {
+            smol_str::SmolStr::new(path.file_stem()?)
+        };
+
+        Some(Self(name))
+    }
 }
 
 impl Deref for ModuleName {
@@ -93,6 +120,18 @@ impl Deref for ModuleName {
     #[inline]
     fn deref(&self) -> &Self::Target {
         self.as_str()
+    }
+}
+
+impl PartialEq<str> for ModuleName {
+    fn eq(&self, other: &str) -> bool {
+        self.as_str() == other
+    }
+}
+
+impl PartialEq<ModuleName> for str {
+    fn eq(&self, other: &ModuleName) -> bool {
+        self == other.as_str()
     }
 }
 
@@ -169,32 +208,6 @@ pub enum ModuleKind {
     Package,
 }
 
-/// The resolved path of a module.
-///
-/// It should be highly likely that the file still exists when accessing but it isn't 100% guaranteed
-/// because the file could have been deleted between resolving the module name and accessing it.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ModulePath {
-    root: ModuleSearchPath,
-    file: VfsFile,
-}
-
-impl ModulePath {
-    pub fn new(root: ModuleSearchPath, file: VfsFile) -> Self {
-        Self { root, file }
-    }
-
-    /// The search path that was used to locate the module
-    pub fn root(&self) -> &ModuleSearchPath {
-        &self.root
-    }
-
-    /// The file containing the source code for the module
-    pub fn file(&self) -> VfsFile {
-        self.file
-    }
-}
-
 /// A search path in which to search modules.
 /// Corresponds to a path in [`sys.path`](https://docs.python.org/3/library/sys_path_init.html) at runtime.
 ///
@@ -205,9 +218,15 @@ pub struct ModuleSearchPath {
 }
 
 impl ModuleSearchPath {
-    pub fn new(path: VfsPath, kind: ModuleSearchPathKind) -> Self {
+    pub fn new<P>(path: P, kind: ModuleSearchPathKind) -> Self
+    where
+        P: Into<VfsPath>,
+    {
         Self {
-            inner: Arc::new(ModuleSearchPathInner { path, kind }),
+            inner: Arc::new(ModuleSearchPathInner {
+                path: path.into(),
+                kind,
+            }),
         }
     }
 
