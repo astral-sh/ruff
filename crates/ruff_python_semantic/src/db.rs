@@ -60,6 +60,7 @@ pub(crate) mod tests {
         /// This useful for testing advanced file system features like permissions, symlinks, etc.
         ///
         /// Note that any files written to the memory file system won't be copied over.
+        #[allow(unused)]
         pub(crate) fn with_os_file_system(&mut self) {
             self.file_system = TestFileSystem::Os(OsFileSystem);
         }
@@ -134,6 +135,7 @@ pub(crate) mod tests {
 
     enum TestFileSystem {
         Memory(MemoryFileSystem),
+        #[allow(unused)]
         Os(OsFileSystem),
     }
 }
