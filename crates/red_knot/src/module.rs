@@ -1,13 +1,13 @@
 use std::collections::BTreeMap;
-use std::fmt::Formatter;
+use std::fmt::{Display, Formatter};
 use std::hash::Hash;
+use std::num::NonZeroUsize;
 use std::ops::{Deref, RangeFrom, RangeInclusive};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::atomic::AtomicU32;
 use std::sync::Arc;
 
-use anyhow::{anyhow, bail, Context};
 use dashmap::mapref::entry::Entry;
 use rustc_hash::FxHashMap;
 use smol_str::SmolStr;
@@ -782,6 +782,64 @@ impl PackageKind {
 }
 
 #[derive(Debug)]
+struct TypeshedVersionsParseError {
+    line_number: NonZeroUsize,
+    reason: TypeshedVersionsParseErrorKind,
+}
+
+impl Display for TypeshedVersionsParseError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let TypeshedVersionsParseError {
+            line_number,
+            reason,
+        } = self;
+        write!(
+            f,
+            "Error while parsing line {line_number} of typeshed's VERSIONS file: {reason}"
+        )
+    }
+}
+
+impl std::error::Error for TypeshedVersionsParseError {}
+
+#[derive(Debug, PartialEq, Eq)]
+enum TypeshedVersionsParseErrorKind {
+    UnexpectedNumberOfColons,
+    InvalidModuleName(String),
+    UnexpectedNumberOfHyphens,
+    UnexpectedNumberOfPeriods(String),
+    IntegerParsingFailure {
+        version: String,
+        err: std::num::ParseIntError,
+    },
+}
+
+impl Display for TypeshedVersionsParseErrorKind {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::UnexpectedNumberOfColons => {
+                f.write_str("Expected every non-comment line to have exactly one colon")
+            }
+            Self::InvalidModuleName(name) => write!(
+                f,
+                "Expected all components of '{name}' to be valid Python identifiers"
+            ),
+            Self::UnexpectedNumberOfHyphens => {
+                f.write_str("Expected every non-comment line to have exactly one '-' character")
+            }
+            Self::UnexpectedNumberOfPeriods(format) => write!(
+                f,
+                "Expected all versions to be in the form {{MAJOR}}.{{MINOR}}; got '{format}'"
+            ),
+            Self::IntegerParsingFailure { version, err } => write!(
+                f,
+                "Failed to convert '{version}' to a pair of integers due to {err}",
+            ),
+        }
+    }
+}
+
+#[derive(Debug)]
 struct TypeshedVersions(FxHashMap<ModuleName, PyVersionRange>);
 
 #[allow(unused)]
@@ -816,40 +874,51 @@ impl TypeshedVersions {
 }
 
 impl FromStr for TypeshedVersions {
-    type Err = anyhow::Error;
+    type Err = TypeshedVersionsParseError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let mut map = FxHashMap::default();
 
         for (line_number, line) in s.lines().enumerate() {
-            let line_number = line_number + 1; // humans expect line numbers to be 1-indexed
+            // humans expect line numbers to be 1-indexed
+            #[allow(unsafe_code)]
+            let line_number = unsafe { NonZeroUsize::new_unchecked(line_number + 1) };
+
             let Some(content) = line.split('#').map(str::trim).next() else {
                 continue;
             };
             if content.is_empty() {
                 continue;
             }
+
             let mut parts = content.split(':').map(str::trim);
             let (Some(module_name), Some(rest), None) = (parts.next(), parts.next(), parts.next())
             else {
-                bail!(
-                    "Error on line {line_number}: \
-                    expected each line of VERSIONS to have exactly one colon"
-                )
+                return Err(TypeshedVersionsParseError {
+                    line_number,
+                    reason: TypeshedVersionsParseErrorKind::UnexpectedNumberOfColons,
+                });
             };
+
             let module_name = ModuleName::new(module_name);
             if !module_name.components().all(is_identifier) {
-                bail!(
-                    "Error on line {line_number}: \
-                    expected all components of {module_name} \
-                    to be valid Python identifiers"
-                );
+                return Err(TypeshedVersionsParseError {
+                    line_number,
+                    reason: TypeshedVersionsParseErrorKind::InvalidModuleName(
+                        module_name.to_string(),
+                    ),
+                });
             }
-            map.insert(
-                module_name,
-                rest.parse()
-                    .context(format!("Error on line {line_number}"))?,
-            );
+
+            match PyVersionRange::from_str(rest) {
+                Ok(version) => map.insert(module_name, version),
+                Err(reason) => {
+                    return Err(TypeshedVersionsParseError {
+                        line_number,
+                        reason,
+                    })
+                }
+            };
         }
 
         Ok(Self(map))
@@ -882,19 +951,17 @@ impl PyVersionRange {
 }
 
 impl FromStr for PyVersionRange {
-    type Err = anyhow::Error;
+    type Err = TypeshedVersionsParseErrorKind;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let mut parts = s.split_terminator('-').map(str::trim);
-        Ok(match (parts.next(), parts.next(), parts.next()) {
-            (Some(lower), None, None) => Self::AvailableFrom((lower.parse()?)..),
+        match (parts.next(), parts.next(), parts.next()) {
+            (Some(lower), None, None) => Ok(Self::AvailableFrom((lower.parse()?)..)),
             (Some(lower), Some(upper), None) => {
-                Self::AvailableWithin((lower.parse()?)..=(upper.parse()?))
+                Ok(Self::AvailableWithin((lower.parse()?)..=(upper.parse()?)))
             }
-            _ => bail!(
-                "Expected all non-comment lines in VERSIONS to have exactly one '-' character"
-            ),
-        })
+            _ => Err(TypeshedVersionsParseErrorKind::UnexpectedNumberOfHyphens),
+        }
     }
 }
 
@@ -916,20 +983,34 @@ struct PyVersion {
 }
 
 impl FromStr for PyVersion {
-    type Err = anyhow::Error;
+    type Err = TypeshedVersionsParseErrorKind;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let mut parts = s.split('.').map(str::trim);
-        match (parts.next(), parts.next(), parts.next()) {
-            (Some(major), Some(minor), None) => Ok(Self {
-                major: major.parse()?,
-                minor: minor.parse()?,
-            }),
-            _ => Err(anyhow!(
-                "Expected all versions in the VERSIONS file \
-                to be in the form ${{MAJOR}}.${{MINOR}}"
-            )),
-        }
+        let (Some(major), Some(minor), None) = (parts.next(), parts.next(), parts.next()) else {
+            return Err(TypeshedVersionsParseErrorKind::UnexpectedNumberOfPeriods(
+                s.to_string(),
+            ));
+        };
+        let major = match u8::from_str(major) {
+            Ok(major) => major,
+            Err(err) => {
+                return Err(TypeshedVersionsParseErrorKind::IntegerParsingFailure {
+                    version: major.to_string(),
+                    err,
+                })
+            }
+        };
+        let minor = match u8::from_str(minor) {
+            Ok(minor) => minor,
+            Err(err) => {
+                return Err(TypeshedVersionsParseErrorKind::IntegerParsingFailure {
+                    version: minor.to_string(),
+                    err,
+                })
+            }
+        };
+        Ok(Self { major, minor })
     }
 }
 
