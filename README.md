@@ -469,6 +469,7 @@ Ruff is used by a number of major open-source projects and companies, including:
 - [Sphinx](https://github.com/sphinx-doc/sphinx)
 - [Stable Baselines3](https://github.com/DLR-RM/stable-baselines3)
 - [Starlette](https://github.com/encode/starlette)
+- [Streamlit](https://github.com/streamlit/streamlit)
 - [The Algorithms](https://github.com/TheAlgorithms/Python)
 - [Vega-Altair](https://github.com/altair-viz/altair)
 - WordPress ([Openverse](https://github.com/WordPress/openverse))
