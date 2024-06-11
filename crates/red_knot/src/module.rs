@@ -7,7 +7,7 @@ use std::str::FromStr;
 use std::sync::atomic::AtomicU32;
 use std::sync::Arc;
 
-use anyhow::{bail, Context};
+use anyhow::{anyhow, bail, Context};
 use dashmap::mapref::entry::Entry;
 use rustc_hash::FxHashMap;
 use smol_str::SmolStr;
@@ -118,9 +118,8 @@ pub struct ModuleName(smol_str::SmolStr);
 impl ModuleName {
     pub fn new(name: &str) -> Self {
         debug_assert!(!name.is_empty());
-        let instance = Self(smol_str::SmolStr::new(name));
-        debug_assert!(instance.components().all(is_identifier));
-        instance
+
+        Self(smol_str::SmolStr::new(name))
     }
 
     fn from_relative_path(path: &Path) -> Option<Self> {
@@ -830,13 +829,22 @@ impl FromStr for TypeshedVersions {
             if content.is_empty() {
                 continue;
             }
-            let parts: Vec<&str> = content.split(':').map(str::trim).collect();
-            let (module_name, rest) = match parts.as_slice() {
-                [module_name, rest] => (ModuleName::new(module_name), rest),
-                _ => bail!(
-                    "Error on line {line_number}: expected each line of VERSIONS to have exactly one colon"
-                ),
+            let mut parts = content.split(':').map(str::trim);
+            let (Some(module_name), Some(rest), None) = (parts.next(), parts.next(), parts.next())
+            else {
+                bail!(
+                    "Error on line {line_number}: \
+                    expected each line of VERSIONS to have exactly one colon"
+                )
             };
+            let module_name = ModuleName::new(module_name);
+            if !module_name.components().all(is_identifier) {
+                bail!(
+                    "Error on line {line_number}: \
+                    expected all components of {module_name} \
+                    to be valid Python identifiers"
+                );
+            }
             map.insert(
                 module_name,
                 rest.parse()
@@ -877,10 +885,12 @@ impl FromStr for PyVersionRange {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let parts: Vec<&str> = s.split('-').map(str::trim).collect();
-        Ok(match parts.as_slice() {
-            [lower, ""] => Self::AvailableFrom((lower.parse()?)..),
-            [lower, upper] => Self::AvailableWithin((lower.parse()?)..=(upper.parse()?)),
+        let mut parts = s.split_terminator('-').map(str::trim);
+        Ok(match (parts.next(), parts.next(), parts.next()) {
+            (Some(lower), None, None) => Self::AvailableFrom((lower.parse()?)..),
+            (Some(lower), Some(upper), None) => {
+                Self::AvailableWithin((lower.parse()?)..=(upper.parse()?))
+            }
             _ => bail!(
                 "Expected all non-comment lines in VERSIONS to have exactly one '-' character"
             ),
@@ -909,14 +919,17 @@ impl FromStr for PyVersion {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let parts: Vec<&str> = s.split('.').collect();
-        let [major, minor] = parts.as_slice() else {
-            bail!("Expected all versions in the VERSIONS file to be in the form ${{MAJOR}}.${{MINOR}}")
-        };
-        Ok(Self {
-            major: major.parse()?,
-            minor: minor.parse()?,
-        })
+        let mut parts = s.split('.').map(str::trim);
+        match (parts.next(), parts.next(), parts.next()) {
+            (Some(major), Some(minor), None) => Ok(Self {
+                major: major.parse()?,
+                minor: minor.parse()?,
+            }),
+            _ => Err(anyhow!(
+                "Expected all versions in the VERSIONS file \
+                to be in the form ${{MAJOR}}.${{MINOR}}"
+            )),
+        }
     }
 }
 
@@ -1157,6 +1170,7 @@ mod tests {
 
         let versions = TypeshedVersions::from_str(versions_data).unwrap();
         assert!(versions.len() > 100);
+        assert!(versions.len() < 1000);
 
         // (will start failing if the stdlib adds a `foo` module, but oh well)
         assert!(!versions.contains_module("foo"));
