@@ -69,7 +69,8 @@ impl super::SyncRequestHandler for ExecuteCommand {
         let mut edit_tracker = WorkspaceEditTracker::new(session.resolved_client_capabilities());
         for Argument { uri, version } in arguments {
             let Some(snapshot) = session.take_snapshot(uri.clone()) else {
-                tracing::warn!("Document at {uri} could not be opened");
+                tracing::error!("Document at {uri} could not be opened");
+                show_err_msg!("Ruff does not recognize this file");
                 return Ok(None);
             };
             match command {
