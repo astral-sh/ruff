@@ -7,6 +7,7 @@ mod db;
 mod definition;
 mod globals;
 mod model;
+#[cfg(feature = "red_knot")]
 pub mod module;
 mod nodes;
 mod reference;
