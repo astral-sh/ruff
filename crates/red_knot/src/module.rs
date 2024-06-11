@@ -781,7 +781,7 @@ impl PackageKind {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 struct TypeshedVersionsParseError {
     line_number: NonZeroUsize,
     reason: TypeshedVersionsParseErrorKind,
@@ -800,7 +800,15 @@ impl Display for TypeshedVersionsParseError {
     }
 }
 
-impl std::error::Error for TypeshedVersionsParseError {}
+impl std::error::Error for TypeshedVersionsParseError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        if let TypeshedVersionsParseErrorKind::IntegerParsingFailure { err, .. } = &self.reason {
+            Some(err)
+        } else {
+            None
+        }
+    }
+}
 
 #[derive(Debug, PartialEq, Eq)]
 enum TypeshedVersionsParseErrorKind {
@@ -839,7 +847,7 @@ impl Display for TypeshedVersionsParseErrorKind {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 struct TypeshedVersions(FxHashMap<ModuleName, PyVersionRange>);
 
 #[allow(unused)]
@@ -954,9 +962,9 @@ impl FromStr for PyVersionRange {
     type Err = TypeshedVersionsParseErrorKind;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut parts = s.split_terminator('-').map(str::trim);
+        let mut parts = s.split('-').map(str::trim);
         match (parts.next(), parts.next(), parts.next()) {
-            (Some(lower), None, None) => Ok(Self::AvailableFrom((lower.parse()?)..)),
+            (Some(lower), Some(""), None) => Ok(Self::AvailableFrom((lower.parse()?)..)),
             (Some(lower), Some(upper), None) => {
                 Ok(Self::AvailableWithin((lower.parse()?)..=(upper.parse()?)))
             }
@@ -996,7 +1004,7 @@ impl FromStr for PyVersion {
             Ok(major) => major,
             Err(err) => {
                 return Err(TypeshedVersionsParseErrorKind::IntegerParsingFailure {
-                    version: major.to_string(),
+                    version: s.to_string(),
                     err,
                 })
             }
@@ -1005,7 +1013,7 @@ impl FromStr for PyVersion {
             Ok(minor) => minor,
             Err(err) => {
                 return Err(TypeshedVersionsParseErrorKind::IntegerParsingFailure {
-                    version: minor.to_string(),
+                    version: s.to_string(),
                     err,
                 })
             }
@@ -1064,7 +1072,7 @@ impl From<SupportedPyVersion> for PyVersion {
 #[cfg(test)]
 mod tests {
     use std::io::{Cursor, Read};
-    use std::num::NonZeroU32;
+    use std::num::{IntErrorKind, NonZeroU32, NonZeroUsize};
     use std::path::{Path, PathBuf};
     use std::str::FromStr;
 
@@ -1074,7 +1082,8 @@ mod tests {
     use crate::db::SourceDb;
     use crate::module::{
         path_to_module, resolve_module, set_module_search_paths, ModuleKind, ModuleName,
-        ModuleResolutionInputs, SupportedPyVersion, TypeshedVersions, TYPESHED_STDLIB_DIRECTORY,
+        ModuleResolutionInputs, SupportedPyVersion, TypeshedVersions, TypeshedVersionsParseError,
+        TypeshedVersionsParseErrorKind, TYPESHED_STDLIB_DIRECTORY,
     };
     use crate::semantic::Dependency;
 
@@ -1086,6 +1095,9 @@ mod tests {
         custom_typeshed: PathBuf,
         site_packages: PathBuf,
     }
+
+    #[allow(unsafe_code)]
+    static ONE: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(1) };
 
     fn create_resolver() -> std::io::Result<TestCase> {
         let temp_dir = tempfile::tempdir()?;
@@ -1265,6 +1277,121 @@ mod tests {
         assert!(versions.contains_module("audioop"));
         assert!(versions.module_exists_on_version("audioop", SupportedPyVersion::Py312));
         assert!(!versions.module_exists_on_version("audioop", SupportedPyVersion::Py313));
+    }
+
+    #[test]
+    fn invalid_typeshed_versions_bad_colon_number() {
+        assert_eq!(
+            TypeshedVersions::from_str("foo 3.7"),
+            Err(TypeshedVersionsParseError {
+                line_number: ONE,
+                reason: TypeshedVersionsParseErrorKind::UnexpectedNumberOfColons
+            })
+        );
+        assert_eq!(
+            TypeshedVersions::from_str("foo:: 3.7"),
+            Err(TypeshedVersionsParseError {
+                line_number: ONE,
+                reason: TypeshedVersionsParseErrorKind::UnexpectedNumberOfColons
+            })
+        );
+    }
+
+    #[test]
+    fn invalid_typeshed_versions_non_identifier_modules() {
+        assert_eq!(
+            TypeshedVersions::from_str("not!an!identifier!: 3.7"),
+            Err(TypeshedVersionsParseError {
+                line_number: ONE,
+                reason: TypeshedVersionsParseErrorKind::InvalidModuleName(
+                    "not!an!identifier!".to_string()
+                )
+            })
+        );
+        assert_eq!(
+            TypeshedVersions::from_str("(also_not).(an_identifier): 3.7"),
+            Err(TypeshedVersionsParseError {
+                line_number: ONE,
+                reason: TypeshedVersionsParseErrorKind::InvalidModuleName(
+                    "(also_not).(an_identifier)".to_string()
+                )
+            })
+        );
+    }
+
+    #[test]
+    fn invalid_typeshed_versions_bad_hyphen_number() {
+        assert_eq!(
+            TypeshedVersions::from_str("foo: 3.8"),
+            Err(TypeshedVersionsParseError {
+                line_number: ONE,
+                reason: TypeshedVersionsParseErrorKind::UnexpectedNumberOfHyphens
+            })
+        );
+        assert_eq!(
+            TypeshedVersions::from_str("foo: 3.8--"),
+            Err(TypeshedVersionsParseError {
+                line_number: ONE,
+                reason: TypeshedVersionsParseErrorKind::UnexpectedNumberOfHyphens
+            })
+        );
+        assert_eq!(
+            TypeshedVersions::from_str("foo: 3.8--3.9"),
+            Err(TypeshedVersionsParseError {
+                line_number: ONE,
+                reason: TypeshedVersionsParseErrorKind::UnexpectedNumberOfHyphens
+            })
+        );
+    }
+
+    #[test]
+    fn invalid_typeshed_versions_bad_period_number() {
+        assert_eq!(
+            TypeshedVersions::from_str("foo: 38-"),
+            Err(TypeshedVersionsParseError {
+                line_number: ONE,
+                reason: TypeshedVersionsParseErrorKind::UnexpectedNumberOfPeriods("38".to_string())
+            })
+        );
+        assert_eq!(
+            TypeshedVersions::from_str("foo: 3..8-"),
+            Err(TypeshedVersionsParseError {
+                line_number: ONE,
+                reason: TypeshedVersionsParseErrorKind::UnexpectedNumberOfPeriods(
+                    "3..8".to_string()
+                )
+            })
+        );
+        assert_eq!(
+            TypeshedVersions::from_str("foo: 3.8-3..11"),
+            Err(TypeshedVersionsParseError {
+                line_number: ONE,
+                reason: TypeshedVersionsParseErrorKind::UnexpectedNumberOfPeriods(
+                    "3..11".to_string()
+                )
+            })
+        );
+    }
+
+    #[test]
+    fn invalid_typeshed_versions_non_digits() {
+        let err = TypeshedVersions::from_str("foo: 1.two-").unwrap_err();
+        assert_eq!(err.line_number, ONE);
+        let TypeshedVersionsParseErrorKind::IntegerParsingFailure { version, err } = err.reason
+        else {
+            panic!()
+        };
+        assert_eq!(version, "1.two".to_string());
+        assert_eq!(*err.kind(), IntErrorKind::InvalidDigit);
+
+        let err = TypeshedVersions::from_str("foo: 3.8-four.9").unwrap_err();
+        assert_eq!(err.line_number, ONE);
+        let TypeshedVersionsParseErrorKind::IntegerParsingFailure { version, err } = err.reason
+        else {
+            panic!()
+        };
+        assert_eq!(version, "four.9".to_string());
+        assert_eq!(*err.kind(), IntErrorKind::InvalidDigit);
     }
 
     #[test]
