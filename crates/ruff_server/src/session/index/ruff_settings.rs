@@ -19,6 +19,9 @@ use walkdir::WalkDir;
 use crate::session::settings::{ConfigurationPreference, ResolvedEditorSettings};
 
 pub(crate) struct RuffSettings {
+    /// The path to this configuration file, used for debugging.
+    /// The default fallback configuration does not have a file path.
+    path: Option<PathBuf>,
     /// Settings used to manage file inclusion and exclusion.
     file_resolver: ruff_workspace::FileResolverSettings,
     /// Settings to pass into the Ruff linter.
@@ -48,14 +51,17 @@ impl std::fmt::Display for RuffSettings {
 
 impl RuffSettings {
     pub(crate) fn fallback(editor_settings: &ResolvedEditorSettings, root: &Path) -> RuffSettings {
+        let mut path = None;
         let fallback = find_user_settings_toml()
             .and_then(|user_settings| {
-                ruff_workspace::resolver::resolve_root_settings(
+                let settings = ruff_workspace::resolver::resolve_root_settings(
                     &user_settings,
                     Relativity::Cwd,
                     &EditorConfigurationTransformer(editor_settings, root),
                 )
-                .ok()
+                .ok();
+                path = Some(user_settings);
+                settings
             })
             .unwrap_or_else(|| {
                 let default_configuration = Configuration::default();
@@ -68,6 +74,7 @@ impl RuffSettings {
             });
 
         RuffSettings {
+            path,
             file_resolver: fallback.file_resolver,
             formatter: fallback.formatter,
             linter: fallback.linter,
@@ -108,6 +115,7 @@ impl RuffSettingsIndex {
                 index.insert(
                     directory.to_path_buf(),
                     Arc::new(RuffSettings {
+                        path: Some(pyproject),
                         file_resolver: settings.file_resolver,
                         linter: settings.linter,
                         formatter: settings.formatter,
@@ -176,6 +184,7 @@ impl RuffSettingsIndex {
                 index.insert(
                     directory,
                     Arc::new(RuffSettings {
+                        path: Some(pyproject),
                         file_resolver: settings.file_resolver,
                         linter: settings.linter,
                         formatter: settings.formatter,
@@ -196,6 +205,12 @@ impl RuffSettingsIndex {
             .map(|(_, settings)| settings)
             .unwrap_or_else(|| &self.fallback)
             .clone()
+    }
+
+    pub(crate) fn list_files(&self) -> impl Iterator<Item = &Path> {
+        self.index
+            .values()
+            .filter_map(|settings| settings.path.as_deref())
     }
 
     pub(super) fn fallback(&self) -> Arc<RuffSettings> {

@@ -187,6 +187,21 @@ impl Index {
         Self::register_workspace_settings(&mut self.settings, url, None, global_settings)
     }
 
+    pub(super) fn num_documents(&self) -> usize {
+        self.documents.len()
+    }
+
+    pub(super) fn num_workspaces(&self) -> usize {
+        self.settings.len()
+    }
+
+    pub(super) fn list_config_files(&self) -> Vec<&Path> {
+        self.settings
+            .values()
+            .flat_map(|WorkspaceSettings { ruff_settings, .. }| ruff_settings.list_files())
+            .collect()
+    }
+
     fn register_workspace_settings(
         settings_index: &mut SettingsIndex,
         workspace_url: &Url,

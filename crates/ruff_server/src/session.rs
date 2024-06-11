@@ -145,6 +145,18 @@ impl Session {
         Ok(())
     }
 
+    pub(crate) fn num_documents(&self) -> usize {
+        self.index.num_documents()
+    }
+
+    pub(crate) fn num_workspaces(&self) -> usize {
+        self.index.num_workspaces()
+    }
+
+    pub(crate) fn list_config_files(&self) -> Vec<&std::path::Path> {
+        self.index.list_config_files()
+    }
+
     pub(crate) fn resolved_client_capabilities(&self) -> &ResolvedClientCapabilities {
         &self.resolved_client_capabilities
     }
