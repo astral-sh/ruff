@@ -529,34 +529,92 @@ mod tests {
     }
 
     #[test]
-    fn remove_file() {
+    fn remove_file() -> Result<()> {
+        let fs = with_files(["a/a.py", "b.py"]);
 
+        fs.remove_file("a/a.py")?;
+
+        assert!(!fs.exists(FileSystemPath::new("a/a.py")));
+
+        // It doesn't delete the enclosing directories
+        assert!(fs.exists(FileSystemPath::new("a")));
+
+        // It doesn't delete unrelated files.
+        assert!(fs.exists(FileSystemPath::new("b.py")));
+
+        Ok(())
     }
 
     #[test]
     fn remove_non_existing_file() {
+        let fs = with_files(["b.py"]);
 
+        let error = fs.remove_file("a.py").unwrap_err();
+
+        assert_eq!(error.kind(), ErrorKind::NotFound);
     }
 
     #[test]
-    fn remove_file_that_is_a_directory() {
+    fn remove_file_that_is_a_directory() -> Result<()> {
+        let fs = MemoryFileSystem::new();
+        fs.create_directory_all("a")?;
 
+        let error = fs.remove_file("a").unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::Other);
+
+        Ok(())
     }
 
     #[test]
-    fn remove_directory() {}
+    fn remove_directory() -> Result<()> {
+        let fs = with_files(["b.py"]);
+        fs.create_directory_all("a")?;
+
+        fs.remove_directory("a")?;
+
+        assert!(!fs.exists(FileSystemPath::new("a")));
+
+        // It doesn't delete unrelated files.
+        assert!(fs.exists(FileSystemPath::new("b.py")));
+
+        Ok(())
+    }
 
     #[test]
-    fn remove_non_empty_directory() {}
+    fn remove_non_empty_directory() {
+        let fs = with_files(["a/a.py"]);
+
+        let error = fs.remove_directory("a").unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::Other);
+    }
 
     #[test]
-    fn remove_directory_with_files_that_start_with_the_same_string() {}
+    fn remove_directory_with_files_that_start_with_the_same_string() -> Result<()> {
+        let fs = with_files(["foo_bar.py", "foob.py"]);
+        fs.create_directory_all("foo")?;
+
+        fs.remove_directory("foo").unwrap();
+
+        assert!(!fs.exists(FileSystemPath::new("foo")));
+        assert!(fs.exists(FileSystemPath::new("foo_bar.py")));
+        assert!(fs.exists(FileSystemPath::new("foob.py")));
+
+        Ok(())
+    }
 
     #[test]
-    fn remove_non_existing_directory() {}
+    fn remove_non_existing_directory() {
+        let fs = MemoryFileSystem::new();
+
+        let error = fs.remove_directory("a").unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::NotFound);
+    }
 
     #[test]
-    fn remove_directory_that_is_a_file() {}
+    fn remove_directory_that_is_a_file() {
+        let fs = with_files(["a"]);
 
-}
+        let error = fs.remove_directory("a").unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::Other);
+    }
 }
