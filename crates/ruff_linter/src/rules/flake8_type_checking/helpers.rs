@@ -265,10 +265,10 @@ pub(crate) fn quote_annotation(
     let quote = stylist.quote();
     let annotation = generator.expr(expr);
 
-    let annotation_new = if annotation.contains(stylist.quote().as_char()) {
+    let annotation_new = if annotation.contains(quote.as_char()) {
         annotation.replace(
-            stylist.quote().as_char(),
-            &stylist.quote().opposite().as_char().to_string(),
+            quote.as_char(),
+            &quote.opposite().as_char().to_string(),
         )
     } else {
         annotation
