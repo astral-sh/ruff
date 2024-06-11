@@ -24,7 +24,7 @@ pub fn line_index(db: &dyn Db, file: VfsFile) -> LineIndex {
     LineIndex::from_source_text(&source)
 }
 
-/// The source text of a [`VfsFile`](crate::File)
+/// The source text of a [`VfsFile`].
 ///
 /// Cheap cloneable in `O(1)`.
 #[derive(Clone, Eq, PartialEq)]
