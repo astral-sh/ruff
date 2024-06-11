@@ -104,3 +104,9 @@ def f():
     def foo(self, user: AbstractBaseUser["int"], view: "type[CondorBaseViewSet]"):
         pass
 
+    def foo(self, user: AbstractBaseUser['int']):
+        pass
+
+    def foo(self, user: AbstractBaseUser['int', "str"]):
+        pass
+

@@ -469,4 +469,12 @@ quote.py:102:44: TCH002 [*] Move third-party import `django.contrib.auth.models.
 104     |-    def foo(self, user: AbstractBaseUser["int"], view: "type[CondorBaseViewSet]"):
     107 |+    def foo(self, user: "AbstractBaseUser['int']", view: "type[CondorBaseViewSet]"):
 105 108 |         pass
-106 109 |
+106 109 | 
+107     |-    def foo(self, user: AbstractBaseUser['int']):
+    110 |+    def foo(self, user: "AbstractBaseUser['int']"):
+108 111 |         pass
+109 112 | 
+110     |-    def foo(self, user: AbstractBaseUser['int', "str"]):
+    113 |+    def foo(self, user: "AbstractBaseUser['int', 'str']"):
+111 114 |         pass
+112 115 |
