@@ -4,14 +4,16 @@ pub use edit::{PositionEncoding, TextDocument};
 use lsp_types::CodeActionKind;
 pub use server::Server;
 
+#[macro_use]
+mod message;
+
 mod edit;
 mod fix;
 mod format;
 mod lint;
-#[macro_use]
-mod message;
 mod server;
 mod session;
+mod trace;
 
 pub(crate) const SERVER_NAME: &str = "ruff";
 pub(crate) const DIAGNOSTIC_NAME: &str = "Ruff";

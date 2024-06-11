@@ -70,6 +70,20 @@ pub(crate) struct ClientSettings {
     exclude: Option<Vec<String>>,
     line_length: Option<LineLength>,
     configuration_preference: Option<ConfigurationPreference>,
+    // These settings are only needed for tracing, and are only read from the global configuration.
+    // These will not be in the resolved settings.
+    #[serde(flatten)]
+    pub(crate) tracing: TracingSettings,
+}
+
+/// Settings needed to initialize tracing. These will only be
+/// read from the global configuration.
+#[derive(Debug, Deserialize, Default)]
+#[cfg_attr(test, derive(PartialEq, Eq))]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct TracingSettings {
+    pub(crate) log_level: Option<crate::trace::LogLevel>,
+    pub(crate) log_file: Option<PathBuf>,
 }
 
 /// This is a direct representation of the workspace settings schema,
@@ -424,6 +438,10 @@ mod tests {
                 exclude: None,
                 line_length: None,
                 configuration_preference: None,
+                tracing: TracingSettings {
+                    log_level: None,
+                    log_file: None,
+                },
             },
             workspace_settings: [
                 WorkspaceSettings {
@@ -472,6 +490,10 @@ mod tests {
                         exclude: None,
                         line_length: None,
                         configuration_preference: None,
+                        tracing: TracingSettings {
+                            log_level: None,
+                            log_file: None,
+                        },
                     },
                     workspace: Url {
                         scheme: "file",
@@ -533,6 +555,10 @@ mod tests {
                         exclude: None,
                         line_length: None,
                         configuration_preference: None,
+                        tracing: TracingSettings {
+                            log_level: None,
+                            log_file: None,
+                        },
                     },
                     workspace: Url {
                         scheme: "file",
@@ -588,7 +614,7 @@ mod tests {
                     exclude: None,
                     line_length: None,
                     configuration_preference: ConfigurationPreference::default(),
-                }
+                },
             }
         );
         let path =
@@ -619,7 +645,7 @@ mod tests {
                     exclude: None,
                     line_length: None,
                     configuration_preference: ConfigurationPreference::EditorFirst,
-                }
+                },
             }
         );
     }
@@ -673,6 +699,12 @@ mod tests {
                     ),
                 ),
                 configuration_preference: None,
+                tracing: TracingSettings {
+                    log_level: Some(
+                        Warn,
+                    ),
+                    log_file: None,
+                },
             },
         }
         "###);
@@ -703,7 +735,7 @@ mod tests {
                     exclude: Some(vec!["third_party".into()]),
                     line_length: Some(LineLength::try_from(80).unwrap()),
                     configuration_preference: ConfigurationPreference::EditorFirst,
-                }
+                },
             }
         );
     }

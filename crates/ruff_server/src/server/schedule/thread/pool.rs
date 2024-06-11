@@ -56,10 +56,10 @@ impl Pool {
         let extant_tasks = Arc::new(AtomicUsize::new(0));
 
         let mut handles = Vec::with_capacity(threads);
-        for _ in 0..threads {
+        for i in 0..threads {
             let handle = Builder::new(INITIAL_PRIORITY)
                 .stack_size(STACK_SIZE)
-                .name("Worker".into())
+                .name(format!("ruff:worker:{i}"))
                 .spawn({
                     let extant_tasks = Arc::clone(&extant_tasks);
                     let job_receiver: Receiver<Job> = job_receiver.clone();

@@ -201,7 +201,7 @@ pub fn run(
         }
         Command::Check(args) => check(args, global_options),
         Command::Format(args) => format(args, global_options),
-        Command::Server(args) => server(args, global_options.log_level()),
+        Command::Server(args) => server(args),
     }
 }
 
@@ -215,7 +215,7 @@ fn format(args: FormatCommand, global_options: GlobalConfigArgs) -> Result<ExitS
     }
 }
 
-fn server(args: ServerCommand, log_level: LogLevel) -> Result<ExitStatus> {
+fn server(args: ServerCommand) -> Result<ExitStatus> {
     let ServerCommand { preview } = args;
 
     let four = NonZeroUsize::new(4).unwrap();
@@ -224,7 +224,7 @@ fn server(args: ServerCommand, log_level: LogLevel) -> Result<ExitStatus> {
     let worker_threads = std::thread::available_parallelism()
         .unwrap_or(four)
         .max(four);
-    commands::server::run_server(preview, worker_threads, log_level)
+    commands::server::run_server(preview, worker_threads)
 }
 
 pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<ExitStatus> {
