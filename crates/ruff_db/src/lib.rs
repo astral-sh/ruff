@@ -51,6 +51,7 @@ mod tests {
     use crate::vfs::{VendoredPathBuf, Vfs};
     use crate::{Db, Jar};
     use salsa::DebugWithDb;
+    use std::sync::Arc;
 
     /// Database that can be used for testing.
     ///
@@ -81,8 +82,25 @@ mod tests {
             &self.file_system
         }
 
-        pub(crate) fn events(&self) -> std::sync::Arc<std::sync::Mutex<Vec<salsa::Event>>> {
-            self.events.clone()
+        /// Takes the salsa events that have been emitted.
+        ///
+        /// ## Panics
+        /// If there are pending database snapshots.
+        #[allow(unused)]
+        pub(crate) fn take_salsa_events(&mut self) -> Vec<salsa::Event> {
+            let inner = Arc::get_mut(&mut self.events)
+                .expect("expected no pending salsa database snapshots.");
+
+            std::mem::take(inner.get_mut().unwrap())
+        }
+
+        /// Clears the emitted salsa events.
+        ///
+        /// ## Panics
+        /// If there are pending database snapshots.
+        #[allow(unused)]
+        pub(crate) fn clear_salsa_events(&mut self) {
+            self.take_salsa_events();
         }
 
         pub(crate) fn file_system_mut(&mut self) -> &mut MemoryFileSystem {
