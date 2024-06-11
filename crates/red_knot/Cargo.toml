@@ -14,6 +14,7 @@ license.workspace = true
 [dependencies]
 ruff_python_parser = { workspace = true }
 ruff_python_ast = { workspace = true }
+ruff_python_stdlib = { workspace = true }
 ruff_text_size = { workspace = true }
 ruff_index = { workspace = true }
 ruff_notebook = { workspace = true }

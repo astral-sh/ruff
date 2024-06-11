@@ -1,11 +1,18 @@
+use std::collections::{BTreeMap, HashMap};
 use std::fmt::Formatter;
-use std::ops::Deref;
+use std::hash::{BuildHasherDefault, Hash};
+use std::ops::{Deref, RangeFrom, RangeInclusive};
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 use std::sync::atomic::AtomicU32;
 use std::sync::Arc;
 
+use anyhow::{bail, Context};
 use dashmap::mapref::entry::Entry;
+use rustc_hash::FxHashMap;
 use smol_str::SmolStr;
+
+use ruff_python_stdlib::identifiers::is_identifier;
 
 use crate::db::{QueryResult, SemanticDb, SemanticJar};
 use crate::files::FileId;
@@ -105,14 +112,15 @@ impl Module {
 ///
 /// Always normalized to the absolute form
 /// (never a relative module name, i.e., never `.foo`).
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct ModuleName(smol_str::SmolStr);
 
 impl ModuleName {
     pub fn new(name: &str) -> Self {
         debug_assert!(!name.is_empty());
-
-        Self(smol_str::SmolStr::new(name))
+        let instance = Self(smol_str::SmolStr::new(name));
+        debug_assert!(instance.components().all(is_identifier));
+        instance
     }
 
     fn from_relative_path(path: &Path) -> Option<Self> {
@@ -168,6 +176,12 @@ impl Deref for ModuleName {
 
     fn deref(&self) -> &Self::Target {
         self.as_str()
+    }
+}
+
+impl From<&str> for ModuleName {
+    fn from(value: &str) -> Self {
+        Self::new(value)
     }
 }
 
@@ -768,11 +782,197 @@ impl PackageKind {
     }
 }
 
+#[derive(Debug)]
+struct TypeshedVersions(FxHashMap<ModuleName, PyVersionRange>);
+
+#[allow(unused)]
+impl TypeshedVersions {
+    fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    fn contains_module(&self, module_name: impl Into<ModuleName>) -> bool {
+        self.0.contains_key(&module_name.into())
+    }
+
+    fn module_exists_on_version(
+        &self,
+        module: impl Into<ModuleName>,
+        version: impl Into<PyVersion>,
+    ) -> bool {
+        let version = version.into();
+        let mut module = Some(module.into());
+        while let Some(module_to_try) = module {
+            if let Some(range) = self.0.get(&module_to_try) {
+                return range.contains(version);
+            }
+            module = module_to_try.parent();
+        }
+        false
+    }
+}
+
+impl FromStr for TypeshedVersions {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let mut map = HashMap::with_hasher(BuildHasherDefault::default());
+
+        for (line_number, line) in s.lines().enumerate() {
+            let line_number = line_number + 1; // humans expect line numbers to be 1-indexed
+            let Some(content) = line.split('#').map(str::trim).next() else {
+                continue;
+            };
+            if content.is_empty() {
+                continue;
+            }
+            let parts: Vec<&str> = content.split(':').map(str::trim).collect();
+            let (module_name, rest) = match parts.as_slice() {
+                [module_name, rest] => (ModuleName::new(module_name), rest),
+                _ => bail!(
+                    "Error on line {line_number}: expected each line of VERSIONS to have exactly one colon"
+                ),
+            };
+            map.insert(
+                module_name,
+                rest.parse()
+                    .context(format!("Error on line {line_number}"))?,
+            );
+        }
+
+        Ok(Self(map))
+    }
+}
+
+impl std::fmt::Display for TypeshedVersions {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let sorted_items: BTreeMap<&ModuleName, &PyVersionRange> = self.0.iter().collect();
+        for (module_name, range) in sorted_items {
+            writeln!(f, "{module_name}-{range}")?;
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+enum PyVersionRange {
+    AvailableFrom(RangeFrom<PyVersion>),
+    AvailableWithin(RangeInclusive<PyVersion>),
+}
+
+impl PyVersionRange {
+    fn contains(&self, version: PyVersion) -> bool {
+        match self {
+            Self::AvailableFrom(inner) => inner.contains(&version),
+            Self::AvailableWithin(inner) => inner.contains(&version),
+        }
+    }
+}
+
+impl FromStr for PyVersionRange {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let parts: Vec<&str> = s.split('-').map(str::trim).collect();
+        Ok(match parts.as_slice() {
+            [lower, ""] => Self::AvailableFrom((lower.parse()?)..),
+            [lower, upper] => Self::AvailableWithin((lower.parse()?)..=(upper.parse()?)),
+            _ => bail!(
+                "Expected all non-comment lines in VERSIONS to have exactly one '-' character"
+            ),
+        })
+    }
+}
+
+impl std::fmt::Display for PyVersionRange {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::AvailableFrom(range_from) => write!(f, "{}-", range_from.start),
+            Self::AvailableWithin(range_inclusive) => {
+                write!(f, "{}-{}", range_inclusive.start(), range_inclusive.end())
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
+struct PyVersion {
+    major: u8,
+    minor: u8,
+}
+
+impl FromStr for PyVersion {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let parts: Vec<&str> = s.split('.').collect();
+        let [major, minor] = parts.as_slice() else {
+            bail!("Expected all versions in the VERSIONS file to be in the form ${{MAJOR}}.${{MINOR}}")
+        };
+        Ok(Self {
+            major: major.parse()?,
+            minor: minor.parse()?,
+        })
+    }
+}
+
+impl std::fmt::Display for PyVersion {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let PyVersion { major, minor } = self;
+        write!(f, "{major}.{minor}")
+    }
+}
+
+// TODO: unify with the PythonVersion enum in the linter/formatter crates?
+#[allow(unused)]
+#[derive(Copy, Clone, Hash, Debug, PartialEq, Eq, PartialOrd, Ord, Default)]
+enum SupportedPyVersion {
+    Py37,
+    #[default]
+    Py38,
+    Py39,
+    Py310,
+    Py311,
+    Py312,
+    Py313,
+}
+
+impl From<SupportedPyVersion> for PyVersion {
+    fn from(value: SupportedPyVersion) -> Self {
+        match value {
+            SupportedPyVersion::Py37 => PyVersion { major: 3, minor: 7 },
+            SupportedPyVersion::Py38 => PyVersion { major: 3, minor: 8 },
+            SupportedPyVersion::Py39 => PyVersion { major: 3, minor: 9 },
+            SupportedPyVersion::Py310 => PyVersion {
+                major: 3,
+                minor: 10,
+            },
+            SupportedPyVersion::Py311 => PyVersion {
+                major: 3,
+                minor: 11,
+            },
+            SupportedPyVersion::Py312 => PyVersion {
+                major: 3,
+                minor: 12,
+            },
+            SupportedPyVersion::Py313 => PyVersion {
+                major: 3,
+                minor: 13,
+            },
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::io::{Cursor, Read};
     use std::num::NonZeroU32;
     use std::path::{Path, PathBuf};
+    use std::str::FromStr;
 
     use zip::ZipArchive;
 
@@ -780,7 +980,7 @@ mod tests {
     use crate::db::SourceDb;
     use crate::module::{
         path_to_module, resolve_module, set_module_search_paths, ModuleKind, ModuleName,
-        ModuleResolutionInputs, TYPESHED_STDLIB_DIRECTORY,
+        ModuleResolutionInputs, SupportedPyVersion, TypeshedVersions, TYPESHED_STDLIB_DIRECTORY,
     };
     use crate::semantic::Dependency;
 
@@ -946,6 +1146,30 @@ mod tests {
 
         assert!(functools_module_stub_source.contains("def update_wrapper("));
         Ok(())
+    }
+
+    #[test]
+    fn typeshed_versions() {
+        let versions_data = include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/vendor/typeshed/stdlib/VERSIONS"
+        ));
+
+        let versions = TypeshedVersions::from_str(versions_data).unwrap();
+        assert!(versions.len() > 100);
+
+        // (will start failing if the stdlib adds a `foo` module, but oh well)
+        assert!(!versions.contains_module("foo"));
+        assert!(versions.contains_module("asyncio"));
+        assert!(versions.module_exists_on_version("asyncio", SupportedPyVersion::Py310));
+
+        assert!(versions.contains_module("asyncio.staggered"));
+        assert!(versions.module_exists_on_version("asyncio.staggered", SupportedPyVersion::Py38));
+        assert!(!versions.module_exists_on_version("asyncio.staggered", SupportedPyVersion::Py37));
+
+        assert!(versions.contains_module("audioop"));
+        assert!(versions.module_exists_on_version("audioop", SupportedPyVersion::Py312));
+        assert!(!versions.module_exists_on_version("audioop", SupportedPyVersion::Py313));
     }
 
     #[test]
