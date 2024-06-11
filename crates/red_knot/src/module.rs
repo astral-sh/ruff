@@ -1,6 +1,6 @@
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 use std::fmt::Formatter;
-use std::hash::{BuildHasherDefault, Hash};
+use std::hash::Hash;
 use std::ops::{Deref, RangeFrom, RangeInclusive};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
@@ -819,7 +819,7 @@ impl FromStr for TypeshedVersions {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut map = HashMap::with_hasher(BuildHasherDefault::default());
+        let mut map = FxHashMap::default();
 
         for (line_number, line) in s.lines().enumerate() {
             let line_number = line_number + 1; // humans expect line numbers to be 1-indexed
