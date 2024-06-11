@@ -1,5 +1,6 @@
-use crate::file_system::{FileSystem, FileSystemPath, FileType, Metadata, Result};
 use filetime::FileTime;
+
+use crate::file_system::{FileSystem, FileSystemPath, FileType, Metadata, Result};
 
 pub struct OsFileSystem;
 
@@ -14,6 +15,10 @@ impl OsFileSystem {
     #[cfg(not(unix))]
     fn permissions(_metadata: &std::fs::Metadata) -> Option<u32> {
         None
+    }
+
+    pub fn snapshot(&self) -> Self {
+        Self
     }
 }
 

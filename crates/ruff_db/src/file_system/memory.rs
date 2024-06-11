@@ -1,8 +1,8 @@
+use std::collections::BTreeMap;
 use std::sync::{Arc, RwLock, RwLockWriteGuard};
 
 use camino::{Utf8Path, Utf8PathBuf};
 use filetime::FileTime;
-use rustc_hash::FxHashMap;
 
 use crate::file_system::{FileSystem, FileSystemPath, FileType, Metadata, Result};
 
@@ -41,7 +41,7 @@ impl MemoryFileSystem {
 
         let fs = Self {
             inner: Arc::new(MemoryFileSystemInner {
-                by_path: RwLock::new(FxHashMap::default()),
+                by_path: RwLock::new(BTreeMap::default()),
                 cwd: cwd.clone(),
             }),
         };
@@ -80,14 +80,34 @@ impl MemoryFileSystem {
     /// The operation overrides the content for an existing file with the same normalized `path`.
     ///
     /// Enclosing directories are automatically created if they don't exist.
-    pub fn write_file(&self, path: impl AsRef<FileSystemPath>, content: String) -> Result<()> {
+    pub fn write_file(
+        &self,
+        path: impl AsRef<FileSystemPath>,
+        content: impl ToString,
+    ) -> Result<()> {
         let mut by_path = self.inner.by_path.write().unwrap();
 
         let normalized = normalize_path(path.as_ref(), &self.inner.cwd);
 
-        get_or_create_file(&mut by_path, &normalized)?.content = content;
+        get_or_create_file(&mut by_path, &normalized)?.content = content.to_string();
 
         Ok(())
+    }
+
+    pub fn remove_file(&self, path: impl AsRef<FileSystemPath>) -> Result<()> {
+        let mut by_path = self.inner.by_path.write().unwrap();
+        let normalized = normalize_path(path.as_ref(), &self.inner.cwd);
+
+        match by_path.entry(normalized) {
+            std::collections::btree_map::Entry::Occupied(entry) => match entry.get() {
+                Entry::File(_) => {
+                    entry.remove();
+                    Ok(())
+                }
+                Entry::Directory(_) => Err(is_a_directory()),
+            },
+            std::collections::btree_map::Entry::Vacant(_) => Err(not_found()),
+        }
     }
 
     /// Sets the last modified timestamp of the file stored at `path` to now.
@@ -108,6 +128,38 @@ impl MemoryFileSystem {
         let normalized = normalize_path(path.as_ref(), &self.inner.cwd);
 
         create_dir_all(&mut by_path, &normalized)
+    }
+
+    /// Deletes the directory at `path`.
+    ///
+    /// ## Errors
+    /// * If the directory is not empty
+    /// * The `path` is not a directory
+    /// * The `path` does not exist
+    pub fn remove_directory(&self, path: impl AsRef<FileSystemPath>) -> Result<()> {
+        let mut by_path = self.inner.by_path.write().unwrap();
+        let normalized = normalize_path(path.as_ref(), &self.inner.cwd);
+
+        // Test if the directory is empty
+        // Skip the directory path itself
+        for (maybe_child, _) in by_path.range(normalized.clone()..).skip(1) {
+            if maybe_child.starts_with(&normalized) {
+                return Err(directory_not_empty());
+            } else if !maybe_child.as_str().starts_with(normalized.as_str()) {
+                break;
+            }
+        }
+
+        match by_path.entry(normalized.clone()) {
+            std::collections::btree_map::Entry::Occupied(entry) => match entry.get() {
+                Entry::Directory(_) => {
+                    entry.remove();
+                    Ok(())
+                }
+                Entry::File(_) => Err(not_a_directory()),
+            },
+            std::collections::btree_map::Entry::Vacant(_) => Err(not_found()),
+        }
     }
 }
 
@@ -169,7 +221,7 @@ impl std::fmt::Debug for MemoryFileSystem {
 }
 
 struct MemoryFileSystemInner {
-    by_path: RwLock<FxHashMap<Utf8PathBuf, Entry>>,
+    by_path: RwLock<BTreeMap<Utf8PathBuf, Entry>>,
     cwd: Utf8PathBuf,
 }
 
@@ -212,6 +264,10 @@ fn not_a_directory() -> std::io::Error {
     std::io::Error::new(std::io::ErrorKind::Other, "Not a directory")
 }
 
+fn directory_not_empty() -> std::io::Error {
+    std::io::Error::new(std::io::ErrorKind::Other, "directory not empty")
+}
+
 /// Normalizes the path by removing `.` and `..` components and transform the path into an absolute path.
 ///
 /// Adapted from https://github.com/rust-lang/cargo/blob/fede83ccf973457de319ba6fa0e36ead454d2e20/src/cargo/util/paths.rs#L61
@@ -249,7 +305,7 @@ fn normalize_path(path: &FileSystemPath, cwd: &Utf8Path) -> Utf8PathBuf {
 }
 
 fn create_dir_all(
-    paths: &mut RwLockWriteGuard<FxHashMap<Utf8PathBuf, Entry>>,
+    paths: &mut RwLockWriteGuard<BTreeMap<Utf8PathBuf, Entry>>,
     normalized: &Utf8Path,
 ) -> Result<()> {
     let mut path = Utf8PathBuf::new();
@@ -271,7 +327,7 @@ fn create_dir_all(
 }
 
 fn get_or_create_file<'a>(
-    paths: &'a mut RwLockWriteGuard<FxHashMap<Utf8PathBuf, Entry>>,
+    paths: &'a mut RwLockWriteGuard<BTreeMap<Utf8PathBuf, Entry>>,
     normalized: &Utf8Path,
 ) -> Result<&'a mut File> {
     if let Some(parent) = normalized.parent() {
@@ -293,9 +349,10 @@ fn get_or_create_file<'a>(
 
 #[cfg(test)]
 mod tests {
-    use crate::file_system::{FileSystem, FileSystemPath, MemoryFileSystem, Result};
     use std::io::ErrorKind;
     use std::time::Duration;
+
+    use crate::file_system::{FileSystem, FileSystemPath, MemoryFileSystem, Result};
 
     /// Creates a file system with the given files.
     ///
@@ -470,4 +527,36 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn remove_file() {
+
+    }
+
+    #[test]
+    fn remove_non_existing_file() {
+
+    }
+
+    #[test]
+    fn remove_file_that_is_a_directory() {
+
+    }
+
+    #[test]
+    fn remove_directory() {}
+
+    #[test]
+    fn remove_non_empty_directory() {}
+
+    #[test]
+    fn remove_directory_with_files_that_start_with_the_same_string() {}
+
+    #[test]
+    fn remove_non_existing_directory() {}
+
+    #[test]
+    fn remove_directory_that_is_a_file() {}
+
+}
 }
