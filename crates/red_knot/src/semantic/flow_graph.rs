@@ -2,6 +2,7 @@ use super::symbol_table::SymbolId;
 use crate::semantic::{Definition, ExpressionId};
 use ruff_index::{newtype_index, IndexVec};
 use std::iter::FusedIterator;
+use std::ops::Range;
 
 #[newtype_index]
 pub struct FlowNodeId;
@@ -12,9 +13,10 @@ pub(crate) enum FlowNode {
     Definition(DefinitionFlowNode),
     Branch(BranchFlowNode),
     Phi(PhiFlowNode),
+    Constraint(ConstraintFlowNode),
 }
 
-/// A Definition node represents a point in control flow where a symbol is defined
+/// A point in control flow where a symbol is defined
 #[derive(Debug)]
 pub(crate) struct DefinitionFlowNode {
     symbol_id: SymbolId,
@@ -22,17 +24,24 @@ pub(crate) struct DefinitionFlowNode {
     predecessor: FlowNodeId,
 }
 
-/// A Branch node represents a branch in control flow
+/// A branch in control flow
 #[derive(Debug)]
 pub(crate) struct BranchFlowNode {
     predecessor: FlowNodeId,
 }
 
-/// A Phi node represents a join point where control flow paths come together
+/// A join point where control flow paths come together
 #[derive(Debug)]
 pub(crate) struct PhiFlowNode {
     first_predecessor: FlowNodeId,
     second_predecessor: FlowNodeId,
+}
+
+/// A branch test which may apply constraints to a symbol's type
+#[derive(Debug)]
+pub(crate) struct ConstraintFlowNode {
+    predecessor: FlowNodeId,
+    test_expression: ExpressionId,
 }
 
 #[derive(Debug)]
@@ -98,6 +107,17 @@ impl FlowGraphBuilder {
         }))
     }
 
+    pub(crate) fn add_constraint(
+        &mut self,
+        predecessor: FlowNodeId,
+        test_expression: ExpressionId,
+    ) -> FlowNodeId {
+        self.add(FlowNode::Constraint(ConstraintFlowNode {
+            predecessor,
+            test_expression,
+        }))
+    }
+
     pub(super) fn record_expr(&mut self, node_id: FlowNodeId) -> ExpressionId {
         self.flow_graph.expression_map.push(node_id)
     }
@@ -109,11 +129,26 @@ impl FlowGraphBuilder {
     }
 }
 
+/// A definition, and the set of constraints between a use and the definition
+#[derive(Debug, Clone)]
+pub struct ConstrainedDefinition {
+    pub definition: Definition,
+    pub constraints: Vec<ExpressionId>,
+}
+
+/// A flow node and the constraints we passed through to reach it
+#[derive(Debug)]
+struct FlowState {
+    node_id: FlowNodeId,
+    constraints_range: Range<usize>,
+}
+
 #[derive(Debug)]
 pub struct ReachableDefinitionsIterator<'a> {
     flow_graph: &'a FlowGraph,
     symbol_id: SymbolId,
-    pending: Vec<FlowNodeId>,
+    pending: Vec<FlowState>,
+    constraints: Vec<ExpressionId>,
 }
 
 impl<'a> ReachableDefinitionsIterator<'a> {
@@ -121,31 +156,56 @@ impl<'a> ReachableDefinitionsIterator<'a> {
         Self {
             flow_graph,
             symbol_id,
-            pending: vec![start_node_id],
+            pending: vec![FlowState {
+                node_id: start_node_id,
+                constraints_range: 0..0,
+            }],
+            constraints: vec![],
         }
     }
 }
 
 impl<'a> Iterator for ReachableDefinitionsIterator<'a> {
-    type Item = Definition;
+    type Item = ConstrainedDefinition;
 
     fn next(&mut self) -> Option<Self::Item> {
+        let FlowState {
+            mut node_id,
+            mut constraints_range,
+        } = self.pending.pop()?;
+        self.constraints.truncate(constraints_range.end + 1);
         loop {
-            let flow_node_id = self.pending.pop()?;
-            match &self.flow_graph.flow_nodes_by_id[flow_node_id] {
-                FlowNode::Start => return Some(Definition::Unbound),
+            match &self.flow_graph.flow_nodes_by_id[node_id] {
+                FlowNode::Start => {
+                    // constraints on unbound are irrelevant
+                    return Some(ConstrainedDefinition {
+                        definition: Definition::Unbound,
+                        constraints: vec![],
+                    });
+                }
                 FlowNode::Definition(def_node) => {
                     if def_node.symbol_id == self.symbol_id {
-                        return Some(def_node.definition.clone());
+                        return Some(ConstrainedDefinition {
+                            definition: def_node.definition.clone(),
+                            constraints: self.constraints[constraints_range].to_vec(),
+                        });
                     }
-                    self.pending.push(def_node.predecessor);
+                    node_id = def_node.predecessor;
                 }
                 FlowNode::Branch(branch_node) => {
-                    self.pending.push(branch_node.predecessor);
+                    node_id = branch_node.predecessor;
                 }
                 FlowNode::Phi(phi_node) => {
-                    self.pending.push(phi_node.first_predecessor);
-                    self.pending.push(phi_node.second_predecessor);
+                    self.pending.push(FlowState {
+                        node_id: phi_node.first_predecessor,
+                        constraints_range: constraints_range.clone(),
+                    });
+                    node_id = phi_node.second_predecessor;
+                }
+                FlowNode::Constraint(constraint_node) => {
+                    node_id = constraint_node.predecessor;
+                    self.constraints.push(constraint_node.test_expression);
+                    constraints_range.end += 1;
                 }
             }
         }
@@ -191,6 +251,15 @@ impl std::fmt::Display for FlowGraph {
                         f,
                         r"  id{}-->id{}",
                         phi_node.first_predecessor.as_u32(),
+                        id.as_u32()
+                    )?;
+                }
+                FlowNode::Constraint(constraint_node) => {
+                    writeln!(f, r"((Constraint))")?;
+                    writeln!(
+                        f,
+                        r"  id{}-->id{}",
+                        constraint_node.predecessor.as_u32(),
                         id.as_u32()
                     )?;
                 }

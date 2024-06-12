@@ -2,6 +2,7 @@ use std::num::NonZeroU32;
 
 use ruff_python_ast as ast;
 use ruff_python_ast::visitor::source_order::SourceOrderVisitor;
+use ruff_python_ast::AstNode;
 
 use crate::ast_ids::{NodeKey, TypedNodeKey};
 use crate::cache::KeyValueCache;
@@ -13,8 +14,9 @@ use crate::parse::parse;
 use crate::Name;
 pub(crate) use definitions::Definition;
 use definitions::{ImportDefinition, ImportFromDefinition};
+pub(crate) use flow_graph::ConstrainedDefinition;
 use flow_graph::{FlowGraph, FlowGraphBuilder, FlowNodeId, ReachableDefinitionsIterator};
-use ruff_index::newtype_index;
+use ruff_index::{newtype_index, IndexVec};
 use rustc_hash::FxHashMap;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
@@ -65,6 +67,7 @@ pub struct SemanticIndex {
     symbol_table: SymbolTable,
     flow_graph: FlowGraph,
     expressions: FxHashMap<NodeKey, ExpressionId>,
+    expressions_by_id: IndexVec<ExpressionId, NodeKey>,
 }
 
 impl SemanticIndex {
@@ -78,10 +81,22 @@ impl SemanticIndex {
                 current_flow_node_id: FlowGraph::start(),
             }],
             expressions: FxHashMap::default(),
+            expressions_by_id: IndexVec::default(),
             current_definition: None,
         };
         indexer.visit_body(&module.body);
         indexer.finish()
+    }
+
+    fn resolve_expression_id<'a>(
+        &self,
+        ast: &'a ast::ModModule,
+        expression_id: ExpressionId,
+    ) -> ast::AnyNodeRef<'a> {
+        let node_key = self.expressions_by_id[expression_id];
+        node_key
+            .resolve(ast.as_any_node_ref())
+            .expect("node to resolve")
     }
 
     /// Return an iterator over all definitions of `symbol_id` reachable from `use_expr`. The value
@@ -123,19 +138,23 @@ struct SemanticIndexer {
     /// the definition whose target(s) we are currently walking
     current_definition: Option<Definition>,
     expressions: FxHashMap<NodeKey, ExpressionId>,
+    expressions_by_id: IndexVec<ExpressionId, NodeKey>,
 }
 
 impl SemanticIndexer {
-    pub(crate) fn finish(self) -> SemanticIndex {
+    pub(crate) fn finish(mut self) -> SemanticIndex {
         let SemanticIndexer {
             flow_graph_builder,
             symbol_table_builder,
             ..
         } = self;
+        self.expressions.shrink_to_fit();
+        self.expressions_by_id.shrink_to_fit();
         SemanticIndex {
             flow_graph: flow_graph_builder.finish(),
             symbol_table: symbol_table_builder.finish(),
             expressions: self.expressions,
+            expressions_by_id: self.expressions_by_id,
         }
     }
 
@@ -211,6 +230,15 @@ impl SemanticIndexer {
             .record_scope_for_node(node_key, scope_id);
     }
 
+    fn insert_constraint(&mut self, expr: &ast::Expr) {
+        let node_key = NodeKey::from_node(expr.into());
+        let expression_id = self.expressions[&node_key];
+        let constraint = self
+            .flow_graph_builder
+            .add_constraint(self.current_flow_node(), expression_id);
+        self.set_current_flow_node(constraint);
+    }
+
     fn with_type_params(
         &mut self,
         name: &str,
@@ -240,9 +268,14 @@ impl SemanticIndexer {
 
 impl SourceOrderVisitor<'_> for SemanticIndexer {
     fn visit_expr(&mut self, expr: &ast::Expr) {
-        let expression_id = self
-            .flow_graph_builder
-            .record_expr(self.current_flow_node());
+        let node_key = NodeKey::from_node(expr.into());
+        let expression_id = self.expressions_by_id.push(node_key);
+
+        debug_assert_eq!(
+            expression_id,
+            self.flow_graph_builder
+                .record_expr(self.current_flow_node())
+        );
 
         debug_assert_eq!(
             expression_id,
@@ -250,8 +283,7 @@ impl SourceOrderVisitor<'_> for SemanticIndexer {
                 .record_expression(self.cur_scope())
         );
 
-        self.expressions
-            .insert(NodeKey::from_node(expr.into()), expression_id);
+        self.expressions.insert(node_key, expression_id);
 
         match expr {
             ast::Expr::Name(ast::ExprName { id, ctx, .. }) => {
@@ -290,6 +322,7 @@ impl SourceOrderVisitor<'_> for SemanticIndexer {
                 let if_branch = self.flow_graph_builder.add_branch(self.current_flow_node());
 
                 self.set_current_flow_node(if_branch);
+                self.insert_constraint(test);
                 self.visit_expr(body);
 
                 let post_body = self.current_flow_node();
@@ -431,6 +464,7 @@ impl SourceOrderVisitor<'_> for SemanticIndexer {
             }
             ast::Stmt::Assign(node) => {
                 debug_assert!(self.current_definition.is_none());
+                self.visit_expr(&node.value);
                 self.current_definition =
                     Some(Definition::Assignment(TypedNodeKey::from_node(node)));
                 for expr in &node.targets {
@@ -438,7 +472,6 @@ impl SourceOrderVisitor<'_> for SemanticIndexer {
                 }
 
                 self.current_definition = None;
-                self.visit_expr(&node.value);
             }
             ast::Stmt::If(node) => {
                 // TODO detect statically known truthy or falsy test (via type inference, not naive
@@ -453,6 +486,7 @@ impl SourceOrderVisitor<'_> for SemanticIndexer {
 
                 // visit the body of the `if` clause
                 self.set_current_flow_node(if_branch);
+                self.insert_constraint(&node.test);
                 self.visit_body(&node.body);
 
                 // Flow node for the last if/elif condition branch; represents the "no branch
@@ -471,13 +505,15 @@ impl SourceOrderVisitor<'_> for SemanticIndexer {
                 let mut last_branch_is_else = false;
 
                 for clause in &node.elif_else_clauses {
-                    if clause.test.is_some() {
+                    if let Some(test) = &clause.test {
+                        self.visit_expr(test);
                         // This is an elif clause. Create a new branch node. Its predecessor is the
                         // previous branch node, because we can only take one branch in an entire
                         // if/elif/else chain, so if we take this branch, it can only be because we
                         // didn't take the previous one.
                         prior_branch = self.flow_graph_builder.add_branch(prior_branch);
                         self.set_current_flow_node(prior_branch);
+                        self.insert_constraint(test);
                     } else {
                         // This is an else clause. No need to create a branch node; there's no
                         // branch here, if we haven't taken any previous branch, we definitely go
@@ -799,7 +835,10 @@ mod tests {
         let ast::Stmt::Expr(ast::StmtExpr { value: x_use, .. }) = &ast.body[1] else {
             panic!("should be an expr")
         };
-        let x_defs: Vec<_> = index.reachable_definitions(x_sym, x_use).collect();
+        let x_defs: Vec<_> = index
+            .reachable_definitions(x_sym, x_use)
+            .map(|constrained_definition| constrained_definition.definition)
+            .collect();
         assert_eq!(x_defs.len(), 1);
         let Definition::Assignment(node_key) = &x_defs[0] else {
             panic!("def should be an assignment")
