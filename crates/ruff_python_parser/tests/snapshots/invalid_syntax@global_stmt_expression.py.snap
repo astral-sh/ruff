@@ -47,5 +47,5 @@ Module(
 
   |
 1 | global x + 1
-  |          ^ Syntax Error: Expected ',', found '+'
+  |          ^ Syntax Error: Simple statements must be separated by newlines or semicolons
   |

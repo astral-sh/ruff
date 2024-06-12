@@ -75,15 +75,8 @@ Module(
 
   |
 1 | call(x
+  |       ^ Syntax Error: Expected ')', found newline
 2 | 
 3 | def foo():
-  | ^^^ Syntax Error: Expected ',', found 'def'
 4 |     pass
-  |
-
-
-  |
-3 | def foo():
-4 |     pass
-  |          Syntax Error: unexpected EOF while parsing
   |

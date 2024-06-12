@@ -1,4 +1,4 @@
-use ruff_text_size::{TextRange, TextSize};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::lexer::{Lexer, LexerCheckpoint, LexicalError, Token, TokenFlags, TokenValue};
 use crate::{Mode, TokenKind};
@@ -56,6 +56,23 @@ impl<'src> TokenSource<'src> {
     /// [`take_value`]: Lexer::take_value
     pub(crate) fn take_value(&mut self) -> TokenValue {
         self.lexer.take_value()
+    }
+
+    /// Calls the underlying [`re_lex_logical_token`] method on the lexer and updates the token
+    /// vector accordingly.
+    ///
+    /// [`re_lex_logical_token`]: Lexer::re_lex_logical_token
+    pub(crate) fn re_lex_logical_token(&mut self) {
+        if self.lexer.re_lex_logical_token() {
+            let current_start = self.current_range().start();
+            while self
+                .tokens
+                .last()
+                .is_some_and(|last| last.start() >= current_start)
+            {
+                self.tokens.pop();
+            }
+        }
     }
 
     /// Returns the next non-trivia token without consuming it.

@@ -108,7 +108,7 @@ Module(
 
   |
 1 | def foo(a, *args=(1, 2)): ...
-  |                  ^ Syntax Error: Expected a parameter or the end of the parameter list
+  |                  ^ Syntax Error: Expected ')', found '('
   |
 
 

@@ -90,7 +90,7 @@ Module(
 
   |
 1 | import *
-  |        ^ Syntax Error: Expected an import name
+  |        ^ Syntax Error: Expected one or more symbol names after import
 2 | import x, *, y
   |
 
@@ -99,13 +99,6 @@ Module(
 1 | import *
   |         ^ Syntax Error: Expected an expression
 2 | import x, *, y
-  |
-
-
-  |
-1 | import *
-2 | import x, *, y
-  |           ^ Syntax Error: Expected an import name
   |
 
 

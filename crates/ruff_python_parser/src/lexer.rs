@@ -1307,6 +1307,47 @@ impl<'src> Lexer<'src> {
         }
     }
 
+    /// Re-lex the current token in the context of a logical line.
+    ///
+    /// Returns a boolean indicating that whether the new current token is different than the
+    /// previous current token.
+    ///
+    /// This method is a no-op if the lexer isn't in a parenthesized context.
+    pub(crate) fn re_lex_logical_token(&mut self) -> bool {
+        if self.nesting == 0 {
+            return false;
+        }
+
+        // Reduce the nesting level because the parser recovered from an error inside list parsing.
+        self.nesting -= 1;
+
+        let current_position = self.current_range().start();
+        let reverse_chars = self.source[..current_position.to_usize()].chars().rev();
+        let mut new_position = current_position;
+        let mut has_newline = false;
+
+        for ch in reverse_chars {
+            if is_python_whitespace(ch) {
+                new_position -= ch.text_len();
+            } else if matches!(ch, '\n' | '\r') {
+                has_newline |= true;
+                new_position -= ch.text_len();
+            } else {
+                break;
+            }
+        }
+
+        if new_position != current_position && has_newline {
+            self.cursor = Cursor::new(self.source);
+            self.cursor.skip_bytes(new_position.to_usize());
+            self.state = State::Other;
+            self.next_token();
+            true
+        } else {
+            false
+        }
+    }
+
     #[inline]
     fn token_range(&self) -> TextRange {
         let end = self.offset();
