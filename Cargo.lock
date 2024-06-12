@@ -1836,6 +1836,7 @@ dependencies = [
  "dashmap",
  "hashbrown 0.14.5",
  "indexmap",
+ "insta",
  "is-macro",
  "notify",
  "parking_lot",

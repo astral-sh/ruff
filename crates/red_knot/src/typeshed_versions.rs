@@ -315,11 +315,13 @@ mod tests {
 
     use super::*;
 
+    use insta::assert_snapshot;
+
     #[allow(unsafe_code)]
     const ONE: NonZeroU16 = unsafe { NonZeroU16::new_unchecked(1) };
 
     #[test]
-    fn typeshed_versions() {
+    fn can_parse_vendored_versions_file() {
         let versions_data = include_str!(concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/vendor/typeshed/stdlib/VERSIONS"
@@ -329,8 +331,6 @@ mod tests {
         assert!(versions.len() > 100);
         assert!(versions.len() < 1000);
 
-        // (will start failing if the stdlib adds a `foo` module, but oh well)
-        assert!(!versions.contains_module("foo"));
         assert!(versions.contains_module("asyncio"));
         assert!(versions.module_exists_on_version("asyncio", SupportedPyVersion::Py310));
 
@@ -341,6 +341,72 @@ mod tests {
         assert!(versions.contains_module("audioop"));
         assert!(versions.module_exists_on_version("audioop", SupportedPyVersion::Py312));
         assert!(!versions.module_exists_on_version("audioop", SupportedPyVersion::Py313));
+    }
+
+    #[test]
+    fn can_parse_mock_versions_file() {
+        const VERSIONS: &str = "\
+# a comment
+    # some more comment
+# yet more comment
+
+
+# and some more comment
+
+bar: 2.7-3.10
+
+# more comment
+bar.baz: 3.1-3.9
+foo: 3.8-   # trailing comment
+";
+        let parsed_versions = TypeshedVersions::from_str(VERSIONS).unwrap();
+        assert_eq!(parsed_versions.len(), 3);
+        assert_snapshot!(parsed_versions.to_string(), @r###"
+        bar-2.7-3.10
+        bar.baz-3.1-3.9
+        foo-3.8-
+        "###
+        );
+
+        assert!(parsed_versions.contains_module("foo"));
+        assert!(!parsed_versions.module_exists_on_version("foo", SupportedPyVersion::Py37));
+        assert!(parsed_versions.module_exists_on_version("foo", SupportedPyVersion::Py38));
+        assert!(parsed_versions.module_exists_on_version("foo", SupportedPyVersion::Py311));
+
+        assert!(parsed_versions.contains_module("bar"));
+        assert!(parsed_versions.module_exists_on_version("bar", SupportedPyVersion::Py37));
+        assert!(parsed_versions.module_exists_on_version("bar", SupportedPyVersion::Py310));
+        assert!(!parsed_versions.module_exists_on_version("bar", SupportedPyVersion::Py311));
+
+        assert!(parsed_versions.contains_module("bar.baz"));
+        assert!(parsed_versions.module_exists_on_version("bar.baz", SupportedPyVersion::Py37));
+        assert!(parsed_versions.module_exists_on_version("bar.baz", SupportedPyVersion::Py39));
+        assert!(!parsed_versions.module_exists_on_version("bar.baz", SupportedPyVersion::Py310));
+
+        assert!(!parsed_versions.contains_module("spam"));
+        assert!(!parsed_versions.module_exists_on_version("spam", SupportedPyVersion::Py37));
+        assert!(!parsed_versions.module_exists_on_version("spam", SupportedPyVersion::Py313));
+    }
+
+    #[test]
+    fn invalid_huge_versions_file() {
+        let offset = 100;
+        let too_many = u16::MAX as usize + offset;
+
+        let mut massive_versions_file = String::new();
+        for i in 0..too_many {
+            massive_versions_file.push_str(&format!("x{i}: 3.8-\n"));
+        }
+
+        assert_eq!(
+            TypeshedVersions::from_str(&massive_versions_file),
+            Err(TypeshedVersionsParseError {
+                line_number: NonZeroU16::MAX,
+                reason: TypeshedVersionsParseErrorKind::TooManyLines(
+                    NonZeroUsize::new(too_many + 1 - offset).unwrap()
+                )
+            })
+        );
     }
 
     #[test]
