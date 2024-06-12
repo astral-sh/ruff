@@ -18,6 +18,7 @@ use ruff_python_ast::str_prefix::{
     AnyStringPrefix, ByteStringPrefix, FStringPrefix, StringLiteralPrefix,
 };
 use ruff_python_ast::{AnyStringFlags, Int, IpyEscapeKind, StringFlags};
+use ruff_python_trivia::is_python_whitespace;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::error::FStringErrorType;
@@ -1805,20 +1806,6 @@ fn is_identifier_continuation(c: char, identifier_is_ascii_only: &mut bool) -> b
         *identifier_is_ascii_only = false;
         is_xid_continue(c)
     }
-}
-
-/// Returns `true` for [whitespace](https://docs.python.org/3/reference/lexical_analysis.html#whitespace-between-tokens)
-/// characters.
-///
-/// This is the same as `ruff_python_trivia::is_python_whitespace` and is copied
-/// here to avoid a circular dependency as `ruff_python_trivia` has a dev-dependency
-/// on `ruff_python_lexer`.
-const fn is_python_whitespace(c: char) -> bool {
-    matches!(
-        c,
-        // Space, tab, or form-feed
-        ' ' | '\t' | '\x0C'
-    )
 }
 
 enum LexedText<'a> {
