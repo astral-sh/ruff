@@ -41,38 +41,39 @@ pub fn infer_symbol_public_type(db: &dyn SemanticDb, symbol: GlobalSymbolId) -> 
     Ok(ty)
 }
 
-/// Infer type of a symbol as union of the given Definitions.
-#[tracing::instrument(level = "trace", skip(db))]
-pub fn infer_type_from_definitions<T>(
+/// Infer type of a symbol as union of the given `Definitions`.
+fn infer_type_from_definitions<T>(
     db: &dyn SemanticDb,
     symbol: GlobalSymbolId,
     definitions: T,
 ) -> QueryResult<Type>
 where
-    T: Debug + Iterator<Item = Definition>,
+    T: Debug + IntoIterator<Item = Definition>,
 {
     infer_type_from_constrained_definitions(
         db,
         symbol,
-        definitions.map(|definition| ConstrainedDefinition {
-            definition,
-            constraints: vec![],
-        }),
+        definitions
+            .into_iter()
+            .map(|definition| ConstrainedDefinition {
+                definition,
+                constraints: vec![],
+            }),
     )
 }
 
-/// Infer type of a symbol as union of the given ConstrainedDefinitions.
-#[tracing::instrument(level = "trace", skip(db))]
-pub fn infer_type_from_constrained_definitions<T>(
+/// Infer type of a symbol as union of the given `ConstrainedDefinitions`.
+fn infer_type_from_constrained_definitions<T>(
     db: &dyn SemanticDb,
     symbol: GlobalSymbolId,
     constrained_definitions: T,
 ) -> QueryResult<Type>
 where
-    T: Debug + Iterator<Item = ConstrainedDefinition>,
+    T: IntoIterator<Item = ConstrainedDefinition>,
 {
     let jar: &SemanticJar = db.jar()?;
     let mut tys = constrained_definitions
+        .into_iter()
         .map(|def| infer_constrained_definition_type(db, symbol, def.clone()))
         .peekable();
     if let Some(first) = tys.next() {
@@ -235,9 +236,9 @@ pub fn infer_definition_type(
 }
 
 /// Return the type that the given constraint (an expression from a control-flow test) requires the
-/// given symbol to have. For example, returns ~None as the constraint type if given the symbol ID
-/// for x and the expression ID for `x is not None`. Returns None if the given expression applies
-/// no constraints on the given symbol.
+/// given symbol to have. For example, returns the Type "~None" as the constraint type if given the
+/// symbol ID for x and the expression ID for `x is not None`. Returns (Rust) None if the given
+/// expression applies no constraints on the given symbol.
 #[tracing::instrument(level = "trace", skip(db))]
 fn infer_constraint_type(
     db: &dyn SemanticDb,
