@@ -43,6 +43,8 @@ pub struct FileSystemPath(Utf8Path);
 impl FileSystemPath {
     pub fn new(path: &(impl AsRef<Utf8Path> + ?Sized)) -> &Self {
         let path = path.as_ref();
+        // SAFETY: FsPath is marked as #[repr(transparent)] so the conversion from a
+        // *const Utf8Path to a *const FsPath is valid.
         unsafe { &*(path as *const Utf8Path as *const FileSystemPath) }
     }
 
@@ -52,11 +54,13 @@ impl FileSystemPath {
     }
 
     /// Returns the path as a string slice.
+    #[inline]
     pub fn as_str(&self) -> &str {
         self.0.as_str()
     }
 
     /// Returns the std path for the file.
+    #[inline]
     pub fn as_std_path(&self) -> &Path {
         self.0.as_std_path()
     }
@@ -80,14 +84,14 @@ impl FileSystemPathBuf {
         Self(Utf8PathBuf::new())
     }
 
+    #[inline]
     pub fn as_path(&self) -> &FileSystemPath {
-        // SAFETY: FsPath is marked as #[repr(transparent)] so the conversion from a
-        // *const Utf8Path to a *const FsPath is valid.
-        unsafe { &*(self.0.as_path() as *const Utf8Path as *const FileSystemPath) }
+        FileSystemPath::new(&self.0)
     }
 }
 
 impl AsRef<FileSystemPath> for FileSystemPathBuf {
+    #[inline]
     fn as_ref(&self) -> &FileSystemPath {
         self.as_path()
     }
@@ -124,6 +128,7 @@ impl AsRef<Path> for FileSystemPath {
 impl Deref for FileSystemPathBuf {
     type Target = FileSystemPath;
 
+    #[inline]
     fn deref(&self) -> &Self::Target {
         self.as_path()
     }
@@ -217,7 +222,7 @@ impl From<FileTime> for FileRevision {
     fn from(value: FileTime) -> Self {
         let seconds = value.seconds() as u128;
         let seconds = seconds << 64;
-        let nanos = value.nanoseconds() as u128;
+        let nanos = u128::from(value.nanoseconds());
 
         FileRevision(seconds | nanos)
     }

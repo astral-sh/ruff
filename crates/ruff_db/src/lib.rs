@@ -14,7 +14,7 @@ pub(crate) type FxDashMap<K, V> = dashmap::DashMap<K, V, BuildHasherDefault<FxHa
 #[salsa::jar(db=Db)]
 pub struct Jar(VfsFile);
 
-/// Database (or cupboard) that gives access to the virtual filesystem, source code, and parsed AST.
+/// Database that gives access to the virtual filesystem, source code, and parsed AST.
 pub trait Db: DbWithJar<Jar> {
     /// Interns a file system path and returns a salsa `File` ingredient.
     ///

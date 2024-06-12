@@ -60,7 +60,7 @@ impl Vfs {
 
     /// Looks up a file by its path.
     ///
-    /// For a non-existing file, creates a new salsa `File` ingredient and stores it for future lookups.
+    /// For a non-existing file, creates a new salsa [`VfsFile`] ingredient and stores it for future lookups.
     ///
     /// The operation always succeeds even if the path doesn't exist on disk, isn't accessible or if the path points to a directory.
     /// In these cases, a file with status [`FileStatus::Deleted`] is returned.
@@ -183,7 +183,7 @@ pub struct VfsFile {
     #[return_ref]
     pub path: VfsPath,
 
-    /// The unix permissions of the file. Only supported on unix systems. Always 0 on Windows
+    /// The unix permissions of the file. Only supported on unix systems. Always `None` on Windows
     /// or when the file has been deleted.
     pub permissions: Option<u32>,
 

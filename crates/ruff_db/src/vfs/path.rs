@@ -12,6 +12,8 @@ pub struct VendoredPath(Utf8Path);
 impl VendoredPath {
     pub fn new(path: &(impl AsRef<Utf8Path> + ?Sized)) -> &Self {
         let path = path.as_ref();
+        // SAFETY: VendoredPath is marked as #[repr(transparent)] so the conversion from a
+        // *const Utf8Path to a *const VendoredPath is valid.
         unsafe { &*(path as *const Utf8Path as *const VendoredPath) }
     }
 
@@ -40,9 +42,7 @@ impl VendoredPathBuf {
     }
 
     pub fn as_path(&self) -> &VendoredPath {
-        // SAFETY: VendoredPath is marked as #[repr(transparent)] so the conversion from a
-        // *const Utf8Path to a *const VendoredPath is valid.
-        unsafe { &*(self.0.as_path() as *const Utf8Path as *const VendoredPath) }
+        VendoredPath::new(&self.0)
     }
 }
 
