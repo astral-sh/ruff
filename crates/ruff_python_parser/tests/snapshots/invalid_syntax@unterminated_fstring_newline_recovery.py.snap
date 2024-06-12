@@ -335,7 +335,7 @@ Module(
 4 | 2 + 2
 5 | f"hello {x:
 6 | 3 + 3
-  | ^ Syntax Error: Expected an f-string element or the end of the f-string
+  | ^ Syntax Error: Expected an f-string element or a '}'
 7 | f"hello {x}
 8 | 4 + 4
   |

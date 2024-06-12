@@ -11,15 +11,15 @@ Module(
         body: [
             Expr(
                 StmtExpr {
-                    range: 0..14,
+                    range: 0..16,
                     value: FString(
                         ExprFString {
-                            range: 0..14,
+                            range: 0..16,
                             value: FStringValue {
                                 inner: Single(
                                     FString(
                                         FString {
-                                            range: 0..14,
+                                            range: 0..16,
                                             elements: [
                                                 Expression(
                                                     FStringExpressionElement {
@@ -110,17 +110,5 @@ Module(
 
   |
 1 | f"{lambda x: x}"
-  |               ^ Syntax Error: Expected FStringEnd, found '}'
-  |
-
-
-  |
-1 | f"{lambda x: x}"
-  |                ^ Syntax Error: Expected a statement
-  |
-
-
-  |
-1 | f"{lambda x: x}"
-  |                 ^ Syntax Error: Expected a statement
+  |               ^ Syntax Error: Expected an f-string element or the end of the f-string
   |

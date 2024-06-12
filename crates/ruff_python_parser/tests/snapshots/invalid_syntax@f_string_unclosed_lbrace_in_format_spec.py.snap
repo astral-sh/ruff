@@ -116,7 +116,7 @@ Module(
 
   |
 1 | f"hello {x:"
-  |            ^ Syntax Error: f-string: expecting '}'
+  |            ^ Syntax Error: Expected an f-string element or a '}'
 2 | f"hello {x:.3f"
   |
 
@@ -124,7 +124,7 @@ Module(
   |
 1 | f"hello {x:"
 2 | f"hello {x:.3f"
-  |               ^ Syntax Error: f-string: expecting '}'
+  |               ^ Syntax Error: Expected an f-string element or a '}'
   |
 
 

@@ -18,7 +18,7 @@ use crate::string::{parse_fstring_literal_element, parse_string_literal, StringT
 use crate::token_set::TokenSet;
 use crate::{FStringErrorType, Mode, ParseErrorType, TokenKind};
 
-use super::{Parenthesized, RecoveryContextKind};
+use super::{FStringElementsKind, Parenthesized, RecoveryContextKind};
 
 /// A token set consisting of a newline or end of file.
 const NEWLINE_EOF_SET: TokenSet = TokenSet::new([TokenKind::Newline, TokenKind::EndOfFile]);
@@ -1307,7 +1307,7 @@ impl<'src> Parser<'src> {
         let flags = self.tokens.current_flags().as_any_string_flags();
 
         self.bump(TokenKind::FStringStart);
-        let elements = self.parse_fstring_elements(flags);
+        let elements = self.parse_fstring_elements(flags, FStringElementsKind::Regular);
 
         self.expect(TokenKind::FStringEnd);
 
@@ -1323,10 +1323,14 @@ impl<'src> Parser<'src> {
     /// # Panics
     ///
     /// If the parser isn't positioned at a `{` or `FStringMiddle` token.
-    fn parse_fstring_elements(&mut self, flags: ast::AnyStringFlags) -> FStringElements {
+    fn parse_fstring_elements(
+        &mut self,
+        flags: ast::AnyStringFlags,
+        kind: FStringElementsKind,
+    ) -> FStringElements {
         let mut elements = vec![];
 
-        self.parse_list(RecoveryContextKind::FStringElements, |parser| {
+        self.parse_list(RecoveryContextKind::FStringElements(kind), |parser| {
             let element = match parser.current_token_kind() {
                 TokenKind::Lbrace => {
                     FStringElement::Expression(parser.parse_fstring_expression_element(flags))
@@ -1463,7 +1467,7 @@ impl<'src> Parser<'src> {
 
         let format_spec = if self.eat(TokenKind::Colon) {
             let spec_start = self.node_start();
-            let elements = self.parse_fstring_elements(flags);
+            let elements = self.parse_fstring_elements(flags, FStringElementsKind::FormatSpec);
             Some(Box::new(ast::FStringFormatSpec {
                 range: self.node_range(spec_start),
                 elements,
