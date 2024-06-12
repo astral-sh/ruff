@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use std::fmt::{Display, Formatter};
 use std::hash::Hash;
-use std::num::NonZeroUsize;
+use std::num::{NonZeroU16, NonZeroUsize};
 use std::ops::{Deref, RangeFrom, RangeInclusive};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
@@ -783,7 +783,7 @@ impl PackageKind {
 
 #[derive(Debug, PartialEq, Eq)]
 struct TypeshedVersionsParseError {
-    line_number: NonZeroUsize,
+    line_number: NonZeroU16,
     reason: TypeshedVersionsParseErrorKind,
 }
 
@@ -812,6 +812,7 @@ impl std::error::Error for TypeshedVersionsParseError {
 
 #[derive(Debug, PartialEq, Eq)]
 enum TypeshedVersionsParseErrorKind {
+    TooManyLines(NonZeroUsize),
     UnexpectedNumberOfColons,
     InvalidModuleName(String),
     UnexpectedNumberOfHyphens,
@@ -825,6 +826,11 @@ enum TypeshedVersionsParseErrorKind {
 impl Display for TypeshedVersionsParseErrorKind {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
+            Self::TooManyLines(num_lines) => write!(
+                f,
+                "File has too many lines ({num_lines}); maximum allowed is {}",
+                NonZeroU16::MAX
+            ),
             Self::UnexpectedNumberOfColons => {
                 f.write_str("Expected every non-comment line to have exactly one colon")
             }
@@ -887,10 +893,16 @@ impl FromStr for TypeshedVersions {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let mut map = FxHashMap::default();
 
-        for (line_number, line) in s.lines().enumerate() {
+        for (line_index, line) in s.lines().enumerate() {
             // humans expect line numbers to be 1-indexed
-            #[allow(unsafe_code)]
-            let line_number = unsafe { NonZeroUsize::new_unchecked(line_number + 1) };
+            let line_number = NonZeroUsize::new(line_index.saturating_add(1)).unwrap();
+
+            let Ok(line_number) = NonZeroU16::try_from(line_number) else {
+                return Err(TypeshedVersionsParseError {
+                    line_number: NonZeroU16::MAX,
+                    reason: TypeshedVersionsParseErrorKind::TooManyLines(line_number),
+                });
+            };
 
             let Some(content) = line.split('#').map(str::trim).next() else {
                 continue;
@@ -1072,7 +1084,7 @@ impl From<SupportedPyVersion> for PyVersion {
 #[cfg(test)]
 mod tests {
     use std::io::{Cursor, Read};
-    use std::num::{IntErrorKind, NonZeroU32, NonZeroUsize};
+    use std::num::{IntErrorKind, NonZeroU16, NonZeroU32};
     use std::path::{Path, PathBuf};
     use std::str::FromStr;
 
@@ -1097,7 +1109,7 @@ mod tests {
     }
 
     #[allow(unsafe_code)]
-    static ONE: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(1) };
+    const ONE: NonZeroU16 = unsafe { NonZeroU16::new_unchecked(1) };
 
     fn create_resolver() -> std::io::Result<TestCase> {
         let temp_dir = tempfile::tempdir()?;
