@@ -42,6 +42,7 @@ bincode = { version = "1.3.3" }
 bitflags = { version = "2.5.0" }
 bstr = { version = "1.9.1" }
 cachedir = { version = "0.3.1" }
+camino = { version = "1.1.7" }
 chrono = { version = "0.4.35", default-features = false, features = ["clock"] }
 clap = { version = "4.5.3", features = ["derive"] }
 clap_complete_command = { version = "0.5.1" }
@@ -79,7 +80,9 @@ libc = { version = "0.2.153" }
 libcst = { version = "1.1.0", default-features = false }
 log = { version = "0.4.17" }
 lsp-server = { version = "0.7.6" }
-lsp-types = { git = "https://github.com/astral-sh/lsp-types.git", rev = "3512a9f", features = ["proposed"] }
+lsp-types = { git = "https://github.com/astral-sh/lsp-types.git", rev = "3512a9f", features = [
+    "proposed",
+] }
 matchit = { version = "0.8.1" }
 memchr = { version = "2.7.1" }
 mimalloc = { version = "0.1.39" }
@@ -100,13 +103,16 @@ rand = { version = "0.8.5" }
 rayon = { version = "1.10.0" }
 regex = { version = "1.10.2" }
 rustc-hash = { version = "1.1.0" }
+salsa = { git = "https://github.com/salsa-rs/salsa.git", package = "salsa-2022", rev = "05b4e3ebdcdc47730cdd359e7e97fb2470527279" }
 schemars = { version = "0.8.16" }
 seahash = { version = "4.1.0" }
 serde = { version = "1.0.197", features = ["derive"] }
 serde-wasm-bindgen = { version = "0.6.4" }
 serde_json = { version = "1.0.113" }
 serde_test = { version = "1.0.152" }
-serde_with = { version = "3.6.0", default-features = false, features = ["macros"] }
+serde_with = { version = "3.6.0", default-features = false, features = [
+    "macros",
+] }
 shellexpand = { version = "3.0.0" }
 similar = { version = "2.4.0", features = ["inline"] }
 smallvec = { version = "1.13.2" }
@@ -131,7 +137,12 @@ unicode_names2 = { version = "1.2.2" }
 unicode-normalization = { version = "0.1.23" }
 ureq = { version = "2.9.6" }
 url = { version = "2.5.0" }
-uuid = { version = "1.6.1", features = ["v4", "fast-rng", "macro-diagnostics", "js"] }
+uuid = { version = "1.6.1", features = [
+    "v4",
+    "fast-rng",
+    "macro-diagnostics",
+    "js",
+] }
 walkdir = { version = "2.3.2" }
 wasm-bindgen = { version = "0.2.92" }
 wasm-bindgen-test = { version = "0.3.42" }
