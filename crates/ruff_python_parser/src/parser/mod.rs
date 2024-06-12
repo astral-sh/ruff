@@ -779,6 +779,14 @@ impl Parenthesized {
 }
 
 #[derive(Copy, Clone, Debug)]
+enum ListTerminatorKind {
+    /// The current token terminates the list.
+    Regular,
+    /// The current token doesn't terminate the list, but is useful for better error recovery.
+    ErrorRecovery,
+}
+
+#[derive(Copy, Clone, Debug)]
 enum RecoveryContextKind {
     /// When parsing a list of statements at the module level i.e., at the top level of a file.
     ModuleStatements,
@@ -876,15 +884,27 @@ impl RecoveryContextKind {
         )
     }
 
+    /// Returns `true` if the parser is at a token that terminates the list as per the context.
     fn is_list_terminator(self, p: &Parser) -> bool {
+        self.list_terminator_kind(p).is_some()
+    }
+
+    /// Checks the current token the parser is at and returns the list terminator kind if the token
+    /// terminates the list as per the context.
+    fn list_terminator_kind(self, p: &Parser) -> Option<ListTerminatorKind> {
         match self {
             // The parser must consume all tokens until the end
-            RecoveryContextKind::ModuleStatements => false,
-            RecoveryContextKind::BlockStatements => p.at(TokenKind::Dedent),
+            RecoveryContextKind::ModuleStatements => None,
+            RecoveryContextKind::BlockStatements => p
+                .at(TokenKind::Dedent)
+                .then_some(ListTerminatorKind::Regular),
 
-            RecoveryContextKind::Elif => p.at(TokenKind::Else),
+            RecoveryContextKind::Elif => {
+                p.at(TokenKind::Else).then_some(ListTerminatorKind::Regular)
+            }
             RecoveryContextKind::Except => {
                 matches!(p.current_token_kind(), TokenKind::Finally | TokenKind::Else)
+                    .then_some(ListTerminatorKind::Regular)
             }
             RecoveryContextKind::AssignmentTargets => {
                 // test_ok assign_targets_terminator
@@ -892,19 +912,21 @@ impl RecoveryContextKind {
                 // x = y = z = 1
                 // a, b
                 matches!(p.current_token_kind(), TokenKind::Newline | TokenKind::Semi)
+                    .then_some(ListTerminatorKind::Regular)
             }
 
             // Tokens other than `]` are for better error recovery. For example, recover when we
             // find the `:` of a clause header or the equal of a type assignment.
             RecoveryContextKind::TypeParams => {
-                matches!(
-                    p.current_token_kind(),
-                    TokenKind::Rsqb
-                        | TokenKind::Newline
-                        | TokenKind::Colon
-                        | TokenKind::Equal
-                        | TokenKind::Lpar
-                )
+                if p.at(TokenKind::Rsqb) {
+                    Some(ListTerminatorKind::Regular)
+                } else {
+                    matches!(
+                        p.current_token_kind(),
+                        TokenKind::Newline | TokenKind::Colon | TokenKind::Equal | TokenKind::Lpar
+                    )
+                    .then_some(ListTerminatorKind::ErrorRecovery)
+                }
             }
             // The names of an import statement cannot be parenthesized, so `)` is not a
             // terminator.
@@ -914,6 +936,7 @@ impl RecoveryContextKind {
                 // import a, b
                 // c, d
                 matches!(p.current_token_kind(), TokenKind::Semi | TokenKind::Newline)
+                    .then_some(ListTerminatorKind::Regular)
             }
             RecoveryContextKind::ImportFromAsNames(_) => {
                 // test_ok from_import_stmt_terminator
@@ -926,20 +949,21 @@ impl RecoveryContextKind {
                     p.current_token_kind(),
                     TokenKind::Rpar | TokenKind::Semi | TokenKind::Newline
                 )
+                .then_some(ListTerminatorKind::Regular)
             }
             // The elements in a container expression cannot end with a newline
             // as all of them are actually non-logical newlines.
             RecoveryContextKind::Slices | RecoveryContextKind::ListElements => {
-                p.at(TokenKind::Rsqb)
+                p.at(TokenKind::Rsqb).then_some(ListTerminatorKind::Regular)
             }
-            RecoveryContextKind::SetElements | RecoveryContextKind::DictElements => {
-                p.at(TokenKind::Rbrace)
-            }
+            RecoveryContextKind::SetElements | RecoveryContextKind::DictElements => p
+                .at(TokenKind::Rbrace)
+                .then_some(ListTerminatorKind::Regular),
             RecoveryContextKind::TupleElements(parenthesized) => {
                 if parenthesized.is_yes() {
-                    p.at(TokenKind::Rpar)
+                    p.at(TokenKind::Rpar).then_some(ListTerminatorKind::Regular)
                 } else {
-                    p.at_sequence_end()
+                    p.at_sequence_end().then_some(ListTerminatorKind::Regular)
                 }
             }
             RecoveryContextKind::SequenceMatchPattern(parentheses) => match parentheses {
@@ -951,6 +975,7 @@ impl RecoveryContextKind {
                     //     case a, b: ...
                     //     case a, b if x: ...
                     matches!(p.current_token_kind(), TokenKind::Colon | TokenKind::If)
+                        .then_some(ListTerminatorKind::Regular)
                 }
                 Some(parentheses) => {
                     // test_ok match_sequence_pattern_parentheses_terminator
@@ -958,35 +983,50 @@ impl RecoveryContextKind {
                     //     case [a, b]: ...
                     //     case (a, b): ...
                     p.at(parentheses.closing_kind())
+                        .then_some(ListTerminatorKind::Regular)
                 }
             },
-            RecoveryContextKind::MatchPatternMapping => p.at(TokenKind::Rbrace),
-            RecoveryContextKind::MatchPatternClassArguments => p.at(TokenKind::Rpar),
-            RecoveryContextKind::Arguments => p.at(TokenKind::Rpar),
+            RecoveryContextKind::MatchPatternMapping => p
+                .at(TokenKind::Rbrace)
+                .then_some(ListTerminatorKind::Regular),
+            RecoveryContextKind::MatchPatternClassArguments => {
+                p.at(TokenKind::Rpar).then_some(ListTerminatorKind::Regular)
+            }
+            RecoveryContextKind::Arguments => {
+                p.at(TokenKind::Rpar).then_some(ListTerminatorKind::Regular)
+            }
             RecoveryContextKind::DeleteTargets | RecoveryContextKind::Identifiers => {
                 // test_ok del_targets_terminator
                 // del a, b; c, d
                 // del a, b
                 // c, d
                 matches!(p.current_token_kind(), TokenKind::Semi | TokenKind::Newline)
+                    .then_some(ListTerminatorKind::Regular)
             }
             RecoveryContextKind::Parameters(function_kind) => {
                 // `lambda x, y: ...` or `def f(x, y): ...`
-                p.at(function_kind.list_terminator())
+                if p.at(function_kind.list_terminator()) {
+                    Some(ListTerminatorKind::Regular)
+                } else {
                     // To recover from missing closing parentheses
-                    || p.at(TokenKind::Rarrow)
-                    || p.at_compound_stmt()
+                    (p.at(TokenKind::Rarrow) || p.at_compound_stmt())
+                        .then_some(ListTerminatorKind::ErrorRecovery)
+                }
             }
             RecoveryContextKind::WithItems(with_item_kind) => match with_item_kind {
-                WithItemKind::Parenthesized => {
-                    matches!(p.current_token_kind(), TokenKind::Rpar | TokenKind::Colon)
-                }
-                WithItemKind::Unparenthesized | WithItemKind::ParenthesizedExpression => {
-                    p.at(TokenKind::Colon)
-                }
+                WithItemKind::Parenthesized => match p.current_token_kind() {
+                    TokenKind::Rpar => Some(ListTerminatorKind::Regular),
+                    TokenKind::Colon => Some(ListTerminatorKind::ErrorRecovery),
+                    _ => None,
+                },
+                WithItemKind::Unparenthesized | WithItemKind::ParenthesizedExpression => p
+                    .at(TokenKind::Colon)
+                    .then_some(ListTerminatorKind::Regular),
             },
             RecoveryContextKind::FStringElements(kind) => {
-                p.at(kind.list_terminator())
+                if p.at(kind.list_terminator()) {
+                    Some(ListTerminatorKind::Regular)
+                } else {
                     // test_err unterminated_fstring_newline_recovery
                     // f"hello
                     // 1 + 1
@@ -996,7 +1036,9 @@ impl RecoveryContextKind {
                     // 3 + 3
                     // f"hello {x}
                     // 4 + 4
-                    || p.at(TokenKind::Newline)
+                    p.at(TokenKind::Newline)
+                        .then_some(ListTerminatorKind::ErrorRecovery)
+                }
             }
         }
     }
