@@ -178,7 +178,7 @@ impl fmt::Display for TypeshedVersions {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let sorted_items: BTreeMap<&SmolStr, &PyVersionRange> = self.0.iter().collect();
         for (module_name, range) in sorted_items {
-            writeln!(f, "{module_name}-{range}")?;
+            writeln!(f, "{module_name}: {range}")?;
         }
         Ok(())
     }
@@ -362,9 +362,9 @@ foo: 3.8-   # trailing comment
         let parsed_versions = TypeshedVersions::from_str(VERSIONS).unwrap();
         assert_eq!(parsed_versions.len(), 3);
         assert_snapshot!(parsed_versions.to_string(), @r###"
-        bar-2.7-3.10
-        bar.baz-3.1-3.9
-        foo-3.8-
+        bar: 2.7-3.10
+        bar.baz: 3.1-3.9
+        foo: 3.8-
         "###
         );
 
