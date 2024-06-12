@@ -1310,7 +1310,8 @@ impl<'src> Lexer<'src> {
     /// Re-lex the current token in the context of a logical line.
     ///
     /// Returns a boolean indicating that whether the new current token is different than the
-    /// previous current token.
+    /// previous current token. This also means that the current position of the lexer has changed
+    /// and the caller is responsible for updating it's state accordingly.
     ///
     /// This method is a no-op if the lexer isn't in a parenthesized context.
     pub(crate) fn re_lex_logical_token(&mut self) -> bool {
