@@ -14,6 +14,7 @@ license = "MIT"
 [workspace.dependencies]
 ruff = { path = "crates/ruff" }
 ruff_cache = { path = "crates/ruff_cache" }
+ruff_db = { path = "crates/ruff_db" }
 ruff_diagnostics = { path = "crates/ruff_diagnostics" }
 ruff_formatter = { path = "crates/ruff_formatter" }
 ruff_index = { path = "crates/ruff_index" }
@@ -81,7 +82,7 @@ libcst = { version = "1.1.0", default-features = false }
 log = { version = "0.4.17" }
 lsp-server = { version = "0.7.6" }
 lsp-types = { git = "https://github.com/astral-sh/lsp-types.git", rev = "3512a9f", features = [
-    "proposed",
+  "proposed",
 ] }
 matchit = { version = "0.8.1" }
 memchr = { version = "2.7.1" }
@@ -111,7 +112,7 @@ serde-wasm-bindgen = { version = "0.6.4" }
 serde_json = { version = "1.0.113" }
 serde_test = { version = "1.0.152" }
 serde_with = { version = "3.6.0", default-features = false, features = [
-    "macros",
+  "macros",
 ] }
 shellexpand = { version = "3.0.0" }
 similar = { version = "2.4.0", features = ["inline"] }
@@ -138,10 +139,10 @@ unicode-normalization = { version = "0.1.23" }
 ureq = { version = "2.9.6" }
 url = { version = "2.5.0" }
 uuid = { version = "1.6.1", features = [
-    "v4",
-    "fast-rng",
-    "macro-diagnostics",
-    "js",
+  "v4",
+  "fast-rng",
+  "macro-diagnostics",
+  "js",
 ] }
 walkdir = { version = "2.3.2" }
 wasm-bindgen = { version = "0.2.92" }

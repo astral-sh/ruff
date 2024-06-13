@@ -50,12 +50,14 @@ mod tests {
     use crate::file_system::{FileSystem, MemoryFileSystem};
     use crate::vfs::{VendoredPathBuf, Vfs};
     use crate::{Db, Jar};
+    use salsa::DebugWithDb;
+    use std::sync::Arc;
 
     /// Database that can be used for testing.
     ///
     /// Uses an in memory filesystem and it stubs out the vendored files by default.
     #[salsa::db(Jar)]
-    pub struct TestDb {
+    pub(crate) struct TestDb {
         storage: salsa::Storage<Self>,
         vfs: Vfs,
         file_system: MemoryFileSystem,
@@ -63,8 +65,7 @@ mod tests {
     }
 
     impl TestDb {
-        #[allow(unused)]
-        pub fn new() -> Self {
+        pub(crate) fn new() -> Self {
             let mut vfs = Vfs::default();
             vfs.stub_vendored::<VendoredPathBuf, String>([]);
 
@@ -77,20 +78,37 @@ mod tests {
         }
 
         #[allow(unused)]
-        pub fn file_system(&self) -> &MemoryFileSystem {
+        pub(crate) fn file_system(&self) -> &MemoryFileSystem {
             &self.file_system
         }
 
+        /// Empties the internal store of salsa events that have been emitted,
+        /// and returns them as a `Vec` (equivalent to [`std::mem::take`]).
+        ///
+        /// ## Panics
+        /// If there are pending database snapshots.
         #[allow(unused)]
-        pub fn events(&self) -> std::sync::Arc<std::sync::Mutex<Vec<salsa::Event>>> {
-            self.events.clone()
+        pub(crate) fn take_salsa_events(&mut self) -> Vec<salsa::Event> {
+            let inner = Arc::get_mut(&mut self.events)
+                .expect("expected no pending salsa database snapshots.");
+
+            std::mem::take(inner.get_mut().unwrap())
         }
 
-        pub fn file_system_mut(&mut self) -> &mut MemoryFileSystem {
+        /// Clears the emitted salsa events.
+        ///
+        /// ## Panics
+        /// If there are pending database snapshots.
+        #[allow(unused)]
+        pub(crate) fn clear_salsa_events(&mut self) {
+            self.take_salsa_events();
+        }
+
+        pub(crate) fn file_system_mut(&mut self) -> &mut MemoryFileSystem {
             &mut self.file_system
         }
 
-        pub fn vfs_mut(&mut self) -> &mut Vfs {
+        pub(crate) fn vfs_mut(&mut self) -> &mut Vfs {
             &mut self.vfs
         }
     }
@@ -107,7 +125,7 @@ mod tests {
 
     impl salsa::Database for TestDb {
         fn salsa_event(&self, event: salsa::Event) {
-            tracing::trace!("event: {:?}", event);
+            tracing::trace!("event: {:?}", event.debug(self));
             let mut events = self.events.lock().unwrap();
             events.push(event);
         }

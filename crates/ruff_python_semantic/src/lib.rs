@@ -2,6 +2,8 @@ pub mod analyze;
 mod binding;
 mod branches;
 mod context;
+#[cfg(feature = "red_knot")]
+mod db;
 mod definition;
 mod globals;
 mod model;
@@ -20,3 +22,6 @@ pub use nodes::*;
 pub use reference::*;
 pub use scope::*;
 pub use star_import::*;
+
+#[cfg(feature = "red_knot")]
+pub use db::{Db, Jar};
