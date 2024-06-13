@@ -70,7 +70,7 @@ mod tests {
     use crate::parsed::parsed_module;
     use crate::tests::TestDb;
     use crate::vfs::VendoredPath;
-    use crate::vfs::{file_system_path_to_file, vendored_path_to_file};
+    use crate::vfs::{system_path_to_file, vendored_path_to_file};
 
     #[test]
     fn python_file() -> crate::file_system::Result<()> {
@@ -80,7 +80,7 @@ mod tests {
         db.file_system_mut()
             .write_file(path, "x = 10".to_string())?;
 
-        let file = file_system_path_to_file(&db, path).unwrap();
+        let file = system_path_to_file(&db, path).unwrap();
 
         let parsed = parsed_module(&db, file);
 
@@ -97,7 +97,7 @@ mod tests {
         db.file_system_mut()
             .write_file(path, "%timeit a = b".to_string())?;
 
-        let file = file_system_path_to_file(&db, path).unwrap();
+        let file = system_path_to_file(&db, path).unwrap();
 
         let parsed = parsed_module(&db, file);
 
