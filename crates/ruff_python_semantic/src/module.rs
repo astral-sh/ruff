@@ -66,7 +66,7 @@ impl ModuleName {
             return None;
         }
 
-        if name.split('.').all(|component| is_identifier(component)) {
+        if name.split('.').all(is_identifier) {
             Some(Self(name))
         } else {
             None
