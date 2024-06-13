@@ -15,7 +15,7 @@ use crate::Db;
 /// AST even if the file contains syntax errors. The parse errors
 /// are then accessible through [`Parsed::errors`].
 ///
-/// The query is only cached when the [`source_text`] hasn't changed. This is because
+/// The query is only cached when the [`source_text()`] hasn't changed. This is because
 /// comparing two ASTs is a non-trivial operation and every offset change is directly
 /// reflected in the changed AST offsets.
 /// The other reason is that Ruff's AST doesn't implement `Eq` which Sala requires
