@@ -20,7 +20,7 @@ pub fn system_path_to_file(db: &dyn Db, path: impl AsRef<FileSystemPath>) -> Opt
 
     // It's important that `vfs.file_system` creates a `VfsFile` even for files that don't exist or don't
     // exist anymore so that Salsa can track that the caller of this function depends on the existence of
-    // that file. This function filters out file that don't exist, but Salsa will know that it must
+    // that file. This function filters out files that don't exist, but Salsa will know that it must
     // re-run the calling query whenever the `file`'s status changes (because of the `.status` call here).
     match file.status(db) {
         FileStatus::Exists => Some(file),
