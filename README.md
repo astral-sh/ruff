@@ -28,7 +28,7 @@ An extremely fast Python linter and code formatter, written in Rust.
 - ⚡️ 10-100x faster than existing linters (like Flake8) and formatters (like Black)
 - 🐍 Installable via `pip`
 - 🛠️ `pyproject.toml` support
-- 🤝 Python 3.12 compatibility
+- 🤝 Python 3.13 compatibility
 - ⚖️ Drop-in parity with [Flake8](https://docs.astral.sh/ruff/faq/#how-does-ruff-compare-to-flake8), isort, and Black
 - 📦 Built-in caching, to avoid re-analyzing unchanged files
 - 🔧 Fix support, for automatic error correction (e.g., automatically remove unused imports)
