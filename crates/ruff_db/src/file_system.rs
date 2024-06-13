@@ -48,6 +48,31 @@ impl FileSystemPath {
         unsafe { &*(path as *const Utf8Path as *const FileSystemPath) }
     }
 
+    /// Extracts the file extension, if possible.
+    ///
+    /// The extension is:
+    ///
+    /// * [`None`], if there is no file name;
+    /// * [`None`], if there is no embedded `.`;
+    /// * [`None`], if the file name begins with `.` and has no other `.`s within;
+    /// * Otherwise, the portion of the file name after the final `.`
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ruff_db::file_system::FileSystemPath;
+    ///
+    /// assert_eq!("rs", FileSystemPath::new("foo.rs").extension().unwrap());
+    /// assert_eq!("gz", FileSystemPath::new("foo.tar.gz").extension().unwrap());
+    /// ```
+    ///
+    /// See [`Path::extension`] for more details.
+    #[inline]
+    #[must_use]
+    pub fn extension(&self) -> Option<&str> {
+        self.0.extension()
+    }
+
     /// Converts the path to an owned [`FileSystemPathBuf`].
     pub fn to_path_buf(&self) -> FileSystemPathBuf {
         FileSystemPathBuf(self.0.to_path_buf())
@@ -251,8 +276,9 @@ impl FileType {
 
 #[cfg(test)]
 mod tests {
-    use crate::file_system::FileRevision;
     use filetime::FileTime;
+
+    use crate::file_system::FileRevision;
 
     #[test]
     fn revision_from_file_time() {

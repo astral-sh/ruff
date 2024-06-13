@@ -1,3 +1,4 @@
+use std::ffi::OsStr;
 use std::path::Path;
 
 pub use expression::*;
@@ -80,13 +81,25 @@ pub enum PySourceType {
     Ipynb,
 }
 
+impl PySourceType {
+    /// Infers the source type from the file extension.
+    ///
+    /// Falls back to `Python` if the extension is not recognized.
+    pub fn from_extension(extension: &str) -> Self {
+        match extension {
+            "py" => Self::Python,
+            "pyi" => Self::Stub,
+            "ipynb" => Self::Ipynb,
+            _ => Self::Python,
+        }
+    }
+}
+
 impl<P: AsRef<Path>> From<P> for PySourceType {
     fn from(path: P) -> Self {
-        match path.as_ref().extension() {
-            Some(ext) if ext == "py" => PySourceType::Python,
-            Some(ext) if ext == "pyi" => PySourceType::Stub,
-            Some(ext) if ext == "ipynb" => PySourceType::Ipynb,
-            _ => PySourceType::Python,
-        }
+        path.as_ref()
+            .extension()
+            .and_then(OsStr::to_str)
+            .map_or(Self::Python, Self::from_extension)
     }
 }

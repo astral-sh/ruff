@@ -96,11 +96,10 @@ mod tests {
         // Change the file permission only
         file.set_permissions(&mut db).to(Some(0o777));
 
-        db.events().lock().unwrap().clear();
+        db.clear_salsa_events();
         assert_eq!(&*source_text(&db, file), "x = 10");
 
-        let events = db.events();
-        let events = events.lock().unwrap();
+        let events = db.take_salsa_events();
 
         assert!(!events
             .iter()
