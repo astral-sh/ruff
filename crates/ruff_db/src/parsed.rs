@@ -11,16 +11,17 @@ use crate::Db;
 
 /// Returns the parsed AST of `file`, including its token stream.
 ///
-/// The query uses Ruff's error resilient parser. That means that the parser always succeeds to produce a
-/// AST even if the file contains syntax errors. The syntax errors are Parsing the module succeeds even when the file contains syntax error. The parse errors
+/// The query uses Ruff's error-resilient parser. That means that the parser always succeeds to produce a
+/// AST even if the file contains syntax errors. The parse errors
 /// are then accessible through [`Parsed::errors`].
 ///
-/// The parse tree is cached between invocations, but the query doesn't make use of Salsa's optimization
-/// that skips dependent queries if the AST hasn't changed. Comparing two ASTs is a non-trivial operation
-/// and every offset change is directly reflected in the changed AST offsets. Ruff's AST also doesn't implement `Eq`.
-/// which is required to use the optimization.
+/// The query is only cached when the [`source_text`] hasn't changed. This is because
+/// comparing two ASTs is a non-trivial operation and every offset change is directly
+/// reflected in the changed AST offsets.
+/// The other reason is that Ruff's AST doesn't implement `Eq` which Sala requires
+/// for determining if a query result is unchanged.
 #[salsa::tracked(return_ref, no_eq)]
-pub fn parsed_module(db: &dyn Db, file: VfsFile) -> Parsed<ModModule> {
+pub fn parsed_module(db: &dyn Db, file: VfsFile) -> ParsedModule {
     let source = source_text(db, file);
     let path = file.path(db);
 
@@ -31,7 +32,9 @@ pub fn parsed_module(db: &dyn Db, file: VfsFile) -> Parsed<ModModule> {
         VfsPath::Vendored(_) => PySourceType::Stub,
     };
 
-    parse_unchecked_source(&source, ty)
+    ParsedModule {
+        inner: Arc::new(parse_unchecked_source(&source, ty)),
+    }
 }
 
 /// Cheap cloneable wrapper around the parsed module.
@@ -66,6 +69,7 @@ mod tests {
     use crate::file_system::FileSystemPath;
     use crate::parsed::parsed_module;
     use crate::tests::TestDb;
+    use crate::vfs::VendoredPath;
     use crate::Db;
 
     #[test]
@@ -91,6 +95,29 @@ mod tests {
             .write_file(path, "%timeit a = b".to_string());
 
         let file = db.file(path);
+
+        let parsed = parsed_module(&db, file);
+
+        assert!(parsed.is_valid());
+    }
+
+    #[test]
+    fn vendored_file() {
+        let mut db = TestDb::new();
+        db.vfs_mut().stub_vendored([(
+            "path.pyi",
+            r#"
+import sys
+
+if sys.platform == "win32":
+    from ntpath import *
+    from ntpath import __all__ as __all__
+else:
+    from posixpath import *
+    from posixpath import __all__ as __all__"#,
+        )]);
+
+        let file = db.vendored_file(VendoredPath::new("path.pyi")).unwrap();
 
         let parsed = parsed_module(&db, file);
 
