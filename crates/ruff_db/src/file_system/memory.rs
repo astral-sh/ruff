@@ -35,7 +35,7 @@ impl MemoryFileSystem {
         let cwd = Utf8PathBuf::from(cwd.as_ref().as_str());
 
         assert!(
-            cwd.is_absolute(),
+            cwd.starts_with("/"),
             "The current working directory must be an absolute path."
         );
 
