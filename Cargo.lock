@@ -2029,13 +2029,17 @@ dependencies = [
  "countme",
  "dashmap",
  "filetime",
+ "itertools 0.13.0",
+ "once_cell",
  "ruff_python_ast",
  "ruff_python_parser",
  "ruff_source_file",
  "ruff_text_size",
  "rustc-hash",
  "salsa-2022",
+ "tempfile",
  "tracing",
+ "zip",
 ]
 
 [[package]]

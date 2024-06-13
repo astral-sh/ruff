@@ -7,9 +7,11 @@ use filetime::FileTime;
 
 pub use memory::MemoryFileSystem;
 pub use os::OsFileSystem;
+pub use vendored::VendoredFileSystem;
 
 mod memory;
 mod os;
+mod vendored;
 
 pub type Result<T> = std::io::Result<T>;
 
