@@ -157,8 +157,12 @@ impl SymbolTable {
         &self.dependencies
     }
 
+    pub const fn root_scope_id() -> ScopeId {
+        ScopeId::from_usize(0)
+    }
+
     pub fn root_scope(&self) -> &Scope {
-        &self.scopes_by_id[ScopeId::root()]
+        &self.scopes_by_id[SymbolTable::root_scope_id()]
     }
 
     pub fn symbol_ids_for_scope(&self, scope_id: ScopeId) -> Copied<Keys<SymbolId, ()>> {
