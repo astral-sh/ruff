@@ -82,7 +82,8 @@ mod tests {
             &self.file_system
         }
 
-        /// Takes the salsa events that have been emitted.
+        /// Empties the internal store of salsa events that have been emitted,
+        /// and returns them as a `Vec` (equivalent to [`std::mem::take`]).
         ///
         /// ## Panics
         /// If there are pending database snapshots.
