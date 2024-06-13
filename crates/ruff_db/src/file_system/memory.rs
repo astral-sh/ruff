@@ -90,7 +90,7 @@ impl MemoryFileSystem {
         Ok(())
     }
 
-    /// Sets the last modified time stamp of the file stored at `path` to now.
+    /// Sets the last modified timestamp of the file stored at `path` to now.
     ///
     /// Creates a new file if the file at `path` doesn't exist.
     pub fn touch(&self, path: impl AsRef<FileSystemPath>) -> Result<()> {
@@ -220,7 +220,7 @@ fn normalize_path(path: &FileSystemPath, cwd: &Utf8Path) -> Utf8PathBuf {
 
     let mut components = path.components().peekable();
     let mut ret =
-        if let Some(c @ camino::Utf8Component::Prefix(..) | c @ camino::Utf8Component::RootDir) =
+        if let Some(c @ (camino::Utf8Component::Prefix(..) | camino::Utf8Component::RootDir)) =
             components.peek().cloned()
         {
             components.next();
