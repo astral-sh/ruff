@@ -15,20 +15,20 @@ mod path;
 ///
 /// Returns `None` if the path doesn't exist, isn't accessible, or if the path points to a directory.
 #[inline]
-pub fn file_system_path_to_file(db: &dyn Db, path: impl AsRef<FileSystemPath>) -> Option<VfsFile> {
+pub fn system_path_to_file(db: &dyn Db, path: impl AsRef<FileSystemPath>) -> Option<VfsFile> {
     let file = db.vfs().file_system(db, path.as_ref());
 
-    // Query the status of the file to determine if it exists.
-    // It's important that the `.file_system` method always returns a file and that the status is queried here
-    // to ensure that salsa knows which queries depend on the existence of this file, even if it doesn't exist
-    // yet or doesn't exist anymore.
+    // It's important that `vfs.file_system` creates a `VfsFile` even for files that don't exist or don't
+    // exist anymore so that Salsa can track that the caller of this function depends on the existence of
+    // that file. This function filters out file that don't exist, but Salsa will know that it must
+    // re-run the calling query whenever the `file`'s status changes (because of the `.status` call here).
     match file.status(db) {
         FileStatus::Exists => Some(file),
         FileStatus::Deleted => None,
     }
 }
 
-/// Interns a vendored file path. Returns `None` if no such vendored file exists and `Some` otherwise.
+/// Interns a vendored file path. Returns `Some` if the vendored file for `path` exists and `None` otherwise.
 #[inline]
 pub fn vendored_path_to_file(db: &dyn Db, path: impl AsRef<VendoredPath>) -> Option<VfsFile> {
     db.vfs().vendored(db, path.as_ref())
@@ -38,11 +38,11 @@ pub fn vendored_path_to_file(db: &dyn Db, path: impl AsRef<VendoredPath>) -> Opt
 ///
 /// Returns `Some` if a file for `path` exists and is accessible by the user. Returns `None` otherwise.
 ///
-/// See [`file_system_path_to_file`] and [`vendored_path_to_file`] if you always have either a file system or vendored path.
+/// See [`system_path_to_file`] and [`vendored_path_to_file`] if you always have either a file system or vendored path.
 #[inline]
 pub fn vfs_path_to_file(db: &dyn Db, path: &VfsPath) -> Option<VfsFile> {
     match path {
-        VfsPath::FileSystem(path) => file_system_path_to_file(db, path),
+        VfsPath::FileSystem(path) => system_path_to_file(db, path),
         VfsPath::Vendored(path) => vendored_path_to_file(db, path),
     }
 }
@@ -303,7 +303,7 @@ mod private {
 mod tests {
     use crate::file_system::FileRevision;
     use crate::tests::TestDb;
-    use crate::vfs::{file_system_path_to_file, vendored_path_to_file};
+    use crate::vfs::{system_path_to_file, vendored_path_to_file};
 
     #[test]
     fn file_system_existing_file() -> crate::file_system::Result<()> {
@@ -312,7 +312,7 @@ mod tests {
         db.file_system_mut()
             .write_files([("test.py", "print('Hello world')")])?;
 
-        let test = file_system_path_to_file(&db, "test.py").expect("File to exist.");
+        let test = system_path_to_file(&db, "test.py").expect("File to exist.");
 
         assert_eq!(test.permissions(&db), Some(0o755));
         assert_ne!(test.revision(&db), FileRevision::zero());
@@ -325,7 +325,7 @@ mod tests {
     fn file_system_non_existing_file() {
         let db = TestDb::new();
 
-        let test = file_system_path_to_file(&db, "test.py");
+        let test = system_path_to_file(&db, "test.py");
 
         assert_eq!(test, None);
     }
