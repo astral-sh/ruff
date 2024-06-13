@@ -2470,6 +2470,7 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "bitflags 2.5.0",
+ "hashbrown 0.14.5",
  "is-macro",
  "ruff_db",
  "ruff_index",
@@ -2480,6 +2481,7 @@ dependencies = [
  "ruff_text_size",
  "rustc-hash",
  "salsa-2022",
+ "smallvec",
  "smol_str",
  "tempfile",
  "tracing",
