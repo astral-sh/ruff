@@ -266,11 +266,11 @@ mod tests {
     use crate::Db;
 
     #[test]
-    fn file_system_existing_file() {
+    fn file_system_existing_file() -> crate::file_system::Result<()> {
         let mut db = TestDb::new();
 
         db.file_system_mut()
-            .write_files([("test.py", "print('Hello world')")]);
+            .write_files([("test.py", "print('Hello world')")])?;
 
         let test = db.file(FileSystemPath::new("test.py"));
 
@@ -278,6 +278,8 @@ mod tests {
         assert_eq!(test.permissions(&db), Some(0o755));
         assert_ne!(test.revision(&db), FileRevision::zero());
         assert_eq!(&test.read(&db), "print('Hello world')");
+
+        Ok(())
     }
 
     #[test]

@@ -66,28 +66,34 @@ mod tests {
     use crate::Db;
 
     #[test]
-    fn re_runs_query_when_file_revision_changes() {
+    fn re_runs_query_when_file_revision_changes() -> crate::file_system::Result<()> {
         let mut db = TestDb::new();
         let path = FileSystemPath::new("test.py");
 
-        db.file_system_mut().write_file(path, "x = 10".to_string());
+        db.file_system_mut()
+            .write_file(path, "x = 10".to_string())?;
 
         let file = db.file(path);
 
         assert_eq!(&*source_text(&db, file), "x = 10");
 
-        db.file_system_mut().write_file(path, "x = 20".to_string());
+        db.file_system_mut()
+            .write_file(path, "x = 20".to_string())
+            .unwrap();
         file.set_revision(&mut db).to(FileTime::now().into());
 
         assert_eq!(&*source_text(&db, file), "x = 20");
+
+        Ok(())
     }
 
     #[test]
-    fn text_is_cached_if_revision_is_unchanged() {
+    fn text_is_cached_if_revision_is_unchanged() -> crate::file_system::Result<()> {
         let mut db = TestDb::new();
         let path = FileSystemPath::new("test.py");
 
-        db.file_system_mut().write_file(path, "x = 10".to_string());
+        db.file_system_mut()
+            .write_file(path, "x = 10".to_string())?;
 
         let file = db.file(path);
 
@@ -104,15 +110,17 @@ mod tests {
         assert!(!events
             .iter()
             .any(|event| matches!(event.kind, EventKind::WillExecute { .. })));
+
+        Ok(())
     }
 
     #[test]
-    fn line_index_for_source() {
+    fn line_index_for_source() -> crate::file_system::Result<()> {
         let mut db = TestDb::new();
         let path = FileSystemPath::new("test.py");
 
         db.file_system_mut()
-            .write_file(path, "x = 10\ny = 20".to_string());
+            .write_file(path, "x = 10\ny = 20".to_string())?;
 
         let file = db.file(path);
         let index = line_index(&db, file);
@@ -123,5 +131,7 @@ mod tests {
             index.line_start(OneIndexed::from_zero_indexed(0), &text),
             TextSize::new(0)
         );
+
+        Ok(())
     }
 }
