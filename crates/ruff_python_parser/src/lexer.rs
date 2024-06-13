@@ -1319,7 +1319,8 @@ impl<'src> Lexer<'src> {
             return false;
         }
 
-        // Reduce the nesting level because the parser recovered from an error inside list parsing.
+        // Reduce the nesting level because the parser recovered from an error inside list parsing
+        // i.e., it recovered from an unclosed parenthesis (`(`, `[`, or `{`).
         self.nesting -= 1;
 
         let current_position = self.current_range().start();
@@ -1338,7 +1339,29 @@ impl<'src> Lexer<'src> {
             }
         }
 
+        // The lexer should only be moved if there's a newline character which needs to be
+        // re-lexed.
         if new_position != current_position && has_newline {
+            // Earlier we reduced the nesting level unconditionally. Now that we know the lexer's
+            // position is going to be moved back, the lexer needs to be put back into a
+            // parenthesized context if the current token was a closing parenthesis.
+            //
+            // ```py
+            // (a, [b,
+            //     c
+            // )
+            // ```
+            //
+            // Here, the parser would request to re-lex the token when it's at `)` and can recover
+            // from an unclosed `[`. This method will move the lexer back to the newline character
+            // after `c` which means it goes back into parenthesized context.
+            if matches!(
+                self.current_kind,
+                TokenKind::Rpar | TokenKind::Rsqb | TokenKind::Rbrace
+            ) {
+                self.nesting += 1;
+            }
+
             self.cursor = Cursor::new(self.source);
             self.cursor.skip_bytes(new_position.to_usize());
             self.state = State::Other;

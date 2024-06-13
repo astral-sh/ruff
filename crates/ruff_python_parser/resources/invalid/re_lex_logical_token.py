@@ -35,3 +35,12 @@ if call(foo, [a, b
 if call(foo, [a, b)
     def bar():
         pass
+
+
+# The parser tries to recover from an unclosed `]` when the current token is `)`. This
+# test is to make sure it emits a `NonLogicalNewline` token after `c`.
+if call(foo, [a,
+    b
+)
+    def bar():
+        pass

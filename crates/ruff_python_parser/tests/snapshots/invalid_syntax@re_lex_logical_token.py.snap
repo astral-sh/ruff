@@ -7,7 +7,7 @@ input_file: crates/ruff_python_parser/resources/invalid/re_lex_logical_token.py
 ```
 Module(
     ModModule {
-        range: 0..611,
+        range: 0..824,
         body: [
             If(
                 StmtIf {
@@ -418,6 +418,89 @@ Module(
                     elif_else_clauses: [],
                 },
             ),
+            If(
+                StmtIf {
+                    range: 772..824,
+                    test: Call(
+                        ExprCall {
+                            range: 775..796,
+                            func: Name(
+                                ExprName {
+                                    range: 775..779,
+                                    id: "call",
+                                    ctx: Load,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 779..796,
+                                args: [
+                                    Name(
+                                        ExprName {
+                                            range: 780..783,
+                                            id: "foo",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    List(
+                                        ExprList {
+                                            range: 785..794,
+                                            elts: [
+                                                Name(
+                                                    ExprName {
+                                                        range: 786..787,
+                                                        id: "a",
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                Name(
+                                                    ExprName {
+                                                        range: 793..794,
+                                                        id: "b",
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                            ],
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ],
+                                keywords: [],
+                            },
+                        },
+                    ),
+                    body: [
+                        FunctionDef(
+                            StmtFunctionDef {
+                                range: 801..824,
+                                is_async: false,
+                                decorator_list: [],
+                                name: Identifier {
+                                    id: "bar",
+                                    range: 805..808,
+                                },
+                                type_params: None,
+                                parameters: Parameters {
+                                    range: 808..810,
+                                    posonlyargs: [],
+                                    args: [],
+                                    vararg: None,
+                                    kwonlyargs: [],
+                                    kwarg: None,
+                                },
+                                returns: None,
+                                body: [
+                                    Pass(
+                                        StmtPass {
+                                            range: 820..824,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    ],
+                    elif_else_clauses: [],
+                },
+            ),
         ],
     },
 )
@@ -495,4 +578,25 @@ Module(
    |                    ^ Syntax Error: Expected ':', found newline
 36 |     def bar():
 37 |         pass
+   |
+
+
+   |
+41 | # test is to make sure it emits a `NonLogicalNewline` token after `c`.
+42 | if call(foo, [a,
+43 |     b
+   |      ^ Syntax Error: Expected ']', found NonLogicalNewline
+44 | )
+45 |     def bar():
+46 |         pass
+   |
+
+
+   |
+42 | if call(foo, [a,
+43 |     b
+44 | )
+   |  ^ Syntax Error: Expected ':', found newline
+45 |     def bar():
+46 |         pass
    |
