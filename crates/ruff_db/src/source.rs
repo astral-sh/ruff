@@ -54,7 +54,6 @@ impl std::fmt::Debug for SourceText {
 
 #[cfg(test)]
 mod tests {
-    use filetime::FileTime;
     use salsa::EventKind;
 
     use ruff_source_file::OneIndexed;
@@ -80,7 +79,7 @@ mod tests {
         db.file_system_mut()
             .write_file(path, "x = 20".to_string())
             .unwrap();
-        file.set_revision(&mut db).to(FileTime::now().into());
+        file.touch(&mut db);
 
         assert_eq!(&*source_text(&db, file), "x = 20");
 

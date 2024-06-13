@@ -272,6 +272,7 @@ impl VfsFile {
         Self::touch_impl(db, &path, Some(self));
     }
 
+    /// Private method providing the implementation for [`Self::touch_path`] and [`Self::touch`].
     fn touch_impl(db: &mut dyn Db, path: &VfsPath, file: Option<VfsFile>) {
         match path {
             VfsPath::FileSystem(path) => {
