@@ -19,7 +19,23 @@ pub fn ast_ids(db: &dyn Db, scope: GlobalScope) -> Arc<AstIds> {
     index.ast_ids(scope.scope_id(db))
 }
 
+/// AST ids for a single scope.
+///
+/// The motivation for building the AST ids per scope isn't about reducing invalidation because
+/// the struct changes whenever the parsed AST changes. Instead, it's mainly that we can
+/// build the AST ids struct when building the symbol table and also keep the property that
+/// IDs of outer scopes are unaffected by changes in inner scopes.
+///
+/// For example, we don't want that adding new statements to `foo` changes the statement id of `x = foo()` in:
+///
+/// ```python
+/// def foo():
+///     return 5
+///
+/// x = foo()
+/// ```
 pub struct AstIds {
+    /// Maps expression ids to their expressions.
     expressions: IndexVec<LocalExpressionId, AstNodeRef<ast::Expr>>,
 
     /// Maps expressions to their expression id. Uses `NodeKey` because it avoids cloning [`Parsed`].
@@ -49,56 +65,43 @@ impl std::fmt::Debug for AstIds {
     }
 }
 
-impl PartialEq for AstIds {
-    fn eq(&self, other: &Self) -> bool {
-        self.expressions == other.expressions && self.statements == other.statements
-    }
-}
-
-impl Eq for AstIds {}
-
+/// Uniquely identifies an [`ast::Expr`] in a [`ScopeId`].
 #[newtype_index]
 pub struct LocalExpressionId;
 
-/// ID that uniquely identifies an expression inside a module.
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
-pub struct ExpressionId {
-    scope: ScopeId,
-    local: LocalExpressionId,
-}
-
+/// Uniquely identifies an [`ast::Stmt`] in a [`ScopeId`].
 #[newtype_index]
 pub struct LocalStatementId;
 
-/// ID that uniquely identifies an expression inside a module.
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
-pub struct StatementId {
-    scope: ScopeId,
-    local: LocalStatementId,
-}
-
+/// Node that can be uniquely identified by an id in a [`ScopeId`].
 pub trait LocalAstIdNode {
+    /// The type of the ID uniquely identifying the node.
     type Id;
 
+    /// Returns the ID that uniquely identifies the node in `scope`.
+    ///
+    /// ## Panics
+    /// Panics if the node doesn't belong to `file` or is outside `scope`.
     fn local_ast_id(&self, db: &dyn Db, file: VfsFile, scope: ScopeId) -> Self::Id;
 
+    /// Looks up the AST node by its ID.
+    ///
+    /// ## Panics
+    /// May panic if the `id` does not belong to the AST of `file`, or is outside `scope`.
     fn lookup_local(db: &dyn Db, file: VfsFile, scope: ScopeId, id: Self::Id) -> AstNodeRef<Self>
     where
         Self: Sized;
 }
 
-pub struct AstId<L> {
-    scope: ScopeId,
-    local: L,
-}
-
+/// Extension trait for AST nodes that can be resolved by an `AstId`.
 pub trait AstIdNode {
     type LocalId;
 
     /// Resolves the AST id of the node.
     ///
     /// ## Panics
-    /// May panic if the node does not belong to the AST of `file` or it returns an incorrect node.
+    /// May panic if the node does not belongs to `file`'s AST or is outside of `scope`. It may also
+    /// return an incorrect node if that's the case.
 
     fn ast_id(&self, db: &dyn Db, file: VfsFile, scope: ScopeId) -> AstId<Self::LocalId>;
 
@@ -133,6 +136,16 @@ where
         let scope = id.scope;
         Self::lookup_local(db, file, scope, id.local)
     }
+}
+
+/// Uniquely identifies an AST node in a file.
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+pub struct AstId<L> {
+    /// The node's scope.
+    scope: ScopeId,
+
+    /// The ID of the node inside [`Self::scope`].
+    local: L,
 }
 
 impl LocalAstIdNode for ast::Expr {
