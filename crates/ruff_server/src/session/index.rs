@@ -145,11 +145,8 @@ impl Index {
         encoding: PositionEncoding,
     ) -> crate::Result<()> {
         // update notebook cell index
-        if let Some(lsp_types::NotebookDocumentCellChangeStructure {
-            did_open,
-            did_close,
-            ..
-        }) = cells.as_ref().and_then(|cells| cells.structure.as_ref())
+        if let Some(lsp_types::NotebookDocumentCellChangeStructure { did_open, .. }) =
+            cells.as_ref().and_then(|cells| cells.structure.as_ref())
         {
             let Some(path) = self.url_for_key(key).cloned() else {
                 anyhow::bail!("Tried to open unavailable document `{key}`");
@@ -159,14 +156,7 @@ impl Index {
                 self.notebook_cells
                     .insert(opened_cell.uri.clone(), path.clone());
             }
-            for closed_cell in did_close.iter().flatten() {
-                if self.notebook_cells.remove(&closed_cell.uri).is_none() {
-                    tracing::warn!(
-                        "Tried to remove a notebook cell that does not exist: {}",
-                        closed_cell.uri
-                    );
-                }
-            }
+            // deleted notebook cells are closed via textDocument/didClose - we don't close them here.
         }
 
         let controller = self.document_controller_for_key(key)?;
@@ -347,6 +337,12 @@ impl Index {
     }
 
     pub(super) fn close_document(&mut self, key: &DocumentKey) -> crate::Result<()> {
+        if let DocumentKey::NotebookCell(uri) = key {
+            if self.notebook_cells.remove(uri).is_none() {
+                tracing::warn!("Tried to remove a notebook cell that does not exist: {uri}",);
+            }
+            return Ok(());
+        }
         let Some(url) = self.url_for_key(key).cloned() else {
             anyhow::bail!("Tried to close unavailable document `{key}`");
         };
