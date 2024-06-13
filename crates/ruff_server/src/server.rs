@@ -1,6 +1,7 @@
 //! Scheduling, I/O, and API endpoints.
 
 use std::num::NonZeroUsize;
+use std::str::FromStr;
 
 use lsp_server as lsp;
 use lsp_types as types;
@@ -276,6 +277,14 @@ impl Server {
                     },
                 },
             )),
+            execute_command_provider: Some(types::ExecuteCommandOptions {
+                commands: SupportedCommand::all()
+                    .map(|command| command.identifier().to_string())
+                    .to_vec(),
+                work_done_progress_options: WorkDoneProgressOptions {
+                    work_done_progress: Some(false),
+                },
+            }),
             hover_provider: Some(types::HoverProviderCapability::Simple(true)),
             notebook_document_sync: Some(types::OneOf::Left(NotebookDocumentSyncOptions {
                 save: Some(false),
@@ -352,5 +361,58 @@ impl SupportedCodeAction {
             Self::NotebookSourceOrganizeImports,
         ]
         .into_iter()
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) enum SupportedCommand {
+    Debug,
+    Format,
+    FixAll,
+    OrganizeImports,
+}
+
+impl SupportedCommand {
+    const fn label(self) -> &'static str {
+        match self {
+            Self::FixAll => "Fix all auto-fixable problems",
+            Self::Format => "Format document",
+            Self::OrganizeImports => "Format imports",
+            Self::Debug => "Print debug information",
+        }
+    }
+
+    /// Returns the identifier of the command.
+    const fn identifier(self) -> &'static str {
+        match self {
+            SupportedCommand::Format => "ruff.applyFormat",
+            SupportedCommand::FixAll => "ruff.applyAutofix",
+            SupportedCommand::OrganizeImports => "ruff.applyOrganizeImports",
+            SupportedCommand::Debug => "ruff.printDebugInformation",
+        }
+    }
+
+    /// Returns all the commands that the server currently supports.
+    const fn all() -> [SupportedCommand; 4] {
+        [
+            SupportedCommand::Format,
+            SupportedCommand::FixAll,
+            SupportedCommand::OrganizeImports,
+            SupportedCommand::Debug,
+        ]
+    }
+}
+
+impl FromStr for SupportedCommand {
+    type Err = anyhow::Error;
+
+    fn from_str(name: &str) -> anyhow::Result<Self, Self::Err> {
+        Ok(match name {
+            "ruff.applyAutofix" => Self::FixAll,
+            "ruff.applyFormat" => Self::Format,
+            "ruff.applyOrganizeImports" => Self::OrganizeImports,
+            "ruff.printDebugInformation" => Self::Debug,
+            _ => return Err(anyhow::anyhow!("Invalid command `{name}`")),
+        })
     }
 }

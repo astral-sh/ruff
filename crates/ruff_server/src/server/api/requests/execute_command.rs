@@ -2,22 +2,14 @@ use std::str::FromStr;
 
 use crate::edit::WorkspaceEditTracker;
 use crate::server::api::LSPResult;
-use crate::server::client;
 use crate::server::schedule::Task;
+use crate::server::{client, SupportedCommand};
 use crate::session::Session;
 use crate::DIAGNOSTIC_NAME;
 use crate::{edit::DocumentVersion, server};
 use lsp_server::ErrorCode;
 use lsp_types::{self as types, request as req};
 use serde::Deserialize;
-
-#[derive(Debug, PartialEq)]
-enum Command {
-    Debug,
-    Format,
-    FixAll,
-    OrganizeImports,
-}
 
 pub(crate) struct ExecuteCommand;
 
@@ -38,10 +30,10 @@ impl super::SyncRequestHandler for ExecuteCommand {
         requester: &mut client::Requester,
         params: types::ExecuteCommandParams,
     ) -> server::Result<Option<serde_json::Value>> {
-        let command =
-            Command::from_str(&params.command).with_failure_code(ErrorCode::InvalidParams)?;
+        let command = SupportedCommand::from_str(&params.command)
+            .with_failure_code(ErrorCode::InvalidParams)?;
 
-        if command == Command::Debug {
+        if command == SupportedCommand::Debug {
             let output = debug_information(session);
             notifier
                 .notify::<types::notification::LogMessage>(types::LogMessageParams {
@@ -74,7 +66,7 @@ impl super::SyncRequestHandler for ExecuteCommand {
                 return Ok(None);
             };
             match command {
-                Command::FixAll => {
+                SupportedCommand::FixAll => {
                     let fixes = super::code_action_resolve::fix_all_edit(
                         snapshot.query(),
                         snapshot.encoding(),
@@ -84,13 +76,13 @@ impl super::SyncRequestHandler for ExecuteCommand {
                         .set_fixes_for_document(fixes, snapshot.query().version())
                         .with_failure_code(ErrorCode::InternalError)?;
                 }
-                Command::Format => {
+                SupportedCommand::Format => {
                     let fixes = super::format::format_full_document(&snapshot)?;
                     edit_tracker
                         .set_fixes_for_document(fixes, version)
                         .with_failure_code(ErrorCode::InternalError)?;
                 }
-                Command::OrganizeImports => {
+                SupportedCommand::OrganizeImports => {
                     let fixes = super::code_action_resolve::organize_imports_edit(
                         snapshot.query(),
                         snapshot.encoding(),
@@ -100,7 +92,7 @@ impl super::SyncRequestHandler for ExecuteCommand {
                         .set_fixes_for_document(fixes, snapshot.query().version())
                         .with_failure_code(ErrorCode::InternalError)?;
                 }
-                Command::Debug => {
+                SupportedCommand::Debug => {
                     unreachable!("The debug command should have already been handled")
                 }
             }
@@ -116,31 +108,6 @@ impl super::SyncRequestHandler for ExecuteCommand {
         }
 
         Ok(None)
-    }
-}
-
-impl Command {
-    fn label(&self) -> &str {
-        match self {
-            Self::FixAll => "Fix all auto-fixable problems",
-            Self::Format => "Format document",
-            Self::OrganizeImports => "Format imports",
-            Self::Debug => "Print debug information",
-        }
-    }
-}
-
-impl FromStr for Command {
-    type Err = anyhow::Error;
-
-    fn from_str(name: &str) -> Result<Self, Self::Err> {
-        Ok(match name {
-            "ruff.applyAutofix" => Self::FixAll,
-            "ruff.applyFormat" => Self::Format,
-            "ruff.applyOrganizeImports" => Self::OrganizeImports,
-            "ruff.printDebugInformation" => Self::Debug,
-            _ => return Err(anyhow::anyhow!("Invalid command `{name}`")),
-        })
     }
 }
 
