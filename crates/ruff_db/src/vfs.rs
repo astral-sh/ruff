@@ -38,7 +38,7 @@ pub struct Vfs {
 
 #[derive(Default)]
 struct VfsInner {
-    /// Lookup table that maps the path to a salsa interned [`VfsFile`] instance.
+    /// Lookup table that maps [`VfsPath`]s to salsa interned [`VfsFile`] instances.
     ///
     /// The map also stores entries for files that don't exist on the file system. This is necessary
     /// so that queries that depend on the existence of a file are re-executed when the file is created.
@@ -93,7 +93,7 @@ impl Vfs {
             })
     }
 
-    /// Lookups a vendored file by its path. Returns `Some` if a vendored file for the given path
+    /// Looks up a vendored file by its path. Returns `Some` if a vendored file for the given path
     /// exists and `None` otherwise.
     pub fn vendored(&self, db: &dyn Db, path: &VendoredPath) -> Option<VfsFile> {
         let file = match self
@@ -144,7 +144,7 @@ impl Vfs {
     }
 
     /// Creates a salsa like snapshot of the files. The instances share
-    /// the same path to file mapping.
+    /// the same path-to-file mapping.
     pub fn snapshot(&self) -> Self {
         Self {
             inner: self.inner.clone(),

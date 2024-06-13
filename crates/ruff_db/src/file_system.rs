@@ -13,11 +13,14 @@ mod os;
 
 pub type Result<T> = std::io::Result<T>;
 
-/// A file system that can be used to read and write files.
+/// An abstraction over `std::fs` with features tailored to Ruff's needs.
 ///
-/// The file system is agnostic to the actual storage medium, it could be a real file system, a combination
-/// of a real file system and an in-memory file system in the case of an LSP where unsaved changes are stored in memory,
-/// or an all in-memory file system for testing.
+/// Provides a file system agnostic API to interact with files and directories.
+/// Abstracting the file system operations enables:
+///
+/// * Accessing unsaved or even untitled files in the LSP use case
+/// * Testing with an in-memory file system
+/// * Running Ruff in a WASM environment without needing to stub out the full `std::fs` API.
 pub trait FileSystem {
     /// Reads the metadata of the file or directory at `path`.
     fn metadata(&self, path: &FileSystemPath) -> Result<Metadata>;
