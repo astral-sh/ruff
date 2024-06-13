@@ -537,10 +537,11 @@ impl<'src> Parser<'src> {
             if recovery_context_kind.is_list_element(self) {
                 parse_element(self);
 
-                // Only unset this when we've completely parsed a single element.
-                if first_element {
-                    first_element = false;
-                }
+                // Only unset this when we've completely parsed a single element. This is mainly to
+                // raise the correct error in case the first element isn't valid and the current
+                // token isn't a comma. Without this knowledge, the parser would later expect a
+                // comma instead of raising the context error.
+                first_element = false;
 
                 let maybe_comma_range = self.current_token_range();
                 if self.eat(TokenKind::Comma) {

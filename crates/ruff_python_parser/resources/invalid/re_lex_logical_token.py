@@ -38,7 +38,7 @@ if call(foo, [a, b)
 
 
 # The parser tries to recover from an unclosed `]` when the current token is `)`. This
-# test is to make sure it emits a `NonLogicalNewline` token after `c`.
+# test is to make sure it emits a `NonLogicalNewline` token after `b`.
 if call(foo, [a,
     b
 )

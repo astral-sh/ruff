@@ -582,7 +582,7 @@ Module(
 
 
    |
-41 | # test is to make sure it emits a `NonLogicalNewline` token after `c`.
+41 | # test is to make sure it emits a `NonLogicalNewline` token after `b`.
 42 | if call(foo, [a,
 43 |     b
    |      ^ Syntax Error: Expected ']', found NonLogicalNewline
