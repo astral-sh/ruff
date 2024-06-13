@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use ruff_db::file_system::FileSystemPath;
 use ruff_db::vfs::{VfsFile, VfsPath};
+use ruff_python_stdlib::identifiers::is_identifier;
 
 use crate::Db;
 
@@ -16,13 +17,60 @@ pub mod resolver;
 pub struct ModuleName(smol_str::SmolStr);
 
 impl ModuleName {
+    /// Creates a new module name for `name`. Returns `Some` if `name` is a valid, absolute
+    /// module name and `None` otherwise.
+    ///
+    /// The module name is invalid if:
+    ///
+    /// * The name is empty
+    /// * The name is relative
+    /// * The name ends with a `.`
+    /// * The name contains a sequence of multiple dots
+    /// * A component of a name (the part between two dots) isn't a valid python identifier.
     #[inline]
-    pub fn new(name: &str) -> Self {
-        assert!(!name.is_empty());
-        assert!(!name.starts_with('.'), "module name must be absolute");
-        assert!(!name.ends_with('.'), "module cannot end with a '.'");
+    pub fn new(name: &str) -> Option<Self> {
+        Self::new_from_smol(smol_str::SmolStr::new(name))
+    }
 
-        Self(smol_str::SmolStr::new(name))
+    /// Creates a new module name for `name` where `name` is a static string.
+    /// Returns `Some` if `name` is a valid, absolute module name and `None` otherwise.
+    ///
+    /// The module name is invalid if:
+    ///
+    /// * The name is empty
+    /// * The name is relative
+    /// * The name ends with a `.`
+    /// * The name contains a sequence of multiple dots
+    /// * A component of a name (the part between two dots) isn't a valid python identifier.
+    ///
+    /// ## Examples
+    ///
+    /// ```
+    /// use ruff_python_semantic::module::ModuleName;
+    ///
+    /// assert_eq!(ModuleName::new_static("foo.bar").as_deref(), Some("foo.bar"));
+    /// assert_eq!(ModuleName::new_static(""), None);
+    /// assert_eq!(ModuleName::new_static("..foo"), None);
+    /// assert_eq!(ModuleName::new_static(".foo"), None);
+    /// assert_eq!(ModuleName::new_static("foo."), None);
+    /// assert_eq!(ModuleName::new_static("foo..bar"), None);
+    /// assert_eq!(ModuleName::new_static("2000"), None);
+    /// ```
+    #[inline]
+    pub fn new_static(name: &'static str) -> Option<Self> {
+        Self::new_from_smol(smol_str::SmolStr::new_static(name))
+    }
+
+    fn new_from_smol(name: smol_str::SmolStr) -> Option<Self> {
+        if name.is_empty() {
+            return None;
+        }
+
+        if name.split('.').all(|component| is_identifier(component)) {
+            Some(Self(name))
+        } else {
+            None
+        }
     }
 
     /// An iterator over the components of the module name:
@@ -32,7 +80,7 @@ impl ModuleName {
     /// ```
     /// use ruff_python_semantic::module::ModuleName;
     ///
-    /// assert_eq!(ModuleName::new("foo.bar.baz").components().collect::<Vec<_>>(), vec!["foo", "bar", "baz"]);
+    /// assert_eq!(ModuleName::new_static("foo.bar.baz").unwrap().components().collect::<Vec<_>>(), vec!["foo", "bar", "baz"]);
     /// ```
     pub fn components(&self) -> impl DoubleEndedIterator<Item = &str> {
         self.0.split('.')
@@ -45,9 +93,9 @@ impl ModuleName {
     /// ```
     /// use ruff_python_semantic::module::ModuleName;
     ///
-    /// assert_eq!(ModuleName::new("foo.bar").parent(), Some(ModuleName::new("foo")));
-    /// assert_eq!(ModuleName::new("foo.bar.baz").parent(), Some(ModuleName::new("foo.bar")));
-    /// assert_eq!(ModuleName::new("root").parent(), None);
+    /// assert_eq!(ModuleName::new_static("foo.bar").unwrap().parent(), Some(ModuleName::new_static("foo").unwrap()));
+    /// assert_eq!(ModuleName::new_static("foo.bar.baz").unwrap().parent(), Some(ModuleName::new_static("foo.bar").unwrap()));
+    /// assert_eq!(ModuleName::new_static("root").unwrap().parent(), None);
     /// ```
     pub fn parent(&self) -> Option<ModuleName> {
         let (parent, _) = self.0.rsplit_once('.')?;
@@ -64,10 +112,10 @@ impl ModuleName {
     /// ```
     /// use ruff_python_semantic::module::ModuleName;
     ///
-    /// assert!(ModuleName::new("foo.bar").starts_with(&ModuleName::new("foo")));
+    /// assert!(ModuleName::new_static("foo.bar").unwrap().starts_with(&ModuleName::new_static("foo").unwrap()));
     ///
-    /// assert!(!ModuleName::new("foo.bar").starts_with(&ModuleName::new("bar")));
-    /// assert!(!ModuleName::new("foo_bar").starts_with(&ModuleName::new("foo")));
+    /// assert!(!ModuleName::new_static("foo.bar").unwrap().starts_with(&ModuleName::new_static("bar").unwrap()));
+    /// assert!(!ModuleName::new_static("foo_bar").unwrap().starts_with(&ModuleName::new_static("foo").unwrap()));
     /// ```
     pub fn starts_with(&self, other: &ModuleName) -> bool {
         let mut self_components = self.components();

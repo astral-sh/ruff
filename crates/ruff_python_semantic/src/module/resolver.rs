@@ -66,11 +66,14 @@ pub(crate) fn resolve_module_query(
 /// Returns `None` if the path is not a module locatable via `sys.path`.
 #[tracing::instrument(level = "debug", skip(db))]
 pub fn path_to_module(db: &dyn Db, path: &VfsPath) -> Option<Module> {
-    // It's a bit surprising to have `path_to_module` that resolves the file for `path` when the first thing that `file_to_module` does
-    // is retrieving the path from `file`. The reason for this "odd" looking API is that
-    // `file_to_module` is cached using Salsa and:
-    // * Salsa only allows ingredients as query arguments
-    // * `path` isn't a salsa ingredient, but `file` is
+    // It's not entirely clear on first sight why this method calls `file_to_module` instead of
+    // it being the other way round, considering that the first thing that `file_to_module` does
+    // is to retrieve the file's path.
+    //
+    // The reason is that `file_to_module` is a tracked Salsa query and salsa queries require that
+    // all arguments are Salsa ingredients (something stored in Salsa). `Path`s aren't salsa ingredients but
+    // `VfsFile` is. So what we do here is to retrieve the `path`'s `VfsFile` so that we can make
+    // use of Salsa's caching and invalidation.
     let file = vfs_path_to_file(db.upcast(), path)?;
     file_to_module(db, file)
 }
@@ -425,15 +428,16 @@ mod tests {
     fn first_party_module() -> anyhow::Result<()> {
         let TestCase { db, src, .. } = create_resolver()?;
 
+        let foo_module_name = ModuleName::new_static("foo").unwrap();
         let foo_path = src.join("foo.py");
         db.memory_file_system()
             .write_file(&foo_path, "print('Hello, world!')")?;
 
-        let foo_module = resolve_module(&db, ModuleName::new("foo")).unwrap();
+        let foo_module = resolve_module(&db, foo_module_name.clone()).unwrap();
 
         assert_eq!(
             Some(&foo_module),
-            resolve_module(&db, ModuleName::new("foo")).as_ref()
+            resolve_module(&db, foo_module_name.clone()).as_ref()
         );
 
         assert_eq!("foo", foo_module.name());
@@ -462,11 +466,12 @@ mod tests {
         db.memory_file_system()
             .write_file(&functools_path, "def update_wrapper(): ...")?;
 
-        let functools_module = resolve_module(&db, ModuleName::new("functools")).unwrap();
+        let functools_module_name = ModuleName::new_static("functools").unwrap();
+        let functools_module = resolve_module(&db, functools_module_name.clone()).unwrap();
 
         assert_eq!(
             Some(&functools_module),
-            resolve_module(&db, ModuleName::new("functools")).as_ref()
+            resolve_module(&db, functools_module_name).as_ref()
         );
 
         assert_eq!(&stdlib_dir, functools_module.search_path().path());
@@ -499,11 +504,12 @@ mod tests {
             (&first_party_functools_path, "def update_wrapper(): ..."),
         ])?;
 
-        let functools_module = resolve_module(&db, ModuleName::new("functools")).unwrap();
+        let functools_module_name = ModuleName::new_static("functools").unwrap();
+        let functools_module = resolve_module(&db, functools_module_name.clone()).unwrap();
 
         assert_eq!(
             Some(&functools_module),
-            resolve_module(&db, ModuleName::new("functools")).as_ref()
+            resolve_module(&db, functools_module_name).as_ref()
         );
         assert_eq!(&src, functools_module.search_path().path());
         assert_eq!(ModuleKind::Module, functools_module.kind());
@@ -554,7 +560,7 @@ mod tests {
         db.memory_file_system()
             .write_file(&foo_path, "print('Hello, world!')")?;
 
-        let foo_module = resolve_module(&db, ModuleName::new("foo")).unwrap();
+        let foo_module = resolve_module(&db, ModuleName::new_static("foo").unwrap()).unwrap();
 
         assert_eq!("foo", foo_module.name());
         assert_eq!(&src, foo_module.search_path().path());
@@ -585,7 +591,7 @@ mod tests {
         db.memory_file_system()
             .write_file(&foo_py, "print('Hello, world!')")?;
 
-        let foo_module = resolve_module(&db, ModuleName::new("foo")).unwrap();
+        let foo_module = resolve_module(&db, ModuleName::new_static("foo").unwrap()).unwrap();
 
         assert_eq!(&src, foo_module.search_path().path());
         assert_eq!(&foo_init, foo_module.file().path(&db));
@@ -609,7 +615,7 @@ mod tests {
         db.memory_file_system()
             .write_files([(&foo_stub, "x: int"), (&foo_py, "print('Hello, world!')")])?;
 
-        let foo = resolve_module(&db, ModuleName::new("foo")).unwrap();
+        let foo = resolve_module(&db, ModuleName::new_static("foo").unwrap()).unwrap();
 
         assert_eq!(&src, foo.search_path().path());
         assert_eq!(&foo_stub, foo.file().path(&db));
@@ -637,7 +643,8 @@ mod tests {
             (&baz, "print('Hello, world!')"),
         ])?;
 
-        let baz_module = resolve_module(&db, ModuleName::new("foo.bar.baz")).unwrap();
+        let baz_module =
+            resolve_module(&db, ModuleName::new_static("foo.bar.baz").unwrap()).unwrap();
 
         assert_eq!(&src, baz_module.search_path().path());
         assert_eq!(&baz, baz_module.file().path(&db));
@@ -685,14 +692,16 @@ mod tests {
             (&two, "print('Hello, world!')"),
         ])?;
 
-        let one_module = resolve_module(&db, ModuleName::new("parent.child.one")).unwrap();
+        let one_module =
+            resolve_module(&db, ModuleName::new_static("parent.child.one").unwrap()).unwrap();
 
         assert_eq!(
             Some(one_module),
             path_to_module(&db, &VfsPath::FileSystem(one))
         );
 
-        let two_module = resolve_module(&db, ModuleName::new("parent.child.two")).unwrap();
+        let two_module =
+            resolve_module(&db, ModuleName::new_static("parent.child.two").unwrap()).unwrap();
         assert_eq!(
             Some(two_module),
             path_to_module(&db, &VfsPath::FileSystem(two))
@@ -737,7 +746,8 @@ mod tests {
             (&two, "print('Hello, world!')"),
         ])?;
 
-        let one_module = resolve_module(&db, ModuleName::new("parent.child.one")).unwrap();
+        let one_module =
+            resolve_module(&db, ModuleName::new_static("parent.child.one").unwrap()).unwrap();
 
         assert_eq!(
             Some(one_module),
@@ -746,7 +756,7 @@ mod tests {
 
         assert_eq!(
             None,
-            resolve_module(&db, ModuleName::new("parent.child.two"))
+            resolve_module(&db, ModuleName::new_static("parent.child.two").unwrap())
         );
         Ok(())
     }
@@ -766,7 +776,7 @@ mod tests {
         db.memory_file_system()
             .write_files([(&foo_src, ""), (&foo_site_packages, "")])?;
 
-        let foo_module = resolve_module(&db, ModuleName::new("foo")).unwrap();
+        let foo_module = resolve_module(&db, ModuleName::new_static("foo").unwrap()).unwrap();
 
         assert_eq!(&src, foo_module.search_path().path());
         assert_eq!(&foo_src, foo_module.file().path(&db));
@@ -821,8 +831,8 @@ mod tests {
 
         set_module_resolution_settings(&mut db, settings);
 
-        let foo_module = resolve_module(&db, ModuleName::new("foo")).unwrap();
-        let bar_module = resolve_module(&db, ModuleName::new("bar")).unwrap();
+        let foo_module = resolve_module(&db, ModuleName::new_static("foo").unwrap()).unwrap();
+        let bar_module = resolve_module(&db, ModuleName::new_static("bar").unwrap()).unwrap();
 
         assert_ne!(foo_module, bar_module);
 
@@ -859,7 +869,8 @@ mod tests {
         db.memory_file_system()
             .write_files([(&foo_path, "x = 1"), (&bar_path, "y = 2")])?;
 
-        let foo_module = resolve_module(&db, ModuleName::new("foo")).unwrap();
+        let foo_module_name = ModuleName::new_static("foo").unwrap();
+        let foo_module = resolve_module(&db, foo_module_name.clone()).unwrap();
 
         let bar = file_system_path_to_file(&db, &bar_path).expect("bar.py to exist");
 
@@ -872,7 +883,7 @@ mod tests {
         // Re-query the foo module. The foo module should still be cached because `bar.py` isn't relevant
         // for resolving `foo`.
 
-        let foo_module2 = resolve_module(&db, ModuleName::new("foo"));
+        let foo_module2 = resolve_module(&db, foo_module_name);
 
         assert!(!db
             .take_sale_events()
@@ -890,15 +901,15 @@ mod tests {
         let TestCase { mut db, src, .. } = create_resolver()?;
         let foo_path = src.join("foo.py");
 
-        assert_eq!(resolve_module(&db, ModuleName::new("foo")), None);
+        let foo_module_name = ModuleName::new_static("foo").unwrap();
+        assert_eq!(resolve_module(&db, foo_module_name.clone()), None);
 
         // Now write the foo file
         db.memory_file_system().write_file(&foo_path, "x = 1")?;
         VfsFile::touch_path(&mut db, &VfsPath::FileSystem(foo_path.clone()));
         let foo_file = file_system_path_to_file(&db, &foo_path).expect("foo.py to exist");
 
-        let foo_module =
-            resolve_module(&db, ModuleName::new("foo")).expect("Foo module to resolve");
+        let foo_module = resolve_module(&db, foo_module_name).expect("Foo module to resolve");
         assert_eq!(foo_file, foo_module.file());
 
         Ok(())
@@ -914,7 +925,8 @@ mod tests {
         db.memory_file_system()
             .write_files([(&foo_path, "x = 1"), (&foo_init_path, "x = 2")])?;
 
-        let foo_module = resolve_module(&db, ModuleName::new("foo")).expect("foo module to exist");
+        let foo_module_name = ModuleName::new_static("foo").unwrap();
+        let foo_module = resolve_module(&db, foo_module_name.clone()).expect("foo module to exist");
 
         assert_eq!(&foo_init_path, foo_module.file().path(&db));
 
@@ -924,8 +936,7 @@ mod tests {
             .remove_directory(foo_init_path.parent().unwrap())?;
         VfsFile::touch_path(&mut db, &VfsPath::FileSystem(foo_init_path.clone()));
 
-        let foo_module =
-            resolve_module(&db, ModuleName::new("foo")).expect("Foo module to resolve");
+        let foo_module = resolve_module(&db, foo_module_name).expect("Foo module to resolve");
         assert_eq!(&foo_path, foo_module.file().path(&db));
 
         Ok(())
