@@ -2,7 +2,7 @@ use std::ops::Deref;
 use std::sync::Arc;
 
 use ruff_db::file_system::{FileSystem, FileSystemPath, FileSystemPathBuf};
-use ruff_db::vfs::{file_system_path_to_file, vfs_path_to_file, VfsFile, VfsPath};
+use ruff_db::vfs::{system_path_to_file, vfs_path_to_file, VfsFile, VfsPath};
 
 use crate::module::resolver::internal::ModuleResolverSearchPaths;
 use crate::module::{
@@ -258,13 +258,13 @@ fn resolve_name(db: &dyn Db, name: &ModuleName) -> Option<(ModuleSearchPath, Vfs
                 // TODO Implement full https://peps.python.org/pep-0561/#type-checker-module-resolution-order resolution
                 let stub = package_path.with_extension("pyi");
 
-                if let Some(stub) = file_system_path_to_file(db.upcast(), &stub) {
+                if let Some(stub) = system_path_to_file(db.upcast(), &stub) {
                     return Some((search_path.clone(), stub, kind));
                 }
 
                 let module = package_path.with_extension("py");
 
-                if let Some(module) = file_system_path_to_file(db.upcast(), &module) {
+                if let Some(module) = system_path_to_file(db.upcast(), &module) {
                     return Some((search_path.clone(), module, kind));
                 }
 
@@ -376,7 +376,7 @@ impl PackageKind {
 mod tests {
 
     use ruff_db::file_system::{FileSystemPath, FileSystemPathBuf};
-    use ruff_db::vfs::{file_system_path_to_file, VfsFile, VfsPath};
+    use ruff_db::vfs::{system_path_to_file, VfsFile, VfsPath};
 
     use crate::db::tests::TestDb;
     use crate::module::{ModuleKind, ModuleName};
@@ -872,7 +872,7 @@ mod tests {
         let foo_module_name = ModuleName::new_static("foo").unwrap();
         let foo_module = resolve_module(&db, foo_module_name.clone()).unwrap();
 
-        let bar = file_system_path_to_file(&db, &bar_path).expect("bar.py to exist");
+        let bar = system_path_to_file(&db, &bar_path).expect("bar.py to exist");
 
         db.clear_salsa_events();
 
@@ -907,7 +907,7 @@ mod tests {
         // Now write the foo file
         db.memory_file_system().write_file(&foo_path, "x = 1")?;
         VfsFile::touch_path(&mut db, &VfsPath::FileSystem(foo_path.clone()));
-        let foo_file = file_system_path_to_file(&db, &foo_path).expect("foo.py to exist");
+        let foo_file = system_path_to_file(&db, &foo_path).expect("foo.py to exist");
 
         let foo_module = resolve_module(&db, foo_module_name).expect("Foo module to resolve");
         assert_eq!(foo_file, foo_module.file());
