@@ -30,7 +30,7 @@ pub(super) struct SemanticIndexBuilder<'a> {
     // Semantic Index fields
     scopes: IndexVec<ScopeId, Scope>,
     symbol_tables: IndexVec<ScopeId, SymbolTable>,
-    ast_ids: IndexVec<ScopeId, AstIdsBuilder<'a>>,
+    ast_ids: IndexVec<ScopeId, AstIdsBuilder>,
     expression_scopes: FxHashMap<NodeKey, ScopeId>,
     scopes_by_node: FxHashMap<NodeWithScope, ScopeId>,
 }
@@ -80,7 +80,7 @@ impl<'a> SemanticIndexBuilder<'a> {
 
         let scope_id = self.scopes.push(scope);
         self.symbol_tables.push(SymbolTable::new(scope_id));
-        self.ast_ids.push(AstIdsBuilder::new(self.module));
+        self.ast_ids.push(AstIdsBuilder::new());
         self.scope_stack.push(scope_id);
     }
 
@@ -97,7 +97,7 @@ impl<'a> SemanticIndexBuilder<'a> {
         &mut self.symbol_tables[scope_id]
     }
 
-    fn current_ast_ids(&mut self) -> &mut AstIdsBuilder<'a> {
+    fn current_ast_ids(&mut self) -> &mut AstIdsBuilder {
         let scope_id = self.current_scope();
         &mut self.ast_ids[scope_id]
     }
@@ -183,7 +183,7 @@ impl<'a> SemanticIndexBuilder<'a> {
     }
 
     pub(super) fn build(mut self) -> SemanticIndex {
-        let module = self.module.clone();
+        let module = self.module;
         self.visit_body(module.suite());
 
         // Pop the root scope
@@ -223,7 +223,13 @@ impl<'a> SemanticIndexBuilder<'a> {
 
 impl Visitor<'_> for SemanticIndexBuilder<'_> {
     fn visit_stmt(&mut self, stmt: &ast::Stmt) {
-        let statement_id = self.current_ast_ids().record_statement(stmt);
+        let module = self.module;
+        #[allow(unsafe_code)]
+        let statement_id = unsafe {
+            // SAFETY: The builder only visits nodes that are part of `module`. This guarantees that
+            // the current statement must be a child of `module`.
+            self.current_ast_ids().record_statement(stmt, module)
+        };
         match stmt {
             ast::Stmt::FunctionDef(function_def) => {
                 for decorator in &function_def.decorator_list {
@@ -414,7 +420,13 @@ impl Visitor<'_> for SemanticIndexBuilder<'_> {
     }
 
     fn visit_expr(&mut self, expr: &'_ ast::Expr) {
-        self.current_ast_ids().record_expression(expr);
+        let module = self.module;
+        #[allow(unsafe_code)]
+        let _id = unsafe {
+            // SAFETY: The builder only visits nodes that are part of `module`. This guarantees that
+            // the current expression must be a child of `module`.
+            self.current_ast_ids().record_expression(expr, module)
+        };
 
         self.expression_scopes
             .insert(NodeKey::from_node(expr), self.current_scope());

@@ -14,7 +14,7 @@ use crate::Db;
 
 #[tracing::instrument(level = "debug", skip(db))]
 #[salsa::tracked(no_eq)]
-pub fn ast_ids(db: &dyn Db, scope: GlobalScope) -> Arc<AstIds> {
+pub(crate) fn ast_ids(db: &dyn Db, scope: GlobalScope) -> Arc<AstIds> {
     let index = semantic_index(db, scope.file(db));
     index.ast_ids(scope.scope_id(db))
 }
@@ -34,7 +34,7 @@ pub fn ast_ids(db: &dyn Db, scope: GlobalScope) -> Arc<AstIds> {
 ///
 /// x = foo()
 /// ```
-pub struct AstIds {
+pub(crate) struct AstIds {
     /// Maps expression ids to their expressions.
     expressions: IndexVec<LocalExpressionId, AstNodeRef<ast::Expr>>,
 
@@ -64,14 +64,6 @@ impl std::fmt::Debug for AstIds {
             .finish()
     }
 }
-
-/// Uniquely identifies an [`ast::Expr`] in a [`ScopeId`].
-#[newtype_index]
-pub struct LocalExpressionId;
-
-/// Uniquely identifies an [`ast::Stmt`] in a [`ScopeId`].
-#[newtype_index]
-pub struct LocalStatementId;
 
 /// Node that can be uniquely identified by an id in a [`ScopeId`].
 pub trait LocalAstIdNode {
@@ -148,6 +140,10 @@ pub struct AstId<L> {
     local: L,
 }
 
+/// Uniquely identifies an [`ast::Expr`] in a [`ScopeId`].
+#[newtype_index]
+pub struct LocalExpressionId;
+
 impl LocalAstIdNode for ast::Expr {
     type Id = LocalExpressionId;
 
@@ -164,6 +160,10 @@ impl LocalAstIdNode for ast::Expr {
         ast_ids.expressions[id].clone()
     }
 }
+
+/// Uniquely identifies an [`ast::Stmt`] in a [`ScopeId`].
+#[newtype_index]
+pub struct LocalStatementId;
 
 impl LocalAstIdNode for ast::Stmt {
     type Id = LocalStatementId;
@@ -184,7 +184,7 @@ impl LocalAstIdNode for ast::Stmt {
 }
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
-pub struct LocalFunctionId(pub(in crate::red_knot) LocalStatementId);
+pub struct LocalFunctionId(pub(super) LocalStatementId);
 
 impl LocalAstIdNode for ast::StmtFunctionDef {
     type Id = LocalFunctionId;
@@ -203,7 +203,7 @@ impl LocalAstIdNode for ast::StmtFunctionDef {
 }
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
-pub struct LocalClassId(pub(in crate::red_knot) LocalStatementId);
+pub struct LocalClassId(pub(super) LocalStatementId);
 
 impl LocalAstIdNode for ast::StmtClassDef {
     type Id = LocalClassId;
@@ -257,7 +257,7 @@ impl LocalAstIdNode for ast::StmtAnnAssign {
 }
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
-pub struct LocalImportId(pub(in crate::red_knot) LocalStatementId);
+pub struct LocalImportId(pub(super) LocalStatementId);
 
 impl LocalAstIdNode for ast::StmtImport {
     type Id = LocalImportId;
@@ -275,7 +275,7 @@ impl LocalAstIdNode for ast::StmtImport {
 }
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
-pub struct LocalImportFromId(pub(in crate::red_knot) LocalStatementId);
+pub struct LocalImportFromId(pub(super) LocalStatementId);
 
 impl LocalAstIdNode for ast::StmtImportFrom {
     type Id = LocalImportFromId;
@@ -293,18 +293,16 @@ impl LocalAstIdNode for ast::StmtImportFrom {
 }
 
 #[derive(Debug)]
-pub(in crate::red_knot) struct AstIdsBuilder<'a> {
-    parsed: &'a ParsedModule,
+pub(super) struct AstIdsBuilder {
     expressions: IndexVec<LocalExpressionId, AstNodeRef<ast::Expr>>,
     expressions_map: FxHashMap<NodeKey, LocalExpressionId>,
     statements: IndexVec<LocalStatementId, AstNodeRef<ast::Stmt>>,
     statements_map: FxHashMap<NodeKey, LocalStatementId>,
 }
 
-impl<'a> AstIdsBuilder<'a> {
-    pub(in crate::red_knot) fn new(parsed: &'a ParsedModule) -> Self {
+impl AstIdsBuilder {
+    pub(super) fn new() -> Self {
         Self {
-            parsed,
             expressions: IndexVec::default(),
             expressions_map: FxHashMap::default(),
             statements: IndexVec::default(),
@@ -312,10 +310,18 @@ impl<'a> AstIdsBuilder<'a> {
         }
     }
 
-    pub(in crate::red_knot) fn record_statement(&mut self, stmt: &ast::Stmt) -> LocalStatementId {
-        let statement_id = self
-            .statements
-            .push(unsafe { AstNodeRef::new(self.parsed.clone(), stmt) });
+    /// Adds `stmt` to the AST ids map and returns its id.
+    ///
+    /// ## Safety
+    /// The function is marked as unsafe because it calls [`AstNodeRef::new`] which requires
+    /// that `stmt` is a child of `parsed`.
+    #[allow(unsafe_code)]
+    pub(super) unsafe fn record_statement(
+        &mut self,
+        stmt: &ast::Stmt,
+        parsed: &ParsedModule,
+    ) -> LocalStatementId {
+        let statement_id = self.statements.push(AstNodeRef::new(parsed.clone(), stmt));
 
         self.statements_map
             .insert(NodeKey::from_node(stmt), statement_id);
@@ -323,10 +329,18 @@ impl<'a> AstIdsBuilder<'a> {
         statement_id
     }
 
-    pub(in crate::red_knot) fn record_expression(&mut self, expr: &ast::Expr) -> LocalExpressionId {
-        let expression_id = self
-            .expressions
-            .push(unsafe { AstNodeRef::new(self.parsed.clone(), expr) });
+    /// Adds `expr` to the AST ids map and returns its id.
+    ///
+    /// ## Safety
+    /// The function is marked as unsafe because it calls [`AstNodeRef::new`] which requires
+    /// that `expr` is a child of `parsed`.
+    #[allow(unsafe_code)]
+    pub(super) unsafe fn record_expression(
+        &mut self,
+        expr: &ast::Expr,
+        parsed: &ParsedModule,
+    ) -> LocalExpressionId {
+        let expression_id = self.expressions.push(AstNodeRef::new(parsed.clone(), expr));
 
         self.expressions_map
             .insert(NodeKey::from_node(expr), expression_id);
@@ -334,7 +348,7 @@ impl<'a> AstIdsBuilder<'a> {
         expression_id
     }
 
-    pub(in crate::red_knot) fn finish(mut self) -> AstIds {
+    pub(super) fn finish(mut self) -> AstIds {
         self.expressions.shrink_to_fit();
         self.expressions_map.shrink_to_fit();
         self.statements.shrink_to_fit();
