@@ -45,9 +45,9 @@ impl VendoredFileSystem {
         self.inner.clone()
     }
 
-    fn read_zipfile(mut zipfile: ZipFile) -> Result<String> {
+    fn read_zip_file(mut zip_file: ZipFile) -> Result<String> {
         let mut buffer = String::new();
-        zipfile.read_to_string(&mut buffer)?;
+        zip_file.read_to_string(&mut buffer)?;
         Ok(buffer)
     }
 }
@@ -65,15 +65,15 @@ impl FileSystem for VendoredFileSystem {
 
     fn is_directory(&self, path: &FileSystemPath) -> bool {
         let normalized = normalize_vendored_path(path);
-        if let Ok(zipfile) = self.vendored_archive().lookup_path(&normalized) {
-            return zipfile.is_dir();
+        if let Ok(zip_file) = self.vendored_archive().lookup_path(&normalized) {
+            return zip_file.is_dir();
         }
         if normalized.has_trailing_slash() {
             return false;
         }
         self.vendored_archive()
             .lookup_path(&normalized.with_trailing_slash())
-            .is_ok_and(|zipfile| zipfile.is_dir())
+            .is_ok_and(|zip_file| zip_file.is_dir())
     }
 
     fn is_file(&self, path: &FileSystemPath) -> bool {
@@ -82,23 +82,23 @@ impl FileSystem for VendoredFileSystem {
         }
         self.vendored_archive()
             .lookup_path(&normalize_vendored_path(path))
-            .is_ok_and(|zipfile| zipfile.is_file())
+            .is_ok_and(|zip_file| zip_file.is_file())
     }
 
     fn metadata(&self, path: &FileSystemPath) -> Result<Metadata> {
         let normalized = normalize_vendored_path(path);
         let mut archive = self.vendored_archive();
 
-        let is_dir = match archive.lookup_path(&normalized) {
-            Ok(zipfile) => zipfile.is_dir(),
+        let (is_dir, last_modified) = match archive.lookup_path(&normalized) {
+            Ok(zip_file) => (zip_file.is_dir(), zip_file.last_modified()),
             Err(err) => {
                 if normalized.has_trailing_slash() {
                     return Err(err);
                 }
                 let mut archive = self.vendored_archive();
                 let lookup_result = archive.lookup_path(&normalized.with_trailing_slash());
-                if let Ok(zipfile) = lookup_result {
-                    zipfile.is_dir()
+                if let Ok(zip_file) = lookup_result {
+                    (zip_file.is_dir(), zip_file.last_modified())
                 } else {
                     return Err(err);
                 }
@@ -111,8 +111,16 @@ impl FileSystem for VendoredFileSystem {
             FileType::File
         };
 
+        let last_modified_timestamp = last_modified
+            .to_time()
+            .expect("Expected the last-modified time of the file to be representable as an OffsetDateTime")
+            .unix_timestamp_nanos();
+
+        let last_modified_timestamp = u128::try_from(last_modified_timestamp)
+            .expect("Expected the UTC offset to be a positive number");
+
         Ok(Metadata {
-            revision: FileRevision::zero(),
+            revision: FileRevision::new(last_modified_timestamp),
             permissions: Some(Self::READ_ONLY_PERMISSIONS),
             file_type,
         })
@@ -122,14 +130,14 @@ impl FileSystem for VendoredFileSystem {
         let normalized = normalize_vendored_path(path);
         let mut archive = self.vendored_archive();
         let lookup_error = match archive.lookup_path(&normalized) {
-            Ok(zipfile) => return Self::read_zipfile(zipfile),
+            Ok(zip_file) => return Self::read_zip_file(zip_file),
             Err(err) => err,
         };
         if normalized.has_trailing_slash() {
             return Err(lookup_error);
         }
-        let zipfile = archive.lookup_path(&normalized.with_trailing_slash())?;
-        Self::read_zipfile(zipfile)
+        let zip_file = archive.lookup_path(&normalized.with_trailing_slash())?;
+        Self::read_zip_file(zip_file)
     }
 }
 
@@ -313,7 +321,7 @@ mod tests {
         let path_metadata = mock_typeshed.metadata(path).unwrap();
         assert!(path_metadata.file_type().is_directory());
         assert!(path_metadata.permissions().is_some());
-        assert_eq!(path_metadata.revision(), FileRevision::zero());
+        path_metadata.revision();
     }
 
     #[test]
@@ -384,7 +392,7 @@ mod tests {
         let path_metadata = mock_typeshed.metadata(path).unwrap();
         assert!(path_metadata.file_type().is_file());
         assert!(path_metadata.permissions().is_some());
-        assert_eq!(path_metadata.revision(), FileRevision::zero());
+        path_metadata.revision();
     }
 
     #[test]
