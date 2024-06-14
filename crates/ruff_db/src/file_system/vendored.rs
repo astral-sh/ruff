@@ -1,8 +1,10 @@
+use std::fmt;
 use std::io::{Cursor, Read};
+use std::ops::Deref;
 use std::sync::Arc;
 
 use itertools::Itertools;
-use zip::{read::ZipFile, result::ZipResult, ZipArchive};
+use zip::{read::ZipFile, ZipArchive};
 
 use crate::file_system::{FileRevision, FileSystem, FileSystemPath, FileType, Metadata, Result};
 
@@ -14,9 +16,17 @@ pub struct VendoredFileSystem {
 impl VendoredFileSystem {
     const READ_ONLY_PERMISSIONS: u32 = 0o444;
 
-    pub fn new(raw_bytes: Arc<[u8]>) -> Result<Self> {
+    pub fn new(raw_bytes: &'static [u8]) -> Result<Self> {
         Ok(Self {
-            inner: VendoredZipArchive::new(raw_bytes)?,
+            inner: VendoredZipArchive::from_static_data(raw_bytes)?,
+        })
+    }
+
+    /// Alternative, private constructor for testing purposes
+    #[cfg(test)]
+    fn from_dynamic_data(data: &[u8]) -> Result<Self> {
+        Ok(Self {
+            inner: VendoredZipArchive::from_dynamic_data(data)?,
         })
     }
 
@@ -35,9 +45,8 @@ impl VendoredFileSystem {
         self.inner.clone()
     }
 
-    /// Create a new empty string, read the contents of `zipfile` into it, and return the string
     fn read_zipfile(mut zipfile: ZipFile) -> Result<String> {
-        let mut buffer = String::with_capacity(zipfile.size() as usize);
+        let mut buffer = String::new();
         zipfile.read_to_string(&mut buffer)?;
         Ok(buffer)
     }
@@ -119,9 +128,43 @@ impl FileSystem for VendoredFileSystem {
         if normalized.has_trailing_slash() {
             return Err(lookup_error);
         }
-        let mut archive = self.vendored_archive();
         let zipfile = archive.lookup_path(&normalized.with_trailing_slash())?;
         Self::read_zipfile(zipfile)
+    }
+}
+
+#[derive(Clone)]
+enum VendoredZipData {
+    /// Used for zips that are available at build time
+    Static(&'static [u8]),
+
+    /// Used mainly for testing: we generally want to create mock zip archives
+    /// inside the test, so that we can easily see what's in the archive.
+    /// This means that it's hard for the mock zip archive to be available at build time.
+    #[allow(unused)]
+    Dynamic(Arc<[u8]>),
+}
+
+impl Deref for VendoredZipData {
+    type Target = [u8];
+
+    fn deref(&self) -> &Self::Target {
+        match self {
+            Self::Static(data) => data,
+            Self::Dynamic(data) => data,
+        }
+    }
+}
+
+impl AsRef<[u8]> for VendoredZipData {
+    fn as_ref(&self) -> &[u8] {
+        self
+    }
+}
+
+impl fmt::Debug for VendoredZipData {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "<Binary data of length {}>", self.len())
     }
 }
 
@@ -129,11 +172,20 @@ impl FileSystem for VendoredFileSystem {
 ///
 /// Since ZipArchives are generally cheap to clone (for now), this should be too.
 #[derive(Debug, Clone)]
-struct VendoredZipArchive(ZipArchive<Cursor<Arc<[u8]>>>);
+struct VendoredZipArchive(ZipArchive<Cursor<VendoredZipData>>);
 
 impl VendoredZipArchive {
-    fn new(vendored_bytes: Arc<[u8]>) -> ZipResult<Self> {
-        Ok(Self(ZipArchive::new(Cursor::new(vendored_bytes))?))
+    fn from_static_data(data: &'static [u8]) -> Result<Self> {
+        Ok(Self(ZipArchive::new(Cursor::new(
+            VendoredZipData::Static(data),
+        ))?))
+    }
+
+    #[cfg(test)]
+    fn from_dynamic_data(data: &[u8]) -> Result<Self> {
+        Ok(Self(ZipArchive::new(Cursor::new(
+            VendoredZipData::Dynamic(Arc::from(data)),
+        ))?))
     }
 
     fn lookup_path(&mut self, path: &NormalizedVendoredPath) -> Result<ZipFile> {
@@ -206,11 +258,9 @@ fn normalize_vendored_path(path: &FileSystemPath) -> NormalizedVendoredPath {
 
 #[cfg(test)]
 mod tests {
-    use std::fs;
     use std::io::Write;
 
     use once_cell::sync::Lazy;
-    use tempfile::TempDir;
     use zip::{write::FileOptions, CompressionMethod, ZipWriter};
 
     use super::*;
@@ -219,135 +269,155 @@ mod tests {
     const ASYNCIO_TASKS_CONTENTS: &str = "class Task: ...";
 
     static MOCK_ZIP_ARCHIVE: Lazy<Arc<[u8]>> = Lazy::new(|| {
-        let td = TempDir::new().unwrap();
-        let typeshed_path = td.path().join("typeshed");
-        let typeshed = fs::File::create(&typeshed_path).unwrap();
+        let mut typeshed_buffer = Vec::new();
+        let typeshed = Cursor::new(&mut typeshed_buffer);
 
         let options = FileOptions::default()
             .compression_method(CompressionMethod::Zstd)
             .unix_permissions(0o644);
 
-        let mut archive = ZipWriter::new(typeshed);
+        {
+            let mut archive = ZipWriter::new(typeshed);
 
-        archive.add_directory("stdlib/", options).unwrap();
-        archive.start_file("stdlib/functools.pyi", options).unwrap();
-        archive.write_all(FUNCTOOLS_CONTENTS.as_bytes()).unwrap();
+            archive.add_directory("stdlib/", options).unwrap();
+            archive.start_file("stdlib/functools.pyi", options).unwrap();
+            archive.write_all(FUNCTOOLS_CONTENTS.as_bytes()).unwrap();
 
-        archive.add_directory("stdlib/asyncio/", options).unwrap();
-        archive
-            .start_file("stdlib/asyncio/tasks.pyi", options)
-            .unwrap();
-        archive
-            .write_all(ASYNCIO_TASKS_CONTENTS.as_bytes())
-            .unwrap();
+            archive.add_directory("stdlib/asyncio/", options).unwrap();
+            archive
+                .start_file("stdlib/asyncio/tasks.pyi", options)
+                .unwrap();
+            archive
+                .write_all(ASYNCIO_TASKS_CONTENTS.as_bytes())
+                .unwrap();
 
-        archive.finish().unwrap();
-        Arc::from(fs::read(typeshed_path).unwrap().into_boxed_slice())
+            archive.finish().unwrap();
+        }
+
+        Arc::from(typeshed_buffer.into_boxed_slice())
     });
 
     fn mock_typeshed() -> VendoredFileSystem {
-        VendoredFileSystem::new(Arc::clone(&MOCK_ZIP_ARCHIVE)).unwrap()
+        VendoredFileSystem::from_dynamic_data(&MOCK_ZIP_ARCHIVE).unwrap()
     }
 
-    macro_rules! directory_tests {
-        ($($name:ident: $dirname:literal,)*) => {
-        $(
-            #[test]
-            fn $name() {
-                let mock_typeshed = mock_typeshed();
+    fn test_directory(dirname: &str) {
+        let mock_typeshed = mock_typeshed();
 
-                let path = FileSystemPath::new($dirname);
+        let path = FileSystemPath::new(dirname);
 
-                assert!(mock_typeshed.exists(path));
-                assert!(mock_typeshed.is_directory(path));
-                assert!(!mock_typeshed.is_file(path));
+        assert!(mock_typeshed.exists(path));
+        assert!(mock_typeshed.is_directory(path));
+        assert!(!mock_typeshed.is_file(path));
 
-                let path_metadata = mock_typeshed.metadata(path).unwrap();
-                assert!(path_metadata.file_type().is_directory());
-                assert!(path_metadata.permissions().is_some());
-                assert_eq!(path_metadata.revision(), FileRevision::zero());
-            }
-        )*
-        }
+        let path_metadata = mock_typeshed.metadata(path).unwrap();
+        assert!(path_metadata.file_type().is_directory());
+        assert!(path_metadata.permissions().is_some());
+        assert_eq!(path_metadata.revision(), FileRevision::zero());
     }
 
-    directory_tests! {
-        stdlib_dir_no_trailing_slash: "stdlib",
-        stdlib_dir_trailing_slash: "stdlib/",
-        asyncio_dir_no_trailing_slash: "stdlib/asyncio",
-        asyncio_dir_trailing_slash: "stdlib/asyncio/",
-        stdlib_dir_parent_components: "stdlib/asyncio/../../stdlib",
-        asyncio_dir_odd_components: "./stdlib/asyncio/../asyncio/",
+    #[test]
+    fn stdlib_dir_no_trailing_slash() {
+        test_directory("stdlib")
     }
 
-    macro_rules! nonexistent_path_tests {
-        ($($name:ident: $path:literal,)*) => {
-        $(
-            #[test]
-            fn $name() {
-                let mock_typeshed = mock_typeshed();
-                let path = FileSystemPath::new($path);
-                assert!(!mock_typeshed.exists(path));
-                assert!(!mock_typeshed.is_directory(path));
-                assert!(!mock_typeshed.is_file(path));
-                assert!(mock_typeshed.metadata(path).is_err());
-                assert!(mock_typeshed.read(path).is_err());
-            }
-        )*
-        }
+    #[test]
+    fn stdlib_dir_trailing_slash() {
+        test_directory("stdlib/")
     }
 
-    nonexistent_path_tests! {
-        simple_path: "foo",
-        path_with_extension: "foo.pyi",
-        path_with_trailing_slash: "foo/",
-        path_with_fancy_components: "./foo/../../../foo",
+    #[test]
+    fn asyncio_dir_no_trailing_slash() {
+        test_directory("stdlib/asyncio")
     }
 
-    macro_rules! file_tests {
-        ($($name:ident: $filename:literal,)*) => {
-        $(
-            #[test]
-            fn $name() {
-                let mock_typeshed = mock_typeshed();
-
-                let path = FileSystemPath::new($filename);
-
-                assert!(mock_typeshed.exists(path));
-                assert!(mock_typeshed.is_file(path));
-                assert!(!mock_typeshed.is_directory(path));
-
-                let path_metadata = mock_typeshed.metadata(path).unwrap();
-                assert!(path_metadata.file_type().is_file());
-                assert!(path_metadata.permissions().is_some());
-                assert_eq!(path_metadata.revision(), FileRevision::zero());
-            }
-        )*
-        }
+    #[test]
+    fn asyncio_dir_trailing_slash() {
+        test_directory("stdlib/asyncio/")
     }
 
-    file_tests! {
-        functools: "stdlib/functools.pyi",
-        asyncio_tasks: "stdlib/asyncio/tasks.pyi",
-        functools_parent_components: "stdlib/../stdlib/../stdlib/functools.pyi",
-        asyncio_tasks_odd_components: "./stdlib/asyncio/../asyncio/tasks.pyi",
+    #[test]
+    fn stdlib_dir_parent_components() {
+        test_directory("stdlib/asyncio/../../stdlib")
+    }
+
+    #[test]
+    fn asyncio_dir_odd_components() {
+        test_directory("./stdlib/asyncio/../asyncio/")
+    }
+
+    fn test_nonexistent_path(path: &str) {
+        let mock_typeshed = mock_typeshed();
+        let path = FileSystemPath::new(path);
+        assert!(!mock_typeshed.exists(path));
+        assert!(!mock_typeshed.is_directory(path));
+        assert!(!mock_typeshed.is_file(path));
+        assert!(mock_typeshed.metadata(path).is_err());
+        assert!(mock_typeshed.read(path).is_err());
+    }
+
+    #[test]
+    fn simple_nonexistent_path() {
+        test_nonexistent_path("foo")
+    }
+
+    #[test]
+    fn nonexistent_path_with_extension() {
+        test_nonexistent_path("foo.pyi")
+    }
+
+    #[test]
+    fn nonexistent_path_with_trailing_slash() {
+        test_nonexistent_path("foo/")
+    }
+
+    #[test]
+    fn nonexistent_path_with_fancy_components() {
+        test_nonexistent_path("./foo/../../../foo")
+    }
+
+    fn test_file(mock_typeshed: &VendoredFileSystem, path: &FileSystemPath) {
+        assert!(mock_typeshed.exists(path));
+        assert!(mock_typeshed.is_file(path));
+        assert!(!mock_typeshed.is_directory(path));
+
+        let path_metadata = mock_typeshed.metadata(path).unwrap();
+        assert!(path_metadata.file_type().is_file());
+        assert!(path_metadata.permissions().is_some());
+        assert_eq!(path_metadata.revision(), FileRevision::zero());
     }
 
     #[test]
     fn functools_file_contents() {
         let mock_typeshed = mock_typeshed();
-        let functools = mock_typeshed
-            .read(FileSystemPath::new("stdlib/functools.pyi"))
-            .unwrap();
-        assert_eq!(functools.as_str(), FUNCTOOLS_CONTENTS);
+        let path = FileSystemPath::new("stdlib/functools.pyi");
+        test_file(&mock_typeshed, path);
+        let functools_stub = mock_typeshed.read(path).unwrap();
+        assert_eq!(functools_stub.as_str(), FUNCTOOLS_CONTENTS);
     }
 
     #[test]
-    fn asyncio_tasks_file_contents() {
+    fn functools_file_other_path() {
+        test_file(
+            &mock_typeshed(),
+            FileSystemPath::new("stdlib/../stdlib/../stdlib/functools.pyi"),
+        )
+    }
+
+    #[test]
+    fn asyncio_file_contents() {
         let mock_typeshed = mock_typeshed();
-        let functools = mock_typeshed
-            .read(FileSystemPath::new("stdlib/asyncio/tasks.pyi"))
-            .unwrap();
-        assert_eq!(functools.as_str(), ASYNCIO_TASKS_CONTENTS);
+        let path = FileSystemPath::new("stdlib/asyncio/tasks.pyi");
+        test_file(&mock_typeshed, path);
+        let asyncio_stub = mock_typeshed.read(path).unwrap();
+        assert_eq!(asyncio_stub.as_str(), ASYNCIO_TASKS_CONTENTS);
+    }
+
+    #[test]
+    fn asyncio_file_other_path() {
+        test_file(
+            &mock_typeshed(),
+            FileSystemPath::new("./stdlib/asyncio/../asyncio/tasks.pyi"),
+        )
     }
 }

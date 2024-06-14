@@ -2037,7 +2037,6 @@ dependencies = [
  "ruff_text_size",
  "rustc-hash",
  "salsa-2022",
- "tempfile",
  "tracing",
  "zip",
 ]
