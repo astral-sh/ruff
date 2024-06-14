@@ -89,8 +89,8 @@ impl FileSystem for VendoredFileSystem {
         let normalized = normalize_vendored_path(path);
         let mut archive = self.vendored_archive();
 
-        let (is_dir, last_modified) = match archive.lookup_path(&normalized) {
-            Ok(zip_file) => (zip_file.is_dir(), zip_file.last_modified()),
+        let (is_dir, file_hash) = match archive.lookup_path(&normalized) {
+            Ok(zip_file) => (zip_file.is_dir(), zip_file.crc32()),
             Err(err) => {
                 if normalized.has_trailing_slash() {
                     return Err(err);
@@ -98,7 +98,7 @@ impl FileSystem for VendoredFileSystem {
                 let mut archive = self.vendored_archive();
                 let lookup_result = archive.lookup_path(&normalized.with_trailing_slash());
                 if let Ok(zip_file) = lookup_result {
-                    (zip_file.is_dir(), zip_file.last_modified())
+                    (zip_file.is_dir(), zip_file.crc32())
                 } else {
                     return Err(err);
                 }
@@ -111,16 +111,11 @@ impl FileSystem for VendoredFileSystem {
             FileType::File
         };
 
-        let last_modified_timestamp = last_modified
-            .to_time()
-            .expect("Expected the last-modified time of the file to be representable as an OffsetDateTime")
-            .unix_timestamp_nanos();
-
-        let last_modified_timestamp = u128::try_from(last_modified_timestamp)
-            .expect("Expected the UTC offset to be a positive number");
-
         Ok(Metadata {
-            revision: FileRevision::new(last_modified_timestamp),
+            // Using the file hash is fine here,
+            // as `FileRevision`s are not guaranteed to be monotonically increasing
+            // for newer revisions
+            revision: FileRevision::new(u128::from(file_hash)),
             permissions: Some(Self::READ_ONLY_PERMISSIONS),
             file_type,
         })
