@@ -932,7 +932,7 @@ mod tests {
         // Luckily this crate will fail to build if this file isn't available at build time.
         const TYPESHED_ZIP_BYTES: &[u8] =
             include_bytes!(concat!(env!("OUT_DIR"), "/zipped_typeshed.zip"));
-        assert!(!TYPESHED_ZIP_BYTES.is_empty());
+
         let mut typeshed_zip_archive = ZipArchive::new(Cursor::new(TYPESHED_ZIP_BYTES))?;
 
         let path_to_functools = Path::new("stdlib").join("functools.pyi");
