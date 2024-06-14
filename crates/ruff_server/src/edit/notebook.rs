@@ -169,7 +169,7 @@ impl NotebookDocument {
     }
 
     /// Returns a list of cell URIs in the order they appear in the array.
-    pub(crate) fn urls(&self) -> impl Iterator<Item = &lsp_types::Url> {
+    pub(crate) fn cell_urls(&self) -> impl Iterator<Item = &lsp_types::Url> {
         self.cells.iter().map(|cell| &cell.url)
     }
 

@@ -141,7 +141,7 @@ pub(crate) fn check(query: &DocumentQuery, encoding: PositionEncoding) -> Diagno
     // Populates all relevant URLs with an empty diagnostic list.
     // This ensures that documents without diagnostics still get updated.
     if let Some(notebook) = query.as_notebook() {
-        for url in notebook.urls() {
+        for url in notebook.cell_urls() {
             diagnostics.entry(url.clone()).or_default();
         }
     } else {

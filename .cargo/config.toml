@@ -6,5 +6,5 @@ benchmark = "bench -p ruff_benchmark --bench linter --bench formatter --"
 # that shared/dynamic library.
 #
 # See: https://github.com/astral-sh/ruff/issues/11503
-[target.'cfg(all(target_env="msvc", target_os = "windows"))']
+[target.'cfg(all(target_env = "msvc", target_os = "windows"))']
 rustflags = ["-C", "target-feature=+crt-static"]

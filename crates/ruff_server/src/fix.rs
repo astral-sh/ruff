@@ -111,7 +111,7 @@ pub(crate) fn fix_all(
             .iter()
             .map(cell_source)
             .zip(modified_notebook.cells().iter().map(cell_source))
-            .zip(notebook.urls())
+            .zip(notebook.cell_urls())
         {
             let source_index = LineIndex::from_source_text(&source);
             let modified_index = LineIndex::from_source_text(&modified);

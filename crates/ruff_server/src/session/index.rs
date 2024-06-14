@@ -328,7 +328,7 @@ impl Index {
     }
 
     pub(super) fn open_notebook_document(&mut self, notebook_url: Url, document: NotebookDocument) {
-        for cell_url in document.urls() {
+        for cell_url in document.cell_urls() {
             self.notebook_cells
                 .insert(cell_url.clone(), notebook_url.clone());
         }
@@ -347,16 +347,10 @@ impl Index {
             anyhow::bail!("Tried to close unavailable document `{key}`");
         };
 
-        let Some(controller) = self.documents.remove(&url) else {
+        if self.documents.remove(&url).is_none() {
             anyhow::bail!("tried to close document that didn't exist at {}", url)
         };
-        if let Some(notebook) = controller.as_notebook() {
-            for url in notebook.urls() {
-                self.notebook_cells.remove(url).ok_or_else(|| {
-                    anyhow!("tried to de-register notebook cell with URL {url} that didn't exist")
-                })?;
-            }
-        }
+        // notebook cells are closed via textDocument/didClose - we don't close them here.
         Ok(())
     }
 

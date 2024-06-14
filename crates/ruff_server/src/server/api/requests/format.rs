@@ -36,7 +36,7 @@ pub(super) fn format_full_document(snapshot: &DocumentSnapshot) -> Result<Fixes>
     match snapshot.query() {
         DocumentQuery::Notebook { notebook, .. } => {
             for (url, text_document) in notebook
-                .urls()
+                .cell_urls()
                 .map(|url| (url.clone(), notebook.cell_document_by_uri(url).unwrap()))
             {
                 if let Some(changes) =
