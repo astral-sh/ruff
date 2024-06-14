@@ -1,16 +1,38 @@
 use crate::name::Name;
-use crate::red_knot::symbol_table::definition::Definition;
-use crate::red_knot::symbol_table::ScopeId;
+use crate::red_knot::semantic_index::definition::Definition;
+use crate::red_knot::semantic_index::ScopeId;
 use bitflags::bitflags;
 use ruff_db::vfs::VfsFile;
 use ruff_index::newtype_index;
+use smallvec::{smallvec, SmallVec};
 
 #[derive(Eq, PartialEq, Debug)]
 pub struct Symbol {
-    pub(super) name: Name,
-    pub(super) flags: SymbolFlags,
-    pub(super) scope: ScopeId,
-    pub(super) definitions: smallvec::SmallVec<[Definition; 1]>,
+    name: Name,
+    flags: SymbolFlags,
+    scope: ScopeId,
+
+    /// The nodes that define this symbol, in source order.
+    definitions: SmallVec<[Definition; 4]>,
+}
+
+impl Symbol {
+    pub(super) fn new(name: Name, scope: ScopeId, definition: Option<Definition>) -> Self {
+        Self {
+            name,
+            scope,
+            flags: SymbolFlags::empty(),
+            definitions: smallvec![definition.unwrap_or(Definition::Unbound)],
+        }
+    }
+
+    pub(super) fn push_definition(&mut self, definition: Definition) {
+        self.definitions.push(definition);
+    }
+
+    pub(super) fn insert_flags(&mut self, flags: SymbolFlags) {
+        self.flags.insert(flags);
+    }
 }
 
 impl Symbol {
@@ -50,15 +72,43 @@ bitflags! {
 /// ID that uniquely identifies a symbol, across modules.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub struct GlobalSymbolId {
-    pub(super) symbol_id: SymbolId,
-    pub(super) file: VfsFile,
+    symbol: SymbolId,
+    file: VfsFile,
+}
+
+impl GlobalSymbolId {
+    pub fn new(file: VfsFile, symbol: SymbolId) -> Self {
+        Self { symbol, file }
+    }
+
+    pub fn file(&self) -> VfsFile {
+        self.file
+    }
+
+    pub fn symbol(&self) -> SymbolId {
+        self.symbol
+    }
 }
 
 /// ID that uniquely identifies a symbol in a module.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub struct SymbolId {
-    pub(super) scope: ScopeId,
-    pub(super) local: LocalSymbolId,
+    scope: ScopeId,
+    symbol: LocalSymbolId,
+}
+
+impl SymbolId {
+    pub(super) fn new(scope: ScopeId, symbol: LocalSymbolId) -> Self {
+        Self { scope, symbol }
+    }
+
+    pub fn scope(&self) -> ScopeId {
+        self.scope
+    }
+
+    pub(super) fn symbol(&self) -> LocalSymbolId {
+        self.symbol
+    }
 }
 
 /// Symbol ID that uniquely identifies a symbol inside a [`Scope`].

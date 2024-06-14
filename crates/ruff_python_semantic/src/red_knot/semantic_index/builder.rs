@@ -4,31 +4,30 @@ use hashbrown::hash_map::RawEntryMut;
 use rustc_hash::FxHashMap;
 
 use ruff_db::parsed::ParsedModule;
-use ruff_db::vfs::VfsFile;
 use ruff_index::IndexVec;
 use ruff_python_ast as ast;
 use ruff_python_ast::visitor::{walk_expr, walk_stmt, Visitor};
 
 use crate::module::ModuleName;
 use crate::name::Name;
-use crate::red_knot::ast_ids::{
-    AstIdsBuilder, LocalClassId, LocalFunctionId, LocalImportFromId, LocalImportId, NodeKey,
+use crate::red_knot::node_key::NodeKey;
+use crate::red_knot::semantic_index::ast_ids::{
+    AstIdsBuilder, LocalClassId, LocalFunctionId, LocalImportFromId, LocalImportId,
 };
-use crate::red_knot::symbol_table::definition::{
+use crate::red_knot::semantic_index::definition::{
     Definition, ImportDefinition, ImportFromDefinition,
 };
-use crate::red_knot::symbol_table::symbol::{LocalSymbolId, Symbol, SymbolFlags, SymbolId};
-use crate::red_knot::symbol_table::{
+use crate::red_knot::semantic_index::symbol::{LocalSymbolId, Symbol, SymbolFlags, SymbolId};
+use crate::red_knot::semantic_index::{
     NodeWithScope, Scope, ScopeId, ScopeKind, SemanticIndex, SymbolTable,
 };
-use crate::Db;
 
 pub(super) struct SemanticIndexBuilder<'a> {
     // Builder state
     module: &'a ParsedModule,
     scope_stack: Vec<ScopeId>,
 
-    //
+    // Semantic Index fields
     scopes: IndexVec<ScopeId, Scope>,
     symbol_tables: IndexVec<ScopeId, SymbolTable>,
     ast_ids: IndexVec<ScopeId, AstIdsBuilder<'a>>,
@@ -68,14 +67,12 @@ impl<'a> SemanticIndexBuilder<'a> {
         definition: Option<Definition>,
     ) {
         let children_start = self.scopes.next_index() + 1;
+        let parent = self.current_scope();
 
         let scope = Scope {
             name: name.clone(),
-            parent: Some(self.current_scope()),
-            defining_symbol: defining_symbol.map(|local_id| SymbolId {
-                scope: self.current_scope(),
-                local: local_id,
-            }),
+            parent: Some(parent),
+            defining_symbol: defining_symbol.map(|local_id| SymbolId::new(parent, local_id)),
             definition,
             kind: scope_kind,
             descendents: children_start..children_start,
@@ -131,21 +128,17 @@ impl<'a> SemanticIndexBuilder<'a> {
         match entry {
             RawEntryMut::Occupied(entry) => {
                 let symbol = &mut symbol_table.symbols[*entry.key()];
-                symbol.flags.insert(flags);
+                symbol.insert_flags(flags);
 
                 if let Some(definition) = definition {
-                    symbol.definitions.push(definition);
+                    symbol.push_definition(definition);
                 }
 
                 *entry.key()
             }
             RawEntryMut::Vacant(entry) => {
-                let symbol = Symbol {
-                    name,
-                    flags,
-                    scope,
-                    definitions: definition.into_iter().collect(),
-                };
+                let mut symbol = Symbol::new(name, scope, definition);
+                symbol.insert_flags(flags);
 
                 let id = symbol_table.symbols.push(symbol);
                 entry.insert_with_hasher(hash, id, (), |id| {

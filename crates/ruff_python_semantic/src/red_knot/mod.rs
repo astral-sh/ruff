@@ -1,2 +1,3 @@
-pub mod ast_ids;
-pub mod symbol_table;
+mod ast_node_ref;
+mod node_key;
+pub mod semantic_index;

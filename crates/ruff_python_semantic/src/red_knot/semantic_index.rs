@@ -11,24 +11,31 @@ use ruff_index::{newtype_index, IndexSlice, IndexVec};
 use ruff_python_ast as ast;
 
 use crate::name::Name;
-use crate::red_knot::ast_ids::{AstIds, NodeKey};
-use crate::red_knot::symbol_table::builder::SemanticIndexBuilder;
-use crate::red_knot::symbol_table::definition::Definition;
-use crate::red_knot::symbol_table::symbol::{GlobalSymbolId, LocalSymbolId, Symbol, SymbolId};
+use crate::red_knot::node_key::NodeKey;
+use crate::red_knot::semantic_index::ast_ids::AstIds;
+use crate::red_knot::semantic_index::builder::SemanticIndexBuilder;
+use crate::red_knot::semantic_index::definition::Definition;
+use crate::red_knot::semantic_index::symbol::{GlobalSymbolId, LocalSymbolId, Symbol, SymbolId};
 use crate::Db;
 
+pub mod ast_ids;
 mod builder;
 mod definition;
 pub mod symbol;
 
 type SymbolMap = hashbrown::HashMap<LocalSymbolId, (), ()>;
 
+/// Maps from the file specific [`ScopeId`] to the global [`GlobalScope`] that can be used as a Salsa query parameter.
+///
+/// The [`SemanticIndex`] uses [`ScopeId`] on a per-file level to identify scopes
+/// because they allow for more efficient storage of associated data
+/// (use of an [`IndexVec`] keyed by [`ScopeId`] over an [`FxHashMap`] keyed by [`GlobalScope`]).
 #[derive(Eq, PartialEq, Debug)]
-pub struct GlobalScopes {
+pub struct ScopesMap {
     scopes: IndexVec<ScopeId, GlobalScope>,
 }
 
-impl Index<ScopeId> for GlobalScopes {
+impl Index<ScopeId> for ScopesMap {
     type Output = GlobalScope;
 
     fn index(&self, index: ScopeId) -> &Self::Output {
@@ -36,10 +43,7 @@ impl Index<ScopeId> for GlobalScopes {
     }
 }
 
-/// Global unique scope across modules.
-///
-/// Why not make [`Scope`] a salsa tracked. Mainly because all iterator methods then
-/// need to perform hash map lookups to get the field values, which seems expensive.
+/// A cross-module identifier of a scope that can be used as a salsa query parameter.
 #[salsa::tracked]
 pub struct GlobalScope {
     pub file: VfsFile,
@@ -183,7 +187,7 @@ pub(crate) fn semantic_index(db: &dyn Db, file: VfsFile) -> SemanticIndex {
 
 /// Returns a mapping from [`ScopeId`] to globally unique [`GlobalScope`].
 #[salsa::tracked(return_ref)]
-pub fn global_scopes(db: &dyn Db, file: VfsFile) -> GlobalScopes {
+pub fn scopes_map(db: &dyn Db, file: VfsFile) -> ScopesMap {
     let index = semantic_index(db, file);
 
     let scopes: IndexVec<_, _> = index
@@ -192,12 +196,12 @@ pub fn global_scopes(db: &dyn Db, file: VfsFile) -> GlobalScopes {
         .map(|id| GlobalScope::new(db, file, id))
         .collect();
 
-    GlobalScopes { scopes }
+    ScopesMap { scopes }
 }
 
 /// Returns the root scope of `file`.
 pub fn root_scope(db: &dyn Db, file: VfsFile) -> GlobalScope {
-    let scopes = global_scopes(db, file);
+    let scopes = scopes_map(db, file);
     scopes.scopes[ScopeId::root()]
 }
 
@@ -208,7 +212,7 @@ pub fn global_symbol(db: &dyn Db, file: VfsFile, name: &str) -> Option<GlobalSym
     let symbol_table = root_scope.symbol_table(db);
     let symbol_id = symbol_table.symbol_id_by_name(name)?;
 
-    Some(GlobalSymbolId { symbol_id, file })
+    Some(GlobalSymbolId::new(file, symbol_id))
 }
 
 /// Symbol table for a specific [`Scope`].
@@ -242,15 +246,15 @@ impl SymbolTable {
     }
     /// TODO: Should these methods take [`LocalSymbolId`] or [`SymbolId`]?
     pub fn symbol(&self, symbol_id: SymbolId) -> &Symbol {
-        debug_assert_eq!(self.scope, symbol_id.scope);
+        debug_assert_eq!(self.scope, symbol_id.scope());
 
-        &self.symbols[symbol_id.local]
+        &self.symbols[symbol_id.symbol()]
     }
 
     /// Returns the symbol named `name`.
     pub fn symbol_by_name(&self, name: &str) -> Option<&Symbol> {
         let id = self.symbol_id_by_name(name)?;
-        Some(&self.symbols[id.local])
+        Some(&self.symbols[id.symbol()])
     }
 
     /// Returns the [`LocalSymbolId`] of the symbol named `name`.
@@ -262,10 +266,7 @@ impl SymbolTable {
                 self.symbols[*id].name().as_str() == name
             })?;
 
-        Some(SymbolId {
-            scope: self.scope,
-            local: *id,
-        })
+        Some(SymbolId::new(self.scope, *id))
     }
 
     pub(super) fn hash_name(name: &str) -> u64 {
