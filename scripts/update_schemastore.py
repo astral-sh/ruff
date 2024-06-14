@@ -136,9 +136,9 @@ def determine_git_protocol(argv: list[str] | None = None) -> GitProtocol:
     )
     parser.add_argument(
         "--proto",
-        required=True,
         choices=[proto.value for proto in GitProtocol],
-        help="Protocol to use for cloning git repos",
+        default="https",
+        help="Protocol to use for git authentication",
     )
     args = parser.parse_args(argv)
     return GitProtocol(args.proto)
