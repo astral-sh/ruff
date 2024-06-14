@@ -1,6 +1,6 @@
 use crate::red_knot::semantic_index::ast_ids::{
     LocalAnnotatedAssignmentId, LocalAssignmentId, LocalClassId, LocalFunctionId,
-    LocalImportFromId, LocalImportId,
+    LocalImportFromId, LocalImportId, LocalNamedExprId,
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -11,7 +11,7 @@ pub enum Definition {
     FunctionDef(LocalFunctionId),
     Assignment(LocalAssignmentId),
     AnnotatedAssignment(LocalAnnotatedAssignmentId),
-    // NamedExpr(TypedNodeKey<ast::ExprNamed>),
+    NamedExpr(LocalNamedExprId),
     /// represents the implicit initial definition of every name as "unbound"
     Unbound,
     // TODO with statements, except handlers, function args...

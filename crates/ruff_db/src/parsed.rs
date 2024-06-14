@@ -32,9 +32,7 @@ pub fn parsed_module(db: &dyn Db, file: VfsFile) -> ParsedModule {
         VfsPath::Vendored(_) => PySourceType::Stub,
     };
 
-    ParsedModule {
-        inner: Arc::new(parse_unchecked_source(&source, ty)),
-    }
+    ParsedModule::new(parse_unchecked_source(&source, ty))
 }
 
 /// Cheap cloneable wrapper around the parsed module.
@@ -44,6 +42,12 @@ pub struct ParsedModule {
 }
 
 impl ParsedModule {
+    pub fn new(parsed: Parsed<ModModule>) -> Self {
+        Self {
+            inner: Arc::new(parsed),
+        }
+    }
+
     /// Consumes `self` and returns the Arc storing the parsed module.
     pub fn into_arc(self) -> Arc<Parsed<ModModule>> {
         self.inner

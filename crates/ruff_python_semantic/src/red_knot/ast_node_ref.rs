@@ -2,7 +2,6 @@ use std::hash::Hash;
 use std::ops::Deref;
 
 use ruff_db::parsed::ParsedModule;
-use ruff_python_ast as ast;
 
 /// Ref-counted owned reference to an AST node.
 ///
@@ -20,7 +19,7 @@ pub struct AstNodeRef<T> {
     ///
     /// The node's reference is guaranteed to remain valid as long as it's enclosing
     /// [`ParsedModule`] is alive.
-    parsed: ParsedModule,
+    _parsed: ParsedModule,
 
     /// Pointer to the referenced node.
     node: std::ptr::NonNull<T>,
@@ -37,7 +36,7 @@ impl<T> AstNodeRef<T> {
 
     pub(super) unsafe fn new(parsed: ParsedModule, node: &T) -> Self {
         Self {
-            parsed,
+            _parsed: parsed,
             node: std::ptr::NonNull::from(node),
         }
     }
@@ -55,59 +54,6 @@ impl<T> Deref for AstNodeRef<T> {
 
     fn deref(&self) -> &Self::Target {
         self.node()
-    }
-}
-
-#[allow(unsafe_code)]
-impl AstNodeRef<ast::Stmt> {
-    #[inline]
-    pub fn to_class_def(&self) -> Option<AstNodeRef<ast::StmtClassDef>> {
-        self.node().as_class_def_stmt().map(|class_def| unsafe {
-            // SAFETY: Casting `node` to a subtype doesn't change the fact that it's a child of `parsed`.
-            AstNodeRef::new(self.parsed.clone(), class_def)
-        })
-    }
-
-    #[inline]
-    pub fn to_function_def(&self) -> Option<AstNodeRef<ast::StmtFunctionDef>> {
-        self.node()
-            .as_function_def_stmt()
-            .map(|function_def| unsafe {
-                // SAFETY: Casting `node` to a subtype doesn't change the fact that it's a child of `parsed`.
-                AstNodeRef::new(self.parsed.clone(), function_def)
-            })
-    }
-
-    #[inline]
-    pub fn to_assign(&self) -> Option<AstNodeRef<ast::StmtAssign>> {
-        self.node().as_assign_stmt().map(|assign| unsafe {
-            // SAFETY: Casting `node` to a subtype doesn't change the fact that it's a child of `parsed`.
-            AstNodeRef::new(self.parsed.clone(), assign)
-        })
-    }
-
-    #[inline]
-    pub fn to_ann_assign(&self) -> Option<AstNodeRef<ast::StmtAnnAssign>> {
-        self.node().as_ann_assign_stmt().map(|assign| unsafe {
-            // SAFETY: Casting `node` to a subtype doesn't change the fact that it's a child of `parsed`.
-            AstNodeRef::new(self.parsed.clone(), assign)
-        })
-    }
-
-    #[inline]
-    pub fn to_import(&self) -> Option<AstNodeRef<ast::StmtImport>> {
-        self.node().as_import_stmt().map(|import| unsafe {
-            // SAFETY: Casting `node` to a subtype doesn't change the fact that it's a child of `parsed`.
-            AstNodeRef::new(self.parsed.clone(), import)
-        })
-    }
-
-    #[inline]
-    pub fn to_import_from(&self) -> Option<AstNodeRef<ast::StmtImportFrom>> {
-        self.node().as_import_from_stmt().map(|import| unsafe {
-            // SAFETY: Casting `node` to a subtype doesn't change the fact that it's a child of `parsed`.
-            AstNodeRef::new(self.parsed.clone(), import)
-        })
     }
 }
 
@@ -136,7 +82,7 @@ where
     T: Hash,
 {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.node().hash(state)
+        self.node().hash(state);
     }
 }
 
@@ -144,3 +90,55 @@ where
 unsafe impl<T> Send for AstNodeRef<T> where T: Send {}
 #[allow(unsafe_code)]
 unsafe impl<T> Sync for AstNodeRef<T> where T: Sync {}
+
+#[cfg(test)]
+mod tests {
+    use crate::red_knot::ast_node_ref::AstNodeRef;
+    use ruff_db::parsed::ParsedModule;
+    use ruff_python_ast::PySourceType;
+    use ruff_python_parser::parse_unchecked_source;
+
+    #[test]
+    #[allow(unsafe_code)]
+    fn equal() {
+        let parsed_raw = parse_unchecked_source("1 + 2", PySourceType::Python);
+        let parsed = ParsedModule::new(parsed_raw.clone());
+
+        let stmt = &parsed.syntax().body[0];
+
+        let node1 = unsafe { AstNodeRef::new(parsed.clone(), stmt) };
+        let node2 = unsafe { AstNodeRef::new(parsed.clone(), stmt) };
+
+        assert_eq!(node1, node2);
+
+        // Compare from different trees
+        let cloned = ParsedModule::new(parsed_raw);
+        let stmt_cloned = &cloned.syntax().body[0];
+        let cloned_node = unsafe { AstNodeRef::new(cloned.clone(), stmt_cloned) };
+
+        assert_eq!(node1, cloned_node);
+
+        let other_raw = parse_unchecked_source("2 + 2", PySourceType::Python);
+        let other = ParsedModule::new(other_raw);
+
+        let other_stmt = &other.syntax().body[0];
+        let other_node = unsafe { AstNodeRef::new(other.clone(), other_stmt) };
+
+        assert_ne!(node1, other_node);
+    }
+
+    #[test]
+    #[allow(unsafe_code)]
+    fn debug() {
+        let parsed_raw = parse_unchecked_source("1 + 2", PySourceType::Python);
+        let parsed = ParsedModule::new(parsed_raw.clone());
+
+        let stmt = &parsed.syntax().body[0];
+
+        let stmt_node = unsafe { AstNodeRef::new(parsed.clone(), stmt) };
+
+        let debug = format!("{stmt_node:?}");
+
+        assert_eq!(debug, format!("AstNodeRef({stmt:?})"));
+    }
+}

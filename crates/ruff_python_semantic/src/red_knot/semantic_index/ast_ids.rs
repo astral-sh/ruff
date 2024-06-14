@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use rustc_hash::FxHashMap;
 
 use ruff_db::parsed::ParsedModule;
@@ -13,13 +11,6 @@ use crate::red_knot::node_key::NodeKey;
 use crate::red_knot::semantic_index::symbol::{GlobalScope, ScopeId};
 use crate::red_knot::semantic_index::{scopes_map, semantic_index};
 use crate::Db;
-
-#[tracing::instrument(level = "debug", skip(db))]
-#[salsa::tracked(no_eq)]
-pub(crate) fn ast_ids(db: &dyn Db, scope: GlobalScope) -> Arc<AstIds> {
-    let index = semantic_index(db, scope.file(db));
-    index.ast_ids(scope.scope_id(db))
-}
 
 /// AST ids for a single scope.
 ///
@@ -55,6 +46,13 @@ impl AstIds {
     {
         self.statements_map[&NodeKey::from_node(node.into())]
     }
+
+    fn expression_id<'a, N>(&self, node: N) -> LocalExpressionId
+    where
+        N: Into<AnyNodeRef<'a>>,
+    {
+        self.expressions_map[&NodeKey::from_node(node.into())]
+    }
 }
 
 #[allow(clippy::missing_fields_in_debug)]
@@ -65,6 +63,10 @@ impl std::fmt::Debug for AstIds {
             .field("statements", &self.statements)
             .finish()
     }
+}
+
+fn ast_ids(db: &dyn Db, scope: GlobalScope) -> &AstIds {
+    semantic_index(db, scope.file(db)).ast_ids(scope.scope_id(db))
 }
 
 /// Node that can be uniquely identified by an id in a [`ScopeId`].
@@ -82,7 +84,7 @@ pub trait LocalAstIdNode {
     ///
     /// ## Panics
     /// May panic if the `id` does not belong to the AST of `file`, or is outside `scope`.
-    fn lookup_local(db: &dyn Db, file: VfsFile, scope: ScopeId, id: Self::Id) -> AstNodeRef<Self>
+    fn lookup_local(db: &dyn Db, file: VfsFile, scope: ScopeId, id: Self::Id) -> &Self
     where
         Self: Sized;
 }
@@ -104,7 +106,7 @@ pub trait AstIdNode {
     /// ## Panics
     /// May panic if the `id` does not belong to the AST of `file` or it returns an incorrect node.
 
-    fn lookup(db: &dyn Db, file: VfsFile, id: AstId<Self::LocalId>) -> AstNodeRef<Self>
+    fn lookup(db: &dyn Db, file: VfsFile, id: AstId<Self::LocalId>) -> &Self
     where
         Self: Sized;
 }
@@ -123,7 +125,7 @@ where
         }
     }
 
-    fn lookup(db: &dyn Db, file: VfsFile, id: AstId<Self::LocalId>) -> AstNodeRef<Self>
+    fn lookup(db: &dyn Db, file: VfsFile, id: AstId<Self::LocalId>) -> &Self
     where
         Self: Sized,
     {
@@ -155,11 +157,11 @@ impl LocalAstIdNode for ast::Expr {
         ast_ids.expressions_map[&NodeKey::from_node(self)]
     }
 
-    fn lookup_local(db: &dyn Db, file: VfsFile, scope: ScopeId, id: Self::Id) -> AstNodeRef<Self> {
+    fn lookup_local(db: &dyn Db, file: VfsFile, scope: ScopeId, id: Self::Id) -> &Self {
         let scopes = scopes_map(db, file);
         let global_scope = scopes[scope];
         let ast_ids = ast_ids(db, global_scope);
-        ast_ids.expressions[id].clone()
+        ast_ids.expressions[id].node()
     }
 }
 
@@ -176,12 +178,12 @@ impl LocalAstIdNode for ast::Stmt {
         ast_ids.statement_id(self)
     }
 
-    fn lookup_local(db: &dyn Db, file: VfsFile, scope: ScopeId, id: Self::Id) -> AstNodeRef<Self> {
+    fn lookup_local(db: &dyn Db, file: VfsFile, scope: ScopeId, id: Self::Id) -> &Self {
         let scopes = scopes_map(db, file);
         let global_scope = scopes[scope];
         let ast_ids = ast_ids(db, global_scope);
 
-        ast_ids.statements[id].clone()
+        ast_ids.statements[id].node()
     }
 }
 
@@ -197,9 +199,9 @@ impl LocalAstIdNode for ast::StmtFunctionDef {
         LocalFunctionId(ast_ids.statement_id(self))
     }
 
-    fn lookup_local(db: &dyn Db, file: VfsFile, scope: ScopeId, id: Self::Id) -> AstNodeRef<Self> {
+    fn lookup_local(db: &dyn Db, file: VfsFile, scope: ScopeId, id: Self::Id) -> &Self {
         ast::Stmt::lookup_local(db, file, scope, id.0)
-            .to_function_def()
+            .as_function_def_stmt()
             .unwrap()
     }
 }
@@ -216,14 +218,14 @@ impl LocalAstIdNode for ast::StmtClassDef {
         LocalClassId(ast_ids.statement_id(self))
     }
 
-    fn lookup_local(db: &dyn Db, file: VfsFile, scope: ScopeId, id: Self::Id) -> AstNodeRef<Self> {
+    fn lookup_local(db: &dyn Db, file: VfsFile, scope: ScopeId, id: Self::Id) -> &Self {
         let statement = ast::Stmt::lookup_local(db, file, scope, id.0);
-        statement.to_class_def().unwrap()
+        statement.as_class_def_stmt().unwrap()
     }
 }
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
-pub struct LocalAssignmentId(LocalStatementId);
+pub struct LocalAssignmentId(pub(super) LocalStatementId);
 
 impl LocalAstIdNode for ast::StmtAssign {
     type Id = LocalAssignmentId;
@@ -234,9 +236,9 @@ impl LocalAstIdNode for ast::StmtAssign {
         LocalAssignmentId(ast_ids.statement_id(self))
     }
 
-    fn lookup_local(db: &dyn Db, file: VfsFile, scope: ScopeId, id: Self::Id) -> AstNodeRef<Self> {
+    fn lookup_local(db: &dyn Db, file: VfsFile, scope: ScopeId, id: Self::Id) -> &Self {
         let statement = ast::Stmt::lookup_local(db, file, scope, id.0);
-        statement.to_assign().unwrap()
+        statement.as_assign_stmt().unwrap()
     }
 }
 
@@ -252,9 +254,9 @@ impl LocalAstIdNode for ast::StmtAnnAssign {
         LocalAnnotatedAssignmentId(ast_ids.statement_id(self))
     }
 
-    fn lookup_local(db: &dyn Db, file: VfsFile, scope: ScopeId, id: Self::Id) -> AstNodeRef<Self> {
+    fn lookup_local(db: &dyn Db, file: VfsFile, scope: ScopeId, id: Self::Id) -> &Self {
         let statement = ast::Stmt::lookup_local(db, file, scope, id.0);
-        statement.to_ann_assign().unwrap()
+        statement.as_ann_assign_stmt().unwrap()
     }
 }
 
@@ -270,9 +272,9 @@ impl LocalAstIdNode for ast::StmtImport {
         LocalImportId(ast_ids.statement_id(self))
     }
 
-    fn lookup_local(db: &dyn Db, file: VfsFile, scope: ScopeId, id: Self::Id) -> AstNodeRef<Self> {
+    fn lookup_local(db: &dyn Db, file: VfsFile, scope: ScopeId, id: Self::Id) -> &Self {
         let statement = ast::Stmt::lookup_local(db, file, scope, id.0);
-        statement.to_import().unwrap()
+        statement.as_import_stmt().unwrap()
     }
 }
 
@@ -288,9 +290,30 @@ impl LocalAstIdNode for ast::StmtImportFrom {
         LocalImportFromId(ast_ids.statement_id(self))
     }
 
-    fn lookup_local(db: &dyn Db, file: VfsFile, scope: ScopeId, id: Self::Id) -> AstNodeRef<Self> {
+    fn lookup_local(db: &dyn Db, file: VfsFile, scope: ScopeId, id: Self::Id) -> &Self {
         let statement = ast::Stmt::lookup_local(db, file, scope, id.0);
-        statement.to_import_from().unwrap()
+        statement.as_import_from_stmt().unwrap()
+    }
+}
+
+#[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
+pub struct LocalNamedExprId(pub(super) LocalExpressionId);
+
+impl LocalAstIdNode for ast::ExprNamed {
+    type Id = LocalNamedExprId;
+
+    fn local_ast_id(&self, db: &dyn Db, file: VfsFile, scope: ScopeId) -> Self::Id {
+        let global_scope = scopes_map(db, file)[scope];
+        let ast_ids = ast_ids(db, global_scope);
+        LocalNamedExprId(ast_ids.expression_id(self))
+    }
+
+    fn lookup_local(db: &dyn Db, file: VfsFile, scope: ScopeId, id: Self::Id) -> &Self
+    where
+        Self: Sized,
+    {
+        let expression = ast::Expr::lookup_local(db, file, scope, id.0);
+        expression.as_named_expr().unwrap()
     }
 }
 

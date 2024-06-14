@@ -8,7 +8,7 @@ use crate::module::resolver::{
 };
 
 use crate::red_knot::semantic_index::symbol::GlobalScope;
-use crate::red_knot::semantic_index::{ast_ids::ast_ids, scopes_map, semantic_index, symbol_table};
+use crate::red_knot::semantic_index::{scopes_map, semantic_index, symbol_table};
 
 #[salsa::jar(db=Db)]
 pub struct Jar(
@@ -20,7 +20,6 @@ pub struct Jar(
     file_to_module,
     scopes_map,
     semantic_index,
-    ast_ids,
 );
 
 /// Database giving access to semantic information about a Python program.

@@ -42,3 +42,15 @@ impl std::fmt::Display for Name {
         f.write_str(self.as_str())
     }
 }
+
+impl PartialEq<str> for Name {
+    fn eq(&self, other: &str) -> bool {
+        self.as_str() == other
+    }
+}
+
+impl PartialEq<Name> for str {
+    fn eq(&self, other: &Name) -> bool {
+        other == self
+    }
+}
