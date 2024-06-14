@@ -44,3 +44,14 @@ if call(foo, [a,
 )
     def bar():
         pass
+
+
+# F-strings uses normal list parsing, so test those as well
+if call(f"hello {x
+    def bar():
+        pass
+
+
+if call(f"hello
+    def bar():
+        pass
