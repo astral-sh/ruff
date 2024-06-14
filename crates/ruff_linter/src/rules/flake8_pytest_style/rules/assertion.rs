@@ -13,7 +13,7 @@ use ruff_python_ast::helpers::Truthiness;
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{
-    self as ast, Arguments, BoolOp, ExceptHandler, Expr, Keyword, Stmt, UnaryOp,
+    self as ast, Arguments, BoolOp, ExceptHandler, Expr, Keyword, Stmt, StmtAssert, UnaryOp,
 };
 use ruff_python_ast::{visitor, whitespace};
 use ruff_python_codegen::Stylist;
@@ -226,9 +226,11 @@ impl<'a> ExceptionHandlerVisitor<'a> {
 impl<'a> Visitor<'a> for ExceptionHandlerVisitor<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
         match stmt {
-            Stmt::Assert(_) => {
+            Stmt::Assert(StmtAssert { test, .. }) => {
                 self.current_assert = Some(stmt);
-                visitor::walk_stmt(self, stmt);
+
+                self.visit_expr(test);
+
                 self.current_assert = None;
             }
             _ => visitor::walk_stmt(self, stmt),
@@ -236,17 +238,19 @@ impl<'a> Visitor<'a> for ExceptionHandlerVisitor<'a> {
     }
 
     fn visit_expr(&mut self, expr: &'a Expr) {
+        let Some(current_assert) = self.current_assert else {
+            return;
+        };
+
         match expr {
             Expr::Name(ast::ExprName { id, .. }) => {
-                if let Some(current_assert) = self.current_assert {
-                    if id.as_str() == self.exception_name {
-                        self.errors.push(Diagnostic::new(
-                            PytestAssertInExcept {
-                                name: id.to_string(),
-                            },
-                            current_assert.range(),
-                        ));
-                    }
+                if id.as_str() == self.exception_name {
+                    self.errors.push(Diagnostic::new(
+                        PytestAssertInExcept {
+                            name: id.to_string(),
+                        },
+                        current_assert.range(),
+                    ));
                 }
             }
             _ => visitor::walk_expr(self, expr),
