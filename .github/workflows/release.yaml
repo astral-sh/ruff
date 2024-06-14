@@ -163,6 +163,9 @@ jobs:
         with:
           target: ${{ matrix.platform.target }}
           args: --release --locked --out dist
+        env:
+          # aarch64 build fails, see https://github.com/PyO3/maturin/issues/2110
+          XWIN_VERSION: 16
       - name: "Test wheel"
         if: ${{ !startsWith(matrix.platform.target, 'aarch64') }}
         shell: bash
