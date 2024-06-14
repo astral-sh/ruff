@@ -1,5 +1,38 @@
 # Changelog
 
+## 0.4.9
+
+### Preview features
+
+- \[`pylint`\] Implement `consider-dict-items` (`C0206`) ([#11688](https://github.com/astral-sh/ruff/pull/11688))
+- \[`refurb`\] Implement `repeated-global` (`FURB154`) ([#11187](https://github.com/astral-sh/ruff/pull/11187))
+
+### Rule changes
+
+- \[`pycodestyle`\] Adapt fix for `E203` to work identical to `ruff format` ([#10999](https://github.com/astral-sh/ruff/pull/10999))
+
+### Formatter
+
+- Fix formatter instability for lines only consisting of zero-width characters ([#11748](https://github.com/astral-sh/ruff/pull/11748))
+
+### Server
+
+- Add supported commands in server capabilities ([#11850](https://github.com/astral-sh/ruff/pull/11850))
+- Use real file path when available in `ruff server` ([#11800](https://github.com/astral-sh/ruff/pull/11800))
+- Improve error message when a command is run on an unavailable document ([#11823](https://github.com/astral-sh/ruff/pull/11823))
+- Introduce the `ruff.printDebugInformation` command ([#11831](https://github.com/astral-sh/ruff/pull/11831))
+- Tracing system now respects log level and trace level, with options to log to a file ([#11747](https://github.com/astral-sh/ruff/pull/11747))
+
+### CLI
+
+- Handle non-printable characters in diff view ([#11687](https://github.com/astral-sh/ruff/pull/11687))
+
+### Bug fixes
+
+- \[`refurb`\] Avoid suggesting starmap when arguments are used outside call (`FURB140`) ([#11830](https://github.com/astral-sh/ruff/pull/11830))
+- \[`flake8-bugbear`\] Avoid panic in `B909` when checking large loop blocks ([#11772](https://github.com/astral-sh/ruff/pull/11772))
+- \[`refurb`\] Fix misbehavior of `operator.itemgetter` when getter param is a tuple (`FURB118`) ([#11774](https://github.com/astral-sh/ruff/pull/11774))
+
 ## 0.4.8
 
 ### Performance
