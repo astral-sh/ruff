@@ -75,7 +75,6 @@ environment = { "RUFF_TRACE" = "messages" }
 
 To change the log level for Ruff (which is `info` by default), use the `logLevel` setting:
 
-````toml
 ```toml
 [language-server.ruff]
 command = "ruff"
@@ -84,4 +83,17 @@ environment = { "RUFF_TRACE" = "messages" }
 
 [language-server.ruff.config.settings]
 logLevel = "debug"
-````
+```
+
+You can also divert Ruff's logs to a separate file with the `logFile` setting:
+
+```toml
+[language-server.ruff]
+command = "ruff"
+args = ["server", "--preview"]
+environment = { "RUFF_TRACE" = "messages" }
+
+[language-server.ruff.config.settings]
+logLevel = "debug"
+logFile = "your/log/file/path/log.txt"
+```
