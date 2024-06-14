@@ -1,7 +1,4 @@
-use std::fmt;
 use std::io::{Cursor, Read};
-use std::ops::Deref;
-use std::sync::Arc;
 
 use itertools::Itertools;
 use zip::{read::ZipFile, ZipArchive};
@@ -18,15 +15,7 @@ impl VendoredFileSystem {
 
     pub fn new(raw_bytes: &'static [u8]) -> Result<Self> {
         Ok(Self {
-            inner: VendoredZipArchive::from_static_data(raw_bytes)?,
-        })
-    }
-
-    /// Alternative, private constructor for testing purposes
-    #[cfg(test)]
-    fn from_dynamic_data(data: &[u8]) -> Result<Self> {
-        Ok(Self {
-            inner: VendoredZipArchive::from_dynamic_data(data)?,
+            inner: VendoredZipArchive::new(raw_bytes)?,
         })
     }
 
@@ -136,59 +125,15 @@ impl FileSystem for VendoredFileSystem {
     }
 }
 
-#[derive(Clone)]
-enum VendoredZipData {
-    /// Used for zips that are available at build time
-    Static(&'static [u8]),
-
-    /// Used mainly for testing: we generally want to create mock zip archives
-    /// inside the test, so that we can easily see what's in the archive.
-    /// This means that it's hard for the mock zip archive to be available at build time.
-    #[allow(unused)]
-    Dynamic(Arc<[u8]>),
-}
-
-impl Deref for VendoredZipData {
-    type Target = [u8];
-
-    fn deref(&self) -> &Self::Target {
-        match self {
-            Self::Static(data) => data,
-            Self::Dynamic(data) => data,
-        }
-    }
-}
-
-impl AsRef<[u8]> for VendoredZipData {
-    fn as_ref(&self) -> &[u8] {
-        self
-    }
-}
-
-impl fmt::Debug for VendoredZipData {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "<Binary data of length {}>", self.len())
-    }
-}
-
 /// Newtype wrapper around a ZipArchive.
 ///
 /// Since ZipArchives are generally cheap to clone (for now), this should be too.
 #[derive(Debug, Clone)]
-struct VendoredZipArchive(ZipArchive<Cursor<VendoredZipData>>);
+struct VendoredZipArchive(ZipArchive<Cursor<&'static [u8]>>);
 
 impl VendoredZipArchive {
-    fn from_static_data(data: &'static [u8]) -> Result<Self> {
-        Ok(Self(ZipArchive::new(Cursor::new(
-            VendoredZipData::Static(data),
-        ))?))
-    }
-
-    #[cfg(test)]
-    fn from_dynamic_data(data: &[u8]) -> Result<Self> {
-        Ok(Self(ZipArchive::new(Cursor::new(
-            VendoredZipData::Dynamic(Arc::from(data)),
-        ))?))
+    pub fn new(data: &'static [u8]) -> Result<Self> {
+        Ok(Self(ZipArchive::new(Cursor::new(data))?))
     }
 
     fn lookup_path(&mut self, path: &NormalizedVendoredPath) -> Result<ZipFile> {
@@ -271,7 +216,7 @@ mod tests {
     const FUNCTOOLS_CONTENTS: &str = "def update_wrapper(): ...";
     const ASYNCIO_TASKS_CONTENTS: &str = "class Task: ...";
 
-    static MOCK_ZIP_ARCHIVE: Lazy<Arc<[u8]>> = Lazy::new(|| {
+    static MOCK_ZIP_ARCHIVE: Lazy<Box<[u8]>> = Lazy::new(|| {
         let mut typeshed_buffer = Vec::new();
         let typeshed = Cursor::new(&mut typeshed_buffer);
 
@@ -297,11 +242,11 @@ mod tests {
             archive.finish().unwrap();
         }
 
-        Arc::from(typeshed_buffer.into_boxed_slice())
+        typeshed_buffer.into_boxed_slice()
     });
 
     fn mock_typeshed() -> VendoredFileSystem {
-        VendoredFileSystem::from_dynamic_data(&MOCK_ZIP_ARCHIVE).unwrap()
+        VendoredFileSystem::new(&MOCK_ZIP_ARCHIVE).unwrap()
     }
 
     fn test_directory(dirname: &str) {
