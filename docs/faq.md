@@ -219,7 +219,7 @@ Ruff as a formatter, but not a linter, or vice versa.
 
 ## What versions of Python does Ruff support?
 
-Ruff can lint code for any Python version from 3.7 onwards, including Python 3.12.
+Ruff can lint code for any Python version from 3.7 onwards, including Python 3.13.
 
 Ruff does not support Python 2. Ruff _may_ run on pre-Python 3.7 code, although such versions
 are not officially supported (e.g., Ruff does _not_ respect type comments).
