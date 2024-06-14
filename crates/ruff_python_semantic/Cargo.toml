@@ -14,7 +14,7 @@ license = { workspace = true }
 doctest = false
 
 [dependencies]
-ruff_db = { workspace = true, optional = true }
+ruff_db = { workspace = true }
 ruff_index = { workspace = true }
 ruff_python_ast = { workspace = true }
 ruff_python_stdlib = { workspace = true }
@@ -34,4 +34,4 @@ ruff_python_parser = { workspace = true }
 workspace = true
 
 [features]
-red_knot = ["dep:ruff_db", "dep:salsa", "dep:tracing"]
+red_knot = ["dep:salsa", "dep:tracing"]
