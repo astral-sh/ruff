@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use hashbrown::hash_map::RawEntryMut;
 use rustc_hash::FxHashMap;
 
 use ruff_db::parsed::ParsedModule;
@@ -17,10 +16,10 @@ use crate::red_knot::semantic_index::ast_ids::{
 use crate::red_knot::semantic_index::definition::{
     Definition, ImportDefinition, ImportFromDefinition,
 };
-use crate::red_knot::semantic_index::symbol::{LocalSymbolId, Symbol, SymbolFlags, SymbolId};
-use crate::red_knot::semantic_index::{
-    NodeWithScope, Scope, ScopeId, ScopeKind, SemanticIndex, SymbolTable,
+use crate::red_knot::semantic_index::symbol::{
+    LocalSymbolId, Scope, ScopeId, ScopeKind, SymbolFlags, SymbolId, SymbolTableBuilder,
 };
+use crate::red_knot::semantic_index::{NodeWithScope, SemanticIndex};
 
 pub(super) struct SemanticIndexBuilder<'a> {
     // Builder state
@@ -29,7 +28,7 @@ pub(super) struct SemanticIndexBuilder<'a> {
 
     // Semantic Index fields
     scopes: IndexVec<ScopeId, Scope>,
-    symbol_tables: IndexVec<ScopeId, SymbolTable>,
+    symbol_tables: IndexVec<ScopeId, SymbolTableBuilder>,
     ast_ids: IndexVec<ScopeId, AstIdsBuilder>,
     expression_scopes: FxHashMap<NodeKey, ScopeId>,
     scopes_by_node: FxHashMap<NodeWithScope, ScopeId>,
@@ -79,7 +78,7 @@ impl<'a> SemanticIndexBuilder<'a> {
         };
 
         let scope_id = self.scopes.push(scope);
-        self.symbol_tables.push(SymbolTable::new(scope_id));
+        self.symbol_tables.push(SymbolTableBuilder::new());
         self.ast_ids.push(AstIdsBuilder::new());
         self.scope_stack.push(scope_id);
     }
@@ -92,7 +91,7 @@ impl<'a> SemanticIndexBuilder<'a> {
         id
     }
 
-    fn current_symbol_table(&mut self) -> &mut SymbolTable {
+    fn current_symbol_table(&mut self) -> &mut SymbolTableBuilder {
         let scope_id = self.current_scope();
         &mut self.symbol_tables[scope_id]
     }
@@ -119,34 +118,7 @@ impl<'a> SemanticIndexBuilder<'a> {
         let scope = self.current_scope();
         let symbol_table = self.current_symbol_table();
 
-        let hash = SymbolTable::hash_name(&name);
-        let entry = symbol_table
-            .symbols_by_name
-            .raw_entry_mut()
-            .from_hash(hash, |id| symbol_table.symbols[*id].name() == &name);
-
-        match entry {
-            RawEntryMut::Occupied(entry) => {
-                let symbol = &mut symbol_table.symbols[*entry.key()];
-                symbol.insert_flags(flags);
-
-                if let Some(definition) = definition {
-                    symbol.push_definition(definition);
-                }
-
-                *entry.key()
-            }
-            RawEntryMut::Vacant(entry) => {
-                let mut symbol = Symbol::new(name, scope, definition);
-                symbol.insert_flags(flags);
-
-                let id = symbol_table.symbols.push(symbol);
-                entry.insert_with_hasher(hash, id, (), |id| {
-                    SymbolTable::hash_name(symbol_table.symbols[*id].name().as_str())
-                });
-                id
-            }
-        }
+        symbol_table.add_or_update_symbol_with_flags(name, scope, flags, definition)
     }
 
     fn with_type_params(
@@ -193,10 +165,7 @@ impl<'a> SemanticIndexBuilder<'a> {
         let mut symbol_tables: IndexVec<_, _> = self
             .symbol_tables
             .into_iter()
-            .map(|mut table| {
-                table.shrink_to_fit();
-                Arc::new(table)
-            })
+            .map(|builder| Arc::new(builder.finish()))
             .collect();
 
         let mut ast_ids: IndexVec<_, _> = self

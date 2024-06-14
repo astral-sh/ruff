@@ -1,5 +1,6 @@
-use rustc_hash::FxHashMap;
 use std::sync::Arc;
+
+use rustc_hash::FxHashMap;
 
 use ruff_db::parsed::ParsedModule;
 use ruff_db::vfs::VfsFile;
@@ -9,7 +10,8 @@ use ruff_python_ast::AnyNodeRef;
 
 use crate::red_knot::ast_node_ref::AstNodeRef;
 use crate::red_knot::node_key::NodeKey;
-use crate::red_knot::semantic_index::{scopes_map, semantic_index, GlobalScope, ScopeId};
+use crate::red_knot::semantic_index::symbol::{GlobalScope, ScopeId};
+use crate::red_knot::semantic_index::{scopes_map, semantic_index};
 use crate::Db;
 
 #[tracing::instrument(level = "debug", skip(db))]

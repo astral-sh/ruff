@@ -7,16 +7,15 @@ use crate::module::resolver::{
     resolve_module_query,
 };
 
-use crate::red_knot::semantic_index::{
-    ast_ids::ast_ids, scopes_map, semantic_index, GlobalScope, GlobalScope_symbol_table,
-};
+use crate::red_knot::semantic_index::symbol::GlobalScope;
+use crate::red_knot::semantic_index::{ast_ids::ast_ids, scopes_map, semantic_index, symbol_table};
 
 #[salsa::jar(db=Db)]
 pub struct Jar(
     ModuleNameIngredient,
     ModuleResolverSearchPaths,
     GlobalScope,
-    GlobalScope_symbol_table,
+    symbol_table,
     resolve_module_query,
     file_to_module,
     scopes_map,
