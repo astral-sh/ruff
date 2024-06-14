@@ -48,6 +48,14 @@ jobs:
         id: generate-comment
         if: steps.download-ecosystem-result.outputs.found_artifact == 'true'
         run: |
+          // Guard against malicious ecosystem results that symlink to a secret
+          // file on this runner
+          if [[ -L pr/ecosystem/ecosystem-result ]]
+          then
+              echo "Error: ecosystem-result cannot be a symlink"
+              exit 1
+          fi
+
           # Note this identifier is used to find the comment to update on
           # subsequent runs
           echo '<!-- generated-comment ecosystem -->' >> comment.txt
