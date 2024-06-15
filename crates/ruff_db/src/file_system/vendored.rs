@@ -18,49 +18,29 @@ impl VendoredFileSystem {
             inner: VendoredZipArchive::new(raw_bytes)?,
         })
     }
-
-    /// Returns an owned copy of the underlying zip archive,
-    /// that can be queried for information regarding contained files and directories
-    fn vendored_archive(&self) -> VendoredZipArchive {
-        // Zip lookups require a mutable reference to the archive,
-        // which creates a nightmare with lifetimes unless you own the archive, hence the clone.
-        //
-        // The zip documentation states that:
-        //
-        //     At the moment, this type is cheap to clone if this is the case for the reader it uses.
-        //     However, this is not guaranteed by this crate and it may change in the future.
-        //
-        // So this should be fairly cheap *for now*.
-        self.inner.clone()
-    }
-
-    fn read_zip_file(mut zip_file: ZipFile) -> Result<String> {
-        let mut buffer = String::new();
-        zip_file.read_to_string(&mut buffer)?;
-        Ok(buffer)
-    }
 }
 
 impl FileSystem for VendoredFileSystem {
     fn exists(&self, path: &FileSystemPath) -> bool {
+        let mut archive = self.inner.clone();
         let normalized = normalize_vendored_path(path);
-        self.vendored_archive().lookup_path(&normalized).is_ok()
+        archive.lookup_path(&normalized).is_ok()
             || (!normalized.has_trailing_slash()
-                && self
-                    .vendored_archive()
+                && archive
                     .lookup_path(&normalized.with_trailing_slash())
                     .is_ok())
     }
 
     fn is_directory(&self, path: &FileSystemPath) -> bool {
         let normalized = normalize_vendored_path(path);
-        if let Ok(zip_file) = self.vendored_archive().lookup_path(&normalized) {
+        let mut archive = self.inner.clone();
+        if let Ok(zip_file) = archive.lookup_path(&normalized) {
             return zip_file.is_dir();
         }
         if normalized.has_trailing_slash() {
             return false;
         }
-        self.vendored_archive()
+        archive
             .lookup_path(&normalized.with_trailing_slash())
             .is_ok_and(|zip_file| zip_file.is_dir())
     }
@@ -69,22 +49,26 @@ impl FileSystem for VendoredFileSystem {
         if path.as_str().ends_with('/') {
             return false;
         }
-        self.vendored_archive()
+        self.inner
+            .clone()
             .lookup_path(&normalize_vendored_path(path))
             .is_ok_and(|zip_file| zip_file.is_file())
     }
 
     fn metadata(&self, path: &FileSystemPath) -> Result<Metadata> {
         let normalized = normalize_vendored_path(path);
-        let mut archive = self.vendored_archive();
+        let mut archive = self.inner.clone();
 
-        let (is_dir, file_hash) = match archive.lookup_path(&normalized) {
-            Ok(zip_file) => (zip_file.is_dir(), zip_file.crc32()),
+        let metadata = archive
+            .lookup_path(&normalized)
+            .map(|zip_file| (zip_file.is_dir(), zip_file.crc32()));
+
+        let (is_dir, file_hash) = match metadata {
+            Ok((is_dir, file_hash)) => (is_dir, file_hash),
             Err(err) => {
                 if normalized.has_trailing_slash() {
                     return Err(err);
                 }
-                let mut archive = self.vendored_archive();
                 let lookup_result = archive.lookup_path(&normalized.with_trailing_slash());
                 if let Ok(zip_file) = lookup_result {
                     (zip_file.is_dir(), zip_file.crc32())
@@ -111,17 +95,11 @@ impl FileSystem for VendoredFileSystem {
     }
 
     fn read(&self, path: &FileSystemPath) -> Result<String> {
-        let normalized = normalize_vendored_path(path);
-        let mut archive = self.vendored_archive();
-        let lookup_error = match archive.lookup_path(&normalized) {
-            Ok(zip_file) => return Self::read_zip_file(zip_file),
-            Err(err) => err,
-        };
-        if normalized.has_trailing_slash() {
-            return Err(lookup_error);
-        }
-        let zip_file = archive.lookup_path(&normalized.with_trailing_slash())?;
-        Self::read_zip_file(zip_file)
+        let mut archive = self.inner.clone();
+        let mut zip_file = archive.lookup_path(&normalize_vendored_path(path))?;
+        let mut buffer = String::new();
+        zip_file.read_to_string(&mut buffer)?;
+        Ok(buffer)
     }
 }
 
