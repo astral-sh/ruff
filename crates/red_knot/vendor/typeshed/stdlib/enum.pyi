@@ -31,10 +31,12 @@ if sys.version_info >= (3, 11):
         "nonmember",
         "property",
         "verify",
+        "pickle_by_enum_name",
+        "pickle_by_global_name",
     ]
 
-if sys.version_info >= (3, 11):
-    __all__ += ["pickle_by_enum_name", "pickle_by_global_name"]
+if sys.version_info >= (3, 13):
+    __all__ += ["EnumDict"]
 
 _EnumMemberT = TypeVar("_EnumMemberT")
 _EnumerationT = TypeVar("_EnumerationT", bound=type[Enum])
@@ -74,6 +76,12 @@ class _EnumDict(dict[str, Any]):
         def update(self, members: SupportsKeysAndGetItem[str, Any], **more_members: Any) -> None: ...
         @overload
         def update(self, members: Iterable[tuple[str, Any]], **more_members: Any) -> None: ...
+    if sys.version_info >= (3, 13):
+        @property
+        def member_names(self) -> list[str]: ...
+
+if sys.version_info >= (3, 13):
+    EnumDict = _EnumDict
 
 # Structurally: Iterable[T], Reversible[T], Container[T] where T is the enum itself
 class EnumMeta(type):
@@ -259,9 +267,9 @@ if sys.version_info >= (3, 11):
         def _generate_next_value_(name: str, start: int, count: int, last_values: list[str]) -> str: ...
 
     class EnumCheck(StrEnum):
-        CONTINUOUS: str
-        NAMED_FLAGS: str
-        UNIQUE: str
+        CONTINUOUS = "no skipped integer values"
+        NAMED_FLAGS = "multi-flag aliases may not contain unnamed flags"
+        UNIQUE = "one name per value"
 
     CONTINUOUS = EnumCheck.CONTINUOUS
     NAMED_FLAGS = EnumCheck.NAMED_FLAGS
@@ -272,10 +280,10 @@ if sys.version_info >= (3, 11):
         def __call__(self, enumeration: _EnumerationT) -> _EnumerationT: ...
 
     class FlagBoundary(StrEnum):
-        STRICT: str
-        CONFORM: str
-        EJECT: str
-        KEEP: str
+        STRICT = "strict"
+        CONFORM = "conform"
+        EJECT = "eject"
+        KEEP = "keep"
 
     STRICT = FlagBoundary.STRICT
     CONFORM = FlagBoundary.CONFORM

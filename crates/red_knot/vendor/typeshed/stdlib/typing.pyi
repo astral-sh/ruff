@@ -21,7 +21,7 @@ from types import (
     TracebackType,
     WrapperDescriptorType,
 )
-from typing_extensions import Never as _Never, ParamSpec as _ParamSpec
+from typing_extensions import Never as _Never, ParamSpec as _ParamSpec, deprecated
 
 if sys.version_info >= (3, 9):
     from types import GenericAlias
@@ -991,11 +991,30 @@ class ForwardRef:
         def __init__(self, arg: str, is_argument: bool = True) -> None: ...
 
     if sys.version_info >= (3, 13):
+        @overload
+        @deprecated(
+            "Failing to pass a value to the 'type_params' parameter of ForwardRef._evaluate() is deprecated, "
+            "as it leads to incorrect behaviour when evaluating a stringified annotation "
+            "that references a PEP 695 type parameter. It will be disallowed in Python 3.15."
+        )
+        def _evaluate(
+            self, globalns: dict[str, Any] | None, localns: dict[str, Any] | None, *, recursive_guard: frozenset[str]
+        ) -> Any | None: ...
+        @overload
         def _evaluate(
             self,
             globalns: dict[str, Any] | None,
             localns: dict[str, Any] | None,
-            type_params: tuple[TypeVar | ParamSpec | TypeVarTuple, ...] = ...,
+            type_params: tuple[TypeVar | ParamSpec | TypeVarTuple, ...],
+            *,
+            recursive_guard: frozenset[str],
+        ) -> Any | None: ...
+    elif sys.version_info >= (3, 12):
+        def _evaluate(
+            self,
+            globalns: dict[str, Any] | None,
+            localns: dict[str, Any] | None,
+            type_params: tuple[TypeVar | ParamSpec | TypeVarTuple, ...] | None = None,
             *,
             recursive_guard: frozenset[str],
         ) -> Any | None: ...

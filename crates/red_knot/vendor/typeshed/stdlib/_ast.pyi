@@ -7,8 +7,11 @@ PyCF_ONLY_AST: Literal[1024]
 PyCF_TYPE_COMMENTS: Literal[4096]
 PyCF_ALLOW_TOP_LEVEL_AWAIT: Literal[8192]
 
+if sys.version_info >= (3, 13):
+    PyCF_OPTIMIZED_AST: Literal[33792]
+
 # Used for node end positions in constructor keyword arguments
-_EndPositionT = typing_extensions.TypeVar("_EndPositionT", int, int | None, default=int | None)  # noqa: Y023
+_EndPositionT = typing_extensions.TypeVar("_EndPositionT", int, int | None, default=int | None)
 
 # Alias used for fields that must always be valid identifiers
 # A string `x` counts as a valid identifier if both the following are True
