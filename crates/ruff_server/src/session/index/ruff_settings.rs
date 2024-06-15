@@ -297,3 +297,436 @@ fn open_configuration_file(
 
     Configuration::from_options(options, Some(config_path), project_root)
 }
+
+#[cfg(test)]
+mod tests {
+    use std::{path::PathBuf, str::FromStr};
+
+    use ruff_linter::{settings::types::PreviewMode, RuleSelector};
+    use ruff_workspace::{
+        configuration::{Configuration, LintConfiguration, RuleSelection},
+        options::Flake8AnnotationsOptions,
+        resolver::ConfigurationTransformer,
+    };
+
+    use crate::session::{
+        index::ruff_settings::EditorConfigurationTransformer,
+        settings::{ConfigurationPreference, ResolvedEditorSettings},
+    };
+
+    #[test]
+    fn test_editor_and_filesystem_configuration_resolution() {
+        let test_path = PathBuf::from_str("/Users/jane/projects/test").unwrap();
+
+        let filesystem_configuration = Configuration {
+            lint: LintConfiguration {
+                exclude: Some(vec![]),
+                preview: Some(PreviewMode::Enabled),
+                rule_selections: vec![RuleSelection {
+                    select: Some(vec![]),
+                    ignore: vec![],
+                    fixable: Some(vec![]),
+                    ..Default::default()
+                }],
+                flake8_annotations: Some(Flake8AnnotationsOptions {
+                    mypy_init_return: Some(true),
+                    suppress_dummy_args: Some(false),
+                    ignore_fully_untyped: Some(true),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let mut resolved_editor_settings = ResolvedEditorSettings {
+            configuration: Some(PathBuf::from_str("/Users/test/.config/ruff/ruff.toml").unwrap()),
+            lint_preview: Some(false),
+            format_preview: Some(false),
+            select: Some(vec![RuleSelector::Linter(
+                ruff_linter::registry::Linter::Flake8Annotations,
+            )]),
+            extend_select: Some(vec![RuleSelector::All]),
+            ignore: None,
+            exclude: None,
+            line_length: Some(serde_json::from_value(serde_json::json!(80)).unwrap()),
+            configuration_preference: ConfigurationPreference::EditorFirst,
+        };
+
+        insta::assert_debug_snapshot!(EditorConfigurationTransformer(&resolved_editor_settings, &test_path).transform(filesystem_configuration.clone()), @r###"
+        Configuration {
+            cache_dir: None,
+            extend: None,
+            fix: None,
+            fix_only: None,
+            unsafe_fixes: None,
+            output_format: None,
+            preview: None,
+            required_version: None,
+            extension: None,
+            show_fixes: None,
+            exclude: None,
+            extend_exclude: [],
+            extend_include: [],
+            force_exclude: None,
+            include: None,
+            respect_gitignore: None,
+            builtins: None,
+            namespace_packages: None,
+            src: None,
+            target_version: None,
+            line_length: Some(
+                LineLength(
+                    80,
+                ),
+            ),
+            indent_width: None,
+            lint: LintConfiguration {
+                exclude: Some(
+                    [],
+                ),
+                preview: Some(
+                    Disabled,
+                ),
+                extend_per_file_ignores: [],
+                per_file_ignores: None,
+                rule_selections: [
+                    RuleSelection {
+                        select: Some(
+                            [],
+                        ),
+                        ignore: [],
+                        extend_select: [],
+                        fixable: Some(
+                            [],
+                        ),
+                        unfixable: [],
+                        extend_fixable: [],
+                    },
+                    RuleSelection {
+                        select: Some(
+                            [
+                                Linter(
+                                    Flake8Annotations,
+                                ),
+                            ],
+                        ),
+                        ignore: [],
+                        extend_select: [
+                            All,
+                        ],
+                        fixable: None,
+                        unfixable: [],
+                        extend_fixable: [],
+                    },
+                ],
+                explicit_preview_rules: None,
+                extend_unsafe_fixes: [],
+                extend_safe_fixes: [],
+                allowed_confusables: None,
+                dummy_variable_rgx: None,
+                external: None,
+                ignore_init_module_imports: None,
+                logger_objects: None,
+                task_tags: None,
+                typing_modules: None,
+                flake8_annotations: Some(
+                    Flake8AnnotationsOptions {
+                        mypy_init_return: Some(
+                            true,
+                        ),
+                        suppress_dummy_args: Some(
+                            false,
+                        ),
+                        suppress_none_returning: None,
+                        allow_star_arg_any: None,
+                        ignore_fully_untyped: Some(
+                            true,
+                        ),
+                    },
+                ),
+                flake8_bandit: None,
+                flake8_boolean_trap: None,
+                flake8_bugbear: None,
+                flake8_builtins: None,
+                flake8_comprehensions: None,
+                flake8_copyright: None,
+                flake8_errmsg: None,
+                flake8_gettext: None,
+                flake8_implicit_str_concat: None,
+                flake8_import_conventions: None,
+                flake8_pytest_style: None,
+                flake8_quotes: None,
+                flake8_self: None,
+                flake8_tidy_imports: None,
+                flake8_type_checking: None,
+                flake8_unused_arguments: None,
+                isort: None,
+                mccabe: None,
+                pep8_naming: None,
+                pycodestyle: None,
+                pydocstyle: None,
+                pyflakes: None,
+                pylint: None,
+                pyupgrade: None,
+            },
+            format: FormatConfiguration {
+                exclude: None,
+                preview: Some(
+                    Disabled,
+                ),
+                extension: None,
+                indent_style: None,
+                quote_style: None,
+                magic_trailing_comma: None,
+                line_ending: None,
+                docstring_code_format: None,
+                docstring_code_line_width: None,
+            },
+        }
+        "###);
+
+        resolved_editor_settings.configuration_preference =
+            ConfigurationPreference::FilesystemFirst;
+
+        insta::assert_debug_snapshot!(EditorConfigurationTransformer(&resolved_editor_settings, &test_path).transform(filesystem_configuration.clone()), @r###"
+        Configuration {
+            cache_dir: None,
+            extend: None,
+            fix: None,
+            fix_only: None,
+            unsafe_fixes: None,
+            output_format: None,
+            preview: None,
+            required_version: None,
+            extension: None,
+            show_fixes: None,
+            exclude: None,
+            extend_exclude: [],
+            extend_include: [],
+            force_exclude: None,
+            include: None,
+            respect_gitignore: None,
+            builtins: None,
+            namespace_packages: None,
+            src: None,
+            target_version: None,
+            line_length: Some(
+                LineLength(
+                    80,
+                ),
+            ),
+            indent_width: None,
+            lint: LintConfiguration {
+                exclude: Some(
+                    [],
+                ),
+                preview: Some(
+                    Enabled,
+                ),
+                extend_per_file_ignores: [],
+                per_file_ignores: None,
+                rule_selections: [
+                    RuleSelection {
+                        select: Some(
+                            [
+                                Linter(
+                                    Flake8Annotations,
+                                ),
+                            ],
+                        ),
+                        ignore: [],
+                        extend_select: [
+                            All,
+                        ],
+                        fixable: None,
+                        unfixable: [],
+                        extend_fixable: [],
+                    },
+                    RuleSelection {
+                        select: Some(
+                            [],
+                        ),
+                        ignore: [],
+                        extend_select: [],
+                        fixable: Some(
+                            [],
+                        ),
+                        unfixable: [],
+                        extend_fixable: [],
+                    },
+                ],
+                explicit_preview_rules: None,
+                extend_unsafe_fixes: [],
+                extend_safe_fixes: [],
+                allowed_confusables: None,
+                dummy_variable_rgx: None,
+                external: None,
+                ignore_init_module_imports: None,
+                logger_objects: None,
+                task_tags: None,
+                typing_modules: None,
+                flake8_annotations: Some(
+                    Flake8AnnotationsOptions {
+                        mypy_init_return: Some(
+                            true,
+                        ),
+                        suppress_dummy_args: Some(
+                            false,
+                        ),
+                        suppress_none_returning: None,
+                        allow_star_arg_any: None,
+                        ignore_fully_untyped: Some(
+                            true,
+                        ),
+                    },
+                ),
+                flake8_bandit: None,
+                flake8_boolean_trap: None,
+                flake8_bugbear: None,
+                flake8_builtins: None,
+                flake8_comprehensions: None,
+                flake8_copyright: None,
+                flake8_errmsg: None,
+                flake8_gettext: None,
+                flake8_implicit_str_concat: None,
+                flake8_import_conventions: None,
+                flake8_pytest_style: None,
+                flake8_quotes: None,
+                flake8_self: None,
+                flake8_tidy_imports: None,
+                flake8_type_checking: None,
+                flake8_unused_arguments: None,
+                isort: None,
+                mccabe: None,
+                pep8_naming: None,
+                pycodestyle: None,
+                pydocstyle: None,
+                pyflakes: None,
+                pylint: None,
+                pyupgrade: None,
+            },
+            format: FormatConfiguration {
+                exclude: None,
+                preview: Some(
+                    Disabled,
+                ),
+                extension: None,
+                indent_style: None,
+                quote_style: None,
+                magic_trailing_comma: None,
+                line_ending: None,
+                docstring_code_format: None,
+                docstring_code_line_width: None,
+            },
+        }
+        "###);
+
+        resolved_editor_settings.configuration_preference = ConfigurationPreference::EditorOnly;
+
+        insta::assert_debug_snapshot!(EditorConfigurationTransformer(&resolved_editor_settings, &test_path).transform(filesystem_configuration), @r###"
+        Configuration {
+            cache_dir: None,
+            extend: None,
+            fix: None,
+            fix_only: None,
+            unsafe_fixes: None,
+            output_format: None,
+            preview: None,
+            required_version: None,
+            extension: None,
+            show_fixes: None,
+            exclude: None,
+            extend_exclude: [],
+            extend_include: [],
+            force_exclude: None,
+            include: None,
+            respect_gitignore: None,
+            builtins: None,
+            namespace_packages: None,
+            src: None,
+            target_version: None,
+            line_length: Some(
+                LineLength(
+                    80,
+                ),
+            ),
+            indent_width: None,
+            lint: LintConfiguration {
+                exclude: None,
+                preview: Some(
+                    Disabled,
+                ),
+                extend_per_file_ignores: [],
+                per_file_ignores: None,
+                rule_selections: [
+                    RuleSelection {
+                        select: Some(
+                            [
+                                Linter(
+                                    Flake8Annotations,
+                                ),
+                            ],
+                        ),
+                        ignore: [],
+                        extend_select: [
+                            All,
+                        ],
+                        fixable: None,
+                        unfixable: [],
+                        extend_fixable: [],
+                    },
+                ],
+                explicit_preview_rules: None,
+                extend_unsafe_fixes: [],
+                extend_safe_fixes: [],
+                allowed_confusables: None,
+                dummy_variable_rgx: None,
+                external: None,
+                ignore_init_module_imports: None,
+                logger_objects: None,
+                task_tags: None,
+                typing_modules: None,
+                flake8_annotations: None,
+                flake8_bandit: None,
+                flake8_boolean_trap: None,
+                flake8_bugbear: None,
+                flake8_builtins: None,
+                flake8_comprehensions: None,
+                flake8_copyright: None,
+                flake8_errmsg: None,
+                flake8_gettext: None,
+                flake8_implicit_str_concat: None,
+                flake8_import_conventions: None,
+                flake8_pytest_style: None,
+                flake8_quotes: None,
+                flake8_self: None,
+                flake8_tidy_imports: None,
+                flake8_type_checking: None,
+                flake8_unused_arguments: None,
+                isort: None,
+                mccabe: None,
+                pep8_naming: None,
+                pycodestyle: None,
+                pydocstyle: None,
+                pyflakes: None,
+                pylint: None,
+                pyupgrade: None,
+            },
+            format: FormatConfiguration {
+                exclude: None,
+                preview: Some(
+                    Disabled,
+                ),
+                extension: None,
+                indent_style: None,
+                quote_style: None,
+                magic_trailing_comma: None,
+                line_ending: None,
+                docstring_code_format: None,
+                docstring_code_line_width: None,
+            },
+        }
+        "###);
+    }
+}
