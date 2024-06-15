@@ -1,13 +1,16 @@
+use std::cell::{RefCell, RefMut};
 use std::io::{Cursor, Read};
+use std::ops::{Deref, DerefMut};
+use std::sync::{Mutex, MutexGuard};
 
 use itertools::Itertools;
 use zip::{read::ZipFile, ZipArchive};
 
 use crate::file_system::{FileRevision, FileSystem, FileSystemPath, FileType, Metadata, Result};
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct VendoredFileSystem {
-    inner: VendoredZipArchive,
+    inner: VendoredFileSystemInner,
 }
 
 impl VendoredFileSystem {
@@ -15,14 +18,15 @@ impl VendoredFileSystem {
 
     pub fn new(raw_bytes: &'static [u8]) -> Result<Self> {
         Ok(Self {
-            inner: VendoredZipArchive::new(raw_bytes)?,
+            inner: VendoredFileSystemInner::new(raw_bytes)?,
         })
     }
 }
 
 impl FileSystem for VendoredFileSystem {
     fn exists(&self, path: &FileSystemPath) -> bool {
-        let mut archive = self.inner.clone();
+        let inner_locked = self.inner.lock();
+        let mut archive = inner_locked.borrow_mut();
         let normalized = normalize_vendored_path(path);
         archive.lookup_path(&normalized).is_ok()
             || (!normalized.has_trailing_slash()
@@ -32,8 +36,9 @@ impl FileSystem for VendoredFileSystem {
     }
 
     fn is_directory(&self, path: &FileSystemPath) -> bool {
+        let inner_locked = self.inner.lock();
+        let mut archive = inner_locked.borrow_mut();
         let normalized = normalize_vendored_path(path);
-        let mut archive = self.inner.clone();
         if let Ok(zip_file) = archive.lookup_path(&normalized) {
             return zip_file.is_dir();
         }
@@ -49,15 +54,17 @@ impl FileSystem for VendoredFileSystem {
         if path.as_str().ends_with('/') {
             return false;
         }
-        self.inner
-            .clone()
+        let inner_locked = self.inner.lock();
+        let mut archive = inner_locked.borrow_mut();
+        archive
             .lookup_path(&normalize_vendored_path(path))
             .is_ok_and(|zip_file| zip_file.is_file())
     }
 
     fn metadata(&self, path: &FileSystemPath) -> Result<Metadata> {
         let normalized = normalize_vendored_path(path);
-        let mut archive = self.inner.clone();
+        let inner_locked = self.inner.lock();
+        let mut archive = inner_locked.borrow_mut();
 
         let metadata = archive
             .lookup_path(&normalized)
@@ -95,7 +102,8 @@ impl FileSystem for VendoredFileSystem {
     }
 
     fn read(&self, path: &FileSystemPath) -> Result<String> {
-        let mut archive = self.inner.clone();
+        let inner_locked = self.inner.lock();
+        let mut archive = inner_locked.borrow_mut();
         let mut zip_file = archive.lookup_path(&normalize_vendored_path(path))?;
         let mut buffer = String::new();
         zip_file.read_to_string(&mut buffer)?;
@@ -103,10 +111,54 @@ impl FileSystem for VendoredFileSystem {
     }
 }
 
+#[derive(Debug)]
+struct VendoredFileSystemInner(Mutex<RefCell<VendoredZipArchive>>);
+
+impl VendoredFileSystemInner {
+    fn new(raw_bytes: &'static [u8]) -> Result<Self> {
+        Ok(Self(Mutex::new(RefCell::new(VendoredZipArchive::new(
+            raw_bytes,
+        )?))))
+    }
+
+    /// Acquire a lock on the underlying zip archive.
+    /// The call will block until it is able to acquire the lock.
+    ///
+    /// ## Panics:
+    /// If the current thread already holds the lock.
+    fn lock(&self) -> LockedZipArchive {
+        LockedZipArchive(self.0.lock().unwrap())
+    }
+}
+
+#[derive(Debug)]
+struct LockedZipArchive<'a>(MutexGuard<'a, RefCell<VendoredZipArchive>>);
+
+impl<'a> LockedZipArchive<'a> {
+    fn borrow_mut(&self) -> ArchiveReader {
+        ArchiveReader(self.0.borrow_mut())
+    }
+}
+
+#[derive(Debug)]
+struct ArchiveReader<'a>(RefMut<'a, VendoredZipArchive>);
+
+impl<'a> Deref for ArchiveReader<'a> {
+    type Target = VendoredZipArchive;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<'a> DerefMut for ArchiveReader<'a> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
 /// Newtype wrapper around a ZipArchive.
-///
-/// Since ZipArchives are generally cheap to clone (for now), this should be too.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 struct VendoredZipArchive(ZipArchive<Cursor<&'static [u8]>>);
 
 impl VendoredZipArchive {
@@ -320,6 +372,10 @@ mod tests {
         test_file(&mock_typeshed, path);
         let functools_stub = mock_typeshed.read(path).unwrap();
         assert_eq!(functools_stub.as_str(), FUNCTOOLS_CONTENTS);
+        // Test that using the RefCell doesn't mutate
+        // the internal state of the underlying zip archive incorrectly:
+        let functools_stub_again = mock_typeshed.read(path).unwrap();
+        assert_eq!(functools_stub_again.as_str(), FUNCTOOLS_CONTENTS);
     }
 
     #[test]
