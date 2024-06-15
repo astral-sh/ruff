@@ -65,9 +65,9 @@ array: 3.0-
 ast: 3.0-
 asynchat: 3.0-3.11
 asyncio: 3.4-
-asyncio.mixins: 3.10-
 asyncio.exceptions: 3.8-
 asyncio.format_helpers: 3.7-
+asyncio.mixins: 3.10-
 asyncio.runners: 3.7-
 asyncio.staggered: 3.8-
 asyncio.taskgroups: 3.11-
@@ -270,6 +270,7 @@ threading: 3.0-
 time: 3.0-
 timeit: 3.0-
 tkinter: 3.0-
+tkinter.tix: 3.0-3.12
 token: 3.0-
 tokenize: 3.0-
 tomllib: 3.11-

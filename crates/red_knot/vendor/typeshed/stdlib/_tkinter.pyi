@@ -1,5 +1,7 @@
 import sys
+from collections.abc import Callable
 from typing import Any, ClassVar, Literal, final
+from typing_extensions import TypeAlias
 
 # _tkinter is meant to be only used internally by tkinter, but some tkinter
 # functions e.g. return _tkinter.Tcl_Obj objects. Tcl_Obj represents a Tcl
@@ -29,6 +31,8 @@ class Tcl_Obj:
     def __ne__(self, value, /): ...
 
 class TclError(Exception): ...
+
+_TkinterTraceFunc: TypeAlias = Callable[[tuple[str, ...]], object]
 
 # This class allows running Tcl code. Tkinter uses it internally a lot, and
 # it's often handy to drop a piece of Tcl code into a tkinter program. Example:
@@ -86,6 +90,9 @@ class TkappType:
     def unsetvar(self, *args, **kwargs): ...
     def wantobjects(self, *args, **kwargs): ...
     def willdispatch(self): ...
+    if sys.version_info >= (3, 12):
+        def gettrace(self, /) -> _TkinterTraceFunc | None: ...
+        def settrace(self, func: _TkinterTraceFunc | None, /) -> None: ...
 
 # These should be kept in sync with tkinter.tix constants, except ALL_EVENTS which doesn't match TCL_ALL_EVENTS
 ALL_EVENTS: Literal[-3]
