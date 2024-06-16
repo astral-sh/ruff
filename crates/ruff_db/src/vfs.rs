@@ -3,9 +3,11 @@ use std::sync::Arc;
 use countme::Count;
 use dashmap::mapref::entry::Entry;
 
-pub use path::{VendoredPath, VendoredPathBuf, VfsPath};
+pub use crate::vendored::{VendoredPath, VendoredPathBuf};
+pub use path::VfsPath;
 
 use crate::file_system::{FileRevision, FileSystemPath};
+use crate::vendored::VendoredFileSystem;
 use crate::vfs::private::FileStatus;
 use crate::{Db, FxDashMap};
 
@@ -296,17 +298,24 @@ impl VfsFile {
     }
 }
 
-#[derive(Default, Debug)]
+#[derive(Debug)]
 enum VendoredVfs {
-    #[default]
-    Real,
+    Real(VendoredFileSystem),
     Stubbed(FxDashMap<VendoredPathBuf, String>),
+}
+
+impl Default for VendoredVfs {
+    fn default() -> Self {
+        Self::Real(VendoredFileSystem::default())
+    }
 }
 
 impl VendoredVfs {
     fn revision(&self, path: &VendoredPath) -> Option<FileRevision> {
         match self {
-            VendoredVfs::Real => todo!(),
+            VendoredVfs::Real(file_system) => file_system
+                .file_hash(path)
+                .map(|hash| FileRevision::new(u128::from(hash))),
             VendoredVfs::Stubbed(stubbed) => stubbed
                 .contains_key(&path.to_path_buf())
                 .then_some(FileRevision::new(1)),
@@ -315,7 +324,7 @@ impl VendoredVfs {
 
     fn read(&self, path: &VendoredPath) -> Option<String> {
         match self {
-            VendoredVfs::Real => todo!(),
+            VendoredVfs::Real(file_system) => file_system.read(path),
             VendoredVfs::Stubbed(stubbed) => stubbed.get(&path.to_path_buf()).as_deref().cloned(),
         }
     }

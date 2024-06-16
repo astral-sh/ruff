@@ -2029,6 +2029,7 @@ dependencies = [
  "countme",
  "dashmap",
  "filetime",
+ "is-macro",
  "itertools 0.13.0",
  "once_cell",
  "ruff_python_ast",

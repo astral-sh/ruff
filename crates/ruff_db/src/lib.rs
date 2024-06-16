@@ -11,6 +11,7 @@ use crate::vfs::{Vfs, VfsFile};
 pub mod file_system;
 pub mod parsed;
 pub mod source;
+pub mod vendored;
 pub mod vfs;
 
 pub(crate) type FxDashMap<K, V> = dashmap::DashMap<K, V, BuildHasherDefault<FxHasher>>;

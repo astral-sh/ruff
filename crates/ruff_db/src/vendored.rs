@@ -1,33 +1,71 @@
 use std::cell::{RefCell, RefMut};
-use std::io::{Cursor, Read};
+use std::io::{self, Read};
 use std::ops::{Deref, DerefMut};
 use std::sync::{Mutex, MutexGuard};
 
 use itertools::Itertools;
-use zip::{read::ZipFile, ZipArchive};
+use once_cell::sync::Lazy;
+use zip::{read::ZipFile, ZipArchive, ZipWriter};
 
-use crate::file_system::{FileRevision, FileSystem, FileSystemPath, FileType, Metadata, Result};
+pub use path::{VendoredPath, VendoredPathBuf};
+
+pub mod path;
+
+type Result<T> = io::Result<T>;
 
 #[derive(Debug)]
 pub struct VendoredFileSystem {
     inner: VendoredFileSystemInner,
 }
 
-impl VendoredFileSystem {
-    const READ_ONLY_PERMISSIONS: u32 = 0o444;
+impl Default for VendoredFileSystem {
+    fn default() -> Self {
+        static DATA: Lazy<Box<[u8]>> = Lazy::new(|| {
+            let mut buffer = Vec::new();
+            let cursor = io::Cursor::new(&mut buffer);
+            {
+                let mut archive = ZipWriter::new(cursor);
+                archive.finish().unwrap();
+            }
+            buffer.into_boxed_slice()
+        });
+        Self::new(&DATA).unwrap()
+    }
+}
 
+impl VendoredFileSystem {
     pub fn new(raw_bytes: &'static [u8]) -> Result<Self> {
         Ok(Self {
             inner: VendoredFileSystemInner::new(raw_bytes)?,
         })
     }
-}
 
-impl FileSystem for VendoredFileSystem {
-    fn exists(&self, path: &FileSystemPath) -> bool {
+    pub fn file_type(&self, path: &VendoredPath) -> Option<FileType> {
+        let normalized = normalize_vendored_path(path);
         let inner_locked = self.inner.lock();
         let mut archive = inner_locked.borrow_mut();
+        if let Ok(zip_file) = archive.lookup_path(&normalized) {
+            if zip_file.is_dir() {
+                return Some(FileType::Directory);
+            }
+            return Some(FileType::File);
+        }
+        if normalized.has_trailing_slash() {
+            return None;
+        }
+        if let Ok(zip_file) = archive.lookup_path(&normalized.with_trailing_slash()) {
+            if zip_file.is_dir() {
+                return Some(FileType::Directory);
+            }
+            return Some(FileType::File);
+        }
+        None
+    }
+
+    pub fn exists(&self, path: &VendoredPath) -> bool {
         let normalized = normalize_vendored_path(path);
+        let inner_locked = self.inner.lock();
+        let mut archive = inner_locked.borrow_mut();
         archive.lookup_path(&normalized).is_ok()
             || (!normalized.has_trailing_slash()
                 && archive
@@ -35,80 +73,41 @@ impl FileSystem for VendoredFileSystem {
                     .is_ok())
     }
 
-    fn is_directory(&self, path: &FileSystemPath) -> bool {
+    /// Return the crc32 hash of the file
+    pub fn file_hash(&self, path: &VendoredPath) -> Option<u32> {
+        let normalized = normalize_vendored_path(path);
         let inner_locked = self.inner.lock();
         let mut archive = inner_locked.borrow_mut();
-        let normalized = normalize_vendored_path(path);
         if let Ok(zip_file) = archive.lookup_path(&normalized) {
-            return zip_file.is_dir();
+            return Some(zip_file.crc32());
         }
         if normalized.has_trailing_slash() {
-            return false;
+            return None;
         }
         archive
             .lookup_path(&normalized.with_trailing_slash())
-            .is_ok_and(|zip_file| zip_file.is_dir())
+            .map(|zip_file| zip_file.crc32())
+            .ok()
     }
 
-    fn is_file(&self, path: &FileSystemPath) -> bool {
-        if path.as_str().ends_with('/') {
-            return false;
-        }
+    /// Read the entire contents of the path into a string
+    pub fn read(&self, path: &VendoredPath) -> Option<String> {
         let inner_locked = self.inner.lock();
         let mut archive = inner_locked.borrow_mut();
-        archive
-            .lookup_path(&normalize_vendored_path(path))
-            .is_ok_and(|zip_file| zip_file.is_file())
-    }
-
-    fn metadata(&self, path: &FileSystemPath) -> Result<Metadata> {
-        let normalized = normalize_vendored_path(path);
-        let inner_locked = self.inner.lock();
-        let mut archive = inner_locked.borrow_mut();
-
-        let metadata = archive
-            .lookup_path(&normalized)
-            .map(|zip_file| (zip_file.is_dir(), zip_file.crc32()));
-
-        let (is_dir, file_hash) = match metadata {
-            Ok((is_dir, file_hash)) => (is_dir, file_hash),
-            Err(err) => {
-                if normalized.has_trailing_slash() {
-                    return Err(err);
-                }
-                let lookup_result = archive.lookup_path(&normalized.with_trailing_slash());
-                if let Ok(zip_file) = lookup_result {
-                    (zip_file.is_dir(), zip_file.crc32())
-                } else {
-                    return Err(err);
-                }
-            }
-        };
-
-        let file_type = if is_dir {
-            FileType::Directory
-        } else {
-            FileType::File
-        };
-
-        Ok(Metadata {
-            // Using the file hash is fine here,
-            // as `FileRevision`s are not guaranteed to be monotonically increasing
-            // for newer revisions
-            revision: FileRevision::new(u128::from(file_hash)),
-            permissions: Some(Self::READ_ONLY_PERMISSIONS),
-            file_type,
-        })
-    }
-
-    fn read(&self, path: &FileSystemPath) -> Result<String> {
-        let inner_locked = self.inner.lock();
-        let mut archive = inner_locked.borrow_mut();
-        let mut zip_file = archive.lookup_path(&normalize_vendored_path(path))?;
+        let mut zip_file = archive.lookup_path(&normalize_vendored_path(path)).ok()?;
         let mut buffer = String::new();
-        zip_file.read_to_string(&mut buffer)?;
-        Ok(buffer)
+        zip_file.read_to_string(&mut buffer).ok()?;
+        Some(buffer)
     }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, is_macro::Is)]
+pub enum FileType {
+    /// The path exists in the zip archive and represents a vendored file
+    File,
+
+    /// The path exists in the zip archive and represents a vendored directory of files
+    Directory,
 }
 
 #[derive(Debug)]
@@ -159,11 +158,11 @@ impl<'a> DerefMut for ArchiveReader<'a> {
 
 /// Newtype wrapper around a ZipArchive.
 #[derive(Debug)]
-struct VendoredZipArchive(ZipArchive<Cursor<&'static [u8]>>);
+struct VendoredZipArchive(ZipArchive<io::Cursor<&'static [u8]>>);
 
 impl VendoredZipArchive {
     pub fn new(data: &'static [u8]) -> Result<Self> {
-        Ok(Self(ZipArchive::new(Cursor::new(data))?))
+        Ok(Self(ZipArchive::new(io::Cursor::new(data))?))
     }
 
     fn lookup_path(&mut self, path: &NormalizedVendoredPath) -> Result<ZipFile> {
@@ -200,7 +199,7 @@ impl NormalizedVendoredPath {
 /// If a path with an unsupported component for vendored paths is passed.
 /// Unsupported components are path prefixes,
 /// and path root directories appearing anywhere except at the start of the path.
-fn normalize_vendored_path(path: &FileSystemPath) -> NormalizedVendoredPath {
+fn normalize_vendored_path(path: &VendoredPath) -> NormalizedVendoredPath {
     debug_assert!(
         !path.as_std_path().is_absolute(),
         "Attempted to lookup an absolute filesystem path relative to a vendored zip archive"
@@ -248,7 +247,7 @@ mod tests {
 
     static MOCK_ZIP_ARCHIVE: Lazy<Box<[u8]>> = Lazy::new(|| {
         let mut typeshed_buffer = Vec::new();
-        let typeshed = Cursor::new(&mut typeshed_buffer);
+        let typeshed = io::Cursor::new(&mut typeshed_buffer);
 
         let options = FileOptions::default()
             .compression_method(CompressionMethod::Zstd)
@@ -282,16 +281,13 @@ mod tests {
     fn test_directory(dirname: &str) {
         let mock_typeshed = mock_typeshed();
 
-        let path = FileSystemPath::new(dirname);
+        let path = VendoredPath::new(dirname);
 
         assert!(mock_typeshed.exists(path));
-        assert!(mock_typeshed.is_directory(path));
-        assert!(!mock_typeshed.is_file(path));
-
-        let path_metadata = mock_typeshed.metadata(path).unwrap();
-        assert!(path_metadata.file_type().is_directory());
-        assert!(path_metadata.permissions().is_some());
-        path_metadata.revision();
+        assert!(mock_typeshed
+            .file_type(path)
+            .is_some_and(|file_type| file_type.is_directory()));
+        assert!(mock_typeshed.file_hash(path).is_some())
     }
 
     #[test]
@@ -326,12 +322,11 @@ mod tests {
 
     fn test_nonexistent_path(path: &str) {
         let mock_typeshed = mock_typeshed();
-        let path = FileSystemPath::new(path);
+        let path = VendoredPath::new(path);
         assert!(!mock_typeshed.exists(path));
-        assert!(!mock_typeshed.is_directory(path));
-        assert!(!mock_typeshed.is_file(path));
-        assert!(mock_typeshed.metadata(path).is_err());
-        assert!(mock_typeshed.read(path).is_err());
+        assert!(mock_typeshed.file_type(path).is_none());
+        assert!(mock_typeshed.file_hash(path).is_none());
+        assert!(mock_typeshed.read(path).is_none());
     }
 
     #[test]
@@ -354,21 +349,18 @@ mod tests {
         test_nonexistent_path("./foo/../../../foo")
     }
 
-    fn test_file(mock_typeshed: &VendoredFileSystem, path: &FileSystemPath) {
+    fn test_file(mock_typeshed: &VendoredFileSystem, path: &VendoredPath) {
         assert!(mock_typeshed.exists(path));
-        assert!(mock_typeshed.is_file(path));
-        assert!(!mock_typeshed.is_directory(path));
-
-        let path_metadata = mock_typeshed.metadata(path).unwrap();
-        assert!(path_metadata.file_type().is_file());
-        assert!(path_metadata.permissions().is_some());
-        path_metadata.revision();
+        assert!(mock_typeshed
+            .file_type(path)
+            .is_some_and(|file_type| file_type.is_file()));
+        assert!(mock_typeshed.file_hash(path).is_some());
     }
 
     #[test]
     fn functools_file_contents() {
         let mock_typeshed = mock_typeshed();
-        let path = FileSystemPath::new("stdlib/functools.pyi");
+        let path = VendoredPath::new("stdlib/functools.pyi");
         test_file(&mock_typeshed, path);
         let functools_stub = mock_typeshed.read(path).unwrap();
         assert_eq!(functools_stub.as_str(), FUNCTOOLS_CONTENTS);
@@ -382,14 +374,14 @@ mod tests {
     fn functools_file_other_path() {
         test_file(
             &mock_typeshed(),
-            FileSystemPath::new("stdlib/../stdlib/../stdlib/functools.pyi"),
+            VendoredPath::new("stdlib/../stdlib/../stdlib/functools.pyi"),
         )
     }
 
     #[test]
     fn asyncio_file_contents() {
         let mock_typeshed = mock_typeshed();
-        let path = FileSystemPath::new("stdlib/asyncio/tasks.pyi");
+        let path = VendoredPath::new("stdlib/asyncio/tasks.pyi");
         test_file(&mock_typeshed, path);
         let asyncio_stub = mock_typeshed.read(path).unwrap();
         assert_eq!(asyncio_stub.as_str(), ASYNCIO_TASKS_CONTENTS);
@@ -399,7 +391,7 @@ mod tests {
     fn asyncio_file_other_path() {
         test_file(
             &mock_typeshed(),
-            FileSystemPath::new("./stdlib/asyncio/../asyncio/tasks.pyi"),
+            VendoredPath::new("./stdlib/asyncio/../asyncio/tasks.pyi"),
         )
     }
 }
