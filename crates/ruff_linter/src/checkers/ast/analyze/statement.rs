@@ -423,6 +423,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 if checker.enabled(Rule::DjangoModelWithoutDunderStr) {
                     flake8_django::rules::model_without_dunder_str(checker, class_def);
                 }
+                if checker.enabled(Rule::DjangoModelWithDunderUnicode) {
+                    flake8_django::rules::model_with_dunder_unicode(checker, class_def);
+                }
             }
             if checker.enabled(Rule::EqWithoutHash) {
                 pylint::rules::object_without_hash_method(checker, class_def);
