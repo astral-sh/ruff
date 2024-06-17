@@ -9,13 +9,12 @@ use std::path::Path;
 
 use anyhow::{Context, Result};
 use colored::Colorize;
-use log::{debug, error, warn};
-use ruff_linter::codes::Rule;
+use log::{debug, warn};
 use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::Diagnostic;
+use ruff_linter::codes::Rule;
 use ruff_linter::linter::{lint_fix, lint_only, FixTable, FixerResult, LinterResult, ParseSource};
-use ruff_linter::logging::DisplayParseError;
 use ruff_linter::message::{Message, SyntaxErrorMessage};
 use ruff_linter::pyproject_toml::lint_pyproject_toml;
 use ruff_linter::settings::types::UnsafeFixes;
@@ -357,13 +356,6 @@ pub(crate) fn lint_path(
         }
     }
 
-    if let Some(error) = parse_error {
-        error!(
-            "{}",
-            DisplayParseError::from_source_kind(error, Some(path.to_path_buf()), &transformed)
-        );
-    }
-
     let notebook_indexes = if let SourceKind::IpyNotebook(notebook) = transformed {
         FxHashMap::from_iter([(path.to_string_lossy().to_string(), notebook.into_index())])
     } else {
@@ -408,52 +400,66 @@ pub(crate) fn lint_stdin(
     };
 
     // Lint the inputs.
-    let (
-        LinterResult {
-            data: messages,
-            error: parse_error,
-        },
-        transformed,
-        fixed,
-    ) = if matches!(fix_mode, flags::FixMode::Apply | flags::FixMode::Diff) {
-        if let Ok(FixerResult {
-            result,
-            transformed,
-            fixed,
-        }) = lint_fix(
-            path.unwrap_or_else(|| Path::new("-")),
-            package,
-            noqa,
-            settings.unsafe_fixes,
-            &settings.linter,
-            &source_kind,
-            source_type,
-        ) {
-            match fix_mode {
-                flags::FixMode::Apply => {
-                    // Write the contents to stdout, regardless of whether any errors were fixed.
-                    transformed.write(&mut io::stdout().lock())?;
-                }
-                flags::FixMode::Diff => {
-                    // But only write a diff if it's non-empty.
-                    if !fixed.is_empty() {
-                        write!(
-                            &mut io::stdout().lock(),
-                            "{}",
-                            source_kind.diff(&transformed, path).unwrap()
-                        )?;
+    let (LinterResult { data: messages, .. }, transformed, fixed) =
+        if matches!(fix_mode, flags::FixMode::Apply | flags::FixMode::Diff) {
+            if let Ok(FixerResult {
+                result,
+                transformed,
+                fixed,
+            }) = lint_fix(
+                path.unwrap_or_else(|| Path::new("-")),
+                package,
+                noqa,
+                settings.unsafe_fixes,
+                &settings.linter,
+                &source_kind,
+                source_type,
+            ) {
+                match fix_mode {
+                    flags::FixMode::Apply => {
+                        // Write the contents to stdout, regardless of whether any errors were fixed.
+                        transformed.write(&mut io::stdout().lock())?;
                     }
+                    flags::FixMode::Diff => {
+                        // But only write a diff if it's non-empty.
+                        if !fixed.is_empty() {
+                            write!(
+                                &mut io::stdout().lock(),
+                                "{}",
+                                source_kind.diff(&transformed, path).unwrap()
+                            )?;
+                        }
+                    }
+                    flags::FixMode::Generate => {}
                 }
-                flags::FixMode::Generate => {}
-            }
-            let transformed = if let Cow::Owned(transformed) = transformed {
-                transformed
+                let transformed = if let Cow::Owned(transformed) = transformed {
+                    transformed
+                } else {
+                    source_kind
+                };
+                (result, transformed, fixed)
             } else {
-                source_kind
-            };
-            (result, transformed, fixed)
+                // If we fail to fix, lint the original source code.
+                let result = lint_only(
+                    path.unwrap_or_else(|| Path::new("-")),
+                    package,
+                    &settings.linter,
+                    noqa,
+                    &source_kind,
+                    source_type,
+                    ParseSource::None,
+                );
+
+                // Write the contents to stdout anyway.
+                if fix_mode.is_apply() {
+                    source_kind.write(&mut io::stdout().lock())?;
+                }
+
+                let transformed = source_kind;
+                let fixed = FxHashMap::default();
+                (result, transformed, fixed)
+            }
         } else {
-            // If we fail to fix, lint the original source code.
             let result = lint_only(
                 path.unwrap_or_else(|| Path::new("-")),
                 package,
@@ -463,37 +469,10 @@ pub(crate) fn lint_stdin(
                 source_type,
                 ParseSource::None,
             );
-
-            // Write the contents to stdout anyway.
-            if fix_mode.is_apply() {
-                source_kind.write(&mut io::stdout().lock())?;
-            }
-
             let transformed = source_kind;
             let fixed = FxHashMap::default();
             (result, transformed, fixed)
-        }
-    } else {
-        let result = lint_only(
-            path.unwrap_or_else(|| Path::new("-")),
-            package,
-            &settings.linter,
-            noqa,
-            &source_kind,
-            source_type,
-            ParseSource::None,
-        );
-        let transformed = source_kind;
-        let fixed = FxHashMap::default();
-        (result, transformed, fixed)
-    };
-
-    if let Some(error) = parse_error {
-        error!(
-            "{}",
-            DisplayParseError::from_source_kind(error, path.map(Path::to_path_buf), &transformed)
-        );
-    }
+        };
 
     let notebook_indexes = if let SourceKind::IpyNotebook(notebook) = transformed {
         FxHashMap::from_iter([(
