@@ -335,7 +335,7 @@ Module(
 11 | def keyword[A, await](): ...
 12 | 
 13 | def not_a_type_param[A, |, B](): ...
-   |                         ^ Syntax Error: Expected a type parameter or the end of the type parameter list
+   |                         ^ Syntax Error: Expected ',', found '|'
 14 | 
 15 | def multiple_commas[A,,B](): ...
    |
@@ -383,7 +383,7 @@ Module(
 17 | def multiple_trailing_commas[A,,](): ...
 18 | 
 19 | def multiple_commas_and_recovery[A,,100](): ...
-   |                                     ^^^ Syntax Error: Expected a type parameter or the end of the type parameter list
+   |                                     ^^^ Syntax Error: Expected ']', found int
    |
 
 

@@ -11,7 +11,7 @@ Module(
         body: [
             FunctionDef(
                 StmtFunctionDef {
-                    range: 0..46,
+                    range: 0..39,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
@@ -108,29 +108,29 @@ Module(
                                 ),
                             },
                         ),
-                        Assign(
-                            StmtAssign {
-                                range: 40..46,
-                                targets: [
-                                    Name(
-                                        ExprName {
-                                            range: 40..41,
-                                            id: "x",
-                                            ctx: Store,
-                                        },
-                                    ),
-                                ],
-                                value: NumberLiteral(
-                                    ExprNumberLiteral {
-                                        range: 44..46,
-                                        value: Int(
-                                            10,
-                                        ),
-                                    },
-                                ),
+                    ],
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    range: 40..46,
+                    targets: [
+                        Name(
+                            ExprName {
+                                range: 40..41,
+                                id: "x",
+                                ctx: Store,
                             },
                         ),
                     ],
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 44..46,
+                            value: Int(
+                                10,
+                            ),
+                        },
+                    ),
                 },
             ),
         ],
@@ -142,20 +142,6 @@ Module(
   |
 1 | def foo[T1, *T2(a, b):
   |                ^ Syntax Error: Expected ']', found '('
-2 |     return a + b
-3 | x = 10
-  |
-
-
-  |
-1 | def foo[T1, *T2(a, b):
-2 |     return a + b
-3 | x = 10
-  | ^ Syntax Error: Simple statements must be separated by newlines or semicolons
-  |
-
-
-  |
 2 |     return a + b
 3 | x = 10
   |

@@ -150,7 +150,7 @@ Module(
 
   |
 1 | def foo(a, **kwargs={'b': 1, 'c': 2}): ...
-  |                     ^ Syntax Error: Expected a parameter or the end of the parameter list
+  |                     ^ Syntax Error: Expected ')', found '{'
   |
 
 

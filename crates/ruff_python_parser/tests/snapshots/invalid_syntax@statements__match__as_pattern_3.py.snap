@@ -99,7 +99,7 @@ Module(
 2 |     #     Not in the mapping start token set, so the list parsing bails
 3 |     #     v
 4 |     case {(x as y): 1}:
-  |           ^ Syntax Error: Expected a mapping pattern or the end of the mapping pattern
+  |           ^ Syntax Error: Expected '}', found '('
 5 |         pass
   |
 
