@@ -237,7 +237,7 @@ mod tests {
         assert!(mock_typeshed.crc32_hash(path).is_none());
         assert!(mock_typeshed
             .read(path)
-            .is_err_and(|err| err.kind() == std::io::ErrorKind::NotFound));
+            .is_err_and(|err| err.to_string().contains("file not found")));
     }
 
     #[test]
