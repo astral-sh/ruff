@@ -9,10 +9,10 @@ use ruff_index::{IndexSlice, IndexVec};
 use ruff_python_ast as ast;
 
 use crate::red_knot::node_key::NodeKey;
-use crate::red_knot::semantic_index::ast_ids::AstIds;
+use crate::red_knot::semantic_index::ast_ids::{AstId, AstIds, ScopeClassId, ScopeFunctionId};
 use crate::red_knot::semantic_index::builder::SemanticIndexBuilder;
 use crate::red_knot::semantic_index::symbol::{
-    FileScopeId, PublicSymbolId, Scope, ScopeId, ScopeSymbolId, ScopesMap, SymbolTable,
+    FileScopeId, PublicSymbolId, Scope, ScopeId, ScopeKind, ScopeSymbolId, ScopesMap, SymbolTable,
 };
 use crate::Db;
 
@@ -42,7 +42,7 @@ pub(crate) fn semantic_index(db: &dyn Db, file: VfsFile) -> SemanticIndex {
 pub(crate) fn symbol_table(db: &dyn Db, scope: ScopeId) -> Arc<SymbolTable> {
     let index = semantic_index(db, scope.file(db));
 
-    index.symbol_table(scope.scope_id(db))
+    index.symbol_table(scope.file_id(db))
 }
 
 /// Returns a mapping from file specific [`FileScopeId`] to a program-wide unique [`ScopeId`].
@@ -60,15 +60,18 @@ pub(crate) fn scopes_map(db: &dyn Db, file: VfsFile) -> ScopesMap {
 }
 
 /// Returns the root scope of `file`.
-pub fn root_scope(db: &dyn Db, file: VfsFile) -> ScopeId {
+#[salsa::tracked]
+pub(crate) fn root_scope(db: &dyn Db, file: VfsFile) -> ScopeId {
     FileScopeId::root().to_scope_id(db, file)
 }
 
 /// Returns the symbol with the given name in `file`'s public scope or `None` if
 /// no symbol with the given name exists.
-pub fn global_symbol(db: &dyn Db, file: VfsFile, name: &str) -> Option<PublicSymbolId> {
+pub fn public_symbol(db: &dyn Db, file: VfsFile, name: &str) -> Option<PublicSymbolId> {
     let root_scope = root_scope(db, file);
-    root_scope.symbol(db, name)
+    let symbol_table = symbol_table(db, root_scope);
+    let local = symbol_table.symbol_id_by_name(name)?;
+    Some(local.to_public_symbol(db, file))
 }
 
 /// The symbol tables for an entire file.
@@ -90,6 +93,8 @@ pub struct SemanticIndex {
     /// Note: We should not depend on this map when analysing other files or
     /// changing a file invalidates all dependents.
     ast_ids: IndexVec<FileScopeId, AstIds>,
+
+    scope_nodes: IndexVec<FileScopeId, NodeWithScopeId>,
 }
 
 impl SemanticIndex {
@@ -97,7 +102,7 @@ impl SemanticIndex {
     ///
     /// Use the Salsa cached [`symbol_table`] query if you only need the
     /// symbol table for a single scope.
-    fn symbol_table(&self, scope_id: FileScopeId) -> Arc<SymbolTable> {
+    pub(super) fn symbol_table(&self, scope_id: FileScopeId) -> Arc<SymbolTable> {
         self.symbol_tables[scope_id].clone()
     }
 
@@ -151,6 +156,10 @@ impl SemanticIndex {
     #[allow(unused)]
     pub(crate) fn ancestor_scopes(&self, scope: FileScopeId) -> AncestorsIter {
         AncestorsIter::new(self, scope)
+    }
+
+    pub(crate) fn scope_node(&self, scope_id: FileScopeId) -> NodeWithScopeId {
+        self.scope_nodes[scope_id]
     }
 }
 
@@ -243,6 +252,28 @@ impl<'a> Iterator for ChildrenIter<'a> {
     fn next(&mut self) -> Option<Self::Item> {
         self.descendents
             .find(|(_, scope)| scope.parent == Some(self.parent))
+    }
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub(crate) enum NodeWithScopeId {
+    Module,
+    Class(AstId<ScopeClassId>),
+    ClassTypeParams(AstId<ScopeClassId>),
+    Function(AstId<ScopeFunctionId>),
+    FunctionTypeParams(AstId<ScopeFunctionId>),
+}
+
+impl NodeWithScopeId {
+    fn scope_kind(self) -> ScopeKind {
+        match self {
+            NodeWithScopeId::Module => ScopeKind::Module,
+            NodeWithScopeId::Class(_) => ScopeKind::Class,
+            NodeWithScopeId::Function(_) => ScopeKind::Function,
+            NodeWithScopeId::ClassTypeParams(_) | NodeWithScopeId::FunctionTypeParams(_) => {
+                ScopeKind::Annotation
+            }
+        }
     }
 }
 
@@ -583,19 +614,14 @@ class C[T]:
         let TestCase { db, file } = test_case("x = 1;\ndef test():\n  y = 4");
 
         let index = semantic_index(&db, file);
-        let root_table = index.symbol_table(FileScopeId::root());
         let parsed = parsed_module(&db, file);
         let ast = parsed.syntax();
-
-        let x_sym = root_table
-            .symbol_by_name("x")
-            .expect("x symbol should exist");
 
         let x_stmt = ast.body[0].as_assign_stmt().unwrap();
         let x = &x_stmt.targets[0];
 
         assert_eq!(index.expression_scope(x).kind(), ScopeKind::Module);
-        assert_eq!(index.expression_scope_id(x), x_sym.scope());
+        assert_eq!(index.expression_scope_id(x), FileScopeId::root());
 
         let def = ast.body[1].as_function_def_stmt().unwrap();
         let y_stmt = def.body[0].as_assign_stmt().unwrap();
