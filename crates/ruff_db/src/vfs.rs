@@ -6,7 +6,8 @@ use dashmap::mapref::entry::Entry;
 pub use crate::vendored::{VendoredPath, VendoredPathBuf};
 pub use path::VfsPath;
 
-use crate::file_system::{FileRevision, FileSystemPath};
+use crate::file_system::FileSystemPath;
+use crate::metadata::FileRevision;
 use crate::vendored::VendoredFileSystem;
 use crate::vfs::private::FileStatus;
 use crate::{Db, FxDashMap};
@@ -315,8 +316,8 @@ impl VendoredVfs {
     fn revision(&self, path: &VendoredPath) -> Option<FileRevision> {
         match self {
             VendoredVfs::Real(file_system) => file_system
-                .crc32_hash(path)
-                .map(|hash| FileRevision::new(u128::from(hash))),
+                .metadata(path)
+                .map(|metadata| metadata.revision()),
             VendoredVfs::Stubbed(stubbed) => stubbed
                 .contains_key(&path.to_path_buf())
                 .then_some(FileRevision::new(1)),
@@ -355,7 +356,7 @@ mod private {
 
 #[cfg(test)]
 mod tests {
-    use crate::file_system::FileRevision;
+    use crate::metadata::FileRevision;
     use crate::tests::TestDb;
     use crate::vfs::{system_path_to_file, vendored_path_to_file};
 

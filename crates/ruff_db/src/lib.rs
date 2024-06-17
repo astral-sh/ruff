@@ -9,6 +9,7 @@ use crate::source::{line_index, source_text};
 use crate::vfs::{Vfs, VfsFile};
 
 pub mod file_system;
+mod metadata;
 pub mod parsed;
 pub mod source;
 pub mod vendored;

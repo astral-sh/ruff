@@ -5,6 +5,7 @@ use std::sync::{Mutex, MutexGuard};
 use itertools::Itertools;
 use zip::{read::ZipFile, ZipArchive};
 
+use crate::metadata::FileRevision;
 pub use path::{VendoredPath, VendoredPathBuf};
 
 pub mod path;
@@ -33,18 +34,17 @@ impl VendoredFileSystem {
                 .is_ok()
     }
 
-    /// Return the crc32 hash of the file or directory
-    pub fn crc32_hash(&self, path: &VendoredPath) -> Option<u32> {
+    pub fn metadata(&self, path: &VendoredPath) -> Option<Metadata> {
         let normalized = normalize_vendored_path(path);
         let inner_locked = self.inner.lock();
         let mut archive = inner_locked.borrow_mut();
         if let Ok(zip_file) = archive.lookup_path(&normalized) {
-            return Some(zip_file.crc32());
+            return Some(Metadata::from_zip_file(zip_file));
         }
-        archive
-            .lookup_path(&normalized.with_trailing_slash())
-            .map(|zip_file| zip_file.crc32())
-            .ok()
+        if let Ok(zip_file) = archive.lookup_path(&normalized.with_trailing_slash()) {
+            return Some(Metadata::from_zip_file(zip_file));
+        }
+        None
     }
 
     /// Read the entire contents of the path into a string
@@ -55,6 +55,54 @@ impl VendoredFileSystem {
         let mut buffer = String::new();
         zip_file.read_to_string(&mut buffer)?;
         Ok(buffer)
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum FileType {
+    /// The path exists in the zip archive and represents a vendored file
+    File,
+
+    /// The path exists in the zip archive and represents a vendored directory of files
+    Directory,
+}
+
+impl FileType {
+    pub const fn is_file(self) -> bool {
+        matches!(self, Self::File)
+    }
+
+    pub const fn is_directory(self) -> bool {
+        matches!(self, Self::Directory)
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Metadata {
+    kind: FileType,
+    revision: FileRevision,
+}
+
+impl Metadata {
+    fn from_zip_file(zip_file: ZipFile) -> Self {
+        let kind = if zip_file.is_dir() {
+            FileType::Directory
+        } else {
+            FileType::File
+        };
+
+        Self {
+            kind,
+            revision: FileRevision::new(u128::from(zip_file.crc32())),
+        }
+    }
+
+    pub fn kind(&self) -> FileType {
+        self.kind
+    }
+
+    pub fn revision(&self) -> FileRevision {
+        self.revision
     }
 }
 
@@ -121,10 +169,6 @@ impl NormalizedVendoredPath {
 /// Unsupported components are path prefixes,
 /// and path root directories appearing anywhere except at the start of the path.
 fn normalize_vendored_path(path: &VendoredPath) -> NormalizedVendoredPath {
-    debug_assert!(
-        !path.as_std_path().is_absolute(),
-        "Attempted to lookup an absolute filesystem path relative to a vendored zip archive"
-    );
     let mut normalized_parts = camino::Utf8PathBuf::new();
 
     // Allow the `RootDir` component, but only if it is at the very start of the string.
@@ -197,7 +241,8 @@ mod tests {
         let path = VendoredPath::new(dirname);
 
         assert!(mock_typeshed.exists(path));
-        assert!(mock_typeshed.crc32_hash(path).is_some())
+        let metadata = mock_typeshed.metadata(path).unwrap();
+        assert!(metadata.kind.is_directory());
     }
 
     #[test]
@@ -234,7 +279,7 @@ mod tests {
         let mock_typeshed = mock_typeshed();
         let path = VendoredPath::new(path);
         assert!(!mock_typeshed.exists(path));
-        assert!(mock_typeshed.crc32_hash(path).is_none());
+        assert!(mock_typeshed.metadata(path).is_none());
         assert!(mock_typeshed
             .read(path)
             .is_err_and(|err| err.to_string().contains("file not found")));
@@ -262,7 +307,8 @@ mod tests {
 
     fn test_file(mock_typeshed: &VendoredFileSystem, path: &VendoredPath) {
         assert!(mock_typeshed.exists(path));
-        assert!(mock_typeshed.crc32_hash(path).is_some());
+        let metadata = mock_typeshed.metadata(path).unwrap();
+        assert!(metadata.kind.is_file());
     }
 
     #[test]
