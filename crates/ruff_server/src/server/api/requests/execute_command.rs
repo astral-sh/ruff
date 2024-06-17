@@ -139,14 +139,13 @@ fn debug_information(session: &Session) -> String {
         .map(|path| format!("{}", path.display()))
         .unwrap_or_else(|_| "<unavailable>".to_string());
     format!(
-        r#"executable = {executable}
+        "executable = {executable}
 version = {version}
 encoding = {encoding:?}
 open_document_count = {doc_count}
 active_workspace_count = {workspace_count}
 configuration_files = {config_files:?}
-{client_capabilities}
-    "#,
+{client_capabilities}",
         version = crate::version(),
         encoding = session.encoding(),
         client_capabilities = session.resolved_client_capabilities(),
