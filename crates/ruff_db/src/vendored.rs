@@ -34,8 +34,8 @@ impl VendoredFileSystem {
                 .is_ok()
     }
 
-    /// Return the crc32 hash of the file
-    pub fn file_hash(&self, path: &VendoredPath) -> Option<u32> {
+    /// Return the crc32 hash of the file or directory
+    pub fn crc32_hash(&self, path: &VendoredPath) -> Option<u32> {
         let normalized = normalize_vendored_path(path);
         let inner_locked = self.inner.lock();
         let mut archive = inner_locked.borrow_mut();
@@ -49,13 +49,13 @@ impl VendoredFileSystem {
     }
 
     /// Read the entire contents of the path into a string
-    pub fn read(&self, path: &VendoredPath) -> Option<String> {
+    pub fn read(&self, path: &VendoredPath) -> Result<String> {
         let inner_locked = self.inner.lock();
         let mut archive = inner_locked.borrow_mut();
-        let mut zip_file = archive.lookup_path(&normalize_vendored_path(path)).ok()?;
+        let mut zip_file = archive.lookup_path(&normalize_vendored_path(path))?;
         let mut buffer = String::new();
-        zip_file.read_to_string(&mut buffer).ok()?;
-        Some(buffer)
+        zip_file.read_to_string(&mut buffer)?;
+        Ok(buffer)
     }
 }
 
@@ -222,7 +222,7 @@ mod tests {
         let path = VendoredPath::new(dirname);
 
         assert!(mock_typeshed.exists(path));
-        assert!(mock_typeshed.file_hash(path).is_some())
+        assert!(mock_typeshed.crc32_hash(path).is_some())
     }
 
     #[test]
@@ -259,8 +259,10 @@ mod tests {
         let mock_typeshed = mock_typeshed();
         let path = VendoredPath::new(path);
         assert!(!mock_typeshed.exists(path));
-        assert!(mock_typeshed.file_hash(path).is_none());
-        assert!(mock_typeshed.read(path).is_none());
+        assert!(mock_typeshed.crc32_hash(path).is_none());
+        assert!(mock_typeshed
+            .read(path)
+            .is_err_and(|err| err.kind() == std::io::ErrorKind::NotFound));
     }
 
     #[test]
@@ -285,7 +287,7 @@ mod tests {
 
     fn test_file(mock_typeshed: &VendoredFileSystem, path: &VendoredPath) {
         assert!(mock_typeshed.exists(path));
-        assert!(mock_typeshed.file_hash(path).is_some());
+        assert!(mock_typeshed.crc32_hash(path).is_some());
     }
 
     #[test]

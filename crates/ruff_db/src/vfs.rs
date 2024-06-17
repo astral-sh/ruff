@@ -315,7 +315,7 @@ impl VendoredVfs {
     fn revision(&self, path: &VendoredPath) -> Option<FileRevision> {
         match self {
             VendoredVfs::Real(file_system) => file_system
-                .file_hash(path)
+                .crc32_hash(path)
                 .map(|hash| FileRevision::new(u128::from(hash))),
             VendoredVfs::Stubbed(stubbed) => stubbed
                 .contains_key(&path.to_path_buf())
@@ -323,10 +323,19 @@ impl VendoredVfs {
         }
     }
 
-    fn read(&self, path: &VendoredPath) -> Option<String> {
+    fn read(&self, path: &VendoredPath) -> std::io::Result<String> {
         match self {
             VendoredVfs::Real(file_system) => file_system.read(path),
-            VendoredVfs::Stubbed(stubbed) => stubbed.get(&path.to_path_buf()).as_deref().cloned(),
+            VendoredVfs::Stubbed(stubbed) => {
+                if let Some(contents) = stubbed.get(&path.to_path_buf()).as_deref().cloned() {
+                    Ok(contents)
+                } else {
+                    Err(std::io::Error::new(
+                        std::io::ErrorKind::NotFound,
+                        format!("Could not find file {path:?}"),
+                    ))
+                }
+            }
         }
     }
 }
