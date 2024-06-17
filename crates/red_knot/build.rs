@@ -21,7 +21,7 @@ const TYPESHED_ZIP_LOCATION: &str = "/zipped_typeshed.zip";
 /// This routine is adapted from a recipe at
 /// <https://github.com/zip-rs/zip-old/blob/5d0f198124946b7be4e5969719a7f29f363118cd/examples/write_dir.rs>
 fn zip_dir(
-    directory_path: &str,
+    directory_path: &Path,
     predicate: impl Fn(&Path) -> bool,
     writer: File,
 ) -> ZipResult<File> {
@@ -63,10 +63,8 @@ fn zip_dir(
 
 fn main() {
     println!("cargo:rerun-if-changed={TYPESHED_SOURCE_DIR}");
-    assert!(
-        Path::new(TYPESHED_SOURCE_DIR).is_dir(),
-        "Where is typeshed?"
-    );
+    let typeshed_path = Path::new(TYPESHED_SOURCE_DIR);
+    assert!(typeshed_path.is_dir(), "Where is typeshed?");
     let out_dir = std::env::var("OUT_DIR").unwrap();
 
     // N.B. Deliberately using `format!()` instead of `Path::join()` here,
@@ -81,13 +79,17 @@ fn main() {
 
     let typeshed_path_filter = |path: &Path| {
         assert!(path.is_relative());
-        path.extension().is_some_and(|extension| {
-            extension
-                .to_str()
-                .expect("Expected typeshed file extensions to be UTF-8!")
-                == "pyi"
-        })
+
+        // If there is an extension, it has to be `.pyi`
+        path.extension()
+            .map(|extension| {
+                extension
+                    .to_str()
+                    .expect("Expected typeshed file extensions to be UTF-8!")
+                    == "pyi"
+            })
+            .unwrap_or_else(|| typeshed_path.join(path).is_dir())
     };
 
-    zip_dir(TYPESHED_SOURCE_DIR, typeshed_path_filter, zipped_typeshed).unwrap();
+    zip_dir(typeshed_path, typeshed_path_filter, zipped_typeshed).unwrap();
 }

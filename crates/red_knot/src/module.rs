@@ -770,6 +770,7 @@ impl PackageKind {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeSet;
     use std::io::{Cursor, Read};
     use std::num::NonZeroU32;
     use std::path::{Path, PathBuf};
@@ -935,18 +936,38 @@ mod tests {
 
         let mut typeshed_zip_archive = ZipArchive::new(Cursor::new(TYPESHED_ZIP_BYTES))?;
 
-        for filename in typeshed_zip_archive.file_names() {
-            let path = Path::new(filename);
-            if let Some(extension) = path.extension() {
-                let extension = extension
-                    .to_str()
-                    .expect("Expected all typeshed paths to have UTF-8 file extensions!");
-                assert_eq!(
-                    extension, "pyi",
-                    "Unexpected file extension in typeshed zip for path {filename}"
-                );
-            }
-        }
+        let original_typeshed_root = Path::new("vendor/typeshed/stdlib").canonicalize().unwrap();
+
+        let original_stdlib_files: BTreeSet<PathBuf> =
+            walkdir::WalkDir::new(&original_typeshed_root)
+                .into_iter()
+                .map(|entry| {
+                    entry
+                        .unwrap()
+                        .path()
+                        .strip_prefix(&original_typeshed_root)
+                        .unwrap()
+                        .to_owned()
+                })
+                .collect();
+
+        let zipped_stdlib_files: BTreeSet<PathBuf> = typeshed_zip_archive
+            .file_names()
+            .map(|name| Path::new(name).strip_prefix("stdlib/").unwrap().to_owned())
+            .collect();
+
+        assert!((&zipped_stdlib_files - &original_stdlib_files).is_empty());
+
+        let expected_exclusions_from_zip: BTreeSet<PathBuf> =
+            ["", "VERSIONS", "_typeshed/README.md"]
+                .iter()
+                .map(PathBuf::from)
+                .collect();
+
+        assert_eq!(
+            &original_stdlib_files - &zipped_stdlib_files,
+            expected_exclusions_from_zip
+        );
 
         let path_to_functools = Path::new("stdlib").join("functools.pyi");
         let mut functools_module_stub = typeshed_zip_archive
