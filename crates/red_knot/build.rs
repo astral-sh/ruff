@@ -15,11 +15,16 @@ use zip::CompressionMethod;
 const TYPESHED_SOURCE_DIR: &str = "vendor/typeshed";
 const TYPESHED_ZIP_LOCATION: &str = "/zipped_typeshed.zip";
 
-/// Recursively zip the contents of an entire directory.
+/// Recursively zip the contents of an entire directory,
+/// filtering the directory according to a predicate passed in.
 ///
 /// This routine is adapted from a recipe at
 /// <https://github.com/zip-rs/zip-old/blob/5d0f198124946b7be4e5969719a7f29f363118cd/examples/write_dir.rs>
-fn zip_dir(directory_path: &str, writer: File) -> ZipResult<File> {
+fn zip_dir(
+    directory_path: &str,
+    predicate: impl Fn(&Path) -> bool,
+    writer: File,
+) -> ZipResult<File> {
     let mut zip = ZipWriter::new(writer);
 
     let options = FileOptions::default()
@@ -28,25 +33,29 @@ fn zip_dir(directory_path: &str, writer: File) -> ZipResult<File> {
 
     for entry in walkdir::WalkDir::new(directory_path) {
         let dir_entry = entry.unwrap();
-        let relative_path = dir_entry.path();
-        let name = relative_path
+        let absolute_path = dir_entry.path();
+        let relative_path = absolute_path
             .strip_prefix(Path::new(directory_path))
-            .unwrap()
+            .unwrap();
+        if !predicate(relative_path) {
+            continue;
+        }
+        let relative_path_str = relative_path
             .to_str()
             .expect("Unexpected non-utf8 typeshed path!");
 
         // Write file or directory explicitly
         // Some unzip tools unzip files with directory paths correctly, some do not!
-        if relative_path.is_file() {
-            println!("adding file {relative_path:?} as {name:?} ...");
-            zip.start_file(name, options)?;
-            let mut f = File::open(relative_path)?;
+        if absolute_path.is_file() {
+            println!("adding file {absolute_path:?} as {relative_path_str:?} ...");
+            zip.start_file(relative_path_str, options)?;
+            let mut f = File::open(absolute_path)?;
             std::io::copy(&mut f, &mut zip).unwrap();
-        } else if !name.is_empty() {
+        } else if !relative_path_str.is_empty() {
             // Only if not root! Avoids path spec / warning
             // and mapname conversion failed error on unzip
-            println!("adding dir {relative_path:?} as {name:?} ...");
-            zip.add_directory(name, options)?;
+            println!("adding dir {absolute_path:?} as {relative_path_str:?} ...");
+            zip.add_directory(relative_path_str, options)?;
         }
     }
     zip.finish()
@@ -69,5 +78,16 @@ fn main() {
     let zipped_typeshed_location = format!("{out_dir}{TYPESHED_ZIP_LOCATION}");
 
     let zipped_typeshed = File::create(zipped_typeshed_location).unwrap();
-    zip_dir(TYPESHED_SOURCE_DIR, zipped_typeshed).unwrap();
+
+    let typeshed_path_filter = |path: &Path| {
+        assert!(path.is_relative());
+        path.extension().is_some_and(|extension| {
+            extension
+                .to_str()
+                .expect("Expected typeshed file extensions to be UTF-8!")
+                == "pyi"
+        })
+    };
+
+    zip_dir(TYPESHED_SOURCE_DIR, typeshed_path_filter, zipped_typeshed).unwrap();
 }

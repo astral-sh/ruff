@@ -935,6 +935,19 @@ mod tests {
 
         let mut typeshed_zip_archive = ZipArchive::new(Cursor::new(TYPESHED_ZIP_BYTES))?;
 
+        for filename in typeshed_zip_archive.file_names() {
+            let path = Path::new(filename);
+            if let Some(extension) = path.extension() {
+                let extension = extension
+                    .to_str()
+                    .expect("Expected all typeshed paths to have UTF-8 file extensions!");
+                assert_eq!(
+                    extension, "pyi",
+                    "Unexpected file extension in typeshed zip for path {filename}"
+                );
+            }
+        }
+
         let path_to_functools = Path::new("stdlib").join("functools.pyi");
         let mut functools_module_stub = typeshed_zip_archive
             .by_name(path_to_functools.to_str().unwrap())
