@@ -300,13 +300,14 @@ impl VfsFile {
 
 #[derive(Debug)]
 enum VendoredVfs {
+    #[allow(unused)]
     Real(VendoredFileSystem),
     Stubbed(FxDashMap<VendoredPathBuf, String>),
 }
 
 impl Default for VendoredVfs {
     fn default() -> Self {
-        Self::Real(VendoredFileSystem::default())
+        Self::Stubbed(FxDashMap::default())
     }
 }
 

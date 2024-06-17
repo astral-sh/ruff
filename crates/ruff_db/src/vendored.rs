@@ -4,8 +4,7 @@ use std::ops::{Deref, DerefMut};
 use std::sync::{Mutex, MutexGuard};
 
 use itertools::Itertools;
-use once_cell::sync::Lazy;
-use zip::{read::ZipFile, ZipArchive, ZipWriter};
+use zip::{read::ZipFile, ZipArchive};
 
 pub use path::{VendoredPath, VendoredPathBuf};
 
@@ -18,45 +17,11 @@ pub struct VendoredFileSystem {
     inner: VendoredFileSystemInner,
 }
 
-impl Default for VendoredFileSystem {
-    fn default() -> Self {
-        static DATA: Lazy<Box<[u8]>> = Lazy::new(|| {
-            let mut buffer = Vec::new();
-            let cursor = io::Cursor::new(&mut buffer);
-            {
-                let mut archive = ZipWriter::new(cursor);
-                archive.finish().unwrap();
-            }
-            buffer.into_boxed_slice()
-        });
-        Self::new(&DATA).unwrap()
-    }
-}
-
 impl VendoredFileSystem {
     pub fn new(raw_bytes: &'static [u8]) -> Result<Self> {
         Ok(Self {
             inner: VendoredFileSystemInner::new(raw_bytes)?,
         })
-    }
-
-    pub fn file_type(&self, path: &VendoredPath) -> Option<FileType> {
-        let normalized = normalize_vendored_path(path);
-        let inner_locked = self.inner.lock();
-        let mut archive = inner_locked.borrow_mut();
-        if let Ok(zip_file) = archive.lookup_path(&normalized) {
-            if zip_file.is_dir() {
-                return Some(FileType::Directory);
-            }
-            return Some(FileType::File);
-        }
-        if let Ok(zip_file) = archive.lookup_path(&normalized.with_trailing_slash()) {
-            if zip_file.is_dir() {
-                return Some(FileType::Directory);
-            }
-            return Some(FileType::File);
-        }
-        None
     }
 
     pub fn exists(&self, path: &VendoredPath) -> bool {
@@ -92,15 +57,6 @@ impl VendoredFileSystem {
         zip_file.read_to_string(&mut buffer).ok()?;
         Some(buffer)
     }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, is_macro::Is)]
-pub enum FileType {
-    /// The path exists in the zip archive and represents a vendored file
-    File,
-
-    /// The path exists in the zip archive and represents a vendored directory of files
-    Directory,
 }
 
 #[derive(Debug)]
@@ -266,9 +222,6 @@ mod tests {
         let path = VendoredPath::new(dirname);
 
         assert!(mock_typeshed.exists(path));
-        assert!(mock_typeshed
-            .file_type(path)
-            .is_some_and(|file_type| file_type.is_directory()));
         assert!(mock_typeshed.file_hash(path).is_some())
     }
 
@@ -306,7 +259,6 @@ mod tests {
         let mock_typeshed = mock_typeshed();
         let path = VendoredPath::new(path);
         assert!(!mock_typeshed.exists(path));
-        assert!(mock_typeshed.file_type(path).is_none());
         assert!(mock_typeshed.file_hash(path).is_none());
         assert!(mock_typeshed.read(path).is_none());
     }
@@ -333,9 +285,6 @@ mod tests {
 
     fn test_file(mock_typeshed: &VendoredFileSystem, path: &VendoredPath) {
         assert!(mock_typeshed.exists(path));
-        assert!(mock_typeshed
-            .file_type(path)
-            .is_some_and(|file_type| file_type.is_file()));
         assert!(mock_typeshed.file_hash(path).is_some());
     }
 
