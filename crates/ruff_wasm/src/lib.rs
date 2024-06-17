@@ -9,7 +9,7 @@ use ruff_formatter::printer::SourceMapGeneration;
 use ruff_formatter::{FormatResult, Formatted, IndentStyle};
 use ruff_linter::directives;
 use ruff_linter::line_width::{IndentWidth, LineLength};
-use ruff_linter::linter::{check_path, LinterResult};
+use ruff_linter::linter::check_path;
 use ruff_linter::registry::AsRule;
 use ruff_linter::settings::types::PythonVersion;
 use ruff_linter::settings::{flags, DEFAULT_SELECTORS, DUMMY_VARIABLE_RGX};
@@ -181,9 +181,7 @@ impl Workspace {
         );
 
         // Generate checks.
-        let LinterResult {
-            data: diagnostics, ..
-        } = check_path(
+        let diagnostics = check_path(
             Path::new("<filename>"),
             None,
             &locator,
