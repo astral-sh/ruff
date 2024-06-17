@@ -154,7 +154,7 @@ impl<'a> DerefMut for ArchiveReader<'a> {
 struct VendoredZipArchive(ZipArchive<io::Cursor<&'static [u8]>>);
 
 impl VendoredZipArchive {
-    pub fn new(data: &'static [u8]) -> Result<Self> {
+    fn new(data: &'static [u8]) -> Result<Self> {
         Ok(Self(ZipArchive::new(io::Cursor::new(data))?))
     }
 
