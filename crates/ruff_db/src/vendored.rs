@@ -1,6 +1,5 @@
-use std::cell::{RefCell, RefMut};
+use std::cell::RefCell;
 use std::io::{self, Read};
-use std::ops::{Deref, DerefMut};
 use std::sync::{Mutex, MutexGuard};
 
 use itertools::Itertools;
@@ -62,6 +61,8 @@ impl VendoredFileSystem {
 #[derive(Debug)]
 struct VendoredFileSystemInner(Mutex<RefCell<VendoredZipArchive>>);
 
+type LockedZipArchive<'a> = MutexGuard<'a, RefCell<VendoredZipArchive>>;
+
 impl VendoredFileSystemInner {
     fn new(raw_bytes: &'static [u8]) -> Result<Self> {
         Ok(Self(Mutex::new(RefCell::new(VendoredZipArchive::new(
@@ -75,33 +76,7 @@ impl VendoredFileSystemInner {
     /// ## Panics:
     /// If the current thread already holds the lock.
     fn lock(&self) -> LockedZipArchive {
-        LockedZipArchive(self.0.lock().unwrap())
-    }
-}
-
-#[derive(Debug)]
-struct LockedZipArchive<'a>(MutexGuard<'a, RefCell<VendoredZipArchive>>);
-
-impl<'a> LockedZipArchive<'a> {
-    fn borrow_mut(&self) -> ArchiveReader {
-        ArchiveReader(self.0.borrow_mut())
-    }
-}
-
-#[derive(Debug)]
-struct ArchiveReader<'a>(RefMut<'a, VendoredZipArchive>);
-
-impl<'a> Deref for ArchiveReader<'a> {
-    type Target = VendoredZipArchive;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl<'a> DerefMut for ArchiveReader<'a> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
+        self.0.lock().unwrap()
     }
 }
 
