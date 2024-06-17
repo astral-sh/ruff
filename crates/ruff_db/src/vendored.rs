@@ -50,9 +50,6 @@ impl VendoredFileSystem {
             }
             return Some(FileType::File);
         }
-        if normalized.has_trailing_slash() {
-            return None;
-        }
         if let Ok(zip_file) = archive.lookup_path(&normalized.with_trailing_slash()) {
             if zip_file.is_dir() {
                 return Some(FileType::Directory);
@@ -67,10 +64,9 @@ impl VendoredFileSystem {
         let inner_locked = self.inner.lock();
         let mut archive = inner_locked.borrow_mut();
         archive.lookup_path(&normalized).is_ok()
-            || (!normalized.has_trailing_slash()
-                && archive
-                    .lookup_path(&normalized.with_trailing_slash())
-                    .is_ok())
+            || archive
+                .lookup_path(&normalized.with_trailing_slash())
+                .is_ok()
     }
 
     /// Return the crc32 hash of the file
@@ -80,9 +76,6 @@ impl VendoredFileSystem {
         let mut archive = inner_locked.borrow_mut();
         if let Ok(zip_file) = archive.lookup_path(&normalized) {
             return Some(zip_file.crc32());
-        }
-        if normalized.has_trailing_slash() {
-            return None;
         }
         archive
             .lookup_path(&normalized.with_trailing_slash())
@@ -180,12 +173,9 @@ struct NormalizedVendoredPath(String);
 
 impl NormalizedVendoredPath {
     fn with_trailing_slash(mut self) -> Self {
+        debug_assert!(!self.0.ends_with('/'));
         self.0.push('/');
         self
-    }
-
-    fn has_trailing_slash(&self) -> bool {
-        self.0.ends_with('/')
     }
 
     fn as_str(&self) -> &str {
@@ -222,15 +212,7 @@ fn normalize_vendored_path(path: &VendoredPath) -> NormalizedVendoredPath {
             unsupported => panic!("Unsupported component in a vendored path: {unsupported}"),
         }
     }
-
-    let mut normalized = normalized_parts.into_iter().join("/");
-    // Restore the trailing slash if there was one (camino normalizes these away),
-    // as this is how zip archives distinguish between files and directories.
-    if path.as_str().ends_with('/') {
-        normalized.push('/');
-    }
-
-    NormalizedVendoredPath(normalized)
+    NormalizedVendoredPath(normalized_parts.into_iter().join("/"))
 }
 
 #[cfg(test)]
