@@ -1,4 +1,3 @@
-use salsa::DebugWithDb;
 use std::ops::Deref;
 use std::sync::Arc;
 
@@ -110,8 +109,6 @@ pub fn file_to_module(db: &dyn Db, file: VfsFile) -> Option<Module> {
     // root paths, but that the module corresponding to `path` is in a lower priority search path,
     // in which case we ignore it.
     let module = resolve_module(db, module_name)?;
-
-    module.file().debug(db.upcast());
 
     if file == module.file() {
         Some(module)
