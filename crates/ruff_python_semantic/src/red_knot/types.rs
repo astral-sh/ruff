@@ -36,13 +36,26 @@ pub(crate) fn expression_ty(db: &dyn Db, file: VfsFile, expression: &ast::Expr) 
 
 /// Infers the type of a public symbol.
 ///
-/// This is a Salsa query to get symbol-level  invalidation instead of file-level dependency invalidation.
+/// This is a Salsa query to get symbol-level invalidation instead of file-level dependency invalidation.
 /// Without this being a query, changing any public type of a module would invalidate the type inference
-/// for the module scope of its dependents and the transitive dependents because:
+/// for the module scope of its dependents and the transitive dependents because.
 ///
-/// * The [`TypeInference`] struct changes for the module
-/// * The dependency reruns type inference for the module scope. But its [`TypeInference`] type is
-///   going to change as well because the local symbol of the import variable has now a different type.
+/// For example if we have
+/// ```python
+/// # a.py
+/// import x from b
+///
+/// # b.py
+///
+/// x = 20
+/// ```
+///
+/// And x is now changed from `x = 20` to `x = 30`. The following happens:
+///
+/// * The module level types of `b.py` change because `x` now is a `Literal[30]`.
+/// * The module level types of `a.py` change because the imported symbol `x` now has a `Literal[30]` type
+/// * The module level types of any dependents of `a.py` change because the imported symbol `x` now has a `Literal[30]` type
+/// * And so on for all transitive dependencies.
 ///
 /// This being a query ensures that the invalidation short-circuits if the type of this symbol didn't change.
 #[tracing::instrument(level = "debug", skip(db))]
@@ -55,7 +68,7 @@ pub fn public_symbol_ty(db: &dyn Db, symbol: PublicSymbolId) -> Type {
     inference.symbol_ty(symbol.scope_id(db))
 }
 
-/// Shorthand for [`public_symbol_ty`] that takes a symbol name instead of a [`PublicSymbolId`].
+/// Shorthand for [`public_symbol_ty()`] that takes a symbol name instead of a [`PublicSymbolId`].
 pub fn public_symbol_ty_by_name(db: &dyn Db, file: VfsFile, name: &str) -> Option<Type> {
     let symbol = public_symbol(db, file, name)?;
     Some(public_symbol_ty(db, symbol))
