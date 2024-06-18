@@ -1,16 +1,25 @@
+use salsa::DbWithJar;
+
+use ruff_db::{Db as SourceDb, Upcast};
+
 use crate::module::resolver::{
     file_to_module, internal::ModuleNameIngredient, internal::ModuleResolverSearchPaths,
     resolve_module_query,
 };
-use ruff_db::{Db as SourceDb, Upcast};
-use salsa::DbWithJar;
+
+use crate::red_knot::semantic_index::symbol::ScopeId;
+use crate::red_knot::semantic_index::{scopes_map, semantic_index, symbol_table};
 
 #[salsa::jar(db=Db)]
 pub struct Jar(
     ModuleNameIngredient,
     ModuleResolverSearchPaths,
+    ScopeId,
+    symbol_table,
     resolve_module_query,
     file_to_module,
+    scopes_map,
+    semantic_index,
 );
 
 /// Database giving access to semantic information about a Python program.
@@ -18,12 +27,15 @@ pub trait Db: SourceDb + DbWithJar<Jar> + Upcast<dyn SourceDb> {}
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use super::{Db, Jar};
+    use std::sync::Arc;
+
+    use salsa::DebugWithDb;
+
     use ruff_db::file_system::{FileSystem, MemoryFileSystem, OsFileSystem};
     use ruff_db::vfs::Vfs;
     use ruff_db::{Db as SourceDb, Jar as SourceJar, Upcast};
-    use salsa::DebugWithDb;
-    use std::sync::Arc;
+
+    use super::{Db, Jar};
 
     #[salsa::db(Jar, SourceJar)]
     pub(crate) struct TestDb {

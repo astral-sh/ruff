@@ -9,7 +9,10 @@ mod globals;
 mod model;
 #[cfg(feature = "red_knot")]
 pub mod module;
+pub mod name;
 mod nodes;
+#[cfg(feature = "red_knot")]
+pub mod red_knot;
 mod reference;
 mod scope;
 mod star_import;
