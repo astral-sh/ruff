@@ -1307,6 +1307,118 @@ impl<'src> Lexer<'src> {
         }
     }
 
+    /// Re-lex the current token in the context of a logical line.
+    ///
+    /// Returns a boolean indicating whether the lexer's position has changed. This could result
+    /// into the new current token being different than the previous current token but is not
+    /// necessarily true. If the return value is `true` then the caller is responsible for updating
+    /// it's state accordingly.
+    ///
+    /// This method is a no-op if the lexer isn't in a parenthesized context.
+    ///
+    /// ## Explanation
+    ///
+    /// The lexer emits two different kinds of newline token based on the context. If it's in a
+    /// parenthesized context, it'll emit a [`NonLogicalNewline`] token otherwise it'll emit a
+    /// regular [`Newline`] token. Based on the type of newline token, the lexer will consume and
+    /// emit the indentation tokens appropriately which affects the structure of the code.
+    ///
+    /// For example:
+    /// ```py
+    /// if call(foo
+    ///     def bar():
+    ///         pass
+    /// ```
+    ///
+    /// Here, the lexer emits a [`NonLogicalNewline`] token after `foo` which means that the lexer
+    /// doesn't emit an `Indent` token before the `def` keyword. This leads to an AST which
+    /// considers the function `bar` as part of the module block and the `if` block remains empty.
+    ///
+    /// This method is to facilitate the parser if it recovers from these kind of scenarios so that
+    /// the lexer can then re-lex a [`NonLogicalNewline`] token to a [`Newline`] token which in
+    /// turn helps the parser to build the correct AST.
+    ///
+    /// In the above snippet, it would mean that this method would move the lexer back to the
+    /// newline character after the `foo` token and emit it as a [`Newline`] token instead of
+    /// [`NonLogicalNewline`]. This means that the next token emitted by the lexer would be an
+    /// `Indent` token.
+    ///
+    /// There are cases where the lexer's position will change but the re-lexed token will remain
+    /// the same. This is to help the parser to add the error message at an appropriate location.
+    /// Consider the following example:
+    ///
+    /// ```py
+    /// if call(foo, [a, b
+    ///     def bar():
+    ///         pass
+    /// ```
+    ///
+    /// Here, the parser recovers from two unclosed parenthesis. The inner unclosed `[` will call
+    /// into the re-lexing logic and reduce the nesting level from 2 to 1. And, the re-lexing logic
+    /// will move the lexer at the newline after `b` but still emit a [`NonLogicalNewline`] token.
+    /// Only after the parser recovers from the outer unclosed `(` does the re-lexing logic emit
+    /// the [`Newline`] token.
+    ///
+    /// [`Newline`]: TokenKind::Newline
+    /// [`NonLogicalNewline`]: TokenKind::NonLogicalNewline
+    pub(crate) fn re_lex_logical_token(&mut self) -> bool {
+        if self.nesting == 0 {
+            return false;
+        }
+
+        // Reduce the nesting level because the parser recovered from an error inside list parsing
+        // i.e., it recovered from an unclosed parenthesis (`(`, `[`, or `{`).
+        self.nesting -= 1;
+
+        let current_position = self.current_range().start();
+        let reverse_chars = self.source[..current_position.to_usize()].chars().rev();
+        let mut new_position = current_position;
+        let mut has_newline = false;
+
+        for ch in reverse_chars {
+            if is_python_whitespace(ch) {
+                new_position -= ch.text_len();
+            } else if matches!(ch, '\n' | '\r') {
+                has_newline |= true;
+                new_position -= ch.text_len();
+            } else {
+                break;
+            }
+        }
+
+        // The lexer should only be moved if there's a newline character which needs to be
+        // re-lexed.
+        if new_position != current_position && has_newline {
+            // Earlier we reduced the nesting level unconditionally. Now that we know the lexer's
+            // position is going to be moved back, the lexer needs to be put back into a
+            // parenthesized context if the current token is a closing parenthesis.
+            //
+            // ```py
+            // (a, [b,
+            //     c
+            // )
+            // ```
+            //
+            // Here, the parser would request to re-lex the token when it's at `)` and can recover
+            // from an unclosed `[`. This method will move the lexer back to the newline character
+            // after `c` which means it goes back into parenthesized context.
+            if matches!(
+                self.current_kind,
+                TokenKind::Rpar | TokenKind::Rsqb | TokenKind::Rbrace
+            ) {
+                self.nesting += 1;
+            }
+
+            self.cursor = Cursor::new(self.source);
+            self.cursor.skip_bytes(new_position.to_usize());
+            self.state = State::Other;
+            self.next_token();
+            true
+        } else {
+            false
+        }
+    }
+
     #[inline]
     fn token_range(&self) -> TextRange {
         let end = self.offset();

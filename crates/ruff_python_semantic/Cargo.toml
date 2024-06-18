@@ -11,7 +11,7 @@ repository = { workspace = true }
 license = { workspace = true }
 
 [dependencies]
-ruff_db = { workspace = true, optional = true }
+ruff_db = { workspace = true }
 ruff_index = { workspace = true }
 ruff_python_ast = { workspace = true }
 ruff_python_stdlib = { workspace = true }
@@ -34,4 +34,4 @@ tempfile = { workspace = true }
 workspace = true
 
 [features]
-red_knot = ["dep:ruff_db", "dep:salsa", "dep:smol_str", "dep:tracing"]
+red_knot = ["dep:salsa", "dep:smol_str", "dep:tracing"]

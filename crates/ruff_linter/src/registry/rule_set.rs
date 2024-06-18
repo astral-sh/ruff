@@ -1,7 +1,9 @@
-use crate::registry::Rule;
-use ruff_macros::CacheKey;
 use std::fmt::{Debug, Display, Formatter};
 use std::iter::FusedIterator;
+
+use ruff_macros::CacheKey;
+
+use crate::registry::Rule;
 
 const RULESET_SIZE: usize = 14;
 
@@ -367,7 +369,7 @@ impl Iterator for RuleSetIterator {
                 let rule_value = self.index * RuleSet::SLICE_BITS + bit;
                 // SAFETY: RuleSet guarantees that only valid rules are stored in the set.
                 #[allow(unsafe_code)]
-                return Some(unsafe { std::mem::transmute(rule_value) });
+                return Some(unsafe { std::mem::transmute::<u16, Rule>(rule_value) });
             }
 
             self.index += 1;
@@ -387,8 +389,9 @@ impl FusedIterator for RuleSetIterator {}
 
 #[cfg(test)]
 mod tests {
-    use crate::registry::{Rule, RuleSet};
     use strum::IntoEnumIterator;
+
+    use crate::registry::{Rule, RuleSet};
 
     /// Tests that the set can contain all rules
     #[test]

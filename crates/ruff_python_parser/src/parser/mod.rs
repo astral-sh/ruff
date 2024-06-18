@@ -473,27 +473,23 @@ impl<'src> Parser<'src> {
         loop {
             progress.assert_progressing(self);
 
-            // The end of file marker ends all lists.
-            if self.at(TokenKind::EndOfFile) {
-                break;
-            }
-
             if recovery_context_kind.is_list_element(self) {
                 parse_element(self);
-            } else if recovery_context_kind.is_list_terminator(self) {
+            } else if recovery_context_kind.is_regular_list_terminator(self) {
                 break;
             } else {
-                // Not a recognised element. Add an error and either skip the token or break
-                // parsing the list if the token is recognised as an element or terminator of an
-                // enclosing list.
-                let error = recovery_context_kind.create_error(self);
-                self.add_error(error, self.current_token_range());
-
-                // Run the error recovery: This also handles the case when an element is missing
-                // between two commas: `a,,b`
+                // Run the error recovery: If the token is recognised as an element or terminator
+                // of an enclosing list, then we try to re-lex in the context of a logical line and
+                // break out of list parsing.
                 if self.is_enclosing_list_element_or_terminator() {
+                    self.tokens.re_lex_logical_token();
                     break;
                 }
+
+                self.add_error(
+                    recovery_context_kind.create_error(self),
+                    self.current_token_range(),
+                );
 
                 self.bump_any();
             }
@@ -533,18 +529,20 @@ impl<'src> Parser<'src> {
             .recovery_context
             .union(RecoveryContext::from_kind(recovery_context_kind));
 
+        let mut first_element = true;
         let mut trailing_comma_range: Option<TextRange> = None;
 
         loop {
             progress.assert_progressing(self);
 
-            // The end of file marker ends all lists.
-            if self.at(TokenKind::EndOfFile) {
-                break;
-            }
-
             if recovery_context_kind.is_list_element(self) {
                 parse_element(self);
+
+                // Only unset this when we've completely parsed a single element. This is mainly to
+                // raise the correct error in case the first element isn't valid and the current
+                // token isn't a comma. Without this knowledge, the parser would later expect a
+                // comma instead of raising the context error.
+                first_element = false;
 
                 let maybe_comma_range = self.current_token_range();
                 if self.eat(TokenKind::Comma) {
@@ -552,35 +550,75 @@ impl<'src> Parser<'src> {
                     continue;
                 }
                 trailing_comma_range = None;
-
-                if recovery_context_kind.is_list_terminator(self) {
-                    break;
-                }
-
-                self.expect(TokenKind::Comma);
-            } else if recovery_context_kind.is_list_terminator(self) {
-                break;
-            } else {
-                // Not a recognised element. Add an error and either skip the token or break
-                // parsing the list if the token is recognised as an element or terminator of an
-                // enclosing list.
-                let error = recovery_context_kind.create_error(self);
-                self.add_error(error, self.current_token_range());
-
-                // Run the error recovery: This also handles the case when an element is missing
-                // between two commas: `a,,b`
-                if self.is_enclosing_list_element_or_terminator() {
-                    break;
-                }
-
-                if self.at(TokenKind::Comma) {
-                    trailing_comma_range = Some(self.current_token_range());
-                } else {
-                    trailing_comma_range = None;
-                }
-
-                self.bump_any();
             }
+
+            // test_ok comma_separated_regular_list_terminator
+            // # The first element is parsed by `parse_list_like_expression` and the comma after
+            // # the first element is expected by `parse_list_expression`
+            // [0]
+            // [0, 1]
+            // [0, 1,]
+            // [0, 1, 2]
+            // [0, 1, 2,]
+            if recovery_context_kind.is_regular_list_terminator(self) {
+                break;
+            }
+
+            // test_err comma_separated_missing_comma_between_elements
+            // # The comma between the first two elements is expected in `parse_list_expression`.
+            // [0, 1 2]
+            if recovery_context_kind.is_list_element(self) {
+                // This is a special case to expect a comma between two elements and should be
+                // checked before running the error recovery. This is because the error recovery
+                // will always run as the parser is currently at a list element.
+                self.expect(TokenKind::Comma);
+                continue;
+            }
+
+            // Run the error recovery: If the token is recognised as an element or terminator of an
+            // enclosing list, then we try to re-lex in the context of a logical line and break out
+            // of list parsing.
+            if self.is_enclosing_list_element_or_terminator() {
+                self.tokens.re_lex_logical_token();
+                break;
+            }
+
+            if first_element || self.at(TokenKind::Comma) {
+                // There are two conditions when we need to add the recovery context error:
+                //
+                // 1. If the parser is at a comma which means that there's a missing element
+                //    otherwise the comma would've been consumed by the first `eat` call above.
+                //    And, the parser doesn't take the re-lexing route on a comma token.
+                // 2. If it's the first element and the current token is not a comma which means
+                //    that it's an invalid element.
+
+                // test_err comma_separated_missing_element_between_commas
+                // [0, 1, , 2]
+
+                // test_err comma_separated_missing_first_element
+                // call(= 1)
+                self.add_error(
+                    recovery_context_kind.create_error(self),
+                    self.current_token_range(),
+                );
+
+                trailing_comma_range = if self.at(TokenKind::Comma) {
+                    Some(self.current_token_range())
+                } else {
+                    None
+                };
+            } else {
+                // Otherwise, there should've been a comma at this position. This could be because
+                // the element isn't consumed completely by `parse_element`.
+
+                // test_err comma_separated_missing_comma
+                // call(**x := 1)
+                self.expect(TokenKind::Comma);
+
+                trailing_comma_range = None;
+            }
+
+            self.bump_any();
         }
 
         if let Some(trailing_comma_range) = trailing_comma_range {
@@ -885,13 +923,32 @@ impl RecoveryContextKind {
     }
 
     /// Returns `true` if the parser is at a token that terminates the list as per the context.
+    ///
+    /// This token could either end the list or is only present for better error recovery. Refer to
+    /// [`is_regular_list_terminator`] to only check against the former.
+    ///
+    /// [`is_regular_list_terminator`]: RecoveryContextKind::is_regular_list_terminator
     fn is_list_terminator(self, p: &Parser) -> bool {
         self.list_terminator_kind(p).is_some()
+    }
+
+    /// Returns `true` if the parser is at a token that terminates the list as per the context but
+    /// the token isn't part of the error recovery set.
+    fn is_regular_list_terminator(self, p: &Parser) -> bool {
+        matches!(
+            self.list_terminator_kind(p),
+            Some(ListTerminatorKind::Regular)
+        )
     }
 
     /// Checks the current token the parser is at and returns the list terminator kind if the token
     /// terminates the list as per the context.
     fn list_terminator_kind(self, p: &Parser) -> Option<ListTerminatorKind> {
+        // The end of file marker ends all lists.
+        if p.at(TokenKind::EndOfFile) {
+            return Some(ListTerminatorKind::Regular);
+        }
+
         match self {
             // The parser must consume all tokens until the end
             RecoveryContextKind::ModuleStatements => None,

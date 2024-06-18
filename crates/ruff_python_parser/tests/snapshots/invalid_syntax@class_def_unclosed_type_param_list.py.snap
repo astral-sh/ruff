@@ -11,7 +11,7 @@ Module(
         body: [
             ClassDef(
                 StmtClassDef {
-                    range: 0..40,
+                    range: 0..33,
                     decorator_list: [],
                     name: Identifier {
                         id: "Foo",
@@ -73,29 +73,29 @@ Module(
                                 range: 29..33,
                             },
                         ),
-                        Assign(
-                            StmtAssign {
-                                range: 34..40,
-                                targets: [
-                                    Name(
-                                        ExprName {
-                                            range: 34..35,
-                                            id: "x",
-                                            ctx: Store,
-                                        },
-                                    ),
-                                ],
-                                value: NumberLiteral(
-                                    ExprNumberLiteral {
-                                        range: 38..40,
-                                        value: Int(
-                                            10,
-                                        ),
-                                    },
-                                ),
+                    ],
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    range: 34..40,
+                    targets: [
+                        Name(
+                            ExprName {
+                                range: 34..35,
+                                id: "x",
+                                ctx: Store,
                             },
                         ),
                     ],
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 38..40,
+                            value: Int(
+                                10,
+                            ),
+                        },
+                    ),
                 },
             ),
         ],
@@ -107,20 +107,6 @@ Module(
   |
 1 | class Foo[T1, *T2(a, b):
   |                  ^ Syntax Error: Expected ']', found '('
-2 |     pass
-3 | x = 10
-  |
-
-
-  |
-1 | class Foo[T1, *T2(a, b):
-2 |     pass
-3 | x = 10
-  | ^ Syntax Error: Simple statements must be separated by newlines or semicolons
-  |
-
-
-  |
 2 |     pass
 3 | x = 10
   |

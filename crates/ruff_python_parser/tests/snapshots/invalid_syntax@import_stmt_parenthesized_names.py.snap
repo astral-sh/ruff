@@ -69,7 +69,7 @@ Module(
 
   |
 1 | import (a)
-  |        ^ Syntax Error: Expected an import name
+  |        ^ Syntax Error: Expected one or more symbol names after import
 2 | import (a, b)
   |
 
@@ -77,5 +77,5 @@ Module(
   |
 1 | import (a)
 2 | import (a, b)
-  |        ^ Syntax Error: Expected an import name
+  |        ^ Syntax Error: Expected one or more symbol names after import
   |

@@ -257,10 +257,13 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: "fuzz -> target"
-      - name: "Install cargo-fuzz"
-        uses: taiki-e/install-action@v2
+      - name: "Install cargo-binstall"
+        uses: cargo-bins/cargo-binstall@main
         with:
           tool: cargo-fuzz@0.11.2
+      - name: "Install cargo-fuzz"
+        # Download the latest version from quick install and not the github releases because github releases only has MUSL targets.
+        run: cargo binstall cargo-fuzz --force  --disable-strategies crate-meta-data --no-confirm
       - run: cargo fuzz build -s none
 
   fuzz-parser:
@@ -338,7 +341,7 @@ jobs:
           name: ruff
           path: target/debug
 
-      - uses: dawidd6/action-download-artifact@v5
+      - uses: dawidd6/action-download-artifact@v6
         name: Download baseline Ruff binary
         with:
           name: ruff
