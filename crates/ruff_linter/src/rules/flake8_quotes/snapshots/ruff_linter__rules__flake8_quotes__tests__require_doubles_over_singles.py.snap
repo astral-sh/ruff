@@ -1,10 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_quotes/mod.rs
 ---
-singles.py:1:25: Q000 [*] Single quotes found but double quotes preferred
+singles.py:1:25: Q000 (bad-quotes-inline-string) [*] Single quotes found but double quotes preferred
   |
 1 | this_should_be_linted = 'single quote string'
-  |                         ^^^^^^^^^^^^^^^^^^^^^ Q000
+  |                         ^^^^^^^^^^^^^^^^^^^^^ Q000 (bad-quotes-inline-string)
 2 | this_should_be_linted = u'double quote string'
 3 | this_should_be_linted = f'double quote string'
   |
@@ -17,11 +17,11 @@ singles.py:1:25: Q000 [*] Single quotes found but double quotes preferred
 3 3 | this_should_be_linted = f'double quote string'
 4 4 | this_should_be_linted = f'double {"quote"} string'
 
-singles.py:2:25: Q000 [*] Single quotes found but double quotes preferred
+singles.py:2:25: Q000 (bad-quotes-inline-string) [*] Single quotes found but double quotes preferred
   |
 1 | this_should_be_linted = 'single quote string'
 2 | this_should_be_linted = u'double quote string'
-  |                         ^^^^^^^^^^^^^^^^^^^^^^ Q000
+  |                         ^^^^^^^^^^^^^^^^^^^^^^ Q000 (bad-quotes-inline-string)
 3 | this_should_be_linted = f'double quote string'
 4 | this_should_be_linted = f'double {"quote"} string'
   |
@@ -35,12 +35,12 @@ singles.py:2:25: Q000 [*] Single quotes found but double quotes preferred
 4 4 | this_should_be_linted = f'double {"quote"} string'
 5 5 | 
 
-singles.py:3:25: Q000 [*] Single quotes found but double quotes preferred
+singles.py:3:25: Q000 (bad-quotes-inline-string) [*] Single quotes found but double quotes preferred
   |
 1 | this_should_be_linted = 'single quote string'
 2 | this_should_be_linted = u'double quote string'
 3 | this_should_be_linted = f'double quote string'
-  |                         ^^^^^^^^^^^^^^^^^^^^^^ Q000
+  |                         ^^^^^^^^^^^^^^^^^^^^^^ Q000 (bad-quotes-inline-string)
 4 | this_should_be_linted = f'double {"quote"} string'
   |
   = help: Replace single quotes with double quotes

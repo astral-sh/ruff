@@ -1,10 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_simplify/mod.rs
 ---
-SIM223.py:1:4: SIM223 [*] Use `False` instead of `... and False`
+SIM223.py:1:4: SIM223 (expr-and-false) [*] Use `False` instead of `... and False`
   |
 1 | if a and False:  # SIM223
-  |    ^^^^^^^^^^^ SIM223
+  |    ^^^^^^^^^^^ SIM223 (expr-and-false)
 2 |     pass
   |
   = help: Replace with `False`
@@ -16,12 +16,12 @@ SIM223.py:1:4: SIM223 [*] Use `False` instead of `... and False`
 3 3 | 
 4 4 | if (a or b) and False:  # SIM223
 
-SIM223.py:4:4: SIM223 [*] Use `False` instead of `... and False`
+SIM223.py:4:4: SIM223 (expr-and-false) [*] Use `False` instead of `... and False`
   |
 2 |     pass
 3 | 
 4 | if (a or b) and False:  # SIM223
-  |    ^^^^^^^^^^^^^^^^^^ SIM223
+  |    ^^^^^^^^^^^^^^^^^^ SIM223 (expr-and-false)
 5 |     pass
   |
   = help: Replace with `False`
@@ -36,12 +36,12 @@ SIM223.py:4:4: SIM223 [*] Use `False` instead of `... and False`
 6 6 | 
 7 7 | if a or (b and False):  # SIM223
 
-SIM223.py:7:10: SIM223 [*] Use `False` instead of `... and False`
+SIM223.py:7:10: SIM223 (expr-and-false) [*] Use `False` instead of `... and False`
   |
 5 |     pass
 6 | 
 7 | if a or (b and False):  # SIM223
-  |          ^^^^^^^^^^^ SIM223
+  |          ^^^^^^^^^^^ SIM223 (expr-and-false)
 8 |     pass
   |
   = help: Replace with `False`
@@ -56,12 +56,12 @@ SIM223.py:7:10: SIM223 [*] Use `False` instead of `... and False`
 9 9 | 
 10 10 | if a or False:
 
-SIM223.py:19:18: SIM223 [*] Use `False` instead of `False and ...`
+SIM223.py:19:18: SIM223 (expr-and-false) [*] Use `False` instead of `False and ...`
    |
 17 |     pass
 18 | 
 19 | if a and f() and False and g() and b:  # SIM223
-   |                  ^^^^^^^^^^^^^^^^^^^ SIM223
+   |                  ^^^^^^^^^^^^^^^^^^^ SIM223 (expr-and-false)
 20 |     pass
    |
    = help: Replace with `False`
@@ -76,12 +76,12 @@ SIM223.py:19:18: SIM223 [*] Use `False` instead of `False and ...`
 21 21 | 
 22 22 | if False and f() and a and g() and b:  # SIM223
 
-SIM223.py:22:4: SIM223 [*] Use `False` instead of `False and ...`
+SIM223.py:22:4: SIM223 (expr-and-false) [*] Use `False` instead of `False and ...`
    |
 20 |     pass
 21 | 
 22 | if False and f() and a and g() and b:  # SIM223
-   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM223
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM223 (expr-and-false)
 23 |     pass
    |
    = help: Replace with `False`
@@ -96,12 +96,12 @@ SIM223.py:22:4: SIM223 [*] Use `False` instead of `False and ...`
 24 24 | 
 25 25 | if a and False and f() and b and g():  # SIM223
 
-SIM223.py:25:4: SIM223 [*] Use `False` instead of `... and False and ...`
+SIM223.py:25:4: SIM223 (expr-and-false) [*] Use `False` instead of `... and False and ...`
    |
 23 |     pass
 24 | 
 25 | if a and False and f() and b and g():  # SIM223
-   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM223
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM223 (expr-and-false)
 26 |     pass
    |
    = help: Replace with `False`
@@ -116,10 +116,10 @@ SIM223.py:25:4: SIM223 [*] Use `False` instead of `... and False and ...`
 27 27 | 
 28 28 | 
 
-SIM223.py:42:7: SIM223 [*] Use `""` instead of `"" and ...`
+SIM223.py:42:7: SIM223 (expr-and-false) [*] Use `""` instead of `"" and ...`
    |
 42 | a and "" and False  # SIM223
-   |       ^^^^^^^^^^^^ SIM223
+   |       ^^^^^^^^^^^^ SIM223 (expr-and-false)
 43 | 
 44 | a and "foo" and False and "bar"  # SIM223
    |
@@ -135,12 +135,12 @@ SIM223.py:42:7: SIM223 [*] Use `""` instead of `"" and ...`
 44 44 | a and "foo" and False and "bar"  # SIM223
 45 45 | 
 
-SIM223.py:44:7: SIM223 [*] Use `False` instead of `... and False and ...`
+SIM223.py:44:7: SIM223 (expr-and-false) [*] Use `False` instead of `... and False and ...`
    |
 42 | a and "" and False  # SIM223
 43 | 
 44 | a and "foo" and False and "bar"  # SIM223
-   |       ^^^^^^^^^^^^^^^^^^^^^^^^^ SIM223
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^^ SIM223 (expr-and-false)
 45 | 
 46 | a and 0 and False  # SIM223
    |
@@ -156,12 +156,12 @@ SIM223.py:44:7: SIM223 [*] Use `False` instead of `... and False and ...`
 46 46 | a and 0 and False  # SIM223
 47 47 | 
 
-SIM223.py:46:7: SIM223 [*] Use `0` instead of `0 and ...`
+SIM223.py:46:7: SIM223 (expr-and-false) [*] Use `0` instead of `0 and ...`
    |
 44 | a and "foo" and False and "bar"  # SIM223
 45 | 
 46 | a and 0 and False  # SIM223
-   |       ^^^^^^^^^^^ SIM223
+   |       ^^^^^^^^^^^ SIM223 (expr-and-false)
 47 | 
 48 | a and 1 and False and 2  # SIM223
    |
@@ -177,12 +177,12 @@ SIM223.py:46:7: SIM223 [*] Use `0` instead of `0 and ...`
 48 48 | a and 1 and False and 2  # SIM223
 49 49 | 
 
-SIM223.py:48:7: SIM223 [*] Use `False` instead of `... and False and ...`
+SIM223.py:48:7: SIM223 (expr-and-false) [*] Use `False` instead of `... and False and ...`
    |
 46 | a and 0 and False  # SIM223
 47 | 
 48 | a and 1 and False and 2  # SIM223
-   |       ^^^^^^^^^^^^^^^^^ SIM223
+   |       ^^^^^^^^^^^^^^^^^ SIM223 (expr-and-false)
 49 | 
 50 | a and 0.0 and False  # SIM223
    |
@@ -198,12 +198,12 @@ SIM223.py:48:7: SIM223 [*] Use `False` instead of `... and False and ...`
 50 50 | a and 0.0 and False  # SIM223
 51 51 | 
 
-SIM223.py:50:7: SIM223 [*] Use `0.0` instead of `0.0 and ...`
+SIM223.py:50:7: SIM223 (expr-and-false) [*] Use `0.0` instead of `0.0 and ...`
    |
 48 | a and 1 and False and 2  # SIM223
 49 | 
 50 | a and 0.0 and False  # SIM223
-   |       ^^^^^^^^^^^^^ SIM223
+   |       ^^^^^^^^^^^^^ SIM223 (expr-and-false)
 51 | 
 52 | a and 0.1 and False and 0.2  # SIM223
    |
@@ -219,12 +219,12 @@ SIM223.py:50:7: SIM223 [*] Use `0.0` instead of `0.0 and ...`
 52 52 | a and 0.1 and False and 0.2  # SIM223
 53 53 | 
 
-SIM223.py:52:7: SIM223 [*] Use `False` instead of `... and False and ...`
+SIM223.py:52:7: SIM223 (expr-and-false) [*] Use `False` instead of `... and False and ...`
    |
 50 | a and 0.0 and False  # SIM223
 51 | 
 52 | a and 0.1 and False and 0.2  # SIM223
-   |       ^^^^^^^^^^^^^^^^^^^^^ SIM223
+   |       ^^^^^^^^^^^^^^^^^^^^^ SIM223 (expr-and-false)
 53 | 
 54 | a and [] and False  # SIM223
    |
@@ -240,12 +240,12 @@ SIM223.py:52:7: SIM223 [*] Use `False` instead of `... and False and ...`
 54 54 | a and [] and False  # SIM223
 55 55 | 
 
-SIM223.py:54:7: SIM223 [*] Use `[]` instead of `[] and ...`
+SIM223.py:54:7: SIM223 (expr-and-false) [*] Use `[]` instead of `[] and ...`
    |
 52 | a and 0.1 and False and 0.2  # SIM223
 53 | 
 54 | a and [] and False  # SIM223
-   |       ^^^^^^^^^^^^ SIM223
+   |       ^^^^^^^^^^^^ SIM223 (expr-and-false)
 55 | 
 56 | a and list([]) and False  # SIM223
    |
@@ -261,12 +261,12 @@ SIM223.py:54:7: SIM223 [*] Use `[]` instead of `[] and ...`
 56 56 | a and list([]) and False  # SIM223
 57 57 | 
 
-SIM223.py:56:7: SIM223 [*] Use `list([])` instead of `list([]) and ...`
+SIM223.py:56:7: SIM223 (expr-and-false) [*] Use `list([])` instead of `list([]) and ...`
    |
 54 | a and [] and False  # SIM223
 55 | 
 56 | a and list([]) and False  # SIM223
-   |       ^^^^^^^^^^^^^^^^^^ SIM223
+   |       ^^^^^^^^^^^^^^^^^^ SIM223 (expr-and-false)
 57 | 
 58 | a and [1] and False and [2]  # SIM223
    |
@@ -282,12 +282,12 @@ SIM223.py:56:7: SIM223 [*] Use `list([])` instead of `list([]) and ...`
 58 58 | a and [1] and False and [2]  # SIM223
 59 59 | 
 
-SIM223.py:58:7: SIM223 [*] Use `False` instead of `... and False and ...`
+SIM223.py:58:7: SIM223 (expr-and-false) [*] Use `False` instead of `... and False and ...`
    |
 56 | a and list([]) and False  # SIM223
 57 | 
 58 | a and [1] and False and [2]  # SIM223
-   |       ^^^^^^^^^^^^^^^^^^^^^ SIM223
+   |       ^^^^^^^^^^^^^^^^^^^^^ SIM223 (expr-and-false)
 59 | 
 60 | a and list([1]) and False and list([2])  # SIM223
    |
@@ -303,12 +303,12 @@ SIM223.py:58:7: SIM223 [*] Use `False` instead of `... and False and ...`
 60 60 | a and list([1]) and False and list([2])  # SIM223
 61 61 | 
 
-SIM223.py:60:7: SIM223 [*] Use `False` instead of `... and False and ...`
+SIM223.py:60:7: SIM223 (expr-and-false) [*] Use `False` instead of `... and False and ...`
    |
 58 | a and [1] and False and [2]  # SIM223
 59 | 
 60 | a and list([1]) and False and list([2])  # SIM223
-   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM223
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM223 (expr-and-false)
 61 | 
 62 | a and {} and False  # SIM223
    |
@@ -324,12 +324,12 @@ SIM223.py:60:7: SIM223 [*] Use `False` instead of `... and False and ...`
 62 62 | a and {} and False  # SIM223
 63 63 | 
 
-SIM223.py:62:7: SIM223 [*] Use `{}` instead of `{} and ...`
+SIM223.py:62:7: SIM223 (expr-and-false) [*] Use `{}` instead of `{} and ...`
    |
 60 | a and list([1]) and False and list([2])  # SIM223
 61 | 
 62 | a and {} and False  # SIM223
-   |       ^^^^^^^^^^^^ SIM223
+   |       ^^^^^^^^^^^^ SIM223 (expr-and-false)
 63 | 
 64 | a and dict() and False  # SIM223
    |
@@ -345,12 +345,12 @@ SIM223.py:62:7: SIM223 [*] Use `{}` instead of `{} and ...`
 64 64 | a and dict() and False  # SIM223
 65 65 | 
 
-SIM223.py:64:7: SIM223 [*] Use `dict()` instead of `dict() and ...`
+SIM223.py:64:7: SIM223 (expr-and-false) [*] Use `dict()` instead of `dict() and ...`
    |
 62 | a and {} and False  # SIM223
 63 | 
 64 | a and dict() and False  # SIM223
-   |       ^^^^^^^^^^^^^^^^ SIM223
+   |       ^^^^^^^^^^^^^^^^ SIM223 (expr-and-false)
 65 | 
 66 | a and {1: 1} and False and {2: 2}  # SIM223
    |
@@ -366,12 +366,12 @@ SIM223.py:64:7: SIM223 [*] Use `dict()` instead of `dict() and ...`
 66 66 | a and {1: 1} and False and {2: 2}  # SIM223
 67 67 | 
 
-SIM223.py:66:7: SIM223 [*] Use `False` instead of `... and False and ...`
+SIM223.py:66:7: SIM223 (expr-and-false) [*] Use `False` instead of `... and False and ...`
    |
 64 | a and dict() and False  # SIM223
 65 | 
 66 | a and {1: 1} and False and {2: 2}  # SIM223
-   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM223
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM223 (expr-and-false)
 67 | 
 68 | a and dict({1: 1}) and False and dict({2: 2})  # SIM223
    |
@@ -387,12 +387,12 @@ SIM223.py:66:7: SIM223 [*] Use `False` instead of `... and False and ...`
 68 68 | a and dict({1: 1}) and False and dict({2: 2})  # SIM223
 69 69 | 
 
-SIM223.py:68:7: SIM223 [*] Use `False` instead of `... and False and ...`
+SIM223.py:68:7: SIM223 (expr-and-false) [*] Use `False` instead of `... and False and ...`
    |
 66 | a and {1: 1} and False and {2: 2}  # SIM223
 67 | 
 68 | a and dict({1: 1}) and False and dict({2: 2})  # SIM223
-   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM223
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM223 (expr-and-false)
 69 | 
 70 | a and set() and False  # SIM223
    |
@@ -408,12 +408,12 @@ SIM223.py:68:7: SIM223 [*] Use `False` instead of `... and False and ...`
 70 70 | a and set() and False  # SIM223
 71 71 | 
 
-SIM223.py:70:7: SIM223 [*] Use `set()` instead of `set() and ...`
+SIM223.py:70:7: SIM223 (expr-and-false) [*] Use `set()` instead of `set() and ...`
    |
 68 | a and dict({1: 1}) and False and dict({2: 2})  # SIM223
 69 | 
 70 | a and set() and False  # SIM223
-   |       ^^^^^^^^^^^^^^^ SIM223
+   |       ^^^^^^^^^^^^^^^ SIM223 (expr-and-false)
 71 | 
 72 | a and set(set()) and False  # SIM223
    |
@@ -429,12 +429,12 @@ SIM223.py:70:7: SIM223 [*] Use `set()` instead of `set() and ...`
 72 72 | a and set(set()) and False  # SIM223
 73 73 | 
 
-SIM223.py:72:7: SIM223 [*] Use `set(set())` instead of `set(set()) and ...`
+SIM223.py:72:7: SIM223 (expr-and-false) [*] Use `set(set())` instead of `set(set()) and ...`
    |
 70 | a and set() and False  # SIM223
 71 | 
 72 | a and set(set()) and False  # SIM223
-   |       ^^^^^^^^^^^^^^^^^^^^ SIM223
+   |       ^^^^^^^^^^^^^^^^^^^^ SIM223 (expr-and-false)
 73 | 
 74 | a and {1} and False and {2}  # SIM223
    |
@@ -450,12 +450,12 @@ SIM223.py:72:7: SIM223 [*] Use `set(set())` instead of `set(set()) and ...`
 74 74 | a and {1} and False and {2}  # SIM223
 75 75 | 
 
-SIM223.py:74:7: SIM223 [*] Use `False` instead of `... and False and ...`
+SIM223.py:74:7: SIM223 (expr-and-false) [*] Use `False` instead of `... and False and ...`
    |
 72 | a and set(set()) and False  # SIM223
 73 | 
 74 | a and {1} and False and {2}  # SIM223
-   |       ^^^^^^^^^^^^^^^^^^^^^ SIM223
+   |       ^^^^^^^^^^^^^^^^^^^^^ SIM223 (expr-and-false)
 75 | 
 76 | a and set({1}) and False and set({2})  # SIM223
    |
@@ -471,12 +471,12 @@ SIM223.py:74:7: SIM223 [*] Use `False` instead of `... and False and ...`
 76 76 | a and set({1}) and False and set({2})  # SIM223
 77 77 | 
 
-SIM223.py:76:7: SIM223 [*] Use `False` instead of `... and False and ...`
+SIM223.py:76:7: SIM223 (expr-and-false) [*] Use `False` instead of `... and False and ...`
    |
 74 | a and {1} and False and {2}  # SIM223
 75 | 
 76 | a and set({1}) and False and set({2})  # SIM223
-   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM223
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM223 (expr-and-false)
 77 | 
 78 | a and () and False  # SIM222
    |
@@ -492,12 +492,12 @@ SIM223.py:76:7: SIM223 [*] Use `False` instead of `... and False and ...`
 78 78 | a and () and False  # SIM222
 79 79 | 
 
-SIM223.py:78:7: SIM223 [*] Use `()` instead of `() and ...`
+SIM223.py:78:7: SIM223 (expr-and-false) [*] Use `()` instead of `() and ...`
    |
 76 | a and set({1}) and False and set({2})  # SIM223
 77 | 
 78 | a and () and False  # SIM222
-   |       ^^^^^^^^^^^^ SIM223
+   |       ^^^^^^^^^^^^ SIM223 (expr-and-false)
 79 | 
 80 | a and tuple(()) and False  # SIM222
    |
@@ -513,12 +513,12 @@ SIM223.py:78:7: SIM223 [*] Use `()` instead of `() and ...`
 80 80 | a and tuple(()) and False  # SIM222
 81 81 | 
 
-SIM223.py:80:7: SIM223 [*] Use `tuple(())` instead of `tuple(()) and ...`
+SIM223.py:80:7: SIM223 (expr-and-false) [*] Use `tuple(())` instead of `tuple(()) and ...`
    |
 78 | a and () and False  # SIM222
 79 | 
 80 | a and tuple(()) and False  # SIM222
-   |       ^^^^^^^^^^^^^^^^^^^ SIM223
+   |       ^^^^^^^^^^^^^^^^^^^ SIM223 (expr-and-false)
 81 | 
 82 | a and (1,) and False and (2,)  # SIM222
    |
@@ -534,12 +534,12 @@ SIM223.py:80:7: SIM223 [*] Use `tuple(())` instead of `tuple(()) and ...`
 82 82 | a and (1,) and False and (2,)  # SIM222
 83 83 | 
 
-SIM223.py:82:7: SIM223 [*] Use `False` instead of `... and False and ...`
+SIM223.py:82:7: SIM223 (expr-and-false) [*] Use `False` instead of `... and False and ...`
    |
 80 | a and tuple(()) and False  # SIM222
 81 | 
 82 | a and (1,) and False and (2,)  # SIM222
-   |       ^^^^^^^^^^^^^^^^^^^^^^^ SIM223
+   |       ^^^^^^^^^^^^^^^^^^^^^^^ SIM223 (expr-and-false)
 83 | 
 84 | a and tuple((1,)) and False and tuple((2,))  # SIM222
    |
@@ -555,12 +555,12 @@ SIM223.py:82:7: SIM223 [*] Use `False` instead of `... and False and ...`
 84 84 | a and tuple((1,)) and False and tuple((2,))  # SIM222
 85 85 | 
 
-SIM223.py:84:7: SIM223 [*] Use `False` instead of `... and False and ...`
+SIM223.py:84:7: SIM223 (expr-and-false) [*] Use `False` instead of `... and False and ...`
    |
 82 | a and (1,) and False and (2,)  # SIM222
 83 | 
 84 | a and tuple((1,)) and False and tuple((2,))  # SIM222
-   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM223
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM223 (expr-and-false)
 85 | 
 86 | a and frozenset() and False  # SIM222
    |
@@ -576,12 +576,12 @@ SIM223.py:84:7: SIM223 [*] Use `False` instead of `... and False and ...`
 86 86 | a and frozenset() and False  # SIM222
 87 87 | 
 
-SIM223.py:86:7: SIM223 [*] Use `frozenset()` instead of `frozenset() and ...`
+SIM223.py:86:7: SIM223 (expr-and-false) [*] Use `frozenset()` instead of `frozenset() and ...`
    |
 84 | a and tuple((1,)) and False and tuple((2,))  # SIM222
 85 | 
 86 | a and frozenset() and False  # SIM222
-   |       ^^^^^^^^^^^^^^^^^^^^^ SIM223
+   |       ^^^^^^^^^^^^^^^^^^^^^ SIM223 (expr-and-false)
 87 | 
 88 | a and frozenset(frozenset()) and False  # SIM222
    |
@@ -597,12 +597,12 @@ SIM223.py:86:7: SIM223 [*] Use `frozenset()` instead of `frozenset() and ...`
 88 88 | a and frozenset(frozenset()) and False  # SIM222
 89 89 | 
 
-SIM223.py:88:7: SIM223 [*] Use `frozenset(frozenset())` instead of `frozenset(frozenset()) and ...`
+SIM223.py:88:7: SIM223 (expr-and-false) [*] Use `frozenset(frozenset())` instead of `frozenset(frozenset()) and ...`
    |
 86 | a and frozenset() and False  # SIM222
 87 | 
 88 | a and frozenset(frozenset()) and False  # SIM222
-   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM223
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM223 (expr-and-false)
 89 | 
 90 | a and frozenset({1}) and False and frozenset({2})  # SIM222
    |
@@ -618,12 +618,12 @@ SIM223.py:88:7: SIM223 [*] Use `frozenset(frozenset())` instead of `frozenset(fr
 90 90 | a and frozenset({1}) and False and frozenset({2})  # SIM222
 91 91 | 
 
-SIM223.py:90:7: SIM223 [*] Use `False` instead of `... and False and ...`
+SIM223.py:90:7: SIM223 (expr-and-false) [*] Use `False` instead of `... and False and ...`
    |
 88 | a and frozenset(frozenset()) and False  # SIM222
 89 | 
 90 | a and frozenset({1}) and False and frozenset({2})  # SIM222
-   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM223
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM223 (expr-and-false)
 91 | 
 92 | a and frozenset(frozenset({1})) and False and frozenset(frozenset({2}))  # SIM222
    |
@@ -639,12 +639,12 @@ SIM223.py:90:7: SIM223 [*] Use `False` instead of `... and False and ...`
 92 92 | a and frozenset(frozenset({1})) and False and frozenset(frozenset({2}))  # SIM222
 93 93 | 
 
-SIM223.py:92:7: SIM223 [*] Use `False` instead of `... and False and ...`
+SIM223.py:92:7: SIM223 (expr-and-false) [*] Use `False` instead of `... and False and ...`
    |
 90 | a and frozenset({1}) and False and frozenset({2})  # SIM222
 91 | 
 92 | a and frozenset(frozenset({1})) and False and frozenset(frozenset({2}))  # SIM222
-   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM223
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM223 (expr-and-false)
    |
    = help: Replace with `False`
 
@@ -658,12 +658,12 @@ SIM223.py:92:7: SIM223 [*] Use `False` instead of `... and False and ...`
 94 94 | 
 95 95 | # Inside test `a` is simplified.
 
-SIM223.py:97:6: SIM223 [*] Use `False` instead of `... and False and ...`
+SIM223.py:97:6: SIM223 (expr-and-false) [*] Use `False` instead of `... and False and ...`
    |
 95 | # Inside test `a` is simplified.
 96 | 
 97 | bool(a and [] and False and [])  # SIM223
-   |      ^^^^^^^^^^^^^^^^^^^^^^^^^ SIM223
+   |      ^^^^^^^^^^^^^^^^^^^^^^^^^ SIM223 (expr-and-false)
 98 | 
 99 | assert a and [] and False and []  # SIM223
    |
@@ -679,12 +679,12 @@ SIM223.py:97:6: SIM223 [*] Use `False` instead of `... and False and ...`
 99 99 | assert a and [] and False and []  # SIM223
 100 100 | 
 
-SIM223.py:99:8: SIM223 [*] Use `False` instead of `... and False and ...`
+SIM223.py:99:8: SIM223 (expr-and-false) [*] Use `False` instead of `... and False and ...`
     |
  97 | bool(a and [] and False and [])  # SIM223
  98 | 
  99 | assert a and [] and False and []  # SIM223
-    |        ^^^^^^^^^^^^^^^^^^^^^^^^^ SIM223
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^ SIM223 (expr-and-false)
 100 | 
 101 | if (a and [] and False and []) or (a and [] and False and []):  # SIM223
     |
@@ -700,12 +700,12 @@ SIM223.py:99:8: SIM223 [*] Use `False` instead of `... and False and ...`
 101 101 | if (a and [] and False and []) or (a and [] and False and []):  # SIM223
 102 102 |     pass
 
-SIM223.py:101:5: SIM223 [*] Use `False` instead of `... and False and ...`
+SIM223.py:101:5: SIM223 (expr-and-false) [*] Use `False` instead of `... and False and ...`
     |
  99 | assert a and [] and False and []  # SIM223
 100 | 
 101 | if (a and [] and False and []) or (a and [] and False and []):  # SIM223
-    |     ^^^^^^^^^^^^^^^^^^^^^^^^^ SIM223
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^ SIM223 (expr-and-false)
 102 |     pass
     |
     = help: Replace with `False`
@@ -720,12 +720,12 @@ SIM223.py:101:5: SIM223 [*] Use `False` instead of `... and False and ...`
 103 103 | 
 104 104 | 0 if a and [] and False and [] else 1  # SIM222
 
-SIM223.py:101:36: SIM223 [*] Use `False` instead of `... and False and ...`
+SIM223.py:101:36: SIM223 (expr-and-false) [*] Use `False` instead of `... and False and ...`
     |
  99 | assert a and [] and False and []  # SIM223
 100 | 
 101 | if (a and [] and False and []) or (a and [] and False and []):  # SIM223
-    |                                    ^^^^^^^^^^^^^^^^^^^^^^^^^ SIM223
+    |                                    ^^^^^^^^^^^^^^^^^^^^^^^^^ SIM223 (expr-and-false)
 102 |     pass
     |
     = help: Replace with `False`
@@ -740,12 +740,12 @@ SIM223.py:101:36: SIM223 [*] Use `False` instead of `... and False and ...`
 103 103 | 
 104 104 | 0 if a and [] and False and [] else 1  # SIM222
 
-SIM223.py:104:6: SIM223 [*] Use `False` instead of `... and False and ...`
+SIM223.py:104:6: SIM223 (expr-and-false) [*] Use `False` instead of `... and False and ...`
     |
 102 |     pass
 103 | 
 104 | 0 if a and [] and False and [] else 1  # SIM222
-    |      ^^^^^^^^^^^^^^^^^^^^^^^^^ SIM223
+    |      ^^^^^^^^^^^^^^^^^^^^^^^^^ SIM223 (expr-and-false)
 105 | 
 106 | while a and [] and False and []:  # SIM223
     |
@@ -761,12 +761,12 @@ SIM223.py:104:6: SIM223 [*] Use `False` instead of `... and False and ...`
 106 106 | while a and [] and False and []:  # SIM223
 107 107 |     pass
 
-SIM223.py:106:7: SIM223 [*] Use `False` instead of `... and False and ...`
+SIM223.py:106:7: SIM223 (expr-and-false) [*] Use `False` instead of `... and False and ...`
     |
 104 | 0 if a and [] and False and [] else 1  # SIM222
 105 | 
 106 | while a and [] and False and []:  # SIM223
-    |       ^^^^^^^^^^^^^^^^^^^^^^^^^ SIM223
+    |       ^^^^^^^^^^^^^^^^^^^^^^^^^ SIM223 (expr-and-false)
 107 |     pass
     |
     = help: Replace with `False`
@@ -781,12 +781,12 @@ SIM223.py:106:7: SIM223 [*] Use `False` instead of `... and False and ...`
 108 108 | 
 109 109 | [
 
-SIM223.py:113:8: SIM223 [*] Use `False` instead of `... and False and ...`
+SIM223.py:113:8: SIM223 (expr-and-false) [*] Use `False` instead of `... and False and ...`
     |
 111 |     for a in range(10)
 112 |     for b in range(10)
 113 |     if a and [] and False and []  # SIM223
-    |        ^^^^^^^^^^^^^^^^^^^^^^^^^ SIM223
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^ SIM223 (expr-and-false)
 114 |     if b and [] and False and []  # SIM223
 115 | ]
     |
@@ -802,12 +802,12 @@ SIM223.py:113:8: SIM223 [*] Use `False` instead of `... and False and ...`
 115 115 | ]
 116 116 | 
 
-SIM223.py:114:8: SIM223 [*] Use `False` instead of `... and False and ...`
+SIM223.py:114:8: SIM223 (expr-and-false) [*] Use `False` instead of `... and False and ...`
     |
 112 |     for b in range(10)
 113 |     if a and [] and False and []  # SIM223
 114 |     if b and [] and False and []  # SIM223
-    |        ^^^^^^^^^^^^^^^^^^^^^^^^^ SIM223
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^ SIM223 (expr-and-false)
 115 | ]
     |
     = help: Replace with `False`
@@ -822,12 +822,12 @@ SIM223.py:114:8: SIM223 [*] Use `False` instead of `... and False and ...`
 116 116 | 
 117 117 | {
 
-SIM223.py:121:8: SIM223 [*] Use `False` instead of `... and False and ...`
+SIM223.py:121:8: SIM223 (expr-and-false) [*] Use `False` instead of `... and False and ...`
     |
 119 |     for a in range(10)
 120 |     for b in range(10)
 121 |     if a and [] and False and []  # SIM223
-    |        ^^^^^^^^^^^^^^^^^^^^^^^^^ SIM223
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^ SIM223 (expr-and-false)
 122 |     if b and [] and False and []  # SIM223
 123 | }
     |
@@ -843,12 +843,12 @@ SIM223.py:121:8: SIM223 [*] Use `False` instead of `... and False and ...`
 123 123 | }
 124 124 | 
 
-SIM223.py:122:8: SIM223 [*] Use `False` instead of `... and False and ...`
+SIM223.py:122:8: SIM223 (expr-and-false) [*] Use `False` instead of `... and False and ...`
     |
 120 |     for b in range(10)
 121 |     if a and [] and False and []  # SIM223
 122 |     if b and [] and False and []  # SIM223
-    |        ^^^^^^^^^^^^^^^^^^^^^^^^^ SIM223
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^ SIM223 (expr-and-false)
 123 | }
     |
     = help: Replace with `False`
@@ -863,12 +863,12 @@ SIM223.py:122:8: SIM223 [*] Use `False` instead of `... and False and ...`
 124 124 | 
 125 125 | {
 
-SIM223.py:129:8: SIM223 [*] Use `False` instead of `... and False and ...`
+SIM223.py:129:8: SIM223 (expr-and-false) [*] Use `False` instead of `... and False and ...`
     |
 127 |     for a in range(10)
 128 |     for b in range(10)
 129 |     if a and [] and False and []  # SIM223
-    |        ^^^^^^^^^^^^^^^^^^^^^^^^^ SIM223
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^ SIM223 (expr-and-false)
 130 |     if b and [] and False and []  # SIM223
 131 | }
     |
@@ -884,12 +884,12 @@ SIM223.py:129:8: SIM223 [*] Use `False` instead of `... and False and ...`
 131 131 | }
 132 132 | 
 
-SIM223.py:130:8: SIM223 [*] Use `False` instead of `... and False and ...`
+SIM223.py:130:8: SIM223 (expr-and-false) [*] Use `False` instead of `... and False and ...`
     |
 128 |     for b in range(10)
 129 |     if a and [] and False and []  # SIM223
 130 |     if b and [] and False and []  # SIM223
-    |        ^^^^^^^^^^^^^^^^^^^^^^^^^ SIM223
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^ SIM223 (expr-and-false)
 131 | }
     |
     = help: Replace with `False`
@@ -904,12 +904,12 @@ SIM223.py:130:8: SIM223 [*] Use `False` instead of `... and False and ...`
 132 132 | 
 133 133 | (
 
-SIM223.py:137:8: SIM223 [*] Use `False` instead of `... and False and ...`
+SIM223.py:137:8: SIM223 (expr-and-false) [*] Use `False` instead of `... and False and ...`
     |
 135 |     for a in range(10)
 136 |     for b in range(10)
 137 |     if a and [] and False and []  # SIM223
-    |        ^^^^^^^^^^^^^^^^^^^^^^^^^ SIM223
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^ SIM223 (expr-and-false)
 138 |     if b and [] and False and []  # SIM223
 139 | )
     |
@@ -925,12 +925,12 @@ SIM223.py:137:8: SIM223 [*] Use `False` instead of `... and False and ...`
 139 139 | )
 140 140 | 
 
-SIM223.py:138:8: SIM223 [*] Use `False` instead of `... and False and ...`
+SIM223.py:138:8: SIM223 (expr-and-false) [*] Use `False` instead of `... and False and ...`
     |
 136 |     for b in range(10)
 137 |     if a and [] and False and []  # SIM223
 138 |     if b and [] and False and []  # SIM223
-    |        ^^^^^^^^^^^^^^^^^^^^^^^^^ SIM223
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^ SIM223 (expr-and-false)
 139 | )
     |
     = help: Replace with `False`
@@ -945,12 +945,12 @@ SIM223.py:138:8: SIM223 [*] Use `False` instead of `... and False and ...`
 140 140 | 
 141 141 | # Outside test `a` is not simplified.
 
-SIM223.py:143:7: SIM223 [*] Use `[]` instead of `[] and ...`
+SIM223.py:143:7: SIM223 (expr-and-false) [*] Use `[]` instead of `[] and ...`
     |
 141 | # Outside test `a` is not simplified.
 142 | 
 143 | a and [] and False and []  # SIM223
-    |       ^^^^^^^^^^^^^^^^^^^ SIM223
+    |       ^^^^^^^^^^^^^^^^^^^ SIM223 (expr-and-false)
 144 | 
 145 | if (a and [] and False and []) == (a and []):  # SIM223
     |
@@ -966,12 +966,12 @@ SIM223.py:143:7: SIM223 [*] Use `[]` instead of `[] and ...`
 145 145 | if (a and [] and False and []) == (a and []):  # SIM223
 146 146 |     pass
 
-SIM223.py:145:11: SIM223 [*] Use `[]` instead of `[] and ...`
+SIM223.py:145:11: SIM223 (expr-and-false) [*] Use `[]` instead of `[] and ...`
     |
 143 | a and [] and False and []  # SIM223
 144 | 
 145 | if (a and [] and False and []) == (a and []):  # SIM223
-    |           ^^^^^^^^^^^^^^^^^^^ SIM223
+    |           ^^^^^^^^^^^^^^^^^^^ SIM223 (expr-and-false)
 146 |     pass
     |
     = help: Replace with `[]`
@@ -986,12 +986,12 @@ SIM223.py:145:11: SIM223 [*] Use `[]` instead of `[] and ...`
 147 147 | 
 148 148 | if f(a and [] and False and []):  # SIM223
 
-SIM223.py:148:12: SIM223 [*] Use `[]` instead of `[] and ...`
+SIM223.py:148:12: SIM223 (expr-and-false) [*] Use `[]` instead of `[] and ...`
     |
 146 |     pass
 147 | 
 148 | if f(a and [] and False and []):  # SIM223
-    |            ^^^^^^^^^^^^^^^^^^^ SIM223
+    |            ^^^^^^^^^^^^^^^^^^^ SIM223 (expr-and-false)
 149 |     pass
     |
     = help: Replace with `[]`
@@ -1006,12 +1006,12 @@ SIM223.py:148:12: SIM223 [*] Use `[]` instead of `[] and ...`
 150 150 | 
 151 151 | # Regression test for: https://github.com/astral-sh/ruff/issues/9479
 
-SIM223.py:154:7: SIM223 [*] Use `f"{''}{''}"` instead of `f"{''}{''}" and ...`
+SIM223.py:154:7: SIM223 (expr-and-false) [*] Use `f"{''}{''}"` instead of `f"{''}{''}" and ...`
     |
 152 | print(f"{a}{b}" and "bar")
 153 | print(f"{a}{''}" and "bar")
 154 | print(f"{''}{''}" and "bar")
-    |       ^^^^^^^^^^^^^^^^^^^^^ SIM223
+    |       ^^^^^^^^^^^^^^^^^^^^^ SIM223 (expr-and-false)
 155 | print(f"{1}{''}" and "bar")
     |
     = help: Replace with `f"{''}{''}"`
@@ -1023,5 +1023,3 @@ SIM223.py:154:7: SIM223 [*] Use `f"{''}{''}"` instead of `f"{''}{''}" and ...`
 154     |-print(f"{''}{''}" and "bar")
     154 |+print(f"{''}{''}")
 155 155 | print(f"{1}{''}" and "bar")
-
-

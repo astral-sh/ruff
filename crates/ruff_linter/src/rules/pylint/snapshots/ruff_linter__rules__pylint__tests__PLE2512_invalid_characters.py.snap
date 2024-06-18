@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-invalid_characters.py:24:12: PLE2512 [*] Invalid unescaped character SUB, use "\x1A" instead
+invalid_characters.py:24:12: PLE2512 (invalid-character-sub) [*] Invalid unescaped character SUB, use "\x1A" instead
    |
 22 | cr_ok = f'\\r'
 23 | 
 24 | sub = 'sub '
-   |             PLE2512
+   |             PLE2512 (invalid-character-sub)
 25 | sub = f'sub '
    |
    = help: Replace with escape sequence
@@ -21,11 +21,11 @@ invalid_characters.py:24:12: PLE2512 [*] Invalid unescaped character SUB, use "\
 26 26 | 
 27 27 | sub_ok = '\x1a'
 
-invalid_characters.py:25:13: PLE2512 [*] Invalid unescaped character SUB, use "\x1A" instead
+invalid_characters.py:25:13: PLE2512 (invalid-character-sub) [*] Invalid unescaped character SUB, use "\x1A" instead
    |
 24 | sub = 'sub '
 25 | sub = f'sub '
-   |              PLE2512
+   |              PLE2512 (invalid-character-sub)
 26 | 
 27 | sub_ok = '\x1a'
    |
@@ -41,12 +41,12 @@ invalid_characters.py:25:13: PLE2512 [*] Invalid unescaped character SUB, use "\
 27 27 | sub_ok = '\x1a'
 28 28 | sub_ok = f'\x1a'
 
-invalid_characters.py:55:25: PLE2512 [*] Invalid unescaped character SUB, use "\x1A" instead
+invalid_characters.py:55:25: PLE2512 (invalid-character-sub) [*] Invalid unescaped character SUB, use "\x1A" instead
    |
 53 | zwsp_after_multicharacter_grapheme_cluster = f"ಫ್ರಾನ್ಸಿಸ್ಕೊ ​​"
 54 | 
 55 | nested_fstrings = f'␈{f'{f'␛'}'}'
-   |                          PLE2512
+   |                          PLE2512 (invalid-character-sub)
 56 | 
 57 | # https://github.com/astral-sh/ruff/issues/7455#issuecomment-1741998106
    |
@@ -62,11 +62,11 @@ invalid_characters.py:55:25: PLE2512 [*] Invalid unescaped character SUB, use "\
 57 57 | # https://github.com/astral-sh/ruff/issues/7455#issuecomment-1741998106
 58 58 | x = f"""}}ab"""
 
-invalid_characters.py:58:12: PLE2512 [*] Invalid unescaped character SUB, use "\x1A" instead
+invalid_characters.py:58:12: PLE2512 (invalid-character-sub) [*] Invalid unescaped character SUB, use "\x1A" instead
    |
 57 | # https://github.com/astral-sh/ruff/issues/7455#issuecomment-1741998106
 58 | x = f"""}}ab"""
-   |             PLE2512
+   |             PLE2512 (invalid-character-sub)
 59 | # https://github.com/astral-sh/ruff/issues/7455#issuecomment-1741998256
 60 | x = f"""}}a␛b"""
    |

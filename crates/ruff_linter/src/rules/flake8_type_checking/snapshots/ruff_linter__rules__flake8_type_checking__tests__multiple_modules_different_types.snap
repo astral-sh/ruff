@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
 ---
-<filename>:6:8: TCH003 [*] Move standard library import `os` into a type-checking block
+<filename>:6:8: TCH003 (typing-only-standard-library-import) [*] Move standard library import `os` into a type-checking block
   |
 4 | from typing import TYPE_CHECKING
 5 | 
 6 | import os, pandas
-  |        ^^ TCH003
+  |        ^^ TCH003 (typing-only-standard-library-import)
 7 | 
 8 | def f(x: os, y: pandas):
   |
@@ -25,12 +25,12 @@ source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
 8  11 | def f(x: os, y: pandas):
 9  12 |     pass
 
-<filename>:6:12: TCH002 [*] Move third-party import `pandas` into a type-checking block
+<filename>:6:12: TCH002 (typing-only-third-party-import) [*] Move third-party import `pandas` into a type-checking block
   |
 4 | from typing import TYPE_CHECKING
 5 | 
 6 | import os, pandas
-  |            ^^^^^^ TCH002
+  |            ^^^^^^ TCH002 (typing-only-third-party-import)
 7 | 
 8 | def f(x: os, y: pandas):
   |
@@ -48,5 +48,3 @@ source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
 7  10 | 
 8  11 | def f(x: os, y: pandas):
 9  12 |     pass
-
-

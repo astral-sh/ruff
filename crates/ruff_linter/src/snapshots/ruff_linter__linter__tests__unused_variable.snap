@@ -1,11 +1,11 @@
 ---
 source: crates/ruff_linter/src/linter.rs
 ---
-unused_variable.ipynb:cell 1:2:5: F841 [*] Local variable `foo1` is assigned to but never used
+unused_variable.ipynb:cell 1:2:5: F841 (unused-variable) [*] Local variable `foo1` is assigned to but never used
   |
 1 | def f():
 2 |     foo1 = %matplotlib --list
-  |     ^^^^ F841
+  |     ^^^^ F841 (unused-variable)
 3 |     foo2: list[str] = %matplotlib --list
   |
   = help: Remove assignment to unused variable `foo1`
@@ -18,12 +18,12 @@ unused_variable.ipynb:cell 1:2:5: F841 [*] Local variable `foo1` is assigned to 
 4 4 | def f():
 5 5 |     bar1 = !pwd
 
-unused_variable.ipynb:cell 1:3:5: F841 [*] Local variable `foo2` is assigned to but never used
+unused_variable.ipynb:cell 1:3:5: F841 (unused-variable) [*] Local variable `foo2` is assigned to but never used
   |
 1 | def f():
 2 |     foo1 = %matplotlib --list
 3 |     foo2: list[str] = %matplotlib --list
-  |     ^^^^ F841
+  |     ^^^^ F841 (unused-variable)
   |
   = help: Remove assignment to unused variable `foo2`
 
@@ -36,11 +36,11 @@ unused_variable.ipynb:cell 1:3:5: F841 [*] Local variable `foo2` is assigned to 
 5 5 |     bar1 = !pwd
 6 6 |     bar2: str = !pwd
 
-unused_variable.ipynb:cell 2:2:5: F841 [*] Local variable `bar1` is assigned to but never used
+unused_variable.ipynb:cell 2:2:5: F841 (unused-variable) [*] Local variable `bar1` is assigned to but never used
   |
 1 | def f():
 2 |     bar1 = !pwd
-  |     ^^^^ F841
+  |     ^^^^ F841 (unused-variable)
 3 |     bar2: str = !pwd
   |
   = help: Remove assignment to unused variable `bar1`
@@ -53,12 +53,12 @@ unused_variable.ipynb:cell 2:2:5: F841 [*] Local variable `bar1` is assigned to 
   5 |+    !pwd
 6 6 |     bar2: str = !pwd
 
-unused_variable.ipynb:cell 2:3:5: F841 [*] Local variable `bar2` is assigned to but never used
+unused_variable.ipynb:cell 2:3:5: F841 (unused-variable) [*] Local variable `bar2` is assigned to but never used
   |
 1 | def f():
 2 |     bar1 = !pwd
 3 |     bar2: str = !pwd
-  |     ^^^^ F841
+  |     ^^^^ F841 (unused-variable)
   |
   = help: Remove assignment to unused variable `bar2`
 
@@ -68,5 +68,3 @@ unused_variable.ipynb:cell 2:3:5: F841 [*] Local variable `bar2` is assigned to 
 5 5 |     bar1 = !pwd
 6   |-    bar2: str = !pwd
   6 |+    !pwd
-
-

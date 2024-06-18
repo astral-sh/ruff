@@ -1,13 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
-F821_2.py:5:13: F821 Undefined name `Model`
+F821_2.py:5:13: F821 (undefined-name) Undefined name `Model`
   |
 4 | # F821 Undefined name `Model`
 5 | x: Literal["Model"]
-  |             ^^^^^ F821
+  |             ^^^^^ F821 (undefined-name)
 6 | 
 7 | from typing_extensions import Literal
   |
-
-

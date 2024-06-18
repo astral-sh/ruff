@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-no_method_decorator.py:9:5: PLR0202 [*] Class method defined without decorator
+no_method_decorator.py:9:5: PLR0202 (no-classmethod-decorator) [*] Class method defined without decorator
    |
  7 |         self.color = color
  8 | 
  9 |     def pick_colors(cls, *args):  # [no-classmethod-decorator]
-   |      PLR0202
+   |      PLR0202 (no-classmethod-decorator)
 10 |         """classmethod to pick fruit colors"""
 11 |         cls.COLORS = args
    |
@@ -26,11 +26,11 @@ no_method_decorator.py:9:5: PLR0202 [*] Class method defined without decorator
 15 15 |     def pick_one_color():  # [no-staticmethod-decorator]
 16 16 |         """staticmethod to pick one fruit color"""
 
-no_method_decorator.py:22:5: PLR0202 [*] Class method defined without decorator
+no_method_decorator.py:22:5: PLR0202 (no-classmethod-decorator) [*] Class method defined without decorator
    |
 21 | class Class:
 22 |     def class_method(cls):
-   |      PLR0202
+   |      PLR0202 (no-classmethod-decorator)
 23 |         pass
    |
    = help: Add @classmethod decorator

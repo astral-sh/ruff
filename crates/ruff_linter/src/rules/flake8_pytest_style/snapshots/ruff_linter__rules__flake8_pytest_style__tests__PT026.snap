@@ -1,10 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
 ---
-PT026.py:19:1: PT026 [*] Useless `pytest.mark.usefixtures` without parameters
+PT026.py:19:1: PT026 (pytest-use-fixtures-without-parameters) [*] Useless `pytest.mark.usefixtures` without parameters
    |
 19 | @pytest.mark.usefixtures()
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^ PT026
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^ PT026 (pytest-use-fixtures-without-parameters)
 20 | def test_error_with_parens():
 21 |     pass
    |
@@ -20,10 +20,10 @@ PT026.py:19:1: PT026 [*] Useless `pytest.mark.usefixtures` without parameters
 21 21 |     pass
 22 22 | 
 
-PT026.py:24:1: PT026 [*] Useless `pytest.mark.usefixtures` without parameters
+PT026.py:24:1: PT026 (pytest-use-fixtures-without-parameters) [*] Useless `pytest.mark.usefixtures` without parameters
    |
 24 | @pytest.mark.usefixtures
-   | ^^^^^^^^^^^^^^^^^^^^^^^^ PT026
+   | ^^^^^^^^^^^^^^^^^^^^^^^^ PT026 (pytest-use-fixtures-without-parameters)
 25 | def test_error_no_parens():
 26 |     pass
    |
@@ -37,5 +37,3 @@ PT026.py:24:1: PT026 [*] Useless `pytest.mark.usefixtures` without parameters
    24 |+
 25 25 | def test_error_no_parens():
 26 26 |     pass
-
-

@@ -1,11 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
 ---
-PYI058.pyi:5:13: PYI058 [*] Use `Iterator` as the return value for simple `__iter__` methods
+PYI058.pyi:5:13: PYI058 (generator-return-from-iter-method) [*] Use `Iterator` as the return value for simple `__iter__` methods
   |
 4 |     class IteratorReturningSimpleGenerator1:
 5 |         def __iter__(self) -> Generator: ...  # PYI058 (use `Iterator`)
-  |             ^^^^^^^^ PYI058
+  |             ^^^^^^^^ PYI058 (generator-return-from-iter-method)
 6 | 
 7 | def scope():
   |
@@ -23,11 +23,11 @@ PYI058.pyi:5:13: PYI058 [*] Use `Iterator` as the return value for simple `__ite
 7 8 | def scope():
 8 9 |     import typing
 
-PYI058.pyi:11:13: PYI058 [*] Use `Iterator` as the return value for simple `__iter__` methods
+PYI058.pyi:11:13: PYI058 (generator-return-from-iter-method) [*] Use `Iterator` as the return value for simple `__iter__` methods
    |
 10 |     class IteratorReturningSimpleGenerator2:
 11 |         def __iter__(self) -> typing.Generator: ...  # PYI058 (use `Iterator`)
-   |             ^^^^^^^^ PYI058
+   |             ^^^^^^^^ PYI058 (generator-return-from-iter-method)
 12 | 
 13 | def scope():
    |
@@ -43,11 +43,11 @@ PYI058.pyi:11:13: PYI058 [*] Use `Iterator` as the return value for simple `__it
 13 13 | def scope():
 14 14 |     import collections.abc
 
-PYI058.pyi:17:13: PYI058 [*] Use `Iterator` as the return value for simple `__iter__` methods
+PYI058.pyi:17:13: PYI058 (generator-return-from-iter-method) [*] Use `Iterator` as the return value for simple `__iter__` methods
    |
 16 |     class IteratorReturningSimpleGenerator3:
 17 |         def __iter__(self) -> collections.abc.Generator: ...  # PYI058 (use `Iterator`)
-   |             ^^^^^^^^ PYI058
+   |             ^^^^^^^^ PYI058 (generator-return-from-iter-method)
 18 | 
 19 | def scope():
    |
@@ -63,11 +63,11 @@ PYI058.pyi:17:13: PYI058 [*] Use `Iterator` as the return value for simple `__it
 19 19 | def scope():
 20 20 |     import collections.abc
 
-PYI058.pyi:24:13: PYI058 [*] Use `Iterator` as the return value for simple `__iter__` methods
+PYI058.pyi:24:13: PYI058 (generator-return-from-iter-method) [*] Use `Iterator` as the return value for simple `__iter__` methods
    |
 23 |     class IteratorReturningSimpleGenerator4:
 24 |         def __iter__(self, /) -> collections.abc.Generator[str, Any, None]: ...  # PYI058 (use `Iterator`)
-   |             ^^^^^^^^ PYI058
+   |             ^^^^^^^^ PYI058 (generator-return-from-iter-method)
 25 | 
 26 | def scope():
    |
@@ -83,11 +83,11 @@ PYI058.pyi:24:13: PYI058 [*] Use `Iterator` as the return value for simple `__it
 26 26 | def scope():
 27 27 |     import collections.abc
 
-PYI058.pyi:31:13: PYI058 [*] Use `Iterator` as the return value for simple `__iter__` methods
+PYI058.pyi:31:13: PYI058 (generator-return-from-iter-method) [*] Use `Iterator` as the return value for simple `__iter__` methods
    |
 30 |     class IteratorReturningSimpleGenerator5:
 31 |         def __iter__(self, /) -> collections.abc.Generator[str, None, typing.Any]: ...  # PYI058 (use `Iterator`)
-   |             ^^^^^^^^ PYI058
+   |             ^^^^^^^^ PYI058 (generator-return-from-iter-method)
 32 | 
 33 | def scope():
    |
@@ -103,11 +103,11 @@ PYI058.pyi:31:13: PYI058 [*] Use `Iterator` as the return value for simple `__it
 33 33 | def scope():
 34 34 |     from collections.abc import Generator
 
-PYI058.pyi:37:13: PYI058 [*] Use `Iterator` as the return value for simple `__iter__` methods
+PYI058.pyi:37:13: PYI058 (generator-return-from-iter-method) [*] Use `Iterator` as the return value for simple `__iter__` methods
    |
 36 |     class IteratorReturningSimpleGenerator6:
 37 |         def __iter__(self, /) -> Generator[str, None, None]: ...  # PYI058 (use `Iterator`)
-   |             ^^^^^^^^ PYI058
+   |             ^^^^^^^^ PYI058 (generator-return-from-iter-method)
 38 | 
 39 | def scope():
    |
@@ -128,11 +128,11 @@ PYI058.pyi:37:13: PYI058 [*] Use `Iterator` as the return value for simple `__it
 39 40 | def scope():
 40 41 |     import typing_extensions
 
-PYI058.pyi:43:13: PYI058 [*] Use `AsyncIterator` as the return value for simple `__aiter__` methods
+PYI058.pyi:43:13: PYI058 (generator-return-from-iter-method) [*] Use `AsyncIterator` as the return value for simple `__aiter__` methods
    |
 42 |     class AsyncIteratorReturningSimpleAsyncGenerator1:
 43 |         def __aiter__(self,) -> typing_extensions.AsyncGenerator: ...  # PYI058 (Use `AsyncIterator`)
-   |             ^^^^^^^^^ PYI058
+   |             ^^^^^^^^^ PYI058 (generator-return-from-iter-method)
 44 | 
 45 | def scope():
    |
@@ -148,11 +148,11 @@ PYI058.pyi:43:13: PYI058 [*] Use `AsyncIterator` as the return value for simple 
 45 45 | def scope():
 46 46 |     import collections.abc
 
-PYI058.pyi:49:13: PYI058 [*] Use `AsyncIterator` as the return value for simple `__aiter__` methods
+PYI058.pyi:49:13: PYI058 (generator-return-from-iter-method) [*] Use `AsyncIterator` as the return value for simple `__aiter__` methods
    |
 48 |     class AsyncIteratorReturningSimpleAsyncGenerator3:
 49 |         def __aiter__(self, /) -> collections.abc.AsyncGenerator[str, None]:
-   |             ^^^^^^^^^ PYI058
+   |             ^^^^^^^^^ PYI058 (generator-return-from-iter-method)
 50 |             ...  # PYI058 (Use `AsyncIterator`)
    |
    = help: Convert the return annotation of your `__aiter__` method to `AsyncIterator`
@@ -167,11 +167,11 @@ PYI058.pyi:49:13: PYI058 [*] Use `AsyncIterator` as the return value for simple 
 51 51 | 
 52 52 | def scope():
 
-PYI058.pyi:56:13: PYI058 [*] Use `AsyncIterator` as the return value for simple `__aiter__` methods
+PYI058.pyi:56:13: PYI058 (generator-return-from-iter-method) [*] Use `AsyncIterator` as the return value for simple `__aiter__` methods
    |
 55 |     class AsyncIteratorReturningSimpleAsyncGenerator3:
 56 |         def __aiter__(self, /) -> collections.abc.AsyncGenerator[str, None]: ...  # PYI058 (Use `AsyncIterator`)
-   |             ^^^^^^^^^ PYI058
+   |             ^^^^^^^^^ PYI058 (generator-return-from-iter-method)
 57 | 
 58 | def scope():
    |
@@ -186,5 +186,3 @@ PYI058.pyi:56:13: PYI058 [*] Use `AsyncIterator` as the return value for simple 
 57 57 | 
 58 58 | def scope():
 59 59 |     from typing import Iterator
-
-

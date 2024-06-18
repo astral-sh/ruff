@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
 ---
-PYI025_2.pyi:3:29: PYI025 [*] Use `from collections.abc import Set as AbstractSet` to avoid confusion with the `set` builtin
+PYI025_2.pyi:3:29: PYI025 (unaliased-collections-abc-set-import) [*] Use `from collections.abc import Set as AbstractSet` to avoid confusion with the `set` builtin
   |
 1 | """Tests to ensure we correctly rename references inside `__all__`"""
 2 | 
 3 | from collections.abc import Set
-  |                             ^^^ PYI025
+  |                             ^^^ PYI025 (unaliased-collections-abc-set-import)
 4 | 
 5 | __all__ = ["Set"]
   |

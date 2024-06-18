@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
 ---
-PYI012.pyi:5:5: PYI012 [*] Class body must not contain `pass`
+PYI012.pyi:5:5: PYI012 (pass-in-class-body) [*] Class body must not contain `pass`
   |
 3 | class OneAttributeClass:
 4 |     value: int
 5 |     pass  # PYI012 Class body must not contain `pass`
-  |     ^^^^ PYI012
+  |     ^^^^ PYI012 (pass-in-class-body)
 6 | 
 7 | class OneAttributeClassRev:
   |
@@ -21,11 +21,11 @@ PYI012.pyi:5:5: PYI012 [*] Class body must not contain `pass`
 7 6 | class OneAttributeClassRev:
 8 7 |     pass  # PYI012 Class body must not contain `pass`
 
-PYI012.pyi:8:5: PYI012 [*] Class body must not contain `pass`
+PYI012.pyi:8:5: PYI012 (pass-in-class-body) [*] Class body must not contain `pass`
   |
 7 | class OneAttributeClassRev:
 8 |     pass  # PYI012 Class body must not contain `pass`
-  |     ^^^^ PYI012
+  |     ^^^^ PYI012 (pass-in-class-body)
 9 |     value: int
   |
   = help: Remove unnecessary `pass`
@@ -39,12 +39,12 @@ PYI012.pyi:8:5: PYI012 [*] Class body must not contain `pass`
 10 9 | 
 11 10 | class DocstringClass:
 
-PYI012.pyi:16:5: PYI012 [*] Class body must not contain `pass`
+PYI012.pyi:16:5: PYI012 (pass-in-class-body) [*] Class body must not contain `pass`
    |
 14 |     """
 15 | 
 16 |     pass  # PYI012 Class body must not contain `pass`
-   |     ^^^^ PYI012
+   |     ^^^^ PYI012 (pass-in-class-body)
 17 | 
 18 | class NonEmptyChild(Exception):
    |
@@ -59,12 +59,12 @@ PYI012.pyi:16:5: PYI012 [*] Class body must not contain `pass`
 18 17 | class NonEmptyChild(Exception):
 19 18 |     value: int
 
-PYI012.pyi:20:5: PYI012 [*] Class body must not contain `pass`
+PYI012.pyi:20:5: PYI012 (pass-in-class-body) [*] Class body must not contain `pass`
    |
 18 | class NonEmptyChild(Exception):
 19 |     value: int
 20 |     pass  # PYI012 Class body must not contain `pass`
-   |     ^^^^ PYI012
+   |     ^^^^ PYI012 (pass-in-class-body)
 21 | 
 22 | class NonEmptyChild2(Exception):
    |
@@ -79,11 +79,11 @@ PYI012.pyi:20:5: PYI012 [*] Class body must not contain `pass`
 22 21 | class NonEmptyChild2(Exception):
 23 22 |     pass  # PYI012 Class body must not contain `pass`
 
-PYI012.pyi:23:5: PYI012 [*] Class body must not contain `pass`
+PYI012.pyi:23:5: PYI012 (pass-in-class-body) [*] Class body must not contain `pass`
    |
 22 | class NonEmptyChild2(Exception):
 23 |     pass  # PYI012 Class body must not contain `pass`
-   |     ^^^^ PYI012
+   |     ^^^^ PYI012 (pass-in-class-body)
 24 |     value: int
    |
    = help: Remove unnecessary `pass`
@@ -97,12 +97,12 @@ PYI012.pyi:23:5: PYI012 [*] Class body must not contain `pass`
 25 24 | 
 26 25 | class NonEmptyWithInit:
 
-PYI012.pyi:28:5: PYI012 [*] Class body must not contain `pass`
+PYI012.pyi:28:5: PYI012 (pass-in-class-body) [*] Class body must not contain `pass`
    |
 26 | class NonEmptyWithInit:
 27 |     value: int
 28 |     pass  # PYI012 Class body must not contain `pass`
-   |     ^^^^ PYI012
+   |     ^^^^ PYI012 (pass-in-class-body)
 29 | 
 30 |     def __init__():
    |
@@ -116,5 +116,3 @@ PYI012.pyi:28:5: PYI012 [*] Class body must not contain `pass`
 29 28 | 
 30 29 |     def __init__():
 31 30 |         pass
-
-

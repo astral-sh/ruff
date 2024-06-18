@@ -1,11 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 ---
-D301.py:2:5: D301 [*] Use `r"""` if any backslashes in a docstring
+D301.py:2:5: D301 (escape-sequence-in-docstring) [*] Use `r"""` if any backslashes in a docstring
   |
 1 | def double_quotes_backslash():
 2 |     """Sum\\mary."""
-  |     ^^^^^^^^^^^^^^^^ D301
+  |     ^^^^^^^^^^^^^^^^ D301 (escape-sequence-in-docstring)
   |
   = help: Add `r` prefix
 
@@ -17,12 +17,10 @@ D301.py:2:5: D301 [*] Use `r"""` if any backslashes in a docstring
 4 4 | 
 5 5 | def double_quotes_backslash_raw():
 
-D301.py:37:5: D301 Use `r"""` if any backslashes in a docstring
+D301.py:37:5: D301 (escape-sequence-in-docstring) Use `r"""` if any backslashes in a docstring
    |
 36 | def shouldnt_add_raw_here2():
 37 |     u"Sum\\mary."
-   |     ^^^^^^^^^^^^^ D301
+   |     ^^^^^^^^^^^^^ D301 (escape-sequence-in-docstring)
    |
    = help: Add `r` prefix
-
-

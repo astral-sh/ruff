@@ -1,118 +1,118 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-bad_open_mode.py:11:12: PLW1501 `rwx` is not a valid mode for `open`
+bad_open_mode.py:11:12: PLW1501 (bad-open-mode) `rwx` is not a valid mode for `open`
    |
  9 | open(NAME, "+r", encoding="utf-8")
 10 | open(NAME, "xb")
 11 | open(NAME, "rwx")  # [bad-open-mode]
-   |            ^^^^^ PLW1501
+   |            ^^^^^ PLW1501 (bad-open-mode)
 12 | open(NAME, mode="rwx")  # [bad-open-mode]
 13 | open(NAME, "rwx", encoding="utf-8")  # [bad-open-mode]
    |
 
-bad_open_mode.py:12:17: PLW1501 `rwx` is not a valid mode for `open`
+bad_open_mode.py:12:17: PLW1501 (bad-open-mode) `rwx` is not a valid mode for `open`
    |
 10 | open(NAME, "xb")
 11 | open(NAME, "rwx")  # [bad-open-mode]
 12 | open(NAME, mode="rwx")  # [bad-open-mode]
-   |                 ^^^^^ PLW1501
+   |                 ^^^^^ PLW1501 (bad-open-mode)
 13 | open(NAME, "rwx", encoding="utf-8")  # [bad-open-mode]
 14 | open(NAME, "rr", encoding="utf-8")  # [bad-open-mode]
    |
 
-bad_open_mode.py:13:12: PLW1501 `rwx` is not a valid mode for `open`
+bad_open_mode.py:13:12: PLW1501 (bad-open-mode) `rwx` is not a valid mode for `open`
    |
 11 | open(NAME, "rwx")  # [bad-open-mode]
 12 | open(NAME, mode="rwx")  # [bad-open-mode]
 13 | open(NAME, "rwx", encoding="utf-8")  # [bad-open-mode]
-   |            ^^^^^ PLW1501
+   |            ^^^^^ PLW1501 (bad-open-mode)
 14 | open(NAME, "rr", encoding="utf-8")  # [bad-open-mode]
 15 | open(NAME, "+", encoding="utf-8")  # [bad-open-mode]
    |
 
-bad_open_mode.py:14:12: PLW1501 `rr` is not a valid mode for `open`
+bad_open_mode.py:14:12: PLW1501 (bad-open-mode) `rr` is not a valid mode for `open`
    |
 12 | open(NAME, mode="rwx")  # [bad-open-mode]
 13 | open(NAME, "rwx", encoding="utf-8")  # [bad-open-mode]
 14 | open(NAME, "rr", encoding="utf-8")  # [bad-open-mode]
-   |            ^^^^ PLW1501
+   |            ^^^^ PLW1501 (bad-open-mode)
 15 | open(NAME, "+", encoding="utf-8")  # [bad-open-mode]
 16 | open(NAME, "xw", encoding="utf-8")  # [bad-open-mode]
    |
 
-bad_open_mode.py:15:12: PLW1501 `+` is not a valid mode for `open`
+bad_open_mode.py:15:12: PLW1501 (bad-open-mode) `+` is not a valid mode for `open`
    |
 13 | open(NAME, "rwx", encoding="utf-8")  # [bad-open-mode]
 14 | open(NAME, "rr", encoding="utf-8")  # [bad-open-mode]
 15 | open(NAME, "+", encoding="utf-8")  # [bad-open-mode]
-   |            ^^^ PLW1501
+   |            ^^^ PLW1501 (bad-open-mode)
 16 | open(NAME, "xw", encoding="utf-8")  # [bad-open-mode]
 17 | open(NAME, "ab+")
    |
 
-bad_open_mode.py:16:12: PLW1501 `xw` is not a valid mode for `open`
+bad_open_mode.py:16:12: PLW1501 (bad-open-mode) `xw` is not a valid mode for `open`
    |
 14 | open(NAME, "rr", encoding="utf-8")  # [bad-open-mode]
 15 | open(NAME, "+", encoding="utf-8")  # [bad-open-mode]
 16 | open(NAME, "xw", encoding="utf-8")  # [bad-open-mode]
-   |            ^^^^ PLW1501
+   |            ^^^^ PLW1501 (bad-open-mode)
 17 | open(NAME, "ab+")
 18 | open(NAME, "a+b")
    |
 
-bad_open_mode.py:22:12: PLW1501 `Ua` is not a valid mode for `open`
+bad_open_mode.py:22:12: PLW1501 (bad-open-mode) `Ua` is not a valid mode for `open`
    |
 20 | open(NAME, "+rUb")
 21 | open(NAME, "x+b")
 22 | open(NAME, "Ua", encoding="utf-8")  # [bad-open-mode]
-   |            ^^^^ PLW1501
+   |            ^^^^ PLW1501 (bad-open-mode)
 23 | open(NAME, "Ur++", encoding="utf-8")  # [bad-open-mode]
 24 | open(NAME, "Ut", encoding="utf-8")
    |
 
-bad_open_mode.py:23:12: PLW1501 `Ur++` is not a valid mode for `open`
+bad_open_mode.py:23:12: PLW1501 (bad-open-mode) `Ur++` is not a valid mode for `open`
    |
 21 | open(NAME, "x+b")
 22 | open(NAME, "Ua", encoding="utf-8")  # [bad-open-mode]
 23 | open(NAME, "Ur++", encoding="utf-8")  # [bad-open-mode]
-   |            ^^^^^^ PLW1501
+   |            ^^^^^^ PLW1501 (bad-open-mode)
 24 | open(NAME, "Ut", encoding="utf-8")
 25 | open(NAME, "Ubr")
    |
 
-bad_open_mode.py:32:25: PLW1501 `rwx` is not a valid mode for `open`
+bad_open_mode.py:32:25: PLW1501 (bad-open-mode) `rwx` is not a valid mode for `open`
    |
 30 | pathlib.Path(NAME).open("wb")
 31 | pathlib.Path(NAME).open(mode)
 32 | pathlib.Path(NAME).open("rwx")  # [bad-open-mode]
-   |                         ^^^^^ PLW1501
+   |                         ^^^^^ PLW1501 (bad-open-mode)
 33 | pathlib.Path(NAME).open(mode="rwx")  # [bad-open-mode]
 34 | pathlib.Path(NAME).open("rwx", encoding="utf-8")  # [bad-open-mode]
    |
 
-bad_open_mode.py:33:30: PLW1501 `rwx` is not a valid mode for `open`
+bad_open_mode.py:33:30: PLW1501 (bad-open-mode) `rwx` is not a valid mode for `open`
    |
 31 | pathlib.Path(NAME).open(mode)
 32 | pathlib.Path(NAME).open("rwx")  # [bad-open-mode]
 33 | pathlib.Path(NAME).open(mode="rwx")  # [bad-open-mode]
-   |                              ^^^^^ PLW1501
+   |                              ^^^^^ PLW1501 (bad-open-mode)
 34 | pathlib.Path(NAME).open("rwx", encoding="utf-8")  # [bad-open-mode]
    |
 
-bad_open_mode.py:34:25: PLW1501 `rwx` is not a valid mode for `open`
+bad_open_mode.py:34:25: PLW1501 (bad-open-mode) `rwx` is not a valid mode for `open`
    |
 32 | pathlib.Path(NAME).open("rwx")  # [bad-open-mode]
 33 | pathlib.Path(NAME).open(mode="rwx")  # [bad-open-mode]
 34 | pathlib.Path(NAME).open("rwx", encoding="utf-8")  # [bad-open-mode]
-   |                         ^^^^^ PLW1501
+   |                         ^^^^^ PLW1501 (bad-open-mode)
 35 | 
 36 | import builtins
    |
 
-bad_open_mode.py:37:21: PLW1501 `Ua` is not a valid mode for `open`
+bad_open_mode.py:37:21: PLW1501 (bad-open-mode) `Ua` is not a valid mode for `open`
    |
 36 | import builtins
 37 | builtins.open(NAME, "Ua", encoding="utf-8")
-   |                     ^^^^ PLW1501
+   |                     ^^^^ PLW1501 (bad-open-mode)
    |

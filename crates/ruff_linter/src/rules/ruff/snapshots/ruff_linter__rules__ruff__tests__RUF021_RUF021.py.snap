@@ -1,11 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-RUF021.py:12:10: RUF021 [*] Parenthesize `a and b` expressions when chaining `and` and `or` together, to make the precedence clear
+RUF021.py:12:10: RUF021 (parenthesize-chained-operators) [*] Parenthesize `a and b` expressions when chaining `and` and `or` together, to make the precedence clear
    |
 11 | a, b, c = 1, 0, 2
 12 | x = a or b and c  # RUF021: => `a or (b and c)`
-   |          ^^^^^^^ RUF021
+   |          ^^^^^^^ RUF021 (parenthesize-chained-operators)
 13 | x = a or b and c  # looooooooooooooooooooooooooooooong comment but it won't prevent an autofix
    |
    = help: Parenthesize the `and` subexpression
@@ -20,12 +20,12 @@ RUF021.py:12:10: RUF021 [*] Parenthesize `a and b` expressions when chaining `an
 14 14 | 
 15 15 | a, b, c = 0, 1, 2
 
-RUF021.py:13:10: RUF021 [*] Parenthesize `a and b` expressions when chaining `and` and `or` together, to make the precedence clear
+RUF021.py:13:10: RUF021 (parenthesize-chained-operators) [*] Parenthesize `a and b` expressions when chaining `and` and `or` together, to make the precedence clear
    |
 11 | a, b, c = 1, 0, 2
 12 | x = a or b and c  # RUF021: => `a or (b and c)`
 13 | x = a or b and c  # looooooooooooooooooooooooooooooong comment but it won't prevent an autofix
-   |          ^^^^^^^ RUF021
+   |          ^^^^^^^ RUF021 (parenthesize-chained-operators)
 14 | 
 15 | a, b, c = 0, 1, 2
    |
@@ -41,11 +41,11 @@ RUF021.py:13:10: RUF021 [*] Parenthesize `a and b` expressions when chaining `an
 15 15 | a, b, c = 0, 1, 2
 16 16 | y = a and b or c  # RUF021: => `(a and b) or c`
 
-RUF021.py:16:5: RUF021 [*] Parenthesize `a and b` expressions when chaining `and` and `or` together, to make the precedence clear
+RUF021.py:16:5: RUF021 (parenthesize-chained-operators) [*] Parenthesize `a and b` expressions when chaining `and` and `or` together, to make the precedence clear
    |
 15 | a, b, c = 0, 1, 2
 16 | y = a and b or c  # RUF021: => `(a and b) or c`
-   |     ^^^^^^^ RUF021
+   |     ^^^^^^^ RUF021 (parenthesize-chained-operators)
 17 | 
 18 | a, b, c, d = 1, 2, 0, 3
    |
@@ -61,11 +61,11 @@ RUF021.py:16:5: RUF021 [*] Parenthesize `a and b` expressions when chaining `and
 18 18 | a, b, c, d = 1, 2, 0, 3
 19 19 | if a or b or c and d:  # RUF021: => `a or b or (c and d)`
 
-RUF021.py:19:14: RUF021 [*] Parenthesize `a and b` expressions when chaining `and` and `or` together, to make the precedence clear
+RUF021.py:19:14: RUF021 (parenthesize-chained-operators) [*] Parenthesize `a and b` expressions when chaining `and` and `or` together, to make the precedence clear
    |
 18 | a, b, c, d = 1, 2, 0, 3
 19 | if a or b or c and d:  # RUF021: => `a or b or (c and d)`
-   |              ^^^^^^^ RUF021
+   |              ^^^^^^^ RUF021 (parenthesize-chained-operators)
 20 |     pass
    |
    = help: Parenthesize the `and` subexpression
@@ -80,12 +80,12 @@ RUF021.py:19:14: RUF021 [*] Parenthesize `a and b` expressions when chaining `an
 21 21 | 
 22 22 | a, b, c, d = 0, 0, 2, 3
 
-RUF021.py:26:11: RUF021 [*] Parenthesize `a and b` expressions when chaining `and` and `or` together, to make the precedence clear
+RUF021.py:26:11: RUF021 (parenthesize-chained-operators) [*] Parenthesize `a and b` expressions when chaining `and` and `or` together, to make the precedence clear
    |
 24 | if bool():
 25 |     pass
 26 | elif a or b and c or d:  # RUF021: => `a or (b and c) or d`
-   |           ^^^^^^^ RUF021
+   |           ^^^^^^^ RUF021 (parenthesize-chained-operators)
 27 |     pass
    |
    = help: Parenthesize the `and` subexpression
@@ -100,11 +100,11 @@ RUF021.py:26:11: RUF021 [*] Parenthesize `a and b` expressions when chaining `an
 28 28 | 
 29 29 | a, b, c, d = 0, 1, 0, 2
 
-RUF021.py:30:7: RUF021 [*] Parenthesize `a and b` expressions when chaining `and` and `or` together, to make the precedence clear
+RUF021.py:30:7: RUF021 (parenthesize-chained-operators) [*] Parenthesize `a and b` expressions when chaining `and` and `or` together, to make the precedence clear
    |
 29 | a, b, c, d = 0, 1, 0, 2
 30 | while a and b or c and d:  # RUF021: => `(and b) or (c and d)`
-   |       ^^^^^^^ RUF021
+   |       ^^^^^^^ RUF021 (parenthesize-chained-operators)
 31 |     pass
    |
    = help: Parenthesize the `and` subexpression
@@ -119,11 +119,11 @@ RUF021.py:30:7: RUF021 [*] Parenthesize `a and b` expressions when chaining `and
 32 32 | 
 33 33 | b, c, d, e = 2, 3, 0, 4
 
-RUF021.py:30:18: RUF021 [*] Parenthesize `a and b` expressions when chaining `and` and `or` together, to make the precedence clear
+RUF021.py:30:18: RUF021 (parenthesize-chained-operators) [*] Parenthesize `a and b` expressions when chaining `and` and `or` together, to make the precedence clear
    |
 29 | a, b, c, d = 0, 1, 0, 2
 30 | while a and b or c and d:  # RUF021: => `(and b) or (c and d)`
-   |                  ^^^^^^^ RUF021
+   |                  ^^^^^^^ RUF021 (parenthesize-chained-operators)
 31 |     pass
    |
    = help: Parenthesize the `and` subexpression
@@ -138,12 +138,12 @@ RUF021.py:30:18: RUF021 [*] Parenthesize `a and b` expressions when chaining `an
 32 32 | 
 33 33 | b, c, d, e = 2, 3, 0, 4
 
-RUF021.py:35:44: RUF021 [*] Parenthesize `a and b` expressions when chaining `and` and `or` together, to make the precedence clear
+RUF021.py:35:44: RUF021 (parenthesize-chained-operators) [*] Parenthesize `a and b` expressions when chaining `and` and `or` together, to make the precedence clear
    |
 33 | b, c, d, e = 2, 3, 0, 4
 34 | # RUF021: => `a or b or c or (d and e)`:
 35 | z = [a for a in range(5) if a or b or c or d and e]
-   |                                            ^^^^^^^ RUF021
+   |                                            ^^^^^^^ RUF021 (parenthesize-chained-operators)
 36 | 
 37 | a, b, c, d = 0, 1, 3, 0
    |
@@ -159,11 +159,11 @@ RUF021.py:35:44: RUF021 [*] Parenthesize `a and b` expressions when chaining `an
 37 37 | a, b, c, d = 0, 1, 3, 0
 38 38 | assert not a and b or c or d  # RUF021: => `(not a and b) or c or d`
 
-RUF021.py:38:8: RUF021 [*] Parenthesize `a and b` expressions when chaining `and` and `or` together, to make the precedence clear
+RUF021.py:38:8: RUF021 (parenthesize-chained-operators) [*] Parenthesize `a and b` expressions when chaining `and` and `or` together, to make the precedence clear
    |
 37 | a, b, c, d = 0, 1, 3, 0
 38 | assert not a and b or c or d  # RUF021: => `(not a and b) or c or d`
-   |        ^^^^^^^^^^^ RUF021
+   |        ^^^^^^^^^^^ RUF021 (parenthesize-chained-operators)
 39 | 
 40 | if (not a) and b or c or d:  # RUF021: => `((not a) and b) or c or d`
    |
@@ -179,12 +179,12 @@ RUF021.py:38:8: RUF021 [*] Parenthesize `a and b` expressions when chaining `and
 40 40 | if (not a) and b or c or d:  # RUF021: => `((not a) and b) or c or d`
 41 41 |     if (not a and b) or c or d:  # OK
 
-RUF021.py:40:4: RUF021 [*] Parenthesize `a and b` expressions when chaining `and` and `or` together, to make the precedence clear
+RUF021.py:40:4: RUF021 (parenthesize-chained-operators) [*] Parenthesize `a and b` expressions when chaining `and` and `or` together, to make the precedence clear
    |
 38 | assert not a and b or c or d  # RUF021: => `(not a and b) or c or d`
 39 | 
 40 | if (not a) and b or c or d:  # RUF021: => `((not a) and b) or c or d`
-   |    ^^^^^^^^^^^^^ RUF021
+   |    ^^^^^^^^^^^^^ RUF021 (parenthesize-chained-operators)
 41 |     if (not a and b) or c or d:  # OK
 42 |         pass
    |
@@ -200,14 +200,14 @@ RUF021.py:40:4: RUF021 [*] Parenthesize `a and b` expressions when chaining `and
 42 42 |         pass
 43 43 | 
 
-RUF021.py:46:8: RUF021 [*] Parenthesize `a and b` expressions when chaining `and` and `or` together, to make the precedence clear
+RUF021.py:46:8: RUF021 (parenthesize-chained-operators) [*] Parenthesize `a and b` expressions when chaining `and` and `or` together, to make the precedence clear
    |
 44 |   if (
 45 |       some_reasonably_long_condition
 46 |       or some_other_reasonably_long_condition
    |  ________^
 47 | |     and some_third_reasonably_long_condition
-   | |____________________________________________^ RUF021
+   | |____________________________________________^ RUF021 (parenthesize-chained-operators)
 48 |       or some_fourth_reasonably_long_condition
 49 |       and some_fifth_reasonably_long_condition
    |
@@ -225,7 +225,7 @@ RUF021.py:46:8: RUF021 [*] Parenthesize `a and b` expressions when chaining `and
 49 49 |     and some_fifth_reasonably_long_condition
 50 50 |     # a comment
 
-RUF021.py:48:8: RUF021 [*] Parenthesize `a and b` expressions when chaining `and` and `or` together, to make the precedence clear
+RUF021.py:48:8: RUF021 (parenthesize-chained-operators) [*] Parenthesize `a and b` expressions when chaining `and` and `or` together, to make the precedence clear
    |
 46 |       or some_other_reasonably_long_condition
 47 |       and some_third_reasonably_long_condition
@@ -235,7 +235,7 @@ RUF021.py:48:8: RUF021 [*] Parenthesize `a and b` expressions when chaining `and
 50 | |     # a comment
 51 | |     and some_sixth_reasonably_long_condition
 52 | |     and some_seventh_reasonably_long_condition
-   | |______________________________________________^ RUF021
+   | |______________________________________________^ RUF021 (parenthesize-chained-operators)
 53 |       # another comment
 54 |       or some_eighth_reasonably_long_condition
    |

@@ -1,32 +1,32 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_slots/mod.rs
 ---
-SLOT001.py:1:7: SLOT001 Subclasses of `tuple` should define `__slots__`
+SLOT001.py:1:7: SLOT001 (no-slots-in-tuple-subclass) Subclasses of `tuple` should define `__slots__`
   |
 1 | class Bad(tuple):  # SLOT001
-  |       ^^^ SLOT001
+  |       ^^^ SLOT001 (no-slots-in-tuple-subclass)
 2 |     pass
   |
 
-SLOT001.py:12:7: SLOT001 Subclasses of `tuple` should define `__slots__`
+SLOT001.py:12:7: SLOT001 (no-slots-in-tuple-subclass) Subclasses of `tuple` should define `__slots__`
    |
 12 | class Bad(Tuple):  # SLOT001
-   |       ^^^ SLOT001
+   |       ^^^ SLOT001 (no-slots-in-tuple-subclass)
 13 |     pass
    |
 
-SLOT001.py:16:7: SLOT001 Subclasses of `tuple` should define `__slots__`
+SLOT001.py:16:7: SLOT001 (no-slots-in-tuple-subclass) Subclasses of `tuple` should define `__slots__`
    |
 16 | class Bad(Tuple[str, int, float]):  # SLOT001
-   |       ^^^ SLOT001
+   |       ^^^ SLOT001 (no-slots-in-tuple-subclass)
 17 |     pass
    |
 
-SLOT001.py:26:7: SLOT001 Subclasses of `tuple` should define `__slots__`
+SLOT001.py:26:7: SLOT001 (no-slots-in-tuple-subclass) Subclasses of `tuple` should define `__slots__`
    |
 24 | import builtins
 25 | 
 26 | class AlsoBad(builtins.tuple[int, int]):  # SLOT001
-   |       ^^^^^^^ SLOT001
+   |       ^^^^^^^ SLOT001 (no-slots-in-tuple-subclass)
 27 |     pass
    |

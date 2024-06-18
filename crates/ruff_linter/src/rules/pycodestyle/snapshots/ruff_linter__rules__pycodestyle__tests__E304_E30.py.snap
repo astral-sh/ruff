@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-E30.py:773:1: E304 [*] Blank lines found after function decorator (1)
+E30.py:773:1: E304 (blank-line-after-decorator) [*] Blank lines found after function decorator (1)
     |
 771 | @decorator
 772 | 
 773 | def function():
-    | ^^^ E304
+    | ^^^ E304 (blank-line-after-decorator)
 774 |     pass
 775 | # end
     |
@@ -21,11 +21,11 @@ E30.py:773:1: E304 [*] Blank lines found after function decorator (1)
 774 773 |     pass
 775 774 | # end
 
-E30.py:782:1: E304 [*] Blank lines found after function decorator (1)
+E30.py:782:1: E304 (blank-line-after-decorator) [*] Blank lines found after function decorator (1)
     |
 781 | # comment    E304 not expected
 782 | def function():
-    | ^^^ E304
+    | ^^^ E304 (blank-line-after-decorator)
 783 |     pass
 784 | # end
     |
@@ -40,11 +40,11 @@ E30.py:782:1: E304 [*] Blank lines found after function decorator (1)
 782 781 | def function():
 783 782 |     pass
 
-E30.py:794:1: E304 [*] Blank lines found after function decorator (2)
+E30.py:794:1: E304 (blank-line-after-decorator) [*] Blank lines found after function decorator (2)
     |
 793 | # second comment  E304 not expected
 794 | def function():
-    | ^^^ E304
+    | ^^^ E304 (blank-line-after-decorator)
 795 |     pass
 796 | # end
     |

@@ -1,11 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-RUF015.py:4:1: RUF015 [*] Prefer `next(iter(x))` over single element slice
+RUF015.py:4:1: RUF015 (unnecessary-iterable-allocation-for-first-element) [*] Prefer `next(iter(x))` over single element slice
   |
 3 | # RUF015
 4 | list(x)[0]
-  | ^^^^^^^^^^ RUF015
+  | ^^^^^^^^^^ RUF015 (unnecessary-iterable-allocation-for-first-element)
 5 | tuple(x)[0]
 6 | list(i for i in x)[0]
   |
@@ -21,12 +21,12 @@ RUF015.py:4:1: RUF015 [*] Prefer `next(iter(x))` over single element slice
 6 6 | list(i for i in x)[0]
 7 7 | [i for i in x][0]
 
-RUF015.py:5:1: RUF015 [*] Prefer `next(iter(x))` over single element slice
+RUF015.py:5:1: RUF015 (unnecessary-iterable-allocation-for-first-element) [*] Prefer `next(iter(x))` over single element slice
   |
 3 | # RUF015
 4 | list(x)[0]
 5 | tuple(x)[0]
-  | ^^^^^^^^^^^ RUF015
+  | ^^^^^^^^^^^ RUF015 (unnecessary-iterable-allocation-for-first-element)
 6 | list(i for i in x)[0]
 7 | [i for i in x][0]
   |
@@ -42,12 +42,12 @@ RUF015.py:5:1: RUF015 [*] Prefer `next(iter(x))` over single element slice
 7 7 | [i for i in x][0]
 8 8 | 
 
-RUF015.py:6:1: RUF015 [*] Prefer `next(iter(x))` over single element slice
+RUF015.py:6:1: RUF015 (unnecessary-iterable-allocation-for-first-element) [*] Prefer `next(iter(x))` over single element slice
   |
 4 | list(x)[0]
 5 | tuple(x)[0]
 6 | list(i for i in x)[0]
-  | ^^^^^^^^^^^^^^^^^^^^^ RUF015
+  | ^^^^^^^^^^^^^^^^^^^^^ RUF015 (unnecessary-iterable-allocation-for-first-element)
 7 | [i for i in x][0]
   |
   = help: Replace with `next(iter(x))`
@@ -62,12 +62,12 @@ RUF015.py:6:1: RUF015 [*] Prefer `next(iter(x))` over single element slice
 8 8 | 
 9 9 | # OK (not indexing (solely) the first element)
 
-RUF015.py:7:1: RUF015 [*] Prefer `next(iter(x))` over single element slice
+RUF015.py:7:1: RUF015 (unnecessary-iterable-allocation-for-first-element) [*] Prefer `next(iter(x))` over single element slice
   |
 5 | tuple(x)[0]
 6 | list(i for i in x)[0]
 7 | [i for i in x][0]
-  | ^^^^^^^^^^^^^^^^^ RUF015
+  | ^^^^^^^^^^^^^^^^^ RUF015 (unnecessary-iterable-allocation-for-first-element)
 8 | 
 9 | # OK (not indexing (solely) the first element)
   |
@@ -83,11 +83,11 @@ RUF015.py:7:1: RUF015 [*] Prefer `next(iter(x))` over single element slice
 9 9 | # OK (not indexing (solely) the first element)
 10 10 | list(x)
 
-RUF015.py:29:1: RUF015 [*] Prefer `next(i + 1 for i in x)` over single element slice
+RUF015.py:29:1: RUF015 (unnecessary-iterable-allocation-for-first-element) [*] Prefer `next(i + 1 for i in x)` over single element slice
    |
 28 | # RUF015 (doesn't mirror the underlying list)
 29 | [i + 1 for i in x][0]
-   | ^^^^^^^^^^^^^^^^^^^^^ RUF015
+   | ^^^^^^^^^^^^^^^^^^^^^ RUF015 (unnecessary-iterable-allocation-for-first-element)
 30 | [i for i in x if i > 5][0]
 31 | [(i, i + 1) for i in x][0]
    |
@@ -103,12 +103,12 @@ RUF015.py:29:1: RUF015 [*] Prefer `next(i + 1 for i in x)` over single element s
 31 31 | [(i, i + 1) for i in x][0]
 32 32 | 
 
-RUF015.py:30:1: RUF015 [*] Prefer `next(i for i in x if i > 5)` over single element slice
+RUF015.py:30:1: RUF015 (unnecessary-iterable-allocation-for-first-element) [*] Prefer `next(i for i in x if i > 5)` over single element slice
    |
 28 | # RUF015 (doesn't mirror the underlying list)
 29 | [i + 1 for i in x][0]
 30 | [i for i in x if i > 5][0]
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF015
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF015 (unnecessary-iterable-allocation-for-first-element)
 31 | [(i, i + 1) for i in x][0]
    |
    = help: Replace with `next(i for i in x if i > 5)`
@@ -123,12 +123,12 @@ RUF015.py:30:1: RUF015 [*] Prefer `next(i for i in x if i > 5)` over single elem
 32 32 | 
 33 33 | # RUF015 (multiple generators)
 
-RUF015.py:31:1: RUF015 [*] Prefer `next((i, i + 1) for i in x)` over single element slice
+RUF015.py:31:1: RUF015 (unnecessary-iterable-allocation-for-first-element) [*] Prefer `next((i, i + 1) for i in x)` over single element slice
    |
 29 | [i + 1 for i in x][0]
 30 | [i for i in x if i > 5][0]
 31 | [(i, i + 1) for i in x][0]
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF015
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF015 (unnecessary-iterable-allocation-for-first-element)
 32 | 
 33 | # RUF015 (multiple generators)
    |
@@ -144,12 +144,12 @@ RUF015.py:31:1: RUF015 [*] Prefer `next((i, i + 1) for i in x)` over single elem
 33 33 | # RUF015 (multiple generators)
 34 34 | y = range(10)
 
-RUF015.py:35:1: RUF015 [*] Prefer `next(i + j for i in x for j in y)` over single element slice
+RUF015.py:35:1: RUF015 (unnecessary-iterable-allocation-for-first-element) [*] Prefer `next(i + j for i in x for j in y)` over single element slice
    |
 33 | # RUF015 (multiple generators)
 34 | y = range(10)
 35 | [i + j for i in x for j in y][0]
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF015
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF015 (unnecessary-iterable-allocation-for-first-element)
 36 | 
 37 | # RUF015
    |
@@ -165,11 +165,11 @@ RUF015.py:35:1: RUF015 [*] Prefer `next(i + j for i in x for j in y)` over singl
 37 37 | # RUF015
 38 38 | list(range(10))[0]
 
-RUF015.py:38:1: RUF015 [*] Prefer `next(iter(range(10)))` over single element slice
+RUF015.py:38:1: RUF015 (unnecessary-iterable-allocation-for-first-element) [*] Prefer `next(iter(range(10)))` over single element slice
    |
 37 | # RUF015
 38 | list(range(10))[0]
-   | ^^^^^^^^^^^^^^^^^^ RUF015
+   | ^^^^^^^^^^^^^^^^^^ RUF015 (unnecessary-iterable-allocation-for-first-element)
 39 | list(x.y)[0]
 40 | list(x["y"])[0]
    |
@@ -185,12 +185,12 @@ RUF015.py:38:1: RUF015 [*] Prefer `next(iter(range(10)))` over single element sl
 40 40 | list(x["y"])[0]
 41 41 | [*range(10)][0]
 
-RUF015.py:39:1: RUF015 [*] Prefer `next(iter(x.y))` over single element slice
+RUF015.py:39:1: RUF015 (unnecessary-iterable-allocation-for-first-element) [*] Prefer `next(iter(x.y))` over single element slice
    |
 37 | # RUF015
 38 | list(range(10))[0]
 39 | list(x.y)[0]
-   | ^^^^^^^^^^^^ RUF015
+   | ^^^^^^^^^^^^ RUF015 (unnecessary-iterable-allocation-for-first-element)
 40 | list(x["y"])[0]
 41 | [*range(10)][0]
    |
@@ -206,12 +206,12 @@ RUF015.py:39:1: RUF015 [*] Prefer `next(iter(x.y))` over single element slice
 41 41 | [*range(10)][0]
 42 42 | [*x["y"]][0]
 
-RUF015.py:40:1: RUF015 [*] Prefer `next(iter(x["y"]))` over single element slice
+RUF015.py:40:1: RUF015 (unnecessary-iterable-allocation-for-first-element) [*] Prefer `next(iter(x["y"]))` over single element slice
    |
 38 | list(range(10))[0]
 39 | list(x.y)[0]
 40 | list(x["y"])[0]
-   | ^^^^^^^^^^^^^^^ RUF015
+   | ^^^^^^^^^^^^^^^ RUF015 (unnecessary-iterable-allocation-for-first-element)
 41 | [*range(10)][0]
 42 | [*x["y"]][0]
    |
@@ -227,12 +227,12 @@ RUF015.py:40:1: RUF015 [*] Prefer `next(iter(x["y"]))` over single element slice
 42 42 | [*x["y"]][0]
 43 43 | [*x.y][0]
 
-RUF015.py:41:1: RUF015 [*] Prefer `next(iter(range(10)))` over single element slice
+RUF015.py:41:1: RUF015 (unnecessary-iterable-allocation-for-first-element) [*] Prefer `next(iter(range(10)))` over single element slice
    |
 39 | list(x.y)[0]
 40 | list(x["y"])[0]
 41 | [*range(10)][0]
-   | ^^^^^^^^^^^^^^^ RUF015
+   | ^^^^^^^^^^^^^^^ RUF015 (unnecessary-iterable-allocation-for-first-element)
 42 | [*x["y"]][0]
 43 | [*x.y][0]
    |
@@ -248,12 +248,12 @@ RUF015.py:41:1: RUF015 [*] Prefer `next(iter(range(10)))` over single element sl
 43 43 | [*x.y][0]
 44 44 | [* x.y][0]
 
-RUF015.py:42:1: RUF015 [*] Prefer `next(iter(x["y"]))` over single element slice
+RUF015.py:42:1: RUF015 (unnecessary-iterable-allocation-for-first-element) [*] Prefer `next(iter(x["y"]))` over single element slice
    |
 40 | list(x["y"])[0]
 41 | [*range(10)][0]
 42 | [*x["y"]][0]
-   | ^^^^^^^^^^^^ RUF015
+   | ^^^^^^^^^^^^ RUF015 (unnecessary-iterable-allocation-for-first-element)
 43 | [*x.y][0]
 44 | [* x.y][0]
    |
@@ -269,12 +269,12 @@ RUF015.py:42:1: RUF015 [*] Prefer `next(iter(x["y"]))` over single element slice
 44 44 | [* x.y][0]
 45 45 | [
 
-RUF015.py:43:1: RUF015 [*] Prefer `next(iter(x.y))` over single element slice
+RUF015.py:43:1: RUF015 (unnecessary-iterable-allocation-for-first-element) [*] Prefer `next(iter(x.y))` over single element slice
    |
 41 | [*range(10)][0]
 42 | [*x["y"]][0]
 43 | [*x.y][0]
-   | ^^^^^^^^^ RUF015
+   | ^^^^^^^^^ RUF015 (unnecessary-iterable-allocation-for-first-element)
 44 | [* x.y][0]
 45 | [
    |
@@ -290,12 +290,12 @@ RUF015.py:43:1: RUF015 [*] Prefer `next(iter(x.y))` over single element slice
 45 45 | [
 46 46 |     *x.y
 
-RUF015.py:44:1: RUF015 [*] Prefer `next(iter(x.y))` over single element slice
+RUF015.py:44:1: RUF015 (unnecessary-iterable-allocation-for-first-element) [*] Prefer `next(iter(x.y))` over single element slice
    |
 42 | [*x["y"]][0]
 43 | [*x.y][0]
 44 | [* x.y][0]
-   | ^^^^^^^^^^ RUF015
+   | ^^^^^^^^^^ RUF015 (unnecessary-iterable-allocation-for-first-element)
 45 | [
 46 |     *x.y
    |
@@ -311,14 +311,14 @@ RUF015.py:44:1: RUF015 [*] Prefer `next(iter(x.y))` over single element slice
 46 46 |     *x.y
 47 47 | ][0]
 
-RUF015.py:45:1: RUF015 [*] Prefer `next(iter(x.y))` over single element slice
+RUF015.py:45:1: RUF015 (unnecessary-iterable-allocation-for-first-element) [*] Prefer `next(iter(x.y))` over single element slice
    |
 43 |   [*x.y][0]
 44 |   [* x.y][0]
 45 | / [
 46 | |     *x.y
 47 | | ][0]
-   | |____^ RUF015
+   | |____^ RUF015 (unnecessary-iterable-allocation-for-first-element)
 48 |   
 49 |   # RUF015 (multi-line)
    |
@@ -336,7 +336,7 @@ RUF015.py:45:1: RUF015 [*] Prefer `next(iter(x.y))` over single element slice
 49 47 | # RUF015 (multi-line)
 50 48 | revision_heads_map_ast = [
 
-RUF015.py:50:26: RUF015 [*] Prefer `next(...)` over single element slice
+RUF015.py:50:26: RUF015 (unnecessary-iterable-allocation-for-first-element) [*] Prefer `next(...)` over single element slice
    |
 49 |   # RUF015 (multi-line)
 50 |   revision_heads_map_ast = [
@@ -345,7 +345,7 @@ RUF015.py:50:26: RUF015 [*] Prefer `next(...)` over single element slice
 52 | |     for a in revision_heads_map_ast_obj.body
 53 | |     if isinstance(a, ast.Assign) and a.targets[0].id == "REVISION_HEADS_MAP"
 54 | | ][0]
-   | |____^ RUF015
+   | |____^ RUF015 (unnecessary-iterable-allocation-for-first-element)
 55 |   
 56 |   # RUF015 (zip)
    |
@@ -366,11 +366,11 @@ RUF015.py:50:26: RUF015 [*] Prefer `next(...)` over single element slice
 56 56 | # RUF015 (zip)
 57 57 | list(zip(x, y))[0]
 
-RUF015.py:57:1: RUF015 [*] Prefer `next(zip(x, y))` over single element slice
+RUF015.py:57:1: RUF015 (unnecessary-iterable-allocation-for-first-element) [*] Prefer `next(zip(x, y))` over single element slice
    |
 56 | # RUF015 (zip)
 57 | list(zip(x, y))[0]
-   | ^^^^^^^^^^^^^^^^^^ RUF015
+   | ^^^^^^^^^^^^^^^^^^ RUF015 (unnecessary-iterable-allocation-for-first-element)
 58 | [*zip(x, y)][0]
    |
    = help: Replace with `next(zip(x, y))`
@@ -385,12 +385,12 @@ RUF015.py:57:1: RUF015 [*] Prefer `next(zip(x, y))` over single element slice
 59 59 | 
 60 60 | # RUF015 (pop)
 
-RUF015.py:58:1: RUF015 [*] Prefer `next(zip(x, y))` over single element slice
+RUF015.py:58:1: RUF015 (unnecessary-iterable-allocation-for-first-element) [*] Prefer `next(zip(x, y))` over single element slice
    |
 56 | # RUF015 (zip)
 57 | list(zip(x, y))[0]
 58 | [*zip(x, y)][0]
-   | ^^^^^^^^^^^^^^^ RUF015
+   | ^^^^^^^^^^^^^^^ RUF015 (unnecessary-iterable-allocation-for-first-element)
 59 | 
 60 | # RUF015 (pop)
    |
@@ -406,11 +406,11 @@ RUF015.py:58:1: RUF015 [*] Prefer `next(zip(x, y))` over single element slice
 60 60 | # RUF015 (pop)
 61 61 | list(x).pop(0)
 
-RUF015.py:61:1: RUF015 [*] Prefer `next(iter(x))` over single element slice
+RUF015.py:61:1: RUF015 (unnecessary-iterable-allocation-for-first-element) [*] Prefer `next(iter(x))` over single element slice
    |
 60 | # RUF015 (pop)
 61 | list(x).pop(0)
-   | ^^^^^^^^^^^^^^ RUF015
+   | ^^^^^^^^^^^^^^ RUF015 (unnecessary-iterable-allocation-for-first-element)
 62 | [i for i in x].pop(0)
 63 | list(i for i in x).pop(0)
    |
@@ -426,12 +426,12 @@ RUF015.py:61:1: RUF015 [*] Prefer `next(iter(x))` over single element slice
 63 63 | list(i for i in x).pop(0)
 64 64 | 
 
-RUF015.py:62:1: RUF015 [*] Prefer `next(iter(x))` over single element slice
+RUF015.py:62:1: RUF015 (unnecessary-iterable-allocation-for-first-element) [*] Prefer `next(iter(x))` over single element slice
    |
 60 | # RUF015 (pop)
 61 | list(x).pop(0)
 62 | [i for i in x].pop(0)
-   | ^^^^^^^^^^^^^^^^^^^^^ RUF015
+   | ^^^^^^^^^^^^^^^^^^^^^ RUF015 (unnecessary-iterable-allocation-for-first-element)
 63 | list(i for i in x).pop(0)
    |
    = help: Replace with `next(iter(x))`
@@ -446,12 +446,12 @@ RUF015.py:62:1: RUF015 [*] Prefer `next(iter(x))` over single element slice
 64 64 | 
 65 65 | # OK
 
-RUF015.py:63:1: RUF015 [*] Prefer `next(iter(x))` over single element slice
+RUF015.py:63:1: RUF015 (unnecessary-iterable-allocation-for-first-element) [*] Prefer `next(iter(x))` over single element slice
    |
 61 | list(x).pop(0)
 62 | [i for i in x].pop(0)
 63 | list(i for i in x).pop(0)
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^ RUF015
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^ RUF015 (unnecessary-iterable-allocation-for-first-element)
 64 | 
 65 | # OK
    |
@@ -467,12 +467,12 @@ RUF015.py:63:1: RUF015 [*] Prefer `next(iter(x))` over single element slice
 65 65 | # OK
 66 66 | list(x).pop(1)
 
-RUF015.py:73:5: RUF015 [*] Prefer `next(iter(zip(x, y)))` over single element slice
+RUF015.py:73:5: RUF015 (unnecessary-iterable-allocation-for-first-element) [*] Prefer `next(iter(zip(x, y)))` over single element slice
    |
 71 | def test():
 72 |     zip = list  # Overwrite the builtin zip
 73 |     list(zip(x, y))[0]
-   |     ^^^^^^^^^^^^^^^^^^ RUF015
+   |     ^^^^^^^^^^^^^^^^^^ RUF015 (unnecessary-iterable-allocation-for-first-element)
    |
    = help: Replace with `next(iter(zip(x, y)))`
 

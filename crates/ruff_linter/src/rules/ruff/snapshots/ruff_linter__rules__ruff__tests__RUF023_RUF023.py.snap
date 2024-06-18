@@ -1,11 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-RUF023.py:6:17: RUF023 [*] `Klass.__slots__` is not sorted
+RUF023.py:6:17: RUF023 (unsorted-dunder-slots) [*] `Klass.__slots__` is not sorted
   |
 5 | class Klass:
 6 |     __slots__ = ["d", "c", "b", "a"]  # a comment that is untouched
-  |                 ^^^^^^^^^^^^^^^^^^^^ RUF023
+  |                 ^^^^^^^^^^^^^^^^^^^^ RUF023 (unsorted-dunder-slots)
 7 |     __slots__ = ("d", "c", "b", "a")
   |
   = help: Apply a natural sort to `Klass.__slots__`
@@ -20,12 +20,12 @@ RUF023.py:6:17: RUF023 [*] `Klass.__slots__` is not sorted
 8 8 | 
 9 9 |     # Quoting style is retained,
 
-RUF023.py:7:17: RUF023 [*] `Klass.__slots__` is not sorted
+RUF023.py:7:17: RUF023 (unsorted-dunder-slots) [*] `Klass.__slots__` is not sorted
   |
 5 | class Klass:
 6 |     __slots__ = ["d", "c", "b", "a"]  # a comment that is untouched
 7 |     __slots__ = ("d", "c", "b", "a")
-  |                 ^^^^^^^^^^^^^^^^^^^^ RUF023
+  |                 ^^^^^^^^^^^^^^^^^^^^ RUF023 (unsorted-dunder-slots)
 8 | 
 9 |     # Quoting style is retained,
   |
@@ -41,12 +41,12 @@ RUF023.py:7:17: RUF023 [*] `Klass.__slots__` is not sorted
 9 9 |     # Quoting style is retained,
 10 10 |     # but unnecessary parens are not
 
-RUF023.py:11:22: RUF023 [*] `Klass.__slots__` is not sorted
+RUF023.py:11:22: RUF023 (unsorted-dunder-slots) [*] `Klass.__slots__` is not sorted
    |
  9 |     # Quoting style is retained,
 10 |     # but unnecessary parens are not
 11 |     __slots__: set = {'b', "c", ((('a')))}
-   |                      ^^^^^^^^^^^^^^^^^^^^^ RUF023
+   |                      ^^^^^^^^^^^^^^^^^^^^^ RUF023 (unsorted-dunder-slots)
 12 |     # Trailing commas are also not retained for single-line definitions
 13 |     # (but they are in multiline definitions)
    |
@@ -62,12 +62,12 @@ RUF023.py:11:22: RUF023 [*] `Klass.__slots__` is not sorted
 13 13 |     # (but they are in multiline definitions)
 14 14 |     __slots__: tuple = ("b", "c", "a",)
 
-RUF023.py:14:24: RUF023 [*] `Klass.__slots__` is not sorted
+RUF023.py:14:24: RUF023 (unsorted-dunder-slots) [*] `Klass.__slots__` is not sorted
    |
 12 |     # Trailing commas are also not retained for single-line definitions
 13 |     # (but they are in multiline definitions)
 14 |     __slots__: tuple = ("b", "c", "a",)
-   |                        ^^^^^^^^^^^^^^^^ RUF023
+   |                        ^^^^^^^^^^^^^^^^ RUF023 (unsorted-dunder-slots)
 15 | 
 16 | class Klass2:
    |
@@ -83,12 +83,12 @@ RUF023.py:14:24: RUF023 [*] `Klass.__slots__` is not sorted
 16 16 | class Klass2:
 17 17 |     if bool():
 
-RUF023.py:18:21: RUF023 [*] `Klass2.__slots__` is not sorted
+RUF023.py:18:21: RUF023 (unsorted-dunder-slots) [*] `Klass2.__slots__` is not sorted
    |
 16 | class Klass2:
 17 |     if bool():
 18 |         __slots__ = {"x": "docs for x", "m": "docs for m", "a": "docs for a"}
-   |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF023
+   |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF023 (unsorted-dunder-slots)
 19 |     else:
 20 |         __slots__ = "foo3", "foo2", "foo1"  # NB: an implicit tuple (without parens)
    |
@@ -104,12 +104,12 @@ RUF023.py:18:21: RUF023 [*] `Klass2.__slots__` is not sorted
 20 20 |         __slots__ = "foo3", "foo2", "foo1"  # NB: an implicit tuple (without parens)
 21 21 | 
 
-RUF023.py:20:21: RUF023 [*] `Klass2.__slots__` is not sorted
+RUF023.py:20:21: RUF023 (unsorted-dunder-slots) [*] `Klass2.__slots__` is not sorted
    |
 18 |         __slots__ = {"x": "docs for x", "m": "docs for m", "a": "docs for a"}
 19 |     else:
 20 |         __slots__ = "foo3", "foo2", "foo1"  # NB: an implicit tuple (without parens)
-   |                     ^^^^^^^^^^^^^^^^^^^^^^ RUF023
+   |                     ^^^^^^^^^^^^^^^^^^^^^^ RUF023 (unsorted-dunder-slots)
 21 | 
 22 |     __slots__: list[str] = ["the", "three", "little", "pigs"]
    |
@@ -125,12 +125,12 @@ RUF023.py:20:21: RUF023 [*] `Klass2.__slots__` is not sorted
 22 22 |     __slots__: list[str] = ["the", "three", "little", "pigs"]
 23 23 |     __slots__ = ("parenthesized_item"), "in", ("an_unparenthesized_tuple")
 
-RUF023.py:22:28: RUF023 [*] `Klass2.__slots__` is not sorted
+RUF023.py:22:28: RUF023 (unsorted-dunder-slots) [*] `Klass2.__slots__` is not sorted
    |
 20 |         __slots__ = "foo3", "foo2", "foo1"  # NB: an implicit tuple (without parens)
 21 | 
 22 |     __slots__: list[str] = ["the", "three", "little", "pigs"]
-   |                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF023
+   |                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF023 (unsorted-dunder-slots)
 23 |     __slots__ = ("parenthesized_item"), "in", ("an_unparenthesized_tuple")
 24 |     # we use natural sort,
    |
@@ -146,11 +146,11 @@ RUF023.py:22:28: RUF023 [*] `Klass2.__slots__` is not sorted
 24 24 |     # we use natural sort,
 25 25 |     # not alphabetical sort or "isort-style" sort
 
-RUF023.py:23:17: RUF023 [*] `Klass2.__slots__` is not sorted
+RUF023.py:23:17: RUF023 (unsorted-dunder-slots) [*] `Klass2.__slots__` is not sorted
    |
 22 |     __slots__: list[str] = ["the", "three", "little", "pigs"]
 23 |     __slots__ = ("parenthesized_item"), "in", ("an_unparenthesized_tuple")
-   |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF023
+   |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF023 (unsorted-dunder-slots)
 24 |     # we use natural sort,
 25 |     # not alphabetical sort or "isort-style" sort
    |
@@ -166,12 +166,12 @@ RUF023.py:23:17: RUF023 [*] `Klass2.__slots__` is not sorted
 25 25 |     # not alphabetical sort or "isort-style" sort
 26 26 |     __slots__ = {"aadvark237", "aadvark10092", "aadvark174", "aadvark532"}
 
-RUF023.py:26:17: RUF023 [*] `Klass2.__slots__` is not sorted
+RUF023.py:26:17: RUF023 (unsorted-dunder-slots) [*] `Klass2.__slots__` is not sorted
    |
 24 |     # we use natural sort,
 25 |     # not alphabetical sort or "isort-style" sort
 26 |     __slots__ = {"aadvark237", "aadvark10092", "aadvark174", "aadvark532"}
-   |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF023
+   |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF023 (unsorted-dunder-slots)
 27 | 
 28 | ############################
    |
@@ -187,7 +187,7 @@ RUF023.py:26:17: RUF023 [*] `Klass2.__slots__` is not sorted
 28 28 | ############################
 29 29 | # Neat multiline definitions
 
-RUF023.py:33:17: RUF023 [*] `Klass3.__slots__` is not sorted
+RUF023.py:33:17: RUF023 (unsorted-dunder-slots) [*] `Klass3.__slots__` is not sorted
    |
 32 |   class Klass3:
 33 |       __slots__ = (
@@ -198,7 +198,7 @@ RUF023.py:33:17: RUF023 [*] `Klass3.__slots__` is not sorted
 37 | |         # a comment regarding 'a0':
 38 | |         "a0"
 39 | |     )
-   | |_____^ RUF023
+   | |_____^ RUF023 (unsorted-dunder-slots)
 40 |       __slots__ = [
 41 |           "d",
    |
@@ -221,7 +221,7 @@ RUF023.py:33:17: RUF023 [*] `Klass3.__slots__` is not sorted
 40 40 |     __slots__ = [
 41 41 |         "d",
 
-RUF023.py:40:17: RUF023 [*] `Klass3.__slots__` is not sorted
+RUF023.py:40:17: RUF023 (unsorted-dunder-slots) [*] `Klass3.__slots__` is not sorted
    |
 38 |           "a0"
 39 |       )
@@ -233,7 +233,7 @@ RUF023.py:40:17: RUF023 [*] `Klass3.__slots__` is not sorted
 44 | |         # a comment regarding 'a':
 45 | |         "a"
 46 | |     ]
-   | |_____^ RUF023
+   | |_____^ RUF023 (unsorted-dunder-slots)
 47 |   
 48 |   ##################################
    |
@@ -256,7 +256,7 @@ RUF023.py:40:17: RUF023 [*] `Klass3.__slots__` is not sorted
 47 47 | 
 48 48 | ##################################
 
-RUF023.py:54:17: RUF023 [*] `Klass4.__slots__` is not sorted
+RUF023.py:54:17: RUF023 (unsorted-dunder-slots) [*] `Klass4.__slots__` is not sorted
    |
 52 |   class Klass4:
 53 |       # comment0
@@ -269,7 +269,7 @@ RUF023.py:54:17: RUF023 [*] `Klass4.__slots__` is not sorted
 59 | |         "formatted",
 60 | |         # comment5
 61 | |     )  # comment6
-   | |_____^ RUF023
+   | |_____^ RUF023 (unsorted-dunder-slots)
 62 |       # comment7
    |
    = help: Apply a natural sort to `Klass4.__slots__`
@@ -296,7 +296,7 @@ RUF023.py:54:17: RUF023 [*] `Klass4.__slots__` is not sorted
 61 64 |     )  # comment6
 62 65 |     # comment7
 
-RUF023.py:64:17: RUF023 [*] `Klass4.__slots__` is not sorted
+RUF023.py:64:17: RUF023 (unsorted-dunder-slots) [*] `Klass4.__slots__` is not sorted
    |
 62 |       # comment7
 63 |   
@@ -309,7 +309,7 @@ RUF023.py:64:17: RUF023 [*] `Klass4.__slots__` is not sorted
 69 | |         # comment5
 70 | |         # comment6
 71 | |     ]  # comment7
-   | |_____^ RUF023
+   | |_____^ RUF023 (unsorted-dunder-slots)
 72 |   
 73 |   # from cpython/Lib/pathlib/__init__.py
    |
@@ -330,7 +330,7 @@ RUF023.py:64:17: RUF023 [*] `Klass4.__slots__` is not sorted
 69 72 |         # comment5
 70 73 |         # comment6
 
-RUF023.py:75:17: RUF023 [*] `PurePath.__slots__` is not sorted
+RUF023.py:75:17: RUF023 (unsorted-dunder-slots) [*] `PurePath.__slots__` is not sorted
     |
  73 |   # from cpython/Lib/pathlib/__init__.py
  74 |   class PurePath:
@@ -370,7 +370,7 @@ RUF023.py:75:17: RUF023 [*] `PurePath.__slots__` is not sorted
 107 | |         # path. It's set when `__hash__()` is called for the first time.
 108 | |         '_hash',
 109 | |     )
-    | |_____^ RUF023
+    | |_____^ RUF023 (unsorted-dunder-slots)
 110 |   
 111 |   # From cpython/Lib/pickletools.py
     |
@@ -431,7 +431,7 @@ RUF023.py:75:17: RUF023 [*] `PurePath.__slots__` is not sorted
 110 107 | 
 111 108 | # From cpython/Lib/pickletools.py
 
-RUF023.py:113:17: RUF023 [*] `ArgumentDescriptor.__slots__` is not sorted
+RUF023.py:113:17: RUF023 (unsorted-dunder-slots) [*] `ArgumentDescriptor.__slots__` is not sorted
     |
 111 |   # From cpython/Lib/pickletools.py
 112 |   class ArgumentDescriptor(object):
@@ -453,7 +453,7 @@ RUF023.py:113:17: RUF023 [*] `ArgumentDescriptor.__slots__` is not sorted
 127 | |         # human-readable docs for this arg descriptor; a string
 128 | |         'doc',
 129 | |     )
-    | |_____^ RUF023
+    | |_____^ RUF023 (unsorted-dunder-slots)
 130 |   
 131 |   ####################################
     |
@@ -486,20 +486,20 @@ RUF023.py:113:17: RUF023 [*] `ArgumentDescriptor.__slots__` is not sorted
 130 127 | 
 131 128 | ####################################
 
-RUF023.py:138:17: RUF023 `SlotUser.__slots__` is not sorted
+RUF023.py:138:17: RUF023 (unsorted-dunder-slots) `SlotUser.__slots__` is not sorted
     |
 136 |   # Multiline dicts are out of scope.
 137 |   class SlotUser:
 138 |       __slots__ = {'power': 'measured in kilowatts',
     |  _________________^
 139 | |                  'distance': 'measured in kilometers'}
-    | |______________________________________________________^ RUF023
+    | |______________________________________________________^ RUF023 (unsorted-dunder-slots)
 140 |   
 141 |   class Klass5:
     |
     = help: Apply a natural sort to `SlotUser.__slots__`
 
-RUF023.py:142:17: RUF023 `Klass5.__slots__` is not sorted
+RUF023.py:142:17: RUF023 (unsorted-dunder-slots) `Klass5.__slots__` is not sorted
     |
 141 |   class Klass5:
 142 |       __slots__ = (
@@ -509,13 +509,13 @@ RUF023.py:142:17: RUF023 `Klass5.__slots__` is not sorted
 145 | |             "a_veeeeeeeeeeeeeeeeeeery_long_parenthesized_item"
 146 | |         ),
 147 | |     )
-    | |_____^ RUF023
+    | |_____^ RUF023 (unsorted-dunder-slots)
 148 |       __slots__ = (
 149 |           "b",
     |
     = help: Apply a natural sort to `Klass5.__slots__`
 
-RUF023.py:148:17: RUF023 `Klass5.__slots__` is not sorted
+RUF023.py:148:17: RUF023 (unsorted-dunder-slots) `Klass5.__slots__` is not sorted
     |
 146 |           ),
 147 |       )
@@ -527,29 +527,29 @@ RUF023.py:148:17: RUF023 `Klass5.__slots__` is not sorted
 152 | |         )),
 153 | |         "a"
 154 | |     )
-    | |_____^ RUF023
+    | |_____^ RUF023 (unsorted-dunder-slots)
 155 |       __slots__ = ("don't" "care" "about", "__slots__" "with", "concatenated" "strings")
     |
     = help: Apply a natural sort to `Klass5.__slots__`
 
-RUF023.py:155:17: RUF023 `Klass5.__slots__` is not sorted
+RUF023.py:155:17: RUF023 (unsorted-dunder-slots) `Klass5.__slots__` is not sorted
     |
 153 |         "a"
 154 |     )
 155 |     __slots__ = ("don't" "care" "about", "__slots__" "with", "concatenated" "strings")
-    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF023
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF023 (unsorted-dunder-slots)
 156 | 
 157 | ############################################################
     |
     = help: Apply a natural sort to `Klass5.__slots__`
 
-RUF023.py:162:17: RUF023 [*] `BezierBuilder.__slots__` is not sorted
+RUF023.py:162:17: RUF023 (unsorted-dunder-slots) [*] `BezierBuilder.__slots__` is not sorted
     |
 161 |   class BezierBuilder:
 162 |       __slots__ = ('xp', 'yp',
     |  _________________^
 163 | |                  'canvas',)
-    | |___________________________^ RUF023
+    | |___________________________^ RUF023 (unsorted-dunder-slots)
 164 |   
 165 |   class BezierBuilder2:
     |
@@ -570,13 +570,13 @@ RUF023.py:162:17: RUF023 [*] `BezierBuilder.__slots__` is not sorted
 165 168 | class BezierBuilder2:
 166 169 |     __slots__ = {'xp', 'yp',
 
-RUF023.py:166:17: RUF023 [*] `BezierBuilder2.__slots__` is not sorted
+RUF023.py:166:17: RUF023 (unsorted-dunder-slots) [*] `BezierBuilder2.__slots__` is not sorted
     |
 165 |   class BezierBuilder2:
 166 |       __slots__ = {'xp', 'yp',
     |  _________________^
 167 | |                  'canvas'      ,          }
-    | |___________________________________________^ RUF023
+    | |___________________________________________^ RUF023 (unsorted-dunder-slots)
 168 |   
 169 |   class BezierBuilder3:
     |
@@ -596,7 +596,7 @@ RUF023.py:166:17: RUF023 [*] `BezierBuilder2.__slots__` is not sorted
 169 171 | class BezierBuilder3:
 170 172 |     __slots__ = ['xp', 'yp',
 
-RUF023.py:170:17: RUF023 [*] `BezierBuilder3.__slots__` is not sorted
+RUF023.py:170:17: RUF023 (unsorted-dunder-slots) [*] `BezierBuilder3.__slots__` is not sorted
     |
 169 |   class BezierBuilder3:
 170 |       __slots__ = ['xp', 'yp',
@@ -609,7 +609,7 @@ RUF023.py:170:17: RUF023 [*] `BezierBuilder3.__slots__` is not sorted
 176 | | 
 177 | |                  # another strangely placed comment
 178 | |                  ]
-    | |__________________^ RUF023
+    | |__________________^ RUF023 (unsorted-dunder-slots)
 179 |   
 180 |   class BezierBuilder4:
     |
@@ -629,7 +629,7 @@ RUF023.py:170:17: RUF023 [*] `BezierBuilder3.__slots__` is not sorted
 173 175 |                  # very strangely placed comment
 174 176 | 
 
-RUF023.py:181:17: RUF023 [*] `BezierBuilder4.__slots__` is not sorted
+RUF023.py:181:17: RUF023 (unsorted-dunder-slots) [*] `BezierBuilder4.__slots__` is not sorted
     |
 180 |   class BezierBuilder4:
 181 |       __slots__ = (
@@ -642,7 +642,7 @@ RUF023.py:181:17: RUF023 [*] `BezierBuilder4.__slots__` is not sorted
 187 | |         # strange comment 2
 188 | |         ,
 189 | |     )
-    | |_____^ RUF023
+    | |_____^ RUF023 (unsorted-dunder-slots)
 190 |   
 191 |       __slots__ = {"foo", "bar",
     |
@@ -663,7 +663,7 @@ RUF023.py:181:17: RUF023 [*] `BezierBuilder4.__slots__` is not sorted
 188 187 |         ,
 189 188 |     )
 
-RUF023.py:191:17: RUF023 [*] `BezierBuilder4.__slots__` is not sorted
+RUF023.py:191:17: RUF023 (unsorted-dunder-slots) [*] `BezierBuilder4.__slots__` is not sorted
     |
 189 |       )
 190 |   
@@ -671,7 +671,7 @@ RUF023.py:191:17: RUF023 [*] `BezierBuilder4.__slots__` is not sorted
     |  _________________^
 192 | |                  "baz", "bingo"
 193 | |                  }
-    | |__________________^ RUF023
+    | |__________________^ RUF023 (unsorted-dunder-slots)
 194 |   
 195 |   ###################################
     |
@@ -693,5 +693,3 @@ RUF023.py:191:17: RUF023 [*] `BezierBuilder4.__slots__` is not sorted
 194 197 | 
 195 198 | ###################################
 196 199 | # These should all not get flagged:
-
-

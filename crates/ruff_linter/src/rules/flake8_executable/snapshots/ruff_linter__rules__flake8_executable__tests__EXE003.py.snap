@@ -1,11 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_executable/mod.rs
 ---
-EXE003.py:1:1: EXE003 Shebang should contain `python`
+EXE003.py:1:1: EXE003 (shebang-missing-python) Shebang should contain `python`
   |
 1 | #!/usr/bin/bash
-  | ^^^^^^^^^^^^^^^ EXE003
+  | ^^^^^^^^^^^^^^^ EXE003 (shebang-missing-python)
 2 | print("hello world")
   |
-
-

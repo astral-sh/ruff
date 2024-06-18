@@ -1,0 +1,27 @@
+---
+source: crates/ruff_linter/src/noqa.rs
+expression: "Directive::try_extract(source, TextSize::default())"
+---
+Ok(
+    Some(
+        Codes(
+            Codes {
+                range: 0..29,
+                codes: [
+                    RuleIdent {
+                        identifier: Code(
+                            "F401",
+                        ),
+                        range: 8..12,
+                    },
+                    RuleIdent {
+                        identifier: Name(
+                            "unused-variable",
+                        ),
+                        range: 14..29,
+                    },
+                ],
+            },
+        ),
+    ),
+)

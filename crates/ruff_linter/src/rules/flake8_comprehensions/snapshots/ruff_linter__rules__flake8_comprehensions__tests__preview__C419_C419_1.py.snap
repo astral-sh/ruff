@@ -1,10 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_comprehensions/mod.rs
 ---
-C419_1.py:1:5: C419 [*] Unnecessary list comprehension
+C419_1.py:1:5: C419 (unnecessary-comprehension-in-call) [*] Unnecessary list comprehension
   |
 1 | sum([x.val for x in bar])
-  |     ^^^^^^^^^^^^^^^^^^^^ C419
+  |     ^^^^^^^^^^^^^^^^^^^^ C419 (unnecessary-comprehension-in-call)
 2 | min([x.val for x in bar])
 3 | max([x.val for x in bar])
   |
@@ -17,11 +17,11 @@ C419_1.py:1:5: C419 [*] Unnecessary list comprehension
 3 3 | max([x.val for x in bar])
 4 4 | 
 
-C419_1.py:2:5: C419 [*] Unnecessary list comprehension
+C419_1.py:2:5: C419 (unnecessary-comprehension-in-call) [*] Unnecessary list comprehension
   |
 1 | sum([x.val for x in bar])
 2 | min([x.val for x in bar])
-  |     ^^^^^^^^^^^^^^^^^^^^ C419
+  |     ^^^^^^^^^^^^^^^^^^^^ C419 (unnecessary-comprehension-in-call)
 3 | max([x.val for x in bar])
   |
   = help: Remove unnecessary list comprehension
@@ -34,12 +34,12 @@ C419_1.py:2:5: C419 [*] Unnecessary list comprehension
 4 4 | 
 5 5 | # Ok
 
-C419_1.py:3:5: C419 [*] Unnecessary list comprehension
+C419_1.py:3:5: C419 (unnecessary-comprehension-in-call) [*] Unnecessary list comprehension
   |
 1 | sum([x.val for x in bar])
 2 | min([x.val for x in bar])
 3 | max([x.val for x in bar])
-  |     ^^^^^^^^^^^^^^^^^^^^ C419
+  |     ^^^^^^^^^^^^^^^^^^^^ C419 (unnecessary-comprehension-in-call)
 4 | 
 5 | # Ok
   |

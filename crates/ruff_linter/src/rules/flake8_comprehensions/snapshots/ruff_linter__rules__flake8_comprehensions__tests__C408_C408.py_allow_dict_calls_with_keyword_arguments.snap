@@ -1,10 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_comprehensions/mod.rs
 ---
-C408.py:1:5: C408 [*] Unnecessary `tuple` call (rewrite as a literal)
+C408.py:1:5: C408 (unnecessary-collection-call) [*] Unnecessary `tuple` call (rewrite as a literal)
   |
 1 | t = tuple()
-  |     ^^^^^^^ C408
+  |     ^^^^^^^ C408 (unnecessary-collection-call)
 2 | l = list()
 3 | d1 = dict()
   |
@@ -17,11 +17,11 @@ C408.py:1:5: C408 [*] Unnecessary `tuple` call (rewrite as a literal)
 3 3 | d1 = dict()
 4 4 | d2 = dict(a=1)
 
-C408.py:2:5: C408 [*] Unnecessary `list` call (rewrite as a literal)
+C408.py:2:5: C408 (unnecessary-collection-call) [*] Unnecessary `list` call (rewrite as a literal)
   |
 1 | t = tuple()
 2 | l = list()
-  |     ^^^^^^ C408
+  |     ^^^^^^ C408 (unnecessary-collection-call)
 3 | d1 = dict()
 4 | d2 = dict(a=1)
   |
@@ -35,12 +35,12 @@ C408.py:2:5: C408 [*] Unnecessary `list` call (rewrite as a literal)
 4 4 | d2 = dict(a=1)
 5 5 | d3 = dict(**d2)
 
-C408.py:3:6: C408 [*] Unnecessary `dict` call (rewrite as a literal)
+C408.py:3:6: C408 (unnecessary-collection-call) [*] Unnecessary `dict` call (rewrite as a literal)
   |
 1 | t = tuple()
 2 | l = list()
 3 | d1 = dict()
-  |      ^^^^^^ C408
+  |      ^^^^^^ C408 (unnecessary-collection-call)
 4 | d2 = dict(a=1)
 5 | d3 = dict(**d2)
   |
@@ -55,12 +55,12 @@ C408.py:3:6: C408 [*] Unnecessary `dict` call (rewrite as a literal)
 5 5 | d3 = dict(**d2)
 6 6 | 
 
-C408.py:16:4: C408 [*] Unnecessary `dict` call (rewrite as a literal)
+C408.py:16:4: C408 (unnecessary-collection-call) [*] Unnecessary `dict` call (rewrite as a literal)
    |
 14 | f"{dict(x='y')}"
 15 | f'{dict(x="y")}'
 16 | f"{dict()}"
-   |    ^^^^^^ C408
+   |    ^^^^^^ C408 (unnecessary-collection-call)
 17 | f"a {dict()} b"
    |
    = help: Rewrite as a literal
@@ -75,12 +75,12 @@ C408.py:16:4: C408 [*] Unnecessary `dict` call (rewrite as a literal)
 18 18 | 
 19 19 | f"{dict(x='y') | dict(y='z')}"
 
-C408.py:17:6: C408 [*] Unnecessary `dict` call (rewrite as a literal)
+C408.py:17:6: C408 (unnecessary-collection-call) [*] Unnecessary `dict` call (rewrite as a literal)
    |
 15 | f'{dict(x="y")}'
 16 | f"{dict()}"
 17 | f"a {dict()} b"
-   |      ^^^^^^ C408
+   |      ^^^^^^ C408 (unnecessary-collection-call)
 18 | 
 19 | f"{dict(x='y') | dict(y='z')}"
    |
@@ -96,14 +96,14 @@ C408.py:17:6: C408 [*] Unnecessary `dict` call (rewrite as a literal)
 19 19 | f"{dict(x='y') | dict(y='z')}"
 20 20 | f"{ dict(x='y') | dict(y='z') }"
 
-C408.py:24:1: C408 [*] Unnecessary `dict` call (rewrite as a literal)
+C408.py:24:1: C408 (unnecessary-collection-call) [*] Unnecessary `dict` call (rewrite as a literal)
    |
 22 |   f"a { dict(x='y') | dict(y='z') } b"
 23 |   
 24 | / dict(
 25 | |     # comment
 26 | | )
-   | |_^ C408
+   | |_^ C408 (unnecessary-collection-call)
 27 |   
 28 |   tuple(  # comment
    |
@@ -122,13 +122,13 @@ C408.py:24:1: C408 [*] Unnecessary `dict` call (rewrite as a literal)
 28 28 | tuple(  # comment
 29 29 | )
 
-C408.py:28:1: C408 [*] Unnecessary `tuple` call (rewrite as a literal)
+C408.py:28:1: C408 (unnecessary-collection-call) [*] Unnecessary `tuple` call (rewrite as a literal)
    |
 26 |   )
 27 |   
 28 | / tuple(  # comment
 29 | | )
-   | |_^ C408
+   | |_^ C408 (unnecessary-collection-call)
    |
    = help: Rewrite as a literal
 
@@ -139,5 +139,3 @@ C408.py:28:1: C408 [*] Unnecessary `tuple` call (rewrite as a literal)
 28    |-tuple(  # comment
    28 |+(  # comment
 29 29 | )
-
-

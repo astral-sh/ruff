@@ -1,10 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
 ---
-off.py:1:1: I002 [*] Missing required import: `from __future__ import annotations as _annotations`
+off.py:1:1: I002 (missing-required-import) [*] Missing required import: `from __future__ import annotations as _annotations`
   |
 1 | # isort: off
-  |  I002
+  |  I002 (missing-required-import)
 2 | 
 3 | x = 1
   |
@@ -16,5 +16,3 @@ off.py:1:1: I002 [*] Missing required import: `from __future__ import annotation
 2 3 | 
 3 4 | x = 1
 4 5 | # isort: on
-
-

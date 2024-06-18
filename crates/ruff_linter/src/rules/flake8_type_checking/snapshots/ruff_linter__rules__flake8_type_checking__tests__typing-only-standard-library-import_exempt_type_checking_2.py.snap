@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
 ---
-exempt_type_checking_2.py:5:20: TCH003 [*] Move standard library import `typing.Final` into a type-checking block
+exempt_type_checking_2.py:5:20: TCH003 (typing-only-standard-library-import) [*] Move standard library import `typing.Final` into a type-checking block
   |
 3 | from __future__ import annotations
 4 | 
 5 | from typing import Final, TYPE_CHECKING
-  |                    ^^^^^ TCH003
+  |                    ^^^^^ TCH003 (typing-only-standard-library-import)
 6 | 
 7 | Const: Final[dict] = {}
   |
@@ -23,5 +23,3 @@ exempt_type_checking_2.py:5:20: TCH003 [*] Move standard library import `typing.
   8 |+    from typing import Final
 6 9 | 
 7 10 | Const: Final[dict] = {}
-
-

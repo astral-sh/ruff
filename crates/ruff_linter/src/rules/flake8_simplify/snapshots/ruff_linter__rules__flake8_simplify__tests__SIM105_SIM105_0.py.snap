@@ -1,14 +1,14 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_simplify/mod.rs
 ---
-SIM105_0.py:6:1: SIM105 [*] Use `contextlib.suppress(ValueError)` instead of `try`-`except`-`pass`
+SIM105_0.py:6:1: SIM105 (suppressible-exception) [*] Use `contextlib.suppress(ValueError)` instead of `try`-`except`-`pass`
   |
 5 |   # SIM105
 6 | / try:
 7 | |     foo()
 8 | | except ValueError:
 9 | |     pass
-  | |________^ SIM105
+  | |________^ SIM105 (suppressible-exception)
   |
   = help: Replace with `contextlib.suppress(ValueError)`
 
@@ -28,14 +28,14 @@ SIM105_0.py:6:1: SIM105 [*] Use `contextlib.suppress(ValueError)` instead of `tr
 11 10 | 
 12 11 | # SIM105
 
-SIM105_0.py:13:1: SIM105 [*] Use `contextlib.suppress(ValueError, OSError)` instead of `try`-`except`-`pass`
+SIM105_0.py:13:1: SIM105 (suppressible-exception) [*] Use `contextlib.suppress(ValueError, OSError)` instead of `try`-`except`-`pass`
    |
 12 |   # SIM105
 13 | / try:
 14 | |     foo()
 15 | | except (ValueError, OSError):
 16 | |     pass
-   | |________^ SIM105
+   | |________^ SIM105 (suppressible-exception)
 17 |   
 18 |   # SIM105
    |
@@ -59,14 +59,14 @@ SIM105_0.py:13:1: SIM105 [*] Use `contextlib.suppress(ValueError, OSError)` inst
 18 17 | # SIM105
 19 18 | try:
 
-SIM105_0.py:19:1: SIM105 [*] Use `contextlib.suppress(ValueError, OSError)` instead of `try`-`except`-`pass`
+SIM105_0.py:19:1: SIM105 (suppressible-exception) [*] Use `contextlib.suppress(ValueError, OSError)` instead of `try`-`except`-`pass`
    |
 18 |   # SIM105
 19 | / try:
 20 | |     foo()
 21 | | except (ValueError, OSError) as e:
 22 | |     pass
-   | |________^ SIM105
+   | |________^ SIM105 (suppressible-exception)
 23 |   
 24 |   # SIM105
    |
@@ -90,14 +90,14 @@ SIM105_0.py:19:1: SIM105 [*] Use `contextlib.suppress(ValueError, OSError)` inst
 24 23 | # SIM105
 25 24 | try:
 
-SIM105_0.py:25:1: SIM105 [*] Use `contextlib.suppress(Exception)` instead of `try`-`except`-`pass`
+SIM105_0.py:25:1: SIM105 (suppressible-exception) [*] Use `contextlib.suppress(Exception)` instead of `try`-`except`-`pass`
    |
 24 |   # SIM105
 25 | / try:
 26 | |     foo()
 27 | | except:
 28 | |     pass
-   | |________^ SIM105
+   | |________^ SIM105 (suppressible-exception)
 29 |   
 30 |   # SIM105
    |
@@ -121,14 +121,14 @@ SIM105_0.py:25:1: SIM105 [*] Use `contextlib.suppress(Exception)` instead of `tr
 30 29 | # SIM105
 31 30 | try:
 
-SIM105_0.py:31:1: SIM105 [*] Use `contextlib.suppress(a.Error, b.Error)` instead of `try`-`except`-`pass`
+SIM105_0.py:31:1: SIM105 (suppressible-exception) [*] Use `contextlib.suppress(a.Error, b.Error)` instead of `try`-`except`-`pass`
    |
 30 |   # SIM105
 31 | / try:
 32 | |     foo()
 33 | | except (a.Error, b.Error):
 34 | |     pass
-   | |________^ SIM105
+   | |________^ SIM105 (suppressible-exception)
 35 |   
 36 |   # OK
    |
@@ -152,7 +152,7 @@ SIM105_0.py:31:1: SIM105 [*] Use `contextlib.suppress(a.Error, b.Error)` instead
 36 35 | # OK
 37 36 | try:
 
-SIM105_0.py:85:5: SIM105 [*] Use `contextlib.suppress(ValueError)` instead of `try`-`except`-`pass`
+SIM105_0.py:85:5: SIM105 (suppressible-exception) [*] Use `contextlib.suppress(ValueError)` instead of `try`-`except`-`pass`
    |
 83 |   def with_ellipsis():
 84 |       # OK
@@ -161,7 +161,7 @@ SIM105_0.py:85:5: SIM105 [*] Use `contextlib.suppress(ValueError)` instead of `t
 86 | |         foo()
 87 | |     except ValueError:
 88 | |         ...
-   | |___________^ SIM105
+   | |___________^ SIM105 (suppressible-exception)
    |
    = help: Replace with `contextlib.suppress(ValueError)`
 
@@ -183,7 +183,7 @@ SIM105_0.py:85:5: SIM105 [*] Use `contextlib.suppress(ValueError)` instead of `t
 90 89 | 
 91 90 | def with_ellipsis_and_return():
 
-SIM105_0.py:100:5: SIM105 Use `contextlib.suppress(ValueError, OSError)` instead of `try`-`except`-`pass`
+SIM105_0.py:100:5: SIM105 (suppressible-exception) Use `contextlib.suppress(ValueError, OSError)` instead of `try`-`except`-`pass`
     |
  99 |   def with_comment():
 100 |       try:
@@ -191,13 +191,13 @@ SIM105_0.py:100:5: SIM105 Use `contextlib.suppress(ValueError, OSError)` instead
 101 | |         foo()
 102 | |     except (ValueError, OSError):
 103 | |         pass  # Trailing comment.
-    | |____________^ SIM105
+    | |____________^ SIM105 (suppressible-exception)
 104 |   
 105 |   try:
     |
     = help: Replace with `contextlib.suppress(ValueError, OSError)`
 
-SIM105_0.py:117:5: SIM105 [*] Use `contextlib.suppress(OSError)` instead of `try`-`except`-`pass`
+SIM105_0.py:117:5: SIM105 (suppressible-exception) [*] Use `contextlib.suppress(OSError)` instead of `try`-`except`-`pass`
     |
 115 |   # Regression test for: https://github.com/astral-sh/ruff/issues/7123
 116 |   def write_models(directory, Models):
@@ -206,7 +206,7 @@ SIM105_0.py:117:5: SIM105 [*] Use `contextlib.suppress(OSError)` instead of `try
 118 | |         os.makedirs(model_dir);
 119 | |     except OSError:
 120 | |         pass;
-    | |____________^ SIM105
+    | |____________^ SIM105 (suppressible-exception)
 121 |   
 122 |       try: os.makedirs(model_dir);
     |
@@ -230,7 +230,7 @@ SIM105_0.py:117:5: SIM105 [*] Use `contextlib.suppress(OSError)` instead of `try
 122 121 |     try: os.makedirs(model_dir);
 123 122 |     except OSError:
 
-SIM105_0.py:122:5: SIM105 [*] Use `contextlib.suppress(OSError)` instead of `try`-`except`-`pass`
+SIM105_0.py:122:5: SIM105 (suppressible-exception) [*] Use `contextlib.suppress(OSError)` instead of `try`-`except`-`pass`
     |
 120 |           pass;
 121 |   
@@ -238,7 +238,7 @@ SIM105_0.py:122:5: SIM105 [*] Use `contextlib.suppress(OSError)` instead of `try
     |  _____^
 123 | |     except OSError:
 124 | |         pass;
-    | |____________^ SIM105
+    | |____________^ SIM105 (suppressible-exception)
 125 |   
 126 |       try: os.makedirs(model_dir);
     |
@@ -261,7 +261,7 @@ SIM105_0.py:122:5: SIM105 [*] Use `contextlib.suppress(OSError)` instead of `try
 126 125 |     try: os.makedirs(model_dir);
 127 126 |     except OSError:
 
-SIM105_0.py:126:5: SIM105 [*] Use `contextlib.suppress(OSError)` instead of `try`-`except`-`pass`
+SIM105_0.py:126:5: SIM105 (suppressible-exception) [*] Use `contextlib.suppress(OSError)` instead of `try`-`except`-`pass`
     |
 124 |           pass;
 125 |   
@@ -269,7 +269,7 @@ SIM105_0.py:126:5: SIM105 [*] Use `contextlib.suppress(OSError)` instead of `try
     |  _____^
 127 | |     except OSError:
 128 | |         pass; \
-    | |____________^ SIM105
+    | |____________^ SIM105 (suppressible-exception)
 129 |               \
 130 |               #
     |
@@ -290,5 +290,3 @@ SIM105_0.py:126:5: SIM105 [*] Use `contextlib.suppress(OSError)` instead of `try
     127 |+    with contextlib.suppress(OSError): os.makedirs(model_dir);
 129 128 |             \
 130 129 |             #
-
-

@@ -36,7 +36,7 @@ fn ensure_show_source_is_deprecated() {
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:1: E741 Ambiguous variable name: `l`
+    -:1:1: E741 (ambiguous-variable-name) Ambiguous variable name: `l`
     Found 1 error.
 
     ----- stderr -----
@@ -50,7 +50,7 @@ fn ensure_no_show_source_is_deprecated() {
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:1: E741 Ambiguous variable name: `l`
+    -:1:1: E741 (ambiguous-variable-name) Ambiguous variable name: `l`
     Found 1 error.
 
     ----- stderr -----
@@ -64,7 +64,7 @@ fn ensure_output_format_is_deprecated() {
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:1: E741 Ambiguous variable name: `l`
+    -:1:1: E741 (ambiguous-variable-name) Ambiguous variable name: `l`
     Found 1 error.
 
     ----- stderr -----
@@ -78,7 +78,7 @@ fn ensure_output_format_overrides_show_source() {
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:1: E741 Ambiguous variable name: `l`
+    -:1:1: E741 (ambiguous-variable-name) Ambiguous variable name: `l`
     Found 1 error.
 
     ----- stderr -----
@@ -92,10 +92,10 @@ fn ensure_full_output_format_overrides_no_show_source() {
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:1: E741 Ambiguous variable name: `l`
+    -:1:1: E741 (ambiguous-variable-name) Ambiguous variable name: `l`
       |
     1 | l = 1
-      | ^ E741
+      | ^ E741 (ambiguous-variable-name)
       |
 
     Found 1 error.
@@ -111,7 +111,7 @@ fn ensure_output_format_uses_concise_over_no_show_source() {
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:1: E741 Ambiguous variable name: `l`
+    -:1:1: E741 (ambiguous-variable-name) Ambiguous variable name: `l`
     Found 1 error.
 
     ----- stderr -----
@@ -125,7 +125,7 @@ fn ensure_deprecated_output_format_overrides_show_source() {
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:1: E741 Ambiguous variable name: `l`
+    -:1:1: E741 (ambiguous-variable-name) Ambiguous variable name: `l`
     Found 1 error.
 
     ----- stderr -----
@@ -140,7 +140,7 @@ fn ensure_deprecated_output_format_overrides_no_show_source() {
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:1: E741 Ambiguous variable name: `l`
+    -:1:1: E741 (ambiguous-variable-name) Ambiguous variable name: `l`
     Found 1 error.
 
     ----- stderr -----

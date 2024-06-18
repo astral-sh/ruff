@@ -1,10 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_copyright/mod.rs
 ---
-<filename>:1:1: CPY001 Missing copyright notice at top of file
+<filename>:1:1: CPY001 (missing-copyright-notice) Missing copyright notice at top of file
   |
 1 | # Copyright (C) 2022 - 2023 Ruff
-  |  CPY001
+  |  CPY001 (missing-copyright-notice)
 2 | 
 3 | import os
   |

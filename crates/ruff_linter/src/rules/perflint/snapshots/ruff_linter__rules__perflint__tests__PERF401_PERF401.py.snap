@@ -1,34 +1,34 @@
 ---
 source: crates/ruff_linter/src/rules/perflint/mod.rs
 ---
-PERF401.py:6:13: PERF401 Use a list comprehension to create a transformed list
+PERF401.py:6:13: PERF401 (manual-list-comprehension) Use a list comprehension to create a transformed list
   |
 4 |     for i in items:
 5 |         if i % 2:
 6 |             result.append(i)  # PERF401
-  |             ^^^^^^^^^^^^^^^^ PERF401
+  |             ^^^^^^^^^^^^^^^^ PERF401 (manual-list-comprehension)
   |
 
-PERF401.py:13:9: PERF401 Use a list comprehension to create a transformed list
+PERF401.py:13:9: PERF401 (manual-list-comprehension) Use a list comprehension to create a transformed list
    |
 11 |     result = []
 12 |     for i in items:
 13 |         result.append(i * i)  # PERF401
-   |         ^^^^^^^^^^^^^^^^^^^^ PERF401
+   |         ^^^^^^^^^^^^^^^^^^^^ PERF401 (manual-list-comprehension)
    |
 
-PERF401.py:82:13: PERF401 Use an async list comprehension to create a transformed list
+PERF401.py:82:13: PERF401 (manual-list-comprehension) Use an async list comprehension to create a transformed list
    |
 80 |     async for i in items:
 81 |         if i % 2:
 82 |             result.append(i)  # PERF401
-   |             ^^^^^^^^^^^^^^^^ PERF401
+   |             ^^^^^^^^^^^^^^^^ PERF401 (manual-list-comprehension)
    |
 
-PERF401.py:89:9: PERF401 Use an async list comprehension to create a transformed list
+PERF401.py:89:9: PERF401 (manual-list-comprehension) Use an async list comprehension to create a transformed list
    |
 87 |     result = []
 88 |     async for i in items:
 89 |         result.append(i)  # PERF401
-   |         ^^^^^^^^^^^^^^^^ PERF401
+   |         ^^^^^^^^^^^^^^^^ PERF401 (manual-list-comprehension)
    |

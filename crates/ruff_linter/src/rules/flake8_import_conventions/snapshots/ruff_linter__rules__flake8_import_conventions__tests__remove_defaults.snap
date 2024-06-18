@@ -1,88 +1,86 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_import_conventions/mod.rs
 ---
-remove_default.py:3:8: ICN001 `altair` should be imported as `alt`
+remove_default.py:3:8: ICN001 (unconventional-import-alias) `altair` should be imported as `alt`
   |
 1 | import math  # not checked
 2 | 
 3 | import altair  # unconventional
-  |        ^^^^^^ ICN001
+  |        ^^^^^^ ICN001 (unconventional-import-alias)
 4 | import matplotlib.pyplot  # unconventional
 5 | import numpy  # not checked
   |
   = help: Alias `altair` to `alt`
 
-remove_default.py:4:8: ICN001 `matplotlib.pyplot` should be imported as `plt`
+remove_default.py:4:8: ICN001 (unconventional-import-alias) `matplotlib.pyplot` should be imported as `plt`
   |
 3 | import altair  # unconventional
 4 | import matplotlib.pyplot  # unconventional
-  |        ^^^^^^^^^^^^^^^^^ ICN001
+  |        ^^^^^^^^^^^^^^^^^ ICN001 (unconventional-import-alias)
 5 | import numpy  # not checked
 6 | import pandas  # unconventional
   |
   = help: Alias `matplotlib.pyplot` to `plt`
 
-remove_default.py:6:8: ICN001 `pandas` should be imported as `pd`
+remove_default.py:6:8: ICN001 (unconventional-import-alias) `pandas` should be imported as `pd`
   |
 4 | import matplotlib.pyplot  # unconventional
 5 | import numpy  # not checked
 6 | import pandas  # unconventional
-  |        ^^^^^^ ICN001
+  |        ^^^^^^ ICN001 (unconventional-import-alias)
 7 | import seaborn  # unconventional
   |
   = help: Alias `pandas` to `pd`
 
-remove_default.py:7:8: ICN001 `seaborn` should be imported as `sns`
+remove_default.py:7:8: ICN001 (unconventional-import-alias) `seaborn` should be imported as `sns`
   |
 5 | import numpy  # not checked
 6 | import pandas  # unconventional
 7 | import seaborn  # unconventional
-  |        ^^^^^^^ ICN001
+  |        ^^^^^^^ ICN001 (unconventional-import-alias)
 8 | 
 9 | import altair as altr  # unconventional
   |
   = help: Alias `seaborn` to `sns`
 
-remove_default.py:9:18: ICN001 `altair` should be imported as `alt`
+remove_default.py:9:18: ICN001 (unconventional-import-alias) `altair` should be imported as `alt`
    |
  7 | import seaborn  # unconventional
  8 | 
  9 | import altair as altr  # unconventional
-   |                  ^^^^ ICN001
+   |                  ^^^^ ICN001 (unconventional-import-alias)
 10 | import matplotlib.pyplot as plot  # unconventional
 11 | import numpy as nmp  # not checked
    |
    = help: Alias `altair` to `alt`
 
-remove_default.py:10:29: ICN001 `matplotlib.pyplot` should be imported as `plt`
+remove_default.py:10:29: ICN001 (unconventional-import-alias) `matplotlib.pyplot` should be imported as `plt`
    |
  9 | import altair as altr  # unconventional
 10 | import matplotlib.pyplot as plot  # unconventional
-   |                             ^^^^ ICN001
+   |                             ^^^^ ICN001 (unconventional-import-alias)
 11 | import numpy as nmp  # not checked
 12 | import pandas as pdas  # unconventional
    |
    = help: Alias `matplotlib.pyplot` to `plt`
 
-remove_default.py:12:18: ICN001 `pandas` should be imported as `pd`
+remove_default.py:12:18: ICN001 (unconventional-import-alias) `pandas` should be imported as `pd`
    |
 10 | import matplotlib.pyplot as plot  # unconventional
 11 | import numpy as nmp  # not checked
 12 | import pandas as pdas  # unconventional
-   |                  ^^^^ ICN001
+   |                  ^^^^ ICN001 (unconventional-import-alias)
 13 | import seaborn as sbrn  # unconventional
    |
    = help: Alias `pandas` to `pd`
 
-remove_default.py:13:19: ICN001 `seaborn` should be imported as `sns`
+remove_default.py:13:19: ICN001 (unconventional-import-alias) `seaborn` should be imported as `sns`
    |
 11 | import numpy as nmp  # not checked
 12 | import pandas as pdas  # unconventional
 13 | import seaborn as sbrn  # unconventional
-   |                   ^^^^ ICN001
+   |                   ^^^^ ICN001 (unconventional-import-alias)
 14 | 
 15 | import altair as alt  # conventional
    |
    = help: Alias `seaborn` to `sns`
-
-

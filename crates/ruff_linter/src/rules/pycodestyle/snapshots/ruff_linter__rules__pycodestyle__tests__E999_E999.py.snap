@@ -1,9 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-E999.py:2:9: E999 SyntaxError: Expected an indented block after function definition
+E999.py:2:9: E999 (syntax-error) SyntaxError: Expected an indented block after function definition
   |
 2 | def x():
-  |         ^ E999
+  |         ^ E999 (syntax-error)
 3 | 
   |

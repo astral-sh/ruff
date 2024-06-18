@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/refurb/mod.rs
 ---
-FURB171.py:3:4: FURB171 [*] Membership test against single-item container
+FURB171.py:3:4: FURB171 (single-item-membership-test) [*] Membership test against single-item container
   |
 1 | # Errors.
 2 | 
 3 | if 1 in (1,):
-  |    ^^^^^^^^^ FURB171
+  |    ^^^^^^^^^ FURB171 (single-item-membership-test)
 4 |     print("Single-element tuple")
   |
   = help: Convert to equality test
@@ -20,12 +20,12 @@ FURB171.py:3:4: FURB171 [*] Membership test against single-item container
 5 5 | 
 6 6 | if 1 in [1]:
 
-FURB171.py:6:4: FURB171 [*] Membership test against single-item container
+FURB171.py:6:4: FURB171 (single-item-membership-test) [*] Membership test against single-item container
   |
 4 |     print("Single-element tuple")
 5 | 
 6 | if 1 in [1]:
-  |    ^^^^^^^^ FURB171
+  |    ^^^^^^^^ FURB171 (single-item-membership-test)
 7 |     print("Single-element list")
   |
   = help: Convert to equality test
@@ -40,12 +40,12 @@ FURB171.py:6:4: FURB171 [*] Membership test against single-item container
 8 8 | 
 9 9 | if 1 in {1}:
 
-FURB171.py:9:4: FURB171 [*] Membership test against single-item container
+FURB171.py:9:4: FURB171 (single-item-membership-test) [*] Membership test against single-item container
    |
  7 |     print("Single-element list")
  8 | 
  9 | if 1 in {1}:
-   |    ^^^^^^^^ FURB171
+   |    ^^^^^^^^ FURB171 (single-item-membership-test)
 10 |     print("Single-element set")
    |
    = help: Convert to equality test
@@ -60,12 +60,12 @@ FURB171.py:9:4: FURB171 [*] Membership test against single-item container
 11 11 | 
 12 12 | if "a" in "a":
 
-FURB171.py:12:4: FURB171 [*] Membership test against single-item container
+FURB171.py:12:4: FURB171 (single-item-membership-test) [*] Membership test against single-item container
    |
 10 |     print("Single-element set")
 11 | 
 12 | if "a" in "a":
-   |    ^^^^^^^^^^ FURB171
+   |    ^^^^^^^^^^ FURB171 (single-item-membership-test)
 13 |     print("Single-element string")
    |
    = help: Convert to equality test
@@ -80,12 +80,12 @@ FURB171.py:12:4: FURB171 [*] Membership test against single-item container
 14 14 | 
 15 15 | if 1 not in (1,):
 
-FURB171.py:15:4: FURB171 [*] Membership test against single-item container
+FURB171.py:15:4: FURB171 (single-item-membership-test) [*] Membership test against single-item container
    |
 13 |     print("Single-element string")
 14 | 
 15 | if 1 not in (1,):
-   |    ^^^^^^^^^^^^^ FURB171
+   |    ^^^^^^^^^^^^^ FURB171 (single-item-membership-test)
 16 |     print("Check `not in` membership test")
    |
    = help: Convert to inequality test
@@ -100,12 +100,12 @@ FURB171.py:15:4: FURB171 [*] Membership test against single-item container
 17 17 | 
 18 18 | if not 1 in (1,):
 
-FURB171.py:18:8: FURB171 [*] Membership test against single-item container
+FURB171.py:18:8: FURB171 (single-item-membership-test) [*] Membership test against single-item container
    |
 16 |     print("Check `not in` membership test")
 17 | 
 18 | if not 1 in (1,):
-   |        ^^^^^^^^^ FURB171
+   |        ^^^^^^^^^ FURB171 (single-item-membership-test)
 19 |     print("Check the negated membership test")
    |
    = help: Convert to equality test
@@ -119,5 +119,3 @@ FURB171.py:18:8: FURB171 [*] Membership test against single-item container
 19 19 |     print("Check the negated membership test")
 20 20 | 
 21 21 | # Non-errors.
-
-

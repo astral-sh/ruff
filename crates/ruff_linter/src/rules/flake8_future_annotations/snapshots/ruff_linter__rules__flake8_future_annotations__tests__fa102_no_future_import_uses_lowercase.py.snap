@@ -1,10 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_future_annotations/mod.rs
 ---
-no_future_import_uses_lowercase.py:6:14: FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collection
+no_future_import_uses_lowercase.py:6:14: FA102 (future-required-type-annotation) [*] Missing `from __future__ import annotations`, but uses PEP 585 collection
   |
 6 | def hello(y: dict[str, int]) -> None:
-  |              ^^^^^^^^^^^^^^ FA102
+  |              ^^^^^^^^^^^^^^ FA102 (future-required-type-annotation)
 7 |     del y
   |
   = help: Add `from __future__ import annotations`

@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pie/mod.rs
 ---
-PIE790.py:4:5: PIE790 [*] Unnecessary `pass` statement
+PIE790.py:4:5: PIE790 (unnecessary-placeholder) [*] Unnecessary `pass` statement
   |
 2 |     """buzz"""
 3 | 
 4 |     pass
-  |     ^^^^ PIE790
+  |     ^^^^ PIE790 (unnecessary-placeholder)
   |
   = help: Remove unnecessary `pass`
 
@@ -19,12 +19,12 @@ PIE790.py:4:5: PIE790 [*] Unnecessary `pass` statement
 6 5 | 
 7 6 | if foo:
 
-PIE790.py:9:5: PIE790 [*] Unnecessary `pass` statement
+PIE790.py:9:5: PIE790 (unnecessary-placeholder) [*] Unnecessary `pass` statement
   |
 7 | if foo:
 8 |     """foo"""
 9 |     pass
-  |     ^^^^ PIE790
+  |     ^^^^ PIE790 (unnecessary-placeholder)
   |
   = help: Remove unnecessary `pass`
 
@@ -37,12 +37,12 @@ PIE790.py:9:5: PIE790 [*] Unnecessary `pass` statement
 11 10 | 
 12 11 | def multi_statement() -> None:
 
-PIE790.py:14:5: PIE790 [*] Unnecessary `pass` statement
+PIE790.py:14:5: PIE790 (unnecessary-placeholder) [*] Unnecessary `pass` statement
    |
 12 | def multi_statement() -> None:
 13 |     """This is a function."""
 14 |     pass; print("hello")
-   |     ^^^^ PIE790
+   |     ^^^^ PIE790 (unnecessary-placeholder)
    |
    = help: Remove unnecessary `pass`
 
@@ -56,12 +56,12 @@ PIE790.py:14:5: PIE790 [*] Unnecessary `pass` statement
 16 16 | 
 17 17 | if foo:
 
-PIE790.py:21:5: PIE790 [*] Unnecessary `pass` statement
+PIE790.py:21:5: PIE790 (unnecessary-placeholder) [*] Unnecessary `pass` statement
    |
 19 | else:
 20 |     """bar"""
 21 |     pass
-   |     ^^^^ PIE790
+   |     ^^^^ PIE790 (unnecessary-placeholder)
    |
    = help: Remove unnecessary `pass`
 
@@ -74,12 +74,12 @@ PIE790.py:21:5: PIE790 [*] Unnecessary `pass` statement
 23 22 | 
 24 23 | while True:
 
-PIE790.py:28:5: PIE790 [*] Unnecessary `pass` statement
+PIE790.py:28:5: PIE790 (unnecessary-placeholder) [*] Unnecessary `pass` statement
    |
 26 | else:
 27 |     """bar"""
 28 |     pass
-   |     ^^^^ PIE790
+   |     ^^^^ PIE790 (unnecessary-placeholder)
    |
    = help: Remove unnecessary `pass`
 
@@ -92,12 +92,12 @@ PIE790.py:28:5: PIE790 [*] Unnecessary `pass` statement
 30 29 | 
 31 30 | for _ in range(10):
 
-PIE790.py:35:5: PIE790 [*] Unnecessary `pass` statement
+PIE790.py:35:5: PIE790 (unnecessary-placeholder) [*] Unnecessary `pass` statement
    |
 33 | else:
 34 |     """bar"""
 35 |     pass
-   |     ^^^^ PIE790
+   |     ^^^^ PIE790 (unnecessary-placeholder)
    |
    = help: Remove unnecessary `pass`
 
@@ -110,12 +110,12 @@ PIE790.py:35:5: PIE790 [*] Unnecessary `pass` statement
 37 36 | 
 38 37 | async for _ in range(10):
 
-PIE790.py:42:5: PIE790 [*] Unnecessary `pass` statement
+PIE790.py:42:5: PIE790 (unnecessary-placeholder) [*] Unnecessary `pass` statement
    |
 40 | else:
 41 |     """bar"""
 42 |     pass
-   |     ^^^^ PIE790
+   |     ^^^^ PIE790 (unnecessary-placeholder)
    |
    = help: Remove unnecessary `pass`
 
@@ -128,12 +128,12 @@ PIE790.py:42:5: PIE790 [*] Unnecessary `pass` statement
 44 43 | 
 45 44 | def foo() -> None:
 
-PIE790.py:50:5: PIE790 [*] Unnecessary `pass` statement
+PIE790.py:50:5: PIE790 (unnecessary-placeholder) [*] Unnecessary `pass` statement
    |
 48 |     """
 49 | 
 50 |     pass
-   |     ^^^^ PIE790
+   |     ^^^^ PIE790 (unnecessary-placeholder)
    |
    = help: Remove unnecessary `pass`
 
@@ -146,12 +146,12 @@ PIE790.py:50:5: PIE790 [*] Unnecessary `pass` statement
 52 51 | 
 53 52 | async def foo():
 
-PIE790.py:58:5: PIE790 [*] Unnecessary `pass` statement
+PIE790.py:58:5: PIE790 (unnecessary-placeholder) [*] Unnecessary `pass` statement
    |
 56 |     """
 57 | 
 58 |     pass
-   |     ^^^^ PIE790
+   |     ^^^^ PIE790 (unnecessary-placeholder)
    |
    = help: Remove unnecessary `pass`
 
@@ -164,12 +164,12 @@ PIE790.py:58:5: PIE790 [*] Unnecessary `pass` statement
 60 59 | 
 61 60 | try:
 
-PIE790.py:65:5: PIE790 [*] Unnecessary `pass` statement
+PIE790.py:65:5: PIE790 (unnecessary-placeholder) [*] Unnecessary `pass` statement
    |
 63 |     buzz
 64 |     """
 65 |     pass
-   |     ^^^^ PIE790
+   |     ^^^^ PIE790 (unnecessary-placeholder)
 66 | except ValueError:
 67 |     pass
    |
@@ -184,12 +184,12 @@ PIE790.py:65:5: PIE790 [*] Unnecessary `pass` statement
 67 66 |     pass
 68 67 | 
 
-PIE790.py:74:5: PIE790 [*] Unnecessary `pass` statement
+PIE790.py:74:5: PIE790 (unnecessary-placeholder) [*] Unnecessary `pass` statement
    |
 72 | except ValueError:
 73 |     """bar"""
 74 |     pass
-   |     ^^^^ PIE790
+   |     ^^^^ PIE790 (unnecessary-placeholder)
    |
    = help: Remove unnecessary `pass`
 
@@ -202,12 +202,12 @@ PIE790.py:74:5: PIE790 [*] Unnecessary `pass` statement
 76 75 | 
 77 76 | for _ in range(10):
 
-PIE790.py:79:5: PIE790 [*] Unnecessary `pass` statement
+PIE790.py:79:5: PIE790 (unnecessary-placeholder) [*] Unnecessary `pass` statement
    |
 77 | for _ in range(10):
 78 |     """buzz"""
 79 |     pass
-   |     ^^^^ PIE790
+   |     ^^^^ PIE790 (unnecessary-placeholder)
 80 | 
 81 | async for _ in range(10):
    |
@@ -222,12 +222,12 @@ PIE790.py:79:5: PIE790 [*] Unnecessary `pass` statement
 81 80 | async for _ in range(10):
 82 81 |     """buzz"""
 
-PIE790.py:83:5: PIE790 [*] Unnecessary `pass` statement
+PIE790.py:83:5: PIE790 (unnecessary-placeholder) [*] Unnecessary `pass` statement
    |
 81 | async for _ in range(10):
 82 |     """buzz"""
 83 |     pass
-   |     ^^^^ PIE790
+   |     ^^^^ PIE790 (unnecessary-placeholder)
 84 | 
 85 | while cond:
    |
@@ -242,12 +242,12 @@ PIE790.py:83:5: PIE790 [*] Unnecessary `pass` statement
 85 84 | while cond:
 86 85 |     """buzz"""
 
-PIE790.py:87:5: PIE790 [*] Unnecessary `pass` statement
+PIE790.py:87:5: PIE790 (unnecessary-placeholder) [*] Unnecessary `pass` statement
    |
 85 | while cond:
 86 |     """buzz"""
 87 |     pass
-   |     ^^^^ PIE790
+   |     ^^^^ PIE790 (unnecessary-placeholder)
    |
    = help: Remove unnecessary `pass`
 
@@ -260,12 +260,12 @@ PIE790.py:87:5: PIE790 [*] Unnecessary `pass` statement
 89 88 | 
 90 89 | with bar:
 
-PIE790.py:92:5: PIE790 [*] Unnecessary `pass` statement
+PIE790.py:92:5: PIE790 (unnecessary-placeholder) [*] Unnecessary `pass` statement
    |
 90 | with bar:
 91 |     """buzz"""
 92 |     pass
-   |     ^^^^ PIE790
+   |     ^^^^ PIE790 (unnecessary-placeholder)
 93 | 
 94 | async with bar:
    |
@@ -280,12 +280,12 @@ PIE790.py:92:5: PIE790 [*] Unnecessary `pass` statement
 94 93 | async with bar:
 95 94 |     """buzz"""
 
-PIE790.py:96:5: PIE790 [*] Unnecessary `pass` statement
+PIE790.py:96:5: PIE790 (unnecessary-placeholder) [*] Unnecessary `pass` statement
    |
 94 | async with bar:
 95 |     """buzz"""
 96 |     pass
-   |     ^^^^ PIE790
+   |     ^^^^ PIE790 (unnecessary-placeholder)
    |
    = help: Remove unnecessary `pass`
 
@@ -298,12 +298,12 @@ PIE790.py:96:5: PIE790 [*] Unnecessary `pass` statement
 98 97 | 
 99 98 | def foo() -> None:
 
-PIE790.py:101:5: PIE790 [*] Unnecessary `pass` statement
+PIE790.py:101:5: PIE790 (unnecessary-placeholder) [*] Unnecessary `pass` statement
     |
  99 | def foo() -> None:
 100 |     """buzz"""
 101 |     pass  # bar
-    |     ^^^^ PIE790
+    |     ^^^^ PIE790 (unnecessary-placeholder)
     |
     = help: Remove unnecessary `pass`
 
@@ -317,12 +317,12 @@ PIE790.py:101:5: PIE790 [*] Unnecessary `pass` statement
 103 103 | 
 104 104 | class Foo:
 
-PIE790.py:130:5: PIE790 [*] Unnecessary `pass` statement
+PIE790.py:130:5: PIE790 (unnecessary-placeholder) [*] Unnecessary `pass` statement
     |
 128 | def foo():
 129 |     print("foo")
 130 |     pass
-    |     ^^^^ PIE790
+    |     ^^^^ PIE790 (unnecessary-placeholder)
     |
     = help: Remove unnecessary `pass`
 
@@ -335,12 +335,12 @@ PIE790.py:130:5: PIE790 [*] Unnecessary `pass` statement
 132 131 | 
 133 132 | def foo():
 
-PIE790.py:136:5: PIE790 [*] Unnecessary `pass` statement
+PIE790.py:136:5: PIE790 (unnecessary-placeholder) [*] Unnecessary `pass` statement
     |
 134 |     """A docstring."""
 135 |     print("foo")
 136 |     pass
-    |     ^^^^ PIE790
+    |     ^^^^ PIE790 (unnecessary-placeholder)
     |
     = help: Remove unnecessary `pass`
 
@@ -353,11 +353,11 @@ PIE790.py:136:5: PIE790 [*] Unnecessary `pass` statement
 138 137 | 
 139 138 | for i in range(10):
 
-PIE790.py:140:5: PIE790 [*] Unnecessary `pass` statement
+PIE790.py:140:5: PIE790 (unnecessary-placeholder) [*] Unnecessary `pass` statement
     |
 139 | for i in range(10):
 140 |     pass
-    |     ^^^^ PIE790
+    |     ^^^^ PIE790 (unnecessary-placeholder)
 141 |     pass
     |
     = help: Remove unnecessary `pass`
@@ -371,12 +371,12 @@ PIE790.py:140:5: PIE790 [*] Unnecessary `pass` statement
 143 142 | for i in range(10):
 144 143 |     pass
 
-PIE790.py:141:5: PIE790 [*] Unnecessary `pass` statement
+PIE790.py:141:5: PIE790 (unnecessary-placeholder) [*] Unnecessary `pass` statement
     |
 139 | for i in range(10):
 140 |     pass
 141 |     pass
-    |     ^^^^ PIE790
+    |     ^^^^ PIE790 (unnecessary-placeholder)
 142 | 
 143 | for i in range(10):
     |
@@ -391,11 +391,11 @@ PIE790.py:141:5: PIE790 [*] Unnecessary `pass` statement
 143 142 | for i in range(10):
 144 143 |     pass
 
-PIE790.py:144:5: PIE790 [*] Unnecessary `pass` statement
+PIE790.py:144:5: PIE790 (unnecessary-placeholder) [*] Unnecessary `pass` statement
     |
 143 | for i in range(10):
 144 |     pass
-    |     ^^^^ PIE790
+    |     ^^^^ PIE790 (unnecessary-placeholder)
 145 | 
 146 |     pass
     |
@@ -410,12 +410,12 @@ PIE790.py:144:5: PIE790 [*] Unnecessary `pass` statement
 146 145 |     pass
 147 146 | 
 
-PIE790.py:146:5: PIE790 [*] Unnecessary `pass` statement
+PIE790.py:146:5: PIE790 (unnecessary-placeholder) [*] Unnecessary `pass` statement
     |
 144 |     pass
 145 | 
 146 |     pass
-    |     ^^^^ PIE790
+    |     ^^^^ PIE790 (unnecessary-placeholder)
 147 | 
 148 | for i in range(10):
     |
@@ -430,11 +430,11 @@ PIE790.py:146:5: PIE790 [*] Unnecessary `pass` statement
 148 147 | for i in range(10):
 149 148 |     pass  # comment
 
-PIE790.py:149:5: PIE790 [*] Unnecessary `pass` statement
+PIE790.py:149:5: PIE790 (unnecessary-placeholder) [*] Unnecessary `pass` statement
     |
 148 | for i in range(10):
 149 |     pass  # comment
-    |     ^^^^ PIE790
+    |     ^^^^ PIE790 (unnecessary-placeholder)
 150 |     pass
     |
     = help: Remove unnecessary `pass`
@@ -449,12 +449,12 @@ PIE790.py:149:5: PIE790 [*] Unnecessary `pass` statement
 151 151 | 
 152 152 | 
 
-PIE790.py:150:5: PIE790 [*] Unnecessary `pass` statement
+PIE790.py:150:5: PIE790 (unnecessary-placeholder) [*] Unnecessary `pass` statement
     |
 148 | for i in range(10):
 149 |     pass  # comment
 150 |     pass
-    |     ^^^^ PIE790
+    |     ^^^^ PIE790 (unnecessary-placeholder)
     |
     = help: Remove unnecessary `pass`
 
@@ -467,12 +467,12 @@ PIE790.py:150:5: PIE790 [*] Unnecessary `pass` statement
 152 151 | 
 153 152 | def foo():
 
-PIE790.py:155:5: PIE790 [*] Unnecessary `...` literal
+PIE790.py:155:5: PIE790 (unnecessary-placeholder) [*] Unnecessary `...` literal
     |
 153 | def foo():
 154 |     print("foo")
 155 |     ...
-    |     ^^^ PIE790
+    |     ^^^ PIE790 (unnecessary-placeholder)
     |
     = help: Remove unnecessary `...`
 
@@ -485,12 +485,12 @@ PIE790.py:155:5: PIE790 [*] Unnecessary `...` literal
 157 156 | 
 158 157 | def foo():
 
-PIE790.py:161:5: PIE790 [*] Unnecessary `...` literal
+PIE790.py:161:5: PIE790 (unnecessary-placeholder) [*] Unnecessary `...` literal
     |
 159 |     """A docstring."""
 160 |     print("foo")
 161 |     ...
-    |     ^^^ PIE790
+    |     ^^^ PIE790 (unnecessary-placeholder)
     |
     = help: Remove unnecessary `...`
 
@@ -503,11 +503,11 @@ PIE790.py:161:5: PIE790 [*] Unnecessary `...` literal
 163 162 | 
 164 163 | for i in range(10):
 
-PIE790.py:165:5: PIE790 [*] Unnecessary `...` literal
+PIE790.py:165:5: PIE790 (unnecessary-placeholder) [*] Unnecessary `...` literal
     |
 164 | for i in range(10):
 165 |     ...
-    |     ^^^ PIE790
+    |     ^^^ PIE790 (unnecessary-placeholder)
 166 |     ...
     |
     = help: Remove unnecessary `...`
@@ -521,12 +521,12 @@ PIE790.py:165:5: PIE790 [*] Unnecessary `...` literal
 168 167 | for i in range(10):
 169 168 |     ...
 
-PIE790.py:166:5: PIE790 [*] Unnecessary `...` literal
+PIE790.py:166:5: PIE790 (unnecessary-placeholder) [*] Unnecessary `...` literal
     |
 164 | for i in range(10):
 165 |     ...
 166 |     ...
-    |     ^^^ PIE790
+    |     ^^^ PIE790 (unnecessary-placeholder)
 167 | 
 168 | for i in range(10):
     |
@@ -541,11 +541,11 @@ PIE790.py:166:5: PIE790 [*] Unnecessary `...` literal
 168 167 | for i in range(10):
 169 168 |     ...
 
-PIE790.py:169:5: PIE790 [*] Unnecessary `...` literal
+PIE790.py:169:5: PIE790 (unnecessary-placeholder) [*] Unnecessary `...` literal
     |
 168 | for i in range(10):
 169 |     ...
-    |     ^^^ PIE790
+    |     ^^^ PIE790 (unnecessary-placeholder)
 170 | 
 171 |     ...
     |
@@ -560,12 +560,12 @@ PIE790.py:169:5: PIE790 [*] Unnecessary `...` literal
 171 170 |     ...
 172 171 | 
 
-PIE790.py:171:5: PIE790 [*] Unnecessary `...` literal
+PIE790.py:171:5: PIE790 (unnecessary-placeholder) [*] Unnecessary `...` literal
     |
 169 |     ...
 170 | 
 171 |     ...
-    |     ^^^ PIE790
+    |     ^^^ PIE790 (unnecessary-placeholder)
 172 | 
 173 | for i in range(10):
     |
@@ -580,11 +580,11 @@ PIE790.py:171:5: PIE790 [*] Unnecessary `...` literal
 173 172 | for i in range(10):
 174 173 |     ...  # comment
 
-PIE790.py:174:5: PIE790 [*] Unnecessary `...` literal
+PIE790.py:174:5: PIE790 (unnecessary-placeholder) [*] Unnecessary `...` literal
     |
 173 | for i in range(10):
 174 |     ...  # comment
-    |     ^^^ PIE790
+    |     ^^^ PIE790 (unnecessary-placeholder)
 175 |     ...
     |
     = help: Remove unnecessary `...`
@@ -599,12 +599,12 @@ PIE790.py:174:5: PIE790 [*] Unnecessary `...` literal
 176 176 | 
 177 177 | for i in range(10):
 
-PIE790.py:175:5: PIE790 [*] Unnecessary `...` literal
+PIE790.py:175:5: PIE790 (unnecessary-placeholder) [*] Unnecessary `...` literal
     |
 173 | for i in range(10):
 174 |     ...  # comment
 175 |     ...
-    |     ^^^ PIE790
+    |     ^^^ PIE790 (unnecessary-placeholder)
 176 | 
 177 | for i in range(10):
     |
@@ -619,11 +619,11 @@ PIE790.py:175:5: PIE790 [*] Unnecessary `...` literal
 177 176 | for i in range(10):
 178 177 |     ...
 
-PIE790.py:178:5: PIE790 [*] Unnecessary `...` literal
+PIE790.py:178:5: PIE790 (unnecessary-placeholder) [*] Unnecessary `...` literal
     |
 177 | for i in range(10):
 178 |     ...
-    |     ^^^ PIE790
+    |     ^^^ PIE790 (unnecessary-placeholder)
 179 |     pass
     |
     = help: Remove unnecessary `...`
@@ -637,12 +637,12 @@ PIE790.py:178:5: PIE790 [*] Unnecessary `...` literal
 180 179 | 
 181 180 | from typing import Protocol
 
-PIE790.py:179:5: PIE790 [*] Unnecessary `pass` statement
+PIE790.py:179:5: PIE790 (unnecessary-placeholder) [*] Unnecessary `pass` statement
     |
 177 | for i in range(10):
 178 |     ...
 179 |     pass
-    |     ^^^^ PIE790
+    |     ^^^^ PIE790 (unnecessary-placeholder)
 180 | 
 181 | from typing import Protocol
     |
@@ -657,12 +657,12 @@ PIE790.py:179:5: PIE790 [*] Unnecessary `pass` statement
 181 180 | from typing import Protocol
 182 181 | 
 
-PIE790.py:209:9: PIE790 [*] Unnecessary `...` literal
+PIE790.py:209:9: PIE790 (unnecessary-placeholder) [*] Unnecessary `...` literal
     |
 207 |     def stub(self) -> str:
 208 |         """Docstring"""
 209 |         ...
-    |         ^^^ PIE790
+    |         ^^^ PIE790 (unnecessary-placeholder)
     |
     = help: Remove unnecessary `...`
 
@@ -674,5 +674,3 @@ PIE790.py:209:9: PIE790 [*] Unnecessary `...` literal
 210 209 | 
 211 210 | 
 212 211 | class Repro(Protocol[int]):
-
-

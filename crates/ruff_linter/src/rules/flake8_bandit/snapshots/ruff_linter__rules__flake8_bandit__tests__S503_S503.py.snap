@@ -1,32 +1,30 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
 ---
-S503.py:6:18: S503 Argument default set to insecure SSL protocol: `PROTOCOL_SSLv2`
+S503.py:6:18: S503 (ssl-with-bad-defaults) Argument default set to insecure SSL protocol: `PROTOCOL_SSLv2`
   |
 6 | def func(version=ssl.PROTOCOL_SSLv2):  # S503
-  |                  ^^^^^^^^^^^^^^^^^^ S503
+  |                  ^^^^^^^^^^^^^^^^^^ S503 (ssl-with-bad-defaults)
 7 |     pass
   |
 
-S503.py:10:19: S503 Argument default set to insecure SSL protocol: `SSLv2_METHOD`
+S503.py:10:19: S503 (ssl-with-bad-defaults) Argument default set to insecure SSL protocol: `SSLv2_METHOD`
    |
 10 | def func(protocol=SSL.SSLv2_METHOD):  # S503
-   |                   ^^^^^^^^^^^^^^^^ S503
+   |                   ^^^^^^^^^^^^^^^^ S503 (ssl-with-bad-defaults)
 11 |     pass
    |
 
-S503.py:14:18: S503 Argument default set to insecure SSL protocol: `SSLv23_METHOD`
+S503.py:14:18: S503 (ssl-with-bad-defaults) Argument default set to insecure SSL protocol: `SSLv23_METHOD`
    |
 14 | def func(version=SSL.SSLv23_METHOD):  # S503
-   |                  ^^^^^^^^^^^^^^^^^ S503
+   |                  ^^^^^^^^^^^^^^^^^ S503 (ssl-with-bad-defaults)
 15 |     pass
    |
 
-S503.py:18:19: S503 Argument default set to insecure SSL protocol: `PROTOCOL_TLSv1`
+S503.py:18:19: S503 (ssl-with-bad-defaults) Argument default set to insecure SSL protocol: `PROTOCOL_TLSv1`
    |
 18 | def func(protocol=PROTOCOL_TLSv1):  # S503
-   |                   ^^^^^^^^^^^^^^ S503
+   |                   ^^^^^^^^^^^^^^ S503 (ssl-with-bad-defaults)
 19 |     pass
    |
-
-

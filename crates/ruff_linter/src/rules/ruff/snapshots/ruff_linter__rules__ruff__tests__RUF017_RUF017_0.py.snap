@@ -1,11 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-RUF017_0.py:5:1: RUF017 [*] Avoid quadratic list summation
+RUF017_0.py:5:1: RUF017 (quadratic-list-summation) [*] Avoid quadratic list summation
   |
 4 | # RUF017
 5 | sum([x, y], start=[])
-  | ^^^^^^^^^^^^^^^^^^^^^ RUF017
+  | ^^^^^^^^^^^^^^^^^^^^^ RUF017 (quadratic-list-summation)
 6 | sum([x, y], [])
 7 | sum([[1, 2, 3], [4, 5, 6]], start=[])
   |
@@ -24,12 +24,12 @@ RUF017_0.py:5:1: RUF017 [*] Avoid quadratic list summation
 7 9 | sum([[1, 2, 3], [4, 5, 6]], start=[])
 8 10 | sum([[1, 2, 3], [4, 5, 6]], [])
 
-RUF017_0.py:6:1: RUF017 [*] Avoid quadratic list summation
+RUF017_0.py:6:1: RUF017 (quadratic-list-summation) [*] Avoid quadratic list summation
   |
 4 | # RUF017
 5 | sum([x, y], start=[])
 6 | sum([x, y], [])
-  | ^^^^^^^^^^^^^^^ RUF017
+  | ^^^^^^^^^^^^^^^ RUF017 (quadratic-list-summation)
 7 | sum([[1, 2, 3], [4, 5, 6]], start=[])
 8 | sum([[1, 2, 3], [4, 5, 6]], [])
   |
@@ -49,12 +49,12 @@ RUF017_0.py:6:1: RUF017 [*] Avoid quadratic list summation
 8 10 | sum([[1, 2, 3], [4, 5, 6]], [])
 9 11 | sum([[1, 2, 3], [4, 5, 6]],
 
-RUF017_0.py:7:1: RUF017 [*] Avoid quadratic list summation
+RUF017_0.py:7:1: RUF017 (quadratic-list-summation) [*] Avoid quadratic list summation
   |
 5 | sum([x, y], start=[])
 6 | sum([x, y], [])
 7 | sum([[1, 2, 3], [4, 5, 6]], start=[])
-  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF017
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF017 (quadratic-list-summation)
 8 | sum([[1, 2, 3], [4, 5, 6]], [])
 9 | sum([[1, 2, 3], [4, 5, 6]],
   |
@@ -75,12 +75,12 @@ RUF017_0.py:7:1: RUF017 [*] Avoid quadratic list summation
 9  11 | sum([[1, 2, 3], [4, 5, 6]],
 10 12 |     [])
 
-RUF017_0.py:8:1: RUF017 [*] Avoid quadratic list summation
+RUF017_0.py:8:1: RUF017 (quadratic-list-summation) [*] Avoid quadratic list summation
    |
  6 | sum([x, y], [])
  7 | sum([[1, 2, 3], [4, 5, 6]], start=[])
  8 | sum([[1, 2, 3], [4, 5, 6]], [])
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF017
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF017 (quadratic-list-summation)
  9 | sum([[1, 2, 3], [4, 5, 6]],
 10 |     [])
    |
@@ -102,13 +102,13 @@ RUF017_0.py:8:1: RUF017 [*] Avoid quadratic list summation
 10 12 |     [])
 11 13 | 
 
-RUF017_0.py:9:1: RUF017 [*] Avoid quadratic list summation
+RUF017_0.py:9:1: RUF017 (quadratic-list-summation) [*] Avoid quadratic list summation
    |
  7 |   sum([[1, 2, 3], [4, 5, 6]], start=[])
  8 |   sum([[1, 2, 3], [4, 5, 6]], [])
  9 | / sum([[1, 2, 3], [4, 5, 6]],
 10 | |     [])
-   | |_______^ RUF017
+   | |_______^ RUF017 (quadratic-list-summation)
 11 |   
 12 |   # OK
    |
@@ -131,12 +131,12 @@ RUF017_0.py:9:1: RUF017 [*] Avoid quadratic list summation
 12 13 | # OK
 13 14 | sum([x, y])
 
-RUF017_0.py:21:5: RUF017 [*] Avoid quadratic list summation
+RUF017_0.py:21:5: RUF017 (quadratic-list-summation) [*] Avoid quadratic list summation
    |
 19 |     import functools, operator
 20 | 
 21 |     sum([x, y], [])
-   |     ^^^^^^^^^^^^^^^ RUF017
+   |     ^^^^^^^^^^^^^^^ RUF017 (quadratic-list-summation)
    |
    = help: Replace with `functools.reduce`
 
@@ -150,12 +150,12 @@ RUF017_0.py:21:5: RUF017 [*] Avoid quadratic list summation
 23 23 | 
 24 24 | # Regression test for: https://github.com/astral-sh/ruff/issues/7718
 
-RUF017_0.py:26:5: RUF017 [*] Avoid quadratic list summation
+RUF017_0.py:26:5: RUF017 (quadratic-list-summation) [*] Avoid quadratic list summation
    |
 24 | # Regression test for: https://github.com/astral-sh/ruff/issues/7718
 25 | def func():
 26 |     sum((factor.dims for factor in bases), [])
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF017
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF017 (quadratic-list-summation)
    |
    = help: Replace with `functools.reduce`
 
@@ -171,5 +171,3 @@ RUF017_0.py:26:5: RUF017 [*] Avoid quadratic list summation
 25 27 | def func():
 26    |-    sum((factor.dims for factor in bases), [])
    28 |+    functools.reduce(operator.iadd, (factor.dims for factor in bases), [])
-
-

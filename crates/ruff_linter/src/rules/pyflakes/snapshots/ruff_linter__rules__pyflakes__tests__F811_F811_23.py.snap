@@ -1,10 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
-F811_23.py:4:15: F811 Redefinition of unused `foo` from line 3
+F811_23.py:4:15: F811 (redefined-while-unused) Redefinition of unused `foo` from line 3
   |
 3 | import foo as foo
 4 | import bar as foo
-  |               ^^^ F811
+  |               ^^^ F811 (redefined-while-unused)
   |
   = help: Remove definition: `foo`

@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
-<filename>:4:12: F811 [*] Redefinition of unused `os` from line 3
+<filename>:4:12: F811 (redefined-while-unused) [*] Redefinition of unused `os` from line 3
   |
 2 | def f():
 3 |     import os
 4 |     import os
-  |            ^^ F811
+  |            ^^ F811 (redefined-while-unused)
 5 | 
 6 |     # Despite this `del`, `import os` should still be flagged as shadowing an unused
   |
@@ -20,5 +20,3 @@ source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 5 4 | 
 6 5 |     # Despite this `del`, `import os` should still be flagged as shadowing an unused
 7 6 |     # import.
-
-

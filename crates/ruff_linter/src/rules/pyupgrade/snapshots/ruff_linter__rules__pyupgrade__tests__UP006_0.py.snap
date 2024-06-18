@@ -1,10 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 ---
-UP006_0.py:4:10: UP006 [*] Use `list` instead of `typing.List` for type annotation
+UP006_0.py:4:10: UP006 (non-pep585-annotation) [*] Use `list` instead of `typing.List` for type annotation
   |
 4 | def f(x: typing.List[str]) -> None:
-  |          ^^^^^^^^^^^ UP006
+  |          ^^^^^^^^^^^ UP006 (non-pep585-annotation)
 5 |     ...
   |
   = help: Replace with `list`
@@ -19,10 +19,10 @@ UP006_0.py:4:10: UP006 [*] Use `list` instead of `typing.List` for type annotati
 6 6 | 
 7 7 | 
 
-UP006_0.py:11:10: UP006 [*] Use `list` instead of `List` for type annotation
+UP006_0.py:11:10: UP006 (non-pep585-annotation) [*] Use `list` instead of `List` for type annotation
    |
 11 | def f(x: List[str]) -> None:
-   |          ^^^^ UP006
+   |          ^^^^ UP006 (non-pep585-annotation)
 12 |     ...
    |
    = help: Replace with `list`
@@ -37,10 +37,10 @@ UP006_0.py:11:10: UP006 [*] Use `list` instead of `List` for type annotation
 13 13 | 
 14 14 | 
 
-UP006_0.py:18:10: UP006 [*] Use `list` instead of `t.List` for type annotation
+UP006_0.py:18:10: UP006 (non-pep585-annotation) [*] Use `list` instead of `t.List` for type annotation
    |
 18 | def f(x: t.List[str]) -> None:
-   |          ^^^^^^ UP006
+   |          ^^^^^^ UP006 (non-pep585-annotation)
 19 |     ...
    |
    = help: Replace with `list`
@@ -55,10 +55,10 @@ UP006_0.py:18:10: UP006 [*] Use `list` instead of `t.List` for type annotation
 20 20 | 
 21 21 | 
 
-UP006_0.py:25:10: UP006 [*] Use `list` instead of `IList` for type annotation
+UP006_0.py:25:10: UP006 (non-pep585-annotation) [*] Use `list` instead of `IList` for type annotation
    |
 25 | def f(x: IList[str]) -> None:
-   |          ^^^^^ UP006
+   |          ^^^^^ UP006 (non-pep585-annotation)
 26 |     ...
    |
    = help: Replace with `list`
@@ -73,10 +73,10 @@ UP006_0.py:25:10: UP006 [*] Use `list` instead of `IList` for type annotation
 27 27 | 
 28 28 | 
 
-UP006_0.py:29:11: UP006 [*] Use `list` instead of `List` for type annotation
+UP006_0.py:29:11: UP006 (non-pep585-annotation) [*] Use `list` instead of `List` for type annotation
    |
 29 | def f(x: "List[str]") -> None:
-   |           ^^^^ UP006
+   |           ^^^^ UP006 (non-pep585-annotation)
 30 |     ...
    |
    = help: Replace with `list`
@@ -91,10 +91,10 @@ UP006_0.py:29:11: UP006 [*] Use `list` instead of `List` for type annotation
 31 31 | 
 32 32 | 
 
-UP006_0.py:33:12: UP006 [*] Use `list` instead of `List` for type annotation
+UP006_0.py:33:12: UP006 (non-pep585-annotation) [*] Use `list` instead of `List` for type annotation
    |
 33 | def f(x: r"List[str]") -> None:
-   |            ^^^^ UP006
+   |            ^^^^ UP006 (non-pep585-annotation)
 34 |     ...
    |
    = help: Replace with `list`
@@ -109,10 +109,10 @@ UP006_0.py:33:12: UP006 [*] Use `list` instead of `List` for type annotation
 35 35 | 
 36 36 | 
 
-UP006_0.py:37:11: UP006 [*] Use `list` instead of `List` for type annotation
+UP006_0.py:37:11: UP006 (non-pep585-annotation) [*] Use `list` instead of `List` for type annotation
    |
 37 | def f(x: "List[str]") -> None:
-   |           ^^^^ UP006
+   |           ^^^^ UP006 (non-pep585-annotation)
 38 |     ...
    |
    = help: Replace with `list`
@@ -127,10 +127,10 @@ UP006_0.py:37:11: UP006 [*] Use `list` instead of `List` for type annotation
 39 39 | 
 40 40 | 
 
-UP006_0.py:41:13: UP006 [*] Use `list` instead of `List` for type annotation
+UP006_0.py:41:13: UP006 (non-pep585-annotation) [*] Use `list` instead of `List` for type annotation
    |
 41 | def f(x: """List[str]""") -> None:
-   |             ^^^^ UP006
+   |             ^^^^ UP006 (non-pep585-annotation)
 42 |     ...
    |
    = help: Replace with `list`
@@ -145,18 +145,18 @@ UP006_0.py:41:13: UP006 [*] Use `list` instead of `List` for type annotation
 43 43 | 
 44 44 | 
 
-UP006_0.py:45:10: UP006 Use `list` instead of `List` for type annotation
+UP006_0.py:45:10: UP006 (non-pep585-annotation) Use `list` instead of `List` for type annotation
    |
 45 | def f(x: "Li" "st[str]") -> None:
-   |          ^^^^^^^^^^^^^^ UP006
+   |          ^^^^^^^^^^^^^^ UP006 (non-pep585-annotation)
 46 |     ...
    |
    = help: Replace with `list`
 
-UP006_0.py:49:11: UP006 [*] Use `list` instead of `List` for type annotation
+UP006_0.py:49:11: UP006 (non-pep585-annotation) [*] Use `list` instead of `List` for type annotation
    |
 49 | def f(x: "List['List[str]']") -> None:
-   |           ^^^^ UP006
+   |           ^^^^ UP006 (non-pep585-annotation)
 50 |     ...
    |
    = help: Replace with `list`
@@ -171,10 +171,10 @@ UP006_0.py:49:11: UP006 [*] Use `list` instead of `List` for type annotation
 51 51 | 
 52 52 | 
 
-UP006_0.py:49:17: UP006 [*] Use `list` instead of `List` for type annotation
+UP006_0.py:49:17: UP006 (non-pep585-annotation) [*] Use `list` instead of `List` for type annotation
    |
 49 | def f(x: "List['List[str]']") -> None:
-   |                 ^^^^ UP006
+   |                 ^^^^ UP006 (non-pep585-annotation)
 50 |     ...
    |
    = help: Replace with `list`
@@ -189,10 +189,10 @@ UP006_0.py:49:17: UP006 [*] Use `list` instead of `List` for type annotation
 51 51 | 
 52 52 | 
 
-UP006_0.py:53:11: UP006 [*] Use `list` instead of `List` for type annotation
+UP006_0.py:53:11: UP006 (non-pep585-annotation) [*] Use `list` instead of `List` for type annotation
    |
 53 | def f(x: "List['Li' 'st[str]']") -> None:
-   |           ^^^^ UP006
+   |           ^^^^ UP006 (non-pep585-annotation)
 54 |     ...
    |
    = help: Replace with `list`
@@ -207,34 +207,34 @@ UP006_0.py:53:11: UP006 [*] Use `list` instead of `List` for type annotation
 55 55 | 
 56 56 | 
 
-UP006_0.py:53:16: UP006 Use `list` instead of `List` for type annotation
+UP006_0.py:53:16: UP006 (non-pep585-annotation) Use `list` instead of `List` for type annotation
    |
 53 | def f(x: "List['Li' 'st[str]']") -> None:
-   |                ^^^^^^^^^^^^^^ UP006
+   |                ^^^^^^^^^^^^^^ UP006 (non-pep585-annotation)
 54 |     ...
    |
    = help: Replace with `list`
 
-UP006_0.py:57:10: UP006 Use `list` instead of `List` for type annotation
+UP006_0.py:57:10: UP006 (non-pep585-annotation) Use `list` instead of `List` for type annotation
    |
 57 | def f(x: "Li" "st['List[str]']") -> None:
-   |          ^^^^^^^^^^^^^^^^^^^^^^ UP006
+   |          ^^^^^^^^^^^^^^^^^^^^^^ UP006 (non-pep585-annotation)
 58 |     ...
    |
    = help: Replace with `list`
 
-UP006_0.py:57:10: UP006 Use `list` instead of `List` for type annotation
+UP006_0.py:57:10: UP006 (non-pep585-annotation) Use `list` instead of `List` for type annotation
    |
 57 | def f(x: "Li" "st['List[str]']") -> None:
-   |          ^^^^^^^^^^^^^^^^^^^^^^ UP006
+   |          ^^^^^^^^^^^^^^^^^^^^^^ UP006 (non-pep585-annotation)
 58 |     ...
    |
    = help: Replace with `list`
 
-UP006_0.py:61:10: UP006 [*] Use `collections.deque` instead of `typing.Deque` for type annotation
+UP006_0.py:61:10: UP006 (non-pep585-annotation) [*] Use `collections.deque` instead of `typing.Deque` for type annotation
    |
 61 | def f(x: typing.Deque[str]) -> None:
-   |          ^^^^^^^^^^^^ UP006
+   |          ^^^^^^^^^^^^ UP006 (non-pep585-annotation)
 62 |     ...
    |
    = help: Replace with `collections.deque`
@@ -257,10 +257,10 @@ UP006_0.py:61:10: UP006 [*] Use `collections.deque` instead of `typing.Deque` fo
 63 64 | 
 64 65 | 
 
-UP006_0.py:65:10: UP006 [*] Use `collections.defaultdict` instead of `typing.DefaultDict` for type annotation
+UP006_0.py:65:10: UP006 (non-pep585-annotation) [*] Use `collections.defaultdict` instead of `typing.DefaultDict` for type annotation
    |
 65 | def f(x: typing.DefaultDict[str, str]) -> None:
-   |          ^^^^^^^^^^^^^^^^^^ UP006
+   |          ^^^^^^^^^^^^^^^^^^ UP006 (non-pep585-annotation)
 66 |     ...
    |
    = help: Replace with `collections.defaultdict`
@@ -280,5 +280,3 @@ UP006_0.py:65:10: UP006 [*] Use `collections.defaultdict` instead of `typing.Def
 65    |-def f(x: typing.DefaultDict[str, str]) -> None:
    66 |+def f(x: defaultdict[str, str]) -> None:
 66 67 |     ...
-
-

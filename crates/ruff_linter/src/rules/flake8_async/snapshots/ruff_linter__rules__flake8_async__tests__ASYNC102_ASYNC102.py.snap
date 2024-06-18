@@ -1,18 +1,16 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_async/mod.rs
 ---
-ASYNC102.py:5:5: ASYNC102 Async functions should not call synchronous `os` methods
+ASYNC102.py:5:5: ASYNC102 (blocking-os-call-in-async-function) Async functions should not call synchronous `os` methods
   |
 4 | async def foo():
 5 |     os.popen()
-  |     ^^^^^^^^ ASYNC102
+  |     ^^^^^^^^ ASYNC102 (blocking-os-call-in-async-function)
   |
 
-ASYNC102.py:9:5: ASYNC102 Async functions should not call synchronous `os` methods
+ASYNC102.py:9:5: ASYNC102 (blocking-os-call-in-async-function) Async functions should not call synchronous `os` methods
   |
 8 | async def foo():
 9 |     os.spawnl()
-  |     ^^^^^^^^^ ASYNC102
+  |     ^^^^^^^^^ ASYNC102 (blocking-os-call-in-async-function)
   |
-
-

@@ -1,51 +1,51 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_tidy_imports/mod.rs
 ---
-TID252.py:9:1: TID252 Prefer absolute imports over relative imports from parent modules
+TID252.py:9:1: TID252 (relative-imports) Prefer absolute imports over relative imports from parent modules
    |
  7 | from . import sibling
  8 | from .sibling import example
  9 | from .. import parent
-   | ^^^^^^^^^^^^^^^^^^^^^ TID252
+   | ^^^^^^^^^^^^^^^^^^^^^ TID252 (relative-imports)
 10 | from ..parent import example
 11 | from ... import grandparent
    |
    = help: Replace relative imports from parent modules with absolute imports
 
-TID252.py:10:1: TID252 Prefer absolute imports over relative imports from parent modules
+TID252.py:10:1: TID252 (relative-imports) Prefer absolute imports over relative imports from parent modules
    |
  8 | from .sibling import example
  9 | from .. import parent
 10 | from ..parent import example
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TID252
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TID252 (relative-imports)
 11 | from ... import grandparent
 12 | from ...grandparent import example
    |
    = help: Replace relative imports from parent modules with absolute imports
 
-TID252.py:11:1: TID252 Prefer absolute imports over relative imports from parent modules
+TID252.py:11:1: TID252 (relative-imports) Prefer absolute imports over relative imports from parent modules
    |
  9 | from .. import parent
 10 | from ..parent import example
 11 | from ... import grandparent
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ TID252
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ TID252 (relative-imports)
 12 | from ...grandparent import example
 13 | from  .parent import hello
    |
    = help: Replace relative imports from parent modules with absolute imports
 
-TID252.py:12:1: TID252 Prefer absolute imports over relative imports from parent modules
+TID252.py:12:1: TID252 (relative-imports) Prefer absolute imports over relative imports from parent modules
    |
 10 | from ..parent import example
 11 | from ... import grandparent
 12 | from ...grandparent import example
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TID252
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TID252 (relative-imports)
 13 | from  .parent import hello
 14 | from .\
    |
    = help: Replace relative imports from parent modules with absolute imports
 
-TID252.py:17:1: TID252 Prefer absolute imports over relative imports from parent modules
+TID252.py:17:1: TID252 (relative-imports) Prefer absolute imports over relative imports from parent modules
    |
 15 |       parent import \
 16 |           hello_world
@@ -53,95 +53,93 @@ TID252.py:17:1: TID252 Prefer absolute imports over relative imports from parent
 18 | |     ..parent\
 19 | |     import \
 20 | |     world_hello
-   | |_______________^ TID252
+   | |_______________^ TID252 (relative-imports)
 21 |   from ..... import ultragrantparent
 22 |   from ...... import ultragrantparent
    |
    = help: Replace relative imports from parent modules with absolute imports
 
-TID252.py:21:1: TID252 Prefer absolute imports over relative imports from parent modules
+TID252.py:21:1: TID252 (relative-imports) Prefer absolute imports over relative imports from parent modules
    |
 19 |     import \
 20 |     world_hello
 21 | from ..... import ultragrantparent
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TID252
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TID252 (relative-imports)
 22 | from ...... import ultragrantparent
 23 | from ....... import ultragrantparent
    |
    = help: Replace relative imports from parent modules with absolute imports
 
-TID252.py:22:1: TID252 Prefer absolute imports over relative imports from parent modules
+TID252.py:22:1: TID252 (relative-imports) Prefer absolute imports over relative imports from parent modules
    |
 20 |     world_hello
 21 | from ..... import ultragrantparent
 22 | from ...... import ultragrantparent
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TID252
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TID252 (relative-imports)
 23 | from ....... import ultragrantparent
 24 | from ......... import ultragrantparent
    |
    = help: Replace relative imports from parent modules with absolute imports
 
-TID252.py:23:1: TID252 Prefer absolute imports over relative imports from parent modules
+TID252.py:23:1: TID252 (relative-imports) Prefer absolute imports over relative imports from parent modules
    |
 21 | from ..... import ultragrantparent
 22 | from ...... import ultragrantparent
 23 | from ....... import ultragrantparent
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TID252
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TID252 (relative-imports)
 24 | from ......... import ultragrantparent
 25 | from ........................... import ultragrantparent
    |
    = help: Replace relative imports from parent modules with absolute imports
 
-TID252.py:24:1: TID252 Prefer absolute imports over relative imports from parent modules
+TID252.py:24:1: TID252 (relative-imports) Prefer absolute imports over relative imports from parent modules
    |
 22 | from ...... import ultragrantparent
 23 | from ....... import ultragrantparent
 24 | from ......... import ultragrantparent
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TID252
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TID252 (relative-imports)
 25 | from ........................... import ultragrantparent
 26 | from .....parent import ultragrantparent
    |
    = help: Replace relative imports from parent modules with absolute imports
 
-TID252.py:25:1: TID252 Prefer absolute imports over relative imports from parent modules
+TID252.py:25:1: TID252 (relative-imports) Prefer absolute imports over relative imports from parent modules
    |
 23 | from ....... import ultragrantparent
 24 | from ......... import ultragrantparent
 25 | from ........................... import ultragrantparent
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TID252
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TID252 (relative-imports)
 26 | from .....parent import ultragrantparent
 27 | from .........parent import ultragrantparent
    |
    = help: Replace relative imports from parent modules with absolute imports
 
-TID252.py:26:1: TID252 Prefer absolute imports over relative imports from parent modules
+TID252.py:26:1: TID252 (relative-imports) Prefer absolute imports over relative imports from parent modules
    |
 24 | from ......... import ultragrantparent
 25 | from ........................... import ultragrantparent
 26 | from .....parent import ultragrantparent
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TID252
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TID252 (relative-imports)
 27 | from .........parent import ultragrantparent
 28 | from ...........................parent import ultragrantparent
    |
    = help: Replace relative imports from parent modules with absolute imports
 
-TID252.py:27:1: TID252 Prefer absolute imports over relative imports from parent modules
+TID252.py:27:1: TID252 (relative-imports) Prefer absolute imports over relative imports from parent modules
    |
 25 | from ........................... import ultragrantparent
 26 | from .....parent import ultragrantparent
 27 | from .........parent import ultragrantparent
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TID252
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TID252 (relative-imports)
 28 | from ...........................parent import ultragrantparent
    |
    = help: Replace relative imports from parent modules with absolute imports
 
-TID252.py:28:1: TID252 Prefer absolute imports over relative imports from parent modules
+TID252.py:28:1: TID252 (relative-imports) Prefer absolute imports over relative imports from parent modules
    |
 26 | from .....parent import ultragrantparent
 27 | from .........parent import ultragrantparent
 28 | from ...........................parent import ultragrantparent
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TID252
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TID252 (relative-imports)
    |
    = help: Replace relative imports from parent modules with absolute imports
-
-

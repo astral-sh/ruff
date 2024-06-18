@@ -33,8 +33,9 @@ impl Emitter for GithubEmitter {
             write!(
                 writer,
                 "::error title=Ruff \
-                         ({code}),file={file},line={row},col={column},endLine={end_row},endColumn={end_column}::",
+                         ({code} {rule_name}),file={file},line={row},col={column},endLine={end_row},endColumn={end_column}::",
                 code = message.kind.rule().noqa_code(),
+                rule_name = message.kind.rule().as_ref(),
                 file = message.filename(),
                 row = source_location.row,
                 column = source_location.column,
@@ -44,11 +45,12 @@ impl Emitter for GithubEmitter {
 
             writeln!(
                 writer,
-                "{path}:{row}:{column}: {code} {body}",
+                "{path}:{row}:{column}: {code} ({rule_name}) {body}",
                 path = relativize_path(message.filename()),
                 row = location.row,
                 column = location.column,
                 code = message.kind.rule().noqa_code(),
+                rule_name = message.kind.rule().as_ref(),
                 body = message.kind.body,
             )?;
         }

@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-E27.py:4:9: E271 [*] Multiple spaces after keyword
+E27.py:4:9: E271 (multiple-spaces-after-keyword) [*] Multiple spaces after keyword
   |
 2 | True and False
 3 | #: E271
 4 | True and  False
-  |         ^^ E271
+  |         ^^ E271 (multiple-spaces-after-keyword)
 5 | #: E272
 6 | True  and False
   |
@@ -22,12 +22,12 @@ E27.py:4:9: E271 [*] Multiple spaces after keyword
 6 6 | True  and False
 7 7 | #: E271
 
-E27.py:6:5: E271 [*] Multiple spaces after keyword
+E27.py:6:5: E271 (multiple-spaces-after-keyword) [*] Multiple spaces after keyword
   |
 4 | True and  False
 5 | #: E272
 6 | True  and False
-  |     ^^ E271
+  |     ^^ E271 (multiple-spaces-after-keyword)
 7 | #: E271
 8 | if   1:
   |
@@ -43,12 +43,12 @@ E27.py:6:5: E271 [*] Multiple spaces after keyword
 8 8 | if   1:
 9 9 | #: E273
 
-E27.py:8:3: E271 [*] Multiple spaces after keyword
+E27.py:8:3: E271 (multiple-spaces-after-keyword) [*] Multiple spaces after keyword
    |
  6 | True  and False
  7 | #: E271
  8 | if   1:
-   |   ^^^ E271
+   |   ^^^ E271 (multiple-spaces-after-keyword)
  9 | #: E273
 10 | True and        False
    |
@@ -64,12 +64,12 @@ E27.py:8:3: E271 [*] Multiple spaces after keyword
 10 10 | True and		False
 11 11 | #: E273 E274
 
-E27.py:14:6: E271 [*] Multiple spaces after keyword
+E27.py:14:6: E271 (multiple-spaces-after-keyword) [*] Multiple spaces after keyword
    |
 12 | True        and False
 13 | #: E271
 14 | a and  b
-   |      ^^ E271
+   |      ^^ E271 (multiple-spaces-after-keyword)
 15 | #: E271
 16 | 1 and  b
    |
@@ -85,12 +85,12 @@ E27.py:14:6: E271 [*] Multiple spaces after keyword
 16 16 | 1 and  b
 17 17 | #: E271
 
-E27.py:16:6: E271 [*] Multiple spaces after keyword
+E27.py:16:6: E271 (multiple-spaces-after-keyword) [*] Multiple spaces after keyword
    |
 14 | a and  b
 15 | #: E271
 16 | 1 and  b
-   |      ^^ E271
+   |      ^^ E271 (multiple-spaces-after-keyword)
 17 | #: E271
 18 | a and  2
    |
@@ -106,12 +106,12 @@ E27.py:16:6: E271 [*] Multiple spaces after keyword
 18 18 | a and  2
 19 19 | #: E271 E272
 
-E27.py:18:6: E271 [*] Multiple spaces after keyword
+E27.py:18:6: E271 (multiple-spaces-after-keyword) [*] Multiple spaces after keyword
    |
 16 | 1 and  b
 17 | #: E271
 18 | a and  2
-   |      ^^ E271
+   |      ^^ E271 (multiple-spaces-after-keyword)
 19 | #: E271 E272
 20 | 1  and  b
    |
@@ -127,12 +127,12 @@ E27.py:18:6: E271 [*] Multiple spaces after keyword
 20 20 | 1  and  b
 21 21 | #: E271 E272
 
-E27.py:20:7: E271 [*] Multiple spaces after keyword
+E27.py:20:7: E271 (multiple-spaces-after-keyword) [*] Multiple spaces after keyword
    |
 18 | a and  2
 19 | #: E271 E272
 20 | 1  and  b
-   |       ^^ E271
+   |       ^^ E271 (multiple-spaces-after-keyword)
 21 | #: E271 E272
 22 | a  and  2
    |
@@ -148,12 +148,12 @@ E27.py:20:7: E271 [*] Multiple spaces after keyword
 22 22 | a  and  2
 23 23 | #: E272
 
-E27.py:22:7: E271 [*] Multiple spaces after keyword
+E27.py:22:7: E271 (multiple-spaces-after-keyword) [*] Multiple spaces after keyword
    |
 20 | 1  and  b
 21 | #: E271 E272
 22 | a  and  2
-   |       ^^ E271
+   |       ^^ E271 (multiple-spaces-after-keyword)
 23 | #: E272
 24 | this  and False
    |
@@ -169,12 +169,12 @@ E27.py:22:7: E271 [*] Multiple spaces after keyword
 24 24 | this  and False
 25 25 | #: E273
 
-E27.py:35:14: E271 [*] Multiple spaces after keyword
+E27.py:35:14: E271 (multiple-spaces-after-keyword) [*] Multiple spaces after keyword
    |
 33 | from v import c, d
 34 | #: E271
 35 | from w import  (e, f)
-   |              ^^ E271
+   |              ^^ E271 (multiple-spaces-after-keyword)
 36 | #: E275
 37 | from w import(e, f)
    |
@@ -190,11 +190,11 @@ E27.py:35:14: E271 [*] Multiple spaces after keyword
 37 37 | from w import(e, f)
 38 38 | #: E275
 
-E27.py:70:5: E271 [*] Multiple spaces after keyword
+E27.py:70:5: E271 (multiple-spaces-after-keyword) [*] Multiple spaces after keyword
    |
 69 | #: E271
 70 | type  Number = int
-   |     ^^ E271
+   |     ^^ E271 (multiple-spaces-after-keyword)
 71 | 
 72 | #: E273
    |

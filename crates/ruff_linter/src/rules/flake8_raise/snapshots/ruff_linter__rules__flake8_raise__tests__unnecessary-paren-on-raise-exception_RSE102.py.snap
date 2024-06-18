@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_raise/mod.rs
 ---
-RSE102.py:5:21: RSE102 [*] Unnecessary parentheses on raised exception
+RSE102.py:5:21: RSE102 (unnecessary-paren-on-raise-exception) [*] Unnecessary parentheses on raised exception
   |
 3 | except TypeError:
 4 |     # RSE102
 5 |     raise ValueError()
-  |                     ^^ RSE102
+  |                     ^^ RSE102 (unnecessary-paren-on-raise-exception)
 6 | 
 7 | try:
   |
@@ -22,11 +22,11 @@ RSE102.py:5:21: RSE102 [*] Unnecessary parentheses on raised exception
 7 7 | try:
 8 8 |     x = 1 / 0
 
-RSE102.py:13:16: RSE102 [*] Unnecessary parentheses on raised exception
+RSE102.py:13:16: RSE102 (unnecessary-paren-on-raise-exception) [*] Unnecessary parentheses on raised exception
    |
 12 | # RSE102
 13 | raise TypeError()
-   |                ^^ RSE102
+   |                ^^ RSE102 (unnecessary-paren-on-raise-exception)
 14 | 
 15 | # RSE102
    |
@@ -42,11 +42,11 @@ RSE102.py:13:16: RSE102 [*] Unnecessary parentheses on raised exception
 15 15 | # RSE102
 16 16 | raise TypeError ()
 
-RSE102.py:16:17: RSE102 [*] Unnecessary parentheses on raised exception
+RSE102.py:16:17: RSE102 (unnecessary-paren-on-raise-exception) [*] Unnecessary parentheses on raised exception
    |
 15 | # RSE102
 16 | raise TypeError ()
-   |                 ^^ RSE102
+   |                 ^^ RSE102 (unnecessary-paren-on-raise-exception)
 17 | 
 18 | # RSE102
    |
@@ -62,12 +62,12 @@ RSE102.py:16:17: RSE102 [*] Unnecessary parentheses on raised exception
 18 18 | # RSE102
 19 19 | raise TypeError \
 
-RSE102.py:20:5: RSE102 [*] Unnecessary parentheses on raised exception
+RSE102.py:20:5: RSE102 (unnecessary-paren-on-raise-exception) [*] Unnecessary parentheses on raised exception
    |
 18 | # RSE102
 19 | raise TypeError \
 20 |     ()
-   |     ^^ RSE102
+   |     ^^ RSE102 (unnecessary-paren-on-raise-exception)
 21 | 
 22 | # RSE102
    |
@@ -83,12 +83,12 @@ RSE102.py:20:5: RSE102 [*] Unnecessary parentheses on raised exception
 22 22 | # RSE102
 23 23 | raise TypeError \
 
-RSE102.py:24:5: RSE102 [*] Unnecessary parentheses on raised exception
+RSE102.py:24:5: RSE102 (unnecessary-paren-on-raise-exception) [*] Unnecessary parentheses on raised exception
    |
 22 | # RSE102
 23 | raise TypeError \
 24 |     ();
-   |     ^^ RSE102
+   |     ^^ RSE102 (unnecessary-paren-on-raise-exception)
 25 | 
 26 | # RSE102
    |
@@ -104,14 +104,14 @@ RSE102.py:24:5: RSE102 [*] Unnecessary parentheses on raised exception
 26 26 | # RSE102
 27 27 | raise TypeError(
 
-RSE102.py:27:16: RSE102 [*] Unnecessary parentheses on raised exception
+RSE102.py:27:16: RSE102 (unnecessary-paren-on-raise-exception) [*] Unnecessary parentheses on raised exception
    |
 26 |   # RSE102
 27 |   raise TypeError(
    |  ________________^
 28 | | 
 29 | | )
-   | |_^ RSE102
+   | |_^ RSE102 (unnecessary-paren-on-raise-exception)
 30 |   
 31 |   # RSE102
    |
@@ -129,14 +129,14 @@ RSE102.py:27:16: RSE102 [*] Unnecessary parentheses on raised exception
 31 29 | # RSE102
 32 30 | raise (TypeError) (
 
-RSE102.py:32:19: RSE102 [*] Unnecessary parentheses on raised exception
+RSE102.py:32:19: RSE102 (unnecessary-paren-on-raise-exception) [*] Unnecessary parentheses on raised exception
    |
 31 |   # RSE102
 32 |   raise (TypeError) (
    |  ___________________^
 33 | | 
 34 | | )
-   | |_^ RSE102
+   | |_^ RSE102 (unnecessary-paren-on-raise-exception)
 35 |   
 36 |   # RSE102
    |
@@ -154,14 +154,14 @@ RSE102.py:32:19: RSE102 [*] Unnecessary parentheses on raised exception
 36 34 | # RSE102
 37 35 | raise TypeError(
 
-RSE102.py:37:16: RSE102 [*] Unnecessary parentheses on raised exception
+RSE102.py:37:16: RSE102 (unnecessary-paren-on-raise-exception) [*] Unnecessary parentheses on raised exception
    |
 36 |   # RSE102
 37 |   raise TypeError(
    |  ________________^
 38 | |     # Hello, world!
 39 | | )
-   | |_^ RSE102
+   | |_^ RSE102 (unnecessary-paren-on-raise-exception)
 40 |   
 41 |   # OK
    |
@@ -179,11 +179,11 @@ RSE102.py:37:16: RSE102 [*] Unnecessary parentheses on raised exception
 41 39 | # OK
 42 40 | raise AssertionError
 
-RSE102.py:74:17: RSE102 [*] Unnecessary parentheses on raised exception
+RSE102.py:74:17: RSE102 (unnecessary-paren-on-raise-exception) [*] Unnecessary parentheses on raised exception
    |
 73 | # RSE102
 74 | raise IndexError()from ZeroDivisionError
-   |                 ^^ RSE102
+   |                 ^^ RSE102 (unnecessary-paren-on-raise-exception)
 75 | 
 76 | raise IndexError()\
    |
@@ -199,12 +199,12 @@ RSE102.py:74:17: RSE102 [*] Unnecessary parentheses on raised exception
 76 76 | raise IndexError()\
 77 77 | from ZeroDivisionError
 
-RSE102.py:76:17: RSE102 [*] Unnecessary parentheses on raised exception
+RSE102.py:76:17: RSE102 (unnecessary-paren-on-raise-exception) [*] Unnecessary parentheses on raised exception
    |
 74 | raise IndexError()from ZeroDivisionError
 75 | 
 76 | raise IndexError()\
-   |                 ^^ RSE102
+   |                 ^^ RSE102 (unnecessary-paren-on-raise-exception)
 77 | from ZeroDivisionError
    |
    = help: Remove unnecessary parentheses
@@ -219,12 +219,12 @@ RSE102.py:76:17: RSE102 [*] Unnecessary parentheses on raised exception
 78 78 | 
 79 79 | raise IndexError() from ZeroDivisionError
 
-RSE102.py:79:17: RSE102 [*] Unnecessary parentheses on raised exception
+RSE102.py:79:17: RSE102 (unnecessary-paren-on-raise-exception) [*] Unnecessary parentheses on raised exception
    |
 77 | from ZeroDivisionError
 78 | 
 79 | raise IndexError() from ZeroDivisionError
-   |                 ^^ RSE102
+   |                 ^^ RSE102 (unnecessary-paren-on-raise-exception)
 80 | 
 81 | raise IndexError();
    |
@@ -240,12 +240,12 @@ RSE102.py:79:17: RSE102 [*] Unnecessary parentheses on raised exception
 81 81 | raise IndexError();
 82 82 | 
 
-RSE102.py:81:17: RSE102 [*] Unnecessary parentheses on raised exception
+RSE102.py:81:17: RSE102 (unnecessary-paren-on-raise-exception) [*] Unnecessary parentheses on raised exception
    |
 79 | raise IndexError() from ZeroDivisionError
 80 | 
 81 | raise IndexError();
-   |                 ^^ RSE102
+   |                 ^^ RSE102 (unnecessary-paren-on-raise-exception)
 82 | 
 83 | # RSE102
    |
@@ -261,11 +261,11 @@ RSE102.py:81:17: RSE102 [*] Unnecessary parentheses on raised exception
 83 83 | # RSE102
 84 84 | raise Foo()
 
-RSE102.py:84:10: RSE102 [*] Unnecessary parentheses on raised exception
+RSE102.py:84:10: RSE102 (unnecessary-paren-on-raise-exception) [*] Unnecessary parentheses on raised exception
    |
 83 | # RSE102
 84 | raise Foo()
-   |          ^^ RSE102
+   |          ^^ RSE102 (unnecessary-paren-on-raise-exception)
 85 | 
 86 | # OK
    |
@@ -281,12 +281,12 @@ RSE102.py:84:10: RSE102 [*] Unnecessary parentheses on raised exception
 86 86 | # OK
 87 87 | raise ctypes.WinError()
 
-RSE102.py:107:27: RSE102 [*] Unnecessary parentheses on raised exception
+RSE102.py:107:27: RSE102 (unnecessary-paren-on-raise-exception) [*] Unnecessary parentheses on raised exception
     |
 105 | future = executor.submit(float, "a")
 106 | if future.exception():
 107 |     raise future.Exception()
-    |                           ^^ RSE102
+    |                           ^^ RSE102 (unnecessary-paren-on-raise-exception)
     |
     = help: Remove unnecessary parentheses
 

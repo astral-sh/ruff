@@ -1,10 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_implicit_str_concat/mod.rs
 ---
-ISC.py:1:5: ISC001 [*] Implicitly concatenated string literals on one line
+ISC.py:1:5: ISC001 (single-line-implicit-string-concatenation) [*] Implicitly concatenated string literals on one line
   |
 1 | _ = "a" "b" "c"
-  |     ^^^^^^^ ISC001
+  |     ^^^^^^^ ISC001 (single-line-implicit-string-concatenation)
 2 | 
 3 | _ = "abc" + "def"
   |
@@ -17,10 +17,10 @@ ISC.py:1:5: ISC001 [*] Implicitly concatenated string literals on one line
 3 3 | _ = "abc" + "def"
 4 4 | 
 
-ISC.py:1:9: ISC001 [*] Implicitly concatenated string literals on one line
+ISC.py:1:9: ISC001 (single-line-implicit-string-concatenation) [*] Implicitly concatenated string literals on one line
   |
 1 | _ = "a" "b" "c"
-  |         ^^^^^^^ ISC001
+  |         ^^^^^^^ ISC001 (single-line-implicit-string-concatenation)
 2 | 
 3 | _ = "abc" + "def"
   |
@@ -33,12 +33,12 @@ ISC.py:1:9: ISC001 [*] Implicitly concatenated string literals on one line
 3 3 | _ = "abc" + "def"
 4 4 | 
 
-ISC.py:38:5: ISC001 [*] Implicitly concatenated string literals on one line
+ISC.py:38:5: ISC001 (single-line-implicit-string-concatenation) [*] Implicitly concatenated string literals on one line
    |
 36 | )
 37 | 
 38 | _ = """a""" """b"""
-   |     ^^^^^^^^^^^^^^^ ISC001
+   |     ^^^^^^^^^^^^^^^ ISC001 (single-line-implicit-string-concatenation)
 39 | 
 40 | _ = """a
    |
@@ -54,7 +54,7 @@ ISC.py:38:5: ISC001 [*] Implicitly concatenated string literals on one line
 40 40 | _ = """a
 41 41 | b""" """c
 
-ISC.py:40:5: ISC001 [*] Implicitly concatenated string literals on one line
+ISC.py:40:5: ISC001 (single-line-implicit-string-concatenation) [*] Implicitly concatenated string literals on one line
    |
 38 |   _ = """a""" """b"""
 39 |   
@@ -62,7 +62,7 @@ ISC.py:40:5: ISC001 [*] Implicitly concatenated string literals on one line
    |  _____^
 41 | | b""" """c
 42 | | d"""
-   | |____^ ISC001
+   | |____^ ISC001 (single-line-implicit-string-concatenation)
 43 |   
 44 |   _ = f"""a""" f"""b"""
    |
@@ -78,12 +78,12 @@ ISC.py:40:5: ISC001 [*] Implicitly concatenated string literals on one line
 43 43 | 
 44 44 | _ = f"""a""" f"""b"""
 
-ISC.py:44:5: ISC001 [*] Implicitly concatenated string literals on one line
+ISC.py:44:5: ISC001 (single-line-implicit-string-concatenation) [*] Implicitly concatenated string literals on one line
    |
 42 | d"""
 43 | 
 44 | _ = f"""a""" f"""b"""
-   |     ^^^^^^^^^^^^^^^^^ ISC001
+   |     ^^^^^^^^^^^^^^^^^ ISC001 (single-line-implicit-string-concatenation)
 45 | 
 46 | _ = f"a" "b"
    |
@@ -99,45 +99,45 @@ ISC.py:44:5: ISC001 [*] Implicitly concatenated string literals on one line
 46 46 | _ = f"a" "b"
 47 47 | 
 
-ISC.py:46:5: ISC001 Implicitly concatenated string literals on one line
+ISC.py:46:5: ISC001 (single-line-implicit-string-concatenation) Implicitly concatenated string literals on one line
    |
 44 | _ = f"""a""" f"""b"""
 45 | 
 46 | _ = f"a" "b"
-   |     ^^^^^^^^ ISC001
+   |     ^^^^^^^^ ISC001 (single-line-implicit-string-concatenation)
 47 | 
 48 | _ = """a""" "b"
    |
    = help: Combine string literals
 
-ISC.py:48:5: ISC001 Implicitly concatenated string literals on one line
+ISC.py:48:5: ISC001 (single-line-implicit-string-concatenation) Implicitly concatenated string literals on one line
    |
 46 | _ = f"a" "b"
 47 | 
 48 | _ = """a""" "b"
-   |     ^^^^^^^^^^^ ISC001
+   |     ^^^^^^^^^^^ ISC001 (single-line-implicit-string-concatenation)
 49 | 
 50 | _ = 'a' "b"
    |
    = help: Combine string literals
 
-ISC.py:50:5: ISC001 Implicitly concatenated string literals on one line
+ISC.py:50:5: ISC001 (single-line-implicit-string-concatenation) Implicitly concatenated string literals on one line
    |
 48 | _ = """a""" "b"
 49 | 
 50 | _ = 'a' "b"
-   |     ^^^^^^^ ISC001
+   |     ^^^^^^^ ISC001 (single-line-implicit-string-concatenation)
 51 | 
 52 | _ = rf"a" rf"b"
    |
    = help: Combine string literals
 
-ISC.py:52:5: ISC001 [*] Implicitly concatenated string literals on one line
+ISC.py:52:5: ISC001 (single-line-implicit-string-concatenation) [*] Implicitly concatenated string literals on one line
    |
 50 | _ = 'a' "b"
 51 | 
 52 | _ = rf"a" rf"b"
-   |     ^^^^^^^^^^^ ISC001
+   |     ^^^^^^^^^^^ ISC001 (single-line-implicit-string-concatenation)
 53 | 
 54 | # Single-line explicit concatenation should be ignored.
    |
@@ -153,11 +153,11 @@ ISC.py:52:5: ISC001 [*] Implicitly concatenated string literals on one line
 54 54 | # Single-line explicit concatenation should be ignored.
 55 55 | _ = "abc" + "def" + "ghi"
 
-ISC.py:64:10: ISC001 [*] Implicitly concatenated string literals on one line
+ISC.py:64:10: ISC001 (single-line-implicit-string-concatenation) [*] Implicitly concatenated string literals on one line
    |
 63 | # Multiple strings nested inside a f-string
 64 | _ = f"a {'b' 'c' 'd'} e"
-   |          ^^^^^^^ ISC001
+   |          ^^^^^^^ ISC001 (single-line-implicit-string-concatenation)
 65 | _ = f"""abc {"def" "ghi"} jkl"""
 66 | _ = f"""abc {
    |
@@ -173,11 +173,11 @@ ISC.py:64:10: ISC001 [*] Implicitly concatenated string literals on one line
 66 66 | _ = f"""abc {
 67 67 |     "def"
 
-ISC.py:64:14: ISC001 [*] Implicitly concatenated string literals on one line
+ISC.py:64:14: ISC001 (single-line-implicit-string-concatenation) [*] Implicitly concatenated string literals on one line
    |
 63 | # Multiple strings nested inside a f-string
 64 | _ = f"a {'b' 'c' 'd'} e"
-   |              ^^^^^^^ ISC001
+   |              ^^^^^^^ ISC001 (single-line-implicit-string-concatenation)
 65 | _ = f"""abc {"def" "ghi"} jkl"""
 66 | _ = f"""abc {
    |
@@ -193,12 +193,12 @@ ISC.py:64:14: ISC001 [*] Implicitly concatenated string literals on one line
 66 66 | _ = f"""abc {
 67 67 |     "def"
 
-ISC.py:65:14: ISC001 [*] Implicitly concatenated string literals on one line
+ISC.py:65:14: ISC001 (single-line-implicit-string-concatenation) [*] Implicitly concatenated string literals on one line
    |
 63 | # Multiple strings nested inside a f-string
 64 | _ = f"a {'b' 'c' 'd'} e"
 65 | _ = f"""abc {"def" "ghi"} jkl"""
-   |              ^^^^^^^^^^^ ISC001
+   |              ^^^^^^^^^^^ ISC001 (single-line-implicit-string-concatenation)
 66 | _ = f"""abc {
 67 |     "def"
    |
@@ -214,31 +214,31 @@ ISC.py:65:14: ISC001 [*] Implicitly concatenated string literals on one line
 67 67 |     "def"
 68 68 |     "ghi"
 
-ISC.py:72:5: ISC001 Implicitly concatenated string literals on one line
+ISC.py:72:5: ISC001 (single-line-implicit-string-concatenation) Implicitly concatenated string literals on one line
    |
 71 | # Nested f-strings
 72 | _ = "a" f"b {f"c" f"d"} e" "f"
-   |     ^^^^^^^^^^^^^^^^^^^^^^ ISC001
+   |     ^^^^^^^^^^^^^^^^^^^^^^ ISC001 (single-line-implicit-string-concatenation)
 73 | _ = f"b {f"c" f"d {f"e" f"f"} g"} h"
 74 | _ = f"b {f"abc" \
    |
    = help: Combine string literals
 
-ISC.py:72:9: ISC001 Implicitly concatenated string literals on one line
+ISC.py:72:9: ISC001 (single-line-implicit-string-concatenation) Implicitly concatenated string literals on one line
    |
 71 | # Nested f-strings
 72 | _ = "a" f"b {f"c" f"d"} e" "f"
-   |         ^^^^^^^^^^^^^^^^^^^^^^ ISC001
+   |         ^^^^^^^^^^^^^^^^^^^^^^ ISC001 (single-line-implicit-string-concatenation)
 73 | _ = f"b {f"c" f"d {f"e" f"f"} g"} h"
 74 | _ = f"b {f"abc" \
    |
    = help: Combine string literals
 
-ISC.py:72:14: ISC001 [*] Implicitly concatenated string literals on one line
+ISC.py:72:14: ISC001 (single-line-implicit-string-concatenation) [*] Implicitly concatenated string literals on one line
    |
 71 | # Nested f-strings
 72 | _ = "a" f"b {f"c" f"d"} e" "f"
-   |              ^^^^^^^^^ ISC001
+   |              ^^^^^^^^^ ISC001 (single-line-implicit-string-concatenation)
 73 | _ = f"b {f"c" f"d {f"e" f"f"} g"} h"
 74 | _ = f"b {f"abc" \
    |
@@ -254,12 +254,12 @@ ISC.py:72:14: ISC001 [*] Implicitly concatenated string literals on one line
 74 74 | _ = f"b {f"abc" \
 75 75 |     f"def"} g"
 
-ISC.py:73:10: ISC001 [*] Implicitly concatenated string literals on one line
+ISC.py:73:10: ISC001 (single-line-implicit-string-concatenation) [*] Implicitly concatenated string literals on one line
    |
 71 | # Nested f-strings
 72 | _ = "a" f"b {f"c" f"d"} e" "f"
 73 | _ = f"b {f"c" f"d {f"e" f"f"} g"} h"
-   |          ^^^^^^^^^^^^^^^^^^^^^^^ ISC001
+   |          ^^^^^^^^^^^^^^^^^^^^^^^ ISC001 (single-line-implicit-string-concatenation)
 74 | _ = f"b {f"abc" \
 75 |     f"def"} g"
    |
@@ -275,12 +275,12 @@ ISC.py:73:10: ISC001 [*] Implicitly concatenated string literals on one line
 75 75 |     f"def"} g"
 76 76 | 
 
-ISC.py:73:20: ISC001 [*] Implicitly concatenated string literals on one line
+ISC.py:73:20: ISC001 (single-line-implicit-string-concatenation) [*] Implicitly concatenated string literals on one line
    |
 71 | # Nested f-strings
 72 | _ = "a" f"b {f"c" f"d"} e" "f"
 73 | _ = f"b {f"c" f"d {f"e" f"f"} g"} h"
-   |                    ^^^^^^^^^ ISC001
+   |                    ^^^^^^^^^ ISC001 (single-line-implicit-string-concatenation)
 74 | _ = f"b {f"abc" \
 75 |     f"def"} g"
    |
@@ -294,6 +294,4 @@ ISC.py:73:20: ISC001 [*] Implicitly concatenated string literals on one line
    73 |+_ = f"b {f"c" f"d {f"ef"} g"} h"
 74 74 | _ = f"b {f"abc" \
 75 75 |     f"def"} g"
-76 76 | 
-
-
+76 76 |

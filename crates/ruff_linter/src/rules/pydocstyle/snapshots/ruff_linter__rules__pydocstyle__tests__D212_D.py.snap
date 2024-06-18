@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 ---
-D.py:129:5: D212 [*] Multi-line docstring summary should start at the first line
+D.py:129:5: D212 (multi-line-summary-first-line) [*] Multi-line docstring summary should start at the first line
     |
 127 |   @expect('D212: Multi-line docstring summary should start at the first line')
 128 |   def asdlkfasd():
@@ -9,7 +9,7 @@ D.py:129:5: D212 [*] Multi-line docstring summary should start at the first line
     |  _____^
 130 | |     Wrong.
 131 | |     """
-    | |_______^ D212
+    | |_______^ D212 (multi-line-summary-first-line)
     |
     = help: Remove whitespace after opening quotes
 
@@ -24,7 +24,7 @@ D.py:129:5: D212 [*] Multi-line docstring summary should start at the first line
 132 131 | 
 133 132 | 
 
-D.py:597:5: D212 [*] Multi-line docstring summary should start at the first line
+D.py:597:5: D212 (multi-line-summary-first-line) [*] Multi-line docstring summary should start at the first line
     |
 595 |   @expect('D212: Multi-line docstring summary should start at the first line')
 596 |   def one_liner():
@@ -32,7 +32,7 @@ D.py:597:5: D212 [*] Multi-line docstring summary should start at the first line
     |  _____^
 598 | | 
 599 | |     Wrong."""
-    | |_____________^ D212
+    | |_____________^ D212 (multi-line-summary-first-line)
     |
     = help: Remove whitespace after opening quotes
 
@@ -48,7 +48,7 @@ D.py:597:5: D212 [*] Multi-line docstring summary should start at the first line
 601 599 | 
 602 600 | @expect('D200: One-line docstring should fit on one line with quotes '
 
-D.py:624:5: D212 [*] Multi-line docstring summary should start at the first line
+D.py:624:5: D212 (multi-line-summary-first-line) [*] Multi-line docstring summary should start at the first line
     |
 622 |   @expect('D212: Multi-line docstring summary should start at the first line')
 623 |   def one_liner():
@@ -56,7 +56,7 @@ D.py:624:5: D212 [*] Multi-line docstring summary should start at the first line
     |  _____^
 625 | | 
 626 | |     "Wrong."""
-    | |______________^ D212
+    | |______________^ D212 (multi-line-summary-first-line)
     |
     = help: Remove whitespace after opening quotes
 
@@ -71,5 +71,3 @@ D.py:624:5: D212 [*] Multi-line docstring summary should start at the first line
 627 625 | 
 628 626 | 
 629 627 | @expect('D404: First word of the docstring should not be "This"')
-
-

@@ -1,11 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-duplicate_bases.py:8:12: PLE0241 Duplicate base `A` for class `B`
+duplicate_bases.py:8:12: PLE0241 (duplicate-bases) Duplicate base `A` for class `B`
   |
 8 | class B(A, A):
-  |            ^ PLE0241
+  |            ^ PLE0241 (duplicate-bases)
 9 |     ...
   |
-
-

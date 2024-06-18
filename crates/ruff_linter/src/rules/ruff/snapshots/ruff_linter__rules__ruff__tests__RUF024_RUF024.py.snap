@@ -1,11 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-RUF024.py:9:1: RUF024 [*] Do not pass mutable objects as values to `dict.fromkeys`
+RUF024.py:9:1: RUF024 (mutable-fromkeys-value) [*] Do not pass mutable objects as values to `dict.fromkeys`
    |
  8 | # Errors.
  9 | dict.fromkeys(pierogi_fillings, [])
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF024
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF024 (mutable-fromkeys-value)
 10 | dict.fromkeys(pierogi_fillings, list())
 11 | dict.fromkeys(pierogi_fillings, {})
    |
@@ -21,12 +21,12 @@ RUF024.py:9:1: RUF024 [*] Do not pass mutable objects as values to `dict.fromkey
 11 11 | dict.fromkeys(pierogi_fillings, {})
 12 12 | dict.fromkeys(pierogi_fillings, set())
 
-RUF024.py:10:1: RUF024 [*] Do not pass mutable objects as values to `dict.fromkeys`
+RUF024.py:10:1: RUF024 (mutable-fromkeys-value) [*] Do not pass mutable objects as values to `dict.fromkeys`
    |
  8 | # Errors.
  9 | dict.fromkeys(pierogi_fillings, [])
 10 | dict.fromkeys(pierogi_fillings, list())
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF024
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF024 (mutable-fromkeys-value)
 11 | dict.fromkeys(pierogi_fillings, {})
 12 | dict.fromkeys(pierogi_fillings, set())
    |
@@ -42,12 +42,12 @@ RUF024.py:10:1: RUF024 [*] Do not pass mutable objects as values to `dict.fromke
 12 12 | dict.fromkeys(pierogi_fillings, set())
 13 13 | dict.fromkeys(pierogi_fillings, {"pre": "populated!"})
 
-RUF024.py:11:1: RUF024 [*] Do not pass mutable objects as values to `dict.fromkeys`
+RUF024.py:11:1: RUF024 (mutable-fromkeys-value) [*] Do not pass mutable objects as values to `dict.fromkeys`
    |
  9 | dict.fromkeys(pierogi_fillings, [])
 10 | dict.fromkeys(pierogi_fillings, list())
 11 | dict.fromkeys(pierogi_fillings, {})
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF024
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF024 (mutable-fromkeys-value)
 12 | dict.fromkeys(pierogi_fillings, set())
 13 | dict.fromkeys(pierogi_fillings, {"pre": "populated!"})
    |
@@ -63,12 +63,12 @@ RUF024.py:11:1: RUF024 [*] Do not pass mutable objects as values to `dict.fromke
 13 13 | dict.fromkeys(pierogi_fillings, {"pre": "populated!"})
 14 14 | dict.fromkeys(pierogi_fillings, dict())
 
-RUF024.py:12:1: RUF024 [*] Do not pass mutable objects as values to `dict.fromkeys`
+RUF024.py:12:1: RUF024 (mutable-fromkeys-value) [*] Do not pass mutable objects as values to `dict.fromkeys`
    |
 10 | dict.fromkeys(pierogi_fillings, list())
 11 | dict.fromkeys(pierogi_fillings, {})
 12 | dict.fromkeys(pierogi_fillings, set())
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF024
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF024 (mutable-fromkeys-value)
 13 | dict.fromkeys(pierogi_fillings, {"pre": "populated!"})
 14 | dict.fromkeys(pierogi_fillings, dict())
    |
@@ -84,12 +84,12 @@ RUF024.py:12:1: RUF024 [*] Do not pass mutable objects as values to `dict.fromke
 14 14 | dict.fromkeys(pierogi_fillings, dict())
 15 15 | import builtins
 
-RUF024.py:13:1: RUF024 [*] Do not pass mutable objects as values to `dict.fromkeys`
+RUF024.py:13:1: RUF024 (mutable-fromkeys-value) [*] Do not pass mutable objects as values to `dict.fromkeys`
    |
 11 | dict.fromkeys(pierogi_fillings, {})
 12 | dict.fromkeys(pierogi_fillings, set())
 13 | dict.fromkeys(pierogi_fillings, {"pre": "populated!"})
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF024
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF024 (mutable-fromkeys-value)
 14 | dict.fromkeys(pierogi_fillings, dict())
 15 | import builtins
    |
@@ -105,12 +105,12 @@ RUF024.py:13:1: RUF024 [*] Do not pass mutable objects as values to `dict.fromke
 15 15 | import builtins
 16 16 | builtins.dict.fromkeys(pierogi_fillings, dict())
 
-RUF024.py:14:1: RUF024 [*] Do not pass mutable objects as values to `dict.fromkeys`
+RUF024.py:14:1: RUF024 (mutable-fromkeys-value) [*] Do not pass mutable objects as values to `dict.fromkeys`
    |
 12 | dict.fromkeys(pierogi_fillings, set())
 13 | dict.fromkeys(pierogi_fillings, {"pre": "populated!"})
 14 | dict.fromkeys(pierogi_fillings, dict())
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF024
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF024 (mutable-fromkeys-value)
 15 | import builtins
 16 | builtins.dict.fromkeys(pierogi_fillings, dict())
    |
@@ -126,12 +126,12 @@ RUF024.py:14:1: RUF024 [*] Do not pass mutable objects as values to `dict.fromke
 16 16 | builtins.dict.fromkeys(pierogi_fillings, dict())
 17 17 | 
 
-RUF024.py:16:1: RUF024 [*] Do not pass mutable objects as values to `dict.fromkeys`
+RUF024.py:16:1: RUF024 (mutable-fromkeys-value) [*] Do not pass mutable objects as values to `dict.fromkeys`
    |
 14 | dict.fromkeys(pierogi_fillings, dict())
 15 | import builtins
 16 | builtins.dict.fromkeys(pierogi_fillings, dict())
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF024
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF024 (mutable-fromkeys-value)
 17 | 
 18 | # Okay.
    |

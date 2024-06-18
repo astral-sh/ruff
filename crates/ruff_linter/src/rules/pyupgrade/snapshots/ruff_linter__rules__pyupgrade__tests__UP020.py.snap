@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 ---
-UP020.py:3:6: UP020 [*] Use builtin `open`
+UP020.py:3:6: UP020 (open-alias) [*] Use builtin `open`
   |
 1 | import io
 2 | 
 3 | with io.open("f.txt", mode="r", buffering=-1, **kwargs) as f:
-  |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP020
+  |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP020 (open-alias)
 4 |     print(f.read())
   |
   = help: Replace with builtin `open`
@@ -20,12 +20,12 @@ UP020.py:3:6: UP020 [*] Use builtin `open`
 5 5 | 
 6 6 | from io import open
 
-UP020.py:8:6: UP020 [*] Use builtin `open`
+UP020.py:8:6: UP020 (open-alias) [*] Use builtin `open`
   |
 6 | from io import open
 7 | 
 8 | with open("f.txt") as f:
-  |      ^^^^^^^^^^^^^ UP020
+  |      ^^^^^^^^^^^^^ UP020 (open-alias)
 9 |     print(f.read())
   |
   = help: Replace with builtin `open`

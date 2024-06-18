@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 ---
-sections.py:67:5: D413 [*] Missing blank line after last section ("Returns")
+sections.py:67:5: D413 (blank-line-after-last-section) [*] Missing blank line after last section ("Returns")
    |
 65 |     """Toggle the gizmo.
 66 | 
 67 |     Returns"""
-   |     ^^^^^^^ D413
+   |     ^^^^^^^ D413 (blank-line-after-last-section)
    |
    = help: Add blank line after "Returns"
 
@@ -22,12 +22,12 @@ sections.py:67:5: D413 [*] Missing blank line after last section ("Returns")
 69 71 | 
 70 72 | @expect(_D213)
 
-sections.py:122:5: D413 [*] Missing blank line after last section ("Returns")
+sections.py:122:5: D413 (blank-line-after-last-section) [*] Missing blank line after last section ("Returns")
     |
 120 |     """Toggle the gizmo.
 121 | 
 122 |     Returns
-    |     ^^^^^^^ D413
+    |     ^^^^^^^ D413 (blank-line-after-last-section)
 123 |     -------
 124 |     A value of some sort.
     |
@@ -42,12 +42,12 @@ sections.py:122:5: D413 [*] Missing blank line after last section ("Returns")
 126 127 | 
 127 128 | 
 
-sections.py:172:5: D413 [*] Missing blank line after last section ("Returns")
+sections.py:172:5: D413 (blank-line-after-last-section) [*] Missing blank line after last section ("Returns")
     |
 170 |     """Toggle the gizmo.
 171 | 
 172 |     Returns
-    |     ^^^^^^^ D413
+    |     ^^^^^^^ D413 (blank-line-after-last-section)
 173 |         -------
 174 |     """
     |
@@ -62,12 +62,12 @@ sections.py:172:5: D413 [*] Missing blank line after last section ("Returns")
 175 176 | 
 176 177 | 
 
-sections.py:521:5: D413 [*] Missing blank line after last section ("Parameters")
+sections.py:521:5: D413 (blank-line-after-last-section) [*] Missing blank line after last section ("Parameters")
     |
 519 |     """Equal length equals should be replaced with dashes.
 520 | 
 521 |     Parameters
-    |     ^^^^^^^^^^ D413
+    |     ^^^^^^^^^^ D413 (blank-line-after-last-section)
 522 |     ==========
 523 |     """
     |
@@ -82,12 +82,12 @@ sections.py:521:5: D413 [*] Missing blank line after last section ("Parameters")
 524 525 | 
 525 526 | 
 
-sections.py:529:5: D413 [*] Missing blank line after last section ("Parameters")
+sections.py:529:5: D413 (blank-line-after-last-section) [*] Missing blank line after last section ("Parameters")
     |
 527 |     """Here, the length of equals is not the same.
 528 | 
 529 |     Parameters
-    |     ^^^^^^^^^^ D413
+    |     ^^^^^^^^^^ D413 (blank-line-after-last-section)
 530 |     ===========
 531 |     """
     |
@@ -102,12 +102,12 @@ sections.py:529:5: D413 [*] Missing blank line after last section ("Parameters")
 532 533 | 
 533 534 | 
 
-sections.py:550:5: D413 [*] Missing blank line after last section ("Args")
+sections.py:550:5: D413 (blank-line-after-last-section) [*] Missing blank line after last section ("Args")
     |
 548 |     """Below, `returns:` should _not_ be considered a section header.
 549 | 
 550 |     Args:
-    |     ^^^^ D413
+    |     ^^^^ D413 (blank-line-after-last-section)
 551 |         Here's a note.
     |
     = help: Add blank line after "Args"
@@ -121,12 +121,12 @@ sections.py:550:5: D413 [*] Missing blank line after last section ("Args")
 555 556 | 
 556 557 | 
 
-sections.py:563:9: D413 [*] Missing blank line after last section ("Returns")
+sections.py:563:9: D413 (blank-line-after-last-section) [*] Missing blank line after last section ("Returns")
     |
 561 |         Here's a note.
 562 | 
 563 |         Returns:
-    |         ^^^^^^^ D413
+    |         ^^^^^^^ D413 (blank-line-after-last-section)
 564 |     """
     |
     = help: Add blank line after "Returns"
@@ -140,12 +140,12 @@ sections.py:563:9: D413 [*] Missing blank line after last section ("Returns")
 565 566 | 
 566 567 | 
 
-sections.py:590:5: D413 [*] Missing blank line after last section ("Parameters")
+sections.py:590:5: D413 (blank-line-after-last-section) [*] Missing blank line after last section ("Parameters")
     |
 588 |     """Test that lower case subsection header is valid even if it has the same name as section kind.
 589 | 
 590 |     Parameters:
-    |     ^^^^^^^^^^ D413
+    |     ^^^^^^^^^^ D413 (blank-line-after-last-section)
 591 |     ----------
 592 |     parameters:
     |

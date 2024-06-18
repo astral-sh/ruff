@@ -1,22 +1,20 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-RUF018.py:2:9: RUF018 Avoid assignment expressions in `assert` statements
+RUF018.py:2:9: RUF018 (assignment-in-assert) Avoid assignment expressions in `assert` statements
   |
 1 | # RUF018
 2 | assert (x := 0) == 0
-  |         ^^^^^^ RUF018
+  |         ^^^^^^ RUF018 (assignment-in-assert)
 3 | assert x, (y := "error")
   |
 
-RUF018.py:3:12: RUF018 Avoid assignment expressions in `assert` statements
+RUF018.py:3:12: RUF018 (assignment-in-assert) Avoid assignment expressions in `assert` statements
   |
 1 | # RUF018
 2 | assert (x := 0) == 0
 3 | assert x, (y := "error")
-  |            ^^^^^^^^^^^^ RUF018
+  |            ^^^^^^^^^^^^ RUF018 (assignment-in-assert)
 4 | 
 5 | # OK
   |
-
-

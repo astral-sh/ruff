@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
 ---
-PYI009.pyi:3:5: PYI009 [*] Empty body should contain `...`, not `pass`
+PYI009.pyi:3:5: PYI009 (pass-statement-stub-body) [*] Empty body should contain `...`, not `pass`
   |
 1 | def bar(): ...  # OK
 2 | def foo():
 3 |     pass  # ERROR PYI009, since we're in a stub file
-  |     ^^^^ PYI009
+  |     ^^^^ PYI009 (pass-statement-stub-body)
 4 | 
 5 | class Bar: ...  # OK
   |
@@ -21,11 +21,11 @@ PYI009.pyi:3:5: PYI009 [*] Empty body should contain `...`, not `pass`
 5 5 | class Bar: ...  # OK
 6 6 | 
 
-PYI009.pyi:8:5: PYI009 [*] Empty body should contain `...`, not `pass`
+PYI009.pyi:8:5: PYI009 (pass-statement-stub-body) [*] Empty body should contain `...`, not `pass`
   |
 7 | class Foo:
 8 |     pass  # ERROR PYI009, since we're in a stub file
-  |     ^^^^ PYI009
+  |     ^^^^ PYI009 (pass-statement-stub-body)
   |
   = help: Replace `pass` with `...`
 
@@ -35,5 +35,3 @@ PYI009.pyi:8:5: PYI009 [*] Empty body should contain `...`, not `pass`
 7 7 | class Foo:
 8   |-    pass  # ERROR PYI009, since we're in a stub file
   8 |+    ...  # ERROR PYI009, since we're in a stub file
-
-

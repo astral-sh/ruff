@@ -1,18 +1,18 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_future_annotations/mod.rs
 ---
-edge_case.py:5:13: FA100 Add `from __future__ import annotations` to simplify `typing.List`
+edge_case.py:5:13: FA100 (future-rewritable-type-annotation) Add `from __future__ import annotations` to simplify `typing.List`
   |
 5 | def main(_: List[int]) -> None:
-  |             ^^^^ FA100
+  |             ^^^^ FA100 (future-rewritable-type-annotation)
 6 |     a_list: t.List[str] = []
 7 |     a_list.append("hello")
   |
 
-edge_case.py:6:13: FA100 Add `from __future__ import annotations` to simplify `typing.List`
+edge_case.py:6:13: FA100 (future-rewritable-type-annotation) Add `from __future__ import annotations` to simplify `typing.List`
   |
 5 | def main(_: List[int]) -> None:
 6 |     a_list: t.List[str] = []
-  |             ^^^^^^ FA100
+  |             ^^^^^^ FA100 (future-rewritable-type-annotation)
 7 |     a_list.append("hello")
   |

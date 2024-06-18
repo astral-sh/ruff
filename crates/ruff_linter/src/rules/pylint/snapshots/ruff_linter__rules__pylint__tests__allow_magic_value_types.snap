@@ -1,49 +1,47 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-magic_value_comparison.py:56:12: PLR2004 Magic value used in comparison, consider replacing `-2.0` with a constant variable
+magic_value_comparison.py:56:12: PLR2004 (magic-value-comparison) Magic value used in comparison, consider replacing `-2.0` with a constant variable
    |
 54 |     pass
 55 | 
 56 | if argc != -2.0:  # [magic-value-comparison]
-   |            ^^^^ PLR2004
+   |            ^^^^ PLR2004 (magic-value-comparison)
 57 |     pass
    |
 
-magic_value_comparison.py:59:12: PLR2004 Magic value used in comparison, consider replacing `+2.0` with a constant variable
+magic_value_comparison.py:59:12: PLR2004 (magic-value-comparison) Magic value used in comparison, consider replacing `+2.0` with a constant variable
    |
 57 |     pass
 58 | 
 59 | if argc != +2.0:  # [magic-value-comparison]
-   |            ^^^^ PLR2004
+   |            ^^^^ PLR2004 (magic-value-comparison)
 60 |     pass
    |
 
-magic_value_comparison.py:74:22: PLR2004 Magic value used in comparison, consider replacing `"Hunter2"` with a constant variable
+magic_value_comparison.py:74:22: PLR2004 (magic-value-comparison) Magic value used in comparison, consider replacing `"Hunter2"` with a constant variable
    |
 72 |     pass
 73 | 
 74 | if input_password == "Hunter2":  # correct
-   |                      ^^^^^^^^^ PLR2004
+   |                      ^^^^^^^^^ PLR2004 (magic-value-comparison)
 75 |     pass
    |
 
-magic_value_comparison.py:80:21: PLR2004 Magic value used in comparison, consider replacing `3.141592653589793238` with a constant variable
+magic_value_comparison.py:80:21: PLR2004 (magic-value-comparison) Magic value used in comparison, consider replacing `3.141592653589793238` with a constant variable
    |
 78 | pi_estimation = 3.14
 79 | 
 80 | if pi_estimation == 3.141592653589793238:  # [magic-value-comparison]
-   |                     ^^^^^^^^^^^^^^^^^^^^ PLR2004
+   |                     ^^^^^^^^^^^^^^^^^^^^ PLR2004 (magic-value-comparison)
 81 |     pass
    |
 
-magic_value_comparison.py:92:18: PLR2004 Magic value used in comparison, consider replacing `b"something"` with a constant variable
+magic_value_comparison.py:92:18: PLR2004 (magic-value-comparison) Magic value used in comparison, consider replacing `b"something"` with a constant variable
    |
 90 | user_input = b"Hello, There!"
 91 | 
 92 | if user_input == b"something":  # correct
-   |                  ^^^^^^^^^^^^ PLR2004
+   |                  ^^^^^^^^^^^^ PLR2004 (magic-value-comparison)
 93 |     pass
    |
-
-

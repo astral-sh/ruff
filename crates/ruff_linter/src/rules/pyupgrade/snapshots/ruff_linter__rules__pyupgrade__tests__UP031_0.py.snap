@@ -1,11 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 ---
-UP031_0.py:4:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:4:7: UP031 (printf-string-formatting) [*] Use format specifiers instead of percent format
   |
 3 | # UP031
 4 | print('%s %s' % (a, b))
-  |       ^^^^^^^^^^^^^^^^ UP031
+  |       ^^^^^^^^^^^^^^^^ UP031 (printf-string-formatting)
 5 | 
 6 | print('%s%s' % (a, b))
   |
@@ -21,12 +21,12 @@ UP031_0.py:4:7: UP031 [*] Use format specifiers instead of percent format
 6 6 | print('%s%s' % (a, b))
 7 7 | 
 
-UP031_0.py:6:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:6:7: UP031 (printf-string-formatting) [*] Use format specifiers instead of percent format
   |
 4 | print('%s %s' % (a, b))
 5 | 
 6 | print('%s%s' % (a, b))
-  |       ^^^^^^^^^^^^^^^ UP031
+  |       ^^^^^^^^^^^^^^^ UP031 (printf-string-formatting)
 7 | 
 8 | print("trivial" % ())
   |
@@ -42,12 +42,12 @@ UP031_0.py:6:7: UP031 [*] Use format specifiers instead of percent format
 8 8 | print("trivial" % ())
 9 9 | 
 
-UP031_0.py:8:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:8:7: UP031 (printf-string-formatting) [*] Use format specifiers instead of percent format
    |
  6 | print('%s%s' % (a, b))
  7 | 
  8 | print("trivial" % ())
-   |       ^^^^^^^^^^^^^^ UP031
+   |       ^^^^^^^^^^^^^^ UP031 (printf-string-formatting)
  9 | 
 10 | print("%s" % ("simple",))
    |
@@ -63,12 +63,12 @@ UP031_0.py:8:7: UP031 [*] Use format specifiers instead of percent format
 10 10 | print("%s" % ("simple",))
 11 11 | 
 
-UP031_0.py:10:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:10:7: UP031 (printf-string-formatting) [*] Use format specifiers instead of percent format
    |
  8 | print("trivial" % ())
  9 | 
 10 | print("%s" % ("simple",))
-   |       ^^^^^^^^^^^^^^^^^^ UP031
+   |       ^^^^^^^^^^^^^^^^^^ UP031 (printf-string-formatting)
 11 | 
 12 | print("%s" % ("%s" % ("nested",),))
    |
@@ -84,12 +84,12 @@ UP031_0.py:10:7: UP031 [*] Use format specifiers instead of percent format
 12 12 | print("%s" % ("%s" % ("nested",),))
 13 13 | 
 
-UP031_0.py:12:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:12:7: UP031 (printf-string-formatting) [*] Use format specifiers instead of percent format
    |
 10 | print("%s" % ("simple",))
 11 | 
 12 | print("%s" % ("%s" % ("nested",),))
-   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP031
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP031 (printf-string-formatting)
 13 | 
 14 | print("%s%% percent" % (15,))
    |
@@ -105,12 +105,12 @@ UP031_0.py:12:7: UP031 [*] Use format specifiers instead of percent format
 14 14 | print("%s%% percent" % (15,))
 15 15 | 
 
-UP031_0.py:12:15: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:12:15: UP031 (printf-string-formatting) [*] Use format specifiers instead of percent format
    |
 10 | print("%s" % ("simple",))
 11 | 
 12 | print("%s" % ("%s" % ("nested",),))
-   |               ^^^^^^^^^^^^^^^^^^ UP031
+   |               ^^^^^^^^^^^^^^^^^^ UP031 (printf-string-formatting)
 13 | 
 14 | print("%s%% percent" % (15,))
    |
@@ -126,12 +126,12 @@ UP031_0.py:12:15: UP031 [*] Use format specifiers instead of percent format
 14 14 | print("%s%% percent" % (15,))
 15 15 | 
 
-UP031_0.py:14:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:14:7: UP031 (printf-string-formatting) [*] Use format specifiers instead of percent format
    |
 12 | print("%s" % ("%s" % ("nested",),))
 13 | 
 14 | print("%s%% percent" % (15,))
-   |       ^^^^^^^^^^^^^^^^^^^^^^ UP031
+   |       ^^^^^^^^^^^^^^^^^^^^^^ UP031 (printf-string-formatting)
 15 | 
 16 | print("%f" % (15,))
    |
@@ -147,12 +147,12 @@ UP031_0.py:14:7: UP031 [*] Use format specifiers instead of percent format
 16 16 | print("%f" % (15,))
 17 17 | 
 
-UP031_0.py:16:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:16:7: UP031 (printf-string-formatting) [*] Use format specifiers instead of percent format
    |
 14 | print("%s%% percent" % (15,))
 15 | 
 16 | print("%f" % (15,))
-   |       ^^^^^^^^^^^^ UP031
+   |       ^^^^^^^^^^^^ UP031 (printf-string-formatting)
 17 | 
 18 | print("%.f" % (15,))
    |
@@ -168,12 +168,12 @@ UP031_0.py:16:7: UP031 [*] Use format specifiers instead of percent format
 18 18 | print("%.f" % (15,))
 19 19 | 
 
-UP031_0.py:18:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:18:7: UP031 (printf-string-formatting) [*] Use format specifiers instead of percent format
    |
 16 | print("%f" % (15,))
 17 | 
 18 | print("%.f" % (15,))
-   |       ^^^^^^^^^^^^^ UP031
+   |       ^^^^^^^^^^^^^ UP031 (printf-string-formatting)
 19 | 
 20 | print("%.3f" % (15,))
    |
@@ -189,12 +189,12 @@ UP031_0.py:18:7: UP031 [*] Use format specifiers instead of percent format
 20 20 | print("%.3f" % (15,))
 21 21 | 
 
-UP031_0.py:20:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:20:7: UP031 (printf-string-formatting) [*] Use format specifiers instead of percent format
    |
 18 | print("%.f" % (15,))
 19 | 
 20 | print("%.3f" % (15,))
-   |       ^^^^^^^^^^^^^^ UP031
+   |       ^^^^^^^^^^^^^^ UP031 (printf-string-formatting)
 21 | 
 22 | print("%3f" % (15,))
    |
@@ -210,12 +210,12 @@ UP031_0.py:20:7: UP031 [*] Use format specifiers instead of percent format
 22 22 | print("%3f" % (15,))
 23 23 | 
 
-UP031_0.py:22:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:22:7: UP031 (printf-string-formatting) [*] Use format specifiers instead of percent format
    |
 20 | print("%.3f" % (15,))
 21 | 
 22 | print("%3f" % (15,))
-   |       ^^^^^^^^^^^^^ UP031
+   |       ^^^^^^^^^^^^^ UP031 (printf-string-formatting)
 23 | 
 24 | print("%-5f" % (5,))
    |
@@ -231,12 +231,12 @@ UP031_0.py:22:7: UP031 [*] Use format specifiers instead of percent format
 24 24 | print("%-5f" % (5,))
 25 25 | 
 
-UP031_0.py:24:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:24:7: UP031 (printf-string-formatting) [*] Use format specifiers instead of percent format
    |
 22 | print("%3f" % (15,))
 23 | 
 24 | print("%-5f" % (5,))
-   |       ^^^^^^^^^^^^^ UP031
+   |       ^^^^^^^^^^^^^ UP031 (printf-string-formatting)
 25 | 
 26 | print("%9f" % (5,))
    |
@@ -252,12 +252,12 @@ UP031_0.py:24:7: UP031 [*] Use format specifiers instead of percent format
 26 26 | print("%9f" % (5,))
 27 27 | 
 
-UP031_0.py:26:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:26:7: UP031 (printf-string-formatting) [*] Use format specifiers instead of percent format
    |
 24 | print("%-5f" % (5,))
 25 | 
 26 | print("%9f" % (5,))
-   |       ^^^^^^^^^^^^ UP031
+   |       ^^^^^^^^^^^^ UP031 (printf-string-formatting)
 27 | 
 28 | print("%#o" % (123,))
    |
@@ -273,12 +273,12 @@ UP031_0.py:26:7: UP031 [*] Use format specifiers instead of percent format
 28 28 | print("%#o" % (123,))
 29 29 | 
 
-UP031_0.py:28:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:28:7: UP031 (printf-string-formatting) [*] Use format specifiers instead of percent format
    |
 26 | print("%9f" % (5,))
 27 | 
 28 | print("%#o" % (123,))
-   |       ^^^^^^^^^^^^^^ UP031
+   |       ^^^^^^^^^^^^^^ UP031 (printf-string-formatting)
 29 | 
 30 | print("brace {} %s" % (1,))
    |
@@ -294,12 +294,12 @@ UP031_0.py:28:7: UP031 [*] Use format specifiers instead of percent format
 30 30 | print("brace {} %s" % (1,))
 31 31 | 
 
-UP031_0.py:30:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:30:7: UP031 (printf-string-formatting) [*] Use format specifiers instead of percent format
    |
 28 | print("%#o" % (123,))
 29 | 
 30 | print("brace {} %s" % (1,))
-   |       ^^^^^^^^^^^^^^^^^^^^ UP031
+   |       ^^^^^^^^^^^^^^^^^^^^ UP031 (printf-string-formatting)
 31 | 
 32 | print((
    |
@@ -315,13 +315,13 @@ UP031_0.py:30:7: UP031 [*] Use format specifiers instead of percent format
 32 32 | print((
 33 33 |     "foo %s "
 
-UP031_0.py:33:5: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:33:5: UP031 (printf-string-formatting) [*] Use format specifiers instead of percent format
    |
 32 |   print((
 33 |       "foo %s "
    |  _____^
 34 | |     "bar %s" % (x, y)
-   | |_____________________^ UP031
+   | |_____________________^ UP031 (printf-string-formatting)
 35 |   ))
    |
    = help: Replace with format specifiers
@@ -338,14 +338,14 @@ UP031_0.py:33:5: UP031 [*] Use format specifiers instead of percent format
 36 36 | 
 37 37 | print(
 
-UP031_0.py:38:3: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:38:3: UP031 (printf-string-formatting) [*] Use format specifiers instead of percent format
    |
 37 |   print(
 38 |     "%s" % (
    |  ___^
 39 | |     "trailing comma",
 40 | |         )
-   | |_________^ UP031
+   | |_________^ UP031 (printf-string-formatting)
 41 |   )
    |
    = help: Replace with format specifiers
@@ -360,12 +360,12 @@ UP031_0.py:38:3: UP031 [*] Use format specifiers instead of percent format
 40 40 |         )
 41 41 | )
 
-UP031_0.py:43:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:43:7: UP031 (printf-string-formatting) [*] Use format specifiers instead of percent format
    |
 41 | )
 42 | 
 43 | print("foo %s " % (x,))
-   |       ^^^^^^^^^^^^^^^^ UP031
+   |       ^^^^^^^^^^^^^^^^ UP031 (printf-string-formatting)
 44 | 
 45 | print("%(k)s" % {"k": "v"})
    |
@@ -381,12 +381,12 @@ UP031_0.py:43:7: UP031 [*] Use format specifiers instead of percent format
 45 45 | print("%(k)s" % {"k": "v"})
 46 46 | 
 
-UP031_0.py:45:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:45:7: UP031 (printf-string-formatting) [*] Use format specifiers instead of percent format
    |
 43 | print("foo %s " % (x,))
 44 | 
 45 | print("%(k)s" % {"k": "v"})
-   |       ^^^^^^^^^^^^^^^^^^^^ UP031
+   |       ^^^^^^^^^^^^^^^^^^^^ UP031 (printf-string-formatting)
 46 | 
 47 | print("%(k)s" % {
    |
@@ -402,7 +402,7 @@ UP031_0.py:45:7: UP031 [*] Use format specifiers instead of percent format
 47 47 | print("%(k)s" % {
 48 48 |     "k": "v",
 
-UP031_0.py:47:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:47:7: UP031 (printf-string-formatting) [*] Use format specifiers instead of percent format
    |
 45 |   print("%(k)s" % {"k": "v"})
 46 |   
@@ -411,7 +411,7 @@ UP031_0.py:47:7: UP031 [*] Use format specifiers instead of percent format
 48 | |     "k": "v",
 49 | |     "i": "j"
 50 | | })
-   | |_^ UP031
+   | |_^ UP031 (printf-string-formatting)
 51 |   
 52 |   print("%(to_list)s" % {"to_list": []})
    |
@@ -433,12 +433,12 @@ UP031_0.py:47:7: UP031 [*] Use format specifiers instead of percent format
 52 52 | print("%(to_list)s" % {"to_list": []})
 53 53 | 
 
-UP031_0.py:52:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:52:7: UP031 (printf-string-formatting) [*] Use format specifiers instead of percent format
    |
 50 | })
 51 | 
 52 | print("%(to_list)s" % {"to_list": []})
-   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP031
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP031 (printf-string-formatting)
 53 | 
 54 | print("%(k)s" % {"k": "v", "i": 1, "j": []})
    |
@@ -454,12 +454,12 @@ UP031_0.py:52:7: UP031 [*] Use format specifiers instead of percent format
 54 54 | print("%(k)s" % {"k": "v", "i": 1, "j": []})
 55 55 | 
 
-UP031_0.py:54:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:54:7: UP031 (printf-string-formatting) [*] Use format specifiers instead of percent format
    |
 52 | print("%(to_list)s" % {"to_list": []})
 53 | 
 54 | print("%(k)s" % {"k": "v", "i": 1, "j": []})
-   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP031
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP031 (printf-string-formatting)
 55 | 
 56 | print("%(ab)s" % {"a" "b": 1})
    |
@@ -475,12 +475,12 @@ UP031_0.py:54:7: UP031 [*] Use format specifiers instead of percent format
 56 56 | print("%(ab)s" % {"a" "b": 1})
 57 57 | 
 
-UP031_0.py:56:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:56:7: UP031 (printf-string-formatting) [*] Use format specifiers instead of percent format
    |
 54 | print("%(k)s" % {"k": "v", "i": 1, "j": []})
 55 | 
 56 | print("%(ab)s" % {"a" "b": 1})
-   |       ^^^^^^^^^^^^^^^^^^^^^^^ UP031
+   |       ^^^^^^^^^^^^^^^^^^^^^^^ UP031 (printf-string-formatting)
 57 | 
 58 | print("%(a)s" % {"a"  :  1})
    |
@@ -496,12 +496,12 @@ UP031_0.py:56:7: UP031 [*] Use format specifiers instead of percent format
 58 58 | print("%(a)s" % {"a"  :  1})
 59 59 | 
 
-UP031_0.py:58:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:58:7: UP031 (printf-string-formatting) [*] Use format specifiers instead of percent format
    |
 56 | print("%(ab)s" % {"a" "b": 1})
 57 | 
 58 | print("%(a)s" % {"a"  :  1})
-   |       ^^^^^^^^^^^^^^^^^^^^^ UP031
+   |       ^^^^^^^^^^^^^^^^^^^^^ UP031 (printf-string-formatting)
    |
    = help: Replace with format specifiers
 
@@ -515,13 +515,13 @@ UP031_0.py:58:7: UP031 [*] Use format specifiers instead of percent format
 60 60 | 
 61 61 | print(
 
-UP031_0.py:62:5: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:62:5: UP031 (printf-string-formatting) [*] Use format specifiers instead of percent format
    |
 61 |   print(
 62 |       "foo %(foo)s "
    |  _____^
 63 | |     "bar %(bar)s" % {"foo": x, "bar": y}
-   | |________________________________________^ UP031
+   | |________________________________________^ UP031 (printf-string-formatting)
 64 |   )
    |
    = help: Replace with format specifiers
@@ -538,14 +538,14 @@ UP031_0.py:62:5: UP031 [*] Use format specifiers instead of percent format
 65 65 | 
 66 66 | bar = {"bar": y}
 
-UP031_0.py:68:5: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:68:5: UP031 (printf-string-formatting) [*] Use format specifiers instead of percent format
    |
 66 |   bar = {"bar": y}
 67 |   print(
 68 |       "foo %(foo)s "
    |  _____^
 69 | |     "bar %(bar)s" % {"foo": x, **bar}
-   | |_____________________________________^ UP031
+   | |_____________________________________^ UP031 (printf-string-formatting)
 70 |   )
    |
    = help: Replace with format specifiers
@@ -562,12 +562,12 @@ UP031_0.py:68:5: UP031 [*] Use format specifiers instead of percent format
 71 71 | 
 72 72 | print("%s \N{snowman}" % (a,))
 
-UP031_0.py:72:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:72:7: UP031 (printf-string-formatting) [*] Use format specifiers instead of percent format
    |
 70 | )
 71 | 
 72 | print("%s \N{snowman}" % (a,))
-   |       ^^^^^^^^^^^^^^^^^^^^^^^ UP031
+   |       ^^^^^^^^^^^^^^^^^^^^^^^ UP031 (printf-string-formatting)
 73 | 
 74 | print("%(foo)s \N{snowman}" % {"foo": 1})
    |
@@ -583,12 +583,12 @@ UP031_0.py:72:7: UP031 [*] Use format specifiers instead of percent format
 74 74 | print("%(foo)s \N{snowman}" % {"foo": 1})
 75 75 | 
 
-UP031_0.py:74:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:74:7: UP031 (printf-string-formatting) [*] Use format specifiers instead of percent format
    |
 72 | print("%s \N{snowman}" % (a,))
 73 | 
 74 | print("%(foo)s \N{snowman}" % {"foo": 1})
-   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP031
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP031 (printf-string-formatting)
 75 | 
 76 | print(("foo %s " "bar %s") % (x, y))
    |
@@ -604,12 +604,12 @@ UP031_0.py:74:7: UP031 [*] Use format specifiers instead of percent format
 76 76 | print(("foo %s " "bar %s") % (x, y))
 77 77 | 
 
-UP031_0.py:76:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:76:7: UP031 (printf-string-formatting) [*] Use format specifiers instead of percent format
    |
 74 | print("%(foo)s \N{snowman}" % {"foo": 1})
 75 | 
 76 | print(("foo %s " "bar %s") % (x, y))
-   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP031
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP031 (printf-string-formatting)
 77 | 
 78 | # Single-value expressions
    |
@@ -625,11 +625,11 @@ UP031_0.py:76:7: UP031 [*] Use format specifiers instead of percent format
 78 78 | # Single-value expressions
 79 79 | print('Hello %s' % "World")
 
-UP031_0.py:79:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:79:7: UP031 (printf-string-formatting) [*] Use format specifiers instead of percent format
    |
 78 | # Single-value expressions
 79 | print('Hello %s' % "World")
-   |       ^^^^^^^^^^^^^^^^^^^^ UP031
+   |       ^^^^^^^^^^^^^^^^^^^^ UP031 (printf-string-formatting)
 80 | print('Hello %s' % f"World")
 81 | print('Hello %s (%s)' % bar)
    |
@@ -645,12 +645,12 @@ UP031_0.py:79:7: UP031 [*] Use format specifiers instead of percent format
 81 81 | print('Hello %s (%s)' % bar)
 82 82 | print('Hello %s (%s)' % bar.baz)
 
-UP031_0.py:80:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:80:7: UP031 (printf-string-formatting) [*] Use format specifiers instead of percent format
    |
 78 | # Single-value expressions
 79 | print('Hello %s' % "World")
 80 | print('Hello %s' % f"World")
-   |       ^^^^^^^^^^^^^^^^^^^^^ UP031
+   |       ^^^^^^^^^^^^^^^^^^^^^ UP031 (printf-string-formatting)
 81 | print('Hello %s (%s)' % bar)
 82 | print('Hello %s (%s)' % bar.baz)
    |
@@ -666,12 +666,12 @@ UP031_0.py:80:7: UP031 [*] Use format specifiers instead of percent format
 82 82 | print('Hello %s (%s)' % bar.baz)
 83 83 | print('Hello %s (%s)' % bar['bop'])
 
-UP031_0.py:81:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:81:7: UP031 (printf-string-formatting) [*] Use format specifiers instead of percent format
    |
 79 | print('Hello %s' % "World")
 80 | print('Hello %s' % f"World")
 81 | print('Hello %s (%s)' % bar)
-   |       ^^^^^^^^^^^^^^^^^^^^^ UP031
+   |       ^^^^^^^^^^^^^^^^^^^^^ UP031 (printf-string-formatting)
 82 | print('Hello %s (%s)' % bar.baz)
 83 | print('Hello %s (%s)' % bar['bop'])
    |
@@ -687,12 +687,12 @@ UP031_0.py:81:7: UP031 [*] Use format specifiers instead of percent format
 83 83 | print('Hello %s (%s)' % bar['bop'])
 84 84 | print('Hello %(arg)s' % bar)
 
-UP031_0.py:82:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:82:7: UP031 (printf-string-formatting) [*] Use format specifiers instead of percent format
    |
 80 | print('Hello %s' % f"World")
 81 | print('Hello %s (%s)' % bar)
 82 | print('Hello %s (%s)' % bar.baz)
-   |       ^^^^^^^^^^^^^^^^^^^^^^^^^ UP031
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^^ UP031 (printf-string-formatting)
 83 | print('Hello %s (%s)' % bar['bop'])
 84 | print('Hello %(arg)s' % bar)
    |
@@ -708,12 +708,12 @@ UP031_0.py:82:7: UP031 [*] Use format specifiers instead of percent format
 84 84 | print('Hello %(arg)s' % bar)
 85 85 | print('Hello %(arg)s' % bar.baz)
 
-UP031_0.py:83:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:83:7: UP031 (printf-string-formatting) [*] Use format specifiers instead of percent format
    |
 81 | print('Hello %s (%s)' % bar)
 82 | print('Hello %s (%s)' % bar.baz)
 83 | print('Hello %s (%s)' % bar['bop'])
-   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP031
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP031 (printf-string-formatting)
 84 | print('Hello %(arg)s' % bar)
 85 | print('Hello %(arg)s' % bar.baz)
    |
@@ -729,12 +729,12 @@ UP031_0.py:83:7: UP031 [*] Use format specifiers instead of percent format
 85 85 | print('Hello %(arg)s' % bar.baz)
 86 86 | print('Hello %(arg)s' % bar['bop'])
 
-UP031_0.py:84:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:84:7: UP031 (printf-string-formatting) [*] Use format specifiers instead of percent format
    |
 82 | print('Hello %s (%s)' % bar.baz)
 83 | print('Hello %s (%s)' % bar['bop'])
 84 | print('Hello %(arg)s' % bar)
-   |       ^^^^^^^^^^^^^^^^^^^^^ UP031
+   |       ^^^^^^^^^^^^^^^^^^^^^ UP031 (printf-string-formatting)
 85 | print('Hello %(arg)s' % bar.baz)
 86 | print('Hello %(arg)s' % bar['bop'])
    |
@@ -750,12 +750,12 @@ UP031_0.py:84:7: UP031 [*] Use format specifiers instead of percent format
 86 86 | print('Hello %(arg)s' % bar['bop'])
 87 87 | 
 
-UP031_0.py:85:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:85:7: UP031 (printf-string-formatting) [*] Use format specifiers instead of percent format
    |
 83 | print('Hello %s (%s)' % bar['bop'])
 84 | print('Hello %(arg)s' % bar)
 85 | print('Hello %(arg)s' % bar.baz)
-   |       ^^^^^^^^^^^^^^^^^^^^^^^^^ UP031
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^^ UP031 (printf-string-formatting)
 86 | print('Hello %(arg)s' % bar['bop'])
    |
    = help: Replace with format specifiers
@@ -770,12 +770,12 @@ UP031_0.py:85:7: UP031 [*] Use format specifiers instead of percent format
 87 87 | 
 88 88 | # Hanging modulos
 
-UP031_0.py:86:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:86:7: UP031 (printf-string-formatting) [*] Use format specifiers instead of percent format
    |
 84 | print('Hello %(arg)s' % bar)
 85 | print('Hello %(arg)s' % bar.baz)
 86 | print('Hello %(arg)s' % bar['bop'])
-   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP031
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP031 (printf-string-formatting)
 87 | 
 88 | # Hanging modulos
    |
@@ -791,14 +791,14 @@ UP031_0.py:86:7: UP031 [*] Use format specifiers instead of percent format
 88 88 | # Hanging modulos
 89 89 | (
 
-UP031_0.py:89:1: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:89:1: UP031 (printf-string-formatting) [*] Use format specifiers instead of percent format
    |
 88 |   # Hanging modulos
 89 | / (
 90 | |     "foo %s "
 91 | |     "bar %s"
 92 | | ) % (x, y)
-   | |__________^ UP031
+   | |__________^ UP031 (printf-string-formatting)
 93 |   
 94 |   (
    |
@@ -818,7 +818,7 @@ UP031_0.py:89:1: UP031 [*] Use format specifiers instead of percent format
 94 94 | (
 95 95 |     "foo %(foo)s "
 
-UP031_0.py:94:1: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:94:1: UP031 (printf-string-formatting) [*] Use format specifiers instead of percent format
    |
 92 |   ) % (x, y)
 93 |   
@@ -826,7 +826,7 @@ UP031_0.py:94:1: UP031 [*] Use format specifiers instead of percent format
 95 | |     "foo %(foo)s "
 96 | |     "bar %(bar)s"
 97 | | ) % {"foo": x, "bar": y}
-   | |________________________^ UP031
+   | |________________________^ UP031 (printf-string-formatting)
 98 |   
 99 |   (
    |
@@ -846,13 +846,13 @@ UP031_0.py:94:1: UP031 [*] Use format specifiers instead of percent format
 99 99 | (
 100 100 |     """foo %s"""
 
-UP031_0.py:100:5: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:100:5: UP031 (printf-string-formatting) [*] Use format specifiers instead of percent format
     |
  99 |   (
 100 |       """foo %s"""
     |  _____^
 101 | |     % (x,)
-    | |__________^ UP031
+    | |__________^ UP031 (printf-string-formatting)
 102 |   )
     |
     = help: Replace with format specifiers
@@ -868,7 +868,7 @@ UP031_0.py:100:5: UP031 [*] Use format specifiers instead of percent format
 103 102 | 
 104 103 | (
 
-UP031_0.py:105:5: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:105:5: UP031 (printf-string-formatting) [*] Use format specifiers instead of percent format
     |
 104 |   (
 105 |       """
@@ -876,7 +876,7 @@ UP031_0.py:105:5: UP031 [*] Use format specifiers instead of percent format
 106 | |     foo %s
 107 | |     """
 108 | |     % (x,)
-    | |__________^ UP031
+    | |__________^ UP031 (printf-string-formatting)
 109 |   )
     |
     = help: Replace with format specifiers
@@ -894,14 +894,14 @@ UP031_0.py:105:5: UP031 [*] Use format specifiers instead of percent format
 110 109 | 
 111 110 | "%s" % (
 
-UP031_0.py:111:1: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:111:1: UP031 (printf-string-formatting) [*] Use format specifiers instead of percent format
     |
 109 |   )
 110 |   
 111 | / "%s" % (
 112 | |     x,  # comment
 113 | | )
-    | |_^ UP031
+    | |_^ UP031 (printf-string-formatting)
     |
     = help: Replace with format specifiers
 
@@ -915,7 +915,7 @@ UP031_0.py:111:1: UP031 [*] Use format specifiers instead of percent format
 113 113 | )
 114 114 | 
 
-UP031_0.py:116:8: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:116:8: UP031 (printf-string-formatting) [*] Use format specifiers instead of percent format
     |
 116 |   path = "%s-%s-%s.pem" % (
     |  ________^
@@ -923,7 +923,7 @@ UP031_0.py:116:8: UP031 [*] Use format specifiers instead of percent format
 118 | |     cert.not_valid_after.date().isoformat().replace("-", ""), # expiration date
 119 | |     hexlify(cert.fingerprint(hashes.SHA256())).decode("ascii")[0:8], # fingerprint prefix
 120 | | )
-    | |_^ UP031
+    | |_^ UP031 (printf-string-formatting)
 121 |   
 122 |   # UP031 (no longer false negatives; now offer potentially unsafe fixes)
     |
@@ -939,11 +939,11 @@ UP031_0.py:116:8: UP031 [*] Use format specifiers instead of percent format
 118 118 |     cert.not_valid_after.date().isoformat().replace("-", ""), # expiration date
 119 119 |     hexlify(cert.fingerprint(hashes.SHA256())).decode("ascii")[0:8], # fingerprint prefix
 
-UP031_0.py:123:1: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:123:1: UP031 (printf-string-formatting) [*] Use format specifiers instead of percent format
     |
 122 | # UP031 (no longer false negatives; now offer potentially unsafe fixes)
 123 | 'Hello %s' % bar
-    | ^^^^^^^^^^^^^^^^ UP031
+    | ^^^^^^^^^^^^^^^^ UP031 (printf-string-formatting)
 124 | 
 125 | 'Hello %s' % bar.baz
     |
@@ -959,12 +959,12 @@ UP031_0.py:123:1: UP031 [*] Use format specifiers instead of percent format
 125 125 | 'Hello %s' % bar.baz
 126 126 | 
 
-UP031_0.py:125:1: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:125:1: UP031 (printf-string-formatting) [*] Use format specifiers instead of percent format
     |
 123 | 'Hello %s' % bar
 124 | 
 125 | 'Hello %s' % bar.baz
-    | ^^^^^^^^^^^^^^^^^^^^ UP031
+    | ^^^^^^^^^^^^^^^^^^^^ UP031 (printf-string-formatting)
 126 | 
 127 | 'Hello %s' % bar['bop']
     |
@@ -980,12 +980,12 @@ UP031_0.py:125:1: UP031 [*] Use format specifiers instead of percent format
 127 127 | 'Hello %s' % bar['bop']
 128 128 | 
 
-UP031_0.py:127:1: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:127:1: UP031 (printf-string-formatting) [*] Use format specifiers instead of percent format
     |
 125 | 'Hello %s' % bar.baz
 126 | 
 127 | 'Hello %s' % bar['bop']
-    | ^^^^^^^^^^^^^^^^^^^^^^^ UP031
+    | ^^^^^^^^^^^^^^^^^^^^^^^ UP031 (printf-string-formatting)
 128 | 
 129 | # Not a valid type annotation but this test shouldn't result in a panic.
     |
@@ -1001,12 +1001,12 @@ UP031_0.py:127:1: UP031 [*] Use format specifiers instead of percent format
 129 129 | # Not a valid type annotation but this test shouldn't result in a panic.
 130 130 | # Refer: https://github.com/astral-sh/ruff/issues/11736
 
-UP031_0.py:131:5: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:131:5: UP031 (printf-string-formatting) [*] Use format specifiers instead of percent format
     |
 129 | # Not a valid type annotation but this test shouldn't result in a panic.
 130 | # Refer: https://github.com/astral-sh/ruff/issues/11736
 131 | x: "'%s + %s' % (1, 2)"
-    |     ^^^^^^^^^^^^^^^^^^ UP031
+    |     ^^^^^^^^^^^^^^^^^^ UP031 (printf-string-formatting)
     |
     = help: Replace with format specifiers
 

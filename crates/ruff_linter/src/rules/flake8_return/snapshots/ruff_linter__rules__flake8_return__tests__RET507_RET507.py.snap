@@ -1,80 +1,78 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_return/mod.rs
 ---
-RET507.py:8:9: RET507 Unnecessary `elif` after `continue` statement
+RET507.py:8:9: RET507 (superfluous-else-continue) Unnecessary `elif` after `continue` statement
    |
  6 |         if i < y:  # [no-else-continue]
  7 |             continue
  8 |         elif i < w:
-   |         ^^^^ RET507
+   |         ^^^^ RET507 (superfluous-else-continue)
  9 |             continue
 10 |         else:
    |
    = help: Remove unnecessary `elif`
 
-RET507.py:22:9: RET507 Unnecessary `elif` after `continue` statement
+RET507.py:22:9: RET507 (superfluous-else-continue) Unnecessary `elif` after `continue` statement
    |
 20 |                 b = 2
 21 |             continue
 22 |         elif z:
-   |         ^^^^ RET507
+   |         ^^^^ RET507 (superfluous-else-continue)
 23 |             c = 2
 24 |         else:
    |
    = help: Remove unnecessary `elif`
 
-RET507.py:36:9: RET507 Unnecessary `else` after `continue` statement
+RET507.py:36:9: RET507 (superfluous-else-continue) Unnecessary `else` after `continue` statement
    |
 34 |         if i < y:  # [no-else-continue]
 35 |             continue
 36 |         else:
-   |         ^^^^ RET507
+   |         ^^^^ RET507 (superfluous-else-continue)
 37 |             a = z
    |
    = help: Remove unnecessary `else`
 
-RET507.py:47:13: RET507 Unnecessary `else` after `continue` statement
+RET507.py:47:13: RET507 (superfluous-else-continue) Unnecessary `else` after `continue` statement
    |
 45 |                 b = 2
 46 |                 continue
 47 |             else:
-   |             ^^^^ RET507
+   |             ^^^^ RET507 (superfluous-else-continue)
 48 |                 c = 3
 49 |                 continue
    |
    = help: Remove unnecessary `else`
 
-RET507.py:63:9: RET507 Unnecessary `else` after `continue` statement
+RET507.py:63:9: RET507 (superfluous-else-continue) Unnecessary `else` after `continue` statement
    |
 61 |                 b = 2
 62 |             continue
 63 |         else:
-   |         ^^^^ RET507
+   |         ^^^^ RET507 (superfluous-else-continue)
 64 |             c = 3
 65 |         continue
    |
    = help: Remove unnecessary `else`
 
-RET507.py:74:13: RET507 Unnecessary `else` after `continue` statement
+RET507.py:74:13: RET507 (superfluous-else-continue) Unnecessary `else` after `continue` statement
    |
 72 |                 a = 4
 73 |                 continue
 74 |             else:
-   |             ^^^^ RET507
+   |             ^^^^ RET507 (superfluous-else-continue)
 75 |                 b = 2
 76 |         else:
    |
    = help: Remove unnecessary `else`
 
-RET507.py:85:9: RET507 Unnecessary `else` after `continue` statement
+RET507.py:85:9: RET507 (superfluous-else-continue) Unnecessary `else` after `continue` statement
    |
 83 |         if x:  # [no-else-continue]
 84 |             continue
 85 |         else:
-   |         ^^^^ RET507
+   |         ^^^^ RET507 (superfluous-else-continue)
 86 |             try:
 87 |                 return
    |
    = help: Remove unnecessary `else`
-
-

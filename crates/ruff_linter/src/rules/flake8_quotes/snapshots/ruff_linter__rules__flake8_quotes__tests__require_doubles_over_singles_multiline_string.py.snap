@@ -1,13 +1,13 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_quotes/mod.rs
 ---
-singles_multiline_string.py:1:5: Q001 [*] Single quote multiline found but double quotes preferred
+singles_multiline_string.py:1:5: Q001 (bad-quotes-multiline-string) [*] Single quote multiline found but double quotes preferred
   |
 1 |   s = ''' This 'should'
   |  _____^
 2 | | be
 3 | | 'linted' '''
-  | |____________^ Q001
+  | |____________^ Q001 (bad-quotes-multiline-string)
 4 |   
 5 |   s = """ This 'should'
   |
@@ -22,5 +22,3 @@ singles_multiline_string.py:1:5: Q001 [*] Single quote multiline found but doubl
 4 4 | 
 5 5 | s = """ This 'should'
 6 6 | 'not' be
-
-

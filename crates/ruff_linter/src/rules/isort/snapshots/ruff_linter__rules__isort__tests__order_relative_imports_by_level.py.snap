@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
 ---
-order_relative_imports_by_level.py:1:1: I001 [*] Import block is un-sorted or un-formatted
+order_relative_imports_by_level.py:1:1: I001 (unsorted-imports) [*] Import block is un-sorted or un-formatted
   |
 1 | / from .a import a
 2 | | from ..a import a
@@ -16,5 +16,3 @@ order_relative_imports_by_level.py:1:1: I001 [*] Import block is un-sorted or un
 3 2 | from ..b import a
   3 |+from .a import a
 4 4 | from .b import a
-
-

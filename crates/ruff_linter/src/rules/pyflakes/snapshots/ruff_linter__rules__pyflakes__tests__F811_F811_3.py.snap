@@ -1,11 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
-F811_3.py:1:12: F811 Redefinition of unused `fu` from line 1
+F811_3.py:1:12: F811 (redefined-while-unused) Redefinition of unused `fu` from line 1
   |
 1 | import fu; fu = 3
-  |            ^^ F811
+  |            ^^ F811 (redefined-while-unused)
   |
   = help: Remove definition: `fu`
-
-

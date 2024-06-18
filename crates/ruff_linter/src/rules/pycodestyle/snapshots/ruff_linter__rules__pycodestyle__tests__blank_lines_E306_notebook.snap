@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-E30.ipynb:60:5: E306 [*] Expected 1 blank line before a nested definition, found 0
+E30.ipynb:60:5: E306 (blank-lines-before-nested-definition) [*] Expected 1 blank line before a nested definition, found 0
    |
 58 | def a():
 59 |     x = 1
 60 |     def b():
-   |     ^^^ E306
+   |     ^^^ E306 (blank-lines-before-nested-definition)
 61 |         pass
 62 | # end
    |

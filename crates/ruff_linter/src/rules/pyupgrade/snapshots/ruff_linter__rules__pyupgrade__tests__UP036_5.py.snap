@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 ---
-UP036_5.py:3:4: UP036 [*] Version block is outdated for minimum Python version
+UP036_5.py:3:4: UP036 (outdated-version-block) [*] Version block is outdated for minimum Python version
   |
 1 | import sys
 2 | 
 3 | if sys.version_info < (3, 8):
-  |    ^^^^^^^^^^^^^^^^^^^^^^^^^ UP036
+  |    ^^^^^^^^^^^^^^^^^^^^^^^^^ UP036 (outdated-version-block)
 4 | 
 5 |     def a():
   |
@@ -31,12 +31,12 @@ UP036_5.py:3:4: UP036 [*] Version block is outdated for minimum Python version
 15 5  | 
 16 6  | import sys
 
-UP036_5.py:18:4: UP036 [*] Version block is outdated for minimum Python version
+UP036_5.py:18:4: UP036 (outdated-version-block) [*] Version block is outdated for minimum Python version
    |
 16 | import sys
 17 | 
 18 | if sys.version_info < (3, 8):
-   |    ^^^^^^^^^^^^^^^^^^^^^^^^^ UP036
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^ UP036 (outdated-version-block)
 19 |     pass
    |
    = help: Remove outdated version block
@@ -66,5 +66,3 @@ UP036_5.py:18:4: UP036 [*] Version block is outdated for minimum Python version
    23 |+    else:
    24 |+        print(3)
    25 |+    return None
-
-

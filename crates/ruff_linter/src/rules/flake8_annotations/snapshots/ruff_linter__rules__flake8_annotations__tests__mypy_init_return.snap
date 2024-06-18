@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_annotations/mod.rs
 ---
-mypy_init_return.py:5:9: ANN204 [*] Missing return type annotation for special method `__init__`
+mypy_init_return.py:5:9: ANN204 (missing-return-type-special-method) [*] Missing return type annotation for special method `__init__`
   |
 3 | # Error
 4 | class Foo:
 5 |     def __init__(self):
-  |         ^^^^^^^^ ANN204
+  |         ^^^^^^^^ ANN204 (missing-return-type-special-method)
 6 |         ...
   |
   = help: Add return type annotation: `None`
@@ -21,12 +21,12 @@ mypy_init_return.py:5:9: ANN204 [*] Missing return type annotation for special m
 7 7 | 
 8 8 | 
 
-mypy_init_return.py:11:9: ANN204 [*] Missing return type annotation for special method `__init__`
+mypy_init_return.py:11:9: ANN204 (missing-return-type-special-method) [*] Missing return type annotation for special method `__init__`
    |
  9 | # Error
 10 | class Foo:
 11 |     def __init__(self, foo):
-   |         ^^^^^^^^ ANN204
+   |         ^^^^^^^^ ANN204 (missing-return-type-special-method)
 12 |         ...
    |
    = help: Add return type annotation: `None`
@@ -41,11 +41,11 @@ mypy_init_return.py:11:9: ANN204 [*] Missing return type annotation for special 
 13 13 | 
 14 14 | 
 
-mypy_init_return.py:40:5: ANN202 [*] Missing return type annotation for private function `__init__`
+mypy_init_return.py:40:5: ANN202 (missing-return-type-private-function) [*] Missing return type annotation for private function `__init__`
    |
 39 | # Error
 40 | def __init__(self, foo: int):
-   |     ^^^^^^^^ ANN202
+   |     ^^^^^^^^ ANN202 (missing-return-type-private-function)
 41 |     ...
    |
    = help: Add return type annotation: `None`
@@ -60,12 +60,12 @@ mypy_init_return.py:40:5: ANN202 [*] Missing return type annotation for private 
 42 42 | 
 43 43 | 
 
-mypy_init_return.py:47:9: ANN204 [*] Missing return type annotation for special method `__init__`
+mypy_init_return.py:47:9: ANN204 (missing-return-type-special-method) [*] Missing return type annotation for special method `__init__`
    |
 45 | # of a vararg falsely indicated that the function has a typed argument.
 46 | class Foo:
 47 |     def __init__(self, *arg):
-   |         ^^^^^^^^ ANN204
+   |         ^^^^^^^^ ANN204 (missing-return-type-special-method)
 48 |         ...
    |
    = help: Add return type annotation: `None`
@@ -77,5 +77,3 @@ mypy_init_return.py:47:9: ANN204 [*] Missing return type annotation for special 
 47    |-    def __init__(self, *arg):
    47 |+    def __init__(self, *arg) -> None:
 48 48 |         ...
-
-

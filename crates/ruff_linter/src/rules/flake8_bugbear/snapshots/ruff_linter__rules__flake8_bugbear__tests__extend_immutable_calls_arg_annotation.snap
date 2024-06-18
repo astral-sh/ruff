@@ -1,10 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
 ---
-B006_extended.py:17:55: B006 [*] Do not use mutable data structures for argument defaults
+B006_extended.py:17:55: B006 (mutable-argument-default) [*] Do not use mutable data structures for argument defaults
    |
 17 | def error_due_to_missing_import(foo: ImmutableTypeA = []):
-   |                                                       ^^ B006
+   |                                                       ^^ B006 (mutable-argument-default)
 18 |     ...
    |
    = help: Replace with `None`; initialize within function

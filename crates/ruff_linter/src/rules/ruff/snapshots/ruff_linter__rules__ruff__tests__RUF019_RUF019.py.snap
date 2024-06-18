@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-RUF019.py:3:4: RUF019 [*] Unnecessary key check before dictionary access
+RUF019.py:3:4: RUF019 (unnecessary-key-check) [*] Unnecessary key check before dictionary access
   |
 1 | d = {}
 2 | # RUF019
 3 | if "k" in d and d["k"]:
-  |    ^^^^^^^^^^^^^^^^^^^ RUF019
+  |    ^^^^^^^^^^^^^^^^^^^ RUF019 (unnecessary-key-check)
 4 |     pass
   |
   = help: Replace with `dict.get`
@@ -20,11 +20,11 @@ RUF019.py:3:4: RUF019 [*] Unnecessary key check before dictionary access
 5 5 | 
 6 6 | k = "k"
 
-RUF019.py:7:4: RUF019 [*] Unnecessary key check before dictionary access
+RUF019.py:7:4: RUF019 (unnecessary-key-check) [*] Unnecessary key check before dictionary access
   |
 6 | k = "k"
 7 | if k in d and d[k]:
-  |    ^^^^^^^^^^^^^^^ RUF019
+  |    ^^^^^^^^^^^^^^^ RUF019 (unnecessary-key-check)
 8 |     pass
   |
   = help: Replace with `dict.get`
@@ -39,12 +39,12 @@ RUF019.py:7:4: RUF019 [*] Unnecessary key check before dictionary access
 9 9 | 
 10 10 | if (k) in d and d[k]:
 
-RUF019.py:10:4: RUF019 [*] Unnecessary key check before dictionary access
+RUF019.py:10:4: RUF019 (unnecessary-key-check) [*] Unnecessary key check before dictionary access
    |
  8 |     pass
  9 | 
 10 | if (k) in d and d[k]:
-   |    ^^^^^^^^^^^^^^^^^ RUF019
+   |    ^^^^^^^^^^^^^^^^^ RUF019 (unnecessary-key-check)
 11 |     pass
    |
    = help: Replace with `dict.get`
@@ -59,12 +59,12 @@ RUF019.py:10:4: RUF019 [*] Unnecessary key check before dictionary access
 12 12 | 
 13 13 | if k in d and d[(k)]:
 
-RUF019.py:13:4: RUF019 [*] Unnecessary key check before dictionary access
+RUF019.py:13:4: RUF019 (unnecessary-key-check) [*] Unnecessary key check before dictionary access
    |
 11 |     pass
 12 | 
 13 | if k in d and d[(k)]:
-   |    ^^^^^^^^^^^^^^^^^ RUF019
+   |    ^^^^^^^^^^^^^^^^^ RUF019 (unnecessary-key-check)
 14 |     pass
    |
    = help: Replace with `dict.get`
@@ -78,5 +78,3 @@ RUF019.py:13:4: RUF019 [*] Unnecessary key check before dictionary access
 14 14 |     pass
 15 15 | 
 16 16 | # OK
-
-

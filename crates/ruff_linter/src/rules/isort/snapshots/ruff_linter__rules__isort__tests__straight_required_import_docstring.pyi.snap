@@ -1,10 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
 ---
-docstring.pyi:1:1: I002 [*] Missing required import: `import os`
+docstring.pyi:1:1: I002 (missing-required-import) [*] Missing required import: `import os`
   |
 1 | """Hello, world!"""
-  |  I002
+  |  I002 (missing-required-import)
 2 | 
 3 | x = 1
   |
@@ -15,5 +15,3 @@ docstring.pyi:1:1: I002 [*] Missing required import: `import os`
   2 |+import os
 2 3 | 
 3 4 | x = 1
-
-

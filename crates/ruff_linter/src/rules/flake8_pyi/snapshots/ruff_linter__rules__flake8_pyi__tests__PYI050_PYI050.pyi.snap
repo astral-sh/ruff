@@ -1,104 +1,102 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
 ---
-PYI050.pyi:6:24: PYI050 Prefer `typing.Never` over `NoReturn` for argument annotations
+PYI050.pyi:6:24: PYI050 (no-return-argument-annotation-in-stub) Prefer `typing.Never` over `NoReturn` for argument annotations
   |
 4 | def foo(arg): ...
 5 | def foo_int(arg: int): ...
 6 | def foo_no_return(arg: NoReturn): ...  # Error: PYI050
-  |                        ^^^^^^^^ PYI050
+  |                        ^^^^^^^^ PYI050 (no-return-argument-annotation-in-stub)
 7 | def foo_no_return_typing_extensions(
 8 |     arg: typing_extensions.NoReturn,
   |
 
-PYI050.pyi:8:10: PYI050 Prefer `typing.Never` over `NoReturn` for argument annotations
+PYI050.pyi:8:10: PYI050 (no-return-argument-annotation-in-stub) Prefer `typing.Never` over `NoReturn` for argument annotations
    |
  6 | def foo_no_return(arg: NoReturn): ...  # Error: PYI050
  7 | def foo_no_return_typing_extensions(
  8 |     arg: typing_extensions.NoReturn,
-   |          ^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI050
+   |          ^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI050 (no-return-argument-annotation-in-stub)
  9 | ): ...  # Error: PYI050
 10 | def foo_no_return_kwarg(arg: int, *, arg2: NoReturn): ...  # Error: PYI050
    |
 
-PYI050.pyi:10:44: PYI050 Prefer `typing.Never` over `NoReturn` for argument annotations
+PYI050.pyi:10:44: PYI050 (no-return-argument-annotation-in-stub) Prefer `typing.Never` over `NoReturn` for argument annotations
    |
  8 |     arg: typing_extensions.NoReturn,
  9 | ): ...  # Error: PYI050
 10 | def foo_no_return_kwarg(arg: int, *, arg2: NoReturn): ...  # Error: PYI050
-   |                                            ^^^^^^^^ PYI050
+   |                                            ^^^^^^^^ PYI050 (no-return-argument-annotation-in-stub)
 11 | def foo_no_return_pos_only(arg: int, /, arg2: NoReturn): ...  # Error: PYI050
 12 | def foo_never(arg: Never): ...
    |
 
-PYI050.pyi:11:47: PYI050 Prefer `typing.Never` over `NoReturn` for argument annotations
+PYI050.pyi:11:47: PYI050 (no-return-argument-annotation-in-stub) Prefer `typing.Never` over `NoReturn` for argument annotations
    |
  9 | ): ...  # Error: PYI050
 10 | def foo_no_return_kwarg(arg: int, *, arg2: NoReturn): ...  # Error: PYI050
 11 | def foo_no_return_pos_only(arg: int, /, arg2: NoReturn): ...  # Error: PYI050
-   |                                               ^^^^^^^^ PYI050
+   |                                               ^^^^^^^^ PYI050 (no-return-argument-annotation-in-stub)
 12 | def foo_never(arg: Never): ...
 13 | def foo_args(*args: NoReturn): ...  # Error: PYI050
    |
 
-PYI050.pyi:13:21: PYI050 Prefer `typing.Never` over `NoReturn` for argument annotations
+PYI050.pyi:13:21: PYI050 (no-return-argument-annotation-in-stub) Prefer `typing.Never` over `NoReturn` for argument annotations
    |
 11 | def foo_no_return_pos_only(arg: int, /, arg2: NoReturn): ...  # Error: PYI050
 12 | def foo_never(arg: Never): ...
 13 | def foo_args(*args: NoReturn): ...  # Error: PYI050
-   |                     ^^^^^^^^ PYI050
+   |                     ^^^^^^^^ PYI050 (no-return-argument-annotation-in-stub)
 14 | def foo_kwargs(**kwargs: NoReturn): ...  # Error: PYI050
 15 | def foo_args_kwargs(*args: NoReturn, **kwargs: NoReturn): ...  # Error: PYI050
    |
 
-PYI050.pyi:14:26: PYI050 Prefer `typing.Never` over `NoReturn` for argument annotations
+PYI050.pyi:14:26: PYI050 (no-return-argument-annotation-in-stub) Prefer `typing.Never` over `NoReturn` for argument annotations
    |
 12 | def foo_never(arg: Never): ...
 13 | def foo_args(*args: NoReturn): ...  # Error: PYI050
 14 | def foo_kwargs(**kwargs: NoReturn): ...  # Error: PYI050
-   |                          ^^^^^^^^ PYI050
+   |                          ^^^^^^^^ PYI050 (no-return-argument-annotation-in-stub)
 15 | def foo_args_kwargs(*args: NoReturn, **kwargs: NoReturn): ...  # Error: PYI050
 16 | def foo_int_args(*args: int): ...
    |
 
-PYI050.pyi:15:28: PYI050 Prefer `typing.Never` over `NoReturn` for argument annotations
+PYI050.pyi:15:28: PYI050 (no-return-argument-annotation-in-stub) Prefer `typing.Never` over `NoReturn` for argument annotations
    |
 13 | def foo_args(*args: NoReturn): ...  # Error: PYI050
 14 | def foo_kwargs(**kwargs: NoReturn): ...  # Error: PYI050
 15 | def foo_args_kwargs(*args: NoReturn, **kwargs: NoReturn): ...  # Error: PYI050
-   |                            ^^^^^^^^ PYI050
+   |                            ^^^^^^^^ PYI050 (no-return-argument-annotation-in-stub)
 16 | def foo_int_args(*args: int): ...
 17 | def foo_int_kwargs(**kwargs: int): ...
    |
 
-PYI050.pyi:15:48: PYI050 Prefer `typing.Never` over `NoReturn` for argument annotations
+PYI050.pyi:15:48: PYI050 (no-return-argument-annotation-in-stub) Prefer `typing.Never` over `NoReturn` for argument annotations
    |
 13 | def foo_args(*args: NoReturn): ...  # Error: PYI050
 14 | def foo_kwargs(**kwargs: NoReturn): ...  # Error: PYI050
 15 | def foo_args_kwargs(*args: NoReturn, **kwargs: NoReturn): ...  # Error: PYI050
-   |                                                ^^^^^^^^ PYI050
+   |                                                ^^^^^^^^ PYI050 (no-return-argument-annotation-in-stub)
 16 | def foo_int_args(*args: int): ...
 17 | def foo_int_kwargs(**kwargs: int): ...
    |
 
-PYI050.pyi:19:50: PYI050 Prefer `typing.Never` over `NoReturn` for argument annotations
+PYI050.pyi:19:50: PYI050 (no-return-argument-annotation-in-stub) Prefer `typing.Never` over `NoReturn` for argument annotations
    |
 17 | def foo_int_kwargs(**kwargs: int): ...
 18 | def foo_int_args_kwargs(*args: int, **kwargs: int): ...
 19 | def foo_int_args_no_return(*args: int, **kwargs: NoReturn): ...  # Error: PYI050
-   |                                                  ^^^^^^^^ PYI050
+   |                                                  ^^^^^^^^ PYI050 (no-return-argument-annotation-in-stub)
 20 | def foo_int_kwargs_no_return(*args: NoReturn, **kwargs: int): ...  # Error: PYI050
 21 | def foo_args_never(*args: Never): ...
    |
 
-PYI050.pyi:20:37: PYI050 Prefer `typing.Never` over `NoReturn` for argument annotations
+PYI050.pyi:20:37: PYI050 (no-return-argument-annotation-in-stub) Prefer `typing.Never` over `NoReturn` for argument annotations
    |
 18 | def foo_int_args_kwargs(*args: int, **kwargs: int): ...
 19 | def foo_int_args_no_return(*args: int, **kwargs: NoReturn): ...  # Error: PYI050
 20 | def foo_int_kwargs_no_return(*args: NoReturn, **kwargs: int): ...  # Error: PYI050
-   |                                     ^^^^^^^^ PYI050
+   |                                     ^^^^^^^^ PYI050 (no-return-argument-annotation-in-stub)
 21 | def foo_args_never(*args: Never): ...
 22 | def foo_kwargs_never(**kwargs: Never): ...
    |
-
-

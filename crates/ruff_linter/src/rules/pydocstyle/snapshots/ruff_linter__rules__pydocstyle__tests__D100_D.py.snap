@@ -1,12 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 ---
-D.py:1:1: D100 Missing docstring in public module
+D.py:1:1: D100 (undocumented-public-module) Missing docstring in public module
   |
 1 | # No docstring, so we can test D100
-  |  D100
+  |  D100 (undocumented-public-module)
 2 | from functools import wraps
 3 | import os
   |
-
-

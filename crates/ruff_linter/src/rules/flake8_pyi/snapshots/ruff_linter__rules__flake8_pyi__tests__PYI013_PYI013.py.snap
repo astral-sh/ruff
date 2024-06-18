@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
 ---
-PYI013.py:3:5: PYI013 [*] Non-empty class body must not contain `...`
+PYI013.py:3:5: PYI013 (ellipsis-in-non-empty-class-body) [*] Non-empty class body must not contain `...`
   |
 1 | class OneAttributeClass:
 2 |     value: int
 3 |     ...
-  |     ^^^ PYI013
+  |     ^^^ PYI013 (ellipsis-in-non-empty-class-body)
   |
   = help: Remove unnecessary `...`
 
@@ -18,11 +18,11 @@ PYI013.py:3:5: PYI013 [*] Non-empty class body must not contain `...`
 5 4 | 
 6 5 | class OneAttributeClass2:
 
-PYI013.py:7:5: PYI013 [*] Non-empty class body must not contain `...`
+PYI013.py:7:5: PYI013 (ellipsis-in-non-empty-class-body) [*] Non-empty class body must not contain `...`
   |
 6 | class OneAttributeClass2:
 7 |     ...
-  |     ^^^ PYI013
+  |     ^^^ PYI013 (ellipsis-in-non-empty-class-body)
 8 |     value: int
   |
   = help: Remove unnecessary `...`
@@ -36,11 +36,11 @@ PYI013.py:7:5: PYI013 [*] Non-empty class body must not contain `...`
 9 8 | 
 10 9 | 
 
-PYI013.py:12:5: PYI013 [*] Non-empty class body must not contain `...`
+PYI013.py:12:5: PYI013 (ellipsis-in-non-empty-class-body) [*] Non-empty class body must not contain `...`
    |
 11 | class TwoEllipsesClass:
 12 |     ...
-   |     ^^^ PYI013
+   |     ^^^ PYI013 (ellipsis-in-non-empty-class-body)
 13 |     ...
    |
    = help: Remove unnecessary `...`
@@ -54,12 +54,12 @@ PYI013.py:12:5: PYI013 [*] Non-empty class body must not contain `...`
 15 14 | 
 16 15 | class DocstringClass:
 
-PYI013.py:13:5: PYI013 [*] Non-empty class body must not contain `...`
+PYI013.py:13:5: PYI013 (ellipsis-in-non-empty-class-body) [*] Non-empty class body must not contain `...`
    |
 11 | class TwoEllipsesClass:
 12 |     ...
 13 |     ...
-   |     ^^^ PYI013
+   |     ^^^ PYI013 (ellipsis-in-non-empty-class-body)
    |
    = help: Remove unnecessary `...`
 
@@ -72,12 +72,12 @@ PYI013.py:13:5: PYI013 [*] Non-empty class body must not contain `...`
 15 14 | 
 16 15 | class DocstringClass:
 
-PYI013.py:21:5: PYI013 [*] Non-empty class body must not contain `...`
+PYI013.py:21:5: PYI013 (ellipsis-in-non-empty-class-body) [*] Non-empty class body must not contain `...`
    |
 19 |     """
 20 | 
 21 |     ...
-   |     ^^^ PYI013
+   |     ^^^ PYI013 (ellipsis-in-non-empty-class-body)
    |
    = help: Remove unnecessary `...`
 
@@ -90,12 +90,12 @@ PYI013.py:21:5: PYI013 [*] Non-empty class body must not contain `...`
 23 22 | 
 24 23 | class NonEmptyChild(Exception):
 
-PYI013.py:26:5: PYI013 [*] Non-empty class body must not contain `...`
+PYI013.py:26:5: PYI013 (ellipsis-in-non-empty-class-body) [*] Non-empty class body must not contain `...`
    |
 24 | class NonEmptyChild(Exception):
 25 |     value: int
 26 |     ...
-   |     ^^^ PYI013
+   |     ^^^ PYI013 (ellipsis-in-non-empty-class-body)
    |
    = help: Remove unnecessary `...`
 
@@ -108,11 +108,11 @@ PYI013.py:26:5: PYI013 [*] Non-empty class body must not contain `...`
 28 27 | 
 29 28 | class NonEmptyChild2(Exception):
 
-PYI013.py:30:5: PYI013 [*] Non-empty class body must not contain `...`
+PYI013.py:30:5: PYI013 (ellipsis-in-non-empty-class-body) [*] Non-empty class body must not contain `...`
    |
 29 | class NonEmptyChild2(Exception):
 30 |     ...
-   |     ^^^ PYI013
+   |     ^^^ PYI013 (ellipsis-in-non-empty-class-body)
 31 |     value: int
    |
    = help: Remove unnecessary `...`
@@ -126,12 +126,12 @@ PYI013.py:30:5: PYI013 [*] Non-empty class body must not contain `...`
 32 31 | 
 33 32 | 
 
-PYI013.py:36:5: PYI013 [*] Non-empty class body must not contain `...`
+PYI013.py:36:5: PYI013 (ellipsis-in-non-empty-class-body) [*] Non-empty class body must not contain `...`
    |
 34 | class NonEmptyWithInit:
 35 |     value: int
 36 |     ...
-   |     ^^^ PYI013
+   |     ^^^ PYI013 (ellipsis-in-non-empty-class-body)
 37 | 
 38 |     def __init__():
    |
@@ -145,5 +145,3 @@ PYI013.py:36:5: PYI013 [*] Non-empty class body must not contain `...`
 37 36 | 
 38 37 |     def __init__():
 39 38 |         pass
-
-

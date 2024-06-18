@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
 ---
-main_first_party.py:1:1: I001 [*] Import block is un-sorted or un-formatted
+main_first_party.py:1:1: I001 (unsorted-imports) [*] Import block is un-sorted or un-formatted
    |
  1 | / import os
  2 | | 
@@ -11,7 +11,7 @@ main_first_party.py:1:1: I001 [*] Import block is un-sorted or un-formatted
  6 | | import first_party
  7 | | 
  8 | | os.a
-   | |_^ I001
+   | |_^ I001 (unsorted-imports)
  9 |   third_party.a
 10 |   __main__.a
    |
@@ -27,5 +27,3 @@ main_first_party.py:1:1: I001 [*] Import block is un-sorted or un-formatted
 6 6 | import first_party
 7 7 | 
 8 8 | os.a
-
-

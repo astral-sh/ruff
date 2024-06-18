@@ -1,11 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
 ---
-B011.py:8:8: B011 [*] Do not `assert False` (`python -O` removes these calls), raise `AssertionError()`
+B011.py:8:8: B011 (assert-false) [*] Do not `assert False` (`python -O` removes these calls), raise `AssertionError()`
    |
  7 | assert 1 != 2
  8 | assert False
-   |        ^^^^^ B011
+   |        ^^^^^ B011 (assert-false)
  9 | assert 1 != 2, "message"
 10 | assert False, "message"
    |
@@ -20,12 +20,12 @@ B011.py:8:8: B011 [*] Do not `assert False` (`python -O` removes these calls), r
 9 9 | assert 1 != 2, "message"
 10 10 | assert False, "message"
 
-B011.py:10:8: B011 [*] Do not `assert False` (`python -O` removes these calls), raise `AssertionError()`
+B011.py:10:8: B011 (assert-false) [*] Do not `assert False` (`python -O` removes these calls), raise `AssertionError()`
    |
  8 | assert False
  9 | assert 1 != 2, "message"
 10 | assert False, "message"
-   |        ^^^^^ B011
+   |        ^^^^^ B011 (assert-false)
    |
    = help: Replace `assert False`
 
@@ -35,5 +35,3 @@ B011.py:10:8: B011 [*] Do not `assert False` (`python -O` removes these calls), 
 9  9  | assert 1 != 2, "message"
 10    |-assert False, "message"
    10 |+raise AssertionError("message")
-
-

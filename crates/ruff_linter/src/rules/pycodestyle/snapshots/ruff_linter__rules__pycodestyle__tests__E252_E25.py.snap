@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-E25.py:46:15: E252 [*] Missing whitespace around parameter equals
+E25.py:46:15: E252 (missing-whitespace-around-parameter-equals) [*] Missing whitespace around parameter equals
    |
 44 |     return a + b
 45 | #: E252:1:15 E252:1:16 E252:1:27 E252:1:36
 46 | def add(a: int=0, b: int =0, c: int= 0) -> int:
-   |               ^ E252
+   |               ^ E252 (missing-whitespace-around-parameter-equals)
 47 |     return a + b + c
 48 | #: Okay
    |
@@ -22,12 +22,12 @@ E25.py:46:15: E252 [*] Missing whitespace around parameter equals
 48 48 | #: Okay
 49 49 | def add(a: int = _default(name='f')):
 
-E25.py:46:15: E252 [*] Missing whitespace around parameter equals
+E25.py:46:15: E252 (missing-whitespace-around-parameter-equals) [*] Missing whitespace around parameter equals
    |
 44 |     return a + b
 45 | #: E252:1:15 E252:1:16 E252:1:27 E252:1:36
 46 | def add(a: int=0, b: int =0, c: int= 0) -> int:
-   |               ^ E252
+   |               ^ E252 (missing-whitespace-around-parameter-equals)
 47 |     return a + b + c
 48 | #: Okay
    |
@@ -43,12 +43,12 @@ E25.py:46:15: E252 [*] Missing whitespace around parameter equals
 48 48 | #: Okay
 49 49 | def add(a: int = _default(name='f')):
 
-E25.py:46:26: E252 [*] Missing whitespace around parameter equals
+E25.py:46:26: E252 (missing-whitespace-around-parameter-equals) [*] Missing whitespace around parameter equals
    |
 44 |     return a + b
 45 | #: E252:1:15 E252:1:16 E252:1:27 E252:1:36
 46 | def add(a: int=0, b: int =0, c: int= 0) -> int:
-   |                          ^ E252
+   |                          ^ E252 (missing-whitespace-around-parameter-equals)
 47 |     return a + b + c
 48 | #: Okay
    |
@@ -64,12 +64,12 @@ E25.py:46:26: E252 [*] Missing whitespace around parameter equals
 48 48 | #: Okay
 49 49 | def add(a: int = _default(name='f')):
 
-E25.py:46:36: E252 [*] Missing whitespace around parameter equals
+E25.py:46:36: E252 (missing-whitespace-around-parameter-equals) [*] Missing whitespace around parameter equals
    |
 44 |     return a + b
 45 | #: E252:1:15 E252:1:16 E252:1:27 E252:1:36
 46 | def add(a: int=0, b: int =0, c: int= 0) -> int:
-   |                                    ^ E252
+   |                                    ^ E252 (missing-whitespace-around-parameter-equals)
 47 |     return a + b + c
 48 | #: Okay
    |
@@ -84,5 +84,3 @@ E25.py:46:36: E252 [*] Missing whitespace around parameter equals
 47 47 |     return a + b + c
 48 48 | #: Okay
 49 49 | def add(a: int = _default(name='f')):
-
-

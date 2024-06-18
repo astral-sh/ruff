@@ -29,9 +29,10 @@ impl Emitter for PylintEmitter {
 
             writeln!(
                 writer,
-                "{path}:{row}: [{code}] {body}",
+                "{path}:{row}: [{code} ({rule_name})] {body}",
                 path = relativize_path(message.filename()),
                 code = message.kind.rule().noqa_code(),
+                rule_name = message.kind.rule().as_ref(),
                 body = message.kind.body,
             )?;
         }

@@ -1,197 +1,197 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
 ---
-S324.py:7:13: S324 Probable use of insecure hash functions in `hashlib`: `md5`
+S324.py:7:13: S324 (hashlib-insecure-hash-function) Probable use of insecure hash functions in `hashlib`: `md5`
   |
 6 | # Errors
 7 | hashlib.new('md5')
-  |             ^^^^^ S324
+  |             ^^^^^ S324 (hashlib-insecure-hash-function)
 8 | hashlib.new('md4', b'test')
 9 | hashlib.new(name='md5', data=b'test')
   |
 
-S324.py:8:13: S324 Probable use of insecure hash functions in `hashlib`: `md4`
+S324.py:8:13: S324 (hashlib-insecure-hash-function) Probable use of insecure hash functions in `hashlib`: `md4`
    |
  6 | # Errors
  7 | hashlib.new('md5')
  8 | hashlib.new('md4', b'test')
-   |             ^^^^^ S324
+   |             ^^^^^ S324 (hashlib-insecure-hash-function)
  9 | hashlib.new(name='md5', data=b'test')
 10 | hashlib.new('MD4', data=b'test')
    |
 
-S324.py:9:18: S324 Probable use of insecure hash functions in `hashlib`: `md5`
+S324.py:9:18: S324 (hashlib-insecure-hash-function) Probable use of insecure hash functions in `hashlib`: `md5`
    |
  7 | hashlib.new('md5')
  8 | hashlib.new('md4', b'test')
  9 | hashlib.new(name='md5', data=b'test')
-   |                  ^^^^^ S324
+   |                  ^^^^^ S324 (hashlib-insecure-hash-function)
 10 | hashlib.new('MD4', data=b'test')
 11 | hashlib.new('sha1')
    |
 
-S324.py:10:13: S324 Probable use of insecure hash functions in `hashlib`: `MD4`
+S324.py:10:13: S324 (hashlib-insecure-hash-function) Probable use of insecure hash functions in `hashlib`: `MD4`
    |
  8 | hashlib.new('md4', b'test')
  9 | hashlib.new(name='md5', data=b'test')
 10 | hashlib.new('MD4', data=b'test')
-   |             ^^^^^ S324
+   |             ^^^^^ S324 (hashlib-insecure-hash-function)
 11 | hashlib.new('sha1')
 12 | hashlib.new('sha1', data=b'test')
    |
 
-S324.py:11:13: S324 Probable use of insecure hash functions in `hashlib`: `sha1`
+S324.py:11:13: S324 (hashlib-insecure-hash-function) Probable use of insecure hash functions in `hashlib`: `sha1`
    |
  9 | hashlib.new(name='md5', data=b'test')
 10 | hashlib.new('MD4', data=b'test')
 11 | hashlib.new('sha1')
-   |             ^^^^^^ S324
+   |             ^^^^^^ S324 (hashlib-insecure-hash-function)
 12 | hashlib.new('sha1', data=b'test')
 13 | hashlib.new('sha', data=b'test')
    |
 
-S324.py:12:13: S324 Probable use of insecure hash functions in `hashlib`: `sha1`
+S324.py:12:13: S324 (hashlib-insecure-hash-function) Probable use of insecure hash functions in `hashlib`: `sha1`
    |
 10 | hashlib.new('MD4', data=b'test')
 11 | hashlib.new('sha1')
 12 | hashlib.new('sha1', data=b'test')
-   |             ^^^^^^ S324
+   |             ^^^^^^ S324 (hashlib-insecure-hash-function)
 13 | hashlib.new('sha', data=b'test')
 14 | hashlib.new(name='SHA', data=b'test')
    |
 
-S324.py:13:13: S324 Probable use of insecure hash functions in `hashlib`: `sha`
+S324.py:13:13: S324 (hashlib-insecure-hash-function) Probable use of insecure hash functions in `hashlib`: `sha`
    |
 11 | hashlib.new('sha1')
 12 | hashlib.new('sha1', data=b'test')
 13 | hashlib.new('sha', data=b'test')
-   |             ^^^^^ S324
+   |             ^^^^^ S324 (hashlib-insecure-hash-function)
 14 | hashlib.new(name='SHA', data=b'test')
 15 | hashlib.sha(data=b'test')
    |
 
-S324.py:14:18: S324 Probable use of insecure hash functions in `hashlib`: `SHA`
+S324.py:14:18: S324 (hashlib-insecure-hash-function) Probable use of insecure hash functions in `hashlib`: `SHA`
    |
 12 | hashlib.new('sha1', data=b'test')
 13 | hashlib.new('sha', data=b'test')
 14 | hashlib.new(name='SHA', data=b'test')
-   |                  ^^^^^ S324
+   |                  ^^^^^ S324 (hashlib-insecure-hash-function)
 15 | hashlib.sha(data=b'test')
 16 | hashlib.md5()
    |
 
-S324.py:15:1: S324 Probable use of insecure hash functions in `hashlib`: `sha`
+S324.py:15:1: S324 (hashlib-insecure-hash-function) Probable use of insecure hash functions in `hashlib`: `sha`
    |
 13 | hashlib.new('sha', data=b'test')
 14 | hashlib.new(name='SHA', data=b'test')
 15 | hashlib.sha(data=b'test')
-   | ^^^^^^^^^^^ S324
+   | ^^^^^^^^^^^ S324 (hashlib-insecure-hash-function)
 16 | hashlib.md5()
 17 | hashlib_new('sha1')
    |
 
-S324.py:16:1: S324 Probable use of insecure hash functions in `hashlib`: `md5`
+S324.py:16:1: S324 (hashlib-insecure-hash-function) Probable use of insecure hash functions in `hashlib`: `md5`
    |
 14 | hashlib.new(name='SHA', data=b'test')
 15 | hashlib.sha(data=b'test')
 16 | hashlib.md5()
-   | ^^^^^^^^^^^ S324
+   | ^^^^^^^^^^^ S324 (hashlib-insecure-hash-function)
 17 | hashlib_new('sha1')
 18 | hashlib_sha1('sha1')
    |
 
-S324.py:17:13: S324 Probable use of insecure hash functions in `hashlib`: `sha1`
+S324.py:17:13: S324 (hashlib-insecure-hash-function) Probable use of insecure hash functions in `hashlib`: `sha1`
    |
 15 | hashlib.sha(data=b'test')
 16 | hashlib.md5()
 17 | hashlib_new('sha1')
-   |             ^^^^^^ S324
+   |             ^^^^^^ S324 (hashlib-insecure-hash-function)
 18 | hashlib_sha1('sha1')
 19 | # usedforsecurity arg only available in Python 3.9+
    |
 
-S324.py:18:1: S324 Probable use of insecure hash functions in `hashlib`: `sha1`
+S324.py:18:1: S324 (hashlib-insecure-hash-function) Probable use of insecure hash functions in `hashlib`: `sha1`
    |
 16 | hashlib.md5()
 17 | hashlib_new('sha1')
 18 | hashlib_sha1('sha1')
-   | ^^^^^^^^^^^^ S324
+   | ^^^^^^^^^^^^ S324 (hashlib-insecure-hash-function)
 19 | # usedforsecurity arg only available in Python 3.9+
 20 | hashlib.new('sha1', usedforsecurity=True)
    |
 
-S324.py:20:13: S324 Probable use of insecure hash functions in `hashlib`: `sha1`
+S324.py:20:13: S324 (hashlib-insecure-hash-function) Probable use of insecure hash functions in `hashlib`: `sha1`
    |
 18 | hashlib_sha1('sha1')
 19 | # usedforsecurity arg only available in Python 3.9+
 20 | hashlib.new('sha1', usedforsecurity=True)
-   |             ^^^^^^ S324
+   |             ^^^^^^ S324 (hashlib-insecure-hash-function)
 21 | 
 22 | crypt.crypt("test", salt=crypt.METHOD_CRYPT)
    |
 
-S324.py:22:26: S324 Probable use of insecure hash functions in `crypt`: `crypt.METHOD_CRYPT`
+S324.py:22:26: S324 (hashlib-insecure-hash-function) Probable use of insecure hash functions in `crypt`: `crypt.METHOD_CRYPT`
    |
 20 | hashlib.new('sha1', usedforsecurity=True)
 21 | 
 22 | crypt.crypt("test", salt=crypt.METHOD_CRYPT)
-   |                          ^^^^^^^^^^^^^^^^^^ S324
+   |                          ^^^^^^^^^^^^^^^^^^ S324 (hashlib-insecure-hash-function)
 23 | crypt.crypt("test", salt=crypt.METHOD_MD5)
 24 | crypt.crypt("test", salt=crypt.METHOD_BLOWFISH)
    |
 
-S324.py:23:26: S324 Probable use of insecure hash functions in `crypt`: `crypt.METHOD_MD5`
+S324.py:23:26: S324 (hashlib-insecure-hash-function) Probable use of insecure hash functions in `crypt`: `crypt.METHOD_MD5`
    |
 22 | crypt.crypt("test", salt=crypt.METHOD_CRYPT)
 23 | crypt.crypt("test", salt=crypt.METHOD_MD5)
-   |                          ^^^^^^^^^^^^^^^^ S324
+   |                          ^^^^^^^^^^^^^^^^ S324 (hashlib-insecure-hash-function)
 24 | crypt.crypt("test", salt=crypt.METHOD_BLOWFISH)
 25 | crypt.crypt("test", crypt.METHOD_BLOWFISH)
    |
 
-S324.py:24:26: S324 Probable use of insecure hash functions in `crypt`: `crypt.METHOD_BLOWFISH`
+S324.py:24:26: S324 (hashlib-insecure-hash-function) Probable use of insecure hash functions in `crypt`: `crypt.METHOD_BLOWFISH`
    |
 22 | crypt.crypt("test", salt=crypt.METHOD_CRYPT)
 23 | crypt.crypt("test", salt=crypt.METHOD_MD5)
 24 | crypt.crypt("test", salt=crypt.METHOD_BLOWFISH)
-   |                          ^^^^^^^^^^^^^^^^^^^^^ S324
+   |                          ^^^^^^^^^^^^^^^^^^^^^ S324 (hashlib-insecure-hash-function)
 25 | crypt.crypt("test", crypt.METHOD_BLOWFISH)
    |
 
-S324.py:25:21: S324 Probable use of insecure hash functions in `crypt`: `crypt.METHOD_BLOWFISH`
+S324.py:25:21: S324 (hashlib-insecure-hash-function) Probable use of insecure hash functions in `crypt`: `crypt.METHOD_BLOWFISH`
    |
 23 | crypt.crypt("test", salt=crypt.METHOD_MD5)
 24 | crypt.crypt("test", salt=crypt.METHOD_BLOWFISH)
 25 | crypt.crypt("test", crypt.METHOD_BLOWFISH)
-   |                     ^^^^^^^^^^^^^^^^^^^^^ S324
+   |                     ^^^^^^^^^^^^^^^^^^^^^ S324 (hashlib-insecure-hash-function)
 26 | 
 27 | crypt.mksalt(crypt.METHOD_CRYPT)
    |
 
-S324.py:27:14: S324 Probable use of insecure hash functions in `crypt`: `crypt.METHOD_CRYPT`
+S324.py:27:14: S324 (hashlib-insecure-hash-function) Probable use of insecure hash functions in `crypt`: `crypt.METHOD_CRYPT`
    |
 25 | crypt.crypt("test", crypt.METHOD_BLOWFISH)
 26 | 
 27 | crypt.mksalt(crypt.METHOD_CRYPT)
-   |              ^^^^^^^^^^^^^^^^^^ S324
+   |              ^^^^^^^^^^^^^^^^^^ S324 (hashlib-insecure-hash-function)
 28 | crypt.mksalt(crypt.METHOD_MD5)
 29 | crypt.mksalt(crypt.METHOD_BLOWFISH)
    |
 
-S324.py:28:14: S324 Probable use of insecure hash functions in `crypt`: `crypt.METHOD_MD5`
+S324.py:28:14: S324 (hashlib-insecure-hash-function) Probable use of insecure hash functions in `crypt`: `crypt.METHOD_MD5`
    |
 27 | crypt.mksalt(crypt.METHOD_CRYPT)
 28 | crypt.mksalt(crypt.METHOD_MD5)
-   |              ^^^^^^^^^^^^^^^^ S324
+   |              ^^^^^^^^^^^^^^^^ S324 (hashlib-insecure-hash-function)
 29 | crypt.mksalt(crypt.METHOD_BLOWFISH)
    |
 
-S324.py:29:14: S324 Probable use of insecure hash functions in `crypt`: `crypt.METHOD_BLOWFISH`
+S324.py:29:14: S324 (hashlib-insecure-hash-function) Probable use of insecure hash functions in `crypt`: `crypt.METHOD_BLOWFISH`
    |
 27 | crypt.mksalt(crypt.METHOD_CRYPT)
 28 | crypt.mksalt(crypt.METHOD_MD5)
 29 | crypt.mksalt(crypt.METHOD_BLOWFISH)
-   |              ^^^^^^^^^^^^^^^^^^^^^ S324
+   |              ^^^^^^^^^^^^^^^^^^^^^ S324 (hashlib-insecure-hash-function)
 30 | 
 31 | # OK
    |

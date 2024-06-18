@@ -1,34 +1,32 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 ---
-all.py:1:1: D100 Missing docstring in public module
+all.py:1:1: D100 (undocumented-public-module) Missing docstring in public module
   |
 1 | def public_func():
-  |  D100
+  |  D100 (undocumented-public-module)
 2 |     pass
   |
 
-all.py:1:5: D103 Missing docstring in public function
+all.py:1:5: D103 (undocumented-public-function) Missing docstring in public function
   |
 1 | def public_func():
-  |     ^^^^^^^^^^^ D103
+  |     ^^^^^^^^^^^ D103 (undocumented-public-function)
 2 |     pass
   |
 
-all.py:9:7: D101 Missing docstring in public class
+all.py:9:7: D101 (undocumented-public-class) Missing docstring in public class
    |
  9 | class PublicClass:
-   |       ^^^^^^^^^^^ D101
+   |       ^^^^^^^^^^^ D101 (undocumented-public-class)
 10 |     class PublicNestedClass:
 11 |         pass
    |
 
-all.py:10:11: D106 Missing docstring in public nested class
+all.py:10:11: D106 (undocumented-public-nested-class) Missing docstring in public nested class
    |
  9 | class PublicClass:
 10 |     class PublicNestedClass:
-   |           ^^^^^^^^^^^^^^^^^ D106
+   |           ^^^^^^^^^^^^^^^^^ D106 (undocumented-public-nested-class)
 11 |         pass
    |
-
-

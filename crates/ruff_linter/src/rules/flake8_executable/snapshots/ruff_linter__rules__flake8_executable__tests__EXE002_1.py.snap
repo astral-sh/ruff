@@ -1,9 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_executable/mod.rs
 ---
-EXE002_1.py:1:1: EXE002 The file is executable but no shebang is present
+EXE002_1.py:1:1: EXE002 (shebang-missing-executable-file) The file is executable but no shebang is present
   |
 1 | if __name__ == '__main__':
-  |  EXE002
+  |  EXE002 (shebang-missing-executable-file)
 2 |     print('I should be executable.')
   |

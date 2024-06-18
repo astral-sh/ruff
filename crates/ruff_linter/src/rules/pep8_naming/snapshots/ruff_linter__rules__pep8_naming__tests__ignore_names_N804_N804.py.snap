@@ -1,11 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/pep8_naming/mod.rs
 ---
-N804.py:5:27: N804 [*] First argument of a class method should be named `cls`
+N804.py:5:27: N804 (invalid-first-argument-name-for-class-method) [*] First argument of a class method should be named `cls`
   |
 4 | class Class:
 5 |     def __init_subclass__(self, default_name, **kwargs):
-  |                           ^^^^ N804
+  |                           ^^^^ N804 (invalid-first-argument-name-for-class-method)
 6 |         ...
   |
   = help: Rename `self` to `cls`
@@ -20,11 +20,11 @@ N804.py:5:27: N804 [*] First argument of a class method should be named `cls`
 7 7 | 
 8 8 |     @classmethod
 
-N804.py:13:18: N804 [*] First argument of a class method should be named `cls`
+N804.py:13:18: N804 (invalid-first-argument-name-for-class-method) [*] First argument of a class method should be named `cls`
    |
 12 |     @classmethod
 13 |     def stillBad(self, x, /, other):
-   |                  ^^^^ N804
+   |                  ^^^^ N804 (invalid-first-argument-name-for-class-method)
 14 |         ...
    |
    = help: Rename `self` to `cls`
@@ -39,12 +39,12 @@ N804.py:13:18: N804 [*] First argument of a class method should be named `cls`
 15 15 | 
 16 16 | 
 
-N804.py:21:18: N804 [*] First argument of a class method should be named `cls`
+N804.py:21:18: N804 (invalid-first-argument-name-for-class-method) [*] First argument of a class method should be named `cls`
    |
 19 |         pass
 20 | 
 21 |     def stillBad(self):
-   |                  ^^^^ N804
+   |                  ^^^^ N804 (invalid-first-argument-name-for-class-method)
 22 |         pass
    |
    = help: Rename `self` to `cls`

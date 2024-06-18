@@ -1,10 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_comprehensions/mod.rs
 ---
-C404.py:1:1: C404 [*] Unnecessary `list` comprehension (rewrite as a `dict` comprehension)
+C404.py:1:1: C404 (unnecessary-list-comprehension-dict) [*] Unnecessary `list` comprehension (rewrite as a `dict` comprehension)
   |
 1 | dict([(i, i) for i in range(3)])
-  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C404
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C404 (unnecessary-list-comprehension-dict)
 2 | dict([(i, i) for i in range(3)], z=4)
   |
   = help: Rewrite as a `dict` comprehension
@@ -16,12 +16,12 @@ C404.py:1:1: C404 [*] Unnecessary `list` comprehension (rewrite as a `dict` comp
 3 3 | 
 4 4 | def f(x):
 
-C404.py:7:4: C404 [*] Unnecessary `list` comprehension (rewrite as a `dict` comprehension)
+C404.py:7:4: C404 (unnecessary-list-comprehension-dict) [*] Unnecessary `list` comprehension (rewrite as a `dict` comprehension)
   |
 5 |     return x
 6 | 
 7 | f'{dict([(s,s) for s in "ab"])}'
-  |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^ C404
+  |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^ C404 (unnecessary-list-comprehension-dict)
 8 | f"{dict([(s,s) for s in 'ab'])}"
 9 | f"{dict([(s, s) for s in 'ab'])}"
   |
@@ -37,11 +37,11 @@ C404.py:7:4: C404 [*] Unnecessary `list` comprehension (rewrite as a `dict` comp
 9 9 | f"{dict([(s, s) for s in 'ab'])}"
 10 10 | f"{dict([(s,f(s)) for s in 'ab'])}"
 
-C404.py:8:4: C404 [*] Unnecessary `list` comprehension (rewrite as a `dict` comprehension)
+C404.py:8:4: C404 (unnecessary-list-comprehension-dict) [*] Unnecessary `list` comprehension (rewrite as a `dict` comprehension)
    |
  7 | f'{dict([(s,s) for s in "ab"])}'
  8 | f"{dict([(s,s) for s in 'ab'])}"
-   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^ C404
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^ C404 (unnecessary-list-comprehension-dict)
  9 | f"{dict([(s, s) for s in 'ab'])}"
 10 | f"{dict([(s,f(s)) for s in 'ab'])}"
    |
@@ -57,12 +57,12 @@ C404.py:8:4: C404 [*] Unnecessary `list` comprehension (rewrite as a `dict` comp
 10 10 | f"{dict([(s,f(s)) for s in 'ab'])}"
 11 11 | 
 
-C404.py:9:4: C404 [*] Unnecessary `list` comprehension (rewrite as a `dict` comprehension)
+C404.py:9:4: C404 (unnecessary-list-comprehension-dict) [*] Unnecessary `list` comprehension (rewrite as a `dict` comprehension)
    |
  7 | f'{dict([(s,s) for s in "ab"])}'
  8 | f"{dict([(s,s) for s in 'ab'])}"
  9 | f"{dict([(s, s) for s in 'ab'])}"
-   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C404
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C404 (unnecessary-list-comprehension-dict)
 10 | f"{dict([(s,f(s)) for s in 'ab'])}"
    |
    = help: Rewrite as a `dict` comprehension
@@ -77,12 +77,12 @@ C404.py:9:4: C404 [*] Unnecessary `list` comprehension (rewrite as a `dict` comp
 11 11 | 
 12 12 | f'{dict([(s,s) for s in "ab"]) | dict([(s,s) for s in "ab"])}'
 
-C404.py:10:4: C404 [*] Unnecessary `list` comprehension (rewrite as a `dict` comprehension)
+C404.py:10:4: C404 (unnecessary-list-comprehension-dict) [*] Unnecessary `list` comprehension (rewrite as a `dict` comprehension)
    |
  8 | f"{dict([(s,s) for s in 'ab'])}"
  9 | f"{dict([(s, s) for s in 'ab'])}"
 10 | f"{dict([(s,f(s)) for s in 'ab'])}"
-   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C404
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C404 (unnecessary-list-comprehension-dict)
 11 | 
 12 | f'{dict([(s,s) for s in "ab"]) | dict([(s,s) for s in "ab"])}'
    |
@@ -98,12 +98,12 @@ C404.py:10:4: C404 [*] Unnecessary `list` comprehension (rewrite as a `dict` com
 12 12 | f'{dict([(s,s) for s in "ab"]) | dict([(s,s) for s in "ab"])}'
 13 13 | f'{ dict([(s,s) for s in "ab"]) | dict([(s,s) for s in "ab"]) }'
 
-C404.py:12:4: C404 [*] Unnecessary `list` comprehension (rewrite as a `dict` comprehension)
+C404.py:12:4: C404 (unnecessary-list-comprehension-dict) [*] Unnecessary `list` comprehension (rewrite as a `dict` comprehension)
    |
 10 | f"{dict([(s,f(s)) for s in 'ab'])}"
 11 | 
 12 | f'{dict([(s,s) for s in "ab"]) | dict([(s,s) for s in "ab"])}'
-   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^ C404
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^ C404 (unnecessary-list-comprehension-dict)
 13 | f'{ dict([(s,s) for s in "ab"]) | dict([(s,s) for s in "ab"]) }'
    |
    = help: Rewrite as a `dict` comprehension
@@ -118,12 +118,12 @@ C404.py:12:4: C404 [*] Unnecessary `list` comprehension (rewrite as a `dict` com
 14 14 | 
 15 15 | # Regression test for: https://github.com/astral-sh/ruff/issues/7087
 
-C404.py:12:34: C404 [*] Unnecessary `list` comprehension (rewrite as a `dict` comprehension)
+C404.py:12:34: C404 (unnecessary-list-comprehension-dict) [*] Unnecessary `list` comprehension (rewrite as a `dict` comprehension)
    |
 10 | f"{dict([(s,f(s)) for s in 'ab'])}"
 11 | 
 12 | f'{dict([(s,s) for s in "ab"]) | dict([(s,s) for s in "ab"])}'
-   |                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^ C404
+   |                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^ C404 (unnecessary-list-comprehension-dict)
 13 | f'{ dict([(s,s) for s in "ab"]) | dict([(s,s) for s in "ab"]) }'
    |
    = help: Rewrite as a `dict` comprehension
@@ -138,11 +138,11 @@ C404.py:12:34: C404 [*] Unnecessary `list` comprehension (rewrite as a `dict` co
 14 14 | 
 15 15 | # Regression test for: https://github.com/astral-sh/ruff/issues/7087
 
-C404.py:13:5: C404 [*] Unnecessary `list` comprehension (rewrite as a `dict` comprehension)
+C404.py:13:5: C404 (unnecessary-list-comprehension-dict) [*] Unnecessary `list` comprehension (rewrite as a `dict` comprehension)
    |
 12 | f'{dict([(s,s) for s in "ab"]) | dict([(s,s) for s in "ab"])}'
 13 | f'{ dict([(s,s) for s in "ab"]) | dict([(s,s) for s in "ab"]) }'
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^ C404
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^ C404 (unnecessary-list-comprehension-dict)
 14 | 
 15 | # Regression test for: https://github.com/astral-sh/ruff/issues/7087
    |
@@ -158,11 +158,11 @@ C404.py:13:5: C404 [*] Unnecessary `list` comprehension (rewrite as a `dict` com
 15 15 | # Regression test for: https://github.com/astral-sh/ruff/issues/7087
 16 16 | saved.append(dict([(k, v)for k,v in list(unique_instance.__dict__.items()) if k in [f.name for f in unique_instance._meta.fields]]))
 
-C404.py:13:35: C404 [*] Unnecessary `list` comprehension (rewrite as a `dict` comprehension)
+C404.py:13:35: C404 (unnecessary-list-comprehension-dict) [*] Unnecessary `list` comprehension (rewrite as a `dict` comprehension)
    |
 12 | f'{dict([(s,s) for s in "ab"]) | dict([(s,s) for s in "ab"])}'
 13 | f'{ dict([(s,s) for s in "ab"]) | dict([(s,s) for s in "ab"]) }'
-   |                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^ C404
+   |                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^ C404 (unnecessary-list-comprehension-dict)
 14 | 
 15 | # Regression test for: https://github.com/astral-sh/ruff/issues/7087
    |
@@ -178,11 +178,11 @@ C404.py:13:35: C404 [*] Unnecessary `list` comprehension (rewrite as a `dict` co
 15 15 | # Regression test for: https://github.com/astral-sh/ruff/issues/7087
 16 16 | saved.append(dict([(k, v)for k,v in list(unique_instance.__dict__.items()) if k in [f.name for f in unique_instance._meta.fields]]))
 
-C404.py:16:14: C404 [*] Unnecessary `list` comprehension (rewrite as a `dict` comprehension)
+C404.py:16:14: C404 (unnecessary-list-comprehension-dict) [*] Unnecessary `list` comprehension (rewrite as a `dict` comprehension)
    |
 15 | # Regression test for: https://github.com/astral-sh/ruff/issues/7087
 16 | saved.append(dict([(k, v)for k,v in list(unique_instance.__dict__.items()) if k in [f.name for f in unique_instance._meta.fields]]))
-   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C404
+   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C404 (unnecessary-list-comprehension-dict)
    |
    = help: Rewrite as a `dict` comprehension
 
@@ -192,5 +192,3 @@ C404.py:16:14: C404 [*] Unnecessary `list` comprehension (rewrite as a `dict` co
 15 15 | # Regression test for: https://github.com/astral-sh/ruff/issues/7087
 16    |-saved.append(dict([(k, v)for k,v in list(unique_instance.__dict__.items()) if k in [f.name for f in unique_instance._meta.fields]]))
    16 |+saved.append({k: v for k,v in list(unique_instance.__dict__.items()) if k in [f.name for f in unique_instance._meta.fields]})
-
-

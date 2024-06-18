@@ -1,177 +1,177 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-E721.py:2:4: E721 Do not compare types, use `isinstance()`
+E721.py:2:4: E721 (type-comparison) Do not compare types, use `isinstance()`
   |
 1 | #: E721
 2 | if type(res) == type(42):
-  |    ^^^^^^^^^^^^^^^^^^^^^ E721
+  |    ^^^^^^^^^^^^^^^^^^^^^ E721 (type-comparison)
 3 |     pass
 4 | #: E721
   |
 
-E721.py:5:4: E721 Do not compare types, use `isinstance()`
+E721.py:5:4: E721 (type-comparison) Do not compare types, use `isinstance()`
   |
 3 |     pass
 4 | #: E721
 5 | if type(res) != type(""):
-  |    ^^^^^^^^^^^^^^^^^^^^^ E721
+  |    ^^^^^^^^^^^^^^^^^^^^^ E721 (type-comparison)
 6 |     pass
 7 | #: E721
   |
 
-E721.py:8:4: E721 Do not compare types, use `isinstance()`
+E721.py:8:4: E721 (type-comparison) Do not compare types, use `isinstance()`
    |
  6 |     pass
  7 | #: E721
  8 | if type(res) == memoryview:
-   |    ^^^^^^^^^^^^^^^^^^^^^^^ E721
+   |    ^^^^^^^^^^^^^^^^^^^^^^^ E721 (type-comparison)
  9 |     pass
 10 | #: Okay
    |
 
-E721.py:18:4: E721 Do not compare types, use `isinstance()`
+E721.py:18:4: E721 (type-comparison) Do not compare types, use `isinstance()`
    |
 16 | import types
 17 | 
 18 | if type(res) is not types.ListType:
-   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E721
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E721 (type-comparison)
 19 |     pass
 20 | #: E721
    |
 
-E721.py:21:8: E721 Do not compare types, use `isinstance()`
+E721.py:21:8: E721 (type-comparison) Do not compare types, use `isinstance()`
    |
 19 |     pass
 20 | #: E721
 21 | assert type(res) == type(False) or type(res) == type(None)
-   |        ^^^^^^^^^^^^^^^^^^^^^^^^ E721
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^ E721 (type-comparison)
 22 | #: E721
 23 | assert type(res) == type([])
    |
 
-E721.py:23:8: E721 Do not compare types, use `isinstance()`
+E721.py:23:8: E721 (type-comparison) Do not compare types, use `isinstance()`
    |
 21 | assert type(res) == type(False) or type(res) == type(None)
 22 | #: E721
 23 | assert type(res) == type([])
-   |        ^^^^^^^^^^^^^^^^^^^^^ E721
+   |        ^^^^^^^^^^^^^^^^^^^^^ E721 (type-comparison)
 24 | #: E721
 25 | assert type(res) == type(())
    |
 
-E721.py:25:8: E721 Do not compare types, use `isinstance()`
+E721.py:25:8: E721 (type-comparison) Do not compare types, use `isinstance()`
    |
 23 | assert type(res) == type([])
 24 | #: E721
 25 | assert type(res) == type(())
-   |        ^^^^^^^^^^^^^^^^^^^^^ E721
+   |        ^^^^^^^^^^^^^^^^^^^^^ E721 (type-comparison)
 26 | #: E721
 27 | assert type(res) == type((0,))
    |
 
-E721.py:27:8: E721 Do not compare types, use `isinstance()`
+E721.py:27:8: E721 (type-comparison) Do not compare types, use `isinstance()`
    |
 25 | assert type(res) == type(())
 26 | #: E721
 27 | assert type(res) == type((0,))
-   |        ^^^^^^^^^^^^^^^^^^^^^^^ E721
+   |        ^^^^^^^^^^^^^^^^^^^^^^^ E721 (type-comparison)
 28 | #: E721
 29 | assert type(res) == type((0))
    |
 
-E721.py:29:8: E721 Do not compare types, use `isinstance()`
+E721.py:29:8: E721 (type-comparison) Do not compare types, use `isinstance()`
    |
 27 | assert type(res) == type((0,))
 28 | #: E721
 29 | assert type(res) == type((0))
-   |        ^^^^^^^^^^^^^^^^^^^^^^ E721
+   |        ^^^^^^^^^^^^^^^^^^^^^^ E721 (type-comparison)
 30 | #: E721
 31 | assert type(res) != type((1, ))
    |
 
-E721.py:31:8: E721 Do not compare types, use `isinstance()`
+E721.py:31:8: E721 (type-comparison) Do not compare types, use `isinstance()`
    |
 29 | assert type(res) == type((0))
 30 | #: E721
 31 | assert type(res) != type((1, ))
-   |        ^^^^^^^^^^^^^^^^^^^^^^^^ E721
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^ E721 (type-comparison)
 32 | #: Okay
 33 | assert type(res) is type((1, ))
    |
 
-E721.py:33:8: E721 Do not compare types, use `isinstance()`
+E721.py:33:8: E721 (type-comparison) Do not compare types, use `isinstance()`
    |
 31 | assert type(res) != type((1, ))
 32 | #: Okay
 33 | assert type(res) is type((1, ))
-   |        ^^^^^^^^^^^^^^^^^^^^^^^^ E721
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^ E721 (type-comparison)
 34 | #: Okay
 35 | assert type(res) is not type((1, ))
    |
 
-E721.py:35:8: E721 Do not compare types, use `isinstance()`
+E721.py:35:8: E721 (type-comparison) Do not compare types, use `isinstance()`
    |
 33 | assert type(res) is type((1, ))
 34 | #: Okay
 35 | assert type(res) is not type((1, ))
-   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E721
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E721 (type-comparison)
 36 | #: E211 E721
 37 | assert type(res) == type ([2, ])
    |
 
-E721.py:37:8: E721 Do not compare types, use `isinstance()`
+E721.py:37:8: E721 (type-comparison) Do not compare types, use `isinstance()`
    |
 35 | assert type(res) is not type((1, ))
 36 | #: E211 E721
 37 | assert type(res) == type ([2, ])
-   |        ^^^^^^^^^^^^^^^^^^^^^^^^^ E721
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^^ E721 (type-comparison)
 38 | #: E201 E201 E202 E721
 39 | assert type(res) == type( ( ) )
    |
 
-E721.py:39:8: E721 Do not compare types, use `isinstance()`
+E721.py:39:8: E721 (type-comparison) Do not compare types, use `isinstance()`
    |
 37 | assert type(res) == type ([2, ])
 38 | #: E201 E201 E202 E721
 39 | assert type(res) == type( ( ) )
-   |        ^^^^^^^^^^^^^^^^^^^^^^^^ E721
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^ E721 (type-comparison)
 40 | #: E201 E202 E721
 41 | assert type(res) == type( (0, ) )
    |
 
-E721.py:41:8: E721 Do not compare types, use `isinstance()`
+E721.py:41:8: E721 (type-comparison) Do not compare types, use `isinstance()`
    |
 39 | assert type(res) == type( ( ) )
 40 | #: E201 E202 E721
 41 | assert type(res) == type( (0, ) )
-   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^ E721
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^ E721 (type-comparison)
 42 | #:
    |
 
-E721.py:107:12: E721 Do not compare types, use `isinstance()`
+E721.py:107:12: E721 (type-comparison) Do not compare types, use `isinstance()`
     |
 105 |     def asdf(self, value: str | None):
 106 |         #: E721
 107 |         if type(value) is str:
-    |            ^^^^^^^^^^^^^^^^^^ E721
+    |            ^^^^^^^^^^^^^^^^^^ E721 (type-comparison)
 108 |             ...
     |
 
-E721.py:117:12: E721 Do not compare types, use `isinstance()`
+E721.py:117:12: E721 (type-comparison) Do not compare types, use `isinstance()`
     |
 115 |     def asdf(self, value: str | None):
 116 |         #: E721
 117 |         if type(value) is str:
-    |            ^^^^^^^^^^^^^^^^^^ E721
+    |            ^^^^^^^^^^^^^^^^^^ E721 (type-comparison)
 118 |             ...
     |
 
-E721.py:144:4: E721 Do not compare types, use `isinstance()`
+E721.py:144:4: E721 (type-comparison) Do not compare types, use `isinstance()`
     |
 142 | import builtins
 143 | 
 144 | if builtins.type(res) == memoryview:  # E721
-    |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E721
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E721 (type-comparison)
 145 |     pass
     |

@@ -1,10 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-sys_exit_alias_6.py:1:1: PLR1722 [*] Use `sys.exit()` instead of `exit`
+sys_exit_alias_6.py:1:1: PLR1722 (sys-exit-alias) [*] Use `sys.exit()` instead of `exit`
   |
 1 | exit(0)
-  | ^^^^ PLR1722
+  | ^^^^ PLR1722 (sys-exit-alias)
 2 | quit(0)
   |
   = help: Replace `exit` with `sys.exit()`
@@ -17,11 +17,11 @@ sys_exit_alias_6.py:1:1: PLR1722 [*] Use `sys.exit()` instead of `exit`
 3 4 | 
 4 5 | 
 
-sys_exit_alias_6.py:2:1: PLR1722 [*] Use `sys.exit()` instead of `quit`
+sys_exit_alias_6.py:2:1: PLR1722 (sys-exit-alias) [*] Use `sys.exit()` instead of `quit`
   |
 1 | exit(0)
 2 | quit(0)
-  | ^^^^ PLR1722
+  | ^^^^ PLR1722 (sys-exit-alias)
   |
   = help: Replace `quit` with `sys.exit()`
 
@@ -33,5 +33,3 @@ sys_exit_alias_6.py:2:1: PLR1722 [*] Use `sys.exit()` instead of `quit`
 3 4 | 
 4 5 | 
 5 6 | def exit(e):
-
-

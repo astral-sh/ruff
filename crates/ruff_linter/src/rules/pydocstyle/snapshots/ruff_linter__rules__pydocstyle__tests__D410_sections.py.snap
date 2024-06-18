@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 ---
-sections.py:78:5: D410 [*] Missing blank line after section ("Returns")
+sections.py:78:5: D410 (no-blank-line-after-section) [*] Missing blank line after section ("Returns")
    |
 76 |     """Toggle the gizmo.
 77 | 
 78 |     Returns
-   |     ^^^^^^^ D410
+   |     ^^^^^^^ D410 (no-blank-line-after-section)
 79 |     -------
 80 |     Yields
    |
@@ -21,12 +21,12 @@ sections.py:78:5: D410 [*] Missing blank line after section ("Returns")
 81 82 |     ------
 82 83 | 
 
-sections.py:224:5: D410 [*] Missing blank line after section ("Returns")
+sections.py:224:5: D410 (no-blank-line-after-section) [*] Missing blank line after section ("Returns")
     |
 222 |     returns.
 223 | 
 224 |     Returns
-    |     ^^^^^^^ D410
+    |     ^^^^^^^ D410 (no-blank-line-after-section)
 225 |     ------
 226 |     Many many wonderful things.
     |

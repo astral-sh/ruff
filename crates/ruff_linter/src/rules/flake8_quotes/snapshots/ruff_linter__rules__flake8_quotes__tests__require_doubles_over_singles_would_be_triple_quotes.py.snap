@@ -1,18 +1,18 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_quotes/mod.rs
 ---
-singles_would_be_triple_quotes.py:1:5: Q000 Single quotes found but double quotes preferred
+singles_would_be_triple_quotes.py:1:5: Q000 (bad-quotes-inline-string) Single quotes found but double quotes preferred
   |
 1 | s = ''"Start with empty string" ' and lint docstring safely'
-  |     ^^ Q000
+  |     ^^ Q000 (bad-quotes-inline-string)
 2 | s = 'Do not'" start with empty string" ' and lint docstring safely'
   |
   = help: Replace single quotes with double quotes
 
-singles_would_be_triple_quotes.py:1:33: Q000 [*] Single quotes found but double quotes preferred
+singles_would_be_triple_quotes.py:1:33: Q000 (bad-quotes-inline-string) [*] Single quotes found but double quotes preferred
   |
 1 | s = ''"Start with empty string" ' and lint docstring safely'
-  |                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Q000
+  |                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Q000 (bad-quotes-inline-string)
 2 | s = 'Do not'" start with empty string" ' and lint docstring safely'
   |
   = help: Replace single quotes with double quotes
@@ -22,11 +22,11 @@ singles_would_be_triple_quotes.py:1:33: Q000 [*] Single quotes found but double 
   1 |+s = ''"Start with empty string" " and lint docstring safely"
 2 2 | s = 'Do not'" start with empty string" ' and lint docstring safely'
 
-singles_would_be_triple_quotes.py:2:5: Q000 [*] Single quotes found but double quotes preferred
+singles_would_be_triple_quotes.py:2:5: Q000 (bad-quotes-inline-string) [*] Single quotes found but double quotes preferred
   |
 1 | s = ''"Start with empty string" ' and lint docstring safely'
 2 | s = 'Do not'" start with empty string" ' and lint docstring safely'
-  |     ^^^^^^^^ Q000
+  |     ^^^^^^^^ Q000 (bad-quotes-inline-string)
   |
   = help: Replace single quotes with double quotes
 
@@ -35,11 +35,11 @@ singles_would_be_triple_quotes.py:2:5: Q000 [*] Single quotes found but double q
 2   |-s = 'Do not'" start with empty string" ' and lint docstring safely'
   2 |+s = "Do not"" start with empty string" ' and lint docstring safely'
 
-singles_would_be_triple_quotes.py:2:40: Q000 [*] Single quotes found but double quotes preferred
+singles_would_be_triple_quotes.py:2:40: Q000 (bad-quotes-inline-string) [*] Single quotes found but double quotes preferred
   |
 1 | s = ''"Start with empty string" ' and lint docstring safely'
 2 | s = 'Do not'" start with empty string" ' and lint docstring safely'
-  |                                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Q000
+  |                                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Q000 (bad-quotes-inline-string)
   |
   = help: Replace single quotes with double quotes
 

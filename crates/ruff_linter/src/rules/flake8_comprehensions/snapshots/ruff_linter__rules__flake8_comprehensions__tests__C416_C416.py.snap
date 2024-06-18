@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_comprehensions/mod.rs
 ---
-C416.py:6:1: C416 [*] Unnecessary `list` comprehension (rewrite using `list()`)
+C416.py:6:1: C416 (unnecessary-comprehension) [*] Unnecessary `list` comprehension (rewrite using `list()`)
   |
 4 | d = {"a": 1, "b": 2, "c": 3}
 5 | 
 6 | [i for i in x]
-  | ^^^^^^^^^^^^^^ C416
+  | ^^^^^^^^^^^^^^ C416 (unnecessary-comprehension)
 7 | {i for i in x}
 8 | {k: v for k, v in y}
   |
@@ -22,11 +22,11 @@ C416.py:6:1: C416 [*] Unnecessary `list` comprehension (rewrite using `list()`)
 8 8 | {k: v for k, v in y}
 9 9 | {k: v for k, v in d.items()}
 
-C416.py:7:1: C416 [*] Unnecessary `set` comprehension (rewrite using `set()`)
+C416.py:7:1: C416 (unnecessary-comprehension) [*] Unnecessary `set` comprehension (rewrite using `set()`)
   |
 6 | [i for i in x]
 7 | {i for i in x}
-  | ^^^^^^^^^^^^^^ C416
+  | ^^^^^^^^^^^^^^ C416 (unnecessary-comprehension)
 8 | {k: v for k, v in y}
 9 | {k: v for k, v in d.items()}
   |
@@ -42,12 +42,12 @@ C416.py:7:1: C416 [*] Unnecessary `set` comprehension (rewrite using `set()`)
 9 9 | {k: v for k, v in d.items()}
 10 10 | [(k, v) for k, v in d.items()]
 
-C416.py:8:1: C416 [*] Unnecessary `dict` comprehension (rewrite using `dict()`)
+C416.py:8:1: C416 (unnecessary-comprehension) [*] Unnecessary `dict` comprehension (rewrite using `dict()`)
    |
  6 | [i for i in x]
  7 | {i for i in x}
  8 | {k: v for k, v in y}
-   | ^^^^^^^^^^^^^^^^^^^^ C416
+   | ^^^^^^^^^^^^^^^^^^^^ C416 (unnecessary-comprehension)
  9 | {k: v for k, v in d.items()}
 10 | [(k, v) for k, v in d.items()]
    |
@@ -63,12 +63,12 @@ C416.py:8:1: C416 [*] Unnecessary `dict` comprehension (rewrite using `dict()`)
 10 10 | [(k, v) for k, v in d.items()]
 11 11 | {k: (a, b) for k, (a, b) in d.items()}
 
-C416.py:9:1: C416 [*] Unnecessary `dict` comprehension (rewrite using `dict()`)
+C416.py:9:1: C416 (unnecessary-comprehension) [*] Unnecessary `dict` comprehension (rewrite using `dict()`)
    |
  7 | {i for i in x}
  8 | {k: v for k, v in y}
  9 | {k: v for k, v in d.items()}
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C416
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C416 (unnecessary-comprehension)
 10 | [(k, v) for k, v in d.items()]
 11 | {k: (a, b) for k, (a, b) in d.items()}
    |
@@ -84,12 +84,12 @@ C416.py:9:1: C416 [*] Unnecessary `dict` comprehension (rewrite using `dict()`)
 11 11 | {k: (a, b) for k, (a, b) in d.items()}
 12 12 | 
 
-C416.py:10:1: C416 [*] Unnecessary `list` comprehension (rewrite using `list()`)
+C416.py:10:1: C416 (unnecessary-comprehension) [*] Unnecessary `list` comprehension (rewrite using `list()`)
    |
  8 | {k: v for k, v in y}
  9 | {k: v for k, v in d.items()}
 10 | [(k, v) for k, v in d.items()]
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C416
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C416 (unnecessary-comprehension)
 11 | {k: (a, b) for k, (a, b) in d.items()}
    |
    = help: Rewrite using `list()`
@@ -104,12 +104,12 @@ C416.py:10:1: C416 [*] Unnecessary `list` comprehension (rewrite using `list()`)
 12 12 | 
 13 13 | [i for i, in z]
 
-C416.py:11:1: C416 [*] Unnecessary `dict` comprehension (rewrite using `dict()`)
+C416.py:11:1: C416 (unnecessary-comprehension) [*] Unnecessary `dict` comprehension (rewrite using `dict()`)
    |
  9 | {k: v for k, v in d.items()}
 10 | [(k, v) for k, v in d.items()]
 11 | {k: (a, b) for k, (a, b) in d.items()}
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C416
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C416 (unnecessary-comprehension)
 12 | 
 13 | [i for i, in z]
    |
@@ -125,11 +125,11 @@ C416.py:11:1: C416 [*] Unnecessary `dict` comprehension (rewrite using `dict()`)
 13 13 | [i for i, in z]
 14 14 | [i for i, j in y]
 
-C416.py:24:70: C416 [*] Unnecessary `list` comprehension (rewrite using `list()`)
+C416.py:24:70: C416 (unnecessary-comprehension) [*] Unnecessary `list` comprehension (rewrite using `list()`)
    |
 23 | # Regression test for: https://github.com/astral-sh/ruff/issues/7196
 24 | any(len(symbol_table.get_by_type(symbol_type)) > 0 for symbol_type in[t for t in SymbolType])
-   |                                                                      ^^^^^^^^^^^^^^^^^^^^^^^ C416
+   |                                                                      ^^^^^^^^^^^^^^^^^^^^^^^ C416 (unnecessary-comprehension)
    |
    = help: Rewrite using `list()`
 
@@ -139,5 +139,3 @@ C416.py:24:70: C416 [*] Unnecessary `list` comprehension (rewrite using `list()`
 23 23 | # Regression test for: https://github.com/astral-sh/ruff/issues/7196
 24    |-any(len(symbol_table.get_by_type(symbol_type)) > 0 for symbol_type in[t for t in SymbolType])
    24 |+any(len(symbol_table.get_by_type(symbol_type)) > 0 for symbol_type in list(SymbolType))
-
-

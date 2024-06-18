@@ -1,15 +1,13 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 ---
-bom.py:1:1: D300 [*] Use triple double quotes `"""`
+bom.py:1:1: D300 (triple-single-quotes) [*] Use triple double quotes `"""`
   |
 1 | ﻿''' SAM macro definitions '''
-  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ D300
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ D300 (triple-single-quotes)
   |
   = help: Convert to triple double quotes
 
 ℹ Safe fix
 1   |-﻿''' SAM macro definitions '''
   1 |+﻿""" SAM macro definitions """
-
-

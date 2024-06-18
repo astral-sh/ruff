@@ -1,10 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 ---
-UP025.py:1:1: UP025 [*] Remove unicode literals from strings
+UP025.py:1:1: UP025 (unicode-kind-prefix) [*] Remove unicode literals from strings
   |
 1 | u"Hello"
-  | ^^^^^^^^ UP025
+  | ^^^^^^^^ UP025 (unicode-kind-prefix)
 2 | 
 3 | x = u"Hello"  # UP025
   |
@@ -17,12 +17,12 @@ UP025.py:1:1: UP025 [*] Remove unicode literals from strings
 3 3 | x = u"Hello"  # UP025
 4 4 | 
 
-UP025.py:3:5: UP025 [*] Remove unicode literals from strings
+UP025.py:3:5: UP025 (unicode-kind-prefix) [*] Remove unicode literals from strings
   |
 1 | u"Hello"
 2 | 
 3 | x = u"Hello"  # UP025
-  |     ^^^^^^^^ UP025
+  |     ^^^^^^^^ UP025 (unicode-kind-prefix)
 4 | 
 5 | u'world'  # UP025
   |
@@ -37,12 +37,12 @@ UP025.py:3:5: UP025 [*] Remove unicode literals from strings
 5 5 | u'world'  # UP025
 6 6 | 
 
-UP025.py:5:1: UP025 [*] Remove unicode literals from strings
+UP025.py:5:1: UP025 (unicode-kind-prefix) [*] Remove unicode literals from strings
   |
 3 | x = u"Hello"  # UP025
 4 | 
 5 | u'world'  # UP025
-  | ^^^^^^^^ UP025
+  | ^^^^^^^^ UP025 (unicode-kind-prefix)
 6 | 
 7 | print(u"Hello")  # UP025
   |
@@ -58,12 +58,12 @@ UP025.py:5:1: UP025 [*] Remove unicode literals from strings
 7 7 | print(u"Hello")  # UP025
 8 8 | 
 
-UP025.py:7:7: UP025 [*] Remove unicode literals from strings
+UP025.py:7:7: UP025 (unicode-kind-prefix) [*] Remove unicode literals from strings
   |
 5 | u'world'  # UP025
 6 | 
 7 | print(u"Hello")  # UP025
-  |       ^^^^^^^^ UP025
+  |       ^^^^^^^^ UP025 (unicode-kind-prefix)
 8 | 
 9 | print(u'world')  # UP025
   |
@@ -79,12 +79,12 @@ UP025.py:7:7: UP025 [*] Remove unicode literals from strings
 9 9 | print(u'world')  # UP025
 10 10 | 
 
-UP025.py:9:7: UP025 [*] Remove unicode literals from strings
+UP025.py:9:7: UP025 (unicode-kind-prefix) [*] Remove unicode literals from strings
    |
  7 | print(u"Hello")  # UP025
  8 | 
  9 | print(u'world')  # UP025
-   |       ^^^^^^^^ UP025
+   |       ^^^^^^^^ UP025 (unicode-kind-prefix)
 10 | 
 11 | import foo
    |
@@ -100,12 +100,12 @@ UP025.py:9:7: UP025 [*] Remove unicode literals from strings
 11 11 | import foo
 12 12 | 
 
-UP025.py:13:5: UP025 [*] Remove unicode literals from strings
+UP025.py:13:5: UP025 (unicode-kind-prefix) [*] Remove unicode literals from strings
    |
 11 | import foo
 12 | 
 13 | foo(u"Hello", U"world", a=u"Hello", b=u"world")  # UP025
-   |     ^^^^^^^^ UP025
+   |     ^^^^^^^^ UP025 (unicode-kind-prefix)
 14 | 
 15 | # Retain quotes when fixing.
    |
@@ -121,12 +121,12 @@ UP025.py:13:5: UP025 [*] Remove unicode literals from strings
 15 15 | # Retain quotes when fixing.
 16 16 | x = u'hello'  # UP025
 
-UP025.py:13:15: UP025 [*] Remove unicode literals from strings
+UP025.py:13:15: UP025 (unicode-kind-prefix) [*] Remove unicode literals from strings
    |
 11 | import foo
 12 | 
 13 | foo(u"Hello", U"world", a=u"Hello", b=u"world")  # UP025
-   |               ^^^^^^^^ UP025
+   |               ^^^^^^^^ UP025 (unicode-kind-prefix)
 14 | 
 15 | # Retain quotes when fixing.
    |
@@ -142,12 +142,12 @@ UP025.py:13:15: UP025 [*] Remove unicode literals from strings
 15 15 | # Retain quotes when fixing.
 16 16 | x = u'hello'  # UP025
 
-UP025.py:13:27: UP025 [*] Remove unicode literals from strings
+UP025.py:13:27: UP025 (unicode-kind-prefix) [*] Remove unicode literals from strings
    |
 11 | import foo
 12 | 
 13 | foo(u"Hello", U"world", a=u"Hello", b=u"world")  # UP025
-   |                           ^^^^^^^^ UP025
+   |                           ^^^^^^^^ UP025 (unicode-kind-prefix)
 14 | 
 15 | # Retain quotes when fixing.
    |
@@ -163,12 +163,12 @@ UP025.py:13:27: UP025 [*] Remove unicode literals from strings
 15 15 | # Retain quotes when fixing.
 16 16 | x = u'hello'  # UP025
 
-UP025.py:13:39: UP025 [*] Remove unicode literals from strings
+UP025.py:13:39: UP025 (unicode-kind-prefix) [*] Remove unicode literals from strings
    |
 11 | import foo
 12 | 
 13 | foo(u"Hello", U"world", a=u"Hello", b=u"world")  # UP025
-   |                                       ^^^^^^^^ UP025
+   |                                       ^^^^^^^^ UP025 (unicode-kind-prefix)
 14 | 
 15 | # Retain quotes when fixing.
    |
@@ -184,11 +184,11 @@ UP025.py:13:39: UP025 [*] Remove unicode literals from strings
 15 15 | # Retain quotes when fixing.
 16 16 | x = u'hello'  # UP025
 
-UP025.py:16:5: UP025 [*] Remove unicode literals from strings
+UP025.py:16:5: UP025 (unicode-kind-prefix) [*] Remove unicode literals from strings
    |
 15 | # Retain quotes when fixing.
 16 | x = u'hello'  # UP025
-   |     ^^^^^^^^ UP025
+   |     ^^^^^^^^ UP025 (unicode-kind-prefix)
 17 | x = u"""hello"""  # UP025
 18 | x = u'''hello'''  # UP025
    |
@@ -204,12 +204,12 @@ UP025.py:16:5: UP025 [*] Remove unicode literals from strings
 18 18 | x = u'''hello'''  # UP025
 19 19 | x = u'Hello "World"'  # UP025
 
-UP025.py:17:5: UP025 [*] Remove unicode literals from strings
+UP025.py:17:5: UP025 (unicode-kind-prefix) [*] Remove unicode literals from strings
    |
 15 | # Retain quotes when fixing.
 16 | x = u'hello'  # UP025
 17 | x = u"""hello"""  # UP025
-   |     ^^^^^^^^^^^^ UP025
+   |     ^^^^^^^^^^^^ UP025 (unicode-kind-prefix)
 18 | x = u'''hello'''  # UP025
 19 | x = u'Hello "World"'  # UP025
    |
@@ -225,12 +225,12 @@ UP025.py:17:5: UP025 [*] Remove unicode literals from strings
 19 19 | x = u'Hello "World"'  # UP025
 20 20 | 
 
-UP025.py:18:5: UP025 [*] Remove unicode literals from strings
+UP025.py:18:5: UP025 (unicode-kind-prefix) [*] Remove unicode literals from strings
    |
 16 | x = u'hello'  # UP025
 17 | x = u"""hello"""  # UP025
 18 | x = u'''hello'''  # UP025
-   |     ^^^^^^^^^^^^ UP025
+   |     ^^^^^^^^^^^^ UP025 (unicode-kind-prefix)
 19 | x = u'Hello "World"'  # UP025
    |
    = help: Remove unicode prefix
@@ -245,12 +245,12 @@ UP025.py:18:5: UP025 [*] Remove unicode literals from strings
 20 20 | 
 21 21 | u = "Hello"  # OK
 
-UP025.py:19:5: UP025 [*] Remove unicode literals from strings
+UP025.py:19:5: UP025 (unicode-kind-prefix) [*] Remove unicode literals from strings
    |
 17 | x = u"""hello"""  # UP025
 18 | x = u'''hello'''  # UP025
 19 | x = u'Hello "World"'  # UP025
-   |     ^^^^^^^^^^^^^^^^ UP025
+   |     ^^^^^^^^^^^^^^^^ UP025 (unicode-kind-prefix)
 20 | 
 21 | u = "Hello"  # OK
    |
@@ -266,12 +266,12 @@ UP025.py:19:5: UP025 [*] Remove unicode literals from strings
 21 21 | u = "Hello"  # OK
 22 22 | u = u  # OK
 
-UP025.py:27:7: UP025 [*] Remove unicode literals from strings
+UP025.py:27:7: UP025 (unicode-kind-prefix) [*] Remove unicode literals from strings
    |
 25 |     return"Hello"  # OK
 26 | 
 27 | f"foo"u"bar"  # OK
-   |       ^^^^^^ UP025
+   |       ^^^^^^ UP025 (unicode-kind-prefix)
 28 | f"foo" u"bar"  # OK
    |
    = help: Remove unicode prefix
@@ -284,11 +284,11 @@ UP025.py:27:7: UP025 [*] Remove unicode literals from strings
    27 |+f"foo""bar"  # OK
 28 28 | f"foo" u"bar"  # OK
 
-UP025.py:28:8: UP025 [*] Remove unicode literals from strings
+UP025.py:28:8: UP025 (unicode-kind-prefix) [*] Remove unicode literals from strings
    |
 27 | f"foo"u"bar"  # OK
 28 | f"foo" u"bar"  # OK
-   |        ^^^^^^ UP025
+   |        ^^^^^^ UP025 (unicode-kind-prefix)
    |
    = help: Remove unicode prefix
 
@@ -298,5 +298,3 @@ UP025.py:28:8: UP025 [*] Remove unicode literals from strings
 27 27 | f"foo"u"bar"  # OK
 28    |-f"foo" u"bar"  # OK
    28 |+f"foo" "bar"  # OK
-
-

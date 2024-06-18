@@ -1,8 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pep8_naming/mod.rs
 ---
-__init__.py:1:1: N999 Invalid module name: 'mod with spaces'
+__init__.py:1:1: N999 (invalid-module-name) Invalid module name: 'mod with spaces'
  |
  |
-
-

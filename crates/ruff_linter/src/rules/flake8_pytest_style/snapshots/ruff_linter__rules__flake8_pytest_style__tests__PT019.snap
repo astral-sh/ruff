@@ -1,18 +1,16 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
 ---
-PT019.py:9:14: PT019 Fixture `_fixture` without value is injected as parameter, use `@pytest.mark.usefixtures` instead
+PT019.py:9:14: PT019 (pytest-fixture-param-without-value) Fixture `_fixture` without value is injected as parameter, use `@pytest.mark.usefixtures` instead
    |
  9 | def test_xxx(_fixture):  # Error arg
-   |              ^^^^^^^^ PT019
+   |              ^^^^^^^^ PT019 (pytest-fixture-param-without-value)
 10 |     pass
    |
 
-PT019.py:13:17: PT019 Fixture `_fixture` without value is injected as parameter, use `@pytest.mark.usefixtures` instead
+PT019.py:13:17: PT019 (pytest-fixture-param-without-value) Fixture `_fixture` without value is injected as parameter, use `@pytest.mark.usefixtures` instead
    |
 13 | def test_xxx(*, _fixture):  # Error kwonly
-   |                 ^^^^^^^^ PT019
+   |                 ^^^^^^^^ PT019 (pytest-fixture-param-without-value)
 14 |     pass
    |
-
-

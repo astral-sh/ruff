@@ -1,0 +1,18 @@
+---
+source: crates/ruff_linter/src/noqa.rs
+expression: "ParsedFileExemption::try_extract(source)"
+---
+Ok(
+    Some(
+        Codes(
+            [
+                Name(
+                    "unused-import",
+                ),
+                Name(
+                    "unused-variable",
+                ),
+            ],
+        ),
+    ),
+)

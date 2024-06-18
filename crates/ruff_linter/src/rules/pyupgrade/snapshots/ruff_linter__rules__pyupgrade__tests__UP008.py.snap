@@ -1,11 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 ---
-UP008.py:17:23: UP008 [*] Use `super()` instead of `super(__class__, self)`
+UP008.py:17:23: UP008 (super-call-with-parameters) [*] Use `super()` instead of `super(__class__, self)`
    |
 16 |     def wrong(self):
 17 |         parent = super(Child, self)  # wrong
-   |                       ^^^^^^^^^^^^^ UP008
+   |                       ^^^^^^^^^^^^^ UP008 (super-call-with-parameters)
 18 |         super(Child, self).method  # wrong
 19 |         super(
    |
@@ -21,12 +21,12 @@ UP008.py:17:23: UP008 [*] Use `super()` instead of `super(__class__, self)`
 19 19 |         super(
 20 20 |             Child,
 
-UP008.py:18:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
+UP008.py:18:14: UP008 (super-call-with-parameters) [*] Use `super()` instead of `super(__class__, self)`
    |
 16 |     def wrong(self):
 17 |         parent = super(Child, self)  # wrong
 18 |         super(Child, self).method  # wrong
-   |              ^^^^^^^^^^^^^ UP008
+   |              ^^^^^^^^^^^^^ UP008 (super-call-with-parameters)
 19 |         super(
 20 |             Child,
    |
@@ -42,7 +42,7 @@ UP008.py:18:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
 20 20 |             Child,
 21 21 |             self,
 
-UP008.py:19:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
+UP008.py:19:14: UP008 (super-call-with-parameters) [*] Use `super()` instead of `super(__class__, self)`
    |
 17 |           parent = super(Child, self)  # wrong
 18 |           super(Child, self).method  # wrong
@@ -51,7 +51,7 @@ UP008.py:19:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
 20 | |             Child,
 21 | |             self,
 22 | |         ).method()  # wrong
-   | |_________^ UP008
+   | |_________^ UP008 (super-call-with-parameters)
    |
    = help: Remove `__super__` parameters
 
@@ -68,12 +68,12 @@ UP008.py:19:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
 24 21 | 
 25 22 | class BaseClass:
 
-UP008.py:36:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
+UP008.py:36:14: UP008 (super-call-with-parameters) [*] Use `super()` instead of `super(__class__, self)`
    |
 34 | class MyClass(BaseClass):
 35 |     def normal(self):
 36 |         super(MyClass, self).f()  # can use super()
-   |              ^^^^^^^^^^^^^^^ UP008
+   |              ^^^^^^^^^^^^^^^ UP008 (super-call-with-parameters)
 37 |         super().f()
    |
    = help: Remove `__super__` parameters
@@ -88,11 +88,11 @@ UP008.py:36:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
 38 38 | 
 39 39 |     def different_argument(self, other):
 
-UP008.py:50:18: UP008 [*] Use `super()` instead of `super(__class__, self)`
+UP008.py:50:18: UP008 (super-call-with-parameters) [*] Use `super()` instead of `super(__class__, self)`
    |
 49 |         def inner_argument(self):
 50 |             super(MyClass, self).f()  # can use super()
-   |                  ^^^^^^^^^^^^^^^ UP008
+   |                  ^^^^^^^^^^^^^^^ UP008 (super-call-with-parameters)
 51 |             super().f()
    |
    = help: Remove `__super__` parameters
@@ -106,5 +106,3 @@ UP008.py:50:18: UP008 [*] Use `super()` instead of `super(__class__, self)`
 51 51 |             super().f()
 52 52 | 
 53 53 |         outer_argument()
-
-

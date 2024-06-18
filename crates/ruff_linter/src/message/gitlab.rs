@@ -92,7 +92,7 @@ impl Serialize for SerializedMessages<'_> {
             fingerprints.insert(message_fingerprint);
 
             let value = json!({
-                "description": format!("({}) {}", message.kind.rule().noqa_code(), message.kind.body),
+                "description": format!("({} {}) {}", message.kind.rule().noqa_code(), message.kind.rule().as_ref(), message.kind.body),
                 "severity": "major",
                 "fingerprint": format!("{:x}", message_fingerprint),
                 "location": {

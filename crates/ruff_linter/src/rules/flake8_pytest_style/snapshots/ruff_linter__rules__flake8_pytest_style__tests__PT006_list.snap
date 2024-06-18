@@ -1,10 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
 ---
-PT006.py:9:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.parametrize`; expected `list`
+PT006.py:9:26: PT006 (pytest-parametrize-names-wrong-type) [*] Wrong type passed to first argument of `@pytest.mark.parametrize`; expected `list`
    |
  9 | @pytest.mark.parametrize("param1,param2", [(1, 2), (3, 4)])
-   |                          ^^^^^^^^^^^^^^^ PT006
+   |                          ^^^^^^^^^^^^^^^ PT006 (pytest-parametrize-names-wrong-type)
 10 | def test_csv(param1, param2):
 11 |     ...
    |
@@ -20,10 +20,10 @@ PT006.py:9:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.pa
 11 11 |     ...
 12 12 | 
 
-PT006.py:14:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.parametrize`; expected `list`
+PT006.py:14:26: PT006 (pytest-parametrize-names-wrong-type) [*] Wrong type passed to first argument of `@pytest.mark.parametrize`; expected `list`
    |
 14 | @pytest.mark.parametrize("   param1,   ,    param2   , ", [(1, 2), (3, 4)])
-   |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT006
+   |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT006 (pytest-parametrize-names-wrong-type)
 15 | def test_csv_with_whitespace(param1, param2):
 16 |     ...
    |
@@ -39,10 +39,10 @@ PT006.py:14:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.p
 16 16 |     ...
 17 17 | 
 
-PT006.py:19:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.parametrize`; expected `list`
+PT006.py:19:26: PT006 (pytest-parametrize-names-wrong-type) [*] Wrong type passed to first argument of `@pytest.mark.parametrize`; expected `list`
    |
 19 | @pytest.mark.parametrize("param1,param2", [(1, 2), (3, 4)])
-   |                          ^^^^^^^^^^^^^^^ PT006
+   |                          ^^^^^^^^^^^^^^^ PT006 (pytest-parametrize-names-wrong-type)
 20 | def test_csv_bad_quotes(param1, param2):
 21 |     ...
    |
@@ -58,10 +58,10 @@ PT006.py:19:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.p
 21 21 |     ...
 22 22 | 
 
-PT006.py:24:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.parametrize`; expected `list`
+PT006.py:24:26: PT006 (pytest-parametrize-names-wrong-type) [*] Wrong type passed to first argument of `@pytest.mark.parametrize`; expected `list`
    |
 24 | @pytest.mark.parametrize(("param1", "param2"), [(1, 2), (3, 4)])
-   |                          ^^^^^^^^^^^^^^^^^^^^ PT006
+   |                          ^^^^^^^^^^^^^^^^^^^^ PT006 (pytest-parametrize-names-wrong-type)
 25 | def test_tuple(param1, param2):
 26 |     ...
    |
@@ -77,10 +77,10 @@ PT006.py:24:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.p
 26 26 |     ...
 27 27 | 
 
-PT006.py:29:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.parametrize`; expected `str`
+PT006.py:29:26: PT006 (pytest-parametrize-names-wrong-type) [*] Wrong type passed to first argument of `@pytest.mark.parametrize`; expected `str`
    |
 29 | @pytest.mark.parametrize(("param1",), [1, 2, 3])
-   |                          ^^^^^^^^^^^ PT006
+   |                          ^^^^^^^^^^^ PT006 (pytest-parametrize-names-wrong-type)
 30 | def test_tuple_one_elem(param1, param2):
 31 |     ...
    |
@@ -96,10 +96,10 @@ PT006.py:29:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.p
 31 31 |     ...
 32 32 | 
 
-PT006.py:39:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.parametrize`; expected `str`
+PT006.py:39:26: PT006 (pytest-parametrize-names-wrong-type) [*] Wrong type passed to first argument of `@pytest.mark.parametrize`; expected `str`
    |
 39 | @pytest.mark.parametrize(["param1"], [1, 2, 3])
-   |                          ^^^^^^^^^^ PT006
+   |                          ^^^^^^^^^^ PT006 (pytest-parametrize-names-wrong-type)
 40 | def test_list_one_elem(param1, param2):
 41 |     ...
    |
@@ -115,10 +115,10 @@ PT006.py:39:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.p
 41 41 |     ...
 42 42 | 
 
-PT006.py:54:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.parametrize`; expected `list`
+PT006.py:54:26: PT006 (pytest-parametrize-names-wrong-type) [*] Wrong type passed to first argument of `@pytest.mark.parametrize`; expected `list`
    |
 54 | @pytest.mark.parametrize(("param1, " "param2, " "param3"), [(1, 2, 3), (4, 5, 6)])
-   |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT006
+   |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT006 (pytest-parametrize-names-wrong-type)
 55 | def test_implicit_str_concat_with_parens(param1, param2, param3):
 56 |     ...
    |
@@ -134,10 +134,10 @@ PT006.py:54:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.p
 56 56 |     ...
 57 57 | 
 
-PT006.py:59:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.parametrize`; expected `list`
+PT006.py:59:26: PT006 (pytest-parametrize-names-wrong-type) [*] Wrong type passed to first argument of `@pytest.mark.parametrize`; expected `list`
    |
 59 | @pytest.mark.parametrize("param1, " "param2, " "param3", [(1, 2, 3), (4, 5, 6)])
-   |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT006
+   |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT006 (pytest-parametrize-names-wrong-type)
 60 | def test_implicit_str_concat_no_parens(param1, param2, param3):
 61 |     ...
    |
@@ -153,10 +153,10 @@ PT006.py:59:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.p
 61 61 |     ...
 62 62 | 
 
-PT006.py:64:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.parametrize`; expected `list`
+PT006.py:64:26: PT006 (pytest-parametrize-names-wrong-type) [*] Wrong type passed to first argument of `@pytest.mark.parametrize`; expected `list`
    |
 64 | @pytest.mark.parametrize((("param1, " "param2, " "param3")), [(1, 2, 3), (4, 5, 6)])
-   |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT006
+   |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT006 (pytest-parametrize-names-wrong-type)
 65 | def test_implicit_str_concat_with_multi_parens(param1, param2, param3):
 66 |     ...
    |
@@ -172,10 +172,10 @@ PT006.py:64:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.p
 66 66 |     ...
 67 67 | 
 
-PT006.py:69:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.parametrize`; expected `list`
+PT006.py:69:26: PT006 (pytest-parametrize-names-wrong-type) [*] Wrong type passed to first argument of `@pytest.mark.parametrize`; expected `list`
    |
 69 | @pytest.mark.parametrize(("param1,param2"), [(1, 2), (3, 4)])
-   |                          ^^^^^^^^^^^^^^^^^ PT006
+   |                          ^^^^^^^^^^^^^^^^^ PT006 (pytest-parametrize-names-wrong-type)
 70 | def test_csv_with_parens(param1, param2):
 71 |     ...
    |

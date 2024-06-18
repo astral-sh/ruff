@@ -1,12 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
-F50x.py:1:1: F501 `%`-format string has invalid format string: incomplete format
+F50x.py:1:1: F501 (percent-format-invalid-format) `%`-format string has invalid format string: incomplete format
   |
 1 | '%(foo)' % {'foo': 'bar'}  # F501
-  | ^^^^^^^^^^^^^^^^^^^^^^^^^ F501
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^ F501 (percent-format-invalid-format)
 2 | '%s %(foo)s' % {'foo': 'bar'}  # F506
 3 | '%(foo)s %s' % {'foo': 'bar'}  # F506
   |
-
-

@@ -180,11 +180,11 @@ pub(crate) fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
     }
     output.extend(quote! {
         impl RuleCodePrefix {
-            pub fn parse(linter: &Linter, code: &str) -> Result<Self, crate::registry::FromCodeError> {
+            pub fn parse(linter: &Linter, code: &str) -> Result<Self, crate::registry::FromCodeOrNameError> {
                 use std::str::FromStr;
 
                 Ok(match linter {
-                    #(Linter::#linter_idents => RuleCodePrefix::#linter_idents(#linter_idents::from_str(code).map_err(|_| crate::registry::FromCodeError::Unknown)?),)*
+                    #(Linter::#linter_idents => RuleCodePrefix::#linter_idents(#linter_idents::from_str(code).map_err(|_| crate::registry::FromCodeOrNameError::UnknownCode)?),)*
                 })
             }
 

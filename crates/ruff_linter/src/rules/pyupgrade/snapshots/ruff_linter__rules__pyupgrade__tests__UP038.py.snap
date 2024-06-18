@@ -1,10 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 ---
-UP038.py:1:1: UP038 [*] Use `X | Y` in `isinstance` call instead of `(X, Y)`
+UP038.py:1:1: UP038 (non-pep604-isinstance) [*] Use `X | Y` in `isinstance` call instead of `(X, Y)`
   |
 1 | isinstance(1, (int, float))  # UP038
-  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP038
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP038 (non-pep604-isinstance)
 2 | issubclass("yes", (int, float, str))  # UP038
   |
   = help: Convert to `X | Y`
@@ -16,11 +16,11 @@ UP038.py:1:1: UP038 [*] Use `X | Y` in `isinstance` call instead of `(X, Y)`
 3 3 | 
 4 4 | isinstance(1, int)  # OK
 
-UP038.py:2:1: UP038 [*] Use `X | Y` in `issubclass` call instead of `(X, Y)`
+UP038.py:2:1: UP038 (non-pep604-isinstance) [*] Use `X | Y` in `issubclass` call instead of `(X, Y)`
   |
 1 | isinstance(1, (int, float))  # UP038
 2 | issubclass("yes", (int, float, str))  # UP038
-  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP038
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP038 (non-pep604-isinstance)
 3 | 
 4 | isinstance(1, int)  # OK
   |
@@ -33,5 +33,3 @@ UP038.py:2:1: UP038 [*] Use `X | Y` in `issubclass` call instead of `(X, Y)`
 3 3 | 
 4 4 | isinstance(1, int)  # OK
 5 5 | issubclass("yes", int)  # OK
-
-

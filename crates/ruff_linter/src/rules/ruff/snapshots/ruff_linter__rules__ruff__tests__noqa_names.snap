@@ -1,0 +1,45 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+noqa_names.py:13:5: F841 (unused-variable) [*] Local variable `I` is assigned to but never used
+   |
+11 | def f():
+12 |     # Only `ambiguous-variable-name` should be ignored by the `noqa`.
+13 |     I = 1  # noqa: ambiguous-variable-name unused-variable
+   |     ^ F841 (unused-variable)
+   |
+   = help: Remove assignment to unused variable `I`
+
+ℹ Unsafe fix
+10 10 | 
+11 11 | def f():
+12 12 |     # Only `ambiguous-variable-name` should be ignored by the `noqa`.
+13    |-    I = 1  # noqa: ambiguous-variable-name unused-variable
+   13 |+    pass  # noqa: ambiguous-variable-name unused-variable
+14 14 | 
+15 15 | 
+16 16 | def f():
+
+noqa_names.py:23:5: E741 (ambiguous-variable-name) Ambiguous variable name: `I`
+   |
+21 | def f():
+22 |     # Neither of these should be ignored by the `noqa`.
+23 |     I = 1  # noqa: ambiguous-variable-name.unused-variable
+   |     ^ E741 (ambiguous-variable-name)
+   |
+
+noqa_names.py:23:5: F841 (unused-variable) [*] Local variable `I` is assigned to but never used
+   |
+21 | def f():
+22 |     # Neither of these should be ignored by the `noqa`.
+23 |     I = 1  # noqa: ambiguous-variable-name.unused-variable
+   |     ^ F841 (unused-variable)
+   |
+   = help: Remove assignment to unused variable `I`
+
+ℹ Unsafe fix
+20 20 | 
+21 21 | def f():
+22 22 |     # Neither of these should be ignored by the `noqa`.
+23    |-    I = 1  # noqa: ambiguous-variable-name.unused-variable
+   23 |+    pass  # noqa: ambiguous-variable-name.unused-variable

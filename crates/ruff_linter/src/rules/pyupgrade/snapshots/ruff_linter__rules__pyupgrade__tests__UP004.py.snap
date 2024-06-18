@@ -1,10 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 ---
-UP004.py:5:9: UP004 [*] Class `A` inherits from `object`
+UP004.py:5:9: UP004 (useless-object-inheritance) [*] Class `A` inherits from `object`
   |
 5 | class A(object):
-  |         ^^^^^^ UP004
+  |         ^^^^^^ UP004 (useless-object-inheritance)
 6 |     ...
   |
   = help: Remove `object` inheritance
@@ -19,11 +19,11 @@ UP004.py:5:9: UP004 [*] Class `A` inherits from `object`
 7 7 | 
 8 8 | 
 
-UP004.py:10:5: UP004 [*] Class `A` inherits from `object`
+UP004.py:10:5: UP004 (useless-object-inheritance) [*] Class `A` inherits from `object`
    |
  9 | class A(
 10 |     object,
-   |     ^^^^^^ UP004
+   |     ^^^^^^ UP004 (useless-object-inheritance)
 11 | ):
 12 |     ...
    |
@@ -41,11 +41,11 @@ UP004.py:10:5: UP004 [*] Class `A` inherits from `object`
 13 11 | 
 14 12 | 
 
-UP004.py:16:5: UP004 [*] Class `A` inherits from `object`
+UP004.py:16:5: UP004 (useless-object-inheritance) [*] Class `A` inherits from `object`
    |
 15 | class A(
 16 |     object,
-   |     ^^^^^^ UP004
+   |     ^^^^^^ UP004 (useless-object-inheritance)
 17 |     #
 18 | ):
    |
@@ -64,12 +64,12 @@ UP004.py:16:5: UP004 [*] Class `A` inherits from `object`
 20 17 | 
 21 18 | 
 
-UP004.py:24:5: UP004 [*] Class `A` inherits from `object`
+UP004.py:24:5: UP004 (useless-object-inheritance) [*] Class `A` inherits from `object`
    |
 22 | class A(
 23 |     #
 24 |     object,
-   |     ^^^^^^ UP004
+   |     ^^^^^^ UP004 (useless-object-inheritance)
 25 | ):
 26 |     ...
    |
@@ -88,12 +88,12 @@ UP004.py:24:5: UP004 [*] Class `A` inherits from `object`
 27 24 | 
 28 25 | 
 
-UP004.py:31:5: UP004 [*] Class `A` inherits from `object`
+UP004.py:31:5: UP004 (useless-object-inheritance) [*] Class `A` inherits from `object`
    |
 29 | class A(
 30 |     #
 31 |     object
-   |     ^^^^^^ UP004
+   |     ^^^^^^ UP004 (useless-object-inheritance)
 32 | ):
 33 |     ...
    |
@@ -112,11 +112,11 @@ UP004.py:31:5: UP004 [*] Class `A` inherits from `object`
 34 31 | 
 35 32 | 
 
-UP004.py:37:5: UP004 [*] Class `A` inherits from `object`
+UP004.py:37:5: UP004 (useless-object-inheritance) [*] Class `A` inherits from `object`
    |
 36 | class A(
 37 |     object
-   |     ^^^^^^ UP004
+   |     ^^^^^^ UP004 (useless-object-inheritance)
 38 |     #
 39 | ):
    |
@@ -135,12 +135,12 @@ UP004.py:37:5: UP004 [*] Class `A` inherits from `object`
 41 38 | 
 42 39 | 
 
-UP004.py:45:5: UP004 [*] Class `A` inherits from `object`
+UP004.py:45:5: UP004 (useless-object-inheritance) [*] Class `A` inherits from `object`
    |
 43 | class A(
 44 |     #
 45 |     object,
-   |     ^^^^^^ UP004
+   |     ^^^^^^ UP004 (useless-object-inheritance)
 46 |     #
 47 | ):
    |
@@ -160,12 +160,12 @@ UP004.py:45:5: UP004 [*] Class `A` inherits from `object`
 49 45 | 
 50 46 | 
 
-UP004.py:53:5: UP004 [*] Class `A` inherits from `object`
+UP004.py:53:5: UP004 (useless-object-inheritance) [*] Class `A` inherits from `object`
    |
 51 | class A(
 52 |     #
 53 |     object,
-   |     ^^^^^^ UP004
+   |     ^^^^^^ UP004 (useless-object-inheritance)
 54 |     #
 55 | ):
    |
@@ -185,12 +185,12 @@ UP004.py:53:5: UP004 [*] Class `A` inherits from `object`
 57 53 | 
 58 54 | 
 
-UP004.py:61:5: UP004 [*] Class `A` inherits from `object`
+UP004.py:61:5: UP004 (useless-object-inheritance) [*] Class `A` inherits from `object`
    |
 59 | class A(
 60 |     #
 61 |     object
-   |     ^^^^^^ UP004
+   |     ^^^^^^ UP004 (useless-object-inheritance)
 62 |     #
 63 | ):
    |
@@ -210,12 +210,12 @@ UP004.py:61:5: UP004 [*] Class `A` inherits from `object`
 65 61 | 
 66 62 | 
 
-UP004.py:69:5: UP004 [*] Class `A` inherits from `object`
+UP004.py:69:5: UP004 (useless-object-inheritance) [*] Class `A` inherits from `object`
    |
 67 | class A(
 68 |     #
 69 |     object
-   |     ^^^^^^ UP004
+   |     ^^^^^^ UP004 (useless-object-inheritance)
 70 |     #
 71 | ):
    |
@@ -235,10 +235,10 @@ UP004.py:69:5: UP004 [*] Class `A` inherits from `object`
 73 69 | 
 74 70 | 
 
-UP004.py:75:12: UP004 [*] Class `B` inherits from `object`
+UP004.py:75:12: UP004 (useless-object-inheritance) [*] Class `B` inherits from `object`
    |
 75 | class B(A, object):
-   |            ^^^^^^ UP004
+   |            ^^^^^^ UP004 (useless-object-inheritance)
 76 |     ...
    |
    = help: Remove `object` inheritance
@@ -253,10 +253,10 @@ UP004.py:75:12: UP004 [*] Class `B` inherits from `object`
 77 77 | 
 78 78 | 
 
-UP004.py:79:9: UP004 [*] Class `B` inherits from `object`
+UP004.py:79:9: UP004 (useless-object-inheritance) [*] Class `B` inherits from `object`
    |
 79 | class B(object, A):
-   |         ^^^^^^ UP004
+   |         ^^^^^^ UP004 (useless-object-inheritance)
 80 |     ...
    |
    = help: Remove `object` inheritance
@@ -271,11 +271,11 @@ UP004.py:79:9: UP004 [*] Class `B` inherits from `object`
 81 81 | 
 82 82 | 
 
-UP004.py:84:5: UP004 [*] Class `B` inherits from `object`
+UP004.py:84:5: UP004 (useless-object-inheritance) [*] Class `B` inherits from `object`
    |
 83 | class B(
 84 |     object,
-   |     ^^^^^^ UP004
+   |     ^^^^^^ UP004 (useless-object-inheritance)
 85 |     A,
 86 | ):
    |
@@ -290,12 +290,12 @@ UP004.py:84:5: UP004 [*] Class `B` inherits from `object`
 86 85 | ):
 87 86 |     ...
 
-UP004.py:92:5: UP004 [*] Class `B` inherits from `object`
+UP004.py:92:5: UP004 (useless-object-inheritance) [*] Class `B` inherits from `object`
    |
 90 | class B(
 91 |     A,
 92 |     object,
-   |     ^^^^^^ UP004
+   |     ^^^^^^ UP004 (useless-object-inheritance)
 93 | ):
 94 |     ...
    |
@@ -310,11 +310,11 @@ UP004.py:92:5: UP004 [*] Class `B` inherits from `object`
 94 93 |     ...
 95 94 | 
 
-UP004.py:98:5: UP004 [*] Class `B` inherits from `object`
+UP004.py:98:5: UP004 (useless-object-inheritance) [*] Class `B` inherits from `object`
     |
  97 | class B(
  98 |     object,
-    |     ^^^^^^ UP004
+    |     ^^^^^^ UP004 (useless-object-inheritance)
  99 |     # Comment on A.
 100 |     A,
     |
@@ -329,12 +329,12 @@ UP004.py:98:5: UP004 [*] Class `B` inherits from `object`
 100 99 |     A,
 101 100 | ):
 
-UP004.py:108:5: UP004 [*] Class `B` inherits from `object`
+UP004.py:108:5: UP004 (useless-object-inheritance) [*] Class `B` inherits from `object`
     |
 106 |     # Comment on A.
 107 |     A,
 108 |     object,
-    |     ^^^^^^ UP004
+    |     ^^^^^^ UP004 (useless-object-inheritance)
 109 | ):
 110 |     ...
     |
@@ -349,11 +349,11 @@ UP004.py:108:5: UP004 [*] Class `B` inherits from `object`
 110 109 |     ...
 111 110 | 
 
-UP004.py:119:5: UP004 [*] Class `A` inherits from `object`
+UP004.py:119:5: UP004 (useless-object-inheritance) [*] Class `A` inherits from `object`
     |
 118 | class A(
 119 |     object,
-    |     ^^^^^^ UP004
+    |     ^^^^^^ UP004 (useless-object-inheritance)
 120 | ):
 121 |     ...
     |
@@ -371,11 +371,11 @@ UP004.py:119:5: UP004 [*] Class `A` inherits from `object`
 122 120 | 
 123 121 | 
 
-UP004.py:125:5: UP004 [*] Class `A` inherits from `object`
+UP004.py:125:5: UP004 (useless-object-inheritance) [*] Class `A` inherits from `object`
     |
 124 | class A(
 125 |     object,  # )
-    |     ^^^^^^ UP004
+    |     ^^^^^^ UP004 (useless-object-inheritance)
 126 | ):
 127 |     ...
     |
@@ -393,11 +393,11 @@ UP004.py:125:5: UP004 [*] Class `A` inherits from `object`
 128 126 | 
 129 127 | 
 
-UP004.py:131:5: UP004 [*] Class `A` inherits from `object`
+UP004.py:131:5: UP004 (useless-object-inheritance) [*] Class `A` inherits from `object`
     |
 130 | class A(
 131 |     object  # )
-    |     ^^^^^^ UP004
+    |     ^^^^^^ UP004 (useless-object-inheritance)
 132 |     ,
 133 | ):
     |
@@ -416,10 +416,10 @@ UP004.py:131:5: UP004 [*] Class `A` inherits from `object`
 135 132 | 
 136 133 | 
 
-UP004.py:137:9: UP004 [*] Class `A` inherits from `object`
+UP004.py:137:9: UP004 (useless-object-inheritance) [*] Class `A` inherits from `object`
     |
 137 | class A(object, object):
-    |         ^^^^^^ UP004
+    |         ^^^^^^ UP004 (useless-object-inheritance)
 138 |     ...
     |
     = help: Remove `object` inheritance
@@ -434,10 +434,10 @@ UP004.py:137:9: UP004 [*] Class `A` inherits from `object`
 139 139 | 
 140 140 | 
 
-UP004.py:137:17: UP004 [*] Class `A` inherits from `object`
+UP004.py:137:17: UP004 (useless-object-inheritance) [*] Class `A` inherits from `object`
     |
 137 | class A(object, object):
-    |                 ^^^^^^ UP004
+    |                 ^^^^^^ UP004 (useless-object-inheritance)
 138 |     ...
     |
     = help: Remove `object` inheritance
@@ -452,11 +452,11 @@ UP004.py:137:17: UP004 [*] Class `A` inherits from `object`
 139 139 | 
 140 140 | 
 
-UP004.py:142:9: UP004 [*] Class `A` inherits from `object`
+UP004.py:142:9: UP004 (useless-object-inheritance) [*] Class `A` inherits from `object`
     |
 141 | @decorator()
 142 | class A(object):
-    |         ^^^^^^ UP004
+    |         ^^^^^^ UP004 (useless-object-inheritance)
 143 |     ...
     |
     = help: Remove `object` inheritance
@@ -471,11 +471,11 @@ UP004.py:142:9: UP004 [*] Class `A` inherits from `object`
 144 144 | 
 145 145 | @decorator()  # class A(object):
 
-UP004.py:146:9: UP004 [*] Class `A` inherits from `object`
+UP004.py:146:9: UP004 (useless-object-inheritance) [*] Class `A` inherits from `object`
     |
 145 | @decorator()  # class A(object):
 146 | class A(object):
-    |         ^^^^^^ UP004
+    |         ^^^^^^ UP004 (useless-object-inheritance)
 147 |     ...
     |
     = help: Remove `object` inheritance
@@ -490,12 +490,12 @@ UP004.py:146:9: UP004 [*] Class `A` inherits from `object`
 148 148 | 
 149 149 | 
 
-UP004.py:159:15: UP004 [*] Class `Unusual` inherits from `object`
+UP004.py:159:15: UP004 (useless-object-inheritance) [*] Class `Unusual` inherits from `object`
     |
 157 | import builtins
 158 | 
 159 | class Unusual(builtins.object):
-    |               ^^^^^^^^^^^^^^^ UP004
+    |               ^^^^^^^^^^^^^^^ UP004 (useless-object-inheritance)
 160 |     ...
     |
     = help: Remove `object` inheritance

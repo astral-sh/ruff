@@ -1,10 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 ---
-UP032_1.py:1:1: UP032 [*] Use f-string instead of `format` call
+UP032_1.py:1:1: UP032 (f-string) [*] Use f-string instead of `format` call
   |
 1 | "{} {}".format(a, b)  # Intentionally at start-of-file, to ensure graceful handling.
-  | ^^^^^^^^^^^^^^^^^^^^ UP032
+  | ^^^^^^^^^^^^^^^^^^^^ UP032 (f-string)
   |
   = help: Convert to f-string
 

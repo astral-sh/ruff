@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
 ---
-no_lines_before.py:1:1: I001 [*] Import block is un-sorted or un-formatted
+no_lines_before.py:1:1: I001 (unsorted-imports) [*] Import block is un-sorted or un-formatted
   |
 1 | / from __future__ import annotations
 2 | | 
@@ -26,5 +26,3 @@ no_lines_before.py:1:1: I001 [*] Import block is un-sorted or un-formatted
 7   |-from my_first_party import my_first_party_object
 8   |-
 9 5 | from . import my_local_folder_object
-
-

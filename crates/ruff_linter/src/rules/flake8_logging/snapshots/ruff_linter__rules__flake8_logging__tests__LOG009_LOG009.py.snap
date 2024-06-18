@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_logging/mod.rs
 ---
-LOG009.py:4:5: LOG009 [*] Use of undocumented `logging.WARN` constant
+LOG009.py:4:5: LOG009 (undocumented-warn) [*] Use of undocumented `logging.WARN` constant
   |
 2 |     import logging
 3 | 
 4 |     logging.WARN  # LOG009
-  |     ^^^^^^^^^^^^ LOG009
+  |     ^^^^^^^^^^^^ LOG009 (undocumented-warn)
 5 |     logging.WARNING  # OK
   |
   = help: Replace `logging.WARN` with `logging.WARNING`
@@ -21,12 +21,12 @@ LOG009.py:4:5: LOG009 [*] Use of undocumented `logging.WARN` constant
 6 6 | 
 7 7 | 
 
-LOG009.py:11:5: LOG009 [*] Use of undocumented `logging.WARN` constant
+LOG009.py:11:5: LOG009 (undocumented-warn) [*] Use of undocumented `logging.WARN` constant
    |
  9 |     from logging import WARN, WARNING
 10 | 
 11 |     WARN  # LOG009
-   |     ^^^^ LOG009
+   |     ^^^^ LOG009 (undocumented-warn)
 12 |     WARNING  # OK
    |
    = help: Replace `logging.WARN` with `logging.WARNING`

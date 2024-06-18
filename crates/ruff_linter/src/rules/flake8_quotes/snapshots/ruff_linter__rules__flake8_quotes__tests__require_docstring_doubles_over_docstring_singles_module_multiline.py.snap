@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_quotes/mod.rs
 ---
-docstring_singles_module_multiline.py:1:1: Q002 [*] Single quote docstring found but double quotes preferred
+docstring_singles_module_multiline.py:1:1: Q002 (bad-quotes-docstring) [*] Single quote docstring found but double quotes preferred
   |
 1 | / '''
 2 | | Double quotes multiline module docstring
 3 | | '''
-  | |___^ Q002
+  | |___^ Q002 (bad-quotes-docstring)
 4 |   '''
 5 |   this is not a docstring
   |
@@ -21,5 +21,3 @@ docstring_singles_module_multiline.py:1:1: Q002 [*] Single quote docstring found
 4 4 | '''
 5 5 | this is not a docstring
 6 6 | '''
-
-

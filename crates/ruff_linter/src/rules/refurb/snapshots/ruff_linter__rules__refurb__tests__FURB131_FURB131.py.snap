@@ -1,11 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/refurb/mod.rs
 ---
-FURB131.py:11:1: FURB131 [*] Prefer `clear` over deleting a full slice
+FURB131.py:11:1: FURB131 (delete-full-slice) [*] Prefer `clear` over deleting a full slice
    |
 10 | # FURB131
 11 | del nums[:]
-   | ^^^^^^^^^^^ FURB131
+   | ^^^^^^^^^^^ FURB131 (delete-full-slice)
    |
    = help: Replace with `clear()`
 
@@ -19,11 +19,11 @@ FURB131.py:11:1: FURB131 [*] Prefer `clear` over deleting a full slice
 13 13 | 
 14 14 | # FURB131
 
-FURB131.py:15:1: FURB131 [*] Prefer `clear` over deleting a full slice
+FURB131.py:15:1: FURB131 (delete-full-slice) [*] Prefer `clear` over deleting a full slice
    |
 14 | # FURB131
 15 | del names[:]
-   | ^^^^^^^^^^^^ FURB131
+   | ^^^^^^^^^^^^ FURB131 (delete-full-slice)
    |
    = help: Replace with `clear()`
 
@@ -37,28 +37,28 @@ FURB131.py:15:1: FURB131 [*] Prefer `clear` over deleting a full slice
 17 17 | 
 18 18 | # FURB131
 
-FURB131.py:19:1: FURB131 Prefer `clear` over deleting a full slice
+FURB131.py:19:1: FURB131 (delete-full-slice) Prefer `clear` over deleting a full slice
    |
 18 | # FURB131
 19 | del x, nums[:]
-   | ^^^^^^^^^^^^^^ FURB131
+   | ^^^^^^^^^^^^^^ FURB131 (delete-full-slice)
    |
    = help: Replace with `clear()`
 
-FURB131.py:23:1: FURB131 Prefer `clear` over deleting a full slice
+FURB131.py:23:1: FURB131 (delete-full-slice) Prefer `clear` over deleting a full slice
    |
 22 | # FURB131
 23 | del y, names[:], x
-   | ^^^^^^^^^^^^^^^^^^ FURB131
+   | ^^^^^^^^^^^^^^^^^^ FURB131 (delete-full-slice)
    |
    = help: Replace with `clear()`
 
-FURB131.py:28:5: FURB131 [*] Prefer `clear` over deleting a full slice
+FURB131.py:28:5: FURB131 (delete-full-slice) [*] Prefer `clear` over deleting a full slice
    |
 26 | def yes_one(x: list[int]):
 27 |     # FURB131
 28 |     del x[:]
-   |     ^^^^^^^^ FURB131
+   |     ^^^^^^^^ FURB131 (delete-full-slice)
    |
    = help: Replace with `clear()`
 
@@ -72,12 +72,12 @@ FURB131.py:28:5: FURB131 [*] Prefer `clear` over deleting a full slice
 30 30 | 
 31 31 | def yes_two(x: dict[int, str]):
 
-FURB131.py:33:5: FURB131 [*] Prefer `clear` over deleting a full slice
+FURB131.py:33:5: FURB131 (delete-full-slice) [*] Prefer `clear` over deleting a full slice
    |
 31 | def yes_two(x: dict[int, str]):
 32 |     # FURB131
 33 |     del x[:]
-   |     ^^^^^^^^ FURB131
+   |     ^^^^^^^^ FURB131 (delete-full-slice)
    |
    = help: Replace with `clear()`
 
@@ -91,12 +91,12 @@ FURB131.py:33:5: FURB131 [*] Prefer `clear` over deleting a full slice
 35 35 | 
 36 36 | def yes_three(x: List[int]):
 
-FURB131.py:38:5: FURB131 [*] Prefer `clear` over deleting a full slice
+FURB131.py:38:5: FURB131 (delete-full-slice) [*] Prefer `clear` over deleting a full slice
    |
 36 | def yes_three(x: List[int]):
 37 |     # FURB131
 38 |     del x[:]
-   |     ^^^^^^^^ FURB131
+   |     ^^^^^^^^ FURB131 (delete-full-slice)
    |
    = help: Replace with `clear()`
 
@@ -110,12 +110,12 @@ FURB131.py:38:5: FURB131 [*] Prefer `clear` over deleting a full slice
 40 40 | 
 41 41 | def yes_four(x: Dict[int, str]):
 
-FURB131.py:43:5: FURB131 [*] Prefer `clear` over deleting a full slice
+FURB131.py:43:5: FURB131 (delete-full-slice) [*] Prefer `clear` over deleting a full slice
    |
 41 | def yes_four(x: Dict[int, str]):
 42 |     # FURB131
 43 |     del x[:]
-   |     ^^^^^^^^ FURB131
+   |     ^^^^^^^^ FURB131 (delete-full-slice)
    |
    = help: Replace with `clear()`
 
@@ -129,12 +129,12 @@ FURB131.py:43:5: FURB131 [*] Prefer `clear` over deleting a full slice
 45 45 | 
 46 46 | def yes_five(x: Dict[int, str]):
 
-FURB131.py:48:5: FURB131 [*] Prefer `clear` over deleting a full slice
+FURB131.py:48:5: FURB131 (delete-full-slice) [*] Prefer `clear` over deleting a full slice
    |
 46 | def yes_five(x: Dict[int, str]):
 47 |     # FURB131
 48 |     del x[:]
-   |     ^^^^^^^^ FURB131
+   |     ^^^^^^^^ FURB131 (delete-full-slice)
 49 | 
 50 |     x = 1
    |
@@ -150,12 +150,12 @@ FURB131.py:48:5: FURB131 [*] Prefer `clear` over deleting a full slice
 50 50 |     x = 1
 51 51 | 
 
-FURB131.py:58:1: FURB131 [*] Prefer `clear` over deleting a full slice
+FURB131.py:58:1: FURB131 (delete-full-slice) [*] Prefer `clear` over deleting a full slice
    |
 56 | sneaky = SneakyList()
 57 | # FURB131
 58 | del sneaky[:]
-   | ^^^^^^^^^^^^^ FURB131
+   | ^^^^^^^^^^^^^ FURB131 (delete-full-slice)
 59 | 
 60 | # these should not
    |

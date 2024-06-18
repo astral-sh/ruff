@@ -1,10 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_future_annotations/mod.rs
 ---
-no_future_import_uses_union_inner.py:6:14: FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collection
+no_future_import_uses_union_inner.py:6:14: FA102 (future-required-type-annotation) [*] Missing `from __future__ import annotations`, but uses PEP 585 collection
   |
 6 | def hello(y: dict[str | None, int]) -> None:
-  |              ^^^^^^^^^^^^^^^^^^^^^ FA102
+  |              ^^^^^^^^^^^^^^^^^^^^^ FA102 (future-required-type-annotation)
 7 |     z: tuple[str, str | None, str] = tuple(y)
 8 |     del z
   |
@@ -16,10 +16,10 @@ no_future_import_uses_union_inner.py:6:14: FA102 [*] Missing `from __future__ im
 2 3 |     a_list: list[str | None] = []
 3 4 |     a_list.append("hello")
 
-no_future_import_uses_union_inner.py:6:19: FA102 [*] Missing `from __future__ import annotations`, but uses PEP 604 union
+no_future_import_uses_union_inner.py:6:19: FA102 (future-required-type-annotation) [*] Missing `from __future__ import annotations`, but uses PEP 604 union
   |
 6 | def hello(y: dict[str | None, int]) -> None:
-  |                   ^^^^^^^^^^ FA102
+  |                   ^^^^^^^^^^ FA102 (future-required-type-annotation)
 7 |     z: tuple[str, str | None, str] = tuple(y)
 8 |     del z
   |

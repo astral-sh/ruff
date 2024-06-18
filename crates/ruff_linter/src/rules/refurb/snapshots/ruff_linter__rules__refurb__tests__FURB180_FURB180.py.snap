@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/refurb/mod.rs
 ---
-FURB180.py:7:10: FURB180 [*] Use of `metaclass=abc.ABCMeta` to define abstract base class
+FURB180.py:7:10: FURB180 (meta-class-abc-meta) [*] Use of `metaclass=abc.ABCMeta` to define abstract base class
   |
 5 | # Errors
 6 | 
 7 | class A0(metaclass=abc.ABCMeta):
-  |          ^^^^^^^^^^^^^^^^^^^^^ FURB180
+  |          ^^^^^^^^^^^^^^^^^^^^^ FURB180 (meta-class-abc-meta)
 8 |     @abstractmethod
 9 |     def foo(self): pass
   |
@@ -22,10 +22,10 @@ FURB180.py:7:10: FURB180 [*] Use of `metaclass=abc.ABCMeta` to define abstract b
 9 9 |     def foo(self): pass
 10 10 | 
 
-FURB180.py:12:10: FURB180 [*] Use of `metaclass=abc.ABCMeta` to define abstract base class
+FURB180.py:12:10: FURB180 (meta-class-abc-meta) [*] Use of `metaclass=abc.ABCMeta` to define abstract base class
    |
 12 | class A1(metaclass=ABCMeta):
-   |          ^^^^^^^^^^^^^^^^^ FURB180
+   |          ^^^^^^^^^^^^^^^^^ FURB180 (meta-class-abc-meta)
 13 |     @abstractmethod
 14 |     def foo(self): pass
    |
@@ -41,10 +41,10 @@ FURB180.py:12:10: FURB180 [*] Use of `metaclass=abc.ABCMeta` to define abstract 
 14 14 |     def foo(self): pass
 15 15 | 
 
-FURB180.py:26:18: FURB180 [*] Use of `metaclass=abc.ABCMeta` to define abstract base class
+FURB180.py:26:18: FURB180 (meta-class-abc-meta) [*] Use of `metaclass=abc.ABCMeta` to define abstract base class
    |
 26 | class A2(B0, B1, metaclass=ABCMeta):
-   |                  ^^^^^^^^^^^^^^^^^ FURB180
+   |                  ^^^^^^^^^^^^^^^^^ FURB180 (meta-class-abc-meta)
 27 |     @abstractmethod
 28 |     def foo(self): pass
    |
@@ -60,10 +60,10 @@ FURB180.py:26:18: FURB180 [*] Use of `metaclass=abc.ABCMeta` to define abstract 
 28 28 |     def foo(self): pass
 29 29 | 
 
-FURB180.py:31:34: FURB180 [*] Use of `metaclass=abc.ABCMeta` to define abstract base class
+FURB180.py:31:34: FURB180 (meta-class-abc-meta) [*] Use of `metaclass=abc.ABCMeta` to define abstract base class
    |
 31 | class A3(B0, before_metaclass=1, metaclass=abc.ABCMeta):
-   |                                  ^^^^^^^^^^^^^^^^^^^^^ FURB180
+   |                                  ^^^^^^^^^^^^^^^^^^^^^ FURB180 (meta-class-abc-meta)
 32 |     pass
    |
    = help: Replace with `abc.ABC`
@@ -76,6 +76,4 @@ FURB180.py:31:34: FURB180 [*] Use of `metaclass=abc.ABCMeta` to define abstract 
    31 |+class A3(B0, abc.ABC, before_metaclass=1):
 32 32 |     pass
 33 33 | 
-34 34 | 
-
-
+34 34 |

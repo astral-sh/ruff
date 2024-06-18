@@ -1,38 +1,36 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-non_ascii_module_import.py:1:29: PLC2403 Module alias `łos` contains a non-ASCII character, use an ASCII-only alias
+non_ascii_module_import.py:1:29: PLC2403 (non-ascii-import-name) Module alias `łos` contains a non-ASCII character, use an ASCII-only alias
   |
 1 | from os.path import join as łos  # Error
-  |                             ^^^ PLC2403
+  |                             ^^^ PLC2403 (non-ascii-import-name)
 2 | from os.path import join as los  # OK
   |
 
-non_ascii_module_import.py:4:24: PLC2403 Module alias `łos` contains a non-ASCII character, use an ASCII-only alias
+non_ascii_module_import.py:4:24: PLC2403 (non-ascii-import-name) Module alias `łos` contains a non-ASCII character, use an ASCII-only alias
   |
 2 | from os.path import join as los  # OK
 3 | 
 4 | import os.path.join as łos  # Error
-  |                        ^^^ PLC2403
+  |                        ^^^ PLC2403 (non-ascii-import-name)
 5 | import os.path.join as los  # OK
   |
 
-non_ascii_module_import.py:7:8: PLC2403 Module name `os.path.łos` contains a non-ASCII character, use an ASCII-only alias
+non_ascii_module_import.py:7:8: PLC2403 (non-ascii-import-name) Module name `os.path.łos` contains a non-ASCII character, use an ASCII-only alias
   |
 5 | import os.path.join as los  # OK
 6 | 
 7 | import os.path.łos  # Error (recommend an ASCII alias)
-  |        ^^^^^^^^^^^ PLC2403
+  |        ^^^^^^^^^^^ PLC2403 (non-ascii-import-name)
 8 | import os.path.los  # OK
   |
 
-non_ascii_module_import.py:10:21: PLC2403 Module name `łos` contains a non-ASCII character, use an ASCII-only alias
+non_ascii_module_import.py:10:21: PLC2403 (non-ascii-import-name) Module name `łos` contains a non-ASCII character, use an ASCII-only alias
    |
  8 | import os.path.los  # OK
  9 | 
 10 | from os.path import łos  # Error (recommend an ASCII alias)
-   |                     ^^^ PLC2403
+   |                     ^^^ PLC2403 (non-ascii-import-name)
 11 | from os.path import los  # OK
    |
-
-

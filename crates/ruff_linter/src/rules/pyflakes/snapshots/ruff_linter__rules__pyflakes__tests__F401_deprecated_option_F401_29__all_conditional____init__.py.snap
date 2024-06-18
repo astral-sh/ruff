@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
-__init__.py:8:15: F401 [*] `.unused` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+__init__.py:8:15: F401 (unused-import) [*] `.unused` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
    |
  6 | import sys
  7 | 
  8 | from . import unused, exported, renamed as bees
-   |               ^^^^^^ F401
+   |               ^^^^^^ F401 (unused-import)
  9 | 
 10 | if sys.version_info > (3, 9):
    |
@@ -22,12 +22,12 @@ __init__.py:8:15: F401 [*] `.unused` imported but unused; consider removing, add
 10 10 | if sys.version_info > (3, 9):
 11 11 |     from . import also_exported
 
-__init__.py:8:44: F401 [*] `.renamed` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+__init__.py:8:44: F401 (unused-import) [*] `.renamed` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
    |
  6 | import sys
  7 | 
  8 | from . import unused, exported, renamed as bees
-   |                                            ^^^^ F401
+   |                                            ^^^^ F401 (unused-import)
  9 | 
 10 | if sys.version_info > (3, 9):
    |

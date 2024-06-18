@@ -1,10 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-E30.pyi:17:1: E303 [*] Too many blank lines (2)
+E30.pyi:17:1: E303 (too-many-blank-lines) [*] Too many blank lines (2)
    |
 17 | def grouped1(): ...
-   | ^^^ E303
+   | ^^^ E303 (too-many-blank-lines)
 18 | def grouped2(): ...
 19 | def grouped3( ): ...
    |
@@ -19,10 +19,10 @@ E30.pyi:17:1: E303 [*] Too many blank lines (2)
 18 17 | def grouped2(): ...
 19 18 | def grouped3( ): ...
 
-E30.pyi:22:1: E303 [*] Too many blank lines (2)
+E30.pyi:22:1: E303 (too-many-blank-lines) [*] Too many blank lines (2)
    |
 22 | class BackendProxy:
-   | ^^^^^ E303
+   | ^^^^^ E303 (too-many-blank-lines)
 23 |     backend_module: str
 24 |     backend_object: str | None
    |
@@ -37,10 +37,10 @@ E30.pyi:22:1: E303 [*] Too many blank lines (2)
 23 22 |     backend_module: str
 24 23 |     backend_object: str | None
 
-E30.pyi:35:5: E303 [*] Too many blank lines (2)
+E30.pyi:35:5: E303 (too-many-blank-lines) [*] Too many blank lines (2)
    |
 35 |     def ungrouped(): ...
-   |     ^^^ E303
+   |     ^^^ E303 (too-many-blank-lines)
 36 | a = "test"
    |
    = help: Remove extraneous blank line(s)
@@ -54,10 +54,10 @@ E30.pyi:35:5: E303 [*] Too many blank lines (2)
 36 35 | a = "test"
 37 36 | 
 
-E30.pyi:43:1: E303 [*] Too many blank lines (2)
+E30.pyi:43:1: E303 (too-many-blank-lines) [*] Too many blank lines (2)
    |
 43 | def outer():
-   | ^^^ E303
+   | ^^^ E303 (too-many-blank-lines)
 44 |      def inner():
 45 |          pass
    |

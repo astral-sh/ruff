@@ -1,11 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 ---
-D208.py:2:1: D208 [*] Docstring is over-indented
+D208.py:2:1: D208 (over-indentation) [*] Docstring is over-indented
   |
 1 | """
 2 |    Author
-  |  D208
+  |  D208 (over-indentation)
 3 | """
   |
   = help: Remove over-indentation
@@ -18,12 +18,12 @@ D208.py:2:1: D208 [*] Docstring is over-indented
 4 4 | 
 5 5 | 
 
-D208.py:8:1: D208 [*] Docstring is over-indented
+D208.py:8:1: D208 (over-indentation) [*] Docstring is over-indented
    |
  6 | class Platform:
  7 |     """ Remove sampler
  8 |             Args:
-   |  D208
+   |  D208 (over-indentation)
  9 |             Returns:
 10 |             """
    |
@@ -39,12 +39,12 @@ D208.py:8:1: D208 [*] Docstring is over-indented
 10 10 |             """
 11 11 | 
 
-D208.py:9:1: D208 [*] Docstring is over-indented
+D208.py:9:1: D208 (over-indentation) [*] Docstring is over-indented
    |
  7 |     """ Remove sampler
  8 |             Args:
  9 |             Returns:
-   |  D208
+   |  D208 (over-indentation)
 10 |             """
    |
    = help: Remove over-indentation
@@ -59,12 +59,12 @@ D208.py:9:1: D208 [*] Docstring is over-indented
 11 11 | 
 12 12 | 
 
-D208.py:10:1: D208 [*] Docstring is over-indented
+D208.py:10:1: D208 (over-indentation) [*] Docstring is over-indented
    |
  8 |             Args:
  9 |             Returns:
 10 |             """
-   |  D208
+   |  D208 (over-indentation)
    |
    = help: Remove over-indentation
 
@@ -77,5 +77,3 @@ D208.py:10:1: D208 [*] Docstring is over-indented
 11 11 | 
 12 12 | 
 13 13 | def memory_test():
-
-

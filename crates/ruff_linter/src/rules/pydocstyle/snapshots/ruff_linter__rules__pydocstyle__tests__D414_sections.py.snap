@@ -1,68 +1,68 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 ---
-sections.py:56:5: D414 Section has no content ("Returns")
+sections.py:56:5: D414 (empty-docstring-section) Section has no content ("Returns")
    |
 54 |     """Toggle the gizmo.
 55 | 
 56 |     Returns
-   |     ^^^^^^^ D414
+   |     ^^^^^^^ D414 (empty-docstring-section)
 57 | 
 58 |     """
    |
 
-sections.py:67:5: D414 Section has no content ("Returns")
+sections.py:67:5: D414 (empty-docstring-section) Section has no content ("Returns")
    |
 65 |     """Toggle the gizmo.
 66 | 
 67 |     Returns"""
-   |     ^^^^^^^ D414
+   |     ^^^^^^^ D414 (empty-docstring-section)
    |
 
-sections.py:78:5: D414 Section has no content ("Returns")
+sections.py:78:5: D414 (empty-docstring-section) Section has no content ("Returns")
    |
 76 |     """Toggle the gizmo.
 77 | 
 78 |     Returns
-   |     ^^^^^^^ D414
+   |     ^^^^^^^ D414 (empty-docstring-section)
 79 |     -------
 80 |     Yields
    |
 
-sections.py:80:5: D414 Section has no content ("Yields")
+sections.py:80:5: D414 (empty-docstring-section) Section has no content ("Yields")
    |
 78 |     Returns
 79 |     -------
 80 |     Yields
-   |     ^^^^^^ D414
+   |     ^^^^^^ D414 (empty-docstring-section)
 81 |     ------
    |
 
-sections.py:172:5: D414 Section has no content ("Returns")
+sections.py:172:5: D414 (empty-docstring-section) Section has no content ("Returns")
     |
 170 |     """Toggle the gizmo.
 171 | 
 172 |     Returns
-    |     ^^^^^^^ D414
+    |     ^^^^^^^ D414 (empty-docstring-section)
 173 |         -------
 174 |     """
     |
 
-sections.py:266:5: D414 Section has no content ("Returns")
+sections.py:266:5: D414 (empty-docstring-section) Section has no content ("Returns")
     |
 264 |         note: A random string.
 265 | 
 266 |     Returns:
-    |     ^^^^^^^ D414
+    |     ^^^^^^^ D414 (empty-docstring-section)
 267 | 
 268 |     Raises:
     |
 
-sections.py:563:9: D414 Section has no content ("Returns")
+sections.py:563:9: D414 (empty-docstring-section) Section has no content ("Returns")
     |
 561 |         Here's a note.
 562 | 
 563 |         Returns:
-    |         ^^^^^^^ D414
+    |         ^^^^^^^ D414 (empty-docstring-section)
 564 |     """
     |

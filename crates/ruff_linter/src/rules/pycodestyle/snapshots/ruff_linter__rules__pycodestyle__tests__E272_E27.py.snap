@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-E27.py:20:2: E272 [*] Multiple spaces before keyword
+E27.py:20:2: E272 (multiple-spaces-before-keyword) [*] Multiple spaces before keyword
    |
 18 | a and  2
 19 | #: E271 E272
 20 | 1  and  b
-   |  ^^ E272
+   |  ^^ E272 (multiple-spaces-before-keyword)
 21 | #: E271 E272
 22 | a  and  2
    |
@@ -22,12 +22,12 @@ E27.py:20:2: E272 [*] Multiple spaces before keyword
 22 22 | a  and  2
 23 23 | #: E272
 
-E27.py:22:2: E272 [*] Multiple spaces before keyword
+E27.py:22:2: E272 (multiple-spaces-before-keyword) [*] Multiple spaces before keyword
    |
 20 | 1  and  b
 21 | #: E271 E272
 22 | a  and  2
-   |  ^^ E272
+   |  ^^ E272 (multiple-spaces-before-keyword)
 23 | #: E272
 24 | this  and False
    |
@@ -43,12 +43,12 @@ E27.py:22:2: E272 [*] Multiple spaces before keyword
 24 24 | this  and False
 25 25 | #: E273
 
-E27.py:24:5: E272 [*] Multiple spaces before keyword
+E27.py:24:5: E272 (multiple-spaces-before-keyword) [*] Multiple spaces before keyword
    |
 22 | a  and  2
 23 | #: E272
 24 | this  and False
-   |     ^^ E272
+   |     ^^ E272 (multiple-spaces-before-keyword)
 25 | #: E273
 26 | a and   b
    |
@@ -63,5 +63,3 @@ E27.py:24:5: E272 [*] Multiple spaces before keyword
 25 25 | #: E273
 26 26 | a and	b
 27 27 | #: E274
-
-

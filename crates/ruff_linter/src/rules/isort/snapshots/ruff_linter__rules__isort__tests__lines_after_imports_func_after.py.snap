@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
 ---
-lines_after_imports_func_after.py:1:1: I001 [*] Import block is un-sorted or un-formatted
+lines_after_imports_func_after.py:1:1: I001 (unsorted-imports) [*] Import block is un-sorted or un-formatted
    |
  1 | / from __future__ import annotations
  2 | | 
@@ -24,7 +24,7 @@ lines_after_imports_func_after.py:1:1: I001 [*] Import block is un-sorted or un-
 19 | | 
 20 | | 
 21 | | def main():
-   | |_^ I001
+   | |_^ I001 (unsorted-imports)
 22 |     my_local_folder_object.get()
    |
    = help: Organize imports
@@ -51,5 +51,3 @@ lines_after_imports_func_after.py:1:1: I001 [*] Import block is un-sorted or un-
 19 9  | 
 20 10 | 
 21 11 | def main():
-
-

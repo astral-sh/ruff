@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 ---
-sections.py:80:5: D411 [*] Missing blank line before section ("Yields")
+sections.py:80:5: D411 (no-blank-line-before-section) [*] Missing blank line before section ("Yields")
    |
 78 |     Returns
 79 |     -------
 80 |     Yields
-   |     ^^^^^^ D411
+   |     ^^^^^^ D411 (no-blank-line-before-section)
 81 |     ------
    |
    = help: Add blank line before "Yields"
@@ -20,11 +20,11 @@ sections.py:80:5: D411 [*] Missing blank line before section ("Yields")
 81 82 |     ------
 82 83 | 
 
-sections.py:134:5: D411 [*] Missing blank line before section ("Returns")
+sections.py:134:5: D411 (no-blank-line-before-section) [*] Missing blank line before section ("Returns")
     |
 133 |     The function's description.
 134 |     Returns
-    |     ^^^^^^^ D411
+    |     ^^^^^^^ D411 (no-blank-line-before-section)
 135 |     -------
 136 |     A value of some sort.
     |
@@ -39,12 +39,12 @@ sections.py:134:5: D411 [*] Missing blank line before section ("Returns")
 135 136 |     -------
 136 137 |     A value of some sort.
 
-sections.py:227:5: D411 [*] Missing blank line before section ("Raises")
+sections.py:227:5: D411 (no-blank-line-before-section) [*] Missing blank line before section ("Raises")
     |
 225 |     ------
 226 |     Many many wonderful things.
 227 |     Raises:
-    |     ^^^^^^ D411
+    |     ^^^^^^ D411 (no-blank-line-before-section)
 228 |     My attention.
     |
     = help: Add blank line before "Raises"

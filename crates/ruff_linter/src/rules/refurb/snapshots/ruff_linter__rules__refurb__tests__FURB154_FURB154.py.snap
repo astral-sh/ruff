@@ -1,13 +1,13 @@
 ---
 source: crates/ruff_linter/src/rules/refurb/mod.rs
 ---
-FURB154.py:4:5: FURB154 [*] Use of repeated consecutive `global`
+FURB154.py:4:5: FURB154 (repeated-global) [*] Use of repeated consecutive `global`
   |
 3 |   def f1():
 4 |       global x
   |  _____^
 5 | |     global y
-  | |____________^ FURB154
+  | |____________^ FURB154 (repeated-global)
   |
   = help: Merge `global` statements
 
@@ -22,14 +22,14 @@ FURB154.py:4:5: FURB154 [*] Use of repeated consecutive `global`
 7 6 | 
 8 7 | def f3():
 
-FURB154.py:9:5: FURB154 [*] Use of repeated consecutive `global`
+FURB154.py:9:5: FURB154 (repeated-global) [*] Use of repeated consecutive `global`
    |
  8 |   def f3():
  9 |       global x
    |  _____^
 10 | |     global y
 11 | |     global z
-   | |____________^ FURB154
+   | |____________^ FURB154 (repeated-global)
    |
    = help: Merge `global` statements
 
@@ -45,13 +45,13 @@ FURB154.py:9:5: FURB154 [*] Use of repeated consecutive `global`
 13 11 | 
 14 12 | def f4():
 
-FURB154.py:15:5: FURB154 [*] Use of repeated consecutive `global`
+FURB154.py:15:5: FURB154 (repeated-global) [*] Use of repeated consecutive `global`
    |
 14 |   def f4():
 15 |       global x
    |  _____^
 16 | |     global y
-   | |____________^ FURB154
+   | |____________^ FURB154 (repeated-global)
 17 |       pass
 18 |       global x
    |
@@ -68,14 +68,14 @@ FURB154.py:15:5: FURB154 [*] Use of repeated consecutive `global`
 18 17 |     global x
 19 18 |     global y
 
-FURB154.py:18:5: FURB154 [*] Use of repeated consecutive `global`
+FURB154.py:18:5: FURB154 (repeated-global) [*] Use of repeated consecutive `global`
    |
 16 |       global y
 17 |       pass
 18 |       global x
    |  _____^
 19 | |     global y
-   | |____________^ FURB154
+   | |____________^ FURB154 (repeated-global)
    |
    = help: Merge `global` statements
 
@@ -90,13 +90,13 @@ FURB154.py:18:5: FURB154 [*] Use of repeated consecutive `global`
 21 20 | 
 22 21 | def f2():
 
-FURB154.py:26:9: FURB154 [*] Use of repeated consecutive `nonlocal`
+FURB154.py:26:9: FURB154 (repeated-global) [*] Use of repeated consecutive `nonlocal`
    |
 25 |       def inner():
 26 |           nonlocal x
    |  _________^
 27 | |         nonlocal y
-   | |__________________^ FURB154
+   | |__________________^ FURB154 (repeated-global)
 28 |   
 29 |       def inner2():
    |
@@ -113,14 +113,14 @@ FURB154.py:26:9: FURB154 [*] Use of repeated consecutive `nonlocal`
 29 28 |     def inner2():
 30 29 |         nonlocal x
 
-FURB154.py:30:9: FURB154 [*] Use of repeated consecutive `nonlocal`
+FURB154.py:30:9: FURB154 (repeated-global) [*] Use of repeated consecutive `nonlocal`
    |
 29 |       def inner2():
 30 |           nonlocal x
    |  _________^
 31 | |         nonlocal y
 32 | |         nonlocal z
-   | |__________________^ FURB154
+   | |__________________^ FURB154 (repeated-global)
 33 |   
 34 |       def inner3():
    |
@@ -138,13 +138,13 @@ FURB154.py:30:9: FURB154 [*] Use of repeated consecutive `nonlocal`
 34 32 |     def inner3():
 35 33 |         nonlocal x
 
-FURB154.py:35:9: FURB154 [*] Use of repeated consecutive `nonlocal`
+FURB154.py:35:9: FURB154 (repeated-global) [*] Use of repeated consecutive `nonlocal`
    |
 34 |       def inner3():
 35 |           nonlocal x
    |  _________^
 36 | |         nonlocal y
-   | |__________________^ FURB154
+   | |__________________^ FURB154 (repeated-global)
 37 |           pass
 38 |           nonlocal x
    |
@@ -161,14 +161,14 @@ FURB154.py:35:9: FURB154 [*] Use of repeated consecutive `nonlocal`
 38 37 |         nonlocal x
 39 38 |         nonlocal y
 
-FURB154.py:38:9: FURB154 [*] Use of repeated consecutive `nonlocal`
+FURB154.py:38:9: FURB154 (repeated-global) [*] Use of repeated consecutive `nonlocal`
    |
 36 |           nonlocal y
 37 |           pass
 38 |           nonlocal x
    |  _________^
 39 | |         nonlocal y
-   | |__________________^ FURB154
+   | |__________________^ FURB154 (repeated-global)
    |
    = help: Merge `nonlocal` statements
 
@@ -183,13 +183,13 @@ FURB154.py:38:9: FURB154 [*] Use of repeated consecutive `nonlocal`
 41 40 | 
 42 41 | def f5():
 
-FURB154.py:46:9: FURB154 [*] Use of repeated consecutive `global`
+FURB154.py:46:9: FURB154 (repeated-global) [*] Use of repeated consecutive `global`
    |
 45 |       def inner():
 46 |           global w
    |  _________^
 47 | |         global x
-   | |________________^ FURB154
+   | |________________^ FURB154 (repeated-global)
 48 |           nonlocal y
 49 |           nonlocal z
    |
@@ -206,14 +206,14 @@ FURB154.py:46:9: FURB154 [*] Use of repeated consecutive `global`
 49 48 |         nonlocal z
 50 49 | 
 
-FURB154.py:48:9: FURB154 [*] Use of repeated consecutive `nonlocal`
+FURB154.py:48:9: FURB154 (repeated-global) [*] Use of repeated consecutive `nonlocal`
    |
 46 |           global w
 47 |           global x
 48 |           nonlocal y
    |  _________^
 49 | |         nonlocal z
-   | |__________________^ FURB154
+   | |__________________^ FURB154 (repeated-global)
 50 |   
 51 |       def inner2():
    |
@@ -230,14 +230,14 @@ FURB154.py:48:9: FURB154 [*] Use of repeated consecutive `nonlocal`
 51 50 |     def inner2():
 52 51 |         global x
 
-FURB154.py:53:9: FURB154 [*] Use of repeated consecutive `nonlocal`
+FURB154.py:53:9: FURB154 (repeated-global) [*] Use of repeated consecutive `nonlocal`
    |
 51 |       def inner2():
 52 |           global x
 53 |           nonlocal y
    |  _________^
 54 | |         nonlocal z
-   | |__________________^ FURB154
+   | |__________________^ FURB154 (repeated-global)
    |
    = help: Merge `nonlocal` statements
 
@@ -252,14 +252,14 @@ FURB154.py:53:9: FURB154 [*] Use of repeated consecutive `nonlocal`
 56 55 | 
 57 56 | def f6():
 
-FURB154.py:58:5: FURB154 [*] Use of repeated consecutive `global`
+FURB154.py:58:5: FURB154 (repeated-global) [*] Use of repeated consecutive `global`
    |
 57 |   def f6():
 58 |       global x, y, z
    |  _____^
 59 | |     global a, b, c
 60 | |     global d, e, f
-   | |__________________^ FURB154
+   | |__________________^ FURB154 (repeated-global)
    |
    = help: Merge `global` statements
 

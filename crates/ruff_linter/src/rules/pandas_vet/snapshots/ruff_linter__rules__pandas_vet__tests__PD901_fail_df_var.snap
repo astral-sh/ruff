@@ -1,11 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pandas_vet/mod.rs
 ---
-<filename>:3:1: PD901 Avoid using the generic variable name `df` for DataFrames
+<filename>:3:1: PD901 (pandas-df-variable-name) Avoid using the generic variable name `df` for DataFrames
   |
 2 | import pandas as pd
 3 | df = pd.DataFrame()
-  | ^^ PD901
+  | ^^ PD901 (pandas-df-variable-name)
   |
-
-

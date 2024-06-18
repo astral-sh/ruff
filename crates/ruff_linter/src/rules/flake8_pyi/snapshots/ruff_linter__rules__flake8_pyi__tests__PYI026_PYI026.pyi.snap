@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
 ---
-PYI026.pyi:3:1: PYI026 [*] Use `typing.TypeAlias` for type alias, e.g., `NewAny: TypeAlias = Any`
+PYI026.pyi:3:1: PYI026 (type-alias-without-annotation) [*] Use `typing.TypeAlias` for type alias, e.g., `NewAny: TypeAlias = Any`
   |
 1 | from typing import Literal, Any
 2 | 
 3 | NewAny = Any
-  | ^^^^^^ PYI026
+  | ^^^^^^ PYI026 (type-alias-without-annotation)
 4 | OptionalStr = typing.Optional[str]
 5 | Foo = Literal["foo"]
   |
@@ -22,11 +22,11 @@ PYI026.pyi:3:1: PYI026 [*] Use `typing.TypeAlias` for type alias, e.g., `NewAny:
 5 5 | Foo = Literal["foo"]
 6 6 | IntOrStr = int | str
 
-PYI026.pyi:4:1: PYI026 [*] Use `typing.TypeAlias` for type alias, e.g., `OptionalStr: TypeAlias = typing.Optional[str]`
+PYI026.pyi:4:1: PYI026 (type-alias-without-annotation) [*] Use `typing.TypeAlias` for type alias, e.g., `OptionalStr: TypeAlias = typing.Optional[str]`
   |
 3 | NewAny = Any
 4 | OptionalStr = typing.Optional[str]
-  | ^^^^^^^^^^^ PYI026
+  | ^^^^^^^^^^^ PYI026 (type-alias-without-annotation)
 5 | Foo = Literal["foo"]
 6 | IntOrStr = int | str
   |
@@ -43,12 +43,12 @@ PYI026.pyi:4:1: PYI026 [*] Use `typing.TypeAlias` for type alias, e.g., `Optiona
 6 6 | IntOrStr = int | str
 7 7 | AliasNone = None
 
-PYI026.pyi:5:1: PYI026 [*] Use `typing.TypeAlias` for type alias, e.g., `Foo: TypeAlias = Literal["foo"]`
+PYI026.pyi:5:1: PYI026 (type-alias-without-annotation) [*] Use `typing.TypeAlias` for type alias, e.g., `Foo: TypeAlias = Literal["foo"]`
   |
 3 | NewAny = Any
 4 | OptionalStr = typing.Optional[str]
 5 | Foo = Literal["foo"]
-  | ^^^ PYI026
+  | ^^^ PYI026 (type-alias-without-annotation)
 6 | IntOrStr = int | str
 7 | AliasNone = None
   |
@@ -66,12 +66,12 @@ PYI026.pyi:5:1: PYI026 [*] Use `typing.TypeAlias` for type alias, e.g., `Foo: Ty
 7 7 | AliasNone = None
 8 8 | 
 
-PYI026.pyi:6:1: PYI026 [*] Use `typing.TypeAlias` for type alias, e.g., `IntOrStr: TypeAlias = int | str`
+PYI026.pyi:6:1: PYI026 (type-alias-without-annotation) [*] Use `typing.TypeAlias` for type alias, e.g., `IntOrStr: TypeAlias = int | str`
   |
 4 | OptionalStr = typing.Optional[str]
 5 | Foo = Literal["foo"]
 6 | IntOrStr = int | str
-  | ^^^^^^^^ PYI026
+  | ^^^^^^^^ PYI026 (type-alias-without-annotation)
 7 | AliasNone = None
   |
   = help: Add `TypeAlias` annotation
@@ -89,12 +89,12 @@ PYI026.pyi:6:1: PYI026 [*] Use `typing.TypeAlias` for type alias, e.g., `IntOrSt
 8 8 | 
 9 9 | NewAny: typing.TypeAlias = Any
 
-PYI026.pyi:7:1: PYI026 [*] Use `typing.TypeAlias` for type alias, e.g., `AliasNone: TypeAlias = None`
+PYI026.pyi:7:1: PYI026 (type-alias-without-annotation) [*] Use `typing.TypeAlias` for type alias, e.g., `AliasNone: TypeAlias = None`
   |
 5 | Foo = Literal["foo"]
 6 | IntOrStr = int | str
 7 | AliasNone = None
-  | ^^^^^^^^^ PYI026
+  | ^^^^^^^^^ PYI026 (type-alias-without-annotation)
 8 | 
 9 | NewAny: typing.TypeAlias = Any
   |
@@ -114,11 +114,11 @@ PYI026.pyi:7:1: PYI026 [*] Use `typing.TypeAlias` for type alias, e.g., `AliasNo
 9 9 | NewAny: typing.TypeAlias = Any
 10 10 | OptionalStr: TypeAlias = typing.Optional[str]
 
-PYI026.pyi:17:5: PYI026 [*] Use `typing.TypeAlias` for type alias, e.g., `FLAG_THIS: TypeAlias = None`
+PYI026.pyi:17:5: PYI026 (type-alias-without-annotation) [*] Use `typing.TypeAlias` for type alias, e.g., `FLAG_THIS: TypeAlias = None`
    |
 16 | class NotAnEnum:
 17 |     FLAG_THIS = None
-   |     ^^^^^^^^^ PYI026
+   |     ^^^^^^^^^ PYI026 (type-alias-without-annotation)
 18 | 
 19 | # these are ok
    |

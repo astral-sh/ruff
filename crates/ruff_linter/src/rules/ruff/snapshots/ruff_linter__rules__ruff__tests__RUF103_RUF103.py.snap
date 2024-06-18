@@ -1,0 +1,94 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF103.py:18:12: RUF103 (noqa-by-name) [*] Noqa directive lists rule names instead of rule codes: ambiguous-variable-name (E741), unused-variable (F841)
+   |
+16 | def f():
+17 |     # These should both be converted, but the comment should be left as-is (including spacing beforehand)
+18 |     I = 1  # noqa: ambiguous-variable-name,unused-variable  comment
+   |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF103 (noqa-by-name)
+   |
+   = help: Use rule codes in noqa directive
+
+ℹ Safe fix
+15 15 | 
+16 16 | def f():
+17 17 |     # These should both be converted, but the comment should be left as-is (including spacing beforehand)
+18    |-    I = 1  # noqa: ambiguous-variable-name,unused-variable  comment
+   18 |+    I = 1  # noqa: E741, F841  comment
+19 19 | 
+20 20 | 
+21 21 | def f():
+
+RUF103.py:23:12: RUF103 (noqa-by-name) [*] Noqa directive lists rule names instead of rule codes: ambiguous-variable-name (E741)
+   |
+21 | def f():
+22 |     # `ambiguous-variable-name` should be converted to `E741`.
+23 |     I = 1  # noqa: ambiguous-variable-name F841  comment
+   |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF103 (noqa-by-name)
+   |
+   = help: Use rule codes in noqa directive
+
+ℹ Safe fix
+20 20 | 
+21 21 | def f():
+22 22 |     # `ambiguous-variable-name` should be converted to `E741`.
+23    |-    I = 1  # noqa: ambiguous-variable-name F841  comment
+   23 |+    I = 1  # noqa: E741, F841  comment
+24 24 | 
+25 25 | 
+26 26 | def f():
+
+RUF103.py:28:12: RUF103 (noqa-by-name) [*] Noqa directive lists rule names instead of rule codes: ambiguous-variable-name (E741)
+   |
+26 | def f():
+27 |     # `ambiguous-variable-name` should be converted to `E741`.
+28 |     I = 1  # noqa: ambiguous-variable-name, F841
+   |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF103 (noqa-by-name)
+   |
+   = help: Use rule codes in noqa directive
+
+ℹ Safe fix
+25 25 | 
+26 26 | def f():
+27 27 |     # `ambiguous-variable-name` should be converted to `E741`.
+28    |-    I = 1  # noqa: ambiguous-variable-name, F841
+   28 |+    I = 1  # noqa: E741, F841
+29 29 | 
+30 30 | 
+31 31 | def f():
+
+RUF103.py:33:12: RUF103 (noqa-by-name) [*] Noqa directive lists rule names instead of rule codes: unused-variable (F841)
+   |
+31 | def f():
+32 |     # `unused-variable` should be converted to `F841`.
+33 |     I = 1  # noqa: E741, unused-variable
+   |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF103 (noqa-by-name)
+   |
+   = help: Use rule codes in noqa directive
+
+ℹ Safe fix
+30 30 | 
+31 31 | def f():
+32 32 |     # `unused-variable` should be converted to `F841`.
+33    |-    I = 1  # noqa: E741, unused-variable
+   33 |+    I = 1  # noqa: E741, F841
+34 34 | 
+35 35 | 
+36 36 | def f():
+
+RUF103.py:38:12: RUF103 (noqa-by-name) [*] Noqa directive lists rule names instead of rule codes: ambiguous-variable-name (E741), unused-variable (F841)
+   |
+36 | def f():
+37 |     # These should both be converted.
+38 |     I = 1  # noqa: ambiguous-variable-name, unused-variable
+   |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF103 (noqa-by-name)
+   |
+   = help: Use rule codes in noqa directive
+
+ℹ Safe fix
+35 35 | 
+36 36 | def f():
+37 37 |     # These should both be converted.
+38    |-    I = 1  # noqa: ambiguous-variable-name, unused-variable
+   38 |+    I = 1  # noqa: E741, F841

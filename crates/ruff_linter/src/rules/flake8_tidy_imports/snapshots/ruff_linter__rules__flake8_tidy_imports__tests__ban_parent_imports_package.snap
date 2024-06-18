@@ -1,22 +1,22 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_tidy_imports/mod.rs
 ---
-application.py:5:1: TID252 Prefer absolute imports over relative imports from parent modules
+application.py:5:1: TID252 (relative-imports) Prefer absolute imports over relative imports from parent modules
   |
 3 | import attrs
 4 | 
 5 | from ....import unknown
-  | ^^^^^^^^^^^^^^^^^^^^^^^ TID252
+  | ^^^^^^^^^^^^^^^^^^^^^^^ TID252 (relative-imports)
 6 | from ..protocol import commands, definitions, responses
 7 | from ..server import example
   |
   = help: Replace relative imports from parent modules with absolute imports
 
-application.py:6:1: TID252 [*] Prefer absolute imports over relative imports from parent modules
+application.py:6:1: TID252 (relative-imports) [*] Prefer absolute imports over relative imports from parent modules
   |
 5 | from ....import unknown
 6 | from ..protocol import commands, definitions, responses
-  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TID252
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TID252 (relative-imports)
 7 | from ..server import example
 8 | from .. import server
   |
@@ -32,11 +32,11 @@ application.py:6:1: TID252 [*] Prefer absolute imports over relative imports fro
 8 8 | from .. import server
 9 9 | from . import logger, models
 
-application.py:6:1: TID252 [*] Prefer absolute imports over relative imports from parent modules
+application.py:6:1: TID252 (relative-imports) [*] Prefer absolute imports over relative imports from parent modules
   |
 5 | from ....import unknown
 6 | from ..protocol import commands, definitions, responses
-  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TID252
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TID252 (relative-imports)
 7 | from ..server import example
 8 | from .. import server
   |
@@ -52,11 +52,11 @@ application.py:6:1: TID252 [*] Prefer absolute imports over relative imports fro
 8 8 | from .. import server
 9 9 | from . import logger, models
 
-application.py:6:1: TID252 [*] Prefer absolute imports over relative imports from parent modules
+application.py:6:1: TID252 (relative-imports) [*] Prefer absolute imports over relative imports from parent modules
   |
 5 | from ....import unknown
 6 | from ..protocol import commands, definitions, responses
-  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TID252
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TID252 (relative-imports)
 7 | from ..server import example
 8 | from .. import server
   |
@@ -72,12 +72,12 @@ application.py:6:1: TID252 [*] Prefer absolute imports over relative imports fro
 8 8 | from .. import server
 9 9 | from . import logger, models
 
-application.py:7:1: TID252 [*] Prefer absolute imports over relative imports from parent modules
+application.py:7:1: TID252 (relative-imports) [*] Prefer absolute imports over relative imports from parent modules
   |
 5 | from ....import unknown
 6 | from ..protocol import commands, definitions, responses
 7 | from ..server import example
-  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TID252
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TID252 (relative-imports)
 8 | from .. import server
 9 | from . import logger, models
   |
@@ -93,12 +93,12 @@ application.py:7:1: TID252 [*] Prefer absolute imports over relative imports fro
 9 9 | from . import logger, models
 10 10 | from ..protocol.UpperCaseModule import some_function
 
-application.py:8:1: TID252 [*] Prefer absolute imports over relative imports from parent modules
+application.py:8:1: TID252 (relative-imports) [*] Prefer absolute imports over relative imports from parent modules
    |
  6 | from ..protocol import commands, definitions, responses
  7 | from ..server import example
  8 | from .. import server
-   | ^^^^^^^^^^^^^^^^^^^^^ TID252
+   | ^^^^^^^^^^^^^^^^^^^^^ TID252 (relative-imports)
  9 | from . import logger, models
 10 | from ..protocol.UpperCaseModule import some_function
    |
@@ -113,12 +113,12 @@ application.py:8:1: TID252 [*] Prefer absolute imports over relative imports fro
 9 9 | from . import logger, models
 10 10 | from ..protocol.UpperCaseModule import some_function
 
-application.py:10:1: TID252 [*] Prefer absolute imports over relative imports from parent modules
+application.py:10:1: TID252 (relative-imports) [*] Prefer absolute imports over relative imports from parent modules
    |
  8 | from .. import server
  9 | from . import logger, models
 10 | from ..protocol.UpperCaseModule import some_function
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TID252
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TID252 (relative-imports)
    |
    = help: Replace relative imports from parent modules with absolute imports
 
@@ -128,5 +128,3 @@ application.py:10:1: TID252 [*] Prefer absolute imports over relative imports fr
 9  9  | from . import logger, models
 10    |-from ..protocol.UpperCaseModule import some_function
    10 |+from my_package.sublib.protocol.UpperCaseModule import some_function
-
-

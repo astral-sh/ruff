@@ -1,11 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_errmsg/mod.rs
 ---
-EM.py:5:24: EM101 [*] Exception must not use a string literal, assign to variable first
+EM.py:5:24: EM101 (raw-string-in-exception) [*] Exception must not use a string literal, assign to variable first
   |
 4 | def f_a():
 5 |     raise RuntimeError("This is an example exception")
-  |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ EM101
+  |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ EM101 (raw-string-in-exception)
   |
   = help: Assign to variable; remove string literal
 
@@ -20,11 +20,11 @@ EM.py:5:24: EM101 [*] Exception must not use a string literal, assign to variabl
 7 8 | 
 8 9 | def f_a_short():
 
-EM.py:9:24: EM101 [*] Exception must not use a string literal, assign to variable first
+EM.py:9:24: EM101 (raw-string-in-exception) [*] Exception must not use a string literal, assign to variable first
   |
 8 | def f_a_short():
 9 |     raise RuntimeError("Error")
-  |                        ^^^^^^^ EM101
+  |                        ^^^^^^^ EM101 (raw-string-in-exception)
   |
   = help: Assign to variable; remove string literal
 
@@ -39,11 +39,11 @@ EM.py:9:24: EM101 [*] Exception must not use a string literal, assign to variabl
 11 12 | 
 12 13 | def f_a_empty():
 
-EM.py:13:24: EM101 [*] Exception must not use a string literal, assign to variable first
+EM.py:13:24: EM101 (raw-string-in-exception) [*] Exception must not use a string literal, assign to variable first
    |
 12 | def f_a_empty():
 13 |     raise RuntimeError("")
-   |                        ^^ EM101
+   |                        ^^ EM101 (raw-string-in-exception)
    |
    = help: Assign to variable; remove string literal
 
@@ -58,12 +58,12 @@ EM.py:13:24: EM101 [*] Exception must not use a string literal, assign to variab
 15 16 | 
 16 17 | def f_b():
 
-EM.py:18:24: EM102 [*] Exception must not use an f-string literal, assign to variable first
+EM.py:18:24: EM102 (f-string-in-exception) [*] Exception must not use an f-string literal, assign to variable first
    |
 16 | def f_b():
 17 |     example = "example"
 18 |     raise RuntimeError(f"This is an {example} exception")
-   |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ EM102
+   |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ EM102 (f-string-in-exception)
    |
    = help: Assign to variable; remove f-string literal
 
@@ -78,11 +78,11 @@ EM.py:18:24: EM102 [*] Exception must not use an f-string literal, assign to var
 20 21 | 
 21 22 | def f_c():
 
-EM.py:22:24: EM103 [*] Exception must not use a `.format()` string directly, assign to variable first
+EM.py:22:24: EM103 (dot-format-in-exception) [*] Exception must not use a `.format()` string directly, assign to variable first
    |
 21 | def f_c():
 22 |     raise RuntimeError("This is an {example} exception".format(example="example"))
-   |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ EM103
+   |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ EM103 (dot-format-in-exception)
    |
    = help: Assign to variable; remove `.format()` string
 
@@ -97,12 +97,12 @@ EM.py:22:24: EM103 [*] Exception must not use a `.format()` string directly, ass
 24 25 | 
 25 26 | def f_ok():
 
-EM.py:32:24: EM101 [*] Exception must not use a string literal, assign to variable first
+EM.py:32:24: EM101 (raw-string-in-exception) [*] Exception must not use a string literal, assign to variable first
    |
 30 | def f_msg_defined():
 31 |     msg = "hello"
 32 |     raise RuntimeError("This is an example exception")
-   |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ EM101
+   |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ EM101 (raw-string-in-exception)
    |
    = help: Assign to variable; remove string literal
 
@@ -117,12 +117,12 @@ EM.py:32:24: EM101 [*] Exception must not use a string literal, assign to variab
 34 35 | 
 35 36 | def f_msg_in_nested_scope():
 
-EM.py:39:24: EM101 [*] Exception must not use a string literal, assign to variable first
+EM.py:39:24: EM101 (raw-string-in-exception) [*] Exception must not use a string literal, assign to variable first
    |
 37 |         msg = "hello"
 38 | 
 39 |     raise RuntimeError("This is an example exception")
-   |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ EM101
+   |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ EM101 (raw-string-in-exception)
    |
    = help: Assign to variable; remove string literal
 
@@ -137,11 +137,11 @@ EM.py:39:24: EM101 [*] Exception must not use a string literal, assign to variab
 41 42 | 
 42 43 | def f_msg_in_parent_scope():
 
-EM.py:46:28: EM101 [*] Exception must not use a string literal, assign to variable first
+EM.py:46:28: EM101 (raw-string-in-exception) [*] Exception must not use a string literal, assign to variable first
    |
 45 |     def nested():
 46 |         raise RuntimeError("This is an example exception")
-   |                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ EM101
+   |                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ EM101 (raw-string-in-exception)
    |
    = help: Assign to variable; remove string literal
 
@@ -156,12 +156,12 @@ EM.py:46:28: EM101 [*] Exception must not use a string literal, assign to variab
 48 49 | 
 49 50 | def f_fix_indentation_check(foo):
 
-EM.py:51:28: EM101 [*] Exception must not use a string literal, assign to variable first
+EM.py:51:28: EM101 (raw-string-in-exception) [*] Exception must not use a string literal, assign to variable first
    |
 49 | def f_fix_indentation_check(foo):
 50 |     if foo:
 51 |         raise RuntimeError("This is an example exception")
-   |                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ EM101
+   |                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ EM101 (raw-string-in-exception)
 52 |     else:
 53 |         if foo == "foo":
    |
@@ -178,12 +178,12 @@ EM.py:51:28: EM101 [*] Exception must not use a string literal, assign to variab
 53 54 |         if foo == "foo":
 54 55 |             raise RuntimeError(f"This is an exception: {foo}")
 
-EM.py:54:32: EM102 [*] Exception must not use an f-string literal, assign to variable first
+EM.py:54:32: EM102 (f-string-in-exception) [*] Exception must not use an f-string literal, assign to variable first
    |
 52 |     else:
 53 |         if foo == "foo":
 54 |             raise RuntimeError(f"This is an exception: {foo}")
-   |                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ EM102
+   |                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ EM102 (f-string-in-exception)
 55 |     raise RuntimeError("This is an exception: {}".format(foo))
    |
    = help: Assign to variable; remove f-string literal
@@ -199,12 +199,12 @@ EM.py:54:32: EM102 [*] Exception must not use an f-string literal, assign to var
 56 57 | 
 57 58 | 
 
-EM.py:55:24: EM103 [*] Exception must not use a `.format()` string directly, assign to variable first
+EM.py:55:24: EM103 (dot-format-in-exception) [*] Exception must not use a `.format()` string directly, assign to variable first
    |
 53 |         if foo == "foo":
 54 |             raise RuntimeError(f"This is an exception: {foo}")
 55 |     raise RuntimeError("This is an exception: {}".format(foo))
-   |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ EM103
+   |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ EM103 (dot-format-in-exception)
    |
    = help: Assign to variable; remove `.format()` string
 
@@ -219,29 +219,29 @@ EM.py:55:24: EM103 [*] Exception must not use a `.format()` string directly, ass
 57 58 | 
 58 59 | # Report these, but don't fix them
 
-EM.py:59:28: EM101 Exception must not use a string literal, assign to variable first
+EM.py:59:28: EM101 (raw-string-in-exception) Exception must not use a string literal, assign to variable first
    |
 58 | # Report these, but don't fix them
 59 | if foo: raise RuntimeError("This is an example exception")
-   |                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ EM101
+   |                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ EM101 (raw-string-in-exception)
 60 | if foo: x = 1; raise RuntimeError("This is an example exception")
    |
    = help: Assign to variable; remove string literal
 
-EM.py:60:35: EM101 Exception must not use a string literal, assign to variable first
+EM.py:60:35: EM101 (raw-string-in-exception) Exception must not use a string literal, assign to variable first
    |
 58 | # Report these, but don't fix them
 59 | if foo: raise RuntimeError("This is an example exception")
 60 | if foo: x = 1; raise RuntimeError("This is an example exception")
-   |                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ EM101
+   |                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ EM101 (raw-string-in-exception)
    |
    = help: Assign to variable; remove string literal
 
-EM.py:64:24: EM102 [*] Exception must not use an f-string literal, assign to variable first
+EM.py:64:24: EM102 (f-string-in-exception) [*] Exception must not use an f-string literal, assign to variable first
    |
 63 | def f_triple_quoted_string():
 64 |     raise RuntimeError(f"""This is an {"example"} exception""")
-   |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ EM102
+   |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ EM102 (f-string-in-exception)
    |
    = help: Assign to variable; remove f-string literal
 
@@ -256,14 +256,14 @@ EM.py:64:24: EM102 [*] Exception must not use an f-string literal, assign to var
 66 67 | 
 67 68 | def f_multi_line_string():
 
-EM.py:69:9: EM101 [*] Exception must not use a string literal, assign to variable first
+EM.py:69:9: EM101 (raw-string-in-exception) [*] Exception must not use a string literal, assign to variable first
    |
 67 |   def f_multi_line_string():
 68 |       raise RuntimeError(
 69 |           "first"
    |  _________^
 70 | |         "second"
-   | |________________^ EM101
+   | |________________^ EM101 (raw-string-in-exception)
 71 |       )
    |
    = help: Assign to variable; remove string literal
@@ -284,7 +284,7 @@ EM.py:69:9: EM101 [*] Exception must not use a string literal, assign to variabl
 73 76 | 
 74 77 | def f_multi_line_string2():
 
-EM.py:76:9: EM103 [*] Exception must not use a `.format()` string directly, assign to variable first
+EM.py:76:9: EM103 (dot-format-in-exception) [*] Exception must not use a `.format()` string directly, assign to variable first
    |
 74 |   def f_multi_line_string2():
 75 |       raise RuntimeError(
@@ -292,7 +292,7 @@ EM.py:76:9: EM103 [*] Exception must not use a `.format()` string directly, assi
    |  _________^
 77 | |             example="example"
 78 | |         )
-   | |_________^ EM103
+   | |_________^ EM103 (dot-format-in-exception)
 79 |       )
    |
    = help: Assign to variable; remove `.format()` string
@@ -314,7 +314,7 @@ EM.py:76:9: EM103 [*] Exception must not use a `.format()` string directly, assi
 81 84 | 
 82 85 | def f_multi_line_string2():
 
-EM.py:84:9: EM103 [*] Exception must not use a `.format()` string directly, assign to variable first
+EM.py:84:9: EM103 (dot-format-in-exception) [*] Exception must not use a `.format()` string directly, assign to variable first
    |
 82 |   def f_multi_line_string2():
 83 |       raise RuntimeError(
@@ -325,7 +325,7 @@ EM.py:84:9: EM103 [*] Exception must not use a `.format()` string directly, assi
 87 | |         ).format(
 88 | |             example="example"
 89 | |         )
-   | |_________^ EM103
+   | |_________^ EM103 (dot-format-in-exception)
 90 |       )
    |
    = help: Assign to variable; remove `.format()` string
@@ -346,5 +346,3 @@ EM.py:84:9: EM103 [*] Exception must not use a `.format()` string directly, assi
    91 |+    raise RuntimeError(
    92 |+        msg
    93 |+    )
-
-

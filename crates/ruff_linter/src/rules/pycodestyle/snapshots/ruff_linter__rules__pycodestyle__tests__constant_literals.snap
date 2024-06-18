@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-constant_literals.py:4:4: F632 [*] Use `==` to compare constant literals
+constant_literals.py:4:4: F632 (is-literal) [*] Use `==` to compare constant literals
   |
 2 | # Errors
 3 | ###
 4 | if "abc" is "def":  # F632 (fix)
-  |    ^^^^^^^^^^^^^^ F632
+  |    ^^^^^^^^^^^^^^ F632 (is-literal)
 5 |     pass
 6 | if "abc" is None:  # F632 (fix, but leaves behind unfixable E711)
   |
@@ -22,12 +22,12 @@ constant_literals.py:4:4: F632 [*] Use `==` to compare constant literals
 6 6 | if "abc" is None:  # F632 (fix, but leaves behind unfixable E711)
 7 7 |     pass
 
-constant_literals.py:6:4: F632 [*] Use `==` to compare constant literals
+constant_literals.py:6:4: F632 (is-literal) [*] Use `==` to compare constant literals
   |
 4 | if "abc" is "def":  # F632 (fix)
 5 |     pass
 6 | if "abc" is None:  # F632 (fix, but leaves behind unfixable E711)
-  |    ^^^^^^^^^^^^^ F632
+  |    ^^^^^^^^^^^^^ F632 (is-literal)
 7 |     pass
 8 | if None is "abc":  # F632 (fix, but leaves behind unfixable E711)
   |
@@ -43,12 +43,12 @@ constant_literals.py:6:4: F632 [*] Use `==` to compare constant literals
 8 8 | if None is "abc":  # F632 (fix, but leaves behind unfixable E711)
 9 9 |     pass
 
-constant_literals.py:8:4: F632 [*] Use `==` to compare constant literals
+constant_literals.py:8:4: F632 (is-literal) [*] Use `==` to compare constant literals
    |
  6 | if "abc" is None:  # F632 (fix, but leaves behind unfixable E711)
  7 |     pass
  8 | if None is "abc":  # F632 (fix, but leaves behind unfixable E711)
-   |    ^^^^^^^^^^^^^ F632
+   |    ^^^^^^^^^^^^^ F632 (is-literal)
  9 |     pass
 10 | if "abc" is False:  # F632 (fix, but leaves behind unfixable E712)
    |
@@ -64,12 +64,12 @@ constant_literals.py:8:4: F632 [*] Use `==` to compare constant literals
 10 10 | if "abc" is False:  # F632 (fix, but leaves behind unfixable E712)
 11 11 |     pass
 
-constant_literals.py:10:4: F632 [*] Use `==` to compare constant literals
+constant_literals.py:10:4: F632 (is-literal) [*] Use `==` to compare constant literals
    |
  8 | if None is "abc":  # F632 (fix, but leaves behind unfixable E711)
  9 |     pass
 10 | if "abc" is False:  # F632 (fix, but leaves behind unfixable E712)
-   |    ^^^^^^^^^^^^^^ F632
+   |    ^^^^^^^^^^^^^^ F632 (is-literal)
 11 |     pass
 12 | if False is "abc":  # F632 (fix, but leaves behind unfixable E712)
    |
@@ -85,12 +85,12 @@ constant_literals.py:10:4: F632 [*] Use `==` to compare constant literals
 12 12 | if False is "abc":  # F632 (fix, but leaves behind unfixable E712)
 13 13 |     pass
 
-constant_literals.py:12:4: F632 [*] Use `==` to compare constant literals
+constant_literals.py:12:4: F632 (is-literal) [*] Use `==` to compare constant literals
    |
 10 | if "abc" is False:  # F632 (fix, but leaves behind unfixable E712)
 11 |     pass
 12 | if False is "abc":  # F632 (fix, but leaves behind unfixable E712)
-   |    ^^^^^^^^^^^^^^ F632
+   |    ^^^^^^^^^^^^^^ F632 (is-literal)
 13 |     pass
 14 | if False == None:  # E711, E712 (fix)
    |
@@ -106,12 +106,12 @@ constant_literals.py:12:4: F632 [*] Use `==` to compare constant literals
 14 14 | if False == None:  # E711, E712 (fix)
 15 15 |     pass
 
-constant_literals.py:14:4: E712 [*] Avoid equality comparisons to `False`; use `if not None:` for false checks
+constant_literals.py:14:4: E712 (true-false-comparison) [*] Avoid equality comparisons to `False`; use `if not None:` for false checks
    |
 12 | if False is "abc":  # F632 (fix, but leaves behind unfixable E712)
 13 |     pass
 14 | if False == None:  # E711, E712 (fix)
-   |    ^^^^^^^^^^^^^ E712
+   |    ^^^^^^^^^^^^^ E712 (true-false-comparison)
 15 |     pass
 16 | if None == False:  # E711, E712 (fix)
    |
@@ -127,12 +127,12 @@ constant_literals.py:14:4: E712 [*] Avoid equality comparisons to `False`; use `
 16 16 | if None == False:  # E711, E712 (fix)
 17 17 |     pass
 
-constant_literals.py:14:13: E711 [*] Comparison to `None` should be `cond is None`
+constant_literals.py:14:13: E711 (none-comparison) [*] Comparison to `None` should be `cond is None`
    |
 12 | if False is "abc":  # F632 (fix, but leaves behind unfixable E712)
 13 |     pass
 14 | if False == None:  # E711, E712 (fix)
-   |             ^^^^ E711
+   |             ^^^^ E711 (none-comparison)
 15 |     pass
 16 | if None == False:  # E711, E712 (fix)
    |
@@ -148,12 +148,12 @@ constant_literals.py:14:13: E711 [*] Comparison to `None` should be `cond is Non
 16 16 | if None == False:  # E711, E712 (fix)
 17 17 |     pass
 
-constant_literals.py:16:4: E711 [*] Comparison to `None` should be `cond is None`
+constant_literals.py:16:4: E711 (none-comparison) [*] Comparison to `None` should be `cond is None`
    |
 14 | if False == None:  # E711, E712 (fix)
 15 |     pass
 16 | if None == False:  # E711, E712 (fix)
-   |    ^^^^ E711
+   |    ^^^^ E711 (none-comparison)
 17 |     pass
    |
    = help: Replace with `cond is None`
@@ -168,12 +168,12 @@ constant_literals.py:16:4: E711 [*] Comparison to `None` should be `cond is None
 18 18 | 
 19 19 | named_var = []
 
-constant_literals.py:16:4: E712 [*] Avoid equality comparisons to `False`; use `if not None:` for false checks
+constant_literals.py:16:4: E712 (true-false-comparison) [*] Avoid equality comparisons to `False`; use `if not None:` for false checks
    |
 14 | if False == None:  # E711, E712 (fix)
 15 |     pass
 16 | if None == False:  # E711, E712 (fix)
-   |    ^^^^^^^^^^^^^ E712
+   |    ^^^^^^^^^^^^^ E712 (true-false-comparison)
 17 |     pass
    |
    = help: Replace with `not None`

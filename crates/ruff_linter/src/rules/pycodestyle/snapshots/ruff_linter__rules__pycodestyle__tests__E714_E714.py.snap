@@ -1,11 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-E714.py:2:8: E714 [*] Test for object identity should be `is not`
+E714.py:2:8: E714 (not-is-test) [*] Test for object identity should be `is not`
   |
 1 | #: E714
 2 | if not X is Y:
-  |        ^^^^^^ E714
+  |        ^^^^^^ E714 (not-is-test)
 3 |     pass
 4 | #: E714
   |
@@ -19,12 +19,12 @@ E714.py:2:8: E714 [*] Test for object identity should be `is not`
 4 4 | #: E714
 5 5 | if not X.B is Y:
 
-E714.py:5:8: E714 [*] Test for object identity should be `is not`
+E714.py:5:8: E714 (not-is-test) [*] Test for object identity should be `is not`
   |
 3 |     pass
 4 | #: E714
 5 | if not X.B is Y:
-  |        ^^^^^^^^ E714
+  |        ^^^^^^^^ E714 (not-is-test)
 6 |     pass
   |
   = help: Convert to `is not`
@@ -39,12 +39,12 @@ E714.py:5:8: E714 [*] Test for object identity should be `is not`
 7 7 | 
 8 8 | #: Okay
 
-E714.py:39:13: E714 [*] Test for object identity should be `is not`
+E714.py:39:13: E714 (not-is-test) [*] Test for object identity should be `is not`
    |
 37 | assert {"x": not foo} in bar
 38 | assert [42, not foo] in bar
 39 | assert not (re.search(r"^.:\\Users\\[^\\]*\\Downloads\\.*") is None)
-   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E714
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E714 (not-is-test)
    |
    = help: Convert to `is not`
 
@@ -54,5 +54,3 @@ E714.py:39:13: E714 [*] Test for object identity should be `is not`
 38 38 | assert [42, not foo] in bar
 39    |-assert not (re.search(r"^.:\\Users\\[^\\]*\\Downloads\\.*") is None)
    39 |+assert re.search(r"^.:\\Users\\[^\\]*\\Downloads\\.*") is not None
-
-

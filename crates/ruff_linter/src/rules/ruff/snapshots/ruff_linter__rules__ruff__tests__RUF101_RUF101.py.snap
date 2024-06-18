@@ -1,10 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-RUF101.py:1:15: RUF101 [*] `RUF940` is a redirect to `RUF950`
+RUF101.py:1:15: RUF101 (redirected-noqa) [*] `RUF940` is a redirect to `RUF950`
   |
 1 | x = 2 # noqa: RUF940
-  |               ^^^^^^ RUF101
+  |               ^^^^^^ RUF101 (redirected-noqa)
 2 | x = 2 # noqa: RUF950
 3 | x = 2 # noqa: RUF940, RUF950
   |
@@ -18,12 +18,12 @@ RUF101.py:1:15: RUF101 [*] `RUF940` is a redirect to `RUF950`
 4 4 | x = 2 # noqa: RUF950, RUF940, RUF950, RUF950, RUF950
 5 5 | x = 2 # noqa: RUF940, RUF950, RUF940
 
-RUF101.py:3:15: RUF101 [*] `RUF940` is a redirect to `RUF950`
+RUF101.py:3:15: RUF101 (redirected-noqa) [*] `RUF940` is a redirect to `RUF950`
   |
 1 | x = 2 # noqa: RUF940
 2 | x = 2 # noqa: RUF950
 3 | x = 2 # noqa: RUF940, RUF950
-  |               ^^^^^^ RUF101
+  |               ^^^^^^ RUF101 (redirected-noqa)
 4 | x = 2 # noqa: RUF950, RUF940, RUF950, RUF950, RUF950
 5 | x = 2 # noqa: RUF940, RUF950, RUF940
   |
@@ -38,12 +38,12 @@ RUF101.py:3:15: RUF101 [*] `RUF940` is a redirect to `RUF950`
 5 5 | x = 2 # noqa: RUF940, RUF950, RUF940
 6 6 | x = 2 # noqa: RUF940, RUF950, RUF940, RUF950
 
-RUF101.py:4:23: RUF101 [*] `RUF940` is a redirect to `RUF950`
+RUF101.py:4:23: RUF101 (redirected-noqa) [*] `RUF940` is a redirect to `RUF950`
   |
 2 | x = 2 # noqa: RUF950
 3 | x = 2 # noqa: RUF940, RUF950
 4 | x = 2 # noqa: RUF950, RUF940, RUF950, RUF950, RUF950
-  |                       ^^^^^^ RUF101
+  |                       ^^^^^^ RUF101 (redirected-noqa)
 5 | x = 2 # noqa: RUF940, RUF950, RUF940
 6 | x = 2 # noqa: RUF940, RUF950, RUF940, RUF950
   |
@@ -58,12 +58,12 @@ RUF101.py:4:23: RUF101 [*] `RUF940` is a redirect to `RUF950`
 5 5 | x = 2 # noqa: RUF940, RUF950, RUF940
 6 6 | x = 2 # noqa: RUF940, RUF950, RUF940, RUF950
 
-RUF101.py:5:15: RUF101 [*] `RUF940` is a redirect to `RUF950`
+RUF101.py:5:15: RUF101 (redirected-noqa) [*] `RUF940` is a redirect to `RUF950`
   |
 3 | x = 2 # noqa: RUF940, RUF950
 4 | x = 2 # noqa: RUF950, RUF940, RUF950, RUF950, RUF950
 5 | x = 2 # noqa: RUF940, RUF950, RUF940
-  |               ^^^^^^ RUF101
+  |               ^^^^^^ RUF101 (redirected-noqa)
 6 | x = 2 # noqa: RUF940, RUF950, RUF940, RUF950
   |
   = help: Replace with `RUF950`
@@ -76,12 +76,12 @@ RUF101.py:5:15: RUF101 [*] `RUF940` is a redirect to `RUF950`
   5 |+x = 2 # noqa: RUF950, RUF950, RUF940
 6 6 | x = 2 # noqa: RUF940, RUF950, RUF940, RUF950
 
-RUF101.py:5:31: RUF101 [*] `RUF940` is a redirect to `RUF950`
+RUF101.py:5:31: RUF101 (redirected-noqa) [*] `RUF940` is a redirect to `RUF950`
   |
 3 | x = 2 # noqa: RUF940, RUF950
 4 | x = 2 # noqa: RUF950, RUF940, RUF950, RUF950, RUF950
 5 | x = 2 # noqa: RUF940, RUF950, RUF940
-  |                               ^^^^^^ RUF101
+  |                               ^^^^^^ RUF101 (redirected-noqa)
 6 | x = 2 # noqa: RUF940, RUF950, RUF940, RUF950
   |
   = help: Replace with `RUF950`
@@ -94,12 +94,12 @@ RUF101.py:5:31: RUF101 [*] `RUF940` is a redirect to `RUF950`
   5 |+x = 2 # noqa: RUF940, RUF950, RUF950
 6 6 | x = 2 # noqa: RUF940, RUF950, RUF940, RUF950
 
-RUF101.py:6:15: RUF101 [*] `RUF940` is a redirect to `RUF950`
+RUF101.py:6:15: RUF101 (redirected-noqa) [*] `RUF940` is a redirect to `RUF950`
   |
 4 | x = 2 # noqa: RUF950, RUF940, RUF950, RUF950, RUF950
 5 | x = 2 # noqa: RUF940, RUF950, RUF940
 6 | x = 2 # noqa: RUF940, RUF950, RUF940, RUF950
-  |               ^^^^^^ RUF101
+  |               ^^^^^^ RUF101 (redirected-noqa)
   |
   = help: Replace with `RUF950`
 
@@ -110,12 +110,12 @@ RUF101.py:6:15: RUF101 [*] `RUF940` is a redirect to `RUF950`
 6   |-x = 2 # noqa: RUF940, RUF950, RUF940, RUF950
   6 |+x = 2 # noqa: RUF950, RUF950, RUF940, RUF950
 
-RUF101.py:6:31: RUF101 [*] `RUF940` is a redirect to `RUF950`
+RUF101.py:6:31: RUF101 (redirected-noqa) [*] `RUF940` is a redirect to `RUF950`
   |
 4 | x = 2 # noqa: RUF950, RUF940, RUF950, RUF950, RUF950
 5 | x = 2 # noqa: RUF940, RUF950, RUF940
 6 | x = 2 # noqa: RUF940, RUF950, RUF940, RUF950
-  |                               ^^^^^^ RUF101
+  |                               ^^^^^^ RUF101 (redirected-noqa)
   |
   = help: Replace with `RUF950`
 

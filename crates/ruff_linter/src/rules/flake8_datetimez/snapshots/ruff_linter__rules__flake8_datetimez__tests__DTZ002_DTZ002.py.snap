@@ -1,21 +1,21 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_datetimez/mod.rs
 ---
-DTZ002.py:4:1: DTZ002 `datetime.datetime.today()` used
+DTZ002.py:4:1: DTZ002 (call-datetime-today) `datetime.datetime.today()` used
   |
 3 | # qualified
 4 | datetime.datetime.today()
-  | ^^^^^^^^^^^^^^^^^^^^^^^^^ DTZ002
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^ DTZ002 (call-datetime-today)
 5 | 
 6 | from datetime import datetime
   |
   = help: Use `datetime.datetime.now(tz=...)` instead
 
-DTZ002.py:9:1: DTZ002 `datetime.datetime.today()` used
+DTZ002.py:9:1: DTZ002 (call-datetime-today) `datetime.datetime.today()` used
    |
  8 | # unqualified
  9 | datetime.today()
-   | ^^^^^^^^^^^^^^^^ DTZ002
+   | ^^^^^^^^^^^^^^^^ DTZ002 (call-datetime-today)
 10 | 
 11 | # uses `astimezone` method
    |

@@ -1,20 +1,18 @@
 ---
 source: crates/ruff_linter/src/rules/pep8_naming/mod.rs
 ---
-N817.py:2:8: N817 CamelCase `StillBad` imported as acronym `SB`
+N817.py:2:8: N817 (camelcase-imported-as-acronym) CamelCase `StillBad` imported as acronym `SB`
   |
 1 | import mod.BadAllowed as BA
 2 | import mod.StillBad as SB
-  |        ^^^^^^^^^^^^^^^^^^ N817
+  |        ^^^^^^^^^^^^^^^^^^ N817 (camelcase-imported-as-acronym)
 3 | 
 4 | from mod import BadAllowed as BA
   |
 
-N817.py:5:17: N817 CamelCase `StillBad` imported as acronym `SB`
+N817.py:5:17: N817 (camelcase-imported-as-acronym) CamelCase `StillBad` imported as acronym `SB`
   |
 4 | from mod import BadAllowed as BA
 5 | from mod import StillBad as SB
-  |                 ^^^^^^^^^^^^^^ N817
+  |                 ^^^^^^^^^^^^^^ N817 (camelcase-imported-as-acronym)
   |
-
-

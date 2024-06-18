@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-E26.py:10:1: E265 [*] Block comment should start with `# `
+E26.py:10:1: E265 (no-space-after-block-comment) [*] Block comment should start with `# `
    |
  8 | x = y + 1  #:  Increment x
  9 | #: E265:1:1
 10 | #Block comment
-   | ^^^^^^^^^^^^^^ E265
+   | ^^^^^^^^^^^^^^ E265 (no-space-after-block-comment)
 11 | a = 1
 12 | #: E265:2:1
    |
@@ -22,12 +22,12 @@ E26.py:10:1: E265 [*] Block comment should start with `# `
 12 12 | #: E265:2:1
 13 13 | m = 42
 
-E26.py:14:1: E265 [*] Block comment should start with `# `
+E26.py:14:1: E265 (no-space-after-block-comment) [*] Block comment should start with `# `
    |
 12 | #: E265:2:1
 13 | m = 42
 14 | #! This is important
-   | ^^^^^^^^^^^^^^^^^^^^ E265
+   | ^^^^^^^^^^^^^^^^^^^^ E265 (no-space-after-block-comment)
 15 | mx = 42 - 42
 16 | #: E266:3:5 E266:6:5
    |
@@ -43,12 +43,12 @@ E26.py:14:1: E265 [*] Block comment should start with `# `
 16 16 | #: E266:3:5 E266:6:5
 17 17 | def how_it_feel(r):
 
-E26.py:25:1: E265 [*] Block comment should start with `# `
+E26.py:25:1: E265 (no-space-after-block-comment) [*] Block comment should start with `# `
    |
 23 |     return
 24 | #: E265:1:1 E266:2:1
 25 | ##if DEBUG:
-   | ^^^^^^^^^^^ E265
+   | ^^^^^^^^^^^ E265 (no-space-after-block-comment)
 26 | ##    logging.error()
 27 | #: W291:1:42
    |
@@ -64,11 +64,11 @@ E26.py:25:1: E265 [*] Block comment should start with `# `
 27 27 | #: W291:1:42
 28 28 | #########################################
 
-E26.py:32:1: E265 [*] Block comment should start with `# `
+E26.py:32:1: E265 (no-space-after-block-comment) [*] Block comment should start with `# `
    |
 31 | #: Okay
 32 | #!/usr/bin/env python
-   | ^^^^^^^^^^^^^^^^^^^^^ E265
+   | ^^^^^^^^^^^^^^^^^^^^^ E265 (no-space-after-block-comment)
 33 | 
 34 | pass  # an inline comment
    |
@@ -84,12 +84,12 @@ E26.py:32:1: E265 [*] Block comment should start with `# `
 34 34 | pass  # an inline comment
 35 35 | x = x + 1   # Increment x
 
-E26.py:73:1: E265 [*] Block comment should start with `# `
+E26.py:73:1: E265 (no-space-after-block-comment) [*] Block comment should start with `# `
    |
 71 | # F   Means test is failing (F)
 72 | # EF  Means test is giving error and Failing
 73 | #!   Means test is segfaulting
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E265
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E265 (no-space-after-block-comment)
 74 | # 8   Means test runs forever
    |
    = help: Format space
@@ -104,12 +104,12 @@ E26.py:73:1: E265 [*] Block comment should start with `# `
 75 75 | 
 76 76 | #: Colon prefix is okay
 
-E26.py:78:1: E265 [*] Block comment should start with `# `
+E26.py:78:1: E265 (no-space-after-block-comment) [*] Block comment should start with `# `
    |
 76 | #: Colon prefix is okay
 77 | 
 78 | ###This is a variable ###
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^ E265
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^ E265 (no-space-after-block-comment)
 79 | 
 80 | # We should strip the space, but preserve the hashes.
    |
@@ -124,5 +124,3 @@ E26.py:78:1: E265 [*] Block comment should start with `# `
 79 79 | 
 80 80 | # We should strip the space, but preserve the hashes.
 81 81 | #: E266:1:3
-
-

@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
 ---
-B014.py:17:8: B014 [*] Exception handler with duplicate exception: `OSError`
+B014.py:17:8: B014 (duplicate-handler-exception) [*] Exception handler with duplicate exception: `OSError`
    |
 15 | try:
 16 |     pass
 17 | except (OSError, OSError) as err:
-   |        ^^^^^^^^^^^^^^^^^^ B014
+   |        ^^^^^^^^^^^^^^^^^^ B014 (duplicate-handler-exception)
 18 |     # Duplicate exception types are useless
 19 |     pass
    |
@@ -22,12 +22,12 @@ B014.py:17:8: B014 [*] Exception handler with duplicate exception: `OSError`
 19 19 |     pass
 20 20 | 
 
-B014.py:28:8: B014 [*] Exception handler with duplicate exception: `MyError`
+B014.py:28:8: B014 (duplicate-handler-exception) [*] Exception handler with duplicate exception: `MyError`
    |
 26 | try:
 27 |     pass
 28 | except (MyError, MyError):
-   |        ^^^^^^^^^^^^^^^^^^ B014
+   |        ^^^^^^^^^^^^^^^^^^ B014 (duplicate-handler-exception)
 29 |     # Detect duplicate non-builtin errors
 30 |     pass
    |
@@ -43,12 +43,12 @@ B014.py:28:8: B014 [*] Exception handler with duplicate exception: `MyError`
 30 30 |     pass
 31 31 | 
 
-B014.py:49:8: B014 [*] Exception handler with duplicate exception: `re.error`
+B014.py:49:8: B014 (duplicate-handler-exception) [*] Exception handler with duplicate exception: `re.error`
    |
 47 | try:
 48 |     pass
 49 | except (re.error, re.error):
-   |        ^^^^^^^^^^^^^^^^^^^^ B014
+   |        ^^^^^^^^^^^^^^^^^^^^ B014 (duplicate-handler-exception)
 50 |     # Duplicate exception types as attributes
 51 |     pass
    |
@@ -64,12 +64,12 @@ B014.py:49:8: B014 [*] Exception handler with duplicate exception: `re.error`
 51 51 |     pass
 52 52 | 
 
-B014.py:82:8: B014 [*] Exception handler with duplicate exception: `ValueError`
+B014.py:82:8: B014 (duplicate-handler-exception) [*] Exception handler with duplicate exception: `ValueError`
    |
 80 | try:
 81 |     pass
 82 | except (ValueError, ValueError, TypeError):
-   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ B014
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ B014 (duplicate-handler-exception)
 83 |     pass
    |
    = help: De-duplicate exceptions
@@ -84,12 +84,12 @@ B014.py:82:8: B014 [*] Exception handler with duplicate exception: `ValueError`
 84 84 | 
 85 85 | 
 
-B014.py:89:7: B014 [*] Exception handler with duplicate exception: `re.error`
+B014.py:89:7: B014 (duplicate-handler-exception) [*] Exception handler with duplicate exception: `re.error`
    |
 87 | try:
 88 |     pas
 89 | except(re.error, re.error):
-   |       ^^^^^^^^^^^^^^^^^^^^ B014
+   |       ^^^^^^^^^^^^^^^^^^^^ B014 (duplicate-handler-exception)
 90 |     p
    |
    = help: De-duplicate exceptions
@@ -101,5 +101,3 @@ B014.py:89:7: B014 [*] Exception handler with duplicate exception: `re.error`
 89    |-except(re.error, re.error):
    89 |+except re.error:
 90 90 |     p
-
-

@@ -1,11 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
 ---
-PT018.py:14:5: PT018 [*] Assertion should be broken down into multiple parts
+PT018.py:14:5: PT018 (pytest-composite-assertion) [*] Assertion should be broken down into multiple parts
    |
 13 | def test_error():
 14 |     assert something and something_else
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT018
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT018 (pytest-composite-assertion)
 15 |     assert something and something_else and something_third
 16 |     assert something and not something_else
    |
@@ -22,12 +22,12 @@ PT018.py:14:5: PT018 [*] Assertion should be broken down into multiple parts
 16 17 |     assert something and not something_else
 17 18 |     assert something and (something_else or something_third)
 
-PT018.py:15:5: PT018 [*] Assertion should be broken down into multiple parts
+PT018.py:15:5: PT018 (pytest-composite-assertion) [*] Assertion should be broken down into multiple parts
    |
 13 | def test_error():
 14 |     assert something and something_else
 15 |     assert something and something_else and something_third
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT018
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT018 (pytest-composite-assertion)
 16 |     assert something and not something_else
 17 |     assert something and (something_else or something_third)
    |
@@ -44,12 +44,12 @@ PT018.py:15:5: PT018 [*] Assertion should be broken down into multiple parts
 17 18 |     assert something and (something_else or something_third)
 18 19 |     assert not something and something_else
 
-PT018.py:16:5: PT018 [*] Assertion should be broken down into multiple parts
+PT018.py:16:5: PT018 (pytest-composite-assertion) [*] Assertion should be broken down into multiple parts
    |
 14 |     assert something and something_else
 15 |     assert something and something_else and something_third
 16 |     assert something and not something_else
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT018
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT018 (pytest-composite-assertion)
 17 |     assert something and (something_else or something_third)
 18 |     assert not something and something_else
    |
@@ -66,12 +66,12 @@ PT018.py:16:5: PT018 [*] Assertion should be broken down into multiple parts
 18 19 |     assert not something and something_else
 19 20 |     assert not (something or something_else)
 
-PT018.py:17:5: PT018 [*] Assertion should be broken down into multiple parts
+PT018.py:17:5: PT018 (pytest-composite-assertion) [*] Assertion should be broken down into multiple parts
    |
 15 |     assert something and something_else and something_third
 16 |     assert something and not something_else
 17 |     assert something and (something_else or something_third)
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT018
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT018 (pytest-composite-assertion)
 18 |     assert not something and something_else
 19 |     assert not (something or something_else)
    |
@@ -88,12 +88,12 @@ PT018.py:17:5: PT018 [*] Assertion should be broken down into multiple parts
 19 20 |     assert not (something or something_else)
 20 21 |     assert not (something or something_else or something_third)
 
-PT018.py:18:5: PT018 [*] Assertion should be broken down into multiple parts
+PT018.py:18:5: PT018 (pytest-composite-assertion) [*] Assertion should be broken down into multiple parts
    |
 16 |     assert something and not something_else
 17 |     assert something and (something_else or something_third)
 18 |     assert not something and something_else
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT018
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT018 (pytest-composite-assertion)
 19 |     assert not (something or something_else)
 20 |     assert not (something or something_else or something_third)
    |
@@ -110,12 +110,12 @@ PT018.py:18:5: PT018 [*] Assertion should be broken down into multiple parts
 20 21 |     assert not (something or something_else or something_third)
 21 22 |     assert something and something_else == """error
 
-PT018.py:19:5: PT018 [*] Assertion should be broken down into multiple parts
+PT018.py:19:5: PT018 (pytest-composite-assertion) [*] Assertion should be broken down into multiple parts
    |
 17 |     assert something and (something_else or something_third)
 18 |     assert not something and something_else
 19 |     assert not (something or something_else)
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT018
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT018 (pytest-composite-assertion)
 20 |     assert not (something or something_else or something_third)
 21 |     assert something and something_else == """error
    |
@@ -132,12 +132,12 @@ PT018.py:19:5: PT018 [*] Assertion should be broken down into multiple parts
 21 22 |     assert something and something_else == """error
 22 23 |     message
 
-PT018.py:20:5: PT018 [*] Assertion should be broken down into multiple parts
+PT018.py:20:5: PT018 (pytest-composite-assertion) [*] Assertion should be broken down into multiple parts
    |
 18 |     assert not something and something_else
 19 |     assert not (something or something_else)
 20 |     assert not (something or something_else or something_third)
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT018
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT018 (pytest-composite-assertion)
 21 |     assert something and something_else == """error
 22 |     message
    |
@@ -154,7 +154,7 @@ PT018.py:20:5: PT018 [*] Assertion should be broken down into multiple parts
 22 23 |     message
 23 24 |     """
 
-PT018.py:21:5: PT018 [*] Assertion should be broken down into multiple parts
+PT018.py:21:5: PT018 (pytest-composite-assertion) [*] Assertion should be broken down into multiple parts
    |
 19 |       assert not (something or something_else)
 20 |       assert not (something or something_else or something_third)
@@ -162,7 +162,7 @@ PT018.py:21:5: PT018 [*] Assertion should be broken down into multiple parts
    |  _____^
 22 | |     message
 23 | |     """
-   | |_______^ PT018
+   | |_______^ PT018 (pytest-composite-assertion)
 24 |       assert (
 25 |           something
    |
@@ -179,7 +179,7 @@ PT018.py:21:5: PT018 [*] Assertion should be broken down into multiple parts
 23 24 |     """
 24 25 |     assert (
 
-PT018.py:24:5: PT018 [*] Assertion should be broken down into multiple parts
+PT018.py:24:5: PT018 (pytest-composite-assertion) [*] Assertion should be broken down into multiple parts
    |
 22 |       message
 23 |       """
@@ -191,7 +191,7 @@ PT018.py:24:5: PT018 [*] Assertion should be broken down into multiple parts
 28 | | message
 29 | | """
 30 | |     )
-   | |_____^ PT018
+   | |_____^ PT018 (pytest-composite-assertion)
 31 |   
 32 |       # recursive case
    |
@@ -210,11 +210,11 @@ PT018.py:24:5: PT018 [*] Assertion should be broken down into multiple parts
 28 28 | message
 29 29 | """
 
-PT018.py:33:5: PT018 [*] Assertion should be broken down into multiple parts
+PT018.py:33:5: PT018 (pytest-composite-assertion) [*] Assertion should be broken down into multiple parts
    |
 32 |     # recursive case
 33 |     assert not (a or not (b or c))
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT018
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT018 (pytest-composite-assertion)
 34 |     assert not (a or not (b and c))
    |
    = help: Break down assertion into multiple parts
@@ -230,12 +230,12 @@ PT018.py:33:5: PT018 [*] Assertion should be broken down into multiple parts
 35 36 | 
 36 37 |     # detected, but no fix for messages
 
-PT018.py:34:5: PT018 [*] Assertion should be broken down into multiple parts
+PT018.py:34:5: PT018 (pytest-composite-assertion) [*] Assertion should be broken down into multiple parts
    |
 32 |     # recursive case
 33 |     assert not (a or not (b or c))
 34 |     assert not (a or not (b and c))
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT018
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT018 (pytest-composite-assertion)
 35 | 
 36 |     # detected, but no fix for messages
    |
@@ -252,41 +252,41 @@ PT018.py:34:5: PT018 [*] Assertion should be broken down into multiple parts
 36 37 |     # detected, but no fix for messages
 37 38 |     assert something and something_else, "error message"
 
-PT018.py:37:5: PT018 Assertion should be broken down into multiple parts
+PT018.py:37:5: PT018 (pytest-composite-assertion) Assertion should be broken down into multiple parts
    |
 36 |     # detected, but no fix for messages
 37 |     assert something and something_else, "error message"
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT018
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT018 (pytest-composite-assertion)
 38 |     assert not (something or something_else and something_third), "with message"
 39 |     # detected, but no fix for mixed conditions (e.g. `a or b and c`)
    |
    = help: Break down assertion into multiple parts
 
-PT018.py:38:5: PT018 Assertion should be broken down into multiple parts
+PT018.py:38:5: PT018 (pytest-composite-assertion) Assertion should be broken down into multiple parts
    |
 36 |     # detected, but no fix for messages
 37 |     assert something and something_else, "error message"
 38 |     assert not (something or something_else and something_third), "with message"
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT018
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT018 (pytest-composite-assertion)
 39 |     # detected, but no fix for mixed conditions (e.g. `a or b and c`)
 40 |     assert not (something or something_else and something_third)
    |
    = help: Break down assertion into multiple parts
 
-PT018.py:40:5: PT018 Assertion should be broken down into multiple parts
+PT018.py:40:5: PT018 (pytest-composite-assertion) Assertion should be broken down into multiple parts
    |
 38 |     assert not (something or something_else and something_third), "with message"
 39 |     # detected, but no fix for mixed conditions (e.g. `a or b and c`)
 40 |     assert not (something or something_else and something_third)
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT018
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT018 (pytest-composite-assertion)
    |
    = help: Break down assertion into multiple parts
 
-PT018.py:44:1: PT018 [*] Assertion should be broken down into multiple parts
+PT018.py:44:1: PT018 (pytest-composite-assertion) [*] Assertion should be broken down into multiple parts
    |
 43 | assert something  # OK
 44 | assert something and something_else  # Error
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT018
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT018 (pytest-composite-assertion)
 45 | assert something and something_else and something_third  # Error
    |
    = help: Break down assertion into multiple parts
@@ -302,12 +302,12 @@ PT018.py:44:1: PT018 [*] Assertion should be broken down into multiple parts
 46 47 | 
 47 48 | 
 
-PT018.py:45:1: PT018 [*] Assertion should be broken down into multiple parts
+PT018.py:45:1: PT018 (pytest-composite-assertion) [*] Assertion should be broken down into multiple parts
    |
 43 | assert something  # OK
 44 | assert something and something_else  # Error
 45 | assert something and something_else and something_third  # Error
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT018
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT018 (pytest-composite-assertion)
    |
    = help: Break down assertion into multiple parts
 
@@ -322,36 +322,36 @@ PT018.py:45:1: PT018 [*] Assertion should be broken down into multiple parts
 47 48 | 
 48 49 | def test_multiline():
 
-PT018.py:49:5: PT018 Assertion should be broken down into multiple parts
+PT018.py:49:5: PT018 (pytest-composite-assertion) Assertion should be broken down into multiple parts
    |
 48 | def test_multiline():
 49 |     assert something and something_else; x = 1
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT018
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT018 (pytest-composite-assertion)
 50 | 
 51 |     x = 1; assert something and something_else
    |
    = help: Break down assertion into multiple parts
 
-PT018.py:51:12: PT018 Assertion should be broken down into multiple parts
+PT018.py:51:12: PT018 (pytest-composite-assertion) Assertion should be broken down into multiple parts
    |
 49 |     assert something and something_else; x = 1
 50 | 
 51 |     x = 1; assert something and something_else
-   |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT018
+   |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT018 (pytest-composite-assertion)
 52 | 
 53 |     x = 1; \
    |
    = help: Break down assertion into multiple parts
 
-PT018.py:54:9: PT018 Assertion should be broken down into multiple parts
+PT018.py:54:9: PT018 (pytest-composite-assertion) Assertion should be broken down into multiple parts
    |
 53 |     x = 1; \
 54 |         assert something and something_else
-   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT018
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT018 (pytest-composite-assertion)
    |
    = help: Break down assertion into multiple parts
 
-PT018.py:59:5: PT018 [*] Assertion should be broken down into multiple parts
+PT018.py:59:5: PT018 (pytest-composite-assertion) [*] Assertion should be broken down into multiple parts
    |
 57 |   # Regression test for: https://github.com/astral-sh/ruff/issues/7143
 58 |   def test_parenthesized_not():
@@ -361,7 +361,7 @@ PT018.py:59:5: PT018 [*] Assertion should be broken down into multiple parts
 61 | |         or self.find_graph_input(node.input[0])
 62 | |         or self.find_graph_output(node.input[0])
 63 | |     )
-   | |_____^ PT018
+   | |_____^ PT018 (pytest-composite-assertion)
 64 |   
 65 |       assert (not (
    |
@@ -380,7 +380,7 @@ PT018.py:59:5: PT018 [*] Assertion should be broken down into multiple parts
 65 67 |     assert (not (
 66 68 |         self.find_graph_output(node.output[0])
 
-PT018.py:65:5: PT018 [*] Assertion should be broken down into multiple parts
+PT018.py:65:5: PT018 (pytest-composite-assertion) [*] Assertion should be broken down into multiple parts
    |
 63 |       )
 64 |   
@@ -390,7 +390,7 @@ PT018.py:65:5: PT018 [*] Assertion should be broken down into multiple parts
 67 | |         or self.find_graph_input(node.input[0])
 68 | |         or self.find_graph_output(node.input[0])
 69 | |     ))
-   | |______^ PT018
+   | |______^ PT018 (pytest-composite-assertion)
 70 |   
 71 |       assert (not self.find_graph_output(node.output[0]) or
    |

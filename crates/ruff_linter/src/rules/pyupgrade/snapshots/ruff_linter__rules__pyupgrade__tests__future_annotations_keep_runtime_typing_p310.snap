@@ -1,10 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 ---
-future_annotations.py:34:18: UP006 [*] Use `list` instead of `List` for type annotation
+future_annotations.py:34:18: UP006 (non-pep585-annotation) [*] Use `list` instead of `List` for type annotation
    |
 34 | def f(x: int) -> List[int]:
-   |                  ^^^^ UP006
+   |                  ^^^^ UP006 (non-pep585-annotation)
 35 |     y = List[int]()
 36 |     y.append(x)
    |
@@ -20,11 +20,11 @@ future_annotations.py:34:18: UP006 [*] Use `list` instead of `List` for type ann
 36 36 |     y.append(x)
 37 37 |     return y
 
-future_annotations.py:35:9: UP006 [*] Use `list` instead of `List` for type annotation
+future_annotations.py:35:9: UP006 (non-pep585-annotation) [*] Use `list` instead of `List` for type annotation
    |
 34 | def f(x: int) -> List[int]:
 35 |     y = List[int]()
-   |         ^^^^ UP006
+   |         ^^^^ UP006 (non-pep585-annotation)
 36 |     y.append(x)
 37 |     return y
    |
@@ -40,12 +40,12 @@ future_annotations.py:35:9: UP006 [*] Use `list` instead of `List` for type anno
 37 37 |     return y
 38 38 | 
 
-future_annotations.py:42:27: UP006 [*] Use `list` instead of `List` for type annotation
+future_annotations.py:42:27: UP006 (non-pep585-annotation) [*] Use `list` instead of `List` for type annotation
    |
 40 | x: Optional[int] = None
 41 | 
 42 | MyList: TypeAlias = Union[List[int], List[str]]
-   |                           ^^^^ UP006
+   |                           ^^^^ UP006 (non-pep585-annotation)
    |
    = help: Replace with `list`
 
@@ -56,12 +56,12 @@ future_annotations.py:42:27: UP006 [*] Use `list` instead of `List` for type ann
 42    |-MyList: TypeAlias = Union[List[int], List[str]]
    42 |+MyList: TypeAlias = Union[list[int], List[str]]
 
-future_annotations.py:42:38: UP006 [*] Use `list` instead of `List` for type annotation
+future_annotations.py:42:38: UP006 (non-pep585-annotation) [*] Use `list` instead of `List` for type annotation
    |
 40 | x: Optional[int] = None
 41 | 
 42 | MyList: TypeAlias = Union[List[int], List[str]]
-   |                                      ^^^^ UP006
+   |                                      ^^^^ UP006 (non-pep585-annotation)
    |
    = help: Replace with `list`
 
@@ -71,5 +71,3 @@ future_annotations.py:42:38: UP006 [*] Use `list` instead of `List` for type ann
 41 41 | 
 42    |-MyList: TypeAlias = Union[List[int], List[str]]
    42 |+MyList: TypeAlias = Union[List[int], list[str]]
-
-

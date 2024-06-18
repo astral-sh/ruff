@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
 ---
-unicode.py:1:1: I001 [*] Import block is un-sorted or un-formatted
+unicode.py:1:1: I001 (unsorted-imports) [*] Import block is un-sorted or un-formatted
   |
 1 | / from astropy.constants import hbar as ℏ
 2 | | from numpy import pi as π
@@ -9,7 +9,7 @@ unicode.py:1:1: I001 [*] Import block is un-sorted or un-formatted
 4 | | import numpy as CƐgHHHhIILlNZΩZKÅBCeEFio
 5 | | 
 6 | | h = 2 * π * ℏ
-  | |_^ I001
+  | |_^ I001 (unsorted-imports)
   |
   = help: Organize imports
 

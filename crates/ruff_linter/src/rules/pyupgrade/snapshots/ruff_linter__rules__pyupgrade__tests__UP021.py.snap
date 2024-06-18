@@ -1,11 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 ---
-UP021.py:5:25: UP021 [*] `universal_newlines` is deprecated, use `text`
+UP021.py:5:25: UP021 (replace-universal-newlines) [*] `universal_newlines` is deprecated, use `text`
   |
 4 | # Errors
 5 | subprocess.run(["foo"], universal_newlines=True, check=True)
-  |                         ^^^^^^^^^^^^^^^^^^ UP021
+  |                         ^^^^^^^^^^^^^^^^^^ UP021 (replace-universal-newlines)
 6 | subprocess.run(["foo"], universal_newlines=True, text=True)
 7 | run(["foo"], universal_newlines=True, check=False)
   |
@@ -21,12 +21,12 @@ UP021.py:5:25: UP021 [*] `universal_newlines` is deprecated, use `text`
 7 7 | run(["foo"], universal_newlines=True, check=False)
 8 8 | 
 
-UP021.py:6:25: UP021 [*] `universal_newlines` is deprecated, use `text`
+UP021.py:6:25: UP021 (replace-universal-newlines) [*] `universal_newlines` is deprecated, use `text`
   |
 4 | # Errors
 5 | subprocess.run(["foo"], universal_newlines=True, check=True)
 6 | subprocess.run(["foo"], universal_newlines=True, text=True)
-  |                         ^^^^^^^^^^^^^^^^^^ UP021
+  |                         ^^^^^^^^^^^^^^^^^^ UP021 (replace-universal-newlines)
 7 | run(["foo"], universal_newlines=True, check=False)
   |
   = help: Replace with `text` keyword argument
@@ -41,12 +41,12 @@ UP021.py:6:25: UP021 [*] `universal_newlines` is deprecated, use `text`
 8 8 | 
 9 9 | # OK
 
-UP021.py:7:14: UP021 [*] `universal_newlines` is deprecated, use `text`
+UP021.py:7:14: UP021 (replace-universal-newlines) [*] `universal_newlines` is deprecated, use `text`
   |
 5 | subprocess.run(["foo"], universal_newlines=True, check=True)
 6 | subprocess.run(["foo"], universal_newlines=True, text=True)
 7 | run(["foo"], universal_newlines=True, check=False)
-  |              ^^^^^^^^^^^^^^^^^^ UP021
+  |              ^^^^^^^^^^^^^^^^^^ UP021 (replace-universal-newlines)
 8 | 
 9 | # OK
   |
@@ -61,5 +61,3 @@ UP021.py:7:14: UP021 [*] `universal_newlines` is deprecated, use `text`
 8 8 | 
 9 9 | # OK
 10 10 | subprocess.run(["foo"], check=True)
-
-

@@ -1,93 +1,91 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-comparison_of_constant.py:3:4: PLR0133 Two constants compared in a comparison, consider replacing `100 == 100`
+comparison_of_constant.py:3:4: PLR0133 (comparison-of-constant) Two constants compared in a comparison, consider replacing `100 == 100`
   |
 1 | """Check that magic values are not used in comparisons"""
 2 | 
 3 | if 100 == 100: # [comparison-of-constants]
-  |    ^^^ PLR0133
+  |    ^^^ PLR0133 (comparison-of-constant)
 4 |     pass
   |
 
-comparison_of_constant.py:6:4: PLR0133 Two constants compared in a comparison, consider replacing `1 == 3`
+comparison_of_constant.py:6:4: PLR0133 (comparison-of-constant) Two constants compared in a comparison, consider replacing `1 == 3`
   |
 4 |     pass
 5 | 
 6 | if 1 == 3: # [comparison-of-constants]
-  |    ^ PLR0133
+  |    ^ PLR0133 (comparison-of-constant)
 7 |     pass
   |
 
-comparison_of_constant.py:9:4: PLR0133 Two constants compared in a comparison, consider replacing `1 != 3`
+comparison_of_constant.py:9:4: PLR0133 (comparison-of-constant) Two constants compared in a comparison, consider replacing `1 != 3`
    |
  7 |     pass
  8 | 
  9 | if 1 != 3: # [comparison-of-constants]
-   |    ^ PLR0133
+   |    ^ PLR0133 (comparison-of-constant)
 10 |     pass
    |
 
-comparison_of_constant.py:13:4: PLR0133 Two constants compared in a comparison, consider replacing `4 == 3`
+comparison_of_constant.py:13:4: PLR0133 (comparison-of-constant) Two constants compared in a comparison, consider replacing `4 == 3`
    |
 12 | x = 0
 13 | if 4 == 3 == x: # [comparison-of-constants]
-   |    ^ PLR0133
+   |    ^ PLR0133 (comparison-of-constant)
 14 |     pass
    |
 
-comparison_of_constant.py:23:4: PLR0133 Two constants compared in a comparison, consider replacing `1 > 0`
+comparison_of_constant.py:23:4: PLR0133 (comparison-of-constant) Two constants compared in a comparison, consider replacing `1 > 0`
    |
 21 |     pass
 22 | 
 23 | if 1 > 0: # [comparison-of-constants]
-   |    ^ PLR0133
+   |    ^ PLR0133 (comparison-of-constant)
 24 |     pass
    |
 
-comparison_of_constant.py:29:4: PLR0133 Two constants compared in a comparison, consider replacing `1 >= 0`
+comparison_of_constant.py:29:4: PLR0133 (comparison-of-constant) Two constants compared in a comparison, consider replacing `1 >= 0`
    |
 27 |     pass
 28 | 
 29 | if 1 >= 0: # [comparison-of-constants]
-   |    ^ PLR0133
+   |    ^ PLR0133 (comparison-of-constant)
 30 |     pass
    |
 
-comparison_of_constant.py:35:4: PLR0133 Two constants compared in a comparison, consider replacing `1 < 0`
+comparison_of_constant.py:35:4: PLR0133 (comparison-of-constant) Two constants compared in a comparison, consider replacing `1 < 0`
    |
 33 |     pass
 34 | 
 35 | if 1 < 0: # [comparison-of-constants]
-   |    ^ PLR0133
+   |    ^ PLR0133 (comparison-of-constant)
 36 |     pass
    |
 
-comparison_of_constant.py:41:4: PLR0133 Two constants compared in a comparison, consider replacing `1 <= 0`
+comparison_of_constant.py:41:4: PLR0133 (comparison-of-constant) Two constants compared in a comparison, consider replacing `1 <= 0`
    |
 39 |     pass
 40 | 
 41 | if 1 <= 0: # [comparison-of-constants]
-   |    ^ PLR0133
+   |    ^ PLR0133 (comparison-of-constant)
 42 |     pass
    |
 
-comparison_of_constant.py:51:4: PLR0133 Two constants compared in a comparison, consider replacing `"hello" == ""`
+comparison_of_constant.py:51:4: PLR0133 (comparison-of-constant) Two constants compared in a comparison, consider replacing `"hello" == ""`
    |
 49 |     pass
 50 | 
 51 | if "hello" == "": # [comparison-of-constants]
-   |    ^^^^^^^ PLR0133
+   |    ^^^^^^^ PLR0133 (comparison-of-constant)
 52 |     pass
    |
 
-comparison_of_constant.py:58:4: PLR0133 Two constants compared in a comparison, consider replacing `True == False`
+comparison_of_constant.py:58:4: PLR0133 (comparison-of-constant) Two constants compared in a comparison, consider replacing `True == False`
    |
 56 |     pass
 57 | 
 58 | if True == False: # [comparison-of-constants]
-   |    ^^^^ PLR0133
+   |    ^^^^ PLR0133 (comparison-of-constant)
 59 |     pass
    |
-
-

@@ -1,11 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 ---
-UP013.py:5:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class syntax
+UP013.py:5:1: UP013 (convert-typed-dict-functional-to-class) [*] Convert `MyType` from `TypedDict` functional to class syntax
   |
 4 | # dict literal
 5 | MyType = TypedDict("MyType", {"a": int, "b": str})
-  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP013
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP013 (convert-typed-dict-functional-to-class)
 6 | 
 7 | # dict call
   |
@@ -23,11 +23,11 @@ UP013.py:5:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class sy
 7 9 | # dict call
 8 10 | MyType = TypedDict("MyType", dict(a=int, b=str))
 
-UP013.py:8:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class syntax
+UP013.py:8:1: UP013 (convert-typed-dict-functional-to-class) [*] Convert `MyType` from `TypedDict` functional to class syntax
    |
  7 | # dict call
  8 | MyType = TypedDict("MyType", dict(a=int, b=str))
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP013
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP013 (convert-typed-dict-functional-to-class)
  9 | 
 10 | # kwargs
    |
@@ -45,11 +45,11 @@ UP013.py:8:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class sy
 10 12 | # kwargs
 11 13 | MyType = TypedDict("MyType", a=int, b=str)
 
-UP013.py:11:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class syntax
+UP013.py:11:1: UP013 (convert-typed-dict-functional-to-class) [*] Convert `MyType` from `TypedDict` functional to class syntax
    |
 10 | # kwargs
 11 | MyType = TypedDict("MyType", a=int, b=str)
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP013
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP013 (convert-typed-dict-functional-to-class)
 12 | 
 13 | # Empty TypedDict
    |
@@ -67,11 +67,11 @@ UP013.py:11:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class s
 13 15 | # Empty TypedDict
 14 16 | MyType = TypedDict("MyType")
 
-UP013.py:14:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class syntax
+UP013.py:14:1: UP013 (convert-typed-dict-functional-to-class) [*] Convert `MyType` from `TypedDict` functional to class syntax
    |
 13 | # Empty TypedDict
 14 | MyType = TypedDict("MyType")
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP013
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP013 (convert-typed-dict-functional-to-class)
 15 | 
 16 | # Literal values
    |
@@ -88,11 +88,11 @@ UP013.py:14:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class s
 16 17 | # Literal values
 17 18 | MyType = TypedDict("MyType", {"a": "hello"})
 
-UP013.py:17:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class syntax
+UP013.py:17:1: UP013 (convert-typed-dict-functional-to-class) [*] Convert `MyType` from `TypedDict` functional to class syntax
    |
 16 | # Literal values
 17 | MyType = TypedDict("MyType", {"a": "hello"})
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP013
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP013 (convert-typed-dict-functional-to-class)
 18 | MyType = TypedDict("MyType", a="hello")
    |
    = help: Convert `MyType` to class syntax
@@ -108,12 +108,12 @@ UP013.py:17:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class s
 19 20 | 
 20 21 | # NotRequired
 
-UP013.py:18:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class syntax
+UP013.py:18:1: UP013 (convert-typed-dict-functional-to-class) [*] Convert `MyType` from `TypedDict` functional to class syntax
    |
 16 | # Literal values
 17 | MyType = TypedDict("MyType", {"a": "hello"})
 18 | MyType = TypedDict("MyType", a="hello")
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP013
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP013 (convert-typed-dict-functional-to-class)
 19 | 
 20 | # NotRequired
    |
@@ -130,11 +130,11 @@ UP013.py:18:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class s
 20 21 | # NotRequired
 21 22 | MyType = TypedDict("MyType", {"a": NotRequired[dict]})
 
-UP013.py:21:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class syntax
+UP013.py:21:1: UP013 (convert-typed-dict-functional-to-class) [*] Convert `MyType` from `TypedDict` functional to class syntax
    |
 20 | # NotRequired
 21 | MyType = TypedDict("MyType", {"a": NotRequired[dict]})
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP013
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP013 (convert-typed-dict-functional-to-class)
 22 | 
 23 | # total
    |
@@ -151,11 +151,11 @@ UP013.py:21:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class s
 23 24 | # total
 24 25 | MyType = TypedDict("MyType", {"x": int, "y": int}, total=False)
 
-UP013.py:24:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class syntax
+UP013.py:24:1: UP013 (convert-typed-dict-functional-to-class) [*] Convert `MyType` from `TypedDict` functional to class syntax
    |
 23 | # total
 24 | MyType = TypedDict("MyType", {"x": int, "y": int}, total=False)
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP013
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP013 (convert-typed-dict-functional-to-class)
 25 | 
 26 | # using Literal type
    |
@@ -173,11 +173,11 @@ UP013.py:24:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class s
 26 28 | # using Literal type
 27 29 | MyType = TypedDict("MyType", {"key": Literal["value"]})
 
-UP013.py:27:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class syntax
+UP013.py:27:1: UP013 (convert-typed-dict-functional-to-class) [*] Convert `MyType` from `TypedDict` functional to class syntax
    |
 26 | # using Literal type
 27 | MyType = TypedDict("MyType", {"key": Literal["value"]})
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP013
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP013 (convert-typed-dict-functional-to-class)
 28 | 
 29 | # using namespace TypedDict
    |
@@ -194,11 +194,11 @@ UP013.py:27:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class s
 29 30 | # using namespace TypedDict
 30 31 | MyType = typing.TypedDict("MyType", {"key": int})
 
-UP013.py:30:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class syntax
+UP013.py:30:1: UP013 (convert-typed-dict-functional-to-class) [*] Convert `MyType` from `TypedDict` functional to class syntax
    |
 29 | # using namespace TypedDict
 30 | MyType = typing.TypedDict("MyType", {"key": int})
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP013
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP013 (convert-typed-dict-functional-to-class)
 31 | 
 32 | # invalid identifiers (OK)
    |
@@ -215,11 +215,11 @@ UP013.py:30:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class s
 32 33 | # invalid identifiers (OK)
 33 34 | MyType = TypedDict("MyType", {"in": int, "x-y": int})
 
-UP013.py:40:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class syntax
+UP013.py:40:1: UP013 (convert-typed-dict-functional-to-class) [*] Convert `MyType` from `TypedDict` functional to class syntax
    |
 39 | # Empty dict literal
 40 | MyType = TypedDict("MyType", {})
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP013
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP013 (convert-typed-dict-functional-to-class)
 41 | 
 42 | # Empty dict call
    |
@@ -236,11 +236,11 @@ UP013.py:40:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class s
 42 43 | # Empty dict call
 43 44 | MyType = TypedDict("MyType", dict())
 
-UP013.py:43:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class syntax
+UP013.py:43:1: UP013 (convert-typed-dict-functional-to-class) [*] Convert `MyType` from `TypedDict` functional to class syntax
    |
 42 | # Empty dict call
 43 | MyType = TypedDict("MyType", dict())
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP013
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP013 (convert-typed-dict-functional-to-class)
    |
    = help: Convert `MyType` to class syntax
 
@@ -251,5 +251,3 @@ UP013.py:43:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class s
 43    |-MyType = TypedDict("MyType", dict())
    43 |+class MyType(TypedDict):
    44 |+    pass
-
-

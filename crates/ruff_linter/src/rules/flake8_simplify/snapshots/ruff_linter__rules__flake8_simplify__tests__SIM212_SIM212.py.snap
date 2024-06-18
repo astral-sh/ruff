@@ -1,10 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_simplify/mod.rs
 ---
-SIM212.py:1:5: SIM212 [*] Use `a if a else b` instead of `b if not a else a`
+SIM212.py:1:5: SIM212 (if-expr-with-twisted-arms) [*] Use `a if a else b` instead of `b if not a else a`
   |
 1 | c = b if not a else a  # SIM212
-  |     ^^^^^^^^^^^^^^^^^ SIM212
+  |     ^^^^^^^^^^^^^^^^^ SIM212 (if-expr-with-twisted-arms)
 2 | 
 3 | c = b + c if not a else a  # SIM212
   |
@@ -17,12 +17,12 @@ SIM212.py:1:5: SIM212 [*] Use `a if a else b` instead of `b if not a else a`
 3 3 | c = b + c if not a else a  # SIM212
 4 4 | 
 
-SIM212.py:3:5: SIM212 [*] Use `a if a else b + c` instead of `b + c if not a else a`
+SIM212.py:3:5: SIM212 (if-expr-with-twisted-arms) [*] Use `a if a else b + c` instead of `b + c if not a else a`
   |
 1 | c = b if not a else a  # SIM212
 2 | 
 3 | c = b + c if not a else a  # SIM212
-  |     ^^^^^^^^^^^^^^^^^^^^^ SIM212
+  |     ^^^^^^^^^^^^^^^^^^^^^ SIM212 (if-expr-with-twisted-arms)
 4 | 
 5 | c = b if not x else a  # OK
   |
@@ -35,6 +35,4 @@ SIM212.py:3:5: SIM212 [*] Use `a if a else b + c` instead of `b + c if not a els
   3 |+c = a if a else b + c  # SIM212
 4 4 | 
 5 5 | c = b if not x else a  # OK
-6 6 | 
-
-
+6 6 |

@@ -1,11 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 ---
-UP035.py:2:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
+UP035.py:2:1: UP035 (deprecated-import) [*] Import from `collections.abc` instead: `Mapping`
   |
 1 | # UP035
 2 | from collections import Mapping
-  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035 (deprecated-import)
 3 | 
 4 | from collections import Mapping as MAP
   |
@@ -19,12 +19,12 @@ UP035.py:2:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
 4 4 | from collections import Mapping as MAP
 5 5 | 
 
-UP035.py:4:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
+UP035.py:4:1: UP035 (deprecated-import) [*] Import from `collections.abc` instead: `Mapping`
   |
 2 | from collections import Mapping
 3 | 
 4 | from collections import Mapping as MAP
-  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035 (deprecated-import)
 5 | 
 6 | from collections import Mapping, Sequence
   |
@@ -40,12 +40,12 @@ UP035.py:4:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
 6 6 | from collections import Mapping, Sequence
 7 7 | 
 
-UP035.py:6:1: UP035 [*] Import from `collections.abc` instead: `Mapping`, `Sequence`
+UP035.py:6:1: UP035 (deprecated-import) [*] Import from `collections.abc` instead: `Mapping`, `Sequence`
   |
 4 | from collections import Mapping as MAP
 5 | 
 6 | from collections import Mapping, Sequence
-  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035 (deprecated-import)
 7 | 
 8 | from collections import Counter, Mapping
   |
@@ -61,12 +61,12 @@ UP035.py:6:1: UP035 [*] Import from `collections.abc` instead: `Mapping`, `Seque
 8 8 | from collections import Counter, Mapping
 9 9 | 
 
-UP035.py:8:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
+UP035.py:8:1: UP035 (deprecated-import) [*] Import from `collections.abc` instead: `Mapping`
    |
  6 | from collections import Mapping, Sequence
  7 | 
  8 | from collections import Counter, Mapping
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035 (deprecated-import)
  9 | 
 10 | from collections import (Counter, Mapping)
    |
@@ -83,12 +83,12 @@ UP035.py:8:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
 10 11 | from collections import (Counter, Mapping)
 11 12 | 
 
-UP035.py:10:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
+UP035.py:10:1: UP035 (deprecated-import) [*] Import from `collections.abc` instead: `Mapping`
    |
  8 | from collections import Counter, Mapping
  9 | 
 10 | from collections import (Counter, Mapping)
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035 (deprecated-import)
 11 | 
 12 | from collections import (Counter,
    |
@@ -105,13 +105,13 @@ UP035.py:10:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
 12 13 | from collections import (Counter,
 13 14 |                          Mapping)
 
-UP035.py:12:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
+UP035.py:12:1: UP035 (deprecated-import) [*] Import from `collections.abc` instead: `Mapping`
    |
 10 |   from collections import (Counter, Mapping)
 11 |   
 12 | / from collections import (Counter,
 13 | |                          Mapping)
-   | |_________________________________^ UP035
+   | |_________________________________^ UP035 (deprecated-import)
 14 |   
 15 |   from collections import Counter, \
    |
@@ -129,13 +129,13 @@ UP035.py:12:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
 15 15 | from collections import Counter, \
 16 16 |                          Mapping
 
-UP035.py:15:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
+UP035.py:15:1: UP035 (deprecated-import) [*] Import from `collections.abc` instead: `Mapping`
    |
 13 |                            Mapping)
 14 |   
 15 | / from collections import Counter, \
 16 | |                          Mapping
-   | |________________________________^ UP035
+   | |________________________________^ UP035 (deprecated-import)
 17 |   
 18 |   from collections import Counter, Mapping, Sequence
    |
@@ -153,12 +153,12 @@ UP035.py:15:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
 18 18 | from collections import Counter, Mapping, Sequence
 19 19 | 
 
-UP035.py:18:1: UP035 [*] Import from `collections.abc` instead: `Mapping`, `Sequence`
+UP035.py:18:1: UP035 (deprecated-import) [*] Import from `collections.abc` instead: `Mapping`, `Sequence`
    |
 16 |                          Mapping
 17 | 
 18 | from collections import Counter, Mapping, Sequence
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035 (deprecated-import)
 19 | 
 20 | from collections import Mapping as mapping, Counter
    |
@@ -175,12 +175,12 @@ UP035.py:18:1: UP035 [*] Import from `collections.abc` instead: `Mapping`, `Sequ
 20 21 | from collections import Mapping as mapping, Counter
 21 22 | 
 
-UP035.py:20:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
+UP035.py:20:1: UP035 (deprecated-import) [*] Import from `collections.abc` instead: `Mapping`
    |
 18 | from collections import Counter, Mapping, Sequence
 19 | 
 20 | from collections import Mapping as mapping, Counter
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035 (deprecated-import)
 21 | 
 22 | if True:
    |
@@ -197,11 +197,11 @@ UP035.py:20:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
 22 23 | if True:
 23 24 |     from collections import Mapping, Counter
 
-UP035.py:23:5: UP035 [*] Import from `collections.abc` instead: `Mapping`
+UP035.py:23:5: UP035 (deprecated-import) [*] Import from `collections.abc` instead: `Mapping`
    |
 22 | if True:
 23 |     from collections import Mapping, Counter
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035 (deprecated-import)
 24 | 
 25 | if True:
    |
@@ -218,12 +218,12 @@ UP035.py:23:5: UP035 [*] Import from `collections.abc` instead: `Mapping`
 25 26 | if True:
 26 27 |     if True:
 
-UP035.py:28:5: UP035 [*] Import from `collections.abc` instead: `Mapping`
+UP035.py:28:5: UP035 (deprecated-import) [*] Import from `collections.abc` instead: `Mapping`
    |
 26 |     if True:
 27 |         pass
 28 |     from collections import Mapping, Counter
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035 (deprecated-import)
 29 | 
 30 | if True: from collections import Mapping
    |
@@ -240,12 +240,12 @@ UP035.py:28:5: UP035 [*] Import from `collections.abc` instead: `Mapping`
 30 31 | if True: from collections import Mapping
 31 32 | 
 
-UP035.py:30:10: UP035 [*] Import from `collections.abc` instead: `Mapping`
+UP035.py:30:10: UP035 (deprecated-import) [*] Import from `collections.abc` instead: `Mapping`
    |
 28 |     from collections import Mapping, Counter
 29 | 
 30 | if True: from collections import Mapping
-   |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+   |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035 (deprecated-import)
 31 | 
 32 | import os
    |
@@ -261,11 +261,11 @@ UP035.py:30:10: UP035 [*] Import from `collections.abc` instead: `Mapping`
 32 32 | import os
 33 33 | from collections import Counter, Mapping
 
-UP035.py:33:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
+UP035.py:33:1: UP035 (deprecated-import) [*] Import from `collections.abc` instead: `Mapping`
    |
 32 | import os
 33 | from collections import Counter, Mapping
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035 (deprecated-import)
 34 | import sys
    |
    = help: Import from `collections.abc`
@@ -281,7 +281,7 @@ UP035.py:33:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
 35 36 | 
 36 37 | if True:
 
-UP035.py:37:5: UP035 [*] Import from `collections.abc` instead: `Mapping`, `Callable`
+UP035.py:37:5: UP035 (deprecated-import) [*] Import from `collections.abc` instead: `Mapping`, `Callable`
    |
 36 |   if True:
 37 |       from collections import (
@@ -291,7 +291,7 @@ UP035.py:37:5: UP035 [*] Import from `collections.abc` instead: `Mapping`, `Call
 40 | |         Bad,
 41 | |         Good,
 42 | |     )
-   | |_____^ UP035
+   | |_____^ UP035 (deprecated-import)
 43 |   
 44 |   from typing import Callable, Match, Pattern, List, OrderedDict, AbstractSet, ContextManager
    |
@@ -311,12 +311,12 @@ UP035.py:37:5: UP035 [*] Import from `collections.abc` instead: `Mapping`, `Call
 44 43 | from typing import Callable, Match, Pattern, List, OrderedDict, AbstractSet, ContextManager
 45 44 | 
 
-UP035.py:44:1: UP035 [*] Import from `collections.abc` instead: `Callable`
+UP035.py:44:1: UP035 (deprecated-import) [*] Import from `collections.abc` instead: `Callable`
    |
 42 |     )
 43 | 
 44 | from typing import Callable, Match, Pattern, List, OrderedDict, AbstractSet, ContextManager
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035 (deprecated-import)
 45 | 
 46 | if True: from collections import (
    |
@@ -333,12 +333,12 @@ UP035.py:44:1: UP035 [*] Import from `collections.abc` instead: `Callable`
 46 47 | if True: from collections import (
 47 48 |     Mapping, Counter)
 
-UP035.py:44:1: UP035 [*] Import from `collections` instead: `OrderedDict`
+UP035.py:44:1: UP035 (deprecated-import) [*] Import from `collections` instead: `OrderedDict`
    |
 42 |     )
 43 | 
 44 | from typing import Callable, Match, Pattern, List, OrderedDict, AbstractSet, ContextManager
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035 (deprecated-import)
 45 | 
 46 | if True: from collections import (
    |
@@ -355,12 +355,12 @@ UP035.py:44:1: UP035 [*] Import from `collections` instead: `OrderedDict`
 46 47 | if True: from collections import (
 47 48 |     Mapping, Counter)
 
-UP035.py:44:1: UP035 [*] Import from `re` instead: `Match`, `Pattern`
+UP035.py:44:1: UP035 (deprecated-import) [*] Import from `re` instead: `Match`, `Pattern`
    |
 42 |     )
 43 | 
 44 | from typing import Callable, Match, Pattern, List, OrderedDict, AbstractSet, ContextManager
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035 (deprecated-import)
 45 | 
 46 | if True: from collections import (
    |
@@ -377,64 +377,64 @@ UP035.py:44:1: UP035 [*] Import from `re` instead: `Match`, `Pattern`
 46 47 | if True: from collections import (
 47 48 |     Mapping, Counter)
 
-UP035.py:44:1: UP035 `typing.List` is deprecated, use `list` instead
+UP035.py:44:1: UP035 (deprecated-import) `typing.List` is deprecated, use `list` instead
    |
 42 |     )
 43 | 
 44 | from typing import Callable, Match, Pattern, List, OrderedDict, AbstractSet, ContextManager
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035 (deprecated-import)
 45 | 
 46 | if True: from collections import (
    |
 
-UP035.py:44:1: UP035 `typing.AbstractSet` is deprecated, use `collections.abc.Set` instead
+UP035.py:44:1: UP035 (deprecated-import) `typing.AbstractSet` is deprecated, use `collections.abc.Set` instead
    |
 42 |     )
 43 | 
 44 | from typing import Callable, Match, Pattern, List, OrderedDict, AbstractSet, ContextManager
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035 (deprecated-import)
 45 | 
 46 | if True: from collections import (
    |
 
-UP035.py:44:1: UP035 `typing.ContextManager` is deprecated, use `contextlib.AbstractContextManager` instead
+UP035.py:44:1: UP035 (deprecated-import) `typing.ContextManager` is deprecated, use `contextlib.AbstractContextManager` instead
    |
 42 |     )
 43 | 
 44 | from typing import Callable, Match, Pattern, List, OrderedDict, AbstractSet, ContextManager
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035 (deprecated-import)
 45 | 
 46 | if True: from collections import (
    |
 
-UP035.py:46:10: UP035 Import from `collections.abc` instead: `Mapping`
+UP035.py:46:10: UP035 (deprecated-import) Import from `collections.abc` instead: `Mapping`
    |
 44 |   from typing import Callable, Match, Pattern, List, OrderedDict, AbstractSet, ContextManager
 45 |   
 46 |   if True: from collections import (
    |  __________^
 47 | |     Mapping, Counter)
-   | |_____________________^ UP035
+   | |_____________________^ UP035 (deprecated-import)
 48 |   
 49 |   # Bad imports from PYI027 that are now handled by PYI022 (UP035)
    |
    = help: Import from `collections.abc`
 
-UP035.py:50:1: UP035 `typing.ContextManager` is deprecated, use `contextlib.AbstractContextManager` instead
+UP035.py:50:1: UP035 (deprecated-import) `typing.ContextManager` is deprecated, use `contextlib.AbstractContextManager` instead
    |
 49 | # Bad imports from PYI027 that are now handled by PYI022 (UP035)
 50 | from typing import ContextManager
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035 (deprecated-import)
 51 | from typing import OrderedDict
 52 | from typing_extensions import OrderedDict
    |
 
-UP035.py:51:1: UP035 [*] Import from `collections` instead: `OrderedDict`
+UP035.py:51:1: UP035 (deprecated-import) [*] Import from `collections` instead: `OrderedDict`
    |
 49 | # Bad imports from PYI027 that are now handled by PYI022 (UP035)
 50 | from typing import ContextManager
 51 | from typing import OrderedDict
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035 (deprecated-import)
 52 | from typing_extensions import OrderedDict
 53 | from typing import Callable
    |
@@ -450,12 +450,12 @@ UP035.py:51:1: UP035 [*] Import from `collections` instead: `OrderedDict`
 53 53 | from typing import Callable
 54 54 | from typing import ByteString
 
-UP035.py:52:1: UP035 [*] Import from `typing` instead: `OrderedDict`
+UP035.py:52:1: UP035 (deprecated-import) [*] Import from `typing` instead: `OrderedDict`
    |
 50 | from typing import ContextManager
 51 | from typing import OrderedDict
 52 | from typing_extensions import OrderedDict
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035 (deprecated-import)
 53 | from typing import Callable
 54 | from typing import ByteString
    |
@@ -471,12 +471,12 @@ UP035.py:52:1: UP035 [*] Import from `typing` instead: `OrderedDict`
 54 54 | from typing import ByteString
 55 55 | from typing import Container
 
-UP035.py:53:1: UP035 [*] Import from `collections.abc` instead: `Callable`
+UP035.py:53:1: UP035 (deprecated-import) [*] Import from `collections.abc` instead: `Callable`
    |
 51 | from typing import OrderedDict
 52 | from typing_extensions import OrderedDict
 53 | from typing import Callable
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035 (deprecated-import)
 54 | from typing import ByteString
 55 | from typing import Container
    |
@@ -492,12 +492,12 @@ UP035.py:53:1: UP035 [*] Import from `collections.abc` instead: `Callable`
 55 55 | from typing import Container
 56 56 | from typing import Hashable
 
-UP035.py:54:1: UP035 [*] Import from `collections.abc` instead: `ByteString`
+UP035.py:54:1: UP035 (deprecated-import) [*] Import from `collections.abc` instead: `ByteString`
    |
 52 | from typing_extensions import OrderedDict
 53 | from typing import Callable
 54 | from typing import ByteString
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035 (deprecated-import)
 55 | from typing import Container
 56 | from typing import Hashable
    |
@@ -513,12 +513,12 @@ UP035.py:54:1: UP035 [*] Import from `collections.abc` instead: `ByteString`
 56 56 | from typing import Hashable
 57 57 | from typing import ItemsView
 
-UP035.py:55:1: UP035 [*] Import from `collections.abc` instead: `Container`
+UP035.py:55:1: UP035 (deprecated-import) [*] Import from `collections.abc` instead: `Container`
    |
 53 | from typing import Callable
 54 | from typing import ByteString
 55 | from typing import Container
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035 (deprecated-import)
 56 | from typing import Hashable
 57 | from typing import ItemsView
    |
@@ -534,12 +534,12 @@ UP035.py:55:1: UP035 [*] Import from `collections.abc` instead: `Container`
 57 57 | from typing import ItemsView
 58 58 | from typing import Iterable
 
-UP035.py:56:1: UP035 [*] Import from `collections.abc` instead: `Hashable`
+UP035.py:56:1: UP035 (deprecated-import) [*] Import from `collections.abc` instead: `Hashable`
    |
 54 | from typing import ByteString
 55 | from typing import Container
 56 | from typing import Hashable
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035 (deprecated-import)
 57 | from typing import ItemsView
 58 | from typing import Iterable
    |
@@ -555,12 +555,12 @@ UP035.py:56:1: UP035 [*] Import from `collections.abc` instead: `Hashable`
 58 58 | from typing import Iterable
 59 59 | from typing import Iterator
 
-UP035.py:57:1: UP035 [*] Import from `collections.abc` instead: `ItemsView`
+UP035.py:57:1: UP035 (deprecated-import) [*] Import from `collections.abc` instead: `ItemsView`
    |
 55 | from typing import Container
 56 | from typing import Hashable
 57 | from typing import ItemsView
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035 (deprecated-import)
 58 | from typing import Iterable
 59 | from typing import Iterator
    |
@@ -576,12 +576,12 @@ UP035.py:57:1: UP035 [*] Import from `collections.abc` instead: `ItemsView`
 59 59 | from typing import Iterator
 60 60 | from typing import KeysView
 
-UP035.py:58:1: UP035 [*] Import from `collections.abc` instead: `Iterable`
+UP035.py:58:1: UP035 (deprecated-import) [*] Import from `collections.abc` instead: `Iterable`
    |
 56 | from typing import Hashable
 57 | from typing import ItemsView
 58 | from typing import Iterable
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035 (deprecated-import)
 59 | from typing import Iterator
 60 | from typing import KeysView
    |
@@ -597,12 +597,12 @@ UP035.py:58:1: UP035 [*] Import from `collections.abc` instead: `Iterable`
 60 60 | from typing import KeysView
 61 61 | from typing import Mapping
 
-UP035.py:59:1: UP035 [*] Import from `collections.abc` instead: `Iterator`
+UP035.py:59:1: UP035 (deprecated-import) [*] Import from `collections.abc` instead: `Iterator`
    |
 57 | from typing import ItemsView
 58 | from typing import Iterable
 59 | from typing import Iterator
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035 (deprecated-import)
 60 | from typing import KeysView
 61 | from typing import Mapping
    |
@@ -618,12 +618,12 @@ UP035.py:59:1: UP035 [*] Import from `collections.abc` instead: `Iterator`
 61 61 | from typing import Mapping
 62 62 | from typing import MappingView
 
-UP035.py:60:1: UP035 [*] Import from `collections.abc` instead: `KeysView`
+UP035.py:60:1: UP035 (deprecated-import) [*] Import from `collections.abc` instead: `KeysView`
    |
 58 | from typing import Iterable
 59 | from typing import Iterator
 60 | from typing import KeysView
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035 (deprecated-import)
 61 | from typing import Mapping
 62 | from typing import MappingView
    |
@@ -639,12 +639,12 @@ UP035.py:60:1: UP035 [*] Import from `collections.abc` instead: `KeysView`
 62 62 | from typing import MappingView
 63 63 | from typing import MutableMapping
 
-UP035.py:61:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
+UP035.py:61:1: UP035 (deprecated-import) [*] Import from `collections.abc` instead: `Mapping`
    |
 59 | from typing import Iterator
 60 | from typing import KeysView
 61 | from typing import Mapping
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035 (deprecated-import)
 62 | from typing import MappingView
 63 | from typing import MutableMapping
    |
@@ -660,12 +660,12 @@ UP035.py:61:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
 63 63 | from typing import MutableMapping
 64 64 | from typing import MutableSequence
 
-UP035.py:62:1: UP035 [*] Import from `collections.abc` instead: `MappingView`
+UP035.py:62:1: UP035 (deprecated-import) [*] Import from `collections.abc` instead: `MappingView`
    |
 60 | from typing import KeysView
 61 | from typing import Mapping
 62 | from typing import MappingView
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035 (deprecated-import)
 63 | from typing import MutableMapping
 64 | from typing import MutableSequence
    |
@@ -681,12 +681,12 @@ UP035.py:62:1: UP035 [*] Import from `collections.abc` instead: `MappingView`
 64 64 | from typing import MutableSequence
 65 65 | from typing import MutableSet
 
-UP035.py:63:1: UP035 [*] Import from `collections.abc` instead: `MutableMapping`
+UP035.py:63:1: UP035 (deprecated-import) [*] Import from `collections.abc` instead: `MutableMapping`
    |
 61 | from typing import Mapping
 62 | from typing import MappingView
 63 | from typing import MutableMapping
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035 (deprecated-import)
 64 | from typing import MutableSequence
 65 | from typing import MutableSet
    |
@@ -702,12 +702,12 @@ UP035.py:63:1: UP035 [*] Import from `collections.abc` instead: `MutableMapping`
 65 65 | from typing import MutableSet
 66 66 | from typing import Sequence
 
-UP035.py:64:1: UP035 [*] Import from `collections.abc` instead: `MutableSequence`
+UP035.py:64:1: UP035 (deprecated-import) [*] Import from `collections.abc` instead: `MutableSequence`
    |
 62 | from typing import MappingView
 63 | from typing import MutableMapping
 64 | from typing import MutableSequence
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035 (deprecated-import)
 65 | from typing import MutableSet
 66 | from typing import Sequence
    |
@@ -723,12 +723,12 @@ UP035.py:64:1: UP035 [*] Import from `collections.abc` instead: `MutableSequence
 66 66 | from typing import Sequence
 67 67 | from typing import Sized
 
-UP035.py:65:1: UP035 [*] Import from `collections.abc` instead: `MutableSet`
+UP035.py:65:1: UP035 (deprecated-import) [*] Import from `collections.abc` instead: `MutableSet`
    |
 63 | from typing import MutableMapping
 64 | from typing import MutableSequence
 65 | from typing import MutableSet
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035 (deprecated-import)
 66 | from typing import Sequence
 67 | from typing import Sized
    |
@@ -744,12 +744,12 @@ UP035.py:65:1: UP035 [*] Import from `collections.abc` instead: `MutableSet`
 67 67 | from typing import Sized
 68 68 | from typing import ValuesView
 
-UP035.py:66:1: UP035 [*] Import from `collections.abc` instead: `Sequence`
+UP035.py:66:1: UP035 (deprecated-import) [*] Import from `collections.abc` instead: `Sequence`
    |
 64 | from typing import MutableSequence
 65 | from typing import MutableSet
 66 | from typing import Sequence
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035 (deprecated-import)
 67 | from typing import Sized
 68 | from typing import ValuesView
    |
@@ -765,12 +765,12 @@ UP035.py:66:1: UP035 [*] Import from `collections.abc` instead: `Sequence`
 68 68 | from typing import ValuesView
 69 69 | from typing import Awaitable
 
-UP035.py:67:1: UP035 [*] Import from `collections.abc` instead: `Sized`
+UP035.py:67:1: UP035 (deprecated-import) [*] Import from `collections.abc` instead: `Sized`
    |
 65 | from typing import MutableSet
 66 | from typing import Sequence
 67 | from typing import Sized
-   | ^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+   | ^^^^^^^^^^^^^^^^^^^^^^^^ UP035 (deprecated-import)
 68 | from typing import ValuesView
 69 | from typing import Awaitable
    |
@@ -786,12 +786,12 @@ UP035.py:67:1: UP035 [*] Import from `collections.abc` instead: `Sized`
 69 69 | from typing import Awaitable
 70 70 | from typing import AsyncIterator
 
-UP035.py:68:1: UP035 [*] Import from `collections.abc` instead: `ValuesView`
+UP035.py:68:1: UP035 (deprecated-import) [*] Import from `collections.abc` instead: `ValuesView`
    |
 66 | from typing import Sequence
 67 | from typing import Sized
 68 | from typing import ValuesView
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035 (deprecated-import)
 69 | from typing import Awaitable
 70 | from typing import AsyncIterator
    |
@@ -807,12 +807,12 @@ UP035.py:68:1: UP035 [*] Import from `collections.abc` instead: `ValuesView`
 70 70 | from typing import AsyncIterator
 71 71 | from typing import AsyncIterable
 
-UP035.py:69:1: UP035 [*] Import from `collections.abc` instead: `Awaitable`
+UP035.py:69:1: UP035 (deprecated-import) [*] Import from `collections.abc` instead: `Awaitable`
    |
 67 | from typing import Sized
 68 | from typing import ValuesView
 69 | from typing import Awaitable
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035 (deprecated-import)
 70 | from typing import AsyncIterator
 71 | from typing import AsyncIterable
    |
@@ -828,12 +828,12 @@ UP035.py:69:1: UP035 [*] Import from `collections.abc` instead: `Awaitable`
 71 71 | from typing import AsyncIterable
 72 72 | from typing import Coroutine
 
-UP035.py:70:1: UP035 [*] Import from `collections.abc` instead: `AsyncIterator`
+UP035.py:70:1: UP035 (deprecated-import) [*] Import from `collections.abc` instead: `AsyncIterator`
    |
 68 | from typing import ValuesView
 69 | from typing import Awaitable
 70 | from typing import AsyncIterator
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035 (deprecated-import)
 71 | from typing import AsyncIterable
 72 | from typing import Coroutine
    |
@@ -849,12 +849,12 @@ UP035.py:70:1: UP035 [*] Import from `collections.abc` instead: `AsyncIterator`
 72 72 | from typing import Coroutine
 73 73 | from typing import Collection
 
-UP035.py:71:1: UP035 [*] Import from `collections.abc` instead: `AsyncIterable`
+UP035.py:71:1: UP035 (deprecated-import) [*] Import from `collections.abc` instead: `AsyncIterable`
    |
 69 | from typing import Awaitable
 70 | from typing import AsyncIterator
 71 | from typing import AsyncIterable
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035 (deprecated-import)
 72 | from typing import Coroutine
 73 | from typing import Collection
    |
@@ -870,12 +870,12 @@ UP035.py:71:1: UP035 [*] Import from `collections.abc` instead: `AsyncIterable`
 73 73 | from typing import Collection
 74 74 | from typing import AsyncGenerator
 
-UP035.py:72:1: UP035 [*] Import from `collections.abc` instead: `Coroutine`
+UP035.py:72:1: UP035 (deprecated-import) [*] Import from `collections.abc` instead: `Coroutine`
    |
 70 | from typing import AsyncIterator
 71 | from typing import AsyncIterable
 72 | from typing import Coroutine
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035 (deprecated-import)
 73 | from typing import Collection
 74 | from typing import AsyncGenerator
    |
@@ -891,12 +891,12 @@ UP035.py:72:1: UP035 [*] Import from `collections.abc` instead: `Coroutine`
 74 74 | from typing import AsyncGenerator
 75 75 | from typing import Reversible
 
-UP035.py:73:1: UP035 [*] Import from `collections.abc` instead: `Collection`
+UP035.py:73:1: UP035 (deprecated-import) [*] Import from `collections.abc` instead: `Collection`
    |
 71 | from typing import AsyncIterable
 72 | from typing import Coroutine
 73 | from typing import Collection
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035 (deprecated-import)
 74 | from typing import AsyncGenerator
 75 | from typing import Reversible
    |
@@ -912,12 +912,12 @@ UP035.py:73:1: UP035 [*] Import from `collections.abc` instead: `Collection`
 75 75 | from typing import Reversible
 76 76 | from typing import Generator
 
-UP035.py:74:1: UP035 [*] Import from `collections.abc` instead: `AsyncGenerator`
+UP035.py:74:1: UP035 (deprecated-import) [*] Import from `collections.abc` instead: `AsyncGenerator`
    |
 72 | from typing import Coroutine
 73 | from typing import Collection
 74 | from typing import AsyncGenerator
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035 (deprecated-import)
 75 | from typing import Reversible
 76 | from typing import Generator
    |
@@ -933,12 +933,12 @@ UP035.py:74:1: UP035 [*] Import from `collections.abc` instead: `AsyncGenerator`
 76 76 | from typing import Generator
 77 77 | from typing import Callable
 
-UP035.py:75:1: UP035 [*] Import from `collections.abc` instead: `Reversible`
+UP035.py:75:1: UP035 (deprecated-import) [*] Import from `collections.abc` instead: `Reversible`
    |
 73 | from typing import Collection
 74 | from typing import AsyncGenerator
 75 | from typing import Reversible
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035 (deprecated-import)
 76 | from typing import Generator
 77 | from typing import Callable
    |
@@ -954,12 +954,12 @@ UP035.py:75:1: UP035 [*] Import from `collections.abc` instead: `Reversible`
 77 77 | from typing import Callable
 78 78 | from typing import cast
 
-UP035.py:76:1: UP035 [*] Import from `collections.abc` instead: `Generator`
+UP035.py:76:1: UP035 (deprecated-import) [*] Import from `collections.abc` instead: `Generator`
    |
 74 | from typing import AsyncGenerator
 75 | from typing import Reversible
 76 | from typing import Generator
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035 (deprecated-import)
 77 | from typing import Callable
 78 | from typing import cast
    |
@@ -975,12 +975,12 @@ UP035.py:76:1: UP035 [*] Import from `collections.abc` instead: `Generator`
 78 78 | from typing import cast
 79 79 | 
 
-UP035.py:77:1: UP035 [*] Import from `collections.abc` instead: `Callable`
+UP035.py:77:1: UP035 (deprecated-import) [*] Import from `collections.abc` instead: `Callable`
    |
 75 | from typing import Reversible
 76 | from typing import Generator
 77 | from typing import Callable
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035 (deprecated-import)
 78 | from typing import cast
    |
    = help: Import from `collections.abc`
@@ -995,11 +995,11 @@ UP035.py:77:1: UP035 [*] Import from `collections.abc` instead: `Callable`
 79 79 | 
 80 80 | # OK
 
-UP035.py:84:1: UP035 [*] Import from `typing` instead: `SupportsIndex`
+UP035.py:84:1: UP035 (deprecated-import) [*] Import from `typing` instead: `SupportsIndex`
    |
 83 | # UP035 on py312+ only
 84 | from typing_extensions import SupportsIndex
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035 (deprecated-import)
 85 | 
 86 | # UP035 on py312+ only
    |
@@ -1015,11 +1015,11 @@ UP035.py:84:1: UP035 [*] Import from `typing` instead: `SupportsIndex`
 86 86 | # UP035 on py312+ only
 87 87 | from typing_extensions import NamedTuple
 
-UP035.py:87:1: UP035 [*] Import from `typing` instead: `NamedTuple`
+UP035.py:87:1: UP035 (deprecated-import) [*] Import from `typing` instead: `NamedTuple`
    |
 86 | # UP035 on py312+ only
 87 | from typing_extensions import NamedTuple
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035 (deprecated-import)
 88 | 
 89 | # UP035 on py312+ only: `typing_extensions` supports `frozen_default` (backported from 3.12).
    |
@@ -1035,11 +1035,11 @@ UP035.py:87:1: UP035 [*] Import from `typing` instead: `NamedTuple`
 89 89 | # UP035 on py312+ only: `typing_extensions` supports `frozen_default` (backported from 3.12).
 90 90 | from typing_extensions import dataclass_transform
 
-UP035.py:90:1: UP035 [*] Import from `typing` instead: `dataclass_transform`
+UP035.py:90:1: UP035 (deprecated-import) [*] Import from `typing` instead: `dataclass_transform`
    |
 89 | # UP035 on py312+ only: `typing_extensions` supports `frozen_default` (backported from 3.12).
 90 | from typing_extensions import dataclass_transform
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035 (deprecated-import)
 91 | 
 92 | # UP035
    |
@@ -1055,11 +1055,11 @@ UP035.py:90:1: UP035 [*] Import from `typing` instead: `dataclass_transform`
 92 92 | # UP035
 93 93 | from backports.strenum import StrEnum
 
-UP035.py:93:1: UP035 [*] Import from `enum` instead: `StrEnum`
+UP035.py:93:1: UP035 (deprecated-import) [*] Import from `enum` instead: `StrEnum`
    |
 92 | # UP035
 93 | from backports.strenum import StrEnum
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035 (deprecated-import)
 94 | 
 95 | # UP035
    |
@@ -1075,11 +1075,11 @@ UP035.py:93:1: UP035 [*] Import from `enum` instead: `StrEnum`
 95 95 | # UP035
 96 96 | from typing_extensions import override
 
-UP035.py:96:1: UP035 [*] Import from `typing` instead: `override`
+UP035.py:96:1: UP035 (deprecated-import) [*] Import from `typing` instead: `override`
    |
 95 | # UP035
 96 | from typing_extensions import override
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035 (deprecated-import)
 97 | 
 98 | # UP035
    |
@@ -1095,11 +1095,11 @@ UP035.py:96:1: UP035 [*] Import from `typing` instead: `override`
 98 98 | # UP035
 99 99 | from typing_extensions import Buffer
 
-UP035.py:99:1: UP035 [*] Import from `collections.abc` instead: `Buffer`
+UP035.py:99:1: UP035 (deprecated-import) [*] Import from `collections.abc` instead: `Buffer`
     |
  98 | # UP035
  99 | from typing_extensions import Buffer
-    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035 (deprecated-import)
 100 | 
 101 | # UP035
     |
@@ -1115,11 +1115,11 @@ UP035.py:99:1: UP035 [*] Import from `collections.abc` instead: `Buffer`
 101 101 | # UP035
 102 102 | from typing_extensions import get_original_bases
 
-UP035.py:102:1: UP035 [*] Import from `types` instead: `get_original_bases`
+UP035.py:102:1: UP035 (deprecated-import) [*] Import from `types` instead: `get_original_bases`
     |
 101 | # UP035
 102 | from typing_extensions import get_original_bases
-    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035 (deprecated-import)
 103 | 
 104 | # UP035 on py313+ only
     |
@@ -1135,11 +1135,11 @@ UP035.py:102:1: UP035 [*] Import from `types` instead: `get_original_bases`
 104 104 | # UP035 on py313+ only
 105 105 | from typing_extensions import TypeVar
 
-UP035.py:105:1: UP035 [*] Import from `typing` instead: `TypeVar`
+UP035.py:105:1: UP035 (deprecated-import) [*] Import from `typing` instead: `TypeVar`
     |
 104 | # UP035 on py313+ only
 105 | from typing_extensions import TypeVar
-    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035 (deprecated-import)
 106 | 
 107 | # UP035 on py313+ only
     |
@@ -1155,11 +1155,11 @@ UP035.py:105:1: UP035 [*] Import from `typing` instead: `TypeVar`
 107 107 | # UP035 on py313+ only
 108 108 | from typing_extensions import CapsuleType
 
-UP035.py:108:1: UP035 [*] Import from `types` instead: `CapsuleType`
+UP035.py:108:1: UP035 (deprecated-import) [*] Import from `types` instead: `CapsuleType`
     |
 107 | # UP035 on py313+ only
 108 | from typing_extensions import CapsuleType
-    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035 (deprecated-import)
 109 | 
 110 | # UP035 on py313+ only
     |
@@ -1175,11 +1175,11 @@ UP035.py:108:1: UP035 [*] Import from `types` instead: `CapsuleType`
 110 110 | # UP035 on py313+ only
 111 111 | from typing_extensions import deprecated
 
-UP035.py:111:1: UP035 [*] Import from `warnings` instead: `deprecated`
+UP035.py:111:1: UP035 (deprecated-import) [*] Import from `warnings` instead: `deprecated`
     |
 110 | # UP035 on py313+ only
 111 | from typing_extensions import deprecated
-    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035 (deprecated-import)
     |
     = help: Import from `warnings`
 

@@ -1,11 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-sys_exit_alias_3.py:4:1: PLR1722 [*] Use `sys.exit()` instead of `quit`
+sys_exit_alias_3.py:4:1: PLR1722 (sys-exit-alias) [*] Use `sys.exit()` instead of `quit`
   |
 3 | exit(0)
 4 | quit(0)
-  | ^^^^ PLR1722
+  | ^^^^ PLR1722 (sys-exit-alias)
   |
   = help: Replace `quit` with `sys.exit()`
 
@@ -19,12 +19,12 @@ sys_exit_alias_3.py:4:1: PLR1722 [*] Use `sys.exit()` instead of `quit`
 6 6 | 
 7 7 | def main():
 
-sys_exit_alias_3.py:9:5: PLR1722 [*] Use `sys.exit()` instead of `quit`
+sys_exit_alias_3.py:9:5: PLR1722 (sys-exit-alias) [*] Use `sys.exit()` instead of `quit`
   |
 7 | def main():
 8 |     exit(1)
 9 |     quit(1)
-  |     ^^^^ PLR1722
+  |     ^^^^ PLR1722 (sys-exit-alias)
   |
   = help: Replace `quit` with `sys.exit()`
 
@@ -38,12 +38,10 @@ sys_exit_alias_3.py:9:5: PLR1722 [*] Use `sys.exit()` instead of `quit`
 11 11 | 
 12 12 | def main():
 
-sys_exit_alias_3.py:16:5: PLR1722 Use `sys.exit()` instead of `quit`
+sys_exit_alias_3.py:16:5: PLR1722 (sys-exit-alias) Use `sys.exit()` instead of `quit`
    |
 15 |     exit(1)
 16 |     quit(1)
-   |     ^^^^ PLR1722
+   |     ^^^^ PLR1722 (sys-exit-alias)
    |
    = help: Replace `quit` with `sys.exit()`
-
-

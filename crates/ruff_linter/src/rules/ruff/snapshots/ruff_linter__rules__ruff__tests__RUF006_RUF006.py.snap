@@ -1,72 +1,72 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-RUF006.py:6:5: RUF006 Store a reference to the return value of `asyncio.create_task`
+RUF006.py:6:5: RUF006 (asyncio-dangling-task) Store a reference to the return value of `asyncio.create_task`
   |
 4 | # Error
 5 | def f():
 6 |     asyncio.create_task(coordinator.ws_connect())  # Error
-  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF006
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF006 (asyncio-dangling-task)
   |
 
-RUF006.py:11:5: RUF006 Store a reference to the return value of `asyncio.ensure_future`
+RUF006.py:11:5: RUF006 (asyncio-dangling-task) Store a reference to the return value of `asyncio.ensure_future`
    |
  9 | # Error
 10 | def f():
 11 |     asyncio.ensure_future(coordinator.ws_connect())  # Error
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF006
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF006 (asyncio-dangling-task)
    |
 
-RUF006.py:68:12: RUF006 Store a reference to the return value of `asyncio.create_task`
+RUF006.py:68:12: RUF006 (asyncio-dangling-task) Store a reference to the return value of `asyncio.create_task`
    |
 66 | # Error
 67 | def f():
 68 |     task = asyncio.create_task(coordinator.ws_connect())
-   |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF006
+   |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF006 (asyncio-dangling-task)
    |
 
-RUF006.py:74:26: RUF006 Store a reference to the return value of `loop.create_task`
+RUF006.py:74:26: RUF006 (asyncio-dangling-task) Store a reference to the return value of `loop.create_task`
    |
 72 | def f():
 73 |     loop = asyncio.get_running_loop()
 74 |     task: asyncio.Task = loop.create_task(coordinator.ws_connect())
-   |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF006
+   |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF006 (asyncio-dangling-task)
    |
 
-RUF006.py:97:5: RUF006 Store a reference to the return value of `loop.create_task`
+RUF006.py:97:5: RUF006 (asyncio-dangling-task) Store a reference to the return value of `loop.create_task`
    |
 95 | def f():
 96 |     loop = asyncio.get_running_loop()
 97 |     loop.create_task(coordinator.ws_connect())  # Error
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF006
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF006 (asyncio-dangling-task)
    |
 
-RUF006.py:152:13: RUF006 Store a reference to the return value of `asyncio.create_task`
+RUF006.py:152:13: RUF006 (asyncio-dangling-task) Store a reference to the return value of `asyncio.create_task`
     |
 150 | async def f(x: bool):
 151 |     if x:
 152 |         t = asyncio.create_task(asyncio.sleep(1))
-    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF006
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF006 (asyncio-dangling-task)
 153 |     else:
 154 |         t = None
     |
 
-RUF006.py:170:5: RUF006 Store a reference to the return value of `loop.create_task`
+RUF006.py:170:5: RUF006 (asyncio-dangling-task) Store a reference to the return value of `loop.create_task`
     |
 168 | def f():
 169 |     loop = asyncio.new_event_loop()
 170 |     loop.create_task(main()) # Error
-    |     ^^^^^^^^^^^^^^^^^^^^^^^^ RUF006
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^ RUF006 (asyncio-dangling-task)
 171 | 
 172 | # Error
     |
 
-RUF006.py:175:5: RUF006 Store a reference to the return value of `loop.create_task`
+RUF006.py:175:5: RUF006 (asyncio-dangling-task) Store a reference to the return value of `loop.create_task`
     |
 173 | def f():
 174 |     loop = asyncio.get_event_loop()
 175 |     loop.create_task(main()) # Error
-    |     ^^^^^^^^^^^^^^^^^^^^^^^^ RUF006
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^ RUF006 (asyncio-dangling-task)
 176 | 
 177 | # OK
     |

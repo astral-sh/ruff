@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/refurb/mod.rs
 ---
-FURB187.py:6:5: FURB187 [*] Use of assignment of `reversed` on list `l`
+FURB187.py:6:5: FURB187 (list-reverse-copy) [*] Use of assignment of `reversed` on list `l`
   |
 4 | def a():
 5 |     l = []
 6 |     l = reversed(l)
-  |     ^^^^^^^^^^^^^^^ FURB187
+  |     ^^^^^^^^^^^^^^^ FURB187 (list-reverse-copy)
   |
   = help: Replace with `l.reverse()`
 
@@ -20,12 +20,12 @@ FURB187.py:6:5: FURB187 [*] Use of assignment of `reversed` on list `l`
 8 8 | 
 9 9 | def b():
 
-FURB187.py:11:5: FURB187 [*] Use of assignment of `reversed` on list `l`
+FURB187.py:11:5: FURB187 (list-reverse-copy) [*] Use of assignment of `reversed` on list `l`
    |
  9 | def b():
 10 |     l = []
 11 |     l = list(reversed(l))
-   |     ^^^^^^^^^^^^^^^^^^^^^ FURB187
+   |     ^^^^^^^^^^^^^^^^^^^^^ FURB187 (list-reverse-copy)
    |
    = help: Replace with `l.reverse()`
 
@@ -39,12 +39,12 @@ FURB187.py:11:5: FURB187 [*] Use of assignment of `reversed` on list `l`
 13 13 | 
 14 14 | def c():
 
-FURB187.py:16:5: FURB187 [*] Use of assignment of `reversed` on list `l`
+FURB187.py:16:5: FURB187 (list-reverse-copy) [*] Use of assignment of `reversed` on list `l`
    |
 14 | def c():
 15 |     l = []
 16 |     l = l[::-1]
-   |     ^^^^^^^^^^^ FURB187
+   |     ^^^^^^^^^^^ FURB187 (list-reverse-copy)
    |
    = help: Replace with `l.reverse()`
 

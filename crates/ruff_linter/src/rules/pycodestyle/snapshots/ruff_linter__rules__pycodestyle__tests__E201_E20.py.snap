@@ -1,11 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-E20.py:2:6: E201 [*] Whitespace after '('
+E20.py:2:6: E201 (whitespace-after-open-bracket) [*] Whitespace after '('
   |
 1 | #: E201:1:6
 2 | spam( ham[1], {eggs: 2})
-  |      ^ E201
+  |      ^ E201 (whitespace-after-open-bracket)
 3 | #: E201:1:10
 4 | spam(ham[ 1], {eggs: 2})
   |
@@ -19,12 +19,12 @@ E20.py:2:6: E201 [*] Whitespace after '('
 4 4 | spam(ham[ 1], {eggs: 2})
 5 5 | #: E201:1:15
 
-E20.py:4:10: E201 [*] Whitespace after '['
+E20.py:4:10: E201 (whitespace-after-open-bracket) [*] Whitespace after '['
   |
 2 | spam( ham[1], {eggs: 2})
 3 | #: E201:1:10
 4 | spam(ham[ 1], {eggs: 2})
-  |          ^ E201
+  |          ^ E201 (whitespace-after-open-bracket)
 5 | #: E201:1:15
 6 | spam(ham[1], { eggs: 2})
   |
@@ -40,12 +40,12 @@ E20.py:4:10: E201 [*] Whitespace after '['
 6 6 | spam(ham[1], { eggs: 2})
 7 7 | #: E201:1:6
 
-E20.py:6:15: E201 [*] Whitespace after '{'
+E20.py:6:15: E201 (whitespace-after-open-bracket) [*] Whitespace after '{'
   |
 4 | spam(ham[ 1], {eggs: 2})
 5 | #: E201:1:15
 6 | spam(ham[1], { eggs: 2})
-  |               ^ E201
+  |               ^ E201 (whitespace-after-open-bracket)
 7 | #: E201:1:6
 8 | spam(   ham[1], {eggs: 2})
   |
@@ -61,12 +61,12 @@ E20.py:6:15: E201 [*] Whitespace after '{'
 8 8 | spam(	ham[1], {eggs: 2})
 9 9 | #: E201:1:10
 
-E20.py:8:6: E201 [*] Whitespace after '('
+E20.py:8:6: E201 (whitespace-after-open-bracket) [*] Whitespace after '('
    |
  6 | spam(ham[1], { eggs: 2})
  7 | #: E201:1:6
  8 | spam(   ham[1], {eggs: 2})
-   |      ^^^ E201
+   |      ^^^ E201 (whitespace-after-open-bracket)
  9 | #: E201:1:10
 10 | spam(ham[   1], {eggs: 2})
    |
@@ -82,12 +82,12 @@ E20.py:8:6: E201 [*] Whitespace after '('
 10 10 | spam(ham[	1], {eggs: 2})
 11 11 | #: E201:1:15
 
-E20.py:10:10: E201 [*] Whitespace after '['
+E20.py:10:10: E201 (whitespace-after-open-bracket) [*] Whitespace after '['
    |
  8 | spam(   ham[1], {eggs: 2})
  9 | #: E201:1:10
 10 | spam(ham[   1], {eggs: 2})
-   |          ^^^ E201
+   |          ^^^ E201 (whitespace-after-open-bracket)
 11 | #: E201:1:15
 12 | spam(ham[1], {  eggs: 2})
    |
@@ -103,12 +103,12 @@ E20.py:10:10: E201 [*] Whitespace after '['
 12 12 | spam(ham[1], {	eggs: 2})
 13 13 | #: Okay
 
-E20.py:12:15: E201 [*] Whitespace after '{'
+E20.py:12:15: E201 (whitespace-after-open-bracket) [*] Whitespace after '{'
    |
 10 | spam(ham[   1], {eggs: 2})
 11 | #: E201:1:15
 12 | spam(ham[1], {  eggs: 2})
-   |               ^^ E201
+   |               ^^ E201 (whitespace-after-open-bracket)
 13 | #: Okay
 14 | spam(ham[1], {eggs: 2})
    |
@@ -124,11 +124,11 @@ E20.py:12:15: E201 [*] Whitespace after '{'
 14 14 | spam(ham[1], {eggs: 2})
 15 15 | #:
 
-E20.py:107:6: E201 [*] Whitespace after '['
+E20.py:107:6: E201 (whitespace-after-open-bracket) [*] Whitespace after '['
     |
 106 | #: E201:1:6
 107 | spam[ ~ham]
-    |      ^ E201
+    |      ^ E201 (whitespace-after-open-bracket)
 108 | 
 109 | #: Okay
     |
@@ -144,12 +144,12 @@ E20.py:107:6: E201 [*] Whitespace after '['
 109 109 | #: Okay
 110 110 | x = [  #
 
-E20.py:116:5: E201 [*] Whitespace after '['
+E20.py:116:5: E201 (whitespace-after-open-bracket) [*] Whitespace after '['
     |
 114 | # F-strings
 115 | f"{ {'a': 1} }"
 116 | f"{[ { {'a': 1} } ]}"
-    |     ^ E201
+    |     ^ E201 (whitespace-after-open-bracket)
 117 | f"normal { {f"{ { [1, 2] } }" } } normal"
     |
     = help: Remove whitespace before '['
@@ -164,11 +164,11 @@ E20.py:116:5: E201 [*] Whitespace after '['
 118 118 | 
 119 119 | #: Okay
 
-E20.py:145:5: E201 [*] Whitespace after '['
+E20.py:145:5: E201 (whitespace-after-open-bracket) [*] Whitespace after '['
     |
 144 | #: E201:1:5
 145 | ham[ : upper]
-    |     ^ E201
+    |     ^ E201 (whitespace-after-open-bracket)
 146 | 
 147 | #: Okay
     |

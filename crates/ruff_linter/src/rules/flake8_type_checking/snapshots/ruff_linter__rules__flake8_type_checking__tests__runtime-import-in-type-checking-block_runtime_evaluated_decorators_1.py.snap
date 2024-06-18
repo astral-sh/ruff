@@ -1,11 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
 ---
-runtime_evaluated_decorators_1.py:12:12: TCH004 [*] Move import `datetime` out of type-checking block. Import is used for more than type hinting.
+runtime_evaluated_decorators_1.py:12:12: TCH004 (runtime-import-in-type-checking-block) [*] Move import `datetime` out of type-checking block. Import is used for more than type hinting.
    |
 11 | if TYPE_CHECKING:
 12 |     import datetime  # TCH004
-   |            ^^^^^^^^ TCH004
+   |            ^^^^^^^^ TCH004 (runtime-import-in-type-checking-block)
 13 |     from array import array  # TCH004
    |
    = help: Move out of type-checking block
@@ -22,12 +22,12 @@ runtime_evaluated_decorators_1.py:12:12: TCH004 [*] Move import `datetime` out o
 14 14 | 
 15 15 |     import pandas  # TCH004
 
-runtime_evaluated_decorators_1.py:13:23: TCH004 [*] Move import `array.array` out of type-checking block. Import is used for more than type hinting.
+runtime_evaluated_decorators_1.py:13:23: TCH004 (runtime-import-in-type-checking-block) [*] Move import `array.array` out of type-checking block. Import is used for more than type hinting.
    |
 11 | if TYPE_CHECKING:
 12 |     import datetime  # TCH004
 13 |     from array import array  # TCH004
-   |                       ^^^^^ TCH004
+   |                       ^^^^^ TCH004 (runtime-import-in-type-checking-block)
 14 | 
 15 |     import pandas  # TCH004
    |
@@ -46,12 +46,12 @@ runtime_evaluated_decorators_1.py:13:23: TCH004 [*] Move import `array.array` ou
 15 15 |     import pandas  # TCH004
 16 16 |     import pyproj
 
-runtime_evaluated_decorators_1.py:15:12: TCH004 [*] Move import `pandas` out of type-checking block. Import is used for more than type hinting.
+runtime_evaluated_decorators_1.py:15:12: TCH004 (runtime-import-in-type-checking-block) [*] Move import `pandas` out of type-checking block. Import is used for more than type hinting.
    |
 13 |     from array import array  # TCH004
 14 | 
 15 |     import pandas  # TCH004
-   |            ^^^^^^ TCH004
+   |            ^^^^^^ TCH004 (runtime-import-in-type-checking-block)
 16 |     import pyproj
    |
    = help: Move out of type-checking block
@@ -69,6 +69,4 @@ runtime_evaluated_decorators_1.py:15:12: TCH004 [*] Move import `pandas` out of 
 15    |-    import pandas  # TCH004
 16 16 |     import pyproj
 17 17 | 
-18 18 | 
-
-
+18 18 |
