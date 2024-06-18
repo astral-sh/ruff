@@ -292,7 +292,9 @@ mod tests {
     #[test_case(
         r"
         import pandas as pd
-        pd.stack(
+        x = pd.DataFrame()
+        y = pd.DataFrame()
+        x.merge(y)
     ",
         "PD015_pass_merge_on_dataframe"
     )]

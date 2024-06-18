@@ -106,7 +106,7 @@ COM81.py:45:8: COM818 Trailing comma on bare tuple prohibited
    |
 43 | )
 44 | 
-45 | foo = 3, 
+45 | foo = 3,
    |        ^ COM818
 46 | 
 47 | class A(object):
@@ -977,5 +977,3 @@ COM81.py:647:49: COM812 [*] Trailing comma missing
 648 648 | )
 649 649 | 
 650 650 | assert False, f"<- This is not a trailing comma"
-
-
