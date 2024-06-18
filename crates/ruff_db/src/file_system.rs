@@ -3,8 +3,8 @@ use std::ops::Deref;
 use std::path::{Path, StripPrefixError};
 
 use camino::{Utf8Path, Utf8PathBuf};
-use filetime::FileTime;
 
+use crate::file_revision::FileRevision;
 pub use memory::MemoryFileSystem;
 pub use os::OsFileSystem;
 
@@ -514,55 +514,6 @@ impl Metadata {
     }
 }
 
-/// A number representing the revision of a file.
-///
-/// Two revisions that don't compare equal signify that the file has been modified.
-/// Revisions aren't guaranteed to be monotonically increasing or in any specific order.
-///
-/// Possible revisions are:
-/// * The last modification time of the file.
-/// * The hash of the file's content.
-/// * The revision as it comes from an external system, for example the LSP.
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub struct FileRevision(u128);
-
-impl FileRevision {
-    pub fn new(value: u128) -> Self {
-        Self(value)
-    }
-
-    pub const fn zero() -> Self {
-        Self(0)
-    }
-
-    #[must_use]
-    pub fn as_u128(self) -> u128 {
-        self.0
-    }
-}
-
-impl From<u128> for FileRevision {
-    fn from(value: u128) -> Self {
-        FileRevision(value)
-    }
-}
-
-impl From<u64> for FileRevision {
-    fn from(value: u64) -> Self {
-        FileRevision(u128::from(value))
-    }
-}
-
-impl From<FileTime> for FileRevision {
-    fn from(value: FileTime) -> Self {
-        let seconds = value.seconds() as u128;
-        let seconds = seconds << 64;
-        let nanos = u128::from(value.nanoseconds());
-
-        FileRevision(seconds | nanos)
-    }
-}
-
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
 pub enum FileType {
     File,
@@ -581,26 +532,5 @@ impl FileType {
 
     pub const fn is_symlink(self) -> bool {
         matches!(self, FileType::Symlink)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use filetime::FileTime;
-
-    use crate::file_system::FileRevision;
-
-    #[test]
-    fn revision_from_file_time() {
-        let file_time = FileTime::now();
-        let revision = FileRevision::from(file_time);
-
-        let revision = revision.as_u128();
-
-        let nano = revision & 0xFFFF_FFFF_FFFF_FFFF;
-        let seconds = revision >> 64;
-
-        assert_eq!(file_time.nanoseconds(), nano as u32);
-        assert_eq!(file_time.seconds(), seconds as i64);
     }
 }

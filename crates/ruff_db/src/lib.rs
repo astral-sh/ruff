@@ -8,9 +8,11 @@ use crate::parsed::parsed_module;
 use crate::source::{line_index, source_text};
 use crate::vfs::{Vfs, VfsFile};
 
+mod file_revision;
 pub mod file_system;
 pub mod parsed;
 pub mod source;
+pub mod vendored;
 pub mod vfs;
 
 pub(crate) type FxDashMap<K, V> = dashmap::DashMap<K, V, BuildHasherDefault<FxHasher>>;

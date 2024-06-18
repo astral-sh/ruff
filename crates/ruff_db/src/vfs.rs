@@ -3,9 +3,12 @@ use std::sync::Arc;
 use countme::Count;
 use dashmap::mapref::entry::Entry;
 
-pub use path::{VendoredPath, VendoredPathBuf, VfsPath};
+pub use crate::vendored::{VendoredPath, VendoredPathBuf};
+pub use path::VfsPath;
 
-use crate::file_system::{FileRevision, FileSystemPath};
+use crate::file_revision::FileRevision;
+use crate::file_system::FileSystemPath;
+use crate::vendored::VendoredFileSystem;
 use crate::vfs::private::FileStatus;
 use crate::{Db, FxDashMap};
 
@@ -296,27 +299,44 @@ impl VfsFile {
     }
 }
 
-#[derive(Default, Debug)]
+#[derive(Debug)]
 enum VendoredVfs {
-    #[default]
-    Real,
+    #[allow(unused)]
+    Real(VendoredFileSystem),
     Stubbed(FxDashMap<VendoredPathBuf, String>),
+}
+
+impl Default for VendoredVfs {
+    fn default() -> Self {
+        Self::Stubbed(FxDashMap::default())
+    }
 }
 
 impl VendoredVfs {
     fn revision(&self, path: &VendoredPath) -> Option<FileRevision> {
         match self {
-            VendoredVfs::Real => todo!(),
+            VendoredVfs::Real(file_system) => file_system
+                .metadata(path)
+                .map(|metadata| metadata.revision()),
             VendoredVfs::Stubbed(stubbed) => stubbed
                 .contains_key(&path.to_path_buf())
                 .then_some(FileRevision::new(1)),
         }
     }
 
-    fn read(&self, path: &VendoredPath) -> Option<String> {
+    fn read(&self, path: &VendoredPath) -> std::io::Result<String> {
         match self {
-            VendoredVfs::Real => todo!(),
-            VendoredVfs::Stubbed(stubbed) => stubbed.get(&path.to_path_buf()).as_deref().cloned(),
+            VendoredVfs::Real(file_system) => file_system.read(path),
+            VendoredVfs::Stubbed(stubbed) => {
+                if let Some(contents) = stubbed.get(&path.to_path_buf()).as_deref().cloned() {
+                    Ok(contents)
+                } else {
+                    Err(std::io::Error::new(
+                        std::io::ErrorKind::NotFound,
+                        format!("Could not find file {path:?}"),
+                    ))
+                }
+            }
         }
     }
 }
@@ -336,7 +356,7 @@ mod private {
 
 #[cfg(test)]
 mod tests {
-    use crate::file_system::FileRevision;
+    use crate::file_revision::FileRevision;
     use crate::tests::TestDb;
     use crate::vfs::{system_path_to_file, vendored_path_to_file};
 

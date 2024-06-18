@@ -20,6 +20,11 @@ camino = { workspace = true }
 countme = { workspace = true }
 dashmap = { workspace = true }
 filetime = { workspace = true }
+itertools = { workspace = true }
 salsa = { workspace = true }
 tracing = { workspace = true }
 rustc-hash = { workspace = true }
+zip = { workspace = true }
+
+[dev-dependencies]
+once_cell = { workspace = true }

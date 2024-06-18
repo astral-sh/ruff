@@ -73,7 +73,7 @@ mod tests {
     use crate::file_system::FileSystemPath;
     use crate::parsed::parsed_module;
     use crate::tests::TestDb;
-    use crate::vfs::VendoredPath;
+    use crate::vendored::VendoredPath;
     use crate::vfs::{system_path_to_file, vendored_path_to_file};
 
     #[test]
