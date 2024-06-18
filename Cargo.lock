@@ -2468,6 +2468,7 @@ dependencies = [
 name = "ruff_python_semantic"
 version = "0.0.0"
 dependencies = [
+ "anyhow",
  "bitflags 2.5.0",
  "is-macro",
  "ruff_db",
@@ -2479,6 +2480,8 @@ dependencies = [
  "ruff_text_size",
  "rustc-hash",
  "salsa-2022",
+ "smol_str",
+ "tempfile",
  "tracing",
 ]
 

@@ -1,6 +1,6 @@
 use std::fmt::Formatter;
 use std::ops::Deref;
-use std::path::Path;
+use std::path::{Path, StripPrefixError};
 
 use camino::{Utf8Path, Utf8PathBuf};
 use filetime::FileTime;
@@ -88,6 +88,245 @@ impl FileSystemPath {
         self.0.extension()
     }
 
+    /// Determines whether `base` is a prefix of `self`.
+    ///
+    /// Only considers whole path components to match.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ruff_db::file_system::FileSystemPath;
+    ///
+    /// let path = FileSystemPath::new("/etc/passwd");
+    ///
+    /// assert!(path.starts_with("/etc"));
+    /// assert!(path.starts_with("/etc/"));
+    /// assert!(path.starts_with("/etc/passwd"));
+    /// assert!(path.starts_with("/etc/passwd/")); // extra slash is okay
+    /// assert!(path.starts_with("/etc/passwd///")); // multiple extra slashes are okay
+    ///
+    /// assert!(!path.starts_with("/e"));
+    /// assert!(!path.starts_with("/etc/passwd.txt"));
+    ///
+    /// assert!(!FileSystemPath::new("/etc/foo.rs").starts_with("/etc/foo"));
+    /// ```
+    #[inline]
+    #[must_use]
+    pub fn starts_with(&self, base: impl AsRef<FileSystemPath>) -> bool {
+        self.0.starts_with(base.as_ref())
+    }
+
+    /// Determines whether `child` is a suffix of `self`.
+    ///
+    /// Only considers whole path components to match.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ruff_db::file_system::FileSystemPath;
+    ///
+    /// let path = FileSystemPath::new("/etc/resolv.conf");
+    ///
+    /// assert!(path.ends_with("resolv.conf"));
+    /// assert!(path.ends_with("etc/resolv.conf"));
+    /// assert!(path.ends_with("/etc/resolv.conf"));
+    ///
+    /// assert!(!path.ends_with("/resolv.conf"));
+    /// assert!(!path.ends_with("conf")); // use .extension() instead
+    /// ```
+    #[inline]
+    #[must_use]
+    pub fn ends_with(&self, child: impl AsRef<FileSystemPath>) -> bool {
+        self.0.ends_with(child.as_ref())
+    }
+
+    /// Returns the `FileSystemPath` without its final component, if there is one.
+    ///
+    /// Returns [`None`] if the path terminates in a root or prefix.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ruff_db::file_system::FileSystemPath;
+    ///
+    /// let path = FileSystemPath::new("/foo/bar");
+    /// let parent = path.parent().unwrap();
+    /// assert_eq!(parent, FileSystemPath::new("/foo"));
+    ///
+    /// let grand_parent = parent.parent().unwrap();
+    /// assert_eq!(grand_parent, FileSystemPath::new("/"));
+    /// assert_eq!(grand_parent.parent(), None);
+    /// ```
+    #[inline]
+    #[must_use]
+    pub fn parent(&self) -> Option<&FileSystemPath> {
+        self.0.parent().map(FileSystemPath::new)
+    }
+
+    /// Produces an iterator over the [`camino::Utf8Component`]s of the path.
+    ///
+    /// When parsing the path, there is a small amount of normalization:
+    ///
+    /// * Repeated separators are ignored, so `a/b` and `a//b` both have
+    ///   `a` and `b` as components.
+    ///
+    /// * Occurrences of `.` are normalized away, except if they are at the
+    ///   beginning of the path. For example, `a/./b`, `a/b/`, `a/b/.` and
+    ///   `a/b` all have `a` and `b` as components, but `./a/b` starts with
+    ///   an additional [`CurDir`] component.
+    ///
+    /// * A trailing slash is normalized away, `/a/b` and `/a/b/` are equivalent.
+    ///
+    /// Note that no other normalization takes place; in particular, `a/c`
+    /// and `a/b/../c` are distinct, to account for the possibility that `b`
+    /// is a symbolic link (so its parent isn't `a`).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use camino::{Utf8Component};
+    /// use ruff_db::file_system::FileSystemPath;
+    ///
+    /// let mut components = FileSystemPath::new("/tmp/foo.txt").components();
+    ///
+    /// assert_eq!(components.next(), Some(Utf8Component::RootDir));
+    /// assert_eq!(components.next(), Some(Utf8Component::Normal("tmp")));
+    /// assert_eq!(components.next(), Some(Utf8Component::Normal("foo.txt")));
+    /// assert_eq!(components.next(), None)
+    /// ```
+    ///
+    /// [`CurDir`]: camino::Utf8Component::CurDir
+    #[inline]
+    pub fn components(&self) -> camino::Utf8Components {
+        self.0.components()
+    }
+
+    /// Returns the final component of the `FileSystemPath`, if there is one.
+    ///
+    /// If the path is a normal file, this is the file name. If it's the path of a directory, this
+    /// is the directory name.
+    ///
+    /// Returns [`None`] if the path terminates in `..`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use camino::Utf8Path;
+    /// use ruff_db::file_system::FileSystemPath;
+    ///
+    /// assert_eq!(Some("bin"), FileSystemPath::new("/usr/bin/").file_name());
+    /// assert_eq!(Some("foo.txt"), FileSystemPath::new("tmp/foo.txt").file_name());
+    /// assert_eq!(Some("foo.txt"), FileSystemPath::new("foo.txt/.").file_name());
+    /// assert_eq!(Some("foo.txt"), FileSystemPath::new("foo.txt/.//").file_name());
+    /// assert_eq!(None, FileSystemPath::new("foo.txt/..").file_name());
+    /// assert_eq!(None, FileSystemPath::new("/").file_name());
+    /// ```
+    #[inline]
+    #[must_use]
+    pub fn file_name(&self) -> Option<&str> {
+        self.0.file_name()
+    }
+
+    /// Extracts the stem (non-extension) portion of [`self.file_name`].
+    ///
+    /// [`self.file_name`]: FileSystemPath::file_name
+    ///
+    /// The stem is:
+    ///
+    /// * [`None`], if there is no file name;
+    /// * The entire file name if there is no embedded `.`;
+    /// * The entire file name if the file name begins with `.` and has no other `.`s within;
+    /// * Otherwise, the portion of the file name before the final `.`
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ruff_db::file_system::FileSystemPath;
+    ///
+    /// assert_eq!("foo", FileSystemPath::new("foo.rs").file_stem().unwrap());
+    /// assert_eq!("foo.tar", FileSystemPath::new("foo.tar.gz").file_stem().unwrap());
+    /// ```
+    #[inline]
+    #[must_use]
+    pub fn file_stem(&self) -> Option<&str> {
+        self.0.file_stem()
+    }
+
+    /// Returns a path that, when joined onto `base`, yields `self`.
+    ///
+    /// # Errors
+    ///
+    /// If `base` is not a prefix of `self` (i.e., [`starts_with`]
+    /// returns `false`), returns [`Err`].
+    ///
+    /// [`starts_with`]: FileSystemPath::starts_with
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ruff_db::file_system::{FileSystemPath, FileSystemPathBuf};
+    ///
+    /// let path = FileSystemPath::new("/test/haha/foo.txt");
+    ///
+    /// assert_eq!(path.strip_prefix("/"), Ok(FileSystemPath::new("test/haha/foo.txt")));
+    /// assert_eq!(path.strip_prefix("/test"), Ok(FileSystemPath::new("haha/foo.txt")));
+    /// assert_eq!(path.strip_prefix("/test/"), Ok(FileSystemPath::new("haha/foo.txt")));
+    /// assert_eq!(path.strip_prefix("/test/haha/foo.txt"), Ok(FileSystemPath::new("")));
+    /// assert_eq!(path.strip_prefix("/test/haha/foo.txt/"), Ok(FileSystemPath::new("")));
+    ///
+    /// assert!(path.strip_prefix("test").is_err());
+    /// assert!(path.strip_prefix("/haha").is_err());
+    ///
+    /// let prefix = FileSystemPathBuf::from("/test/");
+    /// assert_eq!(path.strip_prefix(prefix), Ok(FileSystemPath::new("haha/foo.txt")));
+    /// ```
+    #[inline]
+    pub fn strip_prefix(
+        &self,
+        base: impl AsRef<FileSystemPath>,
+    ) -> std::result::Result<&FileSystemPath, StripPrefixError> {
+        self.0.strip_prefix(base.as_ref()).map(FileSystemPath::new)
+    }
+
+    /// Creates an owned [`FileSystemPathBuf`] with `path` adjoined to `self`.
+    ///
+    /// See [`std::path::PathBuf::push`] for more details on what it means to adjoin a path.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ruff_db::file_system::{FileSystemPath, FileSystemPathBuf};
+    ///
+    /// assert_eq!(FileSystemPath::new("/etc").join("passwd"), FileSystemPathBuf::from("/etc/passwd"));
+    /// ```
+    #[inline]
+    #[must_use]
+    pub fn join(&self, path: impl AsRef<FileSystemPath>) -> FileSystemPathBuf {
+        FileSystemPathBuf::from_utf8_path_buf(self.0.join(&path.as_ref().0))
+    }
+
+    /// Creates an owned [`FileSystemPathBuf`] like `self` but with the given extension.
+    ///
+    /// See [`std::path::PathBuf::set_extension`] for more details.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ruff_db::file_system::{FileSystemPath, FileSystemPathBuf};
+    ///
+    /// let path = FileSystemPath::new("foo.rs");
+    /// assert_eq!(path.with_extension("txt"), FileSystemPathBuf::from("foo.txt"));
+    ///
+    /// let path = FileSystemPath::new("foo.tar.gz");
+    /// assert_eq!(path.with_extension(""), FileSystemPathBuf::from("foo.tar"));
+    /// assert_eq!(path.with_extension("xz"), FileSystemPathBuf::from("foo.tar.xz"));
+    /// assert_eq!(path.with_extension("").with_extension("txt"), FileSystemPathBuf::from("foo.txt"));
+    /// ```
+    #[inline]
+    pub fn with_extension(&self, extension: &str) -> FileSystemPathBuf {
+        FileSystemPathBuf::from_utf8_path_buf(self.0.with_extension(extension))
+    }
+
     /// Converts the path to an owned [`FileSystemPathBuf`].
     pub fn to_path_buf(&self) -> FileSystemPathBuf {
         FileSystemPathBuf(self.0.to_path_buf())
@@ -104,6 +343,10 @@ impl FileSystemPath {
     pub fn as_std_path(&self) -> &Path {
         self.0.as_std_path()
     }
+
+    pub fn from_std_path(path: &Path) -> Option<&FileSystemPath> {
+        Some(FileSystemPath::new(Utf8Path::from_path(path)?))
+    }
 }
 
 /// Owned path to a file or directory stored in [`FileSystem`].
@@ -112,12 +355,6 @@ impl FileSystemPath {
 #[repr(transparent)]
 #[derive(Eq, PartialEq, Clone, Hash, PartialOrd, Ord)]
 pub struct FileSystemPathBuf(Utf8PathBuf);
-
-impl Default for FileSystemPathBuf {
-    fn default() -> Self {
-        Self::new()
-    }
-}
 
 impl FileSystemPathBuf {
     pub fn new() -> Self {
@@ -128,9 +365,63 @@ impl FileSystemPathBuf {
         Self(path)
     }
 
+    pub fn from_path_buf(
+        path: std::path::PathBuf,
+    ) -> std::result::Result<Self, std::path::PathBuf> {
+        Utf8PathBuf::from_path_buf(path).map(Self)
+    }
+
+    /// Extends `self` with `path`.
+    ///
+    /// If `path` is absolute, it replaces the current path.
+    ///
+    /// On Windows:
+    ///
+    /// * if `path` has a root but no prefix (e.g., `\windows`), it
+    ///   replaces everything except for the prefix (if any) of `self`.
+    /// * if `path` has a prefix but no root, it replaces `self`.
+    ///
+    /// # Examples
+    ///
+    /// Pushing a relative path extends the existing path:
+    ///
+    /// ```
+    /// use ruff_db::file_system::FileSystemPathBuf;
+    ///
+    /// let mut path = FileSystemPathBuf::from("/tmp");
+    /// path.push("file.bk");
+    /// assert_eq!(path, FileSystemPathBuf::from("/tmp/file.bk"));
+    /// ```
+    ///
+    /// Pushing an absolute path replaces the existing path:
+    ///
+    /// ```
+    ///
+    /// use ruff_db::file_system::FileSystemPathBuf;
+    ///
+    /// let mut path = FileSystemPathBuf::from("/tmp");
+    /// path.push("/etc");
+    /// assert_eq!(path, FileSystemPathBuf::from("/etc"));
+    /// ```
+    pub fn push(&mut self, path: impl AsRef<FileSystemPath>) {
+        self.0.push(&path.as_ref().0);
+    }
+
     #[inline]
     pub fn as_path(&self) -> &FileSystemPath {
         FileSystemPath::new(&self.0)
+    }
+}
+
+impl From<&str> for FileSystemPathBuf {
+    fn from(value: &str) -> Self {
+        FileSystemPathBuf::from_utf8_path_buf(Utf8PathBuf::from(value))
+    }
+}
+
+impl Default for FileSystemPathBuf {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
