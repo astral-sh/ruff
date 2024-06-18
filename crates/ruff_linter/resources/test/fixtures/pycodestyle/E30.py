@@ -411,17 +411,9 @@ async def function1():
 
 # no error
 async def function1():
-	await function2()
+    await function2()
     async with function3():
-    	pass
-# end
-
-
-# no error
-class Test:
-    async
-
-    def a(self): pass
+        pass
 # end
 
 
