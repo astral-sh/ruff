@@ -95,5 +95,5 @@ environment = { "RUFF_TRACE" = "messages" }
 
 [language-server.ruff.config.settings]
 logLevel = "debug"
-logFile = "your/log/file/path/log.txt"
+logFile = "/Users/developer/.cache/helix/ruff.log"
 ```
