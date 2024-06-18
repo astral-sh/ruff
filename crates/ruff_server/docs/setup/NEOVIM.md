@@ -69,8 +69,10 @@ You can set the log level in `settings`:
 ```lua
 require('lspconfig').ruff.setup {
   cmd_env = { RUFF_TRACE = "messages" },
-  settings = {
-    logLevel = "debug",
+  init_options = {
+    settings = {
+      logLevel = "debug",
+    }
   }
 }
 ```
@@ -80,9 +82,11 @@ It's also possible to divert Ruff's logs to a separate file with the `logFile` s
 ```lua
 require('lspconfig').ruff.setup {
   cmd_env = { RUFF_TRACE = "messages" },
-  settings = {
-    logLevel = "debug",
-    logFile = "your/log/file/path/log.txt"
+  init_options = {
+    settings = {
+      logLevel = "debug",
+      logFile = "your/log/file/path/log.txt"
+    }
   }
 }
 ```
