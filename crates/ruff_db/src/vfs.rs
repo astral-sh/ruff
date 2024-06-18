@@ -6,9 +6,46 @@ use dashmap::mapref::entry::Entry;
 pub use path::{VendoredPath, VendoredPathBuf, VfsPath};
 
 use crate::file_system::{FileRevision, FileSystemPath};
+use crate::vfs::private::FileStatus;
 use crate::{Db, FxDashMap};
 
 mod path;
+
+/// Interns a file system path and returns a salsa `File` ingredient.
+///
+/// Returns `None` if the path doesn't exist, isn't accessible, or if the path points to a directory.
+#[inline]
+pub fn system_path_to_file(db: &dyn Db, path: impl AsRef<FileSystemPath>) -> Option<VfsFile> {
+    let file = db.vfs().file_system(db, path.as_ref());
+
+    // It's important that `vfs.file_system` creates a `VfsFile` even for files that don't exist or don't
+    // exist anymore so that Salsa can track that the caller of this function depends on the existence of
+    // that file. This function filters out files that don't exist, but Salsa will know that it must
+    // re-run the calling query whenever the `file`'s status changes (because of the `.status` call here).
+    match file.status(db) {
+        FileStatus::Exists => Some(file),
+        FileStatus::Deleted => None,
+    }
+}
+
+/// Interns a vendored file path. Returns `Some` if the vendored file for `path` exists and `None` otherwise.
+#[inline]
+pub fn vendored_path_to_file(db: &dyn Db, path: impl AsRef<VendoredPath>) -> Option<VfsFile> {
+    db.vfs().vendored(db, path.as_ref())
+}
+
+/// Interns a virtual file system path and returns a salsa [`VfsFile`] ingredient.
+///
+/// Returns `Some` if a file for `path` exists and is accessible by the user. Returns `None` otherwise.
+///
+/// See [`system_path_to_file`] and [`vendored_path_to_file`] if you always have either a file system or vendored path.
+#[inline]
+pub fn vfs_path_to_file(db: &dyn Db, path: &VfsPath) -> Option<VfsFile> {
+    match path {
+        VfsPath::FileSystem(path) => system_path_to_file(db, path),
+        VfsPath::Vendored(path) => vendored_path_to_file(db, path),
+    }
+}
 
 /// Virtual file system that supports files from different sources.
 ///
@@ -64,7 +101,7 @@ impl Vfs {
     ///
     /// The operation always succeeds even if the path doesn't exist on disk, isn't accessible or if the path points to a directory.
     /// In these cases, a file with status [`FileStatus::Deleted`] is returned.
-    pub fn file(&self, db: &dyn Db, path: &FileSystemPath) -> VfsFile {
+    fn file_system(&self, db: &dyn Db, path: &FileSystemPath) -> VfsFile {
         *self
             .inner
             .files_by_path
@@ -95,7 +132,7 @@ impl Vfs {
 
     /// Looks up a vendored file by its path. Returns `Some` if a vendored file for the given path
     /// exists and `None` otherwise.
-    pub fn vendored(&self, db: &dyn Db, path: &VendoredPath) -> Option<VfsFile> {
+    fn vendored(&self, db: &dyn Db, path: &VendoredPath) -> Option<VfsFile> {
         let file = match self
             .inner
             .files_by_path
@@ -194,7 +231,7 @@ pub struct VfsFile {
     ///
     /// Salsa doesn't support deleting inputs. The only way to signal to the depending queries that
     /// the file has been deleted is to change the status to `Deleted`.
-    pub status: FileStatus,
+    status: FileStatus,
 
     /// Counter that counts the number of created file instances and active file instances.
     /// Only enabled in debug builds.
@@ -224,15 +261,6 @@ impl VfsFile {
     }
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub enum FileStatus {
-    /// The file exists.
-    Exists,
-
-    /// The file was deleted, didn't exist to begin with or the path isn't a file.
-    Deleted,
-}
-
 #[derive(Default, Debug)]
 enum VendoredVfs {
     #[default]
@@ -258,12 +286,24 @@ impl VendoredVfs {
     }
 }
 
+// The types in here need to be public because they're salsa ingredients but we
+// don't want them to be publicly accessible. That's why we put them into a private module.
+mod private {
+    #[derive(Copy, Clone, Debug, Eq, PartialEq)]
+    pub enum FileStatus {
+        /// The file exists.
+        Exists,
+
+        /// The file was deleted, didn't exist to begin with or the path isn't a file.
+        Deleted,
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::file_system::{FileRevision, FileSystemPath};
+    use crate::file_system::FileRevision;
     use crate::tests::TestDb;
-    use crate::vfs::{FileStatus, VendoredPath};
-    use crate::Db;
+    use crate::vfs::{system_path_to_file, vendored_path_to_file};
 
     #[test]
     fn file_system_existing_file() -> crate::file_system::Result<()> {
@@ -272,9 +312,8 @@ mod tests {
         db.file_system_mut()
             .write_files([("test.py", "print('Hello world')")])?;
 
-        let test = db.file(FileSystemPath::new("test.py"));
+        let test = system_path_to_file(&db, "test.py").expect("File to exist.");
 
-        assert_eq!(test.status(&db), FileStatus::Exists);
         assert_eq!(test.permissions(&db), Some(0o755));
         assert_ne!(test.revision(&db), FileRevision::zero());
         assert_eq!(&test.read(&db), "print('Hello world')");
@@ -286,12 +325,9 @@ mod tests {
     fn file_system_non_existing_file() {
         let db = TestDb::new();
 
-        let test = db.file(FileSystemPath::new("test.py"));
+        let test = system_path_to_file(&db, "test.py");
 
-        assert_eq!(test.status(&db), FileStatus::Deleted);
-        assert_eq!(test.permissions(&db), None);
-        assert_eq!(test.revision(&db), FileRevision::zero());
-        assert_eq!(&test.read(&db), "");
+        assert_eq!(test, None);
     }
 
     #[test]
@@ -301,11 +337,8 @@ mod tests {
         db.vfs_mut()
             .stub_vendored([("test.py", "def foo() -> str")]);
 
-        let test = db
-            .vendored_file(VendoredPath::new("test.py"))
-            .expect("Vendored file to exist.");
+        let test = vendored_path_to_file(&db, "test.py").expect("Vendored file to exist.");
 
-        assert_eq!(test.status(&db), FileStatus::Exists);
         assert_eq!(test.permissions(&db), Some(0o444));
         assert_ne!(test.revision(&db), FileRevision::zero());
         assert_eq!(&test.read(&db), "def foo() -> str");
@@ -315,6 +348,6 @@ mod tests {
     fn stubbed_vendored_file_non_existing() {
         let db = TestDb::new();
 
-        assert_eq!(db.vendored_file(VendoredPath::new("test.py")), None);
+        assert_eq!(vendored_path_to_file(&db, "test.py"), None);
     }
 }
