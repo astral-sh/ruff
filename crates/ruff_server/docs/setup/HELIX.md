@@ -52,10 +52,48 @@ You can pass settings into `ruff server` using `[language-server.ruff.config.set
 
 ```toml
 [language-server.ruff.config.settings]
-line-length = 80
+lineLength = 80
 [language-server.ruff.config.settings.lint]
 select = ["E4", "E7"]
 preview = false
 [language-server.ruff.config.settings.format]
 preview = true
+```
+
+By default, Ruff does not log anything to Helix. To enable logging, set the `RUFF_TRACE` environment variable
+to either `messages` or `verbose`.
+
+```toml
+[language-server.ruff]
+command = "ruff"
+args = ["server", "--preview"]
+environment = { "RUFF_TRACE" = "messages" }
+```
+
+> \[!NOTE\]
+> `RUFF_TRACE=verbose` does not enable Helix's verbose mode by itself. You'll need to run Helix with `-v` for verbose logging.
+
+To change the log level for Ruff (which is `info` by default), use the `logLevel` setting:
+
+```toml
+[language-server.ruff]
+command = "ruff"
+args = ["server", "--preview"]
+environment = { "RUFF_TRACE" = "messages" }
+
+[language-server.ruff.config.settings]
+logLevel = "debug"
+```
+
+You can also divert Ruff's logs to a separate file with the `logFile` setting:
+
+```toml
+[language-server.ruff]
+command = "ruff"
+args = ["server", "--preview"]
+environment = { "RUFF_TRACE" = "messages" }
+
+[language-server.ruff.config.settings]
+logLevel = "debug"
+logFile = "/Users/developer/.cache/helix/ruff.log"
 ```
