@@ -100,7 +100,7 @@ mod tests {
 
     #[test]
     #[allow(unsafe_code)]
-    fn equal() {
+    fn equality() {
         let parsed_raw = parse_unchecked_source("1 + 2", PySourceType::Python);
         let parsed = ParsedModule::new(parsed_raw.clone());
 
@@ -125,6 +125,24 @@ mod tests {
         let other_node = unsafe { AstNodeRef::new(other.clone(), other_stmt) };
 
         assert_ne!(node1, other_node);
+    }
+
+    #[allow(unsafe_code)]
+    #[test]
+    fn inequality() {
+        let parsed_raw = parse_unchecked_source("1 + 2", PySourceType::Python);
+        let parsed = ParsedModule::new(parsed_raw.clone());
+
+        let stmt = &parsed.syntax().body[0];
+        let node = unsafe { AstNodeRef::new(parsed.clone(), stmt) };
+
+        let other_raw = parse_unchecked_source("2 + 2", PySourceType::Python);
+        let other = ParsedModule::new(other_raw);
+
+        let other_stmt = &other.syntax().body[0];
+        let other_node = unsafe { AstNodeRef::new(other.clone(), other_stmt) };
+
+        assert_ne!(node, other_node);
     }
 
     #[test]

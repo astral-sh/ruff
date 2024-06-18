@@ -17,6 +17,18 @@ pub enum Definition {
     // TODO with statements, except handlers, function args...
 }
 
+impl From<ImportDefinition> for Definition {
+    fn from(value: ImportDefinition) -> Self {
+        Self::Import(value)
+    }
+}
+
+impl From<ImportFromDefinition> for Definition {
+    fn from(value: ImportFromDefinition) -> Self {
+        Self::ImportFrom(value)
+    }
+}
+
 impl From<LocalClassId> for Definition {
     fn from(value: LocalClassId) -> Self {
         Self::ClassDef(value)
@@ -26,6 +38,24 @@ impl From<LocalClassId> for Definition {
 impl From<LocalFunctionId> for Definition {
     fn from(value: LocalFunctionId) -> Self {
         Self::FunctionDef(value)
+    }
+}
+
+impl From<LocalAssignmentId> for Definition {
+    fn from(value: LocalAssignmentId) -> Self {
+        Self::Assignment(value)
+    }
+}
+
+impl From<LocalAnnotatedAssignmentId> for Definition {
+    fn from(value: LocalAnnotatedAssignmentId) -> Self {
+        Self::AnnotatedAssignment(value)
+    }
+}
+
+impl From<LocalNamedExprId> for Definition {
+    fn from(value: LocalNamedExprId) -> Self {
+        Self::NamedExpr(value)
     }
 }
 
@@ -41,6 +71,6 @@ pub struct ImportDefinition {
 pub struct ImportFromDefinition {
     pub(super) import_id: LocalImportFromId,
 
-    /// Index into [`ruff_python_ast::StmtImport::names`].
+    /// Index into [`ruff_python_ast::StmtImportFrom::names`].
     pub(super) name: u32,
 }

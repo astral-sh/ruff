@@ -72,7 +72,7 @@ pub fn global_symbol(db: &dyn Db, file: VfsFile, name: &str) -> Option<GlobalSym
     root_scope.symbol(db, name)
 }
 
-/// The symbol table for an entire file.
+/// The symbol tables for an entire file.
 #[derive(Debug)]
 pub struct SemanticIndex {
     /// List of all symbol tables in this file, indexed by scope.
@@ -84,9 +84,6 @@ pub struct SemanticIndex {
     /// Maps expressions to their corresponding scope.
     /// We can't use [`ExpressionId`] here, because the challenge is how to get from
     /// an [`ast::Expr`] to an [`ExpressionId`] (which requires knowing the scope).
-    ///
-    /// Note: We should not depend on this map when analysing other files or
-    /// changing a file invalidates all dependents.
     expression_scopes: FxHashMap<NodeKey, ScopeId>,
 
     /// Lookup table to map between node ids and ast nodes.
@@ -109,11 +106,13 @@ impl SemanticIndex {
         &self.ast_ids[scope_id]
     }
 
+    /// Returns the ID of the `expression`'s enclosing scope.
     #[allow(unused)]
     pub(crate) fn expression_scope_id(&self, expression: &ast::Expr) -> ScopeId {
         self.expression_scopes[&NodeKey::from_node(expression)]
     }
 
+    /// Returns the [`Scope`] of the `expression`'s enclosing scope.
     #[allow(unused)]
     pub(crate) fn expression_scope(&self, expression: &ast::Expr) -> &Scope {
         &self.scopes[self.expression_scope_id(expression)]
@@ -249,6 +248,7 @@ impl<'a> Iterator for ChildrenIter<'a> {
 }
 
 impl FusedIterator for ChildrenIter<'_> {}
+
 #[cfg(test)]
 mod tests {
     use ruff_db::parsed::parsed_module;
