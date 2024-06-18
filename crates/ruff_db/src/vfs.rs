@@ -6,8 +6,8 @@ use dashmap::mapref::entry::Entry;
 pub use crate::vendored::{VendoredPath, VendoredPathBuf};
 pub use path::VfsPath;
 
+use crate::file_revision::FileRevision;
 use crate::file_system::FileSystemPath;
-use crate::metadata::FileRevision;
 use crate::vendored::VendoredFileSystem;
 use crate::vfs::private::FileStatus;
 use crate::{Db, FxDashMap};
@@ -356,7 +356,7 @@ mod private {
 
 #[cfg(test)]
 mod tests {
-    use crate::metadata::FileRevision;
+    use crate::file_revision::FileRevision;
     use crate::tests::TestDb;
     use crate::vfs::{system_path_to_file, vendored_path_to_file};
 

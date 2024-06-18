@@ -5,13 +5,18 @@ use std::sync::{Mutex, MutexGuard};
 use itertools::Itertools;
 use zip::{read::ZipFile, ZipArchive};
 
-use crate::metadata::FileRevision;
+use crate::file_revision::FileRevision;
 pub use path::{VendoredPath, VendoredPathBuf};
 
 pub mod path;
 
 type Result<T> = io::Result<T>;
 
+/// File system that stores all content in a static zip archive
+/// bundled as part of the Ruff binary.
+///
+/// "Files" in the `VendoredFileSystem` are read-only and immutable.
+/// Directories are supported, but symlinks and hardlinks cannot exist.
 #[derive(Debug)]
 pub struct VendoredFileSystem {
     inner: VendoredFileSystemInner,
@@ -28,6 +33,11 @@ impl VendoredFileSystem {
         let normalized = normalize_vendored_path(path);
         let inner_locked = self.inner.lock();
         let mut archive = inner_locked.borrow_mut();
+
+        // Must probe the zipfile twice, as "stdlib" and "stdlib/" are considered
+        // different paths in a zip file, but we want to abstract over that difference here
+        // so that paths relative to the `VendoredFileSystem`
+        // work the same as other paths in Ruff.
         archive.lookup_path(&normalized).is_ok()
             || archive
                 .lookup_path(&normalized.with_trailing_slash())
@@ -37,19 +47,28 @@ impl VendoredFileSystem {
     pub fn metadata(&self, path: &VendoredPath) -> Option<Metadata> {
         let normalized = normalize_vendored_path(path);
         let inner_locked = self.inner.lock();
-        let mut archive = inner_locked.borrow_mut();
 
+        // Must probe the zipfile twice, as "stdlib" and "stdlib/" are considered
+        // different paths in a zip file, but we want to abstract over that difference here
+        // so that paths relative to the `VendoredFileSystem`
+        // work the same as other paths in Ruff.
+        let mut archive = inner_locked.borrow_mut();
         if let Ok(zip_file) = archive.lookup_path(&normalized) {
             return Some(Metadata::from_zip_file(zip_file));
         }
-        
         if let Ok(zip_file) = archive.lookup_path(&normalized.with_trailing_slash()) {
             return Some(Metadata::from_zip_file(zip_file));
         }
+
         None
     }
 
-    /// Read the entire contents of the path into a string
+    /// Read the entire contents of the zip file at `path` into a string
+    ///
+    /// Returns an Err() if any of the following are true:
+    /// - The path does not exist in the underlying zip archive
+    /// - The path exists in the underlying zip archive, but represents a directory
+    /// - The contents of the zip file at `path` contain invalid UTF-8
     pub fn read(&self, path: &VendoredPath) -> Result<String> {
         let inner_locked = self.inner.lock();
         let mut archive = inner_locked.borrow_mut();
@@ -243,6 +262,7 @@ mod tests {
         let path = VendoredPath::new(dirname);
 
         assert!(mock_typeshed.exists(path));
+        assert!(mock_typeshed.read(path).is_err());
         let metadata = mock_typeshed.metadata(path).unwrap();
         assert!(metadata.kind.is_directory());
     }

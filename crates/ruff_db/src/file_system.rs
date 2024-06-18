@@ -4,7 +4,7 @@ use std::path::{Path, StripPrefixError};
 
 use camino::{Utf8Path, Utf8PathBuf};
 
-use crate::metadata::FileRevision;
+use crate::file_revision::FileRevision;
 pub use memory::MemoryFileSystem;
 pub use os::OsFileSystem;
 
