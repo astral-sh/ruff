@@ -38,9 +38,11 @@ impl VendoredFileSystem {
         let normalized = normalize_vendored_path(path);
         let inner_locked = self.inner.lock();
         let mut archive = inner_locked.borrow_mut();
+
         if let Ok(zip_file) = archive.lookup_path(&normalized) {
             return Some(Metadata::from_zip_file(zip_file));
         }
+        
         if let Ok(zip_file) = archive.lookup_path(&normalized.with_trailing_slash()) {
             return Some(Metadata::from_zip_file(zip_file));
         }
