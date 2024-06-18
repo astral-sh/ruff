@@ -61,7 +61,7 @@ preview = true
 ```
 
 By default, Ruff does not log anything to Helix. To enable logging, set the `RUFF_TRACE` environment variable
-to either `messages` or `verbose`. This will set the trace level for this server.
+to either `messages` or `verbose`.
 
 ```toml
 [language-server.ruff]
