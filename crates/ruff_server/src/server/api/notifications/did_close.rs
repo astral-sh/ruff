@@ -1,4 +1,3 @@
-use crate::edit::DocumentKey;
 use crate::server::api::diagnostics::clear_diagnostics_for_document;
 use crate::server::api::LSPResult;
 use crate::server::client::{Notifier, Requester};
@@ -30,13 +29,6 @@ impl super::SyncNotificationHandler for DidClose {
         clear_diagnostics_for_document(snapshot.query(), &notifier)?;
 
         let key = snapshot.query().make_key();
-
-        // Notebook cells will go through the `textDocument/didClose` path.
-        // We still want to publish empty diagnostics for them, but we
-        // shouldn't call `session.close_document` on them.
-        if matches!(key, DocumentKey::NotebookCell(_)) {
-            return Ok(());
-        }
 
         session
             .close_document(&key)
