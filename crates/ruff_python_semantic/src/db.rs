@@ -7,8 +7,10 @@ use crate::module::resolver::{
     resolve_module_query,
 };
 
-use crate::red_knot::semantic_index::symbol::{public_symbols_map, PublicSymbolId, ScopeId};
-use crate::red_knot::semantic_index::{root_scope, scopes_map, semantic_index, symbol_table};
+use crate::red_knot::semantic_index::symbol::{
+    public_symbols_map, scopes_map, PublicSymbolId, ScopeId,
+};
+use crate::red_knot::semantic_index::{root_scope, semantic_index, symbol_table};
 use crate::red_knot::types::{infer_types, public_symbol_ty};
 
 #[salsa::jar(db=Db)]

@@ -12,7 +12,7 @@ use crate::red_knot::node_key::NodeKey;
 use crate::red_knot::semantic_index::ast_ids::{AstId, AstIds, ScopeClassId, ScopeFunctionId};
 use crate::red_knot::semantic_index::builder::SemanticIndexBuilder;
 use crate::red_knot::semantic_index::symbol::{
-    FileScopeId, PublicSymbolId, Scope, ScopeId, ScopeKind, ScopeSymbolId, ScopesMap, SymbolTable,
+    FileScopeId, PublicSymbolId, Scope, ScopeId, ScopeKind, ScopeSymbolId, SymbolTable,
 };
 use crate::Db;
 
@@ -43,20 +43,6 @@ pub(crate) fn symbol_table(db: &dyn Db, scope: ScopeId) -> Arc<SymbolTable> {
     let index = semantic_index(db, scope.file(db));
 
     index.symbol_table(scope.file_id(db))
-}
-
-/// Returns a mapping from file specific [`FileScopeId`] to a program-wide unique [`ScopeId`].
-#[salsa::tracked(return_ref)]
-pub(crate) fn scopes_map(db: &dyn Db, file: VfsFile) -> ScopesMap {
-    let index = semantic_index(db, file);
-
-    let scopes: IndexVec<_, _> = index
-        .scopes
-        .indices()
-        .map(|id| ScopeId::new(db, file, id))
-        .collect();
-
-    ScopesMap::new(scopes)
 }
 
 /// Returns the root scope of `file`.

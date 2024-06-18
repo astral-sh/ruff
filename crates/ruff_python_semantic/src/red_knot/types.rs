@@ -34,7 +34,17 @@ pub(crate) fn expression_ty(db: &dyn Db, file: VfsFile, expression: &ast::Expr) 
     infer_types(db, scope).expression_ty(expression_id)
 }
 
-/// Resolves the public type`symbol`.
+/// Infers the type of a public symbol.
+///
+/// This is a Salsa query to get symbol-level  invalidation instead of file-level dependency invalidation.
+/// Without this being a query, changing any public type of a module would invalidate the type inference
+/// for the module scope of its dependents and the transitive dependents because:
+///
+/// * The [`TypeInference`] struct changes for the module
+/// * The dependency reruns type inference for the module scope. But its [`TypeInference`] type is
+///   going to change as well because the local symbol of the import variable has now a different type.
+///
+/// This being a query ensures that the invalidation short-circuits if the type of this symbol didn't change.
 #[tracing::instrument(level = "debug", skip(db))]
 #[salsa::tracked]
 pub fn public_symbol_ty(db: &dyn Db, symbol: PublicSymbolId) -> Type {
@@ -51,11 +61,12 @@ pub fn public_symbol_ty_by_name(db: &dyn Db, file: VfsFile, name: &str) -> Optio
     Some(public_symbol_ty(db, symbol))
 }
 
+/// Infers the type for `scope`.
 #[salsa::tracked(return_ref)]
 pub(crate) fn infer_types(db: &dyn Db, scope: ScopeId) -> TypeInference {
     let file = scope.file(db);
     // Using the index here is fine because the code below depends on the AST anyway.
-    // The isolation of the query is by the return infered types.
+    // The isolation of the query is by the return inferred types.
     let index = semantic_index(db, file);
 
     let scope_id = scope.file_id(db);
@@ -135,7 +146,7 @@ impl Type {
             Type::None => todo!("attribute lookup on None type"),
             Type::Function(_) => todo!("attribute lookup on Function type"),
             Type::Module(module) => module.member(context, name),
-            Type::Class(class) => class.own_class_member(context, name),
+            Type::Class(class) => class.class_member(context, name),
             Type::Instance(_) => {
                 // TODO MRO? get_own_instance_member, get_instance_member
                 todo!("attribute lookup on Instance type")
@@ -160,9 +171,12 @@ impl Type {
     }
 }
 
+/// ID that uniquely identifies a type in a program.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub struct TypeId<L> {
+    /// The scope in which this type is defined or was created.
     scope: ScopeId,
+    /// The type's local ID in its scope.
     local: L,
 }
 
@@ -178,6 +192,7 @@ where
         self.local
     }
 
+    /// Resolves the type ID to the actual type.
     pub(crate) fn lookup<'a>(self, context: &'a TypingContext) -> &'a Id::Ty
     where
         Id: LocalTypeId,
@@ -186,12 +201,20 @@ where
         self.local.lookup_local(types)
     }
 }
+
+/// ID that uniquely identifies a type in a scope.
 pub(crate) trait LocalTypeId {
+    /// The type that this ID points to.
     type Ty;
 
+    /// Looks up the type in `index`.
+    ///
+    /// ## Panics
+    /// May panic if this type is from another scope than `index`, or might just return an invalid type.
     fn lookup_local(self, index: &TypeInference) -> &Self::Ty;
 }
 
+/// ID uniquely identifying a function type in a `scope`.
 #[newtype_index]
 pub struct LocalFunctionTypeId;
 
@@ -234,6 +257,25 @@ impl LocalTypeId for LocalClassTypeId {
 }
 
 impl TypeId<LocalClassTypeId> {
+    /// Returns the class member of this class named `name`.
+    ///
+    /// The member resolves to a member of the class itself or any of its bases.
+    fn class_member(self, context: &TypingContext, name: &Name) -> Option<Type> {
+        if let Some(member) = self.own_class_member(context, name) {
+            return Some(member);
+        }
+
+        let class = self.lookup(context);
+        for base in &class.bases {
+            if let Some(member) = base.member(context, name) {
+                return Some(member);
+            }
+        }
+
+        None
+    }
+
+    /// Returns the inferred type of the class member named `name`.
     fn own_class_member(self, context: &TypingContext, name: &Name) -> Option<Type> {
         let class = self.lookup(context);
 
@@ -414,6 +456,10 @@ impl<'a> TypingContext<'a> {
         })
     }
 
+    /// Resolves the public type of a symbol named `name` defined in `file`.
+    ///
+    /// This function calls [`public_symbol_ty`] if the local scope isn't the module scope of `file`.
+    /// It otherwise tries to resolve the symbol type locally.
     fn public_symbol_ty(&self, file: VfsFile, name: &Name) -> Option<Type> {
         let symbol = public_symbol(self.db, file, name)?;
 
@@ -436,15 +482,17 @@ mod tests {
     use salsa::AsId;
 
     use ruff_db::file_system::FileSystemPathBuf;
+    use ruff_db::parsed::parsed_module;
     use ruff_db::vfs::system_path_to_file;
 
     use crate::db::tests::TestDb;
     use crate::module::resolver::{set_module_resolution_settings, ModuleResolutionSettings};
     use crate::red_knot::semantic_index::root_scope;
-    use crate::red_knot::types::{infer_types, public_symbol_ty_by_name, TypingContext};
+    use crate::red_knot::types::{
+        expression_ty, infer_types, public_symbol_ty_by_name, TypingContext,
+    };
 
-    #[test]
-    fn dependency_public_symbol_type_change() -> anyhow::Result<()> {
+    fn setup_db() -> TestDb {
         let mut db = TestDb::new();
         set_module_resolution_settings(
             &mut db,
@@ -455,6 +503,34 @@ mod tests {
                 custom_typeshed: None,
             },
         );
+
+        db
+    }
+
+    #[test]
+    fn local_inference() -> anyhow::Result<()> {
+        let db = setup_db();
+
+        db.memory_file_system().write_file("/src/a.py", "x = 10")?;
+        let a = system_path_to_file(&db, "/src/a.py").unwrap();
+
+        let parsed = parsed_module(&db, a);
+
+        let statement = parsed.suite().first().unwrap().as_assign_stmt().unwrap();
+
+        let literal_ty = expression_ty(&db, a, &statement.value);
+
+        assert_eq!(
+            format!("{}", literal_ty.display(&TypingContext::global(&db))),
+            "Literal[10]"
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn dependency_public_symbol_type_change() -> anyhow::Result<()> {
+        let mut db = setup_db();
 
         db.memory_file_system().write_files([
             ("/src/a.py", "from foo import x"),
@@ -505,16 +581,7 @@ mod tests {
 
     #[test]
     fn dependency_non_public_symbol_change() -> anyhow::Result<()> {
-        let mut db = TestDb::new();
-        set_module_resolution_settings(
-            &mut db,
-            ModuleResolutionSettings {
-                extra_paths: vec![],
-                workspace_root: FileSystemPathBuf::from("/src"),
-                site_packages: None,
-                custom_typeshed: None,
-            },
-        );
+        let mut db = setup_db();
 
         db.memory_file_system().write_files([
             ("/src/a.py", "from foo import x"),
@@ -565,16 +632,7 @@ mod tests {
 
     #[test]
     fn dependency_unrelated_public_symbol() -> anyhow::Result<()> {
-        let mut db = TestDb::new();
-        set_module_resolution_settings(
-            &mut db,
-            ModuleResolutionSettings {
-                extra_paths: vec![],
-                workspace_root: FileSystemPathBuf::from("/src"),
-                site_packages: None,
-                custom_typeshed: None,
-            },
-        );
+        let mut db = setup_db();
 
         db.memory_file_system().write_files([
             ("/src/a.py", "from foo import x"),

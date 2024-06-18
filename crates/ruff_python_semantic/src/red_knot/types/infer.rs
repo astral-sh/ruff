@@ -106,7 +106,7 @@ pub(super) struct TypeInferenceBuilder<'a> {
 }
 
 impl<'a> TypeInferenceBuilder<'a> {
-    /// Creates a new builder for infering the types of `scope`.
+    /// Creates a new builder for inferring the types of `scope`.
     pub(super) fn new(db: &'a dyn Db, scope: ScopeId, index: &'a SemanticIndex) -> Self {
         let file_scope_id = scope.file_id(db);
         let file = scope.file(db);
@@ -813,7 +813,7 @@ class Sub(Base):
         };
 
         let context = TypingContext::global(&db);
-        let member_ty = class_id.own_class_member(&context, &Name::new("f"));
+        let member_ty = class_id.class_member(&context, &Name::new("f"));
 
         let Some(Type::Function(func_id)) = member_ty else {
             panic!("C.f is not a Function");

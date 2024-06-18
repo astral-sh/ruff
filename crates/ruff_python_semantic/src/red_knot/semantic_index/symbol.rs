@@ -15,7 +15,7 @@ use ruff_index::{newtype_index, IndexVec};
 
 use crate::name::Name;
 use crate::red_knot::semantic_index::definition::Definition;
-use crate::red_knot::semantic_index::{root_scope, scopes_map, symbol_table, SymbolMap};
+use crate::red_knot::semantic_index::{root_scope, semantic_index, symbol_table, SymbolMap};
 use crate::Db;
 
 #[derive(Eq, PartialEq, Debug)]
@@ -127,6 +127,20 @@ impl ScopeSymbolId {
     }
 }
 
+/// Returns a mapping from [`FileScopeId`] to globally unique [`ScopeId`].
+#[salsa::tracked(return_ref)]
+pub(crate) fn scopes_map(db: &dyn Db, file: VfsFile) -> ScopesMap {
+    let index = semantic_index(db, file);
+
+    let scopes: IndexVec<_, _> = index
+        .scopes
+        .indices()
+        .map(|id| ScopeId::new(db, file, id))
+        .collect();
+
+    ScopesMap { scopes }
+}
+
 /// Maps from the file specific [`FileScopeId`] to the global [`ScopeId`] that can be used as a Salsa query parameter.
 ///
 /// The [`SemanticIndex`] uses [`FileScopeId`] on a per-file level to identify scopes
@@ -138,10 +152,6 @@ pub(crate) struct ScopesMap {
 }
 
 impl ScopesMap {
-    pub(super) fn new(scopes: IndexVec<FileScopeId, ScopeId>) -> Self {
-        Self { scopes }
-    }
-
     /// Gets the program-wide unique scope id for the given file specific `scope_id`.
     fn get(&self, scope: FileScopeId) -> ScopeId {
         self.scopes[scope]
