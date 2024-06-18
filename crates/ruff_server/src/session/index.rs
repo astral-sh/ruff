@@ -337,6 +337,11 @@ impl Index {
     }
 
     pub(super) fn close_document(&mut self, key: &DocumentKey) -> crate::Result<()> {
+        // Notebook cells URIs are removed from the index here, instead of during
+        // `update_notebook_document`. This is because a notebook cell, as a text document,
+        // is requested to be `closed` by VS Code after the notebook gets updated.
+        // This is not documented in the LSP specification explicitly, and this assumption
+        // may need revisiting in the future as we support more editors with notebook support.
         if let DocumentKey::NotebookCell(uri) = key {
             if self.notebook_cells.remove(uri).is_none() {
                 tracing::warn!("Tried to remove a notebook cell that does not exist: {uri}",);
