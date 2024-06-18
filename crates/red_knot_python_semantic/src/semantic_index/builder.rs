@@ -8,18 +8,16 @@ use ruff_python_ast as ast;
 use ruff_python_ast::visitor::{walk_expr, walk_stmt, Visitor};
 
 use crate::name::Name;
-use crate::red_knot::node_key::NodeKey;
-use crate::red_knot::semantic_index::ast_ids::{
+use crate::node_key::NodeKey;
+use crate::semantic_index::ast_ids::{
     AstId, AstIdsBuilder, ScopeAssignmentId, ScopeClassId, ScopeFunctionId, ScopeImportFromId,
     ScopeImportId, ScopeNamedExprId,
 };
-use crate::red_knot::semantic_index::definition::{
-    Definition, ImportDefinition, ImportFromDefinition,
-};
-use crate::red_knot::semantic_index::symbol::{
+use crate::semantic_index::definition::{Definition, ImportDefinition, ImportFromDefinition};
+use crate::semantic_index::symbol::{
     FileScopeId, FileSymbolId, Scope, ScopedSymbolId, SymbolFlags, SymbolTableBuilder,
 };
-use crate::red_knot::semantic_index::{NodeWithScopeId, SemanticIndex};
+use crate::semantic_index::{NodeWithScopeId, SemanticIndex};
 
 pub(super) struct SemanticIndexBuilder<'a> {
     // Builder state

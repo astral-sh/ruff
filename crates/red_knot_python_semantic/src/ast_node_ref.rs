@@ -93,7 +93,7 @@ unsafe impl<T> Sync for AstNodeRef<T> where T: Sync {}
 
 #[cfg(test)]
 mod tests {
-    use crate::red_knot::ast_node_ref::AstNodeRef;
+    use crate::ast_node_ref::AstNodeRef;
     use ruff_db::parsed::ParsedModule;
     use ruff_python_ast::PySourceType;
     use ruff_python_parser::parse_unchecked_source;

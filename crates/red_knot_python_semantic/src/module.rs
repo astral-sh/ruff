@@ -312,7 +312,7 @@ struct ModuleSearchPathInner {
 /// for the standard library are moved higher up to match Python's semantics at runtime.
 ///
 /// [the order given in the typing spec]: https://typing.readthedocs.io/en/latest/spec/distributing.html#import-resolution-ordering
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, is_macro::Is)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub enum ModuleSearchPathKind {
     /// "Extra" paths provided by the user in a config file, env var or CLI flag.
     /// E.g. mypy's `MYPYPATH` env var, or pyright's `stubPath` configuration setting

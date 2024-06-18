@@ -6,10 +6,10 @@ use ruff_index::{newtype_index, IndexVec};
 use ruff_python_ast as ast;
 use ruff_python_ast::AnyNodeRef;
 
-use crate::red_knot::ast_node_ref::AstNodeRef;
-use crate::red_knot::node_key::NodeKey;
-use crate::red_knot::semantic_index::semantic_index;
-use crate::red_knot::semantic_index::symbol::{FileScopeId, ScopeId};
+use crate::ast_node_ref::AstNodeRef;
+use crate::node_key::NodeKey;
+use crate::semantic_index::semantic_index;
+use crate::semantic_index::symbol::{FileScopeId, ScopeId};
 use crate::Db;
 
 /// AST ids for a single scope.
@@ -98,7 +98,6 @@ pub trait AstIdNode {
     /// ## Panics
     /// May panic if the node does not belongs to `file`'s AST or is outside of `scope`. It may also
     /// return an incorrect node if that's the case.
-
     fn ast_id(&self, db: &dyn Db, file: VfsFile, scope: FileScopeId) -> AstId<Self::ScopeId>;
 
     /// Resolves the AST node for `id`.

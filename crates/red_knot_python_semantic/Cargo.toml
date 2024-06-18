@@ -1,5 +1,5 @@
 [package]
-name = "ruff_python_semantic"
+name = "red_knot_python_semantic"
 version = "0.0.0"
 publish = false
 authors = { workspace = true }
@@ -11,16 +11,20 @@ repository = { workspace = true }
 license = { workspace = true }
 
 [dependencies]
+ruff_db = { workspace = true }
 ruff_index = { workspace = true }
 ruff_python_ast = { workspace = true }
 ruff_python_stdlib = { workspace = true }
-ruff_source_file = { workspace = true }
 ruff_text_size = { workspace = true }
 
 bitflags = { workspace = true }
-is-macro = { workspace = true }
+indexmap = { workspace = true }
+salsa = { workspace = true }
+smallvec = { workspace = true }
 smol_str = { workspace = true }
+tracing = { workspace = true }
 rustc-hash = { workspace = true }
+hashbrown = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }

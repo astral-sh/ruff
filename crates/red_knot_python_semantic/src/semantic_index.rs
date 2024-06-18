@@ -8,10 +8,10 @@ use ruff_db::vfs::VfsFile;
 use ruff_index::{IndexSlice, IndexVec};
 use ruff_python_ast as ast;
 
-use crate::red_knot::node_key::NodeKey;
-use crate::red_knot::semantic_index::ast_ids::{AstId, AstIds, ScopeClassId, ScopeFunctionId};
-use crate::red_knot::semantic_index::builder::SemanticIndexBuilder;
-use crate::red_knot::semantic_index::symbol::{
+use crate::node_key::NodeKey;
+use crate::semantic_index::ast_ids::{AstId, AstIds, ScopeClassId, ScopeFunctionId};
+use crate::semantic_index::builder::SemanticIndexBuilder;
+use crate::semantic_index::symbol::{
     FileScopeId, PublicSymbolId, Scope, ScopeId, ScopeKind, ScopedSymbolId, SymbolTable,
 };
 use crate::Db;
@@ -272,8 +272,8 @@ mod tests {
     use ruff_db::vfs::{system_path_to_file, VfsFile};
 
     use crate::db::tests::TestDb;
-    use crate::red_knot::semantic_index::symbol::{FileScopeId, ScopeKind, SymbolTable};
-    use crate::red_knot::semantic_index::{root_scope, semantic_index, symbol_table};
+    use crate::semantic_index::symbol::{FileScopeId, ScopeKind, SymbolTable};
+    use crate::semantic_index::{root_scope, semantic_index, symbol_table};
 
     struct TestCase {
         db: TestDb,

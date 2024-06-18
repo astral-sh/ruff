@@ -12,6 +12,9 @@ license.workspace = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+red_knot_python_semantic = { workspace = true }
+
+ruff_db = { workspace = true }
 ruff_python_parser = { workspace = true }
 ruff_python_ast = { workspace = true }
 ruff_python_stdlib = { workspace = true }
