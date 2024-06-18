@@ -10,29 +10,29 @@ use ruff_python_ast::visitor::{walk_expr, walk_stmt, Visitor};
 use crate::name::Name;
 use crate::red_knot::node_key::NodeKey;
 use crate::red_knot::semantic_index::ast_ids::{
-    AstIdsBuilder, LocalAssignmentId, LocalClassId, LocalFunctionId, LocalImportFromId,
-    LocalImportId, LocalNamedExprId,
+    AstIdsBuilder, ScopeAssignmentId, ScopeClassId, ScopeFunctionId, ScopeImportFromId,
+    ScopeImportId, ScopeNamedExprId,
 };
 use crate::red_knot::semantic_index::definition::{
     Definition, ImportDefinition, ImportFromDefinition,
 };
 use crate::red_knot::semantic_index::symbol::{
-    LocalSymbolId, Scope, ScopeId, ScopeKind, SymbolFlags, SymbolId, SymbolTableBuilder,
+    FileScopeId, FileSymbolId, Scope, ScopeKind, ScopeSymbolId, SymbolFlags, SymbolTableBuilder,
 };
 use crate::red_knot::semantic_index::SemanticIndex;
 
 pub(super) struct SemanticIndexBuilder<'a> {
     // Builder state
     module: &'a ParsedModule,
-    scope_stack: Vec<ScopeId>,
+    scope_stack: Vec<FileScopeId>,
     /// the definition whose target(s) we are currently walking
     current_definition: Option<Definition>,
 
     // Semantic Index fields
-    scopes: IndexVec<ScopeId, Scope>,
-    symbol_tables: IndexVec<ScopeId, SymbolTableBuilder>,
-    ast_ids: IndexVec<ScopeId, AstIdsBuilder>,
-    expression_scopes: FxHashMap<NodeKey, ScopeId>,
+    scopes: IndexVec<FileScopeId, Scope>,
+    symbol_tables: IndexVec<FileScopeId, SymbolTableBuilder>,
+    ast_ids: IndexVec<FileScopeId, AstIdsBuilder>,
+    expression_scopes: FxHashMap<NodeKey, FileScopeId>,
 }
 
 impl<'a> SemanticIndexBuilder<'a> {
@@ -59,7 +59,7 @@ impl<'a> SemanticIndexBuilder<'a> {
         builder
     }
 
-    fn current_scope(&self) -> ScopeId {
+    fn current_scope(&self) -> FileScopeId {
         *self
             .scope_stack
             .last()
@@ -70,7 +70,7 @@ impl<'a> SemanticIndexBuilder<'a> {
         &mut self,
         scope_kind: ScopeKind,
         name: &Name,
-        defining_symbol: Option<SymbolId>,
+        defining_symbol: Option<FileSymbolId>,
         definition: Option<Definition>,
     ) {
         let parent = self.current_scope();
@@ -81,9 +81,9 @@ impl<'a> SemanticIndexBuilder<'a> {
         &mut self,
         scope_kind: ScopeKind,
         name: &Name,
-        defining_symbol: Option<SymbolId>,
+        defining_symbol: Option<FileSymbolId>,
         definition: Option<Definition>,
-        parent: Option<ScopeId>,
+        parent: Option<FileScopeId>,
     ) {
         let children_start = self.scopes.next_index() + 1;
 
@@ -102,7 +102,7 @@ impl<'a> SemanticIndexBuilder<'a> {
         self.scope_stack.push(scope_id);
     }
 
-    fn pop_scope(&mut self) -> ScopeId {
+    fn pop_scope(&mut self) -> FileScopeId {
         let id = self.scope_stack.pop().expect("Root scope to be present");
         let children_end = self.scopes.next_index();
         let scope = &mut self.scopes[id];
@@ -120,7 +120,7 @@ impl<'a> SemanticIndexBuilder<'a> {
         &mut self.ast_ids[scope_id]
     }
 
-    fn add_or_update_symbol(&mut self, name: Name, flags: SymbolFlags) -> LocalSymbolId {
+    fn add_or_update_symbol(&mut self, name: Name, flags: SymbolFlags) -> ScopeSymbolId {
         let scope = self.current_scope();
         let symbol_table = self.current_symbol_table();
 
@@ -132,7 +132,7 @@ impl<'a> SemanticIndexBuilder<'a> {
         name: Name,
 
         definition: Definition,
-    ) -> LocalSymbolId {
+    ) -> ScopeSymbolId {
         let scope = self.current_scope();
         let symbol_table = self.current_symbol_table();
 
@@ -144,9 +144,9 @@ impl<'a> SemanticIndexBuilder<'a> {
         name: &Name,
         params: &Option<Box<ast::TypeParams>>,
         definition: Option<Definition>,
-        defining_symbol: SymbolId,
-        nested: impl FnOnce(&mut Self) -> ScopeId,
-    ) -> ScopeId {
+        defining_symbol: FileSymbolId,
+        nested: impl FnOnce(&mut Self) -> FileScopeId,
+    ) -> FileScopeId {
         if let Some(type_params) = params {
             self.push_scope(
                 ScopeKind::Annotation,
@@ -223,9 +223,9 @@ impl Visitor<'_> for SemanticIndexBuilder<'_> {
                     self.visit_decorator(decorator);
                 }
                 let name = Name::new(&function_def.name.id);
-                let definition = Definition::FunctionDef(LocalFunctionId(statement_id));
+                let definition = Definition::FunctionDef(ScopeFunctionId(statement_id));
                 let scope = self.current_scope();
-                let symbol = SymbolId::new(
+                let symbol = FileSymbolId::new(
                     scope,
                     self.add_or_update_symbol_with_definition(name.clone(), definition),
                 );
@@ -258,8 +258,8 @@ impl Visitor<'_> for SemanticIndexBuilder<'_> {
                 }
 
                 let name = Name::new(&class.name.id);
-                let definition = Definition::from(LocalClassId(statement_id));
-                let id = SymbolId::new(
+                let definition = Definition::from(ScopeClassId(statement_id));
+                let id = FileSymbolId::new(
                     self.current_scope(),
                     self.add_or_update_symbol_with_definition(name.clone(), definition),
                 );
@@ -283,7 +283,7 @@ impl Visitor<'_> for SemanticIndexBuilder<'_> {
                     };
 
                     let def = Definition::Import(ImportDefinition {
-                        import_id: LocalImportId(statement_id),
+                        import_id: ScopeImportId(statement_id),
                         alias: u32::try_from(i).unwrap(),
                     });
                     self.add_or_update_symbol_with_definition(Name::new(symbol_name), def);
@@ -302,7 +302,7 @@ impl Visitor<'_> for SemanticIndexBuilder<'_> {
                         alias.name.id.as_str()
                     };
                     let def = Definition::ImportFrom(ImportFromDefinition {
-                        import_id: LocalImportFromId(statement_id),
+                        import_id: ScopeImportFromId(statement_id),
                         name: u32::try_from(i).unwrap(),
                     });
                     self.add_or_update_symbol_with_definition(Name::new(symbol_name), def);
@@ -312,7 +312,7 @@ impl Visitor<'_> for SemanticIndexBuilder<'_> {
                 debug_assert!(self.current_definition.is_none());
                 self.visit_expr(&node.value);
                 self.current_definition =
-                    Some(Definition::Assignment(LocalAssignmentId(statement_id)));
+                    Some(Definition::Assignment(ScopeAssignmentId(statement_id)));
                 for target in &node.targets {
                     self.visit_expr(target);
                 }
@@ -358,7 +358,7 @@ impl Visitor<'_> for SemanticIndexBuilder<'_> {
             ast::Expr::Named(node) => {
                 debug_assert!(self.current_definition.is_none());
                 self.current_definition =
-                    Some(Definition::NamedExpr(LocalNamedExprId(expression_id)));
+                    Some(Definition::NamedExpr(ScopeNamedExprId(expression_id)));
                 // TODO walrus in comprehensions is implicitly nonlocal
                 self.visit_expr(&node.target);
                 self.current_definition = None;

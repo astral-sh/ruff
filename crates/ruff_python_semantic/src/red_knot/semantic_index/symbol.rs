@@ -3,7 +3,7 @@
 #![allow(clippy::used_underscore_binding)]
 
 use std::hash::{Hash, Hasher};
-use std::ops::{Index, Range};
+use std::ops::Range;
 
 use bitflags::bitflags;
 use hashbrown::hash_map::RawEntryMut;
@@ -15,21 +15,21 @@ use ruff_index::{newtype_index, IndexVec};
 
 use crate::name::Name;
 use crate::red_knot::semantic_index::definition::Definition;
-use crate::red_knot::semantic_index::{symbol_table, SymbolMap};
+use crate::red_knot::semantic_index::{scopes_map, symbol_table, SymbolMap};
 use crate::Db;
 
 #[derive(Eq, PartialEq, Debug)]
 pub struct Symbol {
     name: Name,
     flags: SymbolFlags,
-    scope: ScopeId,
+    scope: FileScopeId,
 
     /// The nodes that define this symbol, in source order.
     definitions: SmallVec<[Definition; 4]>,
 }
 
 impl Symbol {
-    fn new(name: Name, scope: ScopeId, definition: Option<Definition>) -> Self {
+    fn new(name: Name, scope: FileScopeId, definition: Option<Definition>) -> Self {
         Self {
             name,
             scope,
@@ -52,7 +52,7 @@ impl Symbol {
     }
 
     /// The scope in which this symbol is defined.
-    pub fn scope(&self) -> ScopeId {
+    pub fn scope(&self) -> FileScopeId {
         self.scope
     }
 
@@ -83,42 +83,15 @@ bitflags! {
     }
 }
 
-/// ID that uniquely identifies a symbol, across modules.
+/// ID that uniquely identifies a public symbol defined in a module's root scope.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
-pub struct GlobalSymbol {
-    scope: GlobalScope,
-    symbol: LocalSymbolId,
-}
-
-impl GlobalSymbol {
-    pub(crate) fn new(scope: GlobalScope, symbol: LocalSymbolId) -> Self {
-        Self { scope, symbol }
-    }
-
-    pub fn scope(self) -> GlobalScope {
-        self.scope
-    }
-
-    pub fn symbol(self) -> LocalSymbolId {
-        self.symbol
-    }
-}
-
-impl From<GlobalSymbol> for LocalSymbolId {
-    fn from(val: GlobalSymbol) -> Self {
-        val.symbol()
-    }
-}
-
-/// ID that uniquely identifies a symbol in a module.
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
-pub struct SymbolId {
+pub struct PublicSymbolId {
     scope: ScopeId,
-    symbol: LocalSymbolId,
+    symbol: ScopeSymbolId,
 }
 
-impl SymbolId {
-    pub(super) fn new(scope: ScopeId, symbol: LocalSymbolId) -> Self {
+impl PublicSymbolId {
+    pub(crate) fn new(scope: ScopeId, symbol: ScopeSymbolId) -> Self {
         Self { scope, symbol }
     }
 
@@ -126,82 +99,110 @@ impl SymbolId {
         self.scope
     }
 
-    pub fn symbol(self) -> LocalSymbolId {
+    pub(crate) fn scope_symbol(self) -> ScopeSymbolId {
         self.symbol
     }
 }
 
-impl From<SymbolId> for LocalSymbolId {
-    fn from(val: SymbolId) -> Self {
+impl From<PublicSymbolId> for ScopeSymbolId {
+    fn from(val: PublicSymbolId) -> Self {
+        val.scope_symbol()
+    }
+}
+
+/// ID that uniquely identifies a symbol in a file.
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+pub struct FileSymbolId {
+    scope: FileScopeId,
+    symbol: ScopeSymbolId,
+}
+
+impl FileSymbolId {
+    pub(super) fn new(scope: FileScopeId, symbol: ScopeSymbolId) -> Self {
+        Self { scope, symbol }
+    }
+
+    pub fn scope(self) -> FileScopeId {
+        self.scope
+    }
+
+    pub(crate) fn symbol(self) -> ScopeSymbolId {
+        self.symbol
+    }
+}
+
+impl From<FileSymbolId> for ScopeSymbolId {
+    fn from(val: FileSymbolId) -> Self {
         val.symbol()
     }
 }
 
 /// Symbol ID that uniquely identifies a symbol inside a [`Scope`].
 #[newtype_index]
-pub struct LocalSymbolId;
+pub(crate) struct ScopeSymbolId;
 
-/// Maps from the file specific [`ScopeId`] to the global [`GlobalScope`] that can be used as a Salsa query parameter.
+/// Maps from the file specific [`FileScopeId`] to the global [`ScopeId`] that can be used as a Salsa query parameter.
 ///
-/// The [`SemanticIndex`] uses [`ScopeId`] on a per-file level to identify scopes
+/// The [`SemanticIndex`] uses [`FileScopeId`] on a per-file level to identify scopes
 /// because they allow for more efficient storage of associated data
-/// (use of an [`IndexVec`] keyed by [`ScopeId`] over an [`FxHashMap`] keyed by [`GlobalScope`]).
+/// (use of an [`IndexVec`] keyed by [`FileScopeId`] over an [`FxHashMap`] keyed by [`ScopeId`]).
 #[derive(Eq, PartialEq, Debug)]
-pub struct ScopesMap {
-    scopes: IndexVec<ScopeId, GlobalScope>,
+pub(crate) struct ScopesMap {
+    scopes: IndexVec<FileScopeId, ScopeId>,
 }
 
 impl ScopesMap {
-    pub(super) fn new(scopes: IndexVec<ScopeId, GlobalScope>) -> Self {
+    pub(super) fn new(scopes: IndexVec<FileScopeId, ScopeId>) -> Self {
         Self { scopes }
     }
-}
 
-impl Index<ScopeId> for ScopesMap {
-    type Output = GlobalScope;
-
-    fn index(&self, index: ScopeId) -> &Self::Output {
-        &self.scopes[index]
+    /// Gets the program-wide unique scope id for the given file specific `scope_id`.
+    fn get(&self, scope_id: FileScopeId) -> ScopeId {
+        self.scopes[scope_id]
     }
 }
 
 /// A cross-module identifier of a scope that can be used as a salsa query parameter.
 #[salsa::tracked]
-pub struct GlobalScope {
+pub struct ScopeId {
     #[allow(clippy::used_underscore_binding)]
     pub file: VfsFile,
-    pub scope_id: ScopeId,
+    pub scope_id: FileScopeId,
 }
 
-impl GlobalScope {
+impl ScopeId {
     /// Resolves the symbol named `name` in this scope.
-    pub fn symbol(self, db: &dyn Db, name: &str) -> Option<GlobalSymbol> {
+    pub fn symbol(self, db: &dyn Db, name: &str) -> Option<PublicSymbolId> {
         let symbol_table = symbol_table(db, self);
-        let local_id = symbol_table.symbol_id_by_name(name)?;
+        let in_scope_id = symbol_table.symbol_id_by_name(name)?;
 
-        Some(GlobalSymbol::new(self, local_id))
+        Some(PublicSymbolId::new(self, in_scope_id))
     }
 }
 
 /// ID that uniquely identifies a scope inside of a module.
 #[newtype_index]
-pub struct ScopeId;
+pub struct FileScopeId;
 
-impl ScopeId {
+impl FileScopeId {
     /// Returns the scope id of the Root scope.
     pub fn root() -> Self {
-        ScopeId::from_u32(0)
+        FileScopeId::from_u32(0)
+    }
+
+    pub fn to_scope_id(self, db: &dyn Db, file: VfsFile) -> ScopeId {
+        scopes_map(db, file).get(self)
     }
 }
 
 #[derive(Debug, Eq, PartialEq)]
 pub struct Scope {
     pub(super) name: Name,
-    pub(super) parent: Option<ScopeId>,
+    pub(super) parent: Option<FileScopeId>,
     pub(super) definition: Option<Definition>,
-    pub(super) defining_symbol: Option<SymbolId>,
+    pub(super) defining_symbol: Option<FileSymbolId>,
     pub(super) kind: ScopeKind,
-    pub(super) descendents: Range<ScopeId>,
+    pub(super) descendents: Range<FileScopeId>,
 }
 
 impl Scope {
@@ -213,11 +214,11 @@ impl Scope {
         self.definition
     }
 
-    pub fn defining_symbol(&self) -> Option<SymbolId> {
+    pub fn defining_symbol(&self) -> Option<FileSymbolId> {
         self.defining_symbol
     }
 
-    pub fn parent(self) -> Option<ScopeId> {
+    pub fn parent(self) -> Option<FileScopeId> {
         self.parent
     }
 
@@ -238,7 +239,7 @@ pub enum ScopeKind {
 #[derive(Debug)]
 pub struct SymbolTable {
     /// The symbols in this scope.
-    symbols: IndexVec<LocalSymbolId, Symbol>,
+    symbols: IndexVec<ScopeSymbolId, Symbol>,
 
     /// The symbols indexed by name.
     symbols_by_name: SymbolMap,
@@ -256,11 +257,12 @@ impl SymbolTable {
         self.symbols.shrink_to_fit();
     }
 
-    pub fn symbol(&self, symbol_id: impl Into<LocalSymbolId>) -> &Symbol {
+    pub(crate) fn symbol(&self, symbol_id: impl Into<ScopeSymbolId>) -> &Symbol {
         &self.symbols[symbol_id.into()]
     }
 
-    pub fn symbol_ids(&self) -> impl Iterator<Item = LocalSymbolId> {
+    #[allow(unused)]
+    pub(crate) fn symbol_ids(&self) -> impl Iterator<Item = ScopeSymbolId> {
         self.symbols.indices()
     }
 
@@ -275,8 +277,8 @@ impl SymbolTable {
         Some(self.symbol(id))
     }
 
-    /// Returns the [`LocalSymbolId`] of the symbol named `name`.
-    pub(crate) fn symbol_id_by_name(&self, name: &str) -> Option<LocalSymbolId> {
+    /// Returns the [`ScopeSymbolId`] of the symbol named `name`.
+    pub(crate) fn symbol_id_by_name(&self, name: &str) -> Option<ScopeSymbolId> {
         let (id, ()) = self
             .symbols_by_name
             .raw_entry()
@@ -318,10 +320,10 @@ impl SymbolTableBuilder {
     pub(super) fn add_or_update_symbol(
         &mut self,
         name: Name,
-        scope: ScopeId,
+        scope: FileScopeId,
         flags: SymbolFlags,
         definition: Option<Definition>,
-    ) -> LocalSymbolId {
+    ) -> ScopeSymbolId {
         let hash = SymbolTable::hash_name(&name);
         let entry = self
             .table
