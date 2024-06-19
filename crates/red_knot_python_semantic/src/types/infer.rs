@@ -1,4 +1,5 @@
 use rustc_hash::FxHashMap;
+use std::borrow::Cow;
 use std::sync::Arc;
 
 use red_knot_module_resolver::resolve_module;
@@ -487,35 +488,38 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         match ctx {
             ExprContext::Load => {
-                if let Some(symbol_id) = self
-                    .index
-                    .symbol_table(self.file_scope_id)
-                    .symbol_id_by_name(id)
-                {
-                    self.local_definition_ty(symbol_id)
-                } else {
-                    let ancestors = self.index.ancestor_scopes(self.file_scope_id).skip(1);
+                let ancestors = self.index.ancestor_scopes(self.file_scope_id);
 
-                    for (ancestor_id, _) in ancestors {
-                        // TODO: Skip over class scopes unless the they are a immediately-nested type param scope.
-                        // TODO: Support built-ins
+                for (ancestor_id, _) in ancestors {
+                    // TODO: Skip over class scopes unless the they are a immediately-nested type param scope.
+                    // TODO: Support built-ins
 
+                    let (symbol_table, ancestor_scope) = if ancestor_id == self.file_scope_id {
+                        (Cow::Borrowed(&self.symbol_table), None)
+                    } else {
                         let ancestor_scope = ancestor_id.to_scope_id(self.db, self.file_id);
-                        let symbol_table = symbol_table(self.db, ancestor_scope);
+                        (
+                            Cow::Owned(symbol_table(self.db, ancestor_scope)),
+                            Some(ancestor_scope),
+                        )
+                    };
 
-                        if let Some(symbol_id) = symbol_table.symbol_id_by_name(id) {
-                            let symbol = symbol_table.symbol(symbol_id);
+                    if let Some(symbol_id) = symbol_table.symbol_id_by_name(id) {
+                        let symbol = symbol_table.symbol(symbol_id);
 
-                            if !symbol.is_defined() {
-                                continue;
-                            }
-
-                            let types = infer_types(self.db, ancestor_scope);
-                            return types.symbol_ty(symbol_id);
+                        if !symbol.is_defined() {
+                            continue;
                         }
+
+                        return if let Some(ancestor_scope) = ancestor_scope {
+                            let types = infer_types(self.db, ancestor_scope);
+                            types.symbol_ty(symbol_id)
+                        } else {
+                            self.local_definition_ty(symbol_id)
+                        };
                     }
-                    Type::Unknown
                 }
+                Type::Unknown
             }
             ExprContext::Del => Type::None,
             ExprContext::Invalid => Type::Unknown,
