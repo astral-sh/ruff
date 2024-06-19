@@ -139,60 +139,70 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 24..29,
+                    range: 24..37,
                     value: FString(
                         ExprFString {
-                            range: 24..29,
+                            range: 24..37,
                             value: FStringValue {
-                                inner: Single(
-                                    FString(
-                                        FString {
-                                            range: 24..29,
-                                            elements: [
-                                                Expression(
-                                                    FStringExpressionElement {
-                                                        range: 26..27,
-                                                        expression: Name(
-                                                            ExprName {
-                                                                range: 27..27,
-                                                                id: "",
-                                                                ctx: Invalid,
-                                                            },
-                                                        ),
-                                                        debug_text: None,
-                                                        conversion: None,
-                                                        format_spec: None,
-                                                    },
-                                                ),
-                                            ],
-                                            flags: FStringFlags {
-                                                quote_style: Double,
-                                                prefix: Regular,
-                                                triple_quoted: false,
+                                inner: Concatenated(
+                                    [
+                                        FString(
+                                            FString {
+                                                range: 24..29,
+                                                elements: [
+                                                    Expression(
+                                                        FStringExpressionElement {
+                                                            range: 26..27,
+                                                            expression: Name(
+                                                                ExprName {
+                                                                    range: 27..27,
+                                                                    id: "",
+                                                                    ctx: Invalid,
+                                                                },
+                                                            ),
+                                                            debug_text: None,
+                                                            conversion: None,
+                                                            format_spec: None,
+                                                        },
+                                                    ),
+                                                ],
+                                                flags: FStringFlags {
+                                                    quote_style: Double,
+                                                    prefix: Regular,
+                                                    triple_quoted: false,
+                                                },
                                             },
-                                        },
-                                    ),
+                                        ),
+                                        FString(
+                                            FString {
+                                                range: 29..37,
+                                                elements: [
+                                                    Expression(
+                                                        FStringExpressionElement {
+                                                            range: 33..34,
+                                                            expression: Name(
+                                                                ExprName {
+                                                                    range: 34..34,
+                                                                    id: "",
+                                                                    ctx: Invalid,
+                                                                },
+                                                            ),
+                                                            debug_text: None,
+                                                            conversion: None,
+                                                            format_spec: None,
+                                                        },
+                                                    ),
+                                                ],
+                                                flags: FStringFlags {
+                                                    quote_style: Double,
+                                                    prefix: Regular,
+                                                    triple_quoted: true,
+                                                },
+                                            },
+                                        ),
+                                    ],
                                 ),
                             },
-                        },
-                    ),
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    range: 33..38,
-                    value: Set(
-                        ExprSet {
-                            range: 33..38,
-                            elts: [
-                                Name(
-                                    ExprName {
-                                        range: 34..34,
-                                        id: "",
-                                        ctx: Invalid,
-                                    },
-                                ),
-                            ],
                         },
                     ),
                 },
@@ -319,12 +329,10 @@ Module(
 
 
   |
-2 |   f"{foo!r"
-3 |   f"{foo="
-4 |   f"{"
-  |  _____^
-5 | | f"""{"""
-  | |_^ Syntax Error: Expected FStringEnd, found FStringMiddle
+3 | f"{foo="
+4 | f"{"
+5 | f"""{"""
+  | ^^^^ Syntax Error: Expected FStringEnd, found FStringStart
   |
 
 
@@ -332,15 +340,7 @@ Module(
 3 | f"{foo="
 4 | f"{"
 5 | f"""{"""
-  |  ^^^ Syntax Error: Expected a statement
-  |
-
-
-  |
-3 | f"{foo="
-4 | f"{"
-5 | f"""{"""
-  |______^
+  |      ^^^ Syntax Error: Expected an expression
   |
 
 
