@@ -727,15 +727,32 @@ fn stdin_format_jupyter() {
 fn stdin_parse_error() {
     let mut cmd = RuffCheck::default().build();
     assert_cmd_snapshot!(cmd
-        .pass_stdin("from foo import =\n"), @r###"
+        .pass_stdin("from foo import\n"), @r###"
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:17: E999 SyntaxError: Expected an import name
+    -:1:16: E999 SyntaxError: Expected one or more symbol names after import
     Found 1 error.
 
     ----- stderr -----
-    error: Failed to parse at 1:17: Expected an import name
+    error: Failed to parse at 1:16: Expected one or more symbol names after import
+    "###);
+}
+
+#[test]
+fn stdin_multiple_parse_error() {
+    let mut cmd = RuffCheck::default().build();
+    assert_cmd_snapshot!(cmd
+        .pass_stdin("from foo import\nbar =\n"), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:1:16: E999 SyntaxError: Expected one or more symbol names after import
+    -:2:6: E999 SyntaxError: Expected an expression
+    Found 2 errors.
+
+    ----- stderr -----
+    error: Failed to parse at 1:16: Expected one or more symbol names after import
     "###);
 }
 
