@@ -59,7 +59,7 @@ pub(crate) fn root_scope(db: &dyn Db, file: VfsFile) -> ScopeId<'_> {
 
 /// Returns the symbol with the given name in `file`'s public scope or `None` if
 /// no symbol with the given name exists.
-pub fn public_symbol<'db>(
+pub(crate) fn public_symbol<'db>(
     db: &'db dyn Db,
     file: VfsFile,
     name: &str,
@@ -72,7 +72,7 @@ pub fn public_symbol<'db>(
 
 /// The symbol tables for an entire file.
 #[derive(Debug)]
-pub struct SemanticIndex<'db> {
+pub(crate) struct SemanticIndex<'db> {
     /// List of all symbol tables in this file, indexed by scope.
     symbol_tables: IndexVec<FileScopeId, Arc<SymbolTable<'db>>>,
 

@@ -47,8 +47,9 @@ pub(crate) fn public_symbol_ty<'db>(db: &'db dyn Db, symbol: PublicSymbolId<'db>
     inference.symbol_ty(symbol.scoped_symbol_id(db))
 }
 
-/// Shorthand for `public_symbol_ty` that takes a symbol name instead of a [`PublicSymbolId`].
-pub fn public_symbol_ty_by_name<'db>(
+/// Shorthand for [`public_symbol_ty()`] that takes a symbol name instead of a [`PublicSymbolId`].
+#[allow(unused)]
+pub(crate) fn public_symbol_ty_by_name<'db>(
     db: &'db dyn Db,
     file: VfsFile,
     name: &str,

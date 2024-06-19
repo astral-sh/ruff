@@ -3,7 +3,9 @@
 use std::path::Path;
 use std::sync::Mutex;
 
+use camino::Utf8Path;
 use crossbeam::channel as crossbeam_channel;
+use salsa::ParallelDatabase;
 use tracing::subscriber::Interest;
 use tracing::{Level, Metadata};
 use tracing_subscriber::filter::LevelFilter;
@@ -11,12 +13,20 @@ use tracing_subscriber::layer::{Context, Filter, SubscriberExt};
 use tracing_subscriber::{Layer, Registry};
 use tracing_tree::time::Uptime;
 
-use red_knot::db::{HasJar, ParallelDatabase, QueryError, SourceDb, SourceJar};
-use red_knot::module::{set_module_search_paths, ModuleResolutionInputs};
-use red_knot::program::check::ExecutionMode;
-use red_knot::program::{FileWatcherChange, Program};
-use red_knot::watch::FileWatcher;
 use red_knot::Workspace;
+
+mod db;
+mod lint;
+mod program;
+mod watch;
+
+use crate::program::check::ExecutionMode;
+use crate::program::{FileWatcherChange, Program};
+use crate::watch::FileWatcher;
+pub use db::{Db, Jar};
+use red_knot_module_resolver::{set_module_resolution_settings, ModuleResolutionSettings};
+use ruff_db::file_system::{FileSystemPathBuf, OsFileSystem};
+use ruff_db::vfs::system_path_to_file;
 
 #[allow(clippy::print_stdout, clippy::unnecessary_wraps, clippy::print_stderr)]
 fn main() -> anyhow::Result<()> {
@@ -29,7 +39,7 @@ fn main() -> anyhow::Result<()> {
         return Err(anyhow::anyhow!("Invalid arguments"));
     }
 
-    let entry_point = Path::new(&arguments[1]);
+    let entry_point = Utf8Path::new(&arguments[1]);
 
     if !entry_point.exists() {
         eprintln!("The entry point does not exist.");
@@ -41,22 +51,25 @@ fn main() -> anyhow::Result<()> {
         return Err(anyhow::anyhow!("Invalid arguments"));
     }
 
+    let entry_point = FileSystemPathBuf::from_utf8_path_buf(entry_point.to_path_buf());
+
     let workspace_folder = entry_point.parent().unwrap();
     let workspace = Workspace::new(workspace_folder.to_path_buf());
 
     let workspace_search_path = workspace.root().to_path_buf();
 
-    let search_paths = ModuleResolutionInputs {
-        extra_paths: vec![],
-        workspace_root: workspace_search_path,
-        site_packages: None,
-        custom_typeshed: None,
-    };
+    let mut program = Program::new(workspace, OsFileSystem::default());
+    set_module_resolution_settings(
+        &mut program,
+        ModuleResolutionSettings {
+            extra_paths: vec![],
+            workspace_root: workspace_search_path,
+            site_packages: None,
+            custom_typeshed: None,
+        },
+    );
 
-    let mut program = Program::new(workspace);
-    set_module_search_paths(&mut program, search_paths);
-
-    let entry_id = program.file_id(entry_point);
+    let entry_id = system_path_to_file(&program, entry_point.clone()).unwrap();
     program.workspace_mut().open_file(entry_id);
 
     let (main_loop, main_loop_cancellation_token) = MainLoop::new();
@@ -78,14 +91,11 @@ fn main() -> anyhow::Result<()> {
         file_changes_notifier.notify(changes);
     })?;
 
-    file_watcher.watch_folder(workspace_folder)?;
+    file_watcher.watch_folder(workspace_folder.as_std_path())?;
 
     main_loop.run(&mut program);
 
-    let source_jar: &SourceJar = program.jar().unwrap();
-
-    dbg!(source_jar.parsed.statistics());
-    dbg!(source_jar.sources.statistics());
+    println!("{}", countme::get_all());
 
     Ok(())
 }
@@ -134,6 +144,7 @@ impl MainLoop {
 
         for message in &self.main_loop_receiver {
             tracing::trace!("Main Loop: Tick");
+            println!("{}", countme::get_all());
 
             match message {
                 MainLoopMessage::CheckProgram { revision } => {
@@ -142,21 +153,20 @@ impl MainLoop {
 
                     // Spawn a new task that checks the program. This needs to be done in a separate thread
                     // to prevent blocking the main loop here.
-                    rayon::spawn(move || match program.check(ExecutionMode::ThreadPool) {
-                        Ok(result) => {
-                            sender
-                                .send(OrchestratorMessage::CheckProgramCompleted {
-                                    diagnostics: result,
-                                    revision,
-                                })
-                                .unwrap();
-                        }
-                        Err(QueryError::Cancelled) => {}
+                    rayon::spawn(move || {
+                        let result = program.check(ExecutionMode::ThreadPool);
+                        sender
+                            .send(OrchestratorMessage::CheckProgramCompleted {
+                                diagnostics: result,
+                                revision,
+                            })
+                            .unwrap();
                     });
                 }
                 MainLoopMessage::ApplyChanges(changes) => {
                     // Automatically cancels any pending queries and waits for them to complete.
-                    program.apply_changes(changes);
+                    // TODO apply changes
+                    // program.apply_changes(changes);
                 }
                 MainLoopMessage::CheckCompleted(diagnostics) => {
                     dbg!(diagnostics);

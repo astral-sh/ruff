@@ -13,25 +13,22 @@ license.workspace = true
 
 [dependencies]
 red_knot_module_resolver = { workspace = true }
+red_knot_python_semantic = { workspace = true }
 
-ruff_python_parser = { workspace = true }
+ruff_db = { workspace = true }
 ruff_python_ast = { workspace = true }
 ruff_text_size = { workspace = true }
-ruff_index = { workspace = true }
-ruff_notebook = { workspace = true }
 
 anyhow = { workspace = true }
-bitflags = { workspace = true }
+camino = { workspace = true }
+countme = { workspace = true, features = ["enable"] }
 crossbeam = { workspace = true }
 ctrlc = { version = "3.4.4" }
-dashmap = { workspace = true }
-hashbrown = { workspace = true }
-indexmap = { workspace = true }
-is-macro = { workspace = true }
 notify = { workspace = true }
 parking_lot = { workspace = true }
 rayon = { workspace = true }
 rustc-hash = { workspace = true }
+salsa = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 tracing-tree = { workspace = true }

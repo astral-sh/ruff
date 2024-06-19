@@ -104,6 +104,7 @@ impl Vfs {
     ///
     /// The operation always succeeds even if the path doesn't exist on disk, isn't accessible or if the path points to a directory.
     /// In these cases, a file with status [`FileStatus::Deleted`] is returned.
+    #[tracing::instrument(level = "debug", skip(self, db))]
     fn file_system(&self, db: &dyn Db, path: &FileSystemPath) -> VfsFile {
         *self
             .inner
@@ -135,6 +136,7 @@ impl Vfs {
 
     /// Looks up a vendored file by its path. Returns `Some` if a vendored file for the given path
     /// exists and `None` otherwise.
+    #[tracing::instrument(level = "debug", skip(self, db))]
     fn vendored(&self, db: &dyn Db, path: &VendoredPath) -> Option<VfsFile> {
         let file = match self
             .inner
