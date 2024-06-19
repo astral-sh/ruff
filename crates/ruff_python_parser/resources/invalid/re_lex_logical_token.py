@@ -55,3 +55,9 @@ if call(f"hello {x
 if call(f"hello
     def bar():
         pass
+
+
+# There are trailing whitespace before the newline character but those whitespaces are
+# part of the comment token
+f"""hello {x # comment    
+y = 1

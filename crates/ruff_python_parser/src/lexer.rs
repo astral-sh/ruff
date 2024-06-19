@@ -1370,17 +1370,16 @@ impl<'src> Lexer<'src> {
         // i.e., it recovered from an unclosed parenthesis (`(`, `[`, or `{`).
         self.nesting -= 1;
 
-        let current_position = self.current_range().start();
+        let mut current_position = self.current_range().start();
         let reverse_chars = self.source[..current_position.to_usize()].chars().rev();
-        let mut new_position = current_position;
-        let mut has_newline = false;
+        let mut newline_position = None;
 
         for ch in reverse_chars {
             if is_python_whitespace(ch) {
-                new_position -= ch.text_len();
+                current_position -= ch.text_len();
             } else if matches!(ch, '\n' | '\r') {
-                has_newline |= true;
-                new_position -= ch.text_len();
+                current_position -= ch.text_len();
+                newline_position = Some(current_position);
             } else {
                 break;
             }
@@ -1388,7 +1387,7 @@ impl<'src> Lexer<'src> {
 
         // The lexer should only be moved if there's a newline character which needs to be
         // re-lexed.
-        if new_position != current_position && has_newline {
+        if let Some(newline_position) = newline_position {
             // Earlier we reduced the nesting level unconditionally. Now that we know the lexer's
             // position is going to be moved back, the lexer needs to be put back into a
             // parenthesized context if the current token is a closing parenthesis.
@@ -1410,7 +1409,7 @@ impl<'src> Lexer<'src> {
             }
 
             self.cursor = Cursor::new(self.source);
-            self.cursor.skip_bytes(new_position.to_usize());
+            self.cursor.skip_bytes(newline_position.to_usize());
             self.state = State::Other;
             self.next_token();
             true
