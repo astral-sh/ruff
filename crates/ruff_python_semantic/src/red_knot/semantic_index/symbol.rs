@@ -78,7 +78,9 @@ bitflags! {
 /// ID that uniquely identifies a public symbol defined in a module's root scope.
 #[salsa::tracked]
 pub struct PublicSymbolId {
+    #[id]
     pub(crate) file: VfsFile,
+    #[id]
     pub(crate) scope_id: ScopeSymbolId,
 }
 
@@ -190,7 +192,9 @@ impl PublicSymbolsMap {
 #[salsa::tracked]
 pub struct ScopeId {
     #[allow(clippy::used_underscore_binding)]
+    #[id]
     pub file: VfsFile,
+    #[id]
     pub file_id: FileScopeId,
 }
 
