@@ -1370,6 +1370,12 @@ impl<'src> Lexer<'src> {
         // i.e., it recovered from an unclosed parenthesis (`(`, `[`, or `{`).
         self.nesting -= 1;
 
+        // The lexer can't be moved back for a triple-quoted f-string because the newlines are
+        // part of the f-string itself, so there is no newline token to be emitted.
+        if self.current_flags.is_triple_quoted_fstring() {
+            return false;
+        }
+
         let mut current_position = self.current_range().start();
         let reverse_chars = self.source[..current_position.to_usize()].chars().rev();
         let mut newline_position = None;
@@ -1576,6 +1582,11 @@ impl TokenFlags {
     /// Returns `true` if the token is an f-string.
     const fn is_f_string(self) -> bool {
         self.intersects(TokenFlags::F_STRING)
+    }
+
+    /// Returns `true` if the token is a triple-quoted f-string.
+    fn is_triple_quoted_fstring(self) -> bool {
+        self.contains(TokenFlags::F_STRING | TokenFlags::TRIPLE_QUOTED_STRING)
     }
 
     /// Returns `true` if the token is a raw string.
