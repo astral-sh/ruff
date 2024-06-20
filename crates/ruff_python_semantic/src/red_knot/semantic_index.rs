@@ -12,7 +12,7 @@ use crate::red_knot::node_key::NodeKey;
 use crate::red_knot::semantic_index::ast_ids::{AstId, AstIds, ScopeClassId, ScopeFunctionId};
 use crate::red_knot::semantic_index::builder::SemanticIndexBuilder;
 use crate::red_knot::semantic_index::symbol::{
-    FileScopeId, PublicSymbolId, Scope, ScopeId, ScopeKind, ScopeSymbolId, SymbolTable,
+    FileScopeId, PublicSymbolId, Scope, ScopeId, ScopeKind, ScopedSymbolId, SymbolTable,
 };
 use crate::Db;
 
@@ -21,7 +21,7 @@ mod builder;
 pub mod definition;
 pub mod symbol;
 
-type SymbolMap = hashbrown::HashMap<ScopeSymbolId, (), ()>;
+type SymbolMap = hashbrown::HashMap<ScopedSymbolId, (), ()>;
 
 /// Returns the semantic index for `file`.
 ///
@@ -42,7 +42,7 @@ pub(crate) fn semantic_index(db: &dyn Db, file: VfsFile) -> SemanticIndex {
 pub(crate) fn symbol_table(db: &dyn Db, scope: ScopeId) -> Arc<SymbolTable> {
     let index = semantic_index(db, scope.file(db));
 
-    index.symbol_table(scope.file_id(db))
+    index.symbol_table(scope.file_scope_id(db))
 }
 
 /// Returns the root scope of `file`.
@@ -80,6 +80,7 @@ pub struct SemanticIndex {
     /// changing a file invalidates all dependents.
     ast_ids: IndexVec<FileScopeId, AstIds>,
 
+    /// Map from scope to the node that introduces the scope.
     scope_nodes: IndexVec<FileScopeId, NodeWithScopeId>,
 }
 

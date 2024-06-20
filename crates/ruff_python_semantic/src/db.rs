@@ -6,7 +6,6 @@ use crate::module::resolver::{
     file_to_module, internal::ModuleNameIngredient, internal::ModuleResolverSearchPaths,
     resolve_module_query,
 };
-
 use crate::red_knot::semantic_index::symbol::{
     public_symbols_map, scopes_map, PublicSymbolId, ScopeId,
 };
@@ -35,9 +34,13 @@ pub trait Db: SourceDb + DbWithJar<Jar> + Upcast<dyn SourceDb> {}
 
 #[cfg(test)]
 pub(crate) mod tests {
+    use std::fmt::Formatter;
+    use std::marker::PhantomData;
     use std::sync::Arc;
 
-    use salsa::DebugWithDb;
+    use salsa::ingredient::Ingredient;
+    use salsa::storage::HasIngredientsFor;
+    use salsa::{AsId, DebugWithDb};
 
     use ruff_db::file_system::{FileSystem, MemoryFileSystem, OsFileSystem};
     use ruff_db::vfs::Vfs;
@@ -94,7 +97,7 @@ pub(crate) mod tests {
         ///
         /// ## Panics
         /// If there are any pending salsa snapshots.
-        pub(crate) fn take_sale_events(&mut self) -> Vec<salsa::Event> {
+        pub(crate) fn take_salsa_events(&mut self) -> Vec<salsa::Event> {
             let inner = Arc::get_mut(&mut self.events).expect("no pending salsa snapshots");
 
             let events = inner.get_mut().unwrap();
@@ -106,7 +109,7 @@ pub(crate) mod tests {
         /// ## Panics
         /// If there are any pending salsa snapshots.
         pub(crate) fn clear_salsa_events(&mut self) {
-            self.take_sale_events();
+            self.take_salsa_events();
         }
     }
 
@@ -157,5 +160,107 @@ pub(crate) mod tests {
         Memory(MemoryFileSystem),
         #[allow(unused)]
         Os(OsFileSystem),
+    }
+
+    pub(crate) fn assert_will_run_function_query<C, Db, Jar>(
+        db: &Db,
+        to_function: impl FnOnce(&C) -> &salsa::function::FunctionIngredient<C>,
+        key: C::Key,
+        events: &[salsa::Event],
+    ) where
+        C: salsa::function::Configuration<Jar = Jar>
+            + salsa::storage::IngredientsFor<Jar = Jar, Ingredients = C>,
+        Jar: HasIngredientsFor<C>,
+        Db: salsa::DbWithJar<Jar>,
+        C::Key: AsId,
+    {
+        will_run_function_query(db, to_function, key, events, true);
+    }
+
+    pub(crate) fn assert_will_not_run_function_query<C, Db, Jar>(
+        db: &Db,
+        to_function: impl FnOnce(&C) -> &salsa::function::FunctionIngredient<C>,
+        key: C::Key,
+        events: &[salsa::Event],
+    ) where
+        C: salsa::function::Configuration<Jar = Jar>
+            + salsa::storage::IngredientsFor<Jar = Jar, Ingredients = C>,
+        Jar: HasIngredientsFor<C>,
+        Db: salsa::DbWithJar<Jar>,
+        C::Key: AsId,
+    {
+        will_run_function_query(db, to_function, key, events, false);
+    }
+
+    fn will_run_function_query<C, Db, Jar>(
+        db: &Db,
+        to_function: impl FnOnce(&C) -> &salsa::function::FunctionIngredient<C>,
+        key: C::Key,
+        events: &[salsa::Event],
+        should_run: bool,
+    ) where
+        C: salsa::function::Configuration<Jar = Jar>
+            + salsa::storage::IngredientsFor<Jar = Jar, Ingredients = C>,
+        Jar: HasIngredientsFor<C>,
+        Db: salsa::DbWithJar<Jar>,
+        C::Key: AsId,
+    {
+        let (jar, _) =
+            <_ as salsa::storage::HasJar<<C as salsa::storage::IngredientsFor>::Jar>>::jar(db);
+        let ingredient = jar.ingredient();
+
+        let function_ingredient = to_function(ingredient);
+
+        let ingredient_index =
+            <salsa::function::FunctionIngredient<C> as Ingredient<Db>>::ingredient_index(
+                function_ingredient,
+            );
+
+        let did_run = events.iter().any(|event| {
+            if let salsa::EventKind::WillExecute { database_key } = event.kind {
+                database_key.ingredient_index() == ingredient_index
+                    && database_key.key_index() == key.as_id()
+            } else {
+                false
+            }
+        });
+
+        if should_run && !did_run {
+            panic!(
+                "Expected query {:?} to run but it didn't",
+                DebugIdx {
+                    db: PhantomData::<Db>,
+                    value_id: key.as_id(),
+                    ingredient: function_ingredient,
+                }
+            );
+        } else if !should_run && did_run {
+            panic!(
+                "Expected query {:?} not to run but it did",
+                DebugIdx {
+                    db: PhantomData::<Db>,
+                    value_id: key.as_id(),
+                    ingredient: function_ingredient,
+                }
+            );
+        }
+    }
+
+    struct DebugIdx<'a, I, Db>
+    where
+        I: Ingredient<Db>,
+    {
+        value_id: salsa::Id,
+        ingredient: &'a I,
+        db: PhantomData<Db>,
+    }
+
+    impl<'a, I, Db> std::fmt::Debug for DebugIdx<'a, I, Db>
+    where
+        I: Ingredient<Db>,
+    {
+        fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+            self.ingredient.fmt_index(Some(self.value_id), f)
+        }
     }
 }

@@ -66,7 +66,7 @@ impl std::fmt::Debug for AstIds {
 }
 
 fn ast_ids(db: &dyn Db, scope: ScopeId) -> &AstIds {
-    semantic_index(db, scope.file(db)).ast_ids(scope.file_id(db))
+    semantic_index(db, scope.file(db)).ast_ids(scope.file_scope_id(db))
 }
 
 /// Node that can be uniquely identified by an id in a [`FileScopeId`].

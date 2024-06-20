@@ -15,12 +15,12 @@ use crate::red_knot::semantic_index::definition::{
     Definition, ImportDefinition, ImportFromDefinition,
 };
 use crate::red_knot::semantic_index::symbol::{
-    FileScopeId, ScopeId, ScopeKind, ScopeSymbolId, SymbolTable,
+    FileScopeId, ScopeId, ScopeKind, ScopedSymbolId, SymbolTable,
 };
 use crate::red_knot::semantic_index::{symbol_table, ChildrenIter, SemanticIndex};
 use crate::red_knot::types::{
-    ClassType, FunctionType, IntersectionType, LocalClassTypeId, LocalFunctionTypeId,
-    LocalIntersectionTypeId, LocalUnionTypeId, ModuleType, Type, TypeId, TypingContext, UnionType,
+    ClassType, FunctionType, IntersectionType, ModuleType, ScopedClassTypeId, ScopedFunctionTypeId,
+    ScopedIntersectionTypeId, ScopedUnionTypeId, Type, TypeId, TypingContext, UnionType,
     UnionTypeBuilder,
 };
 use crate::Db;
@@ -32,19 +32,19 @@ pub(crate) struct TypeInference {
     module_type: Option<ModuleType>,
 
     /// The types of the defined classes in this scope.
-    class_types: IndexVec<LocalClassTypeId, ClassType>,
+    class_types: IndexVec<ScopedClassTypeId, ClassType>,
 
     /// The types of the defined functions in this scope.
-    function_types: IndexVec<LocalFunctionTypeId, FunctionType>,
+    function_types: IndexVec<ScopedFunctionTypeId, FunctionType>,
 
-    union_types: IndexVec<LocalUnionTypeId, UnionType>,
-    intersection_types: IndexVec<LocalIntersectionTypeId, IntersectionType>,
+    union_types: IndexVec<ScopedUnionTypeId, UnionType>,
+    intersection_types: IndexVec<ScopedIntersectionTypeId, IntersectionType>,
 
     /// The types of every expression in this scope.
     expression_tys: IndexVec<ScopeExpressionId, Type>,
 
     /// The public types of every symbol in this scope.
-    symbol_tys: IndexVec<ScopeSymbolId, Type>,
+    symbol_tys: IndexVec<ScopedSymbolId, Type>,
 }
 
 impl TypeInference {
@@ -53,7 +53,7 @@ impl TypeInference {
         self.expression_tys[expression]
     }
 
-    pub(super) fn symbol_ty(&self, symbol: ScopeSymbolId) -> Type {
+    pub(super) fn symbol_ty(&self, symbol: ScopedSymbolId) -> Type {
         self.symbol_tys[symbol]
     }
 
@@ -61,19 +61,19 @@ impl TypeInference {
         self.module_type.as_ref().unwrap()
     }
 
-    pub(super) fn class_ty(&self, id: LocalClassTypeId) -> &ClassType {
+    pub(super) fn class_ty(&self, id: ScopedClassTypeId) -> &ClassType {
         &self.class_types[id]
     }
 
-    pub(super) fn function_ty(&self, id: LocalFunctionTypeId) -> &FunctionType {
+    pub(super) fn function_ty(&self, id: ScopedFunctionTypeId) -> &FunctionType {
         &self.function_types[id]
     }
 
-    pub(super) fn union_ty(&self, id: LocalUnionTypeId) -> &UnionType {
+    pub(super) fn union_ty(&self, id: ScopedUnionTypeId) -> &UnionType {
         &self.union_types[id]
     }
 
-    pub(super) fn intersection_ty(&self, id: LocalIntersectionTypeId) -> &IntersectionType {
+    pub(super) fn intersection_ty(&self, id: ScopedIntersectionTypeId) -> &IntersectionType {
         &self.intersection_types[id]
     }
 
@@ -108,7 +108,7 @@ pub(super) struct TypeInferenceBuilder<'a> {
 impl<'a> TypeInferenceBuilder<'a> {
     /// Creates a new builder for inferring the types of `scope`.
     pub(super) fn new(db: &'a dyn Db, scope: ScopeId, index: &'a SemanticIndex) -> Self {
-        let file_scope_id = scope.file_id(db);
+        let file_scope_id = scope.file_scope_id(db);
         let file = scope.file(db);
         let children_scopes = index.child_scopes(file_scope_id);
         let symbol_table = index.symbol_table(file_scope_id);
@@ -127,50 +127,50 @@ impl<'a> TypeInferenceBuilder<'a> {
         }
     }
 
-    /// Lowers `module` to types.
-    pub(super) fn lower_module(&mut self, module: &ast::ModModule) {
-        self.lower_body(&module.body);
+    /// Infers the types of a `module`.
+    pub(super) fn infer_module(&mut self, module: &ast::ModModule) {
+        self.infer_body(&module.body);
     }
 
-    pub(super) fn lower_class_type_params(&mut self, class: &ast::StmtClassDef) {
+    pub(super) fn infer_class_type_params(&mut self, class: &ast::StmtClassDef) {
         if let Some(type_params) = class.type_params.as_deref() {
-            self.lower_type_parameters(type_params);
+            self.infer_type_parameters(type_params);
         }
     }
 
-    pub(super) fn lower_class_body(&mut self, class: &ast::StmtClassDef) {
-        self.lower_body(&class.body);
+    pub(super) fn infer_class_body(&mut self, class: &ast::StmtClassDef) {
+        self.infer_body(&class.body);
     }
 
-    pub(super) fn lower_function_type_params(&mut self, function: &ast::StmtFunctionDef) {
+    pub(super) fn infer_function_type_params(&mut self, function: &ast::StmtFunctionDef) {
         if let Some(type_params) = function.type_params.as_deref() {
-            self.lower_type_parameters(type_params);
+            self.infer_type_parameters(type_params);
         }
     }
 
-    pub(super) fn lower_function_body(&mut self, function: &ast::StmtFunctionDef) {
-        self.lower_body(&function.body);
+    pub(super) fn infer_function_body(&mut self, function: &ast::StmtFunctionDef) {
+        self.infer_body(&function.body);
     }
 
-    fn lower_body(&mut self, suite: &[ast::Stmt]) {
+    fn infer_body(&mut self, suite: &[ast::Stmt]) {
         for statement in suite {
-            self.lower_statement(statement);
+            self.infer_statement(statement);
         }
     }
 
-    fn lower_statement(&mut self, statement: &ast::Stmt) {
+    fn infer_statement(&mut self, statement: &ast::Stmt) {
         match statement {
-            ast::Stmt::FunctionDef(function) => self.lower_function_definition_statement(function),
-            ast::Stmt::ClassDef(class) => self.lower_class_definition_statement(class),
+            ast::Stmt::FunctionDef(function) => self.infer_function_definition_statement(function),
+            ast::Stmt::ClassDef(class) => self.infer_class_definition_statement(class),
             ast::Stmt::Expr(ast::StmtExpr { range: _, value }) => {
-                self.lower_expression(value);
+                self.infer_expression(value);
             }
-            ast::Stmt::If(if_statement) => self.lower_if_statement(if_statement),
-            ast::Stmt::Assign(assign) => self.lower_assignment_statement(assign),
-            ast::Stmt::AnnAssign(assign) => self.lower_annotated_assignment_statement(assign),
-            ast::Stmt::For(for_statement) => self.lower_for_statement(for_statement),
-            ast::Stmt::Import(import) => self.lower_import_statement(import),
-            ast::Stmt::ImportFrom(import) => self.lower_import_from_statement(import),
+            ast::Stmt::If(if_statement) => self.infer_if_statement(if_statement),
+            ast::Stmt::Assign(assign) => self.infer_assignment_statement(assign),
+            ast::Stmt::AnnAssign(assign) => self.infer_annotated_assignment_statement(assign),
+            ast::Stmt::For(for_statement) => self.infer_for_statement(for_statement),
+            ast::Stmt::Import(import) => self.infer_import_statement(import),
+            ast::Stmt::ImportFrom(import) => self.infer_import_from_statement(import),
             ast::Stmt::Break(_) | ast::Stmt::Continue(_) | ast::Stmt::Pass(_) => {
                 // No-op
             }
@@ -178,7 +178,7 @@ impl<'a> TypeInferenceBuilder<'a> {
         }
     }
 
-    fn lower_function_definition_statement(&mut self, function: &ast::StmtFunctionDef) {
+    fn infer_function_definition_statement(&mut self, function: &ast::StmtFunctionDef) {
         let ast::StmtFunctionDef {
             range: _,
             is_async: _,
@@ -193,13 +193,13 @@ impl<'a> TypeInferenceBuilder<'a> {
         let function_id = function.scope_ast_id(self.db, self.file_id, self.file_scope_id);
         let decorator_tys = decorator_list
             .iter()
-            .map(|decorator| self.lower_decorator(decorator))
+            .map(|decorator| self.infer_decorator(decorator))
             .collect();
 
-        // TODO: Lower parameters
+        // TODO: Infer parameters
 
         if let Some(return_ty) = returns {
-            self.lower_expression(return_ty);
+            self.infer_expression(return_ty);
         }
 
         let function_ty = self.function_ty(FunctionType {
@@ -219,7 +219,7 @@ impl<'a> TypeInferenceBuilder<'a> {
             .insert(Definition::FunctionDef(function_id), function_ty);
     }
 
-    fn lower_class_definition_statement(&mut self, class: &ast::StmtClassDef) {
+    fn infer_class_definition_statement(&mut self, class: &ast::StmtClassDef) {
         let ast::StmtClassDef {
             range: _,
             name,
@@ -232,15 +232,15 @@ impl<'a> TypeInferenceBuilder<'a> {
         let class_id = class.scope_ast_id(self.db, self.file_id, self.file_scope_id);
 
         for decorator in decorator_list {
-            self.lower_decorator(decorator);
+            self.infer_decorator(decorator);
         }
 
         let bases = arguments
             .as_deref()
-            .map(|arguments| self.lower_arguments(arguments))
+            .map(|arguments| self.infer_arguments(arguments))
             .unwrap_or(Vec::new());
 
-        // If the class has type parameters, then the function scope is the first child scope of the type parameter's scope
+        // If the class has type parameters, then the class body scope is the first child scope of the type parameter's scope
         // Otherwise the next scope must be the class definition scope.
         let (class_body_scope_id, class_body_scope) = if type_params.is_some() {
             let (type_params_scope, _) = self.children_scopes.next().unwrap();
@@ -261,7 +261,7 @@ impl<'a> TypeInferenceBuilder<'a> {
             .insert(Definition::ClassDef(class_id), class_ty);
     }
 
-    fn lower_if_statement(&mut self, if_statement: &ast::StmtIf) {
+    fn infer_if_statement(&mut self, if_statement: &ast::StmtIf) {
         let ast::StmtIf {
             range: _,
             test,
@@ -269,8 +269,8 @@ impl<'a> TypeInferenceBuilder<'a> {
             elif_else_clauses,
         } = if_statement;
 
-        self.lower_expression(test);
-        self.lower_body(body);
+        self.infer_expression(test);
+        self.infer_body(body);
 
         for clause in elif_else_clauses {
             let ast::ElifElseClause {
@@ -280,33 +280,34 @@ impl<'a> TypeInferenceBuilder<'a> {
             } = clause;
 
             if let Some(test) = &test {
-                self.lower_expression(test);
+                self.infer_expression(test);
             }
 
-            self.lower_body(body);
+            self.infer_body(body);
         }
     }
 
-    fn lower_assignment_statement(&mut self, assignment: &ast::StmtAssign) {
+    fn infer_assignment_statement(&mut self, assignment: &ast::StmtAssign) {
         let ast::StmtAssign {
             range: _,
             targets,
             value,
         } = assignment;
 
-        let value_ty = self.lower_expression(value);
+        let value_ty = self.infer_expression(value);
 
         for target in targets {
-            self.lower_expression(target);
+            self.infer_expression(target);
         }
 
         let assign_id = assignment.scope_ast_id(self.db, self.file_id, self.file_scope_id);
 
+        // TODO: Handle multiple targets.
         self.definition_tys
             .insert(Definition::Assignment(assign_id), value_ty);
     }
 
-    fn lower_annotated_assignment_statement(&mut self, assignment: &ast::StmtAnnAssign) {
+    fn infer_annotated_assignment_statement(&mut self, assignment: &ast::StmtAnnAssign) {
         let ast::StmtAnnAssign {
             range: _,
             target,
@@ -316,11 +317,11 @@ impl<'a> TypeInferenceBuilder<'a> {
         } = assignment;
 
         if let Some(value) = value {
-            let _ = self.lower_expression(value);
+            let _ = self.infer_expression(value);
         }
 
-        let annotation_ty = self.lower_expression(annotation);
-        self.lower_expression(target);
+        let annotation_ty = self.infer_expression(annotation);
+        self.infer_expression(target);
 
         self.definition_tys.insert(
             Definition::AnnotatedAssignment(assignment.scope_ast_id(
@@ -332,7 +333,7 @@ impl<'a> TypeInferenceBuilder<'a> {
         );
     }
 
-    fn lower_for_statement(&mut self, for_statement: &ast::StmtFor) {
+    fn infer_for_statement(&mut self, for_statement: &ast::StmtFor) {
         let ast::StmtFor {
             range: _,
             target,
@@ -342,13 +343,13 @@ impl<'a> TypeInferenceBuilder<'a> {
             is_async: _,
         } = for_statement;
 
-        self.lower_expression(iter);
-        self.lower_expression(target);
-        self.lower_body(body);
-        self.lower_body(orelse);
+        self.infer_expression(iter);
+        self.infer_expression(target);
+        self.infer_body(body);
+        self.infer_body(orelse);
     }
 
-    fn lower_import_statement(&mut self, import: &ast::StmtImport) {
+    fn infer_import_statement(&mut self, import: &ast::StmtImport) {
         let ast::StmtImport { range: _, names } = import;
 
         let import_id = import.scope_ast_id(self.db, self.file_id, self.file_scope_id);
@@ -376,7 +377,7 @@ impl<'a> TypeInferenceBuilder<'a> {
         }
     }
 
-    fn lower_import_from_statement(&mut self, import: &ast::StmtImportFrom) {
+    fn infer_import_from_statement(&mut self, import: &ast::StmtImportFrom) {
         let ast::StmtImportFrom {
             range: _,
             module,
@@ -413,16 +414,16 @@ impl<'a> TypeInferenceBuilder<'a> {
         }
     }
 
-    fn lower_decorator(&mut self, decorator: &ast::Decorator) -> Type {
+    fn infer_decorator(&mut self, decorator: &ast::Decorator) -> Type {
         let ast::Decorator {
             range: _,
             expression,
         } = decorator;
 
-        self.lower_expression(expression)
+        self.infer_expression(expression)
     }
 
-    fn lower_arguments(&mut self, arguments: &ast::Arguments) -> Vec<Type> {
+    fn infer_arguments(&mut self, arguments: &ast::Arguments) -> Vec<Type> {
         let mut types = Vec::with_capacity(
             arguments
                 .args
@@ -430,28 +431,28 @@ impl<'a> TypeInferenceBuilder<'a> {
                 .saturating_add(arguments.keywords.len()),
         );
 
-        types.extend(arguments.args.iter().map(|arg| self.lower_expression(arg)));
+        types.extend(arguments.args.iter().map(|arg| self.infer_expression(arg)));
 
         types.extend(arguments.keywords.iter().map(
             |ast::Keyword {
                  range: _,
                  arg: _,
                  value,
-             }| self.lower_expression(value),
+             }| self.infer_expression(value),
         ));
 
         types
     }
 
-    fn lower_expression(&mut self, expression: &ast::Expr) -> Type {
+    fn infer_expression(&mut self, expression: &ast::Expr) -> Type {
         let ty = match expression {
             ast::Expr::NoneLiteral(ast::ExprNoneLiteral { range: _ }) => Type::None,
-            ast::Expr::NumberLiteral(literal) => self.lower_number_literal_expression(literal),
-            ast::Expr::Name(name) => self.lower_name_expression(name),
-            ast::Expr::Attribute(attribute) => self.lower_attribute_expression(attribute),
-            ast::Expr::BinOp(binary) => self.lower_binary_expression(binary),
-            ast::Expr::Named(named) => self.lower_named_expression(named),
-            ast::Expr::If(if_expression) => self.lower_if_expression(if_expression),
+            ast::Expr::NumberLiteral(literal) => self.infer_number_literal_expression(literal),
+            ast::Expr::Name(name) => self.infer_name_expression(name),
+            ast::Expr::Attribute(attribute) => self.infer_attribute_expression(attribute),
+            ast::Expr::BinOp(binary) => self.infer_binary_expression(binary),
+            ast::Expr::Named(named) => self.infer_named_expression(named),
+            ast::Expr::If(if_expression) => self.infer_if_expression(if_expression),
 
             _ => todo!("expression type resolution for {:?}", expression),
         };
@@ -462,7 +463,7 @@ impl<'a> TypeInferenceBuilder<'a> {
     }
 
     #[allow(clippy::unused_self)]
-    fn lower_number_literal_expression(&mut self, literal: &ast::ExprNumberLiteral) -> Type {
+    fn infer_number_literal_expression(&mut self, literal: &ast::ExprNumberLiteral) -> Type {
         let ast::ExprNumberLiteral { range: _, value } = literal;
 
         match value {
@@ -475,15 +476,15 @@ impl<'a> TypeInferenceBuilder<'a> {
         }
     }
 
-    fn lower_named_expression(&mut self, named: &ast::ExprNamed) -> Type {
+    fn infer_named_expression(&mut self, named: &ast::ExprNamed) -> Type {
         let ast::ExprNamed {
             range: _,
             target,
             value,
         } = named;
 
-        let value_ty = self.lower_expression(value);
-        self.lower_expression(target);
+        let value_ty = self.infer_expression(value);
+        self.infer_expression(target);
 
         self.definition_tys.insert(
             Definition::NamedExpr(named.scope_ast_id(self.db, self.file_id, self.file_scope_id)),
@@ -493,7 +494,7 @@ impl<'a> TypeInferenceBuilder<'a> {
         value_ty
     }
 
-    fn lower_if_expression(&mut self, if_expression: &ast::ExprIf) -> Type {
+    fn infer_if_expression(&mut self, if_expression: &ast::ExprIf) -> Type {
         let ast::ExprIf {
             range: _,
             test,
@@ -501,36 +502,38 @@ impl<'a> TypeInferenceBuilder<'a> {
             orelse,
         } = if_expression;
 
-        self.lower_expression(test);
+        self.infer_expression(test);
 
         // TODO detect statically known truthy or falsy test
-        let body_ty = self.lower_expression(body);
-        let orelse_ty = self.lower_expression(orelse);
+        let body_ty = self.infer_expression(body);
+        let orelse_ty = self.infer_expression(orelse);
 
         let union = UnionTypeBuilder::new(&self.typing_context())
-            .variant(body_ty)
-            .variant(orelse_ty)
+            .add(body_ty)
+            .add(orelse_ty)
             .build();
 
         self.union_ty(union)
     }
 
-    fn lower_name_expression(&mut self, name: &ast::ExprName) -> Type {
+    fn infer_name_expression(&mut self, name: &ast::ExprName) -> Type {
         let ast::ExprName { range: _, id, ctx } = name;
 
         match ctx {
             ExprContext::Load => {
-                // TODO Consider non local scopes?
                 if let Some(symbol_id) = self
                     .index
                     .symbol_table(self.file_scope_id)
                     .symbol_id_by_name(id)
                 {
-                    self.local_definition_ty(symbol_id).into_type(self)
+                    self.local_definition_ty(symbol_id)
                 } else {
                     let ancestors = self.index.ancestor_scopes(self.file_scope_id).skip(1);
 
                     for (ancestor_id, _) in ancestors {
+                        // TODO: Skip over class scopes unless the they are a immediately-nested type param scope.
+                        // TODO: Support built-ins
+
                         let symbol_table =
                             symbol_table(self.db, ancestor_id.to_scope_id(self.db, self.file_id));
 
@@ -547,7 +550,7 @@ impl<'a> TypeInferenceBuilder<'a> {
         }
     }
 
-    fn lower_attribute_expression(&mut self, attribute: &ast::ExprAttribute) -> Type {
+    fn infer_attribute_expression(&mut self, attribute: &ast::ExprAttribute) -> Type {
         let ast::ExprAttribute {
             value,
             attr,
@@ -555,7 +558,7 @@ impl<'a> TypeInferenceBuilder<'a> {
             ctx,
         } = attribute;
 
-        let value_ty = self.lower_expression(value);
+        let value_ty = self.infer_expression(value);
         let member_ty = value_ty
             .member(&self.typing_context(), &Name::new(&attr.id))
             .unwrap_or(Type::Unknown);
@@ -567,7 +570,7 @@ impl<'a> TypeInferenceBuilder<'a> {
         }
     }
 
-    fn lower_binary_expression(&mut self, binary: &ast::ExprBinOp) -> Type {
+    fn infer_binary_expression(&mut self, binary: &ast::ExprBinOp) -> Type {
         let ast::ExprBinOp {
             left,
             op,
@@ -575,8 +578,8 @@ impl<'a> TypeInferenceBuilder<'a> {
             range: _,
         } = binary;
 
-        let left_ty = self.lower_expression(left);
-        let right_ty = self.lower_expression(right);
+        let left_ty = self.infer_expression(left);
+        let right_ty = self.infer_expression(right);
 
         match left_ty {
             Type::Any => Type::Any,
@@ -620,8 +623,8 @@ impl<'a> TypeInferenceBuilder<'a> {
         }
     }
 
-    fn lower_type_parameters(&mut self, _type_parameters: &TypeParams) {
-        todo!("Lower type parameters")
+    fn infer_type_parameters(&mut self, _type_parameters: &TypeParams) {
+        todo!("Infer type parameters")
     }
 
     pub(super) fn finish(mut self) -> TypeInference {
@@ -629,10 +632,7 @@ impl<'a> TypeInferenceBuilder<'a> {
             .index
             .symbol_table(self.file_scope_id)
             .symbol_ids()
-            .map(|symbol| {
-                let ty = self.local_definition_ty(symbol);
-                ty.into_type(&mut self)
-            })
+            .map(|symbol| self.local_definition_ty(symbol))
             .collect();
 
         self.types.symbol_tys = symbol_tys;
@@ -643,29 +643,29 @@ impl<'a> TypeInferenceBuilder<'a> {
     fn union_ty(&mut self, ty: UnionType) -> Type {
         Type::Union(TypeId {
             scope: self.scope,
-            local: self.types.union_types.push(ty),
+            scoped: self.types.union_types.push(ty),
         })
     }
 
     fn function_ty(&mut self, ty: FunctionType) -> Type {
         Type::Function(TypeId {
             scope: self.scope,
-            local: self.types.function_types.push(ty),
+            scoped: self.types.function_types.push(ty),
         })
     }
 
     fn class_ty(&mut self, ty: ClassType) -> Type {
         Type::Class(TypeId {
             scope: self.scope,
-            local: self.types.class_types.push(ty),
+            scoped: self.types.class_types.push(ty),
         })
     }
 
     fn typing_context(&self) -> TypingContext {
-        TypingContext::local(self.db, self.scope, &self.types)
+        TypingContext::scoped(self.db, self.scope, &self.types)
     }
 
-    fn local_definition_ty(&mut self, symbol: ScopeSymbolId) -> DefinitionType {
+    fn local_definition_ty(&mut self, symbol: ScopedSymbolId) -> Type {
         let symbol = self.symbol_table.symbol(symbol);
         let mut definitions = symbol
             .definitions()
@@ -673,40 +673,21 @@ impl<'a> TypeInferenceBuilder<'a> {
             .filter_map(|definition| self.definition_tys.get(definition).copied());
 
         let Some(first) = definitions.next() else {
-            return DefinitionType::Type(Type::Unbound);
+            return Type::Unbound;
         };
 
         if let Some(second) = definitions.next() {
             let context = self.typing_context();
             let mut builder = UnionTypeBuilder::new(&context);
-            builder = builder.variant(first).variant(second);
+            builder = builder.add(first).add(second);
 
             for variant in definitions {
-                builder = builder.variant(variant);
+                builder = builder.add(variant);
             }
 
-            // The fact that the interner is local to a body means that we can't reuse the same union type
-            // across different call sites. But that's something we aren't doing yet anyway. Our interner doesn't
-            // deduplicate union types that are identical.
-            DefinitionType::Union {
-                ty: builder.build(),
-            }
+            self.union_ty(builder.build())
         } else {
-            DefinitionType::Type(first)
-        }
-    }
-}
-
-enum DefinitionType {
-    Union { ty: UnionType },
-    Type(Type),
-}
-
-impl DefinitionType {
-    fn into_type(self, types: &mut TypeInferenceBuilder) -> Type {
-        match self {
-            DefinitionType::Union { ty } => types.union_ty(ty),
-            DefinitionType::Type(ty) => ty,
+            first
         }
     }
 }
@@ -800,8 +781,8 @@ class Sub(Base):
         db.memory_file_system().write_file(
             "src/mod.py",
             "
-                class C:
-                    def f(self): pass
+class C:
+    def f(self): pass
             ",
         )?;
 
@@ -857,10 +838,10 @@ class Sub(Base):
         db.memory_file_system().write_file(
             "src/a.py",
             "
-                if flag:
-                    x = 1
-                else:
-                    x = 2
+if flag:
+    x = 1
+else:
+    x = 2
             ",
         )?;
 
@@ -876,11 +857,11 @@ class Sub(Base):
         db.memory_file_system().write_file(
             "src/a.py",
             "
-                a = 2 + 1
-                b = a - 4
-                c = a * b
-                d = c / 3
-                e = 5 % 3
+a = 2 + 1
+b = a - 4
+c = a * b
+d = c / 3
+e = 5 % 3
             ",
         )?;
 
@@ -897,12 +878,8 @@ class Sub(Base):
     fn walrus() -> anyhow::Result<()> {
         let db = setup_db();
 
-        db.memory_file_system().write_file(
-            "src/a.py",
-            "
-                x = (y := 1) + 1
-            ",
-        )?;
+        db.memory_file_system()
+            .write_file("src/a.py", "x = (y := 1) + 1")?;
 
         assert_public_ty(&db, "src/a.py", "x", "Literal[2]");
         assert_public_ty(&db, "src/a.py", "y", "Literal[1]");
@@ -914,12 +891,8 @@ class Sub(Base):
     fn ifexpr() -> anyhow::Result<()> {
         let db = setup_db();
 
-        db.memory_file_system().write_file(
-            "src/a.py",
-            "
-                x = 1 if flag else 2
-            ",
-        )?;
+        db.memory_file_system()
+            .write_file("src/a.py", "x = 1 if flag else 2")?;
 
         assert_public_ty(&db, "src/a.py", "x", "Literal[1, 2]");
 
@@ -933,10 +906,10 @@ class Sub(Base):
         db.memory_file_system().write_file(
             "src/a.py",
             "
-                y = z = 0
-                x = (y := 1) if flag else (z := 2)
-                a = y
-                b = z
+y = z = 0
+x = (y := 1) if flag else (z := 2)
+a = y
+b = z
             ",
         )?;
 
@@ -951,12 +924,8 @@ class Sub(Base):
     fn ifexpr_nested() -> anyhow::Result<()> {
         let db = setup_db();
 
-        db.memory_file_system().write_file(
-            "src/a.py",
-            "
-                x = 1 if flag else 2 if flag2 else 3
-            ",
-        )?;
+        db.memory_file_system()
+            .write_file("src/a.py", "x = 1 if flag else 2 if flag2 else 3")?;
 
         assert_public_ty(&db, "src/a.py", "x", "Literal[1, 2, 3]");
 
@@ -967,12 +936,8 @@ class Sub(Base):
     fn none() -> anyhow::Result<()> {
         let db = setup_db();
 
-        db.memory_file_system().write_file(
-            "src/a.py",
-            "
-                x = 1 if flag else None
-            ",
-        )?;
+        db.memory_file_system()
+            .write_file("src/a.py", "x = 1 if flag else None")?;
 
         assert_public_ty(&db, "src/a.py", "x", "Literal[1] | None");
         Ok(())

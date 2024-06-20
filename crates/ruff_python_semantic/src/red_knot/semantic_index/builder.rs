@@ -17,7 +17,7 @@ use crate::red_knot::semantic_index::definition::{
     Definition, ImportDefinition, ImportFromDefinition,
 };
 use crate::red_knot::semantic_index::symbol::{
-    FileScopeId, FileSymbolId, Scope, ScopeSymbolId, SymbolFlags, SymbolTableBuilder,
+    FileScopeId, FileSymbolId, Scope, ScopedSymbolId, SymbolFlags, SymbolTableBuilder,
 };
 use crate::red_knot::semantic_index::{NodeWithScopeId, SemanticIndex};
 
@@ -100,9 +100,12 @@ impl<'a> SemanticIndexBuilder<'a> {
 
         let scope_id = self.scopes.push(scope);
         self.symbol_tables.push(SymbolTableBuilder::new());
-        self.ast_ids.push(AstIdsBuilder::new());
+        let ast_id_scope = self.ast_ids.push(AstIdsBuilder::new());
+        let scope_node_id = self.scope_nodes.push(node);
+
+        debug_assert_eq!(ast_id_scope, scope_id);
+        debug_assert_eq!(scope_id, scope_node_id);
         self.scope_stack.push(scope_id);
-        self.scope_nodes.push(node);
     }
 
     fn pop_scope(&mut self) -> FileScopeId {
@@ -123,7 +126,7 @@ impl<'a> SemanticIndexBuilder<'a> {
         &mut self.ast_ids[scope_id]
     }
 
-    fn add_or_update_symbol(&mut self, name: Name, flags: SymbolFlags) -> ScopeSymbolId {
+    fn add_or_update_symbol(&mut self, name: Name, flags: SymbolFlags) -> ScopedSymbolId {
         let symbol_table = self.current_symbol_table();
 
         symbol_table.add_or_update_symbol(name, flags, None)
@@ -134,7 +137,7 @@ impl<'a> SemanticIndexBuilder<'a> {
         name: Name,
 
         definition: Definition,
-    ) -> ScopeSymbolId {
+    ) -> ScopedSymbolId {
         let symbol_table = self.current_symbol_table();
 
         symbol_table.add_or_update_symbol(name, SymbolFlags::IS_DEFINED, Some(definition))
