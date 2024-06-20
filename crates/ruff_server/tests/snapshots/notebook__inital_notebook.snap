@@ -12,7 +12,7 @@ NotebookDocument {
                 password: None,
                 host: None,
                 port: None,
-                path: "/Users/jane/astral/ruff/crates/ruff_server/resources/test/fixtures/super_resolution_overview.ipynb",
+                path: "/Users/test/notebooks/super_resolution_overview.ipynb.ipynb",
                 query: Some(
                     "cell=0",
                 ),
@@ -45,7 +45,7 @@ NotebookDocument {
                 password: None,
                 host: None,
                 port: None,
-                path: "/Users/jane/astral/ruff/crates/ruff_server/resources/test/fixtures/super_resolution_overview.ipynb",
+                path: "/Users/test/notebooks/super_resolution_overview.ipynb.ipynb",
                 query: Some(
                     "cell=1",
                 ),
@@ -68,7 +68,7 @@ NotebookDocument {
                 password: None,
                 host: None,
                 port: None,
-                path: "/Users/jane/astral/ruff/crates/ruff_server/resources/test/fixtures/super_resolution_overview.ipynb",
+                path: "/Users/test/notebooks/super_resolution_overview.ipynb.ipynb",
                 query: Some(
                     "cell=2",
                 ),
@@ -94,7 +94,7 @@ NotebookDocument {
                 password: None,
                 host: None,
                 port: None,
-                path: "/Users/jane/astral/ruff/crates/ruff_server/resources/test/fixtures/super_resolution_overview.ipynb",
+                path: "/Users/test/notebooks/super_resolution_overview.ipynb.ipynb",
                 query: Some(
                     "cell=3",
                 ),
@@ -132,7 +132,7 @@ NotebookDocument {
                 password: None,
                 host: None,
                 port: None,
-                path: "/Users/jane/astral/ruff/crates/ruff_server/resources/test/fixtures/super_resolution_overview.ipynb",
+                path: "/Users/test/notebooks/super_resolution_overview.ipynb.ipynb",
                 query: Some(
                     "cell=4",
                 ),
@@ -155,7 +155,7 @@ NotebookDocument {
                 password: None,
                 host: None,
                 port: None,
-                path: "/Users/jane/astral/ruff/crates/ruff_server/resources/test/fixtures/super_resolution_overview.ipynb",
+                path: "/Users/test/notebooks/super_resolution_overview.ipynb.ipynb",
                 query: Some(
                     "cell=5",
                 ),
@@ -200,7 +200,7 @@ NotebookDocument {
                 password: None,
                 host: None,
                 port: None,
-                path: "/Users/jane/astral/ruff/crates/ruff_server/resources/test/fixtures/super_resolution_overview.ipynb",
+                path: "/Users/test/notebooks/super_resolution_overview.ipynb.ipynb",
                 query: Some(
                     "cell=6",
                 ),
@@ -283,12 +283,12 @@ NotebookDocument {
             password: None,
             host: None,
             port: None,
-            path: "/Users/jane/astral/ruff/crates/ruff_server/resources/test/fixtures/super_resolution_overview.ipynb",
+            path: "/Users/test/notebooks/super_resolution_overview.ipynb.ipynb",
             query: Some(
-                "cell=2",
+                "cell=0",
             ),
             fragment: None,
-        }: 2,
+        }: 0,
         Url {
             scheme: "notebook-cell",
             cannot_be_a_base: false,
@@ -296,33 +296,7 @@ NotebookDocument {
             password: None,
             host: None,
             port: None,
-            path: "/Users/jane/astral/ruff/crates/ruff_server/resources/test/fixtures/super_resolution_overview.ipynb",
-            query: Some(
-                "cell=3",
-            ),
-            fragment: None,
-        }: 3,
-        Url {
-            scheme: "notebook-cell",
-            cannot_be_a_base: false,
-            username: "",
-            password: None,
-            host: None,
-            port: None,
-            path: "/Users/jane/astral/ruff/crates/ruff_server/resources/test/fixtures/super_resolution_overview.ipynb",
-            query: Some(
-                "cell=5",
-            ),
-            fragment: None,
-        }: 5,
-        Url {
-            scheme: "notebook-cell",
-            cannot_be_a_base: false,
-            username: "",
-            password: None,
-            host: None,
-            port: None,
-            path: "/Users/jane/astral/ruff/crates/ruff_server/resources/test/fixtures/super_resolution_overview.ipynb",
+            path: "/Users/test/notebooks/super_resolution_overview.ipynb.ipynb",
             query: Some(
                 "cell=6",
             ),
@@ -335,7 +309,20 @@ NotebookDocument {
             password: None,
             host: None,
             port: None,
-            path: "/Users/jane/astral/ruff/crates/ruff_server/resources/test/fixtures/super_resolution_overview.ipynb",
+            path: "/Users/test/notebooks/super_resolution_overview.ipynb.ipynb",
+            query: Some(
+                "cell=3",
+            ),
+            fragment: None,
+        }: 3,
+        Url {
+            scheme: "notebook-cell",
+            cannot_be_a_base: false,
+            username: "",
+            password: None,
+            host: None,
+            port: None,
+            path: "/Users/test/notebooks/super_resolution_overview.ipynb.ipynb",
             query: Some(
                 "cell=4",
             ),
@@ -348,7 +335,20 @@ NotebookDocument {
             password: None,
             host: None,
             port: None,
-            path: "/Users/jane/astral/ruff/crates/ruff_server/resources/test/fixtures/super_resolution_overview.ipynb",
+            path: "/Users/test/notebooks/super_resolution_overview.ipynb.ipynb",
+            query: Some(
+                "cell=5",
+            ),
+            fragment: None,
+        }: 5,
+        Url {
+            scheme: "notebook-cell",
+            cannot_be_a_base: false,
+            username: "",
+            password: None,
+            host: None,
+            port: None,
+            path: "/Users/test/notebooks/super_resolution_overview.ipynb.ipynb",
             query: Some(
                 "cell=1",
             ),
@@ -361,11 +361,11 @@ NotebookDocument {
             password: None,
             host: None,
             port: None,
-            path: "/Users/jane/astral/ruff/crates/ruff_server/resources/test/fixtures/super_resolution_overview.ipynb",
+            path: "/Users/test/notebooks/super_resolution_overview.ipynb.ipynb",
             query: Some(
-                "cell=0",
+                "cell=2",
             ),
             fragment: None,
-        }: 0,
+        }: 2,
     },
 }

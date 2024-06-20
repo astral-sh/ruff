@@ -305,7 +305,11 @@ fn super_resolution_overview() {
 
 // produces an opaque URL based on a document path and a cell index
 fn make_cell_uri(path: &Path, index: usize) -> lsp_types::Url {
-    lsp_types::Url::parse(&format!("notebook-cell://{}?cell={index}", path.display())).unwrap()
+    lsp_types::Url::parse(&format!(
+        "notebook-cell:///Users/test/notebooks/{}.ipynb?cell={index}",
+        path.file_name().unwrap().to_string_lossy()
+    ))
+    .unwrap()
 }
 
 fn create_notebook(file_path: &Path) -> anyhow::Result<ruff_server::NotebookDocument> {
