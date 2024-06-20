@@ -65,7 +65,7 @@ impl std::fmt::Debug for AstIds {
     }
 }
 
-fn ast_ids(db: &dyn Db, scope: ScopeId) -> &AstIds {
+fn ast_ids<'db>(db: &'db dyn Db, scope: ScopeId) -> &'db AstIds {
     semantic_index(db, scope.file(db)).ast_ids(scope.file_scope_id(db))
 }
 

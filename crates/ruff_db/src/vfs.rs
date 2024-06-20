@@ -251,7 +251,6 @@ impl VfsFile {
     /// an empty string, which is the closest to the content that the file contains now. Returning
     /// an empty string shouldn't be a problem because the query will be re-executed as soon as the
     /// changes are applied to the database.
-    #[allow(unused)]
     pub(crate) fn read(&self, db: &dyn Db) -> String {
         let path = self.path(db);
 

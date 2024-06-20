@@ -42,7 +42,7 @@ pub(crate) fn semantic_index(db: &dyn Db, file: VfsFile) -> SemanticIndex {
 /// Salsa can avoid invalidating dependent queries if this scope's symbol table
 /// is unchanged.
 #[salsa::tracked]
-pub(crate) fn symbol_table(db: &dyn Db, scope: ScopeId) -> Arc<SymbolTable> {
+pub(crate) fn symbol_table<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Arc<SymbolTable> {
     let _ = tracing::trace_span!("symbol_table", scope = ?scope.debug(db)).enter();
     let index = semantic_index(db, scope.file(db));
 
@@ -51,7 +51,7 @@ pub(crate) fn symbol_table(db: &dyn Db, scope: ScopeId) -> Arc<SymbolTable> {
 
 /// Returns the root scope of `file`.
 #[salsa::tracked]
-pub(crate) fn root_scope(db: &dyn Db, file: VfsFile) -> ScopeId {
+pub(crate) fn root_scope(db: &dyn Db, file: VfsFile) -> ScopeId<'_> {
     let _ = tracing::trace_span!("root_scope", file = ?file.debug(db.upcast())).enter();
 
     FileScopeId::root().to_scope_id(db, file)
@@ -59,7 +59,11 @@ pub(crate) fn root_scope(db: &dyn Db, file: VfsFile) -> ScopeId {
 
 /// Returns the symbol with the given name in `file`'s public scope or `None` if
 /// no symbol with the given name exists.
-pub fn public_symbol(db: &dyn Db, file: VfsFile, name: &str) -> Option<PublicSymbolId> {
+pub fn public_symbol<'db>(
+    db: &'db dyn Db,
+    file: VfsFile,
+    name: &str,
+) -> Option<PublicSymbolId<'db>> {
     let root_scope = root_scope(db, file);
     let symbol_table = symbol_table(db, root_scope);
     let local = symbol_table.symbol_id_by_name(name)?;
@@ -104,7 +108,6 @@ impl SemanticIndex {
     }
 
     /// Returns the ID of the `expression`'s enclosing scope.
-    #[allow(unused)]
     pub(crate) fn expression_scope_id(&self, expression: &ast::Expr) -> FileScopeId {
         self.expression_scopes[&NodeKey::from_node(expression)]
     }
@@ -116,7 +119,6 @@ impl SemanticIndex {
     }
 
     /// Returns the [`Scope`] with the given id.
-    #[allow(unused)]
     pub(crate) fn scope(&self, id: FileScopeId) -> &Scope {
         &self.scopes[id]
     }
@@ -140,13 +142,11 @@ impl SemanticIndex {
     }
 
     /// Returns an iterator over the direct child scopes of `scope`.
-    #[allow(unused)]
     pub(crate) fn child_scopes(&self, scope: FileScopeId) -> ChildrenIter {
         ChildrenIter::new(self, scope)
     }
 
     /// Returns an iterator over all ancestors of `scope`, starting with `scope` itself.
-    #[allow(unused)]
     pub(crate) fn ancestor_scopes(&self, scope: FileScopeId) -> AncestorsIter {
         AncestorsIter::new(self, scope)
     }

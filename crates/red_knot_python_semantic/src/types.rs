@@ -27,7 +27,11 @@ mod infer;
 ///
 /// Prefer [`public_symbol_ty`] when resolving the type of symbol from another file.
 #[tracing::instrument(level = "debug", skip(db))]
-pub(crate) fn expression_ty(db: &dyn Db, file: VfsFile, expression: &ast::Expr) -> Type {
+pub(crate) fn expression_ty<'db>(
+    db: &'db dyn Db,
+    file: VfsFile,
+    expression: &ast::Expr,
+) -> Type<'db> {
     let index = semantic_index(db, file);
     let file_scope = index.expression_scope_id(expression);
     let expression_id = expression.scope_ast_id(db, file, file_scope);
@@ -61,7 +65,7 @@ pub(crate) fn expression_ty(db: &dyn Db, file: VfsFile, expression: &ast::Expr) 
 ///
 /// This being a query ensures that the invalidation short-circuits if the type of this symbol didn't change.
 #[salsa::tracked]
-pub(crate) fn public_symbol_ty(db: &dyn Db, symbol: PublicSymbolId) -> Type {
+pub(crate) fn public_symbol_ty<'db>(db: &'db dyn Db, symbol: PublicSymbolId<'db>) -> Type<'db> {
     let _ = tracing::trace_span!("public_symbol_ty", symbol = ?symbol.debug(db)).enter();
 
     let file = symbol.file(db);
@@ -72,14 +76,18 @@ pub(crate) fn public_symbol_ty(db: &dyn Db, symbol: PublicSymbolId) -> Type {
 }
 
 /// Shorthand for `public_symbol_ty` that takes a symbol name instead of a [`PublicSymbolId`].
-pub fn public_symbol_ty_by_name(db: &dyn Db, file: VfsFile, name: &str) -> Option<Type> {
+pub fn public_symbol_ty_by_name<'db>(
+    db: &'db dyn Db,
+    file: VfsFile,
+    name: &str,
+) -> Option<Type<'db>> {
     let symbol = public_symbol(db, file, name)?;
     Some(public_symbol_ty(db, symbol))
 }
 
 /// Infers all types for `scope`.
 #[salsa::tracked(return_ref)]
-pub(crate) fn infer_types(db: &dyn Db, scope: ScopeId) -> TypeInference {
+pub(crate) fn infer_types<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> TypeInference<'db> {
     let _ = tracing::trace_span!("infer_types", scope = ?scope.debug(db)).enter();
 
     let file = scope.file(db);
@@ -120,7 +128,7 @@ pub(crate) fn infer_types(db: &dyn Db, scope: ScopeId) -> TypeInference {
 
 /// unique ID for a type
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-pub enum Type {
+pub enum Type<'db> {
     /// the dynamic type: a statically-unknown set of values
     Any,
     /// the empty set of values
@@ -133,20 +141,20 @@ pub enum Type {
     /// the None object (TODO remove this in favor of Instance(types.NoneType)
     None,
     /// a specific function object
-    Function(TypeId<ScopedFunctionTypeId>),
+    Function(TypeId<'db, ScopedFunctionTypeId>),
     /// a specific module object
-    Module(TypeId<ScopedModuleTypeId>),
+    Module(TypeId<'db, ScopedModuleTypeId>),
     /// a specific class object
-    Class(TypeId<ScopedClassTypeId>),
+    Class(TypeId<'db, ScopedClassTypeId>),
     /// the set of Python objects with the given class in their __class__'s method resolution order
-    Instance(TypeId<ScopedClassTypeId>),
-    Union(TypeId<ScopedUnionTypeId>),
-    Intersection(TypeId<ScopedIntersectionTypeId>),
+    Instance(TypeId<'db, ScopedClassTypeId>),
+    Union(TypeId<'db, ScopedUnionTypeId>),
+    Intersection(TypeId<'db, ScopedIntersectionTypeId>),
     IntLiteral(i64),
     // TODO protocols, callable types, overloads, generics, type vars
 }
 
-impl Type {
+impl<'db> Type<'db> {
     pub const fn is_unbound(&self) -> bool {
         matches!(self, Type::Unbound)
     }
@@ -155,7 +163,7 @@ impl Type {
         matches!(self, Type::Unknown)
     }
 
-    pub fn member(&self, context: &TypingContext, name: &Name) -> Option<Type> {
+    pub fn member(&self, context: &TypingContext<'db, '_>, name: &Name) -> Option<Type<'db>> {
         match self {
             Type::Any => Some(Type::Any),
             Type::Never => todo!("attribute lookup on Never type"),
@@ -191,18 +199,18 @@ impl Type {
 
 /// ID that uniquely identifies a type in a program.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
-pub struct TypeId<L> {
+pub struct TypeId<'db, L> {
     /// The scope in which this type is defined or was created.
-    scope: ScopeId,
+    scope: ScopeId<'db>,
     /// The type's local ID in its scope.
     scoped: L,
 }
 
-impl<Id> TypeId<Id>
+impl<'db, Id> TypeId<'db, Id>
 where
     Id: Copy,
 {
-    pub fn scope(&self) -> ScopeId {
+    pub fn scope(&self) -> ScopeId<'db> {
         self.scope
     }
 
@@ -211,7 +219,7 @@ where
     }
 
     /// Resolves the type ID to the actual type.
-    pub(crate) fn lookup<'a>(self, context: &'a TypingContext) -> &'a Id::Ty
+    pub(crate) fn lookup<'a>(self, context: &'a TypingContext<'db, 'a>) -> &'a Id::Ty<'db>
     where
         Id: ScopedTypeId,
     {
@@ -223,13 +231,13 @@ where
 /// ID that uniquely identifies a type in a scope.
 pub(crate) trait ScopedTypeId {
     /// The type that this ID points to.
-    type Ty;
+    type Ty<'db>;
 
     /// Looks up the type in `index`.
     ///
     /// ## Panics
     /// May panic if this type is from another scope than `index`, or might just return an invalid type.
-    fn lookup_scoped(self, index: &TypeInference) -> &Self::Ty;
+    fn lookup_scoped<'a, 'db>(self, index: &'a TypeInference<'db>) -> &'a Self::Ty<'db>;
 }
 
 /// ID uniquely identifying a function type in a `scope`.
@@ -237,28 +245,28 @@ pub(crate) trait ScopedTypeId {
 pub struct ScopedFunctionTypeId;
 
 impl ScopedTypeId for ScopedFunctionTypeId {
-    type Ty = FunctionType;
+    type Ty<'db> = FunctionType<'db>;
 
-    fn lookup_scoped(self, types: &TypeInference) -> &Self::Ty {
+    fn lookup_scoped<'a, 'db>(self, types: &'a TypeInference<'db>) -> &'a Self::Ty<'db> {
         types.function_ty(self)
     }
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
-pub struct FunctionType {
+pub struct FunctionType<'a> {
     /// name of the function at definition
     name: Name,
     /// types of all decorators on this function
-    decorators: Vec<Type>,
+    decorators: Vec<Type<'a>>,
 }
 
-impl FunctionType {
+impl<'a> FunctionType<'a> {
     fn name(&self) -> &str {
         self.name.as_str()
     }
 
     #[allow(unused)]
-    pub(crate) fn decorators(&self) -> &[Type] {
+    pub(crate) fn decorators(&self) -> &[Type<'a>] {
         self.decorators.as_slice()
     }
 }
@@ -267,18 +275,18 @@ impl FunctionType {
 pub struct ScopedClassTypeId;
 
 impl ScopedTypeId for ScopedClassTypeId {
-    type Ty = ClassType;
+    type Ty<'db> = ClassType<'db>;
 
-    fn lookup_scoped(self, types: &TypeInference) -> &Self::Ty {
+    fn lookup_scoped<'a, 'db>(self, types: &'a TypeInference<'db>) -> &'a Self::Ty<'db> {
         types.class_ty(self)
     }
 }
 
-impl TypeId<ScopedClassTypeId> {
+impl<'db> TypeId<'db, ScopedClassTypeId> {
     /// Returns the class member of this class named `name`.
     ///
     /// The member resolves to a member of the class itself or any of its bases.
-    fn class_member(self, context: &TypingContext, name: &Name) -> Option<Type> {
+    fn class_member(self, context: &TypingContext<'db, '_>, name: &Name) -> Option<Type<'db>> {
         if let Some(member) = self.own_class_member(context, name) {
             return Some(member);
         }
@@ -294,7 +302,7 @@ impl TypeId<ScopedClassTypeId> {
     }
 
     /// Returns the inferred type of the class member named `name`.
-    fn own_class_member(self, context: &TypingContext, name: &Name) -> Option<Type> {
+    fn own_class_member(self, context: &TypingContext<'db, '_>, name: &Name) -> Option<Type<'db>> {
         let class = self.lookup(context);
 
         let symbols = symbol_table(context.db, class.body_scope);
@@ -306,23 +314,23 @@ impl TypeId<ScopedClassTypeId> {
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
-pub struct ClassType {
+pub struct ClassType<'db> {
     /// Name of the class at definition
     name: Name,
 
     /// Types of all class bases
-    bases: Vec<Type>,
+    bases: Vec<Type<'db>>,
 
-    body_scope: ScopeId,
+    body_scope: ScopeId<'db>,
 }
 
-impl ClassType {
+impl<'db> ClassType<'db> {
     fn name(&self) -> &str {
         self.name.as_str()
     }
 
     #[allow(unused)]
-    pub(super) fn bases(&self) -> &[Type] {
+    pub(super) fn bases(&self) -> &'db [Type] {
         self.bases.as_slice()
     }
 }
@@ -331,26 +339,26 @@ impl ClassType {
 pub struct ScopedUnionTypeId;
 
 impl ScopedTypeId for ScopedUnionTypeId {
-    type Ty = UnionType;
+    type Ty<'db> = UnionType<'db>;
 
-    fn lookup_scoped(self, types: &TypeInference) -> &Self::Ty {
+    fn lookup_scoped<'a, 'db>(self, types: &'a TypeInference<'db>) -> &'a Self::Ty<'db> {
         types.union_ty(self)
     }
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
-pub struct UnionType {
+pub struct UnionType<'db> {
     // the union type includes values in any of these types
-    elements: FxIndexSet<Type>,
+    elements: FxIndexSet<Type<'db>>,
 }
 
-struct UnionTypeBuilder<'a> {
-    elements: FxIndexSet<Type>,
-    context: &'a TypingContext<'a>,
+struct UnionTypeBuilder<'db, 'a> {
+    elements: FxIndexSet<Type<'db>>,
+    context: &'a TypingContext<'db, 'a>,
 }
 
-impl<'a> UnionTypeBuilder<'a> {
-    fn new(context: &'a TypingContext<'a>) -> Self {
+impl<'db, 'a> UnionTypeBuilder<'db, 'a> {
+    fn new(context: &'a TypingContext<'db, 'a>) -> Self {
         Self {
             context,
             elements: FxIndexSet::default(),
@@ -358,7 +366,7 @@ impl<'a> UnionTypeBuilder<'a> {
     }
 
     /// Adds a type to this union.
-    fn add(mut self, ty: Type) -> Self {
+    fn add(mut self, ty: Type<'db>) -> Self {
         match ty {
             Type::Union(union_id) => {
                 let union = union_id.lookup(self.context);
@@ -372,7 +380,7 @@ impl<'a> UnionTypeBuilder<'a> {
         self
     }
 
-    fn build(self) -> UnionType {
+    fn build(self) -> UnionType<'db> {
         UnionType {
             elements: self.elements,
         }
@@ -383,9 +391,9 @@ impl<'a> UnionTypeBuilder<'a> {
 pub struct ScopedIntersectionTypeId;
 
 impl ScopedTypeId for ScopedIntersectionTypeId {
-    type Ty = IntersectionType;
+    type Ty<'db> = IntersectionType<'db>;
 
-    fn lookup_scoped(self, types: &TypeInference) -> &Self::Ty {
+    fn lookup_scoped<'a, 'db>(self, types: &'a TypeInference<'db>) -> &'a Self::Ty<'db> {
         types.intersection_ty(self)
     }
 }
@@ -397,26 +405,26 @@ impl ScopedTypeId for ScopedIntersectionTypeId {
 // have to represent it as a single-element intersection if it did) in exchange for better
 // efficiency in the within-intersection case.
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct IntersectionType {
+pub struct IntersectionType<'db> {
     // the intersection type includes only values in all of these types
-    positive: FxIndexSet<Type>,
+    positive: FxIndexSet<Type<'db>>,
     // the intersection type does not include any value in any of these types
-    negative: FxIndexSet<Type>,
+    negative: FxIndexSet<Type<'db>>,
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub struct ScopedModuleTypeId;
 
 impl ScopedTypeId for ScopedModuleTypeId {
-    type Ty = ModuleType;
+    type Ty<'db> = ModuleType;
 
-    fn lookup_scoped(self, types: &TypeInference) -> &Self::Ty {
+    fn lookup_scoped<'a, 'db>(self, types: &'a TypeInference<'db>) -> &'a Self::Ty<'db> {
         types.module_ty()
     }
 }
 
-impl TypeId<ScopedModuleTypeId> {
-    fn member(self, context: &TypingContext, name: &Name) -> Option<Type> {
+impl<'db> TypeId<'db, ScopedModuleTypeId> {
+    fn member(self, context: &TypingContext<'db, '_>, name: &Name) -> Option<Type<'db>> {
         context.public_symbol_ty(self.scope.file(context.db), name)
     }
 }
@@ -431,24 +439,28 @@ pub struct ModuleType {
 /// This abstraction is necessary to support a uniform API that can be used
 /// while in the process of building the type inference structure for a scope
 /// but also when all types should be resolved by querying the db.
-pub struct TypingContext<'a> {
-    db: &'a dyn Db,
+pub struct TypingContext<'db, 'inference> {
+    db: &'db dyn Db,
 
     /// The Local type inference scope that is in the process of being built.
     ///
     /// Bypass the `db` when resolving the types for this scope.
-    local: Option<(ScopeId, &'a TypeInference)>,
+    local: Option<(ScopeId<'db>, &'inference TypeInference<'db>)>,
 }
 
-impl<'a> TypingContext<'a> {
+impl<'db, 'inference> TypingContext<'db, 'inference> {
     /// Creates a context that resolves all types by querying the db.
     #[allow(unused)]
-    pub(super) fn global(db: &'a dyn Db) -> Self {
+    pub(super) fn global(db: &'db dyn Db) -> Self {
         Self { db, local: None }
     }
 
     /// Creates a context that by-passes the `db` when resolving types from `scope_id` and instead uses `types`.
-    fn scoped(db: &'a dyn Db, scope_id: ScopeId, types: &'a TypeInference) -> Self {
+    fn scoped(
+        db: &'db dyn Db,
+        scope_id: ScopeId<'db>,
+        types: &'inference TypeInference<'db>,
+    ) -> Self {
         Self {
             db,
             local: Some((scope_id, types)),
@@ -456,7 +468,7 @@ impl<'a> TypingContext<'a> {
     }
 
     /// Returns the [`TypeInference`] results (not guaranteed to be complete) for `scope_id`.
-    fn types(&self, scope_id: ScopeId) -> &'a TypeInference {
+    fn types(&self, scope_id: ScopeId<'db>) -> &'inference TypeInference<'db> {
         if let Some((scope, local_types)) = self.local {
             if scope == scope_id {
                 return local_types;
@@ -466,7 +478,7 @@ impl<'a> TypingContext<'a> {
         infer_types(self.db, scope_id)
     }
 
-    fn module_ty(&self, file: VfsFile) -> Type {
+    fn module_ty(&self, file: VfsFile) -> Type<'db> {
         let scope = root_scope(self.db, file);
 
         Type::Module(TypeId {
@@ -479,7 +491,7 @@ impl<'a> TypingContext<'a> {
     ///
     /// This function calls [`public_symbol_ty`] if the local scope isn't the module scope of `file`.
     /// It otherwise tries to resolve the symbol type locally.
-    fn public_symbol_ty(&self, file: VfsFile, name: &Name) -> Option<Type> {
+    fn public_symbol_ty(&self, file: VfsFile, name: &Name) -> Option<Type<'db>> {
         let symbol = public_symbol(self.db, file, name)?;
 
         if let Some((scope, local_types)) = self.local {
@@ -581,7 +593,7 @@ mod tests {
         assert_will_run_function_query::<infer_types, _, _>(
             &db,
             |ty| &ty.function,
-            a_root_scope,
+            &a_root_scope,
             &events,
         );
 
@@ -629,7 +641,7 @@ mod tests {
         assert_will_not_run_function_query::<infer_types, _, _>(
             &db,
             |ty| &ty.function,
-            a_root_scope,
+            &a_root_scope,
             &events,
         );
 
@@ -676,7 +688,7 @@ mod tests {
         assert_will_not_run_function_query::<infer_types, _, _>(
             &db,
             |ty| &ty.function,
-            a_root_scope,
+            &a_root_scope,
             &events,
         );
         Ok(())

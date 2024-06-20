@@ -4,7 +4,7 @@ use std::fmt::{Display, Formatter};
 
 use crate::types::{IntersectionType, Type, TypingContext, UnionType};
 
-impl Type {
+impl Type<'_> {
     pub fn display<'a>(&'a self, context: &'a TypingContext) -> DisplayType<'a> {
         DisplayType { ty: self, context }
     }
@@ -12,8 +12,8 @@ impl Type {
 
 #[derive(Copy, Clone)]
 pub struct DisplayType<'a> {
-    ty: &'a Type,
-    context: &'a TypingContext<'a>,
+    ty: &'a Type<'a>,
+    context: &'a TypingContext<'a, 'a>,
 }
 
 impl Display for DisplayType<'_> {
@@ -71,15 +71,15 @@ impl std::fmt::Debug for DisplayType<'_> {
     }
 }
 
-impl UnionType {
-    fn display<'a>(&'a self, context: &'a TypingContext<'a>) -> DisplayUnionType<'a> {
+impl UnionType<'_> {
+    fn display<'a>(&'a self, context: &'a TypingContext<'a, 'a>) -> DisplayUnionType<'a> {
         DisplayUnionType { context, ty: self }
     }
 }
 
 struct DisplayUnionType<'a> {
-    ty: &'a UnionType,
-    context: &'a TypingContext<'a>,
+    ty: &'a UnionType<'a>,
+    context: &'a TypingContext<'a, 'a>,
 }
 
 impl Display for DisplayUnionType<'_> {
@@ -134,15 +134,15 @@ impl std::fmt::Debug for DisplayUnionType<'_> {
     }
 }
 
-impl IntersectionType {
-    fn display<'a>(&'a self, context: &'a TypingContext<'a>) -> DisplayIntersectionType<'a> {
+impl IntersectionType<'_> {
+    fn display<'a>(&'a self, context: &'a TypingContext<'a, 'a>) -> DisplayIntersectionType<'a> {
         DisplayIntersectionType { ty: self, context }
     }
 }
 
 struct DisplayIntersectionType<'a> {
-    ty: &'a IntersectionType,
-    context: &'a TypingContext<'a>,
+    ty: &'a IntersectionType<'a>,
+    context: &'a TypingContext<'a, 'a>,
 }
 
 impl Display for DisplayIntersectionType<'_> {
