@@ -886,7 +886,7 @@ mod tests {
         let foo_module2 = resolve_module(&db, foo_module_name);
 
         assert!(!db
-            .take_sale_events()
+            .take_salsa_events()
             .iter()
             .any(|event| { matches!(event.kind, salsa::EventKind::WillExecute { .. }) }));
 

@@ -3,7 +3,7 @@ use crate::red_knot::semantic_index::ast_ids::{
     ScopeImportFromId, ScopeImportId, ScopeNamedExprId,
 };
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Definition {
     Import(ImportDefinition),
     ImportFrom(ImportFromDefinition),
@@ -59,18 +59,18 @@ impl From<ScopeNamedExprId> for Definition {
     }
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub struct ImportDefinition {
-    pub(super) import_id: ScopeImportId,
+    pub(crate) import_id: ScopeImportId,
 
     /// Index into [`ruff_python_ast::StmtImport::names`].
-    pub(super) alias: u32,
+    pub(crate) alias: u32,
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub struct ImportFromDefinition {
-    pub(super) import_id: ScopeImportFromId,
+    pub(crate) import_id: ScopeImportFromId,
 
     /// Index into [`ruff_python_ast::StmtImportFrom::names`].
-    pub(super) name: u32,
+    pub(crate) name: u32,
 }

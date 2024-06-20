@@ -15,24 +15,21 @@ use ruff_index::{newtype_index, IndexVec};
 
 use crate::name::Name;
 use crate::red_knot::semantic_index::definition::Definition;
-use crate::red_knot::semantic_index::{scopes_map, symbol_table, SymbolMap};
+use crate::red_knot::semantic_index::{root_scope, semantic_index, symbol_table, SymbolMap};
 use crate::Db;
 
 #[derive(Eq, PartialEq, Debug)]
 pub struct Symbol {
     name: Name,
     flags: SymbolFlags,
-    scope: FileScopeId,
-
     /// The nodes that define this symbol, in source order.
     definitions: SmallVec<[Definition; 4]>,
 }
 
 impl Symbol {
-    fn new(name: Name, scope: FileScopeId, definition: Option<Definition>) -> Self {
+    fn new(name: Name, definition: Option<Definition>) -> Self {
         Self {
             name,
-            scope,
             flags: SymbolFlags::empty(),
             definitions: definition.into_iter().collect(),
         }
@@ -49,11 +46,6 @@ impl Symbol {
     /// The symbol's name.
     pub fn name(&self) -> &Name {
         &self.name
-    }
-
-    /// The scope in which this symbol is defined.
-    pub fn scope(&self) -> FileScopeId {
-        self.scope
     }
 
     /// Is the symbol used in its containing scope?
@@ -84,62 +76,72 @@ bitflags! {
 }
 
 /// ID that uniquely identifies a public symbol defined in a module's root scope.
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+#[salsa::tracked]
 pub struct PublicSymbolId {
-    scope: ScopeId,
-    symbol: ScopeSymbolId,
-}
-
-impl PublicSymbolId {
-    pub(crate) fn new(scope: ScopeId, symbol: ScopeSymbolId) -> Self {
-        Self { scope, symbol }
-    }
-
-    pub fn scope(self) -> ScopeId {
-        self.scope
-    }
-
-    pub(crate) fn scope_symbol(self) -> ScopeSymbolId {
-        self.symbol
-    }
-}
-
-impl From<PublicSymbolId> for ScopeSymbolId {
-    fn from(val: PublicSymbolId) -> Self {
-        val.scope_symbol()
-    }
+    #[id]
+    pub(crate) file: VfsFile,
+    #[id]
+    pub(crate) scoped_symbol_id: ScopedSymbolId,
 }
 
 /// ID that uniquely identifies a symbol in a file.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub struct FileSymbolId {
     scope: FileScopeId,
-    symbol: ScopeSymbolId,
+    scoped_symbol_id: ScopedSymbolId,
 }
 
 impl FileSymbolId {
-    pub(super) fn new(scope: FileScopeId, symbol: ScopeSymbolId) -> Self {
-        Self { scope, symbol }
+    pub(super) fn new(scope: FileScopeId, symbol: ScopedSymbolId) -> Self {
+        Self {
+            scope,
+            scoped_symbol_id: symbol,
+        }
     }
 
     pub fn scope(self) -> FileScopeId {
         self.scope
     }
 
-    pub(crate) fn symbol(self) -> ScopeSymbolId {
-        self.symbol
+    pub(crate) fn scoped_symbol_id(self) -> ScopedSymbolId {
+        self.scoped_symbol_id
     }
 }
 
-impl From<FileSymbolId> for ScopeSymbolId {
+impl From<FileSymbolId> for ScopedSymbolId {
     fn from(val: FileSymbolId) -> Self {
-        val.symbol()
+        val.scoped_symbol_id()
     }
 }
 
 /// Symbol ID that uniquely identifies a symbol inside a [`Scope`].
 #[newtype_index]
-pub(crate) struct ScopeSymbolId;
+pub struct ScopedSymbolId;
+
+impl ScopedSymbolId {
+    /// Converts the symbol to a public symbol.
+    ///
+    /// # Panics
+    /// May panic if the symbol does not belong to `file` or is not a symbol of `file`'s root scope.
+    pub(crate) fn to_public_symbol(self, db: &dyn Db, file: VfsFile) -> PublicSymbolId {
+        let symbols = public_symbols_map(db, file);
+        symbols.public(self)
+    }
+}
+
+/// Returns a mapping from [`FileScopeId`] to globally unique [`ScopeId`].
+#[salsa::tracked(return_ref)]
+pub(crate) fn scopes_map(db: &dyn Db, file: VfsFile) -> ScopesMap {
+    let index = semantic_index(db, file);
+
+    let scopes: IndexVec<_, _> = index
+        .scopes
+        .indices()
+        .map(|id| ScopeId::new(db, file, id))
+        .collect();
+
+    ScopesMap { scopes }
+}
 
 /// Maps from the file specific [`FileScopeId`] to the global [`ScopeId`] that can be used as a Salsa query parameter.
 ///
@@ -152,13 +154,37 @@ pub(crate) struct ScopesMap {
 }
 
 impl ScopesMap {
-    pub(super) fn new(scopes: IndexVec<FileScopeId, ScopeId>) -> Self {
-        Self { scopes }
-    }
-
     /// Gets the program-wide unique scope id for the given file specific `scope_id`.
-    fn get(&self, scope_id: FileScopeId) -> ScopeId {
-        self.scopes[scope_id]
+    fn get(&self, scope: FileScopeId) -> ScopeId {
+        self.scopes[scope]
+    }
+}
+
+#[salsa::tracked(return_ref)]
+pub(crate) fn public_symbols_map(db: &dyn Db, file: VfsFile) -> PublicSymbolsMap {
+    let module_scope = root_scope(db, file);
+    let symbols = symbol_table(db, module_scope);
+
+    let public_symbols: IndexVec<_, _> = symbols
+        .symbol_ids()
+        .map(|id| PublicSymbolId::new(db, file, id))
+        .collect();
+
+    PublicSymbolsMap {
+        symbols: public_symbols,
+    }
+}
+
+/// Maps [`LocalSymbolId`] of a file's root scope to the corresponding [`PublicSymbolId`] (Salsa ingredients).
+#[derive(Eq, PartialEq, Debug)]
+pub(crate) struct PublicSymbolsMap {
+    symbols: IndexVec<ScopedSymbolId, PublicSymbolId>,
+}
+
+impl PublicSymbolsMap {
+    /// Resolve the [`PublicSymbolId`] for the module-level `symbol_id`.
+    fn public(&self, symbol_id: ScopedSymbolId) -> PublicSymbolId {
+        self.symbols[symbol_id]
     }
 }
 
@@ -166,18 +192,10 @@ impl ScopesMap {
 #[salsa::tracked]
 pub struct ScopeId {
     #[allow(clippy::used_underscore_binding)]
+    #[id]
     pub file: VfsFile,
-    pub scope_id: FileScopeId,
-}
-
-impl ScopeId {
-    /// Resolves the symbol named `name` in this scope.
-    pub fn symbol(self, db: &dyn Db, name: &str) -> Option<PublicSymbolId> {
-        let symbol_table = symbol_table(db, self);
-        let in_scope_id = symbol_table.symbol_id_by_name(name)?;
-
-        Some(PublicSymbolId::new(self, in_scope_id))
-    }
+    #[id]
+    pub file_scope_id: FileScopeId,
 }
 
 /// ID that uniquely identifies a scope inside of a module.
@@ -239,7 +257,7 @@ pub enum ScopeKind {
 #[derive(Debug)]
 pub struct SymbolTable {
     /// The symbols in this scope.
-    symbols: IndexVec<ScopeSymbolId, Symbol>,
+    symbols: IndexVec<ScopedSymbolId, Symbol>,
 
     /// The symbols indexed by name.
     symbols_by_name: SymbolMap,
@@ -257,12 +275,12 @@ impl SymbolTable {
         self.symbols.shrink_to_fit();
     }
 
-    pub(crate) fn symbol(&self, symbol_id: impl Into<ScopeSymbolId>) -> &Symbol {
+    pub(crate) fn symbol(&self, symbol_id: impl Into<ScopedSymbolId>) -> &Symbol {
         &self.symbols[symbol_id.into()]
     }
 
     #[allow(unused)]
-    pub(crate) fn symbol_ids(&self) -> impl Iterator<Item = ScopeSymbolId> {
+    pub(crate) fn symbol_ids(&self) -> impl Iterator<Item = ScopedSymbolId> {
         self.symbols.indices()
     }
 
@@ -277,8 +295,8 @@ impl SymbolTable {
         Some(self.symbol(id))
     }
 
-    /// Returns the [`ScopeSymbolId`] of the symbol named `name`.
-    pub(crate) fn symbol_id_by_name(&self, name: &str) -> Option<ScopeSymbolId> {
+    /// Returns the [`ScopedSymbolId`] of the symbol named `name`.
+    pub(crate) fn symbol_id_by_name(&self, name: &str) -> Option<ScopedSymbolId> {
         let (id, ()) = self
             .symbols_by_name
             .raw_entry()
@@ -320,10 +338,9 @@ impl SymbolTableBuilder {
     pub(super) fn add_or_update_symbol(
         &mut self,
         name: Name,
-        scope: FileScopeId,
         flags: SymbolFlags,
         definition: Option<Definition>,
-    ) -> ScopeSymbolId {
+    ) -> ScopedSymbolId {
         let hash = SymbolTable::hash_name(&name);
         let entry = self
             .table
@@ -343,7 +360,7 @@ impl SymbolTableBuilder {
                 *entry.key()
             }
             RawEntryMut::Vacant(entry) => {
-                let mut symbol = Symbol::new(name, scope, definition);
+                let mut symbol = Symbol::new(name, definition);
                 symbol.insert_flags(flags);
 
                 let id = self.table.symbols.push(symbol);

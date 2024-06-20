@@ -66,13 +66,13 @@ impl std::fmt::Debug for AstIds {
 }
 
 fn ast_ids(db: &dyn Db, scope: ScopeId) -> &AstIds {
-    semantic_index(db, scope.file(db)).ast_ids(scope.scope_id(db))
+    semantic_index(db, scope.file(db)).ast_ids(scope.file_scope_id(db))
 }
 
 /// Node that can be uniquely identified by an id in a [`FileScopeId`].
 pub trait ScopeAstIdNode {
     /// The type of the ID uniquely identifying the node.
-    type Id;
+    type Id: Copy;
 
     /// Returns the ID that uniquely identifies the node in `scope`.
     ///
@@ -91,7 +91,7 @@ pub trait ScopeAstIdNode {
 
 /// Extension trait for AST nodes that can be resolved by an `AstId`.
 pub trait AstIdNode {
-    type ScopeId;
+    type ScopeId: Copy;
 
     /// Resolves the AST id of the node.
     ///
@@ -133,12 +133,22 @@ where
 
 /// Uniquely identifies an AST node in a file.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
-pub struct AstId<L> {
+pub struct AstId<L: Copy> {
     /// The node's scope.
     scope: FileScopeId,
 
     /// The ID of the node inside [`Self::scope`].
     in_scope_id: L,
+}
+
+impl<L: Copy> AstId<L> {
+    pub(super) fn new(scope: FileScopeId, in_scope_id: L) -> Self {
+        Self { scope, in_scope_id }
+    }
+
+    pub(super) fn in_scope_id(self) -> L {
+        self.in_scope_id
+    }
 }
 
 /// Uniquely identifies an [`ast::Expr`] in a [`FileScopeId`].

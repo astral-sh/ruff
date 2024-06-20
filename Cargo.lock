@@ -2474,6 +2474,7 @@ dependencies = [
  "anyhow",
  "bitflags 2.5.0",
  "hashbrown 0.14.5",
+ "indexmap",
  "is-macro",
  "ruff_db",
  "ruff_index",

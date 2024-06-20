@@ -20,6 +20,7 @@ ruff_text_size = { workspace = true }
 
 bitflags = { workspace = true }
 is-macro = { workspace = true }
+indexmap = { workspace = true, optional = true }
 salsa = { workspace = true, optional = true }
 smallvec = { workspace = true, optional = true }
 smol_str = { workspace = true }
@@ -36,4 +37,4 @@ tempfile = { workspace = true }
 workspace = true
 
 [features]
-red_knot = ["dep:salsa", "dep:tracing", "dep:hashbrown", "dep:smallvec"]
+red_knot = ["dep:salsa", "dep:tracing", "dep:hashbrown", "dep:smallvec", "dep:indexmap"]
