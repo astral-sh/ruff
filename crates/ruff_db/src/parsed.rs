@@ -1,3 +1,4 @@
+use salsa::DebugWithDb;
 use std::fmt::Formatter;
 use std::ops::Deref;
 use std::sync::Arc;
@@ -22,6 +23,8 @@ use crate::Db;
 /// for determining if a query result is unchanged.
 #[salsa::tracked(return_ref, no_eq)]
 pub fn parsed_module(db: &dyn Db, file: VfsFile) -> ParsedModule {
+    let _ = tracing::trace_span!("parse_module", file = ?file.debug(db)).enter();
+
     let source = source_text(db, file);
     let path = file.path(db);
 

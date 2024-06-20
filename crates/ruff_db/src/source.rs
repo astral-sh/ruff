@@ -1,3 +1,4 @@
+use salsa::DebugWithDb;
 use std::ops::Deref;
 use std::sync::Arc;
 
@@ -9,6 +10,8 @@ use crate::Db;
 /// Reads the content of file.
 #[salsa::tracked]
 pub fn source_text(db: &dyn Db, file: VfsFile) -> SourceText {
+    let _ = tracing::trace_span!("source_text", file = ?file.debug(db)).enter();
+
     let content = file.read(db);
 
     SourceText {
@@ -19,6 +22,8 @@ pub fn source_text(db: &dyn Db, file: VfsFile) -> SourceText {
 /// Computes the [`LineIndex`] for `file`.
 #[salsa::tracked]
 pub fn line_index(db: &dyn Db, file: VfsFile) -> LineIndex {
+    let _ = tracing::trace_span!("line_index", file = ?file.debug(db)).enter();
+
     let source = source_text(db, file);
 
     LineIndex::from_source_text(&source)

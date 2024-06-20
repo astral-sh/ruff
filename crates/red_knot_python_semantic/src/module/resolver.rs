@@ -1,3 +1,4 @@
+use salsa::DebugWithDb;
 use std::ops::Deref;
 use std::sync::Arc;
 
@@ -29,7 +30,6 @@ pub fn set_module_resolution_settings(db: &mut dyn Db, config: ModuleResolutionS
 }
 
 /// Resolves a module name to a module.
-#[tracing::instrument(level = "debug", skip(db))]
 pub fn resolve_module(db: &dyn Db, module_name: ModuleName) -> Option<Module> {
     let interned_name = internal::ModuleNameIngredient::new(db, module_name);
 
@@ -45,6 +45,8 @@ pub(crate) fn resolve_module_query(
     db: &dyn Db,
     module_name: internal::ModuleNameIngredient,
 ) -> Option<Module> {
+    let _ = tracing::trace_span!("resolve_module", module_name = ?module_name.debug(db)).enter();
+
     let name = module_name.name(db);
 
     let (search_path, module_file, kind) = resolve_name(db, name)?;
@@ -82,8 +84,9 @@ pub fn path_to_module(db: &dyn Db, path: &VfsPath) -> Option<Module> {
 ///
 /// Returns `None` if the file is not a module locatable via `sys.path`.
 #[salsa::tracked]
-#[tracing::instrument(level = "debug", skip(db))]
-pub fn file_to_module(db: &dyn Db, file: VfsFile) -> Option<Module> {
+pub(crate) fn file_to_module(db: &dyn Db, file: VfsFile) -> Option<Module> {
+    let _ = tracing::trace_span!("file_to_module", file = ?file.debug(db.upcast())).enter();
+
     let path = file.path(db.upcast());
 
     let search_paths = module_search_paths(db);

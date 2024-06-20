@@ -62,7 +62,7 @@ pub(crate) fn expression_ty(db: &dyn Db, file: VfsFile, expression: &ast::Expr) 
 /// This being a query ensures that the invalidation short-circuits if the type of this symbol didn't change.
 #[salsa::tracked]
 pub(crate) fn public_symbol_ty(db: &dyn Db, symbol: PublicSymbolId) -> Type {
-    let _ = tracing::debug_span!("public_symbol_ty", symbol = ?symbol.debug(db)).enter();
+    let _ = tracing::trace_span!("public_symbol_ty", symbol = ?symbol.debug(db)).enter();
 
     let file = symbol.file(db);
     let scope = root_scope(db, file);
@@ -80,6 +80,8 @@ pub fn public_symbol_ty_by_name(db: &dyn Db, file: VfsFile, name: &str) -> Optio
 /// Infers all types for `scope`.
 #[salsa::tracked(return_ref)]
 pub(crate) fn infer_types(db: &dyn Db, scope: ScopeId) -> TypeInference {
+    let _ = tracing::trace_span!("infer_types", scope = ?scope.debug(db)).enter();
+
     let file = scope.file(db);
     // Using the index here is fine because the code below depends on the AST anyway.
     // The isolation of the query is by the return inferred types.

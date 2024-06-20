@@ -2,6 +2,7 @@ use std::iter::FusedIterator;
 use std::sync::Arc;
 
 use rustc_hash::FxHashMap;
+use salsa::DebugWithDb;
 
 use ruff_db::parsed::parsed_module;
 use ruff_db::vfs::VfsFile;
@@ -28,6 +29,8 @@ type SymbolMap = hashbrown::HashMap<ScopedSymbolId, (), ()>;
 /// Prefer using [`symbol_table`] when working with symbols from a single scope.
 #[salsa::tracked(return_ref, no_eq)]
 pub(crate) fn semantic_index(db: &dyn Db, file: VfsFile) -> SemanticIndex {
+    let _ = tracing::trace_span!("semantic_index", file = ?file.debug(db.upcast())).enter();
+
     let parsed = parsed_module(db.upcast(), file);
 
     SemanticIndexBuilder::new(parsed).build()
@@ -40,6 +43,7 @@ pub(crate) fn semantic_index(db: &dyn Db, file: VfsFile) -> SemanticIndex {
 /// is unchanged.
 #[salsa::tracked]
 pub(crate) fn symbol_table(db: &dyn Db, scope: ScopeId) -> Arc<SymbolTable> {
+    let _ = tracing::trace_span!("symbol_table", scope = ?scope.debug(db)).enter();
     let index = semantic_index(db, scope.file(db));
 
     index.symbol_table(scope.file_scope_id(db))
@@ -48,6 +52,8 @@ pub(crate) fn symbol_table(db: &dyn Db, scope: ScopeId) -> Arc<SymbolTable> {
 /// Returns the root scope of `file`.
 #[salsa::tracked]
 pub(crate) fn root_scope(db: &dyn Db, file: VfsFile) -> ScopeId {
+    let _ = tracing::trace_span!("root_scope", file = ?file.debug(db.upcast())).enter();
+
     FileScopeId::root().to_scope_id(db, file)
 }
 
