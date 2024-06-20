@@ -60,7 +60,7 @@ pub(crate) enum ConfigurationPreference {
 #[derive(Debug, Deserialize, Default)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct ClientSettings {
+pub struct ClientSettings {
     configuration: Option<String>,
     fix_all: Option<bool>,
     organize_imports: Option<bool>,
