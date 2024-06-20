@@ -357,9 +357,11 @@ impl Index {
         };
         if let Some(notebook) = controller.as_notebook() {
             for url in notebook.urls() {
-                self.notebook_cells.remove(url).ok_or_else(|| {
-                    anyhow!("tried to de-register notebook cell with URL {url} that didn't exist")
-                })?;
+                if self.notebook_cells.remove(url).is_none() {
+                    tracing::debug!(
+                        "tried to de-register notebook cell with URL {url} that didn't exist"
+                    );
+                }
             }
         }
         Ok(())

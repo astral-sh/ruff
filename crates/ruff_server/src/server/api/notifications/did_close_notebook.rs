@@ -1,8 +1,9 @@
+use crate::server::api::LSPResult;
 use crate::server::client::{Notifier, Requester};
 use crate::server::Result;
 use crate::session::Session;
-use lsp_types as types;
 use lsp_types::notification as notif;
+use lsp_types::{self as types, NotebookDocumentIdentifier};
 
 pub(crate) struct DidCloseNotebook;
 
@@ -12,14 +13,18 @@ impl super::NotificationHandler for DidCloseNotebook {
 
 impl super::SyncNotificationHandler for DidCloseNotebook {
     fn run(
-        _session: &mut Session,
+        session: &mut Session,
         _notifier: Notifier,
         _requester: &mut Requester,
-        _params: types::DidCloseNotebookDocumentParams,
+        types::DidCloseNotebookDocumentParams {
+            notebook_document: NotebookDocumentIdentifier { uri },
+            ..
+        }: types::DidCloseNotebookDocumentParams,
     ) -> Result<()> {
-        // `textDocument/didClose` is called after didCloseNotebook,
-        // and the document is removed from the index at that point.
-        // For this specific notification, we don't need to do anything.
+        let key = session.key_from_url(uri);
+        session
+            .close_document(&key)
+            .with_failure_code(lsp_server::ErrorCode::InternalError)?;
         Ok(())
     }
 }
