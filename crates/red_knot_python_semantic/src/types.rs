@@ -62,7 +62,7 @@ pub(crate) fn expression_ty(db: &dyn Db, file: VfsFile, expression: &ast::Expr) 
 /// This being a query ensures that the invalidation short-circuits if the type of this symbol didn't change.
 #[salsa::tracked]
 pub(crate) fn public_symbol_ty(db: &dyn Db, symbol: PublicSymbolId) -> Type {
-    let _ = tracing::debug_span!("public_symbol_ty", "{:?}", symbol.debug(db));
+    let _ = tracing::debug_span!("public_symbol_ty", symbol = ?symbol.debug(db)).enter();
 
     let file = symbol.file(db);
     let scope = root_scope(db, file);
@@ -71,7 +71,7 @@ pub(crate) fn public_symbol_ty(db: &dyn Db, symbol: PublicSymbolId) -> Type {
     inference.symbol_ty(symbol.scoped_symbol_id(db))
 }
 
-/// Shorthand for [`public_symbol_ty()`] that takes a symbol name instead of a [`PublicSymbolId`].
+/// Shorthand for `public_symbol_ty` that takes a symbol name instead of a [`PublicSymbolId`].
 pub fn public_symbol_ty_by_name(db: &dyn Db, file: VfsFile, name: &str) -> Option<Type> {
     let symbol = public_symbol(db, file, name)?;
     Some(public_symbol_ty(db, symbol))
