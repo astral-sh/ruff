@@ -13,10 +13,10 @@ use crate::types::{infer_types, public_symbol_ty};
 
 #[salsa::jar(db=Db)]
 pub struct Jar(
-    ModuleNameIngredient,
+    ModuleNameIngredient<'_>,
     ModuleResolverSearchPaths,
-    ScopeId,
-    PublicSymbolId,
+    ScopeId<'_>,
+    PublicSymbolId<'_>,
     symbol_table,
     resolve_module_query,
     file_to_module,
@@ -37,9 +37,10 @@ pub(crate) mod tests {
     use std::marker::PhantomData;
     use std::sync::Arc;
 
+    use salsa::id::AsId;
     use salsa::ingredient::Ingredient;
     use salsa::storage::HasIngredientsFor;
-    use salsa::{AsId, DebugWithDb};
+    use salsa::DebugWithDb;
 
     use ruff_db::file_system::{FileSystem, MemoryFileSystem, OsFileSystem};
     use ruff_db::vfs::Vfs;
@@ -82,7 +83,6 @@ pub(crate) mod tests {
         /// This useful for testing advanced file system features like permissions, symlinks, etc.
         ///
         /// Note that any files written to the memory file system won't be copied over.
-        #[allow(unused)]
         pub(crate) fn with_os_file_system(&mut self) {
             self.file_system = TestFileSystem::Os(OsFileSystem);
         }
@@ -157,44 +157,43 @@ pub(crate) mod tests {
 
     enum TestFileSystem {
         Memory(MemoryFileSystem),
-        #[allow(unused)]
         Os(OsFileSystem),
     }
 
-    pub(crate) fn assert_will_run_function_query<C, Db, Jar>(
-        db: &Db,
+    pub(crate) fn assert_will_run_function_query<'db, C, Db, Jar>(
+        db: &'db Db,
         to_function: impl FnOnce(&C) -> &salsa::function::FunctionIngredient<C>,
-        key: C::Key,
+        input: &C::Input<'db>,
         events: &[salsa::Event],
     ) where
         C: salsa::function::Configuration<Jar = Jar>
             + salsa::storage::IngredientsFor<Jar = Jar, Ingredients = C>,
         Jar: HasIngredientsFor<C>,
         Db: salsa::DbWithJar<Jar>,
-        C::Key: AsId,
+        C::Input<'db>: AsId,
     {
-        will_run_function_query(db, to_function, key, events, true);
+        will_run_function_query(db, to_function, input, events, true);
     }
 
-    pub(crate) fn assert_will_not_run_function_query<C, Db, Jar>(
-        db: &Db,
+    pub(crate) fn assert_will_not_run_function_query<'db, C, Db, Jar>(
+        db: &'db Db,
         to_function: impl FnOnce(&C) -> &salsa::function::FunctionIngredient<C>,
-        key: C::Key,
+        input: &C::Input<'db>,
         events: &[salsa::Event],
     ) where
         C: salsa::function::Configuration<Jar = Jar>
             + salsa::storage::IngredientsFor<Jar = Jar, Ingredients = C>,
         Jar: HasIngredientsFor<C>,
         Db: salsa::DbWithJar<Jar>,
-        C::Key: AsId,
+        C::Input<'db>: AsId,
     {
-        will_run_function_query(db, to_function, key, events, false);
+        will_run_function_query(db, to_function, input, events, false);
     }
 
-    fn will_run_function_query<C, Db, Jar>(
-        db: &Db,
+    fn will_run_function_query<'db, C, Db, Jar>(
+        db: &'db Db,
         to_function: impl FnOnce(&C) -> &salsa::function::FunctionIngredient<C>,
-        key: C::Key,
+        input: &C::Input<'db>,
         events: &[salsa::Event],
         should_run: bool,
     ) where
@@ -202,7 +201,7 @@ pub(crate) mod tests {
             + salsa::storage::IngredientsFor<Jar = Jar, Ingredients = C>,
         Jar: HasIngredientsFor<C>,
         Db: salsa::DbWithJar<Jar>,
-        C::Key: AsId,
+        C::Input<'db>: AsId,
     {
         let (jar, _) =
             <_ as salsa::storage::HasJar<<C as salsa::storage::IngredientsFor>::Jar>>::jar(db);
@@ -218,7 +217,7 @@ pub(crate) mod tests {
         let did_run = events.iter().any(|event| {
             if let salsa::EventKind::WillExecute { database_key } = event.kind {
                 database_key.ingredient_index() == ingredient_index
-                    && database_key.key_index() == key.as_id()
+                    && database_key.key_index() == input.as_id()
             } else {
                 false
             }
@@ -229,7 +228,7 @@ pub(crate) mod tests {
                 "Expected query {:?} to run but it didn't",
                 DebugIdx {
                     db: PhantomData::<Db>,
-                    value_id: key.as_id(),
+                    value_id: input.as_id(),
                     ingredient: function_ingredient,
                 }
             );
@@ -238,7 +237,7 @@ pub(crate) mod tests {
                 "Expected query {:?} not to run but it did",
                 DebugIdx {
                     db: PhantomData::<Db>,
-                    value_id: key.as_id(),
+                    value_id: input.as_id(),
                     ingredient: function_ingredient,
                 }
             );

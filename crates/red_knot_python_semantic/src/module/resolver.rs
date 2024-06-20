@@ -41,9 +41,9 @@ pub fn resolve_module(db: &dyn Db, module_name: ModuleName) -> Option<Module> {
 /// This query should not be called directly. Instead, use [`resolve_module`]. It only exists
 /// because Salsa requires the module name to be an ingredient.
 #[salsa::tracked]
-pub(crate) fn resolve_module_query(
-    db: &dyn Db,
-    module_name: internal::ModuleNameIngredient,
+pub(crate) fn resolve_module_query<'db>(
+    db: &'db dyn Db,
+    module_name: internal::ModuleNameIngredient<'db>,
 ) -> Option<Module> {
     let _ = tracing::trace_span!("resolve_module", module_name = ?module_name.debug(db)).enter();
 
@@ -221,7 +221,7 @@ pub(crate) mod internal {
     ///
     /// This is needed because Salsa requires that all query arguments are salsa ingredients.
     #[salsa::interned]
-    pub(crate) struct ModuleNameIngredient {
+    pub(crate) struct ModuleNameIngredient<'db> {
         #[return_ref]
         pub(super) name: ModuleName,
     }
