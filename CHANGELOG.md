@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.4.10
+
+### Parser
+
+- Implement re-lexing logic for better error recovery ([#11845](https://github.com/astral-sh/ruff/pull/11845))
+
+### Rule changes
+
+- \[`flake8-copyright`\] Update `CPY001` to check the first 4096 bytes instead of 1024 ([#11927](https://github.com/astral-sh/ruff/pull/11927))
+- \[`pycodestyle`\] Update `E999` to show all syntax errors instead of just the first one ([#11900](https://github.com/astral-sh/ruff/pull/11900))
+
+### Server
+
+- Add tracing setup guide to Helix documentation ([#11883](https://github.com/astral-sh/ruff/pull/11883))
+- Add tracing setup guide to Neovim documentation ([#11884](https://github.com/astral-sh/ruff/pull/11884))
+- Defer notebook cell deletion to avoid an error message ([#11864](https://github.com/astral-sh/ruff/pull/11864))
+
+### Security
+
+- Guard against malicious ecosystem comment artifacts ([#11879](https://github.com/astral-sh/ruff/pull/11879))
+
 ## 0.4.9
 
 ### Preview features
