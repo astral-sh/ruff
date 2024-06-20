@@ -16,7 +16,11 @@
 //! A `logFile` path can also be specified in the settings, and output will be directed there instead.
 use lsp_types::TraceValue;
 use serde::Deserialize;
-use std::sync::{Arc, Mutex, OnceLock};
+use std::{
+    path::PathBuf,
+    str::FromStr,
+    sync::{Arc, Mutex, OnceLock},
+};
 use tracing::level_filters::LevelFilter;
 use tracing_subscriber::{
     fmt::{time::Uptime, writer::BoxMakeWriter},
@@ -48,13 +52,24 @@ pub(crate) fn init_tracing(
         .set(sender)
         .expect("logging sender should only be initialized once");
 
-    let log_file = log_file.and_then(|path| {
-        std::fs::OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(path)
-            .ok()
-    });
+    let log_file = log_file
+        .map(|path| {
+            if let Some(expanded) = shellexpand::full(&path.to_string_lossy())
+                .ok()
+                .and_then(|path| PathBuf::from_str(&path).ok())
+            {
+                expanded
+            } else {
+                path.to_path_buf()
+            }
+        })
+        .and_then(|path| {
+            std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(path)
+                .ok()
+        });
 
     let subscriber = tracing_subscriber::Registry::default().with(
         tracing_subscriber::fmt::layer()
