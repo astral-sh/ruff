@@ -306,6 +306,14 @@ pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
                     guideline: Some("Use the `np.errstate` context manager instead."),
                 },
             }),
+            ["numpy", "in1d"] => Some(Replacement {
+                existing: "in1d",
+                details: Details::AutoImport {
+                    path: "numpy",
+                    name: "isin",
+                    compatibility: Compatibility::BackwardsCompatible,
+                },
+            }),
             ["numpy", "INF"] => Some(Replacement {
                 existing: "INF",
                 details: Details::AutoImport {
@@ -534,6 +542,14 @@ pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
                     path: "numpy.lib",
                     name: "tracemalloc_domain",
                     compatibility: Compatibility::BackwardsCompatible,
+                },
+            }),
+            ["numpy", "trapz"] => Some(Replacement {
+                existing: "trapz",
+                details: Details::AutoImport {
+                    path: "numpy",
+                    name: "trapezoid",
+                    compatibility: Compatibility::Breaking,
                 },
             }),
             ["numpy", "unicode_"] => Some(Replacement {
