@@ -97,26 +97,16 @@ fn detect_indention(tokens: &[Token], locator: &Locator) -> Indentation {
         //   cos,
         // )
         // ```
-        let mut depth = 0usize;
         for token in tokens {
-            match token.kind() {
-                TokenKind::Lpar | TokenKind::Lbrace | TokenKind::Lsqb => {
-                    depth = depth.saturating_add(1);
-                }
-                TokenKind::Rpar | TokenKind::Rbrace | TokenKind::Rsqb => {
-                    depth = depth.saturating_sub(1);
-                }
-                TokenKind::NonLogicalNewline => {
-                    let line = locator.line(token.end());
-                    let indent_index = line.find(|c: char| !c.is_whitespace());
-                    if let Some(indent_index) = indent_index {
-                        if indent_index > 0 {
-                            let whitespace = &line[..indent_index];
-                            return Indentation(whitespace.to_string());
-                        }
+            if token.kind() == TokenKind::NonLogicalNewline {
+                let line = locator.line(token.end());
+                let indent_index = line.find(|c: char| !c.is_whitespace());
+                if let Some(indent_index) = indent_index {
+                    if indent_index > 0 {
+                        let whitespace = &line[..indent_index];
+                        return Indentation(whitespace.to_string());
                     }
                 }
-                _ => {}
             }
         }
 
