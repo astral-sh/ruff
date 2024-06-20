@@ -77,6 +77,7 @@ mod tests {
     #[test_case(Rule::TooManyNewlinesAtEndOfFile, Path::new("W391_2.py"))]
     #[test_case(Rule::TooManyNewlinesAtEndOfFile, Path::new("W391_3.py"))]
     #[test_case(Rule::TooManyNewlinesAtEndOfFile, Path::new("W391_4.py"))]
+    #[test_case(Rule::MissingOrOutdentedIndentation, Path::new("E122.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",

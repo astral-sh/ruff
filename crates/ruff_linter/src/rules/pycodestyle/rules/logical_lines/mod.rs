@@ -1,3 +1,4 @@
+pub(crate) use continuation_lines::*;
 pub(crate) use extraneous_whitespace::*;
 pub(crate) use indentation::*;
 pub(crate) use missing_whitespace::*;
@@ -14,12 +15,13 @@ use std::fmt::{Debug, Formatter};
 use std::iter::FusedIterator;
 
 use bitflags::bitflags;
-use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
-
+use ruff_python_index::Indexer;
 use ruff_python_parser::{TokenKind, Tokens};
 use ruff_python_trivia::is_python_whitespace;
 use ruff_source_file::Locator;
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
+mod continuation_lines;
 mod extraneous_whitespace;
 mod indentation;
 mod missing_whitespace;
@@ -45,9 +47,10 @@ bitflags! {
         const KEYWORD = 0b0000_1000;
         /// Whether the logical line contains a comment.
         const COMMENT = 0b0001_0000;
-
         /// Whether the logical line contains any non trivia token (no comment, newline, or in/dedent)
         const NON_TRIVIA = 0b0010_0000;
+        /// Whether the logical line contains any newline.
+        const NON_LOGICAL_NEWLINE = 0b0100_0000;
     }
 }
 
@@ -106,7 +109,7 @@ impl<'a> IntoIterator for &'a LogicalLines<'a> {
     }
 }
 
-/// A logical line spawns multiple lines in the source document if the line
+/// A logical line spans multiple lines in the source document if the line
 /// ends with a parenthesized expression (`(..)`, `[..]`, `{..}`) that contains
 /// line breaks.
 ///
@@ -123,6 +126,7 @@ impl<'a> IntoIterator for &'a LogicalLines<'a> {
 pub(crate) struct LogicalLine<'a> {
     lines: &'a LogicalLines<'a>,
     line: &'a Line,
+    contains_backslash: Option<bool>,
 }
 
 impl<'a> LogicalLine<'a> {
@@ -134,6 +138,7 @@ impl<'a> LogicalLine<'a> {
     /// Returns `true` if this is a comment only line
     pub(crate) fn is_comment_only(&self) -> bool {
         self.flags() == TokenFlags::COMMENT
+            || self.flags() == (TokenFlags::COMMENT | TokenFlags::NON_LOGICAL_NEWLINE)
     }
 
     /// Returns logical line's text including comments, indents, dedent and trailing new lines.
@@ -244,6 +249,29 @@ impl<'a> LogicalLine<'a> {
     pub(crate) const fn flags(&self) -> TokenFlags {
         self.line.flags
     }
+
+    // Checks if the line contains explicit line joins, i.e. backslashes
+    pub(crate) fn contains_backslash(&mut self, locator: &Locator, indexer: &Indexer) -> bool {
+        if let Some(contains_backslash) = self.contains_backslash {
+            contains_backslash
+        } else {
+            let Some(first_token) = self.tokens().first() else {
+                return false;
+            };
+            let line_start = locator.line_start(first_token.start());
+            let last_token = self.tokens().last().unwrap();
+            let continuation_lines = indexer.continuation_line_starts();
+            let start_index = continuation_lines
+                .binary_search(&line_start)
+                .unwrap_or_else(|err_index| err_index);
+            let end_index = continuation_lines
+                .binary_search(&last_token.start())
+                .unwrap_or_else(|err_index| err_index);
+            let contains_backslash = end_index > start_index;
+            self.contains_backslash = Some(contains_backslash);
+            contains_backslash
+        }
+    }
 }
 
 /// Helper struct to pretty print [`LogicalLine`] with `dbg`
@@ -274,6 +302,7 @@ impl<'a> Iterator for LogicalLinesIter<'a> {
         Some(LogicalLine {
             lines: self.lines,
             line,
+            contains_backslash: None,
         })
     }
 
@@ -289,6 +318,7 @@ impl DoubleEndedIterator for LogicalLinesIter<'_> {
         Some(LogicalLine {
             lines: self.lines,
             line,
+            contains_backslash: None,
         })
     }
 }
@@ -458,10 +488,14 @@ impl LogicalLinesBuilder {
             line.flags.insert(TokenFlags::NON_TRIVIA);
         }
 
+        if matches!(kind, TokenKind::NonLogicalNewline) {
+            line.flags.insert(TokenFlags::NON_LOGICAL_NEWLINE);
+        }
+
         self.tokens.push(LogicalLineToken { kind, range });
     }
 
-    // SAFETY: `LogicalLines::from_tokens` asserts that the file has less than `u32::MAX` tokens and each tokens is at least one character long
+    // SAFETY: `LogicalLines::from_tokens` asserts that the file has less than `u32::MAX` tokens and each token is at least one character long
     #[allow(clippy::cast_possible_truncation)]
     fn finish_line(&mut self) {
         let end = self.tokens.len() as u32;

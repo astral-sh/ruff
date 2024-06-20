@@ -19,8 +19,8 @@ use ruff_source_file::{Locator, UniversalNewlines};
 use ruff_text_size::TextRange;
 use ruff_text_size::TextSize;
 
-use crate::checkers::logical_lines::expand_indent;
 use crate::line_width::IndentWidth;
+use crate::rules::pycodestyle::helpers::expand_indent;
 use ruff_python_trivia::PythonWhitespace;
 
 /// Number of blank lines around top level classes and functions.

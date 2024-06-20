@@ -304,6 +304,7 @@ impl Rule {
             Rule::ImplicitNamespacePackage | Rule::InvalidModuleName => LintSource::Filesystem,
             Rule::IndentationWithInvalidMultiple
             | Rule::IndentationWithInvalidMultipleComment
+            | Rule::MissingOrOutdentedIndentation
             | Rule::MissingWhitespace
             | Rule::MissingWhitespaceAfterKeyword
             | Rule::MissingWhitespaceAroundArithmeticOperator

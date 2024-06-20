@@ -1,4 +1,4 @@
-use crate::line_width::IndentWidth;
+use crate::registry::Rule;
 use ruff_diagnostics::Diagnostic;
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
@@ -7,30 +7,15 @@ use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::registry::AsRule;
+use crate::rules::pycodestyle::helpers::expand_indent;
 use crate::rules::pycodestyle::rules::logical_lines::{
-    extraneous_whitespace, indentation, missing_whitespace, missing_whitespace_after_keyword,
-    missing_whitespace_around_operator, redundant_backslash, space_after_comma,
-    space_around_operator, whitespace_around_keywords, whitespace_around_named_parameter_equals,
-    whitespace_before_comment, whitespace_before_parameters, LogicalLines, TokenFlags,
+    continuation_lines, extraneous_whitespace, indentation, missing_whitespace,
+    missing_whitespace_after_keyword, missing_whitespace_around_operator, redundant_backslash,
+    space_after_comma, space_around_operator, whitespace_around_keywords,
+    whitespace_around_named_parameter_equals, whitespace_before_comment,
+    whitespace_before_parameters, LogicalLines, TokenFlags,
 };
 use crate::settings::LinterSettings;
-
-/// Return the amount of indentation, expanding tabs to the next multiple of the settings' tab size.
-pub(crate) fn expand_indent(line: &str, indent_width: IndentWidth) -> usize {
-    let line = line.trim_end_matches(['\n', '\r']);
-
-    let mut indent = 0;
-    let tab_size = indent_width.as_usize();
-    for c in line.bytes() {
-        match c {
-            b'\t' => indent = (indent / tab_size) * tab_size + tab_size,
-            b' ' => indent += 1,
-            _ => break,
-        }
-    }
-
-    indent
-}
 
 pub(crate) fn check_logical_lines(
     tokens: &Tokens,
@@ -45,7 +30,7 @@ pub(crate) fn check_logical_lines(
     let mut prev_indent_level = None;
     let indent_char = stylist.indentation().as_char();
 
-    for line in &LogicalLines::from_tokens(tokens, locator) {
+    for mut line in &LogicalLines::from_tokens(tokens, locator) {
         if line.flags().contains(TokenFlags::OPERATOR) {
             space_around_operator(&line, &mut context);
             whitespace_around_named_parameter_equals(&line, &mut context);
@@ -74,7 +59,14 @@ pub(crate) fn check_logical_lines(
 
         if line.flags().contains(TokenFlags::BRACKET) {
             whitespace_before_parameters(&line, &mut context);
-            redundant_backslash(&line, locator, indexer, &mut context);
+        }
+
+        if settings.rules.enabled(Rule::RedundantBackslash) {
+            if line.flags().contains(TokenFlags::BRACKET)
+                && line.contains_backslash(locator, indexer)
+            {
+                redundant_backslash(&line, locator, indexer, &mut context);
+            }
         }
 
         // Extract the indentation level.
@@ -102,6 +94,23 @@ pub(crate) fn check_logical_lines(
         ) {
             if settings.rules.enabled(kind.rule()) {
                 context.push_diagnostic(Diagnostic::new(kind, range));
+            }
+        }
+
+        if settings.rules.enabled(Rule::MissingOrOutdentedIndentation) {
+            if line
+                .flags()
+                .contains(TokenFlags::NON_LOGICAL_NEWLINE | TokenFlags::BRACKET)
+                || line.contains_backslash(locator, indexer)
+            {
+                continuation_lines(
+                    &line,
+                    indent_char,
+                    settings.tab_size,
+                    locator,
+                    indexer,
+                    &mut context,
+                );
             }
         }
 
