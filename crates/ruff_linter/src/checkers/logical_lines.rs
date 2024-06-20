@@ -6,7 +6,7 @@ use ruff_python_parser::{TokenKind, Tokens};
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::registry::AsRule;
+use crate::registry::{AsRule, Rule};
 use crate::rules::pycodestyle::rules::logical_lines::{
     extraneous_whitespace, indentation, missing_whitespace, missing_whitespace_after_keyword,
     missing_whitespace_around_operator, redundant_backslash, space_after_comma,
@@ -47,34 +47,90 @@ pub(crate) fn check_logical_lines(
 
     for line in &LogicalLines::from_tokens(tokens, locator) {
         if line.flags().contains(TokenFlags::OPERATOR) {
-            space_around_operator(&line, &mut context);
-            whitespace_around_named_parameter_equals(&line, &mut context);
-            missing_whitespace_around_operator(&line, &mut context);
-            missing_whitespace(&line, &mut context);
+            if settings.rules.any_enabled(&[
+                Rule::MultipleSpacesBeforeOperator,
+                Rule::MultipleSpacesAfterOperator,
+                Rule::TabBeforeOperator,
+                Rule::TabAfterOperator,
+            ]) {
+                space_around_operator(&line, &mut context);
+            }
+
+            if settings.rules.any_enabled(&[
+                Rule::UnexpectedSpacesAroundKeywordParameterEquals,
+                Rule::MissingWhitespaceAroundParameterEquals,
+            ]) {
+                whitespace_around_named_parameter_equals(&line, &mut context);
+            }
+
+            if settings.rules.any_enabled(&[
+                Rule::MissingWhitespaceAroundOperator,
+                Rule::MissingWhitespaceAroundArithmeticOperator,
+                Rule::MissingWhitespaceAroundBitwiseOrShiftOperator,
+                Rule::MissingWhitespaceAroundModuloOperator,
+            ]) {
+                missing_whitespace_around_operator(&line, &mut context);
+            }
+
+            if settings.rules.enabled(Rule::MissingWhitespace) {
+                missing_whitespace(&line, &mut context);
+            }
         }
-        if line.flags().contains(TokenFlags::PUNCTUATION) {
+
+        if line.flags().contains(TokenFlags::PUNCTUATION)
+            && settings
+                .rules
+                .any_enabled(&[Rule::MultipleSpacesAfterComma, Rule::TabAfterComma])
+        {
             space_after_comma(&line, &mut context);
         }
 
         if line
             .flags()
             .intersects(TokenFlags::OPERATOR | TokenFlags::BRACKET | TokenFlags::PUNCTUATION)
+            && settings.rules.any_enabled(&[
+                Rule::WhitespaceAfterOpenBracket,
+                Rule::WhitespaceBeforeCloseBracket,
+                Rule::WhitespaceBeforePunctuation,
+            ])
         {
             extraneous_whitespace(&line, &mut context);
         }
 
         if line.flags().contains(TokenFlags::KEYWORD) {
-            whitespace_around_keywords(&line, &mut context);
-            missing_whitespace_after_keyword(&line, &mut context);
+            if settings.rules.any_enabled(&[
+                Rule::MultipleSpacesAfterKeyword,
+                Rule::MultipleSpacesBeforeKeyword,
+                Rule::TabAfterKeyword,
+                Rule::TabBeforeKeyword,
+            ]) {
+                whitespace_around_keywords(&line, &mut context);
+            }
+
+            if settings.rules.enabled(Rule::MissingWhitespaceAfterKeyword) {
+                missing_whitespace_after_keyword(&line, &mut context);
+            }
         }
 
-        if line.flags().contains(TokenFlags::COMMENT) {
+        if line.flags().contains(TokenFlags::COMMENT)
+            && settings.rules.any_enabled(&[
+                Rule::TooFewSpacesBeforeInlineComment,
+                Rule::NoSpaceAfterInlineComment,
+                Rule::NoSpaceAfterBlockComment,
+                Rule::MultipleLeadingHashesForBlockComment,
+            ])
+        {
             whitespace_before_comment(&line, locator, &mut context);
         }
 
         if line.flags().contains(TokenFlags::BRACKET) {
-            whitespace_before_parameters(&line, &mut context);
-            redundant_backslash(&line, locator, indexer, &mut context);
+            if settings.rules.enabled(Rule::WhitespaceBeforeParameters) {
+                whitespace_before_parameters(&line, &mut context);
+            }
+
+            if settings.rules.enabled(Rule::RedundantBackslash) {
+                redundant_backslash(&line, locator, indexer, &mut context);
+            }
         }
 
         // Extract the indentation level.
@@ -92,16 +148,26 @@ pub(crate) fn check_logical_lines(
 
         let indent_size = 4;
 
-        for kind in indentation(
-            &line,
-            prev_line.as_ref(),
-            indent_char,
-            indent_level,
-            prev_indent_level,
-            indent_size,
-        ) {
-            if settings.rules.enabled(kind.rule()) {
-                context.push_diagnostic(Diagnostic::new(kind, range));
+        if settings.rules.any_enabled(&[
+            Rule::IndentationWithInvalidMultiple,
+            Rule::NoIndentedBlock,
+            Rule::UnexpectedIndentation,
+            Rule::IndentationWithInvalidMultipleComment,
+            Rule::NoIndentedBlockComment,
+            Rule::UnexpectedIndentationComment,
+            Rule::OverIndented,
+        ]) {
+            for kind in indentation(
+                &line,
+                prev_line.as_ref(),
+                indent_char,
+                indent_level,
+                prev_indent_level,
+                indent_size,
+            ) {
+                if settings.rules.enabled(kind.rule()) {
+                    context.push_diagnostic(Diagnostic::new(kind, range));
+                }
             }
         }
 
