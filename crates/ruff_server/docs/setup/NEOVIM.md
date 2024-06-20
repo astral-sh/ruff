@@ -85,8 +85,10 @@ require('lspconfig').ruff.setup {
   init_options = {
     settings = {
       logLevel = "debug",
-      logFile = "your/log/file/path/log.txt"
+      logFile = "~/.local/state/nvim/ruff.log"
     }
   }
 }
 ```
+
+The `logFile` path supports tildes and environment variables.
