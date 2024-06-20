@@ -14,7 +14,6 @@ license.workspace = true
 [dependencies]
 red_knot_python_semantic = { workspace = true }
 
-ruff_db = { workspace = true }
 ruff_python_parser = { workspace = true }
 ruff_python_ast = { workspace = true }
 ruff_python_stdlib = { workspace = true }

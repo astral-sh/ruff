@@ -19,13 +19,10 @@ ruff_text_size = { workspace = true }
 
 bitflags = { workspace = true }
 is-macro = { workspace = true }
-smol_str = { workspace = true }
 rustc-hash = { workspace = true }
 
 [dev-dependencies]
-anyhow = { workspace = true }
 ruff_python_parser = { workspace = true }
-tempfile = { workspace = true }
 
 [lints]
 workspace = true

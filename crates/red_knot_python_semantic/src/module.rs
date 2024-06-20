@@ -46,7 +46,7 @@ impl ModuleName {
     /// ## Examples
     ///
     /// ```
-    /// use ruff_python_semantic::module::ModuleName;
+    /// use red_knot_python_semantic::module::ModuleName;
     ///
     /// assert_eq!(ModuleName::new_static("foo.bar").as_deref(), Some("foo.bar"));
     /// assert_eq!(ModuleName::new_static(""), None);
@@ -78,7 +78,7 @@ impl ModuleName {
     /// # Examples
     ///
     /// ```
-    /// use ruff_python_semantic::module::ModuleName;
+    /// use red_knot_python_semantic::module::ModuleName;
     ///
     /// assert_eq!(ModuleName::new_static("foo.bar.baz").unwrap().components().collect::<Vec<_>>(), vec!["foo", "bar", "baz"]);
     /// ```
@@ -91,7 +91,7 @@ impl ModuleName {
     /// # Examples
     ///
     /// ```
-    /// use ruff_python_semantic::module::ModuleName;
+    /// use red_knot_python_semantic::module::ModuleName;
     ///
     /// assert_eq!(ModuleName::new_static("foo.bar").unwrap().parent(), Some(ModuleName::new_static("foo").unwrap()));
     /// assert_eq!(ModuleName::new_static("foo.bar.baz").unwrap().parent(), Some(ModuleName::new_static("foo.bar").unwrap()));
@@ -110,7 +110,7 @@ impl ModuleName {
     /// # Examples
     ///
     /// ```
-    /// use ruff_python_semantic::module::ModuleName;
+    /// use red_knot_python_semantic::module::ModuleName;
     ///
     /// assert!(ModuleName::new_static("foo.bar").unwrap().starts_with(&ModuleName::new_static("foo").unwrap()));
     ///

@@ -1979,7 +1979,6 @@ dependencies = [
  "parking_lot",
  "rayon",
  "red_knot_python_semantic",
- "ruff_db",
  "ruff_index",
  "ruff_notebook",
  "ruff_python_ast",
@@ -2495,7 +2494,6 @@ dependencies = [
 name = "ruff_python_semantic"
 version = "0.0.0"
 dependencies = [
- "anyhow",
  "bitflags 2.5.0",
  "is-macro",
  "ruff_index",
@@ -2505,8 +2503,6 @@ dependencies = [
  "ruff_source_file",
  "ruff_text_size",
  "rustc-hash",
- "smol_str",
- "tempfile",
 ]
 
 [[package]]
