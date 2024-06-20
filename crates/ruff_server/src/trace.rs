@@ -54,6 +54,8 @@ pub(crate) fn init_tracing(
 
     let log_file = log_file
         .map(|path| {
+            // this expands `logFile` so that tildes and environment variables
+            // are replaced with their values, if possible.
             if let Some(expanded) = shellexpand::full(&path.to_string_lossy())
                 .ok()
                 .and_then(|path| PathBuf::from_str(&path).ok())

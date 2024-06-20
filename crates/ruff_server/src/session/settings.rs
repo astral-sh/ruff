@@ -83,6 +83,7 @@ pub(crate) struct ClientSettings {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct TracingSettings {
     pub(crate) log_level: Option<crate::trace::LogLevel>,
+    /// Path to the log file - tildes and environment variables are supported.
     pub(crate) log_file: Option<PathBuf>,
 }
 
