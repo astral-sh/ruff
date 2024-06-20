@@ -8,6 +8,7 @@ use std::ops::Range;
 use bitflags::bitflags;
 use hashbrown::hash_map::RawEntryMut;
 use rustc_hash::FxHasher;
+use salsa::DebugWithDb;
 use smallvec::SmallVec;
 
 use ruff_db::vfs::VfsFile;
@@ -132,6 +133,8 @@ impl ScopedSymbolId {
 /// Returns a mapping from [`FileScopeId`] to globally unique [`ScopeId`].
 #[salsa::tracked(return_ref)]
 pub(crate) fn scopes_map(db: &dyn Db, file: VfsFile) -> ScopesMap {
+    let _ = tracing::trace_span!("scopes_map", file = ?file.debug(db.upcast())).enter();
+
     let index = semantic_index(db, file);
 
     let scopes: IndexVec<_, _> = index
@@ -162,6 +165,8 @@ impl ScopesMap {
 
 #[salsa::tracked(return_ref)]
 pub(crate) fn public_symbols_map(db: &dyn Db, file: VfsFile) -> PublicSymbolsMap {
+    let _ = tracing::trace_span!("public_symbols_map", file = ?file.debug(db.upcast())).enter();
+
     let module_scope = root_scope(db, file);
     let symbols = symbol_table(db, module_scope);
 
