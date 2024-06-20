@@ -14,8 +14,8 @@ use ruff_db::vfs::VfsFile;
 use ruff_index::{newtype_index, IndexVec};
 
 use crate::name::Name;
-use crate::red_knot::semantic_index::definition::Definition;
-use crate::red_knot::semantic_index::{root_scope, semantic_index, symbol_table, SymbolMap};
+use crate::semantic_index::definition::Definition;
+use crate::semantic_index::{root_scope, semantic_index, symbol_table, SymbolMap};
 use crate::Db;
 
 #[derive(Eq, PartialEq, Debug)]

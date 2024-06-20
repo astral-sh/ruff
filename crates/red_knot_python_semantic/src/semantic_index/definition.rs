@@ -1,4 +1,4 @@
-use crate::red_knot::semantic_index::ast_ids::{
+use crate::semantic_index::ast_ids::{
     ScopeAnnotatedAssignmentId, ScopeAssignmentId, ScopeClassId, ScopeFunctionId,
     ScopeImportFromId, ScopeImportId, ScopeNamedExprId,
 };

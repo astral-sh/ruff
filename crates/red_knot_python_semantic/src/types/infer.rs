@@ -10,15 +10,11 @@ use ruff_python_ast::{ExprContext, TypeParams};
 use crate::module::resolver::resolve_module;
 use crate::module::ModuleName;
 use crate::name::Name;
-use crate::red_knot::semantic_index::ast_ids::{ScopeAstIdNode, ScopeExpressionId};
-use crate::red_knot::semantic_index::definition::{
-    Definition, ImportDefinition, ImportFromDefinition,
-};
-use crate::red_knot::semantic_index::symbol::{
-    FileScopeId, ScopeId, ScopeKind, ScopedSymbolId, SymbolTable,
-};
-use crate::red_knot::semantic_index::{symbol_table, ChildrenIter, SemanticIndex};
-use crate::red_knot::types::{
+use crate::semantic_index::ast_ids::{ScopeAstIdNode, ScopeExpressionId};
+use crate::semantic_index::definition::{Definition, ImportDefinition, ImportFromDefinition};
+use crate::semantic_index::symbol::{FileScopeId, ScopeId, ScopeKind, ScopedSymbolId, SymbolTable};
+use crate::semantic_index::{symbol_table, ChildrenIter, SemanticIndex};
+use crate::types::{
     ClassType, FunctionType, IntersectionType, ModuleType, ScopedClassTypeId, ScopedFunctionTypeId,
     ScopedIntersectionTypeId, ScopedUnionTypeId, Type, TypeId, TypingContext, UnionType,
     UnionTypeBuilder,
@@ -700,7 +696,7 @@ mod tests {
     use crate::db::tests::TestDb;
     use crate::module::resolver::{set_module_resolution_settings, ModuleResolutionSettings};
     use crate::name::Name;
-    use crate::red_knot::types::{public_symbol_ty_by_name, Type, TypingContext};
+    use crate::types::{public_symbol_ty_by_name, Type, TypingContext};
 
     fn setup_db() -> TestDb {
         let mut db = TestDb::new();

@@ -1978,6 +1978,7 @@ dependencies = [
  "notify",
  "parking_lot",
  "rayon",
+ "red_knot_python_semantic",
  "ruff_index",
  "ruff_notebook",
  "ruff_python_ast",
@@ -1992,6 +1993,28 @@ dependencies = [
  "tracing-tree",
  "walkdir",
  "zip",
+]
+
+[[package]]
+name = "red_knot_python_semantic"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "bitflags 2.5.0",
+ "hashbrown 0.14.5",
+ "indexmap",
+ "ruff_db",
+ "ruff_index",
+ "ruff_python_ast",
+ "ruff_python_parser",
+ "ruff_python_stdlib",
+ "ruff_text_size",
+ "rustc-hash",
+ "salsa-2022",
+ "smallvec",
+ "smol_str",
+ "tempfile",
+ "tracing",
 ]
 
 [[package]]
@@ -2471,12 +2494,8 @@ dependencies = [
 name = "ruff_python_semantic"
 version = "0.0.0"
 dependencies = [
- "anyhow",
  "bitflags 2.5.0",
- "hashbrown 0.14.5",
- "indexmap",
  "is-macro",
- "ruff_db",
  "ruff_index",
  "ruff_python_ast",
  "ruff_python_parser",
@@ -2484,11 +2503,6 @@ dependencies = [
  "ruff_source_file",
  "ruff_text_size",
  "rustc-hash",
- "salsa-2022",
- "smallvec",
- "smol_str",
- "tempfile",
- "tracing",
 ]
 
 [[package]]

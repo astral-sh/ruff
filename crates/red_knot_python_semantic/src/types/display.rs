@@ -2,7 +2,7 @@
 
 use std::fmt::{Display, Formatter};
 
-use crate::red_knot::types::{IntersectionType, Type, TypingContext, UnionType};
+use crate::types::{IntersectionType, Type, TypingContext, UnionType};
 
 impl Type {
     pub fn display<'a>(&'a self, context: &'a TypingContext) -> DisplayType<'a> {

@@ -6,14 +6,14 @@ use ruff_index::newtype_index;
 use ruff_python_ast as ast;
 
 use crate::name::Name;
-use crate::red_knot::semantic_index::ast_ids::{AstIdNode, ScopeAstIdNode};
-use crate::red_knot::semantic_index::symbol::{FileScopeId, PublicSymbolId, ScopeId};
-use crate::red_knot::semantic_index::{
+use crate::semantic_index::ast_ids::{AstIdNode, ScopeAstIdNode};
+use crate::semantic_index::symbol::{FileScopeId, PublicSymbolId, ScopeId};
+use crate::semantic_index::{
     public_symbol, root_scope, semantic_index, symbol_table, NodeWithScopeId,
 };
-use crate::red_knot::types::infer::{TypeInference, TypeInferenceBuilder};
-use crate::red_knot::FxIndexSet;
+use crate::types::infer::{TypeInference, TypeInferenceBuilder};
 use crate::Db;
+use crate::FxIndexSet;
 
 mod display;
 mod infer;
@@ -62,7 +62,7 @@ pub(crate) fn expression_ty(db: &dyn Db, file: VfsFile, expression: &ast::Expr) 
 /// This being a query ensures that the invalidation short-circuits if the type of this symbol didn't change.
 #[salsa::tracked]
 pub(crate) fn public_symbol_ty(db: &dyn Db, symbol: PublicSymbolId) -> Type {
-    let _ = tracing::debug_span!("public_symbol_ty", "{:?}", symbol.debug(db));
+    let _ = tracing::debug_span!("public_symbol_ty", symbol = ?symbol.debug(db)).enter();
 
     let file = symbol.file(db);
     let scope = root_scope(db, file);
@@ -71,7 +71,7 @@ pub(crate) fn public_symbol_ty(db: &dyn Db, symbol: PublicSymbolId) -> Type {
     inference.symbol_ty(symbol.scoped_symbol_id(db))
 }
 
-/// Shorthand for [`public_symbol_ty()`] that takes a symbol name instead of a [`PublicSymbolId`].
+/// Shorthand for `public_symbol_ty` that takes a symbol name instead of a [`PublicSymbolId`].
 pub fn public_symbol_ty_by_name(db: &dyn Db, file: VfsFile, name: &str) -> Option<Type> {
     let symbol = public_symbol(db, file, name)?;
     Some(public_symbol_ty(db, symbol))
@@ -500,10 +500,8 @@ mod tests {
         assert_will_not_run_function_query, assert_will_run_function_query, TestDb,
     };
     use crate::module::resolver::{set_module_resolution_settings, ModuleResolutionSettings};
-    use crate::red_knot::semantic_index::root_scope;
-    use crate::red_knot::types::{
-        expression_ty, infer_types, public_symbol_ty_by_name, TypingContext,
-    };
+    use crate::semantic_index::root_scope;
+    use crate::types::{expression_ty, infer_types, public_symbol_ty_by_name, TypingContext};
 
     fn setup_db() -> TestDb {
         let mut db = TestDb::new();

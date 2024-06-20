@@ -7,6 +7,8 @@ use std::sync::Arc;
 use dashmap::mapref::entry::Entry;
 use smol_str::SmolStr;
 
+use red_knot_python_semantic::module::ModuleKind;
+
 use crate::db::{QueryResult, SemanticDb, SemanticJar};
 use crate::files::FileId;
 use crate::semantic::Dependency;
@@ -175,15 +177,6 @@ impl std::fmt::Display for ModuleName {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.write_str(&self.0)
     }
-}
-
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
-pub enum ModuleKind {
-    /// A single-file module (e.g. `foo.py` or `foo.pyi`)
-    Module,
-
-    /// A python package (`foo/__init__.py` or `foo/__init__.pyi`)
-    Package,
 }
 
 /// A search path in which to search modules.
