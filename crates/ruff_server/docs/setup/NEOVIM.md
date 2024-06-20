@@ -85,7 +85,7 @@ require('lspconfig').ruff.setup {
   init_options = {
     settings = {
       logLevel = "debug",
-      logFile = "~/.config/nvim/logs/ruff_logs.txt"
+      logFile = "~/.local/state/nvim/ruff.log"
     }
   }
 }
