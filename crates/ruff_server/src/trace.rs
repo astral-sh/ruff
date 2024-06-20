@@ -69,7 +69,16 @@ pub(crate) fn init_tracing(
             std::fs::OpenOptions::new()
                 .create(true)
                 .append(true)
-                .open(path)
+                .open(&path)
+                .map_err(|err| {
+                    #[allow(clippy::print_stderr)]
+                    {
+                        eprintln!(
+                            "Failed to open file at {} for logging: {err}",
+                            path.display()
+                        );
+                    }
+                })
                 .ok()
         });
 

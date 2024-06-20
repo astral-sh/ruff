@@ -90,3 +90,5 @@ require('lspconfig').ruff.setup {
   }
 }
 ```
+
+The `logFile` path supports tildes and environment variables.

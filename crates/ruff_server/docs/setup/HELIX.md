@@ -97,3 +97,5 @@ environment = { "RUFF_TRACE" = "messages" }
 logLevel = "debug"
 logFile = "~/.cache/helix/ruff.log"
 ```
+
+The `logFile` path supports tildes and environment variables.
