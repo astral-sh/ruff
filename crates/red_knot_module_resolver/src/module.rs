@@ -11,7 +11,7 @@ use crate::Db;
 /// A module name, e.g. `foo.bar`.
 ///
 /// Always normalized to the absolute form (never a relative module name, i.e., never `.foo`).
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash, PartialOrd, Ord)]
 pub struct ModuleName(smol_str::SmolStr);
 
 impl ModuleName {
