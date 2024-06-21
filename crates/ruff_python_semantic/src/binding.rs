@@ -179,14 +179,15 @@ impl<'a> Binding<'a> {
             }
             _ => {}
         }
-        // Otherwise, the shadowed binding must be a class definition, function definition, or
-        // import to be considered a redefinition.
+        // Otherwise, the shadowed binding must be a class definition, function definition,
+        // import, or assignment to be considered a redefinition.
         matches!(
             existing.kind,
             BindingKind::ClassDefinition(_)
                 | BindingKind::FunctionDefinition(_)
                 | BindingKind::Import(_)
                 | BindingKind::FromImport(_)
+                | BindingKind::Assignment
         )
     }
 

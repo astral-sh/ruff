@@ -227,6 +227,13 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
                             continue;
                         };
 
+                        // Ignore non-import redefinitions
+                        if matches!(shadowed.kind, BindingKind::Assignment)
+                            && matches!(binding.kind, BindingKind::Assignment)
+                        {
+                            continue;
+                        }
+
                         // If this is an overloaded function, abort.
                         if shadowed.kind.is_function_definition() {
                             if checker
