@@ -1997,7 +1997,6 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "insta",
- "once_cell",
  "ruff_db",
  "ruff_python_stdlib",
  "rustc-hash",
