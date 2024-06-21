@@ -67,8 +67,7 @@
 use std::ops::Deref;
 
 pub use crate::error::{FStringErrorType, ParseError, ParseErrorType};
-pub use crate::lexer::Token;
-pub use crate::token::TokenKind;
+pub use crate::token::{Token, TokenKind};
 
 use crate::parser::Parser;
 
@@ -592,7 +591,7 @@ impl std::fmt::Display for ModeParseError {
 mod tests {
     use std::ops::Range;
 
-    use crate::lexer::TokenFlags;
+    use crate::token::TokenFlags;
 
     use super::*;
 

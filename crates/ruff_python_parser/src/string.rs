@@ -5,7 +5,7 @@ use bstr::ByteSlice;
 use ruff_python_ast::{self as ast, AnyStringFlags, Expr, StringFlags};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
-use crate::lexer::{LexicalError, LexicalErrorType};
+use crate::error::{LexicalError, LexicalErrorType};
 
 #[derive(Debug)]
 pub(crate) enum StringType {
@@ -471,7 +471,7 @@ pub(crate) fn parse_fstring_literal_element(
 mod tests {
     use ruff_python_ast::Suite;
 
-    use crate::lexer::LexicalErrorType;
+    use crate::error::LexicalErrorType;
     use crate::{parse_module, FStringErrorType, ParseError, ParseErrorType, Parsed};
 
     const WINDOWS_EOL: &str = "\r\n";
