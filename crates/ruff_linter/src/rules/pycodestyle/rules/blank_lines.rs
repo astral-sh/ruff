@@ -15,13 +15,14 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::PySourceType;
 use ruff_python_codegen::Stylist;
 use ruff_python_parser::TokenKind;
+use ruff_python_trivia::PythonWhitespace;
 use ruff_source_file::{Locator, UniversalNewlines};
 use ruff_text_size::TextRange;
 use ruff_text_size::TextSize;
 
 use crate::checkers::logical_lines::expand_indent;
 use crate::line_width::IndentWidth;
-use ruff_python_trivia::PythonWhitespace;
+use crate::rules::pycodestyle::helpers::is_non_logical_token;
 
 /// Number of blank lines around top level classes and functions.
 const BLANK_LINES_TOP_LEVEL: u32 = 2;
@@ -489,13 +490,13 @@ impl<'a> Iterator for LinePreprocessor<'a> {
                     (logical_line_kind, range)
                 };
 
-            if !kind.is_trivia() {
+            if !is_non_logical_token(kind) {
                 line_is_comment_only = false;
             }
 
             // A docstring line is composed only of the docstring (TokenKind::String) and trivia tokens.
             // (If a comment follows a docstring, we still count the line as a docstring)
-            if kind != TokenKind::String && !kind.is_trivia() {
+            if kind != TokenKind::String && !is_non_logical_token(kind) {
                 is_docstring = false;
             }
 
@@ -545,7 +546,7 @@ impl<'a> Iterator for LinePreprocessor<'a> {
                 _ => {}
             }
 
-            if !kind.is_trivia() {
+            if !is_non_logical_token(kind) {
                 last_token = kind;
             }
         }
