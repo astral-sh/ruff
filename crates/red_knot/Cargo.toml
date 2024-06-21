@@ -16,7 +16,6 @@ red_knot_module_resolver = { workspace = true }
 
 ruff_python_parser = { workspace = true }
 ruff_python_ast = { workspace = true }
-ruff_python_stdlib = { workspace = true }
 ruff_text_size = { workspace = true }
 ruff_index = { workspace = true }
 ruff_notebook = { workspace = true }
@@ -39,7 +38,6 @@ tracing-subscriber = { workspace = true }
 tracing-tree = { workspace = true }
 
 [dev-dependencies]
-insta = { workspace = true }
 tempfile = { workspace = true }
 
 [lints]

@@ -1973,7 +1973,6 @@ dependencies = [
  "dashmap",
  "hashbrown 0.14.5",
  "indexmap",
- "insta",
  "is-macro",
  "notify",
  "parking_lot",
@@ -1983,7 +1982,6 @@ dependencies = [
  "ruff_notebook",
  "ruff_python_ast",
  "ruff_python_parser",
- "ruff_python_stdlib",
  "ruff_text_size",
  "rustc-hash",
  "smol_str",
@@ -1998,8 +1996,10 @@ name = "red_knot_module_resolver"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "insta",
  "ruff_db",
  "ruff_python_stdlib",
+ "rustc-hash",
  "salsa",
  "smol_str",
  "tempfile",

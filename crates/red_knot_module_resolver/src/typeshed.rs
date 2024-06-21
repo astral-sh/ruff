@@ -1,3 +1,5 @@
+pub(crate) mod versions;
+
 #[cfg(test)]
 mod tests {
     use std::io::{self, Read};
