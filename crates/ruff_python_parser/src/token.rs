@@ -192,13 +192,15 @@ pub enum TokenKind {
 }
 
 impl TokenKind {
+    /// Returns `true` if this is an end of file token.
     #[inline]
     pub const fn is_eof(self) -> bool {
         matches!(self, TokenKind::EndOfFile)
     }
 
+    /// Returns `true` if this is either a newline or non-logical newline token.
     #[inline]
-    pub const fn is_newline(self) -> bool {
+    pub const fn is_any_newline(self) -> bool {
         matches!(self, TokenKind::Newline | TokenKind::NonLogicalNewline)
     }
 
@@ -294,21 +296,16 @@ impl TokenKind {
         )
     }
 
+    /// Returns `true` if this is a singleton token i.e., `True`, `False`, or `None`.
     #[inline]
     pub const fn is_singleton(self) -> bool {
         matches!(self, TokenKind::False | TokenKind::True | TokenKind::None)
     }
 
+    /// Returns `true` if this is a trivia token i.e., a comment or a non-logical newline.
     #[inline]
     pub const fn is_trivia(&self) -> bool {
-        matches!(
-            self,
-            TokenKind::Newline
-                | TokenKind::Indent
-                | TokenKind::Dedent
-                | TokenKind::NonLogicalNewline
-                | TokenKind::Comment
-        )
+        matches!(self, TokenKind::Comment | TokenKind::NonLogicalNewline)
     }
 
     #[inline]

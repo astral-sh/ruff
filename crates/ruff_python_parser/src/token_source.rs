@@ -114,7 +114,7 @@ impl<'src> TokenSource<'src> {
     fn do_bump(&mut self) {
         loop {
             let kind = self.lexer.next_token();
-            if is_trivia(kind) {
+            if kind.is_trivia() {
                 self.tokens
                     .push(Token::new(kind, self.current_range(), self.current_flags()));
                 continue;
@@ -127,7 +127,7 @@ impl<'src> TokenSource<'src> {
     fn next_non_trivia_token(&mut self) -> TokenKind {
         loop {
             let kind = self.lexer.next_token();
-            if is_trivia(kind) {
+            if kind.is_trivia() {
                 continue;
             }
             break kind;
@@ -186,8 +186,4 @@ pub(crate) struct TokenSourceCheckpoint {
 fn allocate_tokens_vec(contents: &str) -> Vec<Token> {
     let lower_bound = contents.len().saturating_mul(15) / 100;
     Vec::with_capacity(lower_bound)
-}
-
-fn is_trivia(token: TokenKind) -> bool {
-    matches!(token, TokenKind::Comment | TokenKind::NonLogicalNewline)
 }

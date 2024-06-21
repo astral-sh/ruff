@@ -20,6 +20,8 @@ use ruff_python_parser::{TokenKind, Tokens};
 use ruff_python_trivia::is_python_whitespace;
 use ruff_source_file::Locator;
 
+use crate::rules::pycodestyle::helpers::is_non_logical_token;
+
 mod extraneous_whitespace;
 mod indentation;
 mod missing_whitespace;
@@ -167,32 +169,14 @@ impl<'a> LogicalLine<'a> {
 
         let start = tokens
             .iter()
-            .position(|t| {
-                !matches!(
-                    t.kind(),
-                    TokenKind::Newline
-                        | TokenKind::NonLogicalNewline
-                        | TokenKind::Indent
-                        | TokenKind::Dedent
-                        | TokenKind::Comment,
-                )
-            })
+            .position(|t| !is_non_logical_token(t.kind()))
             .unwrap_or(tokens.len());
 
         let tokens = &tokens[start..];
 
         let end = tokens
             .iter()
-            .rposition(|t| {
-                !matches!(
-                    t.kind(),
-                    TokenKind::Newline
-                        | TokenKind::NonLogicalNewline
-                        | TokenKind::Indent
-                        | TokenKind::Dedent
-                        | TokenKind::Comment,
-                )
-            })
+            .rposition(|t| !is_non_logical_token(t.kind()))
             .map_or(0, |pos| pos + 1);
 
         &tokens[..end]
@@ -447,14 +431,7 @@ impl LogicalLinesBuilder {
             line.flags.insert(TokenFlags::KEYWORD);
         }
 
-        if !matches!(
-            kind,
-            TokenKind::Comment
-                | TokenKind::Newline
-                | TokenKind::NonLogicalNewline
-                | TokenKind::Dedent
-                | TokenKind::Indent
-        ) {
+        if !is_non_logical_token(kind) {
             line.flags.insert(TokenFlags::NON_TRIVIA);
         }
 
@@ -468,7 +445,7 @@ impl LogicalLinesBuilder {
         if self.current_line.tokens_start < end {
             let is_empty = self.tokens[self.current_line.tokens_start as usize..end as usize]
                 .iter()
-                .all(|token| token.kind.is_newline());
+                .all(|token| token.kind.is_any_newline());
             if !is_empty {
                 self.lines.push(Line {
                     flags: self.current_line.flags,

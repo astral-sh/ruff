@@ -1626,12 +1626,6 @@ impl Token {
         (self.kind, self.range)
     }
 
-    /// Returns `true` if this is a trivia token.
-    #[inline]
-    pub const fn is_trivia(self) -> bool {
-        matches!(self.kind, TokenKind::Comment | TokenKind::NonLogicalNewline)
-    }
-
     /// Returns `true` if this is any kind of string token.
     const fn is_any_string(self) -> bool {
         matches!(
