@@ -1,0 +1,2 @@
+#[violation]
+pub struct WhitespaceAfterDecorator;
