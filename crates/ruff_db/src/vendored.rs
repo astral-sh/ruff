@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::fmt::{self, Debug};
@@ -30,7 +31,7 @@ impl VendoredFileSystem {
     }
 
     pub fn exists(&self, path: &VendoredPath) -> bool {
-        let normalized = normalize_vendored_path(path);
+        let lookup_path = ZipLookupPath::from(path);
         let inner_locked = self.inner.lock();
         let mut archive = inner_locked.borrow_mut();
 
@@ -38,14 +39,14 @@ impl VendoredFileSystem {
         // different paths in a zip file, but we want to abstract over that difference here
         // so that paths relative to the `VendoredFileSystem`
         // work the same as other paths in Ruff.
-        archive.lookup_path(&normalized).is_ok()
+        archive.lookup_path(&lookup_path).is_ok()
             || archive
-                .lookup_path(&normalized.with_trailing_slash())
+                .lookup_path(&lookup_path.with_trailing_slash())
                 .is_ok()
     }
 
     pub fn metadata(&self, path: &VendoredPath) -> Option<Metadata> {
-        let normalized = normalize_vendored_path(path);
+        let lookup_path = ZipLookupPath::from(path);
         let inner_locked = self.inner.lock();
 
         // Must probe the zipfile twice, as "stdlib" and "stdlib/" are considered
@@ -53,10 +54,10 @@ impl VendoredFileSystem {
         // so that paths relative to the `VendoredFileSystem`
         // work the same as other paths in Ruff.
         let mut archive = inner_locked.borrow_mut();
-        if let Ok(zip_file) = archive.lookup_path(&normalized) {
+        if let Ok(zip_file) = archive.lookup_path(&lookup_path) {
             return Some(Metadata::from_zip_file(zip_file));
         }
-        if let Ok(zip_file) = archive.lookup_path(&normalized.with_trailing_slash()) {
+        if let Ok(zip_file) = archive.lookup_path(&lookup_path.with_trailing_slash()) {
             return Some(Metadata::from_zip_file(zip_file));
         }
 
@@ -72,7 +73,7 @@ impl VendoredFileSystem {
     pub fn read(&self, path: &VendoredPath) -> Result<String> {
         let inner_locked = self.inner.lock();
         let mut archive = inner_locked.borrow_mut();
-        let mut zip_file = archive.lookup_path(&normalize_vendored_path(path))?;
+        let mut zip_file = archive.lookup_path(&ZipLookupPath::from(path))?;
         let mut buffer = String::new();
         zip_file.read_to_string(&mut buffer)?;
         Ok(buffer)
@@ -225,7 +226,7 @@ impl VendoredZipArchive {
         Ok(Self(ZipArchive::new(io::Cursor::new(data))?))
     }
 
-    fn lookup_path(&mut self, path: &NormalizedVendoredPath) -> Result<ZipFile> {
+    fn lookup_path(&mut self, path: &ZipLookupPath) -> Result<ZipFile> {
         Ok(self.0.by_name(path.as_str())?)
     }
 
@@ -234,51 +235,33 @@ impl VendoredZipArchive {
     }
 }
 
-/// A path that has been normalized via the `normalize_vendored_path` function.
+/// A path that can be used for querying the zipfile.
 ///
-/// Trailing slashes are normalized away by `camino::Utf8PathBuf`s,
-/// but trailing slashes are crucial for distinguishing between
-/// files and directories inside zip archives.
+/// Unlike `VendoredPath`s, which always have trailing slashes normalized away,
+/// `ZipLookupPath`s can sometimes have trailing slashes!
+/// This is because trailing slashes are semantically meaningful for zip files,
+/// where a path with a trailing slash signifies a directory,
+/// and a path without a trailing slash cannot be a directory.
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct NormalizedVendoredPath(String);
+struct ZipLookupPath<'a>(Cow<'a, str>);
 
-impl NormalizedVendoredPath {
-    fn with_trailing_slash(mut self) -> Self {
+impl<'a> ZipLookupPath<'a> {
+    fn with_trailing_slash(self) -> Self {
         debug_assert!(!self.0.ends_with('/'));
-        self.0.push('/');
-        self
+        let mut data = self.0.into_owned();
+        data.push('/');
+        Self(Cow::Owned(data))
     }
 
     fn as_str(&self) -> &str {
-        self.0.as_str()
+        &self.0
     }
 }
 
-/// Normalizes the path by removing `.` and `..` components.
-///
-/// ## Panics:
-/// If a path with an unsupported component for vendored paths is passed.
-/// Unsupported components are path prefixes,
-/// and path root directories appearing anywhere except at the start of the path.
-fn normalize_vendored_path(path: &VendoredPath) -> NormalizedVendoredPath {
-    // Allow the `RootDir` component, but only if it is at the very start of the string.
-    let mut components = path.components().peekable();
-    if let Some(camino::Utf8Component::RootDir) = components.peek() {
-        components.next();
+impl<'a> From<&'a VendoredPath> for ZipLookupPath<'a> {
+    fn from(value: &'a VendoredPath) -> Self {
+        Self(Cow::Borrowed(value.as_str()))
     }
-
-    let mut normalized_parts = Vec::new();
-    for component in components {
-        match component {
-            camino::Utf8Component::Normal(part) => normalized_parts.push(part),
-            camino::Utf8Component::CurDir => continue,
-            camino::Utf8Component::ParentDir => {
-                normalized_parts.pop();
-            }
-            unsupported => panic!("Unsupported component in a vendored path: {unsupported}"),
-        }
-    }
-    NormalizedVendoredPath(normalized_parts.join("/"))
 }
 
 #[cfg(test)]
@@ -384,11 +367,11 @@ mod tests {
     fn test_directory(dirname: &str) {
         let mock_typeshed = mock_typeshed();
 
-        let path = VendoredPath::new(dirname);
+        let path = VendoredPathBuf::try_from(dirname).unwrap();
 
-        assert!(mock_typeshed.exists(path));
-        assert!(mock_typeshed.read(path).is_err());
-        let metadata = mock_typeshed.metadata(path).unwrap();
+        assert!(mock_typeshed.exists(&path));
+        assert!(mock_typeshed.read(&path).is_err());
+        let metadata = mock_typeshed.metadata(&path).unwrap();
         assert!(metadata.kind.is_directory());
     }
 
@@ -424,11 +407,11 @@ mod tests {
 
     fn test_nonexistent_path(path: &str) {
         let mock_typeshed = mock_typeshed();
-        let path = VendoredPath::new(path);
-        assert!(!mock_typeshed.exists(path));
-        assert!(mock_typeshed.metadata(path).is_none());
+        let path = VendoredPathBuf::try_from(path).unwrap();
+        assert!(!mock_typeshed.exists(&path));
+        assert!(mock_typeshed.metadata(&path).is_none());
         assert!(mock_typeshed
-            .read(path)
+            .read(&path)
             .is_err_and(|err| err.to_string().contains("file not found")));
     }
 
@@ -461,13 +444,13 @@ mod tests {
     #[test]
     fn functools_file_contents() {
         let mock_typeshed = mock_typeshed();
-        let path = VendoredPath::new("stdlib/functools.pyi");
-        test_file(&mock_typeshed, path);
-        let functools_stub = mock_typeshed.read(path).unwrap();
+        let path = VendoredPathBuf::try_from("stdlib/functools.pyi").unwrap();
+        test_file(&mock_typeshed, &path);
+        let functools_stub = mock_typeshed.read(&path).unwrap();
         assert_eq!(functools_stub.as_str(), FUNCTOOLS_CONTENTS);
         // Test that using the RefCell doesn't mutate
         // the internal state of the underlying zip archive incorrectly:
-        let functools_stub_again = mock_typeshed.read(path).unwrap();
+        let functools_stub_again = mock_typeshed.read(&path).unwrap();
         assert_eq!(functools_stub_again.as_str(), FUNCTOOLS_CONTENTS);
     }
 
@@ -475,16 +458,16 @@ mod tests {
     fn functools_file_other_path() {
         test_file(
             &mock_typeshed(),
-            VendoredPath::new("stdlib/../stdlib/../stdlib/functools.pyi"),
+            &VendoredPathBuf::try_from("stdlib/../stdlib/../stdlib/functools.pyi").unwrap(),
         )
     }
 
     #[test]
     fn asyncio_file_contents() {
         let mock_typeshed = mock_typeshed();
-        let path = VendoredPath::new("stdlib/asyncio/tasks.pyi");
-        test_file(&mock_typeshed, path);
-        let asyncio_stub = mock_typeshed.read(path).unwrap();
+        let path = VendoredPathBuf::try_from("stdlib/asyncio/tasks.pyi").unwrap();
+        test_file(&mock_typeshed, &path);
+        let asyncio_stub = mock_typeshed.read(&path).unwrap();
         assert_eq!(asyncio_stub.as_str(), ASYNCIO_TASKS_CONTENTS);
     }
 
@@ -492,7 +475,7 @@ mod tests {
     fn asyncio_file_other_path() {
         test_file(
             &mock_typeshed(),
-            VendoredPath::new("./stdlib/asyncio/../asyncio/tasks.pyi"),
+            &VendoredPathBuf::try_from("./stdlib/asyncio/../asyncio/tasks.pyi").unwrap(),
         )
     }
 }

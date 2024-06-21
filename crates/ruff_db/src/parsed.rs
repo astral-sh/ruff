@@ -76,7 +76,7 @@ mod tests {
     use crate::file_system::FileSystemPath;
     use crate::parsed::parsed_module;
     use crate::tests::TestDb;
-    use crate::vendored::VendoredPath;
+    use crate::vendored::VendoredPathBuf;
     use crate::vfs::{system_path_to_file, vendored_path_to_file};
 
     #[test]
@@ -117,7 +117,7 @@ mod tests {
     fn vendored_file() {
         let mut db = TestDb::new();
         db.vfs_mut().stub_vendored([(
-            "path.pyi",
+            VendoredPathBuf::try_from("path.pyi").unwrap(),
             r#"
 import sys
 
@@ -129,7 +129,8 @@ else:
     from posixpath import __all__ as __all__"#,
         )]);
 
-        let file = vendored_path_to_file(&db, VendoredPath::new("path.pyi")).unwrap();
+        let file =
+            vendored_path_to_file(&db, &VendoredPathBuf::try_from("path.pyi").unwrap()).unwrap();
 
         let parsed = parsed_module(&db, file);
 

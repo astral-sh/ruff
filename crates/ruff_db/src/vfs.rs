@@ -33,8 +33,8 @@ pub fn system_path_to_file(db: &dyn Db, path: impl AsRef<FileSystemPath>) -> Opt
 
 /// Interns a vendored file path. Returns `Some` if the vendored file for `path` exists and `None` otherwise.
 #[inline]
-pub fn vendored_path_to_file(db: &dyn Db, path: impl AsRef<VendoredPath>) -> Option<VfsFile> {
-    db.vfs().vendored(db, path.as_ref())
+pub fn vendored_path_to_file(db: &dyn Db, path: &VendoredPath) -> Option<VfsFile> {
+    db.vfs().vendored(db, path)
 }
 
 /// Interns a virtual file system path and returns a salsa [`VfsFile`] ingredient.
@@ -167,9 +167,8 @@ impl Vfs {
     ///
     /// ## Panics
     /// If there are pending snapshots referencing this `Vfs` instance.
-    pub fn stub_vendored<P, S>(&mut self, vendored: impl IntoIterator<Item = (P, S)>)
+    pub fn stub_vendored<S>(&mut self, vendored: impl IntoIterator<Item = (VendoredPathBuf, S)>)
     where
-        P: AsRef<VendoredPath>,
         S: ToString,
     {
         let inner = Arc::get_mut(&mut self.inner).unwrap();
@@ -177,7 +176,7 @@ impl Vfs {
         let stubbed = FxDashMap::default();
 
         for (path, content) in vendored {
-            stubbed.insert(path.as_ref().to_path_buf(), content.to_string());
+            stubbed.insert(path, content.to_string());
         }
 
         inner.vendored = VendoredVfs::Stubbed(stubbed);
@@ -357,6 +356,7 @@ mod private {
 mod tests {
     use crate::file_revision::FileRevision;
     use crate::tests::TestDb;
+    use crate::vendored::VendoredPathBuf;
     use crate::vfs::{system_path_to_file, vendored_path_to_file};
 
     #[test]
@@ -387,11 +387,12 @@ mod tests {
     #[test]
     fn stubbed_vendored_file() {
         let mut db = TestDb::new();
+        let path = VendoredPathBuf::try_from("test.py").unwrap();
 
         db.vfs_mut()
-            .stub_vendored([("test.py", "def foo() -> str")]);
+            .stub_vendored([(path.clone(), "def foo() -> str")]);
 
-        let test = vendored_path_to_file(&db, "test.py").expect("Vendored file to exist.");
+        let test = vendored_path_to_file(&db, &path).expect("Vendored file to exist.");
 
         assert_eq!(test.permissions(&db), Some(0o444));
         assert_ne!(test.revision(&db), FileRevision::zero());
@@ -402,6 +403,9 @@ mod tests {
     fn stubbed_vendored_file_non_existing() {
         let db = TestDb::new();
 
-        assert_eq!(vendored_path_to_file(&db, "test.py"), None);
+        assert_eq!(
+            vendored_path_to_file(&db, &VendoredPathBuf::try_from("test.py").unwrap()),
+            None
+        );
     }
 }

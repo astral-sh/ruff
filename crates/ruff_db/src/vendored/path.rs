@@ -1,54 +1,76 @@
+use std::fmt;
 use std::ops::Deref;
 use std::path;
 
-use camino::{Utf8Components, Utf8Path, Utf8PathBuf};
-
 #[repr(transparent)]
 #[derive(Debug, Eq, PartialEq, Hash)]
-pub struct VendoredPath(Utf8Path);
+pub struct VendoredPath(str);
 
 impl VendoredPath {
-    pub fn new(path: &(impl AsRef<Utf8Path> + ?Sized)) -> &Self {
-        let path = path.as_ref();
-        // SAFETY: VendoredPath is marked as #[repr(transparent)] so the conversion from a
-        // *const Utf8Path to a *const VendoredPath is valid.
-        unsafe { &*(path as *const Utf8Path as *const VendoredPath) }
-    }
-
     pub fn to_path_buf(&self) -> VendoredPathBuf {
-        VendoredPathBuf(self.0.to_path_buf())
+        VendoredPathBuf(self.0.to_string())
     }
 
     pub fn as_str(&self) -> &str {
-        self.0.as_str()
+        &self.0
     }
 
     pub fn as_std_path(&self) -> &path::Path {
-        self.0.as_std_path()
+        path::Path::new(&self.0)
     }
 
-    pub fn components(&self) -> Utf8Components {
-        self.0.components()
+    pub fn parts(&self) -> impl Iterator<Item = &str> {
+        self.0.split('/')
     }
 }
+
+#[derive(Debug)]
+pub struct UnsupportedComponentError(String);
+
+impl fmt::Display for UnsupportedComponentError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Unsupported component in a vendored path: {:?}", self.0)
+    }
+}
+
+impl std::error::Error for UnsupportedComponentError {}
 
 #[repr(transparent)]
-#[derive(Debug, Eq, PartialEq, Clone, Hash)]
-pub struct VendoredPathBuf(Utf8PathBuf);
-
-impl Default for VendoredPathBuf {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+#[derive(Debug, Eq, PartialEq, Clone, Hash, Default)]
+pub struct VendoredPathBuf(String);
 
 impl VendoredPathBuf {
-    pub fn new() -> Self {
-        Self(Utf8PathBuf::new())
+    pub fn new(path: &camino::Utf8Path) -> Result<Self, UnsupportedComponentError> {
+        // Allow the `RootDir` component, but only if it is at the very start of the string.
+        let mut components = path.components().peekable();
+        if let Some(camino::Utf8Component::RootDir) = components.peek() {
+            components.next();
+        }
+
+        let mut normalized_parts = Vec::new();
+
+        for component in components {
+            match component {
+                camino::Utf8Component::Normal(part) => normalized_parts.push(part),
+                camino::Utf8Component::CurDir => continue,
+                camino::Utf8Component::ParentDir => {
+                    normalized_parts.pop();
+                }
+                unsupported => return Err(UnsupportedComponentError(unsupported.to_string())),
+            }
+        }
+        Ok(Self(normalized_parts.join("/")))
     }
 
     pub fn as_path(&self) -> &VendoredPath {
-        VendoredPath::new(&self.0)
+        let path = self.0.as_str();
+        // SAFETY: VendoredPath is marked as #[repr(transparent)] so the conversion from a
+        // *const str to a *const VendoredPath is valid.
+        unsafe { &*(path as *const str as *const VendoredPath) }
+    }
+
+    pub fn into_string(self) -> String {
+        self.0
     }
 }
 
@@ -65,24 +87,10 @@ impl AsRef<VendoredPath> for VendoredPath {
     }
 }
 
-impl AsRef<VendoredPath> for str {
-    #[inline]
-    fn as_ref(&self) -> &VendoredPath {
-        VendoredPath::new(self)
-    }
-}
-
-impl AsRef<VendoredPath> for String {
-    #[inline]
-    fn as_ref(&self) -> &VendoredPath {
-        VendoredPath::new(self)
-    }
-}
-
 impl AsRef<path::Path> for VendoredPath {
     #[inline]
     fn as_ref(&self) -> &path::Path {
-        self.0.as_std_path()
+        path::Path::new(&self.0)
     }
 }
 
@@ -94,18 +102,37 @@ impl Deref for VendoredPathBuf {
     }
 }
 
-impl<'a> TryFrom<&'a path::Path> for &'a VendoredPath {
-    type Error = camino::FromPathError;
+impl<'a> TryFrom<&'a camino::Utf8Path> for VendoredPathBuf {
+    type Error = UnsupportedComponentError;
 
-    fn try_from(value: &'a path::Path) -> Result<Self, Self::Error> {
-        Ok(VendoredPath::new(<&camino::Utf8Path>::try_from(value)?))
+    fn try_from(value: &'a camino::Utf8Path) -> Result<Self, Self::Error> {
+        VendoredPathBuf::new(value)
     }
 }
 
-impl TryFrom<path::PathBuf> for VendoredPathBuf {
-    type Error = camino::FromPathBufError;
+impl<'a> TryFrom<&'a str> for VendoredPathBuf {
+    type Error = UnsupportedComponentError;
 
-    fn try_from(value: path::PathBuf) -> Result<Self, Self::Error> {
-        Ok(VendoredPathBuf(camino::Utf8PathBuf::try_from(value)?))
+    fn try_from(value: &'a str) -> Result<Self, Self::Error> {
+        VendoredPathBuf::new(camino::Utf8Path::new(value))
+    }
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum VendoredPathConstructionError<'a> {
+    #[error("Could not convert {0} to a UTF-8 string")]
+    InvalidUTF8(&'a path::Path),
+    #[error("{0}")]
+    UnsupporteComponent(#[from] UnsupportedComponentError),
+}
+
+impl<'a> TryFrom<&'a path::Path> for VendoredPathBuf {
+    type Error = VendoredPathConstructionError<'a>;
+
+    fn try_from(value: &'a path::Path) -> Result<Self, Self::Error> {
+        let Some(path_str) = value.to_str() else {
+            return Err(VendoredPathConstructionError::InvalidUTF8(value));
+        };
+        Ok(VendoredPathBuf::new(camino::Utf8Path::new(path_str))?)
     }
 }
