@@ -18,8 +18,8 @@ use crate::checkers::ast::Checker;
 /// readers than providing arguments by name.
 ///
 /// Consider refactoring functions with many arguments into smaller functions
-/// with fewer arguments, using objects to group related arguments, or
-/// migrating to keyword-only arguments.
+/// with fewer arguments, using objects to group related arguments, or migrating to
+/// [keyword-only arguments](https://docs.python.org/3/tutorial/controlflow.html#special-parameters).
 ///
 /// ## Example
 /// ```python
