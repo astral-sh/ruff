@@ -357,11 +357,8 @@ mod tests {
         let mut empty_iterator = true;
 
         let stdlib_stubs_path = vendored_typeshed_dir.join(TYPESHED_STDLIB_DIR);
-        let stdlib_iterator = std::fs::read_dir(&stdlib_stubs_path).unwrap_or_else(|_| {
-            panic!("Expected {stdlib_stubs_path:?} to be a readable directory!")
-        });
 
-        for entry in stdlib_iterator {
+        for entry in std::fs::read_dir(&stdlib_stubs_path).unwrap() {
             empty_iterator = false;
             let entry = entry.unwrap();
             let absolute_path = entry.path();
