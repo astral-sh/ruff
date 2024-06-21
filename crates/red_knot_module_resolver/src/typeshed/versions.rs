@@ -320,30 +320,28 @@ mod tests {
     #[allow(unsafe_code)]
     const ONE: NonZeroU16 = unsafe { NonZeroU16::new_unchecked(1) };
 
-    // TODO(Alex): move VERSIONS parsing logic to red_knot_module_resolver, add this test back
-    //
-    // #[test]
-    // fn can_parse_vendored_versions_file() {
-    //     let versions_data = include_str!(concat!(
-    //         env!("CARGO_MANIFEST_DIR"),
-    //         "/vendor/typeshed/stdlib/VERSIONS"
-    //     ));
+    #[test]
+    fn can_parse_vendored_versions_file() {
+        let versions_data = include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/vendor/typeshed/stdlib/VERSIONS"
+        ));
 
-    //     let versions = TypeshedVersions::from_str(versions_data).unwrap();
-    //     assert!(versions.len() > 100);
-    //     assert!(versions.len() < 1000);
+        let versions = TypeshedVersions::from_str(versions_data).unwrap();
+        assert!(versions.len() > 100);
+        assert!(versions.len() < 1000);
 
-    //     assert!(versions.contains_module("asyncio"));
-    //     assert!(versions.module_exists_on_version("asyncio", SupportedPyVersion::Py310));
+        assert!(versions.contains_module("asyncio"));
+        assert!(versions.module_exists_on_version("asyncio", SupportedPyVersion::Py310));
 
-    //     assert!(versions.contains_module("asyncio.staggered"));
-    //     assert!(versions.module_exists_on_version("asyncio.staggered", SupportedPyVersion::Py38));
-    //     assert!(!versions.module_exists_on_version("asyncio.staggered", SupportedPyVersion::Py37));
+        assert!(versions.contains_module("asyncio.staggered"));
+        assert!(versions.module_exists_on_version("asyncio.staggered", SupportedPyVersion::Py38));
+        assert!(!versions.module_exists_on_version("asyncio.staggered", SupportedPyVersion::Py37));
 
-    //     assert!(versions.contains_module("audioop"));
-    //     assert!(versions.module_exists_on_version("audioop", SupportedPyVersion::Py312));
-    //     assert!(!versions.module_exists_on_version("audioop", SupportedPyVersion::Py313));
-    // }
+        assert!(versions.contains_module("audioop"));
+        assert!(versions.module_exists_on_version("audioop", SupportedPyVersion::Py312));
+        assert!(!versions.module_exists_on_version("audioop", SupportedPyVersion::Py313));
+    }
 
     #[test]
     fn can_parse_mock_versions_file() {
