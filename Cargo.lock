@@ -1991,8 +1991,6 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "tracing-tree",
- "walkdir",
- "zip",
 ]
 
 [[package]]
@@ -2006,6 +2004,8 @@ dependencies = [
  "smol_str",
  "tempfile",
  "tracing",
+ "walkdir",
+ "zip",
 ]
 
 [[package]]

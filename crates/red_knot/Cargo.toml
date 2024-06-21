@@ -37,11 +37,6 @@ smol_str = { version = "0.2.1" }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 tracing-tree = { workspace = true }
-zip = { workspace = true }
-
-[build-dependencies]
-zip = { workspace = true }
-walkdir = { workspace = true }
 
 [dev-dependencies]
 insta = { workspace = true }
