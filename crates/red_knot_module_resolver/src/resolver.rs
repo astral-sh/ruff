@@ -1,14 +1,11 @@
 use salsa::DebugWithDb;
 use std::ops::Deref;
-use std::sync::Arc;
 
 use ruff_db::file_system::{FileSystem, FileSystemPath, FileSystemPathBuf};
 use ruff_db::vfs::{system_path_to_file, vfs_path_to_file, VfsFile, VfsPath};
 
-use crate::module::resolver::internal::ModuleResolverSearchPaths;
-use crate::module::{
-    Module, ModuleInner, ModuleKind, ModuleName, ModuleSearchPath, ModuleSearchPathKind,
-};
+use crate::module::{Module, ModuleKind, ModuleName, ModuleSearchPath, ModuleSearchPathKind};
+use crate::resolver::internal::ModuleResolverSearchPaths;
 use crate::Db;
 
 const TYPESHED_STDLIB_DIRECTORY: &str = "stdlib";
@@ -51,14 +48,7 @@ pub(crate) fn resolve_module_query<'db>(
 
     let (search_path, module_file, kind) = resolve_name(db, name)?;
 
-    let module = Module {
-        inner: Arc::new(ModuleInner {
-            name: name.clone(),
-            kind,
-            search_path,
-            file: module_file,
-        }),
-    };
+    let module = Module::new(name.clone(), kind, search_path, module_file);
 
     Some(module)
 }
@@ -84,6 +74,7 @@ pub fn path_to_module(db: &dyn Db, path: &VfsPath) -> Option<Module> {
 ///
 /// Returns `None` if the file is not a module locatable via `sys.path`.
 #[salsa::tracked]
+#[allow(unused)]
 pub(crate) fn file_to_module(db: &dyn Db, file: VfsFile) -> Option<Module> {
     let _ = tracing::trace_span!("file_to_module", file = ?file.debug(db.upcast())).enter();
 
@@ -127,7 +118,7 @@ pub(crate) fn file_to_module(db: &dyn Db, file: VfsFile) -> Option<Module> {
     }
 }
 
-/// Configures the [`ModuleSearchPath`]s that are used to resolve modules.
+/// Configures the search paths that are used to resolve modules.
 #[derive(Eq, PartialEq, Debug)]
 pub struct ModuleResolutionSettings {
     /// List of user-provided paths that should take first priority in the module resolution.
@@ -208,8 +199,8 @@ impl Deref for OrderedSearchPaths {
 // TODO(micha): Contribute a fix for this upstream where the singleton methods have the same visibility as the struct.
 #[allow(unreachable_pub, clippy::used_underscore_binding)]
 pub(crate) mod internal {
-    use crate::module::resolver::OrderedSearchPaths;
     use crate::module::ModuleName;
+    use crate::resolver::OrderedSearchPaths;
 
     #[salsa::input(singleton)]
     pub(crate) struct ModuleResolverSearchPaths {

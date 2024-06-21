@@ -2,10 +2,7 @@ use salsa::DbWithJar;
 
 use ruff_db::{Db as SourceDb, Upcast};
 
-use crate::module::resolver::{
-    file_to_module, internal::ModuleNameIngredient, internal::ModuleResolverSearchPaths,
-    resolve_module_query,
-};
+use red_knot_module_resolver::Db as ResolverDb;
 
 use crate::semantic_index::symbol::{public_symbols_map, scopes_map, PublicSymbolId, ScopeId};
 use crate::semantic_index::{root_scope, semantic_index, symbol_table};
@@ -13,13 +10,9 @@ use crate::types::{infer_types, public_symbol_ty};
 
 #[salsa::jar(db=Db)]
 pub struct Jar(
-    ModuleNameIngredient<'_>,
-    ModuleResolverSearchPaths,
     ScopeId<'_>,
     PublicSymbolId<'_>,
     symbol_table,
-    resolve_module_query,
-    file_to_module,
     scopes_map,
     root_scope,
     semantic_index,
@@ -29,7 +22,10 @@ pub struct Jar(
 );
 
 /// Database giving access to semantic information about a Python program.
-pub trait Db: SourceDb + DbWithJar<Jar> + Upcast<dyn SourceDb> {}
+pub trait Db:
+    SourceDb + ResolverDb + DbWithJar<Jar> + Upcast<dyn SourceDb> + Upcast<dyn ResolverDb>
+{
+}
 
 #[cfg(test)]
 pub(crate) mod tests {
@@ -42,13 +38,14 @@ pub(crate) mod tests {
     use salsa::storage::HasIngredientsFor;
     use salsa::DebugWithDb;
 
+    use red_knot_module_resolver::{Db as ResolverDb, Jar as ResolverJar};
     use ruff_db::file_system::{FileSystem, MemoryFileSystem, OsFileSystem};
     use ruff_db::vfs::Vfs;
     use ruff_db::{Db as SourceDb, Jar as SourceJar, Upcast};
 
     use super::{Db, Jar};
 
-    #[salsa::db(Jar, SourceJar)]
+    #[salsa::db(Jar, ResolverJar, SourceJar)]
     pub(crate) struct TestDb {
         storage: salsa::Storage<Self>,
         vfs: Vfs,
@@ -76,15 +73,6 @@ pub(crate) mod tests {
             } else {
                 panic!("The test db is not using a memory file system");
             }
-        }
-
-        /// Uses the real file system instead of the memory file system.
-        ///
-        /// This useful for testing advanced file system features like permissions, symlinks, etc.
-        ///
-        /// Note that any files written to the memory file system won't be copied over.
-        pub(crate) fn with_os_file_system(&mut self) {
-            self.file_system = TestFileSystem::Os(OsFileSystem);
         }
 
         #[allow(unused)]
@@ -131,6 +119,13 @@ pub(crate) mod tests {
         }
     }
 
+    impl Upcast<dyn ResolverDb> for TestDb {
+        fn upcast(&self) -> &(dyn ResolverDb + 'static) {
+            self
+        }
+    }
+
+    impl red_knot_module_resolver::Db for TestDb {}
     impl Db for TestDb {}
 
     impl salsa::Database for TestDb {
@@ -157,6 +152,7 @@ pub(crate) mod tests {
 
     enum TestFileSystem {
         Memory(MemoryFileSystem),
+        #[allow(dead_code)]
         Os(OsFileSystem),
     }
 

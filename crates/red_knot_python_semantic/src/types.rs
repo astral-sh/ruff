@@ -513,9 +513,9 @@ mod tests {
     use crate::db::tests::{
         assert_will_not_run_function_query, assert_will_run_function_query, TestDb,
     };
-    use crate::module::resolver::{set_module_resolution_settings, ModuleResolutionSettings};
     use crate::semantic_index::root_scope;
     use crate::types::{expression_ty, infer_types, public_symbol_ty_by_name, TypingContext};
+    use red_knot_module_resolver::{set_module_resolution_settings, ModuleResolutionSettings};
 
     fn setup_db() -> TestDb {
         let mut db = TestDb::new();

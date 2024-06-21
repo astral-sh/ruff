@@ -1,6 +1,5 @@
 pub mod ast_node_ref;
 mod db;
-pub mod module;
 pub mod name;
 mod node_key;
 pub mod semantic_index;
