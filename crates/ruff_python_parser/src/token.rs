@@ -16,7 +16,7 @@ use ruff_python_ast::str_prefix::{
 use ruff_python_ast::{AnyStringFlags, BoolOp, Int, IpyEscapeKind, Operator, StringFlags, UnaryOp};
 use ruff_text_size::{Ranged, TextRange};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Token {
     /// The kind of the token.
     kind: TokenKind,
@@ -84,6 +84,26 @@ impl Token {
 impl Ranged for Token {
     fn range(&self) -> TextRange {
         self.range
+    }
+}
+
+impl fmt::Debug for Token {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?} {:?}", self.kind, self.range)?;
+        if !self.flags.is_empty() {
+            f.write_str(" (flags = ")?;
+            let mut first = true;
+            for (name, _) in self.flags.iter_names() {
+                if first {
+                    first = false;
+                } else {
+                    f.write_str(" | ")?;
+                }
+                f.write_str(name)?;
+            }
+            f.write_str(")")?;
+        }
+        Ok(())
     }
 }
 
