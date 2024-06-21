@@ -4,7 +4,6 @@ use std::ops::Range;
 use bitflags::bitflags;
 use hashbrown::hash_map::RawEntryMut;
 use rustc_hash::FxHasher;
-use salsa::DebugWithDb;
 use smallvec::SmallVec;
 
 use crate::semantic_index::definition::Definition;
@@ -128,7 +127,7 @@ impl ScopedSymbolId {
 /// Returns a mapping from [`FileScopeId`] to globally unique [`ScopeId`].
 #[salsa::tracked(return_ref)]
 pub(crate) fn scopes_map(db: &dyn Db, file: VfsFile) -> ScopesMap<'_> {
-    let _ = tracing::trace_span!("scopes_map", file = ?file.debug(db.upcast())).enter();
+    let _span = tracing::trace_span!("scopes_map", ?file).entered();
 
     let index = semantic_index(db, file);
 
@@ -160,7 +159,7 @@ impl<'db> ScopesMap<'db> {
 
 #[salsa::tracked(return_ref)]
 pub(crate) fn public_symbols_map(db: &dyn Db, file: VfsFile) -> PublicSymbolsMap<'_> {
-    let _ = tracing::trace_span!("public_symbols_map", file = ?file.debug(db.upcast())).enter();
+    let _span = tracing::trace_span!("public_symbols_map", ?file).entered();
 
     let module_scope = root_scope(db, file);
     let symbols = symbol_table(db, module_scope);
@@ -369,6 +368,10 @@ impl SymbolTableBuilder {
                 id
             }
         }
+    }
+
+    pub(super) fn symbol_by_name(&self, name: &str) -> Option<ScopedSymbolId> {
+        self.table.symbol_id_by_name(name)
     }
 
     pub(super) fn finish(mut self) -> SymbolTable {

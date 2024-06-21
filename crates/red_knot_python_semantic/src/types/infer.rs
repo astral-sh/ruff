@@ -9,14 +9,14 @@ use ruff_index::IndexVec;
 use ruff_python_ast as ast;
 use ruff_python_ast::{ExprContext, TypeParams};
 
-use crate::semantic_index::ast_ids::{ScopeAstIdNode, ScopeExpressionId};
+use crate::semantic_index::ast_ids::{HasScopedAstId, ScopedExpressionId};
 use crate::semantic_index::definition::{Definition, ImportDefinition, ImportFromDefinition};
 use crate::semantic_index::symbol::{FileScopeId, ScopeId, ScopeKind, ScopedSymbolId, SymbolTable};
 use crate::semantic_index::{symbol_table, ChildrenIter, SemanticIndex};
 use crate::types::{
-    ClassType, FunctionType, IntersectionType, ModuleType, ScopedClassTypeId, ScopedFunctionTypeId,
-    ScopedIntersectionTypeId, ScopedUnionTypeId, Type, TypeId, TypingContext, UnionType,
-    UnionTypeBuilder,
+    infer_types, ClassType, FunctionType, IntersectionType, ModuleType, ScopedClassTypeId,
+    ScopedFunctionTypeId, ScopedIntersectionTypeId, ScopedUnionTypeId, Type, TypeId, TypingContext,
+    UnionType, UnionTypeBuilder,
 };
 use crate::Db;
 
@@ -36,15 +36,18 @@ pub(crate) struct TypeInference<'db> {
     intersection_types: IndexVec<ScopedIntersectionTypeId, IntersectionType<'db>>,
 
     /// The types of every expression in this scope.
-    expression_tys: IndexVec<ScopeExpressionId, Type<'db>>,
+    expression_tys: IndexVec<ScopedExpressionId, Type<'db>>,
 
     /// The public types of every symbol in this scope.
     symbol_tys: IndexVec<ScopedSymbolId, Type<'db>>,
+
+    /// The type of a definition.
+    definition_tys: FxHashMap<Definition, Type<'db>>,
 }
 
 impl<'db> TypeInference<'db> {
     #[allow(unused)]
-    pub(super) fn expression_ty(&self, expression: ScopeExpressionId) -> Type<'db> {
+    pub(crate) fn expression_ty(&self, expression: ScopedExpressionId) -> Type<'db> {
         self.expression_tys[expression]
     }
 
@@ -72,6 +75,10 @@ impl<'db> TypeInference<'db> {
         &self.intersection_types[id]
     }
 
+    pub(crate) fn definition_ty(&self, definition: Definition) -> Type<'db> {
+        self.definition_tys[&definition]
+    }
+
     fn shrink_to_fit(&mut self) {
         self.class_types.shrink_to_fit();
         self.function_types.shrink_to_fit();
@@ -80,6 +87,7 @@ impl<'db> TypeInference<'db> {
 
         self.expression_tys.shrink_to_fit();
         self.symbol_tys.shrink_to_fit();
+        self.definition_tys.shrink_to_fit();
     }
 }
 
@@ -96,7 +104,6 @@ pub(super) struct TypeInferenceBuilder<'a> {
 
     /// The type inference results
     types: TypeInference<'a>,
-    definition_tys: FxHashMap<Definition, Type<'a>>,
     children_scopes: ChildrenIter<'a>,
 }
 
@@ -117,7 +124,6 @@ impl<'db> TypeInferenceBuilder<'db> {
 
             db,
             types: TypeInference::default(),
-            definition_tys: FxHashMap::default(),
             children_scopes,
         }
     }
@@ -185,7 +191,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             decorator_list,
         } = function;
 
-        let function_id = function.scope_ast_id(self.db, self.file_id, self.file_scope_id);
+        let function_id = function.scoped_ast_id(self.db, self.file_id, self.file_scope_id);
         let decorator_tys = decorator_list
             .iter()
             .map(|decorator| self.infer_decorator(decorator))
@@ -210,7 +216,8 @@ impl<'db> TypeInferenceBuilder<'db> {
             ScopeKind::Function | ScopeKind::Annotation
         ));
 
-        self.definition_tys
+        self.types
+            .definition_tys
             .insert(Definition::FunctionDef(function_id), function_ty);
     }
 
@@ -224,7 +231,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             body: _,
         } = class;
 
-        let class_id = class.scope_ast_id(self.db, self.file_id, self.file_scope_id);
+        let class_id = class.scoped_ast_id(self.db, self.file_id, self.file_scope_id);
 
         for decorator in decorator_list {
             self.infer_decorator(decorator);
@@ -252,7 +259,8 @@ impl<'db> TypeInferenceBuilder<'db> {
             body_scope: class_body_scope_id.to_scope_id(self.db, self.file_id),
         });
 
-        self.definition_tys
+        self.types
+            .definition_tys
             .insert(Definition::ClassDef(class_id), class_ty);
     }
 
@@ -295,10 +303,11 @@ impl<'db> TypeInferenceBuilder<'db> {
             self.infer_expression(target);
         }
 
-        let assign_id = assignment.scope_ast_id(self.db, self.file_id, self.file_scope_id);
+        let assign_id = assignment.scoped_ast_id(self.db, self.file_id, self.file_scope_id);
 
         // TODO: Handle multiple targets.
-        self.definition_tys
+        self.types
+            .definition_tys
             .insert(Definition::Assignment(assign_id), value_ty);
     }
 
@@ -318,8 +327,8 @@ impl<'db> TypeInferenceBuilder<'db> {
         let annotation_ty = self.infer_expression(annotation);
         self.infer_expression(target);
 
-        self.definition_tys.insert(
-            Definition::AnnotatedAssignment(assignment.scope_ast_id(
+        self.types.definition_tys.insert(
+            Definition::AnnotatedAssignment(assignment.scoped_ast_id(
                 self.db,
                 self.file_id,
                 self.file_scope_id,
@@ -347,7 +356,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     fn infer_import_statement(&mut self, import: &ast::StmtImport) {
         let ast::StmtImport { range: _, names } = import;
 
-        let import_id = import.scope_ast_id(self.db, self.file_id, self.file_scope_id);
+        let import_id = import.scoped_ast_id(self.db, self.file_id, self.file_scope_id);
 
         for (i, alias) in names.iter().enumerate() {
             let ast::Alias {
@@ -362,7 +371,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 .map(|module| self.typing_context().module_ty(module.file()))
                 .unwrap_or(Type::Unknown);
 
-            self.definition_tys.insert(
+            self.types.definition_tys.insert(
                 Definition::Import(ImportDefinition {
                     import_id,
                     alias: u32::try_from(i).unwrap(),
@@ -380,7 +389,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             level: _,
         } = import;
 
-        let import_id = import.scope_ast_id(self.db, self.file_id, self.file_scope_id);
+        let import_id = import.scoped_ast_id(self.db, self.file_id, self.file_scope_id);
         let module_name = ModuleName::new(module.as_deref().expect("Support relative imports"));
 
         let module =
@@ -400,7 +409,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 .member(&self.typing_context(), &name.id)
                 .unwrap_or(Type::Unknown);
 
-            self.definition_tys.insert(
+            self.types.definition_tys.insert(
                 Definition::ImportFrom(ImportFromDefinition {
                     import_id,
                     name: u32::try_from(i).unwrap(),
@@ -482,8 +491,8 @@ impl<'db> TypeInferenceBuilder<'db> {
         let value_ty = self.infer_expression(value);
         self.infer_expression(target);
 
-        self.definition_tys.insert(
-            Definition::NamedExpr(named.scope_ast_id(self.db, self.file_id, self.file_scope_id)),
+        self.types.definition_tys.insert(
+            Definition::NamedExpr(named.scoped_ast_id(self.db, self.file_id, self.file_scope_id)),
             value_ty,
         );
 
@@ -530,11 +539,12 @@ impl<'db> TypeInferenceBuilder<'db> {
                         // TODO: Skip over class scopes unless the they are a immediately-nested type param scope.
                         // TODO: Support built-ins
 
-                        let symbol_table =
-                            symbol_table(self.db, ancestor_id.to_scope_id(self.db, self.file_id));
+                        let ancestor_scope = ancestor_id.to_scope_id(self.db, self.file_id);
+                        let symbol_table = symbol_table(self.db, ancestor_scope);
 
-                        if let Some(_symbol_id) = symbol_table.symbol_id_by_name(id) {
-                            todo!("Return type for symbol from outer scope");
+                        if let Some(symbol_id) = symbol_table.symbol_id_by_name(id) {
+                            let types = infer_types(self.db, ancestor_scope);
+                            return types.symbol_ty(symbol_id);
                         }
                     }
                     Type::Unknown
@@ -666,7 +676,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         let mut definitions = symbol
             .definitions()
             .iter()
-            .filter_map(|definition| self.definition_tys.get(definition).copied());
+            .filter_map(|definition| self.types.definition_tys.get(definition).copied());
 
         let Some(first) = definitions.next() else {
             return Type::Unbound;

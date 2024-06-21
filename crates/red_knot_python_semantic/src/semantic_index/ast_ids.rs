@@ -4,7 +4,7 @@ use ruff_db::parsed::ParsedModule;
 use ruff_db::vfs::VfsFile;
 use ruff_index::{newtype_index, IndexVec};
 use ruff_python_ast as ast;
-use ruff_python_ast::AnyNodeRef;
+use ruff_python_ast::{AnyNodeRef, ExpressionRef};
 
 use crate::ast_node_ref::AstNodeRef;
 use crate::node_key::NodeKey;
@@ -29,27 +29,27 @@ use crate::Db;
 /// ```
 pub(crate) struct AstIds {
     /// Maps expression ids to their expressions.
-    expressions: IndexVec<ScopeExpressionId, AstNodeRef<ast::Expr>>,
+    expressions: IndexVec<ScopedExpressionId, AstNodeRef<ast::Expr>>,
 
     /// Maps expressions to their expression id. Uses `NodeKey` because it avoids cloning [`Parsed`].
-    expressions_map: FxHashMap<NodeKey, ScopeExpressionId>,
+    expressions_map: FxHashMap<NodeKey, ScopedExpressionId>,
 
-    statements: IndexVec<ScopeStatementId, AstNodeRef<ast::Stmt>>,
+    statements: IndexVec<ScopedStatementId, AstNodeRef<ast::Stmt>>,
 
-    statements_map: FxHashMap<NodeKey, ScopeStatementId>,
+    statements_map: FxHashMap<NodeKey, ScopedStatementId>,
 }
 
 impl AstIds {
-    fn statement_id<'a, N>(&self, node: N) -> ScopeStatementId
+    fn statement_id<'a, N>(&self, node: N) -> ScopedStatementId
     where
         N: Into<AnyNodeRef<'a>>,
     {
         self.statements_map[&NodeKey::from_node(node.into())]
     }
 
-    fn expression_id<'a, N>(&self, node: N) -> ScopeExpressionId
+    fn expression_id<'a, N>(&self, node: N) -> ScopedExpressionId
     where
-        N: Into<AnyNodeRef<'a>>,
+        N: Into<ExpressionRef<'a>>,
     {
         self.expressions_map[&NodeKey::from_node(node.into())]
     }
@@ -69,8 +69,7 @@ fn ast_ids<'db>(db: &'db dyn Db, scope: ScopeId) -> &'db AstIds {
     semantic_index(db, scope.file(db)).ast_ids(scope.file_scope_id(db))
 }
 
-/// Node that can be uniquely identified by an id in a [`FileScopeId`].
-pub trait ScopeAstIdNode {
+pub trait HasScopedAstId {
     /// The type of the ID uniquely identifying the node.
     type Id: Copy;
 
@@ -78,8 +77,11 @@ pub trait ScopeAstIdNode {
     ///
     /// ## Panics
     /// Panics if the node doesn't belong to `file` or is outside `scope`.
-    fn scope_ast_id(&self, db: &dyn Db, file: VfsFile, scope: FileScopeId) -> Self::Id;
+    fn scoped_ast_id(&self, db: &dyn Db, file: VfsFile, scope: FileScopeId) -> Self::Id;
+}
 
+/// Node that can be uniquely identified by an id in a [`FileScopeId`].
+pub trait ScopedAstIdNode: HasScopedAstId {
     /// Looks up the AST node by its ID.
     ///
     /// ## Panics
@@ -112,12 +114,12 @@ pub trait AstIdNode {
 
 impl<T> AstIdNode for T
 where
-    T: ScopeAstIdNode,
+    T: ScopedAstIdNode,
 {
     type ScopeId = T::Id;
 
     fn ast_id(&self, db: &dyn Db, file: VfsFile, scope: FileScopeId) -> AstId<Self::ScopeId> {
-        let in_scope_id = self.scope_ast_id(db, file, scope);
+        let in_scope_id = self.scoped_ast_id(db, file, scope);
         AstId { scope, in_scope_id }
     }
 
@@ -152,17 +154,71 @@ impl<L: Copy> AstId<L> {
 
 /// Uniquely identifies an [`ast::Expr`] in a [`FileScopeId`].
 #[newtype_index]
-pub struct ScopeExpressionId;
+pub struct ScopedExpressionId;
 
-impl ScopeAstIdNode for ast::Expr {
-    type Id = ScopeExpressionId;
+macro_rules! impl_has_scoped_expression_id {
+    ($ty: ty) => {
+        impl HasScopedAstId for $ty {
+            type Id = ScopedExpressionId;
 
-    fn scope_ast_id(&self, db: &dyn Db, file: VfsFile, file_scope: FileScopeId) -> Self::Id {
+            fn scoped_ast_id(
+                &self,
+                db: &dyn Db,
+                file: VfsFile,
+                file_scope: FileScopeId,
+            ) -> Self::Id {
+                let expression_ref = ExpressionRef::from(self);
+                expression_ref.scoped_ast_id(db, file, file_scope)
+            }
+        }
+    };
+}
+
+impl_has_scoped_expression_id!(ast::ExprBoolOp);
+impl_has_scoped_expression_id!(ast::ExprName);
+impl_has_scoped_expression_id!(ast::ExprBinOp);
+impl_has_scoped_expression_id!(ast::ExprUnaryOp);
+impl_has_scoped_expression_id!(ast::ExprLambda);
+impl_has_scoped_expression_id!(ast::ExprIf);
+impl_has_scoped_expression_id!(ast::ExprDict);
+impl_has_scoped_expression_id!(ast::ExprSet);
+impl_has_scoped_expression_id!(ast::ExprListComp);
+impl_has_scoped_expression_id!(ast::ExprSetComp);
+impl_has_scoped_expression_id!(ast::ExprDictComp);
+impl_has_scoped_expression_id!(ast::ExprGenerator);
+impl_has_scoped_expression_id!(ast::ExprAwait);
+impl_has_scoped_expression_id!(ast::ExprYield);
+impl_has_scoped_expression_id!(ast::ExprYieldFrom);
+impl_has_scoped_expression_id!(ast::ExprCompare);
+impl_has_scoped_expression_id!(ast::ExprCall);
+impl_has_scoped_expression_id!(ast::ExprFString);
+impl_has_scoped_expression_id!(ast::ExprStringLiteral);
+impl_has_scoped_expression_id!(ast::ExprBytesLiteral);
+impl_has_scoped_expression_id!(ast::ExprNumberLiteral);
+impl_has_scoped_expression_id!(ast::ExprBooleanLiteral);
+impl_has_scoped_expression_id!(ast::ExprNoneLiteral);
+impl_has_scoped_expression_id!(ast::ExprEllipsisLiteral);
+impl_has_scoped_expression_id!(ast::ExprAttribute);
+impl_has_scoped_expression_id!(ast::ExprSubscript);
+impl_has_scoped_expression_id!(ast::ExprStarred);
+impl_has_scoped_expression_id!(ast::ExprNamed);
+impl_has_scoped_expression_id!(ast::ExprList);
+impl_has_scoped_expression_id!(ast::ExprTuple);
+impl_has_scoped_expression_id!(ast::ExprSlice);
+impl_has_scoped_expression_id!(ast::ExprIpyEscapeCommand);
+impl_has_scoped_expression_id!(ast::Expr);
+
+impl HasScopedAstId for ast::ExpressionRef<'_> {
+    type Id = ScopedExpressionId;
+
+    fn scoped_ast_id(&self, db: &dyn Db, file: VfsFile, file_scope: FileScopeId) -> Self::Id {
         let scope = file_scope.to_scope_id(db, file);
         let ast_ids = ast_ids(db, scope);
-        ast_ids.expressions_map[&NodeKey::from_node(self)]
+        ast_ids.expression_id(*self)
     }
+}
 
+impl ScopedAstIdNode for ast::Expr {
     fn lookup_in_scope(db: &dyn Db, file: VfsFile, file_scope: FileScopeId, id: Self::Id) -> &Self {
         let scope = file_scope.to_scope_id(db, file);
         let ast_ids = ast_ids(db, scope);
@@ -172,17 +228,30 @@ impl ScopeAstIdNode for ast::Expr {
 
 /// Uniquely identifies an [`ast::Stmt`] in a [`FileScopeId`].
 #[newtype_index]
-pub struct ScopeStatementId;
+pub struct ScopedStatementId;
 
-impl ScopeAstIdNode for ast::Stmt {
-    type Id = ScopeStatementId;
+macro_rules! impl_has_scoped_statement_id {
+    ($ty: ty) => {
+        impl HasScopedAstId for $ty {
+            type Id = ScopedStatementId;
 
-    fn scope_ast_id(&self, db: &dyn Db, file: VfsFile, file_scope: FileScopeId) -> Self::Id {
-        let scope = file_scope.to_scope_id(db, file);
-        let ast_ids = ast_ids(db, scope);
-        ast_ids.statement_id(self)
-    }
+            fn scoped_ast_id(
+                &self,
+                db: &dyn Db,
+                file: VfsFile,
+                file_scope: FileScopeId,
+            ) -> Self::Id {
+                let scope = file_scope.to_scope_id(db, file);
+                let ast_ids = ast_ids(db, scope);
+                ast_ids.statement_id(self)
+            }
+        }
+    };
+}
 
+impl_has_scoped_statement_id!(ast::Stmt);
+
+impl ScopedAstIdNode for ast::Stmt {
     fn lookup_in_scope(db: &dyn Db, file: VfsFile, file_scope: FileScopeId, id: Self::Id) -> &Self {
         let scope = file_scope.to_scope_id(db, file);
         let ast_ids = ast_ids(db, scope);
@@ -192,17 +261,19 @@ impl ScopeAstIdNode for ast::Stmt {
 }
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
-pub struct ScopeFunctionId(pub(super) ScopeStatementId);
+pub struct ScopedFunctionId(pub(super) ScopedStatementId);
 
-impl ScopeAstIdNode for ast::StmtFunctionDef {
-    type Id = ScopeFunctionId;
+impl HasScopedAstId for ast::StmtFunctionDef {
+    type Id = ScopedFunctionId;
 
-    fn scope_ast_id(&self, db: &dyn Db, file: VfsFile, file_scope: FileScopeId) -> Self::Id {
+    fn scoped_ast_id(&self, db: &dyn Db, file: VfsFile, file_scope: FileScopeId) -> Self::Id {
         let scope = file_scope.to_scope_id(db, file);
         let ast_ids = ast_ids(db, scope);
-        ScopeFunctionId(ast_ids.statement_id(self))
+        ScopedFunctionId(ast_ids.statement_id(self))
     }
+}
 
+impl ScopedAstIdNode for ast::StmtFunctionDef {
     fn lookup_in_scope(db: &dyn Db, file: VfsFile, scope: FileScopeId, id: Self::Id) -> &Self {
         ast::Stmt::lookup_in_scope(db, file, scope, id.0)
             .as_function_def_stmt()
@@ -211,122 +282,36 @@ impl ScopeAstIdNode for ast::StmtFunctionDef {
 }
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
-pub struct ScopeClassId(pub(super) ScopeStatementId);
+pub struct ScopedClassId(pub(super) ScopedStatementId);
 
-impl ScopeAstIdNode for ast::StmtClassDef {
-    type Id = ScopeClassId;
+impl HasScopedAstId for ast::StmtClassDef {
+    type Id = ScopedClassId;
 
-    fn scope_ast_id(&self, db: &dyn Db, file: VfsFile, file_scope: FileScopeId) -> Self::Id {
+    fn scoped_ast_id(&self, db: &dyn Db, file: VfsFile, file_scope: FileScopeId) -> Self::Id {
         let scope = file_scope.to_scope_id(db, file);
         let ast_ids = ast_ids(db, scope);
-        ScopeClassId(ast_ids.statement_id(self))
+        ScopedClassId(ast_ids.statement_id(self))
     }
+}
 
+impl ScopedAstIdNode for ast::StmtClassDef {
     fn lookup_in_scope(db: &dyn Db, file: VfsFile, scope: FileScopeId, id: Self::Id) -> &Self {
         let statement = ast::Stmt::lookup_in_scope(db, file, scope, id.0);
         statement.as_class_def_stmt().unwrap()
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
-pub struct ScopeAssignmentId(pub(super) ScopeStatementId);
-
-impl ScopeAstIdNode for ast::StmtAssign {
-    type Id = ScopeAssignmentId;
-
-    fn scope_ast_id(&self, db: &dyn Db, file: VfsFile, file_scope: FileScopeId) -> Self::Id {
-        let scope = file_scope.to_scope_id(db, file);
-        let ast_ids = ast_ids(db, scope);
-        ScopeAssignmentId(ast_ids.statement_id(self))
-    }
-
-    fn lookup_in_scope(db: &dyn Db, file: VfsFile, scope: FileScopeId, id: Self::Id) -> &Self {
-        let statement = ast::Stmt::lookup_in_scope(db, file, scope, id.0);
-        statement.as_assign_stmt().unwrap()
-    }
-}
-
-#[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
-pub struct ScopeAnnotatedAssignmentId(ScopeStatementId);
-
-impl ScopeAstIdNode for ast::StmtAnnAssign {
-    type Id = ScopeAnnotatedAssignmentId;
-
-    fn scope_ast_id(&self, db: &dyn Db, file: VfsFile, file_scope: FileScopeId) -> Self::Id {
-        let scope = file_scope.to_scope_id(db, file);
-        let ast_ids = ast_ids(db, scope);
-        ScopeAnnotatedAssignmentId(ast_ids.statement_id(self))
-    }
-
-    fn lookup_in_scope(db: &dyn Db, file: VfsFile, scope: FileScopeId, id: Self::Id) -> &Self {
-        let statement = ast::Stmt::lookup_in_scope(db, file, scope, id.0);
-        statement.as_ann_assign_stmt().unwrap()
-    }
-}
-
-#[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
-pub struct ScopeImportId(pub(super) ScopeStatementId);
-
-impl ScopeAstIdNode for ast::StmtImport {
-    type Id = ScopeImportId;
-
-    fn scope_ast_id(&self, db: &dyn Db, file: VfsFile, file_scope: FileScopeId) -> Self::Id {
-        let scope = file_scope.to_scope_id(db, file);
-        let ast_ids = ast_ids(db, scope);
-        ScopeImportId(ast_ids.statement_id(self))
-    }
-
-    fn lookup_in_scope(db: &dyn Db, file: VfsFile, scope: FileScopeId, id: Self::Id) -> &Self {
-        let statement = ast::Stmt::lookup_in_scope(db, file, scope, id.0);
-        statement.as_import_stmt().unwrap()
-    }
-}
-
-#[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
-pub struct ScopeImportFromId(pub(super) ScopeStatementId);
-
-impl ScopeAstIdNode for ast::StmtImportFrom {
-    type Id = ScopeImportFromId;
-
-    fn scope_ast_id(&self, db: &dyn Db, file: VfsFile, file_scope: FileScopeId) -> Self::Id {
-        let scope = file_scope.to_scope_id(db, file);
-        let ast_ids = ast_ids(db, scope);
-        ScopeImportFromId(ast_ids.statement_id(self))
-    }
-
-    fn lookup_in_scope(db: &dyn Db, file: VfsFile, scope: FileScopeId, id: Self::Id) -> &Self {
-        let statement = ast::Stmt::lookup_in_scope(db, file, scope, id.0);
-        statement.as_import_from_stmt().unwrap()
-    }
-}
-
-#[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
-pub struct ScopeNamedExprId(pub(super) ScopeExpressionId);
-
-impl ScopeAstIdNode for ast::ExprNamed {
-    type Id = ScopeNamedExprId;
-
-    fn scope_ast_id(&self, db: &dyn Db, file: VfsFile, file_scope: FileScopeId) -> Self::Id {
-        let scope = file_scope.to_scope_id(db, file);
-        let ast_ids = ast_ids(db, scope);
-        ScopeNamedExprId(ast_ids.expression_id(self))
-    }
-
-    fn lookup_in_scope(db: &dyn Db, file: VfsFile, scope: FileScopeId, id: Self::Id) -> &Self
-    where
-        Self: Sized,
-    {
-        let expression = ast::Expr::lookup_in_scope(db, file, scope, id.0);
-        expression.as_named_expr().unwrap()
-    }
-}
+impl_has_scoped_statement_id!(ast::StmtAssign);
+impl_has_scoped_statement_id!(ast::StmtAnnAssign);
+impl_has_scoped_statement_id!(ast::StmtImport);
+impl_has_scoped_statement_id!(ast::StmtImportFrom);
 
 #[derive(Debug)]
 pub(super) struct AstIdsBuilder {
-    expressions: IndexVec<ScopeExpressionId, AstNodeRef<ast::Expr>>,
-    expressions_map: FxHashMap<NodeKey, ScopeExpressionId>,
-    statements: IndexVec<ScopeStatementId, AstNodeRef<ast::Stmt>>,
-    statements_map: FxHashMap<NodeKey, ScopeStatementId>,
+    expressions: IndexVec<ScopedExpressionId, AstNodeRef<ast::Expr>>,
+    expressions_map: FxHashMap<NodeKey, ScopedExpressionId>,
+    statements: IndexVec<ScopedStatementId, AstNodeRef<ast::Stmt>>,
+    statements_map: FxHashMap<NodeKey, ScopedStatementId>,
 }
 
 impl AstIdsBuilder {
@@ -349,7 +334,7 @@ impl AstIdsBuilder {
         &mut self,
         stmt: &ast::Stmt,
         parsed: &ParsedModule,
-    ) -> ScopeStatementId {
+    ) -> ScopedStatementId {
         let statement_id = self.statements.push(AstNodeRef::new(parsed.clone(), stmt));
 
         self.statements_map
@@ -368,7 +353,7 @@ impl AstIdsBuilder {
         &mut self,
         expr: &ast::Expr,
         parsed: &ParsedModule,
-    ) -> ScopeExpressionId {
+    ) -> ScopedExpressionId {
         let expression_id = self.expressions.push(AstNodeRef::new(parsed.clone(), expr));
 
         self.expressions_map

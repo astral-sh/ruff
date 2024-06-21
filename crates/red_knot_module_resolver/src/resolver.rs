@@ -1,4 +1,3 @@
-use salsa::DebugWithDb;
 use std::ops::Deref;
 
 use ruff_db::file_system::{FileSystem, FileSystemPath, FileSystemPathBuf};
@@ -42,7 +41,7 @@ pub(crate) fn resolve_module_query<'db>(
     db: &'db dyn Db,
     module_name: internal::ModuleNameIngredient<'db>,
 ) -> Option<Module> {
-    let _ = tracing::trace_span!("resolve_module", module_name = ?module_name.debug(db)).enter();
+    let _span = tracing::trace_span!("resolve_module", ?module_name).entered();
 
     let name = module_name.name(db);
 
@@ -76,7 +75,7 @@ pub fn path_to_module(db: &dyn Db, path: &VfsPath) -> Option<Module> {
 #[salsa::tracked]
 #[allow(unused)]
 pub(crate) fn file_to_module(db: &dyn Db, file: VfsFile) -> Option<Module> {
-    let _ = tracing::trace_span!("file_to_module", file = ?file.debug(db.upcast())).enter();
+    let _span = tracing::trace_span!("file_to_module", ?file).entered();
 
     let path = file.path(db.upcast());
 
