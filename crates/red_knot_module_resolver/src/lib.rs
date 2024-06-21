@@ -1,6 +1,7 @@
 mod db;
 mod module;
 mod resolver;
+mod typeshed;
 
 pub use db::{Db, Jar};
 pub use module::{ModuleKind, ModuleName};

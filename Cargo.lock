@@ -2006,6 +2006,8 @@ dependencies = [
  "smol_str",
  "tempfile",
  "tracing",
+ "walkdir",
+ "zip",
 ]
 
 [[package]]

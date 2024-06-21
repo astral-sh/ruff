@@ -17,6 +17,11 @@ ruff_python_stdlib = { workspace = true }
 salsa = { workspace = true }
 smol_str = { workspace = true }
 tracing = { workspace = true }
+zip = { workspace = true }
+
+[build-dependencies]
+walkdir = { workspace = true }
+zip = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
