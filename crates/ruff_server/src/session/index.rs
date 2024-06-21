@@ -352,18 +352,9 @@ impl Index {
             anyhow::bail!("Tried to close unavailable document `{key}`");
         };
 
-        let Some(controller) = self.documents.remove(&url) else {
+        let Some(_) = self.documents.remove(&url) else {
             anyhow::bail!("tried to close document that didn't exist at {}", url)
         };
-        if let Some(notebook) = controller.as_notebook() {
-            for url in notebook.urls() {
-                if self.notebook_cells.remove(url).is_none() {
-                    tracing::debug!(
-                        "tried to de-register notebook cell with URL {url} that didn't exist"
-                    );
-                }
-            }
-        }
         Ok(())
     }
 
