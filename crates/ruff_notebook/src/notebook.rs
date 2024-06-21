@@ -19,6 +19,7 @@ use ruff_text_size::TextSize;
 use crate::cell::CellOffsets;
 use crate::index::NotebookIndex;
 use crate::schema::{Cell, RawNotebook, SortAlphabetically, SourceValue};
+use crate::RawNotebookMetadata;
 
 /// Run round-trip source code generation on a given Jupyter notebook file path.
 pub fn round_trip(path: &Path) -> anyhow::Result<String> {
@@ -381,6 +382,10 @@ impl Notebook {
     /// Return a slice of [`Cell`] in the Jupyter notebook.
     pub fn cells(&self) -> &[Cell] {
         &self.raw.cells
+    }
+
+    pub fn metadata(&self) -> &RawNotebookMetadata {
+        &self.raw.metadata
     }
 
     /// Return `true` if the notebook is a Python notebook, `false` otherwise.

@@ -13,7 +13,7 @@ pub(super) type CellId = usize;
 /// The state of a notebook document in the server. Contains an array of cells whose
 /// contents are internally represented by [`TextDocument`]s.
 #[derive(Clone, Debug)]
-pub(crate) struct NotebookDocument {
+pub struct NotebookDocument {
     cells: Vec<NotebookCell>,
     metadata: ruff_notebook::RawNotebookMetadata,
     version: DocumentVersion,
@@ -30,7 +30,7 @@ struct NotebookCell {
 }
 
 impl NotebookDocument {
-    pub(crate) fn new(
+    pub fn new(
         version: DocumentVersion,
         cells: Vec<lsp_types::NotebookCell>,
         metadata: serde_json::Map<String, serde_json::Value>,
@@ -59,7 +59,7 @@ impl NotebookDocument {
 
     /// Generates a pseudo-representation of a notebook that lacks per-cell metadata and contextual information
     /// but should still work with Ruff's linter.
-    pub(crate) fn make_ruff_notebook(&self) -> ruff_notebook::Notebook {
+    pub fn make_ruff_notebook(&self) -> ruff_notebook::Notebook {
         let cells = self
             .cells
             .iter()

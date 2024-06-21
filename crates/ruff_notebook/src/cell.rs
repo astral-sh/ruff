@@ -31,6 +31,18 @@ impl Cell {
         }
     }
 
+    pub fn is_code_cell(&self) -> bool {
+        matches!(self, Cell::Code(_))
+    }
+
+    pub fn metadata(&self) -> &serde_json::Value {
+        match self {
+            Cell::Code(cell) => &cell.metadata,
+            Cell::Markdown(cell) => &cell.metadata,
+            Cell::Raw(cell) => &cell.metadata,
+        }
+    }
+
     /// Update the [`SourceValue`] of the cell.
     pub(crate) fn set_source(&mut self, source: SourceValue) {
         match self {
