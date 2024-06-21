@@ -1991,8 +1991,6 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "tracing-tree",
- "walkdir",
- "zip",
 ]
 
 [[package]]

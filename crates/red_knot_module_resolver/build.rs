@@ -3,7 +3,7 @@
 //!
 //! This script should be automatically run at build time
 //! whenever the script itself changes, or whenever any files
-//! in `crates/red_knot/vendor/typeshed` change.
+//! in `crates/red_knot_module_resolver/vendor/typeshed` change.
 
 use std::fs::File;
 use std::path::Path;
