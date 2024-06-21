@@ -1978,7 +1978,7 @@ dependencies = [
  "notify",
  "parking_lot",
  "rayon",
- "red_knot_python_semantic",
+ "red_knot_module_resolver",
  "ruff_index",
  "ruff_notebook",
  "ruff_python_ast",
@@ -1996,6 +1996,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "red_knot_module_resolver"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "ruff_db",
+ "ruff_python_stdlib",
+ "salsa",
+ "smol_str",
+ "tempfile",
+ "tracing",
+]
+
+[[package]]
 name = "red_knot_python_semantic"
 version = "0.0.0"
 dependencies = [
@@ -2003,17 +2016,16 @@ dependencies = [
  "bitflags 2.5.0",
  "hashbrown 0.14.5",
  "indexmap",
+ "red_knot_module_resolver",
  "ruff_db",
  "ruff_index",
  "ruff_python_ast",
  "ruff_python_parser",
- "ruff_python_stdlib",
  "ruff_text_size",
  "rustc-hash",
  "salsa",
  "smallvec",
  "smol_str",
- "tempfile",
  "tracing",
 ]
 

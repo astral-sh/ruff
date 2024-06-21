@@ -2,13 +2,13 @@ use std::sync::Arc;
 
 use rustc_hash::FxHashMap;
 
+use red_knot_module_resolver::resolve_module;
+use red_knot_module_resolver::ModuleName;
 use ruff_db::vfs::VfsFile;
 use ruff_index::IndexVec;
 use ruff_python_ast as ast;
 use ruff_python_ast::{ExprContext, TypeParams};
 
-use crate::module::resolver::resolve_module;
-use crate::module::ModuleName;
 use crate::name::Name;
 use crate::semantic_index::ast_ids::{ScopeAstIdNode, ScopeExpressionId};
 use crate::semantic_index::definition::{Definition, ImportDefinition, ImportFromDefinition};
@@ -358,7 +358,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             } = alias;
 
             let module_name = ModuleName::new(&name.id);
-            let module = module_name.and_then(|name| resolve_module(self.db, name));
+            let module = module_name.and_then(|name| resolve_module(self.db.upcast(), name));
             let module_ty = module
                 .map(|module| self.typing_context().module_ty(module.file()))
                 .unwrap_or(Type::Unknown);
@@ -384,7 +384,8 @@ impl<'db> TypeInferenceBuilder<'db> {
         let import_id = import.scope_ast_id(self.db, self.file_id, self.file_scope_id);
         let module_name = ModuleName::new(module.as_deref().expect("Support relative imports"));
 
-        let module = module_name.and_then(|module_name| resolve_module(self.db, module_name));
+        let module =
+            module_name.and_then(|module_name| resolve_module(self.db.upcast(), module_name));
         let module_ty = module
             .map(|module| self.typing_context().module_ty(module.file()))
             .unwrap_or(Type::Unknown);
@@ -694,9 +695,9 @@ mod tests {
     use ruff_db::vfs::system_path_to_file;
 
     use crate::db::tests::TestDb;
-    use crate::module::resolver::{set_module_resolution_settings, ModuleResolutionSettings};
     use crate::name::Name;
     use crate::types::{public_symbol_ty_by_name, Type, TypingContext};
+    use red_knot_module_resolver::{set_module_resolution_settings, ModuleResolutionSettings};
 
     fn setup_db() -> TestDb {
         let mut db = TestDb::new();

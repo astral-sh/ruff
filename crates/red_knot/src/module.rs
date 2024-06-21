@@ -7,7 +7,7 @@ use std::sync::Arc;
 use dashmap::mapref::entry::Entry;
 use smol_str::SmolStr;
 
-use red_knot_python_semantic::module::ModuleKind;
+use red_knot_module_resolver::ModuleKind;
 
 use crate::db::{QueryResult, SemanticDb, SemanticJar};
 use crate::files::FileId;
