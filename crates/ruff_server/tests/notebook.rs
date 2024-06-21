@@ -11,7 +11,7 @@ use ruff_notebook::SourceValue;
 use ruff_server::ClientSettings;
 
 const SUPER_RESOLUTION_OVERVIEW_PATH: &str =
-    "./resources/test/fixtures/super_resolution_overview.ipynb";
+    "./resources/test/fixtures/tensorflow_test_notebook.ipynb";
 
 struct NotebookChange {
     version: i32,
@@ -26,7 +26,7 @@ fn super_resolution_overview() {
     let file_url = lsp_types::Url::from_file_path(&file_path).unwrap();
     let notebook = create_notebook(&file_path).unwrap();
 
-    insta::assert_debug_snapshot!("initial_notebook", notebook);
+    insta::assert_snapshot!("initial_notebook", notebook_source(&notebook));
 
     let mut session = ruff_server::Session::new(
         &ClientCapabilities::default(),
@@ -300,7 +300,14 @@ fn super_resolution_overview() {
 
     let snapshot = session.take_snapshot(file_url.clone()).unwrap();
 
-    insta::assert_debug_snapshot!("changed_notebook", snapshot.query().as_notebook());
+    insta::assert_snapshot!(
+        "changed_notebook",
+        notebook_source(snapshot.query().as_notebook().unwrap())
+    );
+}
+
+fn notebook_source(notebook: &ruff_server::NotebookDocument) -> String {
+    notebook.make_ruff_notebook().source_code().to_string()
 }
 
 // produces an opaque URL based on a document path and a cell index

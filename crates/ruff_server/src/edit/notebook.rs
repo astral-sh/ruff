@@ -59,7 +59,7 @@ impl NotebookDocument {
 
     /// Generates a pseudo-representation of a notebook that lacks per-cell metadata and contextual information
     /// but should still work with Ruff's linter.
-    pub(crate) fn make_ruff_notebook(&self) -> ruff_notebook::Notebook {
+    pub fn make_ruff_notebook(&self) -> ruff_notebook::Notebook {
         let cells = self
             .cells
             .iter()
