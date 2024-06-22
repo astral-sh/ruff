@@ -26,4 +26,5 @@ rustc-hash = { workspace = true }
 zip = { workspace = true }
 
 [dev-dependencies]
+insta = { workspace = true }
 once_cell = { workspace = true }
