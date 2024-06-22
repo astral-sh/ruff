@@ -261,7 +261,7 @@ impl Workspace {
     pub fn tokens(&self, contents: &str) -> Result<String, Error> {
         let parsed = parse_unchecked(contents, Mode::Module);
 
-        Ok(format!("{:#?}", parsed.tokens()))
+        Ok(format!("{:#?}", parsed.tokens().as_ref()))
     }
 }
 
