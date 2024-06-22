@@ -1267,6 +1267,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::InvalidMockAccess) {
                 pygrep_hooks::rules::non_existent_mock_method(checker, test);
             }
+            if checker.enabled(Rule::AssertWithPrintExpression) {
+                ruff::rules::assert_with_print_expression(checker, stmt, test, msg.as_deref());
+            }
         }
         Stmt::With(with_stmt @ ast::StmtWith { items, body, .. }) => {
             if checker.enabled(Rule::TooManyNestedBlocks) {

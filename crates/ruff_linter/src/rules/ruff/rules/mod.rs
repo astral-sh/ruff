@@ -1,4 +1,5 @@
 pub(crate) use ambiguous_unicode_character::*;
+pub(crate) use assert_with_print_expression::*;
 pub(crate) use assignment_in_assert::*;
 pub(crate) use asyncio_dangling_task::*;
 pub(crate) use collection_literal_concatenation::*;
@@ -30,6 +31,7 @@ pub(crate) use unused_async::*;
 pub(crate) use unused_noqa::*;
 
 mod ambiguous_unicode_character;
+mod assert_with_print_expression;
 mod assignment_in_assert;
 mod asyncio_dangling_task;
 mod collection_literal_concatenation;

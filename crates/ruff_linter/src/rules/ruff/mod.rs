@@ -54,6 +54,7 @@ mod tests {
     #[test_case(Rule::MissingFStringSyntax, Path::new("RUF027_2.py"))]
     #[test_case(Rule::InvalidFormatterSuppressionComment, Path::new("RUF028.py"))]
     #[test_case(Rule::UnusedAsync, Path::new("RUF029.py"))]
+    #[test_case(Rule::AssertWithPrintExpression, Path::new("RUF030.py"))]
     #[test_case(Rule::RedirectedNOQA, Path::new("RUF101.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
