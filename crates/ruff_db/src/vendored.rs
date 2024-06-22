@@ -23,9 +23,11 @@ pub struct VendoredFileSystem {
 
 impl VendoredFileSystem {
     pub fn new(raw_bytes: &'static [u8]) -> Result<Self> {
-        Ok(Self {
+        let instance = Self {
             inner: VendoredFileSystemInner::new(raw_bytes)?,
-        })
+        };
+        debug_assert!(!instance.file_names().is_empty());
+        Ok(instance)
     }
 
     pub fn exists(&self, path: &VendoredPath) -> bool {
@@ -75,6 +77,17 @@ impl VendoredFileSystem {
         let mut buffer = String::new();
         zip_file.read_to_string(&mut buffer)?;
         Ok(buffer)
+    }
+
+    /// Return a list of all file paths contained in the underlying zip archive.
+    ///
+    /// This can be useful for debugging. The paths are deliberately not normalized into
+    /// `VendoredPaths` in the returned `Vec`, as it's useful to see exactly how they're
+    /// represented in the underlying zip archive.
+    pub fn file_names(&self) -> Vec<String> {
+        let inner_locked = self.inner.lock();
+        let archive = inner_locked.borrow();
+        archive.file_names().map(String::from).collect()
     }
 }
 
@@ -160,6 +173,10 @@ impl VendoredZipArchive {
     fn lookup_path(&mut self, path: &NormalizedVendoredPath) -> Result<ZipFile> {
         Ok(self.0.by_name(path.as_str())?)
     }
+
+    fn file_names(&self) -> impl Iterator<Item = &str> {
+        self.0.file_names()
+    }
 }
 
 /// A path that has been normalized via the `normalize_vendored_path` function.
@@ -211,10 +228,12 @@ fn normalize_vendored_path(path: &VendoredPath) -> NormalizedVendoredPath {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashSet;
     use std::io::Write;
 
     use once_cell::sync::Lazy;
-    use zip::{write::FileOptions, CompressionMethod, ZipWriter};
+    use zip::write::FileOptions;
+    use zip::{CompressionMethod, ZipWriter};
 
     use super::*;
 
@@ -251,7 +270,19 @@ mod tests {
     });
 
     fn mock_typeshed() -> VendoredFileSystem {
-        VendoredFileSystem::new(&MOCK_ZIP_ARCHIVE).unwrap()
+        let system = VendoredFileSystem::new(&MOCK_ZIP_ARCHIVE).unwrap();
+        let contained_files: HashSet<String> = system.file_names().into_iter().collect();
+        let expected_files: HashSet<String> = {
+            let names = [
+                "stdlib/",
+                "stdlib/functools.pyi",
+                "stdlib/asyncio/",
+                "stdlib/asyncio/tasks.pyi",
+            ];
+            names.into_iter().map(String::from).collect()
+        };
+        assert_eq!(contained_files, expected_files);
+        system
     }
 
     fn test_directory(dirname: &str) {
