@@ -17,7 +17,6 @@ type Result<T> = io::Result<T>;
 ///
 /// "Files" in the `VendoredFileSystem` are read-only and immutable.
 /// Directories are supported, but symlinks and hardlinks cannot exist.
-#[derive(Debug)]
 pub struct VendoredFileSystem {
     inner: VendoredFileSystemInner,
 }
@@ -79,13 +78,18 @@ impl VendoredFileSystem {
     }
 }
 
-impl fmt::Display for VendoredFileSystem {
+impl fmt::Debug for VendoredFileSystem {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let inner_locked = self.inner.lock();
-        let inner_borrowed = inner_locked.borrow();
-        f.debug_struct("VendoredFileSystem")
-            .field("data", &inner_borrowed)
-            .finish()
+        let VendoredFileSystem { inner } = self;
+        if f.alternate() {
+            f.debug_struct("VendoredFileSystem")
+                .field("inner", inner)
+                .finish()
+        } else {
+            let inner_locked = self.inner.lock();
+            let inner_borrowed = inner_locked.borrow();
+            write!(f, "VendoredFileSystem(<{} paths>)", inner_borrowed.len())
+        }
     }
 }
 
@@ -170,19 +174,22 @@ impl VendoredZipArchive {
     fn lookup_path(&mut self, path: &NormalizedVendoredPath) -> Result<ZipFile> {
         Ok(self.0.by_name(path.as_str())?)
     }
+
+    fn len(&self) -> usize {
+        self.0.len()
+    }
 }
 
 impl fmt::Debug for VendoredZipArchive {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let VendoredZipArchive(archive) = self;
         if f.alternate() {
-            let mut paths: Vec<&str> = archive.file_names().collect();
+            let mut paths: Vec<&str> = self.0.file_names().collect();
             paths.sort_unstable();
             f.debug_struct("VendoredZipArchive")
                 .field("paths", &paths)
                 .finish()
         } else {
-            write!(f, "VendoredZipArchive(<{} paths>)", archive.len())
+            write!(f, "VendoredZipArchive(<{} paths>)", self.len())
         }
     }
 }
@@ -282,15 +289,15 @@ mod tests {
     }
 
     #[test]
-    fn manual_debug_implementation() {
+    fn filesystem_debug_implementation() {
         assert_snapshot!(
             format!("{:?}", mock_typeshed()),
-            @"VendoredFileSystem { inner: VendoredFileSystemInner(Mutex { data: RefCell { value: VendoredZipArchive(<4 paths>) }, poisoned: false, .. }) }"
+            @"VendoredFileSystem(<4 paths>)"
         );
     }
 
     #[test]
-    fn manual_debug_implementation_alternate() {
+    fn filesystem_debug_implementation_alternate() {
         assert_snapshot!(format!("{:#?}", mock_typeshed()), @r###"
         VendoredFileSystem {
             inner: VendoredFileSystemInner(
@@ -309,30 +316,6 @@ mod tests {
                     ..
                 },
             ),
-        }
-        "###);
-    }
-
-    #[test]
-    fn display_implementation() {
-        assert_snapshot!(
-            format!("{}", mock_typeshed()),
-            @"VendoredFileSystem { data: VendoredZipArchive(<4 paths>) }"
-        );
-    }
-
-    #[test]
-    fn display_implementation_alternate() {
-        assert_snapshot!(format!("{:#}", mock_typeshed()), @r###"
-        VendoredFileSystem {
-            data: VendoredZipArchive {
-                paths: [
-                    "stdlib/",
-                    "stdlib/asyncio/",
-                    "stdlib/asyncio/tasks.pyi",
-                    "stdlib/functools.pyi",
-                ],
-            },
         }
         "###);
     }
