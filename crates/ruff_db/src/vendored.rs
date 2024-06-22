@@ -2,7 +2,6 @@ use std::cell::RefCell;
 use std::io::{self, Read};
 use std::sync::{Mutex, MutexGuard};
 
-use itertools::Itertools;
 use zip::{read::ZipFile, ZipArchive};
 
 use crate::file_revision::FileRevision;
@@ -190,14 +189,13 @@ impl NormalizedVendoredPath {
 /// Unsupported components are path prefixes,
 /// and path root directories appearing anywhere except at the start of the path.
 fn normalize_vendored_path(path: &VendoredPath) -> NormalizedVendoredPath {
-    let mut normalized_parts = camino::Utf8PathBuf::new();
-
     // Allow the `RootDir` component, but only if it is at the very start of the string.
     let mut components = path.components().peekable();
     if let Some(camino::Utf8Component::RootDir) = components.peek() {
         components.next();
     }
 
+    let mut normalized_parts = Vec::new();
     for component in components {
         match component {
             camino::Utf8Component::Normal(part) => normalized_parts.push(part),
@@ -208,7 +206,7 @@ fn normalize_vendored_path(path: &VendoredPath) -> NormalizedVendoredPath {
             unsupported => panic!("Unsupported component in a vendored path: {unsupported}"),
         }
     }
-    NormalizedVendoredPath(normalized_parts.into_iter().join("/"))
+    NormalizedVendoredPath(normalized_parts.join("/"))
 }
 
 #[cfg(test)]
