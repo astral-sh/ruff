@@ -3,7 +3,6 @@ pub(crate) mod versions;
 #[cfg(test)]
 mod tests {
     use std::io::{self, Read};
-    use std::path::Path;
 
     #[test]
     fn typeshed_zip_created_at_build_time() -> anyhow::Result<()> {
@@ -14,9 +13,8 @@ mod tests {
 
         let mut typeshed_zip_archive = zip::ZipArchive::new(io::Cursor::new(TYPESHED_ZIP_BYTES))?;
 
-        let path_to_functools = Path::new("stdlib").join("functools.pyi");
         let mut functools_module_stub = typeshed_zip_archive
-            .by_name(path_to_functools.to_str().unwrap())
+            .by_name("stdlib/functools.pyi")
             .unwrap();
         assert!(functools_module_stub.is_file());
 

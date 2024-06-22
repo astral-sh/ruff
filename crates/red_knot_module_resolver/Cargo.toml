@@ -21,6 +21,7 @@ tracing = { workspace = true }
 zip = { workspace = true }
 
 [build-dependencies]
+path-slash = { workspace = true }
 walkdir = { workspace = true }
 zip = { workspace = true }
 
