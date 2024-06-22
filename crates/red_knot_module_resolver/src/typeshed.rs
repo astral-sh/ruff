@@ -5,6 +5,8 @@ mod tests {
     use std::io::{self, Read};
     use std::path::Path;
 
+    use path_slash::PathExt;
+
     #[test]
     fn typeshed_zip_created_at_build_time() -> anyhow::Result<()> {
         // The file path here is hardcoded in this crate's `build.rs` script.
@@ -16,7 +18,7 @@ mod tests {
 
         let path_to_functools = Path::new("stdlib").join("functools.pyi");
         let mut functools_module_stub = typeshed_zip_archive
-            .by_name(path_to_functools.to_str().unwrap())
+            .by_name(&path_to_functools.to_slash().unwrap())
             .unwrap();
         assert!(functools_module_stub.is_file());
 
