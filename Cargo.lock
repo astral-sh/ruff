@@ -2202,6 +2202,7 @@ dependencies = [
  "countme",
  "dashmap",
  "filetime",
+ "insta",
  "once_cell",
  "ruff_python_ast",
  "ruff_python_parser",

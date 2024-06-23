@@ -1,4 +1,6 @@
 use std::cell::RefCell;
+use std::collections::BTreeMap;
+use std::fmt::{self, Debug};
 use std::io::{self, Read};
 use std::sync::{Mutex, MutexGuard};
 
@@ -16,7 +18,6 @@ type Result<T> = io::Result<T>;
 ///
 /// "Files" in the `VendoredFileSystem` are read-only and immutable.
 /// Directories are supported, but symlinks and hardlinks cannot exist.
-#[derive(Debug)]
 pub struct VendoredFileSystem {
     inner: VendoredFileSystemInner,
 }
@@ -78,6 +79,74 @@ impl VendoredFileSystem {
     }
 }
 
+impl fmt::Debug for VendoredFileSystem {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let locked_inner = self.inner.lock();
+        if f.alternate() {
+            let mut paths: Vec<String> = locked_inner
+                .borrow()
+                .0
+                .file_names()
+                .map(String::from)
+                .collect();
+            paths.sort();
+            let debug_info: BTreeMap<String, ZipFileDebugInfo> = paths
+                .iter()
+                .map(|path| {
+                    (
+                        path.to_owned(),
+                        ZipFileDebugInfo::from(locked_inner.borrow_mut().0.by_name(path).unwrap()),
+                    )
+                })
+                .collect();
+            f.debug_struct("VendoredFileSystem")
+                .field("inner_mutex_poisoned", &self.inner.0.is_poisoned())
+                .field("paths", &paths)
+                .field("data_by_path", &debug_info)
+                .finish()
+        } else {
+            write!(
+                f,
+                "VendoredFileSystem(<{} paths>)",
+                locked_inner.borrow().len()
+            )
+        }
+    }
+}
+
+/// Private struct only used in `Debug` implementations
+///
+/// This could possibly be unified with the `Metadata` struct,
+/// but that is deliberately kept small, and only exposes metadata
+/// that users of the `VendoredFileSystem` could realistically need.
+/// For debugging purposes, however, we want to have all information
+/// available.
+#[allow(unused)]
+#[derive(Debug)]
+struct ZipFileDebugInfo {
+    crc32_hash: u32,
+    compressed_size: u64,
+    uncompressed_size: u64,
+    compression_method: zip::CompressionMethod,
+    kind: FileType,
+}
+
+impl<'a> From<ZipFile<'a>> for ZipFileDebugInfo {
+    fn from(value: ZipFile<'a>) -> Self {
+        Self {
+            crc32_hash: value.crc32(),
+            compressed_size: value.compressed_size(),
+            uncompressed_size: value.size(),
+            compression_method: value.compression(),
+            kind: if value.is_dir() {
+                FileType::Directory
+            } else {
+                FileType::File
+            },
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum FileType {
     /// The path exists in the zip archive and represents a vendored file
@@ -126,7 +195,6 @@ impl Metadata {
     }
 }
 
-#[derive(Debug)]
 struct VendoredFileSystemInner(Mutex<RefCell<VendoredZipArchive>>);
 
 type LockedZipArchive<'a> = MutexGuard<'a, RefCell<VendoredZipArchive>>;
@@ -159,6 +227,10 @@ impl VendoredZipArchive {
 
     fn lookup_path(&mut self, path: &NormalizedVendoredPath) -> Result<ZipFile> {
         Ok(self.0.by_name(path.as_str())?)
+    }
+
+    fn len(&self) -> usize {
+        self.0.len()
     }
 }
 
@@ -213,8 +285,10 @@ fn normalize_vendored_path(path: &VendoredPath) -> NormalizedVendoredPath {
 mod tests {
     use std::io::Write;
 
+    use insta::assert_snapshot;
     use once_cell::sync::Lazy;
-    use zip::{write::FileOptions, CompressionMethod, ZipWriter};
+    use zip::write::FileOptions;
+    use zip::{CompressionMethod, ZipWriter};
 
     use super::*;
 
@@ -252,6 +326,59 @@ mod tests {
 
     fn mock_typeshed() -> VendoredFileSystem {
         VendoredFileSystem::new(&MOCK_ZIP_ARCHIVE).unwrap()
+    }
+
+    #[test]
+    fn filesystem_debug_implementation() {
+        assert_snapshot!(
+            format!("{:?}", mock_typeshed()),
+            @"VendoredFileSystem(<4 paths>)"
+        );
+    }
+
+    #[test]
+    fn filesystem_debug_implementation_alternate() {
+        assert_snapshot!(format!("{:#?}", mock_typeshed()), @r###"
+        VendoredFileSystem {
+            inner_mutex_poisoned: false,
+            paths: [
+                "stdlib/",
+                "stdlib/asyncio/",
+                "stdlib/asyncio/tasks.pyi",
+                "stdlib/functools.pyi",
+            ],
+            data_by_path: {
+                "stdlib/": ZipFileDebugInfo {
+                    crc32_hash: 0,
+                    compressed_size: 0,
+                    uncompressed_size: 0,
+                    compression_method: Stored,
+                    kind: Directory,
+                },
+                "stdlib/asyncio/": ZipFileDebugInfo {
+                    crc32_hash: 0,
+                    compressed_size: 0,
+                    uncompressed_size: 0,
+                    compression_method: Stored,
+                    kind: Directory,
+                },
+                "stdlib/asyncio/tasks.pyi": ZipFileDebugInfo {
+                    crc32_hash: 2826547428,
+                    compressed_size: 24,
+                    uncompressed_size: 15,
+                    compression_method: Zstd,
+                    kind: File,
+                },
+                "stdlib/functools.pyi": ZipFileDebugInfo {
+                    crc32_hash: 1099005079,
+                    compressed_size: 34,
+                    uncompressed_size: 25,
+                    compression_method: Zstd,
+                    kind: File,
+                },
+            },
+        }
+        "###);
     }
 
     fn test_directory(dirname: &str) {
