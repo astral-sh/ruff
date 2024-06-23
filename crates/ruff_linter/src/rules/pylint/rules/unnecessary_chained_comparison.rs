@@ -71,9 +71,9 @@ fn update_bounds<'a>(
     }
 }
 
-fn set_lower_upper_bounds(
-    node: &ast::ExprCompare,
-    uses: &mut HashMap<String, Bounds>,
+fn set_lower_upper_bounds<'a>(
+    node: &'a ast::ExprCompare,
+    uses: &mut HashMap<&'a str, Bounds>,
     node_idx: u32,
 ) {
     let mut left_operand: &ast::Expr = &node.left;
@@ -98,7 +98,7 @@ pub(crate) fn unnecessary_chained_comparison(checker: &mut Checker, bool_op: &as
         return;
     }
 
-    let mut uses: HashMap<String, Bounds> = HashMap::new();
+    let mut uses: HashMap<&str, Bounds> = HashMap::new();
 
     let mut node_idx: u32 = 0;
     for expr in values {
