@@ -1,4 +1,4 @@
-use ruff_python_ast::{Expr, Stmt, StmtAssert};
+use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_text_size::Ranged;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
@@ -41,21 +41,46 @@ pub struct AssertWithPrintExpression;
 impl AlwaysFixableViolation for AssertWithPrintExpression {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!(
-            "`print()` expressions in `assert` statements is likely unintentional, \
-            remove the `print()` call and pass the message"
-        )
+        format!("`print()` expression in `assert` statement is likely unintentional")
     }
 
     fn fix_title(&self) -> String {
-        "Remove `print`, and pass the message directly to `assert`".to_owned()
+        "Remove `print`".to_owned()
+    }
+}
+
+/// RUF030
+///
+/// Checks if the `msg` argument to an `assert` statement is a `print` call, and if so,
+/// replace the message with the arguments to the `print` call.
+pub(crate) fn assert_with_print_expression(checker: &mut Checker, stmt: &ast::StmtAssert) {
+    if let Some(Expr::Call(call)) = stmt.msg.as_deref() {
+        // We have to check that the print call is a call to the built-in `print` function
+        let semantic = checker.semantic();
+
+        if semantic.match_builtin_expr(&call.func, "print") {
+            // This is the confirmed rule condition
+            let mut diagnostic = Diagnostic::new(AssertWithPrintExpression, call.range());
+            diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+                checker.generator().stmt(&Stmt::Assert(ast::StmtAssert {
+                    range: stmt.range(),
+                    test: stmt.test.clone().into(),
+                    msg: print_arguments::to_expr(&call.arguments).map(Box::new),
+                })),
+                // We have to replace the entire statement,
+                // as the `print` could be empty and thus `call.range()`
+                // will cease to exist.
+                stmt.range(),
+            )));
+            checker.diagnostics.push(diagnostic);
+        }
     }
 }
 
 /// Extracts the arguments from a `print` call and converts them to some kind of string
 /// expression.
 ///
-/// 3 cases are handled:
+/// Three cases are handled:
 /// - if there are no arguments, return `None` so that `diagnostic` can remove `msg` from `assert`;
 /// - if all of `print` arguments including `sep` are string literals, return a `Expr::StringLiteral`;
 /// - otherwise, return a `Expr::FString`.
@@ -70,14 +95,14 @@ mod print_arguments {
 
     /// Converts an expression to a list of `FStringElement`s.
     ///
-    /// 3 cases are handled:
+    /// Three cases are handled:
     /// - if the expression is a string literal, each part of the string will be converted to a
-    /// `FStringLiteralElement`.
+    ///   `FStringLiteralElement`.
     /// - if the expression is an f-string, the elements will be returned as-is.
     /// - otherwise, the expression will be wrapped in a `FStringExpressionElement`.
     fn expr_to_fstring_elements(expr: &Expr) -> Vec<FStringElement> {
         match expr {
-            // If the expression is a string literal, convert each part to a FStringLiteralElement
+            // If the expression is a string literal, convert each part to a `FStringLiteralElement`.
             Expr::StringLiteral(string) => string
                 .value
                 .iter()
@@ -88,10 +113,12 @@ mod print_arguments {
                     })
                 })
                 .collect(),
-            // If the expression is an f-string, return the elements
+
+            // If the expression is an f-string, return the elements.
             Expr::FString(fstring) => fstring.value.elements().cloned().collect(),
-            // Otherwise, return the expression as a single FStringExpressionElement wrapping
-            // the expression
+
+            // Otherwise, return the expression as a single `FStringExpressionElement` wrapping
+            // the expression.
             expr => vec![FStringElement::Expression(FStringExpressionElement {
                 range: TextRange::default(),
                 expression: Box::new(expr.clone()),
@@ -106,7 +133,7 @@ mod print_arguments {
     ///
     /// If any of the elements are not string literals, `None` is returned.
     ///
-    /// This is useful - in combination with [`expr_to_fstring_elements`] for
+    /// This is useful (in combination with [`expr_to_fstring_elements`]) for
     /// checking if the `sep` and `args` arguments to `print` are all string
     /// literals.
     fn fstring_elements_to_string_literals<'a>(
@@ -185,8 +212,8 @@ mod print_arguments {
     /// This function will only return [`None`] if there are no arguments at all.
     ///
     /// ## Note
-    /// This function will always return an f-string, even if all of the arguments
-    /// are string literals. This can produce unnecessary f-strings.
+    /// This function will always return an f-string, even if all arguments are string literals.
+    /// This can produce unnecessary f-strings.
     ///
     /// Also note that the iterator arguments of this function are consumed,
     /// as opposed to the references taken by [`args_to_string_literal_expr`].
@@ -224,8 +251,7 @@ mod print_arguments {
     ///
     /// ## Returns
     ///
-    /// - [`Some`]<[`Expr::StringLiteral`]> if all of the arguments including `sep` are
-    /// string literals.
+    /// - [`Some`]<[`Expr::StringLiteral`]> if all arguments including `sep` are string literals.
     /// - [`Some`]<[`Expr::FString`]> if any of the arguments are not string literals.
     /// - [`None`] if the `print` contains no positional arguments at all.
     pub(super) fn to_expr(arguments: &Arguments) -> Option<Expr> {
@@ -260,41 +286,5 @@ mod print_arguments {
         // falling back to an f-string if the arguments are not all string literals.
         args_to_string_literal_expr(args.iter(), sep.iter())
             .or_else(|| args_to_fstring_expr(args.into_iter(), sep.into_iter()))
-    }
-}
-
-/// Checks if the `msg` argument to an `assert` statement is a `print` call, and if so,
-/// replace the message with the arguments to the `print` call.
-pub(crate) fn assert_with_print_expression(
-    checker: &mut Checker,
-    stmt: &Stmt,
-    test: &Expr,
-    msg: Option<&Expr>,
-) {
-    if let Some(Expr::Call(call)) = msg {
-        // We have to check that the print call is a call to the built-in `print` function
-        let semantic = checker.semantic();
-
-        let Some(qualified_name) = semantic.resolve_qualified_name(&call.func) else {
-            return;
-        };
-
-        if matches!(qualified_name.segments(), ["" | "builtins", "print"]) {
-            // This is the confirmed rule condition
-            let mut diagnostic = Diagnostic::new(AssertWithPrintExpression, call.range());
-            diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-                checker.generator().stmt(&Stmt::Assert(StmtAssert {
-                    range: stmt.range(),
-                    test: test.clone().into(),
-                    // Into::into is used for boxing the expression
-                    msg: print_arguments::to_expr(&call.arguments).map(std::convert::Into::into),
-                })),
-                // We have to replace the entire statement,
-                // as the `print` could be empty and thus `call.range()`
-                // will cease to exist
-                stmt.range(),
-            )));
-            checker.diagnostics.push(diagnostic);
-        }
     }
 }
