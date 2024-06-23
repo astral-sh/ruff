@@ -1,3 +1,4 @@
+use std::io;
 use std::sync::Arc;
 
 use countme::Count;
@@ -8,7 +9,7 @@ pub use path::VfsPath;
 
 use crate::file_revision::FileRevision;
 use crate::file_system::FileSystemPath;
-use crate::vendored::VendoredFileSystem;
+use crate::vendored::{MetadataLookupError, VendoredFileSystem, ZipFileReadError};
 use crate::vfs::private::FileStatus;
 use crate::{Db, FxDashMap};
 
@@ -31,9 +32,15 @@ pub fn system_path_to_file(db: &dyn Db, path: impl AsRef<FileSystemPath>) -> Opt
     }
 }
 
-/// Interns a vendored file path. Returns `Some` if the vendored file for `path` exists and `None` otherwise.
+/// Interns a vendored file path.
+///
+/// - Returns `Ok(VfsFile)` if `path` is valid and points to a file that exists
+/// - Otherwise, returns `Err`
 #[inline]
-pub fn vendored_path_to_file(db: &dyn Db, path: impl AsRef<VendoredPath>) -> Option<VfsFile> {
+pub fn vendored_path_to_file(
+    db: &dyn Db,
+    path: impl AsRef<VendoredPath>,
+) -> Result<VfsFile, MetadataLookupError> {
     db.vfs().vendored(db, path.as_ref())
 }
 
@@ -46,7 +53,7 @@ pub fn vendored_path_to_file(db: &dyn Db, path: impl AsRef<VendoredPath>) -> Opt
 pub fn vfs_path_to_file(db: &dyn Db, path: &VfsPath) -> Option<VfsFile> {
     match path {
         VfsPath::FileSystem(path) => system_path_to_file(db, path),
-        VfsPath::Vendored(path) => vendored_path_to_file(db, path),
+        VfsPath::Vendored(path) => vendored_path_to_file(db, path).ok(),
     }
 }
 
@@ -135,7 +142,7 @@ impl Vfs {
 
     /// Looks up a vendored file by its path. Returns `Some` if a vendored file for the given path
     /// exists and `None` otherwise.
-    fn vendored(&self, db: &dyn Db, path: &VendoredPath) -> Option<VfsFile> {
+    fn vendored(&self, db: &dyn Db, path: &VendoredPath) -> Result<VfsFile, MetadataLookupError> {
         let file = match self
             .inner
             .files_by_path
@@ -160,7 +167,7 @@ impl Vfs {
             }
         };
 
-        Some(file)
+        Ok(file)
     }
 
     /// Stubs out the vendored files with the given content.
@@ -312,28 +319,32 @@ impl Default for VendoredVfs {
 }
 
 impl VendoredVfs {
-    fn revision(&self, path: &VendoredPath) -> Option<FileRevision> {
+    fn revision(&self, path: &VendoredPath) -> Result<FileRevision, MetadataLookupError> {
         match self {
             VendoredVfs::Real(file_system) => file_system
                 .metadata(path)
                 .map(|metadata| metadata.revision()),
-            VendoredVfs::Stubbed(stubbed) => stubbed
-                .contains_key(&path.to_path_buf())
-                .then_some(FileRevision::new(1)),
+            VendoredVfs::Stubbed(stubbed) => {
+                if stubbed.contains_key(&path.to_path_buf()) {
+                    Ok(FileRevision::new(1))
+                } else {
+                    Err(MetadataLookupError::NonExistentPath(path.to_path_buf()))
+                }
+            }
         }
     }
 
-    fn read(&self, path: &VendoredPath) -> std::io::Result<String> {
+    fn read(&self, path: &VendoredPath) -> Result<String, ZipFileReadError> {
         match self {
             VendoredVfs::Real(file_system) => file_system.read(path),
             VendoredVfs::Stubbed(stubbed) => {
                 if let Some(contents) = stubbed.get(&path.to_path_buf()).as_deref().cloned() {
                     Ok(contents)
                 } else {
-                    Err(std::io::Error::new(
-                        std::io::ErrorKind::NotFound,
-                        format!("Could not find file {path:?}"),
-                    ))
+                    Err(ZipFileReadError::UnreadablePath(io::Error::new(
+                        io::ErrorKind::NotFound,
+                        format!("Could not read {path:?}"),
+                    )))
                 }
             }
         }
@@ -357,6 +368,7 @@ mod private {
 mod tests {
     use crate::file_revision::FileRevision;
     use crate::tests::TestDb;
+    use crate::vendored::MetadataLookupError;
     use crate::vfs::{system_path_to_file, vendored_path_to_file};
 
     #[test]
@@ -402,6 +414,9 @@ mod tests {
     fn stubbed_vendored_file_non_existing() {
         let db = TestDb::new();
 
-        assert_eq!(vendored_path_to_file(&db, "test.py"), None);
+        assert!(matches!(
+            vendored_path_to_file(&db, "test.py"),
+            Err(MetadataLookupError::NonExistentPath(_))
+        ));
     }
 }

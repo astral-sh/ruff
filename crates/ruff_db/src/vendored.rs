@@ -11,8 +11,6 @@ pub use path::{VendoredPath, VendoredPathBuf};
 
 pub mod path;
 
-type Result<T> = io::Result<T>;
-
 /// File system that stores all content in a static zip archive
 /// bundled as part of the Ruff binary.
 ///
@@ -23,14 +21,16 @@ pub struct VendoredFileSystem {
 }
 
 impl VendoredFileSystem {
-    pub fn new(raw_bytes: &'static [u8]) -> Result<Self> {
+    pub fn new(raw_bytes: &'static [u8]) -> io::Result<Self> {
         Ok(Self {
             inner: VendoredFileSystemInner::new(raw_bytes)?,
         })
     }
 
     pub fn exists(&self, path: &VendoredPath) -> bool {
-        let normalized = normalize_vendored_path(path);
+        let Ok(normalized) = normalize_vendored_path(path) else {
+            return false;
+        };
         let inner_locked = self.inner.lock();
         let mut archive = inner_locked.borrow_mut();
 
@@ -44,8 +44,8 @@ impl VendoredFileSystem {
                 .is_ok()
     }
 
-    pub fn metadata(&self, path: &VendoredPath) -> Option<Metadata> {
-        let normalized = normalize_vendored_path(path);
+    pub fn metadata(&self, path: &VendoredPath) -> Result<Metadata, MetadataLookupError> {
+        let normalized = normalize_vendored_path(path)?;
         let inner_locked = self.inner.lock();
 
         // Must probe the zipfile twice, as "stdlib" and "stdlib/" are considered
@@ -54,13 +54,13 @@ impl VendoredFileSystem {
         // work the same as other paths in Ruff.
         let mut archive = inner_locked.borrow_mut();
         if let Ok(zip_file) = archive.lookup_path(&normalized) {
-            return Some(Metadata::from_zip_file(zip_file));
+            return Ok(Metadata::from_zip_file(zip_file));
         }
         if let Ok(zip_file) = archive.lookup_path(&normalized.with_trailing_slash()) {
-            return Some(Metadata::from_zip_file(zip_file));
+            return Ok(Metadata::from_zip_file(zip_file));
         }
 
-        None
+        Err(MetadataLookupError::NonExistentPath(path.to_path_buf()))
     }
 
     /// Read the entire contents of the zip file at `path` into a string
@@ -69,10 +69,10 @@ impl VendoredFileSystem {
     /// - The path does not exist in the underlying zip archive
     /// - The path exists in the underlying zip archive, but represents a directory
     /// - The contents of the zip file at `path` contain invalid UTF-8
-    pub fn read(&self, path: &VendoredPath) -> Result<String> {
+    pub fn read(&self, path: &VendoredPath) -> Result<String, ZipFileReadError> {
         let inner_locked = self.inner.lock();
         let mut archive = inner_locked.borrow_mut();
-        let mut zip_file = archive.lookup_path(&normalize_vendored_path(path))?;
+        let mut zip_file = archive.lookup_path(&normalize_vendored_path(path)?)?;
         let mut buffer = String::new();
         zip_file.read_to_string(&mut buffer)?;
         Ok(buffer)
@@ -112,6 +112,30 @@ impl fmt::Debug for VendoredFileSystem {
             )
         }
     }
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum InvalidVendoredPathError {
+    #[error("Unsupported component in a vendored path: {0}")]
+    UnsupportedComponent(String),
+    #[error("Path attempts to escape out of the zipfile using `..` parts")]
+    EscapeFromZipFile,
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum MetadataLookupError {
+    #[error("{0:?} does not exist in the zip archive")]
+    NonExistentPath(VendoredPathBuf),
+    #[error("{0}")]
+    InvalidPath(#[from] InvalidVendoredPathError),
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum ZipFileReadError {
+    #[error("{0}")]
+    InvalidPath(#[from] InvalidVendoredPathError),
+    #[error("Path could not be read due to {0}")]
+    UnreadablePath(#[from] io::Error),
 }
 
 /// Private struct only used in `Debug` implementations
@@ -200,7 +224,7 @@ struct VendoredFileSystemInner(Mutex<RefCell<VendoredZipArchive>>);
 type LockedZipArchive<'a> = MutexGuard<'a, RefCell<VendoredZipArchive>>;
 
 impl VendoredFileSystemInner {
-    fn new(raw_bytes: &'static [u8]) -> Result<Self> {
+    fn new(raw_bytes: &'static [u8]) -> io::Result<Self> {
         Ok(Self(Mutex::new(RefCell::new(VendoredZipArchive::new(
             raw_bytes,
         )?))))
@@ -221,11 +245,11 @@ impl VendoredFileSystemInner {
 struct VendoredZipArchive(ZipArchive<io::Cursor<&'static [u8]>>);
 
 impl VendoredZipArchive {
-    fn new(data: &'static [u8]) -> Result<Self> {
+    fn new(data: &'static [u8]) -> io::Result<Self> {
         Ok(Self(ZipArchive::new(io::Cursor::new(data))?))
     }
 
-    fn lookup_path(&mut self, path: &NormalizedVendoredPath) -> Result<ZipFile> {
+    fn lookup_path(&mut self, path: &NormalizedVendoredPath) -> io::Result<ZipFile> {
         Ok(self.0.by_name(path.as_str())?)
     }
 
@@ -260,7 +284,9 @@ impl NormalizedVendoredPath {
 /// If a path with an unsupported component for vendored paths is passed.
 /// Unsupported components are path prefixes,
 /// and path root directories appearing anywhere except at the start of the path.
-fn normalize_vendored_path(path: &VendoredPath) -> NormalizedVendoredPath {
+fn normalize_vendored_path(
+    path: &VendoredPath,
+) -> Result<NormalizedVendoredPath, InvalidVendoredPathError> {
     // Allow the `RootDir` component, but only if it is at the very start of the string.
     let mut components = path.components().peekable();
     if let Some(camino::Utf8Component::RootDir) = components.peek() {
@@ -273,12 +299,18 @@ fn normalize_vendored_path(path: &VendoredPath) -> NormalizedVendoredPath {
             camino::Utf8Component::Normal(part) => normalized_parts.push(part),
             camino::Utf8Component::CurDir => continue,
             camino::Utf8Component::ParentDir => {
-                normalized_parts.pop();
+                if normalized_parts.pop().is_none() {
+                    return Err(InvalidVendoredPathError::EscapeFromZipFile);
+                }
             }
-            unsupported => panic!("Unsupported component in a vendored path: {unsupported}"),
+            unsupported => {
+                return Err(InvalidVendoredPathError::UnsupportedComponent(
+                    unsupported.to_string(),
+                ))
+            }
         }
     }
-    NormalizedVendoredPath(normalized_parts.join("/"))
+    Ok(NormalizedVendoredPath(normalized_parts.join("/")))
 }
 
 #[cfg(test)]
@@ -426,10 +458,8 @@ mod tests {
         let mock_typeshed = mock_typeshed();
         let path = VendoredPath::new(path);
         assert!(!mock_typeshed.exists(path));
-        assert!(mock_typeshed.metadata(path).is_none());
-        assert!(mock_typeshed
-            .read(path)
-            .is_err_and(|err| err.to_string().contains("file not found")));
+        assert!(mock_typeshed.metadata(path).is_err());
+        assert!(mock_typeshed.read(path).is_err());
     }
 
     #[test]

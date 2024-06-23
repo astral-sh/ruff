@@ -64,9 +64,10 @@ mod tests {
 
             let vendored_path_kind = vendored_typeshed_stubs
                 .metadata(vendored_path)
-                .unwrap_or_else(|| {
+                .unwrap_or_else(|err| {
                     panic!(
                         "Expected metadata for {vendored_path:?} to be retrievable from the `VendoredFileSystem!
+                        Error encountered: {err}
 
                         Vendored file system:
 
