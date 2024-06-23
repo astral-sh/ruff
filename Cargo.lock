@@ -1997,6 +1997,7 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "insta",
+ "path-slash",
  "ruff_db",
  "ruff_python_stdlib",
  "rustc-hash",
@@ -2201,7 +2202,7 @@ dependencies = [
  "countme",
  "dashmap",
  "filetime",
- "itertools 0.13.0",
+ "insta",
  "once_cell",
  "ruff_python_ast",
  "ruff_python_parser",

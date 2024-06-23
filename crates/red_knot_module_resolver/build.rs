@@ -8,6 +8,7 @@
 use std::fs::File;
 use std::path::Path;
 
+use path_slash::PathExt;
 use zip::result::ZipResult;
 use zip::write::{FileOptions, ZipWriter};
 use zip::CompressionMethod;
@@ -28,25 +29,25 @@ fn zip_dir(directory_path: &str, writer: File) -> ZipResult<File> {
 
     for entry in walkdir::WalkDir::new(directory_path) {
         let dir_entry = entry.unwrap();
-        let relative_path = dir_entry.path();
-        let name = relative_path
+        let absolute_path = dir_entry.path();
+        let normalized_relative_path = absolute_path
             .strip_prefix(Path::new(directory_path))
             .unwrap()
-            .to_str()
+            .to_slash()
             .expect("Unexpected non-utf8 typeshed path!");
 
         // Write file or directory explicitly
         // Some unzip tools unzip files with directory paths correctly, some do not!
-        if relative_path.is_file() {
-            println!("adding file {relative_path:?} as {name:?} ...");
-            zip.start_file(name, options)?;
-            let mut f = File::open(relative_path)?;
+        if absolute_path.is_file() {
+            println!("adding file {absolute_path:?} as {normalized_relative_path:?} ...");
+            zip.start_file(normalized_relative_path, options)?;
+            let mut f = File::open(absolute_path)?;
             std::io::copy(&mut f, &mut zip).unwrap();
-        } else if !name.is_empty() {
+        } else if !normalized_relative_path.is_empty() {
             // Only if not root! Avoids path spec / warning
             // and mapname conversion failed error on unzip
-            println!("adding dir {relative_path:?} as {name:?} ...");
-            zip.add_directory(name, options)?;
+            println!("adding dir {absolute_path:?} as {normalized_relative_path:?} ...");
+            zip.add_directory(normalized_relative_path, options)?;
         }
     }
     zip.finish()
