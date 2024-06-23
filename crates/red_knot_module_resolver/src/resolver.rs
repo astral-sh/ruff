@@ -1,13 +1,11 @@
+use salsa::DebugWithDb;
 use std::ops::Deref;
-use std::sync::Arc;
 
 use ruff_db::file_system::{FileSystem, FileSystemPath, FileSystemPathBuf};
 use ruff_db::vfs::{system_path_to_file, vfs_path_to_file, VfsFile, VfsPath};
 
-use crate::module::resolver::internal::ModuleResolverSearchPaths;
-use crate::module::{
-    Module, ModuleInner, ModuleKind, ModuleName, ModuleSearchPath, ModuleSearchPathKind,
-};
+use crate::module::{Module, ModuleKind, ModuleName, ModuleSearchPath, ModuleSearchPathKind};
+use crate::resolver::internal::ModuleResolverSearchPaths;
 use crate::Db;
 
 const TYPESHED_STDLIB_DIRECTORY: &str = "stdlib";
@@ -29,7 +27,6 @@ pub fn set_module_resolution_settings(db: &mut dyn Db, config: ModuleResolutionS
 }
 
 /// Resolves a module name to a module.
-#[tracing::instrument(level = "debug", skip(db))]
 pub fn resolve_module(db: &dyn Db, module_name: ModuleName) -> Option<Module> {
     let interned_name = internal::ModuleNameIngredient::new(db, module_name);
 
@@ -41,22 +38,17 @@ pub fn resolve_module(db: &dyn Db, module_name: ModuleName) -> Option<Module> {
 /// This query should not be called directly. Instead, use [`resolve_module`]. It only exists
 /// because Salsa requires the module name to be an ingredient.
 #[salsa::tracked]
-pub(crate) fn resolve_module_query(
-    db: &dyn Db,
-    module_name: internal::ModuleNameIngredient,
+pub(crate) fn resolve_module_query<'db>(
+    db: &'db dyn Db,
+    module_name: internal::ModuleNameIngredient<'db>,
 ) -> Option<Module> {
+    let _ = tracing::trace_span!("resolve_module", module_name = ?module_name.debug(db)).enter();
+
     let name = module_name.name(db);
 
     let (search_path, module_file, kind) = resolve_name(db, name)?;
 
-    let module = Module {
-        inner: Arc::new(ModuleInner {
-            name: name.clone(),
-            kind,
-            search_path,
-            file: module_file,
-        }),
-    };
+    let module = Module::new(name.clone(), kind, search_path, module_file);
 
     Some(module)
 }
@@ -82,8 +74,10 @@ pub fn path_to_module(db: &dyn Db, path: &VfsPath) -> Option<Module> {
 ///
 /// Returns `None` if the file is not a module locatable via `sys.path`.
 #[salsa::tracked]
-#[tracing::instrument(level = "debug", skip(db))]
-pub fn file_to_module(db: &dyn Db, file: VfsFile) -> Option<Module> {
+#[allow(unused)]
+pub(crate) fn file_to_module(db: &dyn Db, file: VfsFile) -> Option<Module> {
+    let _ = tracing::trace_span!("file_to_module", file = ?file.debug(db.upcast())).enter();
+
     let path = file.path(db.upcast());
 
     let search_paths = module_search_paths(db);
@@ -124,7 +118,7 @@ pub fn file_to_module(db: &dyn Db, file: VfsFile) -> Option<Module> {
     }
 }
 
-/// Configures the [`ModuleSearchPath`]s that are used to resolve modules.
+/// Configures the search paths that are used to resolve modules.
 #[derive(Eq, PartialEq, Debug)]
 pub struct ModuleResolutionSettings {
     /// List of user-provided paths that should take first priority in the module resolution.
@@ -205,8 +199,8 @@ impl Deref for OrderedSearchPaths {
 // TODO(micha): Contribute a fix for this upstream where the singleton methods have the same visibility as the struct.
 #[allow(unreachable_pub, clippy::used_underscore_binding)]
 pub(crate) mod internal {
-    use crate::module::resolver::OrderedSearchPaths;
     use crate::module::ModuleName;
+    use crate::resolver::OrderedSearchPaths;
 
     #[salsa::input(singleton)]
     pub(crate) struct ModuleResolverSearchPaths {
@@ -218,7 +212,7 @@ pub(crate) mod internal {
     ///
     /// This is needed because Salsa requires that all query arguments are salsa ingredients.
     #[salsa::interned]
-    pub(crate) struct ModuleNameIngredient {
+    pub(crate) struct ModuleNameIngredient<'db> {
         #[return_ref]
         pub(super) name: ModuleName,
     }
@@ -886,7 +880,7 @@ mod tests {
         let foo_module2 = resolve_module(&db, foo_module_name);
 
         assert!(!db
-            .take_sale_events()
+            .take_salsa_events()
             .iter()
             .any(|event| { matches!(event.kind, salsa::EventKind::WillExecute { .. }) }));
 

@@ -11,12 +11,12 @@ use ruff_python_ast::{
 };
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
-use crate::lexer::TokenValue;
 use crate::parser::progress::ParserProgress;
 use crate::parser::{helpers, FunctionKind, Parser};
 use crate::string::{parse_fstring_literal_element, parse_string_literal, StringType};
+use crate::token::{TokenKind, TokenValue};
 use crate::token_set::TokenSet;
-use crate::{FStringErrorType, Mode, ParseErrorType, TokenKind};
+use crate::{FStringErrorType, Mode, ParseErrorType};
 
 use super::{FStringElementsKind, Parenthesized, RecoveryContextKind};
 

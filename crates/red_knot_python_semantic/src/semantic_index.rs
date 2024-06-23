@@ -2,17 +2,18 @@ use std::iter::FusedIterator;
 use std::sync::Arc;
 
 use rustc_hash::FxHashMap;
+use salsa::DebugWithDb;
 
 use ruff_db::parsed::parsed_module;
 use ruff_db::vfs::VfsFile;
 use ruff_index::{IndexSlice, IndexVec};
 use ruff_python_ast as ast;
 
-use crate::red_knot::node_key::NodeKey;
-use crate::red_knot::semantic_index::ast_ids::AstIds;
-use crate::red_knot::semantic_index::builder::SemanticIndexBuilder;
-use crate::red_knot::semantic_index::symbol::{
-    FileScopeId, PublicSymbolId, Scope, ScopeId, ScopeSymbolId, ScopesMap, SymbolTable,
+use crate::node_key::NodeKey;
+use crate::semantic_index::ast_ids::{AstId, AstIds, ScopeClassId, ScopeFunctionId};
+use crate::semantic_index::builder::SemanticIndexBuilder;
+use crate::semantic_index::symbol::{
+    FileScopeId, PublicSymbolId, Scope, ScopeId, ScopeKind, ScopedSymbolId, SymbolTable,
 };
 use crate::Db;
 
@@ -21,13 +22,15 @@ mod builder;
 pub mod definition;
 pub mod symbol;
 
-type SymbolMap = hashbrown::HashMap<ScopeSymbolId, (), ()>;
+type SymbolMap = hashbrown::HashMap<ScopedSymbolId, (), ()>;
 
 /// Returns the semantic index for `file`.
 ///
 /// Prefer using [`symbol_table`] when working with symbols from a single scope.
 #[salsa::tracked(return_ref, no_eq)]
 pub(crate) fn semantic_index(db: &dyn Db, file: VfsFile) -> SemanticIndex {
+    let _ = tracing::trace_span!("semantic_index", file = ?file.debug(db.upcast())).enter();
+
     let parsed = parsed_module(db.upcast(), file);
 
     SemanticIndexBuilder::new(parsed).build()
@@ -39,36 +42,32 @@ pub(crate) fn semantic_index(db: &dyn Db, file: VfsFile) -> SemanticIndex {
 /// Salsa can avoid invalidating dependent queries if this scope's symbol table
 /// is unchanged.
 #[salsa::tracked]
-pub(crate) fn symbol_table(db: &dyn Db, scope: ScopeId) -> Arc<SymbolTable> {
+pub(crate) fn symbol_table<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Arc<SymbolTable> {
+    let _ = tracing::trace_span!("symbol_table", scope = ?scope.debug(db)).enter();
     let index = semantic_index(db, scope.file(db));
 
-    index.symbol_table(scope.scope_id(db))
-}
-
-/// Returns a mapping from file specific [`FileScopeId`] to a program-wide unique [`ScopeId`].
-#[salsa::tracked(return_ref)]
-pub(crate) fn scopes_map(db: &dyn Db, file: VfsFile) -> ScopesMap {
-    let index = semantic_index(db, file);
-
-    let scopes: IndexVec<_, _> = index
-        .scopes
-        .indices()
-        .map(|id| ScopeId::new(db, file, id))
-        .collect();
-
-    ScopesMap::new(scopes)
+    index.symbol_table(scope.file_scope_id(db))
 }
 
 /// Returns the root scope of `file`.
-pub fn root_scope(db: &dyn Db, file: VfsFile) -> ScopeId {
+#[salsa::tracked]
+pub(crate) fn root_scope(db: &dyn Db, file: VfsFile) -> ScopeId<'_> {
+    let _ = tracing::trace_span!("root_scope", file = ?file.debug(db.upcast())).enter();
+
     FileScopeId::root().to_scope_id(db, file)
 }
 
 /// Returns the symbol with the given name in `file`'s public scope or `None` if
 /// no symbol with the given name exists.
-pub fn global_symbol(db: &dyn Db, file: VfsFile, name: &str) -> Option<PublicSymbolId> {
+pub fn public_symbol<'db>(
+    db: &'db dyn Db,
+    file: VfsFile,
+    name: &str,
+) -> Option<PublicSymbolId<'db>> {
     let root_scope = root_scope(db, file);
-    root_scope.symbol(db, name)
+    let symbol_table = symbol_table(db, root_scope);
+    let local = symbol_table.symbol_id_by_name(name)?;
+    Some(local.to_public_symbol(db, file))
 }
 
 /// The symbol tables for an entire file.
@@ -90,6 +89,9 @@ pub struct SemanticIndex {
     /// Note: We should not depend on this map when analysing other files or
     /// changing a file invalidates all dependents.
     ast_ids: IndexVec<FileScopeId, AstIds>,
+
+    /// Map from scope to the node that introduces the scope.
+    scope_nodes: IndexVec<FileScopeId, NodeWithScopeId>,
 }
 
 impl SemanticIndex {
@@ -97,7 +99,7 @@ impl SemanticIndex {
     ///
     /// Use the Salsa cached [`symbol_table`] query if you only need the
     /// symbol table for a single scope.
-    fn symbol_table(&self, scope_id: FileScopeId) -> Arc<SymbolTable> {
+    pub(super) fn symbol_table(&self, scope_id: FileScopeId) -> Arc<SymbolTable> {
         self.symbol_tables[scope_id].clone()
     }
 
@@ -106,7 +108,6 @@ impl SemanticIndex {
     }
 
     /// Returns the ID of the `expression`'s enclosing scope.
-    #[allow(unused)]
     pub(crate) fn expression_scope_id(&self, expression: &ast::Expr) -> FileScopeId {
         self.expression_scopes[&NodeKey::from_node(expression)]
     }
@@ -118,7 +119,6 @@ impl SemanticIndex {
     }
 
     /// Returns the [`Scope`] with the given id.
-    #[allow(unused)]
     pub(crate) fn scope(&self, id: FileScopeId) -> &Scope {
         &self.scopes[id]
     }
@@ -142,15 +142,17 @@ impl SemanticIndex {
     }
 
     /// Returns an iterator over the direct child scopes of `scope`.
-    #[allow(unused)]
     pub(crate) fn child_scopes(&self, scope: FileScopeId) -> ChildrenIter {
         ChildrenIter::new(self, scope)
     }
 
     /// Returns an iterator over all ancestors of `scope`, starting with `scope` itself.
-    #[allow(unused)]
     pub(crate) fn ancestor_scopes(&self, scope: FileScopeId) -> AncestorsIter {
         AncestorsIter::new(self, scope)
+    }
+
+    pub(crate) fn scope_node(&self, scope_id: FileScopeId) -> NodeWithScopeId {
+        self.scope_nodes[scope_id]
     }
 }
 
@@ -246,6 +248,28 @@ impl<'a> Iterator for ChildrenIter<'a> {
     }
 }
 
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub(crate) enum NodeWithScopeId {
+    Module,
+    Class(AstId<ScopeClassId>),
+    ClassTypeParams(AstId<ScopeClassId>),
+    Function(AstId<ScopeFunctionId>),
+    FunctionTypeParams(AstId<ScopeFunctionId>),
+}
+
+impl NodeWithScopeId {
+    fn scope_kind(self) -> ScopeKind {
+        match self {
+            NodeWithScopeId::Module => ScopeKind::Module,
+            NodeWithScopeId::Class(_) => ScopeKind::Class,
+            NodeWithScopeId::Function(_) => ScopeKind::Function,
+            NodeWithScopeId::ClassTypeParams(_) | NodeWithScopeId::FunctionTypeParams(_) => {
+                ScopeKind::Annotation
+            }
+        }
+    }
+}
+
 impl FusedIterator for ChildrenIter<'_> {}
 
 #[cfg(test)]
@@ -254,8 +278,8 @@ mod tests {
     use ruff_db::vfs::{system_path_to_file, VfsFile};
 
     use crate::db::tests::TestDb;
-    use crate::red_knot::semantic_index::symbol::{FileScopeId, ScopeKind, SymbolTable};
-    use crate::red_knot::semantic_index::{root_scope, semantic_index, symbol_table};
+    use crate::semantic_index::symbol::{FileScopeId, ScopeKind, SymbolTable};
+    use crate::semantic_index::{root_scope, semantic_index, symbol_table};
 
     struct TestCase {
         db: TestDb,
@@ -583,19 +607,14 @@ class C[T]:
         let TestCase { db, file } = test_case("x = 1;\ndef test():\n  y = 4");
 
         let index = semantic_index(&db, file);
-        let root_table = index.symbol_table(FileScopeId::root());
         let parsed = parsed_module(&db, file);
         let ast = parsed.syntax();
-
-        let x_sym = root_table
-            .symbol_by_name("x")
-            .expect("x symbol should exist");
 
         let x_stmt = ast.body[0].as_assign_stmt().unwrap();
         let x = &x_stmt.targets[0];
 
         assert_eq!(index.expression_scope(x).kind(), ScopeKind::Module);
-        assert_eq!(index.expression_scope_id(x), x_sym.scope());
+        assert_eq!(index.expression_scope_id(x), FileScopeId::root());
 
         let def = ast.body[1].as_function_def_stmt().unwrap();
         let y_stmt = def.body[0].as_assign_stmt().unwrap();

@@ -7,6 +7,8 @@ use std::sync::Arc;
 use dashmap::mapref::entry::Entry;
 use smol_str::SmolStr;
 
+use red_knot_module_resolver::ModuleKind;
+
 use crate::db::{QueryResult, SemanticDb, SemanticJar};
 use crate::files::FileId;
 use crate::semantic::Dependency;
@@ -175,15 +177,6 @@ impl std::fmt::Display for ModuleName {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.write_str(&self.0)
     }
-}
-
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
-pub enum ModuleKind {
-    /// A single-file module (e.g. `foo.py` or `foo.pyi`)
-    Module,
-
-    /// A python package (`foo/__init__.py` or `foo/__init__.pyi`)
-    Package,
 }
 
 /// A search path in which to search modules.
@@ -770,11 +763,8 @@ impl PackageKind {
 
 #[cfg(test)]
 mod tests {
-    use std::io::{Cursor, Read};
     use std::num::NonZeroU32;
-    use std::path::{Path, PathBuf};
-
-    use zip::ZipArchive;
+    use std::path::PathBuf;
 
     use crate::db::tests::TestDb;
     use crate::db::SourceDb;
@@ -923,28 +913,6 @@ mod tests {
             path_to_module(&db, &first_party_functools_path)?
         );
 
-        Ok(())
-    }
-
-    #[test]
-    fn typeshed_zip_created_at_build_time() -> anyhow::Result<()> {
-        // The file path here is hardcoded in this crate's `build.rs` script.
-        // Luckily this crate will fail to build if this file isn't available at build time.
-        const TYPESHED_ZIP_BYTES: &[u8] =
-            include_bytes!(concat!(env!("OUT_DIR"), "/zipped_typeshed.zip"));
-
-        let mut typeshed_zip_archive = ZipArchive::new(Cursor::new(TYPESHED_ZIP_BYTES))?;
-
-        let path_to_functools = Path::new("stdlib").join("functools.pyi");
-        let mut functools_module_stub = typeshed_zip_archive
-            .by_name(path_to_functools.to_str().unwrap())
-            .unwrap();
-        assert!(functools_module_stub.is_file());
-
-        let mut functools_module_stub_source = String::new();
-        functools_module_stub.read_to_string(&mut functools_module_stub_source)?;
-
-        assert!(functools_module_stub_source.contains("def update_wrapper("));
         Ok(())
     }
 

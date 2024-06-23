@@ -351,7 +351,9 @@ even patch releases may contain [non-backwards-compatible changes](https://semve
     - The commit hash of the merged release pull request on `main`
 1. The release workflow will do the following:
     1. Build all the assets. If this fails (even though we tested in step 4), we haven't tagged or
-        uploaded anything, you can restart after pushing a fix.
+        uploaded anything, you can restart after pushing a fix. If you just need to rerun the build,
+        make sure you're [re-running all the failed
+        jobs](https://docs.github.com/en/actions/managing-workflow-runs/re-running-workflows-and-jobs#re-running-failed-jobs-in-a-workflow) and not just a single failed job.
     1. Upload to PyPI.
     1. Create and push the Git tag (as extracted from `pyproject.toml`). We create the Git tag only
         after building the wheels and uploading to PyPI, since we can't delete or modify the tag ([#4468](https://github.com/astral-sh/ruff/issues/4468)).

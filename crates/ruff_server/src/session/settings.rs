@@ -60,7 +60,7 @@ pub(crate) enum ConfigurationPreference {
 #[derive(Debug, Deserialize, Default)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct ClientSettings {
+pub struct ClientSettings {
     configuration: Option<String>,
     fix_all: Option<bool>,
     organize_imports: Option<bool>,
@@ -83,6 +83,7 @@ pub(crate) struct ClientSettings {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct TracingSettings {
     pub(crate) log_level: Option<crate::trace::LogLevel>,
+    /// Path to the log file - tildes and environment variables are supported.
     pub(crate) log_file: Option<PathBuf>,
 }
 

@@ -126,8 +126,7 @@ fn test_invalid_syntax(input_path: &Path) {
 #[allow(clippy::print_stdout)]
 fn parser_quick_test() {
     let source = "\
-def foo()
-    pass
+from foo import
 ";
 
     let parsed = parse_unchecked(source, Mode::Module);

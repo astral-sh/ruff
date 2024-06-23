@@ -173,13 +173,14 @@ pub struct CheckCommand {
     show_fixes: bool,
     #[clap(long, overrides_with("show_fixes"), hide = true)]
     no_show_fixes: bool,
-    /// Avoid writing any fixed files back; instead, output a diff for each changed file to stdout. Implies `--fix-only`.
+    /// Avoid writing any fixed files back; instead, output a diff for each changed file to stdout, and exit 0 if there are no diffs.
+    /// Implies `--fix-only`.
     #[arg(long, conflicts_with = "show_fixes")]
     pub diff: bool,
     /// Run in watch mode by re-running whenever files change.
     #[arg(short, long)]
     pub watch: bool,
-    /// Apply fixes to resolve lint violations, but don't report on leftover violations. Implies `--fix`.
+    /// Apply fixes to resolve lint violations, but don't report on, or exit non-zero for, leftover violations. Implies `--fix`.
     /// Use `--no-fix-only` to disable or `--unsafe-fixes` to include unsafe fixes.
     #[arg(long, overrides_with("no_fix_only"))]
     fix_only: bool,

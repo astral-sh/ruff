@@ -54,3 +54,41 @@ require('lspconfig').pyright.setup {
   },
 }
 ```
+
+By default, Ruff will not show any logs. To enable logging in Neovim, you'll need to set the `RUFF_TRACE` environment variable
+to either `messages` or `verbose`:
+
+```lua
+require('lspconfig').ruff.setup {
+  cmd_env = { RUFF_TRACE = "messages" }
+}
+```
+
+You can set the log level in `settings`:
+
+```lua
+require('lspconfig').ruff.setup {
+  cmd_env = { RUFF_TRACE = "messages" },
+  init_options = {
+    settings = {
+      logLevel = "debug",
+    }
+  }
+}
+```
+
+It's also possible to divert Ruff's logs to a separate file with the `logFile` setting:
+
+```lua
+require('lspconfig').ruff.setup {
+  cmd_env = { RUFF_TRACE = "messages" },
+  init_options = {
+    settings = {
+      logLevel = "debug",
+      logFile = "~/.local/state/nvim/ruff.log"
+    }
+  }
+}
+```
+
+The `logFile` path supports tildes and environment variables.

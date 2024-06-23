@@ -67,8 +67,7 @@
 use std::ops::Deref;
 
 pub use crate::error::{FStringErrorType, ParseError, ParseErrorType};
-pub use crate::lexer::Token;
-pub use crate::token::TokenKind;
+pub use crate::token::{Token, TokenKind};
 
 use crate::parser::Parser;
 
@@ -274,11 +273,11 @@ impl<T> Parsed<T> {
 
     /// Returns the [`Parsed`] output as a [`Result`], returning [`Ok`] if it has no syntax errors,
     /// or [`Err`] containing the first [`ParseError`] encountered.
-    pub fn as_result(&self) -> Result<&Parsed<T>, &ParseError> {
-        if let [error, ..] = self.errors() {
-            Err(error)
-        } else {
+    pub fn as_result(&self) -> Result<&Parsed<T>, &[ParseError]> {
+        if self.is_valid() {
             Ok(self)
+        } else {
+            Err(&self.errors)
         }
     }
 
@@ -592,7 +591,7 @@ impl std::fmt::Display for ModeParseError {
 mod tests {
     use std::ops::Range;
 
-    use crate::lexer::TokenFlags;
+    use crate::token::TokenFlags;
 
     use super::*;
 

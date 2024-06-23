@@ -146,7 +146,7 @@ fn locate_cmp_ops(expr: &Expr, tokens: &Tokens) -> Vec<LocatedCmpOp> {
     let mut tok_iter = tokens
         .in_range(expr.range())
         .iter()
-        .filter(|token| !token.is_trivia())
+        .filter(|token| !token.kind().is_trivia())
         .peekable();
 
     let mut ops: Vec<LocatedCmpOp> = vec![];

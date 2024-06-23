@@ -18,7 +18,7 @@ use walkdir::WalkDir;
 
 use crate::session::settings::{ConfigurationPreference, ResolvedEditorSettings};
 
-pub(crate) struct RuffSettings {
+pub struct RuffSettings {
     /// The path to this configuration file, used for debugging.
     /// The default fallback configuration does not have a file path.
     path: Option<PathBuf>,

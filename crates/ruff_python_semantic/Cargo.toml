@@ -11,7 +11,6 @@ repository = { workspace = true }
 license = { workspace = true }
 
 [dependencies]
-ruff_db = { workspace = true }
 ruff_index = { workspace = true }
 ruff_python_ast = { workspace = true }
 ruff_python_stdlib = { workspace = true }
@@ -20,20 +19,11 @@ ruff_text_size = { workspace = true }
 
 bitflags = { workspace = true }
 is-macro = { workspace = true }
-salsa = { workspace = true, optional = true }
-smallvec = { workspace = true, optional = true }
-smol_str = { workspace = true }
-tracing = { workspace = true, optional = true }
 rustc-hash = { workspace = true }
-hashbrown = { workspace = true, optional = true }
 
 [dev-dependencies]
-anyhow = { workspace = true }
 ruff_python_parser = { workspace = true }
-tempfile = { workspace = true }
 
 [lints]
 workspace = true
 
-[features]
-red_knot = ["dep:salsa", "dep:tracing", "dep:hashbrown", "dep:smallvec"]

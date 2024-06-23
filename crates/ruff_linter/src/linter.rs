@@ -192,15 +192,17 @@ pub fn check_path(
                     doc_lines.extend(doc_lines_from_ast(parsed.suite(), locator));
                 }
             }
-            Err(parse_error) => {
+            Err(parse_errors) => {
                 // Always add a diagnostic for the syntax error, regardless of whether
                 // `Rule::SyntaxError` is enabled. We avoid propagating the syntax error
                 // if it's disabled via any of the usual mechanisms (e.g., `noqa`,
                 // `per-file-ignores`), and the easiest way to detect that suppression is
                 // to see if the diagnostic persists to the end of the function.
-                pycodestyle::rules::syntax_error(&mut diagnostics, parse_error, locator);
+                for parse_error in parse_errors {
+                    pycodestyle::rules::syntax_error(&mut diagnostics, parse_error, locator);
+                }
                 // TODO(dhruvmanila): Remove this clone
-                error = Some(parse_error.clone());
+                error = parse_errors.iter().next().cloned();
             }
         }
     }

@@ -1,7 +1,9 @@
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
-use crate::lexer::{Lexer, LexerCheckpoint, LexicalError, Token, TokenFlags, TokenValue};
-use crate::{Mode, TokenKind};
+use crate::error::LexicalError;
+use crate::lexer::{Lexer, LexerCheckpoint};
+use crate::token::{Token, TokenFlags, TokenKind, TokenValue};
+use crate::Mode;
 
 /// Token source for the parser that skips over any trivia tokens.
 #[derive(Debug)]
@@ -114,7 +116,7 @@ impl<'src> TokenSource<'src> {
     fn do_bump(&mut self) {
         loop {
             let kind = self.lexer.next_token();
-            if is_trivia(kind) {
+            if kind.is_trivia() {
                 self.tokens
                     .push(Token::new(kind, self.current_range(), self.current_flags()));
                 continue;
@@ -127,7 +129,7 @@ impl<'src> TokenSource<'src> {
     fn next_non_trivia_token(&mut self) -> TokenKind {
         loop {
             let kind = self.lexer.next_token();
-            if is_trivia(kind) {
+            if kind.is_trivia() {
                 continue;
             }
             break kind;
@@ -186,8 +188,4 @@ pub(crate) struct TokenSourceCheckpoint {
 fn allocate_tokens_vec(contents: &str) -> Vec<Token> {
     let lower_bound = contents.len().saturating_mul(15) / 100;
     Vec::with_capacity(lower_bound)
-}
-
-fn is_trivia(token: TokenKind) -> bool {
-    matches!(token, TokenKind::Comment | TokenKind::NonLogicalNewline)
 }

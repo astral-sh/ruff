@@ -8,12 +8,10 @@ use ruff_python_stdlib::identifiers::is_identifier;
 
 use crate::Db;
 
-pub mod resolver;
-
 /// A module name, e.g. `foo.bar`.
 ///
 /// Always normalized to the absolute form (never a relative module name, i.e., never `.foo`).
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash, PartialOrd, Ord)]
 pub struct ModuleName(smol_str::SmolStr);
 
 impl ModuleName {
@@ -46,7 +44,7 @@ impl ModuleName {
     /// ## Examples
     ///
     /// ```
-    /// use ruff_python_semantic::module::ModuleName;
+    /// use red_knot_module_resolver::ModuleName;
     ///
     /// assert_eq!(ModuleName::new_static("foo.bar").as_deref(), Some("foo.bar"));
     /// assert_eq!(ModuleName::new_static(""), None);
@@ -78,7 +76,7 @@ impl ModuleName {
     /// # Examples
     ///
     /// ```
-    /// use ruff_python_semantic::module::ModuleName;
+    /// use red_knot_module_resolver::ModuleName;
     ///
     /// assert_eq!(ModuleName::new_static("foo.bar.baz").unwrap().components().collect::<Vec<_>>(), vec!["foo", "bar", "baz"]);
     /// ```
@@ -91,7 +89,7 @@ impl ModuleName {
     /// # Examples
     ///
     /// ```
-    /// use ruff_python_semantic::module::ModuleName;
+    /// use red_knot_module_resolver::ModuleName;
     ///
     /// assert_eq!(ModuleName::new_static("foo.bar").unwrap().parent(), Some(ModuleName::new_static("foo").unwrap()));
     /// assert_eq!(ModuleName::new_static("foo.bar.baz").unwrap().parent(), Some(ModuleName::new_static("foo.bar").unwrap()));
@@ -110,7 +108,7 @@ impl ModuleName {
     /// # Examples
     ///
     /// ```
-    /// use ruff_python_semantic::module::ModuleName;
+    /// use red_knot_module_resolver::ModuleName;
     ///
     /// assert!(ModuleName::new_static("foo.bar").unwrap().starts_with(&ModuleName::new_static("foo").unwrap()));
     ///
@@ -135,7 +133,7 @@ impl ModuleName {
         &self.0
     }
 
-    fn from_relative_path(path: &FileSystemPath) -> Option<Self> {
+    pub(crate) fn from_relative_path(path: &FileSystemPath) -> Option<Self> {
         let path = if path.ends_with("__init__.py") || path.ends_with("__init__.pyi") {
             path.parent()?
         } else {
@@ -196,6 +194,22 @@ pub struct Module {
 }
 
 impl Module {
+    pub(crate) fn new(
+        name: ModuleName,
+        kind: ModuleKind,
+        search_path: ModuleSearchPath,
+        file: VfsFile,
+    ) -> Self {
+        Self {
+            inner: Arc::new(ModuleInner {
+                name,
+                kind,
+                search_path,
+                file,
+            }),
+        }
+    }
+
     /// The absolute name of the module (e.g. `foo.bar`)
     pub fn name(&self) -> &ModuleName {
         &self.inner.name
@@ -312,7 +326,7 @@ struct ModuleSearchPathInner {
 /// for the standard library are moved higher up to match Python's semantics at runtime.
 ///
 /// [the order given in the typing spec]: https://typing.readthedocs.io/en/latest/spec/distributing.html#import-resolution-ordering
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, is_macro::Is)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub enum ModuleSearchPathKind {
     /// "Extra" paths provided by the user in a config file, env var or CLI flag.
     /// E.g. mypy's `MYPYPATH` env var, or pyright's `stubPath` configuration setting

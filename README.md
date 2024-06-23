@@ -152,7 +152,7 @@ Ruff can also be used as a [pre-commit](https://pre-commit.com/) hook via [`ruff
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.4.9
+  rev: v0.4.10
   hooks:
     # Run the linter.
     - id: ruff
@@ -442,6 +442,7 @@ Ruff is used by a number of major open-source projects and companies, including:
 - [NumPyro](https://github.com/pyro-ppl/numpyro)
 - [ONNX](https://github.com/onnx/onnx)
 - [OpenBB](https://github.com/OpenBB-finance/OpenBBTerminal)
+- [Open Wine Components](https://github.com/Open-Wine-Components/umu-launcher)
 - [PDM](https://github.com/pdm-project/pdm)
 - [PaddlePaddle](https://github.com/PaddlePaddle/Paddle)
 - [Pandas](https://github.com/pandas-dev/pandas)

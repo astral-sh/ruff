@@ -585,13 +585,15 @@ Options:
           `--no-show-fixes` to disable
       --diff
           Avoid writing any fixed files back; instead, output a diff for each
-          changed file to stdout. Implies `--fix-only`
+          changed file to stdout, and exit 0 if there are no diffs. Implies
+          `--fix-only`
   -w, --watch
           Run in watch mode by re-running whenever files change
       --fix-only
-          Apply fixes to resolve lint violations, but don't report on leftover
-          violations. Implies `--fix`. Use `--no-fix-only` to disable or
-          `--unsafe-fixes` to include unsafe fixes
+          Apply fixes to resolve lint violations, but don't report on, or exit
+          non-zero for, leftover violations. Implies `--fix`. Use
+          `--no-fix-only` to disable or `--unsafe-fixes` to include unsafe
+          fixes
       --ignore-noqa
           Ignore any `# noqa` comments
       --output-format <OUTPUT_FORMAT>

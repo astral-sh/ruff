@@ -376,7 +376,7 @@ dependencies = [
  "heck 0.5.0",
  "proc-macro2",
  "quote",
- "syn 2.0.66",
+ "syn",
 ]
 
 [[package]]
@@ -617,7 +617,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "strsim 0.10.0",
- "syn 2.0.66",
+ "syn",
 ]
 
 [[package]]
@@ -628,7 +628,7 @@ checksum = "a668eda54683121533a393014d8692171709ff57a7d61f187b6e782719f8933f"
 dependencies = [
  "darling_core",
  "quote",
- "syn 2.0.66",
+ "syn",
 ]
 
 [[package]]
@@ -699,7 +699,7 @@ checksum = "487585f4d0c6655fe74905e2504d8ad6908e4db67f744eb140876906c2f3175d"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.66",
+ "syn",
 ]
 
 [[package]]
@@ -1092,7 +1092,7 @@ checksum = "1ec89e9337638ecdc08744df490b221a7399bf8d164eb52a665454e60e075ad6"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.66",
+ "syn",
 ]
 
 [[package]]
@@ -1260,7 +1260,7 @@ dependencies = [
  "Inflector",
  "proc-macro2",
  "quote",
- "syn 2.0.66",
+ "syn",
 ]
 
 [[package]]
@@ -1386,7 +1386,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a2ae40017ac09cd2c6a53504cb3c871c7f2b41466eac5bc66ba63f39073b467b"
 dependencies = [
  "quote",
- "syn 2.0.66",
+ "syn",
 ]
 
 [[package]]
@@ -1973,16 +1973,15 @@ dependencies = [
  "dashmap",
  "hashbrown 0.14.5",
  "indexmap",
- "insta",
  "is-macro",
  "notify",
  "parking_lot",
  "rayon",
+ "red_knot_module_resolver",
  "ruff_index",
  "ruff_notebook",
  "ruff_python_ast",
  "ruff_python_parser",
- "ruff_python_stdlib",
  "ruff_text_size",
  "rustc-hash",
  "smol_str",
@@ -1990,8 +1989,45 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "tracing-tree",
+]
+
+[[package]]
+name = "red_knot_module_resolver"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "insta",
+ "path-slash",
+ "ruff_db",
+ "ruff_python_stdlib",
+ "rustc-hash",
+ "salsa",
+ "smol_str",
+ "tempfile",
+ "tracing",
  "walkdir",
  "zip",
+]
+
+[[package]]
+name = "red_knot_python_semantic"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "bitflags 2.5.0",
+ "hashbrown 0.14.5",
+ "indexmap",
+ "red_knot_module_resolver",
+ "ruff_db",
+ "ruff_index",
+ "ruff_python_ast",
+ "ruff_python_parser",
+ "ruff_text_size",
+ "rustc-hash",
+ "salsa",
+ "smallvec",
+ "smol_str",
+ "tracing",
 ]
 
 [[package]]
@@ -2075,7 +2111,7 @@ dependencies = [
 
 [[package]]
 name = "ruff"
-version = "0.4.9"
+version = "0.4.10"
 dependencies = [
  "anyhow",
  "argfile",
@@ -2166,14 +2202,14 @@ dependencies = [
  "countme",
  "dashmap",
  "filetime",
- "itertools 0.13.0",
+ "insta",
  "once_cell",
  "ruff_python_ast",
  "ruff_python_parser",
  "ruff_source_file",
  "ruff_text_size",
  "rustc-hash",
- "salsa-2022",
+ "salsa",
  "tracing",
  "zip",
 ]
@@ -2204,7 +2240,6 @@ dependencies = [
  "ruff_python_parser",
  "ruff_python_stdlib",
  "ruff_python_trivia",
- "ruff_text_size",
  "ruff_workspace",
  "schemars",
  "serde",
@@ -2255,7 +2290,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_linter"
-version = "0.4.9"
+version = "0.4.10"
 dependencies = [
  "aho-corasick",
  "annotate-snippets 0.9.2",
@@ -2322,7 +2357,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "ruff_python_trivia",
- "syn 2.0.66",
+ "syn",
 ]
 
 [[package]]
@@ -2471,11 +2506,8 @@ dependencies = [
 name = "ruff_python_semantic"
 version = "0.0.0"
 dependencies = [
- "anyhow",
  "bitflags 2.5.0",
- "hashbrown 0.14.5",
  "is-macro",
- "ruff_db",
  "ruff_index",
  "ruff_python_ast",
  "ruff_python_parser",
@@ -2483,11 +2515,6 @@ dependencies = [
  "ruff_source_file",
  "ruff_text_size",
  "rustc-hash",
- "salsa-2022",
- "smallvec",
- "smol_str",
- "tempfile",
- "tracing",
 ]
 
 [[package]]
@@ -2704,9 +2731,9 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e86697c916019a8588c99b5fac3cead74ec0b4b819707a682fd4d23fa0ce1ba1"
 
 [[package]]
-name = "salsa-2022"
-version = "0.1.0"
-source = "git+https://github.com/salsa-rs/salsa.git?rev=05b4e3ebdcdc47730cdd359e7e97fb2470527279#05b4e3ebdcdc47730cdd359e7e97fb2470527279"
+name = "salsa"
+version = "0.18.0"
+source = "git+https://github.com/salsa-rs/salsa.git?rev=f706aa2d32d473ee633a77c1af01d180c85da308#f706aa2d32d473ee633a77c1af01d180c85da308"
 dependencies = [
  "arc-swap",
  "crossbeam",
@@ -2717,20 +2744,21 @@ dependencies = [
  "log",
  "parking_lot",
  "rustc-hash",
- "salsa-2022-macros",
+ "salsa-macros",
  "smallvec",
 ]
 
 [[package]]
-name = "salsa-2022-macros"
-version = "0.1.0"
-source = "git+https://github.com/salsa-rs/salsa.git?rev=05b4e3ebdcdc47730cdd359e7e97fb2470527279#05b4e3ebdcdc47730cdd359e7e97fb2470527279"
+name = "salsa-macros"
+version = "0.18.0"
+source = "git+https://github.com/salsa-rs/salsa.git?rev=f706aa2d32d473ee633a77c1af01d180c85da308#f706aa2d32d473ee633a77c1af01d180c85da308"
 dependencies = [
  "eyre",
  "heck 0.4.1",
  "proc-macro2",
  "quote",
- "syn 1.0.109",
+ "syn",
+ "synstructure",
 ]
 
 [[package]]
@@ -2763,7 +2791,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "serde_derive_internals",
- "syn 2.0.66",
+ "syn",
 ]
 
 [[package]]
@@ -2812,7 +2840,7 @@ checksum = "500cbc0ebeb6f46627f50f3f5811ccf6bf00643be300b4c3eabc0ef55dc5b5ba"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.66",
+ "syn",
 ]
 
 [[package]]
@@ -2823,7 +2851,7 @@ checksum = "330f01ce65a3a5fe59a60c82f3c9a024b573b8a6e875bd233fe5f934e71d54e3"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.66",
+ "syn",
 ]
 
 [[package]]
@@ -2845,7 +2873,7 @@ checksum = "6c64451ba24fc7a6a2d60fc75dd9c83c90903b19028d4eff35e88fc1e86564e9"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.66",
+ "syn",
 ]
 
 [[package]]
@@ -2886,7 +2914,7 @@ dependencies = [
  "darling",
  "proc-macro2",
  "quote",
- "syn 2.0.66",
+ "syn",
 ]
 
 [[package]]
@@ -2992,7 +3020,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "rustversion",
- "syn 2.0.66",
+ "syn",
 ]
 
 [[package]]
@@ -3000,17 +3028,6 @@ name = "subtle"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "81cdd64d312baedb58e21336b31bc043b77e01cc99033ce76ef539f78e965ebc"
-
-[[package]]
-name = "syn"
-version = "1.0.109"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "72b64191b275b66ffe2469e8af2c1cfe3bafa67b529ead792a6d0160888b4237"
-dependencies = [
- "proc-macro2",
- "quote",
- "unicode-ident",
-]
 
 [[package]]
 name = "syn"
@@ -3031,7 +3048,7 @@ checksum = "c8af7666ab7b6390ab78131fb5b0fce11d6b7a6951602017c35fa82800708971"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.66",
+ "syn",
 ]
 
 [[package]]
@@ -3087,7 +3104,7 @@ dependencies = [
  "cfg-if",
  "proc-macro2",
  "quote",
- "syn 2.0.66",
+ "syn",
 ]
 
 [[package]]
@@ -3098,7 +3115,7 @@ checksum = "5c89e72a01ed4c579669add59014b9a524d609c0c88c6a585ce37485879f6ffb"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.66",
+ "syn",
  "test-case-core",
 ]
 
@@ -3119,7 +3136,7 @@ checksum = "46c3384250002a6d5af4d114f2845d37b57521033f30d5c3f46c4d70e1197533"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.66",
+ "syn",
 ]
 
 [[package]]
@@ -3241,7 +3258,7 @@ checksum = "34704c8d6ebcbc939824180af020566b01a7c01f80641264eba0999f6c2b6be7"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.66",
+ "syn",
 ]
 
 [[package]]
@@ -3477,7 +3494,7 @@ checksum = "9881bea7cbe687e36c9ab3b778c36cd0487402e270304e8b1296d5085303c1a2"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.66",
+ "syn",
 ]
 
 [[package]]
@@ -3562,7 +3579,7 @@ dependencies = [
  "once_cell",
  "proc-macro2",
  "quote",
- "syn 2.0.66",
+ "syn",
  "wasm-bindgen-shared",
 ]
 
@@ -3596,7 +3613,7 @@ checksum = "e94f17b526d0a461a191c78ea52bbce64071ed5c04c9ffe424dcb38f74171bb7"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.66",
+ "syn",
  "wasm-bindgen-backend",
  "wasm-bindgen-shared",
 ]
@@ -3629,7 +3646,7 @@ checksum = "b7f89739351a2e03cb94beb799d47fb2cac01759b40ec441f7de39b00cbf7ef0"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.66",
+ "syn",
 ]
 
 [[package]]
@@ -3913,7 +3930,7 @@ checksum = "28cc31741b18cb6f1d5ff12f5b7523e3d6eb0852bbbad19d73905511d9849b95"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.66",
+ "syn",
  "synstructure",
 ]
 
@@ -3934,7 +3951,7 @@ checksum = "9ce1b18ccd8e73a9321186f97e46f9f04b778851177567b1975109d26a08d2a6"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.66",
+ "syn",
 ]
 
 [[package]]
@@ -3954,7 +3971,7 @@ checksum = "0ea7b4a3637ea8669cedf0f1fd5c286a17f3de97b8dd5a70a6c167a1730e63a5"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.66",
+ "syn",
  "synstructure",
 ]
 
@@ -3983,7 +4000,7 @@ checksum = "97cf56601ee5052b4417d90c8755c6683473c926039908196cf35d99f893ebe7"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.66",
+ "syn",
 ]
 
 [[package]]

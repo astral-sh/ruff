@@ -1,11 +1,11 @@
 use ruff_python_ast::{self as ast, Expr, ExprContext, Number, Operator, Pattern, Singleton};
 use ruff_text_size::{Ranged, TextSize};
 
-use crate::lexer::TokenValue;
 use crate::parser::progress::ParserProgress;
 use crate::parser::{recovery, Parser, RecoveryContextKind, SequenceMatchPatternParentheses};
+use crate::token::{TokenKind, TokenValue};
 use crate::token_set::TokenSet;
-use crate::{ParseErrorType, TokenKind};
+use crate::ParseErrorType;
 
 use super::expression::ExpressionContext;
 

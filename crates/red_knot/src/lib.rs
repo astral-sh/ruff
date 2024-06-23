@@ -19,7 +19,6 @@ mod parse;
 pub mod program;
 mod semantic;
 pub mod source;
-pub mod typeshed_versions;
 pub mod watch;
 
 pub(crate) type FxDashMap<K, V> = dashmap::DashMap<K, V, BuildHasherDefault<FxHasher>>;
