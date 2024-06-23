@@ -1232,11 +1232,13 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 }
             }
         }
-        Stmt::Assert(ast::StmtAssert {
-            test,
-            msg,
-            range: _,
-        }) => {
+        Stmt::Assert(
+            assert_stmt @ ast::StmtAssert {
+                test,
+                msg,
+                range: _,
+            },
+        ) => {
             if !checker.semantic.in_type_checking_block() {
                 if checker.enabled(Rule::Assert) {
                     checker
@@ -1266,6 +1268,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.enabled(Rule::InvalidMockAccess) {
                 pygrep_hooks::rules::non_existent_mock_method(checker, test);
+            }
+            if checker.enabled(Rule::AssertWithPrintMessage) {
+                ruff::rules::assert_with_print_message(checker, assert_stmt);
             }
         }
         Stmt::With(with_stmt @ ast::StmtWith { items, body, .. }) => {
