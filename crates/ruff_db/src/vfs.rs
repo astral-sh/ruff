@@ -63,9 +63,8 @@ pub fn vfs_path_to_file(db: &dyn Db, path: &VfsPath) -> Option<VfsFile> {
 /// a [`VfsPath`]. This would have allowed to unify most of [`Vfs`] and [`FileSystem`](crate::FileSystem). The reason why they are
 /// separate is that not all operations are supported for all [`VfsPath`]s:
 ///
-/// * The only relevant operations for [`VendoredPath`]s are testing for existence and reading the content.
+/// * There are fewer relevant operations for [`VendoredPathBuf`]s
 /// * The vendored file system is immutable and doesn't support writing nor does it require watching for changes.
-/// * There's no requirement to walk the vendored typesystem.
 ///
 /// The other reason is that most operations know if they are working with vendored or file system paths.
 /// Requiring them to convert the path to an `VfsPath` to test if the file exist is cumbersome.
