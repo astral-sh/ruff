@@ -1,5 +1,5 @@
 use ruff_python_ast::{self as ast, Expr, Stmt};
-use ruff_text_size::Ranged;
+use ruff_text_size::{Ranged, TextRange};
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -16,7 +16,7 @@ use crate::checkers::ast::Checker;
 /// empty `AssertionError(None)`.
 ///
 /// Instead, remove the `print` and pass the message directly as the second
-/// expression, allowing `stderr` to capture the message in a well formatted context.
+/// expression, allowing `stderr` to capture the message in a well-formatted context.
 ///
 /// ## Example
 /// ```python
@@ -63,9 +63,9 @@ pub(crate) fn assert_with_print_expression(checker: &mut Checker, stmt: &ast::St
             let mut diagnostic = Diagnostic::new(AssertWithPrintExpression, call.range());
             diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                 checker.generator().stmt(&Stmt::Assert(ast::StmtAssert {
-                    range: stmt.range(),
-                    test: stmt.test.clone().into(),
+                    test: stmt.test.clone(),
                     msg: print_arguments::to_expr(&call.arguments).map(Box::new),
+                    range: TextRange::default(),
                 })),
                 // We have to replace the entire statement,
                 // as the `print` could be empty and thus `call.range()`
@@ -108,8 +108,8 @@ mod print_arguments {
                 .iter()
                 .map(|part| {
                     FStringElement::Literal(FStringLiteralElement {
-                        range: TextRange::default(),
                         value: part.value.clone(),
+                        range: TextRange::default(),
                     })
                 })
                 .collect(),
@@ -120,11 +120,11 @@ mod print_arguments {
             // Otherwise, return the expression as a single `FStringExpressionElement` wrapping
             // the expression.
             expr => vec![FStringElement::Expression(FStringExpressionElement {
-                range: TextRange::default(),
                 expression: Box::new(expr.clone()),
                 debug_text: None,
                 conversion: ConversionFlag::None,
                 format_spec: None,
+                range: TextRange::default(),
             })],
         }
     }
@@ -142,9 +142,9 @@ mod print_arguments {
         elements.try_fold(Vec::with_capacity(elements.len()), |mut acc, element| {
             if let FStringElement::Literal(literal) = element {
                 acc.push(StringLiteral {
-                    range: literal.range,
                     value: literal.value.clone(),
                     flags: StringLiteralFlags::default(),
+                    range: TextRange::default(),
                 });
                 Some(acc)
             } else {
@@ -200,9 +200,9 @@ mod print_arguments {
         Some(Expr::StringLiteral(ExprStringLiteral {
             range: TextRange::default(),
             value: StringLiteralValue::single(StringLiteral {
-                range: TextRange::default(),
                 value: combined_string.into(),
                 flags: StringLiteralFlags::default(),
+                range: TextRange::default(),
             }),
         }))
     }
@@ -232,12 +232,12 @@ mod print_arguments {
         });
 
         Some(Expr::FString(ExprFString {
-            range: TextRange::default(),
             value: FStringValue::single(FString {
-                range: TextRange::default(),
                 elements: FStringElements::from(fstring_elements),
                 flags: FStringFlags::default(),
+                range: TextRange::default(),
             }),
+            range: TextRange::default(),
         }))
     }
 
@@ -259,7 +259,7 @@ mod print_arguments {
         let sep = arguments
             .find_keyword("sep")
             .and_then(
-                // If the `sep` argument is `None`, treat this as default behavior
+                // If the `sep` argument is `None`, treat this as default behavior.
                 |keyword| {
                     if let Expr::NoneLiteral(_) = keyword.value {
                         None
