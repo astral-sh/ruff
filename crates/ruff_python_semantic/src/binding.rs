@@ -177,6 +177,19 @@ impl<'a> Binding<'a> {
             | BindingKind::Builtin => {
                 return false;
             }
+            // Assignment-assignment bindings are not considered redefinitions, as in:
+            // ```python
+            // x = 1
+            // x = 2
+            // ```
+            BindingKind::Assignment | BindingKind::NamedExprAssignment => {
+                if matches!(
+                    existing.kind,
+                    BindingKind::Assignment | BindingKind::NamedExprAssignment
+                ) {
+                    return false;
+                }
+            }
             _ => {}
         }
         // Otherwise, the shadowed binding must be a class definition, function definition,
@@ -188,6 +201,7 @@ impl<'a> Binding<'a> {
                 | BindingKind::Import(_)
                 | BindingKind::FromImport(_)
                 | BindingKind::Assignment
+                | BindingKind::NamedExprAssignment
         )
     }
 
