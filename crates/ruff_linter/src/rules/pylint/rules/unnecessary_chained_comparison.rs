@@ -43,44 +43,47 @@ impl Violation for UnnecessaryChainedComparison {
 // Each integer is a unique identifier for the node.
 #[derive(Default)]
 struct Bounds {
-    lower_bound: HashSet<i32>,
-    upper_bound: HashSet<i32>,
+    lower_bound: HashSet<u32>,
+    upper_bound: HashSet<u32>,
 }
 
 fn update_bounds(
     operator: ast::CmpOp,
     id: String,
-    node_id: i32,
+    node_idx: u32,
     is_left: bool,
     uses: &mut HashMap<String, Bounds>,
 ) {
     match operator {
         ast::CmpOp::Lt | ast::CmpOp::LtE if is_left => {
-            uses.entry(id).or_default().lower_bound.insert(node_id);
+            uses.entry(id).or_default().lower_bound.insert(node_idx);
         }
         ast::CmpOp::Gt | ast::CmpOp::GtE if is_left => {
-            uses.entry(id).or_default().upper_bound.insert(node_id);
+            uses.entry(id).or_default().upper_bound.insert(node_idx);
         }
         ast::CmpOp::Lt | ast::CmpOp::LtE if !is_left => {
-            uses.entry(id).or_default().upper_bound.insert(node_id);
+            uses.entry(id).or_default().upper_bound.insert(node_idx);
         }
         ast::CmpOp::Gt | ast::CmpOp::GtE if !is_left => {
-            uses.entry(id).or_default().lower_bound.insert(node_id);
+            uses.entry(id).or_default().lower_bound.insert(node_idx);
         }
         _ => {}
     }
 }
 
-fn set_lower_upper_bounds(node: &ast::ExprCompare, uses: &mut HashMap<String, Bounds>) {
+fn set_lower_upper_bounds(
+    node: &ast::ExprCompare,
+    uses: &mut HashMap<String, Bounds>,
+    node_idx: u32,
+) {
     let mut left_operand: &ast::Expr = &node.left;
-    let node_id = node as *const _ as i32;
     for (right_operand, operator) in node.comparators.iter().zip(node.ops.iter()) {
         if let Some(left_name_expr) = left_operand.as_name_expr() {
-            update_bounds(*operator, left_name_expr.id.clone(), node_id, true, uses);
+            update_bounds(*operator, left_name_expr.id.clone(), node_idx, true, uses);
         }
 
         if let Some(right_name_expr) = right_operand.as_name_expr() {
-            update_bounds(*operator, right_name_expr.id.clone(), node_id, false, uses);
+            update_bounds(*operator, right_name_expr.id.clone(), node_idx, false, uses);
         }
 
         left_operand = right_operand;
@@ -96,11 +99,14 @@ pub(crate) fn unnecessary_chained_comparison(checker: &mut Checker, bool_op: &as
     }
 
     let mut uses: HashMap<String, Bounds> = HashMap::new();
+
+    let mut node_idx: u32 = 0;
     for expr in values {
         let Some(compare_expr) = expr.as_compare_expr() else {
-            return;
+            continue;
         };
-        set_lower_upper_bounds(compare_expr, &mut uses);
+        set_lower_upper_bounds(compare_expr, &mut uses, node_idx);
+        node_idx += 1;
     }
 
     for bound in uses.values() {
