@@ -308,10 +308,13 @@ impl From<SupportedPyVersion> for PyVersion {
 #[cfg(test)]
 mod tests {
     use std::num::{IntErrorKind, NonZeroU16};
+    use std::path::Path;
 
     use super::*;
 
     use insta::assert_snapshot;
+
+    const TYPESHED_STDLIB_DIR: &str = "stdlib";
 
     #[allow(unsafe_code)]
     const ONE: NonZeroU16 = unsafe { NonZeroU16::new_unchecked(1) };
@@ -343,6 +346,60 @@ mod tests {
         assert!(versions.contains_module(&audioop));
         assert!(versions.module_exists_on_version(audioop.clone(), SupportedPyVersion::Py312));
         assert!(!versions.module_exists_on_version(audioop, SupportedPyVersion::Py313));
+    }
+
+    #[test]
+    fn typeshed_versions_consistent_with_vendored_stubs() {
+        const VERSIONS_DATA: &str = include_str!("../../vendor/typeshed/stdlib/VERSIONS");
+        let vendored_typeshed_dir = Path::new("vendor/typeshed").canonicalize().unwrap();
+        let vendored_typeshed_versions = TypeshedVersions::from_str(VERSIONS_DATA).unwrap();
+
+        let mut empty_iterator = true;
+
+        let stdlib_stubs_path = vendored_typeshed_dir.join(TYPESHED_STDLIB_DIR);
+
+        for entry in std::fs::read_dir(&stdlib_stubs_path).unwrap() {
+            empty_iterator = false;
+            let entry = entry.unwrap();
+            let absolute_path = entry.path();
+
+            let relative_path = absolute_path
+                .strip_prefix(&stdlib_stubs_path)
+                .unwrap_or_else(|_| panic!("Expected path to be a child of {stdlib_stubs_path:?} but found {absolute_path:?}"));
+
+            let relative_path_str = relative_path.as_os_str().to_str().unwrap_or_else(|| {
+                panic!("Expected all typeshed paths to be valid UTF-8; got {relative_path:?}")
+            });
+            if relative_path_str == "VERSIONS" {
+                continue;
+            }
+
+            let top_level_module = if let Some(extension) = relative_path.extension() {
+                // It was a file; strip off the file extension to get the module name:
+                let extension = extension
+                    .to_str()
+                    .unwrap_or_else(||panic!("Expected all file extensions to be UTF-8; was not true for {relative_path:?}"));
+
+                relative_path_str
+                    .strip_suffix(extension)
+                    .and_then(|string| string.strip_suffix('.')).unwrap_or_else(|| {
+                        panic!("Expected path {relative_path_str:?} to end with computed extension {extension:?}")
+                })
+            } else {
+                // It was a directory; no need to do anything to get the module name
+                relative_path_str
+            };
+
+            let top_level_module = ModuleName::new(top_level_module)
+                .unwrap_or_else(|| panic!("{top_level_module:?} was not a valid module name!"));
+
+            assert!(vendored_typeshed_versions.contains_module(&top_level_module));
+        }
+
+        assert!(
+            !empty_iterator,
+            "Expected there to be at least one file or directory in the vendored typeshed stubs"
+        );
     }
 
     #[test]
