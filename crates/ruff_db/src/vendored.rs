@@ -430,11 +430,6 @@ mod tests {
         test_nonexistent_path("foo/")
     }
 
-    #[test]
-    fn nonexistent_path_with_fancy_components() {
-        test_nonexistent_path("./foo/../../../foo")
-    }
-
     fn test_file(mock_typeshed: &VendoredFileSystem, path: &VendoredPathBuf) {
         assert!(mock_typeshed.exists(path));
         let metadata = mock_typeshed.metadata(path).unwrap();

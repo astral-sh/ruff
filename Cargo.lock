@@ -2210,7 +2210,6 @@ dependencies = [
  "ruff_text_size",
  "rustc-hash",
  "salsa",
- "thiserror",
  "tracing",
  "zip",
 ]
