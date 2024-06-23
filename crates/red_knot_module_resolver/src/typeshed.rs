@@ -5,8 +5,6 @@ mod tests {
     use std::io::{self, Read};
     use std::path::Path;
 
-    use path_slash::PathExt;
-
     use ruff_db::vendored::VendoredFileSystem;
     use ruff_db::vfs::VendoredPath;
 
@@ -52,10 +50,11 @@ mod tests {
                 });
 
             let posix_style_path = relative_path
-                .to_slash()
+                .as_os_str()
+                .to_str()
                 .unwrap_or_else(|| panic!("Expected {relative_path:?} to be a valid UTF-8 path"));
 
-            let vendored_path = VendoredPath::new(&*posix_style_path);
+            let vendored_path = VendoredPath::new(posix_style_path);
 
             assert!(
                 vendored_typeshed_stubs.exists(vendored_path),
