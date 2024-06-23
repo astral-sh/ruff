@@ -47,12 +47,12 @@ struct Bounds {
     upper_bound: HashSet<u32>,
 }
 
-fn update_bounds(
+fn update_bounds<'a>(
     operator: ast::CmpOp,
-    id: String,
+    id: &'a str,
     node_idx: u32,
     is_left: bool,
-    uses: &mut HashMap<String, Bounds>,
+    uses: &mut HashMap<&'a str, Bounds>,
 ) {
     match operator {
         ast::CmpOp::Lt | ast::CmpOp::LtE if is_left => {
@@ -79,11 +79,11 @@ fn set_lower_upper_bounds(
     let mut left_operand: &ast::Expr = &node.left;
     for (right_operand, operator) in node.comparators.iter().zip(node.ops.iter()) {
         if let Some(left_name_expr) = left_operand.as_name_expr() {
-            update_bounds(*operator, left_name_expr.id.clone(), node_idx, true, uses);
+            update_bounds(*operator, &left_name_expr.id, node_idx, true, uses);
         }
 
         if let Some(right_name_expr) = right_operand.as_name_expr() {
-            update_bounds(*operator, right_name_expr.id.clone(), node_idx, false, uses);
+            update_bounds(*operator, &right_name_expr.id, node_idx, false, uses);
         }
 
         left_operand = right_operand;
