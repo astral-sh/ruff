@@ -57,22 +57,19 @@ fn update_bounds<'a>(
     //
     // This efficiently tracks whether the identifier is used in lower or upper bounds
     // comparisons across multiple nodes, allowing us to check for shared bounds later.
+    let entry = uses.entry(id).or_default();
     match operator {
         ast::CmpOp::Lt | ast::CmpOp::LtE if is_left => {
-            let entry = uses.entry(id).or_default();
-            entry.0 |= 1 << node_idx;
+            entry.0 |= 1 << node_idx; // Set the bit for lower bound
         }
         ast::CmpOp::Gt | ast::CmpOp::GtE if is_left => {
-            let entry = uses.entry(id).or_default();
-            entry.1 |= 1 << node_idx;
+            entry.1 |= 1 << node_idx; // Set the bit for upper bound
         }
         ast::CmpOp::Lt | ast::CmpOp::LtE if !is_left => {
-            let entry = uses.entry(id).or_default();
-            entry.1 |= 1 << node_idx;
+            entry.1 |= 1 << node_idx; // Set the bit for upper bound
         }
         ast::CmpOp::Gt | ast::CmpOp::GtE if !is_left => {
-            let entry = uses.entry(id).or_default();
-            entry.0 |= 1 << node_idx;
+            entry.0 |= 1 << node_idx; // Set the bit for lower bound
         }
         _ => {}
     }
