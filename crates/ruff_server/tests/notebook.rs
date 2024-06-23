@@ -22,7 +22,7 @@ struct NotebookChange {
 #[test]
 fn super_resolution_overview() {
     let file_path =
-        std::path::absolute(PathBuf::from_str(SUPER_RESOLUTION_OVERVIEW_PATH).unwrap()).unwrap();
+        std::fs::canonicalize(PathBuf::from_str(SUPER_RESOLUTION_OVERVIEW_PATH).unwrap()).unwrap();
     let file_url = lsp_types::Url::from_file_path(&file_path).unwrap();
     let notebook = create_notebook(&file_path).unwrap();
 

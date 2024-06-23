@@ -100,7 +100,7 @@ To use `ruff-lsp` with other editors, including Sublime Text and Helix, see the 
 ## Language Server Protocol (Unofficial)
 
 Ruff is also available as the [`python-lsp-ruff`](https://github.com/python-lsp/python-lsp-ruff)
-plugin for [`python-lsp-server`](https://github.com/python-lsp/python-lsp-ruff), both of which are
+plugin for [`python-lsp-server`](https://github.com/python-lsp/python-lsp-server), both of which are
 installable from PyPI:
 
 ```shell

@@ -21,14 +21,15 @@ impl super::SyncNotificationHandler for DidClose {
             text_document: types::TextDocumentIdentifier { uri },
         }: types::DidCloseTextDocumentParams,
     ) -> Result<()> {
+        let key = session.key_from_url(uri);
         // Publish an empty diagnostic report for the document. This will de-register any existing diagnostics.
-        let snapshot = session
-            .take_snapshot(uri.clone())
-            .ok_or_else(|| anyhow::anyhow!("Unable to take snapshot for document with URL {uri}"))
-            .with_failure_code(lsp_server::ErrorCode::InternalError)?;
+        let Some(snapshot) = session.take_snapshot(key.clone().into_url()) else {
+            tracing::debug!(
+                "Unable to close document with key {key} - the snapshot was unavailable"
+            );
+            return Ok(());
+        };
         clear_diagnostics_for_document(snapshot.query(), &notifier)?;
-
-        let key = snapshot.query().make_key();
 
         session
             .close_document(&key)

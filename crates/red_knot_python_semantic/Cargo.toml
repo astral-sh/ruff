@@ -11,10 +11,10 @@ repository = { workspace = true }
 license = { workspace = true }
 
 [dependencies]
+red_knot_module_resolver = { workspace = true }
 ruff_db = { workspace = true }
 ruff_index = { workspace = true }
 ruff_python_ast = { workspace = true }
-ruff_python_stdlib = { workspace = true }
 ruff_text_size = { workspace = true }
 
 bitflags = { workspace = true }
@@ -29,7 +29,6 @@ hashbrown = { workspace = true }
 [dev-dependencies]
 anyhow = { workspace = true }
 ruff_python_parser = { workspace = true }
-tempfile = { workspace = true }
 
 [lints]
 workspace = true
