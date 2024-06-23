@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::fmt::{self, Debug};
@@ -30,7 +31,7 @@ impl VendoredFileSystem {
     }
 
     pub fn exists(&self, path: &VendoredPath) -> bool {
-        let normalized = normalize_vendored_path(path);
+        let normalized = NormalizedVendoredPath::from(path);
         let inner_locked = self.inner.lock();
         let mut archive = inner_locked.borrow_mut();
 
@@ -45,7 +46,7 @@ impl VendoredFileSystem {
     }
 
     pub fn metadata(&self, path: &VendoredPath) -> Option<Metadata> {
-        let normalized = normalize_vendored_path(path);
+        let normalized = NormalizedVendoredPath::from(path);
         let inner_locked = self.inner.lock();
 
         // Must probe the zipfile twice, as "stdlib" and "stdlib/" are considered
@@ -72,7 +73,7 @@ impl VendoredFileSystem {
     pub fn read(&self, path: &VendoredPath) -> Result<String> {
         let inner_locked = self.inner.lock();
         let mut archive = inner_locked.borrow_mut();
-        let mut zip_file = archive.lookup_path(&normalize_vendored_path(path))?;
+        let mut zip_file = archive.lookup_path(&NormalizedVendoredPath::from(path))?;
         let mut buffer = String::new();
         zip_file.read_to_string(&mut buffer)?;
         Ok(buffer)
@@ -240,45 +241,86 @@ impl VendoredZipArchive {
 /// but trailing slashes are crucial for distinguishing between
 /// files and directories inside zip archives.
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct NormalizedVendoredPath(String);
+struct NormalizedVendoredPath<'a>(Cow<'a, str>);
 
-impl NormalizedVendoredPath {
-    fn with_trailing_slash(mut self) -> Self {
+impl<'a> NormalizedVendoredPath<'a> {
+    fn with_trailing_slash(self) -> Self {
         debug_assert!(!self.0.ends_with('/'));
-        self.0.push('/');
-        self
+        let mut data = self.0.into_owned();
+        data.push('/');
+        Self(Cow::Owned(data))
     }
 
     fn as_str(&self) -> &str {
-        self.0.as_str()
+        &self.0
     }
 }
 
-/// Normalizes the path by removing `.` and `..` components.
-///
-/// ## Panics:
-/// If a path with an unsupported component for vendored paths is passed.
-/// Unsupported components are path prefixes,
-/// and path root directories appearing anywhere except at the start of the path.
-fn normalize_vendored_path(path: &VendoredPath) -> NormalizedVendoredPath {
-    // Allow the `RootDir` component, but only if it is at the very start of the string.
-    let mut components = path.components().peekable();
-    if let Some(camino::Utf8Component::RootDir) = components.peek() {
-        components.next();
-    }
+impl<'a> From<&'a VendoredPath> for NormalizedVendoredPath<'a> {
+    /// Normalizes the path by removing `.` and `..` components.
+    ///
+    /// ## Panics:
+    /// If a path with an unsupported component for vendored paths is passed.
+    /// Unsupported components are path prefixes and path root directories.
+    fn from(path: &'a VendoredPath) -> Self {
+        // Attempt to avoid allocating unless the path is unnormalized in some way
+        // (in most cases, it should hopefully already be normalized)
 
-    let mut normalized_parts = Vec::new();
-    for component in components {
-        match component {
-            camino::Utf8Component::Normal(part) => normalized_parts.push(part),
-            camino::Utf8Component::CurDir => continue,
-            camino::Utf8Component::ParentDir => {
-                normalized_parts.pop();
+        let mut normalized_parts: Option<Vec<&str>> = {
+            let path_str = path.as_str();
+            // If the path uses Windows separators or has a trailing slash,
+            // it requires normalization, so there's no way to avoid allocating;
+            // may as well do so upfront
+            if (std::path::MAIN_SEPARATOR == '\\' && path_str.contains('\\'))
+                || path_str.ends_with('/')
+            {
+                Some(Vec::new())
+            } else {
+                None
             }
-            unsupported => panic!("Unsupported component in a vendored path: {unsupported}"),
+        };
+
+        for (i, component) in path.components().enumerate() {
+            match component {
+                camino::Utf8Component::Normal(part) => {
+                    if let Some(ref mut data) = normalized_parts {
+                        data.push(part);
+                    }
+                }
+                camino::Utf8Component::CurDir => {
+                    if normalized_parts.is_none() {
+                        normalized_parts = Some(
+                            path.components()
+                                .take(i)
+                                .map(|part| part.as_str())
+                                .collect(),
+                        );
+                    }
+                }
+                camino::Utf8Component::ParentDir => {
+                    if let Some(ref mut data) = normalized_parts {
+                        data.pop();
+                    } else {
+                        normalized_parts = Some(
+                            path.components()
+                                .take(i - 1)
+                                .map(|part| part.as_str())
+                                .collect(),
+                        );
+                    }
+                }
+                unsupported => panic!("Unsupported component in a vendored path: {unsupported}"),
+            }
         }
+
+        NormalizedVendoredPath({
+            if let Some(normalized) = normalized_parts {
+                Cow::Owned(normalized.join("/"))
+            } else {
+                Cow::Borrowed(path.as_str())
+            }
+        })
     }
-    NormalizedVendoredPath(normalized_parts.join("/"))
 }
 
 #[cfg(test)]
