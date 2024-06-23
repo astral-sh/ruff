@@ -367,7 +367,7 @@ mod tests {
     fn test_directory(dirname: &str) {
         let mock_typeshed = mock_typeshed();
 
-        let path = VendoredPathBuf::try_from(dirname).unwrap();
+        let path = VendoredPathBuf::from(dirname);
 
         assert!(mock_typeshed.exists(&path));
         assert!(mock_typeshed.read(&path).is_err());
@@ -407,7 +407,7 @@ mod tests {
 
     fn test_nonexistent_path(path: &str) {
         let mock_typeshed = mock_typeshed();
-        let path = VendoredPathBuf::try_from(path).unwrap();
+        let path = VendoredPathBuf::from(path);
         assert!(!mock_typeshed.exists(&path));
         assert!(mock_typeshed.metadata(&path).is_none());
         assert!(mock_typeshed
@@ -439,7 +439,7 @@ mod tests {
     #[test]
     fn functools_file_contents() {
         let mock_typeshed = mock_typeshed();
-        let path = VendoredPathBuf::try_from("stdlib/functools.pyi").unwrap();
+        let path = VendoredPathBuf::from("stdlib/functools.pyi");
         test_file(&mock_typeshed, &path);
         let functools_stub = mock_typeshed.read(&path).unwrap();
         assert_eq!(functools_stub.as_str(), FUNCTOOLS_CONTENTS);
@@ -453,14 +453,14 @@ mod tests {
     fn functools_file_other_path() {
         test_file(
             &mock_typeshed(),
-            &VendoredPathBuf::try_from("stdlib/../stdlib/../stdlib/functools.pyi").unwrap(),
+            &VendoredPathBuf::from("stdlib/../stdlib/../stdlib/functools.pyi"),
         )
     }
 
     #[test]
     fn asyncio_file_contents() {
         let mock_typeshed = mock_typeshed();
-        let path = VendoredPathBuf::try_from("stdlib/asyncio/tasks.pyi").unwrap();
+        let path = VendoredPathBuf::from("stdlib/asyncio/tasks.pyi");
         test_file(&mock_typeshed, &path);
         let asyncio_stub = mock_typeshed.read(&path).unwrap();
         assert_eq!(asyncio_stub.as_str(), ASYNCIO_TASKS_CONTENTS);
@@ -470,7 +470,7 @@ mod tests {
     fn asyncio_file_other_path() {
         test_file(
             &mock_typeshed(),
-            &VendoredPathBuf::try_from("./stdlib/asyncio/../asyncio/tasks.pyi").unwrap(),
+            &VendoredPathBuf::from("./stdlib/asyncio/../asyncio/tasks.pyi"),
         )
     }
 }

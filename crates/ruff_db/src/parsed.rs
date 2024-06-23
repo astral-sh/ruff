@@ -117,7 +117,7 @@ mod tests {
     fn vendored_file() {
         let mut db = TestDb::new();
         db.vfs_mut().stub_vendored([(
-            VendoredPathBuf::try_from("path.pyi").unwrap(),
+            VendoredPathBuf::from("path.pyi"),
             r#"
 import sys
 
@@ -129,8 +129,7 @@ else:
     from posixpath import __all__ as __all__"#,
         )]);
 
-        let file =
-            vendored_path_to_file(&db, &VendoredPathBuf::try_from("path.pyi").unwrap()).unwrap();
+        let file = vendored_path_to_file(&db, &VendoredPathBuf::from("path.pyi")).unwrap();
 
         let parsed = parsed_module(&db, file);
 

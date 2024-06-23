@@ -386,7 +386,7 @@ mod tests {
     #[test]
     fn stubbed_vendored_file() {
         let mut db = TestDb::new();
-        let path = VendoredPathBuf::try_from("test.py").unwrap();
+        let path = VendoredPathBuf::from("test.py");
 
         db.vfs_mut()
             .stub_vendored([(path.clone(), "def foo() -> str")]);
@@ -403,7 +403,7 @@ mod tests {
         let db = TestDb::new();
 
         assert_eq!(
-            vendored_path_to_file(&db, &VendoredPathBuf::try_from("test.py").unwrap()),
+            vendored_path_to_file(&db, &VendoredPathBuf::from("test.py")),
             None
         );
     }
