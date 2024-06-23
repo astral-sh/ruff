@@ -93,3 +93,19 @@ impl Deref for VendoredPathBuf {
         self.as_path()
     }
 }
+
+impl<'a> TryFrom<&'a path::Path> for &'a VendoredPath {
+    type Error = camino::FromPathError;
+
+    fn try_from(value: &'a path::Path) -> Result<Self, Self::Error> {
+        Ok(VendoredPath::new(<&camino::Utf8Path>::try_from(value)?))
+    }
+}
+
+impl TryFrom<path::PathBuf> for VendoredPathBuf {
+    type Error = camino::FromPathBufError;
+
+    fn try_from(value: path::PathBuf) -> Result<Self, Self::Error> {
+        Ok(VendoredPathBuf(camino::Utf8PathBuf::try_from(value)?))
+    }
+}

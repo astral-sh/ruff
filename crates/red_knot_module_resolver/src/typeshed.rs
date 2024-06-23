@@ -49,12 +49,8 @@ mod tests {
                     panic!("Expected {absolute_path:?} to be a child of {vendored_typeshed_dir:?}")
                 });
 
-            let posix_style_path = relative_path
-                .as_os_str()
-                .to_str()
-                .unwrap_or_else(|| panic!("Expected {relative_path:?} to be a valid UTF-8 path"));
-
-            let vendored_path = VendoredPath::new(posix_style_path);
+            let vendored_path = <&VendoredPath>::try_from(relative_path)
+                .unwrap_or_else(|_| panic!("Expected {relative_path:?} to be valid UTF-8"));
 
             assert!(
                 vendored_typeshed_stubs.exists(vendored_path),
