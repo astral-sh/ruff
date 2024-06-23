@@ -20,6 +20,7 @@ pub(crate) use tab_indentation::*;
 pub(crate) use too_many_newlines_at_end_of_file::*;
 pub(crate) use trailing_whitespace::*;
 pub(crate) use type_comparison::*;
+pub(crate) use whitespace_after_decorator::*;
 
 mod ambiguous_class_name;
 mod ambiguous_function_name;
