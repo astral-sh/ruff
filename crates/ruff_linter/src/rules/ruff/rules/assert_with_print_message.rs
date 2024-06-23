@@ -36,9 +36,9 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: `assert`](https://docs.python.org/3/reference/simple_stmts.html#the-assert-statement)
 #[violation]
-pub struct AssertWithPrintExpression;
+pub struct AssertWithPrintMessage;
 
-impl AlwaysFixableViolation for AssertWithPrintExpression {
+impl AlwaysFixableViolation for AssertWithPrintMessage {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`print()` expression in `assert` statement is likely unintentional")
@@ -53,14 +53,14 @@ impl AlwaysFixableViolation for AssertWithPrintExpression {
 ///
 /// Checks if the `msg` argument to an `assert` statement is a `print` call, and if so,
 /// replace the message with the arguments to the `print` call.
-pub(crate) fn assert_with_print_expression(checker: &mut Checker, stmt: &ast::StmtAssert) {
+pub(crate) fn assert_with_print_message(checker: &mut Checker, stmt: &ast::StmtAssert) {
     if let Some(Expr::Call(call)) = stmt.msg.as_deref() {
         // We have to check that the print call is a call to the built-in `print` function
         let semantic = checker.semantic();
 
         if semantic.match_builtin_expr(&call.func, "print") {
             // This is the confirmed rule condition
-            let mut diagnostic = Diagnostic::new(AssertWithPrintExpression, call.range());
+            let mut diagnostic = Diagnostic::new(AssertWithPrintMessage, call.range());
             diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                 checker.generator().stmt(&Stmt::Assert(ast::StmtAssert {
                     test: stmt.test.clone(),
