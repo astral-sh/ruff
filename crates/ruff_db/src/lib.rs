@@ -39,7 +39,7 @@ mod tests {
     use salsa::DebugWithDb;
 
     use crate::file_system::{FileSystem, MemoryFileSystem};
-    use crate::vfs::Vfs;
+    use crate::vfs::{VendoredPathBuf, Vfs};
     use crate::{Db, Jar};
 
     /// Database that can be used for testing.
@@ -56,7 +56,7 @@ mod tests {
     impl TestDb {
         pub(crate) fn new() -> Self {
             let mut vfs = Vfs::default();
-            vfs.stub_vendored::<String>([]);
+            vfs.stub_vendored::<VendoredPathBuf, String>([]);
 
             Self {
                 storage: salsa::Storage::default(),

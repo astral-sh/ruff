@@ -117,7 +117,7 @@ mod tests {
     fn vendored_file() {
         let mut db = TestDb::new();
         db.vfs_mut().stub_vendored([(
-            VendoredPathBuf::from("path.pyi"),
+            "path.pyi",
             r#"
 import sys
 

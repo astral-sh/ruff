@@ -166,8 +166,9 @@ impl Vfs {
     ///
     /// ## Panics
     /// If there are pending snapshots referencing this `Vfs` instance.
-    pub fn stub_vendored<S>(&mut self, vendored: impl IntoIterator<Item = (VendoredPathBuf, S)>)
+    pub fn stub_vendored<P, S>(&mut self, vendored: impl IntoIterator<Item = (P, S)>)
     where
+        P: Into<VendoredPathBuf>,
         S: ToString,
     {
         let inner = Arc::get_mut(&mut self.inner).unwrap();
@@ -175,7 +176,7 @@ impl Vfs {
         let stubbed = FxDashMap::default();
 
         for (path, content) in vendored {
-            stubbed.insert(path, content.to_string());
+            stubbed.insert(path.into(), content.to_string());
         }
 
         inner.vendored = VendoredVfs::Stubbed(stubbed);
@@ -386,12 +387,12 @@ mod tests {
     #[test]
     fn stubbed_vendored_file() {
         let mut db = TestDb::new();
-        let path = VendoredPathBuf::from("test.py");
 
         db.vfs_mut()
-            .stub_vendored([(path.clone(), "def foo() -> str")]);
+            .stub_vendored([("test.py", "def foo() -> str")]);
 
-        let test = vendored_path_to_file(&db, &path).expect("Vendored file to exist.");
+        let test = vendored_path_to_file(&db, &VendoredPathBuf::from("test.py"))
+            .expect("Vendored file to exist.");
 
         assert_eq!(test.permissions(&db), Some(0o444));
         assert_ne!(test.revision(&db), FileRevision::zero());
