@@ -3,6 +3,7 @@ pub(crate) mod versions;
 #[cfg(test)]
 mod tests {
     use std::io::{self, Read};
+    use std::path::Path;
 
     use path_slash::PathExt;
 
@@ -58,13 +59,25 @@ mod tests {
 
             assert!(
                 vendored_typeshed_stubs.exists(vendored_path),
-                "Expected {vendored_path:?} to exist in the `VendoredFileSystem`!"
+                "Expected {vendored_path:?} to exist in the `VendoredFileSystem`!
+
+                Vendored file system:
+
+                {vendored_typeshed_stubs:#?}
+                "
             );
 
             let vendored_path_kind = vendored_typeshed_stubs
                 .metadata(vendored_path)
                 .unwrap_or_else(|| {
-                    panic!("Expected metadata for {vendored_path:?} to be retrievable from the `VendoredFileSystem!")
+                    panic!(
+                        "Expected metadata for {vendored_path:?} to be retrievable from the `VendoredFileSystem!
+
+                        Vendored file system:
+
+                        {vendored_typeshed_stubs:#?}
+                        "
+                    )
                 })
                 .kind();
 
