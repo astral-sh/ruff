@@ -1,5 +1,5 @@
 use crate::file_system::{FileSystemPath, FileSystemPathBuf};
-use crate::vendored::path::{VendoredPath, VendoredPathBuf};
+use crate::vendored::path::VendoredPathBuf;
 
 /// Path to a file.
 ///
@@ -57,9 +57,9 @@ impl VfsPath {
 
     #[must_use]
     #[inline]
-    pub fn as_vendored_path(&self) -> Option<&VendoredPath> {
+    pub fn as_vendored_path(&self) -> Option<&VendoredPathBuf> {
         match self {
-            VfsPath::Vendored(path) => Some(path.as_path()),
+            VfsPath::Vendored(path) => Some(path),
             VfsPath::FileSystem(_) => None,
         }
     }
@@ -97,12 +97,6 @@ impl From<VendoredPathBuf> for VfsPath {
     }
 }
 
-impl From<&VendoredPath> for VfsPath {
-    fn from(value: &VendoredPath) -> Self {
-        Self::Vendored(value.to_path_buf())
-    }
-}
-
 impl PartialEq<FileSystemPath> for VfsPath {
     #[inline]
     fn eq(&self, other: &FileSystemPath) -> bool {
@@ -131,25 +125,10 @@ impl PartialEq<VfsPath> for FileSystemPathBuf {
     }
 }
 
-impl PartialEq<VendoredPath> for VfsPath {
-    #[inline]
-    fn eq(&self, other: &VendoredPath) -> bool {
-        self.as_vendored_path()
-            .is_some_and(|self_path| self_path == other)
-    }
-}
-
-impl PartialEq<VfsPath> for VendoredPath {
-    #[inline]
-    fn eq(&self, other: &VfsPath) -> bool {
-        other == self
-    }
-}
-
 impl PartialEq<VendoredPathBuf> for VfsPath {
     #[inline]
     fn eq(&self, other: &VendoredPathBuf) -> bool {
-        other.as_path() == self
+        other == self
     }
 }
 

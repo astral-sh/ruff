@@ -1,28 +1,5 @@
 use std::fmt;
-use std::ops::Deref;
 use std::path;
-
-#[repr(transparent)]
-#[derive(Debug, Eq, PartialEq, Hash)]
-pub struct VendoredPath(str);
-
-impl VendoredPath {
-    pub fn to_path_buf(&self) -> VendoredPathBuf {
-        VendoredPathBuf(self.0.to_string())
-    }
-
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-
-    pub fn as_std_path(&self) -> &path::Path {
-        path::Path::new(&self.0)
-    }
-
-    pub fn parts(&self) -> impl Iterator<Item = &str> {
-        self.0.split('/')
-    }
-}
 
 #[derive(Debug)]
 pub struct UnsupportedComponentError(String);
@@ -35,7 +12,6 @@ impl fmt::Display for UnsupportedComponentError {
 
 impl std::error::Error for UnsupportedComponentError {}
 
-#[repr(transparent)]
 #[derive(Debug, Eq, PartialEq, Clone, Hash, Default)]
 pub struct VendoredPathBuf(String);
 
@@ -62,43 +38,20 @@ impl VendoredPathBuf {
         Ok(Self(normalized_parts.join("/")))
     }
 
-    pub fn as_path(&self) -> &VendoredPath {
-        let path = self.0.as_str();
-        // SAFETY: VendoredPath is marked as #[repr(transparent)] so the conversion from a
-        // *const str to a *const VendoredPath is valid.
-        unsafe { &*(path as *const str as *const VendoredPath) }
-    }
-
     pub fn into_string(self) -> String {
         self.0
     }
-}
 
-impl AsRef<VendoredPath> for VendoredPathBuf {
-    fn as_ref(&self) -> &VendoredPath {
-        self.as_path()
+    pub fn as_str(&self) -> &str {
+        &self.0
     }
-}
 
-impl AsRef<VendoredPath> for VendoredPath {
-    #[inline]
-    fn as_ref(&self) -> &VendoredPath {
-        self
-    }
-}
-
-impl AsRef<path::Path> for VendoredPath {
-    #[inline]
-    fn as_ref(&self) -> &path::Path {
+    pub fn as_std_path(&self) -> &path::Path {
         path::Path::new(&self.0)
     }
-}
 
-impl Deref for VendoredPathBuf {
-    type Target = VendoredPath;
-
-    fn deref(&self) -> &Self::Target {
-        self.as_path()
+    pub fn components(&self) -> impl Iterator<Item = &str> {
+        self.0.split('/')
     }
 }
 

@@ -8,7 +8,7 @@ use std::sync::{Mutex, MutexGuard};
 use zip::{read::ZipFile, ZipArchive};
 
 use crate::file_revision::FileRevision;
-pub use path::{VendoredPath, VendoredPathBuf};
+pub use path::VendoredPathBuf;
 
 pub mod path;
 
@@ -30,7 +30,7 @@ impl VendoredFileSystem {
         })
     }
 
-    pub fn exists(&self, path: &VendoredPath) -> bool {
+    pub fn exists(&self, path: &VendoredPathBuf) -> bool {
         let lookup_path = ZipLookupPath::from(path);
         let inner_locked = self.inner.lock();
         let mut archive = inner_locked.borrow_mut();
@@ -45,7 +45,7 @@ impl VendoredFileSystem {
                 .is_ok()
     }
 
-    pub fn metadata(&self, path: &VendoredPath) -> Option<Metadata> {
+    pub fn metadata(&self, path: &VendoredPathBuf) -> Option<Metadata> {
         let lookup_path = ZipLookupPath::from(path);
         let inner_locked = self.inner.lock();
 
@@ -70,7 +70,7 @@ impl VendoredFileSystem {
     /// - The path does not exist in the underlying zip archive
     /// - The path exists in the underlying zip archive, but represents a directory
     /// - The contents of the zip file at `path` contain invalid UTF-8
-    pub fn read(&self, path: &VendoredPath) -> Result<String> {
+    pub fn read(&self, path: &VendoredPathBuf) -> Result<String> {
         let inner_locked = self.inner.lock();
         let mut archive = inner_locked.borrow_mut();
         let mut zip_file = archive.lookup_path(&ZipLookupPath::from(path))?;
@@ -258,8 +258,8 @@ impl<'a> ZipLookupPath<'a> {
     }
 }
 
-impl<'a> From<&'a VendoredPath> for ZipLookupPath<'a> {
-    fn from(value: &'a VendoredPath) -> Self {
+impl<'a> From<&'a VendoredPathBuf> for ZipLookupPath<'a> {
+    fn from(value: &'a VendoredPathBuf) -> Self {
         Self(Cow::Borrowed(value.as_str()))
     }
 }
@@ -435,7 +435,7 @@ mod tests {
         test_nonexistent_path("./foo/../../../foo")
     }
 
-    fn test_file(mock_typeshed: &VendoredFileSystem, path: &VendoredPath) {
+    fn test_file(mock_typeshed: &VendoredFileSystem, path: &VendoredPathBuf) {
         assert!(mock_typeshed.exists(path));
         let metadata = mock_typeshed.metadata(path).unwrap();
         assert!(metadata.kind.is_file());

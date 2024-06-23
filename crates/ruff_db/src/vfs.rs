@@ -3,7 +3,7 @@ use std::sync::Arc;
 use countme::Count;
 use dashmap::mapref::entry::Entry;
 
-pub use crate::vendored::{VendoredPath, VendoredPathBuf};
+pub use crate::vendored::VendoredPathBuf;
 pub use path::VfsPath;
 
 use crate::file_revision::FileRevision;
@@ -33,7 +33,7 @@ pub fn system_path_to_file(db: &dyn Db, path: impl AsRef<FileSystemPath>) -> Opt
 
 /// Interns a vendored file path. Returns `Some` if the vendored file for `path` exists and `None` otherwise.
 #[inline]
-pub fn vendored_path_to_file(db: &dyn Db, path: &VendoredPath) -> Option<VfsFile> {
+pub fn vendored_path_to_file(db: &dyn Db, path: &VendoredPathBuf) -> Option<VfsFile> {
     db.vfs().vendored(db, path)
 }
 
@@ -135,11 +135,11 @@ impl Vfs {
 
     /// Looks up a vendored file by its path. Returns `Some` if a vendored file for the given path
     /// exists and `None` otherwise.
-    fn vendored(&self, db: &dyn Db, path: &VendoredPath) -> Option<VfsFile> {
+    fn vendored(&self, db: &dyn Db, path: &VendoredPathBuf) -> Option<VfsFile> {
         let file = match self
             .inner
             .files_by_path
-            .entry(VfsPath::Vendored(path.to_path_buf()))
+            .entry(VfsPath::Vendored(path.to_owned()))
         {
             Entry::Occupied(entry) => *entry.get(),
             Entry::Vacant(entry) => {
@@ -147,7 +147,7 @@ impl Vfs {
 
                 let file = VfsFile::new(
                     db,
-                    VfsPath::Vendored(path.to_path_buf()),
+                    VfsPath::Vendored(path.to_owned()),
                     Some(0o444),
                     revision,
                     FileStatus::Exists,
@@ -311,22 +311,22 @@ impl Default for VendoredVfs {
 }
 
 impl VendoredVfs {
-    fn revision(&self, path: &VendoredPath) -> Option<FileRevision> {
+    fn revision(&self, path: &VendoredPathBuf) -> Option<FileRevision> {
         match self {
             VendoredVfs::Real(file_system) => file_system
                 .metadata(path)
                 .map(|metadata| metadata.revision()),
             VendoredVfs::Stubbed(stubbed) => stubbed
-                .contains_key(&path.to_path_buf())
+                .contains_key(&path.to_owned())
                 .then_some(FileRevision::new(1)),
         }
     }
 
-    fn read(&self, path: &VendoredPath) -> std::io::Result<String> {
+    fn read(&self, path: &VendoredPathBuf) -> std::io::Result<String> {
         match self {
             VendoredVfs::Real(file_system) => file_system.read(path),
             VendoredVfs::Stubbed(stubbed) => {
-                if let Some(contents) = stubbed.get(&path.to_path_buf()).as_deref().cloned() {
+                if let Some(contents) = stubbed.get(&path.to_owned()).as_deref().cloned() {
                     Ok(contents)
                 } else {
                     Err(std::io::Error::new(
