@@ -1,6 +1,6 @@
 //! A test suite that ensures deprecated command line options have appropriate warnings / behaviors
 
-use ruff_linter::settings::types::SerializationFormat;
+use ruff_linter::settings::types::OutputFormat;
 use std::process::Command;
 
 use insta_cmd::{assert_cmd_snapshot, get_cargo_bin};
@@ -11,7 +11,7 @@ const STDIN: &str = "l = 1";
 
 fn ruff_check(output_format: Option<String>) -> Command {
     let mut cmd = Command::new(get_cargo_bin(BIN_NAME));
-    let output_format = output_format.unwrap_or(format!("{}", SerializationFormat::default(false)));
+    let output_format = output_format.unwrap_or(format!("{}", OutputFormat::default(false)));
     cmd.arg("check")
         .arg("--output-format")
         .arg(output_format)

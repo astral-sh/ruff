@@ -534,7 +534,7 @@
       "description": "The style in which violation messages should be formatted: `\"full\"` (shows source),`\"concise\"` (default), `\"grouped\"` (group messages by file), `\"json\"` (machine-readable), `\"junit\"` (machine-readable XML), `\"github\"` (GitHub Actions annotations), `\"gitlab\"` (GitLab CI code quality report), `\"pylint\"` (Pylint text format) or `\"azure\"` (Azure Pipeline logging commands).",
       "anyOf": [
         {
-          "$ref": "#/definitions/SerializationFormat"
+          "$ref": "#/definitions/OutputFormat"
         },
         {
           "type": "null"
@@ -2293,6 +2293,24 @@
       },
       "additionalProperties": false
     },
+    "OutputFormat": {
+      "type": "string",
+      "enum": [
+        "text",
+        "concise",
+        "full",
+        "json",
+        "json-lines",
+        "junit",
+        "grouped",
+        "github",
+        "gitlab",
+        "pylint",
+        "rdjson",
+        "azure",
+        "sarif"
+      ]
+    },
     "ParametrizeNameType": {
       "type": "string",
       "enum": [
@@ -3929,24 +3947,6 @@
         "YTT301",
         "YTT302",
         "YTT303"
-      ]
-    },
-    "SerializationFormat": {
-      "type": "string",
-      "enum": [
-        "text",
-        "concise",
-        "full",
-        "json",
-        "json-lines",
-        "junit",
-        "grouped",
-        "github",
-        "gitlab",
-        "pylint",
-        "rdjson",
-        "azure",
-        "sarif"
       ]
     },
     "Strictness": {

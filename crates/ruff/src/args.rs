@@ -18,8 +18,8 @@ use ruff_linter::line_width::LineLength;
 use ruff_linter::logging::LogLevel;
 use ruff_linter::registry::Rule;
 use ruff_linter::settings::types::{
-    ExtensionPair, FilePattern, PatternPrefixPair, PerFileIgnore, PreviewMode, PythonVersion,
-    SerializationFormat, UnsafeFixes,
+    ExtensionPair, FilePattern, OutputFormat, PatternPrefixPair, PerFileIgnore, PreviewMode,
+    PythonVersion, UnsafeFixes,
 };
 use ruff_linter::{warn_user, RuleParser, RuleSelector, RuleSelectorParser};
 use ruff_source_file::{LineIndex, OneIndexed};
@@ -187,7 +187,7 @@ pub struct CheckCommand {
     /// The default serialization format is "concise".
     /// In preview mode, the default serialization format is "full".
     #[arg(long, value_enum, env = "RUFF_OUTPUT_FORMAT")]
-    pub output_format: Option<SerializationFormat>,
+    pub output_format: Option<OutputFormat>,
 
     /// Specify file to write the linter output to (default: stdout).
     #[arg(short, long, env = "RUFF_OUTPUT_FILE")]
@@ -925,16 +925,16 @@ The path `{value}` does not point to a configuration file"
 }
 
 fn resolve_output_format(
-    output_format: Option<SerializationFormat>,
+    output_format: Option<OutputFormat>,
     preview: bool,
-) -> Option<SerializationFormat> {
+) -> Option<OutputFormat> {
     Some(match output_format {
         Some(o) => o,
         None => return None
     }).map(|format| match format {
-        SerializationFormat::Text => {
-            warn_user!("`--output-format=text` is deprecated. Use `--output-format=full` or `--output-format=concise` instead. `text` will be treated as `{}`.", SerializationFormat::default(preview));
-            SerializationFormat::default(preview)
+        OutputFormat::Text => {
+            warn_user!("`--output-format=text` is deprecated. Use `--output-format=full` or `--output-format=concise` instead. `text` will be treated as `{}`.", OutputFormat::default(preview));
+            OutputFormat::default(preview)
         },
         other => other
     })
@@ -1189,7 +1189,7 @@ struct ExplicitConfigOverrides {
     fix_only: Option<bool>,
     unsafe_fixes: Option<UnsafeFixes>,
     force_exclude: Option<bool>,
-    output_format: Option<SerializationFormat>,
+    output_format: Option<OutputFormat>,
     show_fixes: Option<bool>,
     extension: Option<Vec<ExtensionPair>>,
 }
