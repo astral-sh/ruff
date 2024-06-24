@@ -5,7 +5,6 @@ use std::fmt::{self, Debug};
 use std::io::{self, Read};
 use std::sync::{Mutex, MutexGuard};
 
-use itertools::Itertools;
 use zip::{read::ZipFile, ZipArchive};
 
 use crate::file_revision::FileRevision;
@@ -258,42 +257,59 @@ impl<'a> NormalizedVendoredPath<'a> {
 }
 
 impl<'a> From<&'a VendoredPath> for NormalizedVendoredPath<'a> {
-    /// Normalizes the path by removing `.` and `..` components.
+    /// Normalize the path.
+    ///
+    /// The normalizations are:
+    /// - Remove `.` and `..` components
+    /// - Strip trailing slashes
+    /// - Normalize `\\` separators to `/`
+    /// - Validate that the path does not have any unsupported components
     ///
     /// ## Panics:
     /// If a path with an unsupported component for vendored paths is passed.
     /// Unsupported components are path prefixes and path root directories.
     fn from(path: &'a VendoredPath) -> Self {
-        // Attempt to avoid allocating unless the path is unnormalized in some way
-        // (in most cases, it should hopefully already be normalized)
-        if path
+        /// Remove `.` and `..` components, and validate that unsupported components are not present.
+        ///
+        /// This inner routine also strips trailing slashes,
+        /// and normalizes paths to use Unix `/` separators.
+        /// However, it always allocates, so avoid calling it if possible.
+        /// In most cases, the path should already be normalized.
+        fn normalize_unnormalized_path(path: &VendoredPath) -> String {
+            let mut normalized_parts = Vec::new();
+            for component in path.components() {
+                match component {
+                    camino::Utf8Component::Normal(part) => normalized_parts.push(part),
+                    camino::Utf8Component::CurDir => continue,
+                    camino::Utf8Component::ParentDir => {
+                        // `VendoredPath("")`, `VendoredPath("..")` and `VendoredPath("../..")`
+                        // all resolve to the same path relative to the zip archive
+                        // (see https://github.com/astral-sh/ruff/pull/11991#issuecomment-2185278014)
+                        normalized_parts.pop();
+                    }
+                    unsupported => {
+                        panic!("Unsupported component in a vendored path: {unsupported}")
+                    }
+                }
+            }
+            normalized_parts.join("/")
+        }
+
+        let path_str = path.as_str();
+
+        if std::path::MAIN_SEPARATOR == '\\' && path_str.contains('\\') {
+            // Normalize paths so that they always use Unix path separators
+            NormalizedVendoredPath(Cow::Owned(normalize_unnormalized_path(path)))
+        } else if !path
             .components()
             .all(|component| matches!(component, camino::Utf8Component::Normal(_)))
         {
-            let path_str = path.as_str();
-            // Normalize paths so that they always use Unix path separators
-            if std::path::MAIN_SEPARATOR == '\\' && path_str.contains('\\') {
-                return NormalizedVendoredPath(Cow::Owned(path.components().join("/")));
-            }
+            // Remove non-`Normal` components
+            NormalizedVendoredPath(Cow::Owned(normalize_unnormalized_path(path)))
+        } else {
             // Strip trailing slashes from the path
-            return NormalizedVendoredPath(Cow::Borrowed(path_str.trim_end_matches('/')));
+            NormalizedVendoredPath(Cow::Borrowed(path_str.trim_end_matches('/')))
         }
-
-        let mut normalized_parts = Vec::new();
-        for component in path.components() {
-            match component {
-                camino::Utf8Component::Normal(part) => normalized_parts.push(part),
-                camino::Utf8Component::CurDir => continue,
-                camino::Utf8Component::ParentDir => {
-                    // `VendoredPath("")`, `VendoredPath("..")` and `VendoredPath("../..")`
-                    // all resolve to the same path relative to the zip archive
-                    // (see https://github.com/astral-sh/ruff/pull/11991#issuecomment-2185278014)
-                    normalized_parts.pop();
-                }
-                unsupported => panic!("Unsupported component in a vendored path: {unsupported}"),
-            }
-        }
-        NormalizedVendoredPath(Cow::Owned(normalized_parts.join("/")))
     }
 }
 
