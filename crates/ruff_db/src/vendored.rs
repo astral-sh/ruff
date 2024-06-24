@@ -5,6 +5,7 @@ use std::fmt::{self, Debug};
 use std::io::{self, Read};
 use std::sync::{Mutex, MutexGuard};
 
+use itertools::Itertools;
 use zip::{read::ZipFile, ZipArchive};
 
 use crate::file_revision::FileRevision;
@@ -265,61 +266,34 @@ impl<'a> From<&'a VendoredPath> for NormalizedVendoredPath<'a> {
     fn from(path: &'a VendoredPath) -> Self {
         // Attempt to avoid allocating unless the path is unnormalized in some way
         // (in most cases, it should hopefully already be normalized)
-
-        let mut normalized_parts: Option<Vec<&str>> = {
+        if path
+            .components()
+            .all(|component| matches!(component, camino::Utf8Component::Normal(_)))
+        {
             let path_str = path.as_str();
-            // If the path uses Windows separators or has a trailing slash,
-            // it requires normalization, so there's no way to avoid allocating;
-            // may as well do so upfront
-            if (std::path::MAIN_SEPARATOR == '\\' && path_str.contains('\\'))
-                || path_str.ends_with('/')
-            {
-                Some(Vec::new())
-            } else {
-                None
+            // Normalize paths so that they always use Unix path separators
+            if std::path::MAIN_SEPARATOR == '\\' && path_str.contains('\\') {
+                return NormalizedVendoredPath(Cow::Owned(path.components().join("/")));
             }
-        };
+            // Strip trailing slashes from the path
+            return NormalizedVendoredPath(Cow::Borrowed(path_str.trim_end_matches('/')));
+        }
 
-        for (i, component) in path.components().enumerate() {
+        let mut normalized_parts = Vec::new();
+        for component in path.components() {
             match component {
-                camino::Utf8Component::Normal(part) => {
-                    if let Some(ref mut data) = normalized_parts {
-                        data.push(part);
-                    }
-                }
-                camino::Utf8Component::CurDir => {
-                    if normalized_parts.is_none() {
-                        normalized_parts = Some(
-                            path.components()
-                                .take(i)
-                                .map(|part| part.as_str())
-                                .collect(),
-                        );
-                    }
-                }
+                camino::Utf8Component::Normal(part) => normalized_parts.push(part),
+                camino::Utf8Component::CurDir => continue,
                 camino::Utf8Component::ParentDir => {
-                    if let Some(ref mut data) = normalized_parts {
-                        data.pop();
-                    } else {
-                        normalized_parts = Some(
-                            path.components()
-                                .take(i - 1)
-                                .map(|part| part.as_str())
-                                .collect(),
-                        );
-                    }
+                    // `VendoredPath("")`, `VendoredPath("..")` and `VendoredPath("../..")`
+                    // all resolve to the same path relative to the zip archive
+                    // (see https://github.com/astral-sh/ruff/pull/11991#issuecomment-2185278014)
+                    normalized_parts.pop();
                 }
                 unsupported => panic!("Unsupported component in a vendored path: {unsupported}"),
             }
         }
-
-        NormalizedVendoredPath({
-            if let Some(normalized) = normalized_parts {
-                Cow::Owned(normalized.join("/"))
-            } else {
-                Cow::Borrowed(path.as_str())
-            }
-        })
+        NormalizedVendoredPath(Cow::Owned(normalized_parts.join("/")))
     }
 }
 
