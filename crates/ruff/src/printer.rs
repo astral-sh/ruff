@@ -36,9 +36,9 @@ bitflags! {
 }
 
 #[derive(Serialize)]
-struct ExpandedStatistics<'a> {
+struct ExpandedStatistics {
     code: SerializeRuleAsCode,
-    message: &'a str,
+    name: SerializeRuleAsTitle,
     count: usize,
     fixable: bool,
 }
@@ -61,6 +61,29 @@ impl Display for SerializeRuleAsCode {
 }
 
 impl From<Rule> for SerializeRuleAsCode {
+    fn from(rule: Rule) -> Self {
+        Self(rule)
+    }
+}
+
+struct SerializeRuleAsTitle(Rule);
+
+impl Serialize for SerializeRuleAsTitle {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(self.0.as_ref())
+    }
+}
+
+impl Display for SerializeRuleAsTitle {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0.as_ref())
+    }
+}
+
+impl From<Rule> for SerializeRuleAsTitle {
     fn from(rule: Rule) -> Self {
         Self(rule)
     }
@@ -317,29 +340,23 @@ impl Printer {
         let statistics: Vec<ExpandedStatistics> = diagnostics
             .messages
             .iter()
-            .map(|message| {
-                (
-                    message.kind.rule(),
-                    &message.kind.body,
-                    message.fix.is_some(),
-                )
-            })
+            .map(|message| (message.kind.rule(), message.fix.is_some()))
             .sorted()
-            .fold(vec![], |mut acc, (rule, body, fixable)| {
-                if let Some((prev_rule, _, _, count)) = acc.last_mut() {
+            .fold(vec![], |mut acc, (rule, fixable)| {
+                if let Some((prev_rule, _, count)) = acc.last_mut() {
                     if *prev_rule == rule {
                         *count += 1;
                         return acc;
                     }
                 }
-                acc.push((rule, body, fixable, 1));
+                acc.push((rule, fixable, 1));
                 acc
             })
             .iter()
-            .map(|(rule, message, fixable, count)| ExpandedStatistics {
+            .map(|(rule, fixable, count)| ExpandedStatistics {
                 code: (*rule).into(),
+                name: (*rule).into(),
                 count: *count,
-                message,
                 fixable: *fixable,
             })
             .sorted_by_key(|statistic| Reverse(statistic.count))
@@ -386,7 +403,7 @@ impl Printer {
                         } else {
                             ""
                         },
-                        statistic.message,
+                        statistic.name,
                     )?;
                 }
                 return Ok(());

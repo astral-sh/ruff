@@ -854,7 +854,36 @@ fn show_statistics() {
     success: false
     exit_code: 1
     ----- stdout -----
-    1	F401	[*] `sys` imported but unused
+    1	F401	[*] unused-import
+
+    ----- stderr -----
+    "###);
+}
+
+#[test]
+fn show_statistics_json() {
+    let mut cmd = RuffCheck::default()
+        .args([
+            "--select",
+            "F401",
+            "--statistics",
+            "--output-format",
+            "json",
+        ])
+        .build();
+    assert_cmd_snapshot!(cmd
+        .pass_stdin("import sys\nimport os\n\nprint(os.getuid())\n"), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    [
+      {
+        "code": "F401",
+        "name": "unused-import",
+        "count": 1,
+        "fixable": true
+      }
+    ]
 
     ----- stderr -----
     "###);
