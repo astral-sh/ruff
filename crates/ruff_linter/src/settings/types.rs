@@ -504,7 +504,7 @@ impl FromIterator<ExtensionPair> for ExtensionMapping {
 #[cfg_attr(feature = "clap", derive(clap::ValueEnum))]
 #[serde(rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
-pub enum SerializationFormat {
+pub enum OutputFormat {
     Text,
     Concise,
     Full,
@@ -520,7 +520,7 @@ pub enum SerializationFormat {
     Sarif,
 }
 
-impl Display for SerializationFormat {
+impl Display for OutputFormat {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Text => write!(f, "text"),
@@ -540,7 +540,7 @@ impl Display for SerializationFormat {
     }
 }
 
-impl SerializationFormat {
+impl OutputFormat {
     pub fn default(preview: bool) -> Self {
         if preview {
             Self::Full

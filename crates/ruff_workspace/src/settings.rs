@@ -3,7 +3,7 @@ use ruff_cache::cache_dir;
 use ruff_formatter::{FormatOptions, IndentStyle, IndentWidth, LineWidth};
 use ruff_linter::display_settings;
 use ruff_linter::settings::types::{
-    ExtensionMapping, FilePattern, FilePatternSet, SerializationFormat, UnsafeFixes,
+    ExtensionMapping, FilePattern, FilePatternSet, OutputFormat, UnsafeFixes,
 };
 use ruff_linter::settings::LinterSettings;
 use ruff_macros::CacheKey;
@@ -28,7 +28,7 @@ pub struct Settings {
     #[cache_key(ignore)]
     pub unsafe_fixes: UnsafeFixes,
     #[cache_key(ignore)]
-    pub output_format: SerializationFormat,
+    pub output_format: OutputFormat,
     #[cache_key(ignore)]
     pub show_fixes: bool,
 
@@ -44,7 +44,7 @@ impl Default for Settings {
             cache_dir: cache_dir(project_root),
             fix: false,
             fix_only: false,
-            output_format: SerializationFormat::default(false),
+            output_format: OutputFormat::default(false),
             show_fixes: false,
             unsafe_fixes: UnsafeFixes::default(),
             linter: LinterSettings::new(project_root),
