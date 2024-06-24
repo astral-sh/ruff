@@ -763,7 +763,6 @@ impl LintConfiguration {
 
         // Store selectors for displaying warnings
         let mut redirects = FxHashMap::default();
-        let mut deprecated_nursery_selectors = FxHashSet::default();
         let mut deprecated_selectors = FxHashSet::default();
         let mut removed_selectors = FxHashSet::default();
         let mut ignored_preview_selectors = FxHashSet::default();
@@ -888,27 +887,11 @@ impl LintConfiguration {
 
             // Check for selections that require a warning
             for (kind, selector) in selection.selectors_by_kind() {
-                #[allow(deprecated)]
-                if matches!(selector, RuleSelector::Nursery) {
-                    let suggestion = if preview.mode.is_disabled() {
-                        " Use the `--preview` flag instead."
-                    } else {
-                        " Unstable rules should be selected individually or by their respective groups."
-                    };
-                    return Err(anyhow!("The `NURSERY` selector was removed.{suggestion}"));
-                };
-
                 // Some of these checks are only for `Kind::Enable` which means only `--select` will warn
                 // and use with, e.g., `--ignore` or `--fixable` is okay
 
                 // Unstable rules
                 if preview.mode.is_disabled() && kind.is_enable() {
-                    if selector.is_exact() {
-                        if selector.all_rules().all(|rule| rule.is_nursery()) {
-                            deprecated_nursery_selectors.insert(selector);
-                        }
-                    }
-
                     // Check if the selector is empty because preview mode is disabled
                     if selector.rules(&preview).next().is_none()
                         && selector
@@ -983,29 +966,6 @@ impl LintConfiguration {
                 target.linter().common_prefix(),
                 target.short_code()
             );
-        }
-
-        let deprecated_nursery_selectors = deprecated_nursery_selectors
-            .iter()
-            .sorted()
-            .collect::<Vec<_>>();
-        match deprecated_nursery_selectors.as_slice() {
-            [] => (),
-            [selection] => {
-                let (prefix, code) = selection.prefix_and_code();
-                return Err(anyhow!("Selection of unstable rule `{prefix}{code}` without the `--preview` flag is not allowed."));
-            }
-            [..] => {
-                let mut message = "Selection of unstable rules without the `--preview` flag is not allowed. Enable preview or remove selection of:".to_string();
-                for selection in deprecated_nursery_selectors {
-                    let (prefix, code) = selection.prefix_and_code();
-                    message.push_str("\n\t- ");
-                    message.push_str(prefix);
-                    message.push_str(code);
-                }
-                message.push('\n');
-                return Err(anyhow!(message));
-            }
         }
 
         if preview.mode.is_disabled() {
@@ -1880,64 +1840,6 @@ mod tests {
         let expected = RuleSet::from_rule(Rule::SliceCopy);
         assert_eq!(actual, expected);
         Ok(())
-    }
-
-    #[test]
-    fn nursery_select_code() -> Result<()> {
-        // We do not allow selection of nursery rules when preview is disabled
-        assert!(resolve_rules(
-            [RuleSelection {
-                select: Some(vec![Flake8Copyright::_001.into()]),
-                ..RuleSelection::default()
-            }],
-            Some(PreviewOptions {
-                mode: PreviewMode::Disabled,
-                ..PreviewOptions::default()
-            }),
-        )
-        .is_err());
-
-        let actual = resolve_rules(
-            [RuleSelection {
-                select: Some(vec![Flake8Copyright::_001.into()]),
-                ..RuleSelection::default()
-            }],
-            Some(PreviewOptions {
-                mode: PreviewMode::Enabled,
-                ..PreviewOptions::default()
-            }),
-        )?;
-        let expected = RuleSet::from_rule(Rule::MissingCopyrightNotice);
-        assert_eq!(actual, expected);
-        Ok(())
-    }
-
-    #[test]
-    #[allow(deprecated)]
-    fn select_nursery() {
-        // We no longer allow use of the NURSERY selector and should error in both cases
-        assert!(resolve_rules(
-            [RuleSelection {
-                select: Some(vec![RuleSelector::Nursery]),
-                ..RuleSelection::default()
-            }],
-            Some(PreviewOptions {
-                mode: PreviewMode::Disabled,
-                ..PreviewOptions::default()
-            }),
-        )
-        .is_err());
-        assert!(resolve_rules(
-            [RuleSelection {
-                select: Some(vec![RuleSelector::Nursery]),
-                ..RuleSelection::default()
-            }],
-            Some(PreviewOptions {
-                mode: PreviewMode::Enabled,
-                ..PreviewOptions::default()
-            }),
-        )
-        .is_err());
     }
 
     #[test]
