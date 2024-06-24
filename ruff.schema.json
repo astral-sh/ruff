@@ -534,7 +534,7 @@
       "description": "The style in which violation messages should be formatted: `\"full\"` (shows source),`\"concise\"` (default), `\"grouped\"` (group messages by file), `\"json\"` (machine-readable), `\"junit\"` (machine-readable XML), `\"github\"` (GitHub Actions annotations), `\"gitlab\"` (GitLab CI code quality report), `\"pylint\"` (Pylint text format) or `\"azure\"` (Azure Pipeline logging commands).",
       "anyOf": [
         {
-          "$ref": "#/definitions/SerializationFormat"
+          "$ref": "#/definitions/OutputFormat"
         },
         {
           "type": "null"
@@ -665,14 +665,6 @@
     },
     "show-fixes": {
       "description": "Whether to show an enumeration of all fixed lint violations (overridden by the `--show-fixes` command-line flag).",
-      "type": [
-        "boolean",
-        "null"
-      ]
-    },
-    "show-source": {
-      "description": "Whether to show source code snippets when reporting lint violations (overridden by the `--show-source` command-line flag).",
-      "deprecated": true,
       "type": [
         "boolean",
         "null"
@@ -2300,6 +2292,24 @@
         }
       },
       "additionalProperties": false
+    },
+    "OutputFormat": {
+      "type": "string",
+      "enum": [
+        "text",
+        "concise",
+        "full",
+        "json",
+        "json-lines",
+        "junit",
+        "grouped",
+        "github",
+        "gitlab",
+        "pylint",
+        "rdjson",
+        "azure",
+        "sarif"
+      ]
     },
     "ParametrizeNameType": {
       "type": "string",
@@ -3937,24 +3947,6 @@
         "YTT301",
         "YTT302",
         "YTT303"
-      ]
-    },
-    "SerializationFormat": {
-      "type": "string",
-      "enum": [
-        "text",
-        "concise",
-        "full",
-        "json",
-        "json-lines",
-        "junit",
-        "grouped",
-        "github",
-        "gitlab",
-        "pylint",
-        "rdjson",
-        "azure",
-        "sarif"
       ]
     },
     "Strictness": {
