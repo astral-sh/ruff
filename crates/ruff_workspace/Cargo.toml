@@ -23,7 +23,6 @@ ruff_macros = { workspace = true }
 
 anyhow = { workspace = true }
 colored = { workspace = true }
-dirs = { workspace = true }
 etcetera = { workspace = true }
 ignore = { workspace = true }
 is-macro = { workspace = true }

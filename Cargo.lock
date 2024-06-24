@@ -2504,7 +2504,6 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "colored",
- "dirs 5.0.1",
  "etcetera",
  "glob",
  "globset",

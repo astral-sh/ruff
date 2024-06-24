@@ -114,10 +114,11 @@ pub fn find_user_settings_toml() -> Option<PathBuf> {
 
     // On macOS, we used to support reading from `/Users/Alice/Library/Application Support`.
     if cfg!(target_os = "macos") {
-        let deprecated_config_dir = dirs::config_dir()?.join("ruff");
+        let strategy = etcetera::base_strategy::Apple::new().ok()?;
+        let config_dir = strategy.data_dir().join("ruff");
 
         for file in [".ruff.toml", "ruff.toml", "pyproject.toml"] {
-            let path = deprecated_config_dir.join(file);
+            let path = config_dir.join(file);
             if path.is_file() {
                 warn_user_once!(
                     "Reading configuration from `~/Library/Application Support` is deprecated. Please move your configuration to `{}/{file}`.",
