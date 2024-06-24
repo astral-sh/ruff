@@ -196,6 +196,8 @@ As an example, the following would configure Ruff to:
 
     [tool.ruff.format]
     # 5. Use single quotes for non-triple-quoted strings.
+    #    (Note this only applies to the ruff formatter. To configure
+    #    the ruff linter to also use single quotes, see [tool.ruff.lint.flake8-quotes])
     quote-style = "single"
     ```
 
