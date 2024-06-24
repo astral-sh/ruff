@@ -16,7 +16,7 @@ use notify::{recommended_watcher, RecursiveMode, Watcher};
 
 use ruff_linter::logging::{set_up_logging, LogLevel};
 use ruff_linter::settings::flags::FixMode;
-use ruff_linter::settings::types::SerializationFormat;
+use ruff_linter::settings::types::OutputFormat;
 use ruff_linter::{fs, warn_user, warn_user_once};
 use ruff_workspace::Settings;
 
@@ -351,10 +351,10 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
     let preview = pyproject_config.settings.linter.preview.is_enabled();
 
     if cli.watch {
-        if output_format != SerializationFormat::default(preview) {
+        if output_format != OutputFormat::default(preview) {
             warn_user!(
                 "`--output-format {}` is always used in watch mode.",
-                SerializationFormat::default(preview)
+                OutputFormat::default(preview)
             );
         }
 

@@ -27,8 +27,8 @@ use ruff_linter::rules::pycodestyle;
 use ruff_linter::settings::fix_safety_table::FixSafetyTable;
 use ruff_linter::settings::rule_table::RuleTable;
 use ruff_linter::settings::types::{
-    CompiledPerFileIgnoreList, ExtensionMapping, FilePattern, FilePatternSet, PerFileIgnore,
-    PreviewMode, PythonVersion, RequiredVersion, SerializationFormat, UnsafeFixes,
+    CompiledPerFileIgnoreList, ExtensionMapping, FilePattern, FilePatternSet, OutputFormat,
+    PerFileIgnore, PreviewMode, PythonVersion, RequiredVersion, UnsafeFixes,
 };
 use ruff_linter::settings::{LinterSettings, DEFAULT_SELECTORS, DUMMY_VARIABLE_RGX, TASK_TAGS};
 use ruff_linter::{
@@ -116,7 +116,7 @@ pub struct Configuration {
     pub fix: Option<bool>,
     pub fix_only: Option<bool>,
     pub unsafe_fixes: Option<UnsafeFixes>,
-    pub output_format: Option<SerializationFormat>,
+    pub output_format: Option<OutputFormat>,
     pub preview: Option<PreviewMode>,
     pub required_version: Option<RequiredVersion>,
     pub extension: Option<ExtensionMapping>,
@@ -222,7 +222,7 @@ impl Configuration {
             unsafe_fixes: self.unsafe_fixes.unwrap_or_default(),
             output_format: self
                 .output_format
-                .unwrap_or_else(|| SerializationFormat::default(global_preview.is_enabled())),
+                .unwrap_or_else(|| OutputFormat::default(global_preview.is_enabled())),
             show_fixes: self.show_fixes.unwrap_or(false),
 
             file_resolver: FileResolverSettings {
@@ -429,30 +429,16 @@ impl Configuration {
             options.indent_width.or(options.tab_size)
         };
 
-        #[allow(deprecated)]
         let output_format = {
-            if options.show_source.is_some() {
-                warn_user_once!(
-                    r#"The `show-source` option has been deprecated in favor of `output-format`'s "full" and "concise" variants. Please update your configuration to use `output-format = <full|concise>` instead."#
-                );
-            }
-
             options
                 .output_format
                 .map(|format| match format {
-                    SerializationFormat::Text => {
-                        warn_user_once!(r#"Setting `output_format` to "text" is deprecated. Use "full" or "concise" instead. "text" will be treated as "{}"."#, SerializationFormat::default(options.preview.unwrap_or_default()));
-                        SerializationFormat::default(options.preview.unwrap_or_default())
+                    OutputFormat::Text => {
+                        warn_user_once!(r#"Setting `output_format` to "text" is deprecated. Use "full" or "concise" instead. "text" will be treated as "{}"."#, OutputFormat::default(options.preview.unwrap_or_default()));
+                        OutputFormat::default(options.preview.unwrap_or_default())
                     },
                     other => other
                 })
-                .or(options.show_source.map(|show_source| {
-                    if show_source {
-                        SerializationFormat::Full
-                    } else {
-                        SerializationFormat::Concise
-                    }
-                }))
         };
 
         Ok(Self {

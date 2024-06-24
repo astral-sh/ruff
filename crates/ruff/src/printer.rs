@@ -19,7 +19,7 @@ use ruff_linter::message::{
 use ruff_linter::notify_user;
 use ruff_linter::registry::{AsRule, Rule};
 use ruff_linter::settings::flags::{self};
-use ruff_linter::settings::types::{SerializationFormat, UnsafeFixes};
+use ruff_linter::settings::types::{OutputFormat, UnsafeFixes};
 
 use crate::diagnostics::{Diagnostics, FixMap};
 
@@ -67,7 +67,7 @@ impl From<Rule> for SerializeRuleAsCode {
 }
 
 pub(crate) struct Printer {
-    format: SerializationFormat,
+    format: OutputFormat,
     log_level: LogLevel,
     fix_mode: flags::FixMode,
     unsafe_fixes: UnsafeFixes,
@@ -76,7 +76,7 @@ pub(crate) struct Printer {
 
 impl Printer {
     pub(crate) const fn new(
-        format: SerializationFormat,
+        format: OutputFormat,
         log_level: LogLevel,
         fix_mode: flags::FixMode,
         unsafe_fixes: UnsafeFixes,
@@ -219,10 +219,10 @@ impl Printer {
         if !self.flags.intersects(Flags::SHOW_VIOLATIONS) {
             if matches!(
                 self.format,
-                SerializationFormat::Text
-                    | SerializationFormat::Full
-                    | SerializationFormat::Concise
-                    | SerializationFormat::Grouped
+                OutputFormat::Text
+                    | OutputFormat::Full
+                    | OutputFormat::Concise
+                    | OutputFormat::Grouped
             ) {
                 if self.flags.intersects(Flags::SHOW_FIX_SUMMARY) {
                     if !diagnostics.fixed.is_empty() {
@@ -240,24 +240,24 @@ impl Printer {
         let fixables = FixableStatistics::try_from(diagnostics, self.unsafe_fixes);
 
         match self.format {
-            SerializationFormat::Json => {
+            OutputFormat::Json => {
                 JsonEmitter.emit(writer, &diagnostics.messages, &context)?;
             }
-            SerializationFormat::Rdjson => {
+            OutputFormat::Rdjson => {
                 RdjsonEmitter.emit(writer, &diagnostics.messages, &context)?;
             }
-            SerializationFormat::JsonLines => {
+            OutputFormat::JsonLines => {
                 JsonLinesEmitter.emit(writer, &diagnostics.messages, &context)?;
             }
-            SerializationFormat::Junit => {
+            OutputFormat::Junit => {
                 JunitEmitter.emit(writer, &diagnostics.messages, &context)?;
             }
-            SerializationFormat::Concise
-            | SerializationFormat::Full => {
+            OutputFormat::Concise
+            | OutputFormat::Full => {
                 TextEmitter::default()
                     .with_show_fix_status(show_fix_status(self.fix_mode, fixables.as_ref()))
                     .with_show_fix_diff(self.flags.intersects(Flags::SHOW_FIX_DIFF))
-                    .with_show_source(self.format == SerializationFormat::Full)
+                    .with_show_source(self.format == OutputFormat::Full)
                     .with_unsafe_fixes(self.unsafe_fixes)
                     .emit(writer, &diagnostics.messages, &context)?;
 
@@ -271,7 +271,7 @@ impl Printer {
 
                 self.write_summary_text(writer, diagnostics)?;
             }
-            SerializationFormat::Grouped => {
+            OutputFormat::Grouped => {
                 GroupedEmitter::default()
                     .with_show_fix_status(show_fix_status(self.fix_mode, fixables.as_ref()))
                     .with_unsafe_fixes(self.unsafe_fixes)
@@ -286,22 +286,22 @@ impl Printer {
                 }
                 self.write_summary_text(writer, diagnostics)?;
             }
-            SerializationFormat::Github => {
+            OutputFormat::Github => {
                 GithubEmitter.emit(writer, &diagnostics.messages, &context)?;
             }
-            SerializationFormat::Gitlab => {
+            OutputFormat::Gitlab => {
                 GitlabEmitter::default().emit(writer, &diagnostics.messages, &context)?;
             }
-            SerializationFormat::Pylint => {
+            OutputFormat::Pylint => {
                 PylintEmitter.emit(writer, &diagnostics.messages, &context)?;
             }
-            SerializationFormat::Azure => {
+            OutputFormat::Azure => {
                 AzureEmitter.emit(writer, &diagnostics.messages, &context)?;
             }
-            SerializationFormat::Sarif => {
+            OutputFormat::Sarif => {
                 SarifEmitter.emit(writer, &diagnostics.messages, &context)?;
             }
-            SerializationFormat::Text => unreachable!("Text is deprecated and should have been automatically converted to the default serialization format")
+            OutputFormat::Text => unreachable!("Text is deprecated and should have been automatically converted to the default serialization format")
         }
 
         writer.flush()?;
@@ -350,9 +350,7 @@ impl Printer {
         }
 
         match self.format {
-            SerializationFormat::Text
-            | SerializationFormat::Full
-            | SerializationFormat::Concise => {
+            OutputFormat::Text | OutputFormat::Full | OutputFormat::Concise => {
                 // Compute the maximum number of digits in the count and code, for all messages,
                 // to enable pretty-printing.
                 let count_width = num_digits(
@@ -393,7 +391,7 @@ impl Printer {
                 }
                 return Ok(());
             }
-            SerializationFormat::Json => {
+            OutputFormat::Json => {
                 writeln!(writer, "{}", serde_json::to_string_pretty(&statistics)?)?;
             }
             _ => {
