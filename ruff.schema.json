@@ -2296,7 +2296,6 @@
     "OutputFormat": {
       "type": "string",
       "enum": [
-        "text",
         "concise",
         "full",
         "json",

@@ -500,13 +500,13 @@ impl FromIterator<ExtensionPair> for ExtensionMapping {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Debug, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Debug, Hash, Default)]
 #[cfg_attr(feature = "clap", derive(clap::ValueEnum))]
 #[serde(rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub enum OutputFormat {
-    Text,
     Concise,
+    #[default]
     Full,
     Json,
     JsonLines,
@@ -523,7 +523,6 @@ pub enum OutputFormat {
 impl Display for OutputFormat {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Text => write!(f, "text"),
             Self::Concise => write!(f, "concise"),
             Self::Full => write!(f, "full"),
             Self::Json => write!(f, "json"),
@@ -536,16 +535,6 @@ impl Display for OutputFormat {
             Self::Rdjson => write!(f, "rdjson"),
             Self::Azure => write!(f, "azure"),
             Self::Sarif => write!(f, "sarif"),
-        }
-    }
-}
-
-impl OutputFormat {
-    pub fn default(preview: bool) -> Self {
-        if preview {
-            Self::Full
-        } else {
-            Self::Concise
         }
     }
 }
