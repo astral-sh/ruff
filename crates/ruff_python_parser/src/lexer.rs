@@ -1384,19 +1384,21 @@ impl<'src> Lexer<'src> {
                 current_position -= ch.text_len();
             } else if matches!(ch, '\n' | '\r') {
                 current_position -= ch.text_len();
-                if let Some(first_slash) = reverse_chars.next_if_eq(&'\\') {
-                    if let Some(second_slash) = reverse_chars.next_if_eq(&'\\') {
-                        // Line continuation character has been escaped: `\\\n`
-                        newline_position = Some(current_position);
-                        // Set the newline position before updating the current position.
-                        current_position -= first_slash.text_len() - second_slash.text_len();
-                    } else {
-                        // Newline has been escaped: `\\n`
-                        current_position -= first_slash.text_len();
-                    }
-                } else {
+                // Count the number of backslashes before the newline character.
+                let mut backslash_count = 0;
+                while reverse_chars.next_if_eq(&'\\').is_some() {
+                    backslash_count += 1;
+                }
+                if backslash_count == 0 {
                     // No escapes: `\n`
                     newline_position = Some(current_position);
+                } else {
+                    if backslash_count % 2 == 0 {
+                        // Even number of backslashes i.e., all backslashes cancel each other out
+                        // which means the newline character is not being escaped.
+                        newline_position = Some(current_position);
+                    }
+                    current_position -= TextSize::new('\\'.text_len().to_u32() * backslash_count);
                 }
             } else {
                 break;

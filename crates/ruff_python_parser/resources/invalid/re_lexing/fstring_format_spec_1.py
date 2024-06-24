@@ -4,3 +4,9 @@
 
 f'middle {'string':\
         'format spec'}
+
+f'middle {'string':\\
+        'format spec'}
+
+f'middle {'string':\\\
+        'format spec'}
