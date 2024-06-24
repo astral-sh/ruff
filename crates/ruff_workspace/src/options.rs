@@ -1,8 +1,7 @@
 use std::collections::BTreeSet;
-use std::hash::BuildHasherDefault;
 
 use regex::Regex;
-use rustc_hash::{FxHashMap, FxHashSet};
+use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
 use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
 
@@ -2406,8 +2405,7 @@ impl IsortOptions {
             .collect::<Result<_, _>>()?;
 
         // Verify that `section_order` doesn't contain any duplicates.
-        let mut seen =
-            FxHashSet::with_capacity_and_hasher(section_order.len(), BuildHasherDefault::default());
+        let mut seen = FxHashSet::with_capacity_and_hasher(section_order.len(), FxBuildHasher);
         for section in &section_order {
             if !seen.insert(section) {
                 warn_user_once!(

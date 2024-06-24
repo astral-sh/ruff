@@ -1,8 +1,7 @@
-use std::hash::BuildHasherDefault;
 use std::ops::Deref;
 
 use itertools::{any, Itertools};
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxBuildHasher, FxHashMap};
 
 use ast::ExprContext;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
@@ -83,10 +82,7 @@ pub(crate) fn repeated_equality_comparison(checker: &mut Checker, bool_op: &ast:
 
     // Map from expression hash to (starting offset, number of comparisons, list
     let mut value_to_comparators: FxHashMap<HashableExpr, (TextSize, Vec<&Expr>)> =
-        FxHashMap::with_capacity_and_hasher(
-            bool_op.values.len() * 2,
-            BuildHasherDefault::default(),
-        );
+        FxHashMap::with_capacity_and_hasher(bool_op.values.len() * 2, FxBuildHasher);
 
     for value in &bool_op.values {
         // Enforced via `is_allowed_value`.

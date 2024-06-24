@@ -1,9 +1,8 @@
 use std::cmp::Ordering;
-use std::hash::BuildHasherDefault;
 use std::ops::Deref;
 
 use bitflags::bitflags;
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxBuildHasher, FxHashSet};
 
 use ruff_python_ast::{
     self as ast, BoolOp, CmpOp, ConversionFlag, Expr, ExprContext, FStringElement, FStringElements,
@@ -2279,10 +2278,8 @@ impl<'src> Parser<'src> {
     ///
     /// Report errors for all the duplicate names found.
     fn validate_arguments(&mut self, arguments: &ast::Arguments) {
-        let mut all_arg_names = FxHashSet::with_capacity_and_hasher(
-            arguments.keywords.len(),
-            BuildHasherDefault::default(),
-        );
+        let mut all_arg_names =
+            FxHashSet::with_capacity_and_hasher(arguments.keywords.len(), FxBuildHasher);
 
         for (name, range) in arguments
             .keywords
