@@ -8,7 +8,6 @@ use pep440_rs::VersionSpecifiers;
 use serde::{Deserialize, Serialize};
 
 use ruff_linter::settings::types::PythonVersion;
-use ruff_linter::warn_user_once;
 
 use crate::options::Options;
 
@@ -102,6 +101,7 @@ pub fn find_settings_toml<P: AsRef<Path>>(path: P) -> Result<Option<PathBuf>> {
 #[cfg(not(target_arch = "wasm32"))]
 pub fn find_user_settings_toml() -> Option<PathBuf> {
     use etcetera::BaseStrategy;
+    use ruff_linter::warn_user_once;
 
     let strategy = etcetera::base_strategy::choose_base_strategy().ok()?;
     let config_dir = strategy.config_dir().join("ruff");
@@ -117,10 +117,10 @@ pub fn find_user_settings_toml() -> Option<PathBuf> {
     // On macOS, we used to support reading from `/Users/Alice/Library/Application Support`.
     if cfg!(target_os = "macos") {
         let strategy = etcetera::base_strategy::Apple::new().ok()?;
-        let config_dir = strategy.data_dir().join("ruff");
+        let deprecated_config_dir = strategy.data_dir().join("ruff");
 
         for file in [".ruff.toml", "ruff.toml", "pyproject.toml"] {
-            let path = config_dir.join(file);
+            let path = deprecated_config_dir.join(file);
             if path.is_file() {
                 warn_user_once!(
                     "Reading configuration from `~/Library/Application Support` is deprecated. Please move your configuration to `{}/{file}`.",

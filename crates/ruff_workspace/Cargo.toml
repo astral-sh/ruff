@@ -23,7 +23,6 @@ ruff_macros = { workspace = true }
 
 anyhow = { workspace = true }
 colored = { workspace = true }
-etcetera = { workspace = true }
 ignore = { workspace = true }
 is-macro = { workspace = true }
 itertools = { workspace = true }
@@ -41,6 +40,9 @@ serde = { workspace = true }
 shellexpand = { workspace = true }
 strum = { workspace = true }
 toml = { workspace = true }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+etcetera = { workspace = true }
 
 [dev-dependencies]
 # Enable test rules during development
