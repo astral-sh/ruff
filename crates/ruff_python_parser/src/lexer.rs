@@ -1373,14 +1373,21 @@ impl<'src> Lexer<'src> {
         }
 
         let mut current_position = self.current_range().start();
-        let reverse_chars = self.source[..current_position.to_usize()].chars().rev();
+        let mut reverse_chars = self.source[..current_position.to_usize()]
+            .chars()
+            .rev()
+            .peekable();
         let mut newline_position = None;
 
-        for ch in reverse_chars {
+        while let Some(ch) = reverse_chars.next() {
             if is_python_whitespace(ch) {
                 current_position -= ch.text_len();
             } else if matches!(ch, '\n' | '\r') {
                 current_position -= ch.text_len();
+                if let Some(continuation_char) = reverse_chars.next_if_eq(&'\\') {
+                    current_position -= continuation_char.text_len();
+                    continue;
+                }
                 newline_position = Some(current_position);
             } else {
                 break;

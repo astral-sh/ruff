@@ -1,0 +1,144 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/re_lexing/fstring_format_spec_1.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..205,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 162..192,
+                    value: FString(
+                        ExprFString {
+                            range: 162..192,
+                            value: FStringValue {
+                                inner: Single(
+                                    FString(
+                                        FString {
+                                            range: 162..192,
+                                            elements: [
+                                                Literal(
+                                                    FStringLiteralElement {
+                                                        range: 164..171,
+                                                        value: "middle ",
+                                                    },
+                                                ),
+                                                Expression(
+                                                    FStringExpressionElement {
+                                                        range: 171..191,
+                                                        expression: StringLiteral(
+                                                            ExprStringLiteral {
+                                                                range: 172..180,
+                                                                value: StringLiteralValue {
+                                                                    inner: Single(
+                                                                        StringLiteral {
+                                                                            range: 172..180,
+                                                                            value: "string",
+                                                                            flags: StringLiteralFlags {
+                                                                                quote_style: Single,
+                                                                                prefix: Empty,
+                                                                                triple_quoted: false,
+                                                                            },
+                                                                        },
+                                                                    ),
+                                                                },
+                                                            },
+                                                        ),
+                                                        debug_text: None,
+                                                        conversion: None,
+                                                        format_spec: Some(
+                                                            FStringFormatSpec {
+                                                                range: 181..191,
+                                                                elements: [
+                                                                    Literal(
+                                                                        FStringLiteralElement {
+                                                                            range: 181..191,
+                                                                            value: "        ",
+                                                                        },
+                                                                    ),
+                                                                ],
+                                                            },
+                                                        ),
+                                                    },
+                                                ),
+                                            ],
+                                            flags: FStringFlags {
+                                                quote_style: Single,
+                                                prefix: Regular,
+                                                triple_quoted: false,
+                                            },
+                                        },
+                                    ),
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 192..198,
+                    value: Name(
+                        ExprName {
+                            range: 192..198,
+                            id: "format",
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 199..203,
+                    value: Name(
+                        ExprName {
+                            range: 199..203,
+                            id: "spec",
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+5 | f'middle {'string':\
+6 |         'format spec'}
+  |         ^ Syntax Error: f-string: expecting '}'
+  |
+
+
+  |
+5 | f'middle {'string':\
+6 |         'format spec'}
+  |          ^^^^^^ Syntax Error: Simple statements must be separated by newlines or semicolons
+  |
+
+
+  |
+5 | f'middle {'string':\
+6 |         'format spec'}
+  |                 ^^^^ Syntax Error: Simple statements must be separated by newlines or semicolons
+  |
+
+
+  |
+5 | f'middle {'string':\
+6 |         'format spec'}
+  |                     ^^ Syntax Error: Got unexpected string
+  |
+
+
+  |
+5 | f'middle {'string':\
+6 |         'format spec'}
+  |                        Syntax Error: Expected a statement
+  |
