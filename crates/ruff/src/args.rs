@@ -95,7 +95,6 @@ pub enum Command {
     /// Run Ruff on the given files or directories (default).
     Check(CheckCommand),
     /// Explain a rule (or all rules).
-    #[clap(alias = "--explain")]
     #[command(group = clap::ArgGroup::new("selector").multiple(false).required(true))]
     Rule {
         /// Rule to explain
@@ -125,10 +124,8 @@ pub enum Command {
         output_format: HelpFormat,
     },
     /// Clear any caches in the current directory and any subdirectories.
-    #[clap(alias = "--clean")]
     Clean,
     /// Generate shell completion.
-    #[clap(alias = "--generate-shell-completion", hide = true)]
     GenerateShellCompletion { shell: clap_complete_command::Shell },
     /// Run the Ruff formatter on the given files or directories.
     Format(FormatCommand),

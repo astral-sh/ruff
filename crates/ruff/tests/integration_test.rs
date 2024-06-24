@@ -1377,7 +1377,7 @@ fn unreadable_pyproject_toml() -> Result<()> {
 
     // Don't `--isolated` since the configuration discovery is where the error happens
     let args = Args::parse_from(["", "check", "--no-cache", tempdir.path().to_str().unwrap()]);
-    let err = run(args, None).err().context("Unexpected success")?;
+    let err = run(args).err().context("Unexpected success")?;
     assert_eq!(
         err.chain()
             .map(std::string::ToString::to_string)
