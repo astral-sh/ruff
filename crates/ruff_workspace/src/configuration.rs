@@ -643,23 +643,6 @@ pub struct LintConfiguration {
 impl LintConfiguration {
     fn from_options(options: LintOptions, project_root: &Path) -> Result<Self> {
         #[allow(deprecated)]
-        let ignore = options
-            .common
-            .ignore
-            .into_iter()
-            .flatten()
-            .chain(options.common.extend_ignore.into_iter().flatten())
-            .collect();
-        #[allow(deprecated)]
-        let unfixable = options
-            .common
-            .unfixable
-            .into_iter()
-            .flatten()
-            .chain(options.common.extend_unfixable.into_iter().flatten())
-            .collect();
-
-        #[allow(deprecated)]
         let ignore_init_module_imports = {
             if options.common.ignore_init_module_imports.is_some() {
                 warn_user_once!("The `ignore-init-module-imports` option is deprecated and will be removed in a future release. Ruff's handling of imports in `__init__.py` files has been improved (in preview) and unused imports will always be flagged.");
@@ -681,10 +664,10 @@ impl LintConfiguration {
 
             rule_selections: vec![RuleSelection {
                 select: options.common.select,
-                ignore,
+                ignore: options.common.ignore.into_iter().flatten().collect(),
                 extend_select: options.common.extend_select.unwrap_or_default(),
                 fixable: options.common.fixable,
-                unfixable,
+                unfixable: options.common.unfixable.into_iter().flatten().collect(),
                 extend_fixable: options.common.extend_fixable.unwrap_or_default(),
             }],
             extend_safe_fixes: options.common.extend_safe_fixes.unwrap_or_default(),
@@ -1285,22 +1268,12 @@ fn warn_about_deprecated_top_level_lint_options(
         used_options.push("dummy-variable-rgx");
     }
 
-    #[allow(deprecated)]
-    if top_level_options.extend_ignore.is_some() {
-        used_options.push("extend-ignore");
-    }
-
     if top_level_options.extend_select.is_some() {
         used_options.push("extend-select");
     }
 
     if top_level_options.extend_fixable.is_some() {
         used_options.push("extend-fixable");
-    }
-
-    #[allow(deprecated)]
-    if top_level_options.extend_unfixable.is_some() {
-        used_options.push("extend-unfixable");
     }
 
     if top_level_options.external.is_some() {

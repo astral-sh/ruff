@@ -574,21 +574,6 @@ pub struct LintCommonOptions {
     )]
     pub dummy_variable_rgx: Option<String>,
 
-    /// A list of rule codes or prefixes to ignore, in addition to those
-    /// specified by `ignore`.
-    #[option(
-        default = "[]",
-        value_type = "list[RuleSelector]",
-        example = r#"
-            # Skip unused variable rules (`F841`).
-            extend-ignore = ["F841"]
-        "#
-    )]
-    #[deprecated(
-        note = "The `extend-ignore` option is now interchangeable with `ignore`. Please update your configuration to use the `ignore` option instead."
-    )]
-    pub extend_ignore: Option<Vec<RuleSelector>>,
-
     /// A list of rule codes or prefixes to enable, in addition to those
     /// specified by `select`.
     #[option(
@@ -612,13 +597,6 @@ pub struct LintCommonOptions {
         "#
     )]
     pub extend_fixable: Option<Vec<RuleSelector>>,
-
-    /// A list of rule codes or prefixes to consider non-auto-fixable, in addition to those
-    /// specified by `unfixable`.
-    #[deprecated(
-        note = "The `extend-unfixable` option is now interchangeable with `unfixable`. Please update your configuration to use the `unfixable` option instead."
-    )]
-    pub extend_unfixable: Option<Vec<RuleSelector>>,
 
     /// A list of rule codes or prefixes that are unsupported by Ruff, but should be
     /// preserved when (e.g.) validating `# noqa` directives. Useful for

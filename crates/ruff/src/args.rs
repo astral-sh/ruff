@@ -238,16 +238,6 @@ pub struct CheckCommand {
         hide_possible_values = true
     )]
     pub extend_select: Option<Vec<RuleSelector>>,
-    /// Like --ignore. (Deprecated: You can just use --ignore instead.)
-    #[arg(
-        long,
-        value_delimiter = ',',
-        value_name = "RULE_CODE",
-        value_parser = RuleSelectorParser,
-        help_heading = "Rule selection",
-        hide = true
-    )]
-    pub extend_ignore: Option<Vec<RuleSelector>>,
     /// List of mappings from file pattern to code to exclude.
     #[arg(long, value_delimiter = ',', help_heading = "Rule selection")]
     pub per_file_ignores: Option<Vec<PatternPrefixPair>>,
@@ -300,16 +290,7 @@ pub struct CheckCommand {
         hide_possible_values = true
     )]
     pub extend_fixable: Option<Vec<RuleSelector>>,
-    /// Like --unfixable. (Deprecated: You can just use --unfixable instead.)
-    #[arg(
-        long,
-        value_delimiter = ',',
-        value_name = "RULE_CODE",
-        value_parser = RuleSelectorParser,
-        help_heading = "Rule selection",
-        hide = true
-    )]
-    pub extend_unfixable: Option<Vec<RuleSelector>>,
+
     /// Respect file exclusions via `.gitignore` and other standard ignore files.
     /// Use `--no-respect-gitignore` to disable.
     #[arg(
@@ -681,10 +662,8 @@ impl CheckCommand {
             exclude: self.exclude,
             extend_exclude: self.extend_exclude,
             extend_fixable: self.extend_fixable,
-            extend_ignore: self.extend_ignore,
             extend_per_file_ignores: self.extend_per_file_ignores,
             extend_select: self.extend_select,
-            extend_unfixable: self.extend_unfixable,
             fixable: self.fixable,
             ignore: self.ignore,
             line_length: self.line_length,
@@ -1200,9 +1179,7 @@ struct ExplicitConfigOverrides {
     exclude: Option<Vec<FilePattern>>,
     extend_exclude: Option<Vec<FilePattern>>,
     extend_fixable: Option<Vec<RuleSelector>>,
-    extend_ignore: Option<Vec<RuleSelector>>,
     extend_select: Option<Vec<RuleSelector>>,
-    extend_unfixable: Option<Vec<RuleSelector>>,
     fixable: Option<Vec<RuleSelector>>,
     ignore: Option<Vec<RuleSelector>>,
     line_length: Option<LineLength>,
@@ -1255,22 +1232,10 @@ impl ConfigurationTransformer for ExplicitConfigOverrides {
         }
         config.lint.rule_selections.push(RuleSelection {
             select: self.select.clone(),
-            ignore: self
-                .ignore
-                .iter()
-                .cloned()
-                .chain(self.extend_ignore.iter().cloned())
-                .flatten()
-                .collect(),
+            ignore: self.ignore.iter().flatten().cloned().collect(),
             extend_select: self.extend_select.clone().unwrap_or_default(),
             fixable: self.fixable.clone(),
-            unfixable: self
-                .unfixable
-                .iter()
-                .cloned()
-                .chain(self.extend_unfixable.iter().cloned())
-                .flatten()
-                .collect(),
+            unfixable: self.unfixable.iter().flatten().cloned().collect(),
             extend_fixable: self.extend_fixable.clone().unwrap_or_default(),
         });
         if let Some(output_format) = &self.output_format {

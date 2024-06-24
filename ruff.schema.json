@@ -87,17 +87,6 @@
         "$ref": "#/definitions/RuleSelector"
       }
     },
-    "extend-ignore": {
-      "description": "A list of rule codes or prefixes to ignore, in addition to those specified by `ignore`.",
-      "deprecated": true,
-      "type": [
-        "array",
-        "null"
-      ],
-      "items": {
-        "$ref": "#/definitions/RuleSelector"
-      }
-    },
     "extend-include": {
       "description": "A list of file patterns to include when linting, in addition to those specified by `include`.\n\nInclusion are based on globs, and should be single-path patterns, like `*.pyw`, to include any file with the `.pyw` extension.\n\nFor more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).",
       "type": [
@@ -135,17 +124,6 @@
     },
     "extend-select": {
       "description": "A list of rule codes or prefixes to enable, in addition to those specified by `select`.",
-      "deprecated": true,
-      "type": [
-        "array",
-        "null"
-      ],
-      "items": {
-        "$ref": "#/definitions/RuleSelector"
-      }
-    },
-    "extend-unfixable": {
-      "description": "A list of rule codes or prefixes to consider non-auto-fixable, in addition to those specified by `unfixable`.",
       "deprecated": true,
       "type": [
         "array",
@@ -1835,17 +1813,6 @@
             "$ref": "#/definitions/RuleSelector"
           }
         },
-        "extend-ignore": {
-          "description": "A list of rule codes or prefixes to ignore, in addition to those specified by `ignore`.",
-          "deprecated": true,
-          "type": [
-            "array",
-            "null"
-          ],
-          "items": {
-            "$ref": "#/definitions/RuleSelector"
-          }
-        },
         "extend-per-file-ignores": {
           "description": "A list of mappings from file pattern to rule codes or prefixes to exclude, in addition to any rules excluded by `per-file-ignores`.",
           "type": [
@@ -1871,17 +1838,6 @@
         },
         "extend-select": {
           "description": "A list of rule codes or prefixes to enable, in addition to those specified by `select`.",
-          "type": [
-            "array",
-            "null"
-          ],
-          "items": {
-            "$ref": "#/definitions/RuleSelector"
-          }
-        },
-        "extend-unfixable": {
-          "description": "A list of rule codes or prefixes to consider non-auto-fixable, in addition to those specified by `unfixable`.",
-          "deprecated": true,
           "type": [
             "array",
             "null"
