@@ -22,7 +22,7 @@ use crate::checkers::ast::Checker;
 /// print(f"'{foo}' '{bar}'")
 /// ```
 /// would output
-/// ```
+/// ```text
 /// 'hello' 'g'day'
 /// ```
 ///
@@ -33,7 +33,7 @@ use crate::checkers::ast::Checker;
 /// print(f"{foo!r} {bar!r}")
 /// ```
 /// which would output
-/// ```
+/// ```text
 /// 'hello' "g'day"
 /// ```
 #[violation]
