@@ -612,16 +612,20 @@ Ruff doesn't currently support INI files, like `setup.cfg` or `tox.ini`.
 
 ## How can I change Ruff's default configuration?
 
-When no configuration file is found, Ruff will look for a user-specific `pyproject.toml` or
-`ruff.toml` file as a last resort. This behavior is similar to Flake8's `~/.config/flake8`.
+When no configuration file is found, Ruff will look for a user-specific `ruff.toml` file as a
+last resort. This behavior is similar to Flake8's `~/.config/flake8`.
 
-On macOS, Ruff expects that file to be located at `/Users/Alice/Library/Application Support/ruff/ruff.toml`.
+On macOS and Linux, Ruff expects that file to be located at `~/.config/ruff/ruff.toml`,
+and respects the `XDG_CONFIG_HOME` specification.
 
-On Linux, Ruff expects that file to be located at `/home/alice/.config/ruff/ruff.toml`.
+On Windows, Ruff expects that file to be located at `~\AppData\Roaming\ruff\ruff.toml`.
 
-On Windows, Ruff expects that file to be located at `C:\Users\Alice\AppData\Roaming\ruff\ruff.toml`.
+!!! note
+  Prior to `v0.5.0`, Ruff would read user-specific configuration from
+  `~/Library/Application Support/ruff/ruff.toml` on macOS. While Ruff will still respect
+  such configuration files, the use of `~/Library/ Application Support` is considered deprecated.
 
-For more, see the [`dirs`](https://docs.rs/dirs/4.0.0/dirs/fn.config_dir.html) crate.
+For more, see the [`etcetera`](https://crates.io/crates/etcetera) crate.
 
 ## Ruff tried to fix something — but it broke my code. What's going on?
 
