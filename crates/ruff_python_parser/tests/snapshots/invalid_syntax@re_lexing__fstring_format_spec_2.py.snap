@@ -1,0 +1,134 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/re_lexing/fstring_format_spec_2.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..166,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 139..152,
+                    value: FString(
+                        ExprFString {
+                            range: 139..152,
+                            value: FStringValue {
+                                inner: Single(
+                                    FString(
+                                        FString {
+                                            range: 139..152,
+                                            elements: [
+                                                Literal(
+                                                    FStringLiteralElement {
+                                                        range: 141..147,
+                                                        value: "hello ",
+                                                    },
+                                                ),
+                                                Expression(
+                                                    FStringExpressionElement {
+                                                        range: 147..152,
+                                                        expression: Name(
+                                                            ExprName {
+                                                                range: 148..149,
+                                                                id: "x",
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                        debug_text: None,
+                                                        conversion: None,
+                                                        format_spec: Some(
+                                                            FStringFormatSpec {
+                                                                range: 150..152,
+                                                                elements: [
+                                                                    Literal(
+                                                                        FStringLiteralElement {
+                                                                            range: 150..152,
+                                                                            value: "\\",
+                                                                        },
+                                                                    ),
+                                                                ],
+                                                            },
+                                                        ),
+                                                    },
+                                                ),
+                                            ],
+                                            flags: FStringFlags {
+                                                quote_style: Single,
+                                                prefix: Regular,
+                                                triple_quoted: false,
+                                            },
+                                        },
+                                    ),
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 157..164,
+                    value: StringLiteral(
+                        ExprStringLiteral {
+                            range: 157..164,
+                            value: StringLiteralValue {
+                                inner: Single(
+                                    StringLiteral {
+                                        range: 157..164,
+                                        value: "world",
+                                        flags: StringLiteralFlags {
+                                            quote_style: Single,
+                                            prefix: Empty,
+                                            triple_quoted: false,
+                                        },
+                                    },
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+2 | # is escaped. So, the lexer should be moved back.
+3 | 
+4 | f'hello {x:\\
+  |               Syntax Error: f-string: unterminated string
+5 |     'world'}'
+  |
+
+
+  |
+4 | f'hello {x:\\
+5 |     'world'}'
+  | ^^^^ Syntax Error: Unexpected indentation
+  |
+
+
+  |
+4 | f'hello {x:\\
+5 |     'world'}'
+  |            ^ Syntax Error: Expected a statement
+  |
+
+
+  |
+4 | f'hello {x:\\
+5 |     'world'}'
+  |             ^ Syntax Error: Got unexpected string
+  |
+
+
+  |
+4 | f'hello {x:\\
+5 |     'world'}'
+  |               Syntax Error: Expected a statement
+  |

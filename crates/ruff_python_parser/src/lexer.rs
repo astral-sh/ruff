@@ -1384,11 +1384,20 @@ impl<'src> Lexer<'src> {
                 current_position -= ch.text_len();
             } else if matches!(ch, '\n' | '\r') {
                 current_position -= ch.text_len();
-                if let Some(continuation_char) = reverse_chars.next_if_eq(&'\\') {
-                    current_position -= continuation_char.text_len();
-                    continue;
+                if let Some(first_slash) = reverse_chars.next_if_eq(&'\\') {
+                    if let Some(second_slash) = reverse_chars.next_if_eq(&'\\') {
+                        // Line continuation character has been escaped: `\\\n`
+                        newline_position = Some(current_position);
+                        // Set the newline position before updating the current position.
+                        current_position -= first_slash.text_len() - second_slash.text_len();
+                    } else {
+                        // Newline has been escaped: `\\n`
+                        current_position -= first_slash.text_len();
+                    }
+                } else {
+                    // No escapes: `\n`
+                    newline_position = Some(current_position);
                 }
-                newline_position = Some(current_position);
             } else {
                 break;
             }
