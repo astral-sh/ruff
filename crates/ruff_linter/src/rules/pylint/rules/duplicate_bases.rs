@@ -1,7 +1,5 @@
-use std::hash::BuildHasherDefault;
-
 use ruff_python_ast::{self as ast, Arguments, Expr};
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxBuildHasher, FxHashSet};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -57,8 +55,7 @@ pub(crate) fn duplicate_bases(checker: &mut Checker, name: &str, arguments: Opti
         return;
     };
 
-    let mut seen: FxHashSet<&str> =
-        FxHashSet::with_capacity_and_hasher(bases.len(), BuildHasherDefault::default());
+    let mut seen: FxHashSet<&str> = FxHashSet::with_capacity_and_hasher(bases.len(), FxBuildHasher);
     for base in bases.iter() {
         if let Expr::Name(ast::ExprName { id, .. }) = base {
             if !seen.insert(id) {

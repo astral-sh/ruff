@@ -1,6 +1,4 @@
-use std::hash::BuildHasherDefault;
-
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxBuildHasher, FxHashMap};
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -664,7 +662,7 @@ fn check_duplicates(checker: &mut Checker, values: &Expr) {
     };
 
     let mut seen: FxHashMap<ComparableExpr, usize> =
-        FxHashMap::with_capacity_and_hasher(elts.len(), BuildHasherDefault::default());
+        FxHashMap::with_capacity_and_hasher(elts.len(), FxBuildHasher);
     let mut prev = None;
     for (index, element) in elts.iter().enumerate() {
         let expr = ComparableExpr::from(element);

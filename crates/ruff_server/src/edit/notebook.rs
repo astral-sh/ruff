@@ -1,8 +1,6 @@
-use std::{collections::HashMap, hash::BuildHasherDefault};
-
 use anyhow::Ok;
-use lsp_types::{NotebookCellKind, Url};
-use rustc_hash::FxHashMap;
+use lsp_types::NotebookCellKind;
+use rustc_hash::{FxBuildHasher, FxHashMap};
 
 use crate::{PositionEncoding, TextDocument};
 
@@ -24,7 +22,7 @@ pub struct NotebookDocument {
 /// A single cell within a notebook, which has text contents represented as a `TextDocument`.
 #[derive(Clone, Debug)]
 struct NotebookCell {
-    url: Url,
+    url: lsp_types::Url,
     kind: NotebookCellKind,
     document: TextDocument,
 }
@@ -178,8 +176,7 @@ impl NotebookDocument {
     }
 
     fn make_cell_index(cells: &[NotebookCell]) -> FxHashMap<lsp_types::Url, CellId> {
-        let mut index =
-            HashMap::with_capacity_and_hasher(cells.len(), BuildHasherDefault::default());
+        let mut index = FxHashMap::with_capacity_and_hasher(cells.len(), FxBuildHasher);
         for (i, cell) in cells.iter().enumerate() {
             index.insert(cell.url.clone(), i);
         }

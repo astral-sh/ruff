@@ -1,7 +1,6 @@
 use std::fmt::Display;
-use std::hash::BuildHasherDefault;
 
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxBuildHasher, FxHashSet};
 
 use ruff_python_ast::{
     self as ast, ExceptHandler, Expr, ExprContext, IpyEscapeKind, Operator, Stmt, WithItem,
@@ -3264,7 +3263,7 @@ impl<'src> Parser<'src> {
     /// Report errors for all the duplicate names found.
     fn validate_parameters(&mut self, parameters: &ast::Parameters) {
         let mut all_arg_names =
-            FxHashSet::with_capacity_and_hasher(parameters.len(), BuildHasherDefault::default());
+            FxHashSet::with_capacity_and_hasher(parameters.len(), FxBuildHasher);
 
         for parameter in parameters {
             let range = parameter.name().range();
