@@ -3,7 +3,6 @@
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
-use etcetera::BaseStrategy;
 use log::debug;
 use pep440_rs::VersionSpecifiers;
 use serde::{Deserialize, Serialize};
@@ -100,7 +99,10 @@ pub fn find_settings_toml<P: AsRef<Path>>(path: P) -> Result<Option<PathBuf>> {
 
 /// Find the path to the user-specific `pyproject.toml` or `ruff.toml`, if it
 /// exists.
+#[cfg(not(target_arch = "wasm32"))]
 pub fn find_user_settings_toml() -> Option<PathBuf> {
+    use etcetera::BaseStrategy;
+
     let strategy = etcetera::base_strategy::choose_base_strategy().ok()?;
     let config_dir = strategy.config_dir().join("ruff");
 
@@ -129,6 +131,11 @@ pub fn find_user_settings_toml() -> Option<PathBuf> {
         }
     }
 
+    None
+}
+
+#[cfg(target_arch = "wasm32")]
+pub fn find_user_settings_toml() -> Option<PathBuf> {
     None
 }
 
