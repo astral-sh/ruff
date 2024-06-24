@@ -265,7 +265,7 @@ pub(crate) fn lint_path(
     let (
         LinterResult {
             messages,
-            has_error,
+            has_syntax_error: has_error,
         },
         transformed,
         fixed,

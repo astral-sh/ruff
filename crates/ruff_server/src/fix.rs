@@ -68,7 +68,10 @@ pub(crate) fn fix_all(
     // which is inconsistent with how `ruff check --fix` works.
     let FixerResult {
         transformed,
-        result: LinterResult { has_error, .. },
+        result: LinterResult {
+            has_syntax_error: has_error,
+            ..
+        },
         ..
     } = ruff_linter::linter::lint_fix(
         &query.virtual_file_path(),

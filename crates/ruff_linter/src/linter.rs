@@ -40,7 +40,7 @@ pub struct LinterResult {
     pub messages: Vec<Message>,
     /// A flag indicating the presence of syntax errors in the source file.
     /// If `true`, at least one syntax error was detected in the source file.
-    pub has_error: bool,
+    pub has_syntax_error: bool,
 }
 
 pub type FixTable = FxHashMap<Rule, usize>;
@@ -421,7 +421,7 @@ pub fn lint_only(
             &locator,
             &directives,
         ),
-        has_error: !parsed.is_valid(),
+        has_syntax_error: !parsed.is_valid(),
     }
 }
 
@@ -474,8 +474,8 @@ pub fn lint_fix<'a>(
     // As an escape hatch, bail after 100 iterations.
     let mut iterations = 0;
 
-    // Track whether the _initial_ source code was parseable.
-    let mut parseable = false;
+    // Track whether the _initial_ source code is valid syntax.
+    let mut is_valid_syntax = false;
 
     // Continuously fix until the source code stabilizes.
     loop {
@@ -516,13 +516,13 @@ pub fn lint_fix<'a>(
         );
 
         if iterations == 0 {
-            parseable = parsed.is_valid();
+            is_valid_syntax = parsed.is_valid();
         } else {
             // If the source code was parseable on the first pass, but is no
             // longer parseable on a subsequent pass, then we've introduced a
             // syntax error. Return the original code.
-            if parseable {
-                if let [error, ..] = parsed.errors() {
+            if is_valid_syntax {
+                if let Some(error) = parsed.errors().first() {
                     report_fix_syntax_error(
                         path,
                         transformed.source_code(),
@@ -568,7 +568,7 @@ pub fn lint_fix<'a>(
                     &locator,
                     &directives,
                 ),
-                has_error: !parseable,
+                has_syntax_error: !is_valid_syntax,
             },
             transformed,
             fixed,
