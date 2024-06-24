@@ -190,7 +190,6 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "C0208") => (RuleGroup::Stable, rules::pylint::rules::IterationOverSet),
         (Pylint, "C0414") => (RuleGroup::Stable, rules::pylint::rules::UselessImportAlias),
         (Pylint, "C0415") => (RuleGroup::Preview, rules::pylint::rules::ImportOutsideTopLevel),
-        #[allow(deprecated)]
         (Pylint, "C1901") => (RuleGroup::Preview, rules::pylint::rules::CompareToEmptyString),
         (Pylint, "C2401") => (RuleGroup::Preview, rules::pylint::rules::NonAsciiName),
         (Pylint, "C2403") => (RuleGroup::Preview, rules::pylint::rules::NonAsciiImportName),
@@ -1016,7 +1015,6 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Refurb, "103") => (RuleGroup::Preview, rules::refurb::rules::WriteWholeFile),
         (Refurb, "105") => (RuleGroup::Preview, rules::refurb::rules::PrintEmptyString),
         (Refurb, "110") => (RuleGroup::Preview, rules::refurb::rules::IfExpInsteadOfOrOperator),
-        #[allow(deprecated)]
         (Refurb, "113") => (RuleGroup::Preview, rules::refurb::rules::RepeatedAppend),
         (Refurb, "116") => (RuleGroup::Preview, rules::refurb::rules::FStringNumberFormat),
         (Refurb, "118") => (RuleGroup::Preview, rules::refurb::rules::ReimplementedOperator),

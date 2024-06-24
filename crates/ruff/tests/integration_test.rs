@@ -861,57 +861,6 @@ fn show_statistics() {
 }
 
 #[test]
-fn nursery_prefix() {
-    // Should only detect RUF90X, but not the unstable test rules
-    let mut cmd = RuffCheck::default()
-        .args(["--select", "RUF9", "--output-format=concise"])
-        .build();
-    assert_cmd_snapshot!(cmd, @r###"
-    success: false
-    exit_code: 1
-    ----- stdout -----
-    -:1:1: RUF900 Hey this is a stable test rule.
-    -:1:1: RUF901 [*] Hey this is a stable test rule with a safe fix.
-    -:1:1: RUF902 Hey this is a stable test rule with an unsafe fix.
-    -:1:1: RUF903 Hey this is a stable test rule with a display only fix.
-    -:1:1: RUF920 Hey this is a deprecated test rule.
-    -:1:1: RUF921 Hey this is another deprecated test rule.
-    -:1:1: RUF950 Hey this is a test rule that was redirected from another.
-    Found 7 errors.
-    [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
-
-    ----- stderr -----
-    "###);
-}
-
-#[test]
-fn nursery_all() {
-    // Should detect RUF90X, but not the unstable test rules
-    let mut cmd = RuffCheck::default()
-        .args(["--select", "ALL", "--output-format=concise"])
-        .build();
-    assert_cmd_snapshot!(cmd, @r###"
-    success: false
-    exit_code: 1
-    ----- stdout -----
-    -:1:1: D100 Missing docstring in public module
-    -:1:1: RUF900 Hey this is a stable test rule.
-    -:1:1: RUF901 [*] Hey this is a stable test rule with a safe fix.
-    -:1:1: RUF902 Hey this is a stable test rule with an unsafe fix.
-    -:1:1: RUF903 Hey this is a stable test rule with a display only fix.
-    -:1:1: RUF920 Hey this is a deprecated test rule.
-    -:1:1: RUF921 Hey this is another deprecated test rule.
-    -:1:1: RUF950 Hey this is a test rule that was redirected from another.
-    Found 8 errors.
-    [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
-
-    ----- stderr -----
-    warning: `one-blank-line-before-class` (D203) and `no-blank-line-before-class` (D211) are incompatible. Ignoring `one-blank-line-before-class`.
-    warning: `multi-line-summary-first-line` (D212) and `multi-line-summary-second-line` (D213) are incompatible. Ignoring `multi-line-summary-second-line`.
-    "###);
-}
-
-#[test]
 fn preview_enabled_prefix() {
     // All the RUF9XX test rules should be triggered
     let mut cmd = RuffCheck::default()
