@@ -165,9 +165,9 @@ pub(crate) fn generate() -> String {
             table_out.push('\n');
         }
 
-        if Options::metadata().has(linter.name()) {
+        if Options::metadata().has(&format!("lint.{}", linter.name())) {
             table_out.push_str(&format!(
-                "For related settings, see [{}](settings.md#{}).",
+                "For related settings, see [{}](settings.md#lint{}).",
                 linter.name(),
                 linter.name(),
             ));
