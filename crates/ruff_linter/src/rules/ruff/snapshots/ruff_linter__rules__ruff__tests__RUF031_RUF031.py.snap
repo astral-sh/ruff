@@ -1,0 +1,792 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF031.py:4:17: RUF031 Consider adding context to the exception message by formatting message with variables, or create a custom exception class
+  |
+2 | # Expects:
+3 | # - violation
+4 | raise Exception("This is not a helpful error message.")
+  |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF031
+5 | 
+6 | # Concatenated string literals
+  |
+  = help: Add context to the exception message
+
+RUF031.py:9:17: RUF031 Consider adding context to the exception message by formatting message with variables, or create a custom exception class
+   |
+ 7 | # Expects:
+ 8 | # - violation
+ 9 | raise Exception("This is not " "a helpful " "error message.")
+   |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF031
+10 | 
+11 | # Unpopulated string template
+   |
+   = help: Add context to the exception message
+
+RUF031.py:14:17: RUF031 Consider adding context to the exception message by formatting message with variables, or create a custom exception class
+   |
+12 | # Expects:
+13 | # - violation
+14 | raise Exception("This is not a helpful error message: {reason}")
+   |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF031
+15 | 
+16 | # Numerical literals
+   |
+   = help: Add context to the exception message
+
+RUF031.py:19:17: RUF031 Consider adding context to the exception message by formatting message with variables, or create a custom exception class
+   |
+17 | # Expects:
+18 | # - violation
+19 | raise Exception(42)
+   |                 ^^ RUF031
+20 | 
+21 | # Boolean literals
+   |
+   = help: Add context to the exception message
+
+RUF031.py:24:17: RUF031 Consider adding context to the exception message by formatting message with variables, or create a custom exception class
+   |
+22 | # Expects:
+23 | # - violation
+24 | raise Exception(True)
+   |                 ^^^^ RUF031
+25 | 
+26 | # None literal
+   |
+   = help: Add context to the exception message
+
+RUF031.py:29:17: RUF031 Consider adding context to the exception message by formatting message with variables, or create a custom exception class
+   |
+27 | # Expects:
+28 | # - violation
+29 | raise Exception(None)
+   |                 ^^^^ RUF031
+30 | 
+31 | # Single string literal assigned to a variable
+   |
+   = help: Add context to the exception message
+
+RUF031.py:35:17: RUF031 Consider adding context to the exception message by formatting message with variables, or create a custom exception class
+   |
+33 | # - violation
+34 | my_message = "This is a static error message."
+35 | raise Exception(my_message)
+   |                 ^^^^^^^^^^ RUF031
+36 | 
+37 | # Single string literal assigned with type to a variable
+   |
+   = help: Add context to the exception message
+
+RUF031.py:41:17: RUF031 Consider adding context to the exception message by formatting message with variables, or create a custom exception class
+   |
+39 | # - violation
+40 | my_message: str = "This is a static error message."
+41 | raise Exception(my_message)
+   |                 ^^^^^^^^^^ RUF031
+42 | 
+43 | # Single string literal re-assigned to a variable
+   |
+   = help: Add context to the exception message
+
+RUF031.py:49:17: RUF031 Consider adding context to the exception message by formatting message with variables, or create a custom exception class
+   |
+47 | my_message_3: str = my_message_2
+48 | my_message_4 = my_message_3
+49 | raise Exception(my_message_4)
+   |                 ^^^^^^^^^^^^ RUF031
+50 | 
+51 | # Concatenated string literals assigned to a variable
+   |
+   = help: Add context to the exception message
+
+RUF031.py:55:17: RUF031 Consider adding context to the exception message by formatting message with variables, or create a custom exception class
+   |
+53 | # - violation
+54 | my_message_5 = "This is not " "a helpful " "error message."
+55 | raise Exception(my_message_5)
+   |                 ^^^^^^^^^^^^ RUF031
+56 | 
+57 | # Concatenated string literals re-assigned to a variable with type
+   |
+   = help: Add context to the exception message
+
+RUF031.py:61:17: RUF031 Consider adding context to the exception message by formatting message with variables, or create a custom exception class
+   |
+59 | # - violation
+60 | my_message_6: str = my_message_5
+61 | raise Exception(my_message_6)
+   |                 ^^^^^^^^^^^^ RUF031
+62 | 
+63 | # Single f-string literal assigned to a variable
+   |
+   = help: Add context to the exception message
+
+RUF031.py:67:17: RUF031 Consider adding context to the exception message by formatting message with variables, or create a custom exception class
+   |
+65 | # - violation
+66 | my_message_7 = f"This is not a helpful error message."
+67 | raise Exception(my_message_7)
+   |                 ^^^^^^^^^^^^ RUF031
+68 | 
+69 | # Single f-string literal assigned to a variable with type
+   |
+   = help: Add context to the exception message
+
+RUF031.py:73:17: RUF031 Consider adding context to the exception message by formatting message with variables, or create a custom exception class
+   |
+71 | # - violation
+72 | my_message_8: str = f"This is not a helpful error message."
+73 | raise Exception(my_message_8)
+   |                 ^^^^^^^^^^^^ RUF031
+74 | 
+75 | # Single string literal formatted with string literals
+   |
+   = help: Add context to the exception message
+
+RUF031.py:78:17: RUF031 Consider adding context to the exception message by formatting message with variables, or create a custom exception class
+   |
+76 | # Expects:
+77 | # - violation
+78 | raise Exception("This is your error: {reason}".format(reason="reasons"))
+   |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF031
+79 | 
+80 | # Single string literal formatted with f-string literals
+   |
+   = help: Add context to the exception message
+
+RUF031.py:83:17: RUF031 Consider adding context to the exception message by formatting message with variables, or create a custom exception class
+   |
+81 | # Expects:
+82 | # - violation
+83 | raise Exception("This is your error: {reason}".format(reason=f"reasons"))
+   |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF031
+84 | 
+85 | # Assignment of Exception
+   |
+   = help: Add context to the exception message
+
+RUF031.py:88:17: RUF031 Consider adding context to the exception message by formatting message with variables, or create a custom exception class
+   |
+86 | # Expects:
+87 | # - violation
+88 | exc = Exception("This is not a helpful error message.")
+   |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF031
+89 | 
+90 | # Instantiation of Exception and dropping it
+   |
+   = help: Add context to the exception message
+
+RUF031.py:93:11: RUF031 Consider adding context to the exception message by formatting message with variables, or create a custom exception class
+   |
+91 | # Expects:
+92 | # - violation
+93 | Exception("This is not a helpful error message.")
+   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF031
+94 | 
+95 | # FString with no variables
+   |
+   = help: Add context to the exception message
+
+RUF031.py:98:17: RUF031 Consider adding context to the exception message by formatting message with variables, or create a custom exception class
+    |
+ 96 | # Expects:
+ 97 | # - violation
+ 98 | raise Exception(f"This is not a helpful error message.")
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF031
+ 99 | 
+100 | # FString concatenated literals
+    |
+    = help: Add context to the exception message
+
+RUF031.py:103:17: RUF031 Consider adding context to the exception message by formatting message with variables, or create a custom exception class
+    |
+101 | # Expects:
+102 | # - violation
+103 | raise Exception(f"This is not " "a helpful " f"error message.")
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF031
+104 | 
+105 | # FString with literal placeholders
+    |
+    = help: Add context to the exception message
+
+RUF031.py:108:17: RUF031 Consider adding context to the exception message by formatting message with variables, or create a custom exception class
+    |
+106 | # Expects:
+107 | # - violation
+108 | raise Exception(f"This is {'not':-^11} a helpful error message {10:04} out of {10:.2f} times.")
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF031
+    |
+    = help: Add context to the exception message
+
+RUF031.py:114:23: RUF031 Consider adding context to the exception message by formatting message with variables, or create a custom exception class
+    |
+112 | # Expects:
+113 | # - violation
+114 | raise ArithmeticError("This is not a helpful error message.")
+    |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF031
+115 | 
+116 | # AssertionError with single string literal
+    |
+    = help: Add context to the exception message
+
+RUF031.py:119:22: RUF031 Consider adding context to the exception message by formatting message with variables, or create a custom exception class
+    |
+117 | # Expects:
+118 | # - violation
+119 | raise AssertionError("This is not a helpful error message.")
+    |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF031
+120 | 
+121 | # AttributeError with single string literal
+    |
+    = help: Add context to the exception message
+
+RUF031.py:124:22: RUF031 Consider adding context to the exception message by formatting message with variables, or create a custom exception class
+    |
+122 | # Expects:
+123 | # - violation
+124 | raise AttributeError("This is not a helpful error message.")
+    |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF031
+125 | 
+126 | # BaseException with single string literal
+    |
+    = help: Add context to the exception message
+
+RUF031.py:129:21: RUF031 Consider adding context to the exception message by formatting message with variables, or create a custom exception class
+    |
+127 | # Expects:
+128 | # - violation
+129 | raise BaseException("This is not a helpful error message.")
+    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF031
+130 | 
+131 | # BlockingIOError with single string literal
+    |
+    = help: Add context to the exception message
+
+RUF031.py:134:23: RUF031 Consider adding context to the exception message by formatting message with variables, or create a custom exception class
+    |
+132 | # Expects:
+133 | # - violation
+134 | raise BlockingIOError("This is not a helpful error message.")
+    |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF031
+135 | 
+136 | # BrokenPipeError with single string literal
+    |
+    = help: Add context to the exception message
+
+RUF031.py:139:23: RUF031 Consider adding context to the exception message by formatting message with variables, or create a custom exception class
+    |
+137 | # Expects:
+138 | # - violation
+139 | raise BrokenPipeError("This is not a helpful error message.")
+    |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF031
+140 | 
+141 | # BufferError with single string literal
+    |
+    = help: Add context to the exception message
+
+RUF031.py:144:19: RUF031 Consider adding context to the exception message by formatting message with variables, or create a custom exception class
+    |
+142 | # Expects:
+143 | # - violation
+144 | raise BufferError("This is not a helpful error message.")
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF031
+145 | 
+146 | # ChildProcessError with single string literal
+    |
+    = help: Add context to the exception message
+
+RUF031.py:149:25: RUF031 Consider adding context to the exception message by formatting message with variables, or create a custom exception class
+    |
+147 | # Expects:
+148 | # - violation
+149 | raise ChildProcessError("This is not a helpful error message.")
+    |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF031
+150 | 
+151 | # ConnectionAbortedError with single string literal
+    |
+    = help: Add context to the exception message
+
+RUF031.py:154:30: RUF031 Consider adding context to the exception message by formatting message with variables, or create a custom exception class
+    |
+152 | # Expects:
+153 | # - violation
+154 | raise ConnectionAbortedError("This is not a helpful error message.")
+    |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF031
+155 | 
+156 | # ConnectionError with single string literal
+    |
+    = help: Add context to the exception message
+
+RUF031.py:159:23: RUF031 Consider adding context to the exception message by formatting message with variables, or create a custom exception class
+    |
+157 | # Expects:
+158 | # - violation
+159 | raise ConnectionError("This is not a helpful error message.")
+    |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF031
+160 | 
+161 | # ConnectionRefusedError with single string literal
+    |
+    = help: Add context to the exception message
+
+RUF031.py:164:30: RUF031 Consider adding context to the exception message by formatting message with variables, or create a custom exception class
+    |
+162 | # Expects:
+163 | # - violation
+164 | raise ConnectionRefusedError("This is not a helpful error message.")
+    |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF031
+165 | 
+166 | # ConnectionResetError with single string literal
+    |
+    = help: Add context to the exception message
+
+RUF031.py:169:28: RUF031 Consider adding context to the exception message by formatting message with variables, or create a custom exception class
+    |
+167 | # Expects:
+168 | # - violation
+169 | raise ConnectionResetError("This is not a helpful error message.")
+    |                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF031
+170 | 
+171 | # EOFError with single string literal
+    |
+    = help: Add context to the exception message
+
+RUF031.py:174:16: RUF031 Consider adding context to the exception message by formatting message with variables, or create a custom exception class
+    |
+172 | # Expects:
+173 | # - violation
+174 | raise EOFError("This is not a helpful error message.")
+    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF031
+175 | 
+176 | # EnvironmentError with single string literal
+    |
+    = help: Add context to the exception message
+
+RUF031.py:179:24: RUF031 Consider adding context to the exception message by formatting message with variables, or create a custom exception class
+    |
+177 | # Expects:
+178 | # - violation
+179 | raise EnvironmentError("This is not a helpful error message.")
+    |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF031
+180 | 
+181 | # Exception with single string literal
+    |
+    = help: Add context to the exception message
+
+RUF031.py:184:17: RUF031 Consider adding context to the exception message by formatting message with variables, or create a custom exception class
+    |
+182 | # Expects:
+183 | # - violation
+184 | raise Exception("This is not a helpful error message.")
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF031
+185 | 
+186 | # FileExistsError with single string literal
+    |
+    = help: Add context to the exception message
+
+RUF031.py:189:23: RUF031 Consider adding context to the exception message by formatting message with variables, or create a custom exception class
+    |
+187 | # Expects:
+188 | # - violation
+189 | raise FileExistsError("This is not a helpful error message.")
+    |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF031
+190 | 
+191 | # FileNotFoundError with single string literal
+    |
+    = help: Add context to the exception message
+
+RUF031.py:194:25: RUF031 Consider adding context to the exception message by formatting message with variables, or create a custom exception class
+    |
+192 | # Expects:
+193 | # - violation
+194 | raise FileNotFoundError("This is not a helpful error message.")
+    |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF031
+195 | 
+196 | # FloatingPointError with single string literal
+    |
+    = help: Add context to the exception message
+
+RUF031.py:199:26: RUF031 Consider adding context to the exception message by formatting message with variables, or create a custom exception class
+    |
+197 | # Expects:
+198 | # - violation
+199 | raise FloatingPointError("This is not a helpful error message.")
+    |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF031
+200 | 
+201 | # GeneratorExit with single string literal
+    |
+    = help: Add context to the exception message
+
+RUF031.py:204:21: RUF031 Consider adding context to the exception message by formatting message with variables, or create a custom exception class
+    |
+202 | # Expects:
+203 | # - violation
+204 | raise GeneratorExit("This is not a helpful error message.")
+    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF031
+205 | 
+206 | # IOError with single string literal
+    |
+    = help: Add context to the exception message
+
+RUF031.py:209:15: RUF031 Consider adding context to the exception message by formatting message with variables, or create a custom exception class
+    |
+207 | # Expects:
+208 | # - violation
+209 | raise IOError("This is not a helpful error message.")
+    |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF031
+210 | 
+211 | # ImportError with single string literal
+    |
+    = help: Add context to the exception message
+
+RUF031.py:214:19: RUF031 Consider adding context to the exception message by formatting message with variables, or create a custom exception class
+    |
+212 | # Expects:
+213 | # - violation
+214 | raise ImportError("This is not a helpful error message.")
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF031
+215 | 
+216 | # IndentationError with single string literal
+    |
+    = help: Add context to the exception message
+
+RUF031.py:219:24: RUF031 Consider adding context to the exception message by formatting message with variables, or create a custom exception class
+    |
+217 | # Expects:
+218 | # - violation
+219 | raise IndentationError("This is not a helpful error message.")
+    |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF031
+220 | 
+221 | # IndexError with single string literal
+    |
+    = help: Add context to the exception message
+
+RUF031.py:224:18: RUF031 Consider adding context to the exception message by formatting message with variables, or create a custom exception class
+    |
+222 | # Expects:
+223 | # - violation
+224 | raise IndexError("This is not a helpful error message.")
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF031
+225 | 
+226 | # InterruptedError with single string literal
+    |
+    = help: Add context to the exception message
+
+RUF031.py:229:24: RUF031 Consider adding context to the exception message by formatting message with variables, or create a custom exception class
+    |
+227 | # Expects:
+228 | # - violation
+229 | raise InterruptedError("This is not a helpful error message.")
+    |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF031
+230 | 
+231 | # IsADirectoryError with single string literal
+    |
+    = help: Add context to the exception message
+
+RUF031.py:234:25: RUF031 Consider adding context to the exception message by formatting message with variables, or create a custom exception class
+    |
+232 | # Expects:
+233 | # - violation
+234 | raise IsADirectoryError("This is not a helpful error message.")
+    |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF031
+235 | 
+236 | # KeyError with single string literal
+    |
+    = help: Add context to the exception message
+
+RUF031.py:239:16: RUF031 Consider adding context to the exception message by formatting message with variables, or create a custom exception class
+    |
+237 | # Expects:
+238 | # - violation
+239 | raise KeyError("This is not a helpful error message.")
+    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF031
+240 | 
+241 | # KeyboardInterrupt with single string literal
+    |
+    = help: Add context to the exception message
+
+RUF031.py:244:25: RUF031 Consider adding context to the exception message by formatting message with variables, or create a custom exception class
+    |
+242 | # Expects:
+243 | # - violation
+244 | raise KeyboardInterrupt("This is not a helpful error message.")
+    |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF031
+245 | 
+246 | # LookupError with single string literal
+    |
+    = help: Add context to the exception message
+
+RUF031.py:249:19: RUF031 Consider adding context to the exception message by formatting message with variables, or create a custom exception class
+    |
+247 | # Expects:
+248 | # - violation
+249 | raise LookupError("This is not a helpful error message.")
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF031
+250 | 
+251 | # MemoryError with single string literal
+    |
+    = help: Add context to the exception message
+
+RUF031.py:254:19: RUF031 Consider adding context to the exception message by formatting message with variables, or create a custom exception class
+    |
+252 | # Expects:
+253 | # - violation
+254 | raise MemoryError("This is not a helpful error message.")
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF031
+255 | 
+256 | # ModuleNotFoundError with single string literal
+    |
+    = help: Add context to the exception message
+
+RUF031.py:259:27: RUF031 Consider adding context to the exception message by formatting message with variables, or create a custom exception class
+    |
+257 | # Expects:
+258 | # - violation
+259 | raise ModuleNotFoundError("This is not a helpful error message.")
+    |                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF031
+260 | 
+261 | # NameError with single string literal
+    |
+    = help: Add context to the exception message
+
+RUF031.py:264:17: RUF031 Consider adding context to the exception message by formatting message with variables, or create a custom exception class
+    |
+262 | # Expects:
+263 | # - violation
+264 | raise NameError("This is not a helpful error message.")
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF031
+265 | 
+266 | # NotADirectoryError with single string literal
+    |
+    = help: Add context to the exception message
+
+RUF031.py:269:26: RUF031 Consider adding context to the exception message by formatting message with variables, or create a custom exception class
+    |
+267 | # Expects:
+268 | # - violation
+269 | raise NotADirectoryError("This is not a helpful error message.")
+    |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF031
+270 | 
+271 | # OSError with single string literal
+    |
+    = help: Add context to the exception message
+
+RUF031.py:274:15: RUF031 Consider adding context to the exception message by formatting message with variables, or create a custom exception class
+    |
+272 | # Expects:
+273 | # - violation
+274 | raise OSError("This is not a helpful error message.")
+    |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF031
+275 | 
+276 | # OverflowError with single string literal
+    |
+    = help: Add context to the exception message
+
+RUF031.py:279:21: RUF031 Consider adding context to the exception message by formatting message with variables, or create a custom exception class
+    |
+277 | # Expects:
+278 | # - violation
+279 | raise OverflowError("This is not a helpful error message.")
+    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF031
+280 | 
+281 | # PermissionError with single string literal
+    |
+    = help: Add context to the exception message
+
+RUF031.py:284:23: RUF031 Consider adding context to the exception message by formatting message with variables, or create a custom exception class
+    |
+282 | # Expects:
+283 | # - violation
+284 | raise PermissionError("This is not a helpful error message.")
+    |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF031
+285 | 
+286 | # ProcessLookupError with single string literal
+    |
+    = help: Add context to the exception message
+
+RUF031.py:289:26: RUF031 Consider adding context to the exception message by formatting message with variables, or create a custom exception class
+    |
+287 | # Expects:
+288 | # - violation
+289 | raise ProcessLookupError("This is not a helpful error message.")
+    |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF031
+290 | 
+291 | # RecursionError with single string literal
+    |
+    = help: Add context to the exception message
+
+RUF031.py:294:22: RUF031 Consider adding context to the exception message by formatting message with variables, or create a custom exception class
+    |
+292 | # Expects:
+293 | # - violation
+294 | raise RecursionError("This is not a helpful error message.")
+    |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF031
+295 | 
+296 | # ReferenceError with single string literal
+    |
+    = help: Add context to the exception message
+
+RUF031.py:299:22: RUF031 Consider adding context to the exception message by formatting message with variables, or create a custom exception class
+    |
+297 | # Expects:
+298 | # - violation
+299 | raise ReferenceError("This is not a helpful error message.")
+    |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF031
+300 | 
+301 | # RuntimeError with single string literal
+    |
+    = help: Add context to the exception message
+
+RUF031.py:304:20: RUF031 Consider adding context to the exception message by formatting message with variables, or create a custom exception class
+    |
+302 | # Expects:
+303 | # - violation
+304 | raise RuntimeError("This is not a helpful error message.")
+    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF031
+305 | 
+306 | # StopAsyncIteration with single string literal
+    |
+    = help: Add context to the exception message
+
+RUF031.py:309:26: RUF031 Consider adding context to the exception message by formatting message with variables, or create a custom exception class
+    |
+307 | # Expects:
+308 | # - violation
+309 | raise StopAsyncIteration("This is not a helpful error message.")
+    |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF031
+310 | 
+311 | # StopIteration with single string literal
+    |
+    = help: Add context to the exception message
+
+RUF031.py:314:21: RUF031 Consider adding context to the exception message by formatting message with variables, or create a custom exception class
+    |
+312 | # Expects:
+313 | # - violation
+314 | raise StopIteration("This is not a helpful error message.")
+    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF031
+315 | 
+316 | # SyntaxError with single string literal
+    |
+    = help: Add context to the exception message
+
+RUF031.py:319:19: RUF031 Consider adding context to the exception message by formatting message with variables, or create a custom exception class
+    |
+317 | # Expects:
+318 | # - violation
+319 | raise SyntaxError("This is not a helpful error message.")
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF031
+320 | 
+321 | # SystemError with single string literal
+    |
+    = help: Add context to the exception message
+
+RUF031.py:324:19: RUF031 Consider adding context to the exception message by formatting message with variables, or create a custom exception class
+    |
+322 | # Expects:
+323 | # - violation
+324 | raise SystemError("This is not a helpful error message.")
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF031
+325 | 
+326 | # SystemExit with single string literal
+    |
+    = help: Add context to the exception message
+
+RUF031.py:329:18: RUF031 Consider adding context to the exception message by formatting message with variables, or create a custom exception class
+    |
+327 | # Expects:
+328 | # - violation
+329 | raise SystemExit("This is not a helpful error message.")
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF031
+330 | 
+331 | # TabError with single string literal
+    |
+    = help: Add context to the exception message
+
+RUF031.py:334:16: RUF031 Consider adding context to the exception message by formatting message with variables, or create a custom exception class
+    |
+332 | # Expects:
+333 | # - violation
+334 | raise TabError("This is not a helpful error message.")
+    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF031
+335 | 
+336 | # TimeoutError with single string literal
+    |
+    = help: Add context to the exception message
+
+RUF031.py:339:20: RUF031 Consider adding context to the exception message by formatting message with variables, or create a custom exception class
+    |
+337 | # Expects:
+338 | # - violation
+339 | raise TimeoutError("This is not a helpful error message.")
+    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF031
+340 | 
+341 | # TypeError with single string literal
+    |
+    = help: Add context to the exception message
+
+RUF031.py:344:17: RUF031 Consider adding context to the exception message by formatting message with variables, or create a custom exception class
+    |
+342 | # Expects:
+343 | # - violation
+344 | raise TypeError("This is not a helpful error message.")
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF031
+345 | 
+346 | # UnboundLocalError with single string literal
+    |
+    = help: Add context to the exception message
+
+RUF031.py:349:25: RUF031 Consider adding context to the exception message by formatting message with variables, or create a custom exception class
+    |
+347 | # Expects:
+348 | # - violation
+349 | raise UnboundLocalError("This is not a helpful error message.")
+    |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF031
+350 | 
+351 | # UnicodeError with single string literal
+    |
+    = help: Add context to the exception message
+
+RUF031.py:354:20: RUF031 Consider adding context to the exception message by formatting message with variables, or create a custom exception class
+    |
+352 | # Expects:
+353 | # - violation
+354 | raise UnicodeError("This is not a helpful error message.")
+    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF031
+355 | 
+356 | # ValueError with single string literal
+    |
+    = help: Add context to the exception message
+
+RUF031.py:359:18: RUF031 Consider adding context to the exception message by formatting message with variables, or create a custom exception class
+    |
+357 | # Expects:
+358 | # - violation
+359 | raise ValueError("This is not a helpful error message.")
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF031
+360 | 
+361 | # WindowsError with single string literal
+    |
+    = help: Add context to the exception message
+
+RUF031.py:364:20: RUF031 Consider adding context to the exception message by formatting message with variables, or create a custom exception class
+    |
+362 | # Expects:
+363 | # - violation
+364 | raise WindowsError("This is not a helpful error message.")
+    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF031
+365 | 
+366 | # ZeroDivisionError with single string literal
+    |
+    = help: Add context to the exception message
+
+RUF031.py:369:25: RUF031 Consider adding context to the exception message by formatting message with variables, or create a custom exception class
+    |
+367 | # Expects:
+368 | # - violation
+369 | raise ZeroDivisionError("This is not a helpful error message.")
+    |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF031
+370 | 
+371 | # ======================================================================================
+    |
+    = help: Add context to the exception message
