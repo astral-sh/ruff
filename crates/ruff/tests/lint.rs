@@ -19,49 +19,6 @@ fn tempdir_filter(tempdir: &TempDir) -> String {
 }
 
 #[test]
-fn top_level_options() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let ruff_toml = tempdir.path().join("ruff.toml");
-    fs::write(
-        &ruff_toml,
-        r#"
-extend-select = ["B", "Q"]
-
-[flake8-quotes]
-inline-quotes = "single"
-"#,
-    )?;
-
-    insta::with_settings!({
-        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
-    }, {
-        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-            .args(STDIN_BASE_OPTIONS)
-            .arg("--config")
-            .arg(&ruff_toml)
-            .args(["--stdin-filename", "test.py"])
-            .arg("-")
-            .pass_stdin(r#"a = "abcba".strip("aba")"#), @r###"
-        success: false
-        exit_code: 1
-        ----- stdout -----
-        test.py:1:5: Q000 [*] Double quotes found but single quotes preferred
-        test.py:1:5: B005 Using `.strip()` with multi-character strings is misleading
-        test.py:1:19: Q000 [*] Double quotes found but single quotes preferred
-        Found 3 errors.
-        [*] 2 fixable with the `--fix` option.
-
-        ----- stderr -----
-        warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in `[TMP]/ruff.toml`:
-          - 'extend-select' -> 'lint.extend-select'
-          - 'flake8-quotes' -> 'lint.flake8-quotes'
-        "###);
-    });
-
-    Ok(())
-}
-
-#[test]
 fn lint_options() -> Result<()> {
     let tempdir = TempDir::new()?;
     let ruff_toml = tempdir.path().join("ruff.toml");
@@ -101,94 +58,6 @@ inline-quotes = "single"
     Ok(())
 }
 
-/// Tests that configurations from the top-level and `lint` section are merged together.
-#[test]
-fn mixed_levels() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let ruff_toml = tempdir.path().join("ruff.toml");
-    fs::write(
-        &ruff_toml,
-        r#"
-extend-select = ["B", "Q"]
-
-[lint.flake8-quotes]
-inline-quotes = "single"
-"#,
-    )?;
-
-    insta::with_settings!({
-        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
-    }, {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(STDIN_BASE_OPTIONS)
-        .arg("--config")
-        .arg(&ruff_toml)
-        .arg("-")
-        .pass_stdin(r#"a = "abcba".strip("aba")"#), @r###"
-    success: false
-    exit_code: 1
-    ----- stdout -----
-    -:1:5: Q000 [*] Double quotes found but single quotes preferred
-    -:1:5: B005 Using `.strip()` with multi-character strings is misleading
-    -:1:19: Q000 [*] Double quotes found but single quotes preferred
-    Found 3 errors.
-    [*] 2 fixable with the `--fix` option.
-
-    ----- stderr -----
-    warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in `[TMP]/ruff.toml`:
-      - 'extend-select' -> 'lint.extend-select'
-    "###);
-    });
-
-    Ok(())
-}
-
-/// Tests that options in the `lint` section have higher precedence than top-level options (because they are more specific).
-#[test]
-fn precedence() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let ruff_toml = tempdir.path().join("ruff.toml");
-    fs::write(
-        &ruff_toml,
-        r#"
-[lint]
-extend-select = ["B", "Q"]
-
-[flake8-quotes]
-inline-quotes = "double"
-
-[lint.flake8-quotes]
-inline-quotes = "single"
-"#,
-    )?;
-
-    insta::with_settings!({
-        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
-    }, {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(STDIN_BASE_OPTIONS)
-        .arg("--config")
-        .arg(&ruff_toml)
-        .arg("-")
-        .pass_stdin(r#"a = "abcba".strip("aba")"#), @r###"
-    success: false
-    exit_code: 1
-    ----- stdout -----
-    -:1:5: Q000 [*] Double quotes found but single quotes preferred
-    -:1:5: B005 Using `.strip()` with multi-character strings is misleading
-    -:1:19: Q000 [*] Double quotes found but single quotes preferred
-    Found 3 errors.
-    [*] 2 fixable with the `--fix` option.
-
-    ----- stderr -----
-    warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in `[TMP]/ruff.toml`:
-      - 'flake8-quotes' -> 'lint.flake8-quotes'
-    "###);
-    });
-
-    Ok(())
-}
-
 #[test]
 fn exclude() -> Result<()> {
     let tempdir = TempDir::new()?;
@@ -196,11 +65,11 @@ fn exclude() -> Result<()> {
     fs::write(
         &ruff_toml,
         r#"
-extend-select = ["B", "Q"]
 extend-exclude = ["out"]
 
 [lint]
 exclude = ["test.py", "generated.py"]
+extend-select = ["B", "Q"]
 
 [lint.flake8-quotes]
 inline-quotes = "single"
@@ -262,8 +131,6 @@ OTHER = "OTHER"
     [*] 3 fixable with the `--fix` option.
 
     ----- stderr -----
-    warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in `ruff.toml`:
-      - 'extend-select' -> 'lint.extend-select'
     "###);
     });
 
@@ -277,9 +144,9 @@ fn exclude_stdin() -> Result<()> {
     fs::write(
         &ruff_toml,
         r#"
-extend-select = ["B", "Q"]
 
 [lint]
+extend-select = ["B", "Q"]
 exclude = ["generated.py"]
 
 [lint.flake8-quotes]
@@ -311,8 +178,6 @@ if __name__ == "__main__":
     [*] 2 fixable with the `--fix` option.
 
     ----- stderr -----
-    warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in `ruff.toml`:
-      - 'extend-select' -> 'lint.extend-select'
     "###);
     });
 
@@ -327,9 +192,11 @@ fn line_too_long_width_override() -> Result<()> {
         &ruff_toml,
         r#"
 line-length = 80
+
+[lint]
 select = ["E501"]
 
-[pycodestyle]
+[lint.pycodestyle]
 max-line-length = 100
 "#,
     )?;
@@ -356,9 +223,6 @@ _ = "---------------------------------------------------------------------------
     Found 1 error.
 
     ----- stderr -----
-    warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in `[TMP]/ruff.toml`:
-      - 'select' -> 'lint.select'
-      - 'pycodestyle' -> 'lint.pycodestyle'
     "###);
     });
 
@@ -372,6 +236,7 @@ fn per_file_ignores_stdin() -> Result<()> {
     fs::write(
         &ruff_toml,
         r#"
+[lint]
 extend-select = ["B", "Q"]
 
 [lint.flake8-quotes]
@@ -405,8 +270,6 @@ if __name__ == "__main__":
     [*] 1 fixable with the `--fix` option.
 
     ----- stderr -----
-    warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in `ruff.toml`:
-      - 'extend-select' -> 'lint.extend-select'
     "###);
     });
 
@@ -420,6 +283,7 @@ fn extend_per_file_ignores_stdin() -> Result<()> {
     fs::write(
         &ruff_toml,
         r#"
+[lint]
 extend-select = ["B", "Q"]
 
 [lint.flake8-quotes]
@@ -453,8 +317,6 @@ if __name__ == "__main__":
     [*] 1 fixable with the `--fix` option.
 
     ----- stderr -----
-    warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in `ruff.toml`:
-      - 'extend-select' -> 'lint.extend-select'
     "###);
     });
 
@@ -698,14 +560,14 @@ x = "longer_than_90_charactersssssssssssssssssssssssssssssssssssssssssssssssssss
 fn valid_toml_but_nonexistent_option_provided_via_config_argument() {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
-        .args([".", "--config", "extend-select=['F481']"]),  // No such code as F481!
+        .args([".", "--config", "lint.extend-select=['F481']"]),  // No such code as F481!
         @r###"
     success: false
     exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    error: invalid value 'extend-select=['F481']' for '--config <CONFIG_OPTION>'
+    error: invalid value 'lint.extend-select=['F481']' for '--config <CONFIG_OPTION>'
 
       tip: A `--config` flag must either be a path to a `.toml` configuration file
            or a TOML `<KEY> = <VALUE>` pair overriding a specific configuration
@@ -714,6 +576,7 @@ fn valid_toml_but_nonexistent_option_provided_via_config_argument() {
     Could not parse the supplied argument as a `ruff.toml` configuration option:
 
     Unknown rule selector: `F481`
+    in `lint.extend-select`
 
     For more information, try '--help'.
     "###);
@@ -839,25 +702,6 @@ fn complex_config_setting_overridden_via_cli() -> Result<()> {
     ----- stderr -----
     "###);
     Ok(())
-}
-
-#[test]
-fn deprecated_config_option_overridden_via_cli() {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(STDIN_BASE_OPTIONS)
-        .args(["--config", "select=['N801']", "-"])
-        .pass_stdin("class lowercase: ..."),
-        @r###"
-    success: false
-    exit_code: 1
-    ----- stdout -----
-    -:1:7: N801 Class name `lowercase` should use CapWords convention
-    Found 1 error.
-
-    ----- stderr -----
-    warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in your `--config` CLI arguments:
-      - 'select' -> 'lint.select'
-    "###);
 }
 
 #[test]

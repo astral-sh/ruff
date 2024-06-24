@@ -295,5 +295,5 @@ fn open_configuration_file(
 ) -> crate::Result<Configuration> {
     let options = ruff_workspace::pyproject::load_options(config_path)?;
 
-    Configuration::from_options(options, Some(config_path), project_root)
+    Configuration::from_options(options, project_root)
 }

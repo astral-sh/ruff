@@ -167,7 +167,7 @@ mod tests {
     use ruff_linter::line_width::LineLength;
     use ruff_linter::settings::types::PatternPrefixPair;
 
-    use crate::options::{LintCommonOptions, LintOptions, Options};
+    use crate::options::{LintOptions, Options};
     use crate::pyproject::{find_settings_toml, parse_pyproject_toml, Pyproject, Tools};
 
     #[test]
@@ -242,10 +242,7 @@ select = ["E501"]
             Some(Tools {
                 ruff: Some(Options {
                     lint: Some(LintOptions {
-                        common: LintCommonOptions {
-                            select: Some(vec![codes::Pycodestyle::E501.into()]),
-                            ..LintCommonOptions::default()
-                        },
+                        select: Some(vec![codes::Pycodestyle::E501.into()]),
                         ..LintOptions::default()
                     }),
                     ..Options::default()
@@ -266,11 +263,8 @@ ignore = ["E501"]
             Some(Tools {
                 ruff: Some(Options {
                     lint: Some(LintOptions {
-                        common: LintCommonOptions {
-                            extend_select: Some(vec![codes::Ruff::_100.into()]),
-                            ignore: Some(vec![codes::Pycodestyle::E501.into()]),
-                            ..LintCommonOptions::default()
-                        },
+                        extend_select: Some(vec![codes::Ruff::_100.into()]),
+                        ignore: Some(vec![codes::Pycodestyle::E501.into()]),
                         ..LintOptions::default()
                     }),
                     ..Options::default()
@@ -348,13 +342,10 @@ per-file-ignores = { "__init__.py" = ["F401"] }
                 ]),
 
                 lint: Some(LintOptions {
-                    common: LintCommonOptions {
-                        per_file_ignores: Some(FxHashMap::from_iter([(
-                            "__init__.py".to_string(),
-                            vec![codes::Pyflakes::_401.into()]
-                        )])),
-                        ..LintCommonOptions::default()
-                    },
+                    per_file_ignores: Some(FxHashMap::from_iter([(
+                        "__init__.py".to_string(),
+                        vec![codes::Pyflakes::_401.into()]
+                    )])),
                     ..LintOptions::default()
                 }),
                 ..Options::default()

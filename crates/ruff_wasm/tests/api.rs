@@ -42,16 +42,23 @@ fn empty_config() {
 
 #[wasm_bindgen_test]
 fn partial_config() {
-    check!("if (1, 2):\n    pass", r#"{"ignore": ["F"]}"#, []);
+    check!(
+        "if (1, 2):\n    pass",
+        r#"{ "lint": { "ignore": ["F"] } }"#,
+        []
+    );
 }
 
 #[wasm_bindgen_test]
 fn partial_nested_config() {
-    let config = r#"{
-          "select": ["Q"],
-          "flake8-quotes": {
+    let config = r#"
+{
+    "lint": {
+        "select": ["Q"],
+        "flake8-quotes": {
             "inline-quotes": "single"
-          }
-        }"#;
+        }
+    }
+}"#;
     check!(r#"print('hello world')"#, config, []);
 }

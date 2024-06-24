@@ -657,6 +657,7 @@ fn exclude_stdin() -> Result<()> {
     fs::write(
         &ruff_toml,
         r#"
+[lint]
 extend-select = ["B", "Q"]
 ignore = ["Q000", "Q001", "Q002", "Q003"]
 
@@ -683,9 +684,6 @@ if __name__ == '__main__':
         say_hy("dear Ruff contributor")
 
     ----- stderr -----
-    warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in `ruff.toml`:
-      - 'extend-select' -> 'lint.extend-select'
-      - 'ignore' -> 'lint.ignore'
     "###);
     Ok(())
 }
@@ -697,6 +695,7 @@ fn force_exclude_stdin() -> Result<()> {
     fs::write(
         &ruff_toml,
         r#"
+[lint]
 extend-select = ["B", "Q"]
 ignore = ["Q000", "Q001", "Q002", "Q003"]
 
@@ -724,9 +723,6 @@ if __name__ == '__main__':
         say_hy("dear Ruff contributor")
 
     ----- stderr -----
-    warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in `ruff.toml`:
-      - 'extend-select' -> 'lint.extend-select'
-      - 'ignore' -> 'lint.ignore'
     "###);
     Ok(())
 }

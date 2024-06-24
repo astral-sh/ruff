@@ -45,9 +45,9 @@ use crate::options::{
     Flake8ErrMsgOptions, Flake8GetTextOptions, Flake8ImplicitStrConcatOptions,
     Flake8ImportConventionsOptions, Flake8PytestStyleOptions, Flake8QuotesOptions,
     Flake8SelfOptions, Flake8TidyImportsOptions, Flake8TypeCheckingOptions,
-    Flake8UnusedArgumentsOptions, FormatOptions, IsortOptions, LintCommonOptions, LintOptions,
-    McCabeOptions, Options, Pep8NamingOptions, PyUpgradeOptions, PycodestyleOptions,
-    PydocstyleOptions, PyflakesOptions, PylintOptions,
+    Flake8UnusedArgumentsOptions, FormatOptions, IsortOptions, LintOptions, McCabeOptions, Options,
+    Pep8NamingOptions, PyUpgradeOptions, PycodestyleOptions, PydocstyleOptions, PyflakesOptions,
+    PylintOptions,
 };
 use crate::settings::{
     FileResolverSettings, FormatterSettings, LineEnding, Settings, EXCLUDE, INCLUDE,
@@ -403,23 +403,7 @@ impl Configuration {
     /// Convert the [`Options`] read from the given [`Path`] into a [`Configuration`].
     /// If `None` is supplied for `path`, it indicates that the `Options` instance
     /// was created via "inline TOML" from the `--config` flag
-    pub fn from_options(
-        options: Options,
-        path: Option<&Path>,
-        project_root: &Path,
-    ) -> Result<Self> {
-        warn_about_deprecated_top_level_lint_options(&options.lint_top_level.0, path);
-
-        let lint = if let Some(mut lint) = options.lint {
-            lint.common = lint.common.combine(options.lint_top_level.0);
-            lint
-        } else {
-            LintOptions {
-                common: options.lint_top_level.0,
-                ..LintOptions::default()
-            }
-        };
-
+    pub fn from_options(options: Options, project_root: &Path) -> Result<Self> {
         #[allow(deprecated)]
         let indent_width = {
             if options.tab_size.is_some() {
@@ -540,7 +524,7 @@ impl Configuration {
             // files at present.
             extension: None,
 
-            lint: LintConfiguration::from_options(lint, project_root)?,
+            lint: LintConfiguration::from_options(options.lint.unwrap_or_default(), project_root)?,
             format: FormatConfiguration::from_options(
                 options.format.unwrap_or_default(),
                 project_root,
@@ -644,27 +628,25 @@ impl LintConfiguration {
     fn from_options(options: LintOptions, project_root: &Path) -> Result<Self> {
         #[allow(deprecated)]
         let ignore = options
-            .common
             .ignore
             .into_iter()
             .flatten()
-            .chain(options.common.extend_ignore.into_iter().flatten())
+            .chain(options.extend_ignore.into_iter().flatten())
             .collect();
         #[allow(deprecated)]
         let unfixable = options
-            .common
             .unfixable
             .into_iter()
             .flatten()
-            .chain(options.common.extend_unfixable.into_iter().flatten())
+            .chain(options.extend_unfixable.into_iter().flatten())
             .collect();
 
         #[allow(deprecated)]
         let ignore_init_module_imports = {
-            if options.common.ignore_init_module_imports.is_some() {
+            if options.ignore_init_module_imports.is_some() {
                 warn_user_once!("The `ignore-init-module-imports` option is deprecated and will be removed in a future release. Ruff's handling of imports in `__init__.py` files has been improved (in preview) and unused imports will always be flagged.");
             }
-            options.common.ignore_init_module_imports
+            options.ignore_init_module_imports
         };
 
         Ok(LintConfiguration {
@@ -680,24 +662,22 @@ impl LintConfiguration {
             preview: options.preview.map(PreviewMode::from),
 
             rule_selections: vec![RuleSelection {
-                select: options.common.select,
+                select: options.select,
                 ignore,
-                extend_select: options.common.extend_select.unwrap_or_default(),
-                fixable: options.common.fixable,
+                extend_select: options.extend_select.unwrap_or_default(),
+                fixable: options.fixable,
                 unfixable,
-                extend_fixable: options.common.extend_fixable.unwrap_or_default(),
+                extend_fixable: options.extend_fixable.unwrap_or_default(),
             }],
-            extend_safe_fixes: options.common.extend_safe_fixes.unwrap_or_default(),
-            extend_unsafe_fixes: options.common.extend_unsafe_fixes.unwrap_or_default(),
-            allowed_confusables: options.common.allowed_confusables,
+            extend_safe_fixes: options.extend_safe_fixes.unwrap_or_default(),
+            extend_unsafe_fixes: options.extend_unsafe_fixes.unwrap_or_default(),
+            allowed_confusables: options.allowed_confusables,
             dummy_variable_rgx: options
-                .common
                 .dummy_variable_rgx
                 .map(|pattern| Regex::new(&pattern))
                 .transpose()
                 .map_err(|e| anyhow!("Invalid `dummy-variable-rgx` value: {e}"))?,
             extend_per_file_ignores: options
-                .common
                 .extend_per_file_ignores
                 .map(|per_file_ignores| {
                     per_file_ignores
@@ -708,10 +688,10 @@ impl LintConfiguration {
                         .collect()
                 })
                 .unwrap_or_default(),
-            external: options.common.external,
+            external: options.external,
             ignore_init_module_imports,
-            explicit_preview_rules: options.common.explicit_preview_rules,
-            per_file_ignores: options.common.per_file_ignores.map(|per_file_ignores| {
+            explicit_preview_rules: options.explicit_preview_rules,
+            per_file_ignores: options.per_file_ignores.map(|per_file_ignores| {
                 per_file_ignores
                     .into_iter()
                     .map(|(pattern, prefixes)| {
@@ -719,35 +699,35 @@ impl LintConfiguration {
                     })
                     .collect()
             }),
-            task_tags: options.common.task_tags,
-            logger_objects: options.common.logger_objects,
-            typing_modules: options.common.typing_modules,
+            task_tags: options.task_tags,
+            logger_objects: options.logger_objects,
+            typing_modules: options.typing_modules,
             // Plugins
-            flake8_annotations: options.common.flake8_annotations,
-            flake8_bandit: options.common.flake8_bandit,
-            flake8_boolean_trap: options.common.flake8_boolean_trap,
-            flake8_bugbear: options.common.flake8_bugbear,
-            flake8_builtins: options.common.flake8_builtins,
-            flake8_comprehensions: options.common.flake8_comprehensions,
-            flake8_copyright: options.common.flake8_copyright,
-            flake8_errmsg: options.common.flake8_errmsg,
-            flake8_gettext: options.common.flake8_gettext,
-            flake8_implicit_str_concat: options.common.flake8_implicit_str_concat,
-            flake8_import_conventions: options.common.flake8_import_conventions,
-            flake8_pytest_style: options.common.flake8_pytest_style,
-            flake8_quotes: options.common.flake8_quotes,
-            flake8_self: options.common.flake8_self,
-            flake8_tidy_imports: options.common.flake8_tidy_imports,
-            flake8_type_checking: options.common.flake8_type_checking,
-            flake8_unused_arguments: options.common.flake8_unused_arguments,
-            isort: options.common.isort,
-            mccabe: options.common.mccabe,
-            pep8_naming: options.common.pep8_naming,
-            pycodestyle: options.common.pycodestyle,
-            pydocstyle: options.common.pydocstyle,
-            pyflakes: options.common.pyflakes,
-            pylint: options.common.pylint,
-            pyupgrade: options.common.pyupgrade,
+            flake8_annotations: options.flake8_annotations,
+            flake8_bandit: options.flake8_bandit,
+            flake8_boolean_trap: options.flake8_boolean_trap,
+            flake8_bugbear: options.flake8_bugbear,
+            flake8_builtins: options.flake8_builtins,
+            flake8_comprehensions: options.flake8_comprehensions,
+            flake8_copyright: options.flake8_copyright,
+            flake8_errmsg: options.flake8_errmsg,
+            flake8_gettext: options.flake8_gettext,
+            flake8_implicit_str_concat: options.flake8_implicit_str_concat,
+            flake8_import_conventions: options.flake8_import_conventions,
+            flake8_pytest_style: options.flake8_pytest_style,
+            flake8_quotes: options.flake8_quotes,
+            flake8_self: options.flake8_self,
+            flake8_tidy_imports: options.flake8_tidy_imports,
+            flake8_type_checking: options.flake8_type_checking,
+            flake8_unused_arguments: options.flake8_unused_arguments,
+            isort: options.isort,
+            mccabe: options.mccabe,
+            pep8_naming: options.pep8_naming,
+            pycodestyle: options.pycodestyle,
+            pydocstyle: options.pydocstyle,
+            pyflakes: options.pyflakes,
+            pylint: options.pylint,
+            pyupgrade: options.pyupgrade,
         })
     }
 
@@ -1269,215 +1249,6 @@ pub fn resolve_src(src: &[String], project_root: &Path) -> Result<Vec<PathBuf>> 
         .flatten()
         .collect::<Result<Vec<PathBuf>, GlobError>>()?;
     Ok(paths)
-}
-
-fn warn_about_deprecated_top_level_lint_options(
-    top_level_options: &LintCommonOptions,
-    path: Option<&Path>,
-) {
-    let mut used_options = Vec::new();
-
-    if top_level_options.allowed_confusables.is_some() {
-        used_options.push("allowed-confusables");
-    }
-
-    if top_level_options.dummy_variable_rgx.is_some() {
-        used_options.push("dummy-variable-rgx");
-    }
-
-    #[allow(deprecated)]
-    if top_level_options.extend_ignore.is_some() {
-        used_options.push("extend-ignore");
-    }
-
-    if top_level_options.extend_select.is_some() {
-        used_options.push("extend-select");
-    }
-
-    if top_level_options.extend_fixable.is_some() {
-        used_options.push("extend-fixable");
-    }
-
-    #[allow(deprecated)]
-    if top_level_options.extend_unfixable.is_some() {
-        used_options.push("extend-unfixable");
-    }
-
-    if top_level_options.external.is_some() {
-        used_options.push("external");
-    }
-
-    if top_level_options.fixable.is_some() {
-        used_options.push("fixable");
-    }
-
-    if top_level_options.ignore.is_some() {
-        used_options.push("ignore");
-    }
-
-    if top_level_options.extend_safe_fixes.is_some() {
-        used_options.push("extend-safe-fixes");
-    }
-
-    if top_level_options.extend_unsafe_fixes.is_some() {
-        used_options.push("extend-unsafe-fixes");
-    }
-
-    #[allow(deprecated)]
-    if top_level_options.ignore_init_module_imports.is_some() {
-        used_options.push("ignore-init-module-imports");
-    }
-
-    if top_level_options.logger_objects.is_some() {
-        used_options.push("logger-objects");
-    }
-
-    if top_level_options.select.is_some() {
-        used_options.push("select");
-    }
-
-    if top_level_options.explicit_preview_rules.is_some() {
-        used_options.push("explicit-preview-rules");
-    }
-
-    if top_level_options.task_tags.is_some() {
-        used_options.push("task-tags");
-    }
-
-    if top_level_options.typing_modules.is_some() {
-        used_options.push("typing-modules");
-    }
-
-    if top_level_options.unfixable.is_some() {
-        used_options.push("unfixable");
-    }
-
-    if top_level_options.flake8_annotations.is_some() {
-        used_options.push("flake8-annotations");
-    }
-
-    if top_level_options.flake8_bandit.is_some() {
-        used_options.push("flake8-bandit");
-    }
-
-    if top_level_options.flake8_boolean_trap.is_some() {
-        used_options.push("flake8-boolean-trap");
-    }
-
-    if top_level_options.flake8_bugbear.is_some() {
-        used_options.push("flake8-bugbear");
-    }
-
-    if top_level_options.flake8_builtins.is_some() {
-        used_options.push("flake8-builtins");
-    }
-
-    if top_level_options.flake8_comprehensions.is_some() {
-        used_options.push("flake8-comprehensions");
-    }
-
-    if top_level_options.flake8_copyright.is_some() {
-        used_options.push("flake8-copyright");
-    }
-
-    if top_level_options.flake8_errmsg.is_some() {
-        used_options.push("flake8-errmsg");
-    }
-
-    if top_level_options.flake8_quotes.is_some() {
-        used_options.push("flake8-quotes");
-    }
-
-    if top_level_options.flake8_self.is_some() {
-        used_options.push("flake8-self");
-    }
-
-    if top_level_options.flake8_tidy_imports.is_some() {
-        used_options.push("flake8-tidy-imports");
-    }
-
-    if top_level_options.flake8_type_checking.is_some() {
-        used_options.push("flake8-type-checking");
-    }
-
-    if top_level_options.flake8_gettext.is_some() {
-        used_options.push("flake8-gettext");
-    }
-
-    if top_level_options.flake8_implicit_str_concat.is_some() {
-        used_options.push("flake8-implicit-str-concat");
-    }
-
-    if top_level_options.flake8_import_conventions.is_some() {
-        used_options.push("flake8-import-conventions");
-    }
-
-    if top_level_options.flake8_pytest_style.is_some() {
-        used_options.push("flake8-pytest-style");
-    }
-
-    if top_level_options.flake8_unused_arguments.is_some() {
-        used_options.push("flake8-unused-arguments");
-    }
-
-    if top_level_options.isort.is_some() {
-        used_options.push("isort");
-    }
-
-    if top_level_options.mccabe.is_some() {
-        used_options.push("mccabe");
-    }
-
-    if top_level_options.pep8_naming.is_some() {
-        used_options.push("pep8-naming");
-    }
-
-    if top_level_options.pycodestyle.is_some() {
-        used_options.push("pycodestyle");
-    }
-
-    if top_level_options.pydocstyle.is_some() {
-        used_options.push("pydocstyle");
-    }
-
-    if top_level_options.pyflakes.is_some() {
-        used_options.push("pyflakes");
-    }
-
-    if top_level_options.pylint.is_some() {
-        used_options.push("pylint");
-    }
-
-    if top_level_options.pyupgrade.is_some() {
-        used_options.push("pyupgrade");
-    }
-
-    if top_level_options.per_file_ignores.is_some() {
-        used_options.push("per-file-ignores");
-    }
-
-    if top_level_options.extend_per_file_ignores.is_some() {
-        used_options.push("extend-per-file-ignores");
-    }
-
-    if used_options.is_empty() {
-        return;
-    }
-
-    let options_mapping = used_options
-        .iter()
-        .map(|option| format!("- '{option}' -> 'lint.{option}'"))
-        .join("\n  ");
-
-    let thing_to_update = path.map_or_else(
-        || String::from("your `--config` CLI arguments"),
-        |path| format!("`{}`", fs::relativize_path(path)),
-    );
-
-    warn_user_once_by_message!(
-        "The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. \
-        Please update the following options in {thing_to_update}:\n  {options_mapping}",
-    );
 }
 
 #[cfg(test)]

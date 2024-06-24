@@ -1,2 +1,2 @@
-[tool.ruff]
+[tool.ruff.lint]
 select = []

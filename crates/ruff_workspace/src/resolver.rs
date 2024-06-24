@@ -273,7 +273,7 @@ fn resolve_configuration(
         let options = pyproject::load_options(&path)?;
 
         let project_root = relativity.resolve(&path);
-        let configuration = Configuration::from_options(options, Some(&path), project_root)?;
+        let configuration = Configuration::from_options(options, project_root)?;
 
         // If extending, continue to collect.
         next = configuration.extend.as_ref().map(|extend| {

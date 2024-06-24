@@ -30,7 +30,6 @@ use ruff_linter::{warn_user_once, RuleSelector};
 use ruff_macros::{CombineOptions, OptionsMetadata};
 use ruff_python_formatter::{DocstringCodeLineWidth, QuoteStyle};
 
-use crate::options_base::{OptionsMetadata, Visit};
 use crate::settings::LineEnding;
 
 #[derive(Clone, Debug, PartialEq, Eq, Default, OptionsMetadata, Serialize, Deserialize)]
@@ -433,47 +432,16 @@ pub struct Options {
     #[option_group]
     pub lint: Option<LintOptions>,
 
-    /// The lint sections specified at the top level.
-    #[serde(flatten)]
-    pub lint_top_level: DeprecatedTopLevelLintOptions,
-
     /// Options to configure code formatting.
     #[option_group]
     pub format: Option<FormatOptions>,
 }
 
 /// Configures how ruff checks your code.
-///
-/// Options specified in the `lint` section take precedence over the deprecated top-level settings.
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[derive(Clone, Debug, PartialEq, Eq, Default, OptionsMetadata, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub struct LintOptions {
-    #[serde(flatten)]
-    pub common: LintCommonOptions,
-
-    /// A list of file patterns to exclude from linting in addition to the files excluded globally (see [`exclude`](#exclude), and [`extend-exclude`](#extend-exclude)).
-    ///
-    /// Exclusions are based on globs, and can be either:
-    ///
-    /// - Single-path patterns, like `.mypy_cache` (to exclude any directory
-    ///   named `.mypy_cache` in the tree), `foo.py` (to exclude any file named
-    ///   `foo.py`), or `foo_*.py` (to exclude any file matching `foo_*.py` ).
-    /// - Relative patterns, like `directory/foo.py` (to exclude that specific
-    ///   file) or `directory/*.py` (to exclude any Python files in
-    ///   `directory`). Note that these paths are relative to the project root
-    ///   (e.g., the directory containing your `pyproject.toml`).
-    ///
-    /// For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).
-    #[option(
-        default = r#"[]"#,
-        value_type = "list[str]",
-        example = r#"
-            exclude = ["generated"]
-        "#
-    )]
-    pub exclude: Option<Vec<String>>,
-
     /// Whether to enable preview mode. When preview mode is enabled, Ruff will
     /// use unstable rules and fixes.
     #[option(
@@ -485,69 +453,7 @@ pub struct LintOptions {
         "#
     )]
     pub preview: Option<bool>,
-}
 
-/// Newtype wrapper for [`LintCommonOptions`] that allows customizing the JSON schema and omitting the fields from the [`OptionsMetadata`].
-#[derive(Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize)]
-#[serde(transparent)]
-pub struct DeprecatedTopLevelLintOptions(pub LintCommonOptions);
-
-impl OptionsMetadata for DeprecatedTopLevelLintOptions {
-    fn record(_visit: &mut dyn Visit) {
-        // Intentionally empty. Omit all fields from the documentation and instead promote the options under the `lint.` section.
-        // This doesn't create an empty 'common' option  because the field in the `Options` struct is marked with `#[serde(flatten)]`.
-        // Meaning, the code here flattens no-properties into the parent, which is what we want.
-    }
-}
-
-#[cfg(feature = "schemars")]
-impl schemars::JsonSchema for DeprecatedTopLevelLintOptions {
-    fn schema_name() -> std::string::String {
-        "DeprecatedTopLevelLintOptions".to_owned()
-    }
-    fn schema_id() -> std::borrow::Cow<'static, str> {
-        std::borrow::Cow::Borrowed(std::concat!(
-            std::module_path!(),
-            "::",
-            "DeprecatedTopLevelLintOptions"
-        ))
-    }
-    fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
-        use schemars::schema::Schema;
-
-        let common_schema = LintCommonOptions::json_schema(gen);
-        let mut schema_obj = common_schema.into_object();
-
-        if let Some(object) = schema_obj.object.as_mut() {
-            for property in object.properties.values_mut() {
-                if let Schema::Object(property_object) = property {
-                    if let Some(metadata) = &mut property_object.metadata {
-                        metadata.deprecated = true;
-                    } else {
-                        property_object.metadata = Some(Box::new(schemars::schema::Metadata {
-                            deprecated: true,
-                            ..schemars::schema::Metadata::default()
-                        }));
-                    }
-                }
-            }
-        }
-
-        Schema::Object(schema_obj)
-    }
-}
-
-// Note: This struct should be inlined into [`LintOptions`] once support for the top-level lint settings
-// is removed.
-// Don't add any new options to this struct. Add them to [`LintOptions`] directly to avoid exposing them in the
-// global settings.
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
-#[derive(
-    Clone, Debug, PartialEq, Eq, Default, OptionsMetadata, CombineOptions, Serialize, Deserialize,
-)]
-#[serde(deny_unknown_fields, rename_all = "kebab-case")]
-pub struct LintCommonOptions {
-    // WARNING: Don't add new options to this type. Add them to `LintOptions` instead.
     /// A list of allowed "confusable" Unicode characters to ignore when
     /// enforcing `RUF001`, `RUF002`, and `RUF003`.
     #[option(
@@ -750,6 +656,27 @@ pub struct LintCommonOptions {
     )]
     pub select: Option<Vec<RuleSelector>>,
 
+    /// A list of file patterns to exclude from linting in addition to the files excluded globally (see [`exclude`](#exclude), and [`extend-exclude`](#extend-exclude)).
+    ///
+    /// Exclusions are based on globs, and can be either:
+    ///
+    /// - Single-path patterns, like `.mypy_cache` (to exclude any directory
+    ///   named `.mypy_cache` in the tree), `foo.py` (to exclude any file named
+    ///   `foo.py`), or `foo_*.py` (to exclude any file matching `foo_*.py` ).
+    /// - Relative patterns, like `directory/foo.py` (to exclude that specific
+    ///   file) or `directory/*.py` (to exclude any Python files in
+    ///   `directory`). Note that these paths are relative to the project root
+    ///   (e.g., the directory containing your `pyproject.toml`).
+    ///
+    /// For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).
+    #[option(
+        default = r#"[]"#,
+        value_type = "list[str]",
+        example = r#"
+                exclude = ["generated"]
+            "#
+    )]
+    pub exclude: Option<Vec<String>>,
     /// Whether to require exact codes to select preview rules. When enabled,
     /// preview rules will not be selected by prefixes — the full code of each
     /// preview rule will be required to enable the rule.
@@ -904,8 +831,6 @@ pub struct LintCommonOptions {
     #[option_group]
     pub pyupgrade: Option<PyUpgradeOptions>,
 
-    // WARNING: Don't add new options to this type. Add them to `LintOptions` instead.
-
     // Tables are required to go last.
     /// A list of mappings from file pattern to rule codes or prefixes to
     /// exclude, when considering any matching files. An initial '!' negates
@@ -936,7 +861,6 @@ pub struct LintCommonOptions {
         "#
     )]
     pub extend_per_file_ignores: Option<FxHashMap<String, Vec<RuleSelector>>>,
-    // WARNING: Don't add new options to this type. Add them to `LintOptions` instead.
 }
 
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
