@@ -890,111 +890,6 @@ fn show_statistics_json() {
 }
 
 #[test]
-fn nursery_prefix() {
-    // Should only detect RUF90X, but not the unstable test rules
-    let mut cmd = RuffCheck::default()
-        .args(["--select", "RUF9", "--output-format=concise"])
-        .build();
-    assert_cmd_snapshot!(cmd, @r###"
-    success: false
-    exit_code: 1
-    ----- stdout -----
-    -:1:1: RUF900 Hey this is a stable test rule.
-    -:1:1: RUF901 [*] Hey this is a stable test rule with a safe fix.
-    -:1:1: RUF902 Hey this is a stable test rule with an unsafe fix.
-    -:1:1: RUF903 Hey this is a stable test rule with a display only fix.
-    -:1:1: RUF920 Hey this is a deprecated test rule.
-    -:1:1: RUF921 Hey this is another deprecated test rule.
-    -:1:1: RUF950 Hey this is a test rule that was redirected from another.
-    Found 7 errors.
-    [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
-
-    ----- stderr -----
-    "###);
-}
-
-#[test]
-fn nursery_all() {
-    // Should detect RUF90X, but not the unstable test rules
-    let mut cmd = RuffCheck::default()
-        .args(["--select", "ALL", "--output-format=concise"])
-        .build();
-    assert_cmd_snapshot!(cmd, @r###"
-    success: false
-    exit_code: 1
-    ----- stdout -----
-    -:1:1: D100 Missing docstring in public module
-    -:1:1: RUF900 Hey this is a stable test rule.
-    -:1:1: RUF901 [*] Hey this is a stable test rule with a safe fix.
-    -:1:1: RUF902 Hey this is a stable test rule with an unsafe fix.
-    -:1:1: RUF903 Hey this is a stable test rule with a display only fix.
-    -:1:1: RUF920 Hey this is a deprecated test rule.
-    -:1:1: RUF921 Hey this is another deprecated test rule.
-    -:1:1: RUF950 Hey this is a test rule that was redirected from another.
-    Found 8 errors.
-    [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
-
-    ----- stderr -----
-    warning: `one-blank-line-before-class` (D203) and `no-blank-line-before-class` (D211) are incompatible. Ignoring `one-blank-line-before-class`.
-    warning: `multi-line-summary-first-line` (D212) and `multi-line-summary-second-line` (D213) are incompatible. Ignoring `multi-line-summary-second-line`.
-    "###);
-}
-
-#[test]
-fn nursery_direct() {
-    // Should fail when a nursery rule is selected without the preview flag
-    // Before Ruff v0.2.0 this would warn
-    let mut cmd = RuffCheck::default()
-        .args(["--select", "RUF912", "--output-format=concise"])
-        .build();
-    assert_cmd_snapshot!(cmd, @r###"
-    success: false
-    exit_code: 2
-    ----- stdout -----
-
-    ----- stderr -----
-    ruff failed
-      Cause: Selection of unstable rule `RUF912` without the `--preview` flag is not allowed.
-    "###);
-}
-
-#[test]
-fn nursery_group_selector() {
-    // The NURSERY selector is removed but parses in the CLI for a nicer error message
-    // Before Ruff v0.2.0 this would warn
-    let mut cmd = RuffCheck::default()
-        .args(["--select", "NURSERY", "--output-format=concise"])
-        .build();
-    assert_cmd_snapshot!(cmd, @r###"
-    success: false
-    exit_code: 2
-    ----- stdout -----
-
-    ----- stderr -----
-    ruff failed
-      Cause: The `NURSERY` selector was removed. Use the `--preview` flag instead.
-    "###);
-}
-
-#[test]
-fn nursery_group_selector_preview_enabled() {
-    // When preview mode is enabled, we shouldn't suggest using the `--preview` flag.
-    // Before Ruff v0.2.0 this would warn
-    let mut cmd = RuffCheck::default()
-        .args(["--select", "NURSERY", "--preview"])
-        .build();
-    assert_cmd_snapshot!(cmd, @r###"
-    success: false
-    exit_code: 2
-    ----- stdout -----
-
-    ----- stderr -----
-    ruff failed
-      Cause: The `NURSERY` selector was removed. Unstable rules should be selected individually or by their respective groups.
-    "###);
-}
-
-#[test]
 fn preview_enabled_prefix() {
     // All the RUF9XX test rules should be triggered
     let mut cmd = RuffCheck::default()
@@ -1009,9 +904,8 @@ fn preview_enabled_prefix() {
     -:1:1: RUF902 Hey this is a stable test rule with an unsafe fix.
     -:1:1: RUF903 Hey this is a stable test rule with a display only fix.
     -:1:1: RUF911 Hey this is a preview test rule.
-    -:1:1: RUF912 Hey this is a nursery test rule.
     -:1:1: RUF950 Hey this is a test rule that was redirected from another.
-    Found 7 errors.
+    Found 6 errors.
     [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
 
     ----- stderr -----
@@ -1034,9 +928,8 @@ fn preview_enabled_all() {
     -:1:1: RUF902 Hey this is a stable test rule with an unsafe fix.
     -:1:1: RUF903 Hey this is a stable test rule with a display only fix.
     -:1:1: RUF911 Hey this is a preview test rule.
-    -:1:1: RUF912 Hey this is a nursery test rule.
     -:1:1: RUF950 Hey this is a test rule that was redirected from another.
-    Found 9 errors.
+    Found 8 errors.
     [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
 
     ----- stderr -----
@@ -1174,9 +1067,8 @@ fn preview_enabled_group_ignore() {
     -:1:1: RUF902 Hey this is a stable test rule with an unsafe fix.
     -:1:1: RUF903 Hey this is a stable test rule with a display only fix.
     -:1:1: RUF911 Hey this is a preview test rule.
-    -:1:1: RUF912 Hey this is a nursery test rule.
     -:1:1: RUF950 Hey this is a test rule that was redirected from another.
-    Found 7 errors.
+    Found 6 errors.
     [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
 
     ----- stderr -----
