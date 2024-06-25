@@ -54,7 +54,7 @@ pub(crate) fn lowercase_imported_as_non_lowercase(
     if !str::is_cased_uppercase(name) && str::is_cased_lowercase(name) && !str::is_lowercase(asname)
     {
         // Ignore any explicitly-allowed names.
-        if ignore_names.matches(asname) {
+        if ignore_names.matches(name) || ignore_names.matches(asname) {
             return None;
         }
         let mut diagnostic = Diagnostic::new(
