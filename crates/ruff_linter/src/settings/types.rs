@@ -1,3 +1,5 @@
+#![allow(deprecated)]
+
 use std::fmt::{Display, Formatter};
 use std::hash::{Hash, Hasher};
 use std::ops::Deref;
@@ -505,6 +507,12 @@ impl FromIterator<ExtensionPair> for ExtensionMapping {
 #[serde(rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub enum OutputFormat {
+    // Remove the module level `#![allow(deprecated)` when removing the text variant.
+    // Adding the `#[deprecated]` attribute to text creates clippy warnings about
+    // using a deprecated item in the derived code and there seems to be no way to suppress the clippy error
+    // other than disabling the warning for the entire module and/or moving `OutputFormat` to another module.
+    #[deprecated(note = "Use `concise` or `full` instead")]
+    Text,
     Concise,
     #[default]
     Full,
@@ -523,6 +531,7 @@ pub enum OutputFormat {
 impl Display for OutputFormat {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
+            Self::Text => write!(f, "text"),
             Self::Concise => write!(f, "concise"),
             Self::Full => write!(f, "full"),
             Self::Json => write!(f, "json"),

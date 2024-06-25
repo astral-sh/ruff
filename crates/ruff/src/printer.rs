@@ -240,9 +240,13 @@ impl Printer {
         }
 
         if !self.flags.intersects(Flags::SHOW_VIOLATIONS) {
+            #[allow(deprecated)]
             if matches!(
                 self.format,
-                OutputFormat::Full | OutputFormat::Concise | OutputFormat::Grouped
+                OutputFormat::Text
+                    | OutputFormat::Full
+                    | OutputFormat::Concise
+                    | OutputFormat::Grouped
             ) {
                 if self.flags.intersects(Flags::SHOW_FIX_SUMMARY) {
                     if !diagnostics.fixed.is_empty() {
@@ -320,6 +324,8 @@ impl Printer {
             OutputFormat::Sarif => {
                 SarifEmitter.emit(writer, &diagnostics.messages, &context)?;
             }
+            #[allow(deprecated)]
+            OutputFormat::Text => unreachable!("Text is deprecated and should have been automatically converted to the default serialization format")
         }
 
         writer.flush()?;
@@ -362,7 +368,8 @@ impl Printer {
         }
 
         match self.format {
-            OutputFormat::Full | OutputFormat::Concise => {
+            #[allow(deprecated)]
+            OutputFormat::Text | OutputFormat::Full | OutputFormat::Concise => {
                 // Compute the maximum number of digits in the count and code, for all messages,
                 // to enable pretty-printing.
                 let count_width = num_digits(

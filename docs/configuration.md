@@ -595,7 +595,7 @@ Options:
       --output-format <OUTPUT_FORMAT>
           Output serialization format for violations. The default serialization
           format is "concise". In preview mode, the default serialization
-          format is "full" [env: RUFF_OUTPUT_FORMAT=] [possible values:
+          format is "full" [env: RUFF_OUTPUT_FORMAT=] [possible values: text,
           concise, full, json, json-lines, junit, grouped, github, gitlab,
           pylint, rdjson, azure, sarif]
   -o, --output-file <OUTPUT_FILE>
