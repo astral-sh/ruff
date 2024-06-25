@@ -402,13 +402,6 @@ pub struct Options {
     ///
     /// This option changes the number of spaces inserted by the formatter when
     /// using soft-tabs (`indent-style = space`).
-    #[option(
-        default = "4",
-        value_type = "int",
-        example = r#"
-            tab-size = 2
-        "#
-    )]
     #[deprecated(
         since = "0.1.2",
         note = "The `tab-size` option has been renamed to `indent-width` to emphasize that it configures the indentation used by the formatter as well as the tab width. Please update your configuration to use `indent-width = <value>` instead."

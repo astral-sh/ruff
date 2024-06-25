@@ -812,14 +812,13 @@ tab-size = 2
 if True:
     pass
     "), @r###"
-        success: true
-        exit_code: 0
+        success: false
+        exit_code: 2
         ----- stdout -----
-        if True:
-          pass
 
         ----- stderr -----
-        warning: The `tab-size` option has been renamed to `indent-width` to emphasize that it configures the indentation used by the formatter as well as the tab width. Please update your configuration to use `indent-width = <value>` instead.
+        ruff failed
+          Cause: The `tab-size` option has been renamed to `indent-width` to emphasize that it configures the indentation used by the formatter as well as the tab width. Please update `[RUFF-TOML-PATH]` to use `indent-width = <value>` instead.
         "###);
     });
     Ok(())
