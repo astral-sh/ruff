@@ -1373,15 +1373,33 @@ impl<'src> Lexer<'src> {
         }
 
         let mut current_position = self.current_range().start();
-        let reverse_chars = self.source[..current_position.to_usize()].chars().rev();
+        let mut reverse_chars = self.source[..current_position.to_usize()]
+            .chars()
+            .rev()
+            .peekable();
         let mut newline_position = None;
 
-        for ch in reverse_chars {
+        while let Some(ch) = reverse_chars.next() {
             if is_python_whitespace(ch) {
                 current_position -= ch.text_len();
             } else if matches!(ch, '\n' | '\r') {
                 current_position -= ch.text_len();
-                newline_position = Some(current_position);
+                // Count the number of backslashes before the newline character.
+                let mut backslash_count = 0;
+                while reverse_chars.next_if_eq(&'\\').is_some() {
+                    backslash_count += 1;
+                }
+                if backslash_count == 0 {
+                    // No escapes: `\n`
+                    newline_position = Some(current_position);
+                } else {
+                    if backslash_count % 2 == 0 {
+                        // Even number of backslashes i.e., all backslashes cancel each other out
+                        // which means the newline character is not being escaped.
+                        newline_position = Some(current_position);
+                    }
+                    current_position -= TextSize::new('\\'.text_len().to_u32() * backslash_count);
+                }
             } else {
                 break;
             }
