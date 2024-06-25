@@ -973,10 +973,10 @@ impl<'src> Lexer<'src> {
                 }
 
                 match ch {
-                    Some('\r' | '\n') => {
+                    Some(newline @ ('\r' | '\n')) => {
                         return self.push_error(LexicalError::new(
                             LexicalErrorType::UnclosedStringError,
-                            self.token_range(),
+                            self.token_range().sub_end(newline.text_len()),
                         ));
                     }
                     Some(ch) if ch == quote => {
