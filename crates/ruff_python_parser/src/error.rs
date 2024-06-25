@@ -99,6 +99,8 @@ pub enum ParseErrorType {
     EmptyDeleteTargets,
     /// An empty import names list was found during parsing.
     EmptyImportNames,
+    /// An empty type parameter list was found during parsing.
+    EmptyTypeParams,
 
     /// An unparenthesized named expression was found where it is not allowed.
     UnparenthesizedNamedExpression,
@@ -242,6 +244,7 @@ impl std::fmt::Display for ParseErrorType {
             ParseErrorType::EmptyImportNames => {
                 f.write_str("Expected one or more symbol names after import")
             }
+            ParseErrorType::EmptyTypeParams => f.write_str("Type parameter list cannot be empty"),
             ParseErrorType::ParamAfterVarKeywordParam => {
                 f.write_str("Parameter cannot follow var-keyword parameter")
             }

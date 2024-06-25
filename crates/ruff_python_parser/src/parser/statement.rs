@@ -3027,6 +3027,14 @@ impl<'src> Parser<'src> {
             Parser::parse_type_param,
         );
 
+        if type_params.is_empty() {
+            // test_err type_params_empty
+            // def foo[]():
+            //     pass
+            // type ListOrSet[] = list | set
+            self.add_error(ParseErrorType::EmptyTypeParams, self.current_token_range());
+        }
+
         self.expect(TokenKind::Rsqb);
 
         ast::TypeParams {
