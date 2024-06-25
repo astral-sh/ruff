@@ -100,11 +100,19 @@ fn is_gettext(expr: &ast::Expr, semantic: &SemanticModel) -> bool {
         return false;
     };
 
-    if let ast::Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
-        if id.as_str() == "_" {
-            return true;
+    let short_circuit = match func.as_ref() {
+        ast::Expr::Name(ast::ExprName { id, .. }) => {
+            matches!(id.as_str(), "gettext" | "ngettext" | "_")
         }
+        ast::Expr::Attribute(ast::ExprAttribute { attr, .. }) => {
+            matches!(attr.as_str(), "gettext" | "ngettext")
+        }
+        _ => false,
     };
+
+    if short_circuit {
+        return true;
+    }
 
     semantic
         .resolve_qualified_name(func)

@@ -42,3 +42,6 @@ def negative_cases():
     from gettext import gettext as foo
     should = 42
     x = foo("This {should} also be understood as a translation string")
+
+    import django.utils.translations
+    y = django.utils.translations.gettext("This {should} be understood as a translation string too!")
