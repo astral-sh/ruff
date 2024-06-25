@@ -152,7 +152,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pyflakes, "506") => (RuleGroup::Stable, rules::pyflakes::rules::PercentFormatMixedPositionalAndNamed),
         (Pyflakes, "507") => (RuleGroup::Stable, rules::pyflakes::rules::PercentFormatPositionalCountMismatch),
         (Pyflakes, "508") => (RuleGroup::Stable, rules::pyflakes::rules::PercentFormatStarRequiresSequence),
-        (Pyflakes, "509") => (RuleGroup::Stable, rules::pyflakes::rules::PercentFormatUnsupportedFormatCharacter),
+        (Pyflakes, "509") => (RuleGroup::Removed, rules::pyflakes::rules::PercentFormatUnsupportedFormatCharacter),
         (Pyflakes, "521") => (RuleGroup::Stable, rules::pyflakes::rules::StringDotFormatInvalidFormat),
         (Pyflakes, "522") => (RuleGroup::Stable, rules::pyflakes::rules::StringDotFormatExtraNamedArguments),
         (Pyflakes, "523") => (RuleGroup::Stable, rules::pyflakes::rules::StringDotFormatExtraPositionalArguments),

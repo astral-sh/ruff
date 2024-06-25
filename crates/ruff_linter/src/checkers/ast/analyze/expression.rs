@@ -1098,17 +1098,10 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                     let location = expr.range();
                     match pyflakes::cformat::CFormatSummary::try_from(value.to_str()) {
                         Err(CFormatError {
-                            typ: CFormatErrorType::UnsupportedFormatChar(c),
+                            typ: CFormatErrorType::UnsupportedFormatChar(_),
                             ..
                         }) => {
-                            if checker.enabled(Rule::PercentFormatUnsupportedFormatCharacter) {
-                                checker.diagnostics.push(Diagnostic::new(
-                                    pyflakes::rules::PercentFormatUnsupportedFormatCharacter {
-                                        char: c,
-                                    },
-                                    location,
-                                ));
-                            }
+                            // Unsupported format character violation is raised by `PLE1300`
                         }
                         Err(e) => {
                             if checker.enabled(Rule::PercentFormatInvalidFormat) {

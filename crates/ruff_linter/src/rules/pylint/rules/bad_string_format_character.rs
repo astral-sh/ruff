@@ -22,10 +22,21 @@ use crate::checkers::ast::Checker;
 /// ## Example
 /// ```python
 /// # `z` is not a valid format type.
-/// print("%z" % "1")
+/// print("%z" % 1)
 ///
-/// print("{:z}".format("1"))
+/// print("{:z}".format(1))
 /// ```
+///
+/// Use instead:
+/// ```python
+/// print("%d" % 1)
+///
+/// print("{:d}".format(1))
+/// ```
+///
+/// ## References
+/// - [Python documentation: `printf`-style String Formatting](https://docs.python.org/3/library/stdtypes.html#printf-style-string-formatting)
+/// - [Python documentation: `str.format`](https://docs.python.org/3/library/stdtypes.html#str.format)
 #[violation]
 pub struct BadStringFormatCharacter {
     format_char: char,

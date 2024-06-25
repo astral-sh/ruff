@@ -297,6 +297,10 @@ impl Violation for PercentFormatStarRequiresSequence {
     }
 }
 
+/// ## Removed
+///
+/// This rule is a subset of [PLE1300] which should be used instead.
+///
 /// ## What it does
 /// Checks for `printf`-style format strings with invalid format characters.
 ///
@@ -317,11 +321,14 @@ impl Violation for PercentFormatStarRequiresSequence {
 ///
 /// ## References
 /// - [Python documentation: `printf`-style String Formatting](https://docs.python.org/3/library/stdtypes.html#printf-style-string-formatting)
+///
+/// [PLE1300]: https://docs.astral.sh/ruff/rules/bad-string-format-character/
 #[violation]
 pub struct PercentFormatUnsupportedFormatCharacter {
     pub(crate) char: char,
 }
 
+/// F509
 impl Violation for PercentFormatUnsupportedFormatCharacter {
     #[derive_message_formats]
     fn message(&self) -> String {

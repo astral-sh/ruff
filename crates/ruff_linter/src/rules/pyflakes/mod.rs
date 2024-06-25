@@ -75,7 +75,6 @@ mod tests {
     #[test_case(Rule::PercentFormatMixedPositionalAndNamed, Path::new("F50x.py"))]
     #[test_case(Rule::PercentFormatPositionalCountMismatch, Path::new("F50x.py"))]
     #[test_case(Rule::PercentFormatStarRequiresSequence, Path::new("F50x.py"))]
-    #[test_case(Rule::PercentFormatUnsupportedFormatCharacter, Path::new("F50x.py"))]
     #[test_case(Rule::StringDotFormatInvalidFormat, Path::new("F521.py"))]
     #[test_case(Rule::StringDotFormatExtraNamedArguments, Path::new("F522.py"))]
     #[test_case(Rule::StringDotFormatExtraPositionalArguments, Path::new("F523.py"))]
