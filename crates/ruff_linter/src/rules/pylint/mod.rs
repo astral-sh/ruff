@@ -39,10 +39,6 @@ mod tests {
     #[test_case(Rule::CollapsibleElseIf, Path::new("collapsible_else_if.py"))]
     #[test_case(Rule::CompareToEmptyString, Path::new("compare_to_empty_string.py"))]
     #[test_case(Rule::ComparisonOfConstant, Path::new("comparison_of_constant.py"))]
-    #[test_case(
-        Rule::RepeatedIsinstanceCalls,
-        Path::new("repeated_isinstance_calls.py")
-    )]
     #[test_case(Rule::ComparisonWithItself, Path::new("comparison_with_itself.py"))]
     #[test_case(Rule::EqWithoutHash, Path::new("eq_without_hash.py"))]
     #[test_case(Rule::EmptyComment, Path::new("empty_comment.py"))]
@@ -226,17 +222,6 @@ mod tests {
             },
         )?;
         assert_messages!(snapshot, diagnostics);
-        Ok(())
-    }
-
-    #[test]
-    fn repeated_isinstance_calls() -> Result<()> {
-        let diagnostics = test_path(
-            Path::new("pylint/repeated_isinstance_calls.py"),
-            &LinterSettings::for_rule(Rule::RepeatedIsinstanceCalls)
-                .with_target_version(PythonVersion::Py39),
-        )?;
-        assert_messages!(diagnostics);
         Ok(())
     }
 

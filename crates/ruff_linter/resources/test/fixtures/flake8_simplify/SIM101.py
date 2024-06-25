@@ -48,3 +48,7 @@ def f():
 
     if isinstance(a, int) or isinstance(a, float):
         pass
+
+# Regression test for: https://github.com/astral-sh/ruff/issues/7455#issuecomment-1722460483
+if(isinstance(a, int)) or (isinstance(a, float)):
+    pass
