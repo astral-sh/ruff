@@ -6,7 +6,8 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for uses of Django's `extra` function.
+/// Checks for uses of Django's `extra` function where one or more arguments
+/// passed are not literal expressions.
 ///
 /// ## Why is this bad?
 /// Django's `extra` function can be used to execute arbitrary SQL queries,
@@ -16,7 +17,17 @@ use crate::checkers::ast::Checker;
 /// ```python
 /// from django.contrib.auth.models import User
 ///
+/// # String interpolation creates a security loophole that could be used
+/// # for SQL injection:
 /// User.objects.all().extra(select={"test": "%secure" % "nos"})
+/// ```
+///
+/// ## Use instead:
+/// ```python
+/// from django.contrib.auth.models import User
+///
+/// # SQL injection is impossible if all arguments are literal expressions:
+/// User.objects.all().extra(select={"test": "secure"})
 /// ```
 ///
 /// ## References
