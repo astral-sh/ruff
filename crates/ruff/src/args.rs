@@ -126,6 +126,7 @@ pub enum Command {
     /// Clear any caches in the current directory and any subdirectories.
     Clean,
     /// Generate shell completion.
+    #[clap(hide = true)]
     GenerateShellCompletion { shell: clap_complete_command::Shell },
     /// Run the Ruff formatter on the given files or directories.
     Format(FormatCommand),

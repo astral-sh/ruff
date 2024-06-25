@@ -8,12 +8,12 @@ use std::process::ExitCode;
 use std::sync::mpsc::channel;
 
 use anyhow::Result;
-use args::{GlobalConfigArgs, ServerCommand};
 use clap::CommandFactory;
 use colored::Colorize;
 use log::warn;
 use notify::{recommended_watcher, RecursiveMode, Watcher};
 
+use args::{GlobalConfigArgs, ServerCommand};
 use ruff_linter::logging::{set_up_logging, LogLevel};
 use ruff_linter::settings::flags::FixMode;
 use ruff_linter::settings::types::SerializationFormat;
@@ -142,17 +142,6 @@ pub fn run(
             }
             default_panic_hook(info);
         }));
-    }
-
-    // Enabled ANSI colors on Windows 10.
-    #[cfg(windows)]
-    assert!(colored::control::set_virtual_terminal(true).is_ok());
-
-    // support FORCE_COLOR env var
-    if let Some(force_color) = std::env::var_os("FORCE_COLOR") {
-        if force_color.len() > 0 {
-            colored::control::set_override(true);
-        }
     }
 
     set_up_logging(global_options.log_level())?;
