@@ -15,6 +15,7 @@ use ruff_python_codegen::Generator;
 use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
+use crate::fix::edits::pad;
 
 /// ## What it does
 /// Checks for multiple `isinstance` calls on the same target.
@@ -404,7 +405,7 @@ pub(crate) fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
                     .collect();
 
                 // Generate a single `isinstance` call.
-                let node = ast::ExprTuple {
+                let tuple = ast::ExprTuple {
                     // Flatten all the types used across the `isinstance` calls.
                     elts: types
                         .iter()
@@ -421,21 +422,23 @@ pub(crate) fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
                     range: TextRange::default(),
                     parenthesized: true,
                 };
-                let node1 = ast::ExprName {
-                    id: "isinstance".into(),
-                    ctx: ExprContext::Load,
-                    range: TextRange::default(),
-                };
-                let node2 = ast::ExprCall {
-                    func: Box::new(node1.into()),
+                let isinstance_call = ast::ExprCall {
+                    func: Box::new(
+                        ast::ExprName {
+                            id: "isinstance".into(),
+                            ctx: ExprContext::Load,
+                            range: TextRange::default(),
+                        }
+                        .into(),
+                    ),
                     arguments: Arguments {
-                        args: Box::from([target.clone(), node.into()]),
+                        args: Box::from([target.clone(), tuple.into()]),
                         keywords: Box::from([]),
                         range: TextRange::default(),
                     },
                     range: TextRange::default(),
-                };
-                let call = node2.into();
+                }
+                .into();
 
                 // Generate the combined `BoolOp`.
                 let [first, .., last] = indices.as_slice() else {
@@ -443,17 +446,21 @@ pub(crate) fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
                 };
                 let before = values.iter().take(*first).cloned();
                 let after = values.iter().skip(last + 1).cloned();
-                let node = ast::ExprBoolOp {
+                let bool_op = ast::ExprBoolOp {
                     op: BoolOp::Or,
-                    values: before.chain(iter::once(call)).chain(after).collect(),
+                    values: before
+                        .chain(iter::once(isinstance_call))
+                        .chain(after)
+                        .collect(),
                     range: TextRange::default(),
-                };
-                let bool_op = node.into();
+                }
+                .into();
+                let fixed_source = checker.generator().expr(&bool_op);
 
                 // Populate the `Fix`. Replace the _entire_ `BoolOp`. Note that if we have
                 // multiple duplicates, the fixes will conflict.
                 diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-                    checker.generator().expr(&bool_op),
+                    pad(fixed_source, expr.range(), checker.locator()),
                     expr.range(),
                 )));
             }

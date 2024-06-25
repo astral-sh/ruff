@@ -1515,16 +1515,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 refurb::rules::reimplemented_starmap(checker, &generator.into());
             }
         }
-        Expr::BoolOp(
-            bool_op @ ast::ExprBoolOp {
-                op,
-                values,
-                range: _,
-            },
-        ) => {
-            if checker.enabled(Rule::RepeatedIsinstanceCalls) {
-                pylint::rules::repeated_isinstance_calls(checker, expr, *op, values);
-            }
+        Expr::BoolOp(bool_op) => {
             if checker.enabled(Rule::MultipleStartsEndsWith) {
                 flake8_pie::rules::multiple_starts_ends_with(checker, expr);
             }
