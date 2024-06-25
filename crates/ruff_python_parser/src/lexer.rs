@@ -133,13 +133,24 @@ impl<'src> Lexer<'src> {
         std::mem::take(&mut self.current_value)
     }
 
+    /// Helper function to push the given error, updating the current range with the error location
+    /// and return the [`TokenKind::Unknown`] token.
+    fn push_error(&mut self, error: LexicalError) -> TokenKind {
+        self.current_range = error.location();
+        self.errors.push(error);
+        TokenKind::Unknown
+    }
+
     /// Lex the next token.
     pub fn next_token(&mut self) -> TokenKind {
         self.cursor.start_token();
         self.current_value = TokenValue::None;
         self.current_flags = TokenFlags::empty();
         self.current_kind = self.lex_token();
-        self.current_range = self.token_range();
+        // For `Unknown` token, the `push_error` method updates the current range.
+        if !matches!(self.current_kind, TokenKind::Unknown) {
+            self.current_range = self.token_range();
+        }
         self.current_kind
     }
 
@@ -236,7 +247,7 @@ impl<'src> Lexer<'src> {
                     } else if !self.cursor.eat_char('\n') {
                         return Some(self.push_error(LexicalError::new(
                             LexicalErrorType::LineContinuationError,
-                            self.token_range(),
+                            TextRange::at(self.offset(), self.cursor.first().text_len()),
                         )));
                     }
                     indentation = Indentation::root();
@@ -328,7 +339,7 @@ impl<'src> Lexer<'src> {
                     } else if !self.cursor.eat_char('\n') {
                         return Err(LexicalError::new(
                             LexicalErrorType::LineContinuationError,
-                            self.token_range(),
+                            TextRange::at(self.offset(), self.cursor.first().text_len()),
                         ));
                     }
                 }
@@ -1462,12 +1473,6 @@ impl<'src> Lexer<'src> {
     #[inline]
     fn token_start(&self) -> TextSize {
         self.token_range().start()
-    }
-
-    /// Helper function to push the given error and return the [`TokenKind::Unknown`] token.
-    fn push_error(&mut self, error: LexicalError) -> TokenKind {
-        self.errors.push(error);
-        TokenKind::Unknown
     }
 
     /// Creates a checkpoint to which the lexer can later return to using [`Self::rewind`].
