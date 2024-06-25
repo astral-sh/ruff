@@ -790,6 +790,40 @@ if condition:
     Ok(())
 }
 
+#[test]
+fn deprecated_options() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r"
+tab-size = 2
+",
+    )?;
+
+    insta::with_settings!({filters => vec![
+        (&*regex::escape(ruff_toml.to_str().unwrap()), "[RUFF-TOML-PATH]"),
+    ]}, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+            .args(["format", "--config"])
+            .arg(&ruff_toml)
+            .arg("-")
+            .pass_stdin(r"
+if True:
+    pass
+    "), @r###"
+        success: false
+        exit_code: 2
+        ----- stdout -----
+
+        ----- stderr -----
+        ruff failed
+          Cause: The `tab-size` option has been renamed to `indent-width` to emphasize that it configures the indentation used by the formatter as well as the tab width. Please update `[RUFF-TOML-PATH]` to use `indent-width = <value>` instead.
+        "###);
+    });
+    Ok(())
+}
+
 /// Since 0.1.0 the legacy format option is no longer supported
 #[test]
 fn legacy_format_option() -> Result<()> {
