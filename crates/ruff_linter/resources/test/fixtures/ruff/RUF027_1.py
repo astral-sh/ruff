@@ -38,3 +38,10 @@ def negative_cases():
     print(("{a}" "{c}").format(a=1, c=2))
     print("{a}".attribute.chaining.call(a=2))
     print("{a} {c}".format(a))
+
+    from gettext import gettext as foo
+    should = 42
+    x = foo("This {should} also be understood as a translation string")
+
+    import django.utils.translations
+    y = django.utils.translations.gettext("This {should} be understood as a translation string too!")
