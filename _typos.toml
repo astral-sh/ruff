@@ -16,5 +16,6 @@ jod = "jod" # e.g., `jod-thread`
 [default]
 extend-ignore-re = [
   # Line ignore with trailing "spellchecker:disable-line"
-  "(?Rm)^.*#\\s*spellchecker:disable-line$"
+  "(?Rm)^.*#\\s*spellchecker:disable-line$",
+  "LICENSEs",
 ]
