@@ -101,7 +101,7 @@ fn is_gettext(expr: &ast::Expr, semantic: &SemanticModel) -> bool {
     };
 
     if let ast::Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
-        if matches!(id.as_str(), "_") {
+        if id.as_str() == "_" {
             return true;
         }
     };
@@ -217,8 +217,9 @@ fn should_be_fstring(
 fn has_brackets(possible_fstring: &str) -> bool {
     // this qualifies rare false positives like "{ unclosed bracket"
     // but it's faster in the general case
-    let mut searcher = memchr2_iter(b'{', b'}', possible_fstring.as_bytes());
-    searcher.next().and_then(|_| searcher.next()).is_some()
+    memchr2_iter(b'{', b'}', possible_fstring.as_bytes())
+        .nth(1)
+        .is_some()
 }
 
 fn fix_fstring_syntax(range: TextRange) -> Fix {
