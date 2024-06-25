@@ -71,7 +71,10 @@ pub(crate) fn missing_fstring_syntax(
     }
 
     // We also want to avoid expressions that are intended to be translated.
-    if semantic.current_expressions().any(is_gettext) {
+    if semantic
+        .current_expressions()
+        .any(|expr| is_gettext(expr, semantic))
+    {
         return;
     }
 
@@ -92,14 +95,25 @@ pub(crate) fn missing_fstring_syntax(
 /// and replace the original string with its translated counterpart. If the
 /// string contains variable placeholders or formatting, it can complicate the
 /// translation process, lead to errors or incorrect translations.
-fn is_gettext(expr: &ast::Expr) -> bool {
+fn is_gettext(expr: &ast::Expr, semantic: &SemanticModel) -> bool {
     let ast::Expr::Call(ast::ExprCall { func, .. }) = expr else {
         return false;
     };
-    let ast::Expr::Name(ast::ExprName { id, .. }) = func.as_ref() else {
-        return false;
+
+    if let ast::Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
+        if matches!(id.as_str(), "_") {
+            return true;
+        }
     };
-    matches!(id.as_str(), "_" | "gettext" | "ngettext")
+
+    semantic
+        .resolve_qualified_name(func)
+        .is_some_and(|qualified_name| {
+            matches!(
+                qualified_name.segments(),
+                ["gettext", "gettext" | "ngettext"]
+            )
+        })
 }
 
 /// Returns `true` if `literal` is likely an f-string with a missing `f` prefix.
@@ -119,7 +133,7 @@ fn should_be_fstring(
     };
 
     // Note: Range offsets for `value` are based on `fstring_expr`
-    let Some(ast::ExprFString { value, .. }) = parsed.expr().as_f_string_expr() else {
+    let ast::Expr::FString(ast::ExprFString { value, .. }) = parsed.expr() else {
         return false;
     };
 
@@ -203,7 +217,8 @@ fn should_be_fstring(
 fn has_brackets(possible_fstring: &str) -> bool {
     // this qualifies rare false positives like "{ unclosed bracket"
     // but it's faster in the general case
-    memchr2_iter(b'{', b'}', possible_fstring.as_bytes()).count() > 1
+    let mut searcher = memchr2_iter(b'{', b'}', possible_fstring.as_bytes());
+    searcher.next().and_then(|_| searcher.next()).is_some()
 }
 
 fn fix_fstring_syntax(range: TextRange) -> Fix {

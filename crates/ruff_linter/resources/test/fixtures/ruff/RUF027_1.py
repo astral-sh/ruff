@@ -38,3 +38,6 @@ def negative_cases():
     print(("{a}" "{c}").format(a=1, c=2))
     print("{a}".attribute.chaining.call(a=2))
     print("{a} {c}".format(a))
+
+    from gettext import gettext as fooooooo
+    fooooooo("This {should} also {be} understood as a {translation} string")
