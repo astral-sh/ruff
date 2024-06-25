@@ -5,8 +5,8 @@ use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
-use crate::codes::RuleCodePrefix;
 use crate::codes::RuleIter;
+use crate::codes::{RuleCodePrefix, RuleGroup};
 use crate::registry::{Linter, Rule, RuleNamespace};
 use crate::rule_redirects::get_redirect;
 use crate::settings::types::PreviewMode;
@@ -205,15 +205,23 @@ impl RuleSelector {
     pub fn rules<'a>(&'a self, preview: &PreviewOptions) -> impl Iterator<Item = Rule> + 'a {
         let preview_enabled = preview.mode.is_enabled();
         let preview_require_explicit = preview.require_explicit;
+
         self.all_rules().filter(move |rule| {
-            // Always include stable rules
-            rule.is_stable()
-            // Enabling preview includes all preview rules unless explicit selection is turned on
-            || (rule.is_preview() && preview_enabled && (self.is_exact() || !preview_require_explicit))
-            // Deprecated rules are excluded in preview mode and with 'All' option unless explicitly selected
-            || (rule.is_deprecated() && (!preview_enabled || self.is_exact()) && !matches!(self, RuleSelector::All { .. }))
-            // Removed rules are included if explicitly selected but will error downstream
-            || (rule.is_removed() && self.is_exact())
+            match rule.group() {
+                // Always include stable rules
+                RuleGroup::Stable => true,
+                // Enabling preview includes all preview rules unless explicit selection is turned on
+                RuleGroup::Preview => {
+                    preview_enabled && (self.is_exact() || !preview_require_explicit)
+                }
+                // Deprecated rules are excluded in preview mode and with 'All' option unless explicitly selected
+                RuleGroup::Deprecated => {
+                    (!preview_enabled || self.is_exact())
+                        && !matches!(self, RuleSelector::All { .. })
+                }
+                // Removed rules are included if explicitly selected but will error downstream
+                RuleGroup::Removed => self.is_exact(),
+            }
         })
     }
 
