@@ -44,7 +44,7 @@ impl Violation for TrioTimeoutWithoutAwait {
     }
 }
 
-/// TRIO100
+/// ASYNC100
 pub(crate) fn timeout_without_await(
     checker: &mut Checker,
     with_stmt: &StmtWith,

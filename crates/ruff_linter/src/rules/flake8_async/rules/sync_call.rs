@@ -50,7 +50,7 @@ impl Violation for TrioSyncCall {
     }
 }
 
-/// TRIO105
+/// ASYNC105
 pub(crate) fn sync_call(checker: &mut Checker, call: &ExprCall) {
     if !checker.semantic().seen_module(Modules::TRIO) {
         return;
