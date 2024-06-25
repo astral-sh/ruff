@@ -271,17 +271,16 @@ impl SourceOrderVisitor<'_> for SemanticIndexer {
         let node_key = NodeKey::from_node(expr.into());
         let expression_id = self.expressions_by_id.push(node_key);
 
-        debug_assert_eq!(
-            expression_id,
-            self.flow_graph_builder
-                .record_expr(self.current_flow_node())
-        );
+        let flow_expression_id = self
+            .flow_graph_builder
+            .record_expr(self.current_flow_node());
+        debug_assert_eq!(expression_id, flow_expression_id);
 
-        debug_assert_eq!(
-            expression_id,
-            self.symbol_table_builder
-                .record_expression(self.cur_scope())
-        );
+        let symbol_expression_id = self
+            .symbol_table_builder
+            .record_expression(self.cur_scope());
+
+        debug_assert_eq!(expression_id, symbol_expression_id);
 
         self.expressions.insert(node_key, expression_id);
 
