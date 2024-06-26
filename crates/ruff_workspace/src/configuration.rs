@@ -434,7 +434,7 @@ impl Configuration {
                 |path| format!("`{}`", fs::relativize_path(path)),
             );
             return Err(anyhow!(
-                r#"The Setting `output_format=text` has been deprecated. Update {config_to_update} to use `output-format="concise"` or  `output-format="full"` instead."#
+                r#"The option `output_format=text` is no longer supported. Update {config_to_update} to use `output-format="concise"` or  `output-format="full"` instead."#
             ));
         }
 

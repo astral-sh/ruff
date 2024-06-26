@@ -31,6 +31,6 @@ fn ensure_output_format_is_deprecated() {
 
     ----- stderr -----
     ruff failed
-      Cause: `--output-format=text` is deprecated. Use `--output-format=full` or `--output-format=concise` instead.
+      Cause: `--output-format=text` is no longer supported. Use `--output-format=full` or `--output-format=concise` instead.
     "###);
 }

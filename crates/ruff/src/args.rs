@@ -924,7 +924,7 @@ fn resolve_output_format(
     output_format: Option<OutputFormat>,
 ) -> anyhow::Result<Option<OutputFormat>> {
     if let Some(OutputFormat::Text) = output_format {
-        Err(anyhow!("`--output-format=text` is deprecated. Use `--output-format=full` or `--output-format=concise` instead."))
+        Err(anyhow!("`--output-format=text` is no longer supported. Use `--output-format=full` or `--output-format=concise` instead."))
     } else {
         Ok(output_format)
     }
