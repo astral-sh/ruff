@@ -78,7 +78,7 @@ impl GlobalConfigArgs {
 #[command(
     author,
     name = "ruff",
-    about = "Ruff: An extremely fast Python linter.",
+    about = "Ruff: An extremely fast Python linter and formatter.",
     after_help = "For help with a specific command, see: `ruff help <command>`."
 )]
 #[command(version)]
