@@ -292,17 +292,18 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "W3301") => (RuleGroup::Stable, rules::pylint::rules::NestedMinMax),
 
         // flake8-async
-        (Flake8Async, "100") => (RuleGroup::Stable, rules::flake8_async::rules::BlockingHttpCallInAsyncFunction),
-        (Flake8Async, "101") => (RuleGroup::Stable, rules::flake8_async::rules::OpenSleepOrSubprocessInAsyncFunction),
-        (Flake8Async, "102") => (RuleGroup::Stable, rules::flake8_async::rules::BlockingOsCallInAsyncFunction),
+        (Flake8Async, "100") => (RuleGroup::Stable, rules::flake8_async::rules::TrioTimeoutWithoutAwait),
+        (Flake8Async, "105") => (RuleGroup::Stable, rules::flake8_async::rules::TrioSyncCall),
+        (Flake8Async, "109") => (RuleGroup::Stable, rules::flake8_async::rules::TrioAsyncFunctionWithTimeout),
+        (Flake8Async, "110") => (RuleGroup::Stable, rules::flake8_async::rules::TrioUnneededSleep),
+        (Flake8Async, "115") => (RuleGroup::Stable, rules::flake8_async::rules::TrioZeroSleepCall),
         (Flake8Async, "116") => (RuleGroup::Preview, rules::flake8_async::rules::SleepForeverCall),
-
-        // flake8-trio
-        (Flake8Trio, "100") => (RuleGroup::Stable, rules::flake8_trio::rules::TrioTimeoutWithoutAwait),
-        (Flake8Trio, "105") => (RuleGroup::Stable, rules::flake8_trio::rules::TrioSyncCall),
-        (Flake8Trio, "109") => (RuleGroup::Stable, rules::flake8_trio::rules::TrioAsyncFunctionWithTimeout),
-        (Flake8Trio, "110") => (RuleGroup::Stable, rules::flake8_trio::rules::TrioUnneededSleep),
-        (Flake8Trio, "115") => (RuleGroup::Stable, rules::flake8_trio::rules::TrioZeroSleepCall),
+        (Flake8Async, "210") => (RuleGroup::Stable, rules::flake8_async::rules::BlockingHttpCallInAsyncFunction),
+        (Flake8Async, "220") => (RuleGroup::Stable, rules::flake8_async::rules::CreateSubprocessInAsyncFunction),
+        (Flake8Async, "221") => (RuleGroup::Stable, rules::flake8_async::rules::RunProcessInAsyncFunction),
+        (Flake8Async, "222") => (RuleGroup::Stable, rules::flake8_async::rules::WaitForProcessInAsyncFunction),
+        (Flake8Async, "230") => (RuleGroup::Stable, rules::flake8_async::rules::BlockingOpenCallInAsyncFunction),
+        (Flake8Async, "251") => (RuleGroup::Stable, rules::flake8_async::rules::BlockingSleepInAsyncFunction),
 
         // flake8-builtins
         (Flake8Builtins, "001") => (RuleGroup::Stable, rules::flake8_builtins::rules::BuiltinVariableShadowing),

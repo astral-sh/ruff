@@ -8,11 +8,11 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
 use crate::rules::{
-    airflow, flake8_bandit, flake8_boolean_trap, flake8_bugbear, flake8_builtins, flake8_debugger,
-    flake8_django, flake8_errmsg, flake8_import_conventions, flake8_pie, flake8_pyi,
-    flake8_pytest_style, flake8_raise, flake8_return, flake8_simplify, flake8_slots,
-    flake8_tidy_imports, flake8_trio, flake8_type_checking, mccabe, pandas_vet, pep8_naming,
-    perflint, pycodestyle, pyflakes, pygrep_hooks, pylint, pyupgrade, refurb, ruff, tryceratops,
+    airflow, flake8_async, flake8_bandit, flake8_boolean_trap, flake8_bugbear, flake8_builtins,
+    flake8_debugger, flake8_django, flake8_errmsg, flake8_import_conventions, flake8_pie,
+    flake8_pyi, flake8_pytest_style, flake8_raise, flake8_return, flake8_simplify, flake8_slots,
+    flake8_tidy_imports, flake8_type_checking, mccabe, pandas_vet, pep8_naming, perflint,
+    pycodestyle, pyflakes, pygrep_hooks, pylint, pyupgrade, refurb, ruff, tryceratops,
 };
 use crate::settings::types::PythonVersion;
 
@@ -357,7 +357,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 }
             }
             if checker.enabled(Rule::TrioAsyncFunctionWithTimeout) {
-                flake8_trio::rules::async_function_with_timeout(checker, function_def);
+                flake8_async::rules::async_function_with_timeout(checker, function_def);
             }
             if checker.enabled(Rule::ReimplementedOperator) {
                 refurb::rules::reimplemented_operator(checker, &function_def.into());
@@ -1303,7 +1303,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 pylint::rules::useless_with_lock(checker, with_stmt);
             }
             if checker.enabled(Rule::TrioTimeoutWithoutAwait) {
-                flake8_trio::rules::timeout_without_await(checker, with_stmt, items);
+                flake8_async::rules::timeout_without_await(checker, with_stmt, items);
             }
         }
         Stmt::While(while_stmt @ ast::StmtWhile { body, orelse, .. }) => {
@@ -1320,7 +1320,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 perflint::rules::try_except_in_loop(checker, body);
             }
             if checker.enabled(Rule::TrioUnneededSleep) {
-                flake8_trio::rules::unneeded_sleep(checker, while_stmt);
+                flake8_async::rules::unneeded_sleep(checker, while_stmt);
             }
         }
         Stmt::For(
