@@ -1486,7 +1486,6 @@ mod tests {
     const PREVIEW_RULES: &[Rule] = &[
         Rule::IsinstanceTypeNone,
         Rule::IfExprMinMax,
-        Rule::ManualDictComprehension,
         Rule::ReimplementedStarmap,
         Rule::SliceCopy,
         Rule::TooManyPublicMethods,
