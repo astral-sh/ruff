@@ -9,7 +9,11 @@ use super::LSPResult;
 pub(super) fn generate_diagnostics(snapshot: &DocumentSnapshot) -> DiagnosticsMap {
     if snapshot.client_settings().lint() {
         let document = snapshot.query();
-        crate::lint::check(document, snapshot.encoding())
+        crate::lint::check(
+            document,
+            snapshot.encoding(),
+            snapshot.client_settings().show_syntax_errors(),
+        )
     } else {
         DiagnosticsMap::default()
     }

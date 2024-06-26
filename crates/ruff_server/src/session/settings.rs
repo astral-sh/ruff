@@ -21,6 +21,7 @@ pub(crate) struct ResolvedClientSettings {
     lint_enable: bool,
     disable_rule_comment_enable: bool,
     fix_violation_enable: bool,
+    show_syntax_errors: bool,
     editor_settings: ResolvedEditorSettings,
 }
 
@@ -70,6 +71,13 @@ pub struct ClientSettings {
     exclude: Option<Vec<String>>,
     line_length: Option<LineLength>,
     configuration_preference: Option<ConfigurationPreference>,
+
+    /// If `true` or [`None`], show syntax errors as diagnostics.
+    ///
+    /// This is useful when using Ruff with other language servers, allowing the user to refer
+    /// to syntax errors from only one source.
+    show_syntax_errors: Option<bool>,
+
     // These settings are only needed for tracing, and are only read from the global configuration.
     // These will not be in the resolved settings.
     #[serde(flatten)]
@@ -244,6 +252,11 @@ impl ResolvedClientSettings {
                 },
                 true,
             ),
+            show_syntax_errors: Self::resolve_or(
+                all_settings,
+                |settings| settings.show_syntax_errors,
+                true,
+            ),
             editor_settings: ResolvedEditorSettings {
                 configuration: Self::resolve_optional(all_settings, |settings| {
                     settings
@@ -343,6 +356,10 @@ impl ResolvedClientSettings {
 
     pub(crate) fn fix_violation(&self) -> bool {
         self.fix_violation_enable
+    }
+
+    pub(crate) fn show_syntax_errors(&self) -> bool {
+        self.show_syntax_errors
     }
 
     pub(crate) fn editor_settings(&self) -> &ResolvedEditorSettings {
@@ -602,6 +619,7 @@ mod tests {
                 lint_enable: true,
                 disable_rule_comment_enable: false,
                 fix_violation_enable: false,
+                show_syntax_errors: true,
                 editor_settings: ResolvedEditorSettings {
                     configuration: None,
                     lint_preview: Some(true),
@@ -633,6 +651,7 @@ mod tests {
                 lint_enable: true,
                 disable_rule_comment_enable: true,
                 fix_violation_enable: false,
+                show_syntax_errors: true,
                 editor_settings: ResolvedEditorSettings {
                     configuration: None,
                     lint_preview: Some(false),
@@ -726,6 +745,7 @@ mod tests {
                 lint_enable: true,
                 disable_rule_comment_enable: false,
                 fix_violation_enable: true,
+                show_syntax_errors: true,
                 editor_settings: ResolvedEditorSettings {
                     configuration: None,
                     lint_preview: None,
