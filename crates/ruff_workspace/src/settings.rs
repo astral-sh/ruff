@@ -44,7 +44,7 @@ impl Default for Settings {
             cache_dir: cache_dir(project_root),
             fix: false,
             fix_only: false,
-            output_format: OutputFormat::default(false),
+            output_format: OutputFormat::default(),
             show_fixes: false,
             unsafe_fixes: UnsafeFixes::default(),
             linter: LinterSettings::new(project_root),
