@@ -43,8 +43,8 @@ fn do_fuzz(case: &[u8]) -> Corpus {
 
     let mut warnings = HashMap::new();
 
-    for msg in linter_results.data {
-        let count: &mut usize = warnings.entry(msg.kind.name).or_default();
+    for msg in &linter_results.data {
+        let count: &mut usize = warnings.entry(msg.name()).or_default();
         *count += 1;
     }
 
@@ -67,8 +67,8 @@ fn do_fuzz(case: &[u8]) -> Corpus {
             "formatter introduced a parse error"
         );
 
-        for msg in linter_results.data {
-            if let Some(count) = warnings.get_mut(&msg.kind.name) {
+        for msg in &linter_results.data {
+            if let Some(count) = warnings.get_mut(msg.name()) {
                 if let Some(decremented) = count.checked_sub(1) {
                     *count = decremented;
                 } else {

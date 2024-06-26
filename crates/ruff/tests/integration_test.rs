@@ -798,10 +798,10 @@ fn stdin_parse_error() {
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:16: E999 SyntaxError: Expected one or more symbol names after import
+    -:1:16: SyntaxError: Expected one or more symbol names after import
       |
     1 | from foo import
-      |                ^ E999
+      |                ^
       |
 
     Found 1 error.
@@ -819,24 +819,46 @@ fn stdin_multiple_parse_error() {
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:16: E999 SyntaxError: Expected one or more symbol names after import
+    -:1:16: SyntaxError: Expected one or more symbol names after import
       |
     1 | from foo import
-      |                ^ E999
+      |                ^
     2 | bar =
       |
 
-    -:2:6: E999 SyntaxError: Expected an expression
+    -:2:6: SyntaxError: Expected an expression
       |
     1 | from foo import
     2 | bar =
-      |      ^ E999
+      |      ^
       |
 
     Found 2 errors.
 
     ----- stderr -----
     error: Failed to parse at 1:16: Expected one or more symbol names after import
+    "###);
+}
+
+#[test]
+fn parse_error_not_included() {
+    // Select any rule except for `E999`, syntax error should still be shown.
+    let mut cmd = RuffCheck::default().args(["--select=I"]).build();
+    assert_cmd_snapshot!(cmd
+        .pass_stdin("foo =\n"), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:1:6: SyntaxError: Expected an expression
+      |
+    1 | foo =
+      |      ^
+      |
+
+    Found 1 error.
+
+    ----- stderr -----
+    error: Failed to parse at 1:6: Expected an expression
     "###);
 }
 

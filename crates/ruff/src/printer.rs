@@ -13,11 +13,11 @@ use ruff_linter::fs::relativize_path;
 use ruff_linter::logging::LogLevel;
 use ruff_linter::message::{
     AzureEmitter, Emitter, EmitterContext, GithubEmitter, GitlabEmitter, GroupedEmitter,
-    JsonEmitter, JsonLinesEmitter, JunitEmitter, PylintEmitter, RdjsonEmitter, SarifEmitter,
-    TextEmitter,
+    JsonEmitter, JsonLinesEmitter, JunitEmitter, Message, MessageKind, PylintEmitter,
+    RdjsonEmitter, SarifEmitter, TextEmitter,
 };
 use ruff_linter::notify_user;
-use ruff_linter::registry::{AsRule, Rule};
+use ruff_linter::registry::Rule;
 use ruff_linter::settings::flags::{self};
 use ruff_linter::settings::types::{OutputFormat, UnsafeFixes};
 
@@ -37,12 +37,13 @@ bitflags! {
 
 #[derive(Serialize)]
 struct ExpandedStatistics {
-    code: SerializeRuleAsCode,
-    name: SerializeRuleAsTitle,
+    code: Option<SerializeRuleAsCode>,
+    name: SerializeMessageKindAsTitle,
     count: usize,
     fixable: bool,
 }
 
+#[derive(Copy, Clone)]
 struct SerializeRuleAsCode(Rule);
 
 impl Serialize for SerializeRuleAsCode {
@@ -66,26 +67,26 @@ impl From<Rule> for SerializeRuleAsCode {
     }
 }
 
-struct SerializeRuleAsTitle(Rule);
+struct SerializeMessageKindAsTitle(MessageKind);
 
-impl Serialize for SerializeRuleAsTitle {
+impl Serialize for SerializeMessageKindAsTitle {
     fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
-        serializer.serialize_str(self.0.as_ref())
+        serializer.serialize_str(self.0.as_str())
     }
 }
 
-impl Display for SerializeRuleAsTitle {
+impl Display for SerializeMessageKindAsTitle {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0.as_ref())
+        write!(f, "{}", self.0.as_str())
     }
 }
 
-impl From<Rule> for SerializeRuleAsTitle {
-    fn from(rule: Rule) -> Self {
-        Self(rule)
+impl From<MessageKind> for SerializeMessageKindAsTitle {
+    fn from(kind: MessageKind) -> Self {
+        Self(kind)
     }
 }
 
@@ -341,24 +342,23 @@ impl Printer {
         let statistics: Vec<ExpandedStatistics> = diagnostics
             .messages
             .iter()
-            .map(|message| (message.kind.rule(), message.fix.is_some()))
-            .sorted()
-            .fold(vec![], |mut acc, (rule, fixable)| {
-                if let Some((prev_rule, _, count)) = acc.last_mut() {
-                    if *prev_rule == rule {
+            .sorted_by_key(|message| (message.rule(), message.fixable()))
+            .fold(vec![], |mut acc: Vec<(&Message, usize)>, message| {
+                if let Some((prev_message, count)) = acc.last_mut() {
+                    if prev_message.rule() == message.rule() {
                         *count += 1;
                         return acc;
                     }
                 }
-                acc.push((rule, fixable, 1));
+                acc.push((message, 1));
                 acc
             })
             .iter()
-            .map(|(rule, fixable, count)| ExpandedStatistics {
-                code: (*rule).into(),
-                name: (*rule).into(),
-                count: *count,
-                fixable: *fixable,
+            .map(|&(message, count)| ExpandedStatistics {
+                code: message.rule().map(std::convert::Into::into),
+                name: message.kind().into(),
+                count,
+                fixable: message.fixable(),
             })
             .sorted_by_key(|statistic| Reverse(statistic.count))
             .collect();
@@ -381,7 +381,12 @@ impl Printer {
                 );
                 let code_width = statistics
                     .iter()
-                    .map(|statistic| statistic.code.to_string().len())
+                    .map(|statistic| {
+                        statistic
+                            .code
+                            .map_or_else(String::new, |rule| rule.to_string())
+                            .len()
+                    })
                     .max()
                     .unwrap();
                 let any_fixable = statistics.iter().any(|statistic| statistic.fixable);
@@ -395,7 +400,11 @@ impl Printer {
                         writer,
                         "{:>count_width$}\t{:<code_width$}\t{}{}",
                         statistic.count.to_string().bold(),
-                        statistic.code.to_string().red().bold(),
+                        statistic
+                            .code
+                            .map_or_else(String::new, |rule| rule.to_string())
+                            .red()
+                            .bold(),
                         if any_fixable {
                             if statistic.fixable {
                                 &fixable
@@ -545,7 +554,7 @@ impl FixableStatistics {
         let mut unapplicable_unsafe = 0;
 
         for message in &diagnostics.messages {
-            if let Some(fix) = &message.fix {
+            if let Some(fix) = message.fix() {
                 if fix.applies(unsafe_fixes.required_applicability()) {
                     applicable += 1;
                 } else {

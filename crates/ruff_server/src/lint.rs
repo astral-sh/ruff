@@ -1,5 +1,6 @@
 //! Access to the Ruff linting API for the LSP
 
+use ruff_python_parser::ParseError;
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 
@@ -153,7 +154,10 @@ pub(crate) fn check(query: &DocumentQuery, encoding: PositionEncoding) -> Diagno
         .zip(noqa_edits)
         .map(|(diagnostic, noqa_edit)| {
             to_lsp_diagnostic(diagnostic, &noqa_edit, &source_kind, &index, encoding)
-        });
+        })
+        .chain(parsed.errors().iter().map(|parse_error| {
+            parse_error_to_lsp_diagnostic(parse_error, &source_kind, &index, encoding)
+        }));
 
     if let Some(notebook) = query.as_notebook() {
         for (index, diagnostic) in lsp_diagnostics {
@@ -283,6 +287,45 @@ fn to_lsp_diagnostic(
             message: kind.body,
             related_information: None,
             data,
+        },
+    )
+}
+
+fn parse_error_to_lsp_diagnostic(
+    parse_error: &ParseError,
+    source_kind: &SourceKind,
+    index: &LineIndex,
+    encoding: PositionEncoding,
+) -> (usize, lsp_types::Diagnostic) {
+    let range: lsp_types::Range;
+    let cell: usize;
+
+    if let Some(notebook_index) = source_kind.as_ipy_notebook().map(Notebook::index) {
+        NotebookRange { cell, range } = parse_error.location.to_notebook_range(
+            source_kind.source_code(),
+            index,
+            notebook_index,
+            encoding,
+        );
+    } else {
+        cell = usize::default();
+        range = parse_error
+            .location
+            .to_range(source_kind.source_code(), index, encoding);
+    }
+
+    (
+        cell,
+        lsp_types::Diagnostic {
+            range,
+            severity: Some(lsp_types::DiagnosticSeverity::ERROR),
+            tags: None,
+            code: None,
+            code_description: None,
+            source: Some(DIAGNOSTIC_NAME.into()),
+            message: format!("SyntaxError: {}", &parse_error.error),
+            related_information: None,
+            data: None,
         },
     )
 }

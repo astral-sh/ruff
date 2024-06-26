@@ -10,18 +10,18 @@ use std::path::Path;
 use anyhow::{Context, Result};
 use colored::Colorize;
 use log::{debug, error, warn};
+use ruff_linter::codes::Rule;
 use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::Diagnostic;
 use ruff_linter::linter::{lint_fix, lint_only, FixTable, FixerResult, LinterResult, ParseSource};
 use ruff_linter::logging::DisplayParseError;
-use ruff_linter::message::Message;
+use ruff_linter::message::{Message, SyntaxErrorMessage};
 use ruff_linter::pyproject_toml::lint_pyproject_toml;
-use ruff_linter::registry::AsRule;
 use ruff_linter::settings::types::UnsafeFixes;
 use ruff_linter::settings::{flags, LinterSettings};
 use ruff_linter::source_kind::{SourceError, SourceKind};
-use ruff_linter::{fs, IOError, SyntaxError};
+use ruff_linter::{fs, IOError};
 use ruff_notebook::{Notebook, NotebookError, NotebookIndex};
 use ruff_python_ast::{PySourceType, SourceType, TomlSourceType};
 use ruff_source_file::SourceFileBuilder;
@@ -55,57 +55,61 @@ impl Diagnostics {
         path: Option<&Path>,
         settings: &LinterSettings,
     ) -> Self {
-        let diagnostic = match err {
+        match err {
             // IO errors.
             SourceError::Io(_)
             | SourceError::Notebook(NotebookError::Io(_) | NotebookError::Json(_)) => {
-                Diagnostic::new(
-                    IOError {
-                        message: err.to_string(),
-                    },
-                    TextRange::default(),
-                )
+                if settings.rules.enabled(Rule::IOError) {
+                    let name = path.map_or_else(|| "-".into(), Path::to_string_lossy);
+                    let source_file = SourceFileBuilder::new(name, "").finish();
+                    Self::new(
+                        vec![Message::from_diagnostic(
+                            Diagnostic::new(
+                                IOError {
+                                    message: err.to_string(),
+                                },
+                                TextRange::default(),
+                            ),
+                            source_file,
+                            TextSize::default(),
+                        )],
+                        FxHashMap::default(),
+                    )
+                } else {
+                    match path {
+                        Some(path) => {
+                            warn!(
+                                "{}{}{} {err}",
+                                "Failed to lint ".bold(),
+                                fs::relativize_path(path).bold(),
+                                ":".bold()
+                            );
+                        }
+                        None => {
+                            warn!("{}{} {err}", "Failed to lint".bold(), ":".bold());
+                        }
+                    }
+
+                    Self::default()
+                }
             }
             // Syntax errors.
             SourceError::Notebook(
                 NotebookError::InvalidJson(_)
                 | NotebookError::InvalidSchema(_)
                 | NotebookError::InvalidFormat(_),
-            ) => Diagnostic::new(
-                SyntaxError {
-                    message: err.to_string(),
-                },
-                TextRange::default(),
-            ),
-        };
-
-        if settings.rules.enabled(diagnostic.kind.rule()) {
-            let name = path.map_or_else(|| "-".into(), Path::to_string_lossy);
-            let dummy = SourceFileBuilder::new(name, "").finish();
-            Self::new(
-                vec![Message::from_diagnostic(
-                    diagnostic,
-                    dummy,
-                    TextSize::default(),
-                )],
-                FxHashMap::default(),
-            )
-        } else {
-            match path {
-                Some(path) => {
-                    warn!(
-                        "{}{}{} {err}",
-                        "Failed to lint ".bold(),
-                        fs::relativize_path(path).bold(),
-                        ":".bold()
-                    );
-                }
-                None => {
-                    warn!("{}{} {err}", "Failed to lint".bold(), ":".bold());
-                }
+            ) => {
+                let name = path.map_or_else(|| "-".into(), Path::to_string_lossy);
+                let dummy = SourceFileBuilder::new(name, "").finish();
+                Self::new(
+                    vec![Message::SyntaxError(SyntaxErrorMessage {
+                        message: err.to_string(),
+                        range: TextRange::default(),
+                        file: dummy,
+                    })],
+                    FxHashMap::default(),
+                )
             }
-
-            Self::default()
         }
     }
 }

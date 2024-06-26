@@ -1546,7 +1546,6 @@ mod tests {
             Rule::AmbiguousClassName,
             Rule::AmbiguousFunctionName,
             Rule::IOError,
-            Rule::SyntaxError,
             Rule::TabIndentation,
             Rule::TrailingWhitespace,
             Rule::MissingNewlineAtEndOfFile,
