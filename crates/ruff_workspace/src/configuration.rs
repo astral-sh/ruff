@@ -220,9 +220,7 @@ impl Configuration {
             fix: self.fix.unwrap_or(false),
             fix_only: self.fix_only.unwrap_or(false),
             unsafe_fixes: self.unsafe_fixes.unwrap_or_default(),
-            output_format: self
-                .output_format
-                .unwrap_or_else(|| OutputFormat::default(global_preview.is_enabled())),
+            output_format: self.output_format.unwrap_or_default(),
             show_fixes: self.show_fixes.unwrap_or(false),
 
             file_resolver: FileResolverSettings {
@@ -429,17 +427,16 @@ impl Configuration {
             return Err(anyhow!("The `tab-size` option has been renamed to `indent-width` to emphasize that it configures the indentation used by the formatter as well as the tab width. Please update {config_to_update} to use `indent-width = <value>` instead."));
         }
 
-        let output_format = {
-            options
-                .output_format
-                .map(|format| match format {
-                    OutputFormat::Text => {
-                        warn_user_once!(r#"Setting `output_format` to "text" is deprecated. Use "full" or "concise" instead. "text" will be treated as "{}"."#, OutputFormat::default(options.preview.unwrap_or_default()));
-                        OutputFormat::default(options.preview.unwrap_or_default())
-                    },
-                    other => other
-                })
-        };
+        #[allow(deprecated)]
+        if options.output_format == Some(OutputFormat::Text) {
+            let config_to_update = path.map_or_else(
+                || String::from("your `--config` CLI arguments"),
+                |path| format!("`{}`", fs::relativize_path(path)),
+            );
+            return Err(anyhow!(
+                r#"The option `output_format=text` is no longer supported. Update {config_to_update} to use `output-format="concise"` or  `output-format="full"` instead."#
+            ));
+        }
 
         Ok(Self {
             builtins: options.builtins,
@@ -505,7 +502,7 @@ impl Configuration {
             fix: options.fix,
             fix_only: options.fix_only,
             unsafe_fixes: options.unsafe_fixes.map(UnsafeFixes::from),
-            output_format,
+            output_format: options.output_format,
             force_exclude: options.force_exclude,
             line_length: options.line_length,
             indent_width: options.indent_width,
