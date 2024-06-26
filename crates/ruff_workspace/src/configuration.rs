@@ -1484,8 +1484,6 @@ mod tests {
     use crate::options::PydocstyleOptions;
 
     const PREVIEW_RULES: &[Rule] = &[
-        Rule::IsinstanceTypeNone,
-        Rule::IfExprMinMax,
         Rule::ReimplementedStarmap,
         Rule::SliceCopy,
         Rule::TooManyPublicMethods,
