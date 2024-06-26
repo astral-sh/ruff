@@ -1,3 +1,5 @@
+use std::fmt;
+
 use anyhow::Result;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
@@ -30,7 +32,7 @@ use crate::importer::ImportRequest;
 #[violation]
 pub struct MathConstant {
     literal: String,
-    constant: &'static str,
+    constant: Constant,
 }
 
 impl Violation for MathConstant {
@@ -58,7 +60,7 @@ pub(crate) fn math_constant(checker: &mut Checker, literal: &ast::ExprNumberLite
         let mut diagnostic = Diagnostic::new(
             MathConstant {
                 literal: checker.locator().slice(literal).into(),
-                constant: constant.name(),
+                constant,
             },
             literal.range(),
         );
@@ -97,7 +99,7 @@ fn matches_constant(constant: f64, value: f64) -> bool {
     false
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Constant {
     Pi,
     E,
@@ -118,11 +120,17 @@ impl Constant {
         }
     }
 
-    fn name(self) -> &'static str {
+    const fn name(self) -> &'static str {
         match self {
             Constant::Pi => "pi",
             Constant::E => "e",
             Constant::Tau => "tau",
         }
+    }
+}
+
+impl fmt::Display for Constant {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.name())
     }
 }
