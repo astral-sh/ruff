@@ -998,7 +998,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Perflint, "203") => (RuleGroup::Stable, rules::perflint::rules::TryExceptInLoop),
         (Perflint, "401") => (RuleGroup::Stable, rules::perflint::rules::ManualListComprehension),
         (Perflint, "402") => (RuleGroup::Stable, rules::perflint::rules::ManualListCopy),
-        (Perflint, "403") => (RuleGroup::Preview, rules::perflint::rules::ManualDictComprehension),
+        (Perflint, "403") => (RuleGroup::Stable, rules::perflint::rules::ManualDictComprehension),
 
         // flake8-fixme
         (Flake8Fixme, "001") => (RuleGroup::Stable, rules::flake8_fixme::rules::LineContainsFixme),

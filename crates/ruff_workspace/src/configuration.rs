@@ -1484,7 +1484,6 @@ mod tests {
     use crate::options::PydocstyleOptions;
 
     const PREVIEW_RULES: &[Rule] = &[
-        Rule::ManualDictComprehension,
         Rule::ReimplementedStarmap,
         Rule::SliceCopy,
         Rule::TooManyPublicMethods,
