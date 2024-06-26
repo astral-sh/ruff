@@ -1490,6 +1490,7 @@ mod tests {
         Rule::TooManyPublicMethods,
         Rule::TooManyPublicMethods,
         Rule::UnnecessaryEnumerate,
+        Rule::MathConstant,
         Rule::PreviewTestRule,
         Rule::BlankLineBetweenMethods,
         Rule::BlankLinesTopLevel,
