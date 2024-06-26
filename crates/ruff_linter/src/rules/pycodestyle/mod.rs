@@ -68,7 +68,6 @@ mod tests {
         Ok(())
     }
 
-    #[test_case(Rule::IsLiteral, Path::new("constant_literals.py"))]
     #[test_case(Rule::RedundantBackslash, Path::new("E502.py"))]
     #[test_case(Rule::TooManyNewlinesAtEndOfFile, Path::new("W391_0.py"))]
     #[test_case(Rule::TooManyNewlinesAtEndOfFile, Path::new("W391_1.py"))]
