@@ -41,20 +41,20 @@ impl Violation for NonAsciiImportName {
         let Self { name, kind } = self;
         match kind {
             Kind::Aliased => {
-                format!(
-                    "Module alias `{name}` contains a non-ASCII character, use an ASCII-only alias"
-                )
+                format!("Module alias `{name}` contains a non-ASCII character")
             }
             Kind::Unaliased => {
-                format!(
-                    "Module name `{name}` contains a non-ASCII character, use an ASCII-only alias"
-                )
+                format!("Module name `{name}` contains a non-ASCII character")
             }
         }
     }
+
+    fn fix_title(&self) -> Option<String> {
+        Some("Use an ASCII-only alias".to_string())
+    }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 enum Kind {
     /// The import uses a non-ASCII alias (e.g., `import foo as bár`).
     Aliased,
