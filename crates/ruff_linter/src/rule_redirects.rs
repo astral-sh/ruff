@@ -104,7 +104,7 @@ static REDIRECTS: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| {
         ("PGH001", "S307"),
         ("PGH002", "G010"),
         // flake8-trio and flake8-async merged with name flake8-async
-        ("TRIO", "ASYNC"),
+        ("TRIO", "ASYNC1"),
         ("TRIO1", "ASYNC1"),
         ("TRIO10", "ASYNC10"),
         ("TRIO100", "ASYNC100"),
