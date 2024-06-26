@@ -335,10 +335,10 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
     let preview = pyproject_config.settings.linter.preview.is_enabled();
 
     if cli.watch {
-        if output_format != OutputFormat::default(preview) {
+        if output_format != OutputFormat::default() {
             warn_user!(
                 "`--output-format {}` is always used in watch mode.",
-                OutputFormat::default(preview)
+                OutputFormat::default()
             );
         }
 

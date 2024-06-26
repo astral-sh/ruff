@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::Arc;
 
-use anyhow::bail;
+use anyhow::{anyhow, bail};
 use clap::builder::{TypedValueParser, ValueParserFactory};
 use clap::{command, Parser};
 use colored::Colorize;
@@ -21,7 +21,7 @@ use ruff_linter::settings::types::{
     ExtensionPair, FilePattern, OutputFormat, PatternPrefixPair, PerFileIgnore, PreviewMode,
     PythonVersion, UnsafeFixes,
 };
-use ruff_linter::{warn_user, RuleParser, RuleSelector, RuleSelectorParser};
+use ruff_linter::{RuleParser, RuleSelector, RuleSelectorParser};
 use ruff_source_file::{LineIndex, OneIndexed};
 use ruff_text_size::TextRange;
 use ruff_workspace::configuration::{Configuration, RuleSelection};
@@ -691,10 +691,7 @@ impl CheckCommand {
             unsafe_fixes: resolve_bool_arg(self.unsafe_fixes, self.no_unsafe_fixes)
                 .map(UnsafeFixes::from),
             force_exclude: resolve_bool_arg(self.force_exclude, self.no_force_exclude),
-            output_format: resolve_output_format(
-                self.output_format,
-                resolve_bool_arg(self.preview, self.no_preview).unwrap_or_default(),
-            ),
+            output_format: resolve_output_format(self.output_format)?,
             show_fixes: resolve_bool_arg(self.show_fixes, self.no_show_fixes),
             extension: self.extension,
         };
@@ -922,20 +919,15 @@ The path `{value}` does not point to a configuration file"
     }
 }
 
+#[allow(deprecated)]
 fn resolve_output_format(
     output_format: Option<OutputFormat>,
-    preview: bool,
-) -> Option<OutputFormat> {
-    Some(match output_format {
-        Some(o) => o,
-        None => return None
-    }).map(|format| match format {
-        OutputFormat::Text => {
-            warn_user!("`--output-format=text` is deprecated. Use `--output-format=full` or `--output-format=concise` instead. `text` will be treated as `{}`.", OutputFormat::default(preview));
-            OutputFormat::default(preview)
-        },
-        other => other
-    })
+) -> anyhow::Result<Option<OutputFormat>> {
+    if let Some(OutputFormat::Text) = output_format {
+        Err(anyhow!("`--output-format=text` is no longer supported. Use `--output-format=full` or `--output-format=concise` instead."))
+    } else {
+        Ok(output_format)
+    }
 }
 
 /// CLI settings that are distinct from configuration (commands, lists of files,

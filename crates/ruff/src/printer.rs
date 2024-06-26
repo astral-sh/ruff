@@ -240,6 +240,7 @@ impl Printer {
         }
 
         if !self.flags.intersects(Flags::SHOW_VIOLATIONS) {
+            #[allow(deprecated)]
             if matches!(
                 self.format,
                 OutputFormat::Text
@@ -275,8 +276,7 @@ impl Printer {
             OutputFormat::Junit => {
                 JunitEmitter.emit(writer, &diagnostics.messages, &context)?;
             }
-            OutputFormat::Concise
-            | OutputFormat::Full => {
+            OutputFormat::Concise | OutputFormat::Full => {
                 TextEmitter::default()
                     .with_show_fix_status(show_fix_status(self.fix_mode, fixables.as_ref()))
                     .with_show_fix_diff(self.flags.intersects(Flags::SHOW_FIX_DIFF))
@@ -324,6 +324,7 @@ impl Printer {
             OutputFormat::Sarif => {
                 SarifEmitter.emit(writer, &diagnostics.messages, &context)?;
             }
+            #[allow(deprecated)]
             OutputFormat::Text => unreachable!("Text is deprecated and should have been automatically converted to the default serialization format")
         }
 
@@ -367,6 +368,7 @@ impl Printer {
         }
 
         match self.format {
+            #[allow(deprecated)]
             OutputFormat::Text | OutputFormat::Full | OutputFormat::Concise => {
                 // Compute the maximum number of digits in the count and code, for all messages,
                 // to enable pretty-printing.
