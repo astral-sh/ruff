@@ -10,7 +10,7 @@ The Ruff language server, also known as `ruff server`, is what powers the diagno
 
 Download the [Ruff VS Code extension](https://marketplace.visualstudio.com/items?itemName=charliermarsh.ruff), which supports fix actions, import sorting, and more.
 
-By default, the extension will attempt to use the `ruff` executable installed on your local system, and will use a bundled executable if that's not available. If `ruff` is `v0.4.5` or later, the extension will automatically use `ruff server` - otherwise, it will use `ruff-lsp`. To configure this behavior, refer to the `languageServer` setting (add link here).
+By default, the extension will attempt to use the `ruff` executable installed on your local system, and will use a bundled executable if that's not available. If `ruff` is `v0.4.5` or later, the extension will automatically use `ruff server` - otherwise, it will use `ruff-lsp`.
 
 To learn more about configuring the extension, and the settings available for the extension, refer to [Configuring Ruff](https://github.com/astral-sh/ruff-vscode/?tab=readme-ov-file#configuring-ruff) in the `ruff-vscode` documentation.
 
