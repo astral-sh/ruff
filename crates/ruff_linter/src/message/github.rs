@@ -49,15 +49,10 @@ impl Emitter for GithubEmitter {
             )?;
 
             if let Some(rule) = message.rule() {
-                writeln!(
-                    writer,
-                    " {code} {body}",
-                    code = rule.noqa_code(),
-                    body = message.body()
-                )?;
-            } else {
-                writeln!(writer, " {}", message.body())?;
+                write!(writer, " {}", rule.noqa_code())?;
             }
+
+            writeln!(writer, " {}", message.body())?;
         }
 
         Ok(())
