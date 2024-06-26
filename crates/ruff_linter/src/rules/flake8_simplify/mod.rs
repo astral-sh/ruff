@@ -56,7 +56,6 @@ mod tests {
         Ok(())
     }
 
-    #[test_case(Rule::NeedlessBool, Path::new("SIM103.py"))]
     #[test_case(Rule::YodaConditions, Path::new("SIM300.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
