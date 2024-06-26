@@ -36,3 +36,39 @@ impl Violation for IOError {
         format!("{message}")
     }
 }
+
+/// ## Deprecated
+/// This rule has been deprecated and will be removed in a future release. Syntax errors will
+/// always be shown regardless of whether this rule is selected or not.
+///
+/// ## What it does
+/// Checks for code that contains syntax errors.
+///
+/// ## Why is this bad?
+/// Code with syntax errors cannot be executed. Such errors are likely a
+/// mistake.
+///
+/// ## Example
+/// ```python
+/// x =
+/// ```
+///
+/// Use instead:
+/// ```python
+/// x = 1
+/// ```
+///
+/// ## References
+/// - [Python documentation: Syntax Errors](https://docs.python.org/3/tutorial/errors.html#syntax-errors)
+#[violation]
+pub struct SyntaxError {
+    pub message: String,
+}
+
+impl Violation for SyntaxError {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let SyntaxError { message } = self;
+        format!("SyntaxError: {message}")
+    }
+}

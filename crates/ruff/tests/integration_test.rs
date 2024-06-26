@@ -863,6 +863,28 @@ fn parse_error_not_included() {
 }
 
 #[test]
+fn deprecated_parse_error_selection() {
+    let mut cmd = RuffCheck::default().args(["--select=E999"]).build();
+    assert_cmd_snapshot!(cmd
+        .pass_stdin("foo =\n"), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:1:6: SyntaxError: Expected an expression
+      |
+    1 | foo =
+      |      ^
+      |
+
+    Found 1 error.
+
+    ----- stderr -----
+    warning: Rule `E999` is deprecated and will be removed in a future release. Syntax errors will always be shown regardless of whether this rule is selected or not.
+    error: Failed to parse at 1:6: Expected an expression
+    "###);
+}
+
+#[test]
 fn full_output_preview() {
     let mut cmd = RuffCheck::default().args(["--preview"]).build();
     assert_cmd_snapshot!(cmd

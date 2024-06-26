@@ -6,6 +6,7 @@ pub(crate) use blank_lines::*;
 pub(crate) use compound_statements::*;
 pub(crate) use doc_line_too_long::*;
 pub use errors::IOError;
+pub(crate) use errors::*;
 pub(crate) use invalid_escape_sequence::*;
 pub(crate) use lambda_assignment::*;
 pub(crate) use line_too_long::*;
