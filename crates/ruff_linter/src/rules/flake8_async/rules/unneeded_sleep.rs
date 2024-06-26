@@ -41,7 +41,7 @@ impl Violation for TrioUnneededSleep {
     }
 }
 
-/// TRIO110
+/// ASYNC110
 pub(crate) fn unneeded_sleep(checker: &mut Checker, while_stmt: &ast::StmtWhile) {
     if !checker.semantic().seen_module(Modules::TRIO) {
         return;

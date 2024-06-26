@@ -334,7 +334,6 @@ quality tools, including:
 - [flake8-super](https://pypi.org/project/flake8-super/)
 - [flake8-tidy-imports](https://pypi.org/project/flake8-tidy-imports/)
 - [flake8-todos](https://pypi.org/project/flake8-todos/)
-- [flake8-trio](https://pypi.org/project/flake8-trio/)
 - [flake8-type-checking](https://pypi.org/project/flake8-type-checking/)
 - [flake8-use-pathlib](https://pypi.org/project/flake8-use-pathlib/)
 - [flynt](https://pypi.org/project/flynt/) ([#2102](https://github.com/astral-sh/ruff/issues/2102))

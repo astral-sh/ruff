@@ -15,8 +15,8 @@ use crate::rules::{
     flake8_comprehensions, flake8_datetimez, flake8_debugger, flake8_django,
     flake8_future_annotations, flake8_gettext, flake8_implicit_str_concat, flake8_logging,
     flake8_logging_format, flake8_pie, flake8_print, flake8_pyi, flake8_pytest_style, flake8_self,
-    flake8_simplify, flake8_tidy_imports, flake8_trio, flake8_type_checking, flake8_use_pathlib,
-    flynt, numpy, pandas_vet, pep8_naming, pycodestyle, pyflakes, pylint, pyupgrade, refurb, ruff,
+    flake8_simplify, flake8_tidy_imports, flake8_type_checking, flake8_use_pathlib, flynt, numpy,
+    pandas_vet, pep8_naming, pycodestyle, pyflakes, pylint, pyupgrade, refurb, ruff,
 };
 use crate::settings::types::PythonVersion;
 
@@ -505,11 +505,18 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::BlockingHttpCallInAsyncFunction) {
                 flake8_async::rules::blocking_http_call(checker, call);
             }
-            if checker.enabled(Rule::OpenSleepOrSubprocessInAsyncFunction) {
-                flake8_async::rules::open_sleep_or_subprocess_call(checker, call);
+            if checker.enabled(Rule::BlockingOpenCallInAsyncFunction) {
+                flake8_async::rules::blocking_open_call(checker, call);
             }
-            if checker.enabled(Rule::BlockingOsCallInAsyncFunction) {
-                flake8_async::rules::blocking_os_call(checker, call);
+            if checker.any_enabled(&[
+                Rule::CreateSubprocessInAsyncFunction,
+                Rule::RunProcessInAsyncFunction,
+                Rule::WaitForProcessInAsyncFunction,
+            ]) {
+                flake8_async::rules::blocking_process_invocation(checker, call);
+            }
+            if checker.enabled(Rule::BlockingSleepInAsyncFunction) {
+                flake8_async::rules::blocking_sleep(checker, call);
             }
             if checker.enabled(Rule::SleepForeverCall) {
                 flake8_async::rules::sleep_forever_call(checker, call);
@@ -963,10 +970,10 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 refurb::rules::no_implicit_cwd(checker, call);
             }
             if checker.enabled(Rule::TrioSyncCall) {
-                flake8_trio::rules::sync_call(checker, call);
+                flake8_async::rules::sync_call(checker, call);
             }
             if checker.enabled(Rule::TrioZeroSleepCall) {
-                flake8_trio::rules::zero_sleep_call(checker, call);
+                flake8_async::rules::zero_sleep_call(checker, call);
             }
             if checker.enabled(Rule::UnnecessaryDunderCall) {
                 pylint::rules::unnecessary_dunder_call(checker, call);
