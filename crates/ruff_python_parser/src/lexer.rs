@@ -1393,26 +1393,40 @@ impl<'src> Lexer<'src> {
         while let Some(ch) = reverse_chars.next() {
             if is_python_whitespace(ch) {
                 current_position -= ch.text_len();
-            } else if matches!(ch, '\n' | '\r') {
-                current_position -= ch.text_len();
-                // Count the number of backslashes before the newline character.
-                let mut backslash_count = 0;
-                while reverse_chars.next_if_eq(&'\\').is_some() {
-                    backslash_count += 1;
-                }
-                if backslash_count == 0 {
-                    // No escapes: `\n`
-                    newline_position = Some(current_position);
-                } else {
-                    if backslash_count % 2 == 0 {
-                        // Even number of backslashes i.e., all backslashes cancel each other out
-                        // which means the newline character is not being escaped.
-                        newline_position = Some(current_position);
+                continue;
+            }
+
+            match ch {
+                '\n' => {
+                    current_position -= ch.text_len();
+                    if let Some(carriage_return) = reverse_chars.next_if_eq(&'\r') {
+                        current_position -= carriage_return.text_len();
                     }
-                    current_position -= TextSize::new('\\'.text_len().to_u32() * backslash_count);
                 }
+                '\r' => {
+                    current_position -= ch.text_len();
+                }
+                _ => break,
+            }
+
+            debug_assert!(matches!(ch, '\n' | '\r'));
+
+            // Count the number of backslashes before the newline character.
+            let mut backslash_count = 0;
+            while reverse_chars.next_if_eq(&'\\').is_some() {
+                backslash_count += 1;
+            }
+
+            if backslash_count == 0 {
+                // No escapes: `\n`
+                newline_position = Some(current_position);
             } else {
-                break;
+                if backslash_count % 2 == 0 {
+                    // Even number of backslashes i.e., all backslashes cancel each other out
+                    // which means the newline character is not being escaped.
+                    newline_position = Some(current_position);
+                }
+                current_position -= TextSize::new('\\'.text_len().to_u32() * backslash_count);
             }
         }
 
