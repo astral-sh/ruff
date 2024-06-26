@@ -26,7 +26,7 @@ async def func() -> None:
     await trio.lowlevel.wait_task_rescheduled(foo)
     await trio.lowlevel.wait_writable(foo)
 
-    # TRIO105
+    # ASYNC105
     trio.aclose_forcefully(foo)
     trio.open_file(foo)
     trio.open_ssl_over_tcp_listeners(foo, foo)
@@ -55,10 +55,10 @@ async def func() -> None:
     async with await trio.open_file(foo):  # Ok
         pass
 
-    async with trio.open_file(foo):  # TRIO105
+    async with trio.open_file(foo):  # ASYNC105
         pass
 
 
 def func() -> None:
-    # TRIO105 (without fix)
+    # ASYNC105 (without fix)
     trio.open_file(foo)

@@ -45,7 +45,7 @@ impl AlwaysFixableViolation for TrioZeroSleepCall {
     }
 }
 
-/// TRIO115
+/// ASYNC115
 pub(crate) fn zero_sleep_call(checker: &mut Checker, call: &ExprCall) {
     if !checker.semantic().seen_module(Modules::TRIO) {
         return;

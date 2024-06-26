@@ -2,19 +2,19 @@ async def func():
     import trio
     from trio import sleep
 
-    await trio.sleep(0)  # TRIO115
+    await trio.sleep(0)  # ASYNC115
     await trio.sleep(1)  # OK
     await trio.sleep(0, 1)  # OK
     await trio.sleep(...)  # OK
     await trio.sleep()  # OK
 
-    trio.sleep(0)  # TRIO115
+    trio.sleep(0)  # ASYNC115
     foo = 0
     trio.sleep(foo)  # OK
     trio.sleep(1)  # OK
     time.sleep(0)  # OK
 
-    sleep(0)  # TRIO115
+    sleep(0)  # ASYNC115
 
     bar = "bar"
     trio.sleep(bar)
@@ -45,18 +45,18 @@ async def func():
 def func():
     import trio
 
-    trio.run(trio.sleep(0))  # TRIO115
+    trio.run(trio.sleep(0))  # ASYNC115
 
 
 from trio import Event, sleep
 
 
 def func():
-    sleep(0)  # TRIO115
+    sleep(0)  # ASYNC115
 
 
 async def func():
-    await sleep(seconds=0)  # TRIO115
+    await sleep(seconds=0)  # ASYNC115
 
 
 def func():

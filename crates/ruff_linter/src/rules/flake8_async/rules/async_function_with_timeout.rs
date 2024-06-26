@@ -40,7 +40,7 @@ impl Violation for TrioAsyncFunctionWithTimeout {
     }
 }
 
-/// TRIO109
+/// ASYNC109
 pub(crate) fn async_function_with_timeout(
     checker: &mut Checker,
     function_def: &ast::StmtFunctionDef,

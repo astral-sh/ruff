@@ -7,8 +7,7 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks that async functions do not contain calls to `open`, `time.sleep`,
-/// or `subprocess` methods.
+/// Checks that async functions do not open files with blocking methods like `open`.
 ///
 /// ## Why is this bad?
 /// Blocking an async function via a blocking call will block the entire
@@ -21,61 +20,53 @@ use crate::checkers::ast::Checker;
 /// ## Example
 /// ```python
 /// async def foo():
-///     time.sleep(1000)
+///     with open("bar.txt") as f:
+///         contents = f.read()
 /// ```
 ///
 /// Use instead:
 /// ```python
+/// import anyio
+///
+///
 /// async def foo():
-///     await asyncio.sleep(1000)
+///     async with await anyio.open_file("bar.txt") as f:
+///         contents = await f.read()
 /// ```
 #[violation]
-pub struct OpenSleepOrSubprocessInAsyncFunction;
+pub struct BlockingOpenCallInAsyncFunction;
 
-impl Violation for OpenSleepOrSubprocessInAsyncFunction {
+impl Violation for BlockingOpenCallInAsyncFunction {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Async functions should not call `open`, `time.sleep`, or `subprocess` methods")
+        format!("Async functions should not open files with blocking methods like `open`")
     }
 }
 
-/// ASYNC101
-pub(crate) fn open_sleep_or_subprocess_call(checker: &mut Checker, call: &ast::ExprCall) {
+/// ASYNC230
+pub(crate) fn blocking_open_call(checker: &mut Checker, call: &ast::ExprCall) {
     if !checker.semantic().in_async_context() {
         return;
     }
 
-    if is_open_sleep_or_subprocess_call(&call.func, checker.semantic())
+    if is_open_call(&call.func, checker.semantic())
         || is_open_call_from_pathlib(call.func.as_ref(), checker.semantic())
     {
         checker.diagnostics.push(Diagnostic::new(
-            OpenSleepOrSubprocessInAsyncFunction,
+            BlockingOpenCallInAsyncFunction,
             call.func.range(),
         ));
     }
 }
 
-/// Returns `true` if the expression resolves to a blocking call, like `time.sleep` or
-/// `subprocess.run`.
-fn is_open_sleep_or_subprocess_call(func: &Expr, semantic: &SemanticModel) -> bool {
+/// Returns `true` if the expression resolves to a blocking open call, like `open` or `Path().open()`.
+fn is_open_call(func: &Expr, semantic: &SemanticModel) -> bool {
     semantic
         .resolve_qualified_name(func)
         .is_some_and(|qualified_name| {
             matches!(
                 qualified_name.segments(),
-                ["" | "builtins", "open"]
-                    | ["time", "sleep"]
-                    | [
-                        "subprocess",
-                        "run"
-                            | "Popen"
-                            | "call"
-                            | "check_call"
-                            | "check_output"
-                            | "getoutput"
-                            | "getstatusoutput"
-                    ]
-                    | ["os", "wait" | "wait3" | "wait4" | "waitid" | "waitpid"]
+                ["" | "io", "open"] | ["io", "open_code"]
             )
         })
 }
