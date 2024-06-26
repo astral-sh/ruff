@@ -16,7 +16,6 @@ use crate::cst::helpers::or_space;
 use crate::cst::matchers::{match_comparison, transform_expression};
 use crate::fix::edits::pad;
 use crate::fix::snippet::SourceCodeSnippet;
-use crate::settings::types::PreviewMode;
 
 /// ## What it does
 /// Checks for conditions that position a constant on the left-hand side of the
@@ -94,9 +93,9 @@ enum ConstantLikelihood {
     Definitely = 2,
 }
 
-impl ConstantLikelihood {
+impl From<&Expr> for ConstantLikelihood {
     /// Determine the [`ConstantLikelihood`] of an expression.
-    fn from_expression(expr: &Expr, preview: PreviewMode) -> Self {
+    fn from(expr: &Expr) -> Self {
         match expr {
             _ if expr.is_literal_expr() => ConstantLikelihood::Definitely,
             Expr::Attribute(ast::ExprAttribute { attr, .. }) => {
@@ -105,15 +104,15 @@ impl ConstantLikelihood {
             Expr::Name(ast::ExprName { id, .. }) => ConstantLikelihood::from_identifier(id),
             Expr::Tuple(ast::ExprTuple { elts, .. }) => elts
                 .iter()
-                .map(|expr| ConstantLikelihood::from_expression(expr, preview))
+                .map(ConstantLikelihood::from)
                 .min()
                 .unwrap_or(ConstantLikelihood::Definitely),
-            Expr::List(ast::ExprList { elts, .. }) if preview.is_enabled() => elts
+            Expr::List(ast::ExprList { elts, .. }) => elts
                 .iter()
-                .map(|expr| ConstantLikelihood::from_expression(expr, preview))
+                .map(ConstantLikelihood::from)
                 .min()
                 .unwrap_or(ConstantLikelihood::Definitely),
-            Expr::Dict(ast::ExprDict { items, .. }) if preview.is_enabled() => {
+            Expr::Dict(ast::ExprDict { items, .. }) => {
                 if items.is_empty() {
                     ConstantLikelihood::Definitely
                 } else {
@@ -121,18 +120,20 @@ impl ConstantLikelihood {
                 }
             }
             Expr::BinOp(ast::ExprBinOp { left, right, .. }) => cmp::min(
-                ConstantLikelihood::from_expression(left, preview),
-                ConstantLikelihood::from_expression(right, preview),
+                ConstantLikelihood::from(&**left),
+                ConstantLikelihood::from(&**right),
             ),
             Expr::UnaryOp(ast::ExprUnaryOp {
                 op: UnaryOp::UAdd | UnaryOp::USub | UnaryOp::Invert,
                 operand,
                 range: _,
-            }) => ConstantLikelihood::from_expression(operand, preview),
+            }) => ConstantLikelihood::from(&**operand),
             _ => ConstantLikelihood::Unlikely,
         }
     }
+}
 
+impl ConstantLikelihood {
     /// Determine the [`ConstantLikelihood`] of an identifier.
     fn from_identifier(identifier: &str) -> Self {
         if str::is_cased_uppercase(identifier) {
@@ -230,9 +231,7 @@ pub(crate) fn yoda_conditions(
         return;
     }
 
-    if ConstantLikelihood::from_expression(left, checker.settings.preview)
-        <= ConstantLikelihood::from_expression(right, checker.settings.preview)
-    {
+    if ConstantLikelihood::from(left) <= ConstantLikelihood::from(right) {
         return;
     }
 
