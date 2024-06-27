@@ -1,5 +1,52 @@
 # Changelog
 
+## 0.5.0
+
+### Preview features
+
+- [`ruff`] Add `assert-with-print-message` rule (#11974) ([#11981](https://github.com/astral-sh/ruff/pull/11981))
+
+### Rule changes
+
+- Fix RUF027 false positives if `gettext` is imported using an alias ([#12025](https://github.com/astral-sh/ruff/pull/12025))
+- Update `trapz` and `in1d` deprecation for NPY201 ([#11948](https://github.com/astral-sh/ruff/pull/11948))
+
+### Server
+
+- Add Jupyter Notebook document change snapshot test ([#11944](https://github.com/astral-sh/ruff/pull/11944))
+- Remove usage of `std::path::absolute` from snapshot test ([#11973](https://github.com/astral-sh/ruff/pull/11973))
+- `ruff server`: Closing an untitled, unsaved notebook document no longer throws an error ([#11942](https://github.com/astral-sh/ruff/pull/11942))
+- `ruff server`: Support the usage of tildes and environment variables in `logFile` ([#11945](https://github.com/astral-sh/ruff/pull/11945))
+
+### Bug fixes
+
+- Avoid `E203` for f-string debug expression ([#12024](https://github.com/astral-sh/ruff/pull/12024))
+- Consider 2-character EOL before line continuation ([#12035](https://github.com/astral-sh/ruff/pull/12035))
+- Consider line continuation character for re-lexing ([#12008](https://github.com/astral-sh/ruff/pull/12008))
+- Match import name ignores against both name and alias ([#12033](https://github.com/astral-sh/ruff/pull/12033))
+- Use `TokenSource` to find new location for re-lexing ([#12060](https://github.com/astral-sh/ruff/pull/12060))
+- [`pyflakes`] Detect assignments that shadow definitions (`F811`) ([#11961](https://github.com/astral-sh/ruff/pull/11961))
+
+### Documentation
+
+- Clarify special control flow parameters for `PLR0917`: `too-many-positional` ([#11978](https://github.com/astral-sh/ruff/pull/11978))
+- Fix missing related settings header ([#12013](https://github.com/astral-sh/ruff/pull/12013))
+- Update PEP reference in future_rewritable_type_annotation.rs ([#11985](https://github.com/astral-sh/ruff/pull/11985))
+- `ruff-check`: update docs for fix_only ([#11959](https://github.com/astral-sh/ruff/pull/11959))
+- docs(integrations): fix link to `python-lsp-server` ([#11980](https://github.com/astral-sh/ruff/pull/11980))
+- docs: add `and formatter` to CLI startup message ([#12042](https://github.com/astral-sh/ruff/pull/12042))
+
+### Other changes
+
+- Add Open Wine Components to "Who's Using Ruff?" ([#11976](https://github.com/astral-sh/ruff/pull/11976))
+- Add syntax error for empty type parameter list ([#12030](https://github.com/astral-sh/ruff/pull/12030))
+- Avoid consuming newline for unterminated string ([#12067](https://github.com/astral-sh/ruff/pull/12067))
+- Do not include newline for unterminated string range ([#12017](https://github.com/astral-sh/ruff/pull/12017))
+- Revert "[red-knot] Add more tests asserting that the VendoredFileSystem and the `VERSIONS` parser work with the vendored typeshed stubs" ([#11975](https://github.com/astral-sh/ruff/pull/11975))
+- Ruff 0.5 ([#12005](https://github.com/astral-sh/ruff/pull/12005))
+- Update parser tests to validate token ranges ([#12019](https://github.com/astral-sh/ruff/pull/12019))
+- Use correct range to highlight line continuation error ([#12016](https://github.com/astral-sh/ruff/pull/12016))
+
 ## 0.4.10
 
 ### Parser
@@ -1772,9 +1819,9 @@ Read Ruff's new [versioning policy](https://docs.astral.sh/ruff/versioning/).
 - Unsafe fixes are no longer displayed or applied without opt-in ([#7769](https://github.com/astral-sh/ruff/pull/7769))
 - Drop formatting specific rules from the default set ([#7900](https://github.com/astral-sh/ruff/pull/7900))
 - The deprecated `format` setting has been removed ([#7984](https://github.com/astral-sh/ruff/pull/7984))
-    - The `format` setting cannot be used to configure the output format, use `output-format` instead
-    - The `RUFF_FORMAT` environment variable is ignored, use `RUFF_OUTPUT_FORMAT` instead
-    - The `--format` option has been removed from `ruff check`, use `--output-format` instead
+  - The `format` setting cannot be used to configure the output format, use `output-format` instead
+  - The `RUFF_FORMAT` environment variable is ignored, use `RUFF_OUTPUT_FORMAT` instead
+  - The `--format` option has been removed from `ruff check`, use `--output-format` instead
 
 ### Rule changes
 
