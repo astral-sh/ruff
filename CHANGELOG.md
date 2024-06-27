@@ -134,7 +134,7 @@ The following deprecated CLI commands have been removed:
 ### Other changes
 
 - Upgrade the Unicode table used for measuring the line-length ([#11194](https://github.com/astral-sh/ruff/pull/11194))
-- Remove the deprecation error message for the nursery selector (\[10172\])(<https://github.com/astral-sh/ruff/pull/10172>)
+- Remove the deprecation error message for the nursery selector ([#10172](https://github.com/astral-sh/ruff/pull/10172))
 
 ## 0.4.10
 
