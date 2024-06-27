@@ -962,25 +962,30 @@ impl<'src> Lexer<'src> {
 
                 // Skip up to the current character.
                 self.cursor.skip_bytes(index);
-                let ch = self.cursor.bump();
+
+                // Lookahead because we want to bump only if it's a quote or being escaped.
+                let quote_or_newline = self.cursor.first();
 
                 // If the character is escaped, continue scanning.
                 if num_backslashes % 2 == 1 {
-                    if ch == Some('\r') {
+                    self.cursor.bump();
+                    if quote_or_newline == '\r' {
                         self.cursor.eat_char('\n');
                     }
                     continue;
                 }
 
-                match ch {
-                    Some(newline @ ('\r' | '\n')) => {
+                match quote_or_newline {
+                    '\r' | '\n' => {
                         return self.push_error(LexicalError::new(
                             LexicalErrorType::UnclosedStringError,
-                            self.token_range().sub_end(newline.text_len()),
+                            self.token_range(),
                         ));
                     }
-                    Some(ch) if ch == quote => {
-                        break self.offset() - TextSize::new(1);
+                    ch if ch == quote => {
+                        let value_end = self.offset();
+                        self.cursor.bump();
+                        break value_end;
                     }
                     _ => unreachable!("memchr2 returned an index that is not a quote or a newline"),
                 }
