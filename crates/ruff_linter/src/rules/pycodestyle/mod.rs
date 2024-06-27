@@ -50,7 +50,6 @@ mod tests {
     #[test_case(Rule::NoneComparison, Path::new("E711.py"))]
     #[test_case(Rule::NotInTest, Path::new("E713.py"))]
     #[test_case(Rule::NotIsTest, Path::new("E714.py"))]
-    #[test_case(Rule::SyntaxError, Path::new("E999.py"))]
     #[test_case(Rule::TabIndentation, Path::new("W19.py"))]
     #[test_case(Rule::TrailingWhitespace, Path::new("W29.py"))]
     #[test_case(Rule::TrailingWhitespace, Path::new("W291.py"))]
