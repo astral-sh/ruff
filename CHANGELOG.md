@@ -10,6 +10,8 @@ See also, the "Remapped rules" section which may result in disabled rules.
 
 * Follow the XDG specification to discover user-level configurations on macOS (same as on other Unix platforms)
 * Selecting `ALL` excludes deprecated rules
+* The released archives now include an extra level of nesting, which can be removed with `--strip-components=1` when untarring.
+* The release artifact's file name no longer include the version tag. This enables users to install via `/latest` URLs on GitHub.
 
 
 ### Deprecations
@@ -23,7 +25,7 @@ The following rules have been remapped to new rule codes:
 
 * [`blocking-http-call-in-async-function`](https://docs.astral.sh/ruff/rules/blocking-http-call-in-async-function/): `ASYNC100` to `ASYNC210`
 * [`open-sleep-or-subprocess-in-async-function`](https://docs.astral.sh/ruff/rules/open-sleep-or-subprocess-in-async-function/): `ASYNC101` split into `ASYNC220`, `ASYNC221`, `ASYNC230`, and `ASYNC251`
-* [`blocking-os-call-in-async-function`](`https://docs.astral.sh/ruff/rules/blocking-os-call-in-async-function/`): `ASYNC102` been merged into `ASYNC220` and `ASYNC221`
+* [`blocking-os-call-in-async-function`](https://docs.astral.sh/ruff/rules/blocking-os-call-in-async-function/): `ASYNC102` been merged into `ASYNC220` and `ASYNC221`
 * [`trio-timeout-without-await`](https://docs.astral.sh/ruff/rules/trio-timeout-without-await/): `TRIO100` to `ASYNC100`
 * [`trio-sync-call`](https://docs.astral.sh/ruff/rules/trio-sync-call/): `TRIO105` to `ASYNC105`
 * [`trio-async-function-with-timeout`](https://docs.astral.sh/ruff/rules/trio-async-function-with-timeout/): `TRIO109` to `ASYNC109`
@@ -68,19 +70,23 @@ The following rules have been stabilized and are no longer in preview:
 
 The following behaviors have been stabilized:
 
-TODO
+- [`is-literal`](https://docs.astral.sh/ruff/rules/is-literal/) (`F632`) now warns for identity checks against list, set or dictionary literals
+- [`needless-bool`](https://docs.astral.sh/ruff/rules/needless-bool/) (`SIM103`) now detects `if` expressions with implicit `else` branches
+- [`module-import-not-at-top-of-file`](https://docs.astral.sh/ruff/rules/module-import-not-at-top-of-file/) (`E402`) now allows `os.environ` modifications between import statements
+- [`type-comparison`](https://docs.astral.sh/ruff/rules/type-comparison/) (`E721`) now allows idioms such as `type(x) is int`
+- [`yoda-condition`](https://docs.astral.sh/ruff/rules/yoda-conditions/) (`SIM300`) now flags a wider range of expressions
 
 ### Removals
 
 The following deprecated settings have been removed:
 
-* `output-format=text`; use `output-format=text` or `output-format=full`
+* `output-format=text`; use `output-format=concise` or `output-format=full`
 * `tab-size`; use `indent-width`
 
 The following deprecated CLI options have been removed:
 
-* `show-source`; use `--output-format=full`
-* `no-show-source`; use `--output-format=concise`
+* `--show-source`; use `--output-format=full`
+* `--no-show-source`; use `--output-format=concise`
 
 The following deprecated CLI commands have been removed:
 
@@ -90,19 +96,19 @@ The following deprecated CLI commands have been removed:
 
 ### Preview features
 
-- [`ruff`] Add `assert-with-print-message` rule (#11974) ([#11981](https://github.com/astral-sh/ruff/pull/11981))
+- \[`ruff`\] Add `assert-with-print-message` rule (#11974) ([#11981](https://github.com/astral-sh/ruff/pull/11981))
 
 ### CLI
 
-- Use rule name rather than message in --statistics ([#11697](https://github.com/astral-sh/ruff/pull/11697))
+- Use rule name rather than message in `--statistics` ([#11697](https://github.com/astral-sh/ruff/pull/11697))
 - Use the output format `full` by default ([#12010](https://github.com/astral-sh/ruff/pull/12010))
 - Don't log syntax errors to the console ([#11902](https://github.com/astral-sh/ruff/pull/11902))
 
 ### Rule changes
 
-- Fix RUF027 false positives if `gettext` is imported using an alias ([#12025](https://github.com/astral-sh/ruff/pull/12025))
-- Update `trapz` and `in1d` deprecation for NPY201 ([#11948](https://github.com/astral-sh/ruff/pull/11948))
-- Modify diagnostic ranges for shell-related bandit rules ([#10667](https://github.com/astral-sh/ruff/pull/10667))
+- \[`ruff`\] Fix false positives if `gettext` is imported using an alias (`RUF027`) ([#12025](https://github.com/astral-sh/ruff/pull/12025))
+- \[`npy`\] Update `trapz` and `in1d` deprecation (`NPY201`) ([#11948](https://github.com/astral-sh/ruff/pull/11948))
+- \[`flake8-bandit`\] Modify diagnostic ranges for shell-related rules ([#10667](https://github.com/astral-sh/ruff/pull/10667))
 
 ### Server
 - Closing an untitled, unsaved notebook document no longer throws an error ([#11942](https://github.com/astral-sh/ruff/pull/11942))
@@ -112,30 +118,26 @@ The following deprecated CLI commands have been removed:
 ### Bug fixes
 
 - Avoid `E203` for f-string debug expression ([#12024](https://github.com/astral-sh/ruff/pull/12024))
-- Consider 2-character EOL before line continuation ([#12035](https://github.com/astral-sh/ruff/pull/12035))
+- Match import name ignores against both name and alias (`N812`, `N817`) ([#12033](https://github.com/astral-sh/ruff/pull/12033))
+- \[`pyflakes`\] Detect assignments that shadow definitions (`F811`) ([#11961](https://github.com/astral-sh/ruff/pull/11961))
+- Emit a syntax error for an empty type parameter list ([#12030](https://github.com/astral-sh/ruff/pull/12030))
+- Avoid consuming the newline for unterminated strings ([#12067](https://github.com/astral-sh/ruff/pull/12067))
+- Do not include the newline in the unterminated string range ([#12017](https://github.com/astral-sh/ruff/pull/12017))
+- Use the correct range to highlight line continuation errors ([#12016](https://github.com/astral-sh/ruff/pull/12016))
+- Consider 2-character EOL before line continuations ([#12035](https://github.com/astral-sh/ruff/pull/12035))
 - Consider line continuation character for re-lexing ([#12008](https://github.com/astral-sh/ruff/pull/12008))
-- Match import name ignores against both name and alias ([#12033](https://github.com/astral-sh/ruff/pull/12033))
-- Use `TokenSource` to find new location for re-lexing ([#12060](https://github.com/astral-sh/ruff/pull/12060))
-- [`pyflakes`] Detect assignments that shadow definitions (`F811`) ([#11961](https://github.com/astral-sh/ruff/pull/11961))
-- Add syntax error for empty type parameter list ([#12030](https://github.com/astral-sh/ruff/pull/12030))
-- Avoid consuming newline for unterminated string ([#12067](https://github.com/astral-sh/ruff/pull/12067))
-- Do not include newline for unterminated string range ([#12017](https://github.com/astral-sh/ruff/pull/12017))
-- Use correct range to highlight line continuation error ([#12016](https://github.com/astral-sh/ruff/pull/12016))
 
 
 ### Other changes
-- Upgrade Unicode table ([#11194](https://github.com/astral-sh/ruff/pull/11194))
-- Removed the deprecation error message for the nursery selector ([10172])(https://github.com/astral-sh/ruff/pull/10172)
+- Upgrade the Unicode table used for measuring the line-length ([#11194](https://github.com/astral-sh/ruff/pull/11194))
+- Remove the deprecation error message for the nursery selector ([10172])(https://github.com/astral-sh/ruff/pull/10172)
 
-
-## Release
-- Migrate release workflow to cargo-dist ([#9559](https://github.com/astral-sh/ruff/pull/9559))
 
 ### Documentation
-- Clarify special control flow parameters for `PLR0917`: `too-many-positional` ([#11978](https://github.com/astral-sh/ruff/pull/11978))
-- Fix missing related settings header ([#12013](https://github.com/astral-sh/ruff/pull/12013))
-- Update PEP reference in future_rewritable_type_annotation.rs ([#11985](https://github.com/astral-sh/ruff/pull/11985))
-- `ruff-check`: update docs for fix_only ([#11959](https://github.com/astral-sh/ruff/pull/11959))
+- Clarify special control flow parameters for (`PLR0917`) ([#11978](https://github.com/astral-sh/ruff/pull/11978))
+- Fix "missing related settings" header ([#12013](https://github.com/astral-sh/ruff/pull/12013))
+- Update PEP reference (`FA100`) ([#11985](https://github.com/astral-sh/ruff/pull/11985))
+- Document exit code of `ruff --fix` and `ruff --diff` ([#11959](https://github.com/astral-sh/ruff/pull/11959))
 - Fix link to `python-lsp-server` ([#11980](https://github.com/astral-sh/ruff/pull/11980))
 - Add `and formatter` to CLI startup message ([#12042](https://github.com/astral-sh/ruff/pull/12042))
 
