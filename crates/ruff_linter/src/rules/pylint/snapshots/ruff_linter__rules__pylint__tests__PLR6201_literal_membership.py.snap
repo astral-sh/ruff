@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-literal_membership.py:2:6: PLR6201 [*] Use a `set` literal when testing for membership
+literal_membership.py:2:6: PLR6201 [*] Use a set literal when testing for membership
   |
 1 | # Errors
 2 | 1 in [1, 2, 3]
@@ -19,7 +19,7 @@ literal_membership.py:2:6: PLR6201 [*] Use a `set` literal when testing for memb
 4 4 | 1 in (
 5 5 |     1, 2, 3
 
-literal_membership.py:3:6: PLR6201 [*] Use a `set` literal when testing for membership
+literal_membership.py:3:6: PLR6201 [*] Use a set literal when testing for membership
   |
 1 | # Errors
 2 | 1 in [1, 2, 3]
@@ -39,7 +39,7 @@ literal_membership.py:3:6: PLR6201 [*] Use a `set` literal when testing for memb
 5 5 |     1, 2, 3
 6 6 | )
 
-literal_membership.py:4:6: PLR6201 [*] Use a `set` literal when testing for membership
+literal_membership.py:4:6: PLR6201 [*] Use a set literal when testing for membership
   |
 2 |   1 in [1, 2, 3]
 3 |   1 in (1, 2, 3)
@@ -66,7 +66,7 @@ literal_membership.py:4:6: PLR6201 [*] Use a `set` literal when testing for memb
 8 8 | "cherry" in fruits
 9 9 | _ = {key: value for key, value in {"a": 1, "b": 2}.items() if key in ("a", "b")}
 
-literal_membership.py:9:70: PLR6201 [*] Use a `set` literal when testing for membership
+literal_membership.py:9:70: PLR6201 [*] Use a set literal when testing for membership
    |
  7 | fruits = ["cherry", "grapes"]
  8 | "cherry" in fruits
@@ -86,5 +86,3 @@ literal_membership.py:9:70: PLR6201 [*] Use a `set` literal when testing for mem
 10 10 | 
 11 11 | # OK
 12 12 | fruits in [[1, 2, 3], [4, 5, 6]]
-
-
