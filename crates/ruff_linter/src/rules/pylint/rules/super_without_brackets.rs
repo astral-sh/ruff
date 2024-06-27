@@ -14,8 +14,8 @@ use crate::checkers::ast::Checker;
 /// The [`super()` callable](https://docs.python.org/3/library/functions.html#super)
 /// can be used inside method definitions to create a proxy object that
 /// delegates attribute access to a superclass of the current class. Attempting
-/// to access attributes on the `super` object itself, however, instead of the
-/// object returned by a call to `super()`, will raise `AttributeError`.
+/// to access attributes on `super` itself, however, instead of the object
+/// returned by a call to `super()`, will raise `AttributeError`.
 ///
 /// ## Example
 /// ```python
