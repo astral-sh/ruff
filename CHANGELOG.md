@@ -17,7 +17,7 @@ See also, the "Remapped rules" section which may result in disabled rules.
 
 The following rules are now deprecated:
 
-- [`syntax-error`](https://docs.astral.sh/ruff/rules/syntax-error/) (`E999`)
+- [`syntax-error`](https://docs.astral.sh/ruff/rules/syntax-error/) (`E999`): Syntax errors are now always shown
 
 ### Remapped rules
 
