@@ -123,6 +123,7 @@ The following deprecated CLI commands have been removed:
 - \[`pyflakes`\] Detect assignments that shadow definitions (`F811`) ([#11961](https://github.com/astral-sh/ruff/pull/11961))
 
 ### Parser
+
 - Emit a syntax error for an empty type parameter list ([#12030](https://github.com/astral-sh/ruff/pull/12030))
 - Avoid consuming the newline for unterminated strings ([#12067](https://github.com/astral-sh/ruff/pull/12067))
 - Do not include the newline in the unterminated string range ([#12017](https://github.com/astral-sh/ruff/pull/12017))
