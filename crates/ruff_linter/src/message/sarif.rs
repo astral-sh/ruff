@@ -3,16 +3,15 @@ use std::io::Write;
 use anyhow::Result;
 use serde::{Serialize, Serializer};
 use serde_json::json;
+use strum::IntoEnumIterator;
 
 use ruff_source_file::OneIndexed;
 
 use crate::codes::Rule;
 use crate::fs::normalize_path;
 use crate::message::{Emitter, EmitterContext, Message};
-use crate::registry::{AsRule, Linter, RuleNamespace};
+use crate::registry::{Linter, RuleNamespace};
 use crate::VERSION;
-
-use strum::IntoEnumIterator;
 
 pub struct SarifEmitter;
 
@@ -103,7 +102,7 @@ impl Serialize for SarifRule<'_> {
 
 #[derive(Debug)]
 struct SarifResult {
-    rule: Rule,
+    rule: Option<Rule>,
     level: String,
     message: String,
     uri: String,
@@ -120,9 +119,9 @@ impl SarifResult {
         let end_location = message.compute_end_location();
         let path = normalize_path(message.filename());
         Ok(Self {
-            rule: message.kind.rule(),
+            rule: message.rule(),
             level: "error".to_string(),
-            message: message.kind.name.clone(),
+            message: message.name().to_string(),
             uri: url::Url::from_file_path(&path)
                 .map_err(|()| anyhow::anyhow!("Failed to convert path to URL: {}", path.display()))?
                 .to_string(),
@@ -140,9 +139,9 @@ impl SarifResult {
         let end_location = message.compute_end_location();
         let path = normalize_path(message.filename());
         Ok(Self {
-            rule: message.kind.rule(),
+            rule: message.rule(),
             level: "error".to_string(),
-            message: message.kind.name.clone(),
+            message: message.name().to_string(),
             uri: path.display().to_string(),
             start_line: start_location.row,
             start_column: start_location.column,
@@ -175,7 +174,7 @@ impl Serialize for SarifResult {
                     }
                 }
             }],
-            "ruleId": self.rule.noqa_code().to_string(),
+            "ruleId": self.rule.map(|rule| rule.noqa_code().to_string()),
         })
         .serialize(serializer)
     }
@@ -184,7 +183,9 @@ impl Serialize for SarifResult {
 #[cfg(test)]
 mod tests {
 
-    use crate::message::tests::{capture_emitter_output, create_messages};
+    use crate::message::tests::{
+        capture_emitter_output, create_messages, create_syntax_error_messages,
+    };
     use crate::message::SarifEmitter;
 
     fn get_output() -> String {
@@ -195,6 +196,13 @@ mod tests {
     #[test]
     fn valid_json() {
         let content = get_output();
+        serde_json::from_str::<serde_json::Value>(&content).unwrap();
+    }
+
+    #[test]
+    fn valid_syntax_error_json() {
+        let mut emitter = SarifEmitter {};
+        let content = capture_emitter_output(&mut emitter, &create_syntax_error_messages());
         serde_json::from_str::<serde_json::Value>(&content).unwrap();
     }
 

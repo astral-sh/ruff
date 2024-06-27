@@ -601,7 +601,7 @@ COM81.py:511:10: COM819 [*] Trailing comma prohibited
 511 | image[:,:,]
     |          ^ COM819
 512 | 
-513 | lambda x, :
+513 | lambda x, : x
     |
     = help: Remove trailing comma
 
@@ -612,14 +612,14 @@ COM81.py:511:10: COM819 [*] Trailing comma prohibited
 511     |-image[:,:,]
     511 |+image[:,:]
 512 512 | 
-513 513 | lambda x, :
+513 513 | lambda x, : x
 514 514 | 
 
 COM81.py:513:9: COM819 [*] Trailing comma prohibited
     |
 511 | image[:,:,]
 512 | 
-513 | lambda x, :
+513 | lambda x, : x
     |         ^ COM819
 514 | 
 515 | # ==> unpack.py <==
@@ -630,8 +630,8 @@ COM81.py:513:9: COM819 [*] Trailing comma prohibited
 510 510 | 
 511 511 | image[:,:,]
 512 512 | 
-513     |-lambda x, :
-    513 |+lambda x :
+513     |-lambda x, : x
+    513 |+lambda x : x
 514 514 | 
 515 515 | # ==> unpack.py <==
 516 516 | def function(
@@ -797,6 +797,14 @@ COM81.py:565:13: COM812 [*] Trailing comma missing
 566 566 | }
 567 567 | 
 568 568 | (
+
+COM81.py:569:5: SyntaxError: Starred expression cannot be used here
+    |
+568 | (
+569 |     *args
+    |     ^
+570 | )
+    |
 
 COM81.py:573:10: COM812 [*] Trailing comma missing
     |

@@ -9,7 +9,6 @@ use serde_json::json;
 
 use crate::fs::{relativize_path, relativize_path_to};
 use crate::message::{Emitter, EmitterContext, Message};
-use crate::registry::AsRule;
 
 /// Generate JSON with violations in GitLab CI format
 //  https://docs.gitlab.com/ee/ci/testing/code_quality.html#implement-a-custom-tool
@@ -91,8 +90,14 @@ impl Serialize for SerializedMessages<'_> {
             }
             fingerprints.insert(message_fingerprint);
 
+            let description = if let Some(rule) = message.rule() {
+                format!("({}) {}", rule.noqa_code(), message.body())
+            } else {
+                message.body().to_string()
+            };
+
             let value = json!({
-                "description": format!("({}) {}", message.kind.rule().noqa_code(), message.kind.body),
+                "description": description,
                 "severity": "major",
                 "fingerprint": format!("{:x}", message_fingerprint),
                 "location": {
@@ -110,18 +115,10 @@ impl Serialize for SerializedMessages<'_> {
 
 /// Generate a unique fingerprint to identify a violation.
 fn fingerprint(message: &Message, project_path: &str, salt: u64) -> u64 {
-    let Message {
-        kind,
-        range: _,
-        fix: _fix,
-        file: _,
-        noqa_offset: _,
-    } = message;
-
     let mut hasher = DefaultHasher::new();
 
     salt.hash(&mut hasher);
-    kind.name.hash(&mut hasher);
+    message.name().hash(&mut hasher);
     project_path.hash(&mut hasher);
 
     hasher.finish()
@@ -131,13 +128,23 @@ fn fingerprint(message: &Message, project_path: &str, salt: u64) -> u64 {
 mod tests {
     use insta::assert_snapshot;
 
-    use crate::message::tests::{capture_emitter_output, create_messages};
+    use crate::message::tests::{
+        capture_emitter_output, create_messages, create_syntax_error_messages,
+    };
     use crate::message::GitlabEmitter;
 
     #[test]
     fn output() {
         let mut emitter = GitlabEmitter::default();
         let content = capture_emitter_output(&mut emitter, &create_messages());
+
+        assert_snapshot!(redact_fingerprint(&content));
+    }
+
+    #[test]
+    fn syntax_errors() {
+        let mut emitter = GitlabEmitter::default();
+        let content = capture_emitter_output(&mut emitter, &create_syntax_error_messages());
 
         assert_snapshot!(redact_fingerprint(&content));
     }

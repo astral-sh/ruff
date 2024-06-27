@@ -968,9 +968,13 @@ impl LintConfiguration {
         if preview.mode.is_disabled() {
             for selection in deprecated_selectors.iter().sorted() {
                 let (prefix, code) = selection.prefix_and_code();
-                warn_user_once_by_message!(
-                    "Rule `{prefix}{code}` is deprecated and will be removed in a future release.",
-                );
+                let rule = format!("{prefix}{code}");
+                let mut message =
+                    format!("Rule `{rule}` is deprecated and will be removed in a future release.");
+                if matches!(rule.as_str(), "E999") {
+                    message.push_str(" Syntax errors will always be shown regardless of whether this rule is selected or not.");
+                }
+                warn_user_once_by_message!("{message}");
             }
         } else {
             let deprecated_selectors = deprecated_selectors.iter().sorted().collect::<Vec<_>>();
