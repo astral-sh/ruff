@@ -273,6 +273,6 @@ publish-jobs = ["./publish-pypi"]
 # Announcement jobs to run in CI
 post-announce-jobs = ["./notify-dependents"]
 # Skip checking whether the specified configuration files are up to date
-#allow-dirty = ["ci"]
+allow-dirty = ["ci"]
 # Whether to install an updater program
 install-updater = false
