@@ -263,7 +263,7 @@ config file.
 There are a few exceptions to these rules:
 
 1. In locating the "closest" `pyproject.toml` file for a given path, Ruff ignores any
-    `pyproject.toml` files that lack a `[tool.ruff]` section. ddd
+    `pyproject.toml` files that lack a `[tool.ruff]` section.
 1. If a configuration file is passed directly via `--config`, those settings are used for _all_
     analyzed files, and any relative paths in that configuration file (like `exclude` globs or
     `src` paths) are resolved relative to the _current_ working directory.
