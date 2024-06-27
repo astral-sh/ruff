@@ -346,7 +346,7 @@ even patch releases may contain [non-backwards-compatible changes](https://semve
 1. Run `cargo check`. This should update the lock file with new versions.
 1. Create a pull request with the changelog and version updates
 1. Merge the PR
-1. Run the [release workflow](https://github.com/astral-sh/ruff/actions/workflows/release.yaml) with:
+1. Run the [release workflow](https://github.com/astral-sh/ruff/actions/workflows/release.yml) with:
     - The new version number (without starting `v`)
 1. The release workflow will do the following:
     1. Build all the assets. If this fails (even though we tested in step 4), we haven't tagged or
