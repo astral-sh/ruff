@@ -8,30 +8,30 @@ Check out the [blog post](https://astral.sh/blog/ruff-v0.5.0) for a migration gu
 
 See also, the "Remapped rules" section which may result in disabled rules.
 
-* Follow the XDG specification to discover user-level configurations on macOS (same as on other Unix platforms)
-* Selecting `ALL` excludes deprecated rules
-* The released archives now include an extra level of nesting, which can be removed with `--strip-components=1` when untarring.
-* The release artifact's file name no longer include the version tag. This enables users to install via `/latest` URLs on GitHub.
-
+- Follow the XDG specification to discover user-level configurations on macOS (same as on other Unix platforms)
+- Selecting `ALL` excludes deprecated rules
+- The released archives now include an extra level of nesting, which can be removed with `--strip-components=1` when untarring.
+- The release artifact's file name no longer include the version tag. This enables users to install via `/latest` URLs on GitHub.
 
 ### Deprecations
 
 The following rules are now deprecated:
-* [`syntax-error`](https://docs.astral.sh/ruff/rules/syntax-error/) (`E999`)
+
+- [`syntax-error`](https://docs.astral.sh/ruff/rules/syntax-error/) (`E999`)
 
 ### Remapped rules
 
 The following rules have been remapped to new rule codes:
 
-* [`blocking-http-call-in-async-function`](https://docs.astral.sh/ruff/rules/blocking-http-call-in-async-function/): `ASYNC100` to `ASYNC210`
-* [`open-sleep-or-subprocess-in-async-function`](https://docs.astral.sh/ruff/rules/open-sleep-or-subprocess-in-async-function/): `ASYNC101` split into `ASYNC220`, `ASYNC221`, `ASYNC230`, and `ASYNC251`
-* [`blocking-os-call-in-async-function`](https://docs.astral.sh/ruff/rules/blocking-os-call-in-async-function/): `ASYNC102` been merged into `ASYNC220` and `ASYNC221`
-* [`trio-timeout-without-await`](https://docs.astral.sh/ruff/rules/trio-timeout-without-await/): `TRIO100` to `ASYNC100`
-* [`trio-sync-call`](https://docs.astral.sh/ruff/rules/trio-sync-call/): `TRIO105` to `ASYNC105`
-* [`trio-async-function-with-timeout`](https://docs.astral.sh/ruff/rules/trio-async-function-with-timeout/): `TRIO109` to `ASYNC109`
-* [`trio-unneeded-sleep`](https://docs.astral.sh/ruff/rules/trio-unneeded-sleep/): `TRIO110` to `ASYNC110`
-* [`trio-zero-sleep-call`](https://docs.astral.sh/ruff/rules/trio-zero-sleep-call/): `TRIO115` to `ASYNC115`
-* [`repeated-isinstance-calls`](https://docs.astral.sh/ruff/rules/repeated-isinstance-calls/): `PLR1701` to `SIM101`
+- [`blocking-http-call-in-async-function`](https://docs.astral.sh/ruff/rules/blocking-http-call-in-async-function/): `ASYNC100` to `ASYNC210`
+- [`open-sleep-or-subprocess-in-async-function`](https://docs.astral.sh/ruff/rules/open-sleep-or-subprocess-in-async-function/): `ASYNC101` split into `ASYNC220`, `ASYNC221`, `ASYNC230`, and `ASYNC251`
+- [`blocking-os-call-in-async-function`](https://docs.astral.sh/ruff/rules/blocking-os-call-in-async-function/): `ASYNC102` been merged into `ASYNC220` and `ASYNC221`
+- [`trio-timeout-without-await`](https://docs.astral.sh/ruff/rules/trio-timeout-without-await/): `TRIO100` to `ASYNC100`
+- [`trio-sync-call`](https://docs.astral.sh/ruff/rules/trio-sync-call/): `TRIO105` to `ASYNC105`
+- [`trio-async-function-with-timeout`](https://docs.astral.sh/ruff/rules/trio-async-function-with-timeout/): `TRIO109` to `ASYNC109`
+- [`trio-unneeded-sleep`](https://docs.astral.sh/ruff/rules/trio-unneeded-sleep/): `TRIO110` to `ASYNC110`
+- [`trio-zero-sleep-call`](https://docs.astral.sh/ruff/rules/trio-zero-sleep-call/): `TRIO115` to `ASYNC115`
+- [`repeated-isinstance-calls`](https://docs.astral.sh/ruff/rules/repeated-isinstance-calls/): `PLR1701` to `SIM101`
 
 ### Stabilization
 
@@ -55,7 +55,7 @@ The following rules have been stabilized and are no longer in preview:
 - [`bad-open-mode`](https://docs.astral.sh/ruff/rules/bad-open-mode/) (`PLW1501`)
 - [`empty-comment`](https://docs.astral.sh/ruff/rules/empty-comment/) (`PLR2044`)
 - [`global-at-module-level`](https://docs.astral.sh/ruff/rules/global-at-module-level/) (`PLW0604`)
-- [`misplaced-bare-raise`](https://docs.astral.sh/ruff/rules/misplaced-bare-raise`/) (`PLE0744`)
+- [`misplaced-bare-raise`](https://docs.astral.sh/ruff/rules/misplaced-bare-raise%60/) (`PLE0744`)
 - [`non-ascii-import-name`](https://docs.astral.sh/ruff/rules/non-ascii-import-name/) (`PLC2403`)
 - [`non-ascii-name`](https://docs.astral.sh/ruff/rules/non-ascii-name/) (`PLC2401`)
 - [`nonlocal-and-global`](https://docs.astral.sh/ruff/rules/nonlocal-and-global/) (`PLE0115`)
@@ -80,19 +80,19 @@ The following behaviors have been stabilized:
 
 The following deprecated settings have been removed:
 
-* `output-format=text`; use `output-format=concise` or `output-format=full`
-* `tab-size`; use `indent-width`
+- `output-format=text`; use `output-format=concise` or `output-format=full`
+- `tab-size`; use `indent-width`
 
 The following deprecated CLI options have been removed:
 
-* `--show-source`; use `--output-format=full`
-* `--no-show-source`; use `--output-format=concise`
+- `--show-source`; use `--output-format=full`
+- `--no-show-source`; use `--output-format=concise`
 
 The following deprecated CLI commands have been removed:
 
-* `ruff <path>`; use `ruff check <path>`
-* `ruff --clean`; use `ruff clean`
-* `ruff --generate-shell-completion`; use `ruff generate-shell-completion`
+- `ruff <path>`; use `ruff check <path>`
+- `ruff --clean`; use `ruff clean`
+- `ruff --generate-shell-completion`; use `ruff generate-shell-completion`
 
 ### Preview features
 
@@ -111,6 +111,7 @@ The following deprecated CLI commands have been removed:
 - \[`flake8-bandit`\] Modify diagnostic ranges for shell-related rules ([#10667](https://github.com/astral-sh/ruff/pull/10667))
 
 ### Server
+
 - Closing an untitled, unsaved notebook document no longer throws an error ([#11942](https://github.com/astral-sh/ruff/pull/11942))
 - Support the usage of tildes and environment variables in `logFile` ([#11945](https://github.com/astral-sh/ruff/pull/11945))
 - Add option to configure whether to show syntax errors ([#12059](https://github.com/astral-sh/ruff/pull/12059))
@@ -127,19 +128,10 @@ The following deprecated CLI commands have been removed:
 - Consider 2-character EOL before line continuations ([#12035](https://github.com/astral-sh/ruff/pull/12035))
 - Consider line continuation character for re-lexing ([#12008](https://github.com/astral-sh/ruff/pull/12008))
 
-
 ### Other changes
+
 - Upgrade the Unicode table used for measuring the line-length ([#11194](https://github.com/astral-sh/ruff/pull/11194))
-- Remove the deprecation error message for the nursery selector ([10172])(https://github.com/astral-sh/ruff/pull/10172)
-
-
-### Documentation
-- Clarify special control flow parameters for (`PLR0917`) ([#11978](https://github.com/astral-sh/ruff/pull/11978))
-- Fix "missing related settings" header ([#12013](https://github.com/astral-sh/ruff/pull/12013))
-- Update PEP reference (`FA100`) ([#11985](https://github.com/astral-sh/ruff/pull/11985))
-- Document exit code of `ruff --fix` and `ruff --diff` ([#11959](https://github.com/astral-sh/ruff/pull/11959))
-- Fix link to `python-lsp-server` ([#11980](https://github.com/astral-sh/ruff/pull/11980))
-- Add `and formatter` to CLI startup message ([#12042](https://github.com/astral-sh/ruff/pull/12042))
+- Remove the deprecation error message for the nursery selector (\[10172\])(https://github.com/astral-sh/ruff/pull/10172)
 
 ## 0.4.10
 
