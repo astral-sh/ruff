@@ -5,7 +5,6 @@ use std::path::Path;
 use anyhow::{anyhow, Result};
 use colored::Colorize;
 use itertools::Itertools;
-use log::error;
 use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::Diagnostic;
@@ -26,7 +25,6 @@ use crate::checkers::tokens::check_tokens;
 use crate::directives::Directives;
 use crate::doc_lines::{doc_lines_from_ast, doc_lines_from_tokens};
 use crate::fix::{fix_file, FixResult};
-use crate::logging::DisplayParseError;
 use crate::message::Message;
 use crate::noqa::add_noqa;
 use crate::registry::{AsRule, Rule, RuleSet};
@@ -354,8 +352,7 @@ pub fn add_noqa_to_path(
 
     // Generate diagnostics, ignoring any existing `noqa` directives.
     let LinterResult {
-        data: diagnostics,
-        error,
+        data: diagnostics, ..
     } = check_path(
         path,
         package,
@@ -369,19 +366,6 @@ pub fn add_noqa_to_path(
         source_type,
         &parsed,
     );
-
-    // Log any parse errors.
-    if let Some(error) = error {
-        error!(
-            "{}",
-            DisplayParseError::from_source_code(
-                error,
-                Some(path.to_path_buf()),
-                &locator.to_source_code(),
-                source_kind,
-            )
-        );
-    }
 
     // Add any missing `# noqa` pragmas.
     // TODO(dhruvmanila): Add support for Jupyter Notebooks
