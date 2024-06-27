@@ -11,7 +11,7 @@ See also, the "Remapped rules" section which may result in disabled rules.
 - Follow the XDG specification to discover user-level configurations on macOS (same as on other Unix platforms)
 - Selecting `ALL` now excludes deprecated rules
 - The released archives now include an extra level of nesting, which can be removed with `--strip-components=1` when untarring.
-- The release artifact's file name no longer include the version tag. This enables users to install via `/latest` URLs on GitHub.
+- The release artifact's file name no longer includes the version tag. This enables users to install via `/latest` URLs on GitHub.
 
 ### Deprecations
 
@@ -25,7 +25,7 @@ The following rules have been remapped to new rule codes:
 
 - [`blocking-http-call-in-async-function`](https://docs.astral.sh/ruff/rules/blocking-http-call-in-async-function/): `ASYNC100` to `ASYNC210`
 - [`open-sleep-or-subprocess-in-async-function`](https://docs.astral.sh/ruff/rules/open-sleep-or-subprocess-in-async-function/): `ASYNC101` split into `ASYNC220`, `ASYNC221`, `ASYNC230`, and `ASYNC251`
-- [`blocking-os-call-in-async-function`](https://docs.astral.sh/ruff/rules/blocking-os-call-in-async-function/): `ASYNC102` been merged into `ASYNC220` and `ASYNC221`
+- [`blocking-os-call-in-async-function`](https://docs.astral.sh/ruff/rules/blocking-os-call-in-async-function/): `ASYNC102` has been merged into `ASYNC220` and `ASYNC221`
 - [`trio-timeout-without-await`](https://docs.astral.sh/ruff/rules/trio-timeout-without-await/): `TRIO100` to `ASYNC100`
 - [`trio-sync-call`](https://docs.astral.sh/ruff/rules/trio-sync-call/): `TRIO105` to `ASYNC105`
 - [`trio-async-function-with-timeout`](https://docs.astral.sh/ruff/rules/trio-async-function-with-timeout/): `TRIO109` to `ASYNC109`
@@ -118,9 +118,11 @@ The following deprecated CLI commands have been removed:
 
 ### Bug fixes
 
-- Avoid `E203` for f-string debug expression ([#12024](https://github.com/astral-sh/ruff/pull/12024))
-- Match import-name ignores against both name and alias (`N812`, `N817`) ([#12033](https://github.com/astral-sh/ruff/pull/12033))
+- [`pycodestyle`] Avoid `E203` for f-string debug expression ([#12024](https://github.com/astral-sh/ruff/pull/12024))
+- [`pep8-naming`] Match import-name ignores against both name and alias (`N812`, `N817`) ([#12033](https://github.com/astral-sh/ruff/pull/12033))
 - \[`pyflakes`\] Detect assignments that shadow definitions (`F811`) ([#11961](https://github.com/astral-sh/ruff/pull/11961))
+
+### Parser
 - Emit a syntax error for an empty type parameter list ([#12030](https://github.com/astral-sh/ruff/pull/12030))
 - Avoid consuming the newline for unterminated strings ([#12067](https://github.com/astral-sh/ruff/pull/12067))
 - Do not include the newline in the unterminated string range ([#12017](https://github.com/astral-sh/ruff/pull/12017))
