@@ -5,7 +5,7 @@
 - Follow the XDG specification to discover user-level configurations on macOS (same as on other Unix platforms)
 - Selecting `ALL` excludes deprecated rules
 - The released archives now include an extra level of nesting, which can be removed with `--strip-components=1` when untarring.
-- The release artifact's file name no longer include the version tag. This enables users to install via `/latest` URLs on GitHub.
+- The release artifact's file name no longer includes the version tag. This enables users to install via `/latest` URLs on GitHub.
 
 ## 0.3.0
 
