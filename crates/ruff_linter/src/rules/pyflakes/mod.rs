@@ -22,7 +22,7 @@ mod tests {
     use ruff_source_file::Locator;
     use ruff_text_size::Ranged;
 
-    use crate::linter::{check_path, LinterResult};
+    use crate::linter::check_path;
     use crate::registry::{AsRule, Linter, Rule};
     use crate::rules::pyflakes;
     use crate::settings::types::PreviewMode;
@@ -650,10 +650,7 @@ mod tests {
             &locator,
             &indexer,
         );
-        let LinterResult {
-            data: mut diagnostics,
-            ..
-        } = check_path(
+        let mut diagnostics = check_path(
             Path::new("<filename>"),
             None,
             &locator,

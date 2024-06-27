@@ -73,7 +73,7 @@ fn benchmark_linter(mut group: BenchmarkGroup, settings: &LinterSettings) {
                         );
 
                         // Assert that file contains no parse errors
-                        assert_eq!(result.error, None);
+                        assert!(!result.has_syntax_error);
                     },
                     criterion::BatchSize::SmallInput,
                 );

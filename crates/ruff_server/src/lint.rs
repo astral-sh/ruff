@@ -8,7 +8,7 @@ use ruff_diagnostics::{Applicability, Diagnostic, DiagnosticKind, Edit, Fix};
 use ruff_linter::{
     directives::{extract_directives, Flags},
     generate_noqa_edits,
-    linter::{check_path, LinterResult},
+    linter::check_path,
     packaging::detect_package_root,
     registry::AsRule,
     settings::flags,
@@ -58,9 +58,9 @@ pub(crate) struct DiagnosticFix {
 }
 
 /// A series of diagnostics across a single text document or an arbitrary number of notebook cells.
-pub(crate) type Diagnostics = FxHashMap<lsp_types::Url, Vec<lsp_types::Diagnostic>>;
+pub(crate) type DiagnosticsMap = FxHashMap<lsp_types::Url, Vec<lsp_types::Diagnostic>>;
 
-pub(crate) fn check(query: &DocumentQuery, encoding: PositionEncoding) -> Diagnostics {
+pub(crate) fn check(query: &DocumentQuery, encoding: PositionEncoding) -> DiagnosticsMap {
     let source_kind = query.make_source_kind();
     let file_resolver_settings = query.settings().file_resolver();
     let linter_settings = query.settings().linter();
@@ -80,7 +80,7 @@ pub(crate) fn check(query: &DocumentQuery, encoding: PositionEncoding) -> Diagno
                 exclusion,
                 document_path.display()
             );
-            return Diagnostics::default();
+            return DiagnosticsMap::default();
         }
 
         detect_package_root(
@@ -113,7 +113,7 @@ pub(crate) fn check(query: &DocumentQuery, encoding: PositionEncoding) -> Diagno
     let directives = extract_directives(parsed.tokens(), Flags::all(), &locator, &indexer);
 
     // Generate checks.
-    let LinterResult { data, .. } = check_path(
+    let diagnostics = check_path(
         &query.virtual_file_path(),
         package,
         &locator,
@@ -129,7 +129,7 @@ pub(crate) fn check(query: &DocumentQuery, encoding: PositionEncoding) -> Diagno
 
     let noqa_edits = generate_noqa_edits(
         &query.virtual_file_path(),
-        data.as_slice(),
+        &diagnostics,
         &locator,
         indexer.comment_ranges(),
         &linter_settings.external,
@@ -137,19 +137,21 @@ pub(crate) fn check(query: &DocumentQuery, encoding: PositionEncoding) -> Diagno
         stylist.line_ending(),
     );
 
-    let mut diagnostics = Diagnostics::default();
+    let mut diagnostics_map = DiagnosticsMap::default();
 
     // Populates all relevant URLs with an empty diagnostic list.
     // This ensures that documents without diagnostics still get updated.
     if let Some(notebook) = query.as_notebook() {
         for url in notebook.urls() {
-            diagnostics.entry(url.clone()).or_default();
+            diagnostics_map.entry(url.clone()).or_default();
         }
     } else {
-        diagnostics.entry(query.make_key().into_url()).or_default();
+        diagnostics_map
+            .entry(query.make_key().into_url())
+            .or_default();
     }
 
-    let lsp_diagnostics = data
+    let lsp_diagnostics = diagnostics
         .into_iter()
         .zip(noqa_edits)
         .map(|(diagnostic, noqa_edit)| {
@@ -165,18 +167,21 @@ pub(crate) fn check(query: &DocumentQuery, encoding: PositionEncoding) -> Diagno
                 tracing::warn!("Unable to find notebook cell at index {index}.");
                 continue;
             };
-            diagnostics.entry(uri.clone()).or_default().push(diagnostic);
+            diagnostics_map
+                .entry(uri.clone())
+                .or_default()
+                .push(diagnostic);
         }
     } else {
         for (_, diagnostic) in lsp_diagnostics {
-            diagnostics
+            diagnostics_map
                 .entry(query.make_key().into_url())
                 .or_default()
                 .push(diagnostic);
         }
     }
 
-    diagnostics
+    diagnostics_map
 }
 
 /// Converts LSP diagnostics to a list of `DiagnosticFix`es by deserializing associated data on each diagnostic.
