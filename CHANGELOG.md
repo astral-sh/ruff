@@ -96,7 +96,7 @@ The following deprecated CLI commands have been removed:
 
 ### Preview features
 
-- \[`ruff`\] Add `assert-with-print-message` rule (#11974) ([#11981](https://github.com/astral-sh/ruff/pull/11981))
+- \[`ruff`\] Add `assert-with-print-message` rule ([#11981](https://github.com/astral-sh/ruff/pull/11981))
 
 ### CLI
 
@@ -118,7 +118,7 @@ The following deprecated CLI commands have been removed:
 ### Bug fixes
 
 - Avoid `E203` for f-string debug expression ([#12024](https://github.com/astral-sh/ruff/pull/12024))
-- Match import name ignores against both name and alias (`N812`, `N817`) ([#12033](https://github.com/astral-sh/ruff/pull/12033))
+- Match import-name ignores against both name and alias (`N812`, `N817`) ([#12033](https://github.com/astral-sh/ruff/pull/12033))
 - \[`pyflakes`\] Detect assignments that shadow definitions (`F811`) ([#11961](https://github.com/astral-sh/ruff/pull/11961))
 - Emit a syntax error for an empty type parameter list ([#12030](https://github.com/astral-sh/ruff/pull/12030))
 - Avoid consuming the newline for unterminated strings ([#12067](https://github.com/astral-sh/ruff/pull/12067))
