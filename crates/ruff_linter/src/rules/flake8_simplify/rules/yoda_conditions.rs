@@ -57,26 +57,15 @@ impl Violation for YodaConditions {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let YodaConditions { suggestion } = self;
-        if let Some(suggestion) = suggestion
-            .as_ref()
-            .and_then(SourceCodeSnippet::full_display)
-        {
-            format!("Yoda conditions are discouraged, use `{suggestion}` instead")
-        } else {
-            format!("Yoda conditions are discouraged")
-        }
+        format!("Yoda condition detected")
     }
 
     fn fix_title(&self) -> Option<String> {
         let YodaConditions { suggestion } = self;
-        suggestion.as_ref().map(|suggestion| {
-            if let Some(suggestion) = suggestion.full_display() {
-                format!("Replace Yoda condition with `{suggestion}`")
-            } else {
-                format!("Replace Yoda condition")
-            }
-        })
+        suggestion
+            .as_ref()
+            .and_then(|suggestion| suggestion.full_display())
+            .map(|suggestion| format!("Rewrite as `{suggestion}`"))
     }
 }
 
