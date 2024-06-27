@@ -304,8 +304,11 @@ Ruff is also available as [`emacs-ruff-format`](https://github.com/scop/emacs-ru
 Alternatively, it can be used via the [Apheleia](https://github.com/radian-software/apheleia) formatter library, by setting this configuration:
 
 ```emacs-lisp
-(add-to-list 'apheleia-mode-alist '(python-mode . ruff))
-(add-to-list 'apheleia-mode-alist '(python-ts-mode . ruff))
+;; Replace default (black) to use ruff for sorting import and formatting.
+(setf (alist-get 'python-mode apheleia-mode-alist)
+      '(ruff-isort ruff))
+(setf (alist-get 'python-ts-mode apheleia-mode-alist)
+      '(ruff-isort ruff))
 ```
 
 ## TextMate (Unofficial)
