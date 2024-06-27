@@ -456,6 +456,7 @@ mod tests {
                 exclude: None,
                 line_length: None,
                 configuration_preference: None,
+                show_syntax_errors: None,
                 tracing: TracingSettings {
                     log_level: None,
                     log_file: None,
@@ -508,6 +509,7 @@ mod tests {
                         exclude: None,
                         line_length: None,
                         configuration_preference: None,
+                        show_syntax_errors: None,
                         tracing: TracingSettings {
                             log_level: None,
                             log_file: None,
@@ -573,6 +575,7 @@ mod tests {
                         exclude: None,
                         line_length: None,
                         configuration_preference: None,
+                        show_syntax_errors: None,
                         tracing: TracingSettings {
                             log_level: None,
                             log_file: None,
@@ -719,6 +722,7 @@ mod tests {
                     ),
                 ),
                 configuration_preference: None,
+                show_syntax_errors: None,
                 tracing: TracingSettings {
                     log_level: Some(
                         Warn,
