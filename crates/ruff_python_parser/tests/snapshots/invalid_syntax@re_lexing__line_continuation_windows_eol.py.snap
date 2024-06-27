@@ -82,8 +82,9 @@ Module(
 
   |
 1 |   call(a, b, # comment \
-2 | / 
-3 | | def bar():
+  |  _______________________^
+2 | | 
   | |_^ Syntax Error: Expected ')', found newline
+3 |   def bar():
 4 |       pass
   |
