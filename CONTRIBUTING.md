@@ -367,6 +367,9 @@ even patch releases may contain [non-backwards-compatible changes](https://semve
         `git diff old-version-tag new-version-tag -- ruff.schema.json` returns a non-empty diff.
     1. Once run successfully, you should follow the link in the output to create a PR.
 1. If needed, update the `ruff-lsp` and `ruff-vscode` repositories.
+1. Publish the latest documentation by starting the [`mkdocs`](https://github.com/astral-sh/ruff/actions/workflows/docs.yaml) action with
+   - Branch: `main`
+   - The just created tag (e.g. `0.5.0`)
 
 ## Ecosystem CI
 
