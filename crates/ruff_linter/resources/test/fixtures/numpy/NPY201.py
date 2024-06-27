@@ -114,3 +114,13 @@ def func():
     np.cumproduct([1, 2, 3])
 
     np.product([1, 2, 3])
+
+    np.trapz([1, 2, 3])
+
+    np.in1d([1, 2], [1, 3, 5])
+
+    np.AxisError
+
+    np.ComplexWarning
+
+    np.compare_chararrays

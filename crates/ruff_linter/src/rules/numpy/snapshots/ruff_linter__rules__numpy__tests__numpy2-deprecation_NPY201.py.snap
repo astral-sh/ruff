@@ -909,6 +909,7 @@ NPY201.py:114:5: NPY201 [*] `np.cumproduct` will be removed in NumPy 2.0. Use `n
     114 |+    np.cumprod([1, 2, 3])
 115 115 | 
 116 116 |     np.product([1, 2, 3])
+117 117 | 
 
 NPY201.py:116:5: NPY201 [*] `np.product` will be removed in NumPy 2.0. Use `numpy.prod` instead.
     |
@@ -916,6 +917,8 @@ NPY201.py:116:5: NPY201 [*] `np.product` will be removed in NumPy 2.0. Use `nump
 115 | 
 116 |     np.product([1, 2, 3])
     |     ^^^^^^^^^^ NPY201
+117 | 
+118 |     np.trapz([1, 2, 3])
     |
     = help: Replace with `numpy.prod`
 
@@ -925,5 +928,94 @@ NPY201.py:116:5: NPY201 [*] `np.product` will be removed in NumPy 2.0. Use `nump
 115 115 | 
 116     |-    np.product([1, 2, 3])
     116 |+    np.prod([1, 2, 3])
+117 117 | 
+118 118 |     np.trapz([1, 2, 3])
+119 119 | 
 
+NPY201.py:118:5: NPY201 [*] `np.trapz` will be removed in NumPy 2.0. Use `numpy.trapezoid` on NumPy 2.0, or ignore this warning on earlier versions.
+    |
+116 |     np.product([1, 2, 3])
+117 | 
+118 |     np.trapz([1, 2, 3])
+    |     ^^^^^^^^ NPY201
+119 | 
+120 |     np.in1d([1, 2], [1, 3, 5])
+    |
+    = help: Replace with `numpy.trapezoid` (requires NumPy 2.0 or greater)
 
+ℹ Unsafe fix
+115 115 | 
+116 116 |     np.product([1, 2, 3])
+117 117 | 
+118     |-    np.trapz([1, 2, 3])
+    118 |+    np.trapezoid([1, 2, 3])
+119 119 | 
+120 120 |     np.in1d([1, 2], [1, 3, 5])
+121 121 | 
+
+NPY201.py:120:5: NPY201 [*] `np.in1d` will be removed in NumPy 2.0. Use `numpy.isin` instead.
+    |
+118 |     np.trapz([1, 2, 3])
+119 | 
+120 |     np.in1d([1, 2], [1, 3, 5])
+    |     ^^^^^^^ NPY201
+121 | 
+122 |     np.AxisError
+    |
+    = help: Replace with `numpy.isin`
+
+ℹ Safe fix
+117 117 | 
+118 118 |     np.trapz([1, 2, 3])
+119 119 | 
+120     |-    np.in1d([1, 2], [1, 3, 5])
+    120 |+    np.isin([1, 2], [1, 3, 5])
+121 121 | 
+122 122 |     np.AxisError
+123 123 | 
+
+NPY201.py:122:5: NPY201 [*] `np.AxisError` will be removed in NumPy 2.0. Use `numpy.exceptions.AxisError` instead.
+    |
+120 |     np.in1d([1, 2], [1, 3, 5])
+121 | 
+122 |     np.AxisError
+    |     ^^^^^^^^^^^^ NPY201
+123 | 
+124 |     np.ComplexWarning
+    |
+    = help: Replace with `numpy.exceptions.AxisError`
+
+ℹ Safe fix
+    1   |+from numpy.exceptions import AxisError
+1   2   | def func():
+2   3   |     import numpy as np
+3   4   | 
+--------------------------------------------------------------------------------
+119 120 | 
+120 121 |     np.in1d([1, 2], [1, 3, 5])
+121 122 | 
+122     |-    np.AxisError
+    123 |+    AxisError
+123 124 | 
+124 125 |     np.ComplexWarning
+
+NPY201.py:124:5: NPY201 [*] `np.ComplexWarning` will be removed in NumPy 2.0. Use `numpy.exceptions.ComplexWarning` instead.
+    |
+122 |     np.AxisError
+123 | 
+124 |     np.ComplexWarning
+    |     ^^^^^^^^^^^^^^^^^ NPY201
+    |
+    = help: Replace with `numpy.exceptions.ComplexWarning`
+
+ℹ Safe fix
+    1   |+from numpy.exceptions import ComplexWarning
+1   2   | def func():
+2   3   |     import numpy as np
+3   4   | 
+--------------------------------------------------------------------------------
+121 122 | 
+122 123 |     np.AxisError
+123 124 | 
+124     |-    np.ComplexWarning
+    125 |+    ComplexWarning
