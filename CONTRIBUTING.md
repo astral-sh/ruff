@@ -348,7 +348,6 @@ even patch releases may contain [non-backwards-compatible changes](https://semve
 1. Merge the PR
 1. Run the [release workflow](https://github.com/astral-sh/ruff/actions/workflows/release.yaml) with:
     - The new version number (without starting `v`)
-    - The commit hash of the merged release pull request on `main`
 1. The release workflow will do the following:
     1. Build all the assets. If this fails (even though we tested in step 4), we haven't tagged or
         uploaded anything, you can restart after pushing a fix. If you just need to rerun the build,
@@ -360,10 +359,8 @@ even patch releases may contain [non-backwards-compatible changes](https://semve
     1. Attach artifacts to draft GitHub release
     1. Trigger downstream repositories. This can fail non-catastrophically, as we can run any
         downstream jobs manually if needed.
-1. Publish the GitHub release
-    1. Open the draft release in the GitHub release section
-    1. Copy the changelog for the release into the GitHub release
-        - See previous releases for formatting of section headers
+1. Verify the GitHub release:
+    1. The Changelog should match the content of `CHANGELOG.md`
     1. Append the contributors from the `bump.sh` script
 1. If needed, [update the schemastore](https://github.com/astral-sh/ruff/blob/main/scripts/update_schemastore.py).
     1. One can determine if an update is needed when
