@@ -807,7 +807,6 @@ fn stdin_parse_error() {
     Found 1 error.
 
     ----- stderr -----
-    error: Failed to parse at 1:16: Expected one or more symbol names after import
     "###);
 }
 
@@ -836,7 +835,6 @@ fn stdin_multiple_parse_error() {
     Found 2 errors.
 
     ----- stderr -----
-    error: Failed to parse at 1:16: Expected one or more symbol names after import
     "###);
 }
 
@@ -858,7 +856,6 @@ fn parse_error_not_included() {
     Found 1 error.
 
     ----- stderr -----
-    error: Failed to parse at 1:6: Expected an expression
     "###);
 }
 
@@ -880,7 +877,6 @@ fn deprecated_parse_error_selection() {
 
     ----- stderr -----
     warning: Rule `E999` is deprecated and will be removed in a future release. Syntax errors will always be shown regardless of whether this rule is selected or not.
-    error: Failed to parse at 1:6: Expected an expression
     "###);
 }
 
