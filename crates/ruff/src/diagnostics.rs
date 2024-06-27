@@ -264,8 +264,8 @@ pub(crate) fn lint_path(
     // Lint the file.
     let (
         LinterResult {
-            data: messages,
-            error: parse_error,
+            messages,
+            has_syntax_error: has_error,
         },
         transformed,
         fixed,
@@ -334,7 +334,7 @@ pub(crate) fn lint_path(
 
     if let Some((cache, relative_path, key)) = caching {
         // We don't cache parsing errors.
-        if parse_error.is_none() {
+        if !has_error {
             // `FixMode::Apply` and `FixMode::Diff` rely on side-effects (writing to disk,
             // and writing the diff to stdout, respectively). If a file has diagnostics, we
             // need to avoid reading from and writing to the cache in these modes.
@@ -400,7 +400,7 @@ pub(crate) fn lint_stdin(
     };
 
     // Lint the inputs.
-    let (LinterResult { data: messages, .. }, transformed, fixed) =
+    let (LinterResult { messages, .. }, transformed, fixed) =
         if matches!(fix_mode, flags::FixMode::Apply | flags::FixMode::Diff) {
             if let Ok(FixerResult {
                 result,

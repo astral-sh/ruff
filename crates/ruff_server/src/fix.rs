@@ -68,7 +68,10 @@ pub(crate) fn fix_all(
     // which is inconsistent with how `ruff check --fix` works.
     let FixerResult {
         transformed,
-        result: LinterResult { error, .. },
+        result: LinterResult {
+            has_syntax_error: has_error,
+            ..
+        },
         ..
     } = ruff_linter::linter::lint_fix(
         &query.virtual_file_path(),
@@ -80,11 +83,9 @@ pub(crate) fn fix_all(
         source_type,
     )?;
 
-    if let Some(error) = error {
+    if has_error {
         // abort early if a parsing error occurred
-        return Err(anyhow::anyhow!(
-            "A parsing error occurred during `fix_all`: {error}"
-        ));
+        return Err(anyhow::anyhow!("A parsing error occurred during `fix_all`"));
     }
 
     // fast path: if `transformed` is still borrowed, no changes were made and we can return early
