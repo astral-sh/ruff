@@ -2,21 +2,112 @@
 
 ## 0.5.0
 
+Check out the [blog post](https://astral.sh/blog/ruff-v0.5.0) for a migration guide and overview of the changes!
+
+### Breaking changes
+
+See also, the "Remapped rules" section which may result in disabled rules.
+
+* Follow the XDG specification to discover user-level configurations on macOS (same as on other Unix platforms)
+* Selecting `ALL` excludes deprecated rules
+
+
+### Deprecations
+
+The following rules are now deprecated:
+* [`syntax-error`](https://docs.astral.sh/ruff/rules/syntax-error/) (`E999`)
+
+### Remapped rules
+
+The following rules have been remapped to new rule codes:
+
+* [`blocking-http-call-in-async-function`](https://docs.astral.sh/ruff/rules/blocking-http-call-in-async-function/): `ASYNC100` to `ASYNC210`
+* [`open-sleep-or-subprocess-in-async-function`](https://docs.astral.sh/ruff/rules/open-sleep-or-subprocess-in-async-function/): `ASYNC101` split into `ASYNC220`, `ASYNC221`, `ASYNC230`, and `ASYNC251`
+* [`blocking-os-call-in-async-function`](`https://docs.astral.sh/ruff/rules/blocking-os-call-in-async-function/`): `ASYNC102` been merged into `ASYNC220` and `ASYNC221`
+* [`trio-timeout-without-await`](https://docs.astral.sh/ruff/rules/trio-timeout-without-await/): `TRIO100` to `ASYNC100`
+* [`trio-sync-call`](https://docs.astral.sh/ruff/rules/trio-sync-call/): `TRIO105` to `ASYNC105`
+* [`trio-async-function-with-timeout`](https://docs.astral.sh/ruff/rules/trio-async-function-with-timeout/): `TRIO109` to `ASYNC109`
+* [`trio-unneeded-sleep`](https://docs.astral.sh/ruff/rules/trio-unneeded-sleep/): `TRIO110` to `ASYNC110`
+* [`trio-zero-sleep-call`](https://docs.astral.sh/ruff/rules/trio-zero-sleep-call/): `TRIO115` to `ASYNC115`
+* [`repeated-isinstance-calls`](https://docs.astral.sh/ruff/rules/repeated-isinstance-calls/): `PLR1701` to `SIM101`
+
+### Stabilization
+
+The following rules have been stabilized and are no longer in preview:
+
+- [`mutable-fromkeys-value`](https://docs.astral.sh/ruff/rules/mutable-fromkeys-value/)
+- [`default-factory-kwarg`](https://docs.astral.sh/ruff/rules/default-factory-kwarg/)
+- [`django-extra`](https://docs.astral.sh/ruff/rules/django-extra/)
+- [`manual-dict-comprehension`](https://docs.astral.sh/ruff/rules/manual-dict-comprehension/)
+- [`print-empty-string`](https://docs.astral.sh/ruff/rules/print-empty-string/)
+- [`readlines-in-for`](https://docs.astral.sh/ruff/rules/readlines-in-for/)
+- [`if-expr-min-max`](https://docs.astral.sh/ruff/rules/if-expr-min-max/)
+- [`bit-count`](https://docs.astral.sh/ruff/rules/bit-count/)
+- [`redundant-log-base`](https://docs.astral.sh/ruff/rules/redundant-log-base/)
+- [`regex-flag-alias`](https://docs.astral.sh/ruff/rules/regex-flag-alias/)
+- [`isinstance-type-none`](https://docs.astral.sh/ruff/rules/isinstance-type-none/)
+- [`type-none-comparison`](https://docs.astral.sh/ruff/rules/type-none-comparison/)
+- [`implicit-cwd`](https://docs.astral.sh/ruff/rules/implicit-cwd/)
+- [`hashlib-digest-hex`](https://docs.astral.sh/ruff/rules/hashlib-digest-hex/)
+- [`list-reverse-copy`](https://docs.astral.sh/ruff/rules/list-reverse-copy/)
+- [`bad-open-mode`](https://docs.astral.sh/ruff/rules/bad-open-mode/)
+- [`empty-comment`](https://docs.astral.sh/ruff/rules/empty-comment/)
+- [`global-at-module-level`](https://docs.astral.sh/ruff/rules/global-at-module-level/)
+- [`misplaced-bare-raise`](https://docs.astral.sh/ruff/rules/misplaced-bare-raise`/)
+- [`non-ascii-import-name`](https://docs.astral.sh/ruff/rules/non-ascii-import-name/)
+- [`non-ascii-name`](https://docs.astral.sh/ruff/rules/non-ascii-name/)
+- [`nonlocal-and-global`](https://docs.astral.sh/ruff/rules/nonlocal-and-global/)
+- [`potential-index-error`](https://docs.astral.sh/ruff/rules/potential-index-error/)
+- [`redeclared-assigned-name`](https://docs.astral.sh/ruff/rules/redeclared-assigned-name/)
+- [`redefined-argument-from-locals`](https://docs.astral.sh/ruff/redefined-argument-from-locals/)
+- [`repeated-keyword-argument`](https://docs.astral.sh/ruff/rules/repeated-keyword-argument/)
+- [`super-without-brackets`](https://docs.astral.sh/ruff/rules/super-without-brackets/)
+- [`unnecessary-list-index-lookup`](https://docs.astral.sh/ruff/rules/unnecessary-list-index-lookup/)
+- [`useless-exception-statement`](https://docs.astral.sh/ruff/rules/useless-exception-statement/)
+- [`useless-with-lock`](https://docs.astral.sh/ruff/rules/useless-with-lock/)
+
+The following behaviors have been stabilized:
+
+TODO
+
+### Removals
+
+The following deprecated settings have been removed:
+
+* `output-format=text`; use `output-format=text` or `output-format=full`
+* `tab-size`; use `indent-width`
+
+The following deprecated CLI options have been removed:
+
+* `show-source`; use `--output-format=full`
+* `no-show-source`; use `--output-format=concise`
+
+The following deprecated CLI commands have been removed:
+
+* `ruff <path>`; use `ruff check <path>`
+* `ruff --clean`; use `ruff clean`
+* `ruff --generate-shell-completion`; use `ruff generate-shell-completion`
+
 ### Preview features
 
 - [`ruff`] Add `assert-with-print-message` rule (#11974) ([#11981](https://github.com/astral-sh/ruff/pull/11981))
+
+### CLI
+
+- Use rule name rather than message in --statistics ([#11697](https://github.com/astral-sh/ruff/pull/11697))
+- Use the output format `full` by default ([#12010](https://github.com/astral-sh/ruff/pull/12010))
+- Don't log syntax errors to the console ([#11902](https://github.com/astral-sh/ruff/pull/11902))
 
 ### Rule changes
 
 - Fix RUF027 false positives if `gettext` is imported using an alias ([#12025](https://github.com/astral-sh/ruff/pull/12025))
 - Update `trapz` and `in1d` deprecation for NPY201 ([#11948](https://github.com/astral-sh/ruff/pull/11948))
+- Modify diagnostic ranges for shell-related bandit rules ([#10667](https://github.com/astral-sh/ruff/pull/10667))
 
 ### Server
-
-- Add Jupyter Notebook document change snapshot test ([#11944](https://github.com/astral-sh/ruff/pull/11944))
-- Remove usage of `std::path::absolute` from snapshot test ([#11973](https://github.com/astral-sh/ruff/pull/11973))
-- `ruff server`: Closing an untitled, unsaved notebook document no longer throws an error ([#11942](https://github.com/astral-sh/ruff/pull/11942))
-- `ruff server`: Support the usage of tildes and environment variables in `logFile` ([#11945](https://github.com/astral-sh/ruff/pull/11945))
+- Closing an untitled, unsaved notebook document no longer throws an error ([#11942](https://github.com/astral-sh/ruff/pull/11942))
+- Support the usage of tildes and environment variables in `logFile` ([#11945](https://github.com/astral-sh/ruff/pull/11945))
+- Add option to configure whether to show syntax errors ([#12059](https://github.com/astral-sh/ruff/pull/12059))
 
 ### Bug fixes
 
@@ -26,26 +117,27 @@
 - Match import name ignores against both name and alias ([#12033](https://github.com/astral-sh/ruff/pull/12033))
 - Use `TokenSource` to find new location for re-lexing ([#12060](https://github.com/astral-sh/ruff/pull/12060))
 - [`pyflakes`] Detect assignments that shadow definitions (`F811`) ([#11961](https://github.com/astral-sh/ruff/pull/11961))
+- Add syntax error for empty type parameter list ([#12030](https://github.com/astral-sh/ruff/pull/12030))
+- Avoid consuming newline for unterminated string ([#12067](https://github.com/astral-sh/ruff/pull/12067))
+- Do not include newline for unterminated string range ([#12017](https://github.com/astral-sh/ruff/pull/12017))
+- Use correct range to highlight line continuation error ([#12016](https://github.com/astral-sh/ruff/pull/12016))
+
+
+### Other changes
+- Upgrade Unicode table ([#11194](https://github.com/astral-sh/ruff/pull/11194))
+- Removed the deprecation error message for the nursery selector ([10172])(https://github.com/astral-sh/ruff/pull/10172)
+
+
+## Release
+- Migrate release workflow to cargo-dist ([#9559](https://github.com/astral-sh/ruff/pull/9559))
 
 ### Documentation
-
 - Clarify special control flow parameters for `PLR0917`: `too-many-positional` ([#11978](https://github.com/astral-sh/ruff/pull/11978))
 - Fix missing related settings header ([#12013](https://github.com/astral-sh/ruff/pull/12013))
 - Update PEP reference in future_rewritable_type_annotation.rs ([#11985](https://github.com/astral-sh/ruff/pull/11985))
 - `ruff-check`: update docs for fix_only ([#11959](https://github.com/astral-sh/ruff/pull/11959))
-- docs(integrations): fix link to `python-lsp-server` ([#11980](https://github.com/astral-sh/ruff/pull/11980))
-- docs: add `and formatter` to CLI startup message ([#12042](https://github.com/astral-sh/ruff/pull/12042))
-
-### Other changes
-
-- Add Open Wine Components to "Who's Using Ruff?" ([#11976](https://github.com/astral-sh/ruff/pull/11976))
-- Add syntax error for empty type parameter list ([#12030](https://github.com/astral-sh/ruff/pull/12030))
-- Avoid consuming newline for unterminated string ([#12067](https://github.com/astral-sh/ruff/pull/12067))
-- Do not include newline for unterminated string range ([#12017](https://github.com/astral-sh/ruff/pull/12017))
-- Revert "[red-knot] Add more tests asserting that the VendoredFileSystem and the `VERSIONS` parser work with the vendored typeshed stubs" ([#11975](https://github.com/astral-sh/ruff/pull/11975))
-- Ruff 0.5 ([#12005](https://github.com/astral-sh/ruff/pull/12005))
-- Update parser tests to validate token ranges ([#12019](https://github.com/astral-sh/ruff/pull/12019))
-- Use correct range to highlight line continuation error ([#12016](https://github.com/astral-sh/ruff/pull/12016))
+- Fix link to `python-lsp-server` ([#11980](https://github.com/astral-sh/ruff/pull/11980))
+- Add `and formatter` to CLI startup message ([#12042](https://github.com/astral-sh/ruff/pull/12042))
 
 ## 0.4.10
 
