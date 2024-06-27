@@ -9,7 +9,6 @@ use ruff_source_file::SourceCode;
 use ruff_text_size::Ranged;
 
 use crate::message::{Emitter, EmitterContext, Message, SourceLocation};
-use crate::registry::AsRule;
 
 #[derive(Default)]
 pub struct RdjsonEmitter;
@@ -58,34 +57,34 @@ impl Serialize for ExpandedMessages<'_> {
 }
 
 fn message_to_rdjson_value(message: &Message) -> Value {
-    let source_code = message.file.to_source_code();
+    let source_code = message.source_file().to_source_code();
 
     let start_location = source_code.source_location(message.start());
     let end_location = source_code.source_location(message.end());
 
-    if let Some(fix) = message.fix.as_ref() {
+    if let Some(fix) = message.fix() {
         json!({
-            "message": message.kind.body,
+            "message": message.body(),
             "location": {
                 "path": message.filename(),
                 "range": rdjson_range(&start_location, &end_location),
             },
             "code": {
-                "value": message.kind.rule().noqa_code().to_string(),
-                "url": message.kind.rule().url(),
+                "value": message.rule().map(|rule| rule.noqa_code().to_string()),
+                "url": message.rule().and_then(|rule| rule.url()),
             },
             "suggestions": rdjson_suggestions(fix.edits(), &source_code),
         })
     } else {
         json!({
-            "message": message.kind.body,
+            "message": message.body(),
             "location": {
                 "path": message.filename(),
                 "range": rdjson_range(&start_location, &end_location),
             },
             "code": {
-                "value": message.kind.rule().noqa_code().to_string(),
-                "url": message.kind.rule().url(),
+                "value": message.rule().map(|rule| rule.noqa_code().to_string()),
+                "url": message.rule().and_then(|rule| rule.url()),
             },
         })
     }
@@ -125,13 +124,23 @@ fn rdjson_range(start: &SourceLocation, end: &SourceLocation) -> Value {
 mod tests {
     use insta::assert_snapshot;
 
-    use crate::message::tests::{capture_emitter_output, create_messages};
+    use crate::message::tests::{
+        capture_emitter_output, create_messages, create_syntax_error_messages,
+    };
     use crate::message::RdjsonEmitter;
 
     #[test]
     fn output() {
         let mut emitter = RdjsonEmitter;
         let content = capture_emitter_output(&mut emitter, &create_messages());
+
+        assert_snapshot!(content);
+    }
+
+    #[test]
+    fn syntax_errors() {
+        let mut emitter = RdjsonEmitter;
+        let content = capture_emitter_output(&mut emitter, &create_syntax_error_messages());
 
         assert_snapshot!(content);
     }
