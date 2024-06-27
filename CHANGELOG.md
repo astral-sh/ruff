@@ -9,7 +9,7 @@ Check out the [blog post](https://astral.sh/blog/ruff-v0.5.0) for a migration gu
 See also, the "Remapped rules" section which may result in disabled rules.
 
 - Follow the XDG specification to discover user-level configurations on macOS (same as on other Unix platforms)
-- Selecting `ALL` excludes deprecated rules
+- Selecting `ALL` now excludes deprecated rules
 - The released archives now include an extra level of nesting, which can be removed with `--strip-components=1` when untarring.
 - The release artifact's file name no longer include the version tag. This enables users to install via `/latest` URLs on GitHub.
 
