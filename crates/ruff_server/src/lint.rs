@@ -60,7 +60,11 @@ pub(crate) struct DiagnosticFix {
 /// A series of diagnostics across a single text document or an arbitrary number of notebook cells.
 pub(crate) type DiagnosticsMap = FxHashMap<lsp_types::Url, Vec<lsp_types::Diagnostic>>;
 
-pub(crate) fn check(query: &DocumentQuery, encoding: PositionEncoding) -> DiagnosticsMap {
+pub(crate) fn check(
+    query: &DocumentQuery,
+    encoding: PositionEncoding,
+    show_syntax_errors: bool,
+) -> DiagnosticsMap {
     let source_kind = query.make_source_kind();
     let file_resolver_settings = query.settings().file_resolver();
     let linter_settings = query.settings().linter();
@@ -156,10 +160,18 @@ pub(crate) fn check(query: &DocumentQuery, encoding: PositionEncoding) -> Diagno
         .zip(noqa_edits)
         .map(|(diagnostic, noqa_edit)| {
             to_lsp_diagnostic(diagnostic, &noqa_edit, &source_kind, &index, encoding)
-        })
-        .chain(parsed.errors().iter().map(|parse_error| {
-            parse_error_to_lsp_diagnostic(parse_error, &source_kind, &index, encoding)
-        }));
+        });
+
+    let lsp_diagnostics = lsp_diagnostics.chain(
+        show_syntax_errors
+            .then(|| {
+                parsed.errors().iter().map(|parse_error| {
+                    parse_error_to_lsp_diagnostic(parse_error, &source_kind, &index, encoding)
+                })
+            })
+            .into_iter()
+            .flatten(),
+    );
 
     if let Some(notebook) = query.as_notebook() {
         for (index, diagnostic) in lsp_diagnostics {
@@ -173,12 +185,10 @@ pub(crate) fn check(query: &DocumentQuery, encoding: PositionEncoding) -> Diagno
                 .push(diagnostic);
         }
     } else {
-        for (_, diagnostic) in lsp_diagnostics {
-            diagnostics_map
-                .entry(query.make_key().into_url())
-                .or_default()
-                .push(diagnostic);
-        }
+        diagnostics_map
+            .entry(query.make_key().into_url())
+            .or_default()
+            .extend(lsp_diagnostics.map(|(_, diagnostic)| diagnostic));
     }
 
     diagnostics_map
