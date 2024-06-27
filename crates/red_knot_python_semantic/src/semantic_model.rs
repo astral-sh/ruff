@@ -6,7 +6,7 @@ use ruff_python_ast::{Expr, ExpressionRef, StmtClassDef};
 use crate::semantic_index::ast_ids::HasScopedAstId;
 use crate::semantic_index::symbol::PublicSymbolId;
 use crate::semantic_index::{public_symbol, semantic_index};
-use crate::types::{infer_types, public_symbol_ty, Type, TypingContext};
+use crate::types::{infer_types, public_symbol_ty, Type};
 use crate::Db;
 
 pub struct SemanticModel<'db> {
@@ -19,6 +19,10 @@ impl<'db> SemanticModel<'db> {
         Self { db, file }
     }
 
+    pub fn db(&self) -> &dyn Db {
+        self.db
+    }
+
     pub fn resolve_module(&self, module_name: ModuleName) -> Option<Module> {
         resolve_module(self.db.upcast(), module_name)
     }
@@ -27,12 +31,8 @@ impl<'db> SemanticModel<'db> {
         public_symbol(self.db, module.file(), symbol_name)
     }
 
-    pub fn public_symbol_ty(&self, symbol: PublicSymbolId<'db>) -> Type<'db> {
+    pub fn public_symbol_ty(&self, symbol: PublicSymbolId<'db>) -> Type {
         public_symbol_ty(self.db, symbol)
-    }
-
-    pub fn typing_context(&self) -> TypingContext<'db, '_> {
-        TypingContext::global(self.db)
     }
 }
 
@@ -41,11 +41,11 @@ pub trait HasTy {
     ///
     /// ## Panics
     /// May panic if `self` is from another file than `model`.
-    fn ty<'db>(&self, model: &SemanticModel<'db>) -> Type<'db>;
+    fn ty(&self, model: &SemanticModel<'_>) -> Type;
 }
 
 impl HasTy for ast::ExpressionRef<'_> {
-    fn ty<'db>(&self, model: &SemanticModel<'db>) -> Type<'db> {
+    fn ty(&self, model: &SemanticModel<'_>) -> Type {
         let index = semantic_index(model.db, model.file);
         let file_scope = index.expression_scope_id(*self);
         let scope = file_scope.to_scope_id(model.db, model.file);
@@ -59,7 +59,7 @@ macro_rules! impl_expression_has_ty {
     ($ty: ty) => {
         impl HasTy for $ty {
             #[inline]
-            fn ty<'db>(&self, model: &SemanticModel<'db>) -> Type<'db> {
+            fn ty(&self, model: &SemanticModel<'_>) -> Type {
                 let expression_ref = ExpressionRef::from(self);
                 expression_ref.ty(model)
             }
@@ -101,7 +101,7 @@ impl_expression_has_ty!(ast::ExprSlice);
 impl_expression_has_ty!(ast::ExprIpyEscapeCommand);
 
 impl HasTy for ast::Expr {
-    fn ty<'db>(&self, model: &SemanticModel<'db>) -> Type<'db> {
+    fn ty(&self, model: &SemanticModel<'_>) -> Type {
         match self {
             Expr::BoolOp(inner) => inner.ty(model),
             Expr::Named(inner) => inner.ty(model),
@@ -140,7 +140,7 @@ impl HasTy for ast::Expr {
 }
 
 impl HasTy for ast::StmtFunctionDef {
-    fn ty<'db>(&self, model: &SemanticModel<'db>) -> Type<'db> {
+    fn ty(&self, model: &SemanticModel<'_>) -> Type {
         let index = semantic_index(model.db, model.file);
         let definition = index.definition(self);
 
@@ -152,7 +152,7 @@ impl HasTy for ast::StmtFunctionDef {
 }
 
 impl HasTy for StmtClassDef {
-    fn ty<'db>(&self, model: &SemanticModel<'db>) -> Type<'db> {
+    fn ty(&self, model: &SemanticModel<'_>) -> Type {
         let index = semantic_index(model.db, model.file);
         let definition = index.definition(self);
 
@@ -164,7 +164,7 @@ impl HasTy for StmtClassDef {
 }
 
 impl HasTy for ast::Alias {
-    fn ty<'db>(&self, model: &SemanticModel<'db>) -> Type<'db> {
+    fn ty(&self, model: &SemanticModel<'_>) -> Type {
         let index = semantic_index(model.db, model.file);
         let definition = index.definition(self);
 

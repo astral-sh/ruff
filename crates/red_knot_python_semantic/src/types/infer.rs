@@ -2,8 +2,7 @@ use rustc_hash::FxHashMap;
 use std::borrow::Cow;
 use std::sync::Arc;
 
-use red_knot_module_resolver::resolve_module;
-use red_knot_module_resolver::ModuleName;
+use red_knot_module_resolver::{resolve_module, ModuleName};
 use ruff_db::vfs::VfsFile;
 use ruff_index::IndexVec;
 use ruff_python_ast as ast;
@@ -16,80 +15,42 @@ use crate::semantic_index::symbol::{
 };
 use crate::semantic_index::{symbol_table, SemanticIndex};
 use crate::types::{
-    infer_types, ClassType, FunctionType, IntersectionType, ModuleType, ScopedClassTypeId,
-    ScopedFunctionTypeId, ScopedIntersectionTypeId, ScopedUnionTypeId, Type, TypeId, TypingContext,
-    UnionType, UnionTypeBuilder,
+    infer_types, type_store_query, ClassType, FileModuleTypeId, FileTypeStore, FunctionType, Name,
+    Type, TypeId, UnionType, UnionTypeBuilder,
 };
 use crate::Db;
 
 /// The inferred types for a single scope.
 #[derive(Debug, Eq, PartialEq, Default, Clone)]
 pub(crate) struct TypeInference<'db> {
-    /// The type of the module if the scope is a module scope.
-    module_type: Option<ModuleType>,
-
-    /// The types of the defined classes in this scope.
-    class_types: IndexVec<ScopedClassTypeId, ClassType<'db>>,
-
-    /// The types of the defined functions in this scope.
-    function_types: IndexVec<ScopedFunctionTypeId, FunctionType<'db>>,
-
-    union_types: IndexVec<ScopedUnionTypeId, UnionType<'db>>,
-    intersection_types: IndexVec<ScopedIntersectionTypeId, IntersectionType<'db>>,
-
     /// The types of every expression in this scope.
-    expression_tys: IndexVec<ScopedExpressionId, Type<'db>>,
+    expressions: IndexVec<ScopedExpressionId, Type>,
 
     /// The public types of every symbol in this scope.
-    symbol_tys: IndexVec<ScopedSymbolId, Type<'db>>,
+    symbols: IndexVec<ScopedSymbolId, Type>,
 
     /// The type of a definition.
-    definition_tys: FxHashMap<Definition<'db>, Type<'db>>,
+    definitions: FxHashMap<Definition<'db>, Type>,
 }
 
 impl<'db> TypeInference<'db> {
     #[allow(unused)]
-    pub(crate) fn expression_ty(&self, expression: ScopedExpressionId) -> Type<'db> {
-        self.expression_tys[expression]
+    pub(crate) fn expression_ty(&self, expression: ScopedExpressionId) -> Type {
+        self.expressions[expression]
     }
 
-    pub(super) fn symbol_ty(&self, symbol: ScopedSymbolId) -> Type<'db> {
-        self.symbol_tys[symbol]
+    pub(super) fn symbol_ty(&self, symbol: ScopedSymbolId) -> Type {
+        self.symbols[symbol]
     }
 
-    pub(super) fn module_ty(&self) -> &ModuleType {
-        self.module_type.as_ref().unwrap()
-    }
-
-    pub(super) fn class_ty(&self, id: ScopedClassTypeId) -> &ClassType<'db> {
-        &self.class_types[id]
-    }
-
-    pub(super) fn function_ty(&self, id: ScopedFunctionTypeId) -> &FunctionType<'db> {
-        &self.function_types[id]
-    }
-
-    pub(super) fn union_ty(&self, id: ScopedUnionTypeId) -> &UnionType<'db> {
-        &self.union_types[id]
-    }
-
-    pub(super) fn intersection_ty(&self, id: ScopedIntersectionTypeId) -> &IntersectionType<'db> {
-        &self.intersection_types[id]
-    }
-
-    pub(crate) fn definition_ty(&self, definition: Definition) -> Type<'db> {
-        self.definition_tys[&definition]
+    pub(crate) fn definition_ty(&self, definition: Definition<'db>) -> Type {
+        self.definitions[&definition]
     }
 
     fn shrink_to_fit(&mut self) {
-        self.class_types.shrink_to_fit();
-        self.function_types.shrink_to_fit();
-        self.union_types.shrink_to_fit();
-        self.intersection_types.shrink_to_fit();
-
-        self.expression_tys.shrink_to_fit();
-        self.symbol_tys.shrink_to_fit();
-        self.definition_tys.shrink_to_fit();
+        self.expressions.shrink_to_fit();
+        self.symbols.shrink_to_fit();
+        self.definitions.shrink_to_fit();
     }
 }
 
@@ -99,7 +60,6 @@ pub(super) struct TypeInferenceBuilder<'db> {
 
     // Cached lookups
     index: &'db SemanticIndex<'db>,
-    scope: ScopeId<'db>,
     file_scope_id: FileScopeId,
     file_id: VfsFile,
     symbol_table: Arc<SymbolTable<'db>>,
@@ -123,7 +83,6 @@ impl<'db> TypeInferenceBuilder<'db> {
             index,
             file_scope_id,
             file_id: file,
-            scope,
             symbol_table,
 
             db,
@@ -211,7 +170,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         });
 
         let definition = self.index.definition(function);
-        self.types.definition_tys.insert(definition, function_ty);
+        self.types.definitions.insert(definition, function_ty);
     }
 
     fn infer_class_definition_statement(&mut self, class: &ast::StmtClassDef) {
@@ -238,11 +197,11 @@ impl<'db> TypeInferenceBuilder<'db> {
         let class_ty = self.class_ty(ClassType {
             name: name.id.clone(),
             bases,
-            body_scope: body_scope.to_scope_id(self.db, self.file_id),
+            body_scope,
         });
 
         let definition = self.index.definition(class);
-        self.types.definition_tys.insert(definition, class_ty);
+        self.types.definitions.insert(definition, class_ty);
     }
 
     fn infer_if_statement(&mut self, if_statement: &ast::StmtIf) {
@@ -283,7 +242,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         for target in targets {
             self.infer_expression(target);
 
-            self.types.definition_tys.insert(
+            self.types.definitions.insert(
                 self.index.definition(DefinitionNodeRef::Target(target)),
                 value_ty,
             );
@@ -306,7 +265,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         let annotation_ty = self.infer_expression(annotation);
         self.infer_expression(target);
 
-        self.types.definition_tys.insert(
+        self.types.definitions.insert(
             self.index.definition(DefinitionNodeRef::Target(target)),
             annotation_ty,
         );
@@ -341,12 +300,12 @@ impl<'db> TypeInferenceBuilder<'db> {
             let module_name = ModuleName::new(&name.id);
             let module = module_name.and_then(|name| resolve_module(self.db.upcast(), name));
             let module_ty = module
-                .map(|module| self.typing_context().module_ty(module.file()))
+                .map(|module| TypeInferenceBuilder::module_ty(module.file()))
                 .unwrap_or(Type::Unknown);
 
             let definition = self.index.definition(alias);
 
-            self.types.definition_tys.insert(definition, module_ty);
+            self.types.definitions.insert(definition, module_ty);
         }
     }
 
@@ -363,7 +322,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         let module =
             module_name.and_then(|module_name| resolve_module(self.db.upcast(), module_name));
         let module_ty = module
-            .map(|module| self.typing_context().module_ty(module.file()))
+            .map(|module| TypeInferenceBuilder::module_ty(module.file()))
             .unwrap_or(Type::Unknown);
 
         for alias in names {
@@ -374,15 +333,15 @@ impl<'db> TypeInferenceBuilder<'db> {
             } = alias;
 
             let ty = module_ty
-                .member(&self.typing_context(), &name.id)
+                .member(self.db, &Name::new(&name.id))
                 .unwrap_or(Type::Unknown);
 
             let definition = self.index.definition(alias);
-            self.types.definition_tys.insert(definition, ty);
+            self.types.definitions.insert(definition, ty);
         }
     }
 
-    fn infer_decorator(&mut self, decorator: &ast::Decorator) -> Type<'db> {
+    fn infer_decorator(&mut self, decorator: &ast::Decorator) -> Type {
         let ast::Decorator {
             range: _,
             expression,
@@ -391,7 +350,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.infer_expression(expression)
     }
 
-    fn infer_arguments(&mut self, arguments: &ast::Arguments) -> Vec<Type<'db>> {
+    fn infer_arguments(&mut self, arguments: &ast::Arguments) -> Vec<Type> {
         let mut types = Vec::with_capacity(
             arguments
                 .args
@@ -412,7 +371,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         types
     }
 
-    fn infer_expression(&mut self, expression: &ast::Expr) -> Type<'db> {
+    fn infer_expression(&mut self, expression: &ast::Expr) -> Type {
         let ty = match expression {
             ast::Expr::NoneLiteral(ast::ExprNoneLiteral { range: _ }) => Type::None,
             ast::Expr::NumberLiteral(literal) => self.infer_number_literal_expression(literal),
@@ -425,13 +384,13 @@ impl<'db> TypeInferenceBuilder<'db> {
             _ => todo!("expression type resolution for {:?}", expression),
         };
 
-        self.types.expression_tys.push(ty);
+        self.types.expressions.push(ty);
 
         ty
     }
 
     #[allow(clippy::unused_self)]
-    fn infer_number_literal_expression(&mut self, literal: &ast::ExprNumberLiteral) -> Type<'db> {
+    fn infer_number_literal_expression(&mut self, literal: &ast::ExprNumberLiteral) -> Type {
         let ast::ExprNumberLiteral { range: _, value } = literal;
 
         match value {
@@ -444,7 +403,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
     }
 
-    fn infer_named_expression(&mut self, named: &ast::ExprNamed) -> Type<'db> {
+    fn infer_named_expression(&mut self, named: &ast::ExprNamed) -> Type {
         let ast::ExprNamed {
             range: _,
             target,
@@ -455,13 +414,13 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.infer_expression(target);
 
         self.types
-            .definition_tys
+            .definitions
             .insert(self.index.definition(named), value_ty);
 
         value_ty
     }
 
-    fn infer_if_expression(&mut self, if_expression: &ast::ExprIf) -> Type<'db> {
+    fn infer_if_expression(&mut self, if_expression: &ast::ExprIf) -> Type {
         let ast::ExprIf {
             range: _,
             test,
@@ -475,7 +434,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         let body_ty = self.infer_expression(body);
         let orelse_ty = self.infer_expression(orelse);
 
-        let union = UnionTypeBuilder::new(&self.typing_context())
+        let union = UnionTypeBuilder::new(self.db)
             .add(body_ty)
             .add(orelse_ty)
             .build();
@@ -483,7 +442,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.union_ty(union)
     }
 
-    fn infer_name_expression(&mut self, name: &ast::ExprName) -> Type<'db> {
+    fn infer_name_expression(&mut self, name: &ast::ExprName) -> Type {
         let ast::ExprName { range: _, id, ctx } = name;
 
         match ctx {
@@ -527,7 +486,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
     }
 
-    fn infer_attribute_expression(&mut self, attribute: &ast::ExprAttribute) -> Type<'db> {
+    fn infer_attribute_expression(&mut self, attribute: &ast::ExprAttribute) -> Type {
         let ast::ExprAttribute {
             value,
             attr,
@@ -537,7 +496,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         let value_ty = self.infer_expression(value);
         let member_ty = value_ty
-            .member(&self.typing_context(), &attr.id)
+            .member(self.db, &Name::new(&attr.id))
             .unwrap_or(Type::Unknown);
 
         match ctx {
@@ -547,7 +506,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
     }
 
-    fn infer_binary_expression(&mut self, binary: &ast::ExprBinOp) -> Type<'db> {
+    fn infer_binary_expression(&mut self, binary: &ast::ExprBinOp) -> Type {
         let ast::ExprBinOp {
             left,
             op,
@@ -612,50 +571,62 @@ impl<'db> TypeInferenceBuilder<'db> {
             .map(|symbol| self.local_definition_ty(symbol))
             .collect();
 
-        self.types.symbol_tys = symbol_tys;
+        self.types.symbols = symbol_tys;
         self.types.shrink_to_fit();
         self.types
     }
 
-    fn union_ty(&mut self, ty: UnionType<'db>) -> Type<'db> {
+    fn type_store(&self) -> Arc<FileTypeStore> {
+        type_store_query(self.db, self.file_id).clone()
+    }
+
+    fn module_ty(file: VfsFile) -> Type {
+        Type::Module(TypeId {
+            file,
+            local: FileModuleTypeId,
+        })
+    }
+
+    fn union_ty(&self, ty: UnionType) -> Type {
+        let mut store = self.type_store();
+        let types = Arc::get_mut(&mut store).unwrap();
         Type::Union(TypeId {
-            scope: self.scope,
-            scoped: self.types.union_types.push(ty),
+            file: self.file_id,
+            local: types.add_union(ty),
         })
     }
 
-    fn function_ty(&mut self, ty: FunctionType<'db>) -> Type<'db> {
+    fn function_ty(&self, ty: FunctionType) -> Type {
+        let mut store = self.type_store();
+        let types = Arc::get_mut(&mut store).unwrap();
         Type::Function(TypeId {
-            scope: self.scope,
-            scoped: self.types.function_types.push(ty),
+            file: self.file_id,
+            local: types.add_function(ty),
         })
     }
 
-    fn class_ty(&mut self, ty: ClassType<'db>) -> Type<'db> {
+    fn class_ty(&self, ty: ClassType) -> Type {
+        let mut store = self.type_store();
+        let types = Arc::get_mut(&mut store).unwrap();
         Type::Class(TypeId {
-            scope: self.scope,
-            scoped: self.types.class_types.push(ty),
+            file: self.file_id,
+            local: types.add_class(ty),
         })
     }
 
-    fn typing_context(&self) -> TypingContext<'db, '_> {
-        TypingContext::scoped(self.db, self.scope, &self.types)
-    }
-
-    fn local_definition_ty(&mut self, symbol: ScopedSymbolId) -> Type<'db> {
+    fn local_definition_ty(&mut self, symbol: ScopedSymbolId) -> Type {
         let symbol = self.symbol_table.symbol(symbol);
         let mut definitions = symbol
             .definitions()
             .iter()
-            .filter_map(|definition| self.types.definition_tys.get(definition).copied());
+            .filter_map(|definition| self.types.definitions.get(definition).copied());
 
         let Some(first) = definitions.next() else {
             return Type::Unbound;
         };
 
         if let Some(second) = definitions.next() {
-            let context = self.typing_context();
-            let mut builder = UnionTypeBuilder::new(&context);
+            let mut builder = UnionTypeBuilder::new(self.db);
             builder = builder.add(first).add(second);
 
             for variant in definitions {
@@ -677,7 +648,7 @@ mod tests {
     use ruff_python_ast::name::Name;
 
     use crate::db::tests::TestDb;
-    use crate::types::{public_symbol_ty_by_name, Type, TypingContext};
+    use crate::types::{public_symbol_ty_by_name, Type};
 
     fn setup_db() -> TestDb {
         let mut db = TestDb::new();
@@ -699,7 +670,7 @@ mod tests {
         let file = system_path_to_file(db, file_name).expect("Expected file to exist.");
 
         let ty = public_symbol_ty_by_name(db, file, symbol_name).unwrap_or(Type::Unknown);
-        assert_eq!(ty.display(&TypingContext::global(db)).to_string(), expected);
+        assert_eq!(ty.display(db).to_string(), expected);
     }
 
     #[test]
@@ -737,13 +708,11 @@ class Sub(Base):
             panic!("Sub is not a Class")
         };
 
-        let context = TypingContext::global(&db);
-
         let base_names: Vec<_> = class_id
-            .lookup(&context)
+            .lookup(&db)
             .bases()
             .iter()
-            .map(|base_ty| format!("{}", base_ty.display(&context)))
+            .map(|base_ty| format!("{}", base_ty.display(&db)))
             .collect();
 
         assert_eq!(base_names, vec!["Literal[Base]"]);
@@ -770,14 +739,13 @@ class C:
             panic!("C is not a Class");
         };
 
-        let context = TypingContext::global(&db);
-        let member_ty = class_id.class_member(&context, &Name::new_static("f"));
+        let member_ty = class_id.class_member(&db, &Name::new_static("f"));
 
         let Some(Type::Function(func_id)) = member_ty else {
             panic!("C.f is not a Function");
         };
 
-        let function_ty = func_id.lookup(&context);
+        let function_ty = func_id.lookup(&db);
         assert_eq!(function_ty.name(), "f");
 
         Ok(())
