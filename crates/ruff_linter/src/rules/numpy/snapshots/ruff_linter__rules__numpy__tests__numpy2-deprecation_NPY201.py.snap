@@ -998,6 +998,7 @@ NPY201.py:122:5: NPY201 [*] `np.AxisError` will be removed in NumPy 2.0. Use `nu
     123 |+    AxisError
 123 124 | 
 124 125 |     np.ComplexWarning
+125 126 | 
 
 NPY201.py:124:5: NPY201 [*] `np.ComplexWarning` will be removed in NumPy 2.0. Use `numpy.exceptions.ComplexWarning` instead.
     |
@@ -1005,6 +1006,8 @@ NPY201.py:124:5: NPY201 [*] `np.ComplexWarning` will be removed in NumPy 2.0. Us
 123 | 
 124 |     np.ComplexWarning
     |     ^^^^^^^^^^^^^^^^^ NPY201
+125 | 
+126 |     np.compare_chararrays
     |
     = help: Replace with `numpy.exceptions.ComplexWarning`
 
@@ -1019,3 +1022,26 @@ NPY201.py:124:5: NPY201 [*] `np.ComplexWarning` will be removed in NumPy 2.0. Us
 123 124 | 
 124     |-    np.ComplexWarning
     125 |+    ComplexWarning
+125 126 | 
+126 127 |     np.compare_chararrays
+
+NPY201.py:126:5: NPY201 [*] `np.compare_chararrays` will be removed in NumPy 2.0. Use `numpy.char.compare_chararrays` instead.
+    |
+124 |     np.ComplexWarning
+125 | 
+126 |     np.compare_chararrays
+    |     ^^^^^^^^^^^^^^^^^^^^^ NPY201
+    |
+    = help: Replace with `numpy.char.compare_chararrays`
+
+ℹ Safe fix
+    1   |+from numpy.char import compare_chararrays
+1   2   | def func():
+2   3   |     import numpy as np
+3   4   | 
+--------------------------------------------------------------------------------
+123 124 | 
+124 125 |     np.ComplexWarning
+125 126 | 
+126     |-    np.compare_chararrays
+    127 |+    compare_chararrays
