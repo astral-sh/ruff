@@ -75,31 +75,58 @@ f'"{None}"'
 f'"{...}"'  # although f'"{...!r}"' == 'Ellipsis'
 f'"{True}"'
 
-# alignment specifier
+# various format strings
+# with "add type hint" suggestion
+f'"{var:}"'
 f'"{var:<}"'
 f'"{var:>}"'
 f'"{var:^}"'
-f'"{var:5<}"'
-
-# explicit string specifier
+f'"{var:h<}"'
+f'"{var:h>}"'
+f'"{var:h^}"'
+f'"{var:s<}"'
+f'"{var:s>}"'
+f'"{var:s^}"'
+f'"{var:9}"'
+f'"{var:<9}"'
+f'"{var:>9}"'
+f'"{var:^9}"'
+f'"{var:h<9}"'
+f'"{var:19}"'
+f'"{var:<19}"'
+f'"{var:>19}"'
+f'"{var:^19}"'
+f'"{var:h<19}"'
+f'"{var:.}"'
+f'"{var:<.}"'
+f'"{var:>.}"'
+f'"{var:^.}"'
+f'"{var:h<.}"'
+f'"{var:9.}"'
+f'"{var:19.}"'
+f'"{var:.9}"'
+f'"{var:.19}"'
+# with "add !s" suggestion
 f'"{var:s}"'
-
-# empty format string
-f'"{var:}"'
+f'"{var:<s}"'
+f'"{var:>s}"'
+f'"{var:^s}"'
+f'"{var:h<s}"'
+f'"{var:9s}"'
+f'"{var:19s}"'
+f'"{var:.19s}"'
 
 # These all currently give warnings, but could be considered false alarms
 # multiple quote marks
 f'"""{var}"""'
-# str conversion specified
-f'"{var!s}"'
 # two variables fighting over the same quote mark
 f'"{var}"{var2}"'  # currently gives warning on the first one
 
 
 # ***no warnings*** #
 
-# padding inside quotes
-f'"{var:5}"'
+# str conversion specified
+f'"{var!s}"'
 
 # quote mark not immediately adjacent
 f'" {var} "'
@@ -124,15 +151,28 @@ f'"{var:+}"'
 
 # integer presentation type specified
 f'"{var:b}"'
+f'"{var:c}"'
+f'"{var:d}"'
+f'"{var:o}"'
 f'"{var:x}"'
+f'"{var:X}"'
+f'"{var:n}"'
 
 # float presentation type
-f'"{var:e%}"'
+f'"{var:e}"'
+f'"{var:E}"'
+f'"{var:f}"'
+f'"{var:F}"'
+f'"{var:g}"'
+f'"{var:G}"'
+f'"{var:n}"'
+f'"{var:%}"'
+
+# datetime presentation type
+f'"{var:%B %d, %Y}"'
 
 # alignment specifier invalid for strings
 f'"{var:=}"'
-
-# other types and combinations are tested in test_b907_format_specifier_permutations
 
 # don't attempt to parse complex format specs
 f'"{var:{var}}"'
@@ -154,4 +194,7 @@ k = (r'\''
      f'{var}'
      r'\'')
 # fmt: on
+
+# check for debug formatting
+f'"{var=}"'
 
