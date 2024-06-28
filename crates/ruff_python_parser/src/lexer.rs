@@ -247,7 +247,7 @@ impl<'src> Lexer<'src> {
                     } else if !self.cursor.eat_char('\n') {
                         return Some(self.push_error(LexicalError::new(
                             LexicalErrorType::LineContinuationError,
-                            TextRange::at(self.offset(), self.cursor.first().text_len()),
+                            TextRange::at(self.offset() - '\\'.text_len(), '\\'.text_len()),
                         )));
                     }
                     indentation = Indentation::root();
@@ -339,7 +339,7 @@ impl<'src> Lexer<'src> {
                     } else if !self.cursor.eat_char('\n') {
                         return Err(LexicalError::new(
                             LexicalErrorType::LineContinuationError,
-                            TextRange::at(self.offset(), self.cursor.first().text_len()),
+                            TextRange::at(self.offset() - '\\'.text_len(), '\\'.text_len()),
                         ));
                     }
                 }

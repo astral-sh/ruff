@@ -404,7 +404,7 @@ impl std::fmt::Display for LexicalErrorType {
                 write!(f, "Got unexpected token {tok}")
             }
             LexicalErrorType::LineContinuationError => {
-                write!(f, "unexpected character after line continuation character")
+                write!(f, "Expected a newline after line continuation character")
             }
             LexicalErrorType::Eof => write!(f, "unexpected EOF while parsing"),
             LexicalErrorType::OtherError(msg) => write!(f, "{msg}"),
