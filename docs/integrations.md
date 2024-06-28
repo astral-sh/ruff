@@ -14,7 +14,21 @@ Download the [Ruff VS Code extension](https://marketplace.visualstudio.com/items
 
 By default, the extension will attempt to use the `ruff` executable installed on your local system, and will use a bundled executable if that's not available. If `ruff` is `v0.4.5` or later, the extension will automatically use `ruff server`; otherwise, it will use fall back to `ruff-lsp`.
 
-To learn more about configuring the extension, and the settings available for the extension, refer to [Configuring Ruff](https://github.com/astral-sh/ruff-vscode/?tab=readme-ov-file#configuring-ruff) in the `ruff-vscode` documentation.
+To configure Ruff to format, fix, and organize imports on-save, add the following to your `settings.json`:
+```json
+{
+  "[python]": {
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.fixAll": "explicit",
+      "source.organizeImports": "explicit"
+    },
+    "editor.defaultFormatter": "charliermarsh.ruff"
+  }
+}
+```
+
+For more on configuring the extension, refer to the [ruff-vscode documentation](https://github.com/astral-sh/ruff-vscode/?tab=readme-ov-file#configuring-ruff).
 
 ### Vim & Neovim (Official)
 
