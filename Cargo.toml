@@ -271,7 +271,7 @@ local-artifacts-jobs = ["./build-binaries", "./build-docker"]
 # Publish jobs to run in CI
 publish-jobs = ["./publish-pypi"]
 # Announcement jobs to run in CI
-post-announce-jobs = ["./notify-dependents"]
+post-announce-jobs = ["./notify-dependents", "./publish-docs", "./publish-playground"]
 # Skip checking whether the specified configuration files are up to date
 allow-dirty = ["ci"]
 # Whether to install an updater program
