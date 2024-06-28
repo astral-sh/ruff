@@ -1618,3 +1618,189 @@ print(
 
     Ok(())
 }
+
+/// Infer `3.11` from `requires-python` in `pyproject.toml`.
+#[test]
+fn requires_python() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("pyproject.toml");
+    fs::write(
+        &ruff_toml,
+        r#"[project]
+requires-python = ">= 3.11"
+
+[tool.ruff.lint]
+select = ["UP006"]
+"#,
+    )?;
+
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
+    }, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+            .args(STDIN_BASE_OPTIONS)
+            .arg("--config")
+            .arg(&ruff_toml)
+            .args(["--stdin-filename", "test.py"])
+            .arg("-")
+            .pass_stdin(r#"from typing import List; foo: List[int]"#), @r###"
+        success: false
+        exit_code: 1
+        ----- stdout -----
+        test.py:1:31: UP006 [*] Use `list` instead of `List` for type annotation
+        Found 1 error.
+        [*] 1 fixable with the `--fix` option.
+
+        ----- stderr -----
+        "###);
+    });
+
+    let pyproject_toml = tempdir.path().join("pyproject.toml");
+    fs::write(
+        &pyproject_toml,
+        r#"[project]
+requires-python = ">= 3.8"
+
+[tool.ruff.lint]
+select = ["UP006"]
+"#,
+    )?;
+
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
+    }, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+            .args(STDIN_BASE_OPTIONS)
+            .arg("--config")
+            .arg(&pyproject_toml)
+            .args(["--stdin-filename", "test.py"])
+            .arg("-")
+            .pass_stdin(r#"from typing import List; foo: List[int]"#), @r###"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        All checks passed!
+
+        ----- stderr -----
+        "###);
+    });
+
+    Ok(())
+}
+
+/// Infer `3.11` from `requires-python` in `pyproject.toml`.
+#[test]
+fn requires_python_patch() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let pyproject_toml = tempdir.path().join("pyproject.toml");
+    fs::write(
+        &pyproject_toml,
+        r#"[project]
+requires-python = ">= 3.11.4"
+
+[tool.ruff.lint]
+select = ["UP006"]
+"#,
+    )?;
+
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
+    }, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+            .args(STDIN_BASE_OPTIONS)
+            .arg("--config")
+            .arg(&pyproject_toml)
+            .args(["--stdin-filename", "test.py"])
+            .arg("-")
+            .pass_stdin(r#"from typing import List; foo: List[int]"#), @r###"
+        success: false
+        exit_code: 1
+        ----- stdout -----
+        test.py:1:31: UP006 [*] Use `list` instead of `List` for type annotation
+        Found 1 error.
+        [*] 1 fixable with the `--fix` option.
+
+        ----- stderr -----
+        "###);
+    });
+
+    Ok(())
+}
+
+/// Infer `3.11` from `requires-python` in `pyproject.toml`.
+#[test]
+fn requires_python_equals() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let pyproject_toml = tempdir.path().join("pyproject.toml");
+    fs::write(
+        &pyproject_toml,
+        r#"[project]
+requires-python = "== 3.11"
+
+[tool.ruff.lint]
+select = ["UP006"]
+"#,
+    )?;
+
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
+    }, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+            .args(STDIN_BASE_OPTIONS)
+            .arg("--config")
+            .arg(&pyproject_toml)
+            .args(["--stdin-filename", "test.py"])
+            .arg("-")
+            .pass_stdin(r#"from typing import List; foo: List[int]"#), @r###"
+        success: false
+        exit_code: 1
+        ----- stdout -----
+        test.py:1:31: UP006 [*] Use `list` instead of `List` for type annotation
+        Found 1 error.
+        [*] 1 fixable with the `--fix` option.
+
+        ----- stderr -----
+        "###);
+    });
+
+    Ok(())
+}
+
+/// Infer `3.11` from `requires-python` in `pyproject.toml`.
+#[test]
+fn requires_python_equals_patch() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let pyproject_toml = tempdir.path().join("pyproject.toml");
+    fs::write(
+        &pyproject_toml,
+        r#"[project]
+requires-python = "== 3.11.4"
+
+[tool.ruff.lint]
+select = ["UP006"]
+"#,
+    )?;
+
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
+    }, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+            .args(STDIN_BASE_OPTIONS)
+            .arg("--config")
+            .arg(&pyproject_toml)
+            .args(["--stdin-filename", "test.py"])
+            .arg("-")
+            .pass_stdin(r#"from typing import List; foo: List[int]"#), @r###"
+        success: false
+        exit_code: 1
+        ----- stdout -----
+        test.py:1:31: UP006 [*] Use `list` instead of `List` for type annotation
+        Found 1 error.
+        [*] 1 fixable with the `--fix` option.
+
+        ----- stderr -----
+        "###);
+    });
+
+    Ok(())
+}
