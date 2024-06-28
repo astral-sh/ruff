@@ -1,12 +1,14 @@
-# Editor Integrations
+# Integrations
 
-## Ruff Language Server (`ruff server`)
+## Editor Integrations
+
+### Ruff Language Server (`ruff server`)
 
 The Ruff language server, also known as `ruff server`, is what powers the diagnostic and formatting capabilities of Ruff's VS Code extension and other editors. It is a single, common backend for editor integrations built directly into Ruff, and a direct replacement for `ruff-lsp`, our previous language server. You can read more about `ruff server` in the [`v0.4.5` blog post](https://astral.sh/blog/ruff-v0.4.5).
 
 `ruff server` uses the LSP (Language Server Protocol), and as such works with any editor that supports this protocol. VS Code, Neovim, Helix, and Kate all have official, documented support for `ruff server`. Other editors may support the older `ruff-lsp` server - see the [Setup](https://github.com/astral-sh/ruff-lsp#setup) guide in `ruff-lsp` for more details.
 
-## VS Code (Official)
+### VS Code (Official)
 
 Download the [Ruff VS Code extension](https://marketplace.visualstudio.com/items?itemName=charliermarsh.ruff), which supports fix actions, import sorting, and more.
 
@@ -14,9 +16,9 @@ By default, the extension will attempt to use the `ruff` executable installed on
 
 To learn more about configuring the extension, and the settings available for the extension, refer to [Configuring Ruff](https://github.com/astral-sh/ruff-vscode/?tab=readme-ov-file#configuring-ruff) in the `ruff-vscode` documentation.
 
-## Vim & Neovim (Official)
+### Vim & Neovim (Official)
 
-### Using `nvim-lspconfig`
+#### Using `nvim-lspconfig`
 
 1. Install [`nvim-lspconfig`](https://github.com/neovim/nvim-lspconfig).
 1. Setup `nvim-lspconfig` with the [suggested configuration](https://github.com/neovim/nvim-lspconfig/tree/master#suggested-configuration).
@@ -33,7 +35,7 @@ on how to configure the server from there.
 >
 > If you have the older language server (`ruff-lsp`) configured in Neovim, make sure to disable it to prevent any conflicts.
 
-#### Tips
+##### Tips
 
 If you're using Ruff alongside another LSP (like Pyright), you may want to defer to that LSP for certain capabilities,
 like `textDocument/hover`:
@@ -109,7 +111,7 @@ require('lspconfig').ruff.setup {
 
 The `logFile` path supports tildes and environment variables.
 
-## Helix (Official)
+### Helix (Official)
 
 First, open the language configuration file for Helix. On Linux and macOS, this will be at `~/.config/helix/languages.toml`,
 and on Windows this will be at `%AppData%\helix\languages.toml`.
@@ -211,7 +213,7 @@ logFile = "~/.cache/helix/ruff.log"
 
 The `logFile` path supports tildes and environment variables.
 
-## Kate (Official)
+### Kate (Official)
 
 1. Activate the [LSP Client plugin](https://docs.kde.org/stable5/en/kate/kate/plugins.html#kate-application-plugins).
 1. Setup LSP Client [as desired](https://docs.kde.org/stable5/en/kate/kate/kate-application-plugin-lspclient.html).
@@ -237,7 +239,7 @@ on how to configure the server from there.
 >
 > Kate's LSP Client plugin does not support multiple servers for the same language.
 
-## PyCharm (External Tool)
+### PyCharm (External Tool)
 
 Ruff can be installed as an [External Tool](https://www.jetbrains.com/help/pycharm/configuring-third-party-tools.html)
 in PyCharm. Open the Preferences pane, then navigate to "Tools", then "External Tools". From there,
@@ -249,12 +251,12 @@ Ruff should then appear as a runnable action:
 
 ![Ruff as a runnable action](https://user-images.githubusercontent.com/1309177/193156026-732b0aaf-3dd9-4549-9b4d-2de6d2168a33.png)
 
-## PyCharm (Unofficial)
+### PyCharm (Unofficial)
 
 Ruff is also available as the [Ruff](https://plugins.jetbrains.com/plugin/20574-ruff) plugin on the
 IntelliJ Marketplace (maintained by @koxudaxi).
 
-## Emacs (Unofficial)
+### Emacs (Unofficial)
 
 Ruff is available as [`flymake-ruff`](https://melpa.org/#/flymake-ruff) on MELPA:
 
@@ -277,14 +279,14 @@ Alternatively, it can be used via the [Apheleia](https://github.com/radian-softw
 (add-to-list 'apheleia-mode-alist '(python-ts-mode . ruff))
 ```
 
-## TextMate (Unofficial)
+### TextMate (Unofficial)
 
 Ruff is also available via the [`textmate2-ruff-linter`](https://github.com/vigo/textmate2-ruff-linter)
 bundle for TextMate.
 
-# Other Integrations
+## Other Integrations
 
-## pre-commit
+### pre-commit
 
 Ruff can be used as a [pre-commit](https://pre-commit.com) hook via [`ruff-pre-commit`](https://github.com/astral-sh/ruff-pre-commit):
 
@@ -339,13 +341,13 @@ When running without `--fix`, Ruff's formatter hook can be placed before or afte
 `ruff format` should never introduce new lint errors, so it's safe to run Ruff's format hook _after_
 `ruff check --fix`.)
 
-## mdformat (Unofficial)
+### mdformat (Unofficial)
 
 [mdformat](https://mdformat.readthedocs.io/en/stable/users/plugins.html#code-formatter-plugins) is
 capable of formatting code blocks within Markdown. The [`mdformat-ruff`](https://github.com/Freed-Wu/mdformat-ruff)
 plugin enables mdformat to format Python code blocks with Ruff.
 
-## GitHub Actions
+### GitHub Actions
 
 GitHub Actions has everything you need to run Ruff out-of-the-box:
 
