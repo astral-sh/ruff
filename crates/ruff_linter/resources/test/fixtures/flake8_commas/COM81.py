@@ -510,7 +510,7 @@ image[:,]
 
 image[:,:,]
 
-lambda x, :
+lambda x, : x
 
 # ==> unpack.py <==
 def function(

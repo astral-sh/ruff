@@ -534,7 +534,7 @@
       "description": "The style in which violation messages should be formatted: `\"full\"` (shows source),`\"concise\"` (default), `\"grouped\"` (group messages by file), `\"json\"` (machine-readable), `\"junit\"` (machine-readable XML), `\"github\"` (GitHub Actions annotations), `\"gitlab\"` (GitLab CI code quality report), `\"pylint\"` (Pylint text format) or `\"azure\"` (Azure Pipeline logging commands).",
       "anyOf": [
         {
-          "$ref": "#/definitions/SerializationFormat"
+          "$ref": "#/definitions/OutputFormat"
         },
         {
           "type": "null"
@@ -665,14 +665,6 @@
     },
     "show-fixes": {
       "description": "Whether to show an enumeration of all fixed lint violations (overridden by the `--show-fixes` command-line flag).",
-      "type": [
-        "boolean",
-        "null"
-      ]
-    },
-    "show-source": {
-      "description": "Whether to show source code snippets when reporting lint violations (overridden by the `--show-source` command-line flag).",
-      "deprecated": true,
       "type": [
         "boolean",
         "null"
@@ -2301,6 +2293,34 @@
       },
       "additionalProperties": false
     },
+    "OutputFormat": {
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "concise",
+            "full",
+            "json",
+            "json-lines",
+            "junit",
+            "grouped",
+            "github",
+            "gitlab",
+            "pylint",
+            "rdjson",
+            "azure",
+            "sarif"
+          ]
+        },
+        {
+          "deprecated": true,
+          "type": "string",
+          "enum": [
+            "text"
+          ]
+        }
+      ]
+    },
     "ParametrizeNameType": {
       "type": "string",
       "enum": [
@@ -2683,10 +2703,23 @@
         "ASYNC1",
         "ASYNC10",
         "ASYNC100",
-        "ASYNC101",
-        "ASYNC102",
+        "ASYNC105",
+        "ASYNC109",
         "ASYNC11",
+        "ASYNC110",
+        "ASYNC115",
         "ASYNC116",
+        "ASYNC2",
+        "ASYNC21",
+        "ASYNC210",
+        "ASYNC22",
+        "ASYNC220",
+        "ASYNC221",
+        "ASYNC222",
+        "ASYNC23",
+        "ASYNC230",
+        "ASYNC25",
+        "ASYNC251",
         "B",
         "B0",
         "B00",
@@ -3363,7 +3396,6 @@
         "PLR1",
         "PLR17",
         "PLR170",
-        "PLR1701",
         "PLR1702",
         "PLR1704",
         "PLR171",
@@ -3642,6 +3674,8 @@
         "RUF027",
         "RUF028",
         "RUF029",
+        "RUF03",
+        "RUF030",
         "RUF1",
         "RUF10",
         "RUF100",
@@ -3827,15 +3861,6 @@
         "TID251",
         "TID252",
         "TID253",
-        "TRIO",
-        "TRIO1",
-        "TRIO10",
-        "TRIO100",
-        "TRIO105",
-        "TRIO109",
-        "TRIO11",
-        "TRIO110",
-        "TRIO115",
         "TRY",
         "TRY0",
         "TRY00",
@@ -3936,24 +3961,6 @@
         "YTT301",
         "YTT302",
         "YTT303"
-      ]
-    },
-    "SerializationFormat": {
-      "type": "string",
-      "enum": [
-        "text",
-        "concise",
-        "full",
-        "json",
-        "json-lines",
-        "junit",
-        "grouped",
-        "github",
-        "gitlab",
-        "pylint",
-        "rdjson",
-        "azure",
-        "sarif"
       ]
     },
     "Strictness": {

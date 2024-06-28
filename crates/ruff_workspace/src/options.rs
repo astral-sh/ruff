@@ -1,8 +1,7 @@
 use std::collections::BTreeSet;
-use std::hash::BuildHasherDefault;
 
 use regex::Regex;
-use rustc_hash::{FxHashMap, FxHashSet};
+use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
 use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
 
@@ -25,7 +24,7 @@ use ruff_linter::rules::{
     pycodestyle, pydocstyle, pyflakes, pylint, pyupgrade,
 };
 use ruff_linter::settings::types::{
-    IdentifierPattern, PythonVersion, RequiredVersion, SerializationFormat,
+    IdentifierPattern, OutputFormat, PythonVersion, RequiredVersion,
 };
 use ruff_linter::{warn_user_once, RuleSelector};
 use ruff_macros::{CombineOptions, OptionsMetadata};
@@ -87,7 +86,7 @@ pub struct Options {
             output-format = "grouped"
         "#
     )]
-    pub output_format: Option<SerializationFormat>,
+    pub output_format: Option<OutputFormat>,
 
     /// Enable fix behavior by-default when running `ruff` (overridden
     /// by the `--fix` and `--no-fix` command-line flags).
@@ -108,21 +107,6 @@ pub struct Options {
     /// Like `fix`, but disables reporting on leftover violation. Implies `fix`.
     #[option(default = "false", value_type = "bool", example = "fix-only = true")]
     pub fix_only: Option<bool>,
-
-    /// Whether to show source code snippets when reporting lint violations
-    /// (overridden by the `--show-source` command-line flag).
-    #[option(
-        default = "false",
-        value_type = "bool",
-        example = r#"
-            # By default, always show source code snippets.
-            show-source = true
-        "#
-    )]
-    #[deprecated(
-        note = "`show-source` is deprecated and is now part of `output-format` in the form of `full` or `concise` options. Please update your configuration."
-    )]
-    pub show_source: Option<bool>,
 
     /// Whether to show an enumeration of all fixed lint violations
     /// (overridden by the `--show-fixes` command-line flag).
@@ -418,13 +402,6 @@ pub struct Options {
     ///
     /// This option changes the number of spaces inserted by the formatter when
     /// using soft-tabs (`indent-style = space`).
-    #[option(
-        default = "4",
-        value_type = "int",
-        example = r#"
-            tab-size = 2
-        "#
-    )]
     #[deprecated(
         since = "0.1.2",
         note = "The `tab-size` option has been renamed to `indent-width` to emphasize that it configures the indentation used by the formatter as well as the tab width. Please update your configuration to use `indent-width = <value>` instead."
@@ -2406,8 +2383,7 @@ impl IsortOptions {
             .collect::<Result<_, _>>()?;
 
         // Verify that `section_order` doesn't contain any duplicates.
-        let mut seen =
-            FxHashSet::with_capacity_and_hasher(section_order.len(), BuildHasherDefault::default());
+        let mut seen = FxHashSet::with_capacity_and_hasher(section_order.len(), FxBuildHasher);
         for section in &section_order {
             if !seen.insert(section) {
                 warn_user_once!(

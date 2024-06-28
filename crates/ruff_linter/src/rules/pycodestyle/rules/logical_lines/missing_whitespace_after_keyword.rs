@@ -60,6 +60,7 @@ pub(crate) fn missing_whitespace_after_keyword(
                 || matches!(
                     tok1_kind,
                     TokenKind::Colon
+                        | TokenKind::Semi
                         | TokenKind::Newline
                         | TokenKind::NonLogicalNewline
                         // In the event of a syntax error, do not attempt to add a whitespace.

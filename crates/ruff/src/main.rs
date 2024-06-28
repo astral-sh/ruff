@@ -2,9 +2,11 @@ use std::process::ExitCode;
 
 use clap::{Parser, Subcommand};
 use colored::Colorize;
+use log::error;
 
 use ruff::args::{Args, Command};
 use ruff::{run, ExitStatus};
+use ruff_linter::logging::{set_up_logging, LogLevel};
 
 #[cfg(target_os = "windows")]
 #[global_allocator]
@@ -23,23 +25,33 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
 pub fn main() -> ExitCode {
+    // Enabled ANSI colors on Windows 10.
+    #[cfg(windows)]
+    assert!(colored::control::set_virtual_terminal(true).is_ok());
+
+    // support FORCE_COLOR env var
+    if let Some(force_color) = std::env::var_os("FORCE_COLOR") {
+        if force_color.len() > 0 {
+            colored::control::set_override(true);
+        }
+    }
+
     let args = wild::args_os();
-    let mut args =
-        argfile::expand_args_from(args, argfile::parse_fromfile, argfile::PREFIX).unwrap();
+    let args = argfile::expand_args_from(args, argfile::parse_fromfile, argfile::PREFIX).unwrap();
 
     // We can't use `warn_user` here because logging isn't set up at this point
     // and we also don't know if the user runs ruff with quiet.
     // Keep the message and pass it to `run` that is responsible for emitting the warning.
-    let deprecated_alias_warning = match args.get(1).and_then(|arg| arg.to_str()) {
+    let deprecated_alias_error = match args.get(1).and_then(|arg| arg.to_str()) {
         // Deprecated aliases that are handled by clap
         Some("--explain") => {
-            Some("`ruff --explain <RULE>` is deprecated. Use `ruff rule <RULE>` instead.")
+            Some("`ruff --explain <RULE>` has been removed. Use `ruff rule <RULE>` instead.")
         }
         Some("--clean") => {
-            Some("`ruff --clean` is deprecated. Use `ruff clean` instead.")
+            Some("`ruff --clean` has been removed. Use `ruff clean` instead.")
         }
         Some("--generate-shell-completion") => {
-            Some("`ruff --generate-shell-completion <SHELL>` is deprecated. Use `ruff generate-shell-completion <SHELL>` instead.")
+            Some("`ruff --generate-shell-completion <SHELL>` has been removed. Use `ruff generate-shell-completion <SHELL>` instead.")
         }
         // Deprecated `ruff` alias to `ruff check`
         // Clap doesn't support default subcommands but we want to run `check` by
@@ -51,18 +63,26 @@ pub fn main() -> ExitCode {
             && arg != "-V"
             && arg != "--version"
             && arg != "help" => {
-
             {
-                args.insert(1, "check".into());
-                Some("`ruff <path>` is deprecated. Use `ruff check <path>` instead.")
+                Some("`ruff <path>` has been removed. Use `ruff check <path>` instead.")
             }
         },
         _ => None
     };
 
+    if let Some(error) = deprecated_alias_error {
+        #[allow(clippy::print_stderr)]
+        if set_up_logging(LogLevel::Default).is_ok() {
+            error!("{}", error);
+        } else {
+            eprintln!("{}", error.red().bold());
+        }
+        return ExitCode::FAILURE;
+    }
+
     let args = Args::parse_from(args);
 
-    match run(args, deprecated_alias_warning) {
+    match run(args) {
         Ok(code) => code.into(),
         Err(err) => {
             #[allow(clippy::print_stderr)]

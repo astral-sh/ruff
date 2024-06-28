@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::fmt::{self, Debug};
@@ -30,7 +31,7 @@ impl VendoredFileSystem {
     }
 
     pub fn exists(&self, path: &VendoredPath) -> bool {
-        let normalized = normalize_vendored_path(path);
+        let normalized = NormalizedVendoredPath::from(path);
         let inner_locked = self.inner.lock();
         let mut archive = inner_locked.borrow_mut();
 
@@ -45,7 +46,7 @@ impl VendoredFileSystem {
     }
 
     pub fn metadata(&self, path: &VendoredPath) -> Option<Metadata> {
-        let normalized = normalize_vendored_path(path);
+        let normalized = NormalizedVendoredPath::from(path);
         let inner_locked = self.inner.lock();
 
         // Must probe the zipfile twice, as "stdlib" and "stdlib/" are considered
@@ -72,7 +73,7 @@ impl VendoredFileSystem {
     pub fn read(&self, path: &VendoredPath) -> Result<String> {
         let inner_locked = self.inner.lock();
         let mut archive = inner_locked.borrow_mut();
-        let mut zip_file = archive.lookup_path(&normalize_vendored_path(path))?;
+        let mut zip_file = archive.lookup_path(&NormalizedVendoredPath::from(path))?;
         let mut buffer = String::new();
         zip_file.read_to_string(&mut buffer)?;
         Ok(buffer)
@@ -240,45 +241,76 @@ impl VendoredZipArchive {
 /// but trailing slashes are crucial for distinguishing between
 /// files and directories inside zip archives.
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct NormalizedVendoredPath(String);
+struct NormalizedVendoredPath<'a>(Cow<'a, str>);
 
-impl NormalizedVendoredPath {
-    fn with_trailing_slash(mut self) -> Self {
+impl<'a> NormalizedVendoredPath<'a> {
+    fn with_trailing_slash(self) -> Self {
         debug_assert!(!self.0.ends_with('/'));
-        self.0.push('/');
-        self
+        let mut data = self.0.into_owned();
+        data.push('/');
+        Self(Cow::Owned(data))
     }
 
     fn as_str(&self) -> &str {
-        self.0.as_str()
+        &self.0
     }
 }
 
-/// Normalizes the path by removing `.` and `..` components.
-///
-/// ## Panics:
-/// If a path with an unsupported component for vendored paths is passed.
-/// Unsupported components are path prefixes,
-/// and path root directories appearing anywhere except at the start of the path.
-fn normalize_vendored_path(path: &VendoredPath) -> NormalizedVendoredPath {
-    // Allow the `RootDir` component, but only if it is at the very start of the string.
-    let mut components = path.components().peekable();
-    if let Some(camino::Utf8Component::RootDir) = components.peek() {
-        components.next();
-    }
-
-    let mut normalized_parts = Vec::new();
-    for component in components {
-        match component {
-            camino::Utf8Component::Normal(part) => normalized_parts.push(part),
-            camino::Utf8Component::CurDir => continue,
-            camino::Utf8Component::ParentDir => {
-                normalized_parts.pop();
+impl<'a> From<&'a VendoredPath> for NormalizedVendoredPath<'a> {
+    /// Normalize the path.
+    ///
+    /// The normalizations are:
+    /// - Remove `.` and `..` components
+    /// - Strip trailing slashes
+    /// - Normalize `\\` separators to `/`
+    /// - Validate that the path does not have any unsupported components
+    ///
+    /// ## Panics:
+    /// If a path with an unsupported component for vendored paths is passed.
+    /// Unsupported components are path prefixes and path root directories.
+    fn from(path: &'a VendoredPath) -> Self {
+        /// Remove `.` and `..` components, and validate that unsupported components are not present.
+        ///
+        /// This inner routine also strips trailing slashes,
+        /// and normalizes paths to use Unix `/` separators.
+        /// However, it always allocates, so avoid calling it if possible.
+        /// In most cases, the path should already be normalized.
+        fn normalize_unnormalized_path(path: &VendoredPath) -> String {
+            let mut normalized_parts = Vec::new();
+            for component in path.components() {
+                match component {
+                    camino::Utf8Component::Normal(part) => normalized_parts.push(part),
+                    camino::Utf8Component::CurDir => continue,
+                    camino::Utf8Component::ParentDir => {
+                        // `VendoredPath("")`, `VendoredPath("..")` and `VendoredPath("../..")`
+                        // all resolve to the same path relative to the zip archive
+                        // (see https://github.com/astral-sh/ruff/pull/11991#issuecomment-2185278014)
+                        normalized_parts.pop();
+                    }
+                    unsupported => {
+                        panic!("Unsupported component in a vendored path: {unsupported}")
+                    }
+                }
             }
-            unsupported => panic!("Unsupported component in a vendored path: {unsupported}"),
+            normalized_parts.join("/")
+        }
+
+        let path_str = path.as_str();
+
+        if std::path::MAIN_SEPARATOR == '\\' && path_str.contains('\\') {
+            // Normalize paths so that they always use Unix path separators
+            NormalizedVendoredPath(Cow::Owned(normalize_unnormalized_path(path)))
+        } else if !path
+            .components()
+            .all(|component| matches!(component, camino::Utf8Component::Normal(_)))
+        {
+            // Remove non-`Normal` components
+            NormalizedVendoredPath(Cow::Owned(normalize_unnormalized_path(path)))
+        } else {
+            // Strip trailing slashes from the path
+            NormalizedVendoredPath(Cow::Borrowed(path_str.trim_end_matches('/')))
         }
     }
-    NormalizedVendoredPath(normalized_parts.join("/"))
 }
 
 #[cfg(test)]

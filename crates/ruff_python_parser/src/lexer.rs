@@ -133,13 +133,24 @@ impl<'src> Lexer<'src> {
         std::mem::take(&mut self.current_value)
     }
 
+    /// Helper function to push the given error, updating the current range with the error location
+    /// and return the [`TokenKind::Unknown`] token.
+    fn push_error(&mut self, error: LexicalError) -> TokenKind {
+        self.current_range = error.location();
+        self.errors.push(error);
+        TokenKind::Unknown
+    }
+
     /// Lex the next token.
     pub fn next_token(&mut self) -> TokenKind {
         self.cursor.start_token();
         self.current_value = TokenValue::None;
         self.current_flags = TokenFlags::empty();
         self.current_kind = self.lex_token();
-        self.current_range = self.token_range();
+        // For `Unknown` token, the `push_error` method updates the current range.
+        if !matches!(self.current_kind, TokenKind::Unknown) {
+            self.current_range = self.token_range();
+        }
         self.current_kind
     }
 
@@ -236,7 +247,7 @@ impl<'src> Lexer<'src> {
                     } else if !self.cursor.eat_char('\n') {
                         return Some(self.push_error(LexicalError::new(
                             LexicalErrorType::LineContinuationError,
-                            self.token_range(),
+                            TextRange::at(self.offset() - '\\'.text_len(), '\\'.text_len()),
                         )));
                     }
                     indentation = Indentation::root();
@@ -328,7 +339,7 @@ impl<'src> Lexer<'src> {
                     } else if !self.cursor.eat_char('\n') {
                         return Err(LexicalError::new(
                             LexicalErrorType::LineContinuationError,
-                            self.token_range(),
+                            TextRange::at(self.offset() - '\\'.text_len(), '\\'.text_len()),
                         ));
                     }
                 }
@@ -951,25 +962,30 @@ impl<'src> Lexer<'src> {
 
                 // Skip up to the current character.
                 self.cursor.skip_bytes(index);
-                let ch = self.cursor.bump();
+
+                // Lookahead because we want to bump only if it's a quote or being escaped.
+                let quote_or_newline = self.cursor.first();
 
                 // If the character is escaped, continue scanning.
                 if num_backslashes % 2 == 1 {
-                    if ch == Some('\r') {
+                    self.cursor.bump();
+                    if quote_or_newline == '\r' {
                         self.cursor.eat_char('\n');
                     }
                     continue;
                 }
 
-                match ch {
-                    Some('\r' | '\n') => {
+                match quote_or_newline {
+                    '\r' | '\n' => {
                         return self.push_error(LexicalError::new(
                             LexicalErrorType::UnclosedStringError,
                             self.token_range(),
                         ));
                     }
-                    Some(ch) if ch == quote => {
-                        break self.offset() - TextSize::new(1);
+                    ch if ch == quote => {
+                        let value_end = self.offset();
+                        self.cursor.bump();
+                        break value_end;
                     }
                     _ => unreachable!("memchr2 returned an index that is not a quote or a newline"),
                 }
@@ -1303,7 +1319,8 @@ impl<'src> Lexer<'src> {
         }
     }
 
-    /// Re-lex the current token in the context of a logical line.
+    /// Re-lex the [`NonLogicalNewline`] token at the given position in the context of a logical
+    /// line.
     ///
     /// Returns a boolean indicating whether the lexer's position has changed. This could result
     /// into the new current token being different than the previous current token but is not
@@ -1357,7 +1374,10 @@ impl<'src> Lexer<'src> {
     ///
     /// [`Newline`]: TokenKind::Newline
     /// [`NonLogicalNewline`]: TokenKind::NonLogicalNewline
-    pub(crate) fn re_lex_logical_token(&mut self) -> bool {
+    pub(crate) fn re_lex_logical_token(
+        &mut self,
+        non_logical_newline_start: Option<TextSize>,
+    ) -> bool {
         if self.nesting == 0 {
             return false;
         }
@@ -1372,52 +1392,35 @@ impl<'src> Lexer<'src> {
             return false;
         }
 
-        let mut current_position = self.current_range().start();
-        let reverse_chars = self.source[..current_position.to_usize()].chars().rev();
-        let mut newline_position = None;
+        let Some(new_position) = non_logical_newline_start else {
+            return false;
+        };
 
-        for ch in reverse_chars {
-            if is_python_whitespace(ch) {
-                current_position -= ch.text_len();
-            } else if matches!(ch, '\n' | '\r') {
-                current_position -= ch.text_len();
-                newline_position = Some(current_position);
-            } else {
-                break;
-            }
+        // Earlier we reduced the nesting level unconditionally. Now that we know the lexer's
+        // position is going to be moved back, the lexer needs to be put back into a
+        // parenthesized context if the current token is a closing parenthesis.
+        //
+        // ```py
+        // (a, [b,
+        //     c
+        // )
+        // ```
+        //
+        // Here, the parser would request to re-lex the token when it's at `)` and can recover
+        // from an unclosed `[`. This method will move the lexer back to the newline character
+        // after `c` which means it goes back into parenthesized context.
+        if matches!(
+            self.current_kind,
+            TokenKind::Rpar | TokenKind::Rsqb | TokenKind::Rbrace
+        ) {
+            self.nesting += 1;
         }
 
-        // The lexer should only be moved if there's a newline character which needs to be
-        // re-lexed.
-        if let Some(newline_position) = newline_position {
-            // Earlier we reduced the nesting level unconditionally. Now that we know the lexer's
-            // position is going to be moved back, the lexer needs to be put back into a
-            // parenthesized context if the current token is a closing parenthesis.
-            //
-            // ```py
-            // (a, [b,
-            //     c
-            // )
-            // ```
-            //
-            // Here, the parser would request to re-lex the token when it's at `)` and can recover
-            // from an unclosed `[`. This method will move the lexer back to the newline character
-            // after `c` which means it goes back into parenthesized context.
-            if matches!(
-                self.current_kind,
-                TokenKind::Rpar | TokenKind::Rsqb | TokenKind::Rbrace
-            ) {
-                self.nesting += 1;
-            }
-
-            self.cursor = Cursor::new(self.source);
-            self.cursor.skip_bytes(newline_position.to_usize());
-            self.state = State::Other;
-            self.next_token();
-            true
-        } else {
-            false
-        }
+        self.cursor = Cursor::new(self.source);
+        self.cursor.skip_bytes(new_position.to_usize());
+        self.state = State::Other;
+        self.next_token();
+        true
     }
 
     #[inline]
@@ -1444,12 +1447,6 @@ impl<'src> Lexer<'src> {
     #[inline]
     fn token_start(&self) -> TextSize {
         self.token_range().start()
-    }
-
-    /// Helper function to push the given error and return the [`TokenKind::Unknown`] token.
-    fn push_error(&mut self, error: LexicalError) -> TokenKind {
-        self.errors.push(error);
-        TokenKind::Unknown
     }
 
     /// Creates a checkpoint to which the lexer can later return to using [`Self::rewind`].

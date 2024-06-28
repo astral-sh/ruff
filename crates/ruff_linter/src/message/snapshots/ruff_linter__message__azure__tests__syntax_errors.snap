@@ -1,0 +1,6 @@
+---
+source: crates/ruff_linter/src/message/azure.rs
+expression: content
+---
+##vso[task.logissue type=error;sourcepath=syntax_errors.py;linenumber=1;columnnumber=15;]SyntaxError: Expected one or more symbol names after import
+##vso[task.logissue type=error;sourcepath=syntax_errors.py;linenumber=3;columnnumber=12;]SyntaxError: Expected ')', found newline

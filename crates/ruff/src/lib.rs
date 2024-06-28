@@ -8,15 +8,15 @@ use std::process::ExitCode;
 use std::sync::mpsc::channel;
 
 use anyhow::Result;
-use args::{GlobalConfigArgs, ServerCommand};
 use clap::CommandFactory;
 use colored::Colorize;
 use log::warn;
 use notify::{recommended_watcher, RecursiveMode, Watcher};
 
+use args::{GlobalConfigArgs, ServerCommand};
 use ruff_linter::logging::{set_up_logging, LogLevel};
 use ruff_linter::settings::flags::FixMode;
-use ruff_linter::settings::types::SerializationFormat;
+use ruff_linter::settings::types::OutputFormat;
 use ruff_linter::{fs, warn_user, warn_user_once};
 use ruff_workspace::Settings;
 
@@ -121,7 +121,6 @@ pub fn run(
         command,
         global_options,
     }: Args,
-    deprecated_alias_warning: Option<&'static str>,
 ) -> Result<ExitStatus> {
     {
         let default_panic_hook = std::panic::take_hook();
@@ -145,22 +144,7 @@ pub fn run(
         }));
     }
 
-    // Enabled ANSI colors on Windows 10.
-    #[cfg(windows)]
-    assert!(colored::control::set_virtual_terminal(true).is_ok());
-
-    // support FORCE_COLOR env var
-    if let Some(force_color) = std::env::var_os("FORCE_COLOR") {
-        if force_color.len() > 0 {
-            colored::control::set_override(true);
-        }
-    }
-
     set_up_logging(global_options.log_level())?;
-
-    if let Some(deprecated_alias_warning) = deprecated_alias_warning {
-        warn_user!("{}", deprecated_alias_warning);
-    }
 
     match command {
         Command::Version { output_format } => {
@@ -351,10 +335,10 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
     let preview = pyproject_config.settings.linter.preview.is_enabled();
 
     if cli.watch {
-        if output_format != SerializationFormat::default(preview) {
+        if output_format != OutputFormat::default() {
             warn_user!(
                 "`--output-format {}` is always used in watch mode.",
-                SerializationFormat::default(preview)
+                OutputFormat::default()
             );
         }
 

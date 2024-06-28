@@ -22,7 +22,7 @@ mod tests {
     use ruff_source_file::Locator;
     use ruff_text_size::Ranged;
 
-    use crate::linter::{check_path, LinterResult};
+    use crate::linter::check_path;
     use crate::registry::{AsRule, Linter, Rule};
     use crate::rules::pyflakes;
     use crate::settings::types::PreviewMode;
@@ -125,6 +125,7 @@ mod tests {
     #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_27.py"))]
     #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_28.py"))]
     #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_29.pyi"))]
+    #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_30.py"))]
     #[test_case(Rule::UndefinedName, Path::new("F821_0.py"))]
     #[test_case(Rule::UndefinedName, Path::new("F821_1.py"))]
     #[test_case(Rule::UndefinedName, Path::new("F821_2.py"))]
@@ -649,10 +650,7 @@ mod tests {
             &locator,
             &indexer,
         );
-        let LinterResult {
-            data: mut diagnostics,
-            ..
-        } = check_path(
+        let mut diagnostics = check_path(
             Path::new("<filename>"),
             None,
             &locator,
@@ -2413,7 +2411,7 @@ mod tests {
     fn used_in_lambda() {
         flakes(
             r"import fu;
-        lambda: fu
+lambda: fu
         ",
             &[],
         );
@@ -2432,7 +2430,7 @@ mod tests {
     fn used_in_slice_obj() {
         flakes(
             r#"import fu;
-        "meow"[::fu]
+"meow"[::fu]
         "#,
             &[],
         );
@@ -3033,16 +3031,6 @@ mod tests {
             r#"
         from interior import decorate
         @decorate
-        def f():
-            return "hello"
-        "#,
-            &[],
-        );
-
-        flakes(
-            r#"
-        from interior import decorate
-        @decorate('value", &[]);
         def f():
             return "hello"
         "#,

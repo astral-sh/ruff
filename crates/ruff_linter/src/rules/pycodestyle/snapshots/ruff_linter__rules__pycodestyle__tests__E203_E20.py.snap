@@ -331,6 +331,8 @@ E20.py:187:17: E203 [*] Whitespace before ':'
 186 | #: E203:1:13
 187 | f"{ham[lower + 1  :, "columnname"]}"
     |                 ^^ E203
+188 | 
+189 | #: Okay: https://github.com/astral-sh/ruff/issues/12023
     |
     = help: Remove whitespace before ':'
 
@@ -340,3 +342,6 @@ E20.py:187:17: E203 [*] Whitespace before ':'
 186 186 | #: E203:1:13
 187     |-f"{ham[lower + 1  :, "columnname"]}"
     187 |+f"{ham[lower + 1:, "columnname"]}"
+188 188 | 
+189 189 | #: Okay: https://github.com/astral-sh/ruff/issues/12023
+190 190 | f"{x = :.2f}"

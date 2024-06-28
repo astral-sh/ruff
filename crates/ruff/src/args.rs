@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::Arc;
 
-use anyhow::bail;
+use anyhow::{anyhow, bail};
 use clap::builder::{TypedValueParser, ValueParserFactory};
 use clap::{command, Parser};
 use colored::Colorize;
@@ -18,10 +18,10 @@ use ruff_linter::line_width::LineLength;
 use ruff_linter::logging::LogLevel;
 use ruff_linter::registry::Rule;
 use ruff_linter::settings::types::{
-    ExtensionPair, FilePattern, PatternPrefixPair, PerFileIgnore, PreviewMode, PythonVersion,
-    SerializationFormat, UnsafeFixes,
+    ExtensionPair, FilePattern, OutputFormat, PatternPrefixPair, PerFileIgnore, PreviewMode,
+    PythonVersion, UnsafeFixes,
 };
-use ruff_linter::{warn_user, RuleParser, RuleSelector, RuleSelectorParser};
+use ruff_linter::{RuleParser, RuleSelector, RuleSelectorParser};
 use ruff_source_file::{LineIndex, OneIndexed};
 use ruff_text_size::TextRange;
 use ruff_workspace::configuration::{Configuration, RuleSelection};
@@ -78,7 +78,7 @@ impl GlobalConfigArgs {
 #[command(
     author,
     name = "ruff",
-    about = "Ruff: An extremely fast Python linter.",
+    about = "Ruff: An extremely fast Python linter and code formatter.",
     after_help = "For help with a specific command, see: `ruff help <command>`."
 )]
 #[command(version)]
@@ -95,7 +95,6 @@ pub enum Command {
     /// Run Ruff on the given files or directories (default).
     Check(CheckCommand),
     /// Explain a rule (or all rules).
-    #[clap(alias = "--explain")]
     #[command(group = clap::ArgGroup::new("selector").multiple(false).required(true))]
     Rule {
         /// Rule to explain
@@ -125,10 +124,9 @@ pub enum Command {
         output_format: HelpFormat,
     },
     /// Clear any caches in the current directory and any subdirectories.
-    #[clap(alias = "--clean")]
     Clean,
     /// Generate shell completion.
-    #[clap(alias = "--generate-shell-completion", hide = true)]
+    #[clap(hide = true)]
     GenerateShellCompletion { shell: clap_complete_command::Shell },
     /// Run the Ruff formatter on the given files or directories.
     Format(FormatCommand),
@@ -160,13 +158,6 @@ pub struct CheckCommand {
     unsafe_fixes: bool,
     #[arg(long, overrides_with("unsafe_fixes"), hide = true)]
     no_unsafe_fixes: bool,
-    /// Show violations with source code.
-    /// Use `--no-show-source` to disable.
-    /// (Deprecated: use `--output-format=full` or `--output-format=concise` instead of `--show-source` and `--no-show-source`, respectively)
-    #[arg(long, overrides_with("no_show_source"))]
-    show_source: bool,
-    #[clap(long, overrides_with("show_source"), hide = true)]
-    no_show_source: bool,
     /// Show an enumeration of all fixed lint violations.
     /// Use `--no-show-fixes` to disable.
     #[arg(long, overrides_with("no_show_fixes"))]
@@ -194,7 +185,7 @@ pub struct CheckCommand {
     /// The default serialization format is "concise".
     /// In preview mode, the default serialization format is "full".
     #[arg(long, value_enum, env = "RUFF_OUTPUT_FORMAT")]
-    pub output_format: Option<SerializationFormat>,
+    pub output_format: Option<OutputFormat>,
 
     /// Specify file to write the linter output to (default: stdout).
     #[arg(short, long, env = "RUFF_OUTPUT_FILE")]
@@ -365,7 +356,6 @@ pub struct CheckCommand {
         long,
         // Unsupported default-command arguments.
         conflicts_with = "diff",
-        conflicts_with = "show_source",
         conflicts_with = "watch",
     )]
     pub statistics: bool,
@@ -701,11 +691,7 @@ impl CheckCommand {
             unsafe_fixes: resolve_bool_arg(self.unsafe_fixes, self.no_unsafe_fixes)
                 .map(UnsafeFixes::from),
             force_exclude: resolve_bool_arg(self.force_exclude, self.no_force_exclude),
-            output_format: resolve_output_format(
-                self.output_format,
-                resolve_bool_arg(self.show_source, self.no_show_source),
-                resolve_bool_arg(self.preview, self.no_preview).unwrap_or_default(),
-            ),
+            output_format: resolve_output_format(self.output_format)?,
             show_fixes: resolve_bool_arg(self.show_fixes, self.no_show_fixes),
             extension: self.extension,
         };
@@ -933,41 +919,15 @@ The path `{value}` does not point to a configuration file"
     }
 }
 
+#[allow(deprecated)]
 fn resolve_output_format(
-    output_format: Option<SerializationFormat>,
-    show_sources: Option<bool>,
-    preview: bool,
-) -> Option<SerializationFormat> {
-    Some(match (output_format, show_sources) {
-        (Some(o), None) => o,
-        (Some(SerializationFormat::Grouped), Some(true)) => {
-            warn_user!("`--show-source` with `--output-format=grouped` is deprecated, and will not show source files. Use `--output-format=full` to show source information.");
-            SerializationFormat::Grouped
-        }
-        (Some(fmt), Some(true)) => {
-            warn_user!("The `--show-source` argument is deprecated and has been ignored in favor of `--output-format={fmt}`.");
-            fmt
-        }
-        (Some(fmt), Some(false)) => {
-            warn_user!("The `--no-show-source` argument is deprecated and has been ignored in favor of `--output-format={fmt}`.");
-            fmt
-        }
-        (None, Some(true)) => {
-            warn_user!("The `--show-source` argument is deprecated. Use `--output-format=full` instead.");
-            SerializationFormat::Full
-        }
-        (None, Some(false)) => {
-            warn_user!("The `--no-show-source` argument is deprecated. Use `--output-format=concise` instead.");
-            SerializationFormat::Concise
-        }
-        (None, None) => return None
-    }).map(|format| match format {
-        SerializationFormat::Text => {
-            warn_user!("`--output-format=text` is deprecated. Use `--output-format=full` or `--output-format=concise` instead. `text` will be treated as `{}`.", SerializationFormat::default(preview));
-            SerializationFormat::default(preview)
-        },
-        other => other
-    })
+    output_format: Option<OutputFormat>,
+) -> anyhow::Result<Option<OutputFormat>> {
+    if let Some(OutputFormat::Text) = output_format {
+        Err(anyhow!("`--output-format=text` is no longer supported. Use `--output-format=full` or `--output-format=concise` instead."))
+    } else {
+        Ok(output_format)
+    }
 }
 
 /// CLI settings that are distinct from configuration (commands, lists of files,
@@ -1219,7 +1179,7 @@ struct ExplicitConfigOverrides {
     fix_only: Option<bool>,
     unsafe_fixes: Option<UnsafeFixes>,
     force_exclude: Option<bool>,
-    output_format: Option<SerializationFormat>,
+    output_format: Option<OutputFormat>,
     show_fixes: Option<bool>,
     extension: Option<Vec<ExtensionPair>>,
 }

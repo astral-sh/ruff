@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_simplify/mod.rs
 ---
-SIM300.py:2:1: SIM300 [*] Yoda conditions are discouraged, use `compare == "yoda"` instead
+SIM300.py:2:1: SIM300 [*] Yoda condition detected
   |
 1 | # Errors
 2 | "yoda" == compare  # SIM300
@@ -9,7 +9,7 @@ SIM300.py:2:1: SIM300 [*] Yoda conditions are discouraged, use `compare == "yoda
 3 | 42 == age  # SIM300
 4 | ("a", "b") == compare  # SIM300
   |
-  = help: Replace Yoda condition with `compare == "yoda"`
+  = help: Rewrite as `compare == "yoda"`
 
 ℹ Safe fix
 1 1 | # Errors
@@ -19,7 +19,7 @@ SIM300.py:2:1: SIM300 [*] Yoda conditions are discouraged, use `compare == "yoda
 4 4 | ("a", "b") == compare  # SIM300
 5 5 | "yoda" <= compare  # SIM300
 
-SIM300.py:3:1: SIM300 [*] Yoda conditions are discouraged, use `age == 42` instead
+SIM300.py:3:1: SIM300 [*] Yoda condition detected
   |
 1 | # Errors
 2 | "yoda" == compare  # SIM300
@@ -28,7 +28,7 @@ SIM300.py:3:1: SIM300 [*] Yoda conditions are discouraged, use `age == 42` inste
 4 | ("a", "b") == compare  # SIM300
 5 | "yoda" <= compare  # SIM300
   |
-  = help: Replace Yoda condition with `age == 42`
+  = help: Rewrite as `age == 42`
 
 ℹ Safe fix
 1 1 | # Errors
@@ -39,7 +39,7 @@ SIM300.py:3:1: SIM300 [*] Yoda conditions are discouraged, use `age == 42` inste
 5 5 | "yoda" <= compare  # SIM300
 6 6 | "yoda" < compare  # SIM300
 
-SIM300.py:4:1: SIM300 [*] Yoda conditions are discouraged, use `compare == ("a", "b")` instead
+SIM300.py:4:1: SIM300 [*] Yoda condition detected
   |
 2 | "yoda" == compare  # SIM300
 3 | 42 == age  # SIM300
@@ -48,7 +48,7 @@ SIM300.py:4:1: SIM300 [*] Yoda conditions are discouraged, use `compare == ("a",
 5 | "yoda" <= compare  # SIM300
 6 | "yoda" < compare  # SIM300
   |
-  = help: Replace Yoda condition with `compare == ("a", "b")`
+  = help: Rewrite as `compare == ("a", "b")`
 
 ℹ Safe fix
 1 1 | # Errors
@@ -60,7 +60,7 @@ SIM300.py:4:1: SIM300 [*] Yoda conditions are discouraged, use `compare == ("a",
 6 6 | "yoda" < compare  # SIM300
 7 7 | 42 > age  # SIM300
 
-SIM300.py:5:1: SIM300 [*] Yoda conditions are discouraged, use `compare >= "yoda"` instead
+SIM300.py:5:1: SIM300 [*] Yoda condition detected
   |
 3 | 42 == age  # SIM300
 4 | ("a", "b") == compare  # SIM300
@@ -69,7 +69,7 @@ SIM300.py:5:1: SIM300 [*] Yoda conditions are discouraged, use `compare >= "yoda
 6 | "yoda" < compare  # SIM300
 7 | 42 > age  # SIM300
   |
-  = help: Replace Yoda condition with `compare >= "yoda"`
+  = help: Rewrite as `compare >= "yoda"`
 
 ℹ Safe fix
 2 2 | "yoda" == compare  # SIM300
@@ -81,7 +81,7 @@ SIM300.py:5:1: SIM300 [*] Yoda conditions are discouraged, use `compare >= "yoda
 7 7 | 42 > age  # SIM300
 8 8 | -42 > age  # SIM300
 
-SIM300.py:6:1: SIM300 [*] Yoda conditions are discouraged, use `compare > "yoda"` instead
+SIM300.py:6:1: SIM300 [*] Yoda condition detected
   |
 4 | ("a", "b") == compare  # SIM300
 5 | "yoda" <= compare  # SIM300
@@ -90,7 +90,7 @@ SIM300.py:6:1: SIM300 [*] Yoda conditions are discouraged, use `compare > "yoda"
 7 | 42 > age  # SIM300
 8 | -42 > age  # SIM300
   |
-  = help: Replace Yoda condition with `compare > "yoda"`
+  = help: Rewrite as `compare > "yoda"`
 
 ℹ Safe fix
 3 3 | 42 == age  # SIM300
@@ -102,7 +102,7 @@ SIM300.py:6:1: SIM300 [*] Yoda conditions are discouraged, use `compare > "yoda"
 8 8 | -42 > age  # SIM300
 9 9 | +42 > age  # SIM300
 
-SIM300.py:7:1: SIM300 [*] Yoda conditions are discouraged, use `age < 42` instead
+SIM300.py:7:1: SIM300 [*] Yoda condition detected
   |
 5 | "yoda" <= compare  # SIM300
 6 | "yoda" < compare  # SIM300
@@ -111,7 +111,7 @@ SIM300.py:7:1: SIM300 [*] Yoda conditions are discouraged, use `age < 42` instea
 8 | -42 > age  # SIM300
 9 | +42 > age  # SIM300
   |
-  = help: Replace Yoda condition with `age < 42`
+  = help: Rewrite as `age < 42`
 
 ℹ Safe fix
 4 4 | ("a", "b") == compare  # SIM300
@@ -123,7 +123,7 @@ SIM300.py:7:1: SIM300 [*] Yoda conditions are discouraged, use `age < 42` instea
 9 9 | +42 > age  # SIM300
 10 10 | YODA == age  # SIM300
 
-SIM300.py:8:1: SIM300 [*] Yoda conditions are discouraged, use `age < -42` instead
+SIM300.py:8:1: SIM300 [*] Yoda condition detected
    |
  6 | "yoda" < compare  # SIM300
  7 | 42 > age  # SIM300
@@ -132,7 +132,7 @@ SIM300.py:8:1: SIM300 [*] Yoda conditions are discouraged, use `age < -42` inste
  9 | +42 > age  # SIM300
 10 | YODA == age  # SIM300
    |
-   = help: Replace Yoda condition with `age < -42`
+   = help: Rewrite as `age < -42`
 
 ℹ Safe fix
 5 5 | "yoda" <= compare  # SIM300
@@ -144,7 +144,7 @@ SIM300.py:8:1: SIM300 [*] Yoda conditions are discouraged, use `age < -42` inste
 10 10 | YODA == age  # SIM300
 11 11 | YODA > age  # SIM300
 
-SIM300.py:9:1: SIM300 [*] Yoda conditions are discouraged, use `age < +42` instead
+SIM300.py:9:1: SIM300 [*] Yoda condition detected
    |
  7 | 42 > age  # SIM300
  8 | -42 > age  # SIM300
@@ -153,7 +153,7 @@ SIM300.py:9:1: SIM300 [*] Yoda conditions are discouraged, use `age < +42` inste
 10 | YODA == age  # SIM300
 11 | YODA > age  # SIM300
    |
-   = help: Replace Yoda condition with `age < +42`
+   = help: Rewrite as `age < +42`
 
 ℹ Safe fix
 6  6  | "yoda" < compare  # SIM300
@@ -165,7 +165,7 @@ SIM300.py:9:1: SIM300 [*] Yoda conditions are discouraged, use `age < +42` inste
 11 11 | YODA > age  # SIM300
 12 12 | YODA >= age  # SIM300
 
-SIM300.py:10:1: SIM300 [*] Yoda conditions are discouraged, use `age == YODA` instead
+SIM300.py:10:1: SIM300 [*] Yoda condition detected
    |
  8 | -42 > age  # SIM300
  9 | +42 > age  # SIM300
@@ -174,7 +174,7 @@ SIM300.py:10:1: SIM300 [*] Yoda conditions are discouraged, use `age == YODA` in
 11 | YODA > age  # SIM300
 12 | YODA >= age  # SIM300
    |
-   = help: Replace Yoda condition with `age == YODA`
+   = help: Rewrite as `age == YODA`
 
 ℹ Safe fix
 7  7  | 42 > age  # SIM300
@@ -186,7 +186,7 @@ SIM300.py:10:1: SIM300 [*] Yoda conditions are discouraged, use `age == YODA` in
 12 12 | YODA >= age  # SIM300
 13 13 | JediOrder.YODA == age  # SIM300
 
-SIM300.py:11:1: SIM300 [*] Yoda conditions are discouraged, use `age < YODA` instead
+SIM300.py:11:1: SIM300 [*] Yoda condition detected
    |
  9 | +42 > age  # SIM300
 10 | YODA == age  # SIM300
@@ -195,7 +195,7 @@ SIM300.py:11:1: SIM300 [*] Yoda conditions are discouraged, use `age < YODA` ins
 12 | YODA >= age  # SIM300
 13 | JediOrder.YODA == age  # SIM300
    |
-   = help: Replace Yoda condition with `age < YODA`
+   = help: Rewrite as `age < YODA`
 
 ℹ Safe fix
 8  8  | -42 > age  # SIM300
@@ -207,7 +207,7 @@ SIM300.py:11:1: SIM300 [*] Yoda conditions are discouraged, use `age < YODA` ins
 13 13 | JediOrder.YODA == age  # SIM300
 14 14 | 0 < (number - 100)  # SIM300
 
-SIM300.py:12:1: SIM300 [*] Yoda conditions are discouraged, use `age <= YODA` instead
+SIM300.py:12:1: SIM300 [*] Yoda condition detected
    |
 10 | YODA == age  # SIM300
 11 | YODA > age  # SIM300
@@ -216,7 +216,7 @@ SIM300.py:12:1: SIM300 [*] Yoda conditions are discouraged, use `age <= YODA` in
 13 | JediOrder.YODA == age  # SIM300
 14 | 0 < (number - 100)  # SIM300
    |
-   = help: Replace Yoda condition with `age <= YODA`
+   = help: Rewrite as `age <= YODA`
 
 ℹ Safe fix
 9  9  | +42 > age  # SIM300
@@ -228,7 +228,7 @@ SIM300.py:12:1: SIM300 [*] Yoda conditions are discouraged, use `age <= YODA` in
 14 14 | 0 < (number - 100)  # SIM300
 15 15 | B<A[0][0]or B
 
-SIM300.py:13:1: SIM300 [*] Yoda conditions are discouraged, use `age == JediOrder.YODA` instead
+SIM300.py:13:1: SIM300 [*] Yoda condition detected
    |
 11 | YODA > age  # SIM300
 12 | YODA >= age  # SIM300
@@ -237,7 +237,7 @@ SIM300.py:13:1: SIM300 [*] Yoda conditions are discouraged, use `age == JediOrde
 14 | 0 < (number - 100)  # SIM300
 15 | B<A[0][0]or B
    |
-   = help: Replace Yoda condition with `age == JediOrder.YODA`
+   = help: Rewrite as `age == JediOrder.YODA`
 
 ℹ Safe fix
 10 10 | YODA == age  # SIM300
@@ -249,7 +249,7 @@ SIM300.py:13:1: SIM300 [*] Yoda conditions are discouraged, use `age == JediOrde
 15 15 | B<A[0][0]or B
 16 16 | B or(B)<A[0][0]
 
-SIM300.py:14:1: SIM300 [*] Yoda conditions are discouraged, use `(number - 100) > 0` instead
+SIM300.py:14:1: SIM300 [*] Yoda condition detected
    |
 12 | YODA >= age  # SIM300
 13 | JediOrder.YODA == age  # SIM300
@@ -258,7 +258,7 @@ SIM300.py:14:1: SIM300 [*] Yoda conditions are discouraged, use `(number - 100) 
 15 | B<A[0][0]or B
 16 | B or(B)<A[0][0]
    |
-   = help: Replace Yoda condition with `(number - 100) > 0`
+   = help: Rewrite as `(number - 100) > 0`
 
 ℹ Safe fix
 11 11 | YODA > age  # SIM300
@@ -270,7 +270,7 @@ SIM300.py:14:1: SIM300 [*] Yoda conditions are discouraged, use `(number - 100) 
 16 16 | B or(B)<A[0][0]
 17 17 | 
 
-SIM300.py:15:1: SIM300 [*] Yoda conditions are discouraged, use `A[0][0] > B` instead
+SIM300.py:15:1: SIM300 [*] Yoda condition detected
    |
 13 | JediOrder.YODA == age  # SIM300
 14 | 0 < (number - 100)  # SIM300
@@ -278,7 +278,7 @@ SIM300.py:15:1: SIM300 [*] Yoda conditions are discouraged, use `A[0][0] > B` in
    | ^^^^^^^^^ SIM300
 16 | B or(B)<A[0][0]
    |
-   = help: Replace Yoda condition with `A[0][0] > B`
+   = help: Rewrite as `A[0][0] > B`
 
 ℹ Safe fix
 12 12 | YODA >= age  # SIM300
@@ -290,7 +290,7 @@ SIM300.py:15:1: SIM300 [*] Yoda conditions are discouraged, use `A[0][0] > B` in
 17 17 | 
 18 18 | # Errors in preview
 
-SIM300.py:16:5: SIM300 [*] Yoda conditions are discouraged, use `A[0][0] > (B)` instead
+SIM300.py:16:5: SIM300 [*] Yoda condition detected
    |
 14 | 0 < (number - 100)  # SIM300
 15 | B<A[0][0]or B
@@ -299,7 +299,7 @@ SIM300.py:16:5: SIM300 [*] Yoda conditions are discouraged, use `A[0][0] > (B)` 
 17 | 
 18 | # Errors in preview
    |
-   = help: Replace Yoda condition with `A[0][0] > (B)`
+   = help: Rewrite as `A[0][0] > (B)`
 
 ℹ Safe fix
 13 13 | JediOrder.YODA == age  # SIM300
@@ -311,44 +311,42 @@ SIM300.py:16:5: SIM300 [*] Yoda conditions are discouraged, use `A[0][0] > (B)` 
 18 18 | # Errors in preview
 19 19 | ['upper'] == UPPER_LIST
 
-SIM300.py:23:1: SIM300 [*] Yoda conditions are discouraged, use `['upper'] == UPPER_LIST` instead
+SIM300.py:19:1: SIM300 [*] Yoda condition detected
    |
-22 | # Errors in stable
-23 | UPPER_LIST == ['upper']
+18 | # Errors in preview
+19 | ['upper'] == UPPER_LIST
    | ^^^^^^^^^^^^^^^^^^^^^^^ SIM300
-24 | DummyHandler.CONFIG == {}
+20 | {} == DummyHandler.CONFIG
    |
-   = help: Replace Yoda condition with `['upper'] == UPPER_LIST`
+   = help: Rewrite as `UPPER_LIST == ['upper']`
 
 ℹ Safe fix
+16 16 | B or(B)<A[0][0]
+17 17 | 
+18 18 | # Errors in preview
+19    |-['upper'] == UPPER_LIST
+   19 |+UPPER_LIST == ['upper']
 20 20 | {} == DummyHandler.CONFIG
 21 21 | 
 22 22 | # Errors in stable
-23    |-UPPER_LIST == ['upper']
-   23 |+['upper'] == UPPER_LIST
-24 24 | DummyHandler.CONFIG == {}
-25 25 | 
-26 26 | # OK
 
-SIM300.py:24:1: SIM300 [*] Yoda conditions are discouraged, use `{} == DummyHandler.CONFIG` instead
+SIM300.py:20:1: SIM300 [*] Yoda condition detected
    |
-22 | # Errors in stable
-23 | UPPER_LIST == ['upper']
-24 | DummyHandler.CONFIG == {}
+18 | # Errors in preview
+19 | ['upper'] == UPPER_LIST
+20 | {} == DummyHandler.CONFIG
    | ^^^^^^^^^^^^^^^^^^^^^^^^^ SIM300
-25 | 
-26 | # OK
+21 | 
+22 | # Errors in stable
    |
-   = help: Replace Yoda condition with `{} == DummyHandler.CONFIG`
+   = help: Rewrite as `DummyHandler.CONFIG == {}`
 
 ℹ Safe fix
+17 17 | 
+18 18 | # Errors in preview
+19 19 | ['upper'] == UPPER_LIST
+20    |-{} == DummyHandler.CONFIG
+   20 |+DummyHandler.CONFIG == {}
 21 21 | 
 22 22 | # Errors in stable
 23 23 | UPPER_LIST == ['upper']
-24    |-DummyHandler.CONFIG == {}
-   24 |+{} == DummyHandler.CONFIG
-25 25 | 
-26 26 | # OK
-27 27 | compare == "yoda"
-
-
