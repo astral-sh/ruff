@@ -4,15 +4,15 @@
 
 ### Ruff Language Server (`ruff server`)
 
-The Ruff language server, also known as `ruff server`, is what powers the diagnostic and formatting capabilities of Ruff's VS Code extension and other editors. It is a single, common backend for editor integrations built directly into Ruff, and a direct replacement for `ruff-lsp`, our previous language server. You can read more about `ruff server` in the [`v0.4.5` blog post](https://astral.sh/blog/ruff-v0.4.5).
+The Ruff language server, also known as `ruff server`, powers the diagnostic and formatting capabilities of Ruff's VS Code extension and other editor integrations. It is a single, common backend built directly into Ruff, and a direct replacement for `ruff-lsp`, our previous language server. You can read more about `ruff server` in the [`v0.4.5` blog post](https://astral.sh/blog/ruff-v0.4.5).
 
-`ruff server` uses the LSP (Language Server Protocol), and as such works with any editor that supports this protocol. VS Code, Neovim, Helix, and Kate all have official, documented support for `ruff server`. Other editors may support the older `ruff-lsp` server - see the [Setup](https://github.com/astral-sh/ruff-lsp#setup) guide in `ruff-lsp` for more details.
+`ruff server` uses the LSP (Language Server Protocol), and as such works with any editor that supports this protocol. VS Code, Neovim, Helix, and Kate all have official, documented support for `ruff server`. Other editors may support the legacy `ruff-lsp` server; see the [`ruff-lsp` documentation](https://github.com/astral-sh/ruff-lsp#setup) for more.
 
 ### VS Code (Official)
 
-Download the [Ruff VS Code extension](https://marketplace.visualstudio.com/items?itemName=charliermarsh.ruff), which supports fix actions, import sorting, and more.
+Download the [Ruff VS Code extension](https://marketplace.visualstudio.com/items?itemName=charliermarsh.ruff), which supports code formatting, fix actions, import sorting, and more.
 
-By default, the extension will attempt to use the `ruff` executable installed on your local system, and will use a bundled executable if that's not available. If `ruff` is `v0.4.5` or later, the extension will automatically use `ruff server` - otherwise, it will use `ruff-lsp`.
+By default, the extension will attempt to use the `ruff` executable installed on your local system, and will use a bundled executable if that's not available. If `ruff` is `v0.4.5` or later, the extension will automatically use `ruff server`; otherwise, it will use fall back to `ruff-lsp`.
 
 To learn more about configuring the extension, and the settings available for the extension, refer to [Configuring Ruff](https://github.com/astral-sh/ruff-vscode/?tab=readme-ov-file#configuring-ruff) in the `ruff-vscode` documentation.
 
@@ -73,7 +73,7 @@ require('lspconfig').pyright.setup {
 }
 ```
 
-By default, Ruff will not show any logs. To enable logging in Neovim, you'll need to set the `RUFF_TRACE` environment variable
+To enable logging in Neovim, set the `RUFF_TRACE` environment variable
 to either `messages` or `verbose`:
 
 ```lua
@@ -82,7 +82,7 @@ require('lspconfig').ruff.setup {
 }
 ```
 
-You can set the log level in `settings`:
+You can then set the desired log level (e.g., `debug` vs. `warning`) in the extension `settings`:
 
 ```lua
 require('lspconfig').ruff.setup {
@@ -124,7 +124,7 @@ command = "ruff"
 args = ["server", "--preview"]
 ```
 
-Then, you'll register the language server as the one to use with Python.
+Next, register the language server for use in Python files.
 If you don't already have a language server registered to use with Python, add this to `languages.toml`:
 
 ```toml
