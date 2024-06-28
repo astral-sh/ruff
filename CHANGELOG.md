@@ -12,6 +12,7 @@ See also, the "Remapped rules" section which may result in disabled rules.
 - Selecting `ALL` now excludes deprecated rules
 - The released archives now include an extra level of nesting, which can be removed with `--strip-components=1` when untarring.
 - The release artifact's file name no longer includes the version tag. This enables users to install via `/latest` URLs on GitHub.
+- The diagnostic ranges for some `flake8-bandit` rules were modified ([#10667](https://github.com/astral-sh/ruff/pull/10667))
 
 ### Deprecations
 
@@ -108,7 +109,6 @@ The following deprecated CLI commands have been removed:
 
 - \[`ruff`\] Fix false positives if `gettext` is imported using an alias (`RUF027`) ([#12025](https://github.com/astral-sh/ruff/pull/12025))
 - \[`npy`\] Update `trapz` and `in1d` deprecation (`NPY201`) ([#11948](https://github.com/astral-sh/ruff/pull/11948))
-- \[`flake8-bandit`\] Modify diagnostic ranges for shell-related rules ([#10667](https://github.com/astral-sh/ruff/pull/10667))
 
 ### Server
 
