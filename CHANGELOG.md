@@ -108,7 +108,8 @@ The following deprecated CLI commands have been removed:
 ### Rule changes
 
 - \[`ruff`\] Fix false positives if `gettext` is imported using an alias (`RUF027`) ([#12025](https://github.com/astral-sh/ruff/pull/12025))
-- \[`npy`\] Update `trapz` and `in1d` deprecation (`NPY201`) ([#11948](https://github.com/astral-sh/ruff/pull/11948))
+- \[`numpy`\] Update `trapz` and `in1d` deprecation (`NPY201`) ([#11948](https://github.com/astral-sh/ruff/pull/11948))
+- \[`flake8-bandit`\] Modify diagnostic ranges for shell-related rules ([#10667](https://github.com/astral-sh/ruff/pull/10667))
 
 ### Server
 
