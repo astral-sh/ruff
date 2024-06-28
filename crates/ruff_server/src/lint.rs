@@ -364,8 +364,7 @@ fn severity(code: &str) -> lsp_types::DiagnosticSeverity {
     match code {
         // F821: undefined name <name>
         // E902: IOError
-        // E999: SyntaxError
-        "F821" | "E902" | "E999" => lsp_types::DiagnosticSeverity::ERROR,
+        "F821" | "E902" => lsp_types::DiagnosticSeverity::ERROR,
         _ => lsp_types::DiagnosticSeverity::WARNING,
     }
 }
