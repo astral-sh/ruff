@@ -1,3 +1,7 @@
+# Publish the Ruff documentation.
+#
+# Assumed to run as a subworkflow of .github/workflows/release.yml; specifically, as a post-announce
+# job within `cargo-dist`.
 name: mkdocs
 
 on:
@@ -7,8 +11,11 @@ on:
         description: "The commit SHA, tag, or branch to publish. Uses the default branch if not specified."
         default: ""
         type: string
-  release:
-    types: [published]
+  workflow_call:
+    inputs:
+      plan:
+        required: true
+        type: string
 
 jobs:
   mkdocs:

@@ -247,3 +247,21 @@ jobs:
     with:
       plan: ${{ needs.plan.outputs.val }}
     secrets: inherit
+
+  custom-publish-docs:
+    needs:
+      - plan
+      - announce
+    uses: ./.github/workflows/publish-docs.yml
+    with:
+      plan: ${{ needs.plan.outputs.val }}
+    secrets: inherit
+
+  custom-publish-playground:
+    needs:
+      - plan
+      - announce
+    uses: ./.github/workflows/publish-playground.yml
+    with:
+      plan: ${{ needs.plan.outputs.val }}
+    secrets: inherit

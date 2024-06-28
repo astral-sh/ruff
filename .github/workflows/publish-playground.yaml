@@ -1,9 +1,16 @@
+# Publish the Ruff playground.
+#
+# Assumed to run as a subworkflow of .github/workflows/release.yml; specifically, as a post-announce
+# job within `cargo-dist`.
 name: "[Playground] Release"
 
 on:
   workflow_dispatch:
-  release:
-    types: [published]
+  workflow_call:
+    inputs:
+      plan:
+        required: true
+        type: string
 
 env:
   CARGO_INCREMENTAL: 0
