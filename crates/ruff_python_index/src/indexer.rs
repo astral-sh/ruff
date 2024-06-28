@@ -39,7 +39,7 @@ impl Indexer {
         let mut prev_end = TextSize::default();
         let mut line_start = TextSize::default();
 
-        for token in tokens.up_to_first_unknown() {
+        for token in tokens {
             let trivia = locator.slice(TextRange::new(prev_end, token.start()));
 
             // Get the trivia between the previous and the current token and detect any newlines.
@@ -78,16 +78,6 @@ impl Indexer {
             }
 
             prev_end = token.end();
-        }
-
-        // TODO(dhruvmanila): This is temporary until Ruff becomes error resilient. To understand
-        // why this is required, refer to https://github.com/astral-sh/ruff/pull/11457#issuecomment-2144990269
-        // which was released at the time of this writing. Now we can't just revert that behavior,
-        // so we need to visit the remaining tokens if there are any for the comment ranges.
-        for token in tokens.after(prev_end) {
-            if token.kind() == TokenKind::Comment {
-                comment_ranges.push(token.range());
-            }
         }
 
         Self {

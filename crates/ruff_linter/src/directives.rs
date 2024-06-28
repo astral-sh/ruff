@@ -107,14 +107,9 @@ where
 fn extract_noqa_line_for(tokens: &Tokens, locator: &Locator, indexer: &Indexer) -> NoqaMapping {
     let mut string_mappings = Vec::new();
 
-    for token in tokens.up_to_first_unknown() {
+    for token in tokens {
         match token.kind() {
-            TokenKind::EndOfFile => {
-                break;
-            }
-
-            // For multi-line strings, we expect `noqa` directives on the last line of the
-            // string.
+            // For multi-line strings, we expect `noqa` directives on the last line of the string.
             TokenKind::String if token.is_triple_quoted_string() => {
                 if locator.contains_line_break(token.range()) {
                     string_mappings.push(TextRange::new(
