@@ -2,15 +2,16 @@ use ruff_db::Upcast;
 
 use crate::resolver::{
     file_to_module,
-    internal::{ModuleNameIngredient, ModuleResolverSearchPaths},
+    internal::{ModuleNameIngredient, ModuleResolverSearchPaths, TargetPyVersion},
     resolve_module_query,
 };
-use crate::typeshed::versions::TypeshedVersions;
+use crate::typeshed::TypeshedVersions;
 
 #[salsa::jar(db=Db)]
 pub struct Jar(
     ModuleNameIngredient<'_>,
     ModuleResolverSearchPaths,
+    TargetPyVersion,
     resolve_module_query,
     file_to_module,
 );

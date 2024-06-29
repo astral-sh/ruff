@@ -13,4 +13,4 @@ pub use path::{
     SitePackagesPathBuf, StandardLibraryPath, StandardLibraryPathBuf,
 };
 pub use resolver::{resolve_module, set_module_resolution_settings, ModuleResolutionSettings};
-pub use typeshed::versions::TypeshedVersions;
+pub use typeshed::{SupportedPyVersion, TypeshedVersions};

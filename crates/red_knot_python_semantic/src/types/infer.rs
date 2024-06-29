@@ -706,6 +706,7 @@ mod tests {
     use crate::types::{public_symbol_ty_by_name, Type, TypingContext};
     use red_knot_module_resolver::{
         set_module_resolution_settings, FirstPartyPath, ModuleResolutionSettings,
+        SupportedPyVersion,
     };
     use ruff_python_ast::name::Name;
 
@@ -715,6 +716,7 @@ mod tests {
         set_module_resolution_settings(
             &mut db,
             ModuleResolutionSettings {
+                target_version: SupportedPyVersion::Py38,
                 extra_paths: Vec::new(),
                 workspace_root: FirstPartyPath::new("/src").unwrap().to_path_buf(),
                 site_packages: None,

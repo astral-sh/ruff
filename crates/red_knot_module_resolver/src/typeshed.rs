@@ -1,4 +1,8 @@
-pub(crate) mod versions;
+mod supported_py_version;
+mod versions;
+
+pub use versions::TypeshedVersions;
+pub use supported_py_version::SupportedPyVersion;
 
 #[cfg(test)]
 mod tests {

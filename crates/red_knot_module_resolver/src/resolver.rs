@@ -1,3 +1,4 @@
+use internal::TargetPyVersion;
 use std::ops::Deref;
 use std::sync::Arc;
 
@@ -11,7 +12,7 @@ use crate::path::{
     StandardLibraryPathBuf,
 };
 use crate::resolver::internal::ModuleResolverSearchPaths;
-use crate::Db;
+use crate::{Db, SupportedPyVersion};
 
 /// Configures the module search paths for the module resolver.
 ///
@@ -20,12 +21,16 @@ pub fn set_module_resolution_settings(db: &mut dyn Db, config: ModuleResolutionS
     // There's no concurrency issue here because we hold a `&mut dyn Db` reference. No other
     // thread can mutate the `Db` while we're in this call, so using `try_get` to test if
     // the settings have already been set is safe.
+    let (target_version, search_paths) = config.into_ordered_search_paths();
     if let Some(existing) = ModuleResolverSearchPaths::try_get(db) {
-        existing
-            .set_search_paths(db)
-            .to(config.into_ordered_search_paths());
+        existing.set_search_paths(db).to(search_paths);
     } else {
-        ModuleResolverSearchPaths::new(db, config.into_ordered_search_paths());
+        ModuleResolverSearchPaths::new(db, search_paths);
+    }
+    if let Some(existing) = TargetPyVersion::try_get(db) {
+        existing.set_target_py_version(db).to(target_version);
+    } else {
+        TargetPyVersion::new(db, target_version);
     }
 }
 
@@ -134,6 +139,9 @@ pub(crate) fn file_to_module(db: &dyn Db, file: VfsFile) -> Option<Module> {
 /// Configures the search paths that are used to resolve modules.
 #[derive(Eq, PartialEq, Debug)]
 pub struct ModuleResolutionSettings {
+    /// The target Python version the user has specified
+    pub target_version: SupportedPyVersion,
+
     /// List of user-provided paths that should take first priority in the module resolution.
     /// Examples in other type checkers are mypy's MYPYPATH environment variable,
     /// or pyright's stubPath configuration setting.
@@ -154,8 +162,9 @@ pub struct ModuleResolutionSettings {
 impl ModuleResolutionSettings {
     /// Implementation of PEP 561's module resolution order
     /// (with some small, deliberate, differences)
-    fn into_ordered_search_paths(self) -> OrderedSearchPaths {
+    fn into_ordered_search_paths(self) -> (SupportedPyVersion, OrderedSearchPaths) {
         let ModuleResolutionSettings {
+            target_version,
             extra_paths,
             workspace_root,
             site_packages,
@@ -180,7 +189,10 @@ impl ModuleResolutionSettings {
             paths.push(ModuleSearchPathEntry::SitePackagesThirdParty(site_packages));
         }
 
-        OrderedSearchPaths(paths.into_iter().map(Arc::new).collect())
+        (
+            target_version,
+            OrderedSearchPaths(paths.into_iter().map(Arc::new).collect()),
+        )
     }
 }
 
@@ -205,11 +217,18 @@ impl Deref for OrderedSearchPaths {
 pub(crate) mod internal {
     use crate::module_name::ModuleName;
     use crate::resolver::OrderedSearchPaths;
+    use crate::SupportedPyVersion;
 
     #[salsa::input(singleton)]
     pub(crate) struct ModuleResolverSearchPaths {
         #[return_ref]
         pub(super) search_paths: OrderedSearchPaths,
+    }
+
+    #[salsa::input(singleton)]
+    pub(crate) struct TargetPyVersion {
+        #[return_ref]
+        pub(super) target_py_version: SupportedPyVersion,
     }
 
     /// A thin wrapper around `ModuleName` to make it a Salsa ingredient.
@@ -405,6 +424,7 @@ mod tests {
         fs.create_directory_all(&*custom_typeshed)?;
 
         let settings = ModuleResolutionSettings {
+            target_version: SupportedPyVersion::Py38,
             extra_paths: vec![],
             workspace_root: src.clone(),
             site_packages: Some(site_packages.clone()),
@@ -823,6 +843,7 @@ mod tests {
             .to_path_buf();
 
         let settings = ModuleResolutionSettings {
+            target_version: SupportedPyVersion::Py38,
             extra_paths: vec![],
             workspace_root: src.clone(),
             site_packages: Some(site_packages.clone()),

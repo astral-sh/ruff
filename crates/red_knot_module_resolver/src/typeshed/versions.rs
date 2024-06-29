@@ -7,6 +7,7 @@ use std::str::FromStr;
 use rustc_hash::FxHashMap;
 
 use crate::module_name::ModuleName;
+use super::supported_py_version::SupportedPyVersion;
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct TypeshedVersionsParseError {
@@ -264,19 +265,6 @@ impl fmt::Display for PyVersion {
         let PyVersion { major, minor } = self;
         write!(f, "{major}.{minor}")
     }
-}
-
-// TODO: unify with the PythonVersion enum in the linter/formatter crates?
-#[derive(Copy, Clone, Hash, Debug, PartialEq, Eq, PartialOrd, Ord, Default)]
-pub enum SupportedPyVersion {
-    Py37,
-    #[default]
-    Py38,
-    Py39,
-    Py310,
-    Py311,
-    Py312,
-    Py313,
 }
 
 impl From<SupportedPyVersion> for PyVersion {
