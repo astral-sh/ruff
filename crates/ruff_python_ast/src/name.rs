@@ -9,26 +9,26 @@ use std::ops::Deref;
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize, ruff_macros::CacheKey,)
 )]
-pub struct Name(smol_str::SmolStr);
+pub struct Name(Box<str>);
 
 impl Name {
     #[inline]
     pub fn empty() -> Self {
-        Self(smol_str::SmolStr::new_inline(""))
+        Self("".to_string().into_boxed_str())
     }
 
     #[inline]
     pub fn new(name: impl AsRef<str>) -> Self {
-        Self(smol_str::SmolStr::new(name))
+        Self(name.as_ref().to_string().into_boxed_str())
     }
 
     #[inline]
     pub fn new_static(name: &'static str) -> Self {
-        Self(smol_str::SmolStr::new_static(name))
+        Self::new(name)
     }
 
     pub fn as_str(&self) -> &str {
-        self.0.as_str()
+        &self.0
     }
 }
 
@@ -57,7 +57,7 @@ impl Borrow<str> for Name {
 
 impl<T> From<T> for Name
 where
-    T: Into<smol_str::SmolStr>,
+    T: Into<Box<str>>,
 {
     fn from(value: T) -> Self {
         Self(value.into())
@@ -66,7 +66,7 @@ where
 
 impl FromIterator<char> for Name {
     fn from_iter<I: IntoIterator<Item = char>>(iter: I) -> Self {
-        Self(iter.into_iter().collect())
+        Self(iter.into_iter().collect::<String>().into_boxed_str())
     }
 }
 
