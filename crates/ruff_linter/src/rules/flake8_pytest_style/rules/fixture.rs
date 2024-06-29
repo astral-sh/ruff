@@ -34,6 +34,9 @@ use super::helpers::{
 /// Either removing those unnecessary parentheses _or_ requiring them for all
 /// fixtures is fine, but it's best to be consistent.
 ///
+/// Whilst in [preview], this rule defaults to removing unnecessary parentheses
+/// to cohere better with official Pytest projects.
+///
 /// ## Example
 /// ```python
 /// import pytest
@@ -59,6 +62,8 @@ use super::helpers::{
 ///
 /// ## References
 /// - [`pytest` documentation: API Reference: Fixtures](https://docs.pytest.org/en/latest/reference/reference.html#fixtures-api)
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[violation]
 pub struct PytestFixtureIncorrectParenthesesStyle {
     expected: Parentheses,

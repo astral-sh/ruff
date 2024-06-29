@@ -49,6 +49,20 @@ impl Default for Settings {
     }
 }
 
+impl Settings {
+    pub fn resolve_default(preview: bool) -> Self {
+        if preview {
+            Self {
+                fixture_parentheses: false,
+                mark_parentheses: false,
+                ..Default::default()
+            }
+        } else {
+            Self::default()
+        }
+    }
+}
+
 impl fmt::Display for Settings {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         display_settings! {
