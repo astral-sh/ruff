@@ -86,7 +86,7 @@ pub(crate) fn repeated_global(checker: &mut Checker, mut suite: &[Stmt]) {
                                     Stmt::Nonlocal(stmt) => &stmt.names,
                                     _ => unreachable!(),
                                 })
-                                .map(|identifier| &identifier.id)
+                                .map(|identifier| identifier.id())
                                 .format(", ")
                         ),
                         range,

@@ -3777,6 +3777,10 @@ impl Identifier {
         }
     }
 
+    pub fn id(&self) -> &Name {
+        &self.id
+    }
+
     pub fn is_valid(&self) -> bool {
         !self.id.is_empty()
     }

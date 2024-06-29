@@ -747,7 +747,7 @@ pub(crate) fn string_dot_format_extra_named_arguments(
     let missing: Vec<(usize, &Name)> = keywords
         .enumerate()
         .filter_map(|(index, keyword)| {
-            if summary.keywords.contains(&keyword.id) {
+            if summary.keywords.contains(keyword.id()) {
                 None
             } else {
                 Some((index, &keyword.id))
@@ -863,7 +863,7 @@ pub(crate) fn string_dot_format_missing_argument(
         .iter()
         .filter_map(|k| {
             let Keyword { arg, .. } = &k;
-            arg.as_ref().map(|identifier| &identifier.id)
+            arg.as_ref().map(|identifier| identifier.id())
         })
         .collect();
 

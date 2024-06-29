@@ -1,30 +1,32 @@
-use crate::{nodes, Expr};
-use std::borrow::Borrow;
+use std::borrow::{Borrow, Cow};
 use std::fmt::{Debug, Display, Formatter, Write};
 use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+use crate::{nodes, Expr};
+
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 #[cfg_attr(
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize, ruff_macros::CacheKey,)
 )]
-pub struct Name(smol_str::SmolStr);
+pub struct Name(compact_str::CompactString);
 
 impl Name {
     #[inline]
     pub fn empty() -> Self {
-        Self(smol_str::SmolStr::new_inline(""))
+        Self(compact_str::CompactString::default())
     }
 
     #[inline]
     pub fn new(name: impl AsRef<str>) -> Self {
-        Self(smol_str::SmolStr::new(name))
+        Self(compact_str::CompactString::new(name))
     }
 
     #[inline]
     pub fn new_static(name: &'static str) -> Self {
-        Self(smol_str::SmolStr::new_static(name))
+        // TODO: Use ComactString::const_new once we upgrade to 0.8 https://github.com/ParkMyCar/compact_str/pull/336
+        Self(compact_str::CompactString::from(name))
     }
 
     pub fn as_str(&self) -> &str {
@@ -61,12 +63,52 @@ impl Borrow<str> for Name {
     }
 }
 
-impl<T> From<T> for Name
-where
-    T: Into<smol_str::SmolStr>,
-{
-    fn from(value: T) -> Self {
-        Self(value.into())
+impl<'a> From<&'a str> for Name {
+    #[inline]
+    fn from(s: &'a str) -> Self {
+        Name(s.into())
+    }
+}
+
+impl From<String> for Name {
+    #[inline]
+    fn from(s: String) -> Self {
+        Name(s.into())
+    }
+}
+
+impl<'a> From<&'a String> for Name {
+    #[inline]
+    fn from(s: &'a String) -> Self {
+        Name(s.into())
+    }
+}
+
+impl<'a> From<Cow<'a, str>> for Name {
+    #[inline]
+    fn from(cow: Cow<'a, str>) -> Self {
+        Name(cow.into())
+    }
+}
+
+impl From<Box<str>> for Name {
+    #[inline]
+    fn from(b: Box<str>) -> Self {
+        Name(b.into())
+    }
+}
+
+impl From<compact_str::CompactString> for Name {
+    #[inline]
+    fn from(value: compact_str::CompactString) -> Self {
+        Self(value)
+    }
+}
+
+impl From<Name> for compact_str::CompactString {
+    #[inline]
+    fn from(name: Name) -> Self {
+        name.0
     }
 }
 

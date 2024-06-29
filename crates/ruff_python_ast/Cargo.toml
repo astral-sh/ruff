@@ -27,10 +27,10 @@ once_cell = { workspace = true }
 rustc-hash = { workspace = true }
 schemars = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
-smol_str = { workspace = true }
+compact_str = { workspace = true }
 
 [features]
-serde = ["dep:serde", "ruff_text_size/serde", "dep:ruff_cache", "smol_str/serde", "dep:ruff_macros", "dep:schemars"]
+serde = ["dep:serde", "ruff_text_size/serde", "dep:ruff_cache", "compact_str/serde", "dep:ruff_macros", "dep:schemars"]
 
 [lints]
 workspace = true

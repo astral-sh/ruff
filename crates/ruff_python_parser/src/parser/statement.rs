@@ -1,3 +1,4 @@
+use compact_str::CompactString;
 use std::fmt::Display;
 
 use rustc_hash::{FxBuildHasher, FxHashSet};
@@ -624,7 +625,7 @@ impl<'src> Parser<'src> {
             let range = self.node_range(start);
             return ast::Alias {
                 name: ast::Identifier {
-                    id: "*".into(),
+                    id: Name::new_static("*"),
                     range,
                 },
                 asname: None,
@@ -670,7 +671,7 @@ impl<'src> Parser<'src> {
     fn parse_dotted_name(&mut self) -> ast::Identifier {
         let start = self.node_start();
 
-        let mut dotted_name = self.parse_identifier().id.to_string();
+        let mut dotted_name: CompactString = self.parse_identifier().id.into();
         let mut progress = ParserProgress::default();
 
         while self.eat(TokenKind::Dot) {
@@ -687,7 +688,7 @@ impl<'src> Parser<'src> {
         // import a.b.c
         // import a .  b  . c
         ast::Identifier {
-            id: Name::new(dotted_name),
+            id: Name::from(dotted_name),
             range: self.node_range(start),
         }
     }

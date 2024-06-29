@@ -233,6 +233,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "37b2a672a2cb129a2e41c10b1224bb368f9f37a2b16b612598138befd7b37eb5"
 
 [[package]]
+name = "castaway"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8a17ed5635fc8536268e5d4de1e22e81ac34419e5f052d4d51f4e01dcc263fcc"
+dependencies = [
+ "rustversion",
+]
+
+[[package]]
 name = "cc"
 version = "1.0.95"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -434,6 +443,20 @@ checksum = "cbf2150cce219b664a8a70df7a1f933836724b503f8a413af9365b4dcc4d90b8"
 dependencies = [
  "lazy_static",
  "windows-sys 0.48.0",
+]
+
+[[package]]
+name = "compact_str"
+version = "0.7.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f86b9c4c00838774a6d902ef931eff7470720c51d90c2e32cfe15dc304737b3f"
+dependencies = [
+ "castaway",
+ "cfg-if",
+ "itoa",
+ "ryu",
+ "serde",
+ "static_assertions",
 ]
 
 [[package]]
@@ -2258,6 +2281,7 @@ version = "0.0.0"
 dependencies = [
  "aho-corasick",
  "bitflags 2.6.0",
+ "compact_str",
  "is-macro",
  "itertools 0.13.0",
  "once_cell",
@@ -2269,7 +2293,6 @@ dependencies = [
  "rustc-hash 2.0.0",
  "schemars",
  "serde",
- "smol_str",
 ]
 
 [[package]]
@@ -2355,6 +2378,7 @@ dependencies = [
  "anyhow",
  "bitflags 2.6.0",
  "bstr",
+ "compact_str",
  "insta",
  "memchr",
  "ruff_python_ast",

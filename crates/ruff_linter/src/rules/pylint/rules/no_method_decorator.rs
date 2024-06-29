@@ -153,7 +153,7 @@ fn get_undecorated_methods(checker: &mut Checker, class_stmt: &Stmt, method_type
             ..
         }) = stmt
         {
-            let Some(decorator_call_statement) = explicit_decorator_calls.get(&name.id) else {
+            let Some(decorator_call_statement) = explicit_decorator_calls.get(name.id()) else {
                 continue;
             };
 
