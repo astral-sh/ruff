@@ -102,7 +102,7 @@ Module(
                         Name(
                             ExprName {
                                 range: 78..79,
-                                id: "x",
+                                id: Name("x"),
                                 ctx: Store,
                             },
                         ),

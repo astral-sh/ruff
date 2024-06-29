@@ -1900,7 +1900,6 @@ dependencies = [
  "rustc-hash 2.0.0",
  "salsa",
  "smallvec",
- "smol_str",
  "tracing",
 ]
 
@@ -2262,11 +2261,15 @@ dependencies = [
  "is-macro",
  "itertools 0.13.0",
  "once_cell",
+ "ruff_cache",
+ "ruff_macros",
  "ruff_python_trivia",
  "ruff_source_file",
  "ruff_text_size",
  "rustc-hash 2.0.0",
+ "schemars",
  "serde",
+ "smol_str",
 ]
 
 [[package]]

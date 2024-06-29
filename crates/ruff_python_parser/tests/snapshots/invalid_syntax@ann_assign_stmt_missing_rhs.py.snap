@@ -15,14 +15,14 @@ Module(
                     target: Name(
                         ExprName {
                             range: 0..1,
-                            id: "x",
+                            id: Name("x"),
                             ctx: Store,
                         },
                     ),
                     annotation: Name(
                         ExprName {
                             range: 3..6,
-                            id: "int",
+                            id: Name("int"),
                             ctx: Load,
                         },
                     ),

@@ -1,5 +1,3 @@
-pub mod all;
-
 use std::path::Path;
 
 use bitflags::bitflags;
@@ -26,6 +24,8 @@ use crate::reference::{
 };
 use crate::scope::{Scope, ScopeId, ScopeKind, Scopes};
 use crate::Imported;
+
+pub mod all;
 
 /// A semantic model for a Python module, to enable querying the module's semantic information.
 pub struct SemanticModel<'a> {
@@ -936,7 +936,7 @@ impl<'a> SemanticModel<'a> {
                                             .all(|scope| !scope.has(name))
                                         {
                                             return Some(ImportedName {
-                                                name: (*name).to_string(),
+                                                name: name.to_string(),
                                                 source,
                                                 range: self.nodes[source].range(),
                                                 context: binding.context,

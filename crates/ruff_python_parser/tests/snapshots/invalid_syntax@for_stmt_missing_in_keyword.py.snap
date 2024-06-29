@@ -16,14 +16,14 @@ Module(
                     target: Name(
                         ExprName {
                             range: 4..5,
-                            id: "a",
+                            id: Name("a"),
                             ctx: Store,
                         },
                     ),
                     iter: Name(
                         ExprName {
                             range: 6..7,
-                            id: "b",
+                            id: Name("b"),
                             ctx: Load,
                         },
                     ),
@@ -49,14 +49,14 @@ Module(
                     target: Name(
                         ExprName {
                             range: 17..18,
-                            id: "a",
+                            id: Name("a"),
                             ctx: Store,
                         },
                     ),
                     iter: Name(
                         ExprName {
                             range: 18..18,
-                            id: "",
+                            id: Name(""),
                             ctx: Invalid,
                         },
                     ),

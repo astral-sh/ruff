@@ -6,17 +6,17 @@
 use std::error::Error;
 
 use anyhow::Result;
-use libcst_native::{ImportAlias, Name, NameOrAttribute};
-use ruff_python_ast::{self as ast, ModModule, Stmt};
-use ruff_python_parser::{Parsed, Tokens};
-use ruff_text_size::{Ranged, TextSize};
+use libcst_native::{ImportAlias, Name as cstName, NameOrAttribute};
 
 use ruff_diagnostics::Edit;
 use ruff_python_ast::imports::{AnyImport, Import, ImportFrom};
+use ruff_python_ast::{self as ast, ModModule, Stmt};
 use ruff_python_codegen::Stylist;
+use ruff_python_parser::{Parsed, Tokens};
 use ruff_python_semantic::{ImportedName, SemanticModel};
 use ruff_python_trivia::textwrap::indent;
 use ruff_source_file::Locator;
+use ruff_text_size::{Ranged, TextSize};
 
 use crate::cst::matchers::{match_aliases, match_import_from, match_statement};
 use crate::fix;
@@ -425,7 +425,7 @@ impl<'a> Importer<'a> {
         let import_from = match_import_from(&mut statement)?;
         let aliases = match_aliases(import_from)?;
         aliases.push(ImportAlias {
-            name: NameOrAttribute::N(Box::new(Name {
+            name: NameOrAttribute::N(Box::new(cstName {
                 value: member,
                 lpar: vec![],
                 rpar: vec![],

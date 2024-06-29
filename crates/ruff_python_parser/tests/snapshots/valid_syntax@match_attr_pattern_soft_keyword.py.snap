@@ -15,7 +15,7 @@ Module(
                     subject: Name(
                         ExprName {
                             range: 6..9,
-                            id: "foo",
+                            id: Name("foo"),
                             ctx: Load,
                         },
                     ),
@@ -31,12 +31,12 @@ Module(
                                             value: Name(
                                                 ExprName {
                                                     range: 20..25,
-                                                    id: "match",
+                                                    id: Name("match"),
                                                     ctx: Load,
                                                 },
                                             ),
                                             attr: Identifier {
-                                                id: "bar",
+                                                id: Name("bar"),
                                                 range: 26..29,
                                             },
                                             ctx: Load,
@@ -69,12 +69,12 @@ Module(
                                             value: Name(
                                                 ExprName {
                                                     range: 44..48,
-                                                    id: "case",
+                                                    id: Name("case"),
                                                     ctx: Load,
                                                 },
                                             ),
                                             attr: Identifier {
-                                                id: "bar",
+                                                id: Name("bar"),
                                                 range: 49..52,
                                             },
                                             ctx: Load,
@@ -107,12 +107,12 @@ Module(
                                             value: Name(
                                                 ExprName {
                                                     range: 67..71,
-                                                    id: "type",
+                                                    id: Name("type"),
                                                     ctx: Load,
                                                 },
                                             ),
                                             attr: Identifier {
-                                                id: "bar",
+                                                id: Name("bar"),
                                                 range: 72..75,
                                             },
                                             ctx: Load,
@@ -160,47 +160,47 @@ Module(
                                                                                     value: Name(
                                                                                         ExprName {
                                                                                             range: 90..95,
-                                                                                            id: "match",
+                                                                                            id: Name("match"),
                                                                                             ctx: Load,
                                                                                         },
                                                                                     ),
                                                                                     attr: Identifier {
-                                                                                        id: "case",
+                                                                                        id: Name("case"),
                                                                                         range: 96..100,
                                                                                     },
                                                                                     ctx: Load,
                                                                                 },
                                                                             ),
                                                                             attr: Identifier {
-                                                                                id: "type",
+                                                                                id: Name("type"),
                                                                                 range: 101..105,
                                                                             },
                                                                             ctx: Load,
                                                                         },
                                                                     ),
                                                                     attr: Identifier {
-                                                                        id: "bar",
+                                                                        id: Name("bar"),
                                                                         range: 106..109,
                                                                     },
                                                                     ctx: Load,
                                                                 },
                                                             ),
                                                             attr: Identifier {
-                                                                id: "type",
+                                                                id: Name("type"),
                                                                 range: 110..114,
                                                             },
                                                             ctx: Load,
                                                         },
                                                     ),
                                                     attr: Identifier {
-                                                        id: "case",
+                                                        id: Name("case"),
                                                         range: 115..119,
                                                     },
                                                     ctx: Load,
                                                 },
                                             ),
                                             attr: Identifier {
-                                                id: "match",
+                                                id: Name("match"),
                                                 range: 120..125,
                                             },
                                             ctx: Load,

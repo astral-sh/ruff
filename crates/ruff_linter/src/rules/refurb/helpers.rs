@@ -1,13 +1,14 @@
+use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_codegen::Generator;
 use ruff_python_semantic::{BindingId, ResolvedReference, SemanticModel};
 use ruff_text_size::{Ranged, TextRange};
 
 /// Format a code snippet to call `name.method()`.
-pub(super) fn generate_method_call(name: &str, method: &str, generator: Generator) -> String {
+pub(super) fn generate_method_call(name: Name, method: &str, generator: Generator) -> String {
     // Construct `name`.
     let var = ast::ExprName {
-        id: name.to_string(),
+        id: name,
         ctx: ast::ExprContext::Load,
         range: TextRange::default(),
     };
@@ -38,13 +39,13 @@ pub(super) fn generate_method_call(name: &str, method: &str, generator: Generato
 
 /// Format a code snippet comparing `name` to `None` (e.g., `name is None`).
 pub(super) fn generate_none_identity_comparison(
-    name: &str,
+    name: Name,
     negate: bool,
     generator: Generator,
 ) -> String {
     // Construct `name`.
     let var = ast::ExprName {
-        id: name.to_string(),
+        id: name,
         ctx: ast::ExprContext::Load,
         range: TextRange::default(),
     };
@@ -77,12 +78,12 @@ pub(super) enum OpenMode {
 }
 
 impl OpenMode {
-    pub(super) fn pathlib_method(self) -> String {
+    pub(super) fn pathlib_method(self) -> Name {
         match self {
-            OpenMode::ReadText => "read_text".to_string(),
-            OpenMode::ReadBytes => "read_bytes".to_string(),
-            OpenMode::WriteText => "write_text".to_string(),
-            OpenMode::WriteBytes => "write_bytes".to_string(),
+            OpenMode::ReadText => Name::new_static("read_text"),
+            OpenMode::ReadBytes => Name::new_static("read_bytes"),
+            OpenMode::WriteText => Name::new_static("write_text"),
+            OpenMode::WriteBytes => Name::new_static("write_bytes"),
         }
     }
 }

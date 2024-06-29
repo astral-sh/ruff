@@ -18,12 +18,12 @@ Module(
                             value: Name(
                                 ExprName {
                                     range: 87..92,
-                                    id: "first",
+                                    id: Name("first"),
                                     ctx: Load,
                                 },
                             ),
                             attr: Identifier {
-                                id: "",
+                                id: Name(""),
                                 range: 93..93,
                             },
                             ctx: Load,
@@ -37,7 +37,7 @@ Module(
                     value: Name(
                         ExprName {
                             range: 94..100,
-                            id: "second",
+                            id: Name("second"),
                             ctx: Load,
                         },
                     ),
@@ -52,12 +52,12 @@ Module(
                             value: Name(
                                 ExprName {
                                     range: 136..140,
-                                    id: "last",
+                                    id: Name("last"),
                                     ctx: Load,
                                 },
                             ),
                             attr: Identifier {
-                                id: "",
+                                id: Name(""),
                                 range: 141..141,
                             },
                             ctx: Load,

@@ -10,6 +10,7 @@ use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix, FixAvailab
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::{contains_effect, Truthiness};
+use ruff_python_ast::name::Name;
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_codegen::Generator;
 use ruff_python_semantic::SemanticModel;
@@ -425,7 +426,7 @@ pub(crate) fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
                 let isinstance_call = ast::ExprCall {
                     func: Box::new(
                         ast::ExprName {
-                            id: "isinstance".into(),
+                            id: Name::new_static("isinstance"),
                             ctx: ExprContext::Load,
                             range: TextRange::default(),
                         }
@@ -469,7 +470,7 @@ pub(crate) fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
     }
 }
 
-fn match_eq_target(expr: &Expr) -> Option<(&str, &Expr)> {
+fn match_eq_target(expr: &Expr) -> Option<(&Name, &Expr)> {
     let Expr::Compare(ast::ExprCompare {
         left,
         ops,
@@ -482,7 +483,7 @@ fn match_eq_target(expr: &Expr) -> Option<(&str, &Expr)> {
     if **ops != [CmpOp::Eq] {
         return None;
     }
-    let Expr::Name(ast::ExprName { id, .. }) = left.as_ref() else {
+    let Expr::Name(ast::ExprName { id, .. }) = &**left else {
         return None;
     };
     let [comparator] = &**comparators else {
@@ -507,7 +508,7 @@ pub(crate) fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
 
     // Given `a == "foo" or a == "bar"`, we generate `{"a": [(0, "foo"), (1,
     // "bar")]}`.
-    let mut id_to_comparators: BTreeMap<&str, Vec<(usize, &Expr)>> = BTreeMap::new();
+    let mut id_to_comparators: BTreeMap<&Name, Vec<(usize, &Expr)>> = BTreeMap::new();
     for (index, value) in values.iter().enumerate() {
         if let Some((id, comparator)) = match_eq_target(value) {
             id_to_comparators
@@ -548,7 +549,7 @@ pub(crate) fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
             parenthesized: true,
         };
         let node1 = ast::ExprName {
-            id: id.into(),
+            id: id.clone(),
             ctx: ExprContext::Load,
             range: TextRange::default(),
         };

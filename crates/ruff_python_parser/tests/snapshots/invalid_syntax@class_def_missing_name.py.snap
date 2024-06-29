@@ -14,7 +14,7 @@ Module(
                     range: 0..11,
                     decorator_list: [],
                     name: Identifier {
-                        id: "",
+                        id: Name(""),
                         range: 5..5,
                     },
                     type_params: None,
@@ -38,7 +38,7 @@ Module(
                     range: 12..25,
                     decorator_list: [],
                     name: Identifier {
-                        id: "",
+                        id: Name(""),
                         range: 17..17,
                     },
                     type_params: None,
@@ -68,7 +68,7 @@ Module(
                     range: 26..52,
                     decorator_list: [],
                     name: Identifier {
-                        id: "",
+                        id: Name(""),
                         range: 31..31,
                     },
                     type_params: None,
@@ -81,14 +81,14 @@ Module(
                                     range: 33..46,
                                     arg: Some(
                                         Identifier {
-                                            id: "metaclass",
+                                            id: Name("metaclass"),
                                             range: 33..42,
                                         },
                                     ),
                                     value: Name(
                                         ExprName {
                                             range: 43..46,
-                                            id: "ABC",
+                                            id: Name("ABC"),
                                             ctx: Load,
                                         },
                                     ),

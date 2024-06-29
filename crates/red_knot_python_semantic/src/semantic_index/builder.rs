@@ -5,9 +5,9 @@ use rustc_hash::FxHashMap;
 use ruff_db::parsed::ParsedModule;
 use ruff_index::IndexVec;
 use ruff_python_ast as ast;
+use ruff_python_ast::name::Name;
 use ruff_python_ast::visitor::{walk_expr, walk_stmt, Visitor};
 
-use crate::name::Name;
 use crate::node_key::NodeKey;
 use crate::semantic_index::ast_ids::{
     AstId, AstIdsBuilder, ScopeAssignmentId, ScopeClassId, ScopeFunctionId, ScopeImportFromId,
@@ -133,7 +133,6 @@ impl<'a> SemanticIndexBuilder<'a> {
     fn add_or_update_symbol_with_definition(
         &mut self,
         name: Name,
-
         definition: Definition,
     ) -> ScopedSymbolId {
         let symbol_table = self.current_symbol_table();
@@ -168,7 +167,7 @@ impl<'a> SemanticIndexBuilder<'a> {
                     ast::TypeParam::ParamSpec(ast::TypeParamParamSpec { name, .. }) => name,
                     ast::TypeParam::TypeVarTuple(ast::TypeParamTypeVarTuple { name, .. }) => name,
                 };
-                self.add_or_update_symbol(Name::new(name), SymbolFlags::IS_DEFINED);
+                self.add_or_update_symbol(name.id.clone(), SymbolFlags::IS_DEFINED);
             }
         }
 
@@ -233,7 +232,7 @@ impl Visitor<'_> for SemanticIndexBuilder<'_> {
                 for decorator in &function_def.decorator_list {
                     self.visit_decorator(decorator);
                 }
-                let name = Name::new(&function_def.name.id);
+                let name = &function_def.name.id;
                 let function_id = ScopeFunctionId(statement_id);
                 let definition = Definition::FunctionDef(function_id);
                 let scope = self.current_scope();
@@ -271,7 +270,7 @@ impl Visitor<'_> for SemanticIndexBuilder<'_> {
                     self.visit_decorator(decorator);
                 }
 
-                let name = Name::new(&class.name.id);
+                let name = &class.name.id;
                 let class_id = ScopeClassId(statement_id);
                 let definition = Definition::from(class_id);
                 let scope = self.current_scope();
@@ -306,16 +305,16 @@ impl Visitor<'_> for SemanticIndexBuilder<'_> {
             ast::Stmt::Import(ast::StmtImport { names, .. }) => {
                 for (i, alias) in names.iter().enumerate() {
                     let symbol_name = if let Some(asname) = &alias.asname {
-                        asname.id.as_str()
+                        asname.id.clone()
                     } else {
-                        alias.name.id.split('.').next().unwrap()
+                        Name::new(alias.name.id.split('.').next().unwrap())
                     };
 
                     let def = Definition::Import(ImportDefinition {
                         import_id: ScopeImportId(statement_id),
                         alias: u32::try_from(i).unwrap(),
                     });
-                    self.add_or_update_symbol_with_definition(Name::new(symbol_name), def);
+                    self.add_or_update_symbol_with_definition(symbol_name, def);
                 }
             }
             ast::Stmt::ImportFrom(ast::StmtImportFrom {
@@ -326,15 +325,15 @@ impl Visitor<'_> for SemanticIndexBuilder<'_> {
             }) => {
                 for (i, alias) in names.iter().enumerate() {
                     let symbol_name = if let Some(asname) = &alias.asname {
-                        asname.id.as_str()
+                        &asname.id
                     } else {
-                        alias.name.id.as_str()
+                        &alias.name.id
                     };
                     let def = Definition::ImportFrom(ImportFromDefinition {
                         import_id: ScopeImportFromId(statement_id),
                         name: u32::try_from(i).unwrap(),
                     });
-                    self.add_or_update_symbol_with_definition(Name::new(symbol_name), def);
+                    self.add_or_update_symbol_with_definition(symbol_name.clone(), def);
                 }
             }
             ast::Stmt::Assign(node) => {
@@ -375,10 +374,10 @@ impl Visitor<'_> for SemanticIndexBuilder<'_> {
                 };
                 match self.current_definition {
                     Some(definition) if flags.contains(SymbolFlags::IS_DEFINED) => {
-                        self.add_or_update_symbol_with_definition(Name::new(id), definition);
+                        self.add_or_update_symbol_with_definition(id.clone(), definition);
                     }
                     _ => {
-                        self.add_or_update_symbol(Name::new(id), flags);
+                        self.add_or_update_symbol(id.clone(), flags);
                     }
                 }
 

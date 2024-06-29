@@ -15,7 +15,7 @@ Module(
                     subject: Name(
                         ExprName {
                             range: 6..13,
-                            id: "subject",
+                            id: Name("subject"),
                             ctx: Load,
                         },
                     ),
@@ -31,7 +31,7 @@ Module(
                                             left: Name(
                                                 ExprName {
                                                     range: 146..152,
-                                                    id: "",
+                                                    id: Name(""),
                                                     ctx: Invalid,
                                                 },
                                             ),
