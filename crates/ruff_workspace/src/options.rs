@@ -28,6 +28,7 @@ use ruff_linter::settings::types::{
 };
 use ruff_linter::{warn_user_once, RuleSelector};
 use ruff_macros::{CombineOptions, OptionsMetadata};
+use ruff_python_ast::name::Name;
 use ruff_python_formatter::{DocstringCodeLineWidth, QuoteStyle};
 
 use crate::options_base::{OptionsMetadata, Visit};
@@ -1223,7 +1224,7 @@ pub struct Flake8GetTextOptions {
         value_type = "list[str]",
         example = r#"function-names = ["_", "gettext", "ngettext", "ugettetxt"]"#
     )]
-    pub function_names: Option<Vec<String>>,
+    pub function_names: Option<Vec<Name>>,
 
     /// Additional function names to consider as internationalization calls, in addition to those
     /// included in `function-names`.
@@ -1232,7 +1233,7 @@ pub struct Flake8GetTextOptions {
         value_type = "list[str]",
         example = r#"extend-function-names = ["ugettetxt"]"#
     )]
-    pub extend_function_names: Option<Vec<String>>,
+    pub extend_function_names: Option<Vec<Name>>,
 }
 
 impl Flake8GetTextOptions {
@@ -1585,7 +1586,7 @@ pub struct Flake8SelfOptions {
             ignore-names = ["_new"]
         "#
     )]
-    pub ignore_names: Option<Vec<String>>,
+    pub ignore_names: Option<Vec<Name>>,
 
     /// Additional names to ignore when considering `flake8-self` violations,
     /// in addition to those included in `ignore-names`.
@@ -1594,7 +1595,7 @@ pub struct Flake8SelfOptions {
         value_type = "list[str]",
         example = r#"extend-ignore-names = ["_base_manager", "_default_manager",  "_meta"]"#
     )]
-    pub extend_ignore_names: Option<Vec<String>>,
+    pub extend_ignore_names: Option<Vec<Name>>,
 }
 
 impl Flake8SelfOptions {
@@ -3235,9 +3236,9 @@ pub struct FormatOptions {
 
 #[cfg(test)]
 mod tests {
-    use ruff_linter::rules::flake8_self;
-
     use crate::options::Flake8SelfOptions;
+    use ruff_linter::rules::flake8_self;
+    use ruff_python_ast::name::Name;
 
     #[test]
     fn flake8_self_options() {
@@ -3253,16 +3254,16 @@ mod tests {
 
         // Uses ignore_names if specified.
         let options = Flake8SelfOptions {
-            ignore_names: Some(vec!["_foo".to_string()]),
+            ignore_names: Some(vec![Name::new_static("_foo")]),
             extend_ignore_names: None,
         };
         let settings = options.into_settings();
-        assert_eq!(settings.ignore_names, vec!["_foo".to_string()]);
+        assert_eq!(settings.ignore_names, vec![Name::new_static("_foo")]);
 
         // Appends extend_ignore_names to defaults if only extend_ignore_names is specified.
         let options = Flake8SelfOptions {
             ignore_names: None,
-            extend_ignore_names: Some(vec!["_bar".to_string()]),
+            extend_ignore_names: Some(vec![Name::new_static("_bar")]),
         };
         let settings = options.into_settings();
         assert_eq!(
@@ -3270,19 +3271,19 @@ mod tests {
             default_settings
                 .ignore_names
                 .into_iter()
-                .chain(["_bar".to_string()])
-                .collect::<Vec<String>>()
+                .chain([Name::new_static("_bar")])
+                .collect::<Vec<_>>()
         );
 
         // Appends extend_ignore_names to ignore_names if both are specified.
         let options = Flake8SelfOptions {
-            ignore_names: Some(vec!["_foo".to_string()]),
-            extend_ignore_names: Some(vec!["_bar".to_string()]),
+            ignore_names: Some(vec![Name::new_static("_foo")]),
+            extend_ignore_names: Some(vec![Name::new_static("_bar")]),
         };
         let settings = options.into_settings();
         assert_eq!(
             settings.ignore_names,
-            vec!["_foo".to_string(), "_bar".to_string()]
+            vec![Name::new_static("_foo"), Name::new_static("_bar")]
         );
     }
 }

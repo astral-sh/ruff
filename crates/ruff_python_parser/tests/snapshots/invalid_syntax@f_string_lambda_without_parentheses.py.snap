@@ -37,7 +37,9 @@ Module(
                                                                                 parameter: Parameter {
                                                                                     range: 10..11,
                                                                                     name: Identifier {
-                                                                                        id: "x",
+                                                                                        id: Name(
+                                                                                            "x",
+                                                                                        ),
                                                                                         range: 10..11,
                                                                                     },
                                                                                     annotation: None,
@@ -53,7 +55,9 @@ Module(
                                                                 body: Name(
                                                                     ExprName {
                                                                         range: 12..12,
-                                                                        id: "",
+                                                                        id: Name(
+                                                                            "",
+                                                                        ),
                                                                         ctx: Invalid,
                                                                     },
                                                                 ),

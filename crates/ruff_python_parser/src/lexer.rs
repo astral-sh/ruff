@@ -12,6 +12,7 @@ use std::str::FromStr;
 use unicode_ident::{is_xid_continue, is_xid_start};
 use unicode_normalization::UnicodeNormalization;
 
+use ruff_python_ast::name::Name;
 use ruff_python_ast::{Int, IpyEscapeKind, StringFlags};
 use ruff_python_trivia::is_python_whitespace;
 use ruff_text_size::{TextLen, TextRange, TextSize};
@@ -643,7 +644,7 @@ impl<'src> Lexer<'src> {
         let text = self.token_text();
 
         if !is_ascii {
-            self.current_value = TokenValue::Name(text.nfkc().collect::<String>().into_boxed_str());
+            self.current_value = TokenValue::Name(text.nfkc().collect::<Name>());
             return TokenKind::Name;
         }
 
@@ -687,7 +688,7 @@ impl<'src> Lexer<'src> {
             "with" => TokenKind::With,
             "yield" => TokenKind::Yield,
             _ => {
-                self.current_value = TokenValue::Name(text.to_string().into_boxed_str());
+                self.current_value = TokenValue::Name(Name::new(text));
                 TokenKind::Name
             }
         }

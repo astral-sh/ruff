@@ -19,7 +19,9 @@ Module(
                                 Name(
                                     ExprName {
                                         range: 43..43,
-                                        id: "",
+                                        id: Name(
+                                            "",
+                                        ),
                                         ctx: Invalid,
                                     },
                                 ),

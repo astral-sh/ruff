@@ -9,6 +9,7 @@ use std::fmt;
 
 use bitflags::bitflags;
 
+use ruff_python_ast::name::Name;
 use ruff_python_ast::str::Quote;
 use ruff_python_ast::str_prefix::{
     AnyStringPrefix, ByteStringPrefix, FStringPrefix, StringLiteralPrefix,
@@ -780,7 +781,7 @@ pub(crate) enum TokenValue {
     ///
     /// Unicode names are NFKC-normalized by the lexer,
     /// matching [the behaviour of Python's lexer](https://docs.python.org/3/reference/lexical_analysis.html#identifiers)
-    Name(Box<str>),
+    Name(Name),
     /// Token value for an integer.
     Int(Int),
     /// Token value for a floating point number.

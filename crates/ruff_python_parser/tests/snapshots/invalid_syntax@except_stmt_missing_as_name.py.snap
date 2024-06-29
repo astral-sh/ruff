@@ -27,7 +27,9 @@ Module(
                                     Name(
                                         ExprName {
                                             range: 21..30,
-                                            id: "Exception",
+                                            id: Name(
+                                                "Exception",
+                                            ),
                                             ctx: Load,
                                         },
                                     ),
@@ -49,7 +51,9 @@ Module(
                                     Name(
                                         ExprName {
                                             range: 51..60,
-                                            id: "Exception",
+                                            id: Name(
+                                                "Exception",
+                                            ),
                                             ctx: Load,
                                         },
                                     ),

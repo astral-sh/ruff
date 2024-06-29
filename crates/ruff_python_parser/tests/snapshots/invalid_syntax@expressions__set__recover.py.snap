@@ -19,7 +19,9 @@ Module(
                                 Name(
                                     ExprName {
                                         range: 198..198,
-                                        id: "",
+                                        id: Name(
+                                            "",
+                                        ),
                                         ctx: Invalid,
                                     },
                                 ),
@@ -157,7 +159,9 @@ Module(
                                         left: Name(
                                             ExprName {
                                                 range: 304..305,
-                                                id: "x",
+                                                id: Name(
+                                                    "x",
+                                                ),
                                                 ctx: Load,
                                             },
                                         ),
@@ -165,7 +169,9 @@ Module(
                                         right: Name(
                                             ExprName {
                                                 range: 307..307,
-                                                id: "",
+                                                id: Name(
+                                                    "",
+                                                ),
                                                 ctx: Invalid,
                                             },
                                         ),
@@ -217,7 +223,9 @@ Module(
                                         value: Name(
                                             ExprName {
                                                 range: 321..321,
-                                                id: "",
+                                                id: Name(
+                                                    "",
+                                                ),
                                                 ctx: Invalid,
                                             },
                                         ),

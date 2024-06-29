@@ -16,7 +16,9 @@ Module(
                         Name(
                             ExprName {
                                 range: 0..1,
-                                id: "x",
+                                id: Name(
+                                    "x",
+                                ),
                                 ctx: Store,
                             },
                         ),
@@ -38,7 +40,9 @@ Module(
                         Name(
                             ExprName {
                                 range: 14..15,
-                                id: "x",
+                                id: Name(
+                                    "x",
+                                ),
                                 ctx: Store,
                             },
                         ),
@@ -60,7 +64,9 @@ Module(
                         Name(
                             ExprName {
                                 range: 25..26,
-                                id: "x",
+                                id: Name(
+                                    "x",
+                                ),
                                 ctx: Store,
                             },
                         ),
@@ -82,7 +88,9 @@ Module(
                         Name(
                             ExprName {
                                 range: 32..33,
-                                id: "x",
+                                id: Name(
+                                    "x",
+                                ),
                                 ctx: Store,
                             },
                         ),
@@ -104,7 +112,9 @@ Module(
                         Name(
                             ExprName {
                                 range: 39..40,
-                                id: "x",
+                                id: Name(
+                                    "x",
+                                ),
                                 ctx: Store,
                             },
                         ),
@@ -126,7 +136,9 @@ Module(
                         Name(
                             ExprName {
                                 range: 48..49,
-                                id: "x",
+                                id: Name(
+                                    "x",
+                                ),
                                 ctx: Store,
                             },
                         ),
@@ -148,7 +160,9 @@ Module(
                         Name(
                             ExprName {
                                 range: 57..58,
-                                id: "x",
+                                id: Name(
+                                    "x",
+                                ),
                                 ctx: Store,
                             },
                         ),
@@ -170,7 +184,9 @@ Module(
                         Name(
                             ExprName {
                                 range: 74..75,
-                                id: "x",
+                                id: Name(
+                                    "x",
+                                ),
                                 ctx: Store,
                             },
                         ),
@@ -192,7 +208,9 @@ Module(
                         Name(
                             ExprName {
                                 range: 98..99,
-                                id: "x",
+                                id: Name(
+                                    "x",
+                                ),
                                 ctx: Store,
                             },
                         ),
@@ -214,7 +232,9 @@ Module(
                         Name(
                             ExprName {
                                 range: 132..133,
-                                id: "x",
+                                id: Name(
+                                    "x",
+                                ),
                                 ctx: Store,
                             },
                         ),
@@ -236,7 +256,9 @@ Module(
                         Name(
                             ExprName {
                                 range: 156..157,
-                                id: "x",
+                                id: Name(
+                                    "x",
+                                ),
                                 ctx: Store,
                             },
                         ),
@@ -259,7 +281,9 @@ Module(
                         Name(
                             ExprName {
                                 range: 171..172,
-                                id: "x",
+                                id: Name(
+                                    "x",
+                                ),
                                 ctx: Store,
                             },
                         ),
@@ -282,7 +306,9 @@ Module(
                         Name(
                             ExprName {
                                 range: 196..197,
-                                id: "x",
+                                id: Name(
+                                    "x",
+                                ),
                                 ctx: Store,
                             },
                         ),
@@ -304,7 +330,9 @@ Module(
                         Name(
                             ExprName {
                                 range: 208..209,
-                                id: "x",
+                                id: Name(
+                                    "x",
+                                ),
                                 ctx: Store,
                             },
                         ),
@@ -326,7 +354,9 @@ Module(
                         Name(
                             ExprName {
                                 range: 219..220,
-                                id: "x",
+                                id: Name(
+                                    "x",
+                                ),
                                 ctx: Store,
                             },
                         ),
@@ -348,7 +378,9 @@ Module(
                         Name(
                             ExprName {
                                 range: 229..230,
-                                id: "x",
+                                id: Name(
+                                    "x",
+                                ),
                                 ctx: Store,
                             },
                         ),
@@ -370,7 +402,9 @@ Module(
                         Name(
                             ExprName {
                                 range: 245..246,
-                                id: "x",
+                                id: Name(
+                                    "x",
+                                ),
                                 ctx: Store,
                             },
                         ),
@@ -392,7 +426,9 @@ Module(
                         Name(
                             ExprName {
                                 range: 255..256,
-                                id: "x",
+                                id: Name(
+                                    "x",
+                                ),
                                 ctx: Store,
                             },
                         ),
@@ -414,7 +450,9 @@ Module(
                         Name(
                             ExprName {
                                 range: 286..287,
-                                id: "x",
+                                id: Name(
+                                    "x",
+                                ),
                                 ctx: Store,
                             },
                         ),
@@ -431,7 +469,9 @@ Module(
                                 },
                             ),
                             attr: Identifier {
-                                id: "imag",
+                                id: Name(
+                                    "imag",
+                                ),
                                 range: 294..298,
                             },
                             ctx: Load,
@@ -446,7 +486,9 @@ Module(
                         Name(
                             ExprName {
                                 range: 299..300,
-                                id: "x",
+                                id: Name(
+                                    "x",
+                                ),
                                 ctx: Store,
                             },
                         ),
@@ -463,7 +505,9 @@ Module(
                                 },
                             ),
                             attr: Identifier {
-                                id: "imag",
+                                id: Name(
+                                    "imag",
+                                ),
                                 range: 308..312,
                             },
                             ctx: Load,
@@ -478,7 +522,9 @@ Module(
                         Name(
                             ExprName {
                                 range: 313..314,
-                                id: "x",
+                                id: Name(
+                                    "x",
+                                ),
                                 ctx: Store,
                             },
                         ),
@@ -495,7 +541,9 @@ Module(
                                 },
                             ),
                             attr: Identifier {
-                                id: "real",
+                                id: Name(
+                                    "real",
+                                ),
                                 range: 322..326,
                             },
                             ctx: Load,
@@ -510,7 +558,9 @@ Module(
                         Name(
                             ExprName {
                                 range: 327..328,
-                                id: "x",
+                                id: Name(
+                                    "x",
+                                ),
                                 ctx: Store,
                             },
                         ),
@@ -530,7 +580,9 @@ Module(
                                         },
                                     ),
                                     attr: Identifier {
-                                        id: "hex",
+                                        id: Name(
+                                            "hex",
+                                        ),
                                         range: 351..354,
                                     },
                                     ctx: Load,
@@ -552,7 +604,9 @@ Module(
                         Name(
                             ExprName {
                                 range: 357..358,
-                                id: "x",
+                                id: Name(
+                                    "x",
+                                ),
                                 ctx: Store,
                             },
                         ),
@@ -569,7 +623,9 @@ Module(
                                 },
                             ),
                             attr: Identifier {
-                                id: "real",
+                                id: Name(
+                                    "real",
+                                ),
                                 range: 392..396,
                             },
                             ctx: Load,
@@ -584,7 +640,9 @@ Module(
                         Name(
                             ExprName {
                                 range: 397..398,
-                                id: "x",
+                                id: Name(
+                                    "x",
+                                ),
                                 ctx: Store,
                             },
                         ),
@@ -604,7 +662,9 @@ Module(
                                         },
                                     ),
                                     attr: Identifier {
-                                        id: "conjugate",
+                                        id: Name(
+                                            "conjugate",
+                                        ),
                                         range: 422..431,
                                     },
                                     ctx: Load,
@@ -626,7 +686,9 @@ Module(
                         Name(
                             ExprName {
                                 range: 434..435,
-                                id: "x",
+                                id: Name(
+                                    "x",
+                                ),
                                 ctx: Store,
                             },
                         ),
@@ -644,7 +706,9 @@ Module(
                                 },
                             ),
                             attr: Identifier {
-                                id: "real",
+                                id: Name(
+                                    "real",
+                                ),
                                 range: 449..453,
                             },
                             ctx: Load,
@@ -659,7 +723,9 @@ Module(
                         Name(
                             ExprName {
                                 range: 454..455,
-                                id: "x",
+                                id: Name(
+                                    "x",
+                                ),
                                 ctx: Store,
                             },
                         ),
@@ -680,7 +746,9 @@ Module(
                                         },
                                     ),
                                     attr: Identifier {
-                                        id: "__add__",
+                                        id: Name(
+                                            "__add__",
+                                        ),
                                         range: 479..486,
                                     },
                                     ctx: Load,
@@ -704,7 +772,9 @@ Module(
                                                         },
                                                     ),
                                                     attr: Identifier {
-                                                        id: "bit_length",
+                                                        id: Name(
+                                                            "bit_length",
+                                                        ),
                                                         range: 494..504,
                                                     },
                                                     ctx: Load,
@@ -731,7 +801,9 @@ Module(
                         Name(
                             ExprName {
                                 range: 508..509,
-                                id: "x",
+                                id: Name(
+                                    "x",
+                                ),
                                 ctx: Store,
                             },
                         ),
@@ -751,7 +823,9 @@ Module(
                                         },
                                     ),
                                     attr: Identifier {
-                                        id: "conjugate",
+                                        id: Name(
+                                            "conjugate",
+                                        ),
                                         range: 520..529,
                                     },
                                     ctx: Load,
@@ -773,7 +847,9 @@ Module(
                         Name(
                             ExprName {
                                 range: 532..533,
-                                id: "x",
+                                id: Name(
+                                    "x",
+                                ),
                                 ctx: Store,
                             },
                         ),
@@ -793,7 +869,9 @@ Module(
                                         },
                                     ),
                                     attr: Identifier {
-                                        id: "conjugate",
+                                        id: Name(
+                                            "conjugate",
+                                        ),
                                         range: 544..553,
                                     },
                                     ctx: Load,
@@ -815,7 +893,9 @@ Module(
                         Name(
                             ExprName {
                                 range: 556..557,
-                                id: "x",
+                                id: Name(
+                                    "x",
+                                ),
                                 ctx: Store,
                             },
                         ),
@@ -832,7 +912,9 @@ Module(
                                 },
                             ),
                             attr: Identifier {
-                                id: "real",
+                                id: Name(
+                                    "real",
+                                ),
                                 range: 567..571,
                             },
                             ctx: Load,
@@ -847,7 +929,9 @@ Module(
                         Name(
                             ExprName {
                                 range: 572..573,
-                                id: "x",
+                                id: Name(
+                                    "x",
+                                ),
                                 ctx: Store,
                             },
                         ),
@@ -867,7 +951,9 @@ Module(
                                         },
                                     ),
                                     attr: Identifier {
-                                        id: "hex",
+                                        id: Name(
+                                            "hex",
+                                        ),
                                         range: 590..593,
                                     },
                                     ctx: Load,
@@ -889,7 +975,9 @@ Module(
                         Name(
                             ExprName {
                                 range: 596..597,
-                                id: "x",
+                                id: Name(
+                                    "x",
+                                ),
                                 ctx: Store,
                             },
                         ),
@@ -926,7 +1014,9 @@ Module(
                                 },
                             ),
                             attr: Identifier {
-                                id: "real",
+                                id: Name(
+                                    "real",
+                                ),
                                 range: 619..623,
                             },
                             ctx: Load,
@@ -954,7 +1044,9 @@ Module(
                         Name(
                             ExprName {
                                 range: 677..678,
-                                id: "y",
+                                id: Name(
+                                    "y",
+                                ),
                                 ctx: Store,
                             },
                         ),
@@ -973,7 +1065,9 @@ Module(
                             slice: Name(
                                 ExprName {
                                     range: 685..687,
-                                    id: "no",
+                                    id: Name(
+                                        "no",
+                                    ),
                                     ctx: Load,
                                 },
                             ),
@@ -989,7 +1083,9 @@ Module(
                         Name(
                             ExprName {
                                 range: 689..690,
-                                id: "y",
+                                id: Name(
+                                    "y",
+                                ),
                                 ctx: Store,
                             },
                         ),
@@ -1011,7 +1107,9 @@ Module(
                                     Name(
                                         ExprName {
                                             range: 697..699,
-                                            id: "no",
+                                            id: Name(
+                                                "no",
+                                            ),
                                             ctx: Load,
                                         },
                                     ),

@@ -95,7 +95,9 @@ Module(
                                                             expression: Name(
                                                                 ExprName {
                                                                     range: 38..39,
-                                                                    id: "x",
+                                                                    id: Name(
+                                                                        "x",
+                                                                    ),
                                                                     ctx: Load,
                                                                 },
                                                             ),

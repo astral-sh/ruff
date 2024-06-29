@@ -93,12 +93,7 @@ pub(crate) fn private_member_access(checker: &mut Checker, expr: &Expr) {
         return;
     }
 
-    if checker
-        .settings
-        .flake8_self
-        .ignore_names
-        .contains(attr.as_ref())
-    {
+    if checker.settings.flake8_self.ignore_names.contains(&attr.id) {
         return;
     }
 

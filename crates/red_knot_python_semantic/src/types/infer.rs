@@ -9,7 +9,6 @@ use ruff_index::IndexVec;
 use ruff_python_ast as ast;
 use ruff_python_ast::{ExprContext, TypeParams};
 
-use crate::name::Name;
 use crate::semantic_index::ast_ids::{ScopeAstIdNode, ScopeExpressionId};
 use crate::semantic_index::definition::{Definition, ImportDefinition, ImportFromDefinition};
 use crate::semantic_index::symbol::{FileScopeId, ScopeId, ScopeKind, ScopedSymbolId, SymbolTable};
@@ -199,7 +198,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
 
         let function_ty = self.function_ty(FunctionType {
-            name: Name::new(&name.id),
+            name: name.id.clone(),
             decorators: decorator_tys,
         });
 
@@ -248,7 +247,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         assert_eq!(class_body_scope.kind(), ScopeKind::Class);
 
         let class_ty = self.class_ty(ClassType {
-            name: Name::new(name),
+            name: name.id.clone(),
             bases,
             body_scope: class_body_scope_id.to_scope_id(self.db, self.file_id),
         });
@@ -398,7 +397,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             } = alias;
 
             let ty = module_ty
-                .member(&self.typing_context(), &Name::new(&name.id))
+                .member(&self.typing_context(), &name.id)
                 .unwrap_or(Type::Unknown);
 
             self.definition_tys.insert(
@@ -557,7 +556,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         let value_ty = self.infer_expression(value);
         let member_ty = value_ty
-            .member(&self.typing_context(), &Name::new(&attr.id))
+            .member(&self.typing_context(), &attr.id)
             .unwrap_or(Type::Unknown);
 
         match ctx {
@@ -695,9 +694,9 @@ mod tests {
     use ruff_db::vfs::system_path_to_file;
 
     use crate::db::tests::TestDb;
-    use crate::name::Name;
     use crate::types::{public_symbol_ty_by_name, Type, TypingContext};
     use red_knot_module_resolver::{set_module_resolution_settings, ModuleResolutionSettings};
+    use ruff_python_ast::name::Name;
 
     fn setup_db() -> TestDb {
         let mut db = TestDb::new();
@@ -791,7 +790,7 @@ class C:
         };
 
         let context = TypingContext::global(&db);
-        let member_ty = class_id.class_member(&context, &Name::new("f"));
+        let member_ty = class_id.class_member(&context, &Name::new_static("f"));
 
         let Some(Type::Function(func_id)) = member_ty else {
             panic!("C.f is not a Function");
