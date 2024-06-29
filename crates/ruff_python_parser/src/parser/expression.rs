@@ -478,7 +478,7 @@ impl<'src> Parser<'src> {
                 unreachable!();
             };
             return ast::Identifier {
-                id: name.to_string(),
+                id: name.into_string(),
                 range,
             };
         }
