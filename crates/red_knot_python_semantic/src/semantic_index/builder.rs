@@ -29,7 +29,7 @@ pub(super) struct SemanticIndexBuilder<'a> {
     // Semantic Index fields
     scopes: IndexVec<FileScopeId, Scope>,
     symbol_tables: IndexVec<FileScopeId, SymbolTableBuilder>,
-    ast_ids: IndexVec<FileScopeId, AstIdsBuilder>,
+    ast_ids: IndexVec<FileScopeId, AstIdsBuilder<'a>>,
     expression_scopes: FxHashMap<NodeKey, FileScopeId>,
     scope_nodes: IndexVec<FileScopeId, NodeWithScopeId>,
 }
@@ -119,7 +119,7 @@ impl<'a> SemanticIndexBuilder<'a> {
         &mut self.symbol_tables[scope_id]
     }
 
-    fn current_ast_ids(&mut self) -> &mut AstIdsBuilder {
+    fn current_ast_ids(&mut self) -> &mut AstIdsBuilder<'a> {
         let scope_id = self.current_scope();
         &mut self.ast_ids[scope_id]
     }
@@ -181,7 +181,7 @@ impl<'a> SemanticIndexBuilder<'a> {
         nested_scope
     }
 
-    pub(super) fn build(mut self) -> SemanticIndex {
+    pub(super) fn build(mut self) -> SemanticIndex<'a> {
         let module = self.module;
         self.visit_body(module.suite());
 
@@ -219,15 +219,9 @@ impl<'a> SemanticIndexBuilder<'a> {
     }
 }
 
-impl Visitor<'_> for SemanticIndexBuilder<'_> {
-    fn visit_stmt(&mut self, stmt: &ast::Stmt) {
-        let module = self.module;
-        #[allow(unsafe_code)]
-        let statement_id = unsafe {
-            // SAFETY: The builder only visits nodes that are part of `module`. This guarantees that
-            // the current statement must be a child of `module`.
-            self.current_ast_ids().record_statement(stmt, module)
-        };
+impl<'a> Visitor<'a> for SemanticIndexBuilder<'a> {
+    fn visit_stmt(&mut self, stmt: &'a ast::Stmt) {
+        let statement_id = self.current_ast_ids().record_statement(stmt);
         match stmt {
             ast::Stmt::FunctionDef(function_def) => {
                 for decorator in &function_def.decorator_list {
@@ -353,14 +347,8 @@ impl Visitor<'_> for SemanticIndexBuilder<'_> {
         }
     }
 
-    fn visit_expr(&mut self, expr: &'_ ast::Expr) {
-        let module = self.module;
-        #[allow(unsafe_code)]
-        let expression_id = unsafe {
-            // SAFETY: The builder only visits nodes that are part of `module`. This guarantees that
-            // the current expression must be a child of `module`.
-            self.current_ast_ids().record_expression(expr, module)
-        };
+    fn visit_expr(&mut self, expr: &'a ast::Expr) {
+        let expression_id = self.current_ast_ids().record_expression(expr);
 
         self.expression_scopes
             .insert(NodeKey::from_node(expr), self.current_scope());

@@ -1,12 +1,10 @@
 use rustc_hash::FxHashMap;
 
-use ruff_db::parsed::ParsedModule;
 use ruff_db::vfs::VfsFile;
 use ruff_index::{newtype_index, IndexVec};
 use ruff_python_ast as ast;
 use ruff_python_ast::AnyNodeRef;
 
-use crate::ast_node_ref::AstNodeRef;
 use crate::node_key::NodeKey;
 use crate::semantic_index::semantic_index;
 use crate::semantic_index::symbol::{FileScopeId, ScopeId};
@@ -27,19 +25,19 @@ use crate::Db;
 ///
 /// x = foo()
 /// ```
-pub(crate) struct AstIds {
+pub(crate) struct AstIds<'db> {
     /// Maps expression ids to their expressions.
-    expressions: IndexVec<ScopeExpressionId, AstNodeRef<ast::Expr>>,
+    expressions: IndexVec<ScopeExpressionId, &'db ast::Expr>,
 
     /// Maps expressions to their expression id. Uses `NodeKey` because it avoids cloning [`Parsed`].
     expressions_map: FxHashMap<NodeKey, ScopeExpressionId>,
 
-    statements: IndexVec<ScopeStatementId, AstNodeRef<ast::Stmt>>,
+    statements: IndexVec<ScopeStatementId, &'db ast::Stmt>,
 
     statements_map: FxHashMap<NodeKey, ScopeStatementId>,
 }
 
-impl AstIds {
+impl AstIds<'_> {
     fn statement_id<'a, N>(&self, node: N) -> ScopeStatementId
     where
         N: Into<AnyNodeRef<'a>>,
@@ -56,7 +54,7 @@ impl AstIds {
 }
 
 #[allow(clippy::missing_fields_in_debug)]
-impl std::fmt::Debug for AstIds {
+impl std::fmt::Debug for AstIds<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("AstIds")
             .field("expressions", &self.expressions)
@@ -65,7 +63,7 @@ impl std::fmt::Debug for AstIds {
     }
 }
 
-fn ast_ids<'db>(db: &'db dyn Db, scope: ScopeId) -> &'db AstIds {
+fn ast_ids<'db>(db: &'db dyn Db, scope: ScopeId) -> &'db AstIds<'db> {
     semantic_index(db, scope.file(db)).ast_ids(scope.file_scope_id(db))
 }
 
@@ -166,7 +164,7 @@ impl ScopeAstIdNode for ast::Expr {
     fn lookup_in_scope(db: &dyn Db, file: VfsFile, file_scope: FileScopeId, id: Self::Id) -> &Self {
         let scope = file_scope.to_scope_id(db, file);
         let ast_ids = ast_ids(db, scope);
-        ast_ids.expressions[id].node()
+        ast_ids.expressions[id]
     }
 }
 
@@ -187,7 +185,7 @@ impl ScopeAstIdNode for ast::Stmt {
         let scope = file_scope.to_scope_id(db, file);
         let ast_ids = ast_ids(db, scope);
 
-        ast_ids.statements[id].node()
+        ast_ids.statements[id]
     }
 }
 
@@ -322,14 +320,14 @@ impl ScopeAstIdNode for ast::ExprNamed {
 }
 
 #[derive(Debug)]
-pub(super) struct AstIdsBuilder {
-    expressions: IndexVec<ScopeExpressionId, AstNodeRef<ast::Expr>>,
+pub(super) struct AstIdsBuilder<'db> {
+    expressions: IndexVec<ScopeExpressionId, &'db ast::Expr>,
     expressions_map: FxHashMap<NodeKey, ScopeExpressionId>,
-    statements: IndexVec<ScopeStatementId, AstNodeRef<ast::Stmt>>,
+    statements: IndexVec<ScopeStatementId, &'db ast::Stmt>,
     statements_map: FxHashMap<NodeKey, ScopeStatementId>,
 }
 
-impl AstIdsBuilder {
+impl<'db> AstIdsBuilder<'db> {
     pub(super) fn new() -> Self {
         Self {
             expressions: IndexVec::default(),
@@ -340,17 +338,8 @@ impl AstIdsBuilder {
     }
 
     /// Adds `stmt` to the AST ids map and returns its id.
-    ///
-    /// ## Safety
-    /// The function is marked as unsafe because it calls [`AstNodeRef::new`] which requires
-    /// that `stmt` is a child of `parsed`.
-    #[allow(unsafe_code)]
-    pub(super) unsafe fn record_statement(
-        &mut self,
-        stmt: &ast::Stmt,
-        parsed: &ParsedModule,
-    ) -> ScopeStatementId {
-        let statement_id = self.statements.push(AstNodeRef::new(parsed.clone(), stmt));
+    pub(super) fn record_statement(&mut self, stmt: &'db ast::Stmt) -> ScopeStatementId {
+        let statement_id = self.statements.push(stmt);
 
         self.statements_map
             .insert(NodeKey::from_node(stmt), statement_id);
@@ -359,17 +348,8 @@ impl AstIdsBuilder {
     }
 
     /// Adds `expr` to the AST ids map and returns its id.
-    ///
-    /// ## Safety
-    /// The function is marked as unsafe because it calls [`AstNodeRef::new`] which requires
-    /// that `expr` is a child of `parsed`.
-    #[allow(unsafe_code)]
-    pub(super) unsafe fn record_expression(
-        &mut self,
-        expr: &ast::Expr,
-        parsed: &ParsedModule,
-    ) -> ScopeExpressionId {
-        let expression_id = self.expressions.push(AstNodeRef::new(parsed.clone(), expr));
+    pub(super) fn record_expression(&mut self, expr: &'db ast::Expr) -> ScopeExpressionId {
+        let expression_id = self.expressions.push(expr);
 
         self.expressions_map
             .insert(NodeKey::from_node(expr), expression_id);
@@ -377,7 +357,7 @@ impl AstIdsBuilder {
         expression_id
     }
 
-    pub(super) fn finish(mut self) -> AstIds {
+    pub(super) fn finish(mut self) -> AstIds<'db> {
         self.expressions.shrink_to_fit();
         self.expressions_map.shrink_to_fit();
         self.statements.shrink_to_fit();

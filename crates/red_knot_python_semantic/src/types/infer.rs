@@ -89,7 +89,7 @@ pub(super) struct TypeInferenceBuilder<'a> {
     db: &'a dyn Db,
 
     // Cached lookups
-    index: &'a SemanticIndex,
+    index: &'a SemanticIndex<'a>,
     scope: ScopeId<'a>,
     file_scope_id: FileScopeId,
     file_id: VfsFile,

@@ -28,7 +28,7 @@ type SymbolMap = hashbrown::HashMap<ScopedSymbolId, (), ()>;
 ///
 /// Prefer using [`symbol_table`] when working with symbols from a single scope.
 #[salsa::tracked(return_ref, no_eq)]
-pub(crate) fn semantic_index(db: &dyn Db, file: VfsFile) -> SemanticIndex {
+pub(crate) fn semantic_index(db: &dyn Db, file: VfsFile) -> SemanticIndex<'_> {
     let _ = tracing::trace_span!("semantic_index", file = ?file.debug(db.upcast())).enter();
 
     let parsed = parsed_module(db.upcast(), file);
@@ -72,7 +72,7 @@ pub fn public_symbol<'db>(
 
 /// The symbol tables for an entire file.
 #[derive(Debug)]
-pub struct SemanticIndex {
+pub struct SemanticIndex<'db> {
     /// List of all symbol tables in this file, indexed by scope.
     symbol_tables: IndexVec<FileScopeId, Arc<SymbolTable>>,
 
@@ -88,13 +88,13 @@ pub struct SemanticIndex {
     ///
     /// Note: We should not depend on this map when analysing other files or
     /// changing a file invalidates all dependents.
-    ast_ids: IndexVec<FileScopeId, AstIds>,
+    ast_ids: IndexVec<FileScopeId, AstIds<'db>>,
 
     /// Map from scope to the node that introduces the scope.
     scope_nodes: IndexVec<FileScopeId, NodeWithScopeId>,
 }
 
-impl SemanticIndex {
+impl<'db> SemanticIndex<'db> {
     /// Returns the symbol table for a specific scope.
     ///
     /// Use the Salsa cached [`symbol_table`] query if you only need the
