@@ -202,11 +202,11 @@ pub(crate) enum Parentheses {
 }
 
 /// Generic function to remove arguments or keyword arguments in function
-/// calls and class definitions. (For classes `args` should be considered
-/// `bases`)
+/// calls and class definitions. (For classes, `args` should be considered
+/// `bases`.)
 ///
 /// Supports the removal of parentheses when this is the only (kw)arg left.
-/// For this behavior, set `remove_parentheses` to `true`.
+/// For this behavior, set `parentheses` to `Parentheses::Remove`.
 pub(crate) fn remove_argument<T: Ranged>(
     argument: &T,
     arguments: &Arguments,
