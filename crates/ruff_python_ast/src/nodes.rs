@@ -12,6 +12,7 @@ use itertools::Itertools;
 
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
+use crate::name::Name;
 use crate::{
     int,
     str::Quote,
@@ -1762,12 +1763,6 @@ impl PartialEq<str> for StringLiteralValue {
     }
 }
 
-impl PartialEq<String> for StringLiteralValue {
-    fn eq(&self, other: &String) -> bool {
-        self == other.as_str()
-    }
-}
-
 impl fmt::Display for StringLiteralValue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(self.to_str())
@@ -2740,7 +2735,7 @@ impl From<ExprStarred> for Expr {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprName {
     pub range: TextRange,
-    pub id: String,
+    pub id: Name,
     pub ctx: ExprContext,
 }
 
@@ -3763,13 +3758,13 @@ impl IpyEscapeKind {
 /// ```
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Identifier {
-    pub id: String,
+    pub id: Name,
     pub range: TextRange,
 }
 
 impl Identifier {
     #[inline]
-    pub fn new(id: impl Into<String>, range: TextRange) -> Self {
+    pub fn new(id: impl Into<Name>, range: TextRange) -> Self {
         Self {
             id: id.into(),
             range,
@@ -3798,7 +3793,7 @@ impl PartialEq<str> for Identifier {
 impl PartialEq<String> for Identifier {
     #[inline]
     fn eq(&self, other: &String) -> bool {
-        &self.id == other
+        self.id == other
     }
 }
 
@@ -3817,22 +3812,15 @@ impl AsRef<str> for Identifier {
     }
 }
 
-impl AsRef<String> for Identifier {
-    #[inline]
-    fn as_ref(&self) -> &String {
-        &self.id
-    }
-}
-
 impl std::fmt::Display for Identifier {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         std::fmt::Display::fmt(&self.id, f)
     }
 }
 
-impl From<Identifier> for String {
+impl From<Identifier> for Name {
     #[inline]
-    fn from(identifier: Identifier) -> String {
+    fn from(identifier: Identifier) -> Name {
         identifier.id
     }
 }

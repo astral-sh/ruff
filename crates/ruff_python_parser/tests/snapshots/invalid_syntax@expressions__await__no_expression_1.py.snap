@@ -18,7 +18,9 @@ Module(
                             value: Name(
                                 ExprName {
                                     range: 64..64,
-                                    id: "",
+                                    id: Name(
+                                        "",
+                                    ),
                                     ctx: Invalid,
                                 },
                             ),
@@ -32,7 +34,9 @@ Module(
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
-                        id: "foo",
+                        id: Name(
+                            "foo",
+                        ),
                         range: 70..73,
                     },
                     type_params: None,

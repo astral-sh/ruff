@@ -15,7 +15,9 @@ Module(
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
-                        id: "",
+                        id: Name(
+                            "",
+                        ),
                         range: 3..3,
                     },
                     type_params: None,
@@ -48,7 +50,9 @@ Module(
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
-                        id: "",
+                        id: Name(
+                            "",
+                        ),
                         range: 15..15,
                     },
                     type_params: None,
@@ -64,7 +68,9 @@ Module(
                         Name(
                             ExprName {
                                 range: 22..25,
-                                id: "int",
+                                id: Name(
+                                    "int",
+                                ),
                                 ctx: Load,
                             },
                         ),

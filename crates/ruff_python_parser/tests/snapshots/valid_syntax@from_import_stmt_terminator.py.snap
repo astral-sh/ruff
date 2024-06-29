@@ -14,7 +14,9 @@ Module(
                     range: 0..20,
                     module: Some(
                         Identifier {
-                            id: "a",
+                            id: Name(
+                                "a",
+                            ),
                             range: 5..6,
                         },
                     ),
@@ -22,7 +24,9 @@ Module(
                         Alias {
                             range: 15..16,
                             name: Identifier {
-                                id: "b",
+                                id: Name(
+                                    "b",
+                                ),
                                 range: 15..16,
                             },
                             asname: None,
@@ -30,7 +34,9 @@ Module(
                         Alias {
                             range: 18..19,
                             name: Identifier {
-                                id: "c",
+                                id: Name(
+                                    "c",
+                                ),
                                 range: 18..19,
                             },
                             asname: None,
@@ -44,7 +50,9 @@ Module(
                     range: 21..41,
                     module: Some(
                         Identifier {
-                            id: "a",
+                            id: Name(
+                                "a",
+                            ),
                             range: 26..27,
                         },
                     ),
@@ -52,7 +60,9 @@ Module(
                         Alias {
                             range: 36..37,
                             name: Identifier {
-                                id: "b",
+                                id: Name(
+                                    "b",
+                                ),
                                 range: 36..37,
                             },
                             asname: None,
@@ -60,7 +70,9 @@ Module(
                         Alias {
                             range: 39..40,
                             name: Identifier {
-                                id: "c",
+                                id: Name(
+                                    "c",
+                                ),
                                 range: 39..40,
                             },
                             asname: None,
@@ -79,14 +91,18 @@ Module(
                                 Name(
                                     ExprName {
                                         range: 43..44,
-                                        id: "x",
+                                        id: Name(
+                                            "x",
+                                        ),
                                         ctx: Load,
                                     },
                                 ),
                                 Name(
                                     ExprName {
                                         range: 46..47,
-                                        id: "y",
+                                        id: Name(
+                                            "y",
+                                        ),
                                         ctx: Load,
                                     },
                                 ),
@@ -102,7 +118,9 @@ Module(
                     range: 48..66,
                     module: Some(
                         Identifier {
-                            id: "a",
+                            id: Name(
+                                "a",
+                            ),
                             range: 53..54,
                         },
                     ),
@@ -110,7 +128,9 @@ Module(
                         Alias {
                             range: 62..63,
                             name: Identifier {
-                                id: "b",
+                                id: Name(
+                                    "b",
+                                ),
                                 range: 62..63,
                             },
                             asname: None,
@@ -118,7 +138,9 @@ Module(
                         Alias {
                             range: 65..66,
                             name: Identifier {
-                                id: "c",
+                                id: Name(
+                                    "c",
+                                ),
                                 range: 65..66,
                             },
                             asname: None,
@@ -137,14 +159,18 @@ Module(
                                 Name(
                                     ExprName {
                                         range: 68..69,
-                                        id: "x",
+                                        id: Name(
+                                            "x",
+                                        ),
                                         ctx: Load,
                                     },
                                 ),
                                 Name(
                                     ExprName {
                                         range: 71..72,
-                                        id: "y",
+                                        id: Name(
+                                            "y",
+                                        ),
                                         ctx: Load,
                                     },
                                 ),
@@ -160,7 +186,9 @@ Module(
                     range: 73..91,
                     module: Some(
                         Identifier {
-                            id: "a",
+                            id: Name(
+                                "a",
+                            ),
                             range: 78..79,
                         },
                     ),
@@ -168,7 +196,9 @@ Module(
                         Alias {
                             range: 87..88,
                             name: Identifier {
-                                id: "b",
+                                id: Name(
+                                    "b",
+                                ),
                                 range: 87..88,
                             },
                             asname: None,
@@ -176,7 +206,9 @@ Module(
                         Alias {
                             range: 90..91,
                             name: Identifier {
-                                id: "c",
+                                id: Name(
+                                    "c",
+                                ),
                                 range: 90..91,
                             },
                             asname: None,
@@ -195,14 +227,18 @@ Module(
                                 Name(
                                     ExprName {
                                         range: 92..93,
-                                        id: "x",
+                                        id: Name(
+                                            "x",
+                                        ),
                                         ctx: Load,
                                     },
                                 ),
                                 Name(
                                     ExprName {
                                         range: 95..96,
-                                        id: "y",
+                                        id: Name(
+                                            "y",
+                                        ),
                                         ctx: Load,
                                     },
                                 ),

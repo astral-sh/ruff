@@ -21,7 +21,9 @@ Module(
                                         Name(
                                             ExprName {
                                                 range: 1..2,
-                                                id: "x",
+                                                id: Name(
+                                                    "x",
+                                                ),
                                                 ctx: Load,
                                             },
                                         ),

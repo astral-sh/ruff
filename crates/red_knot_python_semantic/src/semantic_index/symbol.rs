@@ -7,13 +7,12 @@ use rustc_hash::FxHasher;
 use salsa::DebugWithDb;
 use smallvec::SmallVec;
 
-use ruff_db::vfs::VfsFile;
-use ruff_index::{newtype_index, IndexVec};
-
-use crate::name::Name;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::{root_scope, semantic_index, symbol_table, SymbolMap};
 use crate::Db;
+use ruff_db::vfs::VfsFile;
+use ruff_index::{newtype_index, IndexVec};
+use ruff_python_ast::name::Name;
 
 #[derive(Eq, PartialEq, Debug)]
 pub struct Symbol {

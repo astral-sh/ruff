@@ -18,7 +18,9 @@ expression: lex_source(source)
     ),
     (
         Name(
-            "x",
+            Name(
+                "x",
+            ),
         ),
         3..4,
     ),
@@ -28,7 +30,9 @@ expression: lex_source(source)
     ),
     (
         Name(
-            "s",
+            Name(
+                "s",
+            ),
         ),
         5..6,
     ),
@@ -51,7 +55,9 @@ expression: lex_source(source)
     ),
     (
         Name(
-            "x",
+            Name(
+                "x",
+            ),
         ),
         9..10,
     ),
@@ -65,7 +71,9 @@ expression: lex_source(source)
     ),
     (
         Name(
-            "r",
+            Name(
+                "r",
+            ),
         ),
         12..13,
     ),
@@ -88,7 +96,9 @@ expression: lex_source(source)
     ),
     (
         Name(
-            "x",
+            Name(
+                "x",
+            ),
         ),
         16..17,
     ),

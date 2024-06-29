@@ -18,7 +18,9 @@ Module(
                             func: Name(
                                 ExprName {
                                     range: 3..7,
-                                    id: "call",
+                                    id: Name(
+                                        "call",
+                                    ),
                                     ctx: Load,
                                 },
                             ),
@@ -28,7 +30,9 @@ Module(
                                     Name(
                                         ExprName {
                                             range: 8..11,
-                                            id: "foo",
+                                            id: Name(
+                                                "foo",
+                                            ),
                                             ctx: Load,
                                         },
                                     ),
@@ -39,14 +43,18 @@ Module(
                                                 Name(
                                                     ExprName {
                                                         range: 14..15,
-                                                        id: "a",
+                                                        id: Name(
+                                                            "a",
+                                                        ),
                                                         ctx: Load,
                                                     },
                                                 ),
                                                 Name(
                                                     ExprName {
                                                         range: 17..18,
-                                                        id: "b",
+                                                        id: Name(
+                                                            "b",
+                                                        ),
                                                         ctx: Load,
                                                     },
                                                 ),
@@ -66,7 +74,9 @@ Module(
                                 is_async: false,
                                 decorator_list: [],
                                 name: Identifier {
-                                    id: "bar",
+                                    id: Name(
+                                        "bar",
+                                    ),
                                     range: 27..30,
                                 },
                                 type_params: None,

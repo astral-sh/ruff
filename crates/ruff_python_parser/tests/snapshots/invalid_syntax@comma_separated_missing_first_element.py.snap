@@ -18,7 +18,9 @@ Module(
                             func: Name(
                                 ExprName {
                                     range: 0..4,
-                                    id: "call",
+                                    id: Name(
+                                        "call",
+                                    ),
                                     ctx: Load,
                                 },
                             ),

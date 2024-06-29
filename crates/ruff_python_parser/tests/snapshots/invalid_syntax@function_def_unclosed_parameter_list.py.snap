@@ -15,7 +15,9 @@ Module(
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
-                        id: "foo",
+                        id: Name(
+                            "foo",
+                        ),
                         range: 4..7,
                     },
                     type_params: None,
@@ -28,14 +30,18 @@ Module(
                                 parameter: Parameter {
                                     range: 8..14,
                                     name: Identifier {
-                                        id: "a",
+                                        id: Name(
+                                            "a",
+                                        ),
                                         range: 8..9,
                                     },
                                     annotation: Some(
                                         Name(
                                             ExprName {
                                                 range: 11..14,
-                                                id: "int",
+                                                id: Name(
+                                                    "int",
+                                                ),
                                                 ctx: Load,
                                             },
                                         ),
@@ -48,7 +54,9 @@ Module(
                                 parameter: Parameter {
                                     range: 16..18,
                                     name: Identifier {
-                                        id: "b",
+                                        id: Name(
+                                            "b",
+                                        ),
                                         range: 16..17,
                                     },
                                     annotation: None,
@@ -70,7 +78,9 @@ Module(
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
-                        id: "foo",
+                        id: Name(
+                            "foo",
+                        ),
                         range: 23..26,
                     },
                     type_params: None,
@@ -108,7 +118,9 @@ Module(
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
-                        id: "foo",
+                        id: Name(
+                            "foo",
+                        ),
                         range: 48..51,
                     },
                     type_params: None,
@@ -121,14 +133,18 @@ Module(
                                 parameter: Parameter {
                                     range: 52..58,
                                     name: Identifier {
-                                        id: "a",
+                                        id: Name(
+                                            "a",
+                                        ),
                                         range: 52..53,
                                     },
                                     annotation: Some(
                                         Name(
                                             ExprName {
                                                 range: 55..58,
-                                                id: "int",
+                                                id: Name(
+                                                    "int",
+                                                ),
                                                 ctx: Load,
                                             },
                                         ),
@@ -141,14 +157,18 @@ Module(
                                 parameter: Parameter {
                                     range: 60..66,
                                     name: Identifier {
-                                        id: "b",
+                                        id: Name(
+                                            "b",
+                                        ),
                                         range: 60..61,
                                     },
                                     annotation: Some(
                                         Name(
                                             ExprName {
                                                 range: 63..66,
-                                                id: "str",
+                                                id: Name(
+                                                    "str",
+                                                ),
                                                 ctx: Load,
                                             },
                                         ),
@@ -161,7 +181,9 @@ Module(
                                 parameter: Parameter {
                                     range: 67..68,
                                     name: Identifier {
-                                        id: "x",
+                                        id: Name(
+                                            "x",
+                                        ),
                                         range: 67..68,
                                     },
                                     annotation: None,

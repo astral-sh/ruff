@@ -1,8 +1,164 @@
+use crate::{nodes, Expr};
+use std::borrow::Borrow;
 use std::fmt::{Debug, Display, Formatter, Write};
 use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 
-use crate::{nodes, Expr};
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize, ruff_macros::CacheKey,)
+)]
+pub struct Name(smol_str::SmolStr);
+
+impl Name {
+    #[inline]
+    pub fn empty() -> Self {
+        Self(smol_str::SmolStr::new_inline(""))
+    }
+
+    #[inline]
+    pub fn new(name: impl AsRef<str>) -> Self {
+        Self(smol_str::SmolStr::new(name))
+    }
+
+    #[inline]
+    pub fn new_static(name: &'static str) -> Self {
+        Self(smol_str::SmolStr::new_static(name))
+    }
+
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+}
+
+impl AsRef<str> for Name {
+    #[inline]
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+impl Deref for Name {
+    type Target = str;
+
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        self.as_str()
+    }
+}
+
+impl Borrow<str> for Name {
+    #[inline]
+    fn borrow(&self) -> &str {
+        self.as_str()
+    }
+}
+
+impl<T> From<T> for Name
+where
+    T: Into<smol_str::SmolStr>,
+{
+    fn from(value: T) -> Self {
+        Self(value.into())
+    }
+}
+
+impl FromIterator<char> for Name {
+    fn from_iter<I: IntoIterator<Item = char>>(iter: I) -> Self {
+        Self(iter.into_iter().collect())
+    }
+}
+
+impl std::fmt::Display for Name {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+impl PartialEq<str> for Name {
+    #[inline]
+    fn eq(&self, other: &str) -> bool {
+        self.as_str() == other
+    }
+}
+
+impl PartialEq<Name> for str {
+    #[inline]
+    fn eq(&self, other: &Name) -> bool {
+        other == self
+    }
+}
+
+impl PartialEq<&str> for Name {
+    #[inline]
+    fn eq(&self, other: &&str) -> bool {
+        self.as_str() == *other
+    }
+}
+
+impl PartialEq<Name> for &str {
+    #[inline]
+    fn eq(&self, other: &Name) -> bool {
+        other == self
+    }
+}
+
+impl PartialEq<String> for Name {
+    fn eq(&self, other: &String) -> bool {
+        self == other.as_str()
+    }
+}
+
+impl PartialEq<Name> for String {
+    #[inline]
+    fn eq(&self, other: &Name) -> bool {
+        other == self
+    }
+}
+
+impl PartialEq<&String> for Name {
+    #[inline]
+    fn eq(&self, other: &&String) -> bool {
+        self.as_str() == *other
+    }
+}
+
+impl PartialEq<Name> for &String {
+    #[inline]
+    fn eq(&self, other: &Name) -> bool {
+        other == self
+    }
+}
+
+#[cfg(feature = "serde")]
+impl schemars::JsonSchema for Name {
+    fn is_referenceable() -> bool {
+        String::is_referenceable()
+    }
+
+    fn schema_name() -> String {
+        String::schema_name()
+    }
+
+    fn schema_id() -> std::borrow::Cow<'static, str> {
+        String::schema_id()
+    }
+
+    fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+        String::json_schema(gen)
+    }
+
+    fn _schemars_private_non_optional_json_schema(
+        gen: &mut schemars::gen::SchemaGenerator,
+    ) -> schemars::schema::Schema {
+        String::_schemars_private_non_optional_json_schema(gen)
+    }
+
+    fn _schemars_private_is_option() -> bool {
+        String::_schemars_private_is_option()
+    }
+}
 
 /// A representation of a qualified name, like `typing.List`.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

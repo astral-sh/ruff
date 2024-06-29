@@ -1,6 +1,6 @@
 ---
 source: crates/ruff_python_parser/src/parser/tests.rs
-expression: parse_ast
+expression: parsed.syntax()
 ---
 Module(
     ModModule {
@@ -15,7 +15,9 @@ Module(
                             left: Name(
                                 ExprName {
                                     range: 27..28,
-                                    id: "a",
+                                    id: Name(
+                                        "a",
+                                    ),
                                     ctx: Load,
                                 },
                             ),
@@ -23,7 +25,9 @@ Module(
                             right: Name(
                                 ExprName {
                                     range: 39..40,
-                                    id: "b",
+                                    id: Name(
+                                        "b",
+                                    ),
                                     ctx: Load,
                                 },
                             ),
@@ -128,7 +132,9 @@ Module(
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
-                        id: "foo",
+                        id: Name(
+                            "foo",
+                        ),
                         range: 570..573,
                     },
                     type_params: None,
@@ -152,7 +158,9 @@ Module(
                                             left: Name(
                                                 ExprName {
                                                     range: 598..599,
-                                                    id: "a",
+                                                    id: Name(
+                                                        "a",
+                                                    ),
                                                     ctx: Load,
                                                 },
                                             ),
@@ -163,7 +171,9 @@ Module(
                                                 Name(
                                                     ExprName {
                                                         range: 619..620,
-                                                        id: "b",
+                                                        id: Name(
+                                                            "b",
+                                                        ),
                                                         ctx: Load,
                                                     },
                                                 ),
@@ -204,7 +214,9 @@ Module(
                     target: Name(
                         ExprName {
                             range: 715..716,
-                            id: "a",
+                            id: Name(
+                                "a",
+                            ),
                             ctx: Store,
                         },
                     ),
@@ -214,7 +226,9 @@ Module(
                             func: Name(
                                 ExprName {
                                     range: 720..725,
-                                    id: "range",
+                                    id: Name(
+                                        "range",
+                                    ),
                                     ctx: Load,
                                 },
                             ),
@@ -253,7 +267,9 @@ Module(
                         Name(
                             ExprName {
                                 range: 739..741,
-                                id: "p1",
+                                id: Name(
+                                    "p1",
+                                ),
                                 ctx: Store,
                             },
                         ),
@@ -273,14 +289,18 @@ Module(
                     target: Name(
                         ExprName {
                             range: 749..751,
-                            id: "p2",
+                            id: Name(
+                                "p2",
+                            ),
                             ctx: Store,
                         },
                     ),
                     annotation: Name(
                         ExprName {
                             range: 753..756,
-                            id: "str",
+                            id: Name(
+                                "str",
+                            ),
                             ctx: Load,
                         },
                     ),
@@ -303,7 +323,9 @@ Module(
                         Name(
                             ExprName {
                                 range: 764..767,
-                                id: "foo",
+                                id: Name(
+                                    "foo",
+                                ),
                                 ctx: Store,
                             },
                         ),
@@ -331,7 +353,9 @@ Module(
                         Name(
                             ExprName {
                                 range: 792..795,
-                                id: "foo",
+                                id: Name(
+                                    "foo",
+                                ),
                                 ctx: Store,
                             },
                         ),

@@ -21,7 +21,9 @@ Module(
                                         Name(
                                             ExprName {
                                                 range: 1..2,
-                                                id: "x",
+                                                id: Name(
+                                                    "x",
+                                                ),
                                                 ctx: Load,
                                             },
                                         ),
@@ -29,7 +31,9 @@ Module(
                                     value: Name(
                                         ExprName {
                                             range: 5..8,
-                                            id: "def",
+                                            id: Name(
+                                                "def",
+                                            ),
                                             ctx: Load,
                                         },
                                     ),
@@ -42,7 +46,9 @@ Module(
                                                 func: Name(
                                                     ExprName {
                                                         range: 9..12,
-                                                        id: "foo",
+                                                        id: Name(
+                                                            "foo",
+                                                        ),
                                                         ctx: Load,
                                                     },
                                                 ),
@@ -57,7 +63,9 @@ Module(
                                     value: Name(
                                         ExprName {
                                             range: 20..24,
-                                            id: "pass",
+                                            id: Name(
+                                                "pass",
+                                            ),
                                             ctx: Load,
                                         },
                                     ),

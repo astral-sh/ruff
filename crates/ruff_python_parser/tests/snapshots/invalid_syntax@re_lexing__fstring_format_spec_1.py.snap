@@ -85,7 +85,9 @@ Module(
                     value: Name(
                         ExprName {
                             range: 192..198,
-                            id: "format",
+                            id: Name(
+                                "format",
+                            ),
                             ctx: Load,
                         },
                     ),
@@ -97,7 +99,9 @@ Module(
                     value: Name(
                         ExprName {
                             range: 199..203,
-                            id: "spec",
+                            id: Name(
+                                "spec",
+                            ),
                             ctx: Load,
                         },
                     ),
@@ -272,7 +276,9 @@ Module(
                     value: Name(
                         ExprName {
                             range: 285..291,
-                            id: "format",
+                            id: Name(
+                                "format",
+                            ),
                             ctx: Load,
                         },
                     ),
@@ -284,7 +290,9 @@ Module(
                     value: Name(
                         ExprName {
                             range: 292..296,
-                            id: "spec",
+                            id: Name(
+                                "spec",
+                            ),
                             ctx: Load,
                         },
                     ),

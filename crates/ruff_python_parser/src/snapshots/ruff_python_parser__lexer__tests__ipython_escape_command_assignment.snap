@@ -7,7 +7,9 @@ expression: lex_jupyter_source(source)
 [
     (
         Name(
-            "pwd",
+            Name(
+                "pwd",
+            ),
         ),
         0..3,
     ),
@@ -28,7 +30,9 @@ expression: lex_jupyter_source(source)
     ),
     (
         Name(
-            "foo",
+            Name(
+                "foo",
+            ),
         ),
         11..14,
     ),
@@ -49,7 +53,9 @@ expression: lex_jupyter_source(source)
     ),
     (
         Name(
-            "bar",
+            Name(
+                "bar",
+            ),
         ),
         31..34,
     ),
@@ -70,7 +76,9 @@ expression: lex_jupyter_source(source)
     ),
     (
         Name(
-            "baz",
+            Name(
+                "baz",
+            ),
         ),
         51..54,
     ),
