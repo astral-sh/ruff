@@ -6,7 +6,7 @@ use std::str::FromStr;
 
 use rustc_hash::FxHashMap;
 
-use crate::module::ModuleName;
+use crate::module_name::ModuleName;
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct TypeshedVersionsParseError {

@@ -1,11 +1,13 @@
 mod db;
 mod module;
-pub mod path;
+mod module_name;
+mod path;
 mod resolver;
 mod typeshed;
 
 pub use db::{Db, Jar};
-pub use module::{Module, ModuleKind, ModuleName};
+pub use module::{Module, ModuleKind};
+pub use module_name::ModuleName;
 pub use path::{
     ExtraPath, ExtraPathBuf, FirstPartyPath, FirstPartyPathBuf, SitePackagesPath,
     SitePackagesPathBuf, StandardLibraryPath, StandardLibraryPathBuf,

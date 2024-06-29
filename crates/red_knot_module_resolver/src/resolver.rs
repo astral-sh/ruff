@@ -3,7 +3,8 @@ use std::sync::Arc;
 
 use ruff_db::vfs::{system_path_to_file, vfs_path_to_file, VfsFile, VfsPath};
 
-use crate::module::{Module, ModuleKind, ModuleName, ModuleSearchPathEntry};
+use crate::module::{Module, ModuleKind, ModuleSearchPathEntry};
+use crate::module_name::ModuleName;
 use crate::path::{
     ExtraPath, ExtraPathBuf, FirstPartyPath, FirstPartyPathBuf, ModuleResolutionPath,
     ModuleResolutionPathRef, SitePackagesPath, SitePackagesPathBuf, StandardLibraryPath,
@@ -108,7 +109,7 @@ pub(crate) fn file_to_module(db: &dyn Db, file: VfsFile) -> Option<Module> {
         }
     })?;
 
-    let module_name = ModuleName::from_relative_path(relative_path)?;
+    let module_name = relative_path.as_module_name()?;
 
     // Resolve the module name to see if Python would resolve the name to the same path.
     // If it doesn't, then that means that multiple modules have the same name in different
@@ -202,7 +203,7 @@ impl Deref for OrderedSearchPaths {
 // TODO(micha): Contribute a fix for this upstream where the singleton methods have the same visibility as the struct.
 #[allow(unreachable_pub, clippy::used_underscore_binding)]
 pub(crate) mod internal {
-    use crate::module::ModuleName;
+    use crate::module_name::ModuleName;
     use crate::resolver::OrderedSearchPaths;
 
     #[salsa::input(singleton)]
@@ -374,7 +375,8 @@ mod tests {
     use ruff_db::vfs::{system_path_to_file, VfsFile, VfsPath};
 
     use crate::db::tests::TestDb;
-    use crate::module::{ModuleKind, ModuleName};
+    use crate::module::ModuleKind;
+    use crate::module_name::ModuleName;
     use crate::path::{FirstPartyPath, SitePackagesPath};
 
     use super::*;

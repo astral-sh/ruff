@@ -6,6 +6,7 @@ use std::path;
 use ruff_db::file_system::{FileSystem, FileSystemPath, FileSystemPathBuf};
 use ruff_db::vfs::VfsPath;
 
+use crate::module_name::ModuleName;
 use crate::Db;
 
 #[repr(transparent)]
@@ -1027,6 +1028,22 @@ impl<'a> ModuleResolutionPathRef<'a> {
             Self::SitePackages(path) => {
                 Some(ModuleResolutionPath::SitePackages(path.with_py_extension()))
             }
+        }
+    }
+
+    pub(crate) fn as_module_name(&self) -> Option<ModuleName> {
+        let path = self.sans_dunder_init();
+        let mut parts_iter = path.module_name_parts();
+        let first_part = parts_iter.next()?;
+        if let Some(second_part) = parts_iter.next() {
+            let mut name = format!("{first_part}.{second_part}");
+            for part in parts_iter {
+                name.push('.');
+                name.push_str(part);
+            }
+            ModuleName::new(&name)
+        } else {
+            ModuleName::new(first_part)
         }
     }
 }
