@@ -1,13 +1,16 @@
 use std::ops::Deref;
+use std::sync::Arc;
 
-use ruff_db::file_system::{FileSystem, FileSystemPath, FileSystemPathBuf};
 use ruff_db::vfs::{system_path_to_file, vfs_path_to_file, VfsFile, VfsPath};
 
-use crate::module::{Module, ModuleKind, ModuleName, ModuleSearchPath, ModuleSearchPathKind};
+use crate::module::{Module, ModuleKind, ModuleName, ModuleSearchPathEntry};
+use crate::path::{
+    ExtraPath, ExtraPathBuf, FirstPartyPath, FirstPartyPathBuf, ModuleResolutionPath,
+    ModuleResolutionPathRef, SitePackagesPath, SitePackagesPathBuf, StandardLibraryPath,
+    StandardLibraryPathBuf,
+};
 use crate::resolver::internal::ModuleResolverSearchPaths;
 use crate::Db;
-
-const TYPESHED_STDLIB_DIRECTORY: &str = "stdlib";
 
 /// Configures the module search paths for the module resolver.
 ///
@@ -71,7 +74,7 @@ pub fn path_to_module(db: &dyn Db, path: &VfsPath) -> Option<Module> {
 
 /// Resolves the module for the file with the given id.
 ///
-/// Returns `None` if the file is not a module locatable via `sys.path`.
+/// Returns `None` if the file is not a module locatable via any of the PEP-561 search paths
 #[salsa::tracked]
 #[allow(unused)]
 pub(crate) fn file_to_module(db: &dyn Db, file: VfsFile) -> Option<Module> {
@@ -81,19 +84,29 @@ pub(crate) fn file_to_module(db: &dyn Db, file: VfsFile) -> Option<Module> {
 
     let search_paths = module_search_paths(db);
 
-    let relative_path = search_paths
-        .iter()
-        .find_map(|root| match (root.path(), path) {
-            (VfsPath::FileSystem(root_path), VfsPath::FileSystem(path)) => {
-                let relative_path = path.strip_prefix(root_path).ok()?;
-                Some(relative_path)
-            }
-            (VfsPath::Vendored(_), VfsPath::Vendored(_)) => {
-                todo!("Add support for vendored modules")
-            }
-            (VfsPath::Vendored(_), VfsPath::FileSystem(_))
-            | (VfsPath::FileSystem(_), VfsPath::Vendored(_)) => None,
-        })?;
+    let relative_path = search_paths.iter().find_map(|root| match (&**root, path) {
+        (_, VfsPath::Vendored(_)) => todo!("VendoredPaths are not yet supported"),
+        (ModuleSearchPathEntry::Extra(root_path), VfsPath::FileSystem(path)) => {
+            Some(ModuleResolutionPathRef::Extra(
+                ExtraPath::new(path)?.relative_to_search_path(root_path)?,
+            ))
+        }
+        (ModuleSearchPathEntry::FirstParty(root_path), VfsPath::FileSystem(path)) => {
+            Some(ModuleResolutionPathRef::FirstParty(
+                FirstPartyPath::new(path)?.relative_to_search_path(root_path)?,
+            ))
+        }
+        (ModuleSearchPathEntry::StandardLibrary(root_path), VfsPath::FileSystem(path)) => {
+            Some(ModuleResolutionPathRef::StandardLibrary(
+                StandardLibraryPath::new(path)?.relative_to_search_path(root_path)?,
+            ))
+        }
+        (ModuleSearchPathEntry::SitePackagesThirdParty(root_path), VfsPath::FileSystem(path)) => {
+            Some(ModuleResolutionPathRef::SitePackages(
+                SitePackagesPath::new(path)?.relative_to_search_path(root_path)?,
+            ))
+        }
+    })?;
 
     let module_name = ModuleName::from_relative_path(relative_path)?;
 
@@ -123,19 +136,18 @@ pub struct ModuleResolutionSettings {
     /// List of user-provided paths that should take first priority in the module resolution.
     /// Examples in other type checkers are mypy's MYPYPATH environment variable,
     /// or pyright's stubPath configuration setting.
-    pub extra_paths: Vec<FileSystemPathBuf>,
+    pub extra_paths: Vec<ExtraPathBuf>,
 
     /// The root of the workspace, used for finding first-party modules.
-    pub workspace_root: FileSystemPathBuf,
+    pub workspace_root: FirstPartyPathBuf,
+
+    /// Optional (already validated) path to standard-library typeshed stubs.
+    /// If this is not provided, we will fallback to our vendored typeshed stubs
+    /// bundled as a zip file in the binary
+    pub custom_typeshed: Option<StandardLibraryPathBuf>,
 
     /// The path to the user's `site-packages` directory, where third-party packages from ``PyPI`` are installed.
-    pub site_packages: Option<FileSystemPathBuf>,
-
-    /// Optional path to standard-library typeshed stubs.
-    /// Currently this has to be a directory that exists on disk.
-    ///
-    /// (TODO: fall back to vendored stubs if no custom directory is provided.)
-    pub custom_typeshed: Option<FileSystemPathBuf>,
+    pub site_packages: Option<SitePackagesPathBuf>,
 }
 
 impl ModuleResolutionSettings {
@@ -151,41 +163,33 @@ impl ModuleResolutionSettings {
 
         let mut paths: Vec<_> = extra_paths
             .into_iter()
-            .map(|path| ModuleSearchPath::new(path, ModuleSearchPathKind::Extra))
+            .map(ModuleSearchPathEntry::Extra)
             .collect();
 
-        paths.push(ModuleSearchPath::new(
-            workspace_root,
-            ModuleSearchPathKind::FirstParty,
-        ));
+        paths.push(ModuleSearchPathEntry::FirstParty(workspace_root));
 
-        // TODO fallback to vendored typeshed stubs if no custom typeshed directory is provided by the user
         if let Some(custom_typeshed) = custom_typeshed {
-            paths.push(ModuleSearchPath::new(
-                custom_typeshed.join(TYPESHED_STDLIB_DIRECTORY),
-                ModuleSearchPathKind::StandardLibrary,
+            paths.push(ModuleSearchPathEntry::stdlib_from_typeshed_root(
+                &custom_typeshed,
             ));
         }
 
         // TODO vendor typeshed's third-party stubs as well as the stdlib and fallback to them as a final step
         if let Some(site_packages) = site_packages {
-            paths.push(ModuleSearchPath::new(
-                site_packages,
-                ModuleSearchPathKind::SitePackagesThirdParty,
-            ));
+            paths.push(ModuleSearchPathEntry::SitePackagesThirdParty(site_packages));
         }
 
-        OrderedSearchPaths(paths)
+        OrderedSearchPaths(paths.into_iter().map(Arc::new).collect())
     }
 }
 
 /// A resolved module resolution order, implementing PEP 561
 /// (with some small, deliberate differences)
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub(crate) struct OrderedSearchPaths(Vec<ModuleSearchPath>);
+pub(crate) struct OrderedSearchPaths(Vec<Arc<ModuleSearchPathEntry>>);
 
 impl Deref for OrderedSearchPaths {
-    type Target = [ModuleSearchPath];
+    type Target = [Arc<ModuleSearchPathEntry>];
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -217,31 +221,30 @@ pub(crate) mod internal {
     }
 }
 
-fn module_search_paths(db: &dyn Db) -> &[ModuleSearchPath] {
+fn module_search_paths(db: &dyn Db) -> &[Arc<ModuleSearchPathEntry>] {
     ModuleResolverSearchPaths::get(db).search_paths(db)
 }
 
 /// Given a module name and a list of search paths in which to lookup modules,
 /// attempt to resolve the module name
-fn resolve_name(db: &dyn Db, name: &ModuleName) -> Option<(ModuleSearchPath, VfsFile, ModuleKind)> {
+fn resolve_name(
+    db: &dyn Db,
+    name: &ModuleName,
+) -> Option<(Arc<ModuleSearchPathEntry>, VfsFile, ModuleKind)> {
     let search_paths = module_search_paths(db);
 
     for search_path in search_paths {
         let mut components = name.components();
         let module_name = components.next_back()?;
 
-        let VfsPath::FileSystem(fs_search_path) = search_path.path() else {
-            todo!("Vendored search paths are not yet supported");
-        };
-
-        match resolve_package(db.file_system(), fs_search_path, components) {
+        match resolve_package(db, search_path.path(), components) {
             Ok(resolved_package) => {
                 let mut package_path = resolved_package.path;
 
                 package_path.push(module_name);
 
                 // Must be a `__init__.pyi` or `__init__.py` or it isn't a package.
-                let kind = if db.file_system().is_directory(&package_path) {
+                let kind = if package_path.is_directory(db) {
                     package_path.push("__init__");
                     ModuleKind::Package
                 } else {
@@ -249,17 +252,17 @@ fn resolve_name(db: &dyn Db, name: &ModuleName) -> Option<(ModuleSearchPath, Vfs
                 };
 
                 // TODO Implement full https://peps.python.org/pep-0561/#type-checker-module-resolution-order resolution
-                let stub = package_path.with_extension("pyi");
-
-                if let Some(stub) = system_path_to_file(db.upcast(), &stub) {
+                if let Some(stub) =
+                    system_path_to_file(db.upcast(), package_path.with_pyi_extension())
+                {
                     return Some((search_path.clone(), stub, kind));
                 }
 
-                let module = package_path.with_extension("py");
-
-                if let Some(module) = system_path_to_file(db.upcast(), &module) {
-                    return Some((search_path.clone(), module, kind));
-                }
+                if let Some(path_with_extension) = package_path.with_py_extension() {
+                    if let Some(module) = system_path_to_file(db.upcast(), &path_with_extension) {
+                        return Some((search_path.clone(), module, kind));
+                    }
+                };
 
                 // For regular packages, don't search the next search path. All files of that
                 // package must be in the same location
@@ -280,14 +283,14 @@ fn resolve_name(db: &dyn Db, name: &ModuleName) -> Option<(ModuleSearchPath, Vfs
 }
 
 fn resolve_package<'a, I>(
-    fs: &dyn FileSystem,
-    module_search_path: &FileSystemPath,
+    db: &dyn Db,
+    module_search_path: ModuleResolutionPathRef,
     components: I,
 ) -> Result<ResolvedPackage, PackageKind>
 where
     I: Iterator<Item = &'a str>,
 {
-    let mut package_path = module_search_path.to_path_buf();
+    let mut package_path = module_search_path.to_owned();
 
     // `true` if inside a folder that is a namespace package (has no `__init__.py`).
     // Namespace packages are special because they can be spread across multiple search paths.
@@ -301,12 +304,11 @@ where
     for folder in components {
         package_path.push(folder);
 
-        let has_init_py = fs.is_file(&package_path.join("__init__.py"))
-            || fs.is_file(&package_path.join("__init__.pyi"));
+        let is_regular_package = package_path.is_regular_package(db);
 
-        if has_init_py {
+        if is_regular_package {
             in_namespace_package = false;
-        } else if fs.is_directory(&package_path) {
+        } else if package_path.is_directory(db) {
             // A directory without an `__init__.py` is a namespace package, continue with the next folder.
             in_namespace_package = true;
         } else if in_namespace_package {
@@ -339,7 +341,7 @@ where
 
 #[derive(Debug)]
 struct ResolvedPackage {
-    path: FileSystemPathBuf,
+    path: ModuleResolutionPath,
     kind: PackageKind,
 }
 
@@ -368,37 +370,37 @@ impl PackageKind {
 #[cfg(test)]
 mod tests {
 
-    use ruff_db::file_system::{FileSystemPath, FileSystemPathBuf};
+    use ruff_db::file_system::FileSystemPath;
     use ruff_db::vfs::{system_path_to_file, VfsFile, VfsPath};
 
     use crate::db::tests::TestDb;
     use crate::module::{ModuleKind, ModuleName};
+    use crate::path::{FirstPartyPath, SitePackagesPath};
 
-    use super::{
-        path_to_module, resolve_module, set_module_resolution_settings, ModuleResolutionSettings,
-        TYPESHED_STDLIB_DIRECTORY,
-    };
+    use super::*;
 
     struct TestCase {
         db: TestDb,
 
-        src: FileSystemPathBuf,
-        custom_typeshed: FileSystemPathBuf,
-        site_packages: FileSystemPathBuf,
+        src: FirstPartyPathBuf,
+        custom_typeshed: StandardLibraryPathBuf,
+        site_packages: SitePackagesPathBuf,
     }
 
     fn create_resolver() -> std::io::Result<TestCase> {
         let mut db = TestDb::new();
 
-        let src = FileSystemPath::new("src").to_path_buf();
-        let site_packages = FileSystemPath::new("site_packages").to_path_buf();
-        let custom_typeshed = FileSystemPath::new("typeshed").to_path_buf();
+        let src = FirstPartyPath::new("src").unwrap().to_path_buf();
+        let site_packages = SitePackagesPath::new("site_packages")
+            .unwrap()
+            .to_path_buf();
+        let custom_typeshed = StandardLibraryPath::new("typeshed").unwrap().to_path_buf();
 
         let fs = db.memory_file_system();
 
-        fs.create_directory_all(&src)?;
-        fs.create_directory_all(&site_packages)?;
-        fs.create_directory_all(&custom_typeshed)?;
+        fs.create_directory_all(&*src)?;
+        fs.create_directory_all(&*site_packages)?;
+        fs.create_directory_all(&*custom_typeshed)?;
 
         let settings = ModuleResolutionSettings {
             extra_paths: vec![],
@@ -424,7 +426,7 @@ mod tests {
         let foo_module_name = ModuleName::new_static("foo").unwrap();
         let foo_path = src.join("foo.py");
         db.memory_file_system()
-            .write_file(&foo_path, "print('Hello, world!')")?;
+            .write_file(&*foo_path, "print('Hello, world!')")?;
 
         let foo_module = resolve_module(&db, foo_module_name.clone()).unwrap();
 
@@ -434,13 +436,13 @@ mod tests {
         );
 
         assert_eq!("foo", foo_module.name());
-        assert_eq!(&src, foo_module.search_path().path());
+        assert_eq!(*src, foo_module.search_path().path());
         assert_eq!(ModuleKind::Module, foo_module.kind());
-        assert_eq!(&foo_path, foo_module.file().path(&db));
 
+        assert_eq!(*foo_path, *foo_module.file().path(&db));
         assert_eq!(
             Some(foo_module),
-            path_to_module(&db, &VfsPath::FileSystem(foo_path))
+            path_to_module(&db, &foo_path.into_vfs_path())
         );
 
         Ok(())
@@ -454,10 +456,10 @@ mod tests {
             ..
         } = create_resolver()?;
 
-        let stdlib_dir = custom_typeshed.join(TYPESHED_STDLIB_DIRECTORY);
-        let functools_path = stdlib_dir.join("functools.py");
+        let stdlib_dir = StandardLibraryPath::stdlib_from_typeshed_root(&custom_typeshed);
+        let functools_path = stdlib_dir.join("functools.pyi");
         db.memory_file_system()
-            .write_file(&functools_path, "def update_wrapper(): ...")?;
+            .write_file(&*functools_path, "def update_wrapper(): ...")?;
 
         let functools_module_name = ModuleName::new_static("functools").unwrap();
         let functools_module = resolve_module(&db, functools_module_name.clone()).unwrap();
@@ -467,13 +469,14 @@ mod tests {
             resolve_module(&db, functools_module_name).as_ref()
         );
 
-        assert_eq!(&stdlib_dir, functools_module.search_path().path());
+        assert_eq!(*stdlib_dir, functools_module.search_path().path());
         assert_eq!(ModuleKind::Module, functools_module.kind());
-        assert_eq!(&functools_path.clone(), functools_module.file().path(&db));
+
+        assert_eq!(*functools_path, *functools_module.file().path(&db));
 
         assert_eq!(
             Some(functools_module),
-            path_to_module(&db, &VfsPath::FileSystem(functools_path))
+            path_to_module(&db, &functools_path.into_vfs_path())
         );
 
         Ok(())
@@ -488,13 +491,19 @@ mod tests {
             ..
         } = create_resolver()?;
 
-        let stdlib_dir = custom_typeshed.join(TYPESHED_STDLIB_DIRECTORY);
-        let stdlib_functools_path = stdlib_dir.join("functools.py");
+        let stdlib_dir = StandardLibraryPath::stdlib_from_typeshed_root(&custom_typeshed);
+        let stdlib_functools_path = stdlib_dir.join("functools.pyi");
         let first_party_functools_path = src.join("functools.py");
 
         db.memory_file_system().write_files([
-            (&stdlib_functools_path, "def update_wrapper(): ..."),
-            (&first_party_functools_path, "def update_wrapper(): ..."),
+            (
+                stdlib_functools_path.as_file_system_path(),
+                "def update_wrapper(): ...",
+            ),
+            (
+                first_party_functools_path.as_file_system_path(),
+                "def update_wrapper(): ...",
+            ),
         ])?;
 
         let functools_module_name = ModuleName::new_static("functools").unwrap();
@@ -504,16 +513,16 @@ mod tests {
             Some(&functools_module),
             resolve_module(&db, functools_module_name).as_ref()
         );
-        assert_eq!(&src, functools_module.search_path().path());
+        assert_eq!(*src, functools_module.search_path().path());
         assert_eq!(ModuleKind::Module, functools_module.kind());
         assert_eq!(
-            &first_party_functools_path.clone(),
-            functools_module.file().path(&db)
+            *first_party_functools_path,
+            *functools_module.file().path(&db)
         );
 
         assert_eq!(
             Some(functools_module),
-            path_to_module(&db, &VfsPath::FileSystem(first_party_functools_path))
+            path_to_module(&db, &first_party_functools_path.into_vfs_path())
         );
 
         Ok(())
@@ -551,21 +560,21 @@ mod tests {
         let foo_path = foo_dir.join("__init__.py");
 
         db.memory_file_system()
-            .write_file(&foo_path, "print('Hello, world!')")?;
+            .write_file(&*foo_path, "print('Hello, world!')")?;
 
         let foo_module = resolve_module(&db, ModuleName::new_static("foo").unwrap()).unwrap();
 
         assert_eq!("foo", foo_module.name());
-        assert_eq!(&src, foo_module.search_path().path());
-        assert_eq!(&foo_path, foo_module.file().path(&db));
+        assert_eq!(*src, foo_module.search_path().path());
+        assert_eq!(*foo_path, *foo_module.file().path(&db));
 
         assert_eq!(
             Some(&foo_module),
-            path_to_module(&db, &VfsPath::FileSystem(foo_path)).as_ref()
+            path_to_module(&db, &foo_path.into_vfs_path()).as_ref()
         );
 
         // Resolving by directory doesn't resolve to the init file.
-        assert_eq!(None, path_to_module(&db, &VfsPath::FileSystem(foo_dir)));
+        assert_eq!(None, path_to_module(&db, &foo_dir.into_vfs_path()));
 
         Ok(())
     }
@@ -578,23 +587,23 @@ mod tests {
         let foo_init = foo_dir.join("__init__.py");
 
         db.memory_file_system()
-            .write_file(&foo_init, "print('Hello, world!')")?;
+            .write_file(&*foo_init, "print('Hello, world!')")?;
 
         let foo_py = src.join("foo.py");
         db.memory_file_system()
-            .write_file(&foo_py, "print('Hello, world!')")?;
+            .write_file(&*foo_py, "print('Hello, world!')")?;
 
         let foo_module = resolve_module(&db, ModuleName::new_static("foo").unwrap()).unwrap();
 
-        assert_eq!(&src, foo_module.search_path().path());
-        assert_eq!(&foo_init, foo_module.file().path(&db));
+        assert_eq!(*src, foo_module.search_path().path());
+        assert_eq!(*foo_init, *foo_module.file().path(&db));
         assert_eq!(ModuleKind::Package, foo_module.kind());
 
         assert_eq!(
             Some(foo_module),
-            path_to_module(&db, &VfsPath::FileSystem(foo_init))
+            path_to_module(&db, &foo_init.into_vfs_path())
         );
-        assert_eq!(None, path_to_module(&db, &VfsPath::FileSystem(foo_py)));
+        assert_eq!(None, path_to_module(&db, &foo_py.into_vfs_path()));
 
         Ok(())
     }
@@ -606,18 +615,15 @@ mod tests {
         let foo_stub = src.join("foo.pyi");
         let foo_py = src.join("foo.py");
         db.memory_file_system()
-            .write_files([(&foo_stub, "x: int"), (&foo_py, "print('Hello, world!')")])?;
+            .write_files([(&*foo_stub, "x: int"), (&*foo_py, "print('Hello, world!')")])?;
 
         let foo = resolve_module(&db, ModuleName::new_static("foo").unwrap()).unwrap();
 
-        assert_eq!(&src, foo.search_path().path());
-        assert_eq!(&foo_stub, foo.file().path(&db));
+        assert_eq!(*src, foo.search_path().path());
+        assert_eq!(*foo_stub, *foo.file().path(&db));
 
-        assert_eq!(
-            Some(foo),
-            path_to_module(&db, &VfsPath::FileSystem(foo_stub))
-        );
-        assert_eq!(None, path_to_module(&db, &VfsPath::FileSystem(foo_py)));
+        assert_eq!(Some(foo), path_to_module(&db, &foo_stub.into_vfs_path()));
+        assert_eq!(None, path_to_module(&db, &foo_py.into_vfs_path()));
 
         Ok(())
     }
@@ -631,21 +637,18 @@ mod tests {
         let baz = bar.join("baz.py");
 
         db.memory_file_system().write_files([
-            (&foo.join("__init__.py"), ""),
-            (&bar.join("__init__.py"), ""),
-            (&baz, "print('Hello, world!')"),
+            (&*foo.join("__init__.py"), ""),
+            (&*bar.join("__init__.py"), ""),
+            (&*baz, "print('Hello, world!')"),
         ])?;
 
         let baz_module =
             resolve_module(&db, ModuleName::new_static("foo.bar.baz").unwrap()).unwrap();
 
-        assert_eq!(&src, baz_module.search_path().path());
-        assert_eq!(&baz, baz_module.file().path(&db));
+        assert_eq!(*src, baz_module.search_path().path());
+        assert_eq!(*baz, *baz_module.file().path(&db));
 
-        assert_eq!(
-            Some(baz_module),
-            path_to_module(&db, &VfsPath::FileSystem(baz))
-        );
+        assert_eq!(Some(baz_module), path_to_module(&db, &baz.into_vfs_path()));
 
         Ok(())
     }
@@ -681,24 +684,18 @@ mod tests {
         let two = child2.join("two.py");
 
         db.memory_file_system().write_files([
-            (&one, "print('Hello, world!')"),
-            (&two, "print('Hello, world!')"),
+            (one.as_file_system_path(), "print('Hello, world!')"),
+            (two.as_file_system_path(), "print('Hello, world!')"),
         ])?;
 
         let one_module =
             resolve_module(&db, ModuleName::new_static("parent.child.one").unwrap()).unwrap();
 
-        assert_eq!(
-            Some(one_module),
-            path_to_module(&db, &VfsPath::FileSystem(one))
-        );
+        assert_eq!(Some(one_module), path_to_module(&db, &one.into_vfs_path()));
 
         let two_module =
             resolve_module(&db, ModuleName::new_static("parent.child.two").unwrap()).unwrap();
-        assert_eq!(
-            Some(two_module),
-            path_to_module(&db, &VfsPath::FileSystem(two))
-        );
+        assert_eq!(Some(two_module), path_to_module(&db, &two.into_vfs_path()));
 
         Ok(())
     }
@@ -734,18 +731,18 @@ mod tests {
         let two = child2.join("two.py");
 
         db.memory_file_system().write_files([
-            (&child1.join("__init__.py"), "print('Hello, world!')"),
-            (&one, "print('Hello, world!')"),
-            (&two, "print('Hello, world!')"),
+            (
+                child1.join("__init__.py").as_file_system_path(),
+                "print('Hello, world!')",
+            ),
+            (one.as_file_system_path(), "print('Hello, world!')"),
+            (two.as_file_system_path(), "print('Hello, world!')"),
         ])?;
 
         let one_module =
             resolve_module(&db, ModuleName::new_static("parent.child.one").unwrap()).unwrap();
 
-        assert_eq!(
-            Some(one_module),
-            path_to_module(&db, &VfsPath::FileSystem(one))
-        );
+        assert_eq!(Some(one_module), path_to_module(&db, &one.into_vfs_path()));
 
         assert_eq!(
             None,
@@ -766,21 +763,23 @@ mod tests {
         let foo_src = src.join("foo.py");
         let foo_site_packages = site_packages.join("foo.py");
 
-        db.memory_file_system()
-            .write_files([(&foo_src, ""), (&foo_site_packages, "")])?;
+        db.memory_file_system().write_files([
+            (foo_src.as_file_system_path(), ""),
+            (foo_site_packages.as_file_system_path(), ""),
+        ])?;
 
         let foo_module = resolve_module(&db, ModuleName::new_static("foo").unwrap()).unwrap();
 
-        assert_eq!(&src, foo_module.search_path().path());
-        assert_eq!(&foo_src, foo_module.file().path(&db));
+        assert_eq!(*src, foo_module.search_path().path());
+        assert_eq!(*foo_src, *foo_module.file().path(&db));
 
         assert_eq!(
             Some(foo_module),
-            path_to_module(&db, &VfsPath::FileSystem(foo_src))
+            path_to_module(&db, &foo_src.into_vfs_path())
         );
         assert_eq!(
             None,
-            path_to_module(&db, &VfsPath::FileSystem(foo_site_packages))
+            path_to_module(&db, &foo_site_packages.into_vfs_path())
         );
 
         Ok(())
@@ -801,9 +800,9 @@ mod tests {
         let temp_dir = tempfile::tempdir()?;
         let root = FileSystemPath::from_std_path(temp_dir.path()).unwrap();
 
-        let src = root.join(src);
-        let site_packages = root.join(site_packages);
-        let custom_typeshed = root.join(custom_typeshed);
+        let src = root.join(&*src);
+        let site_packages = root.join(&*site_packages);
+        let custom_typeshed = root.join(&*custom_typeshed);
 
         let foo = src.join("foo.py");
         let bar = src.join("bar.py");
@@ -815,11 +814,17 @@ mod tests {
         std::fs::write(foo.as_std_path(), "")?;
         std::os::unix::fs::symlink(foo.as_std_path(), bar.as_std_path())?;
 
+        let src = FirstPartyPath::new(&src).unwrap().to_path_buf();
+        let site_packages = SitePackagesPath::new(&site_packages).unwrap().to_path_buf();
+        let custom_typeshed = StandardLibraryPath::new(&custom_typeshed)
+            .unwrap()
+            .to_path_buf();
+
         let settings = ModuleResolutionSettings {
             extra_paths: vec![],
             workspace_root: src.clone(),
-            site_packages: Some(site_packages),
-            custom_typeshed: Some(custom_typeshed),
+            site_packages: Some(site_packages.clone()),
+            custom_typeshed: Some(custom_typeshed.clone()),
         };
 
         set_module_resolution_settings(&mut db, settings);
@@ -829,12 +834,12 @@ mod tests {
 
         assert_ne!(foo_module, bar_module);
 
-        assert_eq!(&src, foo_module.search_path().path());
+        assert_eq!(*src, foo_module.search_path().path());
         assert_eq!(&foo, foo_module.file().path(&db));
 
         // `foo` and `bar` shouldn't resolve to the same file
 
-        assert_eq!(&src, bar_module.search_path().path());
+        assert_eq!(*src, bar_module.search_path().path());
         assert_eq!(&bar, bar_module.file().path(&db));
         assert_eq!(&foo, foo_module.file().path(&db));
 
@@ -853,24 +858,24 @@ mod tests {
     }
 
     #[test]
-    fn deleting_an_unrealted_file_doesnt_change_module_resolution() -> anyhow::Result<()> {
+    fn deleting_an_unrelated_file_doesnt_change_module_resolution() -> anyhow::Result<()> {
         let TestCase { mut db, src, .. } = create_resolver()?;
 
         let foo_path = src.join("foo.py");
-        let bar_path = src.join("bar.py");
+        let bar_path: FirstPartyPathBuf = src.join("bar.py");
 
         db.memory_file_system()
-            .write_files([(&foo_path, "x = 1"), (&bar_path, "y = 2")])?;
+            .write_files([(&*foo_path, "x = 1"), (&*bar_path, "y = 2")])?;
 
         let foo_module_name = ModuleName::new_static("foo").unwrap();
         let foo_module = resolve_module(&db, foo_module_name.clone()).unwrap();
 
-        let bar = system_path_to_file(&db, &bar_path).expect("bar.py to exist");
+        let bar = system_path_to_file(&db, &*bar_path).expect("bar.py to exist");
 
         db.clear_salsa_events();
 
         // Delete `bar.py`
-        db.memory_file_system().remove_file(&bar_path)?;
+        db.memory_file_system().remove_file(&*bar_path)?;
         bar.touch(&mut db);
 
         // Re-query the foo module. The foo module should still be cached because `bar.py` isn't relevant
@@ -898,9 +903,9 @@ mod tests {
         assert_eq!(resolve_module(&db, foo_module_name.clone()), None);
 
         // Now write the foo file
-        db.memory_file_system().write_file(&foo_path, "x = 1")?;
-        VfsFile::touch_path(&mut db, &VfsPath::FileSystem(foo_path.clone()));
-        let foo_file = system_path_to_file(&db, &foo_path).expect("foo.py to exist");
+        db.memory_file_system().write_file(&*foo_path, "x = 1")?;
+        VfsFile::touch_path(&mut db, &foo_path.clone().into_vfs_path());
+        let foo_file = system_path_to_file(&db, &*foo_path).expect("foo.py to exist");
 
         let foo_module = resolve_module(&db, foo_module_name).expect("Foo module to resolve");
         assert_eq!(foo_file, foo_module.file());
@@ -916,21 +921,21 @@ mod tests {
         let foo_init_path = src.join("foo/__init__.py");
 
         db.memory_file_system()
-            .write_files([(&foo_path, "x = 1"), (&foo_init_path, "x = 2")])?;
+            .write_files([(&*foo_path, "x = 1"), (&*foo_init_path, "x = 2")])?;
 
         let foo_module_name = ModuleName::new_static("foo").unwrap();
         let foo_module = resolve_module(&db, foo_module_name.clone()).expect("foo module to exist");
 
-        assert_eq!(&foo_init_path, foo_module.file().path(&db));
+        assert_eq!(*foo_init_path, *foo_module.file().path(&db));
 
         // Delete `foo/__init__.py` and the `foo` folder. `foo` should now resolve to `foo.py`
-        db.memory_file_system().remove_file(&foo_init_path)?;
+        db.memory_file_system().remove_file(&*foo_init_path)?;
         db.memory_file_system()
             .remove_directory(foo_init_path.parent().unwrap())?;
-        VfsFile::touch_path(&mut db, &VfsPath::FileSystem(foo_init_path.clone()));
+        VfsFile::touch_path(&mut db, &foo_init_path.into_vfs_path());
 
         let foo_module = resolve_module(&db, foo_module_name).expect("Foo module to resolve");
-        assert_eq!(&foo_path, foo_module.file().path(&db));
+        assert_eq!(*foo_path, *foo_module.file().path(&db));
 
         Ok(())
     }

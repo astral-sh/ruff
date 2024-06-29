@@ -3,10 +3,13 @@ use std::fmt::Formatter;
 use std::ops::Deref;
 use std::sync::Arc;
 
-use ruff_db::file_system::FileSystemPath;
-use ruff_db::vfs::{VfsFile, VfsPath};
+use ruff_db::vfs::VfsFile;
 use ruff_python_stdlib::identifiers::is_identifier;
 
+use crate::path::{
+    ExtraPathBuf, FirstPartyPathBuf, ModuleResolutionPathRef, SitePackagesPathBuf,
+    StandardLibraryPath, StandardLibraryPathBuf,
+};
 use crate::Db;
 
 /// A module name, e.g. `foo.bar`.
@@ -62,11 +65,7 @@ impl ModuleName {
     }
 
     fn is_valid_name(name: &str) -> bool {
-        if name.is_empty() {
-            return false;
-        }
-
-        name.split('.').all(is_identifier)
+        !name.is_empty() && name.split('.').all(is_identifier)
     }
 
     /// An iterator over the components of the module name:
@@ -130,30 +129,20 @@ impl ModuleName {
         &self.0
     }
 
-    pub(crate) fn from_relative_path(path: &FileSystemPath) -> Option<Self> {
-        let path = if path.ends_with("__init__.py") || path.ends_with("__init__.pyi") {
-            path.parent()?
-        } else {
-            path
-        };
-
-        let name = if let Some(parent) = path.parent() {
-            let mut name = compact_str::CompactString::with_capacity(path.as_str().len());
-
-            for component in parent.components() {
-                name.push_str(component.as_os_str().to_str()?);
+    pub(crate) fn from_relative_path(path: ModuleResolutionPathRef) -> Option<Self> {
+        let path = path.sans_dunder_init();
+        let mut parts_iter = path.module_name_parts();
+        let first_part = parts_iter.next()?;
+        if let Some(second_part) = parts_iter.next() {
+            let mut name = format!("{first_part}.{second_part}");
+            for part in parts_iter {
                 name.push('.');
+                name.push_str(part);
             }
-
-            // SAFETY: Unwrap is safe here or `parent` would have returned `None`.
-            name.push_str(path.file_stem().unwrap());
-
-            name
+            Self::new(&name)
         } else {
-            path.file_stem()?.to_compact_string()
-        };
-
-        Some(Self(name))
+            Self::new(first_part)
+        }
     }
 }
 
@@ -194,7 +183,7 @@ impl Module {
     pub(crate) fn new(
         name: ModuleName,
         kind: ModuleKind,
-        search_path: ModuleSearchPath,
+        search_path: Arc<ModuleSearchPathEntry>,
         file: VfsFile,
     ) -> Self {
         Self {
@@ -218,7 +207,7 @@ impl Module {
     }
 
     /// The search path from which the module was resolved.
-    pub fn search_path(&self) -> &ModuleSearchPath {
+    pub(crate) fn search_path(&self) -> &ModuleSearchPathEntry {
         &self.inner.search_path
     }
 
@@ -254,7 +243,7 @@ impl salsa::DebugWithDb<dyn Db> for Module {
 struct ModuleInner {
     name: ModuleName,
     kind: ModuleKind,
-    search_path: ModuleSearchPath,
+    search_path: Arc<ModuleSearchPathEntry>,
     file: VfsFile,
 }
 
@@ -267,77 +256,42 @@ pub enum ModuleKind {
     Package,
 }
 
-/// A search path in which to search modules.
-/// Corresponds to a path in [`sys.path`](https://docs.python.org/3/library/sys_path_init.html) at runtime.
-///
-/// Cloning a search path is cheap because it's an `Arc`.
-#[derive(Clone, PartialEq, Eq)]
-pub struct ModuleSearchPath {
-    inner: Arc<ModuleSearchPathInner>,
-}
-
-impl ModuleSearchPath {
-    pub fn new<P>(path: P, kind: ModuleSearchPathKind) -> Self
-    where
-        P: Into<VfsPath>,
-    {
-        Self {
-            inner: Arc::new(ModuleSearchPathInner {
-                path: path.into(),
-                kind,
-            }),
-        }
-    }
-
-    /// Determine whether this is a first-party, third-party or standard-library search path
-    pub fn kind(&self) -> ModuleSearchPathKind {
-        self.inner.kind
-    }
-
-    /// Return the location of the search path on the file system
-    pub fn path(&self) -> &VfsPath {
-        &self.inner.path
-    }
-}
-
-impl std::fmt::Debug for ModuleSearchPath {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("ModuleSearchPath")
-            .field("path", &self.inner.path)
-            .field("kind", &self.kind())
-            .finish()
-    }
-}
-
-#[derive(Eq, PartialEq)]
-struct ModuleSearchPathInner {
-    path: VfsPath,
-    kind: ModuleSearchPathKind,
-}
-
 /// Enumeration of the different kinds of search paths type checkers are expected to support.
 ///
 /// N.B. Although we don't implement `Ord` for this enum, they are ordered in terms of the
-/// priority that we want to give these modules when resolving them.
-/// This is roughly [the order given in the typing spec], but typeshed's stubs
-/// for the standard library are moved higher up to match Python's semantics at runtime.
+/// priority that we want to give these modules when resolving them,
+/// as per [the order given in the typing spec]
 ///
 /// [the order given in the typing spec]: https://typing.readthedocs.io/en/latest/spec/distributing.html#import-resolution-ordering
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
-pub enum ModuleSearchPathKind {
+#[derive(Debug, Eq, PartialEq, Hash)]
+pub(crate) enum ModuleSearchPathEntry {
     /// "Extra" paths provided by the user in a config file, env var or CLI flag.
     /// E.g. mypy's `MYPYPATH` env var, or pyright's `stubPath` configuration setting
-    Extra,
+    Extra(ExtraPathBuf),
 
     /// Files in the project we're directly being invoked on
-    FirstParty,
+    FirstParty(FirstPartyPathBuf),
 
     /// The `stdlib` directory of typeshed (either vendored or custom)
-    StandardLibrary,
+    StandardLibrary(StandardLibraryPathBuf),
 
     /// Stubs or runtime modules installed in site-packages
-    SitePackagesThirdParty,
+    SitePackagesThirdParty(SitePackagesPathBuf),
+    // TODO(Alex): vendor third-party stubs from typeshed as well?
+    // VendoredThirdParty(VendoredPathBuf),
+}
 
-    /// Vendored third-party stubs from typeshed
-    VendoredThirdParty,
+impl ModuleSearchPathEntry {
+    pub(crate) fn stdlib_from_typeshed_root(typeshed: &StandardLibraryPath) -> Self {
+        Self::StandardLibrary(StandardLibraryPath::stdlib_from_typeshed_root(typeshed))
+    }
+
+    pub(crate) fn path(&self) -> ModuleResolutionPathRef {
+        match self {
+            Self::Extra(path) => ModuleResolutionPathRef::Extra(path),
+            Self::FirstParty(path) => ModuleResolutionPathRef::FirstParty(path),
+            Self::StandardLibrary(path) => ModuleResolutionPathRef::StandardLibrary(path),
+            Self::SitePackagesThirdParty(path) => ModuleResolutionPathRef::SitePackages(path),
+        }
+    }
 }

@@ -700,12 +700,13 @@ impl<'db> TypeInferenceBuilder<'db> {
 
 #[cfg(test)]
 mod tests {
-    use ruff_db::file_system::FileSystemPathBuf;
     use ruff_db::vfs::system_path_to_file;
 
     use crate::db::tests::TestDb;
     use crate::types::{public_symbol_ty_by_name, Type, TypingContext};
-    use red_knot_module_resolver::{set_module_resolution_settings, ModuleResolutionSettings};
+    use red_knot_module_resolver::{
+        set_module_resolution_settings, FirstPartyPath, ModuleResolutionSettings,
+    };
     use ruff_python_ast::name::Name;
 
     fn setup_db() -> TestDb {
@@ -715,7 +716,7 @@ mod tests {
             &mut db,
             ModuleResolutionSettings {
                 extra_paths: Vec::new(),
-                workspace_root: FileSystemPathBuf::from("/src"),
+                workspace_root: FirstPartyPath::new("/src").unwrap().to_path_buf(),
                 site_packages: None,
                 custom_typeshed: None,
             },

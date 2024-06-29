@@ -510,8 +510,7 @@ impl<'db, 'inference> TypingContext<'db, 'inference> {
 
 #[cfg(test)]
 mod tests {
-    use red_knot_module_resolver::{set_module_resolution_settings, ModuleResolutionSettings};
-    use ruff_db::file_system::FileSystemPathBuf;
+    use red_knot_module_resolver::{FirstPartyPath, set_module_resolution_settings, ModuleResolutionSettings};
     use ruff_db::parsed::parsed_module;
     use ruff_db::vfs::system_path_to_file;
 
@@ -528,7 +527,7 @@ mod tests {
             &mut db,
             ModuleResolutionSettings {
                 extra_paths: vec![],
-                workspace_root: FileSystemPathBuf::from("/src"),
+                workspace_root: FirstPartyPath::new("/src").unwrap().to_path_buf(),
                 site_packages: None,
                 custom_typeshed: None,
             },
