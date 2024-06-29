@@ -80,7 +80,7 @@ impl fmt::Display for TypeshedVersionsParseErrorKind {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct TypeshedVersions(FxHashMap<ModuleName, PyVersionRange>);
 
 impl TypeshedVersions {

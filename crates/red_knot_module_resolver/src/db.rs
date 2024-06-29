@@ -5,6 +5,7 @@ use crate::resolver::{
     internal::{ModuleNameIngredient, ModuleResolverSearchPaths},
     resolve_module_query,
 };
+use crate::typeshed::versions::TypeshedVersions;
 
 #[salsa::jar(db=Db)]
 pub struct Jar(
@@ -14,9 +15,12 @@ pub struct Jar(
     file_to_module,
 );
 
-pub trait Db: salsa::DbWithJar<Jar> + ruff_db::Db + Upcast<dyn ruff_db::Db> {}
+pub trait Db: salsa::DbWithJar<Jar> + ruff_db::Db + Upcast<dyn ruff_db::Db> {
+    fn typeshed_versions(&self) -> &TypeshedVersions;
+}
 
 pub(crate) mod tests {
+    use std::str::FromStr;
     use std::sync;
 
     use salsa::DebugWithDb;
@@ -32,6 +36,7 @@ pub(crate) mod tests {
         file_system: TestFileSystem,
         events: sync::Arc<sync::Mutex<Vec<salsa::Event>>>,
         vfs: Vfs,
+        typeshed_versions: TypeshedVersions,
     }
 
     impl TestDb {
@@ -42,6 +47,7 @@ pub(crate) mod tests {
                 file_system: TestFileSystem::Memory(MemoryFileSystem::default()),
                 events: sync::Arc::default(),
                 vfs: Vfs::with_stubbed_vendored(),
+                typeshed_versions: TypeshedVersions::from_str("").unwrap(),
             }
         }
 
@@ -111,7 +117,11 @@ pub(crate) mod tests {
         }
     }
 
-    impl Db for TestDb {}
+    impl Db for TestDb {
+        fn typeshed_versions(&self) -> &TypeshedVersions {
+            &self.typeshed_versions
+        }
+    }
 
     impl salsa::Database for TestDb {
         fn salsa_event(&self, event: salsa::Event) {
@@ -128,6 +138,7 @@ pub(crate) mod tests {
                 file_system: self.file_system.snapshot(),
                 events: self.events.clone(),
                 vfs: self.vfs.snapshot(),
+                typeshed_versions: self.typeshed_versions.clone(),
             })
         }
     }

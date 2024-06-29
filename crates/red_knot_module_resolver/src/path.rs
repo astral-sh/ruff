@@ -73,6 +73,11 @@ impl ExtraPath {
     }
 
     #[must_use]
+    fn is_directory(&self, file_system: &dyn FileSystem) -> bool {
+        file_system.is_directory(&self.0)
+    }
+
+    #[must_use]
     pub(crate) fn with_pyi_extension(&self) -> ExtraPathBuf {
         ExtraPathBuf(self.0.with_extension("pyi"))
     }
@@ -251,6 +256,11 @@ impl FirstPartyPath {
     fn is_regular_package(&self, file_system: &dyn FileSystem) -> bool {
         file_system.exists(&self.0.join("__init__.py"))
             || file_system.exists(&self.0.join("__init__.pyi"))
+    }
+
+    #[must_use]
+    fn is_directory(&self, file_system: &dyn FileSystem) -> bool {
+        file_system.is_directory(&self.0)
     }
 
     #[must_use]
@@ -463,6 +473,11 @@ impl StandardLibraryPath {
     }
 
     #[must_use]
+    fn is_directory(&self, db: &dyn Db) -> bool {
+        todo!()
+    }
+
+    #[must_use]
     pub(crate) fn with_pyi_extension(&self) -> StandardLibraryPathBuf {
         StandardLibraryPathBuf(self.0.with_extension("pyi"))
     }
@@ -654,6 +669,11 @@ impl SitePackagesPath {
     }
 
     #[must_use]
+    fn is_directory(&self, file_system: &dyn FileSystem) -> bool {
+        file_system.is_directory(&self.0)
+    }
+
+    #[must_use]
     pub(crate) fn with_pyi_extension(&self) -> SitePackagesPathBuf {
         SitePackagesPathBuf(self.0.with_extension("pyi"))
     }
@@ -806,7 +826,7 @@ impl ModuleResolutionPath {
     }
 
     pub(crate) fn is_directory(&self, db: &dyn Db) -> bool {
-        ModuleResolutionPathRef::from(self).is_regular_package(db)
+        ModuleResolutionPathRef::from(self).is_directory(db)
     }
 
     pub(crate) fn with_pyi_extension(&self) -> Self {
@@ -1000,6 +1020,16 @@ impl<'a> ModuleResolutionPathRef<'a> {
             Self::FirstParty(path) => path.is_regular_package(db.file_system()),
             Self::StandardLibrary(path) => path.is_regular_package(db),
             Self::SitePackages(path) => path.is_regular_package(db.file_system()),
+        }
+    }
+
+    #[must_use]
+    pub(crate) fn is_directory(self, db: &dyn Db) -> bool {
+        match self {
+            Self::Extra(path) => path.is_directory(db.file_system()),
+            Self::FirstParty(path) => path.is_directory(db.file_system()),
+            Self::StandardLibrary(path) => path.is_directory(db),
+            Self::SitePackages(path) => path.is_directory(db.file_system()),
         }
     }
 
