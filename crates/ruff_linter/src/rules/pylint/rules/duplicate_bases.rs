@@ -78,7 +78,7 @@ pub(crate) fn duplicate_bases(checker: &mut Checker, name: &str, arguments: Opti
                     remove_argument(
                         base,
                         arguments.unwrap(),
-                        Parentheses::Preserve,
+                        Parentheses::Remove,
                         checker.locator().contents(),
                     )
                     .map(Fix::safe_edit)
