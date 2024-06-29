@@ -58,9 +58,10 @@ impl Violation for DuplicateBases {
 
 /// PLE0241
 pub(crate) fn duplicate_bases(checker: &mut Checker, name: &str, arguments: Option<&Arguments>) {
-    let Some(Arguments { args: bases, .. }) = arguments else {
+    let Some(arguments) = arguments else {
         return;
     };
+    let bases = &arguments.args;
 
     let mut seen: FxHashSet<&str> = FxHashSet::with_capacity_and_hasher(bases.len(), FxBuildHasher);
     for base in bases.iter() {
@@ -73,11 +74,10 @@ pub(crate) fn duplicate_bases(checker: &mut Checker, name: &str, arguments: Opti
                     },
                     base.range(),
                 );
-
                 diagnostic.try_set_fix(|| {
                     remove_argument(
                         base,
-                        arguments.unwrap(),
+                        arguments,
                         Parentheses::Remove,
                         checker.locator().contents(),
                     )
