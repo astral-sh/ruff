@@ -165,7 +165,7 @@ pub(crate) fn check_logical_lines(
 
         let indent_level = expand_indent(locator.slice(range), settings.tab_size);
 
-        let indent_size = 4;
+        let indent_size = settings.tab_size.as_usize();
 
         if enforce_indentation {
             for kind in indentation(
