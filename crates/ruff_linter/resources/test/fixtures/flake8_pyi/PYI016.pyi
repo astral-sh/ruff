@@ -84,3 +84,6 @@ field24: typing.Union[int, typing.Union[int, int]]  # PYI016: Duplicate union me
 # duplicates of the outer `int`), but not three times (which would indicate that
 # we incorrectly re-checked the nested union).
 field25: typing.Union[int, int | int]  # PYI016: Duplicate union member `int`
+
+# Single element unions should also be accounted for
+field26: typing.Union[int, typing.Union[int]]  # PYI016: Duplicate union member `int`
