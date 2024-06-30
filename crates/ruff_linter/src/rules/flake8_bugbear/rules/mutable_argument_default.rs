@@ -6,7 +6,9 @@ use ruff_python_ast::{self as ast, Expr, Parameter, ParameterWithDefault};
 use ruff_python_codegen::{Generator, Stylist};
 use ruff_python_index::Indexer;
 use ruff_python_semantic::analyze::function_type::is_stub;
-use ruff_python_semantic::analyze::typing::{is_immutable_annotation, is_mutable_expr};
+use ruff_python_semantic::analyze::typing::{
+    is_immutable_annotation, is_immutable_expr, is_mutable_annotation, is_mutable_expr,
+};
 use ruff_python_semantic::SemanticModel;
 use ruff_python_trivia::{indentation_at_offset, textwrap};
 use ruff_source_file::Locator;
@@ -103,10 +105,19 @@ pub(crate) fn mutable_argument_default(checker: &mut Checker, function_def: &ast
             .map(|target| QualifiedName::from_dotted_name(target))
             .collect();
 
-        if is_mutable_expr(default, checker.semantic())
+        // Either the expression _or_ the annotation must be mutable.
+        if (is_mutable_expr(default, checker.semantic())
             && !parameter.annotation.as_ref().is_some_and(|expr| {
                 is_immutable_annotation(expr, checker.semantic(), extend_immutable_calls.as_slice())
-            })
+            }))
+            || (parameter.annotation.as_ref().is_some_and(|annotation| {
+                is_mutable_annotation(annotation, checker.semantic())
+                    && !is_immutable_expr(
+                        default,
+                        checker.semantic(),
+                        extend_immutable_calls.as_slice(),
+                    )
+            }))
         {
             let mut diagnostic = Diagnostic::new(MutableArgumentDefault, default.range());
 

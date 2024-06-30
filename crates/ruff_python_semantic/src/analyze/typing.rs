@@ -212,6 +212,45 @@ pub fn to_pep604_operator(
         })
 }
 
+/// Return `true` if `Expr` represents a reference to a type annotation that resolves to a mutable
+/// type.
+pub fn is_mutable_annotation(expr: &Expr, semantic: &SemanticModel) -> bool {
+    match expr {
+        Expr::Name(_) | Expr::Attribute(_) => semantic
+            .resolve_qualified_name(expr)
+            .is_some_and(|qualified_name| is_mutable_return_type(qualified_name.segments())),
+        Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => semantic
+            .resolve_qualified_name(value)
+            .is_some_and(|qualified_name| {
+                if is_mutable_return_type(qualified_name.segments()) {
+                    true
+                } else if semantic.match_typing_qualified_name(&qualified_name, "Union") {
+                    if let Expr::Tuple(ast::ExprTuple { elts, .. }) = slice.as_ref() {
+                        elts.iter().all(|elt| is_mutable_annotation(elt, semantic))
+                    } else {
+                        false
+                    }
+                } else if is_pep_593_generic_type(qualified_name.segments()) {
+                    if let Expr::Tuple(ast::ExprTuple { elts, .. }) = slice.as_ref() {
+                        elts.first()
+                            .is_some_and(|elt| is_mutable_annotation(elt, semantic))
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                }
+            }),
+        Expr::BinOp(ast::ExprBinOp {
+            left,
+            op: Operator::BitOr,
+            right,
+            range: _,
+        }) => is_mutable_annotation(left, semantic) && is_mutable_annotation(right, semantic),
+        _ => false,
+    }
+}
+
 /// Return `true` if `Expr` represents a reference to a type annotation that resolves to an
 /// immutable type.
 pub fn is_immutable_annotation(
@@ -236,7 +275,7 @@ pub fn is_immutable_annotation(
             .is_some_and(|qualified_name| {
                 if is_immutable_generic_type(qualified_name.segments()) {
                     true
-                } else if matches!(qualified_name.segments(), ["typing", "Union"]) {
+                } else if semantic.match_typing_qualified_name(&qualified_name, "Union") {
                     if let Expr::Tuple(ast::ExprTuple { elts, .. }) = slice.as_ref() {
                         elts.iter().all(|elt| {
                             is_immutable_annotation(elt, semantic, extend_immutable_calls)
@@ -244,7 +283,7 @@ pub fn is_immutable_annotation(
                     } else {
                         false
                     }
-                } else if matches!(qualified_name.segments(), ["typing", "Optional"]) {
+                } else if semantic.match_typing_qualified_name(&qualified_name, "Optional") {
                     is_immutable_annotation(slice, semantic, extend_immutable_calls)
                 } else if is_pep_593_generic_type(qualified_name.segments()) {
                     if let Expr::Tuple(ast::ExprTuple { elts, .. }) = slice.as_ref() {
@@ -307,6 +346,29 @@ pub fn is_mutable_expr(expr: &Expr, semantic: &SemanticModel) -> bool {
         | Expr::DictComp(_)
         | Expr::SetComp(_) => true,
         Expr::Call(ast::ExprCall { func, .. }) => is_mutable_func(func, semantic),
+        _ => false,
+    }
+}
+
+/// Return `true` if `expr` is an expression that resolves to an immutable value.
+pub fn is_immutable_expr(
+    expr: &Expr,
+    semantic: &SemanticModel,
+    extend_immutable_calls: &[QualifiedName],
+) -> bool {
+    match expr {
+        Expr::NoneLiteral(_) => true,
+        Expr::BooleanLiteral(_) => true,
+        Expr::NumberLiteral(_) => true,
+        Expr::StringLiteral(_) => true,
+        Expr::BytesLiteral(_) => true,
+        Expr::EllipsisLiteral(_) => true,
+        Expr::Tuple(ast::ExprTuple { elts, .. }) => elts
+            .iter()
+            .all(|elt| is_immutable_expr(elt, semantic, extend_immutable_calls)),
+        Expr::Call(ast::ExprCall { func, .. }) => {
+            is_immutable_func(func, semantic, extend_immutable_calls)
+        }
         _ => false,
     }
 }
