@@ -14,10 +14,6 @@ use super::super::detection::comment_contains_code;
 /// Commented-out code is dead code, and is often included inadvertently.
 /// It should be removed.
 ///
-/// ## Known problems
-/// Prone to false positives when checking comments that resemble Python code,
-/// but are not actually Python code ([#4845]).
-///
 /// ## Example
 /// ```python
 /// # print("Hello, world!")
@@ -25,8 +21,6 @@ use super::super::detection::comment_contains_code;
 ///
 /// ## Options
 /// - `lint.task-tags`
-///
-/// [#4845]: https://github.com/astral-sh/ruff/issues/4845
 #[violation]
 pub struct CommentedOutCode;
 
