@@ -35,7 +35,7 @@ use super::helpers::{
 /// fixtures is fine, but it's best to be consistent.
 ///
 /// Whilst in [preview], this rule defaults to removing unnecessary parentheses
-/// to cohere better with official Pytest projects.
+/// to cohere better with official pytest projects.
 ///
 /// ## Example
 /// ```python

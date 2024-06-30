@@ -15,7 +15,7 @@ use super::helpers::get_mark_decorators;
 /// setting.
 ///
 /// Whilst in [preview], this rule defaults to removing unnecessary parentheses
-/// to cohere better with official Pytest projects.
+/// to cohere better with official pytest projects.
 ///
 /// ## Why is this bad?
 /// If a `@pytest.mark.<marker>()` doesn't take any arguments, the parentheses are
