@@ -192,7 +192,6 @@ impl<'db> PublicSymbolsMap<'db> {
 /// A cross-module identifier of a scope that can be used as a salsa query parameter.
 #[salsa::tracked]
 pub struct ScopeId<'db> {
-    #[allow(clippy::used_underscore_binding)]
     #[id]
     pub file: VfsFile,
     #[id]
