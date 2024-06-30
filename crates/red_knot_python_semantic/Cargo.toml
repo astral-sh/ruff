@@ -28,7 +28,6 @@ hashbrown = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
-ruff_python_parser = { workspace = true }
 
 [lints]
 workspace = true
