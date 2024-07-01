@@ -70,7 +70,10 @@ _T4 = TypeVar("_T4")
 _T5 = TypeVar("_T5")
 _T6 = TypeVar("_T6")
 _FT = TypeVar("_FT", bound=Future[Any])
-_FutureLike: TypeAlias = Future[_T] | Generator[Any, None, _T] | Awaitable[_T]
+if sys.version_info >= (3, 12):
+    _FutureLike: TypeAlias = Future[_T] | Awaitable[_T]
+else:
+    _FutureLike: TypeAlias = Future[_T] | Generator[Any, None, _T] | Awaitable[_T]
 _TaskYieldType: TypeAlias = Future[object] | None
 
 FIRST_COMPLETED = concurrent.futures.FIRST_COMPLETED

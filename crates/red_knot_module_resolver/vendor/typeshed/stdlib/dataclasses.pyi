@@ -108,7 +108,7 @@ class _DefaultFactory(Protocol[_T_co]):
 
 class Field(Generic[_T]):
     name: str
-    type: Type[_T]
+    type: Type[_T] | str | Any
     default: _T | Literal[_MISSING_TYPE.MISSING]
     default_factory: _DefaultFactory[_T] | Literal[_MISSING_TYPE.MISSING]
     repr: bool

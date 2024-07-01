@@ -16,23 +16,40 @@ from .tasks import Task
 from .transports import BaseTransport, DatagramTransport, ReadTransport, SubprocessTransport, Transport, WriteTransport
 from .unix_events import AbstractChildWatcher
 
-__all__ = (
-    "AbstractEventLoopPolicy",
-    "AbstractEventLoop",
-    "AbstractServer",
-    "Handle",
-    "TimerHandle",
-    "get_event_loop_policy",
-    "set_event_loop_policy",
-    "get_event_loop",
-    "set_event_loop",
-    "new_event_loop",
-    "get_child_watcher",
-    "set_child_watcher",
-    "_set_running_loop",
-    "get_running_loop",
-    "_get_running_loop",
-)
+if sys.version_info >= (3, 14):
+    __all__ = (
+        "AbstractEventLoopPolicy",
+        "AbstractEventLoop",
+        "AbstractServer",
+        "Handle",
+        "TimerHandle",
+        "get_event_loop_policy",
+        "set_event_loop_policy",
+        "get_event_loop",
+        "set_event_loop",
+        "new_event_loop",
+        "_set_running_loop",
+        "get_running_loop",
+        "_get_running_loop",
+    )
+else:
+    __all__ = (
+        "AbstractEventLoopPolicy",
+        "AbstractEventLoop",
+        "AbstractServer",
+        "Handle",
+        "TimerHandle",
+        "get_event_loop_policy",
+        "set_event_loop_policy",
+        "get_event_loop",
+        "set_event_loop",
+        "new_event_loop",
+        "get_child_watcher",
+        "set_child_watcher",
+        "_set_running_loop",
+        "get_running_loop",
+        "_get_running_loop",
+    )
 
 _T = TypeVar("_T")
 _Ts = TypeVarTuple("_Ts")
@@ -541,18 +558,19 @@ class AbstractEventLoopPolicy:
     @abstractmethod
     def new_event_loop(self) -> AbstractEventLoop: ...
     # Child processes handling (Unix only).
-    if sys.version_info >= (3, 12):
-        @abstractmethod
-        @deprecated("Deprecated as of Python 3.12; will be removed in Python 3.14")
-        def get_child_watcher(self) -> AbstractChildWatcher: ...
-        @abstractmethod
-        @deprecated("Deprecated as of Python 3.12; will be removed in Python 3.14")
-        def set_child_watcher(self, watcher: AbstractChildWatcher) -> None: ...
-    else:
-        @abstractmethod
-        def get_child_watcher(self) -> AbstractChildWatcher: ...
-        @abstractmethod
-        def set_child_watcher(self, watcher: AbstractChildWatcher) -> None: ...
+    if sys.version_info < (3, 14):
+        if sys.version_info >= (3, 12):
+            @abstractmethod
+            @deprecated("Deprecated as of Python 3.12; will be removed in Python 3.14")
+            def get_child_watcher(self) -> AbstractChildWatcher: ...
+            @abstractmethod
+            @deprecated("Deprecated as of Python 3.12; will be removed in Python 3.14")
+            def set_child_watcher(self, watcher: AbstractChildWatcher) -> None: ...
+        else:
+            @abstractmethod
+            def get_child_watcher(self) -> AbstractChildWatcher: ...
+            @abstractmethod
+            def set_child_watcher(self, watcher: AbstractChildWatcher) -> None: ...
 
 class BaseDefaultEventLoopPolicy(AbstractEventLoopPolicy, metaclass=ABCMeta):
     def get_event_loop(self) -> AbstractEventLoop: ...
@@ -565,15 +583,16 @@ def get_event_loop() -> AbstractEventLoop: ...
 def set_event_loop(loop: AbstractEventLoop | None) -> None: ...
 def new_event_loop() -> AbstractEventLoop: ...
 
-if sys.version_info >= (3, 12):
-    @deprecated("Deprecated as of Python 3.12; will be removed in Python 3.14")
-    def get_child_watcher() -> AbstractChildWatcher: ...
-    @deprecated("Deprecated as of Python 3.12; will be removed in Python 3.14")
-    def set_child_watcher(watcher: AbstractChildWatcher) -> None: ...
+if sys.version_info < (3, 14):
+    if sys.version_info >= (3, 12):
+        @deprecated("Deprecated as of Python 3.12; will be removed in Python 3.14")
+        def get_child_watcher() -> AbstractChildWatcher: ...
+        @deprecated("Deprecated as of Python 3.12; will be removed in Python 3.14")
+        def set_child_watcher(watcher: AbstractChildWatcher) -> None: ...
 
-else:
-    def get_child_watcher() -> AbstractChildWatcher: ...
-    def set_child_watcher(watcher: AbstractChildWatcher) -> None: ...
+    else:
+        def get_child_watcher() -> AbstractChildWatcher: ...
+        def set_child_watcher(watcher: AbstractChildWatcher) -> None: ...
 
 def _set_running_loop(loop: AbstractEventLoop | None, /) -> None: ...
 def _get_running_loop() -> AbstractEventLoop: ...
