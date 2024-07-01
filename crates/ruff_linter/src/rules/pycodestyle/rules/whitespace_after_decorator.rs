@@ -10,18 +10,21 @@ use crate::checkers::ast::Checker;
 /// Checks for whitespace after a decorator.
 ///
 /// ## Why is this bad?
+/// Whitespace after a decorator is not PEP8 compliant.
 ///
+/// ## Example
 ///
-///
-/// ## Formatter compatibility
-///
-///
-///
-///
-///
-///
-///
-///
+/// ```python
+/// @ decorator
+/// def foo():
+///    pass
+/// ```
+/// Use instead:
+/// ``` python
+/// @decorator
+/// def foo():
+///   pass
+/// ```
 
 #[violation]
 pub struct WhitespaceAfterDecorator;
@@ -37,10 +40,7 @@ impl AlwaysFixableViolation for WhitespaceAfterDecorator {
     }
 }
 
-// Function that checks weather there is a whitespace after a decorator using
-// the provided `Decorator` list and the functions
-// You can use locator.slice(decorator) to get the text of the decorator.
-// The last step is to find the @ and then test if whatever comes after is_python_whitespace.
+/// E204
 pub(crate) fn whitespace_after_decorator(checker: &mut Checker, decorator_list: &[Decorator]) {
     // Get the locator from the checker
     let locator = checker.locator();
