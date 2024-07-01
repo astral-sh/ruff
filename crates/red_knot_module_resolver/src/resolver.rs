@@ -1,4 +1,3 @@
-use internal::TargetPyVersion;
 use std::ops::Deref;
 use std::sync::Arc;
 
@@ -12,9 +11,10 @@ use crate::path::{
     StandardLibraryPathBuf,
 };
 use crate::resolver::internal::ModuleResolverSearchPaths;
+use crate::supported_py_version::set_target_py_version;
 use crate::{Db, SupportedPyVersion};
 
-/// Configures the module search paths for the module resolver.
+/// Configures the module resolver settings.
 ///
 /// Must be called before calling any other module resolution functions.
 pub fn set_module_resolution_settings(db: &mut dyn Db, config: ModuleResolutionSettings) {
@@ -27,11 +27,7 @@ pub fn set_module_resolution_settings(db: &mut dyn Db, config: ModuleResolutionS
     } else {
         ModuleResolverSearchPaths::new(db, search_paths);
     }
-    if let Some(existing) = TargetPyVersion::try_get(db) {
-        existing.set_target_py_version(db).to(target_version);
-    } else {
-        TargetPyVersion::new(db, target_version);
-    }
+    set_target_py_version(db, target_version);
 }
 
 /// Resolves a module name to a module.
@@ -217,18 +213,11 @@ impl Deref for OrderedSearchPaths {
 pub(crate) mod internal {
     use crate::module_name::ModuleName;
     use crate::resolver::OrderedSearchPaths;
-    use crate::SupportedPyVersion;
 
     #[salsa::input(singleton)]
     pub(crate) struct ModuleResolverSearchPaths {
         #[return_ref]
         pub(super) search_paths: OrderedSearchPaths,
-    }
-
-    #[salsa::input(singleton)]
-    pub(crate) struct TargetPyVersion {
-        #[return_ref]
-        pub(super) target_py_version: SupportedPyVersion,
     }
 
     /// A thin wrapper around `ModuleName` to make it a Salsa ingredient.

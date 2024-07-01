@@ -7,8 +7,9 @@ use ruff_db::file_system::{FileSystem, FileSystemPath, FileSystemPathBuf};
 use ruff_db::vfs::VfsPath;
 
 use crate::module_name::ModuleName;
+use crate::supported_py_version::get_target_py_version;
 use crate::typeshed::TypeshedVersionsQueryResult;
-use crate::{Db, SupportedPyVersion};
+use crate::Db;
 
 #[repr(transparent)]
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -479,7 +480,7 @@ impl StandardLibraryPath {
         };
         match db
             .typeshed_versions()
-            .query_module(&module_name, SupportedPyVersion::Py37)
+            .query_module(&module_name, get_target_py_version(db))
         {
             TypeshedVersionsQueryResult::Exists | TypeshedVersionsQueryResult::MaybeExists => {
                 db.file_system().exists(&self.0.join("__init__.pyi"))
@@ -495,7 +496,7 @@ impl StandardLibraryPath {
         };
         match db
             .typeshed_versions()
-            .query_module(&module_name, SupportedPyVersion::Py37)
+            .query_module(&module_name, get_target_py_version(db))
         {
             TypeshedVersionsQueryResult::Exists | TypeshedVersionsQueryResult::MaybeExists => {
                 db.file_system().is_directory(&self.0)

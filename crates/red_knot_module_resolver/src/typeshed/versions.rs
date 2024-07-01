@@ -6,8 +6,8 @@ use std::str::FromStr;
 
 use rustc_hash::FxHashMap;
 
-use super::supported_py_version::SupportedPyVersion;
 use crate::module_name::ModuleName;
+use crate::supported_py_version::SupportedPyVersion;
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct TypeshedVersionsParseError {

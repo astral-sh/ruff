@@ -2,9 +2,10 @@ use ruff_db::Upcast;
 
 use crate::resolver::{
     file_to_module,
-    internal::{ModuleNameIngredient, ModuleResolverSearchPaths, TargetPyVersion},
+    internal::{ModuleNameIngredient, ModuleResolverSearchPaths},
     resolve_module_query,
 };
+use crate::supported_py_version::TargetPyVersion;
 use crate::typeshed::TypeshedVersions;
 
 #[salsa::jar(db=Db)]
