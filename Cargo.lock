@@ -1881,7 +1881,6 @@ dependencies = [
  "ruff_python_parser",
  "ruff_text_size",
  "rustc-hash 2.0.0",
- "smol_str",
  "tempfile",
  "tracing",
  "tracing-subscriber",
@@ -1893,13 +1892,13 @@ name = "red_knot_module_resolver"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "compact_str",
  "insta",
  "path-slash",
  "ruff_db",
  "ruff_python_stdlib",
  "rustc-hash 2.0.0",
  "salsa",
- "smol_str",
  "tempfile",
  "tracing",
  "walkdir",
@@ -2859,15 +2858,6 @@ name = "smallvec"
 version = "1.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3c5e1a9a646d36c3599cd173a41282daf47c44583ad367b8e6837255952e5c67"
-
-[[package]]
-name = "smol_str"
-version = "0.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dd538fb6910ac1099850255cf94a94df6551fbdd602454387d0adb2d1ca6dead"
-dependencies = [
- "serde",
-]
 
 [[package]]
 name = "spin"

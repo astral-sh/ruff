@@ -51,7 +51,7 @@ impl Program {
                     // TODO We may want to have a different check functions for non-first-party
                     //   files because we only need to index them and not check them.
                     //   Supporting non-first-party code also requires supporting typing stubs.
-                    if let Some(dependency) = resolve_module(self, dependency_name)? {
+                    if let Some(dependency) = resolve_module(self, &dependency_name)? {
                         if dependency.path(self)?.root().kind().is_first_party() {
                             context.schedule_dependency(dependency.path(self)?.file());
                         }

@@ -2,7 +2,7 @@
 use crate::ast_ids::NodeKey;
 use crate::db::{QueryResult, SemanticDb, SemanticJar};
 use crate::files::FileId;
-use crate::module::{Module, ModuleName};
+use crate::module::Module;
 use crate::semantic::{
     resolve_global_symbol, semantic_index, GlobalSymbolId, ScopeId, ScopeKind, SymbolId,
 };
@@ -14,6 +14,7 @@ use rustc_hash::FxHashMap;
 pub(crate) mod infer;
 
 pub(crate) use infer::{infer_definition_type, infer_symbol_public_type};
+use red_knot_module_resolver::ModuleName;
 use ruff_python_ast::name::Name;
 
 /// unique ID for a type

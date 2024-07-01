@@ -1,5 +1,5 @@
 use crate::ast_ids::TypedNodeKey;
-use crate::semantic::ModuleName;
+use red_knot_module_resolver::ModuleName;
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 
