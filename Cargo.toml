@@ -58,7 +58,7 @@ countme = { version = "3.0.1" }
 compact_str = "0.7.1"
 criterion = { version = "0.5.1", default-features = false }
 crossbeam = { version = "0.8.4" }
-dashmap = { version = "5.5.3" }
+dashmap = { version = "6.0.0" }
 drop_bomb = { version = "0.1.5" }
 env_logger = { version = "0.11.0" }
 etcetera = { version = "0.8.0" }
