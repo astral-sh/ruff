@@ -1,3 +1,4 @@
+use compact_str::ToCompactString;
 use std::fmt::Formatter;
 use std::ops::Deref;
 use std::sync::Arc;
@@ -12,7 +13,7 @@ use crate::Db;
 ///
 /// Always normalized to the absolute form (never a relative module name, i.e., never `.foo`).
 #[derive(Clone, Debug, Eq, PartialEq, Hash, PartialOrd, Ord)]
-pub struct ModuleName(smol_str::SmolStr);
+pub struct ModuleName(compact_str::CompactString);
 
 impl ModuleName {
     /// Creates a new module name for `name`. Returns `Some` if `name` is a valid, absolute
@@ -27,7 +28,7 @@ impl ModuleName {
     /// * A component of a name (the part between two dots) isn't a valid python identifier.
     #[inline]
     pub fn new(name: &str) -> Option<Self> {
-        Self::new_from_smol(smol_str::SmolStr::new(name))
+        Self::is_valid_name(name).then(|| Self(compact_str::CompactString::from(name)))
     }
 
     /// Creates a new module name for `name` where `name` is a static string.
@@ -56,19 +57,16 @@ impl ModuleName {
     /// ```
     #[inline]
     pub fn new_static(name: &'static str) -> Option<Self> {
-        Self::new_from_smol(smol_str::SmolStr::new_static(name))
+        // TODO(Micha): Use CompactString::const_new once we upgrade to 0.8 https://github.com/ParkMyCar/compact_str/pull/336
+        Self::is_valid_name(name).then(|| Self(compact_str::CompactString::from(name)))
     }
 
-    fn new_from_smol(name: smol_str::SmolStr) -> Option<Self> {
+    fn is_valid_name(name: &str) -> bool {
         if name.is_empty() {
-            return None;
+            return false;
         }
 
-        if name.split('.').all(is_identifier) {
-            Some(Self(name))
-        } else {
-            None
-        }
+        name.split('.').all(is_identifier)
     }
 
     /// An iterator over the components of the module name:
@@ -97,8 +95,7 @@ impl ModuleName {
     /// ```
     pub fn parent(&self) -> Option<ModuleName> {
         let (parent, _) = self.0.rsplit_once('.')?;
-
-        Some(Self(smol_str::SmolStr::new(parent)))
+        Some(Self(parent.to_compact_string()))
     }
 
     /// Returns `true` if the name starts with `other`.
@@ -141,7 +138,7 @@ impl ModuleName {
         };
 
         let name = if let Some(parent) = path.parent() {
-            let mut name = String::with_capacity(path.as_str().len());
+            let mut name = compact_str::CompactString::with_capacity(path.as_str().len());
 
             for component in parent.components() {
                 name.push_str(component.as_os_str().to_str()?);
@@ -151,9 +148,9 @@ impl ModuleName {
             // SAFETY: Unwrap is safe here or `parent` would have returned `None`.
             name.push_str(path.file_stem().unwrap());
 
-            smol_str::SmolStr::from(name)
+            name
         } else {
-            smol_str::SmolStr::new(path.file_stem()?)
+            path.file_stem()?.to_compact_string()
         };
 
         Some(Self(name))
