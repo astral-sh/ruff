@@ -45,9 +45,10 @@ impl HasTy for ast::ExpressionRef<'_> {
     fn ty<'db>(&self, model: &SemanticModel<'db>) -> Type<'db> {
         let index = semantic_index(model.db, model.file);
         let file_scope = index.expression_scope_id(*self);
-        let expression_id = self.scoped_ast_id(model.db, model.file, file_scope);
-
         let scope = file_scope.to_scope_id(model.db, model.file);
+
+        let expression_id = self.scoped_ast_id(model.db, scope);
+
         infer_types(model.db, scope).expression_ty(expression_id)
     }
 }
@@ -152,8 +153,7 @@ impl HasTy for ast::StmtFunctionDef {
         let scope = parent_scope_id.to_scope_id(model.db, model.file);
 
         let types = infer_types(model.db, scope);
-        let definition =
-            Definition::FunctionDef(self.scoped_ast_id(model.db, model.file, parent_scope_id));
+        let definition = Definition::FunctionDef(self.scoped_ast_id(model.db, scope));
 
         types.definition_ty(definition)
     }
@@ -175,8 +175,7 @@ impl HasTy for StmtClassDef {
         let scope = parent_scope_id.to_scope_id(model.db, model.file);
 
         let types = infer_types(model.db, scope);
-        let definition =
-            Definition::ClassDef(self.scoped_ast_id(model.db, model.file, parent_scope_id));
+        let definition = Definition::ClassDef(self.scoped_ast_id(model.db, scope));
 
         types.definition_ty(definition)
     }
