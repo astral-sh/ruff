@@ -863,7 +863,7 @@ pub(crate) fn string_dot_format_missing_argument(
         .iter()
         .filter_map(|k| {
             let Keyword { arg, .. } = &k;
-            arg.as_ref().map(|identifier| identifier.id())
+            arg.as_ref().map(ruff_python_ast::Identifier::id)
         })
         .collect();
 

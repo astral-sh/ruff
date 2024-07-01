@@ -242,7 +242,7 @@ impl Visitor<'_> for SemanticIndexBuilder<'_> {
                 );
 
                 self.with_type_params(
-                    &name,
+                    name,
                     &WithTypeParams::FunctionDef {
                         node: function_def,
                         id: AstId::new(scope, function_id),
@@ -256,7 +256,7 @@ impl Visitor<'_> for SemanticIndexBuilder<'_> {
 
                         builder.push_scope(
                             NodeWithScopeId::Function(AstId::new(scope, function_id)),
-                            &name,
+                            name,
                             Some(symbol),
                             Some(definition),
                         );
@@ -279,7 +279,7 @@ impl Visitor<'_> for SemanticIndexBuilder<'_> {
                     self.add_or_update_symbol_with_definition(name.clone(), definition),
                 );
                 self.with_type_params(
-                    &name,
+                    name,
                     &WithTypeParams::ClassDef {
                         node: class,
                         id: AstId::new(scope, class_id),
@@ -292,7 +292,7 @@ impl Visitor<'_> for SemanticIndexBuilder<'_> {
 
                         builder.push_scope(
                             NodeWithScopeId::Class(AstId::new(scope, class_id)),
-                            &name,
+                            name,
                             Some(id),
                             Some(definition),
                         );

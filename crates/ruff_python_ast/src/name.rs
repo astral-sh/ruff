@@ -8,7 +8,7 @@ use crate::{nodes, Expr};
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 #[cfg_attr(
     feature = "serde",
-    derive(serde::Serialize, serde::Deserialize, ruff_macros::CacheKey,)
+    derive(serde::Serialize, serde::Deserialize, ruff_macros::CacheKey)
 )]
 pub struct Name(compact_str::CompactString);
 
@@ -25,7 +25,7 @@ impl Name {
 
     #[inline]
     pub fn new_static(name: &'static str) -> Self {
-        // TODO: Use ComactString::const_new once we upgrade to 0.8 https://github.com/ParkMyCar/compact_str/pull/336
+        // TODO(Micha): Use CompactString::const_new once we upgrade to 0.8 https://github.com/ParkMyCar/compact_str/pull/336
         Self(compact_str::CompactString::from(name))
     }
 
