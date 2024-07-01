@@ -1,6 +1,7 @@
 mod supported_py_version;
 mod versions;
 
+pub(crate) use versions::TypeshedVersionsQueryResult;
 pub use versions::TypeshedVersions;
 pub use supported_py_version::SupportedPyVersion;
 

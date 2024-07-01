@@ -7,7 +7,8 @@ use ruff_db::file_system::{FileSystem, FileSystemPath, FileSystemPathBuf};
 use ruff_db::vfs::VfsPath;
 
 use crate::module_name::ModuleName;
-use crate::Db;
+use crate::typeshed::TypeshedVersionsQueryResult;
+use crate::{Db, SupportedPyVersion};
 
 #[repr(transparent)]
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -467,14 +468,40 @@ impl StandardLibraryPath {
         StandardLibraryPathBuf(self.0.to_path_buf())
     }
 
+    pub(crate) fn as_module_name(&self) -> Option<ModuleName> {
+        ModuleResolutionPathRef::StandardLibrary(self).as_module_name()
+    }
+
     #[must_use]
     fn is_regular_package(&self, db: &dyn Db) -> bool {
-        todo!()
+        let Some(module_name) = self.as_module_name() else {
+            return false;
+        };
+        match db
+            .typeshed_versions()
+            .query_module(&module_name, SupportedPyVersion::Py37)
+        {
+            TypeshedVersionsQueryResult::Exists | TypeshedVersionsQueryResult::MaybeExists => {
+                db.file_system().exists(&self.0.join("__init__.pyi"))
+            }
+            TypeshedVersionsQueryResult::DoesNotExist => false,
+        }
     }
 
     #[must_use]
     fn is_directory(&self, db: &dyn Db) -> bool {
-        todo!()
+        let Some(module_name) = self.as_module_name() else {
+            return false;
+        };
+        match db
+            .typeshed_versions()
+            .query_module(&module_name, SupportedPyVersion::Py37)
+        {
+            TypeshedVersionsQueryResult::Exists | TypeshedVersionsQueryResult::MaybeExists => {
+                db.file_system().is_directory(&self.0)
+            }
+            TypeshedVersionsQueryResult::DoesNotExist => false,
+        }
     }
 
     #[must_use]
