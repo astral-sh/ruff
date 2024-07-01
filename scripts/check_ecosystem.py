@@ -121,7 +121,7 @@ REPOSITORIES: list[Repository] = [
     Repository("aiven", "aiven-client", "main"),
     Repository("alteryx", "featuretools", "main"),
     Repository("apache", "airflow", "main", select="ALL"),
-    Repository("apache", "airflow", "superset", select="ALL"),
+    Repository("apache", "superset", "master", select="ALL"),
     Repository("aws", "aws-sam-cli", "develop"),
     Repository("binary-husky", "gpt_academic", "master"),
     Repository("bloomberg", "pytest-memray", "main"),
