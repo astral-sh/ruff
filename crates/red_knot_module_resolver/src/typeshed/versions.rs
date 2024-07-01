@@ -6,8 +6,8 @@ use std::str::FromStr;
 
 use rustc_hash::FxHashMap;
 
-use crate::module_name::ModuleName;
 use super::supported_py_version::SupportedPyVersion;
+use crate::module_name::ModuleName;
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct TypeshedVersionsParseError {
@@ -93,25 +93,52 @@ impl TypeshedVersions {
         self.0.is_empty()
     }
 
-    pub fn contains_module(&self, module_name: &ModuleName) -> bool {
-        self.0.contains_key(module_name)
+    fn get_exact(&self, module_name: &ModuleName) -> Option<&PyVersionRange> {
+        self.0.get(module_name)
     }
 
-    pub fn module_exists_on_version(
-        &self,
-        module: ModuleName,
-        version: impl Into<PyVersion>,
-    ) -> bool {
-        let version = version.into();
-        let mut module: Option<ModuleName> = Some(module);
-        while let Some(module_to_try) = module {
-            if let Some(range) = self.0.get(&module_to_try) {
-                return range.contains(version);
-            }
-            module = module_to_try.parent();
-        }
-        false
+    /// Helper function for testing purposes
+    #[cfg(test)]
+    fn contains_exact(&self, module: &ModuleName) -> bool {
+        self.get_exact(module).is_some()
     }
+
+    pub fn query_module(
+        &self,
+        module: &ModuleName,
+        version: impl Into<PyVersion>,
+    ) -> TypeshedVersionsQueryResult {
+        let version = version.into();
+        if let Some(range) = self.get_exact(module) {
+            if range.contains(version) {
+                TypeshedVersionsQueryResult::Exists
+            } else {
+                TypeshedVersionsQueryResult::DoesNotExist
+            }
+        } else {
+            let mut module = module.parent();
+            while let Some(module_to_try) = module {
+                if let Some(range) = self.get_exact(&module_to_try) {
+                    return {
+                        if range.contains(version) {
+                            TypeshedVersionsQueryResult::MaybeExists
+                        } else {
+                            TypeshedVersionsQueryResult::DoesNotExist
+                        }
+                    };
+                }
+                module = module_to_try.parent();
+            }
+            TypeshedVersionsQueryResult::DoesNotExist
+        }
+    }
+}
+
+#[derive(Debug, Copy, PartialEq, Eq, Clone, Hash)]
+pub enum TypeshedVersionsQueryResult {
+    Exists,
+    DoesNotExist,
+    MaybeExists,
 }
 
 impl FromStr for TypeshedVersions {
@@ -181,7 +208,7 @@ impl fmt::Display for TypeshedVersions {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 enum PyVersionRange {
     AvailableFrom(RangeFrom<PyVersion>),
     AvailableWithin(RangeInclusive<PyVersion>),
@@ -322,18 +349,31 @@ mod tests {
         let asyncio_staggered = ModuleName::new_static("asyncio.staggered").unwrap();
         let audioop = ModuleName::new_static("audioop").unwrap();
 
-        assert!(versions.contains_module(&asyncio));
-        assert!(versions.module_exists_on_version(asyncio, SupportedPyVersion::Py310));
-
-        assert!(versions.contains_module(&asyncio_staggered));
-        assert!(
-            versions.module_exists_on_version(asyncio_staggered.clone(), SupportedPyVersion::Py38)
+        assert!(versions.contains_exact(&asyncio));
+        assert_eq!(
+            versions.query_module(&asyncio, SupportedPyVersion::Py310),
+            TypeshedVersionsQueryResult::Exists
         );
-        assert!(!versions.module_exists_on_version(asyncio_staggered, SupportedPyVersion::Py37));
 
-        assert!(versions.contains_module(&audioop));
-        assert!(versions.module_exists_on_version(audioop.clone(), SupportedPyVersion::Py312));
-        assert!(!versions.module_exists_on_version(audioop, SupportedPyVersion::Py313));
+        assert!(versions.contains_exact(&asyncio_staggered));
+        assert_eq!(
+            versions.query_module(&asyncio_staggered, SupportedPyVersion::Py38),
+            TypeshedVersionsQueryResult::Exists
+        );
+        assert_eq!(
+            versions.query_module(&asyncio_staggered, SupportedPyVersion::Py37),
+            TypeshedVersionsQueryResult::DoesNotExist
+        );
+
+        assert!(versions.contains_exact(&audioop));
+        assert_eq!(
+            versions.query_module(&audioop, SupportedPyVersion::Py312),
+            TypeshedVersionsQueryResult::Exists
+        );
+        assert_eq!(
+            versions.query_module(&audioop, SupportedPyVersion::Py313),
+            TypeshedVersionsQueryResult::DoesNotExist
+        );
     }
 
     #[test]
@@ -381,7 +421,7 @@ mod tests {
             let top_level_module = ModuleName::new(top_level_module)
                 .unwrap_or_else(|| panic!("{top_level_module:?} was not a valid module name!"));
 
-            assert!(vendored_typeshed_versions.contains_module(&top_level_module));
+            assert!(vendored_typeshed_versions.contains_exact(&top_level_module));
         }
 
         assert!(
@@ -418,26 +458,74 @@ foo: 3.8-   # trailing comment
         let foo = ModuleName::new_static("foo").unwrap();
         let bar = ModuleName::new_static("bar").unwrap();
         let bar_baz = ModuleName::new_static("bar.baz").unwrap();
+        let bar_eggs = ModuleName::new_static("bar.eggs").unwrap();
         let spam = ModuleName::new_static("spam").unwrap();
 
-        assert!(parsed_versions.contains_module(&foo));
-        assert!(!parsed_versions.module_exists_on_version(foo.clone(), SupportedPyVersion::Py37));
-        assert!(parsed_versions.module_exists_on_version(foo.clone(), SupportedPyVersion::Py38));
-        assert!(parsed_versions.module_exists_on_version(foo, SupportedPyVersion::Py311));
+        assert!(parsed_versions.contains_exact(&foo));
+        assert_eq!(
+            parsed_versions.query_module(&foo, SupportedPyVersion::Py37),
+            TypeshedVersionsQueryResult::DoesNotExist
+        );
+        assert_eq!(
+            parsed_versions.query_module(&foo, SupportedPyVersion::Py38),
+            TypeshedVersionsQueryResult::Exists
+        );
+        assert_eq!(
+            parsed_versions.query_module(&foo, SupportedPyVersion::Py311),
+            TypeshedVersionsQueryResult::Exists
+        );
 
-        assert!(parsed_versions.contains_module(&bar));
-        assert!(parsed_versions.module_exists_on_version(bar.clone(), SupportedPyVersion::Py37));
-        assert!(parsed_versions.module_exists_on_version(bar.clone(), SupportedPyVersion::Py310));
-        assert!(!parsed_versions.module_exists_on_version(bar, SupportedPyVersion::Py311));
+        assert!(parsed_versions.contains_exact(&bar));
+        assert_eq!(
+            parsed_versions.query_module(&bar, SupportedPyVersion::Py37),
+            TypeshedVersionsQueryResult::Exists
+        );
+        assert_eq!(
+            parsed_versions.query_module(&bar, SupportedPyVersion::Py310),
+            TypeshedVersionsQueryResult::Exists
+        );
+        assert_eq!(
+            parsed_versions.query_module(&bar, SupportedPyVersion::Py311),
+            TypeshedVersionsQueryResult::DoesNotExist
+        );
 
-        assert!(parsed_versions.contains_module(&bar_baz));
-        assert!(parsed_versions.module_exists_on_version(bar_baz.clone(), SupportedPyVersion::Py37));
-        assert!(parsed_versions.module_exists_on_version(bar_baz.clone(), SupportedPyVersion::Py39));
-        assert!(!parsed_versions.module_exists_on_version(bar_baz, SupportedPyVersion::Py310));
+        assert!(parsed_versions.contains_exact(&bar_baz));
+        assert_eq!(
+            parsed_versions.query_module(&bar_baz, SupportedPyVersion::Py37),
+            TypeshedVersionsQueryResult::Exists
+        );
+        assert_eq!(
+            parsed_versions.query_module(&bar_baz, SupportedPyVersion::Py39),
+            TypeshedVersionsQueryResult::Exists
+        );
+        assert_eq!(
+            parsed_versions.query_module(&bar_baz, SupportedPyVersion::Py310),
+            TypeshedVersionsQueryResult::DoesNotExist
+        );
 
-        assert!(!parsed_versions.contains_module(&spam));
-        assert!(!parsed_versions.module_exists_on_version(spam.clone(), SupportedPyVersion::Py37));
-        assert!(!parsed_versions.module_exists_on_version(spam, SupportedPyVersion::Py313));
+        assert!(!parsed_versions.contains_exact(&spam));
+        assert_eq!(
+            parsed_versions.query_module(&spam, SupportedPyVersion::Py37),
+            TypeshedVersionsQueryResult::DoesNotExist
+        );
+        assert_eq!(
+            parsed_versions.query_module(&spam, SupportedPyVersion::Py313),
+            TypeshedVersionsQueryResult::DoesNotExist
+        );
+
+        assert!(!parsed_versions.contains_exact(&bar_eggs));
+        assert_eq!(
+            parsed_versions.query_module(&bar_eggs, SupportedPyVersion::Py37),
+            TypeshedVersionsQueryResult::MaybeExists
+        );
+        assert_eq!(
+            parsed_versions.query_module(&bar_eggs, SupportedPyVersion::Py310),
+            TypeshedVersionsQueryResult::MaybeExists
+        );
+        assert_eq!(
+            parsed_versions.query_module(&bar_eggs, SupportedPyVersion::Py311),
+            TypeshedVersionsQueryResult::DoesNotExist
+        );
     }
 
     #[test]
