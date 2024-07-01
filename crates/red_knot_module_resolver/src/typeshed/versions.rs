@@ -3,6 +3,7 @@ use std::fmt;
 use std::num::{NonZeroU16, NonZeroUsize};
 use std::ops::{RangeFrom, RangeInclusive};
 use std::str::FromStr;
+use std::sync::Arc;
 
 use rustc_hash::FxHashMap;
 
@@ -82,7 +83,7 @@ impl fmt::Display for TypeshedVersionsParseErrorKind {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct TypeshedVersions(FxHashMap<ModuleName, PyVersionRange>);
+pub struct TypeshedVersions(Arc<FxHashMap<ModuleName, PyVersionRange>>);
 
 impl TypeshedVersions {
     pub fn len(&self) -> usize {
@@ -93,14 +94,14 @@ impl TypeshedVersions {
         self.0.is_empty()
     }
 
-    fn get_exact(&self, module_name: &ModuleName) -> Option<&PyVersionRange> {
+    fn exact(&self, module_name: &ModuleName) -> Option<&PyVersionRange> {
         self.0.get(module_name)
     }
 
     /// Helper function for testing purposes
     #[cfg(test)]
     fn contains_exact(&self, module: &ModuleName) -> bool {
-        self.get_exact(module).is_some()
+        self.exact(module).is_some()
     }
 
     pub fn query_module(
@@ -109,7 +110,7 @@ impl TypeshedVersions {
         version: impl Into<PyVersion>,
     ) -> TypeshedVersionsQueryResult {
         let version = version.into();
-        if let Some(range) = self.get_exact(module) {
+        if let Some(range) = self.exact(module) {
             if range.contains(version) {
                 TypeshedVersionsQueryResult::Exists
             } else {
@@ -118,7 +119,7 @@ impl TypeshedVersions {
         } else {
             let mut module = module.parent();
             while let Some(module_to_try) = module {
-                if let Some(range) = self.get_exact(&module_to_try) {
+                if let Some(range) = self.exact(&module_to_try) {
                     return {
                         if range.contains(version) {
                             TypeshedVersionsQueryResult::MaybeExists
@@ -194,7 +195,7 @@ impl FromStr for TypeshedVersions {
             };
         }
 
-        Ok(Self(map))
+        Ok(Self(Arc::new(map)))
     }
 }
 
