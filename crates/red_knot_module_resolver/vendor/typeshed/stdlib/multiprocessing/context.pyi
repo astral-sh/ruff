@@ -93,16 +93,20 @@ class BaseContext:
     def Value(self, typecode_or_type: str | type[_CData], *args: Any, lock: bool | _LockLike = True) -> Any: ...
     @overload
     def Array(
+        self, typecode_or_type: type[_SimpleCData[_T]], size_or_initializer: int | Sequence[Any], *, lock: Literal[False]
+    ) -> SynchronizedArray[_T]: ...
+    @overload
+    def Array(
         self, typecode_or_type: type[c_char], size_or_initializer: int | Sequence[Any], *, lock: Literal[True] | _LockLike = True
     ) -> SynchronizedString: ...
     @overload
     def Array(
-        self, typecode_or_type: type[_CT], size_or_initializer: int | Sequence[Any], *, lock: Literal[False]
-    ) -> SynchronizedArray[_CT]: ...
-    @overload
-    def Array(
-        self, typecode_or_type: type[_CT], size_or_initializer: int | Sequence[Any], *, lock: Literal[True] | _LockLike = True
-    ) -> SynchronizedArray[_CT]: ...
+        self,
+        typecode_or_type: type[_SimpleCData[_T]],
+        size_or_initializer: int | Sequence[Any],
+        *,
+        lock: Literal[True] | _LockLike = True,
+    ) -> SynchronizedArray[_T]: ...
     @overload
     def Array(
         self, typecode_or_type: str, size_or_initializer: int | Sequence[Any], *, lock: Literal[True] | _LockLike = True

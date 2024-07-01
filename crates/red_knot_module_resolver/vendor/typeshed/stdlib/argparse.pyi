@@ -32,6 +32,7 @@ _T = TypeVar("_T")
 _ActionT = TypeVar("_ActionT", bound=Action)
 _ArgumentParserT = TypeVar("_ArgumentParserT", bound=ArgumentParser)
 _N = TypeVar("_N")
+_ActionType: TypeAlias = Callable[[str], Any] | FileType | str
 # more precisely, Literal["store", "store_const", "store_true",
 # "store_false", "append", "append_const", "count", "help", "version",
 # "extend"], but using this would make it hard to annotate callers
@@ -89,7 +90,7 @@ class _ActionsContainer:
         nargs: int | _NArgsStr | _SUPPRESS_T | None = None,
         const: Any = ...,
         default: Any = ...,
-        type: Callable[[str], _T] | FileType = ...,
+        type: _ActionType = ...,
         choices: Iterable[_T] | None = ...,
         required: bool = ...,
         help: str | None = ...,
@@ -313,7 +314,7 @@ class Action(_AttributeHolder):
     nargs: int | str | None
     const: Any
     default: Any
-    type: Callable[[str], Any] | FileType | None
+    type: _ActionType | None
     choices: Iterable[Any] | None
     required: bool
     help: str | None
@@ -699,6 +700,7 @@ class _SubParsersAction(Action, Generic[_ArgumentParserT]):
             add_help: bool = ...,
             allow_abbrev: bool = ...,
             exit_on_error: bool = ...,
+            **kwargs: Any,  # Accepting any additional kwargs for custom parser classes
         ) -> _ArgumentParserT: ...
     elif sys.version_info >= (3, 9):
         def add_parser(
@@ -721,6 +723,7 @@ class _SubParsersAction(Action, Generic[_ArgumentParserT]):
             add_help: bool = ...,
             allow_abbrev: bool = ...,
             exit_on_error: bool = ...,
+            **kwargs: Any,  # Accepting any additional kwargs for custom parser classes
         ) -> _ArgumentParserT: ...
     else:
         def add_parser(
@@ -742,6 +745,7 @@ class _SubParsersAction(Action, Generic[_ArgumentParserT]):
             conflict_handler: str = ...,
             add_help: bool = ...,
             allow_abbrev: bool = ...,
+            **kwargs: Any,  # Accepting any additional kwargs for custom parser classes
         ) -> _ArgumentParserT: ...
 
     def _get_subactions(self) -> list[Action]: ...

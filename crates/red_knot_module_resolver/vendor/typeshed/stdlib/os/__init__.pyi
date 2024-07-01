@@ -914,8 +914,8 @@ if sys.platform != "win32":
     def forkpty() -> tuple[int, int]: ...  # some flavors of Unix
     def killpg(pgid: int, signal: int, /) -> None: ...
     def nice(increment: int, /) -> int: ...
-    if sys.platform != "darwin":
-        def plock(op: int, /) -> None: ...  # ???op is int?
+    if sys.platform != "darwin" and sys.platform != "linux":
+        def plock(op: int, /) -> None: ...
 
 class _wrap_close(_TextIOWrapper):
     def __init__(self, stream: _TextIOWrapper, proc: Popen[str]) -> None: ...
@@ -1141,16 +1141,16 @@ if sys.version_info >= (3, 10) and sys.platform == "linux":
 if sys.version_info >= (3, 12) and sys.platform == "linux":
     CLONE_FILES: int
     CLONE_FS: int
-    CLONE_NEWCGROUP: int
-    CLONE_NEWIPC: int
-    CLONE_NEWNET: int
+    CLONE_NEWCGROUP: int  # Linux 4.6+
+    CLONE_NEWIPC: int  # Linux 2.6.19+
+    CLONE_NEWNET: int  # Linux 2.6.24+
     CLONE_NEWNS: int
-    CLONE_NEWPID: int
-    CLONE_NEWTIME: int
-    CLONE_NEWUSER: int
-    CLONE_NEWUTS: int
+    CLONE_NEWPID: int  # Linux 3.8+
+    CLONE_NEWTIME: int  # Linux 5.6+
+    CLONE_NEWUSER: int  # Linux 3.8+
+    CLONE_NEWUTS: int  # Linux 2.6.19+
     CLONE_SIGHAND: int
-    CLONE_SYSVSEM: int
+    CLONE_SYSVSEM: int  # Linux 2.6.26+
     CLONE_THREAD: int
     CLONE_VM: int
     def unshare(flags: int) -> None: ...
