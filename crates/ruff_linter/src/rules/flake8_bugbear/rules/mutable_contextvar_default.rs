@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Diagnostic, FixAvailability, Violation};
+use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{self as ast, Expr};
@@ -9,21 +9,21 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for uses of mutable objects as ContextVar defaults.
+/// Checks for uses of mutable objects as `ContextVar` defaults.
 ///
 /// ## Why is this bad?
 ///
-/// The ContextVar default is evaluated once, when the ContextVar is defined.
+/// The `ContextVar` default is evaluated once, when the `ContextVar` is defined.
 ///
 /// The same mutable object is then shared across all `.get()` method calls to
-/// the ContextVar. If the object is modified, those modifications will persist
+/// the `ContextVar`. If the object is modified, those modifications will persist
 /// across calls, which can lead to unexpected behavior.
 ///
-/// Instead, prefer to use immutable data structures, or take `None` as a
+/// Instead, prefer to use immutable data structures; or, take `None` as a
 /// default, and initialize a new mutable object inside for each call using the
 /// `.set()` method.
 ///
-/// Types outside of the standard library can be marked as immutable with the
+/// Types outside the standard library can be marked as immutable with the
 /// [`lint.flake8-bugbear.extend-immutable-calls`] configuration option.
 ///
 /// ## Example
@@ -56,17 +56,13 @@ use crate::checkers::ast::Checker;
 pub struct MutableContextvarDefault;
 
 impl Violation for MutableContextvarDefault {
-    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
-
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Do not use mutable data structures for ContextVar defaults")
+        format!("Do not use mutable data structures for `ContextVar` defaults")
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some(format!(
-            "Replace with `None`; initialize with `.set()` after checking for `None`"
-        ))
+        Some("Replace with `None`; initialize with `.set()``".to_string())
     }
 }
 
