@@ -15,7 +15,7 @@ Module(
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
-                        id: "foo",
+                        id: Name("foo"),
                         range: 4..7,
                     },
                     type_params: Some(
@@ -48,7 +48,7 @@ Module(
                     name: Name(
                         ExprName {
                             range: 27..36,
-                            id: "ListOrSet",
+                            id: Name("ListOrSet"),
                             ctx: Store,
                         },
                     ),
@@ -64,7 +64,7 @@ Module(
                             left: Name(
                                 ExprName {
                                     range: 41..45,
-                                    id: "list",
+                                    id: Name("list"),
                                     ctx: Load,
                                 },
                             ),
@@ -72,7 +72,7 @@ Module(
                             right: Name(
                                 ExprName {
                                     range: 48..51,
-                                    id: "set",
+                                    id: Name("set"),
                                     ctx: Load,
                                 },
                             ),

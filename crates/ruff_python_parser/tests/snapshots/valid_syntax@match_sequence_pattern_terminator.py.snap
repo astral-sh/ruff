@@ -15,7 +15,7 @@ Module(
                     subject: Name(
                         ExprName {
                             range: 6..13,
-                            id: "subject",
+                            id: Name("subject"),
                             ctx: Load,
                         },
                     ),
@@ -28,7 +28,7 @@ Module(
                                     pattern: None,
                                     name: Some(
                                         Identifier {
-                                            id: "a",
+                                            id: Name("a"),
                                             range: 24..25,
                                         },
                                     ),
@@ -56,7 +56,7 @@ Module(
                                     pattern: None,
                                     name: Some(
                                         Identifier {
-                                            id: "a",
+                                            id: Name("a"),
                                             range: 40..41,
                                         },
                                     ),
@@ -66,7 +66,7 @@ Module(
                                 Name(
                                     ExprName {
                                         range: 45..46,
-                                        id: "x",
+                                        id: Name("x"),
                                         ctx: Load,
                                     },
                                 ),
@@ -96,7 +96,7 @@ Module(
                                                 pattern: None,
                                                 name: Some(
                                                     Identifier {
-                                                        id: "a",
+                                                        id: Name("a"),
                                                         range: 61..62,
                                                     },
                                                 ),
@@ -108,7 +108,7 @@ Module(
                                                 pattern: None,
                                                 name: Some(
                                                     Identifier {
-                                                        id: "b",
+                                                        id: Name("b"),
                                                         range: 64..65,
                                                     },
                                                 ),
@@ -143,7 +143,7 @@ Module(
                                                 pattern: None,
                                                 name: Some(
                                                     Identifier {
-                                                        id: "a",
+                                                        id: Name("a"),
                                                         range: 80..81,
                                                     },
                                                 ),
@@ -155,7 +155,7 @@ Module(
                                                 pattern: None,
                                                 name: Some(
                                                     Identifier {
-                                                        id: "b",
+                                                        id: Name("b"),
                                                         range: 83..84,
                                                     },
                                                 ),
@@ -168,7 +168,7 @@ Module(
                                 Name(
                                     ExprName {
                                         range: 88..89,
-                                        id: "x",
+                                        id: Name("x"),
                                         ctx: Load,
                                     },
                                 ),

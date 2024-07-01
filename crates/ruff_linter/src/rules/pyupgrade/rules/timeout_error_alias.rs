@@ -4,7 +4,7 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::fix::edits::pad;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::name::UnqualifiedName;
+use ruff_python_ast::name::{Name, UnqualifiedName};
 use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
@@ -128,7 +128,7 @@ fn tuple_diagnostic(checker: &mut Checker, tuple: &ast::ExprTuple, aliases: &[&E
             .all(|elt| !semantic.match_builtin_expr(elt, "TimeoutError"))
         {
             let node = ast::ExprName {
-                id: "TimeoutError".into(),
+                id: Name::new_static("TimeoutError"),
                 ctx: ExprContext::Load,
                 range: TextRange::default(),
             };

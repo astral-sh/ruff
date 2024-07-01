@@ -15,7 +15,7 @@ Module(
                     subject: Name(
                         ExprName {
                             range: 80..87,
-                            id: "subject",
+                            id: Name("subject"),
                             ctx: Load,
                         },
                     ),
@@ -196,7 +196,7 @@ Module(
                                     cls: Name(
                                         ExprName {
                                             range: 194..197,
-                                            id: "Foo",
+                                            id: Name("Foo"),
                                             ctx: Load,
                                         },
                                     ),
@@ -207,7 +207,7 @@ Module(
                                             PatternKeyword {
                                                 range: 198..202,
                                                 attr: Identifier {
-                                                    id: "x",
+                                                    id: Name("x"),
                                                     range: 198..199,
                                                 },
                                                 pattern: MatchValue(
@@ -233,7 +233,7 @@ Module(
                                             PatternKeyword {
                                                 range: 204..208,
                                                 attr: Identifier {
-                                                    id: "y",
+                                                    id: Name("y"),
                                                     range: 204..205,
                                                 },
                                                 pattern: MatchValue(

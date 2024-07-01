@@ -13,7 +13,7 @@ use crate::semantic::{
     resolve_global_symbol, semantic_index, ConstrainedDefinition, Definition, GlobalSymbolId,
     ImportDefinition, ImportFromDefinition,
 };
-use crate::{FileId, Name};
+use crate::FileId;
 
 // FIXME: Figure out proper dead-lock free synchronisation now that this takes `&db` instead of `&mut db`.
 /// Resolve the public-facing type for a symbol (the type seen by other scopes: other modules, or
@@ -315,7 +315,7 @@ fn infer_expr_type(db: &dyn SemanticDb, file_id: FileId, expr: &ast::Expr) -> Qu
         }
         ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. }) => {
             let value_type = infer_expr_type(db, file_id, value)?;
-            let attr_name = &Name::new(&attr.id);
+            let attr_name = &attr.id;
             value_type
                 .get_member(db, attr_name)
                 .map(|ty| ty.unwrap_or(Type::Unknown))
@@ -343,6 +343,7 @@ fn infer_expr_type(db: &dyn SemanticDb, file_id: FileId, expr: &ast::Expr) -> Qu
 #[cfg(test)]
 mod tests {
 
+    use ruff_python_ast::name::Name;
     use std::path::PathBuf;
 
     use crate::db::tests::TestDb;
@@ -351,7 +352,6 @@ mod tests {
         resolve_module, set_module_search_paths, ModuleName, ModuleResolutionInputs,
     };
     use crate::semantic::{infer_symbol_public_type, resolve_global_symbol, Type};
-    use crate::Name;
 
     // TODO with virtual filesystem we shouldn't have to write files to disk for these
     // tests
@@ -476,7 +476,7 @@ mod tests {
         };
 
         let member_ty = class_id
-            .get_own_class_member(&case.db, &Name::new("f"))
+            .get_own_class_member(&case.db, &Name::new_static("f"))
             .expect("C.f to resolve");
 
         let Some(Type::Function(func_id)) = member_ty else {

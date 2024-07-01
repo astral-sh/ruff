@@ -21,19 +21,19 @@ Module(
                                     value: Name(
                                         ExprName {
                                             range: 0..5,
-                                            id: "extra",
+                                            id: Name("extra"),
                                             ctx: Load,
                                         },
                                     ),
                                     attr: Identifier {
-                                        id: "",
+                                        id: Name(""),
                                         range: 6..6,
                                     },
                                     ctx: Load,
                                 },
                             ),
                             attr: Identifier {
-                                id: "dot",
+                                id: Name("dot"),
                                 range: 7..10,
                             },
                             ctx: Load,
@@ -47,7 +47,7 @@ Module(
                     value: Name(
                         ExprName {
                             range: 11..19,
-                            id: "multiple",
+                            id: Name("multiple"),
                             ctx: Load,
                         },
                     ),
@@ -65,7 +65,7 @@ Module(
                                 },
                             ),
                             attr: Identifier {
-                                id: "dots",
+                                id: Name("dots"),
                                 range: 23..27,
                             },
                             ctx: Load,
@@ -79,7 +79,7 @@ Module(
                     value: Name(
                         ExprName {
                             range: 28..36,
-                            id: "multiple",
+                            id: Name("multiple"),
                             ctx: Load,
                         },
                     ),
@@ -100,14 +100,14 @@ Module(
                                         },
                                     ),
                                     attr: Identifier {
-                                        id: "",
+                                        id: Name(""),
                                         range: 40..40,
                                     },
                                     ctx: Load,
                                 },
                             ),
                             attr: Identifier {
-                                id: "dots",
+                                id: Name("dots"),
                                 range: 41..45,
                             },
                             ctx: Load,

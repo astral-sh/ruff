@@ -140,7 +140,7 @@ pub(crate) fn make_redundant_alias<'a>(
         .filter_map(|name| {
             aliases
                 .iter()
-                .find(|alias| alias.asname.is_none() && name == alias.name.id)
+                .find(|alias| alias.asname.is_none() && *name == alias.name.id)
                 .map(|alias| Edit::range_replacement(format!("{name} as {name}"), alias.range))
         })
         .collect()

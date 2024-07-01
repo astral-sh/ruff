@@ -1,11 +1,5 @@
 use salsa::DebugWithDb;
 
-use ruff_db::parsed::parsed_module;
-use ruff_db::vfs::VfsFile;
-use ruff_index::newtype_index;
-use ruff_python_ast as ast;
-
-use crate::name::Name;
 use crate::semantic_index::ast_ids::{AstIdNode, ScopeAstIdNode};
 use crate::semantic_index::symbol::{FileScopeId, PublicSymbolId, ScopeId};
 use crate::semantic_index::{
@@ -14,6 +8,11 @@ use crate::semantic_index::{
 use crate::types::infer::{TypeInference, TypeInferenceBuilder};
 use crate::Db;
 use crate::FxIndexSet;
+use ruff_db::parsed::parsed_module;
+use ruff_db::vfs::VfsFile;
+use ruff_index::newtype_index;
+use ruff_python_ast as ast;
+use ruff_python_ast::name::Name;
 
 mod display;
 mod infer;

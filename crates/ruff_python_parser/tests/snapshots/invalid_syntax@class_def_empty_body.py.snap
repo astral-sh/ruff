@@ -14,7 +14,7 @@ Module(
                     range: 0..10,
                     decorator_list: [],
                     name: Identifier {
-                        id: "Foo",
+                        id: Name("Foo"),
                         range: 6..9,
                     },
                     type_params: None,
@@ -27,7 +27,7 @@ Module(
                     range: 11..23,
                     decorator_list: [],
                     name: Identifier {
-                        id: "Foo",
+                        id: Name("Foo"),
                         range: 17..20,
                     },
                     type_params: None,
@@ -48,7 +48,7 @@ Module(
                         Name(
                             ExprName {
                                 range: 24..25,
-                                id: "x",
+                                id: Name("x"),
                                 ctx: Store,
                             },
                         ),

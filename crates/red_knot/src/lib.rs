@@ -1,6 +1,4 @@
-use std::fmt::Formatter;
 use std::hash::BuildHasherDefault;
-use std::ops::Deref;
 use std::path::{Path, PathBuf};
 
 use rustc_hash::{FxHashSet, FxHasher};
@@ -66,43 +64,5 @@ impl Workspace {
 
     pub fn is_file_open(&self, file_id: FileId) -> bool {
         self.open_files.contains(&file_id)
-    }
-}
-
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
-pub struct Name(smol_str::SmolStr);
-
-impl Name {
-    #[inline]
-    pub fn new(name: &str) -> Self {
-        Self(smol_str::SmolStr::new(name))
-    }
-
-    pub fn as_str(&self) -> &str {
-        self.0.as_str()
-    }
-}
-
-impl Deref for Name {
-    type Target = str;
-
-    #[inline]
-    fn deref(&self) -> &Self::Target {
-        self.as_str()
-    }
-}
-
-impl<T> From<T> for Name
-where
-    T: Into<smol_str::SmolStr>,
-{
-    fn from(value: T) -> Self {
-        Self(value.into())
-    }
-}
-
-impl std::fmt::Display for Name {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.as_str())
     }
 }

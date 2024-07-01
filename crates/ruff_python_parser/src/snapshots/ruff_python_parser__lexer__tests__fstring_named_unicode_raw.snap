@@ -27,7 +27,7 @@ expression: lex_source(source)
     ),
     (
         Name(
-            "BULLET",
+            Name("BULLET"),
         ),
         6..12,
     ),
