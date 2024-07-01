@@ -1,4 +1,4 @@
-use unicode_width::UnicodeWidthChar;
+use unicode_width::UnicodeWidthStr;
 
 /// A snippet of source code for user-facing display, as in a diagnostic.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -35,11 +35,6 @@ impl SourceCodeSnippet {
     /// Returns `true` if the source code should be truncated when included in a user-facing
     /// diagnostic.
     fn should_truncate(source_code: &str) -> bool {
-        source_code
-            .chars()
-            .map(|c| c.width().unwrap_or(0))
-            .sum::<usize>()
-            > 50
-            || source_code.contains(['\r', '\n'])
+        source_code.width() > 50 || source_code.contains(['\r', '\n'])
     }
 }
