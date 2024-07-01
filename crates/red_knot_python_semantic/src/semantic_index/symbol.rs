@@ -214,7 +214,6 @@ impl FileScopeId {
 
 #[derive(Debug, Eq, PartialEq)]
 pub struct Scope {
-    pub(super) name: Name,
     pub(super) parent: Option<FileScopeId>,
     pub(super) definition: Option<Definition>,
     pub(super) defining_symbol: Option<FileSymbolId>,
@@ -223,10 +222,6 @@ pub struct Scope {
 }
 
 impl Scope {
-    pub fn name(&self) -> &Name {
-        &self.name
-    }
-
     pub fn definition(&self) -> Option<Definition> {
         self.definition
     }
