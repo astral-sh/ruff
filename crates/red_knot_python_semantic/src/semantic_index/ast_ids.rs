@@ -8,6 +8,7 @@ use ruff_python_ast::{AnyNodeRef, ExpressionRef};
 
 use crate::ast_node_ref::AstNodeRef;
 use crate::node_key::NodeKey;
+use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::semantic_index;
 use crate::semantic_index::symbol::{FileScopeId, ScopeId};
 use crate::Db;
@@ -32,7 +33,7 @@ pub(crate) struct AstIds {
     expressions: IndexVec<ScopedExpressionId, AstNodeRef<ast::Expr>>,
 
     /// Maps expressions to their expression id. Uses `NodeKey` because it avoids cloning [`Parsed`].
-    expressions_map: FxHashMap<NodeKey, ScopedExpressionId>,
+    expressions_map: FxHashMap<ExpressionNodeKey, ScopedExpressionId>,
 
     statements: IndexVec<ScopedStatementId, AstNodeRef<ast::Stmt>>,
 
@@ -47,11 +48,8 @@ impl AstIds {
         self.statements_map[&NodeKey::from_node(node.into())]
     }
 
-    fn expression_id<'a, N>(&self, node: N) -> ScopedExpressionId
-    where
-        N: Into<ExpressionRef<'a>>,
-    {
-        self.expressions_map[&NodeKey::from_node(node.into())]
+    fn expression_id(&self, key: impl Into<ExpressionNodeKey>) -> ScopedExpressionId {
+        self.expressions_map[&key.into()]
     }
 }
 
@@ -294,7 +292,7 @@ impl_has_scoped_statement_id!(ast::StmtImportFrom);
 #[derive(Debug)]
 pub(super) struct AstIdsBuilder {
     expressions: IndexVec<ScopedExpressionId, AstNodeRef<ast::Expr>>,
-    expressions_map: FxHashMap<NodeKey, ScopedExpressionId>,
+    expressions_map: FxHashMap<ExpressionNodeKey, ScopedExpressionId>,
     statements: IndexVec<ScopedStatementId, AstNodeRef<ast::Stmt>>,
     statements_map: FxHashMap<NodeKey, ScopedStatementId>,
 }
@@ -341,8 +339,7 @@ impl AstIdsBuilder {
     ) -> ScopedExpressionId {
         let expression_id = self.expressions.push(AstNodeRef::new(parsed.clone(), expr));
 
-        self.expressions_map
-            .insert(NodeKey::from_node(expr), expression_id);
+        self.expressions_map.insert(expr.into(), expression_id);
 
         expression_id
     }
@@ -358,6 +355,28 @@ impl AstIdsBuilder {
             expressions_map: self.expressions_map,
             statements: self.statements,
             statements_map: self.statements_map,
+        }
+    }
+}
+
+/// Node key that can only be constructed for expressions.
+mod node_key {
+    use ruff_python_ast as ast;
+
+    use crate::node_key::NodeKey;
+
+    #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
+    pub(super) struct ExpressionNodeKey(NodeKey);
+
+    impl From<ast::ExpressionRef<'_>> for ExpressionNodeKey {
+        fn from(value: ast::ExpressionRef<'_>) -> Self {
+            Self(NodeKey::from_node(value))
+        }
+    }
+
+    impl From<&ast::Expr> for ExpressionNodeKey {
+        fn from(value: &ast::Expr) -> Self {
+            Self(NodeKey::from_node(value))
         }
     }
 }
