@@ -6,13 +6,13 @@ use std::num::NonZeroU32;
 
 use bitflags::bitflags;
 use hashbrown::hash_map::{Keys, RawEntryMut};
+use red_knot_module_resolver::ModuleName;
 use rustc_hash::{FxHashMap, FxHasher};
 
 use ruff_index::{newtype_index, IndexVec};
 use ruff_python_ast::name::Name;
 
 use crate::ast_ids::NodeKey;
-use crate::module::ModuleName;
 use crate::semantic::{Definition, ExpressionId};
 
 type Map<K, V> = hashbrown::HashMap<K, V, ()>;

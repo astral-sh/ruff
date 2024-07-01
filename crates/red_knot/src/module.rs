@@ -5,9 +5,8 @@ use std::sync::atomic::AtomicU32;
 use std::sync::Arc;
 
 use dashmap::mapref::entry::Entry;
-use smol_str::SmolStr;
 
-use red_knot_module_resolver::ModuleKind;
+use red_knot_module_resolver::{ModuleKind, ModuleName};
 
 use crate::db::{QueryResult, SemanticDb, SemanticJar};
 use crate::files::FileId;
@@ -95,87 +94,7 @@ impl Module {
             name.push_str(part);
         }
 
-        Ok(if name.is_empty() {
-            None
-        } else {
-            Some(ModuleName(SmolStr::new(name)))
-        })
-    }
-}
-
-/// A module name, e.g. `foo.bar`.
-///
-/// Always normalized to the absolute form
-/// (never a relative module name, i.e., never `.foo`).
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
-pub struct ModuleName(smol_str::SmolStr);
-
-impl ModuleName {
-    pub fn new(name: &str) -> Self {
-        debug_assert!(!name.is_empty());
-
-        Self(smol_str::SmolStr::new(name))
-    }
-
-    fn from_relative_path(path: &Path) -> Option<Self> {
-        let path = if path.ends_with("__init__.py") || path.ends_with("__init__.pyi") {
-            path.parent()?
-        } else {
-            path
-        };
-
-        let name = if let Some(parent) = path.parent() {
-            let mut name = String::with_capacity(path.as_os_str().len());
-
-            for component in parent.components() {
-                name.push_str(component.as_os_str().to_str()?);
-                name.push('.');
-            }
-
-            // SAFETY: Unwrap is safe here or `parent` would have returned `None`.
-            name.push_str(path.file_stem().unwrap().to_str()?);
-
-            smol_str::SmolStr::from(name)
-        } else {
-            smol_str::SmolStr::new(path.file_stem()?.to_str()?)
-        };
-
-        Some(Self(name))
-    }
-
-    /// An iterator over the components of the module name:
-    /// `foo.bar.baz` -> `foo`, `bar`, `baz`
-    pub fn components(&self) -> impl DoubleEndedIterator<Item = &str> {
-        self.0.split('.')
-    }
-
-    /// The name of this module's immediate parent, if it has a parent
-    pub fn parent(&self) -> Option<ModuleName> {
-        let (_, parent) = self.0.rsplit_once('.')?;
-
-        Some(Self(smol_str::SmolStr::new(parent)))
-    }
-
-    pub fn starts_with(&self, other: &ModuleName) -> bool {
-        self.0.starts_with(other.0.as_str())
-    }
-
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-}
-
-impl Deref for ModuleName {
-    type Target = str;
-
-    fn deref(&self) -> &Self::Target {
-        self.as_str()
-    }
-}
-
-impl std::fmt::Display for ModuleName {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&self.0)
+        Ok(ModuleName::new(&name))
     }
 }
 
@@ -262,7 +181,7 @@ pub struct ModuleData {
 /// and, therefore, cannot be used as part of a query.
 /// For this to work with salsa, it would be necessary to intern all `ModuleName`s.
 #[tracing::instrument(level = "debug", skip(db))]
-pub fn resolve_module(db: &dyn SemanticDb, name: ModuleName) -> QueryResult<Option<Module>> {
+pub fn resolve_module(db: &dyn SemanticDb, name: &ModuleName) -> QueryResult<Option<Module>> {
     let jar: &SemanticJar = db.jar()?;
     let modules = &jar.module_resolver;
 
@@ -271,7 +190,7 @@ pub fn resolve_module(db: &dyn SemanticDb, name: ModuleName) -> QueryResult<Opti
     match entry {
         Entry::Occupied(entry) => Ok(Some(*entry.get())),
         Entry::Vacant(entry) => {
-            let Some((root_path, absolute_path, kind)) = resolve_name(&name, &modules.search_paths)
+            let Some((root_path, absolute_path, kind)) = resolve_name(name, &modules.search_paths)
             else {
                 return Ok(None);
             };
@@ -288,9 +207,14 @@ pub fn resolve_module(db: &dyn SemanticDb, name: ModuleName) -> QueryResult<Opti
                     .fetch_add(1, std::sync::atomic::Ordering::Relaxed),
             );
 
-            modules
-                .modules
-                .insert(module, Arc::from(ModuleData { name, path, kind }));
+            modules.modules.insert(
+                module,
+                Arc::from(ModuleData {
+                    name: name.clone(),
+                    path,
+                    kind,
+                }),
+            );
 
             // A path can map to multiple modules because of symlinks:
             // ```
@@ -346,7 +270,7 @@ pub fn file_to_module(db: &dyn SemanticDb, file: FileId) -> QueryResult<Option<M
         return Ok(None);
     };
 
-    let Some(module_name) = ModuleName::from_relative_path(relative_path) else {
+    let Some(module_name) = from_relative_path(relative_path) else {
         return Ok(None);
     };
 
@@ -354,7 +278,7 @@ pub fn file_to_module(db: &dyn SemanticDb, file: FileId) -> QueryResult<Option<M
     // If it doesn't, then that means that multiple modules have the same in different
     // root paths, but that the module corresponding to the past path is in a lower priority search path,
     // in which case we ignore it.
-    let Some(module) = resolve_module(db, module_name)? else {
+    let Some(module) = resolve_module(db, &module_name)? else {
         return Ok(None);
     };
     let module_path = module.path(db)?;
@@ -383,6 +307,32 @@ pub fn file_to_module(db: &dyn SemanticDb, file: FileId) -> QueryResult<Option<M
         // Ignore it.
         Ok(None)
     }
+}
+
+fn from_relative_path(path: &Path) -> Option<ModuleName> {
+    let path = if path.ends_with("__init__.py") || path.ends_with("__init__.pyi") {
+        path.parent()?
+    } else {
+        path
+    };
+
+    let name = if let Some(parent) = path.parent() {
+        let mut name = String::with_capacity(path.to_str().unwrap().len());
+
+        for component in parent.components() {
+            name.push_str(component.as_os_str().to_str()?);
+            name.push('.');
+        }
+
+        // SAFETY: Unwrap is safe here or `parent` would have returned `None`.
+        name.push_str(path.file_stem().unwrap().to_str().unwrap());
+
+        name
+    } else {
+        path.file_stem()?.to_str().unwrap().to_string()
+    };
+
+    ModuleName::new(&name)
 }
 
 //////////////////////////////////////////////////////
@@ -763,13 +713,14 @@ impl PackageKind {
 
 #[cfg(test)]
 mod tests {
+    use red_knot_module_resolver::ModuleName;
     use std::num::NonZeroU32;
     use std::path::PathBuf;
 
     use crate::db::tests::TestDb;
     use crate::db::SourceDb;
     use crate::module::{
-        path_to_module, resolve_module, set_module_search_paths, ModuleKind, ModuleName,
+        path_to_module, resolve_module, set_module_search_paths, ModuleKind,
         ModuleResolutionInputs, TYPESHED_STDLIB_DIRECTORY,
     };
     use crate::semantic::Dependency;
@@ -829,14 +780,12 @@ mod tests {
         let foo_path = src.join("foo.py");
         std::fs::write(&foo_path, "print('Hello, world!')")?;
 
-        let foo_module = resolve_module(&db, ModuleName::new("foo"))?.unwrap();
+        let foo_name = ModuleName::new_static("foo").unwrap();
+        let foo_module = resolve_module(&db, &foo_name)?.unwrap();
 
-        assert_eq!(
-            Some(foo_module),
-            resolve_module(&db, ModuleName::new("foo"))?
-        );
+        assert_eq!(Some(foo_module), resolve_module(&db, &foo_name)?);
 
-        assert_eq!(ModuleName::new("foo"), foo_module.name(&db)?);
+        assert_eq!(foo_name, foo_module.name(&db)?);
         assert_eq!(&src, foo_module.path(&db)?.root().path());
         assert_eq!(ModuleKind::Module, foo_module.kind(&db)?);
         assert_eq!(&foo_path, &*db.file_path(foo_module.path(&db)?.file()));
@@ -855,13 +804,14 @@ mod tests {
         } = create_resolver()?;
         let stdlib_dir = custom_typeshed.join(TYPESHED_STDLIB_DIRECTORY);
         std::fs::create_dir_all(&stdlib_dir).unwrap();
+        let functools_name = ModuleName::new_static("functools").unwrap();
         let functools_path = stdlib_dir.join("functools.py");
         std::fs::write(&functools_path, "def update_wrapper(): ...").unwrap();
-        let functools_module = resolve_module(&db, ModuleName::new("functools"))?.unwrap();
+        let functools_module = resolve_module(&db, &functools_name)?.unwrap();
 
         assert_eq!(
             Some(functools_module),
-            resolve_module(&db, ModuleName::new("functools"))?
+            resolve_module(&db, &functools_name)?
         );
         assert_eq!(&stdlib_dir, functools_module.path(&db)?.root().path());
         assert_eq!(ModuleKind::Module, functools_module.kind(&db)?);
@@ -895,11 +845,12 @@ mod tests {
         let first_party_functools_path = src.join("functools.py");
         std::fs::write(stdlib_functools_path, "def update_wrapper(): ...").unwrap();
         std::fs::write(&first_party_functools_path, "def update_wrapper(): ...").unwrap();
-        let functools_module = resolve_module(&db, ModuleName::new("functools"))?.unwrap();
+        let functools_name = ModuleName::new_static("functools").unwrap();
+        let functools_module = resolve_module(&db, &functools_name)?.unwrap();
 
         assert_eq!(
             Some(functools_module),
-            resolve_module(&db, ModuleName::new("functools"))?
+            resolve_module(&db, &functools_name)?
         );
         assert_eq!(&src, functools_module.path(&db).unwrap().root().path());
         assert_eq!(ModuleKind::Module, functools_module.kind(&db)?);
@@ -925,14 +876,15 @@ mod tests {
             ..
         } = create_resolver()?;
 
+        let foo_name = ModuleName::new("foo").unwrap();
         let foo_dir = src.join("foo");
         let foo_path = foo_dir.join("__init__.py");
         std::fs::create_dir(&foo_dir)?;
         std::fs::write(&foo_path, "print('Hello, world!')")?;
 
-        let foo_module = resolve_module(&db, ModuleName::new("foo"))?.unwrap();
+        let foo_module = resolve_module(&db, &foo_name)?.unwrap();
 
-        assert_eq!(ModuleName::new("foo"), foo_module.name(&db)?);
+        assert_eq!(foo_name, foo_module.name(&db)?);
         assert_eq!(&src, foo_module.path(&db)?.root().path());
         assert_eq!(&foo_path, &*db.file_path(foo_module.path(&db)?.file()));
 
@@ -961,7 +913,7 @@ mod tests {
         let foo_py = src.join("foo.py");
         std::fs::write(&foo_py, "print('Hello, world!')")?;
 
-        let foo_module = resolve_module(&db, ModuleName::new("foo"))?.unwrap();
+        let foo_module = resolve_module(&db, &ModuleName::new("foo").unwrap())?.unwrap();
 
         assert_eq!(&src, foo_module.path(&db)?.root().path());
         assert_eq!(&foo_init, &*db.file_path(foo_module.path(&db)?.file()));
@@ -987,7 +939,7 @@ mod tests {
         std::fs::write(&foo_stub, "x: int")?;
         std::fs::write(&foo_py, "print('Hello, world!')")?;
 
-        let foo = resolve_module(&db, ModuleName::new("foo"))?.unwrap();
+        let foo = resolve_module(&db, &ModuleName::new("foo").unwrap())?.unwrap();
 
         assert_eq!(&src, foo.path(&db)?.root().path());
         assert_eq!(&foo_stub, &*db.file_path(foo.path(&db)?.file()));
@@ -1016,7 +968,7 @@ mod tests {
         std::fs::write(bar.join("__init__.py"), "")?;
         std::fs::write(&baz, "print('Hello, world!')")?;
 
-        let baz_module = resolve_module(&db, ModuleName::new("foo.bar.baz"))?.unwrap();
+        let baz_module = resolve_module(&db, &ModuleName::new("foo.bar.baz").unwrap())?.unwrap();
 
         assert_eq!(&src, baz_module.path(&db)?.root().path());
         assert_eq!(&baz, &*db.file_path(baz_module.path(&db)?.file()));
@@ -1063,11 +1015,13 @@ mod tests {
         std::fs::create_dir_all(&child2)?;
         std::fs::write(&two, "print('Hello, world!')")?;
 
-        let one_module = resolve_module(&db, ModuleName::new("parent.child.one"))?.unwrap();
+        let one_module =
+            resolve_module(&db, &ModuleName::new("parent.child.one").unwrap())?.unwrap();
 
         assert_eq!(Some(one_module), path_to_module(&db, &one)?);
 
-        let two_module = resolve_module(&db, ModuleName::new("parent.child.two"))?.unwrap();
+        let two_module =
+            resolve_module(&db, &ModuleName::new("parent.child.two").unwrap())?.unwrap();
         assert_eq!(Some(two_module), path_to_module(&db, &two)?);
 
         Ok(())
@@ -1111,13 +1065,14 @@ mod tests {
         std::fs::create_dir_all(&child2)?;
         std::fs::write(two, "print('Hello, world!')")?;
 
-        let one_module = resolve_module(&db, ModuleName::new("parent.child.one"))?.unwrap();
+        let one_module =
+            resolve_module(&db, &ModuleName::new("parent.child.one").unwrap())?.unwrap();
 
         assert_eq!(Some(one_module), path_to_module(&db, &one)?);
 
         assert_eq!(
             None,
-            resolve_module(&db, ModuleName::new("parent.child.two"))?
+            resolve_module(&db, &ModuleName::new("parent.child.two").unwrap())?
         );
         Ok(())
     }
@@ -1138,7 +1093,7 @@ mod tests {
         std::fs::write(&foo_src, "")?;
         std::fs::write(&foo_site_packages, "")?;
 
-        let foo_module = resolve_module(&db, ModuleName::new("foo"))?.unwrap();
+        let foo_module = resolve_module(&db, &ModuleName::new("foo").unwrap())?.unwrap();
 
         assert_eq!(&src, foo_module.path(&db)?.root().path());
         assert_eq!(&foo_src, &*db.file_path(foo_module.path(&db)?.file()));
@@ -1165,8 +1120,8 @@ mod tests {
         std::fs::write(&foo, "")?;
         std::os::unix::fs::symlink(&foo, &bar)?;
 
-        let foo_module = resolve_module(&db, ModuleName::new("foo"))?.unwrap();
-        let bar_module = resolve_module(&db, ModuleName::new("bar"))?.unwrap();
+        let foo_module = resolve_module(&db, &ModuleName::new("foo").unwrap())?.unwrap();
+        let bar_module = resolve_module(&db, &ModuleName::new("bar").unwrap())?.unwrap();
 
         assert_ne!(foo_module, bar_module);
 
@@ -1202,12 +1157,12 @@ mod tests {
         std::fs::write(foo_path, "from .bar import test")?;
         std::fs::write(bar_path, "test = 'Hello world'")?;
 
-        let foo_module = resolve_module(&db, ModuleName::new("foo"))?.unwrap();
-        let bar_module = resolve_module(&db, ModuleName::new("foo.bar"))?.unwrap();
+        let foo_module = resolve_module(&db, &ModuleName::new("foo").unwrap())?.unwrap();
+        let bar_module = resolve_module(&db, &ModuleName::new("foo.bar").unwrap())?.unwrap();
 
         // `from . import bar` in `foo/__init__.py` resolves to `foo`
         assert_eq!(
-            Some(ModuleName::new("foo")),
+            ModuleName::new("foo"),
             foo_module.resolve_dependency(
                 &db,
                 &Dependency::Relative {
@@ -1219,18 +1174,19 @@ mod tests {
 
         // `from baz import bar` in `foo/__init__.py` should resolve to `baz.py`
         assert_eq!(
-            Some(ModuleName::new("baz")),
-            foo_module.resolve_dependency(&db, &Dependency::Module(ModuleName::new("baz")))?
+            ModuleName::new("baz"),
+            foo_module
+                .resolve_dependency(&db, &Dependency::Module(ModuleName::new("baz").unwrap()))?
         );
 
         // from .bar import test in `foo/__init__.py` should resolve to `foo/bar.py`
         assert_eq!(
-            Some(ModuleName::new("foo.bar")),
+            ModuleName::new("foo.bar"),
             foo_module.resolve_dependency(
                 &db,
                 &Dependency::Relative {
                     level: NonZeroU32::new(1).unwrap(),
-                    module: Some(ModuleName::new("bar"))
+                    module: ModuleName::new("bar")
                 }
             )?
         );
@@ -1249,7 +1205,7 @@ mod tests {
 
         // `from . import test` in `foo/bar.py` resolves to `foo`
         assert_eq!(
-            Some(ModuleName::new("foo")),
+            ModuleName::new("foo"),
             bar_module.resolve_dependency(
                 &db,
                 &Dependency::Relative {
@@ -1261,18 +1217,19 @@ mod tests {
 
         // `from baz import test` in `foo/bar.py` resolves to `baz`
         assert_eq!(
-            Some(ModuleName::new("baz")),
-            bar_module.resolve_dependency(&db, &Dependency::Module(ModuleName::new("baz")))?
+            ModuleName::new("baz"),
+            bar_module
+                .resolve_dependency(&db, &Dependency::Module(ModuleName::new("baz").unwrap()))?
         );
 
         // `from .baz import test` in `foo/bar.py` resolves to `foo.baz`.
         assert_eq!(
-            Some(ModuleName::new("foo.baz")),
+            ModuleName::new("foo.baz"),
             bar_module.resolve_dependency(
                 &db,
                 &Dependency::Relative {
                     level: NonZeroU32::new(1).unwrap(),
-                    module: Some(ModuleName::new("baz"))
+                    module: ModuleName::new("baz")
                 }
             )?
         );
