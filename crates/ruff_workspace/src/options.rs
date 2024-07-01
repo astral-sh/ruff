@@ -24,7 +24,7 @@ use ruff_linter::rules::{
     pycodestyle, pydocstyle, pyflakes, pylint, pyupgrade,
 };
 use ruff_linter::settings::types::{
-    IdentifierPattern, OutputFormat, PythonVersion, RequiredVersion,
+    IdentifierPattern, OutputFormat, PreviewMode, PythonVersion, RequiredVersion,
 };
 use ruff_linter::{warn_user_once, RuleSelector};
 use ruff_macros::{CombineOptions, OptionsMetadata};
@@ -1374,6 +1374,9 @@ pub struct Flake8PytestStyleOptions {
     /// default), `@pytest.fixture()` is valid and `@pytest.fixture` is
     /// invalid. If set to `false`, `@pytest.fixture` is valid and
     /// `@pytest.fixture()` is invalid.
+    ///
+    /// If [preview](https://docs.astral.sh/ruff/preview/) is enabled, defaults to
+    /// `false`.
     #[option(
         default = "true",
         value_type = "bool",
@@ -1457,6 +1460,9 @@ pub struct Flake8PytestStyleOptions {
     /// default), `@pytest.mark.foo()` is valid and `@pytest.mark.foo` is
     /// invalid. If set to `false`, `@pytest.fixture` is valid and
     /// `@pytest.mark.foo()` is invalid.
+    ///
+    /// If [preview](https://docs.astral.sh/ruff/preview/) is enabled, defaults to
+    /// `false`.
     #[option(
         default = "true",
         value_type = "bool",
@@ -1466,9 +1472,12 @@ pub struct Flake8PytestStyleOptions {
 }
 
 impl Flake8PytestStyleOptions {
-    pub fn try_into_settings(self) -> anyhow::Result<flake8_pytest_style::settings::Settings> {
+    pub fn try_into_settings(
+        self,
+        preview: PreviewMode,
+    ) -> anyhow::Result<flake8_pytest_style::settings::Settings> {
         Ok(flake8_pytest_style::settings::Settings {
-            fixture_parentheses: self.fixture_parentheses.unwrap_or(true),
+            fixture_parentheses: self.fixture_parentheses.unwrap_or(preview.is_disabled()),
             parametrize_names_type: self.parametrize_names_type.unwrap_or_default(),
             parametrize_values_type: self.parametrize_values_type.unwrap_or_default(),
             parametrize_values_row_type: self.parametrize_values_row_type.unwrap_or_default(),
@@ -1494,7 +1503,7 @@ impl Flake8PytestStyleOptions {
                 .transpose()
                 .map_err(SettingsError::InvalidRaisesExtendRequireMatchFor)?
                 .unwrap_or_default(),
-            mark_parentheses: self.mark_parentheses.unwrap_or(true),
+            mark_parentheses: self.mark_parentheses.unwrap_or(preview.is_disabled()),
         })
     }
 }
