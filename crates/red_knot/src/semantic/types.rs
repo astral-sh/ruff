@@ -348,19 +348,9 @@ impl TypeStore {
     }
 }
 
-type ModuleStoreRef<'a> = dashmap::mapref::one::Ref<
-    'a,
-    FileId,
-    ModuleTypeStore,
-    std::hash::BuildHasherDefault<rustc_hash::FxHasher>,
->;
+type ModuleStoreRef<'a> = dashmap::mapref::one::Ref<'a, FileId, ModuleTypeStore>;
 
-type ModuleStoreRefMut<'a> = dashmap::mapref::one::RefMut<
-    'a,
-    FileId,
-    ModuleTypeStore,
-    std::hash::BuildHasherDefault<rustc_hash::FxHasher>,
->;
+type ModuleStoreRefMut<'a> = dashmap::mapref::one::RefMut<'a, FileId, ModuleTypeStore>;
 
 #[derive(Debug)]
 pub(crate) struct FunctionTypeRef<'a> {

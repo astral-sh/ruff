@@ -668,6 +668,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "dashmap"
+version = "6.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "804c8821570c3f8b70230c2ba75ffa5c0f9a4189b9a432b6656c536712acae28"
+dependencies = [
+ "cfg-if",
+ "crossbeam-utils",
+ "hashbrown 0.14.5",
+ "lock_api",
+ "once_cell",
+ "parking_lot_core",
+]
+
+[[package]]
 name = "diff"
 version = "0.1.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1845,7 +1859,7 @@ dependencies = [
  "bitflags 2.6.0",
  "crossbeam",
  "ctrlc",
- "dashmap",
+ "dashmap 6.0.1",
  "hashbrown 0.14.5",
  "indexmap",
  "is-macro",
@@ -2073,7 +2087,7 @@ version = "0.0.0"
 dependencies = [
  "camino",
  "countme",
- "dashmap",
+ "dashmap 6.0.1",
  "filetime",
  "insta",
  "once_cell",
@@ -2621,7 +2635,7 @@ source = "git+https://github.com/salsa-rs/salsa.git?rev=a1bf3a613f451af7fc0a5941
 dependencies = [
  "arc-swap",
  "crossbeam",
- "dashmap",
+ "dashmap 5.5.3",
  "hashlink",
  "indexmap",
  "log",
