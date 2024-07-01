@@ -191,7 +191,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             decorator_list,
         } = function;
 
-        let function_id = function.scoped_ast_id(self.db, self.file_id, self.file_scope_id);
+        let function_id = function.scoped_ast_id(self.db, self.scope);
         let decorator_tys = decorator_list
             .iter()
             .map(|decorator| self.infer_decorator(decorator))
@@ -231,7 +231,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             body: _,
         } = class;
 
-        let class_id = class.scoped_ast_id(self.db, self.file_id, self.file_scope_id);
+        let class_id = class.scoped_ast_id(self.db, self.scope);
 
         for decorator in decorator_list {
             self.infer_decorator(decorator);
@@ -303,7 +303,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             self.infer_expression(target);
         }
 
-        let assign_id = assignment.scoped_ast_id(self.db, self.file_id, self.file_scope_id);
+        let assign_id = assignment.scoped_ast_id(self.db, self.scope);
 
         // TODO: Handle multiple targets.
         self.types
@@ -328,11 +328,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.infer_expression(target);
 
         self.types.definition_tys.insert(
-            Definition::AnnotatedAssignment(assignment.scoped_ast_id(
-                self.db,
-                self.file_id,
-                self.file_scope_id,
-            )),
+            Definition::AnnotatedAssignment(assignment.scoped_ast_id(self.db, self.scope)),
             annotation_ty,
         );
     }
@@ -356,7 +352,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     fn infer_import_statement(&mut self, import: &ast::StmtImport) {
         let ast::StmtImport { range: _, names } = import;
 
-        let import_id = import.scoped_ast_id(self.db, self.file_id, self.file_scope_id);
+        let import_id = import.scoped_ast_id(self.db, self.scope);
 
         for (i, alias) in names.iter().enumerate() {
             let ast::Alias {
@@ -389,7 +385,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             level: _,
         } = import;
 
-        let import_id = import.scoped_ast_id(self.db, self.file_id, self.file_scope_id);
+        let import_id = import.scoped_ast_id(self.db, self.scope);
         let module_name = ModuleName::new(module.as_deref().expect("Support relative imports"));
 
         let module =
@@ -492,7 +488,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.infer_expression(target);
 
         self.types.definition_tys.insert(
-            Definition::NamedExpr(named.scoped_ast_id(self.db, self.file_id, self.file_scope_id)),
+            Definition::NamedExpr(named.scoped_ast_id(self.db, self.scope)),
             value_ty,
         );
 
