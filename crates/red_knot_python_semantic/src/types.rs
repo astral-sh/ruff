@@ -1,6 +1,4 @@
-use salsa::DebugWithDb;
-
-use crate::semantic_index::ast_ids::{AstIdNode, ScopeAstIdNode};
+use crate::semantic_index::ast_ids::AstIdNode;
 use crate::semantic_index::symbol::{FileScopeId, PublicSymbolId, ScopeId};
 use crate::semantic_index::{
     public_symbol, root_scope, semantic_index, symbol_table, NodeWithScopeId,
@@ -16,28 +14,6 @@ use ruff_python_ast::name::Name;
 
 mod display;
 mod infer;
-
-/// Infers the type of `expr`.
-///
-/// Calling this function from a salsa query adds a dependency on [`semantic_index`]
-/// which changes with every AST change. That's why you should only call
-/// this function for the current file that's being analyzed and not for
-/// a dependency (or the query reruns whenever a dependency change).
-///
-/// Prefer [`public_symbol_ty`] when resolving the type of symbol from another file.
-#[tracing::instrument(level = "debug", skip(db))]
-pub(crate) fn expression_ty<'db>(
-    db: &'db dyn Db,
-    file: VfsFile,
-    expression: &ast::Expr,
-) -> Type<'db> {
-    let index = semantic_index(db, file);
-    let file_scope = index.expression_scope_id(expression);
-    let expression_id = expression.scope_ast_id(db, file, file_scope);
-    let scope = file_scope.to_scope_id(db, file);
-
-    infer_types(db, scope).expression_ty(expression_id)
-}
 
 /// Infers the type of a public symbol.
 ///
@@ -65,7 +41,7 @@ pub(crate) fn expression_ty<'db>(
 /// This being a query ensures that the invalidation short-circuits if the type of this symbol didn't change.
 #[salsa::tracked]
 pub(crate) fn public_symbol_ty<'db>(db: &'db dyn Db, symbol: PublicSymbolId<'db>) -> Type<'db> {
-    let _ = tracing::trace_span!("public_symbol_ty", symbol = ?symbol.debug(db)).enter();
+    let _span = tracing::trace_span!("public_symbol_ty", ?symbol).entered();
 
     let file = symbol.file(db);
     let scope = root_scope(db, file);
@@ -87,7 +63,7 @@ pub fn public_symbol_ty_by_name<'db>(
 /// Infers all types for `scope`.
 #[salsa::tracked(return_ref)]
 pub(crate) fn infer_types<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> TypeInference<'db> {
-    let _ = tracing::trace_span!("infer_types", scope = ?scope.debug(db)).enter();
+    let _span = tracing::trace_span!("infer_types", ?scope).entered();
 
     let file = scope.file(db);
     // Using the index here is fine because the code below depends on the AST anyway.
@@ -270,6 +246,18 @@ impl<'a> FunctionType<'a> {
     }
 }
 
+impl<'db> TypeId<'db, ScopedFunctionTypeId> {
+    pub fn name<'a>(self, context: &'a TypingContext<'db, 'a>) -> &'a Name {
+        let function_ty = self.lookup(context);
+        &function_ty.name
+    }
+
+    pub fn has_decorator(self, context: &TypingContext, decorator: Type<'db>) -> bool {
+        let function_ty = self.lookup(context);
+        function_ty.decorators.contains(&decorator)
+    }
+}
+
 #[newtype_index]
 pub struct ScopedClassTypeId;
 
@@ -282,14 +270,42 @@ impl ScopedTypeId for ScopedClassTypeId {
 }
 
 impl<'db> TypeId<'db, ScopedClassTypeId> {
+    pub fn name<'a>(self, context: &'a TypingContext<'db, 'a>) -> &'a Name {
+        let class_ty = self.lookup(context);
+        &class_ty.name
+    }
+
     /// Returns the class member of this class named `name`.
     ///
     /// The member resolves to a member of the class itself or any of its bases.
-    fn class_member(self, context: &TypingContext<'db, '_>, name: &Name) -> Option<Type<'db>> {
+    pub fn class_member(self, context: &TypingContext<'db, '_>, name: &Name) -> Option<Type<'db>> {
         if let Some(member) = self.own_class_member(context, name) {
             return Some(member);
         }
 
+        self.inherited_class_member(context, name)
+    }
+
+    /// Returns the inferred type of the class member named `name`.
+    pub fn own_class_member(
+        self,
+        context: &TypingContext<'db, '_>,
+        name: &Name,
+    ) -> Option<Type<'db>> {
+        let class = self.lookup(context);
+
+        let symbols = symbol_table(context.db, class.body_scope);
+        let symbol = symbols.symbol_id_by_name(name)?;
+        let types = context.types(class.body_scope);
+
+        Some(types.symbol_ty(symbol))
+    }
+
+    pub fn inherited_class_member(
+        self,
+        context: &TypingContext<'db, '_>,
+        name: &Name,
+    ) -> Option<Type<'db>> {
         let class = self.lookup(context);
         for base in &class.bases {
             if let Some(member) = base.member(context, name) {
@@ -298,17 +314,6 @@ impl<'db> TypeId<'db, ScopedClassTypeId> {
         }
 
         None
-    }
-
-    /// Returns the inferred type of the class member named `name`.
-    fn own_class_member(self, context: &TypingContext<'db, '_>, name: &Name) -> Option<Type<'db>> {
-        let class = self.lookup(context);
-
-        let symbols = symbol_table(context.db, class.body_scope);
-        let symbol = symbols.symbol_id_by_name(name)?;
-        let types = context.types(class.body_scope);
-
-        Some(types.symbol_ty(symbol))
     }
 }
 
@@ -505,6 +510,7 @@ impl<'db, 'inference> TypingContext<'db, 'inference> {
 
 #[cfg(test)]
 mod tests {
+    use red_knot_module_resolver::{set_module_resolution_settings, ModuleResolutionSettings};
     use ruff_db::file_system::FileSystemPathBuf;
     use ruff_db::parsed::parsed_module;
     use ruff_db::vfs::system_path_to_file;
@@ -513,8 +519,8 @@ mod tests {
         assert_will_not_run_function_query, assert_will_run_function_query, TestDb,
     };
     use crate::semantic_index::root_scope;
-    use crate::types::{expression_ty, infer_types, public_symbol_ty_by_name, TypingContext};
-    use red_knot_module_resolver::{set_module_resolution_settings, ModuleResolutionSettings};
+    use crate::types::{infer_types, public_symbol_ty_by_name, TypingContext};
+    use crate::{HasTy, SemanticModel};
 
     fn setup_db() -> TestDb {
         let mut db = TestDb::new();
@@ -541,8 +547,9 @@ mod tests {
         let parsed = parsed_module(&db, a);
 
         let statement = parsed.suite().first().unwrap().as_assign_stmt().unwrap();
+        let model = SemanticModel::new(&db, a);
 
-        let literal_ty = expression_ty(&db, a, &statement.value);
+        let literal_ty = statement.value.ty(&model);
 
         assert_eq!(
             format!("{}", literal_ty.display(&TypingContext::global(&db))),

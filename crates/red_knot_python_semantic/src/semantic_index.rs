@@ -2,7 +2,6 @@ use std::iter::FusedIterator;
 use std::sync::Arc;
 
 use rustc_hash::FxHashMap;
-use salsa::DebugWithDb;
 
 use ruff_db::parsed::parsed_module;
 use ruff_db::vfs::VfsFile;
@@ -10,10 +9,10 @@ use ruff_index::{IndexSlice, IndexVec};
 use ruff_python_ast as ast;
 
 use crate::node_key::NodeKey;
-use crate::semantic_index::ast_ids::{AstId, AstIds, ScopeClassId, ScopeFunctionId};
+use crate::semantic_index::ast_ids::{AstId, AstIds, ScopedClassId, ScopedFunctionId};
 use crate::semantic_index::builder::SemanticIndexBuilder;
 use crate::semantic_index::symbol::{
-    FileScopeId, PublicSymbolId, Scope, ScopeId, ScopeKind, ScopedSymbolId, SymbolTable,
+    FileScopeId, PublicSymbolId, Scope, ScopeId, ScopedSymbolId, SymbolTable,
 };
 use crate::Db;
 
@@ -29,7 +28,7 @@ type SymbolMap = hashbrown::HashMap<ScopedSymbolId, (), ()>;
 /// Prefer using [`symbol_table`] when working with symbols from a single scope.
 #[salsa::tracked(return_ref, no_eq)]
 pub(crate) fn semantic_index(db: &dyn Db, file: VfsFile) -> SemanticIndex {
-    let _ = tracing::trace_span!("semantic_index", file = ?file.debug(db.upcast())).enter();
+    let _span = tracing::trace_span!("semantic_index", ?file).entered();
 
     let parsed = parsed_module(db.upcast(), file);
 
@@ -43,7 +42,7 @@ pub(crate) fn semantic_index(db: &dyn Db, file: VfsFile) -> SemanticIndex {
 /// is unchanged.
 #[salsa::tracked]
 pub(crate) fn symbol_table<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Arc<SymbolTable> {
-    let _ = tracing::trace_span!("symbol_table", scope = ?scope.debug(db)).enter();
+    let _span = tracing::trace_span!("symbol_table", ?scope).entered();
     let index = semantic_index(db, scope.file(db));
 
     index.symbol_table(scope.file_scope_id(db))
@@ -52,7 +51,7 @@ pub(crate) fn symbol_table<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Arc<Sym
 /// Returns the root scope of `file`.
 #[salsa::tracked]
 pub(crate) fn root_scope(db: &dyn Db, file: VfsFile) -> ScopeId<'_> {
-    let _ = tracing::trace_span!("root_scope", file = ?file.debug(db.upcast())).enter();
+    let _span = tracing::trace_span!("root_scope", ?file).entered();
 
     FileScopeId::root().to_scope_id(db, file)
 }
@@ -82,7 +81,7 @@ pub struct SemanticIndex {
     /// Maps expressions to their corresponding scope.
     /// We can't use [`ExpressionId`] here, because the challenge is how to get from
     /// an [`ast::Expr`] to an [`ExpressionId`] (which requires knowing the scope).
-    expression_scopes: FxHashMap<NodeKey, FileScopeId>,
+    scopes_by_expression: FxHashMap<NodeKey, FileScopeId>,
 
     /// Lookup table to map between node ids and ast nodes.
     ///
@@ -91,7 +90,10 @@ pub struct SemanticIndex {
     ast_ids: IndexVec<FileScopeId, AstIds>,
 
     /// Map from scope to the node that introduces the scope.
-    scope_nodes: IndexVec<FileScopeId, NodeWithScopeId>,
+    nodes_by_scope: IndexVec<FileScopeId, NodeWithScopeId>,
+
+    /// Map from nodes that introduce a scope to the scope they define.
+    scopes_by_node: FxHashMap<NodeWithScopeKey, FileScopeId>,
 }
 
 impl SemanticIndex {
@@ -108,13 +110,19 @@ impl SemanticIndex {
     }
 
     /// Returns the ID of the `expression`'s enclosing scope.
-    pub(crate) fn expression_scope_id(&self, expression: &ast::Expr) -> FileScopeId {
-        self.expression_scopes[&NodeKey::from_node(expression)]
+    pub(crate) fn expression_scope_id<'expr>(
+        &self,
+        expression: impl Into<ast::ExpressionRef<'expr>>,
+    ) -> FileScopeId {
+        self.scopes_by_expression[&NodeKey::from_node(expression.into())]
     }
 
     /// Returns the [`Scope`] of the `expression`'s enclosing scope.
     #[allow(unused)]
-    pub(crate) fn expression_scope(&self, expression: &ast::Expr) -> &Scope {
+    pub(crate) fn expression_scope<'expr>(
+        &self,
+        expression: impl Into<ast::ExpressionRef<'expr>>,
+    ) -> &Scope {
         &self.scopes[self.expression_scope_id(expression)]
     }
 
@@ -152,7 +160,14 @@ impl SemanticIndex {
     }
 
     pub(crate) fn scope_node(&self, scope_id: FileScopeId) -> NodeWithScopeId {
-        self.scope_nodes[scope_id]
+        self.nodes_by_scope[scope_id]
+    }
+
+    pub(crate) fn definition_scope(
+        &self,
+        node_with_scope: impl Into<NodeWithScopeKey>,
+    ) -> FileScopeId {
+        self.scopes_by_node[&node_with_scope.into()]
     }
 }
 
@@ -248,29 +263,43 @@ impl<'a> Iterator for ChildrenIter<'a> {
     }
 }
 
+impl FusedIterator for ChildrenIter<'_> {}
+
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) enum NodeWithScopeId {
     Module,
-    Class(AstId<ScopeClassId>),
-    ClassTypeParams(AstId<ScopeClassId>),
-    Function(AstId<ScopeFunctionId>),
-    FunctionTypeParams(AstId<ScopeFunctionId>),
+    Class(AstId<ScopedClassId>),
+    ClassTypeParams(AstId<ScopedClassId>),
+    Function(AstId<ScopedFunctionId>),
+    FunctionTypeParams(AstId<ScopedFunctionId>),
 }
 
-impl NodeWithScopeId {
-    fn scope_kind(self) -> ScopeKind {
-        match self {
-            NodeWithScopeId::Module => ScopeKind::Module,
-            NodeWithScopeId::Class(_) => ScopeKind::Class,
-            NodeWithScopeId::Function(_) => ScopeKind::Function,
-            NodeWithScopeId::ClassTypeParams(_) | NodeWithScopeId::FunctionTypeParams(_) => {
-                ScopeKind::Annotation
-            }
-        }
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+pub(crate) struct NodeWithScopeKey(NodeKey);
+
+impl From<&ast::StmtClassDef> for NodeWithScopeKey {
+    fn from(node: &ast::StmtClassDef) -> Self {
+        Self(NodeKey::from_node(node))
     }
 }
 
-impl FusedIterator for ChildrenIter<'_> {}
+impl From<&ast::StmtFunctionDef> for NodeWithScopeKey {
+    fn from(value: &ast::StmtFunctionDef) -> Self {
+        Self(NodeKey::from_node(value))
+    }
+}
+
+impl From<&ast::TypeParams> for NodeWithScopeKey {
+    fn from(value: &ast::TypeParams) -> Self {
+        Self(NodeKey::from_node(value))
+    }
+}
+
+impl From<&ast::ModModule> for NodeWithScopeKey {
+    fn from(value: &ast::ModModule) -> Self {
+        Self(NodeKey::from_node(value))
+    }
+}
 
 #[cfg(test)]
 mod tests {

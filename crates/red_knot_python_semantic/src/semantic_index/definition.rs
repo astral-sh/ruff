@@ -1,17 +1,16 @@
 use crate::semantic_index::ast_ids::{
-    ScopeAnnotatedAssignmentId, ScopeAssignmentId, ScopeClassId, ScopeFunctionId,
-    ScopeImportFromId, ScopeImportId, ScopeNamedExprId,
+    ScopedClassId, ScopedExpressionId, ScopedFunctionId, ScopedStatementId,
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Definition {
     Import(ImportDefinition),
     ImportFrom(ImportFromDefinition),
-    ClassDef(ScopeClassId),
-    FunctionDef(ScopeFunctionId),
-    Assignment(ScopeAssignmentId),
-    AnnotatedAssignment(ScopeAnnotatedAssignmentId),
-    NamedExpr(ScopeNamedExprId),
+    ClassDef(ScopedClassId),
+    FunctionDef(ScopedFunctionId),
+    Assignment(ScopedStatementId),
+    AnnotatedAssignment(ScopedStatementId),
+    NamedExpr(ScopedExpressionId),
     /// represents the implicit initial definition of every name as "unbound"
     Unbound,
     // TODO with statements, except handlers, function args...
@@ -29,39 +28,21 @@ impl From<ImportFromDefinition> for Definition {
     }
 }
 
-impl From<ScopeClassId> for Definition {
-    fn from(value: ScopeClassId) -> Self {
+impl From<ScopedClassId> for Definition {
+    fn from(value: ScopedClassId) -> Self {
         Self::ClassDef(value)
     }
 }
 
-impl From<ScopeFunctionId> for Definition {
-    fn from(value: ScopeFunctionId) -> Self {
+impl From<ScopedFunctionId> for Definition {
+    fn from(value: ScopedFunctionId) -> Self {
         Self::FunctionDef(value)
-    }
-}
-
-impl From<ScopeAssignmentId> for Definition {
-    fn from(value: ScopeAssignmentId) -> Self {
-        Self::Assignment(value)
-    }
-}
-
-impl From<ScopeAnnotatedAssignmentId> for Definition {
-    fn from(value: ScopeAnnotatedAssignmentId) -> Self {
-        Self::AnnotatedAssignment(value)
-    }
-}
-
-impl From<ScopeNamedExprId> for Definition {
-    fn from(value: ScopeNamedExprId) -> Self {
-        Self::NamedExpr(value)
     }
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub struct ImportDefinition {
-    pub(crate) import_id: ScopeImportId,
+    pub(crate) import_id: ScopedStatementId,
 
     /// Index into [`ruff_python_ast::StmtImport::names`].
     pub(crate) alias: u32,
@@ -69,7 +50,7 @@ pub struct ImportDefinition {
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub struct ImportFromDefinition {
-    pub(crate) import_id: ScopeImportFromId,
+    pub(crate) import_id: ScopedStatementId,
 
     /// Index into [`ruff_python_ast::StmtImportFrom::names`].
     pub(crate) name: u32,

@@ -10,7 +10,7 @@ use crate::Db;
 /// Reads the content of file.
 #[salsa::tracked]
 pub fn source_text(db: &dyn Db, file: VfsFile) -> SourceText {
-    let _ = tracing::trace_span!("source_text", file = ?file.debug(db)).enter();
+    let _span = tracing::trace_span!("source_text", ?file).entered();
 
     let content = file.read(db);
 
@@ -22,7 +22,7 @@ pub fn source_text(db: &dyn Db, file: VfsFile) -> SourceText {
 /// Computes the [`LineIndex`] for `file`.
 #[salsa::tracked]
 pub fn line_index(db: &dyn Db, file: VfsFile) -> LineIndex {
-    let _ = tracing::trace_span!("line_index", file = ?file.debug(db)).enter();
+    let _span = tracing::trace_span!("line_index", file = ?file.debug(db)).entered();
 
     let source = source_text(db, file);
 
