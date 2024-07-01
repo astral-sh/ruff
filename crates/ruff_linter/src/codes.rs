@@ -91,6 +91,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pycodestyle, "E202") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::WhitespaceBeforeCloseBracket),
         #[allow(deprecated)]
         (Pycodestyle, "E203") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::WhitespaceBeforePunctuation),
+        (Pycodestyle, "E204") => (RuleGroup::Preview, rules::pycodestyle::rules::WhitespaceAfterDecorator),
         #[allow(deprecated)]
         (Pycodestyle, "E211") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::WhitespaceBeforeParameters),
         #[allow(deprecated)]

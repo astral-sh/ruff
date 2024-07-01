@@ -44,3 +44,4 @@ mod tab_indentation;
 mod too_many_newlines_at_end_of_file;
 mod trailing_whitespace;
 mod type_comparison;
+mod whitespace_after_decorator;
