@@ -48,11 +48,7 @@ impl<'a> SemanticIndexBuilder<'a> {
         };
 
         builder.push_scope_with_parent(
-            NodeWithScope::new(
-                parsed.syntax(),
-                NodeWithScopeId::Module,
-                Name::new_static("<module>"),
-            ),
+            &NodeWithScope::new(parsed.syntax(), NodeWithScopeId::Module),
             None,
             None,
             None,
@@ -70,7 +66,7 @@ impl<'a> SemanticIndexBuilder<'a> {
 
     fn push_scope(
         &mut self,
-        node: NodeWithScope,
+        node: &NodeWithScope,
         defining_symbol: Option<FileSymbolId>,
         definition: Option<Definition>,
     ) {
@@ -80,7 +76,7 @@ impl<'a> SemanticIndexBuilder<'a> {
 
     fn push_scope_with_parent(
         &mut self,
-        node: NodeWithScope,
+        node: &NodeWithScope,
         defining_symbol: Option<FileSymbolId>,
         definition: Option<Definition>,
         parent: Option<FileScopeId>,
@@ -91,7 +87,6 @@ impl<'a> SemanticIndexBuilder<'a> {
         let scope_kind = node.scope_kind();
 
         let scope = Scope {
-            name: node.name,
             parent,
             defining_symbol,
             definition,
@@ -154,7 +149,6 @@ impl<'a> SemanticIndexBuilder<'a> {
 
     fn with_type_params(
         &mut self,
-        name: Name,
         with_params: &WithTypeParams,
         defining_symbol: FileSymbolId,
         nested: impl FnOnce(&mut Self) -> FileScopeId,
@@ -168,7 +162,7 @@ impl<'a> SemanticIndexBuilder<'a> {
             };
 
             self.push_scope(
-                NodeWithScope::new(type_params, type_params_id, name),
+                &NodeWithScope::new(type_params, type_params_id),
                 Some(defining_symbol),
                 Some(with_params.definition()),
             );
@@ -254,7 +248,6 @@ impl Visitor<'_> for SemanticIndexBuilder<'_> {
                 );
 
                 self.with_type_params(
-                    name.clone(),
                     &WithTypeParams::FunctionDef {
                         node: function_def,
                         id: AstId::new(scope, function_id),
@@ -267,10 +260,9 @@ impl Visitor<'_> for SemanticIndexBuilder<'_> {
                         }
 
                         builder.push_scope(
-                            NodeWithScope::new(
+                            &NodeWithScope::new(
                                 function_def,
                                 NodeWithScopeId::Function(AstId::new(scope, function_id)),
-                                name.clone(),
                             ),
                             Some(symbol),
                             Some(definition),
@@ -294,7 +286,6 @@ impl Visitor<'_> for SemanticIndexBuilder<'_> {
                     self.add_or_update_symbol_with_definition(name.clone(), definition),
                 );
                 self.with_type_params(
-                    name.clone(),
                     &WithTypeParams::ClassDef {
                         node: class,
                         id: AstId::new(scope, class_id),
@@ -306,10 +297,9 @@ impl Visitor<'_> for SemanticIndexBuilder<'_> {
                         }
 
                         builder.push_scope(
-                            NodeWithScope::new(
+                            &NodeWithScope::new(
                                 class,
                                 NodeWithScopeId::Class(AstId::new(scope, class_id)),
-                                name.clone(),
                             ),
                             Some(id),
                             Some(definition),
@@ -471,15 +461,13 @@ impl<'a> WithTypeParams<'a> {
 struct NodeWithScope {
     id: NodeWithScopeId,
     key: NodeWithScopeKey,
-    name: Name,
 }
 
 impl NodeWithScope {
-    fn new(node: impl Into<NodeWithScopeKey>, id: NodeWithScopeId, name: Name) -> Self {
+    fn new(node: impl Into<NodeWithScopeKey>, id: NodeWithScopeId) -> Self {
         Self {
             id,
             key: node.into(),
-            name,
         }
     }
 
